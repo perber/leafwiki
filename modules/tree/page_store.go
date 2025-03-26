@@ -194,7 +194,7 @@ func (f *PageStore) UpdatePage(entry *PageNode, slug string, content string) err
 	}
 
 	// Update the file content
-	file, err := os.Open(filePath)
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("could not open file: %v", err)
 	}
@@ -260,9 +260,20 @@ func (f *PageStore) MovePage(entry *PageNode, parentEntry *PageNode) error {
 	// now we have created the folder, we can move the entry to the new parent
 	currentPath := path.Join(f.storageDir, GeneratePathFromPageNode(entry))
 
-	// Move the folder or file from currentPath to the parentPath
-	if err := os.Rename(currentPath, path.Join(parentPath)); err != nil {
-		return fmt.Errorf("could not move folder or file: %v", err)
+	// Check if the entry is a file
+	src := currentPath
+	dest := parentPath
+	if _, err := os.Stat(currentPath + ".md"); err == nil {
+		src = currentPath + ".md"
+		dest = path.Join(parentPath, entry.Slug+".md")
+	} else {
+		src = currentPath
+		dest = path.Join(parentPath, entry.Slug)
+	}
+
+	// Move the file to the parentPath
+	if err := os.Rename(src, dest); err != nil {
+		return fmt.Errorf("could not move file: %v", err)
 	}
 
 	return nil
