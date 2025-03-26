@@ -45,7 +45,7 @@ func (f *FileSystemTreeService) LoadTree(filename string) (*TreeEntry, error) {
 		return nil, fmt.Errorf("could not read tree file")
 	}
 
-	var tree *TreeEntry
+	tree := &TreeEntry{}
 	if err := json.Unmarshal(data, tree); err != nil {
 		return nil, fmt.Errorf("could not unmarshal tree data")
 	}
