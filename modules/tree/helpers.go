@@ -12,10 +12,10 @@ func GenerateUniqueID() (string, error) {
 	return id, nil
 }
 
-func GeneratePathFromTreeEntry(entry *TreeEntry) string {
+func GeneratePathFromPageNode(entry *PageNode) string {
 	path := ""
 	if entry.Parent != nil {
-		path = GeneratePathFromTreeEntry(entry.Parent) + "/" + entry.Slug
+		path = GeneratePathFromPageNode(entry.Parent) + "/" + entry.Slug
 	} else {
 		path = entry.Slug
 	}

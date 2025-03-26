@@ -6,19 +6,19 @@ import (
 	"strings"
 )
 
-// TreeEntry represents a single entry in the tree
+// PageNode represents a single node in the tree
 // It has an ID, a parent, a path, and children
 // The ID is a unique identifier for the entry
-type TreeEntry struct {
-	ID       string       `json:"id"`       // Unique identifier for the entry
-	Title    string       `json:"title"`    // Title is the name of the entry
-	Slug     string       `json:"slug"`     // Slug is the path of the entry
-	Children []*TreeEntry `json:"children"` // Children are the children of the entry
-	Parent   *TreeEntry   `json:"-"`
+type PageNode struct {
+	ID       string      `json:"id"`       // Unique identifier for the entry
+	Title    string      `json:"title"`    // Title is the name of the entry
+	Slug     string      `json:"slug"`     // Slug is the path of the entry
+	Children []*PageNode `json:"children"` // Children are the children of the entry
+	Parent   *PageNode   `json:"-"`
 }
 
-type PageEntry struct {
-	*TreeEntry
+type Page struct {
+	*PageNode
 	Content string `json:"content"`
 }
 
@@ -27,8 +27,8 @@ type PageEntry struct {
 type TreeService struct {
 	storageDir   string
 	treeFilename string
-	tree         *TreeEntry
-	fsService    *FileSystemTreeService
+	tree         *PageNode
+	store        *PageStore
 }
 
 // NewTreeService creates a new TreeService
@@ -37,7 +37,7 @@ func NewTreeService(storageDir string) *TreeService {
 		storageDir:   storageDir,
 		treeFilename: "tree.json",
 		tree:         nil,
-		fsService:    NewFileSystemTreeService(storageDir),
+		store:        NewPageStore(storageDir),
 	}
 }
 
@@ -46,17 +46,17 @@ func NewTreeService(storageDir string) *TreeService {
 func (t *TreeService) LoadTree() error {
 	// Load the tree from the storage directory
 	var err error
-	t.tree, err = t.fsService.LoadTree(t.treeFilename)
+	t.tree, err = t.store.LoadTree(t.treeFilename)
 	return err
 }
 
 func (t *TreeService) SaveTree() error {
 	// Save the tree to the storage directory
-	return t.fsService.SaveTree(t.treeFilename, t.tree)
+	return t.store.SaveTree(t.treeFilename, t.tree)
 }
 
-// AddPageEntry adds a new leaf to the tree
-func (t *TreeService) AddPageEntry(parentID *string, title string, slug string) error {
+// Create Page adds a new page to the tree
+func (t *TreeService) CreatePage(parentID *string, title string, slug string) error {
 	if t.tree == nil {
 		return errors.New("tree not loaded")
 	}
@@ -68,107 +68,107 @@ func (t *TreeService) AddPageEntry(parentID *string, title string, slug string) 
 			return errors.New("root not found")
 		}
 
-		// Generate a unique ID for the new leaf
+		// Generate a unique ID for the new page
 		id, err := GenerateUniqueID()
 		if err != nil {
 			return fmt.Errorf("could not generate unique ID: %v", err)
 		}
 
-		entry := &TreeEntry{
+		entry := &PageNode{
 			ID:       id,
 			Title:    title,
 			Parent:   root,
 			Slug:     slug,
-			Children: []*TreeEntry{},
+			Children: []*PageNode{},
 		}
 
-		if err := t.fsService.CreatePageEntry(root, entry); err != nil {
+		if err := t.store.CreatePage(root, entry); err != nil {
 			return fmt.Errorf("could not create page entry: %v", err)
 		}
 
 		root.Children = append(root.Children, entry)
 
-		// Store Tree after adding leaf
+		// Store Tree after adding page
 		return t.SaveTree()
 	}
 
-	// Find the parent leaf
-	parent, err := t.FindPageEntryByID(t.tree.Children, *parentID)
+	// Find the parent page
+	parent, err := t.FindPageByID(t.tree.Children, *parentID)
 	if err != nil {
 		return errors.New("parent not found")
 	}
 
-	// Generate a unique ID for the new leaf
+	// Generate a unique ID for the new page
 	id, err := GenerateUniqueID()
 	if err != nil {
 		return fmt.Errorf("could not generate unique ID: %v", err)
 	}
 
-	entry := &TreeEntry{
+	entry := &PageNode{
 		ID:       id,
 		Slug:     slug,
 		Title:    title,
 		Parent:   parent,
-		Children: []*TreeEntry{},
+		Children: []*PageNode{},
 	}
 
-	if err := t.fsService.CreatePageEntry(parent, entry); err != nil {
+	if err := t.store.CreatePage(parent, entry); err != nil {
 		return fmt.Errorf("could not create page entry: %v", err)
 	}
 
-	// Add the new leaf to the parent
+	// Add the new page to the parent
 	parent.Children = append(parent.Children, entry)
 
 	return t.SaveTree()
 }
 
-// FindPageEntryByID finds a leaf in the tree by its ID
-// If the leaf is not found, it returns an error
-func (t *TreeService) FindPageEntryByID(entry []*TreeEntry, id string) (*TreeEntry, error) {
+// FindPageByID finds a page in the tree by its ID
+// If the page is not found, it returns an error
+func (t *TreeService) FindPageByID(entry []*PageNode, id string) (*PageNode, error) {
 	for _, e := range entry {
 		if e.ID == id {
 			return e, nil
 		}
 
 		if e.Children != nil {
-			if leaf, err := t.FindPageEntryByID(e.Children, id); err == nil {
-				return leaf, nil
+			if page, err := t.FindPageByID(e.Children, id); err == nil {
+				return page, nil
 			}
 		}
 	}
 
-	return nil, errors.New("leaf not found")
+	return nil, errors.New("page not found")
 }
 
-// DeletePageEntry deletes a leaf from the tree
-func (t *TreeService) DeletePageEntry(id string, recusive bool) error {
+// DeletePage deletes a page from the tree
+func (t *TreeService) DeletePage(id string, recusive bool) error {
 	if t.tree == nil {
 		return errors.New("tree not loaded")
 	}
 
-	// Find the leaf to delete
-	leaf, err := t.FindPageEntryByID(t.tree.Children, id)
+	// Find the page to delete
+	page, err := t.FindPageByID(t.tree.Children, id)
 	if err != nil {
-		return errors.New("leaf not found")
+		return errors.New("page not found")
 	}
 
-	// Check if leaf has children
-	if len(leaf.Children) > 0 && !recusive {
-		return errors.New("leaf has children")
+	// Check if page has children
+	if len(page.Children) > 0 && !recusive {
+		return errors.New("page has children")
 	}
 
-	// Delete the leaf from the parent
-	parent := leaf.Parent
+	// Delete the page from the parent
+	parent := page.Parent
 	if parent == nil {
 		return errors.New("parent not found")
 	}
 
-	// Delete the leaf from the filesystem
-	if err := t.fsService.DeletePageEntry(leaf); err != nil {
+	// Delete the page from the filesystem
+	if err := t.store.DeletePage(page); err != nil {
 		return fmt.Errorf("could not delete page entry: %v", err)
 	}
 
-	// Remove the leaf from the parent
+	// Remove the page from the parent
 	for i, e := range parent.Children {
 		if e.ID == id {
 			parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
@@ -179,81 +179,79 @@ func (t *TreeService) DeletePageEntry(id string, recusive bool) error {
 	return t.SaveTree()
 }
 
-// UpdatePageEntry updates the title and slug of a leaf
-func (t *TreeService) UpdatePageEntry(id string, title string, slug string, content string) error {
+// UpdatePage updates a page in the tree
+func (t *TreeService) UpdatePage(id string, title string, slug string, content string) error {
 	if t.tree == nil {
 		return errors.New("tree not loaded")
 	}
 
-	// Find the leaf to update
-	leaf, err := t.FindPageEntryByID(t.tree.Children, id)
+	// Find the page to update
+	page, err := t.FindPageByID(t.tree.Children, id)
 	if err != nil {
-		return errors.New("leaf not found")
+		return errors.New("page not found")
 	}
 
 	// Update the entry in the filesystem!
-	if err := t.fsService.UpdatePageEntry(leaf, slug, content); err != nil {
+	if err := t.store.UpdatePage(page, slug, content); err != nil {
 		return fmt.Errorf("could not update page entry: %v", err)
 	}
 
-	// Update the leaf
-	leaf.Title = title
-	leaf.Slug = slug
+	// Update the page
+	page.Title = title
+	page.Slug = slug
 
 	// Save the tree
 	return t.SaveTree()
 }
 
 // GetTree returns the tree
-func (t *TreeService) GetTree() *TreeEntry {
+func (t *TreeService) GetTree() *PageNode {
 	return t.tree
 }
 
-// GetPageEntry returns a leaf by its ID
-func (t *TreeService) GetPageEntry(id string) (*PageEntry, error) {
+// GetPage returns a page by its ID
+func (t *TreeService) GetPage(id string) (*Page, error) {
 	if t.tree == nil {
 		return nil, errors.New("tree not loaded")
 	}
 
-	// Find the leaf
-	leaf, err := t.FindPageEntryByID(t.tree.Children, id)
+	// Find the page
+	page, err := t.FindPageByID(t.tree.Children, id)
 	if err != nil {
-		return nil, errors.New("leaf not found")
+		return nil, errors.New("page not found")
 	}
 
-	// Get the content of the leaf
-	content, err := t.fsService.GetPageContent(leaf)
+	// Get the content of the page
+	content, err := t.store.ReadPageContent(page)
 	if err != nil {
 		return nil, fmt.Errorf("could not get page content: %v", err)
 	}
 
-	page := &PageEntry{
-		TreeEntry: leaf,
-		Content:   content,
-	}
-
-	return page, nil
+	return &Page{
+		PageNode: page,
+		Content:  content,
+	}, nil
 }
 
-// FindPageEntryByPath finds a leaf in the tree by its path
-func (t *TreeService) FindPageEntryByRoutePath(entry []*TreeEntry, routePath string) (*PageEntry, error) {
+// FindPageByPath finds a page in the tree by its path
+func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (*Page, error) {
 	// Split the routePath into parts
 	routePart := strings.Split(routePath, "/")
 	// recursive function to find the entry
-	var findEntry func(entry []*TreeEntry, routePart []string) (*PageEntry, error)
-	findEntry = func(entry []*TreeEntry, routePart []string) (*PageEntry, error) {
+	var findEntry func(entry []*PageNode, routePart []string) (*Page, error)
+	findEntry = func(entry []*PageNode, routePart []string) (*Page, error) {
 		for _, e := range entry {
 			if e.Slug == routePart[0] {
 				if len(routePart) == 1 {
 					// Get the content of the entry
-					content, err := t.fsService.GetPageContent(e)
+					content, err := t.store.ReadPageContent(e)
 					if err != nil {
 						return nil, fmt.Errorf("could not get page content: %v", err)
 					}
 
-					return &PageEntry{
-						TreeEntry: e,
-						Content:   content,
+					return &Page{
+						PageNode: e,
+						Content:  content,
 					}, nil
 				}
 
@@ -268,36 +266,36 @@ func (t *TreeService) FindPageEntryByRoutePath(entry []*TreeEntry, routePath str
 	return findEntry(t.tree.Children, routePart)
 }
 
-// MovePageEntry moves a page to another parent
-func (t *TreeService) MovePageEntry(id string, parentID string) error {
+// MovePage moves a page to another parent
+func (t *TreeService) MovePage(id string, parentID string) error {
 	if t.tree == nil {
 		return errors.New("tree not loaded")
 	}
 
-	// Find the leaf to move
-	leaf, err := t.FindPageEntryByID(t.tree.Children, id)
+	// Find the page to move
+	page, err := t.FindPageByID(t.tree.Children, id)
 	if err != nil {
-		return errors.New("leaf not found")
+		return errors.New("page not found")
 	}
 
 	// Find the new parent
-	newParent, err := t.FindPageEntryByID(t.tree.Children, parentID)
+	newParent, err := t.FindPageByID(t.tree.Children, parentID)
 	if err != nil {
 		return errors.New("new parent not found")
 	}
 
-	if err := t.fsService.MovePageEntry(leaf, newParent); err != nil {
+	if err := t.store.MovePage(page, newParent); err != nil {
 		return fmt.Errorf("could not move page entry: %v", err)
 	}
 
-	// Move the leaf to the new parent
-	// Remove the leaf from the old parent
-	oldParent := leaf.Parent
+	// Move the page to the new parent
+	// Remove the page from the old parent
+	oldParent := page.Parent
 	if oldParent == nil {
 		return errors.New("old parent not found")
 	}
 
-	// Remove the leaf from the old parent
+	// Remove the page from the old parent
 	for i, e := range oldParent.Children {
 		if e.ID == id {
 			oldParent.Children = append(oldParent.Children[:i], oldParent.Children[i+1:]...)
@@ -305,9 +303,9 @@ func (t *TreeService) MovePageEntry(id string, parentID string) error {
 		}
 	}
 
-	// Add the leaf to the new parent
-	newParent.Children = append(newParent.Children, leaf)
-	leaf.Parent = newParent
+	// Add the page to the new parent
+	newParent.Children = append(newParent.Children, page)
+	page.Parent = newParent
 
 	// Save the tree
 	return t.SaveTree()

@@ -10,27 +10,27 @@ import (
 	"strings"
 )
 
-type FileSystemTreeService struct {
+type PageStore struct {
 	storageDir string
 }
 
-func NewFileSystemTreeService(storageDir string) *FileSystemTreeService {
-	return &FileSystemTreeService{
+func NewPageStore(storageDir string) *PageStore {
+	return &PageStore{
 		storageDir: storageDir,
 	}
 }
 
-func (f *FileSystemTreeService) LoadTree(filename string) (*TreeEntry, error) {
+func (f *PageStore) LoadTree(filename string) (*PageNode, error) {
 	fullPath := path.Join(f.storageDir, filename)
 
 	// check if file exists
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		return &TreeEntry{
+		return &PageNode{
 			ID:       "root",
 			Slug:     "root",
 			Title:    "root",
 			Parent:   nil,
-			Children: []*TreeEntry{},
+			Children: []*PageNode{},
 		}, nil
 	}
 
@@ -45,7 +45,7 @@ func (f *FileSystemTreeService) LoadTree(filename string) (*TreeEntry, error) {
 		return nil, fmt.Errorf("could not read tree file")
 	}
 
-	tree := &TreeEntry{}
+	tree := &PageNode{}
 	if err := json.Unmarshal(data, tree); err != nil {
 		return nil, fmt.Errorf("could not unmarshal tree data")
 	}
@@ -56,14 +56,14 @@ func (f *FileSystemTreeService) LoadTree(filename string) (*TreeEntry, error) {
 	return tree, nil
 }
 
-func (f *FileSystemTreeService) assignParentToChildren(parent *TreeEntry) {
+func (f *PageStore) assignParentToChildren(parent *PageNode) {
 	for _, child := range parent.Children {
 		child.Parent = parent
 		f.assignParentToChildren(child)
 	}
 }
 
-func (f *FileSystemTreeService) SaveTree(filename string, tree *TreeEntry) error {
+func (f *PageStore) SaveTree(filename string, tree *PageNode) error {
 	if tree == nil {
 		return errors.New("a tree is required")
 	}
@@ -91,7 +91,7 @@ func (f *FileSystemTreeService) SaveTree(filename string, tree *TreeEntry) error
 	return nil
 }
 
-func (f *FileSystemTreeService) CreatePageEntry(parentEntry *TreeEntry, newEntry *TreeEntry) error {
+func (f *PageStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error {
 	if parentEntry == nil {
 		return errors.New("a parent entry is required")
 	}
@@ -101,7 +101,7 @@ func (f *FileSystemTreeService) CreatePageEntry(parentEntry *TreeEntry, newEntry
 	}
 
 	// Retrieving the path of the parent entry
-	parentPath := path.Join(f.storageDir, GeneratePathFromTreeEntry(parentEntry))
+	parentPath := path.Join(f.storageDir, GeneratePathFromPageNode(parentEntry))
 
 	// So the last entry could be a file
 	filename := parentPath + ".md"
@@ -151,13 +151,13 @@ func (f *FileSystemTreeService) CreatePageEntry(parentEntry *TreeEntry, newEntry
 	return nil
 }
 
-func (f *FileSystemTreeService) DeletePageEntry(entry *TreeEntry) error {
+func (f *PageStore) DeletePage(entry *PageNode) error {
 	if entry == nil {
 		return errors.New("an entry is required")
 	}
 
 	// Retrieving the path of the entry
-	entryPath := path.Join(f.storageDir, GeneratePathFromTreeEntry(entry))
+	entryPath := path.Join(f.storageDir, GeneratePathFromPageNode(entry))
 
 	// Check if the entry is a folder
 	if info, err := os.Stat(entryPath); err == nil && info.IsDir() {
@@ -178,7 +178,7 @@ func (f *FileSystemTreeService) DeletePageEntry(entry *TreeEntry) error {
 	return nil
 }
 
-func (f *FileSystemTreeService) UpdatePageEntry(entry *TreeEntry, slug string, content string) error {
+func (f *PageStore) UpdatePage(entry *PageNode, slug string, content string) error {
 	if entry == nil {
 		return errors.New("an entry is required")
 	}
@@ -206,7 +206,7 @@ func (f *FileSystemTreeService) UpdatePageEntry(entry *TreeEntry, slug string, c
 	// We need to check if the slug has changed
 	if entry.Slug != slug {
 		// Get the old path
-		oldPath := path.Join(f.storageDir, GeneratePathFromTreeEntry(entry))
+		oldPath := path.Join(f.storageDir, GeneratePathFromPageNode(entry))
 		// Split the path
 		parts := strings.Split(oldPath, "/")
 		// Create the new path
@@ -231,8 +231,8 @@ func (f *FileSystemTreeService) UpdatePageEntry(entry *TreeEntry, slug string, c
 	return nil
 }
 
-// MovePageEntry moves a page to a other node
-func (f *FileSystemTreeService) MovePageEntry(entry *TreeEntry, parentEntry *TreeEntry) error {
+// MovePage moves a page to a other node
+func (f *PageStore) MovePage(entry *PageNode, parentEntry *PageNode) error {
 	if entry == nil {
 		return errors.New("an entry is required")
 	}
@@ -242,7 +242,7 @@ func (f *FileSystemTreeService) MovePageEntry(entry *TreeEntry, parentEntry *Tre
 	}
 
 	// Retrieving the path of the entry
-	parentPath := path.Join(f.storageDir, GeneratePathFromTreeEntry(parentEntry))
+	parentPath := path.Join(f.storageDir, GeneratePathFromPageNode(parentEntry))
 
 	// Check if the parent entry is a file - if it is a file, we need to move the file to a folder
 	if _, err := os.Stat(parentPath + ".md"); err == nil {
@@ -258,7 +258,7 @@ func (f *FileSystemTreeService) MovePageEntry(entry *TreeEntry, parentEntry *Tre
 	}
 
 	// now we have created the folder, we can move the entry to the new parent
-	currentPath := path.Join(f.storageDir, GeneratePathFromTreeEntry(entry))
+	currentPath := path.Join(f.storageDir, GeneratePathFromPageNode(entry))
 
 	// Move the folder or file from currentPath to the parentPath
 	if err := os.Rename(currentPath, path.Join(parentPath)); err != nil {
@@ -268,8 +268,8 @@ func (f *FileSystemTreeService) MovePageEntry(entry *TreeEntry, parentEntry *Tre
 	return nil
 }
 
-// GetPageContent returns the content of a page
-func (f *FileSystemTreeService) GetPageContent(entry *TreeEntry) (string, error) {
+// ReadPageContent returns the content of a page
+func (f *PageStore) ReadPageContent(entry *PageNode) (string, error) {
 	if entry == nil {
 		return "", errors.New("an entry is required")
 	}
@@ -298,13 +298,13 @@ func (f *FileSystemTreeService) GetPageContent(entry *TreeEntry) (string, error)
 	return string(content), nil
 }
 
-func (f *FileSystemTreeService) getFilePath(entry *TreeEntry) (string, error) {
+func (f *PageStore) getFilePath(entry *PageNode) (string, error) {
 	if entry == nil {
 		return "", errors.New("an entry is required")
 	}
 
 	// Retrieving the path of the entry
-	entryPath := path.Join(f.storageDir, GeneratePathFromTreeEntry(entry))
+	entryPath := path.Join(f.storageDir, GeneratePathFromPageNode(entry))
 
 	// Check if the entry is a file
 	if _, err := os.Stat(entryPath + ".md"); err == nil {
