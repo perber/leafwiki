@@ -24,7 +24,6 @@ type PageEntry struct {
 
 // TreeService is our main component for handling tree operations
 // We use this service to create pages, delete pages, update pages, etc.
-
 type TreeService struct {
 	storageDir   string
 	treeFilename string
@@ -46,23 +45,14 @@ func NewTreeService(storageDir string) *TreeService {
 // If the tree does not exist, it creates a new tree
 func (t *TreeService) LoadTree() error {
 	// Load the tree from the storage directory
-	// If the tree does not exist, create a new tree
-
-	t.tree = &TreeEntry{
-		ID:       "root",
-		Slug:     "root",
-		Title:    "root",
-		Parent:   nil,
-		Children: []*TreeEntry{},
-	}
-
-	return nil
+	var err error
+	t.tree, err = t.fsService.LoadTree(t.treeFilename)
+	return err
 }
 
 func (t *TreeService) SaveTree() error {
 	// Save the tree to the storage directory
-
-	return nil
+	return t.fsService.SaveTree(t.treeFilename, t.tree)
 }
 
 // AddPageEntry adds a new leaf to the tree

@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,77 @@ func NewFileSystemTreeService(storageDir string) *FileSystemTreeService {
 	return &FileSystemTreeService{
 		storageDir: storageDir,
 	}
+}
+
+func (f *FileSystemTreeService) LoadTree(filename string) (*TreeEntry, error) {
+	fullPath := path.Join(f.storageDir, filename)
+
+	// check if file exists
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		return &TreeEntry{
+			ID:       "root",
+			Slug:     "root",
+			Title:    "root",
+			Parent:   nil,
+			Children: []*TreeEntry{},
+		}, nil
+	}
+
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open tree file")
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not read tree file")
+	}
+
+	var tree *TreeEntry
+	if err := json.Unmarshal(data, tree); err != nil {
+		return nil, fmt.Errorf("could not unmarshal tree data")
+	}
+
+	// assigns parent to children
+	f.assignParentToChildren(tree)
+
+	return tree, nil
+}
+
+func (f *FileSystemTreeService) assignParentToChildren(parent *TreeEntry) {
+	for _, child := range parent.Children {
+		child.Parent = parent
+		f.assignParentToChildren(child)
+	}
+}
+
+func (f *FileSystemTreeService) SaveTree(filename string, tree *TreeEntry) error {
+	if tree == nil {
+		return errors.New("a tree is required")
+	}
+
+	fullPath := path.Join(f.storageDir, filename)
+
+	// Create the file
+	file, err := os.Create(fullPath)
+	if err != nil {
+		return fmt.Errorf("could not create file: %v", err)
+	}
+
+	defer file.Close()
+
+	// Write the tree to the file
+	data, err := json.Marshal(tree)
+	if err != nil {
+		return fmt.Errorf("could not marshal tree: %v", err)
+	}
+
+	if _, err := file.Write(data); err != nil {
+		return fmt.Errorf("could not write to file: %v", err)
+	}
+
+	return nil
 }
 
 func (f *FileSystemTreeService) CreatePageEntry(parentEntry *TreeEntry, newEntry *TreeEntry) error {
