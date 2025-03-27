@@ -56,22 +56,22 @@ func (t *TreeService) SaveTree() error {
 }
 
 // Create Page adds a new page to the tree
-func (t *TreeService) CreatePage(parentID *string, title string, slug string) error {
+func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*string, error) {
 	if t.tree == nil {
-		return errors.New("tree not loaded")
+		return nil, errors.New("tree not loaded")
 	}
 
 	if parentID == nil {
 		// The entry needs to be added to the root
 		root := t.tree
 		if root == nil {
-			return errors.New("root not found")
+			return nil, errors.New("root not found")
 		}
 
 		// Generate a unique ID for the new page
 		id, err := GenerateUniqueID()
 		if err != nil {
-			return fmt.Errorf("could not generate unique ID: %v", err)
+			return nil, fmt.Errorf("could not generate unique ID: %v", err)
 		}
 
 		entry := &PageNode{
@@ -83,25 +83,28 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) er
 		}
 
 		if err := t.store.CreatePage(root, entry); err != nil {
-			return fmt.Errorf("could not create page entry: %v", err)
+			return nil, fmt.Errorf("could not create page entry: %v", err)
 		}
 
 		root.Children = append(root.Children, entry)
 
 		// Store Tree after adding page
-		return t.SaveTree()
+		if err := t.SaveTree(); err != nil {
+			return nil, fmt.Errorf("could not save tree: %v", err)
+		}
+		return &entry.ID, nil
 	}
 
 	// Find the parent page
 	parent, err := t.FindPageByID(t.tree.Children, *parentID)
 	if err != nil {
-		return errors.New("parent not found")
+		return nil, errors.New("parent not found")
 	}
 
 	// Generate a unique ID for the new page
 	id, err := GenerateUniqueID()
 	if err != nil {
-		return fmt.Errorf("could not generate unique ID: %v", err)
+		return nil, fmt.Errorf("could not generate unique ID: %v", err)
 	}
 
 	entry := &PageNode{
@@ -113,13 +116,17 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) er
 	}
 
 	if err := t.store.CreatePage(parent, entry); err != nil {
-		return fmt.Errorf("could not create page entry: %v", err)
+		return nil, fmt.Errorf("could not create page entry: %v", err)
 	}
 
 	// Add the new page to the parent
 	parent.Children = append(parent.Children, entry)
 
-	return t.SaveTree()
+	if err := t.SaveTree(); err != nil {
+		return nil, fmt.Errorf("could not save tree: %v", err)
+	}
+
+	return &entry.ID, nil
 }
 
 // FindPageByID finds a page in the tree by its ID

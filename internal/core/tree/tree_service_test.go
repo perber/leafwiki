@@ -88,7 +88,7 @@ func TestTreeService_CreatePage_RootLevel(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	err := service.CreatePage(nil, "Welcome", "welcome")
+	_, err := service.CreatePage(nil, "Welcome", "welcome")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestTreeService_CreatePage_Nested(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Zuerst einen Parent anlegen
-	err := service.CreatePage(nil, "Docs", "docs")
+	_, err := service.CreatePage(nil, "Docs", "docs")
 	if err != nil {
 		t.Fatalf("Failed to create parent page: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestTreeService_CreatePage_Nested(t *testing.T) {
 	parent := service.GetTree().Children[0]
 
 	// Jetzt Subpage erstellen
-	err = service.CreatePage(&parent.ID, "Getting Started", "getting-started")
+	_, err = service.CreatePage(&parent.ID, "Getting Started", "getting-started")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestTreeService_CreatePage_InvalidParent(t *testing.T) {
 	_ = service.LoadTree()
 
 	invalidID := "does-not-exist"
-	err := service.CreatePage(&invalidID, "Broken", "broken")
+	_, err := service.CreatePage(&invalidID, "Broken", "broken")
 	if err == nil {
 		t.Errorf("Expected error for invalid parent ID, got none")
 	}
@@ -163,7 +163,7 @@ func TestTreeService_UpdatePage_ContentAndSlug(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Seite anlegen
-	err := service.CreatePage(nil, "Docs", "docs")
+	_, err := service.CreatePage(nil, "Docs", "docs")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestTreeService_DeletePage_Success(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Seite erstellen
-	err := service.CreatePage(nil, "DeleteMe", "delete-me")
+	_, err := service.CreatePage(nil, "DeleteMe", "delete-me")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -262,13 +262,13 @@ func TestTreeService_DeletePage_HasChildrenWithoutRecursive(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Parent + Child
-	err := service.CreatePage(nil, "Parent", "parent")
+	_, err := service.CreatePage(nil, "Parent", "parent")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	parent := service.GetTree().Children[0]
 
-	err = service.CreatePage(&parent.ID, "Child", "child")
+	_, err = service.CreatePage(&parent.ID, "Child", "child")
 	if err != nil {
 		t.Fatalf("CreatePage (child) failed: %v", err)
 	}
@@ -297,13 +297,13 @@ func TestTreeService_DeletePage_Recursive(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Parent → Child
-	err := service.CreatePage(nil, "Parent", "parent")
+	_, err := service.CreatePage(nil, "Parent", "parent")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	parent := service.GetTree().Children[0]
 
-	err = service.CreatePage(&parent.ID, "Child", "child")
+	_, err = service.CreatePage(&parent.ID, "Child", "child")
 	if err != nil {
 		t.Fatalf("CreatePage (child) failed: %v", err)
 	}
@@ -326,11 +326,11 @@ func TestTreeService_MovePage_FileToFolder(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Create root → a, root → b
-	err := service.CreatePage(nil, "A", "a")
+	_, err := service.CreatePage(nil, "A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
-	err = service.CreatePage(nil, "B", "b")
+	_, err = service.CreatePage(nil, "B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
@@ -361,7 +361,7 @@ func TestTreeService_MovePage_NonexistentPage(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Create only one page
-	err := service.CreatePage(nil, "Target", "target")
+	_, err := service.CreatePage(nil, "Target", "target")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -379,7 +379,7 @@ func TestTreeService_MovePage_NonexistentTarget(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	err := service.CreatePage(nil, "Source", "source")
+	_, err := service.CreatePage(nil, "Source", "source")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -396,7 +396,7 @@ func TestTreeService_MovePage_SelfAsParent(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	err := service.CreatePage(nil, "Loop", "loop")
+	_, err := service.CreatePage(nil, "Loop", "loop")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
