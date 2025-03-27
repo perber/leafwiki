@@ -8,6 +8,7 @@ import (
 
 type Wiki struct {
 	tree *tree.TreeService
+	slug *tree.SlugService
 }
 
 func NewWiki(storageDir string) (*Wiki, error) {
@@ -19,12 +20,11 @@ func NewWiki(storageDir string) (*Wiki, error) {
 
 	return &Wiki{
 		tree: treeService,
+		slug: tree.NewSlugService(),
 	}, nil
 }
 
 func (w *Wiki) CreatePage(parentID *string, title string) (*tree.Page, error) {
-	slugService := tree.NewSlugService(w.tree.GetTree())
-
 	var parent *tree.PageNode
 	if parentID == nil {
 		parent = w.tree.GetTree()
@@ -36,7 +36,7 @@ func (w *Wiki) CreatePage(parentID *string, title string) (*tree.Page, error) {
 		}
 	}
 
-	slug := slugService.GenerateUniqueSlug(parent, title)
+	slug := w.slug.GenerateUniqueSlug(parent, title)
 
 	if err := w.tree.CreatePage(parentID, title, slug); err != nil {
 		return nil, err
@@ -79,6 +79,5 @@ func (w *Wiki) SuggestSlug(parentID string, title string) (string, error) {
 		return "", fmt.Errorf("parent not found: %w", err)
 	}
 
-	slugService := tree.NewSlugService(w.tree.GetTree())
-	return slugService.GenerateUniqueSlug(parent, title), nil
+	return w.slug.GenerateUniqueSlug(parent, title), nil
 }
