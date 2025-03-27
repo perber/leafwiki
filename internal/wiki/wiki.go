@@ -38,11 +38,12 @@ func (w *Wiki) CreatePage(parentID *string, title string) (*tree.Page, error) {
 
 	slug := w.slug.GenerateUniqueSlug(parent, title)
 
-	if err := w.tree.CreatePage(parentID, title, slug); err != nil {
+	id, err := w.tree.CreatePage(parentID, title, slug)
+	if err != nil {
 		return nil, err
 	}
 
-	created, err := w.tree.FindPageByID(w.tree.GetTree().Children, slug)
+	created, err := w.tree.FindPageByID(w.tree.GetTree().Children, *id)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +75,12 @@ func (w *Wiki) FindByPath(route string) (*tree.Page, error) {
 }
 
 func (w *Wiki) SuggestSlug(parentID string, title string) (string, error) {
+	// if no parentID is set or it's the root page
+	// We don't need to look for a page id
+	if parentID == "" || parentID == "root" {
+		return w.slug.GenerateUniqueSlug(w.tree.GetTree(), title), nil
+	}
+
 	parent, err := w.tree.FindPageByID(w.tree.GetTree().Children, parentID)
 	if err != nil {
 		return "", fmt.Errorf("parent not found: %w", err)
