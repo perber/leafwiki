@@ -9,7 +9,7 @@ func TestGenerateUniqueSlug_NoConflict(t *testing.T) {
 		Children: []*PageNode{},
 	}
 
-	s := NewSlugService(nil)
+	s := NewSlugService()
 	result := s.GenerateUniqueSlug(parent, "My Page")
 
 	if result != "my-page" {
@@ -24,7 +24,7 @@ func TestGenerateUniqueSlug_WithConflict(t *testing.T) {
 		},
 	}
 
-	s := NewSlugService(nil)
+	s := NewSlugService()
 	result := s.GenerateUniqueSlug(parent, "My Page")
 
 	if result != "my-page-1" {
@@ -41,7 +41,7 @@ func TestGenerateUniqueSlug_MultipleConflicts(t *testing.T) {
 		},
 	}
 
-	s := NewSlugService(nil)
+	s := NewSlugService()
 	result := s.GenerateUniqueSlug(parent, "My Page")
 
 	if result != "my-page-3" {
@@ -52,7 +52,7 @@ func TestGenerateUniqueSlug_MultipleConflicts(t *testing.T) {
 func TestGenerateUniqueSlug_SpecialCharacters(t *testing.T) {
 	parent := &PageNode{}
 
-	s := NewSlugService(nil)
+	s := NewSlugService()
 	result := s.GenerateUniqueSlug(parent, "Äpfel & Bäume!")
 
 	if result != "apfel-and-baume" {

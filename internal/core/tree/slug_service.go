@@ -9,7 +9,7 @@ import (
 type SlugService struct {
 }
 
-func NewSlugService(root *PageNode) *SlugService {
+func NewSlugService() *SlugService {
 	return &SlugService{}
 }
 
