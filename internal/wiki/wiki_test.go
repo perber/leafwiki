@@ -16,7 +16,7 @@ func setupTestWiki(t *testing.T) *Wiki {
 func TestWiki_CreatePage_Root(t *testing.T) {
 	w := setupTestWiki(t)
 
-	page, err := w.CreatePage(nil, "Home")
+	page, err := w.CreatePage(nil, "Home", "home")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -28,9 +28,9 @@ func TestWiki_CreatePage_Root(t *testing.T) {
 
 func TestWiki_CreatePage_WithParent(t *testing.T) {
 	w := setupTestWiki(t)
-	rootPage, _ := w.CreatePage(nil, "Docs")
+	rootPage, _ := w.CreatePage(nil, "Docs", "docs")
 
-	page, err := w.CreatePage(&rootPage.ID, "API")
+	page, err := w.CreatePage(&rootPage.ID, "API", "api")
 	if err != nil {
 		t.Fatalf("CreatePage with parent failed: %v", err)
 	}
@@ -40,10 +40,20 @@ func TestWiki_CreatePage_WithParent(t *testing.T) {
 	}
 }
 
+func TestWiki_CreatePage_PageExists(t *testing.T) {
+	w := setupTestWiki(t)
+	_, _ = w.CreatePage(nil, "Duplicate", "duplicate")
+
+	_, err := w.CreatePage(nil, "Duplicate", "duplicate")
+	if err == nil {
+		t.Error("Expected error for duplicate page, got none")
+	}
+}
+
 func TestWiki_CreatePage_InvalidParent(t *testing.T) {
 	w := setupTestWiki(t)
 	invalidID := "not-real"
-	_, err := w.CreatePage(&invalidID, "Broken")
+	_, err := w.CreatePage(&invalidID, "Broken", "broken")
 	if err == nil {
 		t.Error("Expected error with invalid parent ID, got none")
 	}
@@ -51,7 +61,7 @@ func TestWiki_CreatePage_InvalidParent(t *testing.T) {
 
 func TestWiki_GetPage_ValidID(t *testing.T) {
 	w := setupTestWiki(t)
-	page, _ := w.CreatePage(nil, "ReadMe")
+	page, _ := w.CreatePage(nil, "ReadMe", "readme")
 
 	found, err := w.GetPage(page.ID)
 	if err != nil {
@@ -73,8 +83,8 @@ func TestWiki_GetPage_InvalidID(t *testing.T) {
 
 func TestWiki_MovePage_Valid(t *testing.T) {
 	w := setupTestWiki(t)
-	parent, _ := w.CreatePage(nil, "Projects")
-	child, _ := w.CreatePage(nil, "Old")
+	parent, _ := w.CreatePage(nil, "Projects", "projects")
+	child, _ := w.CreatePage(nil, "Old", "old")
 
 	err := w.MovePage(child.ID, parent.ID)
 	if err != nil {
@@ -84,7 +94,7 @@ func TestWiki_MovePage_Valid(t *testing.T) {
 
 func TestWiki_DeletePage_Simple(t *testing.T) {
 	w := setupTestWiki(t)
-	page, _ := w.CreatePage(nil, "Trash")
+	page, _ := w.CreatePage(nil, "Trash", "trash")
 
 	err := w.DeletePage(page.ID, false)
 	if err != nil {
@@ -94,8 +104,8 @@ func TestWiki_DeletePage_Simple(t *testing.T) {
 
 func TestWiki_DeletePage_WithChildren(t *testing.T) {
 	w := setupTestWiki(t)
-	parent, _ := w.CreatePage(nil, "Parent")
-	_, _ = w.CreatePage(&parent.ID, "Child")
+	parent, _ := w.CreatePage(nil, "Parent", "parent")
+	_, _ = w.CreatePage(&parent.ID, "Child", "child")
 
 	err := w.DeletePage(parent.ID, false)
 	if err == nil {
@@ -105,8 +115,8 @@ func TestWiki_DeletePage_WithChildren(t *testing.T) {
 
 func TestWiki_DeletePage_Recursive(t *testing.T) {
 	w := setupTestWiki(t)
-	parent, _ := w.CreatePage(nil, "Parent")
-	_, _ = w.CreatePage(&parent.ID, "Child")
+	parent, _ := w.CreatePage(nil, "Parent", "parent")
+	_, _ = w.CreatePage(&parent.ID, "Child", "child")
 
 	err := w.DeletePage(parent.ID, true)
 	if err != nil {
@@ -116,7 +126,7 @@ func TestWiki_DeletePage_Recursive(t *testing.T) {
 
 func TestWiki_UpdatePage(t *testing.T) {
 	w := setupTestWiki(t)
-	page, _ := w.CreatePage(nil, "Draft")
+	page, _ := w.CreatePage(nil, "Draft", "draft")
 
 	page, err := w.UpdatePage(page.ID, "Final", "final", "# Updated")
 	if err != nil {
@@ -143,7 +153,7 @@ func TestWiki_SuggestSlug_Unique(t *testing.T) {
 func TestWiki_SuggestSlug_Conflict(t *testing.T) {
 	w := setupTestWiki(t)
 	root := w.GetTree()
-	_, err := w.CreatePage(nil, "My Page")
+	_, err := w.CreatePage(nil, "My Page", "my-page")
 
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
@@ -166,14 +176,14 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	}
 
 	// Erstelle tiefere Struktur: root -> architecture -> backend
-	_, err = wiki.CreatePage(nil, "Architecture")
+	_, err = wiki.CreatePage(nil, "Architecture", "architecture")
 	if err != nil {
 		t.Fatalf("Failed to create 'Architecture': %v", err)
 	}
 	root := wiki.GetTree()
 	arch := root.Children[0]
 
-	_, err = wiki.CreatePage(&arch.ID, "Backend")
+	_, err = wiki.CreatePage(&arch.ID, "Backend", "backend")
 	if err != nil {
 		t.Fatalf("Failed to create 'Backend': %v", err)
 	}
@@ -190,7 +200,7 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	}
 
 	// Erzeuge ein zweites mit gleichem Namen → es muss nummeriert werden
-	_, err = wiki.CreatePage(&backend.ID, "Data Layer")
+	_, err = wiki.CreatePage(&backend.ID, "Data Layer", "data-layer")
 	if err != nil {
 		t.Fatalf("Failed to create 'Data Layer': %v", err)
 	}
@@ -207,7 +217,7 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 
 func TestWiki_FindByPath_Valid(t *testing.T) {
 	w := setupTestWiki(t)
-	_, _ = w.CreatePage(nil, "Company")
+	_, _ = w.CreatePage(nil, "Company", "company")
 
 	found, err := w.FindByPath("company")
 	if err != nil {

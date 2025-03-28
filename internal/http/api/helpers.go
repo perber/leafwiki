@@ -18,6 +18,12 @@ func respondWithError(c *gin.Context, err error) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Page has children, use recursive delete"})
 	case errors.Is(err, tree.ErrTreeNotLoaded):
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Tree not loaded"})
+	case errors.Is(err, tree.ErrPageAlreadyExists):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Page already exists"})
+	case errors.Is(err, tree.ErrMovePageCircularReference):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Move would create a circular reference"})
+	case errors.Is(err, tree.ErrPageCannotBeMovedToItself):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Page cannot be moved to itself"})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}

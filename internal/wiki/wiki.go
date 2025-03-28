@@ -24,19 +24,15 @@ func NewWiki(storageDir string) (*Wiki, error) {
 	}, nil
 }
 
-func (w *Wiki) CreatePage(parentID *string, title string) (*tree.Page, error) {
-	var parent *tree.PageNode
-	if parentID == nil {
-		parent = w.tree.GetTree()
-	} else {
+func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Page, error) {
+	// Check if the parentID exists
+	if parentID != nil && *parentID != "" {
 		var err error
-		parent, err = w.tree.FindPageByID(w.tree.GetTree().Children, *parentID)
+		_, err = w.tree.FindPageByID(w.tree.GetTree().Children, *parentID)
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	slug := w.slug.GenerateUniqueSlug(parent, title)
 
 	id, err := w.tree.CreatePage(parentID, title, slug)
 	if err != nil {

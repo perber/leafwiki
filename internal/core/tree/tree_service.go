@@ -16,6 +16,31 @@ type PageNode struct {
 	Parent   *PageNode   `json:"-"`
 }
 
+func (p *PageNode) HasChildren() bool {
+	return len(p.Children) > 0
+}
+
+func (p *PageNode) ChildAlreadyExists(slug string) bool {
+	for _, child := range p.Children {
+		if child.Slug == slug {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *PageNode) IsChildOf(childID string, recusive bool) bool {
+	for _, child := range p.Children {
+		if child.ID == childID {
+			return true
+		}
+		if recusive && child.IsChildOf(childID, recusive) {
+			return true
+		}
+	}
+	return false
+}
+
 type Page struct {
 	*PageNode
 	Content string `json:"content"`
@@ -67,6 +92,10 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*
 			return nil, ErrParentNotFound
 		}
 
+		if root.ChildAlreadyExists(slug) {
+			return nil, ErrPageAlreadyExists
+		}
+
 		// Generate a unique ID for the new page
 		id, err := GenerateUniqueID()
 		if err != nil {
@@ -98,6 +127,10 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*
 	parent, err := t.FindPageByID(t.tree.Children, *parentID)
 	if err != nil {
 		return nil, ErrParentNotFound
+	}
+
+	if parent.ChildAlreadyExists(slug) {
+		return nil, ErrPageAlreadyExists
 	}
 
 	// Generate a unique ID for the new page
@@ -159,7 +192,7 @@ func (t *TreeService) DeletePage(id string, recusive bool) error {
 	}
 
 	// Check if page has children
-	if len(page.Children) > 0 && !recusive {
+	if page.HasChildren() && !recusive {
 		return ErrPageHasChildren
 	}
 
@@ -195,6 +228,11 @@ func (t *TreeService) UpdatePage(id string, title string, slug string, content s
 	page, err := t.FindPageByID(t.tree.Children, id)
 	if err != nil {
 		return ErrPageNotFound
+	}
+
+	// Check if the slug is unique when slug changes!
+	if slug != page.Slug && page.Parent.ChildAlreadyExists(slug) {
+		return ErrPageAlreadyExists
 	}
 
 	// Update the entry in the filesystem!
@@ -290,6 +328,22 @@ func (t *TreeService) MovePage(id string, parentID string) error {
 		return fmt.Errorf("new parent not found: %w", ErrParentNotFound)
 	}
 
+	// Child with the same slug already exists
+	if newParent.ChildAlreadyExists(page.Slug) {
+		return fmt.Errorf("child with the same slug already exists: %w", ErrPageAlreadyExists)
+	}
+
+	// Check if the page is not moved to itself
+	if page.ID == newParent.ID {
+		return fmt.Errorf("page cannot be moved to itself: %w", ErrPageCannotBeMovedToItself)
+	}
+
+	// Check if a circular reference is created
+	if newParent.IsChildOf(page.ID, true) {
+		return fmt.Errorf("circular reference detected: %w", ErrMovePageCircularReference)
+	}
+
+	// Move the page in the filesystem
 	if err := t.store.MovePage(page, newParent); err != nil {
 		return fmt.Errorf("could not move page entry: %w", err)
 	}

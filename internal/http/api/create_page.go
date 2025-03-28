@@ -10,6 +10,7 @@ import (
 type createPageRequest struct {
 	ParentID *string `json:"parentId"` // optional
 	Title    string  `json:"title" binding:"required"`
+	Slug     string  `json:"slug" binding:"required"`
 }
 
 func CreatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
@@ -20,7 +21,7 @@ func CreatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		page, err := w.CreatePage(req.ParentID, req.Title)
+		page, err := w.CreatePage(req.ParentID, req.Title, req.Slug)
 		if err != nil {
 			respondWithError(c, err)
 			return
