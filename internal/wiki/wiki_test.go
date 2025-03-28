@@ -118,7 +118,7 @@ func TestWiki_UpdatePage(t *testing.T) {
 	w := setupTestWiki(t)
 	page, _ := w.CreatePage(nil, "Draft")
 
-	err := w.UpdatePage(page.ID, "Final", "final", "# Updated")
+	page, err := w.UpdatePage(page.ID, "Final", "final", "# Updated")
 	if err != nil {
 		t.Fatalf("UpdatePage failed: %v", err)
 	}

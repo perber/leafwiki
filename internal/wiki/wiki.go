@@ -66,8 +66,13 @@ func (w *Wiki) GetTree() *tree.PageNode {
 	return w.tree.GetTree()
 }
 
-func (w *Wiki) UpdatePage(id, title, slug, content string) error {
-	return w.tree.UpdatePage(id, title, slug, content)
+func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
+	err := w.tree.UpdatePage(id, title, slug, content)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.tree.GetPage(id)
 }
 
 func (w *Wiki) FindByPath(route string) (*tree.Page, error) {

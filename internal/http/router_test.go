@@ -131,23 +131,23 @@ func TestUpdatePageEndpoint(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("Expected 204 OK, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
 	}
 
-	updatedPage, err := wikiInstance.GetPage(page.ID)
-	if err != nil {
-		t.Fatalf("GetPage failed: %v", err)
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
 	}
 
-	if updatedPage.Title != "Updated Title" {
-		t.Errorf("Expected updated title, got %q", updatedPage.Title)
+	if resp["title"] != "Updated Title" {
+		t.Errorf("Expected updated title, got %q", resp["title"])
 	}
-	if updatedPage.Slug != "updated-title" {
-		t.Errorf("Expected updated slug, got %q", updatedPage.Slug)
+	if resp["slug"] != "updated-title" {
+		t.Errorf("Expected updated slug, got %q", resp["slug"])
 	}
-	if updatedPage.Content != "# Updated Content\nWith **Markdown** support." {
-		t.Errorf("Expected updated content, got %q", updatedPage.Content)
+	if resp["content"] != "# Updated Content\nWith **Markdown** support." {
+		t.Errorf("Expected updated content, got %q", resp["content"])
 	}
 }
 

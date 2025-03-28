@@ -21,12 +21,12 @@ func UpdatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		err := w.UpdatePage(id, req.Title, req.Slug, req.Content)
+		page, err := w.UpdatePage(id, req.Title, req.Slug, req.Content)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.Status(http.StatusNoContent)
+		c.JSON(http.StatusOK, page)
 	}
 }
