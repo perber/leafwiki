@@ -24,6 +24,6 @@ func MovePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		c.Status(http.StatusNoContent)
+		c.JSON(http.StatusOK, gin.H{"message": "Page moved"})
 	}
 }

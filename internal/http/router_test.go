@@ -231,8 +231,8 @@ func TestMovePageEndpoint(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("Expected status 204, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", rec.Code)
 	}
 
 	// Checke ob a jetzt Kind von b ist
