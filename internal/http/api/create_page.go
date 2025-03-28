@@ -22,7 +22,7 @@ func CreatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 
 		page, err := w.CreatePage(req.ParentID, req.Title)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			respondWithError(c, err)
 			return
 		}
 

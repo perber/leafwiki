@@ -12,10 +12,16 @@ func MovePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 		id := c.Param("id")
 
 		var req struct {
-			NewParentID string `json:"parentId"`
+			NewParentID string `json:"parentId" binding:"required"`
 		}
+
+		if id == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+			return
+		}
+
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+			respondWithError(c, err)
 			return
 		}
 

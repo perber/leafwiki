@@ -19,7 +19,7 @@ func SuggestSlugHandler(w *wiki.Wiki) gin.HandlerFunc {
 
 		slug, err := w.SuggestSlug(parentID, title)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			respondWithError(c, err)
 			return
 		}
 

@@ -163,8 +163,8 @@ func TestUpdatePage_NotFound(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	// TODO: Should return a 404
-	if rec.Code != http.StatusInternalServerError {
-		t.Errorf("Expected 500 for unknown page, got %d", rec.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("Expected 404 for unknown page, got %d", rec.Code)
 	}
 }
 

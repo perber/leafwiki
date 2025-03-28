@@ -12,9 +12,9 @@ func UpdatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 		id := c.Param("id")
 
 		var req struct {
-			Title   string `json:"title"`
-			Slug    string `json:"slug"`
-			Content string `json:"content"`
+			Title   string `json:"title" binding:"required"`
+			Slug    string `json:"slug" binding:"required"`
+			Content string `json:"content" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
@@ -23,7 +23,7 @@ func UpdatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 
 		page, err := w.UpdatePage(id, req.Title, req.Slug, req.Content)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			respondWithError(c, err)
 			return
 		}
 

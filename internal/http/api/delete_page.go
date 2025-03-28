@@ -12,8 +12,13 @@ func DeletePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 		id := c.Param("id")
 		recursive := c.DefaultQuery("recursive", "false") == "true"
 
+		if id == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+			return
+		}
+
 		if err := w.DeletePage(id, recursive); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			respondWithError(c, err)
 			return
 		}
 
