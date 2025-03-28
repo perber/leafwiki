@@ -43,11 +43,7 @@ func (w *Wiki) CreatePage(parentID *string, title string) (*tree.Page, error) {
 		return nil, err
 	}
 
-	created, err := w.tree.FindPageByID(w.tree.GetTree().Children, *id)
-	if err != nil {
-		return nil, err
-	}
-	return &tree.Page{PageNode: created}, nil
+	return w.tree.GetPage(*id)
 }
 
 func (w *Wiki) GetPage(id string) (*tree.Page, error) {
