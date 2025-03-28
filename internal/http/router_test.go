@@ -48,6 +48,48 @@ func TestCreatePageEndpoint(t *testing.T) {
 	}
 }
 
+func TestCreatePage_DuplicateTitleGeneratesUniqueSlug(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `{"title": "Duplicate"}`
+	req1 := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(body))
+	req1.Header.Set("Content-Type", "application/json")
+	rec1 := httptest.NewRecorder()
+	router.ServeHTTP(rec1, req1)
+
+	if rec1.Code != http.StatusCreated {
+		t.Fatalf("Expected status 201, got %d", rec1.Code)
+	}
+
+	req2 := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(body))
+	req2.Header.Set("Content-Type", "application/json")
+	rec2 := httptest.NewRecorder()
+	router.ServeHTTP(rec2, req2)
+
+	if rec2.Code != http.StatusCreated {
+		t.Fatalf("Expected status 201, got %d", rec2.Code)
+	}
+
+	var resp1, resp2 map[string]interface{}
+	if err := json.Unmarshal(rec1.Body.Bytes(), &resp1); err != nil {
+		t.Fatalf("Failed to parse first response: %v", err)
+	}
+	if err := json.Unmarshal(rec2.Body.Bytes(), &resp2); err != nil {
+		t.Fatalf("Failed to parse second response: %v", err)
+	}
+
+	slug1 := resp1["slug"].(string)
+	slug2 := resp2["slug"].(string)
+
+	if slug1 == slug2 {
+		t.Errorf("Expected unique slugs for duplicate titles, got same slug: %v", slug1)
+	}
+	if slug2 != "duplicate-1" {
+		t.Errorf("Expected second slug to be 'duplicate-1', got: %v", slug2)
+	}
+}
+
 func TestCreatePageEndpoint_MissingTitle(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir())
 	router := NewRouter(wikiInstance)
@@ -325,9 +367,45 @@ func TestUpdatePage_NotFound(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
-	// TODO: Should return a 404
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("Expected 404 for unknown page, got %d", rec.Code)
+	}
+}
+
+func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Create a page
+	created, err := wikiInstance.CreatePage(nil, "Immutable Slug")
+	if err != nil {
+		t.Fatalf("Failed to create page: %v", err)
+	}
+
+	// Update title, but reuse slug
+	payload := map[string]string{
+		"title":   "Updated Title",
+		"slug":    created.Slug,
+		"content": "Updated content",
+	}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/"+created.ID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", rec.Code)
+	}
+
+	var updated map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &updated); err != nil {
+		t.Fatalf("Invalid response JSON: %v", err)
+	}
+
+	if updated["slug"] != created.Slug {
+		t.Errorf("Expected slug to remain unchanged, got: %v", updated["slug"])
 	}
 }
 
