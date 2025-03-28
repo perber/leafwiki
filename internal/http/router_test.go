@@ -48,6 +48,40 @@ func TestCreatePageEndpoint(t *testing.T) {
 	}
 }
 
+func TestCreatePageEndpoint_MissingTitle(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `{"title": ""}`
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 Bad Request for missing title, got %d", rec.Code)
+	}
+}
+
+func TestCreatePageEndpoint_InvalidJSON(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `this is not valid json`
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 Bad Request for invalid JSON, got %d", rec.Code)
+	}
+}
+
 func TestGetTreeEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir())
 	router := NewRouter(wikiInstance)
@@ -106,6 +140,135 @@ func TestSuggestSlugEndpoint(t *testing.T) {
 
 	if resp["slug"] != "newpage" {
 		t.Errorf("Expected 'newpage' as slug suggestion, got: %v", resp)
+	}
+}
+
+func TestSuggestSlugEndpoint_ExistingPage(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	_, err := wikiInstance.CreatePage(nil, "NewPage")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pages/slug-suggestion?title=NewPage", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", rec.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	if resp["slug"] == "" {
+		t.Errorf("Expected a slug suggestion, got: %v", resp)
+	}
+
+	if resp["slug"] != "newpage-1" {
+		t.Errorf("Expected 'newpage-1' as slug suggestion, got %v", resp)
+	}
+}
+
+func TestSuggestSlugEndpoint_MissingTitle(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pages/slug-suggestion", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected status 400, got %d", rec.Code)
+	}
+}
+
+func TestDeletePageEndpoint(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	_, err := wikiInstance.CreatePage(nil, "Delete Me")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	page := wikiInstance.GetTree().Children[0]
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/pages/"+page.ID, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	if _, err := wikiInstance.GetPage(page.ID); err == nil {
+		t.Fatalf("Expected page to be deleted")
+	}
+}
+
+func TestDeletePageEndpoint_NotFound(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/pages/not-found-id", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("Expected 404 Not Found, got %d", rec.Code)
+	}
+}
+
+func TestDeletePageEndpoint_HasChildren(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	parent, err := wikiInstance.CreatePage(nil, "Parent")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	_, err = wikiInstance.CreatePage(&parent.ID, "Child")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/pages/"+parent.ID, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400 Bad Request, got %d", rec.Code)
+	}
+}
+
+func TestDeletePageEndpoint_Recursive(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	parent, err := wikiInstance.CreatePage(nil, "Parent")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	_, err = wikiInstance.CreatePage(&parent.ID, "Child")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/pages/"+parent.ID+"?recursive=true", nil)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	if _, err := wikiInstance.GetPage(parent.ID); err == nil {
+		t.Fatalf("Expected page to be deleted")
 	}
 }
 
@@ -168,6 +331,54 @@ func TestUpdatePage_NotFound(t *testing.T) {
 	}
 }
 
+func TestUpdatePage_InvalidJSON(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `this is not valid json`
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/invalid-id", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 for invalid JSON, got %d", rec.Code)
+	}
+}
+
+func TestUpdatePage_MissingTitle(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `{"slug": "updated", "content": "New content"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/missing-title", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 for missing title, got %d", rec.Code)
+	}
+}
+
+func TestUpdatePage_MissingSlug(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `{"title": "Updated", "content": "New content"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/missing-slug", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 for missing slug, got %d", rec.Code)
+	}
+}
+
 func TestGetPageEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir())
 	router := NewRouter(wikiInstance)
@@ -207,6 +418,32 @@ func TestGetPageEndpoint(t *testing.T) {
 	}
 }
 
+func TestGetPageEndpoint_NotFound(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pages/not-found-id", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404, got %d", rec.Code)
+	}
+}
+
+func TestGetPageEndpoint_MissingID(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pages/", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404, got %d", rec.Code)
+	}
+}
+
 func TestMovePageEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir())
 	router := NewRouter(wikiInstance)
@@ -238,5 +475,71 @@ func TestMovePageEndpoint(t *testing.T) {
 	// Checke ob a jetzt Kind von b ist
 	if len(b.Children) != 1 || b.Children[0].ID != a.ID {
 		t.Errorf("Expected page to be moved under new parent")
+	}
+}
+
+func TestMovePageEndpoint_NotFound(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pages/not-found-id/move", strings.NewReader(`{"parentId":"root"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404, got %d", rec.Code)
+	}
+}
+
+func TestMovePageEndpoint_InvalidJSON(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pages/invalid-id/move", strings.NewReader(`this is not valid json`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected status 400, got %d", rec.Code)
+	}
+}
+
+func TestMovePageEndpoint_MissingParentID(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pages/missing-parent/move", strings.NewReader(`{"parentId":""}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected status 400, got %d", rec.Code)
+	}
+}
+
+func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	_, err := wikiInstance.CreatePage(nil, "Section A")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	a := wikiInstance.GetTree().Children[0]
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"not-found-id"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected status 400, got %d", rec.Code)
 	}
 }

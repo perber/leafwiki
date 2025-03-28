@@ -21,12 +21,12 @@ func MovePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			respondWithError(c, err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 			return
 		}
 
 		if err := w.MovePage(id, req.NewParentID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			respondWithError(c, err)
 			return
 		}
 
