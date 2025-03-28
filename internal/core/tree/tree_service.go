@@ -1,7 +1,6 @@
 package tree
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -58,14 +57,14 @@ func (t *TreeService) SaveTree() error {
 // Create Page adds a new page to the tree
 func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*string, error) {
 	if t.tree == nil {
-		return nil, errors.New("tree not loaded")
+		return nil, ErrTreeNotLoaded
 	}
 
 	if parentID == nil {
 		// The entry needs to be added to the root
 		root := t.tree
 		if root == nil {
-			return nil, errors.New("root not found")
+			return nil, ErrParentNotFound
 		}
 
 		// Generate a unique ID for the new page
@@ -98,7 +97,7 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*
 	// Find the parent page
 	parent, err := t.FindPageByID(t.tree.Children, *parentID)
 	if err != nil {
-		return nil, errors.New("parent not found")
+		return nil, ErrParentNotFound
 	}
 
 	// Generate a unique ID for the new page
@@ -144,30 +143,30 @@ func (t *TreeService) FindPageByID(entry []*PageNode, id string) (*PageNode, err
 		}
 	}
 
-	return nil, errors.New("page not found")
+	return nil, ErrPageNotFound
 }
 
 // DeletePage deletes a page from the tree
 func (t *TreeService) DeletePage(id string, recusive bool) error {
 	if t.tree == nil {
-		return errors.New("tree not loaded")
+		return ErrTreeNotLoaded
 	}
 
 	// Find the page to delete
 	page, err := t.FindPageByID(t.tree.Children, id)
 	if err != nil {
-		return errors.New("page not found")
+		return ErrPageNotFound
 	}
 
 	// Check if page has children
 	if len(page.Children) > 0 && !recusive {
-		return errors.New("page has children")
+		return ErrPageHasChildren
 	}
 
 	// Delete the page from the parent
 	parent := page.Parent
 	if parent == nil {
-		return errors.New("parent not found")
+		return ErrParentNotFound
 	}
 
 	// Delete the page from the filesystem
@@ -189,13 +188,13 @@ func (t *TreeService) DeletePage(id string, recusive bool) error {
 // UpdatePage updates a page in the tree
 func (t *TreeService) UpdatePage(id string, title string, slug string, content string) error {
 	if t.tree == nil {
-		return errors.New("tree not loaded")
+		return ErrTreeNotLoaded
 	}
 
 	// Find the page to update
 	page, err := t.FindPageByID(t.tree.Children, id)
 	if err != nil {
-		return errors.New("page not found")
+		return ErrPageNotFound
 	}
 
 	// Update the entry in the filesystem!
@@ -219,13 +218,13 @@ func (t *TreeService) GetTree() *PageNode {
 // GetPage returns a page by its ID
 func (t *TreeService) GetPage(id string) (*Page, error) {
 	if t.tree == nil {
-		return nil, errors.New("tree not loaded")
+		return nil, ErrTreeNotLoaded
 	}
 
 	// Find the page
 	page, err := t.FindPageByID(t.tree.Children, id)
 	if err != nil {
-		return nil, errors.New("page not found")
+		return nil, ErrPageNotFound
 	}
 
 	// Get the content of the page
@@ -267,7 +266,7 @@ func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (
 			}
 		}
 
-		return nil, errors.New("entry not found")
+		return nil, ErrPageNotFound
 	}
 
 	return findEntry(t.tree.Children, routePart)
@@ -276,30 +275,30 @@ func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (
 // MovePage moves a page to another parent
 func (t *TreeService) MovePage(id string, parentID string) error {
 	if t.tree == nil {
-		return errors.New("tree not loaded")
+		return ErrTreeNotLoaded
 	}
 
 	// Find the page to move
 	page, err := t.FindPageByID(t.tree.Children, id)
 	if err != nil {
-		return errors.New("page not found")
+		return ErrPageNotFound
 	}
 
 	// Find the new parent
 	newParent, err := t.FindPageByID(t.tree.Children, parentID)
 	if err != nil {
-		return errors.New("new parent not found")
+		return fmt.Errorf("new parent not found: %w", ErrParentNotFound)
 	}
 
 	if err := t.store.MovePage(page, newParent); err != nil {
-		return fmt.Errorf("could not move page entry: %v", err)
+		return fmt.Errorf("could not move page entry: %w", err)
 	}
 
 	// Move the page to the new parent
 	// Remove the page from the old parent
 	oldParent := page.Parent
 	if oldParent == nil {
-		return errors.New("old parent not found")
+		return fmt.Errorf("old parent not found: %w", ErrParentNotFound)
 	}
 
 	// Remove the page from the old parent
