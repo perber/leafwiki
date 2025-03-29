@@ -37,7 +37,7 @@ func (w *Wiki) EnsureWelcomePage() error {
 		return nil
 	}
 
-	if len(w.tree.GetTree().Children != 0) {
+	if len(w.tree.GetTree().Children) > 0 {
 		return nil
 	}
 
