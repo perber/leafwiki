@@ -50,6 +50,11 @@ func buildPathFromNode(node *tree.PageNode) string {
 
 func ToAPINode(node *tree.PageNode, parentPath string) *Node {
 	path := node.Slug
+
+	if node.Slug == "root" {
+		path = ""
+	}
+
 	if node.Slug != "root" && parentPath != "" {
 		path = parentPath + "/" + node.Slug
 	}
