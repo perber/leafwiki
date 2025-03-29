@@ -18,10 +18,31 @@ func NewWiki(storageDir string) (*Wiki, error) {
 		return nil, err
 	}
 
-	return &Wiki{
+	wiki := &Wiki{
 		tree: treeService,
 		slug: tree.NewSlugService(),
-	}, nil
+	}
+
+	// Ensure the welcome page exists
+	if err := wiki.EnsureWelcomePage(); err != nil {
+		return nil, err
+	}
+
+	return wiki, nil
+}
+
+func (w *Wiki) EnsureWelcomePage() error {
+	_, err := w.tree.GetPage("root")
+	if err == nil {
+		return nil
+	}
+
+	_, err = w.CreatePage(nil, "Welcome to Leaf Wiki", "welcome-to-leaf-wiki")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Page, error) {
