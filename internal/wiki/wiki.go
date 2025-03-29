@@ -37,6 +37,10 @@ func (w *Wiki) EnsureWelcomePage() error {
 		return nil
 	}
 
+	if len(w.tree.GetTree().Children != 0) {
+		return nil
+	}
+
 	_, err = w.CreatePage(nil, "Welcome to Leaf Wiki", "welcome-to-leaf-wiki")
 	if err != nil {
 		return err

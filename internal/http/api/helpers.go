@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/tree"
@@ -27,4 +28,42 @@ func respondWithError(c *gin.Context, err error) {
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}
+}
+
+func ToAPIPage(p *tree.Page) *Page {
+	return &Page{
+		PageNode: p.PageNode,
+		Content:  p.Content,
+		Path:     buildPathFromNode(p.PageNode),
+	}
+}
+
+func buildPathFromNode(node *tree.PageNode) string {
+	var parts []string
+	current := node
+	for current != nil && current.Slug != "root" {
+		parts = append([]string{current.Slug}, parts...)
+		current = current.Parent
+	}
+	return strings.Join(parts, "/")
+}
+
+func ToAPINode(node *tree.PageNode, parentPath string) *Node {
+	path := node.Slug
+	if node.Slug != "root" && parentPath != "" {
+		path = parentPath + "/" + node.Slug
+	}
+
+	apiNode := &Node{
+		ID:    node.ID,
+		Title: node.Title,
+		Slug:  node.Slug,
+		Path:  path,
+	}
+
+	for _, child := range node.Children {
+		apiNode.Children = append(apiNode.Children, ToAPINode(child, path))
+	}
+
+	return apiNode
 }
