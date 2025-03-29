@@ -1,6 +1,5 @@
 import { TreeNode } from "./TreeNode"
 import { useTree } from "./useTree"
-
 export default function TreeView() {
   const { tree, loading, error } = useTree()
 
