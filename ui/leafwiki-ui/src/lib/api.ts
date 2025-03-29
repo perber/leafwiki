@@ -15,7 +15,7 @@ export type PageNode = {
   }
   
   export async function suggestSlug(parentId: string, title: string): Promise<string> {
-    const res = await fetch(`${API_BASE_URL}/api/pages/slug-suggestion?parentId=${parentId}&title=${encodeURIComponent(title)}`)
+    const res = await fetch(`${API_BASE_URL}/api/pages/slug-suggestion?parentID=${parentId}&title=${encodeURIComponent(title)}`)
     const data = await res.json()
     return data.slug
   }
