@@ -1,6 +1,11 @@
+import Breadcrumbs from "@/components/Breadcrumbs"
 import { getPageByPath } from "@/lib/api"
+// import "highlight.js/styles/github.css"
 import { useEffect, useState } from "react"
+import ReactMarkdown from "react-markdown"
 import { useLocation } from "react-router-dom"
+import rehypeHighlight from "rehype-highlight"
+import remarkGfm from "remark-gfm"
 
 export default function PageViewer() {
   const { pathname } = useLocation()
@@ -24,10 +29,15 @@ export default function PageViewer() {
   if (error) return <p className="text-sm text-red-500">Error: {error}</p>
   if (!page) return <p className="text-sm text-gray-500">No page found</p>
   return (
-    <article className="prose max-w-none">
-      <h1>{page.title}</h1>
-      <pre className="text-xs text-gray-500">Slug: {page.slug}</pre>
-      <article className="mt-6 whitespace-pre-wrap">{page.content}</article>
-    </article>
+    <>
+      <Breadcrumbs />
+      <article className="prose prose-lg max-w-none [&_ul>li::marker]:text-gray-800 [&_li]:leading-snug [&_ul_ul]:mt-0 [&_ul_ul]:mb-0 [&_ol_ol]:mt-0 [&_ol_ol]:mb-0 [&_ol_ul]:mt-0 [&_ul_ol]:mb-0">
+        <ReactMarkdown
+          children={page.content}
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeHighlight]}
+        />
+      </article>
+    </>
   )
 }
