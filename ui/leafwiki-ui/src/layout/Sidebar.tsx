@@ -9,7 +9,6 @@ export default function Sidebar() {
         <aside className="w-64 border-r border-gray-200 bg-white p-4" onClick={(e) => {
             // Deselect the page when clicking on the tree view
             // but not when clicking on a node
-            console.log("deselectPage")
             if (e.target === e.currentTarget) {
                 deselectPage()
             }
