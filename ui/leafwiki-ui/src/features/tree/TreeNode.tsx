@@ -1,6 +1,7 @@
 import { useTreeStore } from "@/stores/tree"
 import { ChevronDown, ChevronRight, FileText } from "lucide-react"
 import React, { useState } from "react"
+import { Link } from "react-router-dom"
 import { PageNode } from "../../lib/api"
 import { useSelectedPage } from "../../stores/selectedPage"
 import { TreeAddInline } from "./TreeAddInline"
@@ -22,7 +23,7 @@ export function TreeNode({ node, level = 0 }: Props) {
     <div className="pl-2 relative">
       <div
         className={`flex items-center gap-1 cursor-pointer text-sm hover:underline ${isActive ? "bg-gray-200 font-semibold" : "hover:bg-gray-100"}`}
-        onClick={() => setSelectedPageId(node.id)}  onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+        onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
       >
         {hasChildren && (
           <button
@@ -39,7 +40,9 @@ export function TreeNode({ node, level = 0 }: Props) {
         )}
 
         {!hasChildren && <FileText size={14} className="text-gray-400" />}
-        <span>{node.title}</span>
+        <Link to={`/${node.path}`} onClick={() => setSelectedPageId(node.id)}>
+          <span>{node.title}</span>
+        </Link>
 
         {hovered && (
           <div className="absolute right-1 top-0">

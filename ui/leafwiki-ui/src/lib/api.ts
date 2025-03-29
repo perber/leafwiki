@@ -19,7 +19,13 @@ export type PageNode = {
     const data = await res.json()
     return data.slug
   }
-  
+
+  export async function getPageByPath(path: string) {
+    const res = await fetch(`${API_BASE_URL}/api/pages/by-path?path=${encodeURIComponent(path)}`)
+    if (!res.ok) throw new Error("Page not found")
+    return res.json()
+  }
+
   export async function createPage({ title, slug, parentId }: { title: string, slug: string, parentId: string | null }) {
     if (parentId === "") parentId = null
     const res = await fetch(`${API_BASE_URL}/api/pages`, {
