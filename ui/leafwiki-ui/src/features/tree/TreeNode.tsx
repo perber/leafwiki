@@ -1,22 +1,24 @@
 import { ChevronDown, ChevronRight, FileText } from "lucide-react"
 import { useState } from "react"
 import { PageNode } from "../../lib/api"
+import { useSelectedPage } from "../../stores/selectedPage"
 
 type Props = {
   node: PageNode
   level?: number
-  onSelect?: (id: string) => void
 }
 
-export function TreeNode({ node, level = 0, onSelect }: Props) {
+export function TreeNode({ node, level = 0 }: Props) {
   const [open, setOpen] = useState(true)
   const hasChildren = node.children && node.children.length > 0
+  const { selectedPageId, setSelectedPageId } = useSelectedPage()
+  const isActive = node.id === selectedPageId
 
   return (
     <div className="pl-2">
       <div
-        className="flex items-center gap-1 cursor-pointer text-sm text-gray-800 hover:underline"
-        onClick={() => onSelect?.(node.id)}
+        className={`flex items-center gap-1 cursor-pointer text-sm hover:underline ${isActive ? "bg-gray-200 font-semibold" : "hover:bg-gray-100"}`}
+        onClick={() => setSelectedPageId(node.id)}
       >
         {hasChildren && (
           <button

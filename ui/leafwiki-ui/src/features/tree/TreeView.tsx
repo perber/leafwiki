@@ -10,7 +10,7 @@ export default function TreeView() {
   return (
     <div className="space-y-1">
       {tree.children.map(node => (
-        <TreeNode key={node.id} node={node} onSelect={id => console.log("Selected:", id)} />
+        <TreeNode key={node.id} node={node} />
       ))}
     </div>
   )
