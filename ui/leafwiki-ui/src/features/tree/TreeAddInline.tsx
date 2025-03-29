@@ -24,8 +24,16 @@ export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
 
     const handleTitleChange = async (val: string) => {
         setTitle(val)
-        const suggestion = await suggestSlug(parentId, val)
-        setSlug(suggestion)
+        if (!val.trim()) {
+            setSlug("")
+            return
+        }
+        try {
+            const suggestion = await suggestSlug(parentId, val)
+            setSlug(suggestion)
+        } catch (err) {
+            console.warn(err)
+        }
     }
 
     const handleCreate = async () => {
@@ -61,7 +69,7 @@ export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
                 <Input placeholder="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
             </div>
             <span className="text-sm text-gray-500">
-                Path: {parentPath}{slug && `/${slug}`}
+                Path: {parentPath !== "" && `${parentPath}/`}{slug && `${slug}`}
             </span>
             <div className="flex justify-end mt-4">
                 <Button onClick={handleCreate} disabled={!title || !slug}>
