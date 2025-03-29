@@ -1,5 +1,5 @@
-import { useTreeStore } from "@/stores/tree"
-import { Link, useLocation } from "react-router-dom"
+import { useTreeStore } from '@/stores/tree'
+import { Link, useLocation } from 'react-router-dom'
 
 export default function Breadcrumbs() {
   const { pathname } = useLocation()
@@ -7,15 +7,15 @@ export default function Breadcrumbs() {
 
   if (!tree) return null
 
-  const segments = pathname.slice(1).split("/").filter(Boolean)
+  const segments = pathname.slice(1).split('/').filter(Boolean)
 
   // Hilfsfunktion zum Titel lookup
   const buildBreadcrumbs = () => {
     const crumbs = []
     let current = tree
-    let path = ""
+    let path = ''
     for (const segment of segments) {
-      const match = current.children.find(child => child.slug === segment)
+      const match = current.children.find((child) => child.slug === segment)
       if (!match) break
       path += `/${match.slug}`
       crumbs.push({ title: match.title, path })
@@ -28,12 +28,12 @@ export default function Breadcrumbs() {
   const breadcrumbs = buildBreadcrumbs()
 
   return (
-    <nav className="text-sm text-gray-500 mb-4">
-      <ol className="flex items-center gap-1 flex-wrap">
+    <nav className="mb-4 text-sm text-gray-500">
+      <ol className="flex flex-wrap items-center gap-1">
         {breadcrumbs.map((crumb) => (
           <li key={crumb.path} className="flex items-center gap-1">
             <span>/</span>
-            <Link to={crumb.path} className="hover:underline text-gray-700">
+            <Link to={crumb.path} className="text-gray-700 hover:underline">
               {crumb.title}
             </Link>
           </li>

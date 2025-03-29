@@ -1,7 +1,7 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom"
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './App.css'
 import PageViewer from './features/page/PageViewer'
-import RootRedirect from "./features/page/RootRedirect"
+import RootRedirect from './features/page/RootRedirect'
 import AppLayout from './layout/AppLayout'
 
 function App() {

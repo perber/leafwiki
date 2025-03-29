@@ -1,11 +1,11 @@
-import Breadcrumbs from "@/components/Breadcrumbs"
-import { getPageByPath } from "@/lib/api"
+import Breadcrumbs from '@/components/Breadcrumbs'
+import { getPageByPath } from '@/lib/api'
 // import "highlight.js/styles/github.css"
-import { useEffect, useState } from "react"
-import ReactMarkdown from "react-markdown"
-import { useLocation } from "react-router-dom"
-import rehypeHighlight from "rehype-highlight"
-import remarkGfm from "remark-gfm"
+import { useEffect, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import { useLocation } from 'react-router-dom'
+import rehypeHighlight from 'rehype-highlight'
+import remarkGfm from 'remark-gfm'
 
 export default function PageViewer() {
   const { pathname } = useLocation()
@@ -21,7 +21,7 @@ export default function PageViewer() {
 
     getPageByPath(path)
       .then(setPage)
-      .catch(err => setError(err.message))
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [pathname])
 
@@ -31,7 +31,7 @@ export default function PageViewer() {
   return (
     <>
       <Breadcrumbs />
-      <article className="prose prose-lg max-w-none [&_ul>li::marker]:text-gray-800 [&_li]:leading-snug [&_ul_ul]:mt-0 [&_ul_ul]:mb-0 [&_ol_ol]:mt-0 [&_ol_ol]:mb-0 [&_ol_ul]:mt-0 [&_ul_ol]:mb-0">
+      <article className="prose prose-lg max-w-none [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0">
         <ReactMarkdown
           children={page.content}
           remarkPlugins={[remarkGfm]}

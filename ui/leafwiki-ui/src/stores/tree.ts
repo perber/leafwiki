@@ -1,5 +1,5 @@
-import { fetchTree, PageNode } from "@/lib/api"
-import { create } from "zustand"
+import { fetchTree, PageNode } from '@/lib/api'
+import { create } from 'zustand'
 
 type TreeStore = {
   tree: PageNode | null
@@ -37,10 +37,10 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       }
       return null
     }
-  
+
     const tree = get().tree
     if (!tree) return null
-  
+
     const node = findNodeById(tree)
     return node?.path ?? null
   },
@@ -59,5 +59,4 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       set({ loading: false })
     }
   },
-
 }))
