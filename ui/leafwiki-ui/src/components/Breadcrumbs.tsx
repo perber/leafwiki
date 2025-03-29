@@ -5,16 +5,16 @@ export default function Breadcrumbs() {
   const { pathname } = useLocation()
   const { tree } = useTreeStore()
 
-  if (!tree) return null
+  if (!tree || !tree.children) return null
 
   const segments = pathname.slice(1).split('/').filter(Boolean)
 
-  // Hilfsfunktion zum Titel lookup
   const buildBreadcrumbs = () => {
     const crumbs = []
     let current = tree
     let path = ''
     for (const segment of segments) {
+      if (!current.children) break
       const match = current.children.find((child) => child.slug === segment)
       if (!match) break
       path += `/${match.slug}`

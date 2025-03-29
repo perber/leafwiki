@@ -60,3 +60,10 @@ export async function updatePage(id: string, title: string, slug: string, conten
   })
   if (!res.ok) throw new Error("Update failed")
 }
+
+export async function deletePage(id: string) {
+  const res = await fetch(`${API_BASE_URL}/api/pages/${id}`, {
+    method: "DELETE",
+  })
+  if (!res.ok) throw new Error("Delete failed")
+}
