@@ -31,7 +31,7 @@ export default function PageViewer() {
   return (
     <>
       <Breadcrumbs />
-      <article className="prose prose-lg max-w-none [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0">
+      <article className="prose prose-lg max-w-none [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0 leading-relaxed">
         <ReactMarkdown
           children={page.content}
           remarkPlugins={[remarkGfm]}

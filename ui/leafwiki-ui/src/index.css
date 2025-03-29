@@ -7,6 +7,27 @@ body {
   @apply bg-wiki-bg font-sans text-wiki-text;
 }
 
+.prose {
+  @apply max-w-none;
+}
+
+/* Spezifische Stile für Tabellen innerhalb von Markdown */
+.prose table {
+  @apply w-full border-collapse border border-gray-300;
+}
+
+.prose th, .prose td {
+  @apply border border-gray-300 px-4 py-2;
+}
+
+.prose tr:nth-child(odd) {
+  @apply bg-gray-100;
+}
+
+.prose tr:nth-child(even) {
+  @apply bg-white;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
