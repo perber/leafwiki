@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/http/api"
 	"github.com/perber/wiki/internal/wiki"
@@ -8,6 +9,8 @@ import (
 
 func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 	router := gin.Default()
+
+	router.Use(cors.Default())
 
 	apiGroup := router.Group("/api")
 	{
