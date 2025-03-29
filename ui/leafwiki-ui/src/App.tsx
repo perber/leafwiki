@@ -1,12 +1,17 @@
+import { BrowserRouter, Route, Routes } from "react-router-dom"
 import './App.css'
 import PageViewer from './features/page/PageViewer'
 import AppLayout from './layout/AppLayout'
 
 function App() {
   return (
-    <AppLayout>
-      <PageViewer />
-    </AppLayout>
+    <BrowserRouter>
+      <AppLayout>
+        <Routes>
+          <Route path="*" element={<PageViewer />} />
+        </Routes>
+      </AppLayout>
+    </BrowserRouter>
   )
 }
 
