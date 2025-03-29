@@ -16,7 +16,8 @@ body {
   @apply w-full border-collapse border border-gray-300;
 }
 
-.prose th, .prose td {
+.prose th,
+.prose td {
   @apply border border-gray-300 px-4 py-2;
 }
 

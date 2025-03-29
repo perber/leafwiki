@@ -51,3 +51,12 @@ export async function createPage({
   if (!res.ok) throw new Error('Seite konnte nicht erstellt werden')
   return await res.json()
 }
+
+export async function updatePage(id: string, title: string, slug: string, content: string) {
+  const res = await fetch(`${API_BASE_URL}/api/pages/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, slug, content }),
+  })
+  if (!res.ok) throw new Error("Update failed")
+}

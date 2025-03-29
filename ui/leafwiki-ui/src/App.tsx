@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import './App.css'
+import PageEditor from './features/page/PageEditor'
 import PageViewer from './features/page/PageViewer'
 import RootRedirect from './features/page/RootRedirect'
 import AppLayout from './layout/AppLayout'
@@ -10,6 +11,7 @@ function App() {
       <AppLayout>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
+          <Route path="/e/*" element={<PageEditor />} />
           <Route path="*" element={<PageViewer />} />
         </Routes>
       </AppLayout>
