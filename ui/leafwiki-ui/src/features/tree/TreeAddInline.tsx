@@ -19,6 +19,7 @@ export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
     const [title, setTitle] = useState("")
     const [slug, setSlug] = useState("")
     const reloadTree = useTreeStore((s) => s.reloadTree)
+    const parentPath = useTreeStore((s) => s.getPathById(parentId) || "")
     const { setSelectedPageId } = useSelectedPage()
 
     const handleTitleChange = async (val: string) => {
@@ -59,6 +60,9 @@ export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
                 <Input placeholder="Title" value={title} onChange={(e) => handleTitleChange(e.target.value)} />
                 <Input placeholder="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
             </div>
+            <span className="text-sm text-gray-500">
+                Path: {parentPath}{slug && `/${slug}`}
+            </span>
             <div className="flex justify-end mt-4">
                 <Button onClick={handleCreate} disabled={!title || !slug}>
                     Create

@@ -4,6 +4,7 @@ export type PageNode = {
     id: string
     title: string
     slug: string
+    path: string
     children: PageNode[]
   }
   
