@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { createPage, suggestSlug } from "@/lib/api"
-import { useSelectedPage } from "@/stores/selectedPage"
 import { useTreeStore } from "@/stores/tree"
 import { Plus } from "lucide-react"
 import { useState } from "react"
@@ -20,7 +19,6 @@ export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
     const [slug, setSlug] = useState("")
     const reloadTree = useTreeStore((s) => s.reloadTree)
     const parentPath = useTreeStore((s) => s.getPathById(parentId) || "")
-    const { setSelectedPageId } = useSelectedPage()
 
     const handleTitleChange = async (val: string) => {
         setTitle(val)
@@ -40,7 +38,6 @@ export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
         if (!title || !slug) return
         await createPage({ title, slug, parentId })
         await reloadTree()
-        setSelectedPageId(slug)
         setOpen(false)
         setTitle("")
         setSlug("")

@@ -1,9 +1,8 @@
 import { useTreeStore } from "@/stores/tree"
 import { ChevronDown, ChevronRight, FileText } from "lucide-react"
 import React, { useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import { PageNode } from "../../lib/api"
-import { useSelectedPage } from "../../stores/selectedPage"
 import { TreeAddInline } from "./TreeAddInline"
 
 type Props = {
@@ -14,9 +13,9 @@ type Props = {
 export function TreeNode({ node, level = 0 }: Props) {
   const { isNodeOpen, toggleNode } = useTreeStore()
   const hasChildren = node.children && node.children.length > 0
-  const { selectedPageId, setSelectedPageId } = useSelectedPage()
   const [hovered, setHovered] = useState(false)
-  const isActive = node.id === selectedPageId
+  const { pathname } = useLocation()
+  const isActive = `/${node.path}` === pathname
   const open = isNodeOpen(node.id)
 
   return (
@@ -40,7 +39,7 @@ export function TreeNode({ node, level = 0 }: Props) {
         )}
 
         {!hasChildren && <FileText size={14} className="text-gray-400" />}
-        <Link to={`/${node.path}`} onClick={() => setSelectedPageId(node.id)}>
+        <Link to={`/${node.path}`}>
           <span>{node.title}</span>
         </Link>
 
