@@ -11,12 +11,31 @@ type Props = {
 }
 
 export function TreeNode({ node, level = 0 }: Props) {
-  const { isNodeOpen, toggleNode } = useTreeStore()
+  const { isNodeOpen, toggleNode, searchQuery } = useTreeStore()
   const hasChildren = node.children && node.children.length > 0
   const [hovered, setHovered] = useState(false)
   const { pathname } = useLocation()
   const isActive = `/${node.path}` === pathname
   const open = isNodeOpen(node.id)
+
+  const highlightTitle = () => {
+    if (!searchQuery) return node.title
+
+    const index = node.title.toLowerCase().indexOf(searchQuery.toLowerCase())
+    if (index === -1) return node.title
+
+    const before = node.title.slice(0, index)
+    const match = node.title.slice(index, index + searchQuery.length)
+    const after = node.title.slice(index + searchQuery.length)
+
+    return (
+      <>
+        {before}
+        <mark className="bg-yellow-200 text-black">{match}</mark>
+        {after}
+      </>
+    )
+  }
 
   return (
     <div className="relative pl-2">
@@ -41,7 +60,7 @@ export function TreeNode({ node, level = 0 }: Props) {
 
         {!hasChildren && <FileText size={14} className="text-gray-400" />}
         <Link to={`/${node.path}`}>
-          <span>{node.title}</span>
+          <span>{highlightTitle()}</span>
         </Link>
 
         {hovered && (

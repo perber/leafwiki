@@ -5,6 +5,9 @@ type TreeStore = {
   tree: PageNode | null
   loading: boolean
   error: string | null
+  searchQuery: string
+  setSearchQuery: (query: string) => void
+  clearSearch: () => void
   reloadTree: () => Promise<void>
   toggleNode: (id: string) => void
   isNodeOpen: (id: string) => boolean
@@ -26,6 +29,16 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
       openNodeIds.add(id)
     }
     set({ openNodeIds })
+  },
+
+  searchQuery: '',
+
+  setSearchQuery: (query: string) => {
+    set({ searchQuery: query })
+  },
+
+  clearSearch: () => {
+    set({ searchQuery: '' })
   },
 
   getPathById: (id: string) => {
