@@ -21,7 +21,7 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 		apiGroup.DELETE("/pages/:id", api.DeletePageHandler(wikiInstance))
 		apiGroup.GET("pages/by-path", api.GetPageByPathHandler(wikiInstance))
 
-		apiGroup.POST("/pages/:id/move", api.MovePageHandler(wikiInstance))
+		apiGroup.PUT("/pages/:id/move", api.MovePageHandler(wikiInstance))
 		apiGroup.GET("/pages/slug-suggestion", api.SuggestSlugHandler(wikiInstance))
 
 		// Tree

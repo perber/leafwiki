@@ -12,7 +12,7 @@ func MovePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 		id := c.Param("id")
 
 		var req struct {
-			NewParentID string `json:"parentId" binding:"required"`
+			NewParentID string `json:"parentId"`
 		}
 
 		if id == "" {

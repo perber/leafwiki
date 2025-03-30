@@ -322,10 +322,16 @@ func (t *TreeService) MovePage(id string, parentID string) error {
 		return ErrPageNotFound
 	}
 
-	// Find the new parent
-	newParent, err := t.FindPageByID(t.tree.Children, parentID)
-	if err != nil {
-		return fmt.Errorf("new parent not found: %w", ErrParentNotFound)
+	// We think that the page is moved to the root
+	newParent := t.tree
+
+	// Check if a parentID is provided
+	if parentID != "" && parentID != "root" {
+		// Find the new parent
+		newParent, err = t.FindPageByID(t.tree.Children, parentID)
+		if err != nil {
+			return fmt.Errorf("new parent not found: %w", ErrParentNotFound)
+		}
 	}
 
 	// Child with the same slug already exists
@@ -339,7 +345,7 @@ func (t *TreeService) MovePage(id string, parentID string) error {
 	}
 
 	// Check if a circular reference is created
-	if newParent.IsChildOf(page.ID, true) {
+	if page.IsChildOf(newParent.ID, true) {
 		return fmt.Errorf("circular reference detected: %w", ErrMovePageCircularReference)
 	}
 

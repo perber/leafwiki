@@ -67,3 +67,17 @@ export async function deletePage(id: string) {
   })
   if (!res.ok) throw new Error("Delete failed")
 }
+
+export async function movePage(id: string, parentId: string | null) {
+
+  console.log("parentID ", parentId)
+
+  if (parentId === '' || parentId == "root") parentId = null
+
+  const res = await fetch(`${API_BASE_URL}/api/pages/${id}/move`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ parentId }),
+  })
+  if (!res.ok) throw new Error("Move failed")
+}

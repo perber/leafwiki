@@ -53,17 +53,15 @@ export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
       <DialogTrigger asChild>
         {minimal ? (
           <button
-            className="flex items-center text-sm text-gray-500 hover:text-gray-800"
             onClick={() => setOpen(true)}
           >
-            <Plus className="mr-1 w-4" />
+            <Plus size={16} className="text-gray-500 hover:text-gray-800 cursor-pointer" />
           </button>
         ) : (
           <button
-            className="flex items-center text-sm text-gray-500 hover:text-gray-800"
             onClick={() => setOpen(true)}
           >
-            <Plus className="mr-1 w-4" />
+            <Plus size={16} className="text-gray-500 hover:text-gray-800 cursor-pointer"/>
             Create page {parentId}
           </button>
         )}

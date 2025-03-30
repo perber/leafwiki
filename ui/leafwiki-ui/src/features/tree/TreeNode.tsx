@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, FileText } from 'lucide-react'
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageNode } from '../../lib/api'
+import { MovePageButton } from '../page/MovePageButton'
 import { TreeAddInline } from './TreeAddInline'
 
 type Props = {
@@ -38,34 +39,34 @@ export function TreeNode({ node, level = 0 }: Props) {
   }
 
   return (
-    <div className="relative pl-2">
+    <div className="pl-2">
       <div
         className={`flex cursor-pointer items-center gap-1 text-sm hover:underline ${isActive ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'}`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        {hasChildren && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleNode(node.id)
-            }}
-            className={`p-0.5 text-gray-500 transition-opacity hover:text-gray-800 ${
-              hasChildren ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-            }`}
-          >
-            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </button>
-        )}
-
-        {!hasChildren && <FileText size={14} className="text-gray-400" />}
-        <Link to={`/${node.path}`}>
-          <span>{highlightTitle()}</span>
-        </Link>
-
+        <div className="flex items-center gap-1 flex-grow">
+          {hasChildren && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleNode(node.id)
+              }}
+              className={`p-0.5 text-gray-500 transition-opacity hover:text-gray-800 ${hasChildren ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}
+            >
+              {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </button>
+          )}
+          {!hasChildren && <FileText size={14} className="text-gray-400" />}
+          <Link to={`/${node.path}`}>
+            <span className="block truncate overflow-hidden text-ellipsis w-[130px]">{highlightTitle()}</span>
+          </Link>
+        </div>
         {hovered && (
-          <div className="absolute right-1 top-0">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <TreeAddInline parentId={node.id} minimal />
+            <MovePageButton pageId={node.id} />
           </div>
         )}
       </div>
