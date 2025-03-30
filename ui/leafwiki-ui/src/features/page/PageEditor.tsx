@@ -20,7 +20,7 @@ export default function PageEditor() {
 
     const parentPath = useTreeStore(() => {
         const parts = page?.path?.split('/')
-        parts?.pop() 
+        parts?.pop()
         return parts?.join('/')
     }) || ''
 
@@ -45,6 +45,11 @@ export default function PageEditor() {
     const handleSave = async () => {
         try {
             await updatePage(page.id, title, slug, markdown)
+            if (parentPath === '') {
+                await reloadTree()
+                navigate(`/${slug}`)
+                return
+            }
             navigate(`/${parentPath}/${slug}`)
             await reloadTree()
         } catch (err) {
