@@ -379,11 +379,11 @@ func (t *TreeService) MovePage(id string, parentID string) error {
 	}
 
 	// Add the page to the new parent
+	page.Position = len(newParent.Children)
 	newParent.Children = append(newParent.Children, page)
 	page.Parent = newParent
-	// Set the position of the page
-	page.Position = len(newParent.Children)
 	// Reindex the positions of the old parent
+	t.ReindexPositions(newParent)
 	t.ReindexPositions(oldParent)
 
 	// Save the tree
