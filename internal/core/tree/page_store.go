@@ -30,6 +30,7 @@ func (f *PageStore) LoadTree(filename string) (*PageNode, error) {
 			Slug:     "root",
 			Title:    "root",
 			Parent:   nil,
+			Position: 0,
 			Children: []*PageNode{},
 		}, nil
 	}

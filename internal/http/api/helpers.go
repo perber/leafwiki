@@ -60,10 +60,11 @@ func ToAPINode(node *tree.PageNode, parentPath string) *Node {
 	}
 
 	apiNode := &Node{
-		ID:    node.ID,
-		Title: node.Title,
-		Slug:  node.Slug,
-		Path:  path,
+		ID:       node.ID,
+		Title:    node.Title,
+		Slug:     node.Slug,
+		Path:     path,
+		Position: node.Position,
 	}
 
 	for _, child := range node.Children {

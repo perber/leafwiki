@@ -2,6 +2,7 @@ package tree
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -13,6 +14,7 @@ type PageNode struct {
 	Title    string      `json:"title"`    // Title is the name of the entry
 	Slug     string      `json:"slug"`     // Slug is the path of the entry
 	Children []*PageNode `json:"children"` // Children are the children of the entry
+	Position int         `json:"position"` // Position is the position of the entry
 	Parent   *PageNode   `json:"-"`
 }
 
@@ -107,6 +109,7 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*
 			Title:    title,
 			Parent:   root,
 			Slug:     slug,
+			Position: len(root.Children), // Set the position to the end of the list
 			Children: []*PageNode{},
 		}
 
@@ -144,6 +147,7 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*
 		Slug:     slug,
 		Title:    title,
 		Parent:   parent,
+		Position: len(parent.Children), // Set the position to the end of the list
 		Children: []*PageNode{},
 	}
 
@@ -215,6 +219,8 @@ func (t *TreeService) DeletePage(id string, recusive bool) error {
 		}
 	}
 
+	t.ReindexPositions(parent)
+
 	return t.SaveTree()
 }
 
@@ -250,6 +256,9 @@ func (t *TreeService) UpdatePage(id string, title string, slug string, content s
 
 // GetTree returns the tree
 func (t *TreeService) GetTree() *PageNode {
+	if t.tree != nil {
+		t.sortTreeByPosition(t.tree)
+	}
 	return t.tree
 }
 
@@ -372,7 +381,29 @@ func (t *TreeService) MovePage(id string, parentID string) error {
 	// Add the page to the new parent
 	newParent.Children = append(newParent.Children, page)
 	page.Parent = newParent
+	// Set the position of the page
+	page.Position = len(newParent.Children)
+	// Reindex the positions of the old parent
+	t.ReindexPositions(oldParent)
 
 	// Save the tree
 	return t.SaveTree()
+}
+
+func (t *TreeService) ReindexPositions(parent *PageNode) {
+	sort.SliceStable(parent.Children, func(i, j int) bool {
+		return parent.Children[i].Position < parent.Children[j].Position
+	})
+	for i, child := range parent.Children {
+		child.Position = i
+	}
+}
+
+func (t *TreeService) sortTreeByPosition(node *PageNode) {
+	sort.SliceStable(node.Children, func(i, j int) bool {
+		return node.Children[i].Position < node.Children[j].Position
+	})
+	for _, child := range node.Children {
+		t.sortTreeByPosition(child)
+	}
 }
