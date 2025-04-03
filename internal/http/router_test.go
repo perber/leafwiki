@@ -600,6 +600,9 @@ func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 
+	t.Logf("Response: %s", rec.Body.String())
+	t.Logf("Response Code: %d", rec.Code)
+
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("Expected status 404, got %d", rec.Code)
 	}
@@ -685,5 +688,76 @@ func TestMovePage_InTheSamePlace(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("Expected status 400, got %d", rec.Code)
+	}
+}
+
+func TestSortPagesEndpoint(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Create pages
+	page1, err := wikiInstance.CreatePage(nil, "Page 1", "page-1")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	page2, err := wikiInstance.CreatePage(nil, "Page 2", "page-2")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	page3, err := wikiInstance.CreatePage(nil, "Page 3", "page-3")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	// Get Welcome Page by path
+	welcomePage, err := wikiInstance.FindByPath("welcome-to-leaf-wiki")
+	if err != nil {
+		t.Fatalf("FindByPath failed: %v", err)
+	}
+
+	// Delete Welcome Page
+	err = wikiInstance.DeletePage(welcomePage.ID, false)
+	if err != nil {
+		t.Fatalf("DeletePage failed: %v", err)
+	}
+
+	// Sort pages
+	payload := map[string]interface{}{
+		"orderedIds": []string{page3.ID, page1.ID, page2.ID},
+	}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/root/sort", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", rec.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	if resp["message"] != "Pages sorted successfully" {
+		t.Errorf("Expected success message, got: %v", resp["message"])
+	}
+
+	tree := wikiInstance.GetTree()
+	if len(tree.Children) != 3 {
+		t.Fatalf("Expected 3 children in root, got: %d", len(tree.Children))
+	}
+
+	if tree.Children[0].ID != page3.ID {
+		t.Errorf("Expected first child to be page 3, got: %v", tree.Children[0].ID)
+	}
+	if tree.Children[1].ID != page1.ID {
+		t.Errorf("Expected second child to be page 1, got: %v", tree.Children[1].ID)
+	}
+	if tree.Children[2].ID != page2.ID {
+		t.Errorf("Expected third child to be page 2, got: %v", tree.Children[2].ID)
 	}
 }

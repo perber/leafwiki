@@ -14,7 +14,7 @@ func respondWithError(c *gin.Context, err error) {
 	case errors.Is(err, tree.ErrPageNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "Page not found"})
 	case errors.Is(err, tree.ErrParentNotFound):
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Parent page not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Parent page not found"})
 	case errors.Is(err, tree.ErrPageHasChildren):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Page has children, use recursive delete"})
 	case errors.Is(err, tree.ErrTreeNotLoaded):
