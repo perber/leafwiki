@@ -1,6 +1,7 @@
 import { filterTreeWithOpenNodes } from "@/lib/filterTreeWithOpenNodes"
 import { useTreeStore } from '@/stores/tree'
 import React, { useEffect } from 'react'
+import { SortPagesButton } from "../page/SortPagesButton"
 import { TreeAddInline } from "./TreeAddInline"
 import { TreeNode } from "./TreeNode"
 
@@ -44,6 +45,7 @@ export default function TreeView() {
       ))}
       <div className="ml-2">
         <TreeAddInline parentId={''} minimal />
+        {filteredTree !== null && <SortPagesButton parent={filteredTree} />}
       </div>
     </div>)
   }

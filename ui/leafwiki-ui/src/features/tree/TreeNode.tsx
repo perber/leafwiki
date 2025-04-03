@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageNode } from '../../lib/api'
 import { MovePageButton } from '../page/MovePageButton'
+import { SortPagesButton } from '../page/SortPagesButton'
 import { TreeAddInline } from './TreeAddInline'
 
 type Props = {
@@ -67,6 +68,7 @@ export function TreeNode({ node, level = 0 }: Props) {
           <div className="flex items-center gap-1 flex-shrink-0">
             <TreeAddInline parentId={node.id} minimal />
             <MovePageButton pageId={node.id} />
+            {hasChildren && <SortPagesButton parent={node} />}
           </div>
         )}
       </div>

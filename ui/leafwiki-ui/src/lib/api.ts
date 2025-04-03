@@ -70,8 +70,6 @@ export async function deletePage(id: string) {
 
 export async function movePage(id: string, parentId: string | null) {
 
-  console.log("parentID ", parentId)
-
   if (parentId === '' || parentId == "root") parentId = null
 
   const res = await fetch(`${API_BASE_URL}/api/pages/${id}/move`, {
@@ -80,4 +78,16 @@ export async function movePage(id: string, parentId: string | null) {
     body: JSON.stringify({ parentId }),
   })
   if (!res.ok) throw new Error("Move failed")
+}
+
+export async function sortPages(parentId: string, orderedIDs: string[]) {
+  if (parentId === '') parentId = "root"
+  
+  const res = await fetch(`${API_BASE_URL}/api/pages/${parentId}/sort`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderedIDs }),
+  })
+
+  if (!res.ok) throw new Error("Sort failed")
 }
