@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -461,5 +462,84 @@ func TestTreeService_FindPageByRoutePath_PartialMatch(t *testing.T) {
 	_, err := service.FindPageByRoutePath(service.GetTree().Children, "docs/should-not-exist")
 	if err == nil {
 		t.Error("Expected error for unmatched subpath")
+	}
+}
+
+func setupTestTree() *TreeService {
+	ts := NewTreeService(os.TempDir())
+	ts.tree = &PageNode{
+		ID:    "root",
+		Title: "Root",
+		Children: []*PageNode{
+			{ID: "a", Title: "A"},
+			{ID: "b", Title: "B"},
+			{ID: "c", Title: "C"},
+		},
+	}
+	return ts
+}
+
+func TestTreeService_SortPages_ValidOrder(t *testing.T) {
+	ts := setupTestTree()
+
+	err := ts.SortPages("root", []string{"c", "a", "b"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if ts.tree.Children[0].ID != "c" || ts.tree.Children[1].ID != "a" || ts.tree.Children[2].ID != "b" {
+		t.Errorf("unexpected order after sorting")
+	}
+}
+
+func TestTreeService_SortPages_InvalidLength(t *testing.T) {
+	ts := setupTestTree()
+
+	err := ts.SortPages("root", []string{"a", "b"})
+	if err == nil {
+		t.Errorf("expected error for invalid length, got nil")
+	}
+}
+
+func TestTreeService_SortPages_InvalidID(t *testing.T) {
+	ts := setupTestTree()
+
+	err := ts.SortPages("root", []string{"a", "b", "x"})
+	if err == nil {
+		t.Errorf("expected error for invalid ID, got nil")
+	}
+}
+
+func TestTreeService_SortPages_DuplicateID(t *testing.T) {
+	ts := setupTestTree()
+
+	err := ts.SortPages("root", []string{"a", "a", "b"})
+	if err == nil {
+		t.Errorf("expected error for duplicate ID, got nil")
+	}
+}
+
+func TestTreeService_SortPages_EmptyOK(t *testing.T) {
+	ts := NewTreeService(t.TempDir())
+	ts.tree = &PageNode{
+		ID:       "root",
+		Title:    "Root",
+		Children: []*PageNode{},
+	}
+
+	err := ts.SortPages("root", []string{})
+	if err != nil {
+		t.Fatalf("unexpected error for empty list: %v", err)
+	}
+}
+
+func TestTreeService_SortPages_TreeNotLoaded(t *testing.T) {
+	ts := &TreeService{
+		tree: nil,
+	}
+
+	err := ts.SortPages("root", []string{"a"})
+	if err == nil || !errors.Is(err, ErrTreeNotLoaded) {
+		t.Errorf("expected ErrTreeNotLoaded, got: %v", err)
 	}
 }

@@ -235,3 +235,21 @@ func TestWiki_FindByPath_Invalid(t *testing.T) {
 		t.Error("Expected error for invalid path, got none")
 	}
 }
+
+func TestWiki_SortPages(t *testing.T) {
+	w := setupTestWiki(t)
+	parent, _ := w.CreatePage(nil, "Parent", "parent")
+	child1, _ := w.CreatePage(&parent.ID, "Child1", "child1")
+	child2, _ := w.CreatePage(&parent.ID, "Child2", "child2")
+
+	err := w.SortPages(parent.ID, []string{child2.ID, child1.ID})
+	if err != nil {
+		t.Fatalf("SortPages failed: %v", err)
+	}
+
+	// Check if the order is correct
+	sortedChildren := parent.Children
+	if sortedChildren[0].ID != child2.ID || sortedChildren[1].ID != child1.ID {
+		t.Errorf("Expected order [child2, child1], got [%s, %s]", sortedChildren[0].Slug, sortedChildren[1].Slug)
+	}
+}

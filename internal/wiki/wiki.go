@@ -79,6 +79,10 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 	return w.tree.DeletePage(id, recursive)
 }
 
+func (w *Wiki) SortPages(parentID string, orderedIDs []string) error {
+	return w.tree.SortPages(parentID, orderedIDs)
+}
+
 func (w *Wiki) GetTree() *tree.PageNode {
 	return w.tree.GetTree()
 }

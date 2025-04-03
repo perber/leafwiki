@@ -390,6 +390,69 @@ func (t *TreeService) MovePage(id string, parentID string) error {
 	return t.SaveTree()
 }
 
+func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
+	parent := t.tree
+
+	if parentID != "" && parentID != "root" {
+		// Find the parent page
+		var err error
+		parent, err = t.FindPageByID(t.tree.Children, parentID)
+		if err != nil {
+			return ErrParentNotFound
+		}
+	}
+
+	// Check if the number of orderedIDs is the same as the number of children
+	if len(orderedIDs) != len(parent.Children) {
+		return fmt.Errorf("number of ordered IDs does not match the number of children: %w", ErrInvalidSortOrder)
+	}
+
+	// Check if all IDs in the sort order are valid
+	existingIDs := make(map[string]bool)
+	for _, child := range parent.Children {
+		existingIDs[child.ID] = true
+	}
+	for _, id := range orderedIDs {
+		if !existingIDs[id] {
+			return fmt.Errorf("invalid ID in sort order, ID: %s - %w", id, ErrInvalidSortOrder)
+		}
+	}
+
+	seen := make(map[string]bool)
+	for _, id := range orderedIDs {
+		if seen[id] {
+			return fmt.Errorf("duplicate ID in sort order: %s", id)
+		}
+		seen[id] = true
+	}
+
+	// Create a map to store the position of each page
+	positions := make(map[string]int)
+	for i, id := range orderedIDs {
+		positions[id] = i
+	}
+
+	// Sort the children of the parent
+	sort.SliceStable(parent.Children, func(i, j int) bool {
+		return positions[parent.Children[i].ID] < positions[parent.Children[j].ID]
+	})
+
+	// write postion index to children
+	for i, child := range parent.Children {
+		child.Position = i
+	}
+
+	// Reindex the positions
+	t.ReindexPositions(parent)
+
+	// Save the tree
+	return t.SaveTree()
+}
+
 func (t *TreeService) ReindexPositions(parent *PageNode) {
 	sort.SliceStable(parent.Children, func(i, j int) bool {
 		return parent.Children[i].Position < parent.Children[j].Position
