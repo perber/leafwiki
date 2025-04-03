@@ -523,7 +523,7 @@ func TestMovePageEndpoint(t *testing.T) {
 	b := wikiInstance.GetTree().Children[1]
 
 	// Verschiebe a → unter b
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"`+b.ID+`"}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"`+b.ID+`"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -543,7 +543,7 @@ func TestMovePageEndpoint_NotFound(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir())
 	router := NewRouter(wikiInstance)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/not-found-id/move", strings.NewReader(`{"parentId":"root"}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/not-found-id/move", strings.NewReader(`{"parentId":"root"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -558,7 +558,7 @@ func TestMovePageEndpoint_InvalidJSON(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir())
 	router := NewRouter(wikiInstance)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/invalid-id/move", strings.NewReader(`this is not valid json`))
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/invalid-id/move", strings.NewReader(`this is not valid json`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -573,14 +573,14 @@ func TestMovePageEndpoint_MissingParentID(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir())
 	router := NewRouter(wikiInstance)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/missing-parent/move", strings.NewReader(`{"parentId":""}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/missing-parent/move", strings.NewReader(`{"parentId":""}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("Expected status 400, got %d", rec.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404, got %d", rec.Code)
 	}
 }
 
@@ -594,14 +594,14 @@ func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 	}
 	a := wikiInstance.GetTree().Children[0]
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"not-found-id"}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"not-found-id"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("Expected status 400, got %d", rec.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404, got %d", rec.Code)
 	}
 }
 
@@ -622,7 +622,7 @@ func TestMovePageEndpoint_CircularReference(t *testing.T) {
 	b := a.Children[0]
 
 	// Verschiebe a → unter b
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+b.ID+"/move", strings.NewReader(`{"parentId":"`+a.ID+`"}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/"+b.ID+"/move", strings.NewReader(`{"parentId":"`+a.ID+`"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -647,14 +647,16 @@ func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	b := wikiInstance.GetTree().Children[1]
 
-	_, err = wikiInstance.CreatePage(&b.ID, "Section A", "section-a")
+	// Create Conflict Page in b
+	conflictPage, err := wikiInstance.CreatePage(&a.ID, "Section B", "section-b")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"`+b.ID+`"}`))
+	// Verschibe ConflictPage in root level
+
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/"+conflictPage.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -675,7 +677,7 @@ func TestMovePage_InTheSamePlace(t *testing.T) {
 	}
 	a := wikiInstance.GetTree().Children[0]
 
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
