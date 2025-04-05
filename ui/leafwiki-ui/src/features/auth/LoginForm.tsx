@@ -31,10 +31,10 @@ export default function LoginForm() {
     }
 
     return (
-        <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
+        <div className="w-96 h-screen border-r   bg-white  font-sans text-gray-900 border-gray-200 shadow-md">
             <form
                 onSubmit={handleSubmit}
-                className="w-full max-w-sm rounded-xl bg-white p-4 shadow-md"
+                className="w-full p-4"
             >
                 <h1 className="mb-4 text-xl font-bold">🌿 LeafWiki</h1>
 
