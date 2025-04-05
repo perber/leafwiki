@@ -1,3 +1,14 @@
+package middleware
+
+import (
+	"net/http"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/wiki"
+)
+
 func RequireAuth(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")

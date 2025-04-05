@@ -1,10 +1,10 @@
 package http
 
 import (
-	"github.com/aws/aws-sdk-go-v2/aws/middleware/private/metrics/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/http/api"
+	"github.com/perber/wiki/internal/http/middleware"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -21,7 +21,7 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 	}
 
 	requiresAuthGroup := router.Group("/api")
-	requiresAuthGroup.Use(middleware.AuthMiddleware(wikiInstance))
+	requiresAuthGroup.Use(middleware.RequireAuth(wikiInstance))
 	{
 		// Pages
 		requiresAuthGroup.POST("/pages", api.CreatePageHandler(wikiInstance))
