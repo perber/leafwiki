@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -83,6 +85,12 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 	}, nil
 }
 
+func generateJTI() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
 func (a *AuthService) parseClaims(tokenString string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -111,6 +119,7 @@ func (a *AuthService) generateToken(user *User, duration time.Duration, typ stri
 		"exp":   time.Now().Add(duration).Unix(),
 		"iat":   time.Now().Unix(),
 		"typ":   typ,
+		"jti":   generateJTI(), // Unique identifier for the token
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(a.secretKey)

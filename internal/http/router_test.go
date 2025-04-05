@@ -681,3 +681,78 @@ func TestSortPagesEndpoint(t *testing.T) {
 		t.Errorf("Expected third child to be page 2, got: %v", tree.Children[2].ID)
 	}
 }
+
+func TestAuthLoginEndpoint(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `{"identifier": "admin", "password": "admin"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for valid login, got %d", rec.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to parse JSON response: %v", err)
+	}
+
+	if _, ok := resp["token"]; !ok {
+		t.Errorf("Expected token in response, got: %v", resp)
+	}
+}
+
+func TestAuthLogin_InvalidCredentials(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `{"identifier": "admin", "password": "wrong"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("Expected 401 Unauthorized for wrong credentials, got %d", rec.Code)
+	}
+}
+
+func TestAuthRefreshToken(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Login
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	var loginResp map[string]string
+	_ = json.Unmarshal(loginRec.Body.Bytes(), &loginResp)
+	originalToken := loginResp["token"]
+	refreshToken := loginResp["refresh_token"]
+
+	// Refresh
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh-token", strings.NewReader(`{"token":"`+refreshToken+`"}`))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on refresh, got %d", rec.Code)
+	}
+
+	var refreshResp map[string]string
+	_ = json.Unmarshal(rec.Body.Bytes(), &refreshResp)
+
+	if refreshResp["token"] == originalToken {
+		t.Errorf("Expected new token, got same one")
+	}
+}
