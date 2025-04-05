@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/perber/wiki/internal/core/shared"
 )
 
 // PageNode represents a single node in the tree
@@ -99,7 +101,7 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*
 		}
 
 		// Generate a unique ID for the new page
-		id, err := GenerateUniqueID()
+		id, err := shared.GenerateUniqueID()
 		if err != nil {
 			return nil, fmt.Errorf("could not generate unique ID: %v", err)
 		}
@@ -137,7 +139,7 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*
 	}
 
 	// Generate a unique ID for the new page
-	id, err := GenerateUniqueID()
+	id, err := shared.GenerateUniqueID()
 	if err != nil {
 		return nil, fmt.Errorf("could not generate unique ID: %v", err)
 	}
