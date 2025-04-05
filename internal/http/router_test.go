@@ -756,3 +756,182 @@ func TestAuthRefreshToken(t *testing.T) {
 		t.Errorf("Expected new token, got same one")
 	}
 }
+
+func TestCreateUserEndpoint(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `{"username": "john", "email": "john@example.com", "password": "secret", "role": "editor"}`
+	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected 201 Created, got %d", rec.Code)
+	}
+}
+
+func TestCreateUser_DuplicateEmailOrUsername(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Erstellt initialen Benutzer
+	payload := `{"username": "john", "email": "john@example.com", "password": "secret", "role": "editor"}`
+	_ = authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(payload))
+
+	// Versuch mit gleichem Benutzernamen
+	payloadDuplicate := `{"username": "john", "email": "john2@example.com", "password": "secret", "role": "editor"}`
+	rec1 := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(payloadDuplicate))
+	if rec1.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 for duplicate username, got %d", rec1.Code)
+	}
+
+	// Versuch mit gleicher Email
+	payloadDuplicateEmail := `{"username": "johnny", "email": "john@example.com", "password": "secret", "role": "editor"}`
+	rec2 := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(payloadDuplicateEmail))
+	if rec2.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 for duplicate email, got %d", rec2.Code)
+	}
+}
+
+func TestCreateUser_InvalidRole(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	body := `{"username": "sam", "email": "sam@example.com", "password": "secret", "role": "viewer"}`
+	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 Bad Request for invalid role, got %d", rec.Code)
+	}
+}
+
+func TestGetUsersEndpoint(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/users", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var users []map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &users); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(users) == 0 {
+		t.Errorf("Expected at least one user (admin), got none")
+	}
+}
+
+func TestUpdateUserEndpoint(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Benutzer anlegen
+	create := `{"username": "jane", "email": "jane@example.com", "password": "secret", "role": "editor"}`
+	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
+	var user map[string]interface{}
+	_ = json.Unmarshal(resp.Body.Bytes(), &user)
+
+	updatePayload := map[string]string{
+		"username": "jane-updated",
+		"email":    "jane-updated@example.com",
+		"password": "newpassword",
+		"role":     "editor",
+	}
+	data, _ := json.Marshal(updatePayload)
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/users/"+user["id"].(string), strings.NewReader(string(data)))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for user update, got %d", rec.Code)
+	}
+}
+
+func TestDeleteUserEndpoint(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Benutzer anlegen
+	create := `{"username": "todelete", "email": "delete@example.com", "password": "secret", "role": "editor"}`
+	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
+	var user map[string]interface{}
+	_ = json.Unmarshal(resp.Body.Bytes(), &user)
+
+	// Benutzer löschen
+	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/users/"+user["id"].(string), nil)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("Expected 204 OK on delete, got %d", rec.Code)
+	}
+}
+
+func TestDeleteAdminUser_ShouldFail(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Default Admin holen
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/users", nil)
+	var users []map[string]interface{}
+	_ = json.Unmarshal(rec.Body.Bytes(), &users)
+
+	var adminID string
+	for _, u := range users {
+		if u["role"] == "admin" {
+			adminID = u["id"].(string)
+		}
+	}
+
+	if adminID == "" {
+		t.Fatal("No admin user found")
+	}
+
+	// Versuch den Admin zu löschen
+	recDel := authenticatedRequest(t, router, http.MethodDelete, "/api/users/"+adminID, nil)
+	if recDel.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400 when deleting admin user, got %d", recDel.Code)
+	}
+}
+
+func TestRequireAdminMiddleware(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Default Admin versucht, Benutzer zu erstellen (sollte erlaubt sein)
+	body := `{"username": "mod", "email": "mod@example.com", "password": "secret", "role": "editor"}`
+	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected 201 Created by admin, got %d", rec.Code)
+	}
+}
+
+func TestRequireAuthMiddleware_Unauthorized(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Request ohne Token
+	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(`{"title": "Oops", "slug": "oops"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("Expected 401 Unauthorized, got %d", rec.Code)
+	}
+}
+
+func TestRequireAuthMiddleware_InvalidToken(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(`{"title": "Bad", "slug": "bad"}`))
+	req.Header.Set("Authorization", "Bearer invalidtoken")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("Expected 401 Unauthorized for invalid token, got %d", rec.Code)
+	}
+}
