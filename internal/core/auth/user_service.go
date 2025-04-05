@@ -136,24 +136,26 @@ func (s *UserService) UpdateUser(id, username, email, password, role string) (*U
 	return user, nil
 }
 
-func (s *UserService) UpdatePassword(id string, newpassword string) {
+func (s *UserService) UpdatePassword(id string, newpassword string) error {
 	// Check if user exists
-	user, err := s.store.GetUserByID(id)
+	_, err := s.store.GetUserByID(id)
 	if err != nil {
-		return
+		return err
 	}
 
 	// hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newpassword), bcrypt.DefaultCost)
 	if err != nil {
-		return
+		return err
 	}
 
 	// Save updated user to store
 	err = s.store.UpdatePassword(id, string(hashedPassword))
 	if err != nil {
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (s *UserService) DeleteUser(id string) error {
