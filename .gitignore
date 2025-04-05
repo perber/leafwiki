@@ -26,3 +26,5 @@ go.work.sum
 
 # data dir
 data/
+
+__debug*
