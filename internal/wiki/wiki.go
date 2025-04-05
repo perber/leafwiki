@@ -3,24 +3,45 @@ package wiki
 import (
 	"fmt"
 
+	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
 type Wiki struct {
 	tree *tree.TreeService
 	slug *tree.SlugService
+	auth *auth.AuthService
+	user *auth.UserService
 }
 
 func NewWiki(storageDir string) (*Wiki, error) {
-	treeService := tree.NewTreeService(storageDir)
+	// Initialize the user store
+	store, err := auth.NewUserStore(storageDir)
+	if err != nil {
+		return nil, err
+	}
 
+	// Initialize the user service
+	userService := auth.NewUserService(store)
+	if err := userService.InitDefaultAdmin(); err != nil {
+		return nil, err
+	}
+
+	// Initialize the auth service
+	authService := auth.NewAuthService(userService, "mysecretkey")
+
+	// Initialize the tree service
+	treeService := tree.NewTreeService(storageDir)
 	if err := treeService.LoadTree(); err != nil {
 		return nil, err
 	}
 
+	// Initialize the wiki service
 	wiki := &Wiki{
 		tree: treeService,
 		slug: tree.NewSlugService(),
+		user: userService,
+		auth: authService,
 	}
 
 	// Ensure the welcome page exists
@@ -113,4 +134,48 @@ func (w *Wiki) SuggestSlug(parentID string, title string) (string, error) {
 	}
 
 	return w.slug.GenerateUniqueSlug(parent, title), nil
+}
+
+func (w *Wiki) Login(identifier, password string) (*auth.AuthToken, error) {
+	return w.auth.Login(identifier, password)
+}
+
+func (w *Wiki) RefreshToken(token string) (*auth.AuthToken, error) {
+	return w.auth.RefreshToken(token)
+}
+
+func (w *Wiki) CreateUser(username, email, password, role string) (*auth.User, error) {
+	return w.user.CreateUser(username, email, password, role)
+}
+
+func (w *Wiki) UpdateUser(id, username, email, password, role string) (*auth.User, error) {
+	return w.user.UpdateUser(id, username, email, password, role)
+}
+
+func (w *Wiki) DeleteUser(id string) error {
+	return w.user.DeleteUser(id)
+}
+
+func (w *Wiki) UpdatePassword(id, password string) error {
+	return w.user.UpdatePassword(id, password)
+}
+
+func (w *Wiki) GetUsers() ([]*auth.User, error) {
+	return w.user.GetUsers()
+}
+
+func (w *Wiki) GetUserByID(id string) (*auth.User, error) {
+	return w.user.GetUserByID(id)
+}
+
+func (w *Wiki) GetUserService() *auth.UserService {
+	return w.user
+}
+
+func (w *Wiki) GetAuthService() *auth.AuthService {
+	return w.auth
+}
+
+func (w *Wiki) Close() error {
+	return w.user.Close()
 }

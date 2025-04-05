@@ -14,6 +14,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize Wiki: %v", err)
 	}
+	defer w.Close()
 
 	router := http.NewRouter(w)
 

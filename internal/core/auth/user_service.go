@@ -200,3 +200,7 @@ func (s *UserService) GetUserByEmailOrUsernameAndPassword(identifier, password s
 
 	return user, nil
 }
+
+func (s *UserService) Close() error {
+	return s.store.Close()
+}
