@@ -1,7 +1,9 @@
 package http
 
 import (
+	"bytes"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -22,11 +24,11 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 		t.Fatalf("Failed to login: %d - %s", loginRec.Code, loginRec.Body.String())
 	}
 
-	var loginResp map[string]string
+	var loginResp map[string]interface{}
 	if err := json.Unmarshal(loginRec.Body.Bytes(), &loginResp); err != nil {
 		t.Fatalf("Invalid login response: %v", err)
 	}
-	token := loginResp["token"]
+	token := loginResp["token"].(string)
 
 	// Perform authenticated request
 	if body == nil {
@@ -933,5 +935,74 @@ func TestRequireAuthMiddleware_InvalidToken(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("Expected 401 Unauthorized for invalid token, got %d", rec.Code)
+	}
+}
+
+func TestAssetEndpoints(t *testing.T) {
+	wikiInstance, _ := wiki.NewWiki(t.TempDir())
+	router := NewRouter(wikiInstance)
+
+	// Step 1: Create page
+	page, err := wikiInstance.CreatePage(nil, "Assets Page", "assets-page")
+	if err != nil {
+		t.Fatalf("Failed to create page: %v", err)
+	}
+
+	// Step 2: Upload file
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, _ := writer.CreateFormFile("file", "testfile.txt")
+	part.Write([]byte("Hello, asset!"))
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// Auth
+	login := authenticatedRequest(t, router, http.MethodPost, "/api/auth/login", strings.NewReader(`{"identifier": "admin", "password": "admin"}`))
+	var loginResp map[string]string
+	json.Unmarshal(login.Body.Bytes(), &loginResp)
+	token := loginResp["token"]
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected 201 Created on upload, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var uploadResp map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &uploadResp); err != nil {
+		t.Fatalf("Invalid upload JSON: %v", err)
+	}
+	if uploadResp["url"] == "" {
+		t.Error("Expected URL in upload response")
+	}
+
+	// Step 3: List assets
+	listRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on listing, got %d", listRec.Code)
+	}
+	var listResp map[string][]string
+	json.Unmarshal(listRec.Body.Bytes(), &listResp)
+	if len(listResp["files"]) != 1 || listResp["files"][0] != "testfile.txt" {
+		t.Errorf("Expected file in listing, got: %v", listResp["files"])
+	}
+
+	// Step 4: Delete asset
+	delRec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+page.ID+"/assets/testfile.txt", nil)
+	if delRec.Code != http.StatusNoContent {
+		t.Errorf("Expected 204 No Content on delete, got %d", delRec.Code)
+	}
+
+	// Step 5: Verify asset is gone
+	listRec2 := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	var listResp2 map[string][]string
+	json.Unmarshal(listRec2.Body.Bytes(), &listResp2)
+	if len(listResp2["files"]) != 0 {
+		t.Errorf("Expected asset to be deleted, got: %v", listResp2["files"])
 	}
 }

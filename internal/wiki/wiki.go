@@ -2,16 +2,19 @@ package wiki
 
 import (
 	"fmt"
+	"mime/multipart"
 
+	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
 type Wiki struct {
-	tree *tree.TreeService
-	slug *tree.SlugService
-	auth *auth.AuthService
-	user *auth.UserService
+	tree  *tree.TreeService
+	slug  *tree.SlugService
+	auth  *auth.AuthService
+	user  *auth.UserService
+	asset *assets.AssetService
 }
 
 func NewWiki(storageDir string) (*Wiki, error) {
@@ -36,12 +39,17 @@ func NewWiki(storageDir string) (*Wiki, error) {
 		return nil, err
 	}
 
+	slugService := tree.NewSlugService()
+
+	assetService := assets.NewAssetService(storageDir, slugService)
+
 	// Initialize the wiki service
 	wiki := &Wiki{
-		tree: treeService,
-		slug: tree.NewSlugService(),
-		user: userService,
-		auth: authService,
+		tree:  treeService,
+		slug:  slugService,
+		user:  userService,
+		auth:  authService,
+		asset: assetService,
 	}
 
 	// Ensure the welcome page exists
@@ -174,6 +182,30 @@ func (w *Wiki) GetUserService() *auth.UserService {
 
 func (w *Wiki) GetAuthService() *auth.AuthService {
 	return w.auth
+}
+
+func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string) (string, error) {
+	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
+	if err != nil {
+		return "", err
+	}
+	return w.asset.SaveAssetForPage(page, file, filename)
+}
+
+func (w *Wiki) ListAssets(pageID string) ([]string, error) {
+	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
+	if err != nil {
+		return nil, err
+	}
+	return w.asset.ListAssetsForPage(page)
+}
+
+func (w *Wiki) DeleteAsset(pageID string, filename string) error {
+	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
+	if err != nil {
+		return err
+	}
+	return w.asset.DeleteAsset(page, filename)
 }
 
 func (w *Wiki) Close() error {

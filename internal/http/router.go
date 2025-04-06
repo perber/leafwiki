@@ -52,6 +52,11 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 		requiresAuthGroup.PUT("/users/:id", middleware.RequireAdmin(wikiInstance), api.UpdateUserHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/users/:id", middleware.RequireAdmin(wikiInstance), api.DeleteUserHandler(wikiInstance))
 
+		// Assets
+		requiresAuthGroup.POST("/pages/:id/assets", api.UploadAssetHandler(wikiInstance))
+		requiresAuthGroup.GET("/pages/:id/assets", api.ListAssetsHandler(wikiInstance))
+		requiresAuthGroup.DELETE("/pages/:id/assets/:name", api.DeleteAssetHandler(wikiInstance))
+
 	}
 
 	return router
