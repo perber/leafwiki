@@ -10,6 +10,7 @@ import { AssetManager } from './AssetManager'
 export default function PageEditor() {
   const { '*': path } = useParams()
   const [page, setPage] = useState<any>(null)
+  const [inserted, setInserted] = useState<string | null>(null)
   const navigate = useNavigate()
   const [markdown, setMarkdown] = useState('')
   const [loading, setLoading] = useState(true)
@@ -40,10 +41,6 @@ export default function PageEditor() {
       .finally(() => setLoading(false))
   }, [path])
 
-  const handleOnChange = (value: string) => {
-    setMarkdown(value)
-  }
-
   const handleSave = async () => {
     try {
       await updatePage(page.id, title, slug, markdown)
@@ -64,12 +61,12 @@ export default function PageEditor() {
   if (!page) return <p className="text-sm text-gray-500">No page found</p>
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-250px)]">
+    <div className="flex h-[calc(100vh-250px)] gap-6">
       <div className="flex flex-1 flex-col gap-4">
         <div className="space-y-2">
           <Input
             placeholder="Title"
-            className="text-xl font-semibold mb-2"
+            className="mb-2 text-xl font-semibold"
             value={title}
             onChange={async (e) => {
               const val = e.target.value
@@ -92,7 +89,15 @@ export default function PageEditor() {
             {slug}
           </p>
         </div>
-        <MarkdownEditor value={markdown} onChange={handleOnChange} />
+        <MarkdownEditor
+          value={markdown}
+          onChange={(val) => {
+            setMarkdown(val)
+            
+            if (inserted) setInserted(null) // reset after insert
+          }}
+          insert={inserted}
+        />
         <div className="mt-4 flex justify-end">
           <Button
             variant="outline"
@@ -104,8 +109,8 @@ export default function PageEditor() {
           <Button onClick={handleSave}>Save</Button>
         </div>
       </div>
-      <div className="w-64 border-l pl-4 overflow-y-auto">
-        <AssetManager pageId={page.id} />
+      <div className="w-64 overflow-y-auto border-l pl-4">
+        <AssetManager pageId={page.id} onInsert={(md) => setInserted(md)} />
       </div>
     </div>
   )

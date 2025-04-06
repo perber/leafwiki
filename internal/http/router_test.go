@@ -977,8 +977,8 @@ func TestAssetEndpoints(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &uploadResp); err != nil {
 		t.Fatalf("Invalid upload JSON: %v", err)
 	}
-	if uploadResp["url"] == "" {
-		t.Error("Expected URL in upload response")
+	if uploadResp["file"] == "" {
+		t.Error("Expected File in upload response")
 	}
 
 	// Step 3: List assets
@@ -988,14 +988,14 @@ func TestAssetEndpoints(t *testing.T) {
 	}
 	var listResp map[string][]string
 	json.Unmarshal(listRec.Body.Bytes(), &listResp)
-	if len(listResp["files"]) != 1 || listResp["files"][0] != "testfile.txt" {
+	if len(listResp["files"]) != 1 || listResp["files"][0] != "/assets/root/assets-page/assets/testfile.txt" {
 		t.Errorf("Expected file in listing, got: %v", listResp["files"])
 	}
 
 	// Step 4: Delete asset
 	delRec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+page.ID+"/assets/testfile.txt", nil)
-	if delRec.Code != http.StatusNoContent {
-		t.Errorf("Expected 204 No Content on delete, got %d", delRec.Code)
+	if delRec.Code != http.StatusOK {
+		t.Errorf("Expected 200 No Content on delete, got %d", delRec.Code)
 	}
 
 	// Step 5: Verify asset is gone

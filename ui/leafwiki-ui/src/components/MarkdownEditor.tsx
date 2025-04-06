@@ -1,16 +1,39 @@
+import { useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 export default function MarkdownEditor({
   value = '',
   onChange,
+  insert,
 }: {
   value?: string
   onChange: (newValue: string) => void
+  insert?: string | null
 }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (insert && textareaRef.current) {
+      const textarea = textareaRef.current
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const newText = value.slice(0, start) + insert + value.slice(end)
+
+      onChange(newText)
+
+      // Move cursor to end of inserted text
+      requestAnimationFrame(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + insert.length
+        textarea.focus()
+      })
+    }
+  }, [insert])
+
   return (
     <div className="flex h-full gap-4">
       <textarea
+        ref={textareaRef}
         className="w-1/2 resize-none rounded border border-gray-300 p-4 font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
         value={value}
         onChange={(e) => onChange(e.target.value)}

@@ -272,9 +272,9 @@ export async function uploadAsset(pageId: string, file: File) {
   const form = new FormData()
   form.append('file', file)
   try {
-    await fetchWithAuth(`/api/pages/${pageId}/assets`, {
+    return await fetchWithAuth(`/api/pages/${pageId}/assets`, {
       method: 'POST',
-      body: form
+      body: form,
     })
   } catch (e) {
     throw new Error('Asset upload failed')
@@ -283,21 +283,22 @@ export async function uploadAsset(pageId: string, file: File) {
 
 export async function getAssets(pageId: string): Promise<string[]> {
   try {
-    const data = await fetchWithAuth(`/api/pages/${pageId}/assets`, {  })
+    const data = await fetchWithAuth(`/api/pages/${pageId}/assets`, {})
     return data.files
-  }
-  catch (e) {
+  } catch (e) {
     throw new Error('Asset fetch failed')
   }
 }
 
 export async function deleteAsset(pageId: string, filename: string) {
   try {
-    await fetchWithAuth(`/api/pages/${pageId}/assets/${encodeURIComponent(filename)}`, {
-      method: 'DELETE',
-    })
+    await fetchWithAuth(
+      `/api/pages/${pageId}/assets/${encodeURIComponent(filename)}`,
+      {
+        method: 'DELETE',
+      },
+    )
   } catch (e) {
     throw new Error('Asset deletion failed')
   }
 }
-

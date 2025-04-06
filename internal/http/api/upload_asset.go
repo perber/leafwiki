@@ -33,6 +33,6 @@ func UploadAssetHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusCreated, gin.H{"url": url})
+		c.JSON(http.StatusCreated, gin.H{"file": url})
 	}
 }

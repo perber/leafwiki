@@ -60,7 +60,7 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 	}
 
 	// Return public path (served from /assets)
-	publicURL := fmt.Sprintf("/assets/%s/assets/%s", pagePath, finalFilename)
+	publicURL := "/" + path.Join("assets", pagePath, "assets", finalFilename)
 	return publicURL, nil
 }
 
