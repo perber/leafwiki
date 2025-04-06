@@ -6,6 +6,10 @@ type FieldError = {
   message: string
 }
 
+type APIValidationError = {
+  error: 'validation_error'
+  fields: FieldError[]
+}
 
 export type AuthResponse = {
   token: string
@@ -66,8 +70,24 @@ export async function fetchWithAuth(
   }
 
   if (!res.ok) {
-    const error = await res.text()
-    throw new Error(error || 'Request failed')
+    let errorBody: any = null
+
+    try {
+      errorBody = await res.json()
+    } catch {
+      const text = await res.text()
+      throw new Error(text || 'Request failed')
+    }
+
+    if (errorBody?.error === 'validation_error') {
+      throw errorBody
+    }
+
+    if (errorBody?.error) {
+      throw errorBody
+    }
+
+    throw new Error(errorBody?.message || 'Request failed')
   }
 
   try {
@@ -152,7 +172,7 @@ export async function createPage({
       body: JSON.stringify({ title, slug, parentId }),
     })
   } catch (e) {
-    throw new Error('Page creation failed')
+    throw e
   }
 }
 

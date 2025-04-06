@@ -50,17 +50,15 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
       await createPage({ title, slug, parentId })
     } catch (err: any) {
       console.warn(err)
-
       if (err?.error === 'validation_error' && Array.isArray(err.fields)) {
         const errorMap: Record<string, string> = {}
         for (const e of err.fields) {
           errorMap[e.field] = e.message
         }
         setFieldErrors(errorMap)
-      }
-
-      if (err instanceof Error) {
-        toast.error(err.message)
+        toast.error('Error creating page')
+      } else if (err?.error) {
+        toast.error(err.error)
       } else {
         toast.error('Error creating page')
       }
@@ -105,7 +103,10 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
           <Input
             placeholder="Title"
             value={title}
-            onChange={(e) => handleTitleChange(e.target.value)}
+            onChange={(e) => {
+              handleTitleChange(e.target.value)
+              setFieldErrors((prev) => ({ ...prev, title: '' }))
+            }}
             className={fieldErrors.title ? 'border-red-500' : ''}
           />
           {fieldErrors.title && (
@@ -114,7 +115,10 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
           <Input
             placeholder="Slug"
             value={slug}
-            onChange={(e) => setSlug(e.target.value)}
+            onChange={(e) => {
+              setSlug(e.target.value)
+              setFieldErrors((prev) => ({ ...prev, slug: '' }))
+            }}
             className={fieldErrors.slug ? 'border-red-500' : ''}
           />
           {fieldErrors.slug && (
