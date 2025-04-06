@@ -2,6 +2,8 @@ package wiki
 
 import (
 	"testing"
+
+	verrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
 func setupTestWiki(t *testing.T) *Wiki {
@@ -53,6 +55,15 @@ func TestWiki_CreatePage_ReservedSlug(t *testing.T) {
 	_, err := w.CreatePage(nil, "Reserved", "e")
 	if err == nil {
 		t.Error("Expected error for reserved slug, got none")
+	}
+
+	// Check if the error message is correct
+	if ve, ok := err.(*verrors.ValidationErrors); ok {
+		if len(ve.Errors) != 1 || ve.Errors[0].Field != "slug" {
+			t.Errorf("Expected validation error for slug, got %v", ve)
+		}
+	} else {
+		t.Errorf("Expected ValidationErrors, got %T", err)
 	}
 }
 
