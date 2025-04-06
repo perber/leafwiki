@@ -7,6 +7,7 @@ export type AuthResponse = {
   refresh_token: string
   user: {
     id: string
+    username: string
     email: string
     role: 'admin' | 'editor'
   }

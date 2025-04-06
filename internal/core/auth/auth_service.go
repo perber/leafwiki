@@ -24,6 +24,7 @@ func NewAuthService(userService *UserService, secret string) *AuthService {
 type AuthToken struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
+	User         *User  `json:"user"`
 }
 
 func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
@@ -42,9 +43,13 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 		return nil, err
 	}
 
+	// Clear sensitive information from user object
+	user.Password = "" // Clear password from user object
+
 	return &AuthToken{
 		Token:        accessToken,
 		RefreshToken: refreshToken,
+		User:         user,
 	}, nil
 }
 

@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 
 type UserInfo = {
   id: string
+  username: string
   email: string
   role: 'admin' | 'editor'
 }
