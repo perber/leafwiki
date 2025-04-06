@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { PageNode } from '../../lib/api'
 import { AddPageDialog } from '../page/AddPageDialog'
 import { MovePageButton } from '../page/MovePageButton'
-import { SortPagesButton } from '../page/SortPagesButton'
+import { SortPagesDialog } from '../page/SortPagesDialog'
 
 type Props = {
   node: PageNode
@@ -73,7 +73,7 @@ export function TreeNode({ node, level = 0 }: Props) {
           <div className="flex flex-shrink-0 items-center gap-1">
             <AddPageDialog parentId={node.id} minimal />
             <MovePageButton pageId={node.id} />
-            {hasChildren && <SortPagesButton parent={node} />}
+            {hasChildren && <SortPagesDialog parent={node} />}
           </div>
         )}
       </div>

@@ -2,7 +2,7 @@ import { filterTreeWithOpenNodes } from '@/lib/filterTreeWithOpenNodes'
 import { useTreeStore } from '@/stores/tree'
 import React, { useEffect } from 'react'
 import { AddPageDialog } from '../page/AddPageDialog'
-import { SortPagesButton } from '../page/SortPagesButton'
+import { SortPagesDialog } from '../page/SortPagesDialog'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
@@ -59,7 +59,7 @@ export default function TreeView() {
         ))}
         <div className="ml-2">
           <AddPageDialog parentId={''} minimal />
-          {filteredTree !== null && <SortPagesButton parent={filteredTree} />}
+          {filteredTree !== null && <SortPagesDialog parent={filteredTree} />}
         </div>
       </div>
     )

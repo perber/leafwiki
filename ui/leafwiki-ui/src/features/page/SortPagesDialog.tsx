@@ -13,7 +13,7 @@ import { useTreeStore } from '@/stores/tree'
 import { ArrowDown, ArrowUp, List } from 'lucide-react'
 import { useState } from 'react'
 
-export function SortPagesButton({ parent }: { parent: PageNode }) {
+export function SortPagesDialog({ parent }: { parent: PageNode }) {
   const [open, setOpen] = useState(false)
   const [order, setOrder] = useState(parent.children.map((c) => c.id))
   const reloadTree = useTreeStore((s) => s.reloadTree)
