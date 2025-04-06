@@ -13,6 +13,7 @@ import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useTreeStore } from '@/stores/tree'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 type AddPageDialogProps = {
@@ -28,6 +29,7 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
+  const navigate = useNavigate()
 
   const handleTitleChange = async (val: string) => {
     setTitle(val)
@@ -49,16 +51,17 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
     setFieldErrors({})
     try {
       await createPage({ title, slug, parentId })
+      toast.success('Page created')
+      await reloadTree()
+      const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
+      navigate(`/e/${fullPath}`)
+      setOpen(false)
+      resetForm()
     } catch (err: any) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error creating page')
       setLoading(false)
-      return
     }
-    toast.success('Page created')
-    await reloadTree()
-    setOpen(false)
-    resetForm()
   }
 
   const handleCancel = () => {
@@ -143,7 +146,7 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
           <FormActions
             onCancel={handleCancel}
             onSave={handleCreate}
-            saveLabel="Create"
+            saveLabel={loading ? 'Creating…' : 'Create'}
             disabled={!title || !slug || loading}
             loading={loading}
           />
