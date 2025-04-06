@@ -9,6 +9,15 @@ import (
 
 func UploadAssetHandler(w *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		const maxUploadSize = 50 << 20 // 50 MB
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
+
+		// Parse form
+		if err := c.Request.ParseMultipartForm(maxUploadSize); err != nil {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
+			return
+		}
+
 		pageID := c.Param("id")
 		file, header, err := c.Request.FormFile("file")
 		if err != nil {

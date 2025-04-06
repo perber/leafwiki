@@ -10,11 +10,12 @@ import (
 )
 
 type Wiki struct {
-	tree  *tree.TreeService
-	slug  *tree.SlugService
-	auth  *auth.AuthService
-	user  *auth.UserService
-	asset *assets.AssetService
+	tree       *tree.TreeService
+	slug       *tree.SlugService
+	auth       *auth.AuthService
+	user       *auth.UserService
+	asset      *assets.AssetService
+	storageDir string
 }
 
 func NewWiki(storageDir string) (*Wiki, error) {
@@ -45,11 +46,12 @@ func NewWiki(storageDir string) (*Wiki, error) {
 
 	// Initialize the wiki service
 	wiki := &Wiki{
-		tree:  treeService,
-		slug:  slugService,
-		user:  userService,
-		auth:  authService,
-		asset: assetService,
+		tree:       treeService,
+		slug:       slugService,
+		user:       userService,
+		auth:       authService,
+		asset:      assetService,
+		storageDir: storageDir,
 	}
 
 	// Ensure the welcome page exists
@@ -206,6 +208,10 @@ func (w *Wiki) DeleteAsset(pageID string, filename string) error {
 		return err
 	}
 	return w.asset.DeleteAsset(page, filename)
+}
+
+func (w *Wiki) GetStorageDir() string {
+	return w.storageDir
 }
 
 func (w *Wiki) Close() error {

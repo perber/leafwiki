@@ -22,6 +22,8 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	router.StaticFS("/assets", gin.Dir(wikiInstance.GetStorageDir(), true))
+
 	nonAuthApiGroup := router.Group("/api")
 	{
 		// Auth
