@@ -108,3 +108,12 @@ func (s *AssetService) DeleteAsset(page *tree.PageNode, filename string) error {
 
 	return nil
 }
+
+func (s *AssetService) DeleteAllAssetsForPage(page *tree.PageNode) error {
+	pagePath := tree.GeneratePathFromPageNode(page)
+	assetDir := path.Join(s.storageDir, pagePath, "assets")
+	if _, err := os.Stat(assetDir); err == nil {
+		return os.RemoveAll(assetDir)
+	}
+	return nil
+}

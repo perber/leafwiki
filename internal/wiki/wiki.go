@@ -2,6 +2,7 @@ package wiki
 
 import (
 	"fmt"
+	"log"
 	"mime/multipart"
 
 	"github.com/perber/wiki/internal/core/assets"
@@ -107,7 +108,20 @@ func (w *Wiki) MovePage(id, parentID string) error {
 }
 
 func (w *Wiki) DeletePage(id string, recursive bool) error {
-	return w.tree.DeletePage(id, recursive)
+	page, err := w.tree.GetPage(id)
+	if err != nil {
+		return err
+	}
+
+	if err := w.tree.DeletePage(id, recursive); err != nil {
+		return err
+	}
+
+	if err := w.asset.DeleteAllAssetsForPage(page.PageNode); err != nil {
+		log.Printf("warning: could not delete assets for page %s: %v", page.ID, err)
+	}
+
+	return nil
 }
 
 func (w *Wiki) SortPages(parentID string, orderedIDs []string) error {
