@@ -1,6 +1,8 @@
 package http
 
 import (
+	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -22,7 +24,8 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	router.StaticFS("/assets", gin.Dir(wikiInstance.GetStorageDir(), true))
+	absStorageDir, _ := filepath.Abs(path.Join(wikiInstance.GetStorageDir()))
+	router.StaticFS("/assets", gin.Dir(absStorageDir, true))
 
 	nonAuthApiGroup := router.Group("/api")
 	{

@@ -64,7 +64,7 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 	return publicURL, nil
 }
 
-// ListAssetsForPage returns all asset filenames (not full paths)
+// ListAssetsForPage returns the full paths of all assets for a given page
 func (s *AssetService) ListAssetsForPage(page *tree.PageNode) ([]string, error) {
 	pagePath := tree.GeneratePathFromPageNode(page)
 	assetDir := path.Join(s.storageDir, pagePath, "assets")
@@ -77,7 +77,7 @@ func (s *AssetService) ListAssetsForPage(page *tree.PageNode) ([]string, error) 
 	result := []string{}
 	for _, f := range files {
 		if !f.IsDir() {
-			result = append(result, f.Name())
+			result = append(result, "/"+path.Join("assets", pagePath, "assets", f.Name()))
 		}
 	}
 

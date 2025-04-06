@@ -30,7 +30,9 @@ export async function fetchWithAuth(
   const logout = store.logout
 
   const headers = new Headers(options.headers || {})
-  headers.set('Content-Type', 'application/json')
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -265,3 +267,37 @@ export async function deleteUser(id: string) {
     throw new Error('User deletion failed')
   }
 }
+
+export async function uploadAsset(pageId: string, file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  try {
+    await fetchWithAuth(`/api/pages/${pageId}/assets`, {
+      method: 'POST',
+      body: form
+    })
+  } catch (e) {
+    throw new Error('Asset upload failed')
+  }
+}
+
+export async function getAssets(pageId: string): Promise<string[]> {
+  try {
+    const data = await fetchWithAuth(`/api/pages/${pageId}/assets`, {  })
+    return data.files
+  }
+  catch (e) {
+    throw new Error('Asset fetch failed')
+  }
+}
+
+export async function deleteAsset(pageId: string, filename: string) {
+  try {
+    await fetchWithAuth(`/api/pages/${pageId}/assets/${encodeURIComponent(filename)}`, {
+      method: 'DELETE',
+    })
+  } catch (e) {
+    throw new Error('Asset deletion failed')
+  }
+}
+

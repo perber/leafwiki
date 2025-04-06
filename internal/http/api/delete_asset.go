@@ -21,7 +21,6 @@ func DeleteAssetHandler(w *wiki.Wiki) gin.HandlerFunc {
 			respondWithError(c, err)
 			return
 		}
-
-		c.Status(http.StatusNoContent)
+		c.JSON(http.StatusOK, gin.H{"message": "asset deleted"})
 	}
 }

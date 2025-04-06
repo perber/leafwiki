@@ -5,6 +5,7 @@ import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
 import { useTreeStore } from '@/stores/tree'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { AssetManager } from './AssetManager'
 
 export default function PageEditor() {
   const { '*': path } = useParams()
@@ -63,43 +64,48 @@ export default function PageEditor() {
   if (!page) return <p className="text-sm text-gray-500">No page found</p>
 
   return (
-    <div className="flex h-full flex-col gap-4">
-      <div className="space-y-2">
-        <Input
-          placeholder="Title"
-          className="text-xl font-semibold"
-          value={title}
-          onChange={async (e) => {
-            const val = e.target.value
-            setTitle(val)
+    <div className="flex gap-6 h-[calc(100vh-250px)]">
+      <div className="flex flex-1 flex-col gap-4">
+        <div className="space-y-2">
+          <Input
+            placeholder="Title"
+            className="text-xl font-semibold mb-2"
+            value={title}
+            onChange={async (e) => {
+              const val = e.target.value
+              setTitle(val)
 
-            if (val.trim()) {
-              try {
-                const suggested = await suggestSlug(page?.parentId || '', val)
-                setSlug(suggested)
-              } catch (err) {
-                console.warn('Slug error', err)
+              if (val.trim()) {
+                try {
+                  const suggested = await suggestSlug(page?.parentId || '', val)
+                  setSlug(suggested)
+                } catch (err) {
+                  console.warn('Slug error', err)
+                }
+              } else {
+                setSlug('')
               }
-            } else {
-              setSlug('')
-            }
-          }}
-        />
-        <p className="text-sm text-gray-500">
-          Path: {parentPath && `${parentPath}/`}
-          {slug}
-        </p>
+            }}
+          />
+          <p className="text-sm text-gray-500">
+            Path: {parentPath && `${parentPath}/`}
+            {slug}
+          </p>
+        </div>
+        <MarkdownEditor value={markdown} onChange={handleOnChange} />
+        <div className="mt-4 flex justify-end">
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/${path}`)}
+            className="mr-2"
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>Save</Button>
+        </div>
       </div>
-      <MarkdownEditor value={markdown} onChange={handleOnChange} />
-      <div className="mt-4 flex justify-end">
-        <Button
-          variant="outline"
-          onClick={() => navigate(`/${path}`)}
-          className="mr-2"
-        >
-          Cancel
-        </Button>
-        <Button onClick={handleSave}>Save</Button>
+      <div className="w-64 border-l pl-4 overflow-y-auto">
+        <AssetManager pageId={page.id} />
       </div>
     </div>
   )
