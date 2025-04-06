@@ -1,4 +1,5 @@
 import { FormActions } from '@/components/FormActions'
+import { FormInput } from '@/components/FormInput'
 import {
   Dialog,
   DialogContent,
@@ -7,8 +8,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { createPage, suggestSlug } from '@/lib/api'
+import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useTreeStore } from '@/stores/tree'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
@@ -50,19 +51,7 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
       await createPage({ title, slug, parentId })
     } catch (err: any) {
       console.warn(err)
-      if (err?.error === 'validation_error' && Array.isArray(err.fields)) {
-        const errorMap: Record<string, string> = {}
-        for (const e of err.fields) {
-          errorMap[e.field] = e.message
-        }
-        setFieldErrors(errorMap)
-        toast.error('Error creating page')
-      } else if (err?.error) {
-        toast.error(err.error)
-      } else {
-        toast.error('Error creating page')
-      }
-
+      handleFieldErrors(err, setFieldErrors, 'Error creating page')
       setLoading(false)
       return
     }
@@ -100,30 +89,27 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
           <DialogDescription>Enter the title of the new page</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <Input
-            placeholder="Title"
+          <FormInput
+            label="Title"
             value={title}
-            onChange={(e) => {
-              handleTitleChange(e.target.value)
+            onChange={(val) => {
+              handleTitleChange(val)
               setFieldErrors((prev) => ({ ...prev, title: '' }))
             }}
-            className={fieldErrors.title ? 'border-red-500' : ''}
+            placeholder="Page title"
+            error={fieldErrors.title}
           />
-          {fieldErrors.title && (
-            <p className="text-sm text-red-500">{fieldErrors.title}</p>
-          )}
-          <Input
-            placeholder="Slug"
+
+          <FormInput
+            label="Slug"
             value={slug}
-            onChange={(e) => {
-              setSlug(e.target.value)
+            onChange={(val) => {
+              setSlug(val)
               setFieldErrors((prev) => ({ ...prev, slug: '' }))
             }}
-            className={fieldErrors.slug ? 'border-red-500' : ''}
+            placeholder="Page slug"
+            error={fieldErrors.slug}
           />
-          {fieldErrors.slug && (
-            <p className="text-sm text-red-500">{fieldErrors.slug}</p>
-          )}
         </div>
         <span className="text-sm text-gray-500">
           Path: {parentPath !== '' && `${parentPath}/`}
