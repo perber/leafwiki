@@ -217,3 +217,51 @@ export async function login(identifier: string, password: string) {
 
   return data
 }
+
+export type User = {
+  id: string
+  username: string
+  email: string
+  role: "admin" | "editor"
+}
+
+export async function getUsers(): Promise<User[]> {
+  try {
+    return await fetchWithAuth("/api/users")
+  }
+  catch (e) {
+    throw new Error("User fetch failed")
+  }
+}
+
+export async function createUser(user: Omit<User, "id"> & { password: string }) {
+  try {
+    await fetchWithAuth("/api/users", {
+      method: "POST",
+      body: JSON.stringify(user),
+    })
+  } catch (e) {
+    throw new Error("User creation failed")
+  }
+}
+
+export async function updateUser(user: User & { password?: string }) {
+  try {
+    await fetchWithAuth(`/api/users/${user.id}`, {
+      method: "PUT",
+      body: JSON.stringify(user),
+    })    
+  } catch(e) {
+    throw new Error("User update failed")
+  }
+}
+
+export async function deleteUser(id: string) {
+  try {
+    return await fetchWithAuth(`/api/users/${id}`, {
+      method: "DELETE",
+    })
+  } catch (e) {
+    throw new Error("User deletion failed")
+  }
+}

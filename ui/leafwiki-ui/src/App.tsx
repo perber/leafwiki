@@ -5,6 +5,7 @@ import RequireAuth from './features/auth/RequireAuth'
 import PageEditor from './features/page/PageEditor'
 import PageViewer from './features/page/PageViewer'
 import RootRedirect from './features/page/RootRedirect'
+import UserManagement from './features/users/UserManagement'
 import AppLayout from './layout/AppLayout'
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
             <RequireAuth>
               <AppLayout>
                 <Routes>
+                  <Route path="/users" element={<UserManagement />} />
                   <Route path="/" element={<RootRedirect />} />
                   <Route path="/e/*" element={<PageEditor />} />
                   <Route path="*" element={<PageViewer />} />
