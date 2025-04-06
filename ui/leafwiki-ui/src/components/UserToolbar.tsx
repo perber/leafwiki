@@ -1,7 +1,12 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useAuthStore } from "@/stores/auth"
-import { useNavigate } from "react-router-dom"
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useAuthStore } from '@/stores/auth'
+import { useNavigate } from 'react-router-dom'
 
 export default function UserToolbar() {
   const user = useAuthStore((s) => s.user)
@@ -12,7 +17,7 @@ export default function UserToolbar() {
 
   const handleLogout = () => {
     logout()
-    navigate("/login")
+    navigate('/login')
   }
 
   return (
@@ -24,12 +29,10 @@ export default function UserToolbar() {
           </Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => navigate("/users")}>
+          <DropdownMenuItem onClick={() => navigate('/users')}>
             User Management
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleLogout}>
-            Logout
-          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

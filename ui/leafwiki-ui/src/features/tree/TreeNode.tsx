@@ -46,26 +46,31 @@ export function TreeNode({ node, level = 0 }: Props) {
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <div className="flex items-center gap-1 flex-grow">
+        <div className="flex flex-grow items-center gap-1">
           {hasChildren && (
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 toggleNode(node.id)
               }}
-              className={`p-0.5 text-gray-500 transition-opacity hover:text-gray-800 ${hasChildren ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                }`}
+              className={`p-0.5 text-gray-500 transition-opacity hover:text-gray-800 ${
+                hasChildren
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover:opacity-100'
+              }`}
             >
               {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           )}
           {!hasChildren && <FileText size={14} className="text-gray-400" />}
           <Link to={`/${node.path}`}>
-            <span className="block truncate overflow-hidden text-ellipsis w-[130px]">{highlightTitle()}</span>
+            <span className="block w-[130px] overflow-hidden truncate text-ellipsis">
+              {highlightTitle()}
+            </span>
           </Link>
         </div>
         {hovered && (
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-1">
             <TreeAddInline parentId={node.id} minimal />
             <MovePageButton pageId={node.id} />
             {hasChildren && <SortPagesButton parent={node} />}

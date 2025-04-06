@@ -1,10 +1,16 @@
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { User } from "@/lib/api"
-import { useAuthStore } from "@/stores/auth"
-import { useUserStore } from "@/stores/users"
-import { useEffect, useState } from "react"
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { User } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
+import { useUserStore } from '@/stores/users'
+import { useEffect, useState } from 'react'
 
 type Props = {
   user?: User
@@ -14,10 +20,10 @@ export function UserFormDialog({ user }: Props) {
   const isEdit = !!user
   const [open, setOpen] = useState(false)
 
-  const [username, setUsername] = useState(user?.username || "")
-  const [email, setEmail] = useState(user?.email || "")
-  const [password, setPassword] = useState("")
-  const [role, setRole] = useState<"admin" | "editor">(user?.role || "editor")
+  const [username, setUsername] = useState(user?.username || '')
+  const [email, setEmail] = useState(user?.email || '')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<'admin' | 'editor'>(user?.role || 'editor')
 
   const { createUser, updateUser } = useUserStore()
   const { user: currentUser } = useAuthStore()
@@ -26,7 +32,7 @@ export function UserFormDialog({ user }: Props) {
     if (!username || !email || (!isEdit && !password)) return
 
     const userData = {
-      id: user?.id || "",
+      id: user?.id || '',
       username,
       email,
       password,
@@ -41,7 +47,7 @@ export function UserFormDialog({ user }: Props) {
       }
       setOpen(false)
     } catch (err) {
-      console.error("Fehler beim Speichern:", err)
+      console.error('Fehler beim Speichern:', err)
     }
   }
 
@@ -49,10 +55,10 @@ export function UserFormDialog({ user }: Props) {
 
   useEffect(() => {
     if (open && !isEdit) {
-      setUsername("")
-      setEmail("")
-      setPassword("")
-      setRole("editor")
+      setUsername('')
+      setEmail('')
+      setPassword('')
+      setRole('editor')
     }
   }, [open])
 
@@ -60,7 +66,9 @@ export function UserFormDialog({ user }: Props) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {isEdit ? (
-          <Button size="sm" variant="outline">Edit User</Button>
+          <Button size="sm" variant="outline">
+            Edit User
+          </Button>
         ) : (
           <Button variant="default">New User</Button>
         )}
@@ -68,7 +76,7 @@ export function UserFormDialog({ user }: Props) {
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit User" : "New User"}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Edit User' : 'New User'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
@@ -95,21 +103,24 @@ export function UserFormDialog({ user }: Props) {
             />
           )}
           <select
-            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             value={role}
-            onChange={(e) => setRole(e.target.value as "admin" | "editor")}
+            onChange={(e) => setRole(e.target.value as 'admin' | 'editor')}
             disabled={isOwnUser} // nicht den eigenen Admin-Status wegnehmen
           >
             <option value="editor">Editor</option>
             <option value="admin">Admin</option>
           </select>
 
-          <div className="pt-2 flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={!username || !email || (!isEdit && !password)}>
-              {isEdit ? "Save" : "Create"}
+            <Button
+              onClick={handleSubmit}
+              disabled={!username || !email || (!isEdit && !password)}
+            >
+              {isEdit ? 'Save' : 'Create'}
             </Button>
           </div>
         </div>

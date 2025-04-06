@@ -1,17 +1,17 @@
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import { useAuthStore } from "@/stores/auth"
-import { useUserStore } from "@/stores/users"
-import { useState } from "react"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/stores/auth'
+import { useUserStore } from '@/stores/users'
+import { useState } from 'react'
 
 type Props = {
   userId: string
@@ -33,8 +33,8 @@ export function DeleteUserButton({ userId, username }: Props) {
       await deleteUser(userId)
       setOpen(false)
     } catch (err) {
-        console.error("Error deleting user:", err)
-        // Optionally show an error message to the user
+      console.error('Error deleting user:', err)
+      // Optionally show an error message to the user
     } finally {
       setLoading(false)
     }
@@ -45,7 +45,9 @@ export function DeleteUserButton({ userId, username }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button size="sm" variant="destructive">Delete</Button>
+        <Button size="sm" variant="destructive">
+          Delete
+        </Button>
       </AlertDialogTrigger>
 
       <AlertDialogContent>
@@ -56,16 +58,14 @@ export function DeleteUserButton({ userId, username }: Props) {
         </AlertDialogHeader>
 
         <p className="text-sm text-gray-600">
-          The user <strong>{username}</strong> will be permanently removed from the system.
+          The user <strong>{username}</strong> will be permanently removed from
+          the system.
         </p>
 
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDelete}
-            disabled={loading}
-          >
-            {loading ? "Deleting..." : "Delete"}
+          <AlertDialogAction onClick={handleDelete} disabled={loading}>
+            {loading ? 'Deleting...' : 'Delete'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

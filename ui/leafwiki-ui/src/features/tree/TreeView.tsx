@@ -1,12 +1,20 @@
-import { filterTreeWithOpenNodes } from "@/lib/filterTreeWithOpenNodes"
+import { filterTreeWithOpenNodes } from '@/lib/filterTreeWithOpenNodes'
 import { useTreeStore } from '@/stores/tree'
 import React, { useEffect } from 'react'
-import { SortPagesButton } from "../page/SortPagesButton"
-import { TreeAddInline } from "./TreeAddInline"
-import { TreeNode } from "./TreeNode"
+import { SortPagesButton } from '../page/SortPagesButton'
+import { TreeAddInline } from './TreeAddInline'
+import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
-  const { tree, loading, error, reloadTree, searchQuery, setSearchQuery, clearSearch } = useTreeStore()
+  const {
+    tree,
+    loading,
+    error,
+    reloadTree,
+    searchQuery,
+    setSearchQuery,
+    clearSearch,
+  } = useTreeStore()
 
   useEffect(() => {
     reloadTree()
@@ -32,22 +40,29 @@ export default function TreeView() {
 
   let toRender = <></>
 
-  if (searchQuery && (!filteredTree?.children || filteredTree.children.length === 0)) {
+  if (
+    searchQuery &&
+    (!filteredTree?.children || filteredTree.children.length === 0)
+  ) {
     toRender = (
-      <p className="text-sm text-gray-500 italic px-2">Keine Treffer gefunden</p>
+      <p className="px-2 text-sm italic text-gray-500">
+        Keine Treffer gefunden
+      </p>
     )
   } else {
-    toRender = (<div className="space-y-1">
-      {filteredTree?.children.map((node) => (
-        <React.Fragment key={node.id}>
-          <TreeNode node={node} />
-        </React.Fragment>
-      ))}
-      <div className="ml-2">
-        <TreeAddInline parentId={''} minimal />
-        {filteredTree !== null && <SortPagesButton parent={filteredTree} />}
+    toRender = (
+      <div className="space-y-1">
+        {filteredTree?.children.map((node) => (
+          <React.Fragment key={node.id}>
+            <TreeNode node={node} />
+          </React.Fragment>
+        ))}
+        <div className="ml-2">
+          <TreeAddInline parentId={''} minimal />
+          {filteredTree !== null && <SortPagesButton parent={filteredTree} />}
+        </div>
       </div>
-    </div>)
+    )
   }
 
   return (

@@ -1,15 +1,15 @@
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { useUserStore } from "@/stores/users"
-import { useState } from "react"
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { useUserStore } from '@/stores/users'
+import { useState } from 'react'
 
 type Props = {
   userId: string
@@ -18,19 +18,19 @@ type Props = {
 
 export function ChangePasswordDialog({ userId, username }: Props) {
   const [open, setOpen] = useState(false)
-  const [password, setPassword] = useState("")
-  const [confirm, setConfirm] = useState("")
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const { users, updateUser } = useUserStore()
-  const user = users.find(u => u.id === userId)
+  const user = users.find((u) => u.id === userId)
 
   if (!user) return null
 
   const handleChange = async () => {
     if (!password || password !== confirm) {
-      setError("Passwords are not matching.")
+      setError('Passwords are not matching.')
       return
     }
 
@@ -42,7 +42,7 @@ export function ChangePasswordDialog({ userId, username }: Props) {
       })
       setOpen(false)
     } catch (err) {
-      setError("Error updating password.")
+      setError('Error updating password.')
     } finally {
       setLoading(false)
     }
@@ -51,7 +51,9 @@ export function ChangePasswordDialog({ userId, username }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="secondary">Change Password</Button>
+        <Button size="sm" variant="secondary">
+          Change Password
+        </Button>
       </DialogTrigger>
 
       <DialogContent>
@@ -72,13 +74,15 @@ export function ChangePasswordDialog({ userId, username }: Props) {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
           />
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
 
         <DialogFooter className="pt-4">
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
           <Button onClick={handleChange} disabled={loading}>
-            {loading ? "Saving..." : "Save"}
+            {loading ? 'Saving...' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

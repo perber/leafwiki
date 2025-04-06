@@ -1,8 +1,8 @@
-import { PageNode } from "@/lib/api";
+import { PageNode } from '@/lib/api'
 
 export function filterTreeWithOpenNodes(
   node: PageNode,
-  query: string
+  query: string,
 ): { filtered: PageNode | null; expandedIds: Set<string> } {
   const expandedIds = new Set<string>()
 
@@ -10,9 +10,7 @@ export function filterTreeWithOpenNodes(
     const matches = current.title.toLowerCase().includes(query.toLowerCase())
 
     const children = current.children || []
-    const filteredChildren = children
-      .map(recurse)
-      .filter(Boolean) as PageNode[]
+    const filteredChildren = children.map(recurse).filter(Boolean) as PageNode[]
 
     if (matches || filteredChildren.length > 0) {
       if (filteredChildren.length > 0) {

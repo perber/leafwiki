@@ -1,5 +1,5 @@
-import * as api from "@/lib/api"
-import { create } from "zustand"
+import * as api from '@/lib/api'
+import { create } from 'zustand'
 
 type UserStore = {
   users: api.User[]

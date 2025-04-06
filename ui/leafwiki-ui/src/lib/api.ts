@@ -1,7 +1,6 @@
 import { useAuthStore } from '@/stores/auth'
 import { API_BASE_URL } from './config'
 
-
 export type AuthResponse = {
   token: string
   refresh_token: string
@@ -21,7 +20,6 @@ export function logout() {
 let isRefreshing = false
 let refreshPromise: Promise<void> | null = null
 
-
 export async function fetchWithAuth(
   path: string,
   options: RequestInit = {},
@@ -31,10 +29,9 @@ export async function fetchWithAuth(
   const token = store.token
   const logout = store.logout
 
-
   const headers = new Headers(options.headers || {})
-  headers.set("Content-Type", "application/json")
-  if (token) headers.set("Authorization", `Bearer ${token}`)
+  headers.set('Content-Type', 'application/json')
+  if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -56,13 +53,13 @@ export async function fetchWithAuth(
       return fetchWithAuth(path, options, false) // Retry once
     } catch {
       logout()
-      throw new Error("Unauthorized")
+      throw new Error('Unauthorized')
     }
   }
 
   if (!res.ok) {
     const error = await res.text()
-    throw new Error(error || "Request failed")
+    throw new Error(error || 'Request failed')
   }
 
   try {
@@ -76,15 +73,15 @@ async function refreshAccessToken() {
   const store = useAuthStore.getState()
   const refreshToken = store.refreshToken
 
-  if (!refreshToken) throw new Error("No refresh token available")
+  if (!refreshToken) throw new Error('No refresh token available')
 
   const res = await fetchWithAuth(`${API_BASE_URL}/api/auth/refresh-token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: refreshToken }),
   })
 
-  if (!res.ok) throw new Error("Refresh failed")
+  if (!res.ok) throw new Error('Refresh failed')
 
   const data = await res.json()
   store.setAuth(data.token, data.refresh_token, data.user)
@@ -102,7 +99,7 @@ export async function fetchTree(): Promise<PageNode> {
   try {
     return await fetchWithAuth(`/api/tree`)
   } catch (e) {
-    throw new Error("Tree fetch failed")
+    throw new Error('Tree fetch failed')
   }
 }
 
@@ -116,7 +113,7 @@ export async function suggestSlug(
     )
     return data.slug
   } catch (e) {
-    throw new Error("Slug suggestion failed")
+    throw new Error('Slug suggestion failed')
   }
 }
 
@@ -126,7 +123,7 @@ export async function getPageByPath(path: string) {
       `/api/pages/by-path?path=${encodeURIComponent(path)}`,
     )
   } catch (e) {
-    throw new Error("Page not found")
+    throw new Error('Page not found')
   }
 }
 
@@ -147,58 +144,60 @@ export async function createPage({
       body: JSON.stringify({ title, slug, parentId }),
     })
   } catch (e) {
-    throw new Error("Page creation failed")
+    throw new Error('Page creation failed')
   }
-
 }
 
-export async function updatePage(id: string, title: string, slug: string, content: string) {
+export async function updatePage(
+  id: string,
+  title: string,
+  slug: string,
+  content: string,
+) {
   try {
     return await fetchWithAuth(`/api/pages/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, slug, content }),
     })
   } catch (e) {
-    throw new Error("Page update failed")
+    throw new Error('Page update failed')
   }
 }
 
 export async function deletePage(id: string) {
   try {
     return await fetchWithAuth(`/api/pages/${id}`, {
-      method: "DELETE",
+      method: 'DELETE',
     })
   } catch (e) {
-    throw new Error("Page deletion failed")
+    throw new Error('Page deletion failed')
   }
 }
 
 export async function movePage(id: string, parentId: string | null) {
-
-  if (parentId === '' || parentId == "root") parentId = null
+  if (parentId === '' || parentId == 'root') parentId = null
 
   const res = await fetchWithAuth(`/api/pages/${id}/move`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parentId }),
   })
-  if (!res.ok) throw new Error("Move failed")
+  if (!res.ok) throw new Error('Move failed')
 }
 
 export async function sortPages(parentId: string, orderedIDs: string[]) {
   try {
-    if (parentId === '') parentId = "root"
+    if (parentId === '') parentId = 'root'
 
     return await fetchWithAuth(`/api/pages/${parentId}/sort`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderedIDs }),
     })
   } catch (e) {
-    throw new Error("Sorting failed")
+    throw new Error('Sorting failed')
   }
-
 }
 
 export async function login(identifier: string, password: string) {
@@ -222,46 +221,47 @@ export type User = {
   id: string
   username: string
   email: string
-  role: "admin" | "editor"
+  role: 'admin' | 'editor'
 }
 
 export async function getUsers(): Promise<User[]> {
   try {
-    return await fetchWithAuth("/api/users")
-  }
-  catch (e) {
-    throw new Error("User fetch failed")
+    return await fetchWithAuth('/api/users')
+  } catch (e) {
+    throw new Error('User fetch failed')
   }
 }
 
-export async function createUser(user: Omit<User, "id"> & { password: string }) {
+export async function createUser(
+  user: Omit<User, 'id'> & { password: string },
+) {
   try {
-    await fetchWithAuth("/api/users", {
-      method: "POST",
+    await fetchWithAuth('/api/users', {
+      method: 'POST',
       body: JSON.stringify(user),
     })
   } catch (e) {
-    throw new Error("User creation failed")
+    throw new Error('User creation failed')
   }
 }
 
 export async function updateUser(user: User & { password?: string }) {
   try {
     await fetchWithAuth(`/api/users/${user.id}`, {
-      method: "PUT",
+      method: 'PUT',
       body: JSON.stringify(user),
-    })    
-  } catch(e) {
-    throw new Error("User update failed")
+    })
+  } catch (e) {
+    throw new Error('User update failed')
   }
 }
 
 export async function deleteUser(id: string) {
   try {
     return await fetchWithAuth(`/api/users/${id}`, {
-      method: "DELETE",
+      method: 'DELETE',
     })
   } catch (e) {
-    throw new Error("User deletion failed")
+    throw new Error('User deletion failed')
   }
 }

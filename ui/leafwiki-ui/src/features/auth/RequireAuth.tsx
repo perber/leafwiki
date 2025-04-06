@@ -1,13 +1,13 @@
-import { useAuthStore } from "@/stores/auth"
-import { ReactNode } from "react"
-import { Navigate } from "react-router-dom"
+import { useAuthStore } from '@/stores/auth'
+import { ReactNode } from 'react'
+import { Navigate } from 'react-router-dom'
 
 type Props = {
   children: ReactNode
 }
 
 export default function RequireAuth({ children }: Props) {
-  const token = useAuthStore(state => state.token)
+  const token = useAuthStore((state) => state.token)
 
   if (!token) {
     return <Navigate to="/login" replace />

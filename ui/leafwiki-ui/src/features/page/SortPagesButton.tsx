@@ -1,10 +1,17 @@
 // components/page/SortPagesDialog.tsx
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { PageNode, sortPages } from "@/lib/api"
-import { useTreeStore } from "@/stores/tree"
-import { ArrowDown, ArrowUp, List } from "lucide-react"
-import { useState } from "react"
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { PageNode, sortPages } from '@/lib/api'
+import { useTreeStore } from '@/stores/tree'
+import { ArrowDown, ArrowUp, List } from 'lucide-react'
+import { useState } from 'react'
 
 export function SortPagesButton({ parent }: { parent: PageNode }) {
   const [open, setOpen] = useState(false)
@@ -38,7 +45,8 @@ export function SortPagesButton({ parent }: { parent: PageNode }) {
         <DialogHeader>
           <DialogTitle>Sort Pages</DialogTitle>
           <DialogDescription>
-            Sort the pages by clicking the arrows. The order will be saved after you click "Save".
+            Sort the pages by clicking the arrows. The order will be saved after
+            you click "Save".
           </DialogDescription>
         </DialogHeader>
 
@@ -47,13 +55,26 @@ export function SortPagesButton({ parent }: { parent: PageNode }) {
             const node = parent.children.find((c) => c.id === id)
             if (!node) return null
             return (
-              <li key={id} className="flex items-center justify-between border p-2 rounded">
+              <li
+                key={id}
+                className="flex items-center justify-between rounded border p-2"
+              >
                 <span className="truncate">{node.title}</span>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => move(i, -1)} disabled={i === 0}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => move(i, -1)}
+                    disabled={i === 0}
+                  >
                     <ArrowUp size={14} />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => move(i, 1)} disabled={i === order.length - 1}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => move(i, 1)}
+                    disabled={i === order.length - 1}
+                  >
                     <ArrowDown size={14} />
                   </Button>
                 </div>
@@ -63,7 +84,11 @@ export function SortPagesButton({ parent }: { parent: PageNode }) {
         </ul>
 
         <div className="mt-4 flex justify-end">
-          <Button variant="outline" onClick={() => setOpen(false)} className="mr-2">
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            className="mr-2"
+          >
             Cancel
           </Button>
           <Button onClick={handleSave}>Save</Button>
