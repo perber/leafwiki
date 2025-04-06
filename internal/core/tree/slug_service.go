@@ -95,7 +95,7 @@ func (s *SlugService) GenerateUniqueFilename(existing []string, desired string) 
 	for _, f := range existing {
 		conflicts[f] = true
 	}
-	for conflicts[name] || s.IsValidSlug(name) != nil {
+	for conflicts[name] {
 		name = fmt.Sprintf("%s-%d%s", slugged, i, ext)
 		i++
 	}

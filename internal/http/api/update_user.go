@@ -12,10 +12,10 @@ func UpdateUserHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 		id := c.Param("id")
 
 		var req struct {
-			Username string `json:"username"`
-			Email    string `json:"email"`
+			Username string `json:"username" binding:"required"`
+			Email    string `json:"email" binding:"required,email"`
 			Password string `json:"password"`
-			Role     string `json:"role"`
+			Role     string `json:"role" binding:"required,oneof=admin editor"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload"})

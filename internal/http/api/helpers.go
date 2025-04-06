@@ -6,10 +6,19 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	verrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
 func respondWithError(c *gin.Context, err error) {
+	var vErr *verrors.ValidationErrors
+	if errors.As(err, &vErr) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":  "validation_error",
+			"fields": vErr.Errors,
+		})
+	}
+
 	switch {
 	case errors.Is(err, tree.ErrPageNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "Page not found"})

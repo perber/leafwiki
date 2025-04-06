@@ -7,6 +7,7 @@ import (
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -82,6 +83,20 @@ func (w *Wiki) EnsureWelcomePage() error {
 }
 
 func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Page, error) {
+	ve := errors.NewValidationErrors()
+
+	if title == "" {
+		ve.Add("title", "Title must not be empty")
+	}
+
+	if err := w.slug.IsValidSlug(slug); err != nil {
+		ve.Add("slug", err.Error())
+	}
+
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
 	// Check if the parentID exists
 	if parentID != nil && *parentID != "" {
 		var err error

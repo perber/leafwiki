@@ -10,10 +10,10 @@ import (
 func CreateUserHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Username string `json:"username"`
-			Email    string `json:"email"`
-			Password string `json:"password"`
-			Role     string `json:"role"`
+			Username string `json:"username" binding:"required"`
+			Email    string `json:"email" binding:"required,email"`
+			Password string `json:"password" binding:"required"`
+			Role     string `json:"role" binding:"required,oneof=admin editor"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user payload"})
@@ -22,7 +22,7 @@ func CreateUserHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 
 		user, err := wikiInstance.CreateUser(req.Username, req.Email, req.Password, req.Role)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			respondWithError(c, err)
 			return
 		}
 

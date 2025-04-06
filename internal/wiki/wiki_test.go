@@ -30,13 +30,29 @@ func TestWiki_CreatePage_WithParent(t *testing.T) {
 	w := setupTestWiki(t)
 	rootPage, _ := w.CreatePage(nil, "Docs", "docs")
 
-	page, err := w.CreatePage(&rootPage.ID, "API", "api")
+	page, err := w.CreatePage(&rootPage.ID, "API-Doc", "api-doc")
 	if err != nil {
 		t.Fatalf("CreatePage with parent failed: %v", err)
 	}
 
 	if page.Parent.ID != rootPage.ID {
 		t.Errorf("Expected parent ID %q, got %q", rootPage.ID, page.Parent.ID)
+	}
+}
+
+func TestWiki_CreatePage_EmptyTitle(t *testing.T) {
+	w := setupTestWiki(t)
+	_, err := w.CreatePage(nil, "", "empty")
+	if err == nil {
+		t.Error("Expected error for empty title, got none")
+	}
+}
+
+func TestWiki_CreatePage_ReservedSlug(t *testing.T) {
+	w := setupTestWiki(t)
+	_, err := w.CreatePage(nil, "Reserved", "e")
+	if err == nil {
+		t.Error("Expected error for reserved slug, got none")
 	}
 }
 
