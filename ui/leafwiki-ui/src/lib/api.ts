@@ -1,6 +1,12 @@
 import { useAuthStore } from '@/stores/auth'
 import { API_BASE_URL } from './config'
 
+type FieldError = {
+  field: string
+  message: string
+}
+
+
 export type AuthResponse = {
   token: string
   refresh_token: string

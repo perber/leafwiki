@@ -17,6 +17,7 @@ func respondWithError(c *gin.Context, err error) {
 			"error":  "validation_error",
 			"fields": vErr.Errors,
 		})
+		return
 	}
 
 	switch {

@@ -3,9 +3,9 @@ import { ChevronDown, ChevronRight, FileText } from 'lucide-react'
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageNode } from '../../lib/api'
+import { AddPageDialog } from '../page/AddPageDialog'
 import { MovePageButton } from '../page/MovePageButton'
 import { SortPagesButton } from '../page/SortPagesButton'
-import { TreeAddInline } from './TreeAddInline'
 
 type Props = {
   node: PageNode
@@ -71,7 +71,7 @@ export function TreeNode({ node, level = 0 }: Props) {
         </div>
         {hovered && (
           <div className="flex flex-shrink-0 items-center gap-1">
-            <TreeAddInline parentId={node.id} minimal />
+            <AddPageDialog parentId={node.id} minimal />
             <MovePageButton pageId={node.id} />
             {hasChildren && <SortPagesButton parent={node} />}
           </div>

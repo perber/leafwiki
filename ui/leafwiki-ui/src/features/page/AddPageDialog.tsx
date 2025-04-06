@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button'
+import { FormActions } from '@/components/FormActions'
 import {
   Dialog,
   DialogContent,
@@ -12,16 +12,19 @@ import { createPage, suggestSlug } from '@/lib/api'
 import { useTreeStore } from '@/stores/tree'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 
-type TreeAddInlineProps = {
+type AddPageDialogProps = {
   parentId: string
   minimal?: boolean
 }
 
-export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
+export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
 
@@ -35,14 +38,39 @@ export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
       const suggestion = await suggestSlug(parentId, val)
       setSlug(suggestion)
     } catch (err) {
-      console.warn(err)
+      toast.error('Error generating slug')
     }
   }
 
   const handleCreate = async () => {
     if (!title || !slug) return
-    await createPage({ title, slug, parentId })
+    setLoading(true)
+    setFieldErrors({})
+    try {
+      await createPage({ title, slug, parentId })
+    } catch (err: any) {
+      console.warn(err)
+
+      if (err?.error === 'validation_error' && Array.isArray(err.fields)) {
+        const errorMap: Record<string, string> = {}
+        for (const e of err.fields) {
+          errorMap[e.field] = e.message
+        }
+        setFieldErrors(errorMap)
+      }
+
+      if (err instanceof Error) {
+        toast.error(err.message)
+      } else {
+        toast.error('Error creating page')
+      }
+
+      setLoading(false)
+      return
+    }
+    toast.success('Page created')
     await reloadTree()
+    setLoading(false)
     setOpen(false)
     setTitle('')
     setSlug('')
@@ -78,21 +106,33 @@ export function TreeAddInline({ parentId, minimal }: TreeAddInlineProps) {
             placeholder="Title"
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}
+            className={fieldErrors.title ? 'border-red-500' : ''}
           />
+          {fieldErrors.title && (
+            <p className="text-sm text-red-500">{fieldErrors.title}</p>
+          )}
           <Input
             placeholder="Slug"
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
+            className={fieldErrors.slug ? 'border-red-500' : ''}
           />
+          {fieldErrors.slug && (
+            <p className="text-sm text-red-500">{fieldErrors.slug}</p>
+          )}
         </div>
         <span className="text-sm text-gray-500">
           Path: {parentPath !== '' && `${parentPath}/`}
           {slug && `${slug}`}
         </span>
         <div className="mt-4 flex justify-end">
-          <Button onClick={handleCreate} disabled={!title || !slug}>
-            Create
-          </Button>
+          <FormActions
+            onCancel={() => setOpen(false)}
+            onSave={handleCreate}
+            saveLabel="Create"
+            disabled={!title || !slug || loading}
+            loading={loading}
+          />
         </div>
       </DialogContent>
     </Dialog>

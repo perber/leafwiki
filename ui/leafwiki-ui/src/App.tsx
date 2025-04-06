@@ -1,4 +1,5 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import './App.css'
 import LoginForm from './features/auth/LoginForm'
 import RequireAuth from './features/auth/RequireAuth'
@@ -11,6 +12,7 @@ import AppLayout from './layout/AppLayout'
 function App() {
   return (
     <BrowserRouter>
+      <Toaster richColors position="bottom-right" />
       <Routes>
         {/* Login separat, ohne Layout */}
         <Route path="/login" element={<LoginForm />} />

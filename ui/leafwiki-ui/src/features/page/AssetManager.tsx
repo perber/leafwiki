@@ -6,23 +6,26 @@ import { useEffect, useRef, useState } from 'react'
 const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
 
 function generateMarkdownLink(filename: string, url: string): string {
-    const ext = url.split('.').pop()?.toLowerCase() || ''
-    const isImage = imageExtensions.includes(ext)
+  const ext = url.split('.').pop()?.toLowerCase() || ''
+  const isImage = imageExtensions.includes(ext)
 
-    const baseName = filename.split('/').pop()?.replace(/\.[^/.]+$/, '') || 'file'
+  const baseName =
+    filename
+      .split('/')
+      .pop()
+      ?.replace(/\.[^/.]+$/, '') || 'file'
 
-    if (isImage) {
-        return `![${baseName}](${url})\n`
-    } else {
-        return `[${filename}](${url})\n`
-    }
+  if (isImage) {
+    return `![${baseName}](${url})\n`
+  } else {
+    return `[${filename}](${url})\n`
+  }
 }
 
 type Props = {
   pageId: string
   onInsert?: (md: string) => void // optionaler Callback fürs Markdown
 }
-
 
 export function AssetManager({ pageId, onInsert }: Props) {
   const [assets, setAssets] = useState<string[]>([])
@@ -47,8 +50,6 @@ export function AssetManager({ pageId, onInsert }: Props) {
   useEffect(() => {
     loadAssets()
   }, [pageId])
-
-
 
   const handleUploadFile = async (file: File) => {
     try {
@@ -138,9 +139,7 @@ export function AssetManager({ pageId, onInsert }: Props) {
           {assets.map((filename) => {
             const assetUrl = filename
             const ext = filename.split('.').pop()?.toLowerCase()
-            const isImage = imageExtensions.includes(
-              ext ?? '',
-            )
+            const isImage = imageExtensions.includes(ext ?? '')
             const baseName = filename.split('/').pop() ?? filename
 
             return (

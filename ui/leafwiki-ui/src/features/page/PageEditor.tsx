@@ -93,7 +93,7 @@ export default function PageEditor() {
           value={markdown}
           onChange={(val) => {
             setMarkdown(val)
-            
+
             if (inserted) setInserted(null) // reset after insert
           }}
           insert={inserted}

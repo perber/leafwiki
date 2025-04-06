@@ -1,8 +1,8 @@
 import { filterTreeWithOpenNodes } from '@/lib/filterTreeWithOpenNodes'
 import { useTreeStore } from '@/stores/tree'
 import React, { useEffect } from 'react'
+import { AddPageDialog } from '../page/AddPageDialog'
 import { SortPagesButton } from '../page/SortPagesButton'
-import { TreeAddInline } from './TreeAddInline'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
@@ -58,7 +58,7 @@ export default function TreeView() {
           </React.Fragment>
         ))}
         <div className="ml-2">
-          <TreeAddInline parentId={''} minimal />
+          <AddPageDialog parentId={''} minimal />
           {filteredTree !== null && <SortPagesButton parent={filteredTree} />}
         </div>
       </div>
