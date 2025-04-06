@@ -1,11 +1,22 @@
 package tree
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/gosimple/slug"
 )
+
+var reservedSlugs = map[string]bool{
+	"e":      true,
+	"edit":   true,
+	"api":    true,
+	"assets": true,
+	"index":  true,
+}
 
 type SlugService struct {
 }
@@ -20,12 +31,35 @@ func (s *SlugService) GenerateUniqueSlug(parent *PageNode, desired string) strin
 	original := slug
 	i := 1
 
-	for hasSlugConflict(parent, slug) {
+	for hasSlugConflict(parent, slug) || s.IsValidSlug(slug) != nil {
 		slug = fmt.Sprintf("%s-%d", original, i)
 		i++
 	}
 
 	return slug
+}
+
+func (s *SlugService) IsValidSlug(slug string) error {
+	if slug == "" {
+		return errors.New("slug must not be empty")
+	}
+
+	slug = strings.ToLower(slug)
+
+	if reservedSlugs[slug] {
+		return fmt.Errorf("slug '%s' is reserved", slug)
+	}
+
+	matched, err := regexp.MatchString(`^[a-z0-9]+(-[a-z0-9]+)*$`, slug)
+	if err != nil || !matched {
+		return errors.New("slug must contain only lowercase letters, numbers and hyphens")
+	}
+
+	if strings.HasPrefix(slug, "-") || strings.HasSuffix(slug, "-") {
+		return errors.New("slug must not start or end with a hyphen")
+	}
+
+	return nil
 }
 
 // normalizeSlug creates a URL-friendly slug (can be improved)
@@ -61,7 +95,7 @@ func (s *SlugService) GenerateUniqueFilename(existing []string, desired string) 
 	for _, f := range existing {
 		conflicts[f] = true
 	}
-	for conflicts[name] {
+	for conflicts[name] || s.IsValidSlug(name) != nil {
 		name = fmt.Sprintf("%s-%d%s", slugged, i, ext)
 		i++
 	}
