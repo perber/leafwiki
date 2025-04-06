@@ -2,6 +2,7 @@ package tree
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/gosimple/slug"
 )
@@ -40,4 +41,30 @@ func hasSlugConflict(parent *PageNode, slug string) bool {
 		}
 	}
 	return false
+}
+
+func (s *SlugService) NormalizeFilename(filename string) string {
+	ext := filepath.Ext(filename)
+	base := filename[:len(filename)-len(ext)]
+	return normalizeSlug(base) + ext
+}
+
+func (s *SlugService) GenerateUniqueFilename(existing []string, desired string) string {
+	ext := filepath.Ext(desired)
+	base := desired[:len(desired)-len(ext)]
+	slugged := normalizeSlug(base)
+	name := slugged + ext
+	i := 1
+
+	// Check conflicts in existing list
+	conflicts := make(map[string]bool)
+	for _, f := range existing {
+		conflicts[f] = true
+	}
+	for conflicts[name] {
+		name = fmt.Sprintf("%s-%d%s", slugged, i, ext)
+		i++
+	}
+
+	return name
 }

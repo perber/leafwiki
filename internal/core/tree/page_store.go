@@ -104,19 +104,8 @@ func (f *PageStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 	// Retrieving the path of the parent entry
 	parentPath := path.Join(f.storageDir, GeneratePathFromPageNode(parentEntry))
 
-	// So the last entry could be a file
-	filename := parentPath + ".md"
-	// Check if the file exists - if the file exists, we should migrate it to a folder and move the file to the folder
-	if _, err := os.Stat(filename); err == nil {
-		// Create folder
-		if err := os.MkdirAll(parentPath, 0755); err != nil {
-			return fmt.Errorf("could not create folder: %v", err)
-		}
-
-		// Move file to folder
-		if err := os.Rename(filename, path.Join(parentPath, "index.md")); err != nil {
-			return fmt.Errorf("could not move file to folder: %v", err)
-		}
+	if err := EnsurePageIsFolder(f.storageDir, GeneratePathFromPageNode(parentEntry)); err != nil {
+		return fmt.Errorf("could not prepare parent folder: %w", err)
 	}
 
 	// Check if the folder exists
@@ -174,6 +163,10 @@ func (f *PageStore) DeletePage(entry *PageNode) error {
 		if err := os.Remove(entryPath + ".md"); err != nil {
 			return fmt.Errorf("could not delete file: %v", err)
 		}
+	}
+
+	if entry.Parent != nil {
+		_ = FoldPageFolderIfEmpty(f.storageDir, GeneratePathFromPageNode(entry.Parent))
 	}
 
 	return nil
@@ -245,17 +238,8 @@ func (f *PageStore) MovePage(entry *PageNode, parentEntry *PageNode) error {
 	// Retrieving the path of the entry
 	parentPath := path.Join(f.storageDir, GeneratePathFromPageNode(parentEntry))
 
-	// Check if the parent entry is a file - if it is a file, we need to move the file to a folder
-	if _, err := os.Stat(parentPath + ".md"); err == nil {
-		// Create folder
-		if err := os.MkdirAll(parentPath, 0755); err != nil {
-			return fmt.Errorf("could not create folder: %v", err)
-		}
-
-		// Move file to folder
-		if err := os.Rename(parentPath+".md", path.Join(parentPath, "index.md")); err != nil {
-			return fmt.Errorf("could not move file to folder: %v", err)
-		}
+	if err := EnsurePageIsFolder(f.storageDir, GeneratePathFromPageNode(parentEntry)); err != nil {
+		return fmt.Errorf("could not convert parent to folder: %w", err)
 	}
 
 	// now we have created the folder, we can move the entry to the new parent
@@ -275,6 +259,10 @@ func (f *PageStore) MovePage(entry *PageNode, parentEntry *PageNode) error {
 	// Move the file to the parentPath
 	if err := os.Rename(src, dest); err != nil {
 		return fmt.Errorf("could not move file: %v", err)
+	}
+
+	if entry.Parent != nil {
+		_ = FoldPageFolderIfEmpty(f.storageDir, GeneratePathFromPageNode(entry.Parent))
 	}
 
 	return nil
