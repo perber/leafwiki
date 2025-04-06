@@ -7,11 +7,13 @@ type FormInputProps = {
   placeholder?: string
   error?: string
   type?: string
+  autoFocus?: boolean
 }
 
 export function FormInput({
   label,
   value,
+  autoFocus,
   onChange,
   placeholder,
   error,
@@ -25,6 +27,7 @@ export function FormInput({
         </label>
       )}
       <Input
+        autoFocus={autoFocus || false}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}

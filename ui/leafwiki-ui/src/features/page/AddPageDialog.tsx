@@ -57,14 +57,30 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
     }
     toast.success('Page created')
     await reloadTree()
-    setLoading(false)
     setOpen(false)
+    resetForm()
+  }
+
+  const handleCancel = () => {
+    resetForm()
+    setOpen(false)
+  }
+
+  const resetForm = () => {
     setTitle('')
     setSlug('')
+    setFieldErrors({})
+    setLoading(false)
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen)
+        if (!isOpen) resetForm()
+      }}
+    >
       <DialogTrigger asChild>
         {minimal ? (
           <button onClick={() => setOpen(true)}>
@@ -83,13 +99,21 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
           </button>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && !loading && title && slug) {
+            e.preventDefault()
+            handleCreate()
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Create a new page</DialogTitle>
           <DialogDescription>Enter the title of the new page</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <FormInput
+            autoFocus={true}
             label="Title"
             value={title}
             onChange={(val) => {
@@ -117,7 +141,7 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
         </span>
         <div className="mt-4 flex justify-end">
           <FormActions
-            onCancel={() => setOpen(false)}
+            onCancel={handleCancel}
             onSave={handleCreate}
             saveLabel="Create"
             disabled={!title || !slug || loading}
