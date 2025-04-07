@@ -1,11 +1,11 @@
-import { useTreeStore } from '@/stores/tree'
-import { ChevronDown, ChevronRight, FileText } from 'lucide-react'
-import React, { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { PageNode } from '../../lib/api'
-import { AddPageDialog } from '../page/AddPageDialog'
-import { MovePageButton } from '../page/MovePageButton'
-import { SortPagesDialog } from '../page/SortPagesDialog'
+import { useTreeStore } from '@/stores/tree';
+import { ChevronUp, File } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { PageNode } from '../../lib/api';
+import { AddPageDialog } from '../page/AddPageDialog';
+import { MovePageButton } from '../page/MovePageButton';
+import { SortPagesDialog } from '../page/SortPagesDialog';
 
 type Props = {
   node: PageNode
@@ -42,7 +42,7 @@ export function TreeNode({ node, level = 0 }: Props) {
   return (
     <div className="pl-2">
       <div
-        className={`flex cursor-pointer items-center gap-1 text-sm hover:underline ${isActive ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'}`}
+        className={`flex cursor-pointer items-center gap-1 text-base transition-all ease-in-out duration-150 ${isActive ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'}`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
@@ -59,10 +59,12 @@ export function TreeNode({ node, level = 0 }: Props) {
                   : 'opacity-0 group-hover:opacity-100'
               }`}
             >
-              {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <ChevronUp size={20}
+              className={`${open ? 'rotate-180' : 'rotate-90'} transition-all ease-in-out`}
+            />
             </button>
           )}
-          {!hasChildren && <FileText size={14} className="text-gray-400" />}
+          {!hasChildren && <File size={20} className="text-gray-400" />}
           <Link to={`/${node.path}`}>
             <span className="block w-[130px] overflow-hidden truncate text-ellipsis">
               {highlightTitle()}

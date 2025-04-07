@@ -73,7 +73,7 @@ export default function TreeView() {
           placeholder="Search pages..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded border px-2 py-1 text-sm"
+          className="w-full rounded border px-2 py-1 text-base"
         />
         {searchQuery && (
           <button
