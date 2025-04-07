@@ -1,26 +1,26 @@
 // /lib/useMeasure.ts
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react'
 
 export function useMeasure<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const [height, setHeight] = useState(0);
+  const ref = useRef<T>(null)
+  const [height, setHeight] = useState(0)
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+    const el = ref.current
+    if (!el) return
 
     const observer = new ResizeObserver(([entry]) => {
-      const newHeight = entry.contentRect.height;
-      setHeight(newHeight);
-    });
+      const newHeight = entry.contentRect.height
+      setHeight(newHeight)
+    })
 
-    observer.observe(el);
+    observer.observe(el)
 
     // Initialhöhe setzen (für statischen Inhalt)
-    setHeight(el.scrollHeight);
+    setHeight(el.scrollHeight)
 
-    return () => observer.disconnect();
-  }, []);
+    return () => observer.disconnect()
+  }, [])
 
-  return [ref, height] as const;
+  return [ref, height] as const
 }

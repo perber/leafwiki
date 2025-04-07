@@ -1,7 +1,6 @@
 import { useAuthStore } from '@/stores/auth'
 import { API_BASE_URL } from './config'
 
-
 export type AuthResponse = {
   token: string
   refresh_token: string

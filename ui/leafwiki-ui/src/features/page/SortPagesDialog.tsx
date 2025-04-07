@@ -37,14 +37,14 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-      <div className="relative group flex mr-2">
+        <div className="group relative mr-2 flex">
           <button onClick={() => setOpen(true)}>
             <List
               size={20}
               className="cursor-pointer text-gray-500 hover:text-gray-800"
             />
           </button>
-          <div className="absolute left-0 hidden w-max px-2 py-1 text-xs text-white bg-gray-700 rounded group-hover:block bottom-full mb-2">
+          <div className="absolute bottom-full left-0 mb-2 hidden w-max rounded bg-gray-700 px-2 py-1 text-xs text-white group-hover:block">
             Sort pages
           </div>
         </div>

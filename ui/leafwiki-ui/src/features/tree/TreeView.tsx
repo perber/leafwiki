@@ -1,10 +1,10 @@
-import { filterTreeWithOpenNodes } from '@/lib/filterTreeWithOpenNodes';
-import { useDebounce } from '@/lib/useDebounce';
-import { useTreeStore } from '@/stores/tree';
-import React, { useEffect } from 'react';
-import { AddPageDialog } from '../page/AddPageDialog';
-import { SortPagesDialog } from '../page/SortPagesDialog';
-import { TreeNode } from './TreeNode';
+import { filterTreeWithOpenNodes } from '@/lib/filterTreeWithOpenNodes'
+import { useDebounce } from '@/lib/useDebounce'
+import { useTreeStore } from '@/stores/tree'
+import React, { useEffect } from 'react'
+import { AddPageDialog } from '../page/AddPageDialog'
+import { SortPagesDialog } from '../page/SortPagesDialog'
+import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
   const {
@@ -15,38 +15,42 @@ export default function TreeView() {
     searchQuery,
     setSearchQuery,
     clearSearch,
-  } = useTreeStore();
+  } = useTreeStore()
 
   // Debounce für die Suche: Warte 500ms, bevor die Suche verarbeitet wird
-  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const debouncedSearchQuery = useDebounce(searchQuery, 500)
 
   // Lade die Baumstruktur bei Komponentemount
   useEffect(() => {
     if (tree === null) {
-      reloadTree();
+      reloadTree()
     }
-  }, [tree, reloadTree]);
+  }, [tree, reloadTree])
 
   // Bei Änderung der Debounced-Suche: Setze den Filterstatus
   useEffect(() => {
-    if (!tree || !debouncedSearchQuery) return;
-    const { expandedIds } = filterTreeWithOpenNodes(tree, debouncedSearchQuery);
-    useTreeStore.setState({ openNodeIds: expandedIds });
-  }, [debouncedSearchQuery, tree]);
+    if (!tree || !debouncedSearchQuery) return
+    const { expandedIds } = filterTreeWithOpenNodes(tree, debouncedSearchQuery)
+    useTreeStore.setState({ openNodeIds: expandedIds })
+  }, [debouncedSearchQuery, tree])
 
   // Verwende den debouncedSearchQuery für das Setzen des Such-Querys
   useEffect(() => {
-    setSearchQuery(debouncedSearchQuery);
-  }, [debouncedSearchQuery, setSearchQuery]);
+    setSearchQuery(debouncedSearchQuery)
+  }, [debouncedSearchQuery, setSearchQuery])
 
   // Fehlerbehandlung und Ladezustand
-  if (loading) return <p className="text-sm text-gray-500">Loading...</p>;
-  if (error || !tree) return <p className="text-sm text-red-500">Error: {error}</p>;
+  if (loading) return <p className="text-sm text-gray-500">Loading...</p>
+  if (error || !tree)
+    return <p className="text-sm text-red-500">Error: {error}</p>
 
   // Filterung mit dem debouncedSearchQuery
-  const { filtered: filteredTree } = filterTreeWithOpenNodes(tree, debouncedSearchQuery);
+  const { filtered: filteredTree } = filterTreeWithOpenNodes(
+    tree,
+    debouncedSearchQuery,
+  )
 
-  let toRender = <></>;
+  let toRender = <></>
 
   if (
     debouncedSearchQuery &&
@@ -56,11 +60,11 @@ export default function TreeView() {
       <p className="mt-2 text-sm italic text-gray-500">
         No pages found matching "{debouncedSearchQuery}"
       </p>
-    );
+    )
   } else {
     toRender = (
-      <div className="space-y-1 mt-4">
-        <div className='flex'>
+      <div className="mt-4 space-y-1">
+        <div className="flex">
           <AddPageDialog parentId={''} minimal />
           {filteredTree !== null && <SortPagesDialog parent={filteredTree} />}
         </div>
@@ -70,7 +74,7 @@ export default function TreeView() {
           </React.Fragment>
         ))}
       </div>
-    );
+    )
   }
 
   return (
@@ -94,5 +98,5 @@ export default function TreeView() {
       </div>
       {toRender}
     </>
-  );
+  )
 }
