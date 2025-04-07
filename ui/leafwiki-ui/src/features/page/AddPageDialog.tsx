@@ -10,9 +10,10 @@ import {
 } from '@/components/ui/dialog'
 import { createPage, suggestSlug } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { useDebounce } from '@/lib/useDebounce'
 import { useTreeStore } from '@/stores/tree'
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -31,18 +32,25 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
   const navigate = useNavigate()
 
+  const debouncedTitle = useDebounce(title, 300);
+
+  useEffect(() => {
+    if (debouncedTitle.trim() === '') return;
+    const generateSlug = async () => {
+      try {
+        const suggestion = await suggestSlug(parentId, debouncedTitle);
+        setSlug(suggestion);
+      } catch (err) {
+        toast.error('Error generating slug');
+      }
+    };
+
+    generateSlug();
+  }, [debouncedTitle, parentId]);
+
   const handleTitleChange = async (val: string) => {
     setTitle(val)
-    if (!val.trim()) {
-      setSlug('')
-      return
-    }
-    try {
-      const suggestion = await suggestSlug(parentId, val)
-      setSlug(suggestion)
-    } catch (err) {
-      toast.error('Error generating slug')
-    }
+    setFieldErrors((prev) => ({ ...prev, title: '' }))
   }
 
   const handleCreate = async () => {
