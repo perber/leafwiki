@@ -1,4 +1,5 @@
 import { filterTreeWithOpenNodes } from '@/lib/filterTreeWithOpenNodes'
+import { useDebounce } from '@/lib/useDebounce'
 import { useTreeStore } from '@/stores/tree'
 import React, { useEffect } from 'react'
 import { AddPageDialog } from '../page/AddPageDialog'
@@ -16,37 +17,39 @@ export default function TreeView() {
     clearSearch,
   } = useTreeStore()
 
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);  // Debounce für 500ms
+
   useEffect(() => {
     reloadTree()
   }, [])
 
   useEffect(() => {
-    if (!tree || !searchQuery) return
-    const { expandedIds } = filterTreeWithOpenNodes(tree, searchQuery)
+    if (!tree || !debouncedSearchQuery) return
+    const { expandedIds } = filterTreeWithOpenNodes(tree, debouncedSearchQuery)
     useTreeStore.setState({ openNodeIds: expandedIds })
-  }, [searchQuery, tree])
+  }, [debouncedSearchQuery, tree])
 
   useEffect(() => {
-    if (!searchQuery) {
-      useTreeStore.setState({ openNodeIds: new Set() })
-    }
-  }, [searchQuery])
+    setSearchQuery(debouncedSearchQuery);
+  }, [debouncedSearchQuery, setSearchQuery]);
+
+
 
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>
   if (error || !tree)
     return <p className="text-sm text-red-500">Error: {error}</p>
 
-  const { filtered: filteredTree } = filterTreeWithOpenNodes(tree, searchQuery)
+  const { filtered: filteredTree } = filterTreeWithOpenNodes(tree, debouncedSearchQuery)
 
   let toRender = <></>
 
   if (
-    searchQuery &&
+    debouncedSearchQuery &&
     (!filteredTree?.children || filteredTree.children.length === 0)
   ) {
     toRender = (
-      <p className="px-2 text-sm italic text-gray-500">
-        Keine Treffer gefunden
+      <p className="mt-2 text-sm italic text-gray-500">
+        No pages found matching "{debouncedSearchQuery}"
       </p>
     )
   } else {
@@ -68,7 +71,7 @@ export default function TreeView() {
 
   return (
     <>
-      <div>
+      <div className='flex items-center space-x-2'>
         <input
           type="text"
           placeholder="Search pages..."
