@@ -38,7 +38,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button className="text-gray-500 hover:text-gray-800">
-          <List size={16} />
+          <List size={20} />
         </button>
       </DialogTrigger>
       <DialogContent>
