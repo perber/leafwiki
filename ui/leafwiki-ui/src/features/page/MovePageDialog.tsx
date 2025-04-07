@@ -19,7 +19,7 @@ import { useTreeStore } from '@/stores/tree'
 import { Move } from 'lucide-react'
 import { JSX, useMemo, useState } from 'react'
 
-export function MovePageButton({ pageId }: { pageId: string }) {
+export function MovePageDialog({ pageId }: { pageId: string }) {
   const { tree, reloadTree } = useTreeStore()
   const [open, setOpen] = useState(false)
 
