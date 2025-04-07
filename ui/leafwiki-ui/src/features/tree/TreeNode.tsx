@@ -39,38 +39,45 @@ export function TreeNode({ node, level = 0 }: Props) {
     )
   }
 
+  const linkText = (<Link to={`/${node.path}`}>
+    <span className="block w-[130px] overflow-hidden truncate text-ellipsis">
+      {highlightTitle()}
+    </span>
+  </Link>)
+
   return (
-    <div className="pl-2">
+    <div>
       <div
-        className={`flex cursor-pointer items-center gap-1 text-base transition-all ease-in-out duration-150 ${isActive ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100'}`}
+        className={`flex cursor-pointer items-center text-base transition-all ease-in-out duration-200 ${isActive ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100 text-gray-800'
+          }`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <div className="flex flex-grow items-center gap-1">
           {hasChildren && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleNode(node.id)
-              }}
-              className={`p-0.5 text-gray-500 transition-opacity hover:text-gray-800 ${
-                hasChildren
-                  ? 'opacity-100'
-                  : 'opacity-0 group-hover:opacity-100'
-              }`}
-            >
-            <ChevronUp size={20}
-              className={`${open ? 'rotate-180' : 'rotate-90'} transition-all ease-in-out`}
-            />
-            </button>
+            <>
+              <div className='pt-1 pb-1 pr-1 flex flex-grow items-center gap-2'>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleNode(node.id)
+                  }}
+                  className={`text-gray-600 hover:text-gray-800 transition-all ease-in-out ${hasChildren
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                    }`}
+                >
+                  <ChevronUp size={18}
+                    className={`${open ? 'rotate-180' : 'rotate-90'} transition-all ease-in-out`}
+                  />
+                </button>
+                {linkText}
+              </div>
+            </>
           )}
-          {!hasChildren && <File size={20} className="text-gray-400" />}
-          <Link to={`/${node.path}`}>
-            <span className="block w-[130px] overflow-hidden truncate text-ellipsis">
-              {highlightTitle()}
-            </span>
-          </Link>
-        </div>
+
+
+          {!hasChildren && <div className="pt-1 pb-1 pr-1 flex flex-grow items-center gap-2"><File size={18} className="text-gray-400" />{linkText}</div>}
+
         {hovered && (
           <div className="flex flex-shrink-0 items-center gap-1">
             <AddPageDialog parentId={node.id} minimal />

@@ -51,23 +51,24 @@ export default function TreeView() {
     )
   } else {
     toRender = (
-      <div className="space-y-1">
+      
+      <div className="space-y-1 mt-4">
+        <div>
+          <AddPageDialog parentId={''} minimal />
+          {filteredTree !== null && <SortPagesDialog parent={filteredTree} />}
+        </div>
         {filteredTree?.children.map((node) => (
           <React.Fragment key={node.id}>
             <TreeNode node={node} />
           </React.Fragment>
         ))}
-        <div className="ml-2">
-          <AddPageDialog parentId={''} minimal />
-          {filteredTree !== null && <SortPagesDialog parent={filteredTree} />}
-        </div>
       </div>
     )
   }
 
   return (
     <>
-      <div className="mb-2 flex gap-2">
+      <div>
         <input
           type="text"
           placeholder="Search pages..."
