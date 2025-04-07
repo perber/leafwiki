@@ -60,7 +60,7 @@ export default function TreeView() {
   } else {
     toRender = (
       <div className="space-y-1 mt-4">
-        <div>
+        <div className='flex'>
           <AddPageDialog parentId={''} minimal />
           {filteredTree !== null && <SortPagesDialog parent={filteredTree} />}
         </div>

@@ -44,7 +44,7 @@ export function TreeNode({ node, level = 0 }: Props) {
 
   const linkText = (
     <Link to={`/${node.path}`}>
-      <span className="block w-[130px] overflow-hidden truncate text-ellipsis">
+      <span className="block w-[150px] overflow-hidden truncate text-ellipsis">
         {highlightTitle()}
       </span>
     </Link>
@@ -52,20 +52,19 @@ export function TreeNode({ node, level = 0 }: Props) {
 
   return (
     <div>
-      {/* TreeNode Header */}
       <div
         className={`flex cursor-pointer items-center text-base transition-all ease-in-out duration-200 rounded-lg pt-1 pb-1 ${
           isActive ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-100 text-gray-800'
         }`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        onClick={() => hasChildren && toggleNode(node.id)} // Klickbereich für den Knoten
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-1 gap-2">
           {hasChildren && (
             <ChevronUp
               size={16}
               className={`transition-transform ${open ? 'rotate-180' : 'rotate-90'}`}
+              onClick={() => hasChildren && toggleNode(node.id)}
             />
           )}
 
@@ -76,7 +75,7 @@ export function TreeNode({ node, level = 0 }: Props) {
         </div>
 
         {hovered && (
-          <div className="flex flex-shrink-0 items-center gap-1">
+          <div className="flex gap-0">
             <AddPageDialog parentId={node.id} minimal />
             <MovePageButton pageId={node.id} />
             {hasChildren && <SortPagesDialog parent={node} />}

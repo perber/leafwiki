@@ -93,7 +93,7 @@ export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
       }}
     >
       <DialogTrigger asChild>
-        <div className="relative group inline-block mr-2">
+        <div className="relative group flex mr-2">
           {minimal ? (
             <button onClick={() => setOpen(true)}>
               <Plus
