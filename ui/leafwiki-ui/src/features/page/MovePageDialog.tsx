@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button'
+import { FormActions } from '@/components/FormActions'
 import {
   Dialog,
   DialogContent,
@@ -15,13 +15,23 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { movePage, PageNode } from '@/lib/api'
+import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useTreeStore } from '@/stores/tree'
 import { Move } from 'lucide-react'
 import { JSX, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 export function MovePageDialog({ pageId }: { pageId: string }) {
   const { tree, reloadTree } = useTreeStore()
+  const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [_, setFieldErrors] = useState<Record<string, string>>({})
+  const getPathById = useTreeStore((s) => s.getPathById)
+  const pagePath = getPathById(pageId) || ''
+  // get opened route from react router
+  const currentPath = useLocation().pathname
+  const navigate = useNavigate()
 
   const parentId = useMemo(() => {
     const findParent = (node: any): string | null => {
@@ -45,8 +55,33 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
 
   const handleMove = async () => {
     if (!newParentId || newParentId === parentId) return
-    await movePage(pageId, newParentId)
-    await reloadTree()
+    setLoading(true)
+    try {
+      await movePage(pageId, newParentId)
+      if (`${currentPath}` === `/${pagePath}`) {
+        await reloadTree()
+        const newPath = getPathById(pageId) || '';
+        if (newPath) {
+          navigate(`/${newPath}`)
+        } else {
+          navigate('/')
+        }
+
+      } else {
+        await reloadTree()
+      }
+
+      toast.success('Page moved successfully')
+      setLoading(false)
+      setOpen(false)
+    } catch (err: any) {
+      console.log(err)
+      setLoading(false)
+      handleFieldErrors(err, setFieldErrors, 'Error moving page')
+    }
+  }
+
+  const handleCancel = () => {
     setOpen(false)
   }
 
@@ -100,16 +135,13 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
         </Select>
 
         <div className="mt-4 flex justify-end">
-          <Button
-            variant="outline"
-            onClick={() => setOpen(false)}
-            className="mr-2"
-          >
-            Cancel
-          </Button>
-          <Button onClick={handleMove} disabled={newParentId === parentId}>
-            Confirm Move
-          </Button>
+          <FormActions
+            onCancel={handleCancel}
+            onSave={handleMove}
+            saveLabel={loading ? 'Moving...' : 'Move'}
+            disabled={newParentId === parentId || loading}
+            loading={loading}
+          />
         </div>
       </DialogContent>
     </Dialog>

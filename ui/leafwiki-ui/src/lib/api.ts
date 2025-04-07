@@ -206,12 +206,11 @@ export async function deletePage(id: string) {
 export async function movePage(id: string, parentId: string | null) {
   if (parentId === '' || parentId == 'root') parentId = null
 
-  const res = await fetchWithAuth(`/api/pages/${id}/move`, {
+  return await fetchWithAuth(`/api/pages/${id}/move`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parentId }),
   })
-  if (!res.ok) throw new Error('Move failed')
 }
 
 export async function sortPages(parentId: string, orderedIDs: string[]) {
