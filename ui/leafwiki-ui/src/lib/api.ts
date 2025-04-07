@@ -1,15 +1,6 @@
 import { useAuthStore } from '@/stores/auth'
 import { API_BASE_URL } from './config'
 
-type FieldError = {
-  field: string
-  message: string
-}
-
-type APIValidationError = {
-  error: 'validation_error'
-  fields: FieldError[]
-}
 
 export type AuthResponse = {
   token: string
