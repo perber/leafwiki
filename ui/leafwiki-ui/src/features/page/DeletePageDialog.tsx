@@ -1,17 +1,11 @@
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { deletePage } from '@/lib/api'
 import { useTreeStore } from '@/stores/tree'
 import { Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-export function DeletePageButton({
+export function DeletePageDialog({
   pageId,
   redirectUrl,
 }: {
@@ -28,17 +22,17 @@ export function DeletePageButton({
   }
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
         <Button variant="destructive" size="sm">
           <Trash2 className="mr-1" />
           Delete
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Delete Page?</DialogTitle>
-        </DialogHeader>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Page?</AlertDialogTitle>
+        </AlertDialogHeader>
         <p className="text-sm text-gray-600">
           Are you sure you want to delete this page? This action cannot be
           undone.
@@ -48,7 +42,7 @@ export function DeletePageButton({
             Confirm Delete
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
