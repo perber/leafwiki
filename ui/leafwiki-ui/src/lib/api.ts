@@ -183,14 +183,14 @@ export async function updatePage(
   }
 }
 
-export async function deletePage(id: string) {
-  try {
-    return await fetchWithAuth(`/api/pages/${id}`, {
-      method: 'DELETE',
-    })
-  } catch (e) {
-    throw new Error('Page deletion failed')
-  }
+export async function deletePage(id: string, recursive: boolean) {
+  if (recursive === undefined) recursive = false
+
+  const recursiveQuery = recursive ? 'true' : 'false'
+
+  return await fetchWithAuth(`/api/pages/${id}?recursive=${recursiveQuery}`, {
+    method: 'DELETE',
+  })
 }
 
 export async function movePage(id: string, parentId: string | null) {
