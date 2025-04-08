@@ -71,12 +71,12 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
       }
 
       toast.success('Page moved successfully')
-      setLoading(false)
       setOpen(false)
     } catch (err: any) {
       console.log(err)
-      setLoading(false)
       handleFieldErrors(err, setFieldErrors, 'Error moving page')
+    } finally {
+      setLoading(false)
     }
   }
 

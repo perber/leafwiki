@@ -204,17 +204,13 @@ export async function movePage(id: string, parentId: string | null) {
 }
 
 export async function sortPages(parentId: string, orderedIDs: string[]) {
-  try {
-    if (parentId === '') parentId = 'root'
+  if (parentId === '') parentId = 'root'
 
-    return await fetchWithAuth(`/api/pages/${parentId}/sort`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderedIDs }),
-    })
-  } catch (e) {
-    throw new Error('Sorting failed')
-  }
+  return await fetchWithAuth(`/api/pages/${parentId}/sort`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderedIDs }),
+  })
 }
 
 export async function login(identifier: string, password: string) {
