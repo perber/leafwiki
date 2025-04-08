@@ -1,5 +1,6 @@
 import { useUserStore } from '@/stores/users'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { ChangePasswordDialog } from './ChangePasswordDialog'
 import { DeleteUserButton } from './DeleteUserButton'
 import { UserFormDialog } from './UserFormDialog'
@@ -7,15 +8,26 @@ import { UserFormDialog } from './UserFormDialog'
 
 export default function UserManagement() {
   const { users, loadUsers } = useUserStore()
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    setLoading(true)
     loadUsers()
+      .catch((err) => {
+        console.warn(err)
+        toast.error('Error loading users')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }, [loadUsers])
 
   return (
     <div className="mx-auto max-w-4xl">
       <h1 className="mb-4 text-2xl font-bold">UserManagement</h1>
-      <UserFormDialog />
+      <div className="flex justify-end">
+        <UserFormDialog />
+      </div>
       <div className="mt-4 overflow-hidden rounded-md border shadow">
         <table className="w-full text-sm">
           <thead className="bg-gray-100 text-left">
@@ -27,18 +39,36 @@ export default function UserManagement() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {loading && (
+              <tr>
+                <td colSpan={4} className="p-4 text-center text-gray-500">
+                  Loading users...
+                </td>
+              </tr>
+            )}
+            {!loading && users.length === 0 && (
+              <tr>
+                <td colSpan={4} className="p-4 text-center text-gray-500">
+                  No users found.
+                </td>
+              </tr>
+            )}
+            {!loading && users.length > 0 && users.map((user) => (
               <tr key={user.id} className="border-t">
                 <td className="p-3">{user.username}</td>
                 <td className="p-3">{user.email}</td>
-                <td className="p-3 capitalize">{user.role}</td>
-                <td className="flex gap-2 p-3">
-                  <UserFormDialog user={user} />
-                  <ChangePasswordDialog
-                    userId={user.id}
-                    username={user.username}
-                  />
-                  <DeleteUserButton userId={user.id} username={user.username} />
+                <td className="p-3">
+                  <span className={`rounded px-2 py-1 text-xs font-medium ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}>{user.role}</span>
+                </td>
+                <td className="p-3">
+                  <div className="flex gap-2">
+                    <UserFormDialog user={user} />
+                    <ChangePasswordDialog
+                      userId={user.id}
+                      username={user.username}
+                    />
+                    <DeleteUserButton userId={user.id} username={user.username} />
+                  </div>
                 </td>
               </tr>
             ))}
