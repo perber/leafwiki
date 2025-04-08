@@ -33,6 +33,9 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 		return nil, ErrUserInvalidCredentials
 	}
 
+	// Clear sensitive information from user object
+	user.Password = "" // Clear password from user object
+
 	accessToken, err := a.generateToken(user, time.Hour*1, "access")
 	if err != nil {
 		return nil, err
@@ -42,9 +45,6 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Clear sensitive information from user object
-	user.Password = "" // Clear password from user object
 
 	return &AuthToken{
 		Token:        accessToken,
@@ -74,6 +74,9 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 		return nil, ErrUserNotFound
 	}
 
+	// Clear sensitive information from user object
+	user.Password = "" // Clear password from user object
+
 	newAccessToken, err := a.generateToken(user, time.Hour*1, "access")
 	if err != nil {
 		return nil, err
@@ -87,6 +90,7 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 	return &AuthToken{
 		Token:        newAccessToken,
 		RefreshToken: newRefreshToken,
+		User:         user,
 	}, nil
 }
 

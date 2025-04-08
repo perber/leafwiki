@@ -12,8 +12,10 @@ type UserInfo = {
 type AuthState = {
   token: string | null
   refreshToken: string | null
+  isRefreshing: boolean
   user: UserInfo | null
   setAuth: (token: string, refreshToken: string, user: UserInfo) => void
+  setRefreshing: (value: boolean) => void
   logout: () => void
 }
 
@@ -23,6 +25,8 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       user: null,
+      isRefreshing: false,
+      setRefreshing: (value) => set({ isRefreshing: value }),
       setAuth: (token, refreshToken, user) =>
         set({ token, refreshToken, user }),
       logout: () => set({ token: null, refreshToken: null, user: null }),

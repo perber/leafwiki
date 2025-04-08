@@ -89,20 +89,26 @@ export async function fetchWithAuth(
 
 async function refreshAccessToken() {
   const store = useAuthStore.getState()
+  const setRefreshing = useAuthStore.getState().setRefreshing
   const refreshToken = store.refreshToken
 
   if (!refreshToken) throw new Error('No refresh token available')
 
-  const res = await fetchWithAuth(`${API_BASE_URL}/api/auth/refresh-token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: refreshToken }),
-  })
+  setRefreshing(true)
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: refreshToken }),
+    })
 
-  if (!res.ok) throw new Error('Refresh failed')
+    if (!res.ok) throw new Error('Refresh failed')
 
-  const data = await res.json()
-  store.setAuth(data.token, data.refresh_token, data.user)
+    const data = await res.json()
+    store.setAuth(data.token, data.refresh_token, data.user)
+  } finally {
+    setRefreshing(false)
+  }
 }
 
 export type PageNode = {
