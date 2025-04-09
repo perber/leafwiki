@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/users'
 import { DialogDescription } from '@radix-ui/react-dialog'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 type Props = {
   open: boolean
@@ -19,36 +20,37 @@ type Props = {
 }
 
 export function ChangeOnwnPasswordDialog({open, onOpenChange }: Props) {
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [password, setPassword] = useState('')
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
 
   const { user} = useAuthStore()
-  const { updateUser } = useUserStore()
+  const { changeOwnPassword } = useUserStore()
 
   if (!user) return null
 
-  const handleCurrentPasswordChange = (val: string) => {
-    setCurrentPassword(val)
+  const handleOldPasswordChange = (val: string) => {
+    setOldPassword(val)
+    setFieldErrors((prev) => ({ ...prev, oldPassword: '' }))
   }
 
-  const handlePasswordChange = (val: string) => {
-    setPassword(val)
+  const handleNewPasswordChange = (val: string) => {
+    setNewPassword(val)
     if (val.length < 8) {
       setFieldErrors((prev) => ({
         ...prev,
-        password: 'Password must be at least 8 characters long',
+        newPassword: 'Password must be at least 8 characters long',
       }))
     } else {
-      setFieldErrors((prev) => ({ ...prev, password: '' }))
+      setFieldErrors((prev) => ({ ...prev, newPassword: '' }))
     }
   }
 
   const handleConfirmChange = (val: string) => {
     setConfirm(val)
-    if (val !== password) {
+    if (val !== newPassword) {
       setFieldErrors((prev) => ({ ...prev, confirm: 'Passwords do not match' }))
     } else {
       setFieldErrors((prev) => ({ ...prev, confirm: '' }))
@@ -58,12 +60,17 @@ export function ChangeOnwnPasswordDialog({open, onOpenChange }: Props) {
   const handleChange = async () => {
     setLoading(true)
     try {
-      await updateUser({
-        ...user,
-        password,
-      })
+      await changeOwnPassword(
+        oldPassword,
+        newPassword,
+      )
+      toast.success('Password changed successfully')
+      onOpenChange(false)
     } catch (err) {
       console.warn(err)
+      setOldPassword("")
+      setNewPassword("")
+      setConfirm("")
       handleFieldErrors(err, setFieldErrors, 'Error updating password')
     } finally {
       setLoading(false)
@@ -71,7 +78,8 @@ export function ChangeOnwnPasswordDialog({open, onOpenChange }: Props) {
   }
 
   const resetForm = () => {
-    setPassword('')
+    setOldPassword('')
+    setNewPassword('')
     setConfirm('')
     setFieldErrors({})
   }
@@ -95,21 +103,21 @@ export function ChangeOnwnPasswordDialog({open, onOpenChange }: Props) {
         <div className="space-y-3 pt-2">
           <FormInput
             autoFocus={true}
-            label="Current Password"
+            label="Old Password"
             type="password"
-            value={currentPassword}
-            onChange={handleCurrentPasswordChange}
-            placeholder="Current Password"
-            error={fieldErrors.currentPassword}
+            value={oldPassword}
+            onChange={handleOldPasswordChange}
+            placeholder="Old Password"
+            error={fieldErrors.oldPassword}
           />
           <FormInput
             autoFocus={true}
             label="New Password"
             type="password"
-            value={password}
-            onChange={handlePasswordChange}
+            value={newPassword}
+            onChange={handleNewPasswordChange}
             placeholder="New Password"
-            error={fieldErrors.password}
+            error={fieldErrors.newPassword}
           />
           <FormInput
             label="Confirm Password"
@@ -126,7 +134,7 @@ export function ChangeOnwnPasswordDialog({open, onOpenChange }: Props) {
             onCancel={() => onOpenChange(false)}
             onSave={handleChange}
             saveLabel={loading ? 'Saving...' : 'Save'}
-            disabled={loading || !currentPassword || !password || password !== confirm}
+            disabled={loading || !oldPassword || !newPassword || newPassword !== confirm || fieldErrors.newPassword !== '' || fieldErrors.confirm !== ''}
             loading={loading}
           />
         </DialogFooter>

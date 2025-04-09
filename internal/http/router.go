@@ -57,6 +57,9 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 		requiresAuthGroup.PUT("/users/:id", middleware.RequireSelfOrAdmin(wikiInstance), api.UpdateUserHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/users/:id", middleware.RequireAdmin(wikiInstance), api.DeleteUserHandler(wikiInstance))
 
+		// Change Own Password
+		requiresAuthGroup.PUT("/users/me/password", api.ChangeOwnPasswordUserHandler(wikiInstance))
+
 		// Assets
 		requiresAuthGroup.POST("/pages/:id/assets", api.UploadAssetHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/:id/assets", api.ListAssetsHandler(wikiInstance))

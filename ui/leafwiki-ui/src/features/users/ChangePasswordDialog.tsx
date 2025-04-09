@@ -38,7 +38,8 @@ export function ChangePasswordDialog({ userId, username }: Props) {
         ...prev,
         password: 'Password must be at least 8 characters long',
       }))
-    } else {
+    }
+     else {
       setFieldErrors((prev) => ({ ...prev, password: '' }))
     }
   }
@@ -121,7 +122,7 @@ export function ChangePasswordDialog({ userId, username }: Props) {
             onCancel={() => setOpen(false)}
             onSave={handleChange}
             saveLabel={loading ? 'Saving...' : 'Save'}
-            disabled={loading || !password || password !== confirm}
+            disabled={loading || !password || password !== confirm || fieldErrors.password !== '' || fieldErrors.confirm !== ''}
             loading={loading}
           />
         </DialogFooter>

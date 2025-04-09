@@ -66,3 +66,21 @@ func RequireSelfOrAdmin(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+func RequireSelf(wikiInstance *wiki.Wiki) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userValue, exists := c.Get("user")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
+			return
+		}
+
+		user, ok := userValue.(*auth.User)
+		if !ok || user.ID != c.Param("id") {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "You can only access your own account"})
+			return
+		}
+
+		c.Next()
+	}
+}

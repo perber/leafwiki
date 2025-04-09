@@ -1,5 +1,6 @@
 import * as api from '@/lib/api'
 import { create } from 'zustand'
+import { useAuthStore } from './auth'
 
 type UserStore = {
   users: api.User[]
@@ -7,6 +8,7 @@ type UserStore = {
   createUser: (data: Parameters<typeof api.createUser>[0]) => Promise<void>
   updateUser: (data: Parameters<typeof api.updateUser>[0]) => Promise<void>
   deleteUser: (id: string) => Promise<void>
+  changeOwnPassword: (oldPassword: string, newPassword: string) => Promise<void>
 }
 
 export const useUserStore = create<UserStore>((set, get) => ({
@@ -30,5 +32,24 @@ export const useUserStore = create<UserStore>((set, get) => ({
   deleteUser: async (id) => {
     await api.deleteUser(id)
     await get().loadUsers()
+  },
+
+  changeOwnPassword: async (oldPassword, newPassword) => {
+    await api.changeOwnPassword(oldPassword, newPassword)
+    // relogin user
+    const { user } = useAuthStore.getState()
+    if (user && user.username) {
+      try {
+        await api.login(user?.username, newPassword)
+      } catch (err) {
+        console.warn(err)
+        const { logout } = useAuthStore.getState()
+        logout()
+      }
+    } else {
+      // logout user / Reset token if necessary
+      const { logout } = useAuthStore.getState()
+      logout()
+    }
   },
 }))

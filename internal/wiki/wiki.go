@@ -245,6 +245,26 @@ func (w *Wiki) UpdateUser(id, username, email, password, role string) (*auth.Pub
 	return user.ToPublicUser(), nil
 }
 
+func (w *Wiki) ChangeOwnPassword(id, oldPassword, newPassword string) error {
+	ve := errors.NewValidationErrors()
+	if newPassword == "" {
+		ve.Add("newPassword", "New password must not be empty")
+	} else if len(newPassword) < 8 {
+		ve.Add("newPassword", "New password must be at least 8 characters long")
+	}
+
+	_, err := w.GetUserService().DoesIDAndPasswordMatch(id, oldPassword)
+	if err != nil {
+		ve.Add("oldPassword", "Old password is incorrect")
+	}
+
+	if ve.HasErrors() {
+		return ve
+	}
+
+	return w.user.ChangeOwnPassword(id, oldPassword, newPassword)
+}
+
 func (w *Wiki) DeleteUser(id string) error {
 	return w.user.DeleteUser(id)
 }

@@ -158,6 +158,22 @@ func (s *UserService) UpdatePassword(id string, newpassword string) error {
 	return nil
 }
 
+func (s *UserService) DoesIDAndPasswordMatch(id, password string) (bool, error) {
+	// Check if user exists
+	user, err := s.store.GetUserByID(id)
+	if err != nil {
+		return false, ErrUserNotFound
+	}
+
+	// Check if password is correct
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		return false, ErrUserInvalidCredentials
+	}
+
+	return true, nil
+}
+
 func (s *UserService) DeleteUser(id string) error {
 	// Check if user exists
 	user, err := s.store.GetUserByID(id)
@@ -199,6 +215,34 @@ func (s *UserService) GetUserByEmailOrUsernameAndPassword(identifier, password s
 	}
 
 	return user, nil
+}
+
+func (s *UserService) ChangeOwnPassword(id, oldPassword, newPassword string) error {
+	// Check if user exists
+	user, err := s.store.GetUserByID(id)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	// Check if old password is correct
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword))
+	if err != nil {
+		return ErrUserInvalidCredentials
+	}
+
+	// hash new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	// Save updated user to store
+	err = s.store.UpdatePassword(id, string(hashedPassword))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *UserService) Close() error {
