@@ -5,15 +5,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { ChangeOnwnPasswordDialog } from '@/features/users/ChangeOwnPasswordDialog'
 import { useAuthStore } from '@/stores/auth'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 export default function UserToolbar() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   if (!user) return null
+
+  const handleChangePasswordDialog = () => {
+    setDialogOpen(!dialogOpen)
+  }
 
   const handleLogout = () => {
     logout()
@@ -29,12 +36,16 @@ export default function UserToolbar() {
           </Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => navigate('/users')}>
+          <DropdownMenuItem className='cursor-pointer' onClick={() => navigate('/users')}>
             User Management
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+          <DropdownMenuItem className='cursor-pointer' onClick={() => handleChangePasswordDialog()}>
+            Change Own Password
+          </DropdownMenuItem>
+          <DropdownMenuItem className='cursor-pointer' onClick={handleLogout}>Logout</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <ChangeOnwnPasswordDialog open={dialogOpen} onOpenChange={handleChangePasswordDialog} />
     </div>
   )
 }
