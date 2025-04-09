@@ -1,8 +1,11 @@
+import Breadcrumbs from '@/components/Breadcrumbs'
 import MarkdownEditor from '@/components/MarkdownEditor'
+import { usePageToolbar } from '@/components/PageToolbarContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
 import { useTreeStore } from '@/stores/tree'
+import { Save, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AssetManager } from './AssetManager'
@@ -19,6 +22,8 @@ export default function PageEditor() {
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
+
+  const { setContent, clear } = usePageToolbar()
 
   const parentPath =
     useTreeStore(() => {
@@ -41,6 +46,31 @@ export default function PageEditor() {
       .finally(() => setLoading(false))
   }, [path])
 
+  useEffect(() => {
+    if (!page) return
+    console.log('page', page)
+    setContent(
+      <div className="flex items-center gap-2">
+        <Breadcrumbs />
+        <Button
+          variant="destructive"
+          className='rounded-full shadow-sm'
+          size="icon"
+          onClick={() => navigate(`/${path}`)}
+        >
+          <X />
+        </Button>
+        <Button onClick={handleSave} variant="default" className='rounded-full shadow-md' size="icon">
+          <Save />
+        </Button>
+      </div>
+    )
+
+    return () => {
+      clear()
+    }
+  }, [page, setContent])
+
   const handleSave = async () => {
     try {
       await updatePage(page.id, title, slug, markdown)
@@ -62,7 +92,7 @@ export default function PageEditor() {
 
   return (
     <div className="flex h-[calc(100vh-120px)] gap-6">
-      <div className="flex flex-1 flex-col gap-4">
+      <div className="flex flex-1 flex-col gap-2">
         <div className="space-y-2">
           <Input
             placeholder="Title"
@@ -98,16 +128,6 @@ export default function PageEditor() {
           }}
           insert={inserted}
         />
-        <div className="mt-4 flex justify-end">
-          <Button
-            variant="outline"
-            onClick={() => navigate(`/${path}`)}
-            className="mr-2"
-          >
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>Save</Button>
-        </div>
       </div>
       <div className="w-64 overflow-y-auto border-l pl-4">
         <AssetManager pageId={page.id} onInsert={(md) => setInserted(md)} />
