@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './App.css'
+import { PageToolbarProvider } from './components/PageToolbarContext'
 import LoginForm from './features/auth/LoginForm'
 import RequireAuth from './features/auth/RequireAuth'
 import PageEditor from './features/page/PageEditor'
@@ -22,14 +23,16 @@ function App() {
           path="/*"
           element={
             <RequireAuth>
-              <AppLayout>
-                <Routes>
-                  <Route path="/users" element={<UserManagement />} />
-                  <Route path="/" element={<RootRedirect />} />
-                  <Route path="/e/*" element={<PageEditor />} />
-                  <Route path="*" element={<PageViewer />} />
-                </Routes>
-              </AppLayout>
+              <PageToolbarProvider>
+                <AppLayout>
+                  <Routes>
+                    <Route path="/users" element={<UserManagement />} />
+                    <Route path="/" element={<RootRedirect />} />
+                    <Route path="/e/*" element={<PageEditor />} />
+                    <Route path="*" element={<PageViewer />} />
+                  </Routes>
+                </AppLayout>
+              </PageToolbarProvider>
             </RequireAuth>
           }
         />

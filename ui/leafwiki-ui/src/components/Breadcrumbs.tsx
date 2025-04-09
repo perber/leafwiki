@@ -28,14 +28,18 @@ export default function Breadcrumbs() {
   const breadcrumbs = buildBreadcrumbs()
 
   return (
-    <nav className="mb-4 text-sm text-gray-500">
+    <nav className=" text-sm text-gray-500 flex flex-1 flex-grow w-full">
       <ol className="flex flex-wrap items-center gap-1">
-        {breadcrumbs.map((crumb) => (
+        {breadcrumbs.map((crumb, index) => (
           <li key={crumb.path} className="flex items-center gap-1">
             <span>/</span>
-            <Link to={crumb.path} className="text-gray-700 hover:underline">
-              {crumb.title}
-            </Link>
+            {index === breadcrumbs.length - 1 ? (
+              <span className="text-gray-700 font-semibold">{crumb.title}</span>
+            ) : (
+              <Link to={crumb.path} className="text-gray-700 hover:underline">
+                {crumb.title}
+              </Link>
+            )}
           </li>
         ))}
       </ol>
