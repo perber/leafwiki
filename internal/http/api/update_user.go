@@ -13,7 +13,7 @@ func UpdateUserHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 
 		var req struct {
 			Username string `json:"username" binding:"required"`
-			Email    string `json:"email" binding:"required,email"`
+			Email    string `json:"email" binding:"required"`
 			Password string `json:"password"`
 			Role     string `json:"role" binding:"required,oneof=admin editor"`
 		}

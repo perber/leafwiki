@@ -11,7 +11,7 @@ func CreateUserHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Username string `json:"username" binding:"required"`
-			Email    string `json:"email" binding:"required,email"`
+			Email    string `json:"email" binding:"required"`
 			Password string `json:"password" binding:"required"`
 			Role     string `json:"role" binding:"required,oneof=admin editor"`
 		}

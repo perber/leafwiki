@@ -254,35 +254,24 @@ export async function getUsers(): Promise<User[]> {
 export async function createUser(
   user: Omit<User, 'id'> & { password: string },
 ) {
-  try {
-    await fetchWithAuth('/api/users', {
-      method: 'POST',
-      body: JSON.stringify(user),
-    })
-  } catch (e) {
-    throw new Error('User creation failed')
-  }
+  return await fetchWithAuth('/api/users', {
+    method: 'POST',
+    body: JSON.stringify(user),
+  })
 }
 
 export async function updateUser(user: User & { password?: string }) {
-  try {
-    await fetchWithAuth(`/api/users/${user.id}`, {
-      method: 'PUT',
-      body: JSON.stringify(user),
-    })
-  } catch (e) {
-    throw new Error('User update failed')
-  }
+  return await fetchWithAuth(`/api/users/${user.id}`, {
+    method: 'PUT',
+    body: JSON.stringify(user),
+  })
+
 }
 
 export async function deleteUser(id: string) {
-  try {
-    return await fetchWithAuth(`/api/users/${id}`, {
-      method: 'DELETE',
-    })
-  } catch (e) {
-    throw new Error('User deletion failed')
-  }
+  return await fetchWithAuth(`/api/users/${id}`, {
+    method: 'DELETE',
+  })
 }
 
 export async function uploadAsset(pageId: string, file: File) {
