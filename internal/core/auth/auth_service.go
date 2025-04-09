@@ -22,9 +22,9 @@ func NewAuthService(userService *UserService, secret string) *AuthService {
 }
 
 type AuthToken struct {
-	Token        string `json:"token"`
-	RefreshToken string `json:"refresh_token"`
-	User         *User  `json:"user"`
+	Token        string      `json:"token"`
+	RefreshToken string      `json:"refresh_token"`
+	User         *PublicUser `json:"user"`
 }
 
 func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
@@ -49,7 +49,7 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	return &AuthToken{
 		Token:        accessToken,
 		RefreshToken: refreshToken,
-		User:         user,
+		User:         user.ToPublicUser(),
 	}, nil
 }
 
@@ -90,7 +90,7 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 	return &AuthToken{
 		Token:        newAccessToken,
 		RefreshToken: newRefreshToken,
-		User:         user,
+		User:         user.ToPublicUser(),
 	}, nil
 }
 

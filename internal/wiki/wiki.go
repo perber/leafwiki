@@ -82,6 +82,10 @@ func (w *Wiki) EnsureWelcomePage() error {
 	return nil
 }
 
+func (w *Wiki) GetTree() *tree.PageNode {
+	return w.tree.GetTree()
+}
+
 func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Page, error) {
 	ve := errors.NewValidationErrors()
 
@@ -114,12 +118,13 @@ func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Pa
 	return w.tree.GetPage(*id)
 }
 
-func (w *Wiki) GetPage(id string) (*tree.Page, error) {
-	return w.tree.GetPage(id)
-}
+func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
+	err := w.tree.UpdatePage(id, title, slug, content)
+	if err != nil {
+		return nil, err
+	}
 
-func (w *Wiki) MovePage(id, parentID string) error {
-	return w.tree.MovePage(id, parentID)
+	return w.tree.GetPage(id)
 }
 
 func (w *Wiki) DeletePage(id string, recursive bool) error {
@@ -139,20 +144,15 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 	return nil
 }
 
+func (w *Wiki) MovePage(id, parentID string) error {
+	return w.tree.MovePage(id, parentID)
+}
+
 func (w *Wiki) SortPages(parentID string, orderedIDs []string) error {
 	return w.tree.SortPages(parentID, orderedIDs)
 }
 
-func (w *Wiki) GetTree() *tree.PageNode {
-	return w.tree.GetTree()
-}
-
-func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
-	err := w.tree.UpdatePage(id, title, slug, content)
-	if err != nil {
-		return nil, err
-	}
-
+func (w *Wiki) GetPage(id string) (*tree.Page, error) {
 	return w.tree.GetPage(id)
 }
 
@@ -183,12 +183,22 @@ func (w *Wiki) RefreshToken(token string) (*auth.AuthToken, error) {
 	return w.auth.RefreshToken(token)
 }
 
-func (w *Wiki) CreateUser(username, email, password, role string) (*auth.User, error) {
-	return w.user.CreateUser(username, email, password, role)
+func (w *Wiki) CreateUser(username, email, password, role string) (*auth.PublicUser, error) {
+	user, err := w.user.CreateUser(username, email, password, role)
+	if err != nil {
+		return nil, err
+	}
+
+	return user.ToPublicUser(), nil
 }
 
-func (w *Wiki) UpdateUser(id, username, email, password, role string) (*auth.User, error) {
-	return w.user.UpdateUser(id, username, email, password, role)
+func (w *Wiki) UpdateUser(id, username, email, password, role string) (*auth.PublicUser, error) {
+	user, err := w.user.UpdateUser(id, username, email, password, role)
+	if err != nil {
+		return nil, err
+	}
+
+	return user.ToPublicUser(), nil
 }
 
 func (w *Wiki) DeleteUser(id string) error {
@@ -199,20 +209,27 @@ func (w *Wiki) UpdatePassword(id, password string) error {
 	return w.user.UpdatePassword(id, password)
 }
 
-func (w *Wiki) GetUsers() ([]*auth.User, error) {
-	return w.user.GetUsers()
+func (w *Wiki) GetUsers() ([]*auth.PublicUser, error) {
+	users, err := w.user.GetUsers()
+	if err != nil {
+		return nil, err
+	}
+
+	publicUsers := make([]*auth.PublicUser, len(users))
+	for i, user := range users {
+		publicUsers[i] = user.ToPublicUser()
+	}
+
+	return publicUsers, nil
 }
 
-func (w *Wiki) GetUserByID(id string) (*auth.User, error) {
-	return w.user.GetUserByID(id)
-}
+func (w *Wiki) GetUserByID(id string) (*auth.PublicUser, error) {
+	user, err := w.user.GetUserByID(id)
+	if err != nil {
+		return nil, err
+	}
 
-func (w *Wiki) GetUserService() *auth.UserService {
-	return w.user
-}
-
-func (w *Wiki) GetAuthService() *auth.AuthService {
-	return w.auth
+	return user.ToPublicUser(), nil
 }
 
 func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string) (string, error) {
@@ -237,6 +254,14 @@ func (w *Wiki) DeleteAsset(pageID string, filename string) error {
 		return err
 	}
 	return w.asset.DeleteAsset(page, filename)
+}
+
+func (w *Wiki) GetUserService() *auth.UserService {
+	return w.user
+}
+
+func (w *Wiki) GetAuthService() *auth.AuthService {
+	return w.auth
 }
 
 func (w *Wiki) GetStorageDir() string {
