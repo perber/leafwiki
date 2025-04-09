@@ -43,6 +43,7 @@ export function DeletePageDialog({
       toast.success('Page deleted successfully')
       navigate(`/${redirectUrl}`)
       await reloadTree()
+      setOpen(false)
     } catch (err) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error deleting page')
