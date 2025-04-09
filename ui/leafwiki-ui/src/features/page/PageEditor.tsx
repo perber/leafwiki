@@ -61,7 +61,7 @@ export default function PageEditor() {
   if (!page) return <p className="text-sm text-gray-500">No page found</p>
 
   return (
-    <div className="flex h-[calc(100vh-250px)] gap-6">
+    <div className="flex h-[calc(100vh-120px)] gap-6">
       <div className="flex flex-1 flex-col gap-4">
         <div className="space-y-2">
           <Input
