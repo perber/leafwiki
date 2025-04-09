@@ -33,7 +33,14 @@ export function ChangePasswordDialog({ userId, username }: Props) {
 
   const handlePasswordChange = (val: string) => {
     setPassword(val)
-    setFieldErrors((prev) => ({ ...prev, password: '' }))
+    if (val.length < 8) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        password: 'Password must be at least 8 characters long',
+      }))
+    } else {
+      setFieldErrors((prev) => ({ ...prev, password: '' }))
+    }
   }
 
   const handleConfirmChange = (val: string) => {
