@@ -24,7 +24,7 @@ export default function UserManagement() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <h1 className="mb-4 text-2xl font-bold">UserManagement</h1>
+      <h1 className="mb-4 text-2xl font-bold">User Management</h1>
       <div className="flex justify-end">
         <UserFormDialog />
       </div>
