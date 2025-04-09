@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"mime/multipart"
+	"regexp"
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
@@ -19,6 +20,9 @@ type Wiki struct {
 	asset      *assets.AssetService
 	storageDir string
 }
+
+// Email-RegEx (Basic-Check, nicht RFC-konform, aber gut genug)
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
 func NewWiki(storageDir string) (*Wiki, error) {
 	// Initialize the user store
@@ -184,6 +188,28 @@ func (w *Wiki) RefreshToken(token string) (*auth.AuthToken, error) {
 }
 
 func (w *Wiki) CreateUser(username, email, password, role string) (*auth.PublicUser, error) {
+	ve := errors.NewValidationErrors()
+	if username == "" {
+		ve.Add("username", "Username must not be empty")
+	}
+	if email == "" {
+		ve.Add("email", "Email must not be empty")
+	} else if !emailRegex.MatchString(email) {
+		ve.Add("email", "Email is not valid")
+	}
+	if password == "" {
+		ve.Add("password", "Password must not be empty")
+	} else if len(password) < 8 {
+		ve.Add("password", "Password must be at least 8 characters long")
+	}
+	if !auth.IsValidRole(role) {
+		ve.Add("role", "Invalid role")
+	}
+
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
 	user, err := w.user.CreateUser(username, email, password, role)
 	if err != nil {
 		return nil, err
