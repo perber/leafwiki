@@ -265,7 +265,6 @@ export async function updateUser(user: User & { password?: string }) {
     method: 'PUT',
     body: JSON.stringify(user),
   })
-
 }
 
 export async function deleteUser(id: string) {

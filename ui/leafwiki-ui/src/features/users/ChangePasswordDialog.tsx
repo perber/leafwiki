@@ -26,7 +26,6 @@ export function ChangePasswordDialog({ userId, username }: Props) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
 
-
   const { users, updateUser } = useUserStore()
   const user = users.find((u) => u.id === userId)
 
@@ -56,7 +55,7 @@ export function ChangePasswordDialog({ userId, username }: Props) {
       setOpen(false)
     } catch (err) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, "Error updating password")
+      handleFieldErrors(err, setFieldErrors, 'Error updating password')
     } finally {
       setLoading(false)
     }
@@ -86,12 +85,12 @@ export function ChangePasswordDialog({ userId, username }: Props) {
         <DialogHeader>
           <DialogTitle>Change password for user {username}</DialogTitle>
           <DialogDescription>
-            Enter a new password for the user. 
-        </DialogDescription>
+            Enter a new password for the user.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 pt-2">
-        <FormInput
+          <FormInput
             autoFocus={true}
             label="New Password"
             type="password"
@@ -100,7 +99,7 @@ export function ChangePasswordDialog({ userId, username }: Props) {
             placeholder="New Password"
             error={fieldErrors.password}
           />
-        <FormInput
+          <FormInput
             label="Confirm Password"
             type="password"
             value={confirm}

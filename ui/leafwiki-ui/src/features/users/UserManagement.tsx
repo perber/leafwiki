@@ -53,25 +53,34 @@ export default function UserManagement() {
                 </td>
               </tr>
             )}
-            {!loading && users.length > 0 && users.map((user) => (
-              <tr key={user.id} className="border-t">
-                <td className="p-3">{user.username}</td>
-                <td className="p-3">{user.email}</td>
-                <td className="p-3">
-                  <span className={`rounded px-2 py-1 text-xs font-medium ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}>{user.role}</span>
-                </td>
-                <td className="p-3">
-                  <div className="flex gap-2">
-                    <UserFormDialog user={user} />
-                    <ChangePasswordDialog
-                      userId={user.id}
-                      username={user.username}
-                    />
-                    <DeleteUserButton userId={user.id} username={user.username} />
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {!loading &&
+              users.length > 0 &&
+              users.map((user) => (
+                <tr key={user.id} className="border-t">
+                  <td className="p-3">{user.username}</td>
+                  <td className="p-3">{user.email}</td>
+                  <td className="p-3">
+                    <span
+                      className={`rounded px-2 py-1 text-xs font-medium ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}
+                    >
+                      {user.role}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-2">
+                      <UserFormDialog user={user} />
+                      <ChangePasswordDialog
+                        userId={user.id}
+                        username={user.username}
+                      />
+                      <DeleteUserButton
+                        userId={user.id}
+                        username={user.username}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>

@@ -1,5 +1,12 @@
 import { FormActions } from '@/components/FormActions'
-import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { deletePage } from '@/lib/api'
@@ -50,10 +57,13 @@ export function DeletePageDialog({
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={(o) => {
-      setOpen(o)
-      if (o === true) setDeleteRecursive(false)
-    }}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o)
+        if (o === true) setDeleteRecursive(false)
+      }}
+    >
       <AlertDialogTrigger asChild>
         <Button variant="destructive" size="sm">
           <Trash2 className="mr-1" />
@@ -69,7 +79,6 @@ export function DeletePageDialog({
           undone.
         </AlertDialogDescription>
 
-
         {hasChildren && (
           <div className="space-y-1 text-sm text-gray-600">
             <label className="flex items-center gap-2">
@@ -81,7 +90,6 @@ export function DeletePageDialog({
             </label>
           </div>
         )}
-
 
         <div className="mt-4 flex justify-end">
           <FormActions

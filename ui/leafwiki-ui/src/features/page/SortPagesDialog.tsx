@@ -80,9 +80,11 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
             return (
               <li
                 key={id}
-                className="flex items-center justify-between rounded-lg border px-3 py-2 bg-white hover:shadow-sm transition"
+                className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 transition hover:shadow-sm"
               >
-                <span className="truncate text-sm text-gray-800">{node.title}</span>
+                <span className="truncate text-sm text-gray-800">
+                  {node.title}
+                </span>
                 <div className="flex gap-1">
                   <Button
                     variant="ghost"

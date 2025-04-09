@@ -94,9 +94,9 @@ export function UserFormDialog({ user }: Props) {
     }
   }, [open, isEdit, user])
 
-
   return (
-    <Dialog open={open}
+    <Dialog
+      open={open}
       onOpenChange={(isOpen) => {
         setOpen(isOpen)
       }}
@@ -152,7 +152,8 @@ export function UserFormDialog({ user }: Props) {
               placeholder="password"
               error={fieldErrors.password}
               type="password"
-            />)}
+            />
+          )}
 
           <select
             className={`w-full rounded-md border border-gray-300 px-3 py-2 text-sm ${fieldErrors.role ? 'border-red-500' : ''}`}
@@ -167,14 +168,16 @@ export function UserFormDialog({ user }: Props) {
             <option value="admin">Admin</option>
           </select>
           {fieldErrors.role && (
-            <p className="text-sm text-red-500 mt-1">{fieldErrors.role}</p>
+            <p className="mt-1 text-sm text-red-500">{fieldErrors.role}</p>
           )}
           <div className="flex justify-end gap-2 pt-2">
             <FormActions
               onCancel={handleCancel}
               onSave={handleSubmit}
               saveLabel={loading ? 'Saving...' : 'Save'}
-              disabled={loading || !username || !email || (!isEdit && !password)}
+              disabled={
+                loading || !username || !email || (!isEdit && !password)
+              }
               loading={loading}
             />
           </div>
