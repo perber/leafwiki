@@ -35,6 +35,6 @@ func ChangeOwnPasswordUserHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, user)
+		c.JSON(http.StatusNoContent, user)
 	}
 }

@@ -37,18 +37,16 @@ export const useUserStore = create<UserStore>((set, get) => ({
   changeOwnPassword: async (oldPassword, newPassword) => {
     await api.changeOwnPassword(oldPassword, newPassword)
     // relogin user
-    const { user } = useAuthStore.getState()
+    const { user, logout, setAuth } = useAuthStore.getState()
     if (user && user.username) {
       try {
-        await api.login(user?.username, newPassword)
+        const auth = await api.login(user.username, newPassword)
+        setAuth(auth.token, auth.refresh_token, auth.user)
       } catch (err) {
         console.warn(err)
-        const { logout } = useAuthStore.getState()
         logout()
       }
     } else {
-      // logout user / Reset token if necessary
-      const { logout } = useAuthStore.getState()
       logout()
     }
   },

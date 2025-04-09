@@ -111,7 +111,6 @@ export function ChangeOnwnPasswordDialog({open, onOpenChange }: Props) {
             error={fieldErrors.oldPassword}
           />
           <FormInput
-            autoFocus={true}
             label="New Password"
             type="password"
             value={newPassword}
