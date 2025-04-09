@@ -68,7 +68,7 @@ export function UserFormDialog({ user }: Props) {
     setOpen(false)
   }
 
-  const resetForm = (user : User | null) => {
+  const resetForm = (user: User | null) => {
     if (user) {
       setUsername(user.username)
       setEmail(user.email)
@@ -114,10 +114,10 @@ export function UserFormDialog({ user }: Props) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit User' : 'New User'}</DialogTitle>
-          <DialogDescription>
-            {isEdit ? 'Edit user details' : 'Create a new user'}
-          </DialogDescription>
         </DialogHeader>
+        <DialogDescription>
+          {isEdit ? 'Edit user details' : 'Create a new user'}
+        </DialogDescription>
 
         <div className="space-y-4 pt-2">
           <FormInput

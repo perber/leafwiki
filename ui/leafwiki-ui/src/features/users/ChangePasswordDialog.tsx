@@ -1,3 +1,5 @@
+import { FormActions } from '@/components/FormActions'
+import { FormInput } from '@/components/FormInput'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -7,9 +9,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useUserStore } from '@/stores/users'
-import { useState } from 'react'
+import { DialogDescription } from '@radix-ui/react-dialog'
+import { useEffect, useState } from 'react'
 
 type Props = {
   userId: string
@@ -20,20 +23,30 @@ export function ChangePasswordDialog({ userId, username }: Props) {
   const [open, setOpen] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+
 
   const { users, updateUser } = useUserStore()
   const user = users.find((u) => u.id === userId)
 
   if (!user) return null
 
-  const handleChange = async () => {
-    if (!password || password !== confirm) {
-      setError('Passwords are not matching.')
-      return
-    }
+  const handlePasswordChange = (val: string) => {
+    setPassword(val)
+    setFieldErrors((prev) => ({ ...prev, password: '' }))
+  }
 
+  const handleConfirmChange = (val: string) => {
+    setConfirm(val)
+    if (val !== password) {
+      setFieldErrors((prev) => ({ ...prev, confirm: 'Passwords do not match' }))
+    } else {
+      setFieldErrors((prev) => ({ ...prev, confirm: '' }))
+    }
+  }
+
+  const handleChange = async () => {
     setLoading(true)
     try {
       await updateUser({
@@ -42,11 +55,24 @@ export function ChangePasswordDialog({ userId, username }: Props) {
       })
       setOpen(false)
     } catch (err) {
-      setError('Error updating password.')
+      console.warn(err)
+      handleFieldErrors(err, setFieldErrors, "Error updating password")
     } finally {
       setLoading(false)
     }
   }
+
+  const resetForm = () => {
+    setPassword('')
+    setConfirm('')
+    setFieldErrors({})
+  }
+
+  useEffect(() => {
+    if (open) {
+      resetForm()
+    }
+  }, [open])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -59,31 +85,39 @@ export function ChangePasswordDialog({ userId, username }: Props) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Change password for user {username}</DialogTitle>
+          <DialogDescription>
+            Enter a new password for the user. 
+        </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 pt-2">
-          <Input
+        <FormInput
+            autoFocus={true}
+            label="New Password"
             type="password"
-            placeholder="New Password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={handlePasswordChange}
+            placeholder="New Password"
+            error={fieldErrors.password}
           />
-          <Input
+        <FormInput
+            label="Confirm Password"
             type="password"
-            placeholder="Confirm Password"
             value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
+            onChange={handleConfirmChange}
+            placeholder="Confirm Password"
+            error={fieldErrors.confirm}
           />
-          {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
 
         <DialogFooter className="pt-4">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleChange} disabled={loading}>
-            {loading ? 'Saving...' : 'Save'}
-          </Button>
+          <FormActions
+            onCancel={() => setOpen(false)}
+            onSave={handleChange}
+            saveLabel={loading ? 'Saving...' : 'Save'}
+            disabled={loading || !password || password !== confirm}
+            loading={loading}
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>
