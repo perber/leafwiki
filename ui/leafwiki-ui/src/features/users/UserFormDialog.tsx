@@ -12,6 +12,7 @@ import { User } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/users'
+import { DialogDescription } from '@radix-ui/react-dialog'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -32,6 +33,7 @@ export function UserFormDialog({ user }: Props) {
 
   const { createUser, updateUser } = useUserStore()
   const { user: currentUser } = useAuthStore()
+  const isOwnUser = user?.id === currentUser?.id
 
   const handleSubmit = async () => {
     if (!username || !email || (!isEdit && !password)) return
@@ -52,7 +54,6 @@ export function UserFormDialog({ user }: Props) {
       } else {
         await createUser(userData)
       }
-      resetForm()
       setOpen(false)
       toast.success('User saved successfully')
     } catch (err) {
@@ -65,34 +66,39 @@ export function UserFormDialog({ user }: Props) {
 
   const handleCancel = () => {
     setOpen(false)
-    resetForm()
   }
 
-  const resetForm = () => {
-    setUsername('')
-    setEmail('')
-    setPassword('')
-    setRole('editor')
-    setFieldErrors({})
-  }
-
-  const isOwnUser = user?.id === currentUser?.id
-
-  useEffect(() => {
-    if (open && !isEdit) {
+  const resetForm = (user : User | null) => {
+    if (user) {
+      setUsername(user.username)
+      setEmail(user.email)
+      setPassword('')
+      setRole(user.role)
+    } else {
       setUsername('')
       setEmail('')
       setPassword('')
       setRole('editor')
     }
-  }, [open])
+  }
+
+  useEffect(() => {
+    if (open) {
+      setFieldErrors({})
+      setLoading(false)
+      if (isEdit) {
+        resetForm(user!)
+      } else {
+        resetForm(null)
+      }
+    }
+  }, [open, isEdit, user])
 
 
   return (
     <Dialog open={open}
       onOpenChange={(isOpen) => {
         setOpen(isOpen)
-        if (!isOpen) resetForm()
       }}
     >
       <DialogTrigger asChild>
@@ -108,6 +114,9 @@ export function UserFormDialog({ user }: Props) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit User' : 'New User'}</DialogTitle>
+          <DialogDescription>
+            {isEdit ? 'Edit user details' : 'Create a new user'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 pt-2">

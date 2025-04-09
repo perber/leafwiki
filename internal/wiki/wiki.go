@@ -22,7 +22,7 @@ type Wiki struct {
 }
 
 // Email-RegEx (Basic-Check, nicht RFC-konform, aber gut genug)
-var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
 
 func NewWiki(storageDir string) (*Wiki, error) {
 	// Initialize the user store
@@ -219,6 +219,24 @@ func (w *Wiki) CreateUser(username, email, password, role string) (*auth.PublicU
 }
 
 func (w *Wiki) UpdateUser(id, username, email, password, role string) (*auth.PublicUser, error) {
+
+	ve := errors.NewValidationErrors()
+	if username == "" {
+		ve.Add("username", "Username must not be empty")
+	}
+	if email == "" {
+		ve.Add("email", "Email must not be empty")
+	} else if !emailRegex.MatchString(email) {
+		ve.Add("email", "Email is not valid")
+	}
+	if !auth.IsValidRole(role) {
+		ve.Add("role", "Invalid role")
+	}
+
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
 	user, err := w.user.UpdateUser(id, username, email, password, role)
 	if err != nil {
 		return nil, err
