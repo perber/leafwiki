@@ -1,8 +1,7 @@
-import Breadcrumbs from '@/components/Breadcrumbs'
 import { getPageByPath } from '@/lib/api'
 // import "highlight.js/styles/github.css"
 import { usePageToolbar } from '@/components/PageToolbarContext'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useLocation } from 'react-router-dom'
 import rehypeHighlight from 'rehype-highlight'
@@ -35,11 +34,10 @@ export default function PageViewer() {
     const redirectUrl = page.path.split('/').slice(0, -1).join('/')
 
     setContent(
-      <div className="flex items-center gap-2">
-        <Breadcrumbs />
+      <React.Fragment key="viewing">
         <DeletePageDialog pageId={page.id} redirectUrl={redirectUrl} />
         <EditPageButton path={page.path} />
-      </div>
+      </React.Fragment>
     )
 
     return () => {

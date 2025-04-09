@@ -1,4 +1,3 @@
-import Breadcrumbs from '@/components/Breadcrumbs'
 import MarkdownEditor from '@/components/MarkdownEditor'
 import { usePageToolbar } from '@/components/PageToolbarContext'
 import { Button } from '@/components/ui/button'
@@ -6,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
 import { useTreeStore } from '@/stores/tree'
 import { Save, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AssetManager } from './AssetManager'
 
@@ -50,20 +49,19 @@ export default function PageEditor() {
     if (!page) return
     console.log('page', page)
     setContent(
-      <div className="flex items-center gap-2">
-        <Breadcrumbs />
+      <React.Fragment key="editing">
         <Button
           variant="destructive"
-          className='rounded-full shadow-sm'
+          className='rounded-full shadow-sm h-8 w-8'
           size="icon"
           onClick={() => navigate(`/${path}`)}
         >
           <X />
         </Button>
-        <Button onClick={handleSave} variant="default" className='rounded-full shadow-md' size="icon">
+        <Button onClick={handleSave} variant="default" className='rounded-full shadow-md h-8 w-8' size="icon">
           <Save />
         </Button>
-      </div>
+      </React.Fragment>
     )
 
     return () => {
