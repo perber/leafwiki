@@ -52,16 +52,21 @@ export default function PageEditor() {
       <React.Fragment key="editing">
         <Button
           variant="destructive"
-          className='rounded-full shadow-sm h-8 w-8'
+          className="h-8 w-8 rounded-full shadow-sm"
           size="icon"
           onClick={() => navigate(`/${path}`)}
         >
           <X />
         </Button>
-        <Button onClick={handleSave} variant="default" className='rounded-full shadow-md h-8 w-8' size="icon">
+        <Button
+          onClick={handleSave}
+          variant="default"
+          className="h-8 w-8 rounded-full shadow-md"
+          size="icon"
+        >
           <Save />
         </Button>
-      </React.Fragment>
+      </React.Fragment>,
     )
 
     return () => {

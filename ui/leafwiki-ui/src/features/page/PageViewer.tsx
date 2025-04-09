@@ -37,7 +37,7 @@ export default function PageViewer() {
       <React.Fragment key="viewing">
         <DeletePageDialog pageId={page.id} redirectUrl={redirectUrl} />
         <EditPageButton path={page.path} />
-      </React.Fragment>
+      </React.Fragment>,
     )
 
     return () => {
@@ -48,7 +48,6 @@ export default function PageViewer() {
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>
   if (error) return <p className="text-sm text-red-500">Error: {error}</p>
   if (!page) return <p className="text-sm text-gray-500">No page found</p>
-
 
   return (
     <>

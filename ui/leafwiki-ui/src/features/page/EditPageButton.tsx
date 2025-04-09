@@ -6,7 +6,7 @@ export function EditPageButton({ path }: { path: string }) {
   const navigate = useNavigate()
   return (
     <Button
-      className='rounded-full shadow-sm h-8 w-8'
+      className="h-8 w-8 rounded-full shadow-sm"
       variant="default"
       size="icon"
       onClick={() => navigate(`/e/${path}`)}

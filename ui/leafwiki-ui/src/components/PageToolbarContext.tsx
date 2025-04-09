@@ -13,7 +13,11 @@ const PageToolbarContext = createContext<{
   content: null,
 })
 
-export function PageToolbarProvider({ children }: { children: React.ReactNode }) {
+export function PageToolbarProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const [content, setContent] = useState<ToolbarContent>(null)
 
   return (

@@ -11,25 +11,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b bg-white p-4 shadow-sm">
-          <div className="flex-1 mr-2 flex-grow"><div className="flex items-center gap-2"><Breadcrumbs />
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={content?.key || Math.random()}
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                transition={{ duration: 0.2 }}
-                className="flex items-center gap-2"
-              >
-                {content}
-              </motion.div>
-            </AnimatePresence>
-          </div></div>
+          <div className="mr-2 flex-1 flex-grow">
+            <div className="flex items-center gap-2">
+              <Breadcrumbs />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={content?.key || Math.random()}
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-2"
+                >
+                  {content}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
           <UserToolbar />
         </header>
-        <main className="flex-1 overflow-auto p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
     </div>
   )
