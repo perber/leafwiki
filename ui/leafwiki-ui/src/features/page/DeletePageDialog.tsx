@@ -65,9 +65,8 @@ export function DeletePageDialog({
       }}
     >
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" size="sm">
-          <Trash2 className="mr-1" />
-          Delete
+        <Button variant="destructive" size="icon" className='rounded-full shadow-sm'>
+          <Trash2 />
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

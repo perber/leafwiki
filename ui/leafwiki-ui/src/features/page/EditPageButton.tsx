@@ -6,13 +6,12 @@ export function EditPageButton({ path }: { path: string }) {
   const navigate = useNavigate()
   return (
     <Button
-      className="ml-2"
-      size="sm"
-      variant="outline"
+      className='rounded-full shadow-sm'
+      variant="default"
+      size="icon"
       onClick={() => navigate(`/e/${path}`)}
     >
-      <Pencil className="mr-1 h-4 w-4" />
-      Edit
+      <Pencil size={20} />
     </Button>
   )
 }
