@@ -5,7 +5,7 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useAuthStore } from '@/stores/auth'
@@ -19,14 +19,14 @@ type Props = {
   onOpenChange: (open: boolean) => void
 }
 
-export function ChangeOnwnPasswordDialog({open, onOpenChange }: Props) {
+export function ChangeOnwnPasswordDialog({ open, onOpenChange }: Props) {
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
 
-  const { user} = useAuthStore()
+  const { user } = useAuthStore()
   const { changeOwnPassword } = useUserStore()
 
   if (!user) return null
@@ -60,17 +60,14 @@ export function ChangeOnwnPasswordDialog({open, onOpenChange }: Props) {
   const handleChange = async () => {
     setLoading(true)
     try {
-      await changeOwnPassword(
-        oldPassword,
-        newPassword,
-      )
+      await changeOwnPassword(oldPassword, newPassword)
       toast.success('Password changed successfully')
       onOpenChange(false)
     } catch (err) {
       console.warn(err)
-      setOldPassword("")
-      setNewPassword("")
-      setConfirm("")
+      setOldPassword('')
+      setNewPassword('')
+      setConfirm('')
       handleFieldErrors(err, setFieldErrors, 'Error updating password')
     } finally {
       setLoading(false)
@@ -133,7 +130,14 @@ export function ChangeOnwnPasswordDialog({open, onOpenChange }: Props) {
             onCancel={() => onOpenChange(false)}
             onSave={handleChange}
             saveLabel={loading ? 'Saving...' : 'Save'}
-            disabled={loading || !oldPassword || !newPassword || newPassword !== confirm || fieldErrors.newPassword !== '' || fieldErrors.confirm !== ''}
+            disabled={
+              loading ||
+              !oldPassword ||
+              !newPassword ||
+              newPassword !== confirm ||
+              fieldErrors.newPassword !== '' ||
+              fieldErrors.confirm !== ''
+            }
             loading={loading}
           />
         </DialogFooter>

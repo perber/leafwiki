@@ -36,16 +36,27 @@ export default function UserToolbar() {
           </Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem className='cursor-pointer' onClick={() => navigate('/users')}>
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => navigate('/users')}
+          >
             User Management
           </DropdownMenuItem>
-          <DropdownMenuItem className='cursor-pointer' onClick={() => handleChangePasswordDialog()}>
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => handleChangePasswordDialog()}
+          >
             Change Own Password
           </DropdownMenuItem>
-          <DropdownMenuItem className='cursor-pointer' onClick={handleLogout}>Logout</DropdownMenuItem>
+          <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
+            Logout
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <ChangeOnwnPasswordDialog open={dialogOpen} onOpenChange={handleChangePasswordDialog} />
+      <ChangeOnwnPasswordDialog
+        open={dialogOpen}
+        onOpenChange={handleChangePasswordDialog}
+      />
     </div>
   )
 }

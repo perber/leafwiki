@@ -35,8 +35,8 @@ export default function PageViewer() {
 
   return (
     <>
-      <Breadcrumbs />
       <div className="flex justify-end">
+        <Breadcrumbs />
         <DeletePageDialog pageId={page.id} redirectUrl={redirectUrl} />
         <EditPageButton path={page.path} />
       </div>
