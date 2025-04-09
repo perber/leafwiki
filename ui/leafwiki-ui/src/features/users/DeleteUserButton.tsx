@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/users'
+import { AlertDialogDescription } from '@radix-ui/react-alert-dialog'
 import { useState } from 'react'
 
 type Props = {
@@ -55,6 +56,9 @@ export function DeleteUserButton({ userId, username }: Props) {
           <AlertDialogTitle>
             Are you sure you want to delete this user?
           </AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone.
+          </AlertDialogDescription>
         </AlertDialogHeader>
 
         <p className="text-sm text-gray-600">
