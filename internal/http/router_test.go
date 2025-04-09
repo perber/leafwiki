@@ -830,7 +830,7 @@ func TestUpdateUserEndpoint(t *testing.T) {
 	router := NewRouter(wikiInstance)
 
 	// Benutzer anlegen
-	create := `{"username": "jane", "email": "jane@example.com", "password": "secret", "role": "editor"}`
+	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "editor"}`
 	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
 	var user map[string]interface{}
 	_ = json.Unmarshal(resp.Body.Bytes(), &user)
@@ -847,6 +847,7 @@ func TestUpdateUserEndpoint(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK for user update, got %d", rec.Code)
 	}
+
 }
 
 func TestDeleteUserEndpoint(t *testing.T) {
@@ -854,7 +855,7 @@ func TestDeleteUserEndpoint(t *testing.T) {
 	router := NewRouter(wikiInstance)
 
 	// Benutzer anlegen
-	create := `{"username": "todelete", "email": "delete@example.com", "password": "secret", "role": "editor"}`
+	create := `{"username": "todelete", "email": "delete@example.com", "password": "secrepassword", "role": "editor"}`
 	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
 	var user map[string]interface{}
 	_ = json.Unmarshal(resp.Body.Bytes(), &user)
@@ -898,7 +899,7 @@ func TestRequireAdminMiddleware(t *testing.T) {
 	router := NewRouter(wikiInstance)
 
 	// Default Admin versucht, Benutzer zu erstellen (sollte erlaubt sein)
-	body := `{"username": "mod", "email": "mod@example.com", "password": "secret", "role": "editor"}`
+	body := `{"username": "mod", "email": "mod@example.com", "password": "secretpassword", "role": "editor"}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
 
 	if rec.Code != http.StatusCreated {
