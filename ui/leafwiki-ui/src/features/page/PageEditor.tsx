@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
 import { useTreeStore } from '@/stores/tree'
 import { Save, X } from 'lucide-react'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AssetManager } from './AssetManager'
 
@@ -24,6 +24,8 @@ export default function PageEditor() {
 
   const { setContent, clear } = usePageToolbar()
 
+  const handleSaveRef = useRef<() => void>(() => { })
+
   const parentPath =
     useTreeStore(() => {
       const parts = page?.path?.split('/')
@@ -32,22 +34,24 @@ export default function PageEditor() {
     }) || ''
 
   useEffect(() => {
-    if (!path) return
-    setLoading(true)
-    getPageByPath(path)
-      .then((resp) => {
-        setPage(resp)
-        setMarkdown(resp.content)
-        setTitle(resp.title)
-        setSlug(resp.slug)
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [path])
+    handleSaveRef.current = async () => {
+      try {
+        await updatePage(page.id, title, slug, markdown)
+        if (parentPath === '') {
+          await reloadTree()
+          navigate(`/${slug}`)
+          return
+        }
+        navigate(`/${parentPath}/${slug}`)
+        await reloadTree()
+      } catch (err) {
+        console.error('Save failed', err)
+      }
+    }
+  }, [page, title, slug, markdown, parentPath, reloadTree, navigate])
 
   useEffect(() => {
     if (!page) return
-    console.log('page', page)
     setContent(
       <React.Fragment key="editing">
         <Button
@@ -59,7 +63,7 @@ export default function PageEditor() {
           <X />
         </Button>
         <Button
-          onClick={handleSave}
+          onClick={() => handleSaveRef.current()}
           variant="default"
           className="h-8 w-8 rounded-full shadow-md"
           size="icon"
@@ -74,20 +78,21 @@ export default function PageEditor() {
     }
   }, [page, setContent])
 
-  const handleSave = async () => {
-    try {
-      await updatePage(page.id, title, slug, markdown)
-      if (parentPath === '') {
-        await reloadTree()
-        navigate(`/${slug}`)
-        return
-      }
-      navigate(`/${parentPath}/${slug}`)
-      await reloadTree()
-    } catch (err) {
-      console.error('Save failed', err)
-    }
-  }
+  useEffect(() => {
+    if (!path) return
+
+    setLoading(true)
+    getPageByPath(path)
+      .then((resp) => {
+        setPage(resp)
+        setMarkdown(resp.content)
+        setTitle(resp.title)
+        setSlug(resp.slug)
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [path])
+
 
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>
   if (error) return <p className="text-sm text-red-500">Error: {error}</p>
@@ -125,6 +130,7 @@ export default function PageEditor() {
         <MarkdownEditor
           value={markdown}
           onChange={(val) => {
+            console.log('Markdown changed', val)
             setMarkdown(val)
 
             if (inserted) setInserted(null) // reset after insert
