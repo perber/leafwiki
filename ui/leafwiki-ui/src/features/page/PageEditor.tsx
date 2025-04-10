@@ -1,9 +1,10 @@
+import { EditorTitleBar } from '@/components/EditorTitleBar'
 import MarkdownEditor from '@/components/MarkdownEditor'
 import { usePageToolbar } from '@/components/PageToolbarContext'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
+import { useDebounce } from '@/lib/useDebounce'
 import { useTreeStore } from '@/stores/tree'
 import { DialogDescription } from '@radix-ui/react-dialog'
 import { Save, X } from 'lucide-react'
@@ -25,7 +26,7 @@ export default function PageEditor() {
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
 
-  const { setContent, clear } = usePageToolbar()
+  const { setContent, clearContent, setTitleBar, clearTitleBar } = usePageToolbar()
 
   const handleSaveRef = useRef<() => void>(() => { })
 
@@ -35,6 +36,16 @@ export default function PageEditor() {
       parts?.pop()
       return parts?.join('/')
     }) || ''
+
+  const debouncedTitle = useDebounce(title, 300)
+
+  useEffect(() => {
+    if (!debouncedTitle.trim()) return
+
+    suggestSlug(page?.parentId || '', debouncedTitle)
+      .then(setSlug)
+      .catch((err) => console.warn('Slug error', err))
+  }, [debouncedTitle, page?.parentId])
 
   useEffect(() => {
     handleSaveRef.current = async () => {
@@ -52,6 +63,21 @@ export default function PageEditor() {
       }
     }
   }, [page, title, slug, markdown, parentPath, reloadTree, navigate])
+
+  useEffect(() => {
+    if (!page || !title || !slug) return
+    setTitleBar(
+      <EditorTitleBar
+        title={title}
+        slug={slug}
+        onChange={(newTitle) => {
+          setTitle(newTitle)
+        }}
+      />
+    )
+
+    return () => clearTitleBar()
+  }, [title, slug, page?.parentId])
 
   useEffect(() => {
     if (!page) return
@@ -73,11 +99,11 @@ export default function PageEditor() {
         >
           <Save />
         </Button>
-      </React.Fragment>,
+      </React.Fragment>
     )
 
     return () => {
-      clear()
+      clearContent()
     }
   }, [page, setContent])
 
@@ -104,32 +130,6 @@ export default function PageEditor() {
   return (
     <div className="flex h-[calc(100vh-120px)] gap-6">
       <div className="flex flex-1 flex-col gap-2">
-        <div className="space-y-2">
-          <Input
-            placeholder="Title"
-            className="mb-2 text-xl font-semibold"
-            value={title}
-            onChange={async (e) => {
-              const val = e.target.value
-              setTitle(val)
-
-              if (val.trim()) {
-                try {
-                  const suggested = await suggestSlug(page?.parentId || '', val)
-                  setSlug(suggested)
-                } catch (err) {
-                  console.warn('Slug error', err)
-                }
-              } else {
-                setSlug('')
-              }
-            }}
-          />
-          <p className="text-sm text-gray-500">
-            Path: {parentPath && `${parentPath}/`}
-            {slug}
-          </p>
-        </div>
         <div className="flex justify-end pb-2">
           <Button variant="outline" onClick={() => setAssetModalOpen(true)}>
             + Add Asset

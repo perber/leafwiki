@@ -14,7 +14,7 @@ export default function PageViewer() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState<any>(null)
-  const { setContent, clear } = usePageToolbar()
+  const { setContent, clearContent } = usePageToolbar()
 
   useEffect(() => {
     setLoading(true)
@@ -41,7 +41,7 @@ export default function PageViewer() {
     )
 
     return () => {
-      clear()
+      clearContent()
     }
   }, [page, setContent])
 
