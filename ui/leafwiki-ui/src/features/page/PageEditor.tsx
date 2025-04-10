@@ -1,9 +1,11 @@
 import MarkdownEditor from '@/components/MarkdownEditor'
 import { usePageToolbar } from '@/components/PageToolbarContext'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
 import { useTreeStore } from '@/stores/tree'
+import { DialogDescription } from '@radix-ui/react-dialog'
 import { Save, X } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -17,6 +19,7 @@ export default function PageEditor() {
   const [markdown, setMarkdown] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [assetModalOpen, setAssetModalOpen] = useState(false)
   const reloadTree = useTreeStore((s) => s.reloadTree)
 
   const [title, setTitle] = useState('')
@@ -127,6 +130,11 @@ export default function PageEditor() {
             {slug}
           </p>
         </div>
+        <div className="flex justify-end pb-2">
+          <Button variant="outline" onClick={() => setAssetModalOpen(true)}>
+            + Add Asset
+          </Button>
+        </div>
         <MarkdownEditor
           value={markdown}
           onChange={(val) => {
@@ -138,9 +146,23 @@ export default function PageEditor() {
           insert={inserted}
         />
       </div>
-      <div className="w-64 overflow-y-auto border-l pl-4">
-        <AssetManager pageId={page.id} onInsert={(md) => setInserted(md)} />
-      </div>
+      <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Asset</DialogTitle>
+            <DialogDescription>
+              Upload or select an asset to insert into the page.
+            </DialogDescription>
+          </DialogHeader>
+          <AssetManager
+            pageId={page.id}
+            onInsert={(md) => {
+              setInserted(md)
+              setAssetModalOpen(false)
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
