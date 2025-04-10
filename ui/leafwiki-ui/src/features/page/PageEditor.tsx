@@ -37,13 +37,20 @@ export default function PageEditor() {
       return parts?.join('/')
     }) || ''
 
+  /**
+   * FIXME - Debounce is happending two times, also the generation of slugs is happening when the user is coming in
+   * This shouldn't happend and needs to be fixed!
+   */
   const debouncedTitle = useDebounce(title, 300)
-
   useEffect(() => {
     if (!debouncedTitle.trim()) return
 
     suggestSlug(page?.parentId || '', debouncedTitle)
-      .then(setSlug)
+      .then((suggested) => {
+        if (suggested !== slug) {
+          setSlug(suggested)
+        }
+      })
       .catch((err) => console.warn('Slug error', err))
   }, [debouncedTitle, page?.parentId])
 
@@ -76,7 +83,9 @@ export default function PageEditor() {
       />
     )
 
-    return () => clearTitleBar()
+    return () => {
+      clearTitleBar()
+    }
   }, [title, slug, page?.parentId])
 
   useEffect(() => {
