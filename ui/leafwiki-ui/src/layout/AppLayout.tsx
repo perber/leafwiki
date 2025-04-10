@@ -2,13 +2,35 @@ import Breadcrumbs from '@/components/Breadcrumbs'
 import { usePageToolbar } from '@/components/PageToolbarContext'
 import UserToolbar from '@/components/UserToolbar'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { content } = usePageToolbar()
+  const location = useLocation()
+  const isEditor = location.pathname.startsWith('/e/')
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
-      <Sidebar />
+      <motion.div
+        animate={{
+          width: isEditor ? 0 : '24rem',
+          opacity: isEditor ? 0 : 1,
+        }}
+        transition={{ duration: 0.3, ease: 'easeInOut' }}
+        className="overflow-hidden"
+        style={{ willChange: 'width, opacity' }}
+      >
+        <motion.aside
+          className="h-screen w-96 border-r border-gray-200 bg-white p-4 shadow-md"
+          animate={{
+            x: isEditor ? -20 : 0,
+            opacity: isEditor ? 0 : 1,
+          }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+        >
+          <Sidebar />
+        </motion.aside>
+      </motion.div>
       <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b bg-white p-4 shadow-sm">
           <div className="mr-2 flex-1 flex-grow">
