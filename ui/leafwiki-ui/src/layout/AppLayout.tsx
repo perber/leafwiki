@@ -44,7 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         transition={{ duration: 0.1, ease: 'easeInOut' }}
         style={{ willChange: 'transform' }}
       >
-        <header className="border-b bg-white p-4 shadow-sm min-h-[80px]">
+        <header className="border-b bg-white p-4 shadow-sm min-h-[85px]">
           <div className="flex items-center justify-between h-full">
             <div className="flex items-center gap-2">
               <Breadcrumbs />
