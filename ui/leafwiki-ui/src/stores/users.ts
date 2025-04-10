@@ -4,6 +4,7 @@ import { useAuthStore } from './auth'
 
 type UserStore = {
   users: api.User[]
+  reset: () => void
   loadUsers: () => Promise<void>
   createUser: (data: Parameters<typeof api.createUser>[0]) => Promise<void>
   updateUser: (data: Parameters<typeof api.updateUser>[0]) => Promise<void>
@@ -13,6 +14,8 @@ type UserStore = {
 
 export const useUserStore = create<UserStore>((set, get) => ({
   users: [],
+
+  reset: () => set({ users: [] }),
 
   loadUsers: async () => {
     const users = await api.getUsers()

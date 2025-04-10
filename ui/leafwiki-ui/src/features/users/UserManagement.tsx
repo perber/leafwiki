@@ -7,7 +7,7 @@ import { UserFormDialog } from './UserFormDialog'
 // import { UserFormDialog } from "./UserFormDialog"
 
 export default function UserManagement() {
-  const { users, loadUsers } = useUserStore()
+  const { users, loadUsers, reset } = useUserStore()
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -20,6 +20,11 @@ export default function UserManagement() {
       .finally(() => {
         setLoading(false)
       })
+
+      return () => {
+        reset()
+      }
+
   }, [loadUsers])
 
   return (
