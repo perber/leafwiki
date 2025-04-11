@@ -37,6 +37,26 @@ export default function MarkdownEditor({
         className="w-1/2 resize-none rounded border border-gray-300 p-4 font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Tab') {
+            e.preventDefault()
+      
+            const textarea = e.currentTarget
+            const start = textarea.selectionStart
+            const end = textarea.selectionEnd
+      
+            // Insert tab or spaces (here we use 2 spaces)
+            const newValue =
+              value.substring(0, start) + '  ' + value.substring(end)
+      
+            onChange(newValue)
+      
+            // Restore cursor position after inserted spaces
+            requestAnimationFrame(() => {
+              textarea.selectionStart = textarea.selectionEnd = start + 2
+            })
+          }
+        }}
         placeholder="Write in Markdown..."
       />
 
