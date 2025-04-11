@@ -5,7 +5,8 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog'
 import { createPage, suggestSlug } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
@@ -18,9 +19,10 @@ import { toast } from 'sonner'
 
 type AddPageDialogProps = {
   parentId: string
+  minimal?: boolean
 }
 
-export function AddPageDialog({ parentId }: AddPageDialogProps) {
+export function AddPageDialog({ parentId, minimal }: AddPageDialogProps) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -82,76 +84,87 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
     setLoading(false)
   }
 
-  return <>
-    {open ? (
-      <Dialog
-        modal={true}
-        open={open}
-        onOpenChange={(isOpen) => {
-          setOpen(isOpen)
-          if (!isOpen) resetForm()
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen)
+        if (!isOpen) resetForm()
+      }}
+    >
+      <DialogTrigger asChild>
+        <div className="group relative mr-2 flex">
+          {minimal ? (
+            <button onClick={() => setOpen(true)}>
+              <Plus
+                size={20}
+                className="cursor-pointer text-gray-500 hover:text-gray-800"
+              />
+            </button>
+          ) : (
+            <button onClick={() => setOpen(true)}>
+              <Plus
+                size={20}
+                className="cursor-pointer text-gray-500 hover:text-gray-800"
+              />
+              Create page {parentId}
+            </button>
+          )}
+          <div className="absolute bottom-full left-0 mb-2 hidden w-max rounded bg-gray-700 px-2 py-1 text-xs text-white group-hover:block">
+            Add a new page
+          </div>
+        </div>
+      </DialogTrigger>
+      <DialogContent
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && !loading && title && slug) {
+            e.preventDefault()
+            handleCreate()
+          }
         }}
       >
-        <DialogContent
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !loading && title && slug) {
-              e.preventDefault()
-              handleCreate()
-            }
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>Create a new page</DialogTitle>
-            <DialogDescription>Enter the title of the new page</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <FormInput
-              autoFocus={true}
-              label="Title"
-              value={title}
-              onChange={(val) => {
-                handleTitleChange(val)
-                setFieldErrors((prev) => ({ ...prev, title: '' }))
-              }}
-              placeholder="Page title"
-              error={fieldErrors.title}
-            />
-
-            <FormInput
-              label="Slug"
-              value={slug}
-              onChange={(val) => {
-                setSlug(val)
-                setFieldErrors((prev) => ({ ...prev, slug: '' }))
-              }}
-              placeholder="Page slug"
-              error={fieldErrors.slug}
-            />
-          </div>
-          <span className="text-sm text-gray-500">
-            Path: {parentPath !== '' && `${parentPath}/`}
-            {slug && `${slug}`}
-          </span>
-          <div className="mt-4 flex justify-end">
-            <FormActions
-              onCancel={handleCancel}
-              onSave={handleCreate}
-              saveLabel={loading ? 'Creating…' : 'Create'}
-              disabled={!title || !slug || loading}
-              loading={loading}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-    ) : (
-      <div className="group relative mr-2 flex">
-        <button onClick={() => setOpen(true)}>
-          <Plus
-            size={20}
-            className="cursor-pointer text-gray-500 hover:text-gray-800"
+        <DialogHeader>
+          <DialogTitle>Create a new page</DialogTitle>
+          <DialogDescription>Enter the title of the new page</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <FormInput
+            autoFocus={true}
+            label="Title"
+            value={title}
+            onChange={(val) => {
+              handleTitleChange(val)
+              setFieldErrors((prev) => ({ ...prev, title: '' }))
+            }}
+            placeholder="Page title"
+            error={fieldErrors.title}
           />
-        </button>
-      </div>
-    )}
-  </>
+
+          <FormInput
+            label="Slug"
+            value={slug}
+            onChange={(val) => {
+              setSlug(val)
+              setFieldErrors((prev) => ({ ...prev, slug: '' }))
+            }}
+            placeholder="Page slug"
+            error={fieldErrors.slug}
+          />
+        </div>
+        <span className="text-sm text-gray-500">
+          Path: {parentPath !== '' && `${parentPath}/`}
+          {slug && `${slug}`}
+        </span>
+        <div className="mt-4 flex justify-end">
+          <FormActions
+            onCancel={handleCancel}
+            onSave={handleCreate}
+            saveLabel={loading ? 'Creating…' : 'Create'}
+            disabled={!title || !slug || loading}
+            loading={loading}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
 }
