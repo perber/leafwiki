@@ -3,13 +3,14 @@ import MarkdownEditor from '@/components/MarkdownEditor'
 import { usePageToolbar } from '@/components/PageToolbarContext'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDebounce } from '@/lib/useDebounce'
 import { useTreeStore } from '@/stores/tree'
 import { DialogDescription } from '@radix-ui/react-dialog'
 import { Save, X } from 'lucide-react'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AssetManager } from './AssetManager'
@@ -25,6 +26,9 @@ export default function PageEditor() {
   const [assetModalOpen, setAssetModalOpen] = useState(false)
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const [_, setFieldErrors] = useState<Record<string, string>>({})
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -40,6 +44,7 @@ export default function PageEditor() {
       return parts?.join('/')
     }) || ''
 
+
   const isDirty = useMemo(() => {
     if (!page) return false
     return (
@@ -48,6 +53,16 @@ export default function PageEditor() {
       markdown !== page.content
     )
   }, [page, title, slug, markdown])
+
+
+  const handleNavigateAway = useCallback((targetPath: string) => {
+    if (isDirty) {
+      setPendingNavigation(targetPath)
+      setShowUnsavedDialog(true)
+    } else {
+      navigate(targetPath)
+    }
+  }, [isDirty, navigate])
 
   /**
    * FIXME - Debounce is happending two times, also the generation of slugs is happening when the user is coming in
@@ -85,7 +100,7 @@ export default function PageEditor() {
         handleFieldErrors(err, setFieldErrors, 'Error saving page')
       }
     }
-  }, [page, title, slug, markdown, parentPath, isDirty, navigate])
+  }, [page, title, slug, markdown, parentPath, isDirty])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -125,7 +140,7 @@ export default function PageEditor() {
           size="icon"
           onClick={async () => {
             await reloadTree()
-            navigate(`/${path}`)
+            handleNavigateAway(`/${path}`)
           }}
         >
           <X />
@@ -183,7 +198,7 @@ export default function PageEditor() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-120px)] gap-6">
+      <div className="flex h-[calc(100vh-140px)] gap-6">
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex justify-end pb-2">
             <Button variant="outline" onClick={() => setAssetModalOpen(true)}>
@@ -218,6 +233,19 @@ export default function PageEditor() {
           </DialogContent>
         </Dialog>
       </div>
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        onCancel={() => {
+          setShowUnsavedDialog(false)
+          setPendingNavigation(null)
+        }}
+        onConfirm={() => {
+          if (pendingNavigation) {
+            setShowUnsavedDialog(false)
+            navigate(pendingNavigation)
+          }
+        }}
+      />
     </>
   )
 }
