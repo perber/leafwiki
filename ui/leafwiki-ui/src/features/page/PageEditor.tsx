@@ -4,12 +4,14 @@ import { usePageToolbar } from '@/components/PageToolbarContext'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
+import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDebounce } from '@/lib/useDebounce'
 import { useTreeStore } from '@/stores/tree'
 import { DialogDescription } from '@radix-ui/react-dialog'
 import { Save, X } from 'lucide-react'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { AssetManager } from './AssetManager'
 
 export default function PageEditor() {
@@ -22,6 +24,7 @@ export default function PageEditor() {
   const [error, setError] = useState<string | null>(null)
   const [assetModalOpen, setAssetModalOpen] = useState(false)
   const reloadTree = useTreeStore((s) => s.reloadTree)
+  const [_, setFieldErrors] = useState<Record<string, string>>({})
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -36,6 +39,15 @@ export default function PageEditor() {
       parts?.pop()
       return parts?.join('/')
     }) || ''
+
+  const isDirty = useMemo(() => {
+    if (!page) return false
+    return (
+      title !== page.title ||
+      slug !== page.slug ||
+      markdown !== page.content
+    )
+  }, [page, title, slug, markdown])
 
   /**
    * FIXME - Debounce is happending two times, also the generation of slugs is happening when the user is coming in
@@ -56,20 +68,35 @@ export default function PageEditor() {
 
   useEffect(() => {
     handleSaveRef.current = async () => {
+      if (!isDirty || !page) return
+
       try {
+        toast.info('Saving page...')
         await updatePage(page.id, title, slug, markdown)
-        if (parentPath === '') {
-          await reloadTree()
-          navigate(`/${slug}`)
-          return
-        }
-        navigate(`/${parentPath}/${slug}`)
-        await reloadTree()
+        toast.success('Page saved successfully!')
+        // Set new page content after save
+        setPage({
+          ...page,
+          title,
+          slug,
+          content: markdown,
+        })
       } catch (err) {
-        console.error('Save failed', err)
+        handleFieldErrors(err, setFieldErrors, 'Error saving page')
       }
     }
-  }, [page, title, slug, markdown, parentPath, reloadTree, navigate])
+  }, [page, title, slug, markdown, parentPath, isDirty, navigate])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        handleSaveRef.current()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   useEffect(() => {
     if (!page || !title || !slug) return
@@ -96,7 +123,10 @@ export default function PageEditor() {
           variant="destructive"
           className="h-8 w-8 rounded-full shadow-sm"
           size="icon"
-          onClick={() => navigate(`/${path}`)}
+          onClick={async () => {
+            await reloadTree()
+            navigate(`/${path}`)
+          }}
         >
           <X />
         </Button>
@@ -105,6 +135,7 @@ export default function PageEditor() {
           variant="default"
           className="h-8 w-8 rounded-full shadow-md"
           size="icon"
+          disabled={!isDirty}
         >
           <Save />
         </Button>
@@ -114,7 +145,7 @@ export default function PageEditor() {
     return () => {
       clearContent()
     }
-  }, [page, setContent])
+  }, [page, setContent, isDirty])
 
   useEffect(() => {
     if (!path) return
@@ -138,7 +169,7 @@ export default function PageEditor() {
     } else {
       document.title = 'Edit Page – LeafWiki'
     }
-  
+
     return () => {
       // optional zurücksetzen oder leer lassen
       document.title = 'LeafWiki'
@@ -152,7 +183,6 @@ export default function PageEditor() {
 
   return (
     <>
-      <title>Edit Page - {page?.title + ' - LeafWiki' || 'LeafWiki'}</title>
       <div className="flex h-[calc(100vh-120px)] gap-6">
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex justify-end pb-2">
@@ -163,7 +193,6 @@ export default function PageEditor() {
           <MarkdownEditor
             value={markdown}
             onChange={(val) => {
-              console.log('Markdown changed', val)
               setMarkdown(val)
 
               if (inserted) setInserted(null) // reset after insert
