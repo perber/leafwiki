@@ -9,6 +9,7 @@ import { ChangeOnwnPasswordDialog } from '@/features/users/ChangeOwnPasswordDial
 import { useAuthStore } from '@/stores/auth'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { RoleGuard } from './RoleGuard'
 
 export default function UserToolbar() {
   const user = useAuthStore((s) => s.user)
@@ -36,12 +37,14 @@ export default function UserToolbar() {
           </Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={() => navigate('/users')}
-          >
-            User Management
-          </DropdownMenuItem>
+          <RoleGuard roles={['admin']}>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => navigate('/users')}
+            >
+              User Management
+            </DropdownMenuItem>
+          </RoleGuard>
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={() => handleChangePasswordDialog()}
