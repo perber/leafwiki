@@ -85,10 +85,9 @@ export function TreeNode({ node, level = 0 }: Props) {
         )}
       </div>
 
-      {/* Animierter Bereich für Kinderknoten */}
       <div
         ref={ref}
-        className={`transition-[max-height, opacity] ml-4 duration-500 ease-in-out ${!open ? 'overflow-hidden' : ''}`}
+        className={`ml-4  ease-in-out ${!open ? 'overflow-hidden' : ''}`}
         style={{
           maxHeight: open ? `1000px` : '0px',
           opacity: open ? 1 : 0,
