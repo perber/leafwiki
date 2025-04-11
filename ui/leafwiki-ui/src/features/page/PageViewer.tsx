@@ -45,6 +45,14 @@ export default function PageViewer() {
     }
   }, [page, setContent])
 
+  useEffect(() => {
+    if (!page) {
+      document.title = 'LeafWiki'
+    } else {
+      document.title = page.title + ' - LeafWiki'
+    }
+  }, [page])
+
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>
   if (error) return <p className="text-sm text-red-500">Error: {error}</p>
   if (!page) return <p className="text-sm text-gray-500">No page found</p>

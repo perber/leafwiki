@@ -31,36 +31,39 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="h-screen w-96 border-r border-gray-200 bg-white font-sans text-gray-900 shadow-md">
-      <form onSubmit={handleSubmit} className="w-full p-4">
-        <h1 className="mb-4 text-xl font-bold">🌿 LeafWiki</h1>
+    <>
+      <title>Login - LeafWiki</title>
+      <div className="h-screen w-96 border-r border-gray-200 bg-white font-sans text-gray-900 shadow-md">
+        <form onSubmit={handleSubmit} className="w-full p-4">
+          <h1 className="mb-4 text-xl font-bold">🌿 LeafWiki</h1>
 
-        <div className="mb-4">
-          <Input
-            type="text"
-            placeholder="Username or Email"
-            value={identifier}
-            onChange={(e) => setIdentifier(e.target.value)}
-            required
-          />
-        </div>
+          <div className="mb-4">
+            <Input
+              type="text"
+              placeholder="Username or Email"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              required
+            />
+          </div>
 
-        <div className="mb-4">
-          <Input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
+          <div className="mb-4">
+            <Input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
 
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
-        </Button>
-      </form>
-    </div>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? 'Logging in...' : 'Login'}
+          </Button>
+        </form>
+      </div>
+    </>
   )
 }

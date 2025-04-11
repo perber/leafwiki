@@ -132,46 +132,63 @@ export default function PageEditor() {
   }, [path])
 
 
-  if (loading) return <p className="text-sm text-gray-500">Loading...</p>
-  if (error) return <p className="text-sm text-red-500">Error: {error}</p>
-  if (!page) return <p className="text-sm text-gray-500">No page found</p>
+  useEffect(() => {
+    if (title) {
+      document.title = `${title} - Edit Page – LeafWiki`
+    } else {
+      document.title = 'Edit Page – LeafWiki'
+    }
+  
+    return () => {
+      // optional zurücksetzen oder leer lassen
+      document.title = 'LeafWiki'
+    }
+  }, [title])
+
+
+  if (loading) return <><p className="text-sm text-gray-500">Loading...</p></>
+  if (error) return <><p className="text-sm text-red-500">Error: {error}</p></>
+  if (!page) return <><p className="text-sm text-gray-500">No page found</p></>
 
   return (
-    <div className="flex h-[calc(100vh-120px)] gap-6">
-      <div className="flex flex-1 flex-col gap-2">
-        <div className="flex justify-end pb-2">
-          <Button variant="outline" onClick={() => setAssetModalOpen(true)}>
-            + Add Asset
-          </Button>
-        </div>
-        <MarkdownEditor
-          value={markdown}
-          onChange={(val) => {
-            console.log('Markdown changed', val)
-            setMarkdown(val)
+    <>
+      <title>Edit Page - {page?.title + ' - LeafWiki' || 'LeafWiki'}</title>
+      <div className="flex h-[calc(100vh-120px)] gap-6">
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="flex justify-end pb-2">
+            <Button variant="outline" onClick={() => setAssetModalOpen(true)}>
+              + Add Asset
+            </Button>
+          </div>
+          <MarkdownEditor
+            value={markdown}
+            onChange={(val) => {
+              console.log('Markdown changed', val)
+              setMarkdown(val)
 
-            if (inserted) setInserted(null) // reset after insert
-          }}
-          insert={inserted}
-        />
-      </div>
-      <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add Asset</DialogTitle>
-            <DialogDescription>
-              Upload or select an asset to insert into the page.
-            </DialogDescription>
-          </DialogHeader>
-          <AssetManager
-            pageId={page.id}
-            onInsert={(md) => {
-              setInserted(md)
-              setAssetModalOpen(false)
+              if (inserted) setInserted(null) // reset after insert
             }}
+            insert={inserted}
           />
-        </DialogContent>
-      </Dialog>
-    </div>
+        </div>
+        <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add Asset</DialogTitle>
+              <DialogDescription>
+                Upload or select an asset to insert into the page.
+              </DialogDescription>
+            </DialogHeader>
+            <AssetManager
+              pageId={page.id}
+              onInsert={(md) => {
+                setInserted(md)
+                setAssetModalOpen(false)
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+    </>
   )
 }
