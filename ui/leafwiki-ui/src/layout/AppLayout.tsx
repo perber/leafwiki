@@ -21,12 +21,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative h-screen w-full overflow-y-auto bg-gray-50 font-sans text-gray-900">
       <motion.aside
+        key={'sidebar'}
         className="fixed bottom-0 left-0 top-0 z-20 h-full w-96 overflow-y-auto border-r border-gray-200 bg-white p-4 shadow-md"
         animate={{
           x: isEditor ? '-100%' : '0%',
           opacity: isEditor ? 0 : 1,
         }}
-        transition={{ duration: 0.1, ease: 'easeInOut' }}
+        transition={{ duration: 0.2, ease: 'easeInOut' }}
         style={{ willChange: 'transform, opacity' }}
       >
         <Sidebar />
@@ -34,12 +35,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main-Content */}
       <motion.div
+        key={'content'}
         className="absolute inset-0 z-10 flex flex-col"
         animate={{
           width: isEditor ? '100%' : 'calc(100% - 384px)',
           x: isEditor ? 0 : 384, // ≈ Sidebar-Offset / subtile slide*/
         }}
-        transition={{ duration: 0.1, ease: 'easeInOut' }}
+        transition={{ duration: 0.2, ease: 'easeInOut' }}
         style={{ willChange: 'transform' }}
       >
         <header className="min-h-[85px] border-b bg-white p-4 shadow-sm">
@@ -49,11 +51,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <AnimatePresence mode="wait">
               <motion.div
-                key={Math.random()}
+                key={'titlebar'}
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 4 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.4 }}
                 className="flex items-center gap-2"
               >
                 {titleBar && (
@@ -67,11 +69,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-4">
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={content?.key || Math.random()}
+                  key={'buttons'}
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 4 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.4 }}
                   className="flex items-center gap-2"
                 >
                   {content}
