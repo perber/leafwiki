@@ -19,10 +19,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [location.pathname])
 
   return (
-    <div className="h-screen w-full relative overflow-y-auto bg-gray-50 font-sans text-gray-900">
-
+    <div className="relative h-screen w-full overflow-y-auto bg-gray-50 font-sans text-gray-900">
       <motion.aside
-        className="fixed left-0 top-0 bottom-0 z-20 h-full w-96 border-r border-gray-200 bg-white p-4 shadow-md overflow-y-auto"
+        className="fixed bottom-0 left-0 top-0 z-20 h-full w-96 overflow-y-auto border-r border-gray-200 bg-white p-4 shadow-md"
         animate={{
           x: isEditor ? '-100%' : '0%',
           opacity: isEditor ? 0 : 1,
@@ -35,17 +34,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main-Content */}
       <motion.div
-        className="absolute inset-0 flex flex-col z-10"
+        className="absolute inset-0 z-10 flex flex-col"
         animate={{
           width: isEditor ? '100%' : 'calc(100% - 384px)',
           x: isEditor ? 0 : 384, // ≈ Sidebar-Offset / subtile slide*/
         }}
-
         transition={{ duration: 0.1, ease: 'easeInOut' }}
         style={{ willChange: 'transform' }}
       >
-        <header className="border-b bg-white p-4 shadow-sm min-h-[85px]">
-          <div className="flex items-center justify-between h-full">
+        <header className="min-h-[85px] border-b bg-white p-4 shadow-sm">
+          <div className="flex h-full items-center justify-between">
             <div className="flex items-center gap-2">
               <Breadcrumbs />
             </div>
@@ -59,7 +57,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 className="flex items-center gap-2"
               >
                 {titleBar && (
-                  <div className="flex flex-1 justify-center items-center">
+                  <div className="flex flex-1 items-center justify-center">
                     {titleBar}
                   </div>
                 )}
@@ -84,9 +82,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto p-6">{children}</main>
       </motion.div>
     </div>
   )

@@ -2,7 +2,12 @@ import { EditorTitleBar } from '@/components/EditorTitleBar'
 import MarkdownEditor from '@/components/MarkdownEditor'
 import { usePageToolbar } from '@/components/PageToolbarContext'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
@@ -27,15 +32,17 @@ export default function PageEditor() {
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const [_, setFieldErrors] = useState<Record<string, string>>({})
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
-  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
-
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(
+    null,
+  )
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
 
-  const { setContent, clearContent, setTitleBar, clearTitleBar } = usePageToolbar()
+  const { setContent, clearContent, setTitleBar, clearTitleBar } =
+    usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => { })
+  const handleSaveRef = useRef<() => void>(() => {})
 
   const parentPath =
     useTreeStore(() => {
@@ -44,25 +51,24 @@ export default function PageEditor() {
       return parts?.join('/')
     }) || ''
 
-
   const isDirty = useMemo(() => {
     if (!page) return false
     return (
-      title !== page.title ||
-      slug !== page.slug ||
-      markdown !== page.content
+      title !== page.title || slug !== page.slug || markdown !== page.content
     )
   }, [page, title, slug, markdown])
 
-
-  const handleNavigateAway = useCallback((targetPath: string) => {
-    if (isDirty) {
-      setPendingNavigation(targetPath)
-      setShowUnsavedDialog(true)
-    } else {
-      navigate(targetPath)
-    }
-  }, [isDirty, navigate])
+  const handleNavigateAway = useCallback(
+    (targetPath: string) => {
+      if (isDirty) {
+        setPendingNavigation(targetPath)
+        setShowUnsavedDialog(true)
+      } else {
+        navigate(targetPath)
+      }
+    },
+    [isDirty, navigate],
+  )
 
   /**
    * FIXME - Debounce is happending two times, also the generation of slugs is happening when the user is coming in
@@ -122,7 +128,7 @@ export default function PageEditor() {
         onChange={(newTitle) => {
           setTitle(newTitle)
         }}
-      />
+      />,
     )
 
     return () => {
@@ -154,7 +160,7 @@ export default function PageEditor() {
         >
           <Save />
         </Button>
-      </React.Fragment>
+      </React.Fragment>,
     )
 
     return () => {
@@ -177,7 +183,6 @@ export default function PageEditor() {
       .finally(() => setLoading(false))
   }, [path])
 
-
   useEffect(() => {
     if (title) {
       document.title = `${title} - Edit Page – LeafWiki`
@@ -191,10 +196,24 @@ export default function PageEditor() {
     }
   }, [title])
 
-
-  if (loading) return <><p className="text-sm text-gray-500">Loading...</p></>
-  if (error) return <><p className="text-sm text-red-500">Error: {error}</p></>
-  if (!page) return <><p className="text-sm text-gray-500">No page found</p></>
+  if (loading)
+    return (
+      <>
+        <p className="text-sm text-gray-500">Loading...</p>
+      </>
+    )
+  if (error)
+    return (
+      <>
+        <p className="text-sm text-red-500">Error: {error}</p>
+      </>
+    )
+  if (!page)
+    return (
+      <>
+        <p className="text-sm text-gray-500">No page found</p>
+      </>
+    )
 
   return (
     <>

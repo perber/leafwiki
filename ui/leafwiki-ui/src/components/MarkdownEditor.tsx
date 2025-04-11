@@ -40,17 +40,17 @@ export default function MarkdownEditor({
         onKeyDown={(e) => {
           if (e.key === 'Tab') {
             e.preventDefault()
-      
+
             const textarea = e.currentTarget
             const start = textarea.selectionStart
             const end = textarea.selectionEnd
-      
+
             // Insert tab or spaces (here we use 2 spaces)
             const newValue =
               value.substring(0, start) + '  ' + value.substring(end)
-      
+
             onChange(newValue)
-      
+
             // Restore cursor position after inserted spaces
             requestAnimationFrame(() => {
               textarea.selectionStart = textarea.selectionEnd = start + 2

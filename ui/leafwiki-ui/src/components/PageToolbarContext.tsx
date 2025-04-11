@@ -1,5 +1,11 @@
 // src/context/PageToolbarContext.tsx
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from 'react'
 
 type ToolbarContent = React.ReactNode
 
@@ -11,10 +17,10 @@ const PageToolbarContext = createContext<{
   content: ToolbarContent
   titleBar: ToolbarContent
 }>({
-  setContent: () => { },
-  setTitleBar: () => { },
-  clearContent: () => { },
-  clearTitleBar: () => { },
+  setContent: () => {},
+  setTitleBar: () => {},
+  clearContent: () => {},
+  clearTitleBar: () => {},
   content: null,
   titleBar: null,
 })
@@ -53,7 +59,6 @@ export function PageToolbarProvider({
       clearTitleBar,
     }
   }, [content, setContent, clearContent, setTitleBar, titleBar, clearTitleBar])
-
 
   return (
     <PageToolbarContext.Provider value={value}>
