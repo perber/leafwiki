@@ -217,7 +217,7 @@ export default function PageEditor() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-140px)] gap-6">
+      <div className="flex h-[calc(100vh-180px)] gap-6">
         <div className="flex flex-1 flex-col gap-2">
           <div className="flex justify-end pb-2">
             <Button variant="outline" onClick={() => setAssetModalOpen(true)}>
