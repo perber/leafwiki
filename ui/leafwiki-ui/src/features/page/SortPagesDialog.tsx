@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -13,7 +14,7 @@ import { PageNode, sortPages } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useTreeStore } from '@/stores/tree'
 import { ArrowDown, ArrowUp, List } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 export function SortPagesDialog({ parent }: { parent: PageNode }) {
@@ -33,6 +34,14 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
     newOrder[target] = temp
     setOrder(newOrder)
   }
+
+  useEffect(() => {
+    if (!parent) {
+      setOrder([])
+      return
+    }
+    setOrder(parent.children.map((c) => c.id))
+  }, [parent])
 
   const handleSave = async () => {
     setLoading(true)
@@ -73,7 +82,13 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
           </DialogDescription>
         </DialogHeader>
 
-        <ul className="space-y-2">
+        <ul className="space-y-2"
+          style={{
+            maxHeight: '400px',
+            height: '400px',
+            overflowY: 'auto',
+          }}
+        >
           {order.map((id, i) => {
             const node = parent.children.find((c) => c.id === id)
             if (!node) return null
@@ -107,16 +122,17 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
             )
           })}
         </ul>
-
-        <div className="mt-4 flex justify-end">
-          <FormActions
-            onCancel={() => setOpen(false)}
-            onSave={handleSave}
-            saveLabel={loading ? 'Saving...' : 'Save'}
-            disabled={loading}
-            loading={loading}
-          />
-        </div>
+        <DialogFooter>
+          <div className="mt-4 flex justify-end">
+            <FormActions
+              onCancel={() => setOpen(false)}
+              onSave={handleSave}
+              saveLabel={loading ? 'Saving...' : 'Save'}
+              disabled={loading}
+              loading={loading}
+            />
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
