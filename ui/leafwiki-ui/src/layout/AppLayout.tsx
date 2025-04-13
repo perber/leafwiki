@@ -1,6 +1,7 @@
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { usePageToolbar } from '@/components/PageToolbarContext'
 import UserToolbar from '@/components/UserToolbar'
+import { AddPageDialog } from '@/features/page/AddPageDialog'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -86,6 +87,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </motion.div>
+      <AddPageDialog />
     </div>
   )
 }

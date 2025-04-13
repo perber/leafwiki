@@ -1,8 +1,10 @@
+import { TreeViewActionButton } from '@/components/TreeViewActionButton'
 import { filterTreeWithOpenNodes } from '@/lib/filterTreeWithOpenNodes'
 import { useDebounce } from '@/lib/useDebounce'
+import { useAddPageDialogStore } from '@/stores/addPageDialogStore'
 import { useTreeStore } from '@/stores/tree'
+import { Plus } from 'lucide-react'
 import React, { useEffect } from 'react'
-import { AddPageDialog } from '../page/AddPageDialog'
 import { SortPagesDialog } from '../page/SortPagesDialog'
 import { TreeNode } from './TreeNode'
 
@@ -16,6 +18,8 @@ export default function TreeView() {
     setSearchQuery,
     clearSearch,
   } = useTreeStore()
+
+  const { openDialog: openAddPageDialog } = useAddPageDialogStore()
 
   // Debounce für die Suche: Warte 500ms, bevor die Suche verarbeitet wird
   const debouncedSearchQuery = useDebounce(searchQuery, 500)
@@ -65,7 +69,7 @@ export default function TreeView() {
     toRender = (
       <div className="mt-4 space-y-1">
         <div className="flex">
-          <AddPageDialog parentId={''} minimal />
+          <TreeViewActionButton icon={<Plus size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Create new page" onClick={() => openAddPageDialog("")} />
           {filteredTree !== null && <SortPagesDialog parent={filteredTree} />}
         </div>
         {filteredTree?.children.map((node) => (

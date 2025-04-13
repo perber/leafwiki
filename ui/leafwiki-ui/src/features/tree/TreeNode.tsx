@@ -1,10 +1,11 @@
+import { TreeViewActionButton } from '@/components/TreeViewActionButton'
 import { useMeasure } from '@/lib/useMeasure'
+import { useAddPageDialogStore } from '@/stores/addPageDialogStore'
 import { useTreeStore } from '@/stores/tree'
-import { ChevronUp, File } from 'lucide-react'
+import { ChevronUp, File, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageNode } from '../../lib/api'
-import { AddPageDialog } from '../page/AddPageDialog'
 import { MovePageDialog } from '../page/MovePageDialog'
 import { SortPagesDialog } from '../page/SortPagesDialog'
 
@@ -20,6 +21,7 @@ export function TreeNode({ node, level = 0 }: Props) {
   const { pathname } = useLocation()
   const isActive = `/${node.path}` === pathname
   const open = isNodeOpen(node.id)
+  const { openDialog: openAddPageDialog } = useAddPageDialogStore()
 
   const [ref] = useMeasure<HTMLDivElement>()
 
@@ -78,7 +80,7 @@ export function TreeNode({ node, level = 0 }: Props) {
 
         {hovered && (
           <div className="flex gap-0">
-            <AddPageDialog parentId={node.id} minimal />
+          <TreeViewActionButton icon={<Plus size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Create new page" onClick={() => openAddPageDialog(node.id)} />
             <MovePageDialog pageId={node.id} />
             {hasChildren && <SortPagesDialog parent={node} />}
           </div>
