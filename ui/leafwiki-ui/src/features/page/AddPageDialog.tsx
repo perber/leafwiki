@@ -37,10 +37,8 @@ export function AddPageDialog() {
   const [parentPath, setParentPath] = useState<string>('')
 
   useEffect(() => {
-    if (parentId) {
       const path = getPathById(parentId)
       setParentPath(path || '')
-    }
   }, [parentId, getPathById])
 
   // debounced title for slug generation
