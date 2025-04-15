@@ -68,8 +68,28 @@ export default function TreeView() {
     toRender = (
       <div className="mt-4 space-y-1">
         <div className="flex">
-          <TreeViewActionButton icon={<Plus size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Create new page" onClick={() => openDialog("add", {parentId: ""})} />
-          {filteredTree !== null && <TreeViewActionButton icon={<List size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Sort pages" onClick={() => openDialog("sort", { parent: filteredTree })} />}
+          <TreeViewActionButton
+            icon={
+              <Plus
+                size={20}
+                className="cursor-pointer text-gray-500 hover:text-gray-800"
+              />
+            }
+            tooltip="Create new page"
+            onClick={() => openDialog('add', { parentId: '' })}
+          />
+          {filteredTree !== null && (
+            <TreeViewActionButton
+              icon={
+                <List
+                  size={20}
+                  className="cursor-pointer text-gray-500 hover:text-gray-800"
+                />
+              }
+              tooltip="Sort pages"
+              onClick={() => openDialog('sort', { parent: filteredTree })}
+            />
+          )}
         </div>
         {filteredTree?.children.map((node) => (
           <React.Fragment key={node.id}>

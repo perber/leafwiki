@@ -45,7 +45,7 @@ export default function PageEditor() {
   const { setContent, clearContent, setTitleBar, clearTitleBar } =
     usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => { })
+  const handleSaveRef = useRef<() => void>(() => {})
 
   const onMetaDataChange = useCallback((title: string, slug: string) => {
     setTitle(title)
@@ -63,7 +63,7 @@ export default function PageEditor() {
   // This is a workaround to avoid running against the whole tree
   const parentId = useMemo(() => {
     const p = findPageInTreeByPath(parentPath)
-    if (!p) return ""
+    if (!p) return ''
     return p.id
   }, [parentPath])
 
@@ -107,7 +107,6 @@ export default function PageEditor() {
         // because we are already on the page
 
         window.history.replaceState(null, '', newPath)
-
       } catch (err) {
         console.warn(err)
         handleFieldErrors(err, setFieldErrors, 'Error saving page')
@@ -163,7 +162,9 @@ export default function PageEditor() {
           onClick={async () => {
             await reloadTree()
 
-            handleNavigateAway(parentPath && slug ? `/${parentPath}/${slug}` : '/')
+            handleNavigateAway(
+              parentPath && slug ? `/${parentPath}/${slug}` : '/',
+            )
           }}
         >
           <X />

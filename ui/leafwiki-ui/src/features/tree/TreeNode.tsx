@@ -53,10 +53,11 @@ export function TreeNode({ node, level = 0 }: Props) {
   return (
     <div>
       <div
-        className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${isActive
-          ? 'bg-gray-200 font-semibold'
-          : 'text-gray-800 hover:bg-gray-100'
-          }`}
+        className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${
+          isActive
+            ? 'bg-gray-200 font-semibold'
+            : 'text-gray-800 hover:bg-gray-100'
+        }`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
@@ -77,16 +78,45 @@ export function TreeNode({ node, level = 0 }: Props) {
 
         {hovered && (
           <div className="flex gap-0">
-            <TreeViewActionButton icon={<Plus size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Create new page" onClick={() => openDialog("add", { "parentId": node.id })} />
-            <TreeViewActionButton icon={<Move size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Move page to new parent" onClick={() => openDialog("move", { "pageId": node.id })} />
-            {hasChildren && <TreeViewActionButton icon={<List size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Sort pages" onClick={() => openDialog("sort", { parent: node })} />}
+            <TreeViewActionButton
+              icon={
+                <Plus
+                  size={20}
+                  className="cursor-pointer text-gray-500 hover:text-gray-800"
+                />
+              }
+              tooltip="Create new page"
+              onClick={() => openDialog('add', { parentId: node.id })}
+            />
+            <TreeViewActionButton
+              icon={
+                <Move
+                  size={20}
+                  className="cursor-pointer text-gray-500 hover:text-gray-800"
+                />
+              }
+              tooltip="Move page to new parent"
+              onClick={() => openDialog('move', { pageId: node.id })}
+            />
+            {hasChildren && (
+              <TreeViewActionButton
+                icon={
+                  <List
+                    size={20}
+                    className="cursor-pointer text-gray-500 hover:text-gray-800"
+                  />
+                }
+                tooltip="Sort pages"
+                onClick={() => openDialog('sort', { parent: node })}
+              />
+            )}
           </div>
         )}
       </div>
 
       <div
         ref={ref}
-        className={`ml-4  ease-in-out ${!open ? 'overflow-hidden' : ''}`}
+        className={`ml-4 ease-in-out ${!open ? 'overflow-hidden' : ''}`}
         style={{
           maxHeight: open ? `1000px` : '0px',
           opacity: open ? 1 : 0,

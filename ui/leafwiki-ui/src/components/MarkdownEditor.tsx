@@ -15,60 +15,67 @@ export default function MarkdownEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const rafRef = useRef<number | null>(null)
-  
+
   const handleCursorMove = () => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-  
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+
     rafRef.current = requestAnimationFrame(() => {
-      const textarea = textareaRef.current;
-      const preview = previewRef.current;
-      if (!textarea || !preview) return;
-  
-      const textBeforeCursor = textarea.value.slice(0, textarea.selectionStart);
-      const line = textBeforeCursor.split('\n').length;
-  
-      let target = preview.querySelector(`[data-line='${line}']`) as HTMLElement | null;
-  
+      const textarea = textareaRef.current
+      const preview = previewRef.current
+      if (!textarea || !preview) return
+
+      const textBeforeCursor = textarea.value.slice(0, textarea.selectionStart)
+      const line = textBeforeCursor.split('\n').length
+
+      let target = preview.querySelector(
+        `[data-line='${line}']`,
+      ) as HTMLElement | null
+
       // Fallback: vorherige existierende data-line suchen
       if (!target) {
         for (let i = line - 1; i > 0; i--) {
-          const fallback = preview.querySelector(`[data-line='${i}']`) as HTMLElement | null;
+          const fallback = preview.querySelector(
+            `[data-line='${i}']`,
+          ) as HTMLElement | null
           if (fallback) {
-            target = fallback;
-            break;
+            target = fallback
+            break
           }
         }
       }
-  
+
       if (target) {
-        const targetOffset = target.offsetTop;
-        const targetHeight = target.offsetHeight;
-        const containerHeight = preview.clientHeight;
-        const desiredScrollTop = targetOffset - containerHeight / 2 + targetHeight / 2;
-  
-        const threshold = 16; // px Toleranz
-        const distance = Math.abs(preview.scrollTop - desiredScrollTop);
-  
+        const targetOffset = target.offsetTop
+        const targetHeight = target.offsetHeight
+        const containerHeight = preview.clientHeight
+        const desiredScrollTop =
+          targetOffset - containerHeight / 2 + targetHeight / 2
+
+        const threshold = 16 // px Toleranz
+        const distance = Math.abs(preview.scrollTop - desiredScrollTop)
+
         if (distance > threshold) {
-          preview.scrollTo({ top: desiredScrollTop, behavior: 'smooth' });
+          preview.scrollTo({ top: desiredScrollTop, behavior: 'smooth' })
         }
       } else {
         // Fallback: Scroll-Verhältnis synchronisieren
-        const canScroll = preview.scrollHeight > preview.clientHeight;
-        const canScrollTextarea = textarea.scrollHeight > textarea.clientHeight;
-  
+        const canScroll = preview.scrollHeight > preview.clientHeight
+        const canScrollTextarea = textarea.scrollHeight > textarea.clientHeight
+
         if (canScroll && canScrollTextarea) {
-          const scrollRatio = textarea.scrollTop / (textarea.scrollHeight - textarea.clientHeight);
-          const previewTargetScroll = scrollRatio * (preview.scrollHeight - preview.clientHeight);
-  
+          const scrollRatio =
+            textarea.scrollTop / (textarea.scrollHeight - textarea.clientHeight)
+          const previewTargetScroll =
+            scrollRatio * (preview.scrollHeight - preview.clientHeight)
+
           if (Math.abs(preview.scrollTop - previewTargetScroll) > 16) {
-            preview.scrollTo({ top: previewTargetScroll, behavior: 'smooth' });
+            preview.scrollTo({ top: previewTargetScroll, behavior: 'smooth' })
           }
         }
       }
-    });
-  };
-  
+    })
+  }
+
   useEffect(() => {
     if (insert && textareaRef.current) {
       const textarea = textareaRef.current

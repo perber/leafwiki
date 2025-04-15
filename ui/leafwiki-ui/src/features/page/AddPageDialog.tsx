@@ -5,7 +5,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { createPage, suggestSlug } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'

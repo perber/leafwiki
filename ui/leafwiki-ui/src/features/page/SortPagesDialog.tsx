@@ -82,7 +82,8 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
           </DialogDescription>
         </DialogHeader>
 
-        <ul className="space-y-2"
+        <ul
+          className="space-y-2"
           style={{
             maxHeight: '400px',
             height: '400px',

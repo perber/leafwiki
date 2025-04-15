@@ -5,7 +5,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { suggestSlug } from '@/lib/api'
 import { useDebounce } from '@/lib/useDebounce'
@@ -21,7 +21,12 @@ type EditPageMetadataDialogProps = {
   onChange: (title: string, slug: string) => void
 }
 
-export function EditPageMetadataDialog({ parentId, title: propTitle, slug: propSlug, onChange }: EditPageMetadataDialogProps) {
+export function EditPageMetadataDialog({
+  parentId,
+  title: propTitle,
+  slug: propSlug,
+  onChange,
+}: EditPageMetadataDialogProps) {
   // Dialog state from zustand store
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')

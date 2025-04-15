@@ -178,11 +178,11 @@ export async function updatePage(
   slug: string,
   content: string,
 ) {
-    return await fetchWithAuth(`/api/pages/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, slug, content }),
-    })
+  return await fetchWithAuth(`/api/pages/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, slug, content }),
+  })
 }
 
 export async function deletePage(id: string, recursive: boolean) {

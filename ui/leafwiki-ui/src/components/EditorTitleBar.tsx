@@ -8,17 +8,16 @@ type Props = {
 }
 
 export function EditorTitleBar({ title, slug, onEditClicked, isDirty }: Props) {
-
   return (
     <div className="flex flex-col items-center">
       <button
         onClick={() => onEditClicked()}
-        className="group flex items-center gap-1 text-base font-semibold text-gray-800 hover:underline relative"
+        className="group relative flex items-center gap-1 text-base font-semibold text-gray-800 hover:underline"
       >
         {title && <span>{title}</span>}
         <Pencil
           size={16}
-          className="text-gray-400 group-hover:text-gray-600 absolute -right-6 top-1/2 -translate-y-1/2 transition-transform duration-200 ease-in-out"
+          className="absolute -right-6 top-1/2 -translate-y-1/2 text-gray-400 transition-transform duration-200 ease-in-out group-hover:text-gray-600"
         />
         {isDirty && (
           <span className="ml-2 text-xs text-yellow-600">(Bearbeitet)</span>

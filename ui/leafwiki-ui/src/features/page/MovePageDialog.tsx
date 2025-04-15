@@ -4,7 +4,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from '@/components/ui/dialog'
 import {
   Select,
@@ -104,11 +104,14 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(open) => {
-      if (!open) {
-        closeDialog()
-      }
-    }}>
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!open) {
+          closeDialog()
+        }
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Move Page</DialogTitle>
