@@ -13,65 +13,77 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { PageNode } from '@/lib/api'
-import { useMovePageDialogStore } from '@/stores/movePageDialogStore'
-import { JSX, useEffect, useState } from 'react'
+import { movePage, PageNode } from '@/lib/api'
+import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { useDialogsStore } from '@/stores/dialogs'
+import { useTreeStore } from '@/stores/tree'
+import { JSX, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
-export function MovePageDialog() {
+export function MovePageDialog({ pageId }: { pageId: string }) {
+  // Dialog state from zustand store
+  const closeDialog = useDialogsStore((s) => s.closeDialog)
+  const open = useDialogsStore((s) => s.dialogType === 'move')
+
+  const { tree, reloadTree } = useTreeStore()
+  const [loading, setLoading] = useState(false)
+  const [_, setFieldErrors] = useState<Record<string, string>>({})
+  const getPathById = useTreeStore((s) => s.getPathById)
+  const pagePath = getPathById(pageId) || ''
+  // get opened route from react router
   const currentPath = useLocation().pathname
   const navigate = useNavigate()
-  const {
-    loading,
-    success,
-    closeDialog,
-    movePage,
-    getTree,
-    getPathById,
-    open,
-    parentId,
-    pageId,
-    path,
 
-  } = useMovePageDialogStore()
-
-  const [tree, setTree] = useState<PageNode | null>(null)
-  const [newParentId, setNewParentId] = useState<string>("")
-  // Indicates if need to redirect the user after moving the page
-  const [redirectUser, setRedirectUser] = useState(false)
-
-  useEffect(() => {
-    if (open == true) {
-      setTree(getTree())
-      setNewParentId(parentId)
-    }
-  }, [open, parentId])
-
-  // Check if the page to move is open
-  useEffect(() => {
-    if (pageId) {
-      const path = getPathById(pageId)
-
-      if (`${currentPath}` === `/${path}`) {
-        setRedirectUser(true)
-      } else {
-        setRedirectUser(false)
+  const parentId = useMemo(() => {
+    const findParent = (node: any): string | null => {
+      for (const child of node.children || []) {
+        if (child.id === pageId) return node.id
+        const found = findParent(child)
+        if (found) return found
       }
+      return null
     }
-  }, [pageId, path])
+
+    if (!tree) return null
+    return findParent(tree)
+  }, [tree, pageId])
+
+  if (!tree) return null
+
+  if (!parentId) return null
+
+  const [newParentId, setNewParentId] = useState<string>(parentId)
 
   const handleMove = async () => {
     if (!newParentId || newParentId === parentId) return
-    movePage(newParentId)
+    setLoading(true)
+    try {
+      await movePage(pageId, newParentId)
+      if (`${currentPath}` === `/${pagePath}`) {
+        await reloadTree()
+        const newPath = getPathById(pageId) || ''
+        if (newPath) {
+          navigate(`/${newPath}`)
+        } else {
+          navigate('/')
+        }
+      } else {
+        await reloadTree()
+      }
+
+      toast.success('Page moved successfully')
+      closeDialog()
+    } catch (err: any) {
+      console.log(err)
+      handleFieldErrors(err, setFieldErrors, 'Error moving page')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const onHandleOpenChange = (open: boolean) => {
-    if (!open) {
-      // Reset the state when the dialog is closed
-      setNewParentId('')
-      // store
-      closeDialog()
-    }
+  const handleCancel = () => {
+    closeDialog()
   }
 
   const renderOptions = (node: PageNode, depth = 1): JSX.Element[] => {
@@ -91,25 +103,12 @@ export function MovePageDialog() {
     return options
   }
 
-  useEffect(() => {
-    if (success) {
-      if (redirectUser) {
-        if (path) {
-          navigate(`/${path}`)
-        } else {
-          navigate('/')
-        }
-      }
-
-      // Close the dialog and navigate to the new page
-      closeDialog()
-    }
-  }, [success, navigate, path])
-
-  if (!tree) return null
-
   return (
-    <Dialog open={open} onOpenChange={onHandleOpenChange}>
+    <Dialog open={open} onOpenChange={(open) => {
+      if (!open) {
+        closeDialog()
+      }
+    }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Move Page</DialogTitle>
@@ -123,13 +122,13 @@ export function MovePageDialog() {
             <SelectItem key="root" value="root">
               ⬆️ Top Level
             </SelectItem>
-            {tree && tree.children.map((child: any) => renderOptions(child))}
+            {tree && tree.children.map((child) => renderOptions(child))}
           </SelectContent>
         </Select>
 
         <div className="mt-4 flex justify-end">
           <FormActions
-            onCancel={() => onHandleOpenChange(false)}
+            onCancel={handleCancel}
             onSave={handleMove}
             saveLabel={loading ? 'Moving...' : 'Move'}
             disabled={newParentId === parentId || loading}
