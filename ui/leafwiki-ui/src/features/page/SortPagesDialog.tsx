@@ -8,22 +8,43 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { PageNode, sortPages } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { ArrowDown, ArrowUp, List } from 'lucide-react'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 export function SortPagesDialog({ parent }: { parent: PageNode }) {
-  const [open, setOpen] = useState(false)
+  // Dialog state from zustand store
+  const closeDialog = useDialogsStore((s) => s.closeDialog)
+  const open = useDialogsStore((s) => s.dialogType === 'sort')
+
+  // State to manage the order of the pages
   const [order, setOrder] = useState(parent.children.map((c) => c.id))
+
+  // Loading state
   const [loading, setLoading] = useState(false)
   const [_, setFieldErrors] = useState<Record<string, string>>({})
 
+  // Reload tree state from zustand store
   const reloadTree = useTreeStore((s) => s.reloadTree)
+
+  useEffect(() => {
+    if (!parent) {
+      setOrder([])
+      return
+    }
+    setOrder(parent.children.map((c) => c.id))
+  }, [parent])
+
+  const onOpenChangeDialog = (open: boolean) => {
+    if (!open) {
+      closeDialog()
+    }
+  }
 
   const move = (index: number, direction: -1 | 1) => {
     const newOrder = [...order]
@@ -35,21 +56,13 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
     setOrder(newOrder)
   }
 
-  useEffect(() => {
-    if (!parent) {
-      setOrder([])
-      return
-    }
-    setOrder(parent.children.map((c) => c.id))
-  }, [parent])
-
   const handleSave = async () => {
     setLoading(true)
     try {
       await sortPages(parent.id, order)
       await reloadTree()
       toast.success('Pages sorted successfully')
-      setOpen(false)
+      closeDialog()
     } catch (err) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error moving page')
@@ -59,20 +72,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <div className="group relative mr-2 flex">
-          <button onClick={() => setOpen(true)}>
-            <List
-              size={20}
-              className="cursor-pointer text-gray-500 hover:text-gray-800"
-            />
-          </button>
-          <div className="absolute bottom-full left-0 mb-2 hidden w-max rounded bg-gray-700 px-2 py-1 text-xs text-white group-hover:block">
-            Sort pages
-          </div>
-        </div>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChangeDialog}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Sort Pages</DialogTitle>
@@ -125,7 +125,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
         <DialogFooter>
           <div className="mt-4 flex justify-end">
             <FormActions
-              onCancel={() => setOpen(false)}
+              onCancel={() => closeDialog()}
               onSave={handleSave}
               saveLabel={loading ? 'Saving...' : 'Save'}
               disabled={loading}

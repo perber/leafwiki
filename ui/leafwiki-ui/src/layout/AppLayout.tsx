@@ -1,8 +1,7 @@
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { DialogManger } from '@/components/DialogManager'
 import { usePageToolbar } from '@/components/PageToolbarContext'
 import UserToolbar from '@/components/UserToolbar'
-import { AddPageDialog } from '@/features/page/AddPageDialog'
-import { MovePageDialog } from '@/features/page/MovePageDialog'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -22,9 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <AddPageDialog />
-      <MovePageDialog />
-
+      <DialogManger />
       <div className="relative h-screen w-full overflow-y-auto bg-gray-50 font-sans text-gray-900">
         <motion.aside
           key={'sidebar'}

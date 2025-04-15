@@ -1,13 +1,13 @@
 import { TreeViewActionButton } from '@/components/TreeViewActionButton'
 import { useMeasure } from '@/lib/useMeasure'
 import { useAddPageDialogStore } from '@/stores/addPageDialogStore'
+import { useDialogsStore } from '@/stores/dialogs'
 import { useMovePageDialogStore } from '@/stores/movePageDialogStore'
 import { useTreeStore } from '@/stores/tree'
-import { ChevronUp, File, Move, Plus } from 'lucide-react'
+import { ChevronUp, File, List, Move, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageNode } from '../../lib/api'
-import { SortPagesDialog } from '../page/SortPagesDialog'
 
 type Props = {
   node: PageNode
@@ -23,6 +23,7 @@ export function TreeNode({ node, level = 0 }: Props) {
   const open = isNodeOpen(node.id)
   const { openDialog: openAddPageDialog } = useAddPageDialogStore()
   const { openDialog: openMovePageDialog } = useMovePageDialogStore()
+  const openDialog = useDialogsStore((state) => state.openDialog)
 
   const [ref] = useMeasure<HTMLDivElement>()
 
@@ -56,11 +57,10 @@ export function TreeNode({ node, level = 0 }: Props) {
   return (
     <div>
       <div
-        className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${
-          isActive
+        className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${isActive
             ? 'bg-gray-200 font-semibold'
             : 'text-gray-800 hover:bg-gray-100'
-        }`}
+          }`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
@@ -83,7 +83,7 @@ export function TreeNode({ node, level = 0 }: Props) {
           <div className="flex gap-0">
             <TreeViewActionButton icon={<Plus size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Create new page" onClick={() => openAddPageDialog(node.id)} />
             <TreeViewActionButton icon={<Move size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Move page to new parent" onClick={() => openMovePageDialog(node.id)} />
-            {hasChildren && <SortPagesDialog parent={node} />}
+            {hasChildren && <TreeViewActionButton icon={<List size={20} className="cursor-pointer text-gray-500 hover:text-gray-800" />} tooltip="Sort pages" onClick={() => openDialog("sort", { parent: node })} />}
           </div>
         )}
       </div>
