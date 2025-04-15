@@ -20,6 +20,8 @@ export function handleFieldErrors(
 ) {
   const error = err as APIError
 
+  console.log('Error:', error)
+
   if (error.error === 'validation_error' && Array.isArray(error.fields)) {
     const errorMap: Record<string, string> = {}
     for (const e of error.fields) {

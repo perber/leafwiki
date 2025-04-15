@@ -8,11 +8,17 @@ export default function Breadcrumbs() {
   if (!tree || !tree.children) return null
 
   // if the pathname starts with /e/ remove it
+  let onEditor = false
   let segments = []
   if (pathname.startsWith('/e/')) {
     segments = pathname.slice(2).slice(1).split('/').filter(Boolean)
+    onEditor = true
   } else {
     segments = pathname.slice(1).split('/').filter(Boolean)
+  }
+
+  if (onEditor) {
+    return null
   }
 
   const buildBreadcrumbs = () => {

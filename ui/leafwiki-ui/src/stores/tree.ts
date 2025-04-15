@@ -12,6 +12,7 @@ type TreeStore = {
   toggleNode: (id: string) => void
   isNodeOpen: (id: string) => boolean
   getPageById: (id: string) => PageNode | null
+  getPageByPath: (path: string) => PageNode | null
   getPathById: (id: string) => string | null
   openNodeIds: Set<string>
 }
@@ -57,6 +58,23 @@ export const useTreeStore = create<TreeStore>((set, get) => ({
 
     const node = findNodeById(tree)
     return node?.path ?? null
+  },
+
+  getPageByPath: (path: string) => {
+    const findNodeByPath = (node: PageNode): PageNode | null => {
+      if (node.path === path) return node
+      for (const child of node.children || []) {
+        const found = findNodeByPath(child)
+        if (found) return found
+      }
+      return null
+    }
+
+    const tree = get().tree
+    if (!tree) return null
+
+    const node = findNodeByPath(tree)
+    return node ?? null
   },
 
   getPageById: (id: string) => {

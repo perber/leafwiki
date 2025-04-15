@@ -1,71 +1,29 @@
-import { Input } from '@/components/ui/input'
 import { Pencil } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
 
 type Props = {
   title: string
   slug: string
-  onChange: (newTitle: string) => void
+  onEditClicked: () => void
+  isDirty?: boolean
 }
 
-export function EditorTitleBar({ title, slug, onChange }: Props) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(title)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (!editing) {
-      setValue(title)
-    }
-  }, [title, editing])
-
-  useEffect(() => {
-    if (editing) inputRef.current?.focus()
-  }, [editing])
-
-  const isDirty = value.trim() !== title.trim()
-
-  const submit = () => {
-    setEditing(false)
-    if (isDirty) {
-      onChange(value.trim())
-    }
-  }
+export function EditorTitleBar({ title, slug, onEditClicked, isDirty }: Props) {
 
   return (
     <div className="flex flex-col items-center">
-      {editing ? (
-        <Input
-          ref={inputRef}
-          className="h-8 w-64 text-center text-base font-semibold"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onBlur={submit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              submit()
-            } else if (e.key === 'Escape') {
-              setEditing(false)
-              setValue(title)
-            }
-          }}
+      <button
+        onClick={() => onEditClicked()}
+        className="group flex items-center gap-1 text-base font-semibold text-gray-800 hover:underline relative"
+      >
+        {title && <span>{title}</span>}
+        <Pencil
+          size={16}
+          className="text-gray-400 group-hover:text-gray-600 absolute -right-6 top-1/2 -translate-y-1/2 transition-transform duration-200 ease-in-out"
         />
-      ) : (
-        <button
-          onClick={() => setEditing(true)}
-          className="group flex items-center gap-1 text-base font-semibold text-gray-800 hover:underline"
-        >
-          {title && <span>{title}</span>}
-          <Pencil
-            size={16}
-            className="text-gray-400 group-hover:text-gray-600"
-          />
-          {isDirty && (
-            <span className="ml-2 text-xs text-yellow-600">(Bearbeitet)</span>
-          )}
-        </button>
-      )}
+        {isDirty && (
+          <span className="ml-2 text-xs text-yellow-600">(Bearbeitet)</span>
+        )}
+      </button>
 
       <span className="mt-1 rounded bg-gray-200 px-2 py-0.5 font-mono text-xs text-gray-700">
         {slug}

@@ -178,15 +178,11 @@ export async function updatePage(
   slug: string,
   content: string,
 ) {
-  try {
     return await fetchWithAuth(`/api/pages/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, slug, content }),
     })
-  } catch (e) {
-    throw new Error('Page update failed')
-  }
 }
 
 export async function deletePage(id: string, recursive: boolean) {

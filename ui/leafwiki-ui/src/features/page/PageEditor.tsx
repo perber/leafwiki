@@ -9,9 +9,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
-import { getPageByPath, suggestSlug, updatePage } from '@/lib/api'
+import { getPageByPath, updatePage } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
-import { useDebounce } from '@/lib/useDebounce'
+import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { DialogDescription } from '@radix-ui/react-dialog'
 import { Save, X } from 'lucide-react'
@@ -36,13 +36,21 @@ export default function PageEditor() {
     null,
   )
 
+  const openDialog = useDialogsStore((state) => state.openDialog)
+  const findPageInTreeByPath = useTreeStore((state) => state.getPageByPath)
+
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
 
   const { setContent, clearContent, setTitleBar, clearTitleBar } =
     usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => {})
+  const handleSaveRef = useRef<() => void>(() => { })
+
+  const onMetaDataChange = useCallback((title: string, slug: string) => {
+    setTitle(title)
+    setSlug(slug)
+  }, [])
 
   const parentPath =
     useTreeStore(() => {
@@ -50,6 +58,14 @@ export default function PageEditor() {
       parts?.pop()
       return parts?.join('/')
     }) || ''
+
+  // useMemo to get parentId
+  // This is a workaround to avoid running against the whole tree
+  const parentId = useMemo(() => {
+    const p = findPageInTreeByPath(parentPath)
+    if (!p) return ""
+    return p.id
+  }, [parentPath])
 
   const isDirty = useMemo(() => {
     if (!page) return false
@@ -70,27 +86,9 @@ export default function PageEditor() {
     [isDirty, navigate],
   )
 
-  /**
-   * FIXME - Debounce is happending two times, also the generation of slugs is happening when the user is coming in
-   * This shouldn't happend and needs to be fixed!
-   */
-  const debouncedTitle = useDebounce(title, 300)
-  useEffect(() => {
-    if (!debouncedTitle.trim()) return
-
-    suggestSlug(page?.parentId || '', debouncedTitle)
-      .then((suggested) => {
-        if (suggested !== slug) {
-          setSlug(suggested)
-        }
-      })
-      .catch((err) => console.warn('Slug error', err))
-  }, [debouncedTitle, page?.parentId])
-
   useEffect(() => {
     handleSaveRef.current = async () => {
       if (!isDirty || !page) return
-
       try {
         toast.info('Saving page...')
         await updatePage(page.id, title, slug, markdown)
@@ -102,7 +100,16 @@ export default function PageEditor() {
           slug,
           content: markdown,
         })
+
+        // The slug might have changed, so we need to update the path
+        const newPath = `/e${parentPath}/${slug}`
+        // We don't want to redirect the user to the new path
+        // because we are already on the page
+
+        window.history.replaceState(null, '', newPath)
+
       } catch (err) {
+        console.warn(err)
         handleFieldErrors(err, setFieldErrors, 'Error saving page')
       }
     }
@@ -119,22 +126,31 @@ export default function PageEditor() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  const onEditTitleClicked = useCallback(() => {
+    openDialog('edit-page-metadata', {
+      title,
+      slug,
+      parentId,
+      onChange: onMetaDataChange,
+    })
+  }, [title, slug, parentId, onMetaDataChange])
+
   useEffect(() => {
     if (!page || !title || !slug) return
+
     setTitleBar(
       <EditorTitleBar
         title={title}
         slug={slug}
-        onChange={(newTitle) => {
-          setTitle(newTitle)
-        }}
+        onEditClicked={onEditTitleClicked}
+        isDirty={isDirty}
       />,
     )
 
     return () => {
       clearTitleBar()
     }
-  }, [title, slug, page?.parentId])
+  }, [title, slug, parentId, openDialog, isDirty])
 
   useEffect(() => {
     if (!page) return
@@ -146,7 +162,8 @@ export default function PageEditor() {
           size="icon"
           onClick={async () => {
             await reloadTree()
-            handleNavigateAway(`/${path}`)
+
+            handleNavigateAway(parentPath && slug ? `/${parentPath}/${slug}` : '/')
           }}
         >
           <X />
@@ -166,7 +183,7 @@ export default function PageEditor() {
     return () => {
       clearContent()
     }
-  }, [page, setContent, isDirty])
+  }, [page, path, parentPath, slug, setContent, isDirty])
 
   useEffect(() => {
     if (!path) return
