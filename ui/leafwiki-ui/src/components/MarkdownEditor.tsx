@@ -96,6 +96,7 @@ export default function MarkdownEditor({
   return (
     <div className="flex h-full gap-4">
       <textarea
+        autoFocus
         ref={textareaRef}
         className="w-1/2 resize-none rounded border border-gray-300 p-4 font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
         value={value}
