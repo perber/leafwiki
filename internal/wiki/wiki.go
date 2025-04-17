@@ -328,6 +328,10 @@ func (w *Wiki) GetAuthService() *auth.AuthService {
 	return w.auth
 }
 
+func (w *Wiki) GetAssetService() *assets.AssetService {
+	return w.asset
+}
+
 func (w *Wiki) GetStorageDir() string {
 	return w.storageDir
 }

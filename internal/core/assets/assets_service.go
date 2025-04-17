@@ -32,6 +32,10 @@ func NewAssetService(storageDir string, slugger *tree.SlugService) *AssetService
 	}
 }
 
+func (s *AssetService) GetAssetsDir() string {
+	return s.assetsDir
+}
+
 func (s *AssetService) ensureAssetPagePathExists(page *tree.PageNode) (string, error) {
 	pagePath := path.Join(s.assetsDir, page.ID)
 	// check if the page path exists
