@@ -40,7 +40,11 @@ func createMultipartFile(filename string, content []byte) (multipart.File, strin
 
 func TestSaveAndListAsset(t *testing.T) {
 	tmp := t.TempDir()
-	page := &tree.PageNode{Slug: "test-page"}
+	page := &tree.PageNode{Slug: "lonely-page"}
+	// Create index.md page
+	pagePath := filepath.Join(tmp, "lonely-page")
+	os.MkdirAll(pagePath, 0755)
+	os.WriteFile(filepath.Join(pagePath, "index.md"), []byte("# Lonely Page"), 0644)
 	service := NewAssetService(tmp, tree.NewSlugService())
 
 	file, name, err := createMultipartFile("my-image.png", []byte("hello image"))
@@ -63,7 +67,7 @@ func TestSaveAndListAsset(t *testing.T) {
 		t.Fatalf("ListAssets failed: %v", err)
 	}
 
-	if len(files) != 1 || files[0] != "my-image.png" {
+	if len(files) != 1 || files[0] != "/assets/lonely-page/assets/my-image.png" {
 		t.Errorf("unexpected asset list: %v", files)
 	}
 }
