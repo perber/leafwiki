@@ -763,7 +763,7 @@ func TestCreateUserEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir())
 	router := NewRouter(wikiInstance)
 
-	body := `{"username": "john", "email": "john@example.com", "password": "secret", "role": "editor"}`
+	body := `{"username": "john", "email": "john@example.com", "password": "secret123", "role": "editor"}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
 
 	if rec.Code != http.StatusCreated {
