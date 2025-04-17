@@ -40,7 +40,7 @@ func createMultipartFile(filename string, content []byte) (multipart.File, strin
 
 func TestSaveAndListAsset(t *testing.T) {
 	tmp := t.TempDir()
-	page := &tree.PageNode{Slug: "lonely-page"}
+	page := &tree.PageNode{Slug: "lonely-page", ID: "a7b3"}
 	// Create index.md page
 	pagePath := filepath.Join(tmp, "lonely-page")
 	os.MkdirAll(pagePath, 0755)
@@ -67,21 +67,21 @@ func TestSaveAndListAsset(t *testing.T) {
 		t.Fatalf("ListAssets failed: %v", err)
 	}
 
-	if len(files) != 1 || files[0] != "/assets/lonely-page/assets/my-image.png" {
+	if len(files) != 1 || files[0] != "/assets/a7b3/my-image.png" {
 		t.Errorf("unexpected asset list: %v", files)
 	}
 }
 
-func TestDeleteAssetAndFold(t *testing.T) {
+func TestDeletePageAndEnsureAllAssetsAreDeleted(t *testing.T) {
 	tmp := t.TempDir()
-	page := &tree.PageNode{Slug: "lonely-page"}
+	page := &tree.PageNode{Slug: "lonely-page", ID: "a7b3"}
 	// Create index.md page
 	pagePath := filepath.Join(tmp, "lonely-page")
 	os.MkdirAll(pagePath, 0755)
 	os.WriteFile(filepath.Join(pagePath, "index.md"), []byte("# Lonely Page"), 0644)
 	service := NewAssetService(tmp, tree.NewSlugService())
 
-	file, name, err := createMultipartFile("single.png", []byte("content"))
+	file, name, err := createMultipartFile("my-image.png", []byte("hello image"))
 	if err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
@@ -92,24 +92,18 @@ func TestDeleteAssetAndFold(t *testing.T) {
 		t.Fatalf("SaveAsset failed: %v", err)
 	}
 
-	err = service.DeleteAsset(page, name)
+	err = service.DeleteAllAssetsForPage(page)
 	if err != nil {
-		t.Fatalf("DeleteAsset failed: %v", err)
+		t.Fatalf("DeletePage failed: %v", err)
 	}
 
-	assetDir := filepath.Join(tmp, "lonely-page", "assets")
-	if _, err := os.Stat(assetDir); !os.IsNotExist(err) {
-		t.Errorf("expected assets dir to be deleted, but found")
+	files, err := service.ListAssetsForPage(page)
+	if err != nil {
+		t.Fatalf("ListAssets failed: %v", err)
 	}
 
-	indexPath := filepath.Join(tmp, "lonely-page", "index.md")
-	flatPath := filepath.Join(tmp, "lonely-page.md")
-
-	if _, err := os.Stat(indexPath); !os.IsNotExist(err) {
-		t.Errorf("expected index.md to be gone")
-	}
-	if _, err := os.Stat(flatPath); err != nil {
-		t.Errorf("expected flat file to exist again")
+	if len(files) != 0 {
+		t.Errorf("expected no assets, got %d", len(files))
 	}
 }
 

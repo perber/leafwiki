@@ -989,7 +989,7 @@ func TestAssetEndpoints(t *testing.T) {
 	}
 	var listResp map[string][]string
 	json.Unmarshal(listRec.Body.Bytes(), &listResp)
-	if len(listResp["files"]) != 1 || listResp["files"][0] != "/assets/root/assets-page/assets/testfile.txt" {
+	if len(listResp["files"]) != 1 || listResp["files"][0] != "/assets/"+page.ID+"/testfile.txt" {
 		t.Errorf("Expected file in listing, got: %v", listResp["files"])
 	}
 
