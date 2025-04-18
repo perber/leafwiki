@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { deleteAsset, getAssets, uploadAsset } from '@/lib/api'
 import { Trash2, UploadCloud } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
 
@@ -52,6 +53,15 @@ export function AssetManager({ pageId, onInsert }: Props) {
   }, [pageId])
 
   const handleUploadFile = async (file: File) => {
+
+    const MAX_UPLOAD_SIZE_MB = 50
+    const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+    if (file.size > MAX_UPLOAD_SIZE) {
+      toast.error(`File too large. Max ${MAX_UPLOAD_SIZE_MB}MB allowed.`)
+      return
+    }
+
     try {
       const res = await uploadAsset(pageId, file)
       await loadAssets()
@@ -112,13 +122,12 @@ export function AssetManager({ pageId, onInsert }: Props) {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => fileInput.current?.click()}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${
-          isDragging
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${isDragging
             ? 'border-blue-400 bg-blue-50 text-blue-600'
             : isHovered
               ? 'border-gray-300 bg-gray-50'
               : 'border-gray-200 hover:bg-gray-50'
-        }`}
+          }`}
       >
         <UploadCloud className="mb-2" size={20} />
         <p className="text-xs">Drop files here or click to upload</p>
