@@ -31,14 +31,13 @@ var EmbedFrontend = "false"
 var Environment = "development"
 
 func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
-	router := gin.Default()
-
 	if Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
 		gin.SetMode(gin.DebugMode)
 	}
 
+	router := gin.Default()
 	if EnableCors == "true" {
 		router.Use(cors.New(cors.Config{
 			AllowOrigins:     []string{"*"},

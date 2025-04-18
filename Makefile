@@ -39,15 +39,16 @@ $(PLATFORMS):
 	 docker build -f $(DOCKER_BUILDER) \
 		--build-arg GOOS=$$GOOS \
 		--build-arg GOARCH=$$GOARCH \
-		--build-arg OUTPUT=$$OUTPUT \
-		--build-arg VERSION=$(VERSION) \
+		--build-arg OUTPUT=$(BINARY_NAME) \
 		-t leafwiki-builder-$$GOOS-$$GOARCH . ; \
 	 ID=$$(docker create leafwiki-builder-$$GOOS-$$GOARCH) ; \
-	 docker cp $$ID:/out/$$OUTPUT $(RELEASE_DIR)/$$OUTPUT ; \
+	 docker cp $$ID:/out/$(BINARY_NAME) $(RELEASE_DIR)/$$OUTPUT ; \
 	 docker rm $$ID ; \
+	 echo "✅ Binary done: $(RELEASE_DIR)/$$OUTPUT" ; \
 	 sha256sum $(RELEASE_DIR)/$$OUTPUT > $(RELEASE_DIR)/$$OUTPUT.sha256 ; \
-	 echo "✅ Done: $(RELEASE_DIR)/$$OUTPUT"
-
+	 zip -j $(RELEASE_DIR)/$$OUTPUT.zip $(RELEASE_DIR)/$$OUTPUT ; \
+	 tar -czf $(RELEASE_DIR)/$$OUTPUT.tar.gz -C $(RELEASE_DIR) $$OUTPUT ; \
+	 echo "📦 Compressed: zip and tar.gz"
 
 # Final production Docker image
 docker-prod:
