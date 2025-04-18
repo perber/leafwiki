@@ -1,4 +1,5 @@
 import { remarkLineNumber } from '@/lib/remarkLineNumber'
+import { useDebounce } from '@/lib/useDebounce'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -19,6 +20,8 @@ const MarkdownEditor = forwardRef<HTMLTextAreaElement, Props>(
 
     // expose textareaRef to parent
     useImperativeHandle(ref, () => textareaRef.current as HTMLTextAreaElement)
+
+    const debouncedPreview = useDebounce(value, 100)
 
     const handleCursorMove = () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
@@ -100,6 +103,12 @@ const MarkdownEditor = forwardRef<HTMLTextAreaElement, Props>(
       }
     }, [insert])
 
+    useEffect(() => {
+      return () => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      }
+    }, [])
+
     return (
       <div className="flex h-full gap-4">
         <textarea
@@ -140,7 +149,7 @@ const MarkdownEditor = forwardRef<HTMLTextAreaElement, Props>(
               a: MarkdownLink,
             }}
           >
-            {value}
+            {debouncedPreview}
           </ReactMarkdown>
         </div>
       </div>
