@@ -54,7 +54,6 @@ export default function MarkdownEditor({
         let offsetTop = 0
 
         if (table && preview.contains(table)) {
-          const tableRect = table.getBoundingClientRect()
           const previewRect = preview.getBoundingClientRect()
           const targetRect = target.getBoundingClientRect()
 
