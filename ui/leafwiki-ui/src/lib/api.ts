@@ -116,15 +116,12 @@ export type PageNode = {
   title: string
   slug: string
   path: string
+  parentId?: string | null
   children: PageNode[]
 }
 
 export async function fetchTree(): Promise<PageNode> {
-  try {
     return await fetchWithAuth(`/api/tree`)
-  } catch (e) {
-    throw new Error('Tree fetch failed')
-  }
 }
 
 export async function suggestSlug(

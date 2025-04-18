@@ -1,4 +1,5 @@
 import { fetchTree, PageNode } from '@/lib/api'
+import { assignParentIds } from '@/lib/treeUtils'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -130,7 +131,9 @@ export const useTreeStore = create<TreeStore>()(
 
         try {
           const tree = await fetchTree()
+          assignParentIds(tree)
           set({ tree })
+        // FIXME: a better error handling is required here
         } catch (err: any) {
           set({ error: err.message })
         } finally {

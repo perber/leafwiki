@@ -1,10 +1,11 @@
 import { TreeViewActionButton } from '@/components/TreeViewActionButton'
-import { filterTreeWithOpenNodes } from '@/lib/filterTreeWithOpenNodes'
+import { filterTreeWithOpenNodes, getAncestorIds } from '@/lib/treeUtils'
 import { useDebounce } from '@/lib/useDebounce'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { List, Plus } from 'lucide-react'
 import { startTransition, useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
@@ -16,11 +17,26 @@ export default function TreeView() {
   const setSearchQuery = useTreeStore((s) => s.setSearchQuery)
   const clearSearch = useTreeStore((s) => s.clearSearch)
 
+  const location = useLocation()
+  const currentPath = location.pathname.replace(/^\/(e\/)?/, '') // z.B. docs/setup/intro  
+
   const openDialog = useDialogsStore((state) => state.openDialog)
 
   const [inputValue, setInputValue] = useState(searchQuery)
 
   const debouncedSearchQuery = useDebounce(inputValue, 300)
+
+  useEffect(() => {
+    if (!tree || !currentPath) return
+  
+    const page = useTreeStore.getState().getPageByPath(currentPath)
+    if (page) {
+      const ancestors = getAncestorIds(tree, page.id)
+      useTreeStore.setState((state) => ({
+        openNodeIds: Array.from(new Set([...state.openNodeIds, ...ancestors])),
+      }))
+    }
+  }, [tree, currentPath])
 
   useEffect(() => {
     if (tree === null) {
