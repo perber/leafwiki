@@ -2,7 +2,7 @@ import { TreeViewActionButton } from '@/components/TreeViewActionButton'
 import { useMeasure } from '@/lib/useMeasure'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { ChevronUp, File, List, Move, Plus } from 'lucide-react'
+import { ChevronUp, File, Folder, List, Move, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageNode } from '../../lib/api'
@@ -56,7 +56,7 @@ export function TreeNode({ node, level = 0 }: Props) {
         className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${
           isActive
             ? 'bg-gray-200 font-semibold'
-            : 'text-gray-800 hover:bg-gray-100'
+            : 'text-gray-800 hover:bg-gray-200'
         }`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -72,6 +72,7 @@ export function TreeNode({ node, level = 0 }: Props) {
 
           {/* Zeigt das File-Icon für Knoten ohne Kinder */}
           {!hasChildren && <File size={18} className="text-gray-400" />}
+          {hasChildren && (<Folder size={18} className="text-gray-400" />)}
 
           {linkText}
         </div>
@@ -116,7 +117,7 @@ export function TreeNode({ node, level = 0 }: Props) {
 
       <div
         ref={ref}
-        className={`ml-4 ease-in-out ${!open ? 'overflow-hidden' : ''}`}
+        className={`ml-4 pl-2 ease-in-out ${!open ? 'overflow-hidden' : ''}`}
         style={{
           maxHeight: open ? `1000px` : '0px',
           opacity: open ? 1 : 0,
