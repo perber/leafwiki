@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button'
 import { deleteAsset, getAssets, uploadAsset } from '@/lib/api'
-import { Trash2, UploadCloud } from 'lucide-react'
+import { FileText, Trash2, UploadCloud } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { AssetPreviewTooltip } from './AssetPreviewTooltip'
 
 const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
 
@@ -63,13 +64,13 @@ export function AssetManager({ pageId, onInsert }: Props) {
     }
 
     try {
-      const res = await uploadAsset(pageId, file)
+      await uploadAsset(pageId, file)
       await loadAssets()
 
-      if (onInsert) {
-        const markdown = generateMarkdownLink(file.name.split('.')[0], res.file)
-        onInsert(`${markdown}\n`)
-      }
+      //      if (onInsert) {
+      //        const markdown = generateMarkdownLink(file.name.split('.')[0], res.file)
+      //        onInsert(`${markdown}\n`)
+      //      }
     } catch (err) {
       console.error('Upload failed', err)
     }
@@ -123,10 +124,10 @@ export function AssetManager({ pageId, onInsert }: Props) {
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => fileInput.current?.click()}
         className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${isDragging
-            ? 'border-blue-400 bg-blue-50 text-blue-600'
-            : isHovered
-              ? 'border-gray-300 bg-gray-50'
-              : 'border-gray-200 hover:bg-gray-50'
+          ? 'border-blue-400 bg-blue-50 text-blue-600'
+          : isHovered
+            ? 'border-gray-300 bg-gray-50'
+            : 'border-gray-200 hover:bg-gray-50'
           }`}
       >
         <UploadCloud className="mb-2" size={20} />
@@ -154,33 +155,37 @@ export function AssetManager({ pageId, onInsert }: Props) {
             return (
               <li
                 key={filename}
-                className="group flex items-center justify-between gap-2 text-gray-700"
+                className="group flex items-center justify-between gap-2 rounded-md px-2 py-1 transition hover:bg-gray-100 cursor-pointer"
+                onDoubleClick={() => insertMarkdown(assetUrl)}
               >
-                <div
-                  className="flex cursor-pointer items-center gap-2"
-                  onClick={() => insertMarkdown(assetUrl)}
-                >
-                  {isImage && (
-                    <img
-                      src={assetUrl}
-                      alt={baseName}
-                      className="h-8 w-8 rounded object-cover"
-                    />
+                <div className="flex flex-1 items-center gap-3">
+                  {isImage ? (
+                    <AssetPreviewTooltip url={assetUrl} name={baseName}>
+                      <img
+                        src={assetUrl}
+                        alt={baseName}
+                        className="h-10 w-10 rounded border object-cover"
+                      />
+                    </AssetPreviewTooltip>
+                  ) : (
+                    <AssetPreviewTooltip url={assetUrl} name={baseName}>
+                      <div className="flex h-10 w-10 items-center justify-center rounded border bg-gray-100 text-gray-500">
+                        <FileText size={18} />
+                      </div>
+                    </AssetPreviewTooltip>
                   )}
-                  <span
-                    title="Click to insert Markdown"
-                    className="max-w-[120px] truncate hover:underline"
-                  >
-                    {baseName}
-                  </span>
+                    <span className="truncate text-sm text-gray-800 hover:underline">
+                      {baseName}
+                    </span>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-red-500 hover:text-red-700"
+                  className="text-gray-400 hover:text-red-600"
                   onClick={() => handleDelete(baseName)}
+                  title="Delete asset"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={16} />
                 </Button>
               </li>
             )
