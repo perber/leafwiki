@@ -296,6 +296,15 @@ func (w *Wiki) GetUserByID(id string) (*auth.PublicUser, error) {
 	return user.ToPublicUser(), nil
 }
 
+func (w *Wiki) ResetAdminUserPassword() (*auth.User, error) {
+	adminUser, err := w.user.ResetAdminUserPassword()
+	if err != nil {
+		return nil, err
+	}
+
+	return adminUser, nil
+}
+
 func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string) (string, error) {
 	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
 	if err != nil {

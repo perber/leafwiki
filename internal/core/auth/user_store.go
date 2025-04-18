@@ -220,6 +220,31 @@ func (f *UserStore) DeleteUser(id string) error {
 	return nil
 }
 
+func (f *UserStore) GetAdminUser() (*User, error) {
+	// Ensure the database is connected
+	err := f.Connect()
+	if err != nil {
+		return nil, err
+	}
+	// Query the admin user
+	row := f.db.QueryRow(`
+		SELECT id, username, password, email, role
+		FROM users
+		WHERE role = 'admin'
+		LIMIT 1;
+	`)
+
+	user := &User{}
+	err = row.Scan(&user.ID, &user.Username, &user.Password, &user.Email, &user.Role)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return user, nil
+}
+
 func (f *UserStore) GetAllUsers() ([]*User, error) {
 	// Ensure the database is connected
 	err := f.Connect()

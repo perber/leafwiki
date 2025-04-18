@@ -245,6 +245,41 @@ func (s *UserService) ChangeOwnPassword(id, oldPassword, newPassword string) err
 	return nil
 }
 
+func (s *UserService) ResetAdminUserPassword() (*User, error) {
+
+	// Generate a new password for the admin user
+	password, err := shared.GenerateRandomPassword(16)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate password: %w", err)
+	}
+
+	// if the user is not found create a new one
+	adminUser, err := s.store.GetAdminUser()
+	if err != nil {
+		if err == ErrUserNotFound {
+			// Create default admin user
+			adminUser, err = s.CreateUser("admin", "admin@localhost", password, RoleAdmin)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create default admin: %w", err)
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	// Update the password for the admin user
+	err = s.UpdatePassword(adminUser.ID, password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update admin password: %w", err)
+	}
+
+	// Return the admin user
+	// Note: I need to return the user with the new password, because the user lost his password
+	adminUser.Password = password // Set the password to the generated one
+
+	return adminUser, nil
+}
+
 func (s *UserService) Close() error {
 	return s.store.Close()
 }
