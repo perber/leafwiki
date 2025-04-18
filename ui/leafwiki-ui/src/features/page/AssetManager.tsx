@@ -122,13 +122,12 @@ export function AssetManager({ pageId, onInsert }: Props) {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => fileInput.current?.click()}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${
-          isDragging
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${isDragging
             ? 'border-blue-400 bg-blue-50 text-blue-600'
             : isHovered
               ? 'border-gray-300 bg-gray-50'
               : 'border-gray-200 hover:bg-gray-50'
-        }`}
+          }`}
       >
         <UploadCloud className="mb-2" size={20} />
         <p className="text-xs">Drop files here or click to upload</p>
@@ -192,6 +191,9 @@ export function AssetManager({ pageId, onInsert }: Props) {
           })}
         </ul>
       )}
+      <p className="text-xs text-gray-500 italic mt-2">
+        Tip: Double-click on an asset to insert it into the page.
+      </p>
     </div>
   )
 }

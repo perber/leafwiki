@@ -27,6 +27,10 @@ go.work.sum
 releases/*
 !releases/.gitkeep
 
+
+dist/*
+!dist/.gitkeep
+
 # data dir
 data/
 

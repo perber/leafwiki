@@ -67,15 +67,15 @@ export function DeletePageDialog({
       }}
     >
       <AlertDialogTrigger asChild>
-        <TooltipWrapper label="Delete page" side="top" align="center">
-          <Button
-            variant="destructive"
-            size="icon"
-            className="h-8 w-8 rounded-full shadow-sm"
-          >
+        <Button
+          variant="destructive"
+          size="icon"
+          className="h-8 w-8 rounded-full shadow-sm"
+        >
+          <TooltipWrapper label="Delete page" side="top" align="center">
             <Trash2 />
-          </Button>
-        </TooltipWrapper>
+          </TooltipWrapper>
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
