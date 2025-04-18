@@ -4,40 +4,40 @@ import { useDebounce } from '@/lib/useDebounce'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { List, Plus } from 'lucide-react'
-import React, { useEffect } from 'react'
+import { startTransition, useEffect, useMemo, useState } from 'react'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
-  const {
-    tree,
-    loading,
-    error,
-    reloadTree,
-    searchQuery,
-    setSearchQuery,
-    clearSearch,
-  } = useTreeStore()
+  const searchQuery = useTreeStore((s) => s.searchQuery)
+  const tree = useTreeStore((s) => s.tree)
+  const loading = useTreeStore((s) => s.loading)
+  const error = useTreeStore((s) => s.error)
+  const reloadTree = useTreeStore((s) => s.reloadTree)
+  const setSearchQuery = useTreeStore((s) => s.setSearchQuery)
+  const clearSearch = useTreeStore((s) => s.clearSearch)
 
   const openDialog = useDialogsStore((state) => state.openDialog)
 
-  // Debounce für die Suche: Warte 500ms, bevor die Suche verarbeitet wird
-  const debouncedSearchQuery = useDebounce(searchQuery, 500)
+  const [inputValue, setInputValue] = useState(searchQuery)
 
-  // Lade die Baumstruktur bei Komponentemount
+  const debouncedSearchQuery = useDebounce(inputValue, 300)
+
+  console.log('TreeView', { inputValue, searchQuery, debouncedSearchQuery })
+
   useEffect(() => {
     if (tree === null) {
       reloadTree()
     }
   }, [tree, reloadTree])
 
-  // Bei Änderung der Debounced-Suche: Setze den Filterstatus
   useEffect(() => {
     if (!tree || !debouncedSearchQuery) return
     const { expandedIds } = filterTreeWithOpenNodes(tree, debouncedSearchQuery)
-    useTreeStore.setState({ openNodeIds: expandedIds })
+    startTransition(() => {
+      useTreeStore.setState({ openNodeIds: expandedIds })
+    })
   }, [debouncedSearchQuery, tree])
 
-  // Verwende den debouncedSearchQuery für das Setzen des Such-Querys
   useEffect(() => {
     setSearchQuery(debouncedSearchQuery)
   }, [debouncedSearchQuery, setSearchQuery])
@@ -48,10 +48,12 @@ export default function TreeView() {
     return <p className="text-sm text-red-500">Error: {error}</p>
 
   // Filterung mit dem debouncedSearchQuery
-  const { filtered: filteredTree } = filterTreeWithOpenNodes(
-    tree,
-    debouncedSearchQuery,
-  )
+  const { filtered: filteredTree } = useMemo(() => {
+    return filterTreeWithOpenNodes(
+      tree,
+      debouncedSearchQuery,
+    )
+  }, [tree, debouncedSearchQuery])
 
   let toRender = <></>
 
@@ -92,9 +94,7 @@ export default function TreeView() {
           )}
         </div>
         {filteredTree?.children.map((node) => (
-          <React.Fragment key={node.id}>
-            <TreeNode node={node} />
-          </React.Fragment>
+          <TreeNode key={node.id} node={node} />
         ))}
       </div>
     )
@@ -106,19 +106,23 @@ export default function TreeView() {
         <input
           type="text"
           placeholder="Search pages..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
           className="w-full rounded border px-2 py-1 text-base"
         />
-        {searchQuery && (
+        {inputValue && (
           <button
-            onClick={clearSearch}
+            onClick={() => {
+              setInputValue('')
+              clearSearch()
+            }}
             className="text-xs text-gray-500 hover:underline"
           >
             Clear
           </button>
         )}
       </div>
+
       {toRender}
     </>
   )

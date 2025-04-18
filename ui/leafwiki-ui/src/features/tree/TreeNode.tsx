@@ -4,7 +4,7 @@ import { useMeasure } from '@/lib/useMeasure'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { ChevronUp, File, Folder, List, Move, Plus } from 'lucide-react'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { PageNode } from '../../lib/api'
 
@@ -13,7 +13,7 @@ type Props = {
   level?: number
 }
 
-export function TreeNode({ node, level = 0 }: Props) {
+export const TreeNode = React.memo(function TreeNode({ node, level = 0 }: Props) {
   const { isNodeOpen, toggleNode, searchQuery } = useTreeStore()
   const hasChildren = node.children && node.children.length > 0
   const [hovered, setHovered] = useState(false)
@@ -132,4 +132,4 @@ export function TreeNode({ node, level = 0 }: Props) {
       </div>
     </div>
   )
-}
+})

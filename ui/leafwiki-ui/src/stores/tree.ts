@@ -1,5 +1,6 @@
 import { fetchTree, PageNode } from '@/lib/api'
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 type TreeStore = {
   tree: PageNode | null
@@ -14,98 +15,134 @@ type TreeStore = {
   getPageById: (id: string) => PageNode | null
   getPageByPath: (path: string) => PageNode | null
   getPathById: (id: string) => string | null
-  openNodeIds: Set<string>
+  openNodeIds: string[]
+  prevOpenNodeIds: string[] | null
 }
+export const useTreeStore = create<TreeStore>()(
+  persist(
+    (set, get) => ({
+      tree: null,
+      loading: false,
+      error: null,
+      prevOpenNodeIds: null,
+      openNodeIds: [],
 
-export const useTreeStore = create<TreeStore>((set, get) => ({
-  tree: null,
-  loading: false,
-  error: null,
-  openNodeIds: new Set<string>(),
+      toggleNode: (id: string) => {
+        const current = new Set(get().openNodeIds)
 
-  toggleNode: (id: string) => {
-    const openNodeIds = new Set(get().openNodeIds)
-    if (openNodeIds.has(id)) {
-      openNodeIds.delete(id)
-    } else {
-      openNodeIds.add(id)
-    }
-    set({ openNodeIds })
-  },
+        if (current.has(id)) {
+          current.delete(id)
+        } else {
+          current.add(id)
+        }
 
-  searchQuery: '',
+        if (current.size === 0) {
+          set({ openNodeIds: [] })
+          return
+        }
 
-  setSearchQuery: (query: string) => {
-    set({ searchQuery: query })
-  },
+        set({ openNodeIds: Array.from(current) })
+      },
 
-  clearSearch: () => {
-    set({ searchQuery: '' })
-  },
+      searchQuery: '',
 
-  getPathById: (id: string) => {
-    const findNodeById = (node: PageNode): PageNode | null => {
-      if (node.id === id) return node
-      for (const child of node.children || []) {
-        const found = findNodeById(child)
-        if (found) return found
-      }
-      return null
-    }
+      setSearchQuery: (query: string) => {
+        const wasEmpty = get().searchQuery === ''
+        const isNowEmpty = query === ''
 
-    const tree = get().tree
-    if (!tree) return null
+        if (wasEmpty && !isNowEmpty) {
+          set({ prevOpenNodeIds: get().openNodeIds })
+        }
 
-    const node = findNodeById(tree)
-    return node?.path ?? null
-  },
+        if (!wasEmpty && isNowEmpty) {
+          const previous = get().prevOpenNodeIds
+          if (previous) {
+            set({ openNodeIds: previous, prevOpenNodeIds: null })
+          }
+        }
 
-  getPageByPath: (path: string) => {
-    const findNodeByPath = (node: PageNode): PageNode | null => {
-      if (node.path === path) return node
-      for (const child of node.children || []) {
-        const found = findNodeByPath(child)
-        if (found) return found
-      }
-      return null
-    }
+        set({ searchQuery: query })
+      },
 
-    const tree = get().tree
-    if (!tree) return null
+      clearSearch: () => {
+        const previous = get().prevOpenNodeIds
+        if (previous) {
+          set({ openNodeIds: previous, prevOpenNodeIds: null })
+        }
+        set({ searchQuery: '' })
+      },
 
-    const node = findNodeByPath(tree)
-    return node ?? null
-  },
+      isNodeOpen: (id: string) => {
+        return get().openNodeIds.includes(id)
+      },
 
-  getPageById: (id: string) => {
-    const findNodeById = (node: PageNode): PageNode | null => {
-      if (node.id === id) return node
-      for (const child of node.children || []) {
-        const found = findNodeById(child)
-        if (found) return found
-      }
-      return null
-    }
+      getPathById: (id: string) => {
+        const findNodeById = (node: PageNode): PageNode | null => {
+          if (node.id === id) return node
+          for (const child of node.children || []) {
+            const found = findNodeById(child)
+            if (found) return found
+          }
+          return null
+        }
 
-    const tree = get().tree
-    if (!tree) return null
+        const tree = get().tree
+        if (!tree) return null
 
-    const node = findNodeById(tree)
-    return node ?? null
-  },
+        const node = findNodeById(tree)
+        return node?.path ?? null
+      },
 
-  isNodeOpen: (id: string) => get().openNodeIds.has(id),
+      getPageByPath: (path: string) => {
+        const findNodeByPath = (node: PageNode): PageNode | null => {
+          if (node.path === path) return node
+          for (const child of node.children || []) {
+            const found = findNodeByPath(child)
+            if (found) return found
+          }
+          return null
+        }
 
-  reloadTree: async () => {
-    set({ loading: true, error: null })
+        const tree = get().tree
+        if (!tree) return null
 
-    try {
-      const tree = await fetchTree()
-      set({ tree })
-    } catch (err: any) {
-      set({ error: err.message })
-    } finally {
-      set({ loading: false })
-    }
-  },
-}))
+        return findNodeByPath(tree)
+      },
+
+      getPageById: (id: string) => {
+        const findNodeById = (node: PageNode): PageNode | null => {
+          if (node.id === id) return node
+          for (const child of node.children || []) {
+            const found = findNodeById(child)
+            if (found) return found
+          }
+          return null
+        }
+
+        const tree = get().tree
+        if (!tree) return null
+
+        return findNodeById(tree)
+      },
+
+      reloadTree: async () => {
+        set({ loading: true, error: null })
+
+        try {
+          const tree = await fetchTree()
+          set({ tree })
+        } catch (err: any) {
+          set({ error: err.message })
+        } finally {
+          set({ loading: false })
+        }
+      },
+    }),
+    {
+      name: 'leafwiki-tree-open-node-ids',
+      partialize: (state) => ({
+        openNodeIds: state.openNodeIds,
+      }),
+    },
+  ),
+)
