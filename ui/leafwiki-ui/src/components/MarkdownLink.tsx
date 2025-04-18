@@ -11,7 +11,6 @@ export function MarkdownLink({ href, children, ...props }: any) {
   const normalizedHref = href.startsWith('/') ? href : '/' + href // turn "leafwiki/roadmap" into "/leafwiki/roadmap"
 
   if (isInternal) {
-
     // check if it is a asset link
     if (href.startsWith('assets/') || href.startsWith('/assets/')) {
       return (
@@ -39,7 +38,13 @@ export function MarkdownLink({ href, children, ...props }: any) {
   }
 
   return (
-    <a href={href} {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 no-underline hover:underline dark:text-blue-400">
+    <a
+      href={href}
+      {...props}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 no-underline hover:underline dark:text-blue-400"
+    >
       {children}
     </a>
   )

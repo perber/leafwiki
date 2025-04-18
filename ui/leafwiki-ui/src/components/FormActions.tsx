@@ -7,7 +7,7 @@ export function FormActions({
   saveLabel = 'Save',
   loading = false,
   disabled = false,
-  autoFocus = ''
+  autoFocus = '',
 }: {
   onCancel: () => void
   onSave: () => void
@@ -18,10 +18,19 @@ export function FormActions({
 }) {
   return (
     <div className="mt-6 flex justify-end gap-2">
-      <Button variant="outline" onClick={onCancel} disabled={loading} autoFocus={autoFocus=='cancel'}>
+      <Button
+        variant="outline"
+        onClick={onCancel}
+        disabled={loading}
+        autoFocus={autoFocus == 'cancel'}
+      >
         Cancel
       </Button>
-      <Button onClick={onSave} disabled={loading || disabled} autoFocus={autoFocus=='save'}>
+      <Button
+        onClick={onSave}
+        disabled={loading || disabled}
+        autoFocus={autoFocus == 'save'}
+      >
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {saveLabel}
       </Button>

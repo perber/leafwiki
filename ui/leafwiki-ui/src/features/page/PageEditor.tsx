@@ -48,7 +48,7 @@ export default function PageEditor() {
   const { setContent, clearContent, setTitleBar, clearTitleBar } =
     usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => { })
+  const handleSaveRef = useRef<() => void>(() => {})
 
   const onMetaDataChange = useCallback((title: string, slug: string) => {
     setTitle(title)
@@ -99,7 +99,13 @@ export default function PageEditor() {
         navigate(targetPath)
       }
     },
-    [shouldPromptUnsaved, navigate, pendingNavigation, showUnsavedDialog, isNavigatingAway],
+    [
+      shouldPromptUnsaved,
+      navigate,
+      pendingNavigation,
+      showUnsavedDialog,
+      isNavigatingAway,
+    ],
   )
 
   useEffect(() => {
@@ -158,7 +164,14 @@ export default function PageEditor() {
 
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [parentPath, slug, handleNavigateAway, reloadTree, showUnsavedDialog, assetModalOpen])
+  }, [
+    parentPath,
+    slug,
+    handleNavigateAway,
+    reloadTree,
+    showUnsavedDialog,
+    assetModalOpen,
+  ])
 
   // The user clicks the edit button in the title bar
   // We open the edit page metadata dialog
@@ -266,7 +279,6 @@ export default function PageEditor() {
     }
   }, [title])
 
-
   if (loading)
     return (
       <>
@@ -307,12 +319,15 @@ export default function PageEditor() {
           />
         </div>
         <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
-          <DialogContent className="max-w-2xl" onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              e.stopPropagation()
-              e.preventDefault()
-            }
-          }}>
+          <DialogContent
+            className="max-w-2xl"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation()
+                e.preventDefault()
+              }
+            }}
+          >
             <DialogHeader>
               <DialogTitle>Add Asset</DialogTitle>
               <DialogDescription>
@@ -329,37 +344,40 @@ export default function PageEditor() {
           </DialogContent>
         </Dialog>
       </div>
-      {!isNavigatingAway && (<UnsavedChangesDialog
-        open={showUnsavedDialog}
-        onCancel={() => {
-          // Close the dialog and reset the pending navigation
-          setShowUnsavedDialog(false)
-          setPendingNavigation(null)
-          // set focus back to the editor
-          requestAnimationFrame(() => {
-          const el = textareaRef.current
-          if (el) {
-            el.focus()
-            el.classList.add('flash-border')
-            setTimeout(() => el.classList.remove('flash-border'), 400)
-          }})
-        }}
-        onConfirm={() => {
-          // if the user confirms, and not outstanding navigation
-          // we want to navigate to the new page
-          if (pendingNavigation) {
-            setIsNavigatingAway(true)
+      {!isNavigatingAway && (
+        <UnsavedChangesDialog
+          open={showUnsavedDialog}
+          onCancel={() => {
+            // Close the dialog and reset the pending navigation
             setShowUnsavedDialog(false)
-            const path = pendingNavigation
-            console.log('Navigating to', path)
-            // navigate to the new page
+            setPendingNavigation(null)
+            // set focus back to the editor
             requestAnimationFrame(() => {
-              navigate(path)
-              setPendingNavigation(null)
+              const el = textareaRef.current
+              if (el) {
+                el.focus()
+                el.classList.add('flash-border')
+                setTimeout(() => el.classList.remove('flash-border'), 400)
+              }
             })
-          }
-        }}
-      />)}
+          }}
+          onConfirm={() => {
+            // if the user confirms, and not outstanding navigation
+            // we want to navigate to the new page
+            if (pendingNavigation) {
+              setIsNavigatingAway(true)
+              setShowUnsavedDialog(false)
+              const path = pendingNavigation
+              console.log('Navigating to', path)
+              // navigate to the new page
+              requestAnimationFrame(() => {
+                navigate(path)
+                setPendingNavigation(null)
+              })
+            }
+          }}
+        />
+      )}
     </>
   )
 }

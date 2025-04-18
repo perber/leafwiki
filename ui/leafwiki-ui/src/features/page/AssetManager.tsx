@@ -54,7 +54,6 @@ export function AssetManager({ pageId, onInsert }: Props) {
   }, [pageId])
 
   const handleUploadFile = async (file: File) => {
-
     const MAX_UPLOAD_SIZE_MB = 50
     const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
@@ -123,12 +122,13 @@ export function AssetManager({ pageId, onInsert }: Props) {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => fileInput.current?.click()}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${isDragging
-          ? 'border-blue-400 bg-blue-50 text-blue-600'
-          : isHovered
-            ? 'border-gray-300 bg-gray-50'
-            : 'border-gray-200 hover:bg-gray-50'
-          }`}
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${
+          isDragging
+            ? 'border-blue-400 bg-blue-50 text-blue-600'
+            : isHovered
+              ? 'border-gray-300 bg-gray-50'
+              : 'border-gray-200 hover:bg-gray-50'
+        }`}
       >
         <UploadCloud className="mb-2" size={20} />
         <p className="text-xs">Drop files here or click to upload</p>
@@ -155,7 +155,7 @@ export function AssetManager({ pageId, onInsert }: Props) {
             return (
               <li
                 key={filename}
-                className="group flex items-center justify-between gap-2 rounded-md px-2 py-1 transition hover:bg-gray-100 cursor-pointer"
+                className="group flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1 transition hover:bg-gray-100"
                 onDoubleClick={() => insertMarkdown(assetUrl)}
               >
                 <div className="flex flex-1 items-center gap-3">
@@ -174,9 +174,9 @@ export function AssetManager({ pageId, onInsert }: Props) {
                       </div>
                     </AssetPreviewTooltip>
                   )}
-                    <span className="truncate text-sm text-gray-800 hover:underline">
-                      {baseName}
-                    </span>
+                  <span className="truncate text-sm text-gray-800 hover:underline">
+                    {baseName}
+                  </span>
                 </div>
                 <Button
                   variant="ghost"

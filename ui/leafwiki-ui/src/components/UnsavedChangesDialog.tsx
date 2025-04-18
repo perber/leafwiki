@@ -22,14 +22,14 @@ export function UnsavedChangesDialog({
 }: UnsavedChangesDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={(val) => !val && onCancel()}>
-      <AlertDialogContent onKeyDown={
-        (e) => {
+      <AlertDialogContent
+        onKeyDown={(e) => {
           if (e.key === 'Escape') {
             e.stopPropagation()
             e.preventDefault()
           }
-        }
-      }>
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>Unsave changes?</AlertDialogTitle>
         </AlertDialogHeader>

@@ -31,15 +31,22 @@ const MarkdownEditor = forwardRef<HTMLTextAreaElement, Props>(
         const preview = previewRef.current
         if (!textarea || !preview) return
 
-        const textBeforeCursor = textarea.value.slice(0, textarea.selectionStart)
+        const textBeforeCursor = textarea.value.slice(
+          0,
+          textarea.selectionStart,
+        )
         const line = textBeforeCursor.split('\n').length
 
-        let target = preview.querySelector(`[data-line='${line}']`) as HTMLElement | null
+        let target = preview.querySelector(
+          `[data-line='${line}']`,
+        ) as HTMLElement | null
 
         // Fallback: vorherige existierende data-line suchen
         if (!target) {
           for (let i = line - 1; i > 0; i--) {
-            const fallback = preview.querySelector(`[data-line='${i}']`) as HTMLElement | null
+            const fallback = preview.querySelector(
+              `[data-line='${i}']`,
+            ) as HTMLElement | null
             if (fallback) {
               target = fallback
               break
@@ -61,7 +68,8 @@ const MarkdownEditor = forwardRef<HTMLTextAreaElement, Props>(
 
           const targetHeight = target.offsetHeight
           const containerHeight = preview.clientHeight
-          const desiredScrollTop = offsetTop - containerHeight / 2 + targetHeight / 2
+          const desiredScrollTop =
+            offsetTop - containerHeight / 2 + targetHeight / 2
 
           const threshold = 16
           const distance = Math.abs(preview.scrollTop - desiredScrollTop)
@@ -71,11 +79,13 @@ const MarkdownEditor = forwardRef<HTMLTextAreaElement, Props>(
           }
         } else {
           const canScroll = preview.scrollHeight > preview.clientHeight
-          const canScrollTextarea = textarea.scrollHeight > textarea.clientHeight
+          const canScrollTextarea =
+            textarea.scrollHeight > textarea.clientHeight
 
           if (canScroll && canScrollTextarea) {
             const scrollRatio =
-              textarea.scrollTop / (textarea.scrollHeight - textarea.clientHeight)
+              textarea.scrollTop /
+              (textarea.scrollHeight - textarea.clientHeight)
             const previewTargetScroll =
               scrollRatio * (preview.scrollHeight - preview.clientHeight)
 
@@ -97,7 +107,8 @@ const MarkdownEditor = forwardRef<HTMLTextAreaElement, Props>(
         onChange(newText)
 
         requestAnimationFrame(() => {
-          textarea.selectionStart = textarea.selectionEnd = start + insert.length
+          textarea.selectionStart = textarea.selectionEnd =
+            start + insert.length
           textarea.focus()
         })
       }
@@ -140,7 +151,7 @@ const MarkdownEditor = forwardRef<HTMLTextAreaElement, Props>(
 
         <div
           ref={previewRef}
-          className="prose prose-lg w-1/2 max-w-none overflow-auto rounded border border-gray-200 bg-white p-4 leading-relaxed [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0 [&_img]:max-w-full [&_img]:h-auto"
+          className="prose prose-lg w-1/2 max-w-none overflow-auto rounded border border-gray-200 bg-white p-4 leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0"
         >
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkLineNumber]}
