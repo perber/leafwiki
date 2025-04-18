@@ -368,7 +368,6 @@ export default function PageEditor() {
               setIsNavigatingAway(true)
               setShowUnsavedDialog(false)
               const path = pendingNavigation
-              console.log('Navigating to', path)
               // navigate to the new page
               requestAnimationFrame(() => {
                 navigate(path)

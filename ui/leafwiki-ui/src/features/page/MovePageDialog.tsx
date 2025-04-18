@@ -75,7 +75,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
       toast.success('Page moved successfully')
       closeDialog()
     } catch (err: any) {
-      console.log(err)
+      console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error moving page')
     } finally {
       setLoading(false)
