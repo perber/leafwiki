@@ -1,3 +1,4 @@
+import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { TreeViewActionButton } from '@/components/TreeViewActionButton'
 import { useMeasure } from '@/lib/useMeasure'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -43,21 +44,22 @@ export function TreeNode({ node, level = 0 }: Props) {
   }
 
   const linkText = (
-    <Link to={`/${node.path}`}>
-      <span className="block w-[150px] overflow-hidden truncate text-ellipsis">
-        {highlightTitle()}
-      </span>
-    </Link>
+    <TooltipWrapper label={node.title} side="top" align="start">
+      <Link to={`/${node.path}`}>
+        <span className="block w-[150px] overflow-hidden truncate text-ellipsis">
+          {highlightTitle()}
+        </span>
+      </Link>
+    </TooltipWrapper>
   )
 
   return (
     <div>
       <div
-        className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${
-          isActive
-            ? 'bg-gray-200 font-semibold'
-            : 'text-gray-800 hover:bg-gray-200'
-        }`}
+        className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${isActive
+          ? 'bg-gray-200 font-semibold'
+          : 'text-gray-800 hover:bg-gray-200'
+          }`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >

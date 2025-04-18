@@ -1,6 +1,7 @@
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { DialogManger } from '@/components/DialogManager'
 import { usePageToolbar } from '@/components/PageToolbarContext'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import UserToolbar from '@/components/UserToolbar'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
@@ -20,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [location.pathname])
 
   return (
-    <>
+      <TooltipProvider delayDuration={300}>
       <DialogManger />
       <div className="relative h-screen w-full overflow-y-auto bg-gray-50 font-sans text-gray-900">
         <motion.aside
@@ -90,6 +91,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <main className="flex-1 overflow-auto p-6">{children}</main>
         </motion.div>
       </div>
-    </>
+      </TooltipProvider>
   )
 }

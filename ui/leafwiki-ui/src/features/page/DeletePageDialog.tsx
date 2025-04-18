@@ -1,4 +1,5 @@
 import { FormActions } from '@/components/FormActions'
+import { TooltipWrapper } from '@/components/TooltipWrapper'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -66,13 +67,15 @@ export function DeletePageDialog({
       }}
     >
       <AlertDialogTrigger asChild>
-        <Button
-          variant="destructive"
-          size="icon"
-          className="h-8 w-8 rounded-full shadow-sm"
-        >
-          <Trash2 />
-        </Button>
+        <TooltipWrapper label="Delete page" side="top" align="center">
+          <Button
+            variant="destructive"
+            size="icon"
+            className="h-8 w-8 rounded-full shadow-sm"
+          >
+            <Trash2 />
+          </Button>
+        </TooltipWrapper>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

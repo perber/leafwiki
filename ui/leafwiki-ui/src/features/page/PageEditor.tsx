@@ -1,6 +1,7 @@
 import { EditorTitleBar } from '@/components/EditorTitleBar'
 import MarkdownEditor from '@/components/MarkdownEditor'
 import { usePageToolbar } from '@/components/PageToolbarContext'
+import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -45,7 +46,7 @@ export default function PageEditor() {
   const { setContent, clearContent, setTitleBar, clearTitleBar } =
     usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => {})
+  const handleSaveRef = useRef<() => void>(() => { })
 
   const onMetaDataChange = useCallback((title: string, slug: string) => {
     setTitle(title)
@@ -155,29 +156,33 @@ export default function PageEditor() {
     if (!page) return
     setContent(
       <React.Fragment key="editing">
-        <Button
-          variant="destructive"
-          className="h-8 w-8 rounded-full shadow-sm"
-          size="icon"
-          onClick={async () => {
-            await reloadTree()
+        <TooltipWrapper label="Close" side="top" align="center">
+          <Button
+            variant="destructive"
+            className="h-8 w-8 rounded-full shadow-sm"
+            size="icon"
+            onClick={async () => {
+              await reloadTree()
 
-            handleNavigateAway(
-              parentPath && slug ? `/${parentPath}/${slug}` : '/',
-            )
-          }}
-        >
-          <X />
-        </Button>
-        <Button
-          onClick={() => handleSaveRef.current()}
-          variant="default"
-          className="h-8 w-8 rounded-full shadow-md"
-          size="icon"
-          disabled={!isDirty}
-        >
-          <Save />
-        </Button>
+              handleNavigateAway(
+                parentPath && slug ? `/${parentPath}/${slug}` : '/',
+              )
+            }}
+          >
+            <X />
+          </Button>
+        </TooltipWrapper>
+        <TooltipWrapper label="Save" side="top" align="center">
+          <Button
+            onClick={() => handleSaveRef.current()}
+            variant="default"
+            className="h-8 w-8 rounded-full shadow-md"
+            size="icon"
+            disabled={!isDirty}
+          >
+            <Save />
+          </Button>
+        </TooltipWrapper>
       </React.Fragment>,
     )
 
