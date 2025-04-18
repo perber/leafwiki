@@ -1,5 +1,6 @@
 import { getPageByPath } from '@/lib/api'
 // import "highlight.js/styles/github.css"
+import { MarkdownLink } from '@/components/MarkdownLink'
 import { usePageToolbar } from '@/components/PageToolbarContext'
 import React, { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -64,6 +65,9 @@ export default function PageViewer() {
           children={page.content}
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight]}
+          components={{
+            a: MarkdownLink,
+          }}
         />
       </article>
     </>
