@@ -18,7 +18,7 @@ export default function TreeView() {
   const clearSearch = useTreeStore((s) => s.clearSearch)
 
   const location = useLocation()
-  const currentPath = location.pathname.replace(/^\/(e\/)?/, '') // z.B. docs/setup/intro  
+  const currentPath = location.pathname.replace(/^\/(e\/)?/, '') // z.B. docs/setup/intro
 
   const openDialog = useDialogsStore((state) => state.openDialog)
 
@@ -28,7 +28,7 @@ export default function TreeView() {
 
   useEffect(() => {
     if (!tree || !currentPath) return
-  
+
     const page = useTreeStore.getState().getPageByPath(currentPath)
     if (page) {
       const ancestors = getAncestorIds(tree, page.id)
@@ -62,10 +62,7 @@ export default function TreeView() {
   }, [debouncedSearchQuery, setSearchQuery])
 
   const { filtered: filteredTree } = useMemo(() => {
-    return filterTreeWithOpenNodes(
-      tree,
-      debouncedSearchQuery,
-    )
+    return filterTreeWithOpenNodes(tree, debouncedSearchQuery)
   }, [tree, debouncedSearchQuery])
 
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>

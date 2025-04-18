@@ -13,7 +13,10 @@ type Props = {
   level?: number
 }
 
-export const TreeNode = React.memo(function TreeNode({ node, level = 0 }: Props) {
+export const TreeNode = React.memo(function TreeNode({
+  node,
+  level = 0,
+}: Props) {
   const { isNodeOpen, toggleNode, searchQuery } = useTreeStore()
   const hasChildren = node.children && node.children.length > 0
   const [hovered, setHovered] = useState(false)
@@ -56,10 +59,11 @@ export const TreeNode = React.memo(function TreeNode({ node, level = 0 }: Props)
   return (
     <div>
       <div
-        className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${isActive
-          ? 'bg-gray-200 font-semibold'
-          : 'text-gray-800 hover:bg-gray-200'
-          }`}
+        className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${
+          isActive
+            ? 'bg-gray-200 font-semibold'
+            : 'text-gray-800 hover:bg-gray-200'
+        }`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
@@ -74,7 +78,7 @@ export const TreeNode = React.memo(function TreeNode({ node, level = 0 }: Props)
 
           {/* Zeigt das File-Icon für Knoten ohne Kinder */}
           {!hasChildren && <File size={18} className="text-gray-400" />}
-          {hasChildren && (<Folder size={18} className="text-gray-400" />)}
+          {hasChildren && <Folder size={18} className="text-gray-400" />}
 
           {linkText}
         </div>

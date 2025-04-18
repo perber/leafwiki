@@ -133,7 +133,7 @@ export const useTreeStore = create<TreeStore>()(
           const tree = await fetchTree()
           assignParentIds(tree)
           set({ tree })
-        // FIXME: a better error handling is required here
+          // FIXME: a better error handling is required here
         } catch (err: any) {
           set({ error: err.message })
         } finally {

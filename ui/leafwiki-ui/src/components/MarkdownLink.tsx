@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import { Link } from 'react-router-dom'
 
 export function MarkdownLink({ href, children, ...props }: any) {
   const isInternal =
@@ -8,13 +8,15 @@ export function MarkdownLink({ href, children, ...props }: any) {
     !href.startsWith('#')
 
   // Normalize relative hrefs to absolute
-  const normalizedHref = href.startsWith('/')
-    ? href
-    : '/' + href // turn "leafwiki/roadmap" into "/leafwiki/roadmap"
+  const normalizedHref = href.startsWith('/') ? href : '/' + href // turn "leafwiki/roadmap" into "/leafwiki/roadmap"
 
   if (isInternal) {
     return (
-      <Link to={normalizedHref} {...props} className="text-blue-600 hover:underline no-underline dark:text-blue-400">
+      <Link
+        to={normalizedHref}
+        {...props}
+        className="text-blue-600 no-underline hover:underline dark:text-blue-400"
+      >
         {children}
       </Link>
     )

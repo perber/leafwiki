@@ -1,4 +1,4 @@
-import { PageNode } from '@/lib/api';
+import { PageNode } from '@/lib/api'
 
 export function filterTreeWithOpenNodes(
   node: PageNode | null,
@@ -34,7 +34,6 @@ export function filterTreeWithOpenNodes(
   return { filtered, expandedIds }
 }
 
-
 export function getAncestorIds(tree: PageNode, pageId: string): string[] {
   const byId = new Map<string, PageNode>()
 
@@ -58,9 +57,12 @@ export function getAncestorIds(tree: PageNode, pageId: string): string[] {
   return result
 }
 
-export function assignParentIds(node: PageNode, parentId: string | null = null) {
-    node.parentId = parentId
-    for (const child of node.children || []) {
-      assignParentIds(child, node.id)
-    }
+export function assignParentIds(
+  node: PageNode,
+  parentId: string | null = null,
+) {
+  node.parentId = parentId
+  for (const child of node.children || []) {
+    assignParentIds(child, node.id)
   }
+}

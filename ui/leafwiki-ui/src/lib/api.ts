@@ -121,7 +121,7 @@ export type PageNode = {
 }
 
 export async function fetchTree(): Promise<PageNode> {
-    return await fetchWithAuth(`/api/tree`)
+  return await fetchWithAuth(`/api/tree`)
 }
 
 export async function suggestSlug(

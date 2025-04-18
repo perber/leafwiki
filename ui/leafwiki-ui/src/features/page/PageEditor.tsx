@@ -46,7 +46,7 @@ export default function PageEditor() {
   const { setContent, clearContent, setTitleBar, clearTitleBar } =
     usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => { })
+  const handleSaveRef = useRef<() => void>(() => {})
 
   const onMetaDataChange = useCallback((title: string, slug: string) => {
     setTitle(title)
