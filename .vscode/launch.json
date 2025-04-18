@@ -10,6 +10,7 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/leafwiki/main.go",
+            "args": ["--jwt-secret", "secretkey"],
         },
         // admin reset
         {

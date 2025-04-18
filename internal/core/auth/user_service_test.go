@@ -107,7 +107,7 @@ func TestUserService_InitDefaultAdmin(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
 	service := NewUserService(store)
 
-	err := service.InitDefaultAdmin()
+	err := service.InitDefaultAdmin("")
 	if err != nil {
 		t.Errorf("InitDefaultAdmin failed: %v", err)
 	}

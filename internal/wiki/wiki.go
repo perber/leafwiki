@@ -25,7 +25,7 @@ type Wiki struct {
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
 var defaultAdminPassword = "admin"
 
-func NewWiki(storageDir string, adminPassword string) (*Wiki, error) {
+func NewWiki(storageDir string, adminPassword string, jwtSecret string) (*Wiki, error) {
 	// Initialize the user store
 	store, err := auth.NewUserStore(storageDir)
 	if err != nil {
@@ -43,7 +43,7 @@ func NewWiki(storageDir string, adminPassword string) (*Wiki, error) {
 	}
 
 	// Initialize the auth service
-	authService := auth.NewAuthService(userService, "mysecretkey")
+	authService := auth.NewAuthService(userService, jwtSecret)
 
 	// Initialize the tree service
 	treeService := tree.NewTreeService(storageDir)

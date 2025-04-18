@@ -8,7 +8,7 @@ import (
 
 func setupTestWiki(t *testing.T) *Wiki {
 	tempDir := t.TempDir()
-	w, err := NewWiki(tempDir, "admin")
+	w, err := NewWiki(tempDir, "admin", "secretkey")
 	if err != nil {
 		t.Fatalf("Failed to create wiki: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestWiki_SuggestSlug_Conflict(t *testing.T) {
 
 func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	tmpDir := t.TempDir()
-	wiki, err := NewWiki(tmpDir, "admin")
+	wiki, err := NewWiki(tmpDir, "admin", "secretkey")
 	if err != nil {
 		t.Fatalf("Failed to initialize Wiki: %v", err)
 	}
@@ -324,5 +324,28 @@ func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 	_, err = w.Login("admin", "wrong")
 	if err == nil {
 		t.Error("Expected login to fail with wrong password")
+	}
+}
+
+func TestWiki_ResetAdminPasswordWithoutJWTSecret(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Verwende Dummy-Secret
+	wiki, err := NewWiki(tempDir, "supersecure", "")
+	if err != nil {
+		t.Fatalf("Failed to initialize Wiki: %v", err)
+	}
+	defer wiki.Close()
+
+	user, err := wiki.ResetAdminUserPassword()
+	if err != nil {
+		t.Fatalf("ResetAdminUserPassword failed: %v", err)
+	}
+
+	if user.Username != "admin" {
+		t.Errorf("Expected username to be 'admin', got %s", user.Username)
+	}
+	if user.Password == "" {
+		t.Error("Expected new password to be set, got empty string")
 	}
 }

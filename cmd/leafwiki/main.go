@@ -22,6 +22,7 @@ func printUsage() {
 	--port             Port to run the server on (default: 8080)
 	--storage          Path to storage directory (default: ./data)
 	--admin-password   Initial admin password (used only if no admin exists)
+	--jwt-secret       Secret for signing auth tokens (JWT) (required)
 
 	Environment variables:
 	LEAFWIKI_PORT
@@ -36,23 +37,24 @@ func main() {
 	portFlag := flag.String("port", "", "port to run the server on")
 	storageFlag := flag.String("storage", "", "path to storage directory")
 	adminPasswordFlag := flag.String("admin-password", "", "initial admin password")
+	jwtSecretFlag := flag.String("jwt-secret", "", "JWT secret for authentication")
 	flag.Parse()
 
 	port := getOrFallback(*portFlag, "LEAFWIKI_PORT", "8080")
 	storageDir := getOrFallback(*storageFlag, "LEAFWIKI_STORAGE_DIR", "./data")
 	adminPassword := getOrFallback(*adminPasswordFlag, "LEAFWIKI_ADMIN_PASSWORD", "admin")
+	jwtSecret := getOrFallback(*jwtSecretFlag, "LEAFWIKI_JWT_SECRET", "")
 
-	// needs to get injected by environment variable later
-	w, err := wiki.NewWiki(storageDir, adminPassword)
-	if err != nil {
-		log.Fatalf("Failed to initialize Wiki: %v", err)
-	}
-	defer w.Close()
-
-	args := os.Args
-	if len(args) > 1 {
-		switch args[1] {
+	args := flag.Args()
+	if len(args) > 0 {
+		switch args[0] {
 		case "reset-admin-password":
+			// Note: No JWT secret needed for this command
+			w, err := wiki.NewWiki(storageDir, adminPassword, "")
+			if err != nil {
+				log.Fatalf("Failed to initialize Wiki: %v", err)
+			}
+			defer w.Close()
 			user, err := w.ResetAdminUserPassword()
 			if err != nil {
 				log.Fatalf("Password reset failed: %v", err)
@@ -70,6 +72,17 @@ func main() {
 			return
 		}
 	}
+
+	if jwtSecret == "" {
+		log.Fatal("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
+	}
+
+	// needs to get injected by environment variable later
+	w, err := wiki.NewWiki(storageDir, adminPassword, jwtSecret)
+	if err != nil {
+		log.Fatalf("Failed to initialize Wiki: %v", err)
+	}
+	defer w.Close()
 
 	router := http.NewRouter(w)
 
