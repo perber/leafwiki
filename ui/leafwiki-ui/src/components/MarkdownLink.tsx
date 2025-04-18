@@ -23,7 +23,7 @@ export function MarkdownLink({ href, children, ...props }: any) {
   }
 
   return (
-    <a href={href} {...props} target="_blank" rel="noopener noreferrer">
+    <a href={href} {...props} target="_blank" rel="noopener noreferrer" className="text-blue-600 no-underline hover:underline dark:text-blue-400">
       {children}
     </a>
   )

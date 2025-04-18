@@ -29,6 +29,8 @@ export default function MarkdownEditor({
       const textBeforeCursor = textarea.value.slice(0, textarea.selectionStart)
       const line = textBeforeCursor.split('\n').length
 
+      console.log(line)
+
       let target = preview.querySelector(
         `[data-line='${line}']`,
       ) as HTMLElement | null
@@ -47,13 +49,27 @@ export default function MarkdownEditor({
       }
 
       if (target) {
-        const targetOffset = target.offsetTop
+        // Ist das target innerhalb einer Tabelle?
+        const table = target.closest('table')
+        let offsetTop = 0
+
+        if (table && preview.contains(table)) {
+          const tableRect = table.getBoundingClientRect()
+          const previewRect = preview.getBoundingClientRect()
+          const targetRect = target.getBoundingClientRect()
+
+          // Offset innerhalb des Preview-Containers
+          offsetTop = targetRect.top - previewRect.top + preview.scrollTop
+        } else {
+          // Default fallback
+          offsetTop = target.offsetTop
+        }
+
         const targetHeight = target.offsetHeight
         const containerHeight = preview.clientHeight
-        const desiredScrollTop =
-          targetOffset - containerHeight / 2 + targetHeight / 2
+        const desiredScrollTop = offsetTop - containerHeight / 2 + targetHeight / 2
 
-        const threshold = 16 // px Toleranz
+        const threshold = 16
         const distance = Math.abs(preview.scrollTop - desiredScrollTop)
 
         if (distance > threshold) {
