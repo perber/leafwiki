@@ -25,7 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="relative h-screen w-full overflow-y-auto bg-gray-50 font-sans text-gray-900">
         <motion.aside
           key={'sidebar'}
-          className="fixed bottom-0 left-0 top-0 z-20 h-full w-96 overflow-y-auto border-r border-gray-200 bg-white p-4 shadow-md"
+          className="fixed bottom-0 left-0 top-0 z-20 h-full w-96 bg-gray-100 border-r border-gray-300 overflow-y-auto p-4 shadow-md"
           animate={{
             x: isEditor ? '-100%' : '0%',
             opacity: isEditor ? 0 : 1,
