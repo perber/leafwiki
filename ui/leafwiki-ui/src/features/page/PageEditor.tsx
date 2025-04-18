@@ -27,6 +27,8 @@ export default function PageEditor() {
   const [inserted, setInserted] = useState<string | null>(null)
   const navigate = useNavigate()
   const [markdown, setMarkdown] = useState('')
+  const [isNavigatingAway, setIsNavigatingAway] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [assetModalOpen, setAssetModalOpen] = useState(false)
@@ -46,7 +48,7 @@ export default function PageEditor() {
   const { setContent, clearContent, setTitleBar, clearTitleBar } =
     usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => {})
+  const handleSaveRef = useRef<() => void>(() => { })
 
   const onMetaDataChange = useCallback((title: string, slug: string) => {
     setTitle(title)
@@ -68,6 +70,10 @@ export default function PageEditor() {
     return p.id
   }, [parentPath])
 
+  // isDirty is a boolean that indicates if the page is dirty
+  // We use it to identify if the user has unsaved changes
+  // isDirty is true if the title, slug or markdown content has changed
+  // and the user is not navigating away
   const isDirty = useMemo(() => {
     if (!page) return false
     return (
@@ -75,16 +81,25 @@ export default function PageEditor() {
     )
   }, [page, title, slug, markdown])
 
+  const shouldPromptUnsaved = !isNavigatingAway && isDirty
+
+  // handeNavigateAway is a function that handles the navigation away from the page
+  // It checks if the user has unsaved changes
+  // If the user has unsaved changes, we show the UnsavedChangesDialog
+  // If the user doesn't have unsaved changes, we navigate to the new page
+  // We set the pendingNavigation state to the new path
   const handleNavigateAway = useCallback(
     (targetPath: string) => {
-      if (isDirty) {
+      if (pendingNavigation || showUnsavedDialog || isNavigatingAway) return
+
+      if (shouldPromptUnsaved) {
         setPendingNavigation(targetPath)
         setShowUnsavedDialog(true)
       } else {
         navigate(targetPath)
       }
     },
-    [isDirty, navigate],
+    [shouldPromptUnsaved, navigate, pendingNavigation, showUnsavedDialog, isNavigatingAway],
   )
 
   useEffect(() => {
@@ -126,6 +141,31 @@ export default function PageEditor() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  // The users presses escape in the editor
+  // If the user has unsaved changes, show the dialog
+  // We only show the dialog if the user is not in the asset modal or the UnsavedChangesDialog
+  useEffect(() => {
+    const handleEscape = async (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+
+      if (!showUnsavedDialog && !assetModalOpen) {
+        await reloadTree()
+        handleNavigateAway(parentPath ? `/${parentPath}/${slug}` : '/' + slug)
+      }
+
+      e.preventDefault()
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [parentPath, slug, handleNavigateAway, reloadTree, showUnsavedDialog, assetModalOpen])
+
+  // The user clicks the edit button in the title bar
+  // We open the edit page metadata dialog
+  // and pass the current title and slug to it
+  // The dialog will call the onMetaDataChange function
+  // when the user clicks save
+  // This will set the new title and slug in the editor
   const onEditTitleClicked = useCallback(() => {
     openDialog('edit-page-metadata', {
       title,
@@ -135,6 +175,7 @@ export default function PageEditor() {
     })
   }, [title, slug, parentId, onMetaDataChange])
 
+  // We set the title bar and content of the page editor
   useEffect(() => {
     if (!page || !title || !slug) return
 
@@ -152,27 +193,31 @@ export default function PageEditor() {
     }
   }, [title, slug, parentId, openDialog, isDirty])
 
+  // We set the content of the page editor
+  // This will be shown in the title bar
   useEffect(() => {
     if (!page) return
     setContent(
       <React.Fragment key="editing">
-        <TooltipWrapper label="Close" side="top" align="center">
+        <TooltipWrapper label="Close (ESC)" side="top" align="center">
           <Button
             variant="destructive"
             className="h-8 w-8 rounded-full shadow-sm"
             size="icon"
             onClick={async () => {
               await reloadTree()
-
+              // When the user presses the close button
+              // we want to navigate away from the page
+              // handleNavigateAway will check if the user has unsaved changes and show the dialog
               handleNavigateAway(
-                parentPath && slug ? `/${parentPath}/${slug}` : '/',
+                parentPath ? `/${parentPath}/${slug}` : '/' + slug,
               )
             }}
           >
             <X />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Save" side="top" align="center">
+        <TooltipWrapper label="Save (Ctrl+S)" side="top" align="center">
           <Button
             onClick={() => handleSaveRef.current()}
             variant="default"
@@ -191,6 +236,7 @@ export default function PageEditor() {
     }
   }, [page, path, parentPath, slug, setContent, isDirty])
 
+  // We load the page by path
   useEffect(() => {
     if (!path) return
 
@@ -206,6 +252,7 @@ export default function PageEditor() {
       .finally(() => setLoading(false))
   }, [path])
 
+  // We set the document title to the page title
   useEffect(() => {
     if (title) {
       document.title = `${title} - Edit Page – LeafWiki`
@@ -218,6 +265,7 @@ export default function PageEditor() {
       document.title = 'LeafWiki'
     }
   }, [title])
+
 
   if (loading)
     return (
@@ -248,6 +296,7 @@ export default function PageEditor() {
             </Button>
           </div>
           <MarkdownEditor
+            ref={textareaRef}
             value={markdown}
             onChange={(val) => {
               setMarkdown(val)
@@ -258,7 +307,12 @@ export default function PageEditor() {
           />
         </div>
         <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl" onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.stopPropagation()
+              e.preventDefault()
+            }
+          }}>
             <DialogHeader>
               <DialogTitle>Add Asset</DialogTitle>
               <DialogDescription>
@@ -275,19 +329,37 @@ export default function PageEditor() {
           </DialogContent>
         </Dialog>
       </div>
-      <UnsavedChangesDialog
+      {!isNavigatingAway && (<UnsavedChangesDialog
         open={showUnsavedDialog}
         onCancel={() => {
+          // Close the dialog and reset the pending navigation
           setShowUnsavedDialog(false)
           setPendingNavigation(null)
+          // set focus back to the editor
+          requestAnimationFrame(() => {
+          const el = textareaRef.current
+          if (el) {
+            el.focus()
+            el.classList.add('flash-border')
+            setTimeout(() => el.classList.remove('flash-border'), 400)
+          }})
         }}
         onConfirm={() => {
+          // if the user confirms, and not outstanding navigation
+          // we want to navigate to the new page
           if (pendingNavigation) {
+            setIsNavigatingAway(true)
             setShowUnsavedDialog(false)
-            navigate(pendingNavigation)
+            const path = pendingNavigation
+            console.log('Navigating to', path)
+            // navigate to the new page
+            requestAnimationFrame(() => {
+              navigate(path)
+              setPendingNavigation(null)
+            })
           }
         }}
-      />
+      />)}
     </>
   )
 }

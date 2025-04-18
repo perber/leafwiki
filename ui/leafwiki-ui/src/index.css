@@ -140,3 +140,9 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.flash-border {
+  outline: 2px solid #10b981; /* green-500 */
+  outline-offset: 2px;
+  transition: outline 0.2s ease-in-out;
+}
