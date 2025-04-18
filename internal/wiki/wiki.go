@@ -23,17 +23,22 @@ type Wiki struct {
 
 // Email-RegEx (Basic-Check, nicht RFC-konform, aber gut genug)
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
+var defaultAdminPassword = "admin"
 
-func NewWiki(storageDir string) (*Wiki, error) {
+func NewWiki(storageDir string, adminPassword string) (*Wiki, error) {
 	// Initialize the user store
 	store, err := auth.NewUserStore(storageDir)
 	if err != nil {
 		return nil, err
 	}
 
+	if adminPassword == "" {
+		adminPassword = defaultAdminPassword
+	}
+
 	// Initialize the user service
 	userService := auth.NewUserService(store)
-	if err := userService.InitDefaultAdmin(); err != nil {
+	if err := userService.InitDefaultAdmin(adminPassword); err != nil {
 		return nil, err
 	}
 

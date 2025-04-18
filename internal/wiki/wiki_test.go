@@ -8,7 +8,7 @@ import (
 
 func setupTestWiki(t *testing.T) *Wiki {
 	tempDir := t.TempDir()
-	w, err := NewWiki(tempDir)
+	w, err := NewWiki(tempDir, "admin")
 	if err != nil {
 		t.Fatalf("Failed to create wiki: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestWiki_SuggestSlug_Conflict(t *testing.T) {
 
 func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	tmpDir := t.TempDir()
-	wiki, err := NewWiki(tmpDir)
+	wiki, err := NewWiki(tmpDir, "admin")
 	if err != nil {
 		t.Fatalf("Failed to initialize Wiki: %v", err)
 	}
@@ -278,5 +278,51 @@ func TestWiki_SortPages(t *testing.T) {
 	sortedChildren := parent.Children
 	if sortedChildren[0].ID != child2.ID || sortedChildren[1].ID != child1.ID {
 		t.Errorf("Expected order [child2, child1], got [%s, %s]", sortedChildren[0].Slug, sortedChildren[1].Slug)
+	}
+}
+
+func TestWiki_InitDefaultAdmin_UsesGivenPassword(t *testing.T) {
+	w := setupTestWiki(t)
+
+	_, err := w.GetUserService().GetUserByEmailOrUsernameAndPassword("admin", "admin")
+	if err != nil {
+		t.Fatalf("Admin user not found: %v", err)
+	}
+}
+
+func TestWiki_ResetAdminUserPassword_ChangesPassword(t *testing.T) {
+	w := setupTestWiki(t)
+
+	original, err := w.GetUserService().GetUserByEmailOrUsernameAndPassword("admin", "admin")
+	if err != nil {
+		t.Fatalf("Admin not found: %v", err)
+	}
+
+	resetUser, err := w.ResetAdminUserPassword()
+	if err != nil {
+		t.Fatalf("Reset failed: %v", err)
+	}
+
+	if resetUser.Password == "" {
+		t.Fatal("Reset password is empty")
+	}
+
+	match, err := w.GetUserService().DoesIDAndPasswordMatch(original.ID, resetUser.Password)
+	if err != nil || !match {
+		t.Error("Reset password does not match")
+	}
+}
+
+func TestWiki_Login_SuccessAndFailure(t *testing.T) {
+	w := setupTestWiki(t)
+
+	token, err := w.Login("admin", "admin")
+	if err != nil || token == nil {
+		t.Error("Expected login to succeed with default admin password")
+	}
+
+	_, err = w.Login("admin", "wrong")
+	if err == nil {
+		t.Error("Expected login to fail with wrong password")
 	}
 }

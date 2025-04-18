@@ -17,17 +17,16 @@ func NewUserService(store *UserStore) *UserService {
 	}
 }
 
-func (s *UserService) InitDefaultAdmin() error {
-	count, err := s.store.GetUserCount()
-	if err != nil {
-		return err
+func (s *UserService) InitDefaultAdmin(newPassword string) error {
+	// Check if admin user already exists
+
+	if _, err := s.store.GetAdminUser(); err == nil {
+		// Admin user already exists, no need to create a new one
+		return nil
 	}
 
-	if count == 0 {
-		_, err := s.CreateUser("admin", "admin@localhost", "admin", "admin")
-		if err != nil {
-			return fmt.Errorf("failed to create default admin: %w", err)
-		}
+	if _, err := s.CreateUser("admin", "admin@localhost", newPassword, "admin"); err != nil {
+		return fmt.Errorf("failed to create default admin: %w", err)
 	}
 
 	return nil
@@ -246,7 +245,6 @@ func (s *UserService) ChangeOwnPassword(id, oldPassword, newPassword string) err
 }
 
 func (s *UserService) ResetAdminUserPassword() (*User, error) {
-
 	// Generate a new password for the admin user
 	password, err := shared.GenerateRandomPassword(16)
 	if err != nil {
