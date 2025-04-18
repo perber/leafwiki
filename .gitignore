@@ -24,6 +24,9 @@ go.work.sum
 # env file
 .env
 
+releases/*
+!releases/.gitkeep
+
 # data dir
 data/
 

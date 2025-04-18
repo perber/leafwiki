@@ -1,6 +1,10 @@
 package http
 
 import (
+	"embed"
+	"io/fs"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -10,17 +14,41 @@ import (
 	"github.com/perber/wiki/internal/wiki"
 )
 
+//go:embed dist/**
+var frontend embed.FS
+
+// EnableCors is a flag to enable or disable CORS
+// This is useful for testing purposes, where we might not want to enable CORS
+// During build time, we can set this to false to disable CORS
+var EnableCors = "true"
+
+// EmbedFrontend is a flag to enable or disable embedding the frontend
+// This is useful for testing purposes, where we might not want to embed the frontend
+// During build time, we can set this to false to disable embedding the frontend
+var EmbedFrontend = "false"
+
+// Environment is a flag to set the environment
+var Environment = "development"
+
 func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 	router := gin.Default()
 
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	if Environment == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	} else {
+		gin.SetMode(gin.DebugMode)
+	}
+
+	if EnableCors == "true" {
+		router.Use(cors.New(cors.Config{
+			AllowOrigins:     []string{"*"},
+			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+			ExposeHeaders:    []string{"Content-Length"},
+			AllowCredentials: true,
+			MaxAge:           12 * time.Hour,
+		}))
+	}
 
 	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
 
@@ -61,6 +89,48 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 		requiresAuthGroup.POST("/pages/:id/assets", api.UploadAssetHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/:id/assets", api.ListAssetsHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", api.DeleteAssetHandler(wikiInstance))
+
+	}
+
+	// If frontend embedding is enabled, serve it on all unknown routes
+	if EmbedFrontend == "true" {
+		fsys, err := fs.Sub(frontend, "dist")
+		if err != nil {
+			panic("failed to create sub FS: " + err.Error())
+		}
+
+		staticFS, err := fs.Sub(frontend, "dist/static")
+		if err != nil {
+			panic("failed to create sub FS: " + err.Error())
+		}
+
+		// Serve the embedded frontend files js, css, ...
+		router.StaticFS("/static", http.FS(staticFS))
+		router.StaticFS("/favicon.svg", http.FS(fsys))
+
+		router.NoRoute(func(c *gin.Context) {
+			if c.Request.Method == http.MethodGet &&
+				!strings.HasPrefix(c.Request.URL.Path, "/api") &&
+				!strings.HasPrefix(c.Request.URL.Path, "/assets") &&
+				!strings.HasPrefix(c.Request.URL.Path, "/static") {
+
+				c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+				data, err := fs.ReadFile(fsys, "index.html")
+				if err != nil {
+					c.Status(http.StatusNotFound)
+					return
+				}
+				c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+
+				// serve index.html
+				// endless redirect see issue:
+				// https://github.com/gin-gonic/gin/issues/2654
+				// c.FileFromFS("index.html", http.FS(fsys))
+
+			} else {
+				c.String(http.StatusNotFound, "Page not found")
+			}
+		})
 
 	}
 

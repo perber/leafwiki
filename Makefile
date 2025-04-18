@@ -1,35 +1,66 @@
-# Name der Binary
 BINARY_NAME=leafwiki
-
-# Speicherort der main.go
 CMD_DIR=./cmd/leafwiki
+VERSION := v0.1.0
+RELEASE_DIR := releases
+DOCKER_BUILDER := Dockerfile.builder
 
-# Default Ziel: Build
+# At the moment we only can test it on linux/amd64 and windows/amd64
+PLATFORMS := \
+  linux/amd64 \
+  windows/amd64
+
 all: build
 
-# Build der Binary
 build:
 	go build -o $(BINARY_NAME) $(CMD_DIR)
 
-# Ausführen der App
 run:
 	go run $(CMD_DIR)
 
-# Clean build artifacts
 clean:
 	rm -f $(BINARY_NAME)
+	rm -rf $(RELEASE_DIR)
 
-# Go-Tests für alle Pakete
 test:
 	go test ./...
 
+# Build all platform targets
+release: $(PLATFORMS)
+	@echo "✅ All builds complete."
 
-# Hilfe anzeigen
+# Build for each platform using Docker
+$(PLATFORMS):
+	@mkdir -p $(RELEASE_DIR)
+	@GOOS=$(word 1,$(subst /, ,$@)) ; \
+	 GOARCH=$(word 2,$(subst /, ,$@)) ; \
+	 EXT=$$( [ "$$GOOS" = "windows" ] && echo ".exe" || echo "" ) ; \
+	 OUTPUT=$(BINARY_NAME)-$(VERSION)-$$GOOS-$$GOARCH$$EXT ; \
+	 echo "📦 Building $$OUTPUT..." ; \
+	 docker build -f $(DOCKER_BUILDER) \
+		--build-arg GOOS=$$GOOS \
+		--build-arg GOARCH=$$GOARCH \
+		--build-arg OUTPUT=$$OUTPUT \
+		--build-arg VERSION=$(VERSION) \
+		-t leafwiki-builder-$$GOOS-$$GOARCH . ; \
+	 ID=$$(docker create leafwiki-builder-$$GOOS-$$GOARCH) ; \
+	 docker cp $$ID:/out/$$OUTPUT $(RELEASE_DIR)/$$OUTPUT ; \
+	 docker rm $$ID ; \
+	 sha256sum $(RELEASE_DIR)/$$OUTPUT > $(RELEASE_DIR)/$$OUTPUT.sha256 ; \
+	 echo "✅ Done: $(RELEASE_DIR)/$$OUTPUT"
+
+
+# Final production Docker image
+docker-prod:
+	docker build -f Dockerfile -t leafwiki:$(VERSION) --target final .
+	docker tag leafwiki:$(VERSION) leafwiki:latest
+
 help:
-	@echo "Makefile Befehle:"
-	@echo "  make build     – Baut die LeafWiki Binary"
-	@echo "  make run       – Führt das Projekt aus"
-	@echo "  make test      – Führt alle Tests aus"
-	@echo "  make clean     – Löscht die Binary"
+	@echo "Available commands:"
+	@echo "  make build      – Build binary for current system"
+	@echo "  make release    – Cross-compile binaries for all platforms (via Docker)"
+	@echo "  make clean      – Clean all generated files"
+	@echo "  make test       – Run all Go tests"
+	@echo "  make run        – Run development server"
+	@echo "  make docker-prod    – Build final Docker image"
 
 .PHONY: all build run clean test fmt lint help

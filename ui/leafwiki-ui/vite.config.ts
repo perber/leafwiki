@@ -10,6 +10,14 @@ export default defineConfig({
       '/assets': 'http://localhost:8080', // dein Go-Backend
     },
   },
+  build: {
+    assetsDir: 'static', // <--- hier änderst du das Zielverzeichnis
+    rollupOptions: {
+      output: {
+        assetFileNames: 'static/[name].[hash][extname]', // optional: für konsistente Benennung
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

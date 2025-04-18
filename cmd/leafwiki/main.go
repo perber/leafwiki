@@ -45,6 +45,13 @@ func main() {
 	adminPassword := getOrFallback(*adminPasswordFlag, "LEAFWIKI_ADMIN_PASSWORD", "admin")
 	jwtSecret := getOrFallback(*jwtSecretFlag, "LEAFWIKI_JWT_SECRET", "")
 
+	// Check if storage directory exists
+	if _, err := os.Stat(storageDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(storageDir, 0755); err != nil {
+			log.Fatalf("Failed to create storage directory: %v", err)
+		}
+	}
+
 	args := flag.Args()
 	if len(args) > 0 {
 		switch args[0] {
