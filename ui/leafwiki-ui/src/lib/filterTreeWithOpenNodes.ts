@@ -1,10 +1,14 @@
 import { PageNode } from '@/lib/api';
 
 export function filterTreeWithOpenNodes(
-  node: PageNode,
+  node: PageNode | null,
   query: string,
 ): { filtered: PageNode | null; expandedIds: string[] } {
   const expandedIds: string[] = []
+
+  if (!node) {
+    return { filtered: null, expandedIds }
+  }
 
   function recurse(current: PageNode): PageNode | null {
     const matches = current.title.toLowerCase().includes(query.toLowerCase())

@@ -22,8 +22,6 @@ export default function TreeView() {
 
   const debouncedSearchQuery = useDebounce(inputValue, 300)
 
-  console.log('TreeView', { inputValue, searchQuery, debouncedSearchQuery })
-
   useEffect(() => {
     if (tree === null) {
       reloadTree()
@@ -33,6 +31,11 @@ export default function TreeView() {
   useEffect(() => {
     if (!tree || !debouncedSearchQuery) return
     const { expandedIds } = filterTreeWithOpenNodes(tree, debouncedSearchQuery)
+
+    if (!filteredTree?.children || filteredTree.children.length === 0) {
+      return
+    }
+
     startTransition(() => {
       useTreeStore.setState({ openNodeIds: expandedIds })
     })
@@ -42,18 +45,16 @@ export default function TreeView() {
     setSearchQuery(debouncedSearchQuery)
   }, [debouncedSearchQuery, setSearchQuery])
 
-  // Fehlerbehandlung und Ladezustand
-  if (loading) return <p className="text-sm text-gray-500">Loading...</p>
-  if (error || !tree)
-    return <p className="text-sm text-red-500">Error: {error}</p>
-
-  // Filterung mit dem debouncedSearchQuery
   const { filtered: filteredTree } = useMemo(() => {
     return filterTreeWithOpenNodes(
       tree,
       debouncedSearchQuery,
     )
   }, [tree, debouncedSearchQuery])
+
+  if (loading) return <p className="text-sm text-gray-500">Loading...</p>
+  if (error || !tree)
+    return <p className="text-sm text-red-500">Error: {error}</p>
 
   let toRender = <></>
 
