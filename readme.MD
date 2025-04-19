@@ -8,29 +8,32 @@ LeafWiki is designed for teams and individuals who want a clean, fast, and self-
 
 ## 📦 Status
 
-> LeafWiki is currently under active development.  
-The current version focuses on backend tree structure and file logic.
+> **MVP released – actively developed** 
+LeafWiki is usable and already powers knowledge workflows, but is still in early public stages.  
+Expect improvements, polishing, and community feedback over the next releases.
 
 ---
 
 ## ✨ Features
 
-- 📁 Tree-structured pages (not flat)
-- 📝 Markdown files directly on disk
-- 🔄 Built for Git-based versioning (planned)
-- 🚫 No database, no Docker, no nonsense
-- ⚙️ Single binary written in Go
-- ➕ Pages, folders, slugs, and move operations supported
-- 🧠 Simple API for future UI integrations
+- 🧾 Markdown-first with live editor + preview
+- 🌲 True tree-structured pages (nested folders)
+- 🔒 Role-based access (admin / editor)
+- 🧠 Built for Git – no DB required
+- 📂 Per-page assets with upload support
+- 🖼️ Embed images and files with Markdown
+- ⚙️ Single statically-linked Go binary (no dependencies)
+- 🚀 Easily self-hosted (Docker or standalone)
+- 🔁 Session auth with JWT tokens + refresh
 
 ---
 
 ## 💭 Why Another Wiki?
 
-After working with tools like Wiki.js, Confluence, and DokuWiki, I often found myself asking the same questions:
+After trying out tools like Wiki.js, Confluence, and DokuWiki, I wanted something simpler: no database, easy to host, Markdown-based, and truly Git-friendly.
 
-- Why do I need a database for a bunch of Markdown files?
-- Why is the setup so complex for something that should be simple?
+- Why use a database just to store Markdown?
+- Why should setup be a weekend project?
 - Why can't a wiki just be Git-friendly, file-based and fast?
 
 **LeafWiki** was born out of that frustration — and the desire to have:
@@ -44,34 +47,72 @@ It’s not trying to be everything — just a solid, minimal wiki for people who
 
 ---
 
+## 🛠️ Installation (Production)
+
+```
+# Download the latest release from GitHub
+wget https://github.com/yourname/leafwiki/releases/latest/download/leafwiki-linux-amd64
+chmod +x leafwiki-linux-amd64
+./leafwiki-linux-amd64 --jwt-secret=yoursecret
+```
+
+Default port is `:8080`, and the default data directory is `./data`.
+You can change the data directory with the `--data-dir` flag.
+
+
+### ⚙️ CLI Flags
+
+| Flag               | Description                                 | Default       |
+|--------------------|---------------------------------------------|---------------|
+| `--jwt-secret`     | Secret used for signing JWTs (required)     | –             |
+| `--port`           | Port the server listens on                  | `:8080`       |
+| `--data-dir`       | Directory where data is stored              | `./data`      |
+
+
 ## 🚀 Quick Start (Dev)
 
-```bash
-git clone https://github.com/yourname/leafwiki.git
-cd cmd
+```
+# 1. Clone the repo
 
+git clone https://github.com/yourname/leafwiki.git
+cd leafwiki
+
+# 2. Install frontend dependencies
+
+cd ui/leafwiki-ui
+npm install
+npm run dev   # Starts Vite dev server on http://localhost:5173
+
+# 3. In another terminal, start the backend
+
+cd ../../cmd/leafwiki
 go run main.go
 ```
 
+
 ## 🗺️ Roadmap
 
-### ✅ v0.1 – Core
+### ✅ v0.1 – MVP
 - [x] Tree-based page structure
 - [x] Markdown file creation
 - [x] Slug + file path mapping
 - [x] Move / rename / delete logic
+- [x] Markdown editor with preview
+- [x] File/image uploads per page
+- [x] Simple page title search
+- [x] Asset management (images, files)
+- [x] Basic JWT auth (session-based)
 
-### 🧪 v0.2 – MVP
-- [ ] Markdown editor with preview
-- [ ] File/image uploads per page
-- [ ] Reference/link detection
-- [ ] Simple search
-- [ ] Basic auth (opt-in)
 
-### 🛠️ v0.3+
-- [ ] Git integration
-- [ ] Access control & roles
-- [ ] Public / private content support
+### 🧪 Future Ideas
+
+- [ ] Optimistic locking (conflict resolution)
+- [ ] Versioning (history)
+- [ ] Upload multiple files
+- [ ] Markdown preview with syntax highlighting
+- [ ] Git integration (push/pull)
+- [ ] Full-text search
+- [ ] Automatic update of links
 
 ---
 
@@ -80,13 +121,6 @@ go run main.go
 - **Simple to run**: No container, no DB, just Go
 - **Simple to host**: You know where your data is
 - **Simple to trust**: Markdown is portable & future-proof
-
----
-
-## 📄 License
-
-> License will be defined before public release.  
-> Open for feedback and suggestions.
 
 ---
 
