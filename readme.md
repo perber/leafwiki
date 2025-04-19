@@ -110,8 +110,10 @@ go run main.go
 - [ ] Versioning (history)
 - [ ] Upload multiple files
 - [ ] Markdown preview with syntax highlighting
-- [ ] Git integration (push/pull)
 - [ ] Full-text search
+- [ ] TOC on page
+- [ ] Link to next/previous page in the tree
+- [ ] Git integration
 - [ ] Automatic update of links
 
 ---
