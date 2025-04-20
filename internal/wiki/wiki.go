@@ -83,8 +83,41 @@ func (w *Wiki) EnsureWelcomePage() error {
 		return nil
 	}
 
-	_, err = w.CreatePage(nil, "Welcome to Leaf Wiki", "welcome-to-leaf-wiki")
+	p, err := w.CreatePage(nil, "Welcome to Leaf Wiki", "welcome-to-leaf-wiki")
 	if err != nil {
+		return err
+	}
+
+	// Set the content of the welcome page
+	content := `# Welcome to LeafWiki!
+
+This is your personal, lightweight Markdown wiki.  
+You can write, edit, and structure pages – all in a simple tree layout.
+
+---
+
+## Features
+
+- **Live Markdown editor** with preview
+- **Tree-based navigation**
+- **Per-page assets** like images and files
+- **No database** – just clean files
+- **Single Go binary** – easy to run
+
+---
+
+## Tips
+
+- Click the + button to create new pages or folders
+- Double-click an asset to insert it into the editor
+- Use Markdown for formatting, like:
+
+` + "```" + `md
+- Lists
+- **Bold**
+` + "- `Inline code` \n```\n\n" + "Enjoy writing!"
+
+	if _, err := w.UpdatePage(p.ID, p.Title, p.Slug, content); err != nil {
 		return err
 	}
 
