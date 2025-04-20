@@ -6,6 +6,10 @@ LeafWiki is designed for teams and individuals who want a clean, fast, and self-
 
 ---
 
+![Leafwiki](./preview.gif)
+
+---
+
 ## 📦 Status
 
 > **MVP released – actively developed** 
@@ -109,10 +113,9 @@ go run main.go
 - [ ] Optimistic locking (conflict resolution)
 - [ ] Versioning (history)
 - [ ] Upload multiple files
-- [ ] Markdown preview with syntax highlighting
+- [ ] Syntax Highlighting
 - [ ] Full-text search
 - [ ] TOC on page
-- [ ] Link to next/previous page in the tree
 - [ ] Git integration
 - [ ] Automatic update of links
 
