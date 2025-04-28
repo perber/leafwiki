@@ -109,10 +109,10 @@ go run main.go
 
 
 ### 🧪 Future Ideas
-
 - [ ] Optimistic locking (conflict resolution)
 - [ ] Versioning (history)
 - [ ] Upload multiple files
+- [ ] Editor Improvements (Undo/Redo, ...)
 - [ ] Syntax Highlighting
 - [ ] Full-text search
 - [ ] TOC on page
