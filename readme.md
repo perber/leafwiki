@@ -55,7 +55,7 @@ It’s not trying to be everything — just a solid, minimal wiki for people who
 
 ```
 # Download the latest release from GitHub
-wget https://github.com/yourname/leafwiki/releases/latest/download/leafwiki-linux-amd64
+wget https://github.com/perber/leafwiki/releases/latest/download/leafwiki-linux-amd64
 chmod +x leafwiki-linux-amd64
 ./leafwiki-linux-amd64 --jwt-secret=yoursecret
 ```
@@ -78,7 +78,7 @@ You can change the data directory with the `--data-dir` flag.
 ```
 # 1. Clone the repo
 
-git clone https://github.com/yourname/leafwiki.git
+git clone https://github.com/perber/leafwiki.git
 cd leafwiki
 
 # 2. Install frontend dependencies
