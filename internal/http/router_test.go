@@ -954,7 +954,9 @@ func TestAssetEndpoints(t *testing.T) {
 	writer := multipart.NewWriter(body)
 
 	part, _ := writer.CreateFormFile("file", "testfile.txt")
-	part.Write([]byte("Hello, asset!"))
+	if _, err := part.Write([]byte("Hello, asset!")); err != nil {
+		t.Fatalf("Failed to write file: %v", err)
+	}
 	writer.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
@@ -963,7 +965,9 @@ func TestAssetEndpoints(t *testing.T) {
 	// Auth
 	login := authenticatedRequest(t, router, http.MethodPost, "/api/auth/login", strings.NewReader(`{"identifier": "admin", "password": "admin"}`))
 	var loginResp map[string]string
-	json.Unmarshal(login.Body.Bytes(), &loginResp)
+	if err := json.Unmarshal(login.Body.Bytes(), &loginResp); err != nil {
+		t.Fatalf("Invalid login JSON: %v", err)
+	}
 	token := loginResp["token"]
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -988,7 +992,9 @@ func TestAssetEndpoints(t *testing.T) {
 		t.Fatalf("Expected 200 OK on listing, got %d", listRec.Code)
 	}
 	var listResp map[string][]string
-	json.Unmarshal(listRec.Body.Bytes(), &listResp)
+	if err := json.Unmarshal(listRec.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("Invalid listing JSON: %v", err)
+	}
 	if len(listResp["files"]) != 1 || listResp["files"][0] != "/assets/"+page.ID+"/testfile.txt" {
 		t.Errorf("Expected file in listing, got: %v", listResp["files"])
 	}
@@ -1002,7 +1008,9 @@ func TestAssetEndpoints(t *testing.T) {
 	// Step 5: Verify asset is gone
 	listRec2 := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
 	var listResp2 map[string][]string
-	json.Unmarshal(listRec2.Body.Bytes(), &listResp2)
+	if err := json.Unmarshal(listRec2.Body.Bytes(), &listResp2); err != nil {
+		t.Fatalf("Invalid listing JSON: %v", err)
+	}
 	if len(listResp2["files"]) != 0 {
 		t.Errorf("Expected asset to be deleted, got: %v", listResp2["files"])
 	}

@@ -96,7 +96,9 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 
 func generateJTI() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
 	return hex.EncodeToString(b)
 }
 
