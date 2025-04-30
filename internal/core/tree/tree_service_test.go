@@ -415,17 +415,29 @@ func TestTreeService_FindPageByRoutePath_Success(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Tree: root → architecture → project-a → specs
-	service.CreatePage(nil, "Architecture", "architecture")
+	_, err := service.CreatePage(nil, "Architecture", "architecture")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
 	arch := service.GetTree().Children[0]
 
-	service.CreatePage(&arch.ID, "Project A", "project-a")
+	_, err = service.CreatePage(&arch.ID, "Project A", "project-a")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
 	projectA := arch.Children[0]
 
-	service.CreatePage(&projectA.ID, "Specs", "specs")
+	_, err = service.CreatePage(&projectA.ID, "Specs", "specs")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
 
 	// Datei anlegen
 	specPath := filepath.Join(tmpDir, "root", "architecture", "project-a", "specs.md")
-	os.WriteFile(specPath, []byte("# Project A Specs"), 0644)
+	err = os.WriteFile(specPath, []byte("# Project A Specs"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write specs file: %v", err)
+	}
 
 	// 🔍 Suche über RoutePath
 	page, err := service.FindPageByRoutePath(service.GetTree().Children, "architecture/project-a/specs")
@@ -443,10 +455,11 @@ func TestTreeService_FindPageByRoutePath_NotFound(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	service.CreatePage(nil, "Top", "top")
+	if _, err := service.CreatePage(nil, "Top", "top"); err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
 
-	_, err := service.FindPageByRoutePath(service.GetTree().Children, "top/missing")
-	if err == nil {
+	if _, err := service.FindPageByRoutePath(service.GetTree().Children, "top/missing"); err == nil {
 		t.Error("Expected error for non-existent nested path, got nil")
 	}
 }
@@ -456,11 +469,15 @@ func TestTreeService_FindPageByRoutePath_PartialMatch(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	service.CreatePage(nil, "Docs", "docs")
-	service.CreatePage(nil, "API", "api")
+	if _, err := service.CreatePage(nil, "Docs", "docs"); err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
 
-	_, err := service.FindPageByRoutePath(service.GetTree().Children, "docs/should-not-exist")
-	if err == nil {
+	if _, err := service.CreatePage(nil, "API", "api"); err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	if _, err := service.FindPageByRoutePath(service.GetTree().Children, "docs/should-not-exist"); err == nil {
 		t.Error("Expected error for unmatched subpath")
 	}
 }

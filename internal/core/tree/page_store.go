@@ -246,8 +246,7 @@ func (f *PageStore) MovePage(entry *PageNode, parentEntry *PageNode) error {
 	currentPath := path.Join(f.storageDir, GeneratePathFromPageNode(entry))
 
 	// Check if the entry is a file
-	src := currentPath
-	dest := parentPath
+	var src, dest string
 	if _, err := os.Stat(currentPath + ".md"); err == nil {
 		src = currentPath + ".md"
 		dest = path.Join(parentPath, entry.Slug+".md")

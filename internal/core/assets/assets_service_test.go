@@ -20,7 +20,9 @@ func createMultipartFile(filename string, content []byte) (multipart.File, strin
 	if err != nil {
 		return nil, "", err
 	}
-	part.Write(content)
+	if _, err := part.Write(content); err != nil {
+		return nil, "", err
+	}
 	writer.Close()
 
 	reader := multipart.NewReader(body, writer.Boundary())
@@ -43,8 +45,12 @@ func TestSaveAndListAsset(t *testing.T) {
 	page := &tree.PageNode{Slug: "lonely-page", ID: "a7b3"}
 	// Create index.md page
 	pagePath := filepath.Join(tmp, "lonely-page")
-	os.MkdirAll(pagePath, 0755)
-	os.WriteFile(filepath.Join(pagePath, "index.md"), []byte("# Lonely Page"), 0644)
+	if err := os.MkdirAll(pagePath, 0755); err != nil {
+		t.Fatalf("failed to create test directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pagePath, "index.md"), []byte("# Lonely Page"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
 	service := NewAssetService(tmp, tree.NewSlugService())
 
 	file, name, err := createMultipartFile("my-image.png", []byte("hello image"))
@@ -77,8 +83,12 @@ func TestDeletePageAndEnsureAllAssetsAreDeleted(t *testing.T) {
 	page := &tree.PageNode{Slug: "lonely-page", ID: "a7b3"}
 	// Create index.md page
 	pagePath := filepath.Join(tmp, "lonely-page")
-	os.MkdirAll(pagePath, 0755)
-	os.WriteFile(filepath.Join(pagePath, "index.md"), []byte("# Lonely Page"), 0644)
+	if err := os.MkdirAll(pagePath, 0755); err != nil {
+		t.Fatalf("failed to create test directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pagePath, "index.md"), []byte("# Lonely Page"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
 	service := NewAssetService(tmp, tree.NewSlugService())
 
 	file, name, err := createMultipartFile("my-image.png", []byte("hello image"))
