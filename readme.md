@@ -109,7 +109,7 @@ go run main.go
 
 ## 🗺️ Roadmap
 
-### ✅ v0.1 – MVP
+### ✅ v0.1.0 – MVP
 - [x] Tree-based page structure
 - [x] Markdown file creation
 - [x] Slug + file path mapping
