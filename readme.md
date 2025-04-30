@@ -23,7 +23,7 @@ Expect improvements, polishing, and community feedback over the next releases.
 - 🧾 Markdown-first with live editor + preview
 - 🌲 True tree-structured pages (nested folders)
 - 🔒 Role-based access (admin / editor)
-- 🧠 Built for Git – no DB required
+- 🧠 no DB required
 - 📂 Per-page assets with upload support
 - 🖼️ Embed images and files with Markdown
 - ⚙️ Single statically-linked Go binary (no dependencies)
@@ -38,7 +38,7 @@ After trying out tools like Wiki.js, Confluence, and DokuWiki, I wanted somethin
 
 - Why use a database just to store Markdown?
 - Why should setup be a weekend project?
-- Why can't a wiki just be Git-friendly, file-based and fast?
+- Why can't a wiki just be file-based and fast?
 
 **LeafWiki** was born out of that frustration — and the desire to have:
 
@@ -71,6 +71,19 @@ You can change the data directory with the `--data-dir` flag.
 | `--jwt-secret`     | Secret used for signing JWTs (required)     | –             |
 | `--port`           | Port the server listens on                  | `:8080`       |
 | `--data-dir`       | Directory where data is stored              | `./data`      |
+
+### 🌱 Environment Variables
+
+Instead of CLI flags, you can also configure LeafWiki using environment variables:
+
+| Variable                 | Description                                                  | Default    |
+|--------------------------|--------------------------------------------------------------|------------|
+| `LEAFWIKI_PORT`          | Port the server listens on                                   | `8080`     |
+| `LEAFWIKI_STORAGE_DIR`   | Path to the data storage directory                           | `./data`   |
+| `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | `admin`    |
+| `LEAFWIKI_JWT_SECRET`    | Secret used to sign JWT tokens *(required)*                  | –          |
+
+These environment variables override the default values and are especially useful in containerized or production environments.
 
 
 ## 🚀 Quick Start (Dev)
