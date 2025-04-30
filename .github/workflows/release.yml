@@ -27,6 +27,23 @@ jobs:
           echo "Using version: $VERSION"
           make release VERSION=$VERSION
 
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Docker image
+        run: |
+          VERSION=${GITHUB_REF##*/}  # extract v0.1.0
+          echo "Building Docker image with version $VERSION"
+          make docker-prod VERSION=$VERSION
+          docker tag leafwiki:$VERSION ghcr.io/${{ github.repository_owner }}/leafwiki:$VERSION
+          docker tag leafwiki:$VERSION ghcr.io/${{ github.repository_owner }}/leafwiki:latest
+          docker push ghcr.io/${{ github.repository_owner }}/leafwiki:$VERSION
+          docker push ghcr.io/${{ github.repository_owner }}/leafwiki:latest
+
       - name: Generate changelog from commits
         id: changelog
         uses: heinrichreimer/action-github-changelog-generator@v2.3
