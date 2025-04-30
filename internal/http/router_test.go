@@ -962,13 +962,13 @@ func TestAssetEndpoints(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	// Auth
+	// Get Token for authentication
 	login := authenticatedRequest(t, router, http.MethodPost, "/api/auth/login", strings.NewReader(`{"identifier": "admin", "password": "admin"}`))
-	var loginResp map[string]string
+	var loginResp map[string]interface{}
 	if err := json.Unmarshal(login.Body.Bytes(), &loginResp); err != nil {
 		t.Fatalf("Invalid login JSON: %v", err)
 	}
-	token := loginResp["token"]
+	token := loginResp["token"].(string)
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	rec := httptest.NewRecorder()
