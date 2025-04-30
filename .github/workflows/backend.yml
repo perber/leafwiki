@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+  push:
+    branches:
+      - main
+
 jobs: 
   lint-go:
     runs-on: ubuntu-latest
