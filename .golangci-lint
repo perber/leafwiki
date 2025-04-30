@@ -1,0 +1,14 @@
+run:
+  timeout: 5m
+issues:
+  exclude-use-default: false
+linters:
+  enable:
+    - govet
+    - gofmt
+    - goimports
+    - unused
+    - deadcode
+    - gocritic
+    - staticcheck
+    - structcheck
