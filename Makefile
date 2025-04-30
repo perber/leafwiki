@@ -1,6 +1,6 @@
 BINARY_NAME=leafwiki
 CMD_DIR=./cmd/leafwiki
-VERSION := v0.1.0
+VERSION ?= v0.1.0
 RELEASE_DIR := releases
 DOCKER_BUILDER := Dockerfile.builder
 
