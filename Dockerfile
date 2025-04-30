@@ -7,7 +7,7 @@ COPY ./ui/leafwiki-ui/ ./
 RUN npm run build
 
 # Step 2: Backend + Build binary
-FROM golang:1.21 AS backend-build
+FROM golang:1.23 AS backend-build
 ARG GOOS
 ARG GOARCH
 ARG OUTPUT
