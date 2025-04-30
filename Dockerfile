@@ -8,17 +8,14 @@ RUN npm run build
 
 # Step 2: Backend + Build binary
 FROM golang:1.23 AS backend-build
-ARG GOOS
-ARG GOARCH
-ARG OUTPUT
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=frontend-build /app/dist ./internal/http/dist
-RUN GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 go build \
+RUN CGO_ENABLED=0 go build \
 	-ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.EnableCors=false -X github.com/perber/wiki/internal/http.Environment=production" \
-	-o /out/$(OUTPUT) ./cmd/leafwiki/main.go
+	-o /out/leafwiki ./cmd/leafwiki/main.go
 
 # Step 3: Final image (small)
 FROM alpine:3.20 AS final
