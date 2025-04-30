@@ -23,3 +23,15 @@ go.work.sum
 
 # env file
 .env
+
+releases/*
+!releases/.gitkeep
+
+
+dist/*
+!dist/.gitkeep
+
+# data dir
+data/
+
+__debug*
