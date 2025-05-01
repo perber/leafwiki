@@ -51,13 +51,13 @@ export function EditPageMetadataDialog({
       try {
         const suggestion = await suggestSlug(parentId, debouncedTitle)
         setSlug(suggestion)
-      } catch (err) {
+      } catch {
         toast.error('Error generating slug')
       }
     }
 
     generateSlug()
-  }, [debouncedTitle, parentId, propTitle])
+  }, [debouncedTitle, parentId, propTitle, title])
 
   const handleTitleChange = async (val: string) => {
     setTitle(val)
