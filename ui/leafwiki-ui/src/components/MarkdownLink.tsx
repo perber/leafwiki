@@ -1,14 +1,13 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom'
 
-import { AnchorHTMLAttributes, ReactNode } from 'react';
+import { AnchorHTMLAttributes, ReactNode } from 'react'
 
 interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
-  href?: string;
-  children?: ReactNode;
+  href?: string
+  children?: ReactNode
 }
 
 export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
-
   if (href === undefined) {
     return <>{children}</>
   }

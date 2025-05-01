@@ -42,16 +42,20 @@ export default function PageViewer() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
 
-  function isPage(data: unknown): data is Page {
-    return (
-      typeof data === 'object' &&
-      data !== null &&
-      'id' in data && typeof data.id === 'string' &&
-      'path' in data && typeof data.path === 'string' &&
-      'title' in data && typeof data.title === 'string' &&
-      'content' in data && typeof data.content === 'string'
-    )
-  }
+    function isPage(data: unknown): data is Page {
+      return (
+        typeof data === 'object' &&
+        data !== null &&
+        'id' in data &&
+        typeof data.id === 'string' &&
+        'path' in data &&
+        typeof data.path === 'string' &&
+        'title' in data &&
+        typeof data.title === 'string' &&
+        'content' in data &&
+        typeof data.content === 'string'
+      )
+    }
   }, [pathname])
 
   useEffect(() => {

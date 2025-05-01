@@ -1,13 +1,8 @@
 // src/context/PageToolbarContext.tsx
-import {
-  useCallback,
-  useMemo,
-  useState
-} from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { PageToolbarContext } from './PageToolbarContext'
 
 type ToolbarContent = React.ReactNode
-
 
 export function PageToolbarProvider({
   children,

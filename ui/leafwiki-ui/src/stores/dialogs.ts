@@ -6,7 +6,10 @@ import { create } from 'zustand'
 type DialogsStore = {
   dialogType: string | null
   dialogProps: Record<string, unknown> | null
-  openDialog: (dialogType: string, dialogProps?: Record<string, unknown>) => void
+  openDialog: (
+    dialogType: string,
+    dialogProps?: Record<string, unknown>,
+  ) => void
   closeDialog: () => void
 }
 

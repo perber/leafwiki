@@ -121,7 +121,7 @@ export type PageNode = {
 }
 
 export async function fetchTree(): Promise<PageNode> {
-  return await fetchWithAuth(`/api/tree`) as PageNode
+  return (await fetchWithAuth(`/api/tree`)) as PageNode
 }
 
 export async function suggestSlug(
@@ -159,13 +159,12 @@ export async function createPage({
   parentId: string | null
 }) {
   if (parentId === '') parentId = null
-  
+
   return await fetchWithAuth(`/api/pages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, slug, parentId }),
   })
-
 }
 
 export async function updatePage(
@@ -237,7 +236,7 @@ export type User = {
 
 export async function getUsers(): Promise<User[]> {
   try {
-    return await fetchWithAuth('/api/users') as User[]
+    return (await fetchWithAuth('/api/users')) as User[]
   } catch {
     throw new Error('User fetch failed')
   }

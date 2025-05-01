@@ -212,7 +212,17 @@ export default function PageEditor() {
     return () => {
       clearTitleBar()
     }
-  }, [title, slug, parentId, openDialog, isDirty, clearTitleBar, onEditTitleClicked, page, setTitleBar])
+  }, [
+    title,
+    slug,
+    parentId,
+    openDialog,
+    isDirty,
+    clearTitleBar,
+    onEditTitleClicked,
+    page,
+    setTitleBar,
+  ])
 
   // We set the content of the page editor
   // This will be shown in the title bar
@@ -255,7 +265,17 @@ export default function PageEditor() {
     return () => {
       clearContent()
     }
-  }, [page, path, parentPath, slug, setContent, isDirty, clearContent, handleNavigateAway, reloadTree])
+  }, [
+    page,
+    path,
+    parentPath,
+    slug,
+    setContent,
+    isDirty,
+    clearContent,
+    handleNavigateAway,
+    reloadTree,
+  ])
 
   // We load the page by path
   useEffect(() => {
@@ -264,7 +284,11 @@ export default function PageEditor() {
     setLoading(true)
     getPageByPath(path)
       .then((resp) => {
-        const { content, title, slug } = resp as { content: string; title: string; slug: string }
+        const { content, title, slug } = resp as {
+          content: string
+          title: string
+          slug: string
+        }
         setPage(resp as Page)
         setMarkdown(content)
         setTitle(title)
