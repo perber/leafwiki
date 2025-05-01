@@ -41,7 +41,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
       try {
         const suggestion = await suggestSlug(parentId, debouncedTitle)
         setSlug(suggestion)
-      } catch (err) {
+      } catch {
         toast.error('Error generating slug')
       }
     }
