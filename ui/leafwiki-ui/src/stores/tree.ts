@@ -134,8 +134,12 @@ export const useTreeStore = create<TreeStore>()(
           assignParentIds(tree)
           set({ tree })
           // FIXME: a better error handling is required here
-        } catch (err: any) {
-          set({ error: err.message })
+        } catch (err: unknown) {
+          if (err instanceof Error) {
+            set({ error: err.message })
+          } else {
+            set({ error: 'An unknown error occurred' })
+          }
         } finally {
           set({ loading: false })
         }
