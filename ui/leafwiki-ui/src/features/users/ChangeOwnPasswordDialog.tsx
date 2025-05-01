@@ -11,7 +11,7 @@ import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/users'
 import { DialogDescription } from '@radix-ui/react-dialog'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 type Props = {
@@ -28,6 +28,19 @@ export function ChangeOnwnPasswordDialog({ open, onOpenChange }: Props) {
 
   const { user } = useAuthStore()
   const { changeOwnPassword } = useUserStore()
+
+  const resetForm = useCallback(() => {
+    setOldPassword('')
+    setNewPassword('')
+    setConfirm('')
+    setFieldErrors({})
+  }, [])
+
+  useEffect(() => {
+    if (open) {
+      resetForm()
+    }
+  }, [open, resetForm])
 
   if (!user) return null
 
@@ -73,19 +86,6 @@ export function ChangeOnwnPasswordDialog({ open, onOpenChange }: Props) {
       setLoading(false)
     }
   }
-
-  const resetForm = () => {
-    setOldPassword('')
-    setNewPassword('')
-    setConfirm('')
-    setFieldErrors({})
-  }
-
-  useEffect(() => {
-    if (open) {
-      resetForm()
-    }
-  }, [open])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
