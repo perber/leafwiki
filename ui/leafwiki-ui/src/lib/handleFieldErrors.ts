@@ -14,7 +14,7 @@ type APIError = {
  * Handles a validation error response and optionally maps field errors.
  */
 export function handleFieldErrors(
-  err: any,
+  err: unknown,
   setFieldErrors?: (errors: Record<string, string>) => void,
   fallbackMessage = 'Something went wrong',
 ) {
