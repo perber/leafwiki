@@ -23,7 +23,15 @@ import { AssetManager } from './AssetManager'
 
 export default function PageEditor() {
   const { '*': path } = useParams()
-  const [page, setPage] = useState<any>(null)
+  interface Page {
+    id: string
+    path: string
+    title: string
+    slug: string
+    content: string
+  }
+
+  const [page, setPage] = useState<Page | null>(null)
   const [inserted, setInserted] = useState<string | null>(null)
   const navigate = useNavigate()
   const [markdown, setMarkdown] = useState('')
@@ -33,7 +41,7 @@ export default function PageEditor() {
   const [error, setError] = useState<string | null>(null)
   const [assetModalOpen, setAssetModalOpen] = useState(false)
   const reloadTree = useTreeStore((s) => s.reloadTree)
-  const [_, setFieldErrors] = useState<Record<string, string>>({})
+  const [, setFieldErrors] = useState<Record<string, string>>({})
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
     null,
@@ -68,7 +76,7 @@ export default function PageEditor() {
     const p = findPageInTreeByPath(parentPath)
     if (!p) return ''
     return p.id
-  }, [parentPath])
+  }, [parentPath, findPageInTreeByPath])
 
   // isDirty is a boolean that indicates if the page is dirty
   // We use it to identify if the user has unsaved changes
@@ -186,7 +194,7 @@ export default function PageEditor() {
       parentId,
       onChange: onMetaDataChange,
     })
-  }, [title, slug, parentId, onMetaDataChange])
+  }, [title, slug, parentId, onMetaDataChange, openDialog])
 
   // We set the title bar and content of the page editor
   useEffect(() => {
@@ -204,7 +212,7 @@ export default function PageEditor() {
     return () => {
       clearTitleBar()
     }
-  }, [title, slug, parentId, openDialog, isDirty])
+  }, [title, slug, parentId, openDialog, isDirty, clearTitleBar, onEditTitleClicked, page, setTitleBar])
 
   // We set the content of the page editor
   // This will be shown in the title bar
@@ -247,7 +255,7 @@ export default function PageEditor() {
     return () => {
       clearContent()
     }
-  }, [page, path, parentPath, slug, setContent, isDirty])
+  }, [page, path, parentPath, slug, setContent, isDirty, clearContent, handleNavigateAway, reloadTree])
 
   // We load the page by path
   useEffect(() => {
@@ -256,10 +264,11 @@ export default function PageEditor() {
     setLoading(true)
     getPageByPath(path)
       .then((resp) => {
-        setPage(resp)
-        setMarkdown(resp.content)
-        setTitle(resp.title)
-        setSlug(resp.slug)
+        const { content, title, slug } = resp as { content: string; title: string; slug: string }
+        setPage(resp as Page)
+        setMarkdown(content)
+        setTitle(title)
+        setSlug(slug)
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
