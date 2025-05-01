@@ -16,7 +16,7 @@ export function EditPageButton({ path }: { path: string }) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [navigate, path])
 
   return (
     <TooltipWrapper label="Edit page (Ctrl + e)" side="top" align="center">
