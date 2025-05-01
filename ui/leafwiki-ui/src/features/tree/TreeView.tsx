@@ -44,6 +44,10 @@ export default function TreeView() {
     }
   }, [tree, reloadTree])
 
+  const { filtered: filteredTree } = useMemo(() => {
+    return filterTreeWithOpenNodes(tree, debouncedSearchQuery)
+  }, [tree, debouncedSearchQuery])
+
   useEffect(() => {
     if (!tree || !debouncedSearchQuery) return
     const { expandedIds } = filterTreeWithOpenNodes(tree, debouncedSearchQuery)
@@ -55,15 +59,11 @@ export default function TreeView() {
     startTransition(() => {
       useTreeStore.setState({ openNodeIds: expandedIds })
     })
-  }, [debouncedSearchQuery, tree])
+  }, [debouncedSearchQuery, tree, filteredTree?.children])
 
   useEffect(() => {
     setSearchQuery(debouncedSearchQuery)
   }, [debouncedSearchQuery, setSearchQuery])
-
-  const { filtered: filteredTree } = useMemo(() => {
-    return filterTreeWithOpenNodes(tree, debouncedSearchQuery)
-  }, [tree, debouncedSearchQuery])
 
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>
   if (error || !tree)

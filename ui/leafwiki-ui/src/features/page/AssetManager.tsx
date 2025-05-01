@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { deleteAsset, getAssets, uploadAsset } from '@/lib/api'
 import { FileText, Trash2, UploadCloud } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { AssetPreviewTooltip } from './AssetPreviewTooltip'
 
@@ -37,7 +37,7 @@ export function AssetManager({ pageId, onInsert }: Props) {
   const [isDragging, setIsDragging] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
 
-  const loadAssets = async () => {
+  const loadAssets = useCallback(async () => {
     setLoading(true)
     try {
       const result = await getAssets(pageId)
@@ -47,11 +47,11 @@ export function AssetManager({ pageId, onInsert }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [pageId])
 
   useEffect(() => {
     loadAssets()
-  }, [pageId])
+  }, [pageId, loadAssets])
 
   const handleUploadFile = async (file: File) => {
     const MAX_UPLOAD_SIZE_MB = 50

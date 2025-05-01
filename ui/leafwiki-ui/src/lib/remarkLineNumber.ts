@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Plugin } from 'unified'
 import { visit } from 'unist-util-visit'
 

@@ -1,7 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './App.css'
-import { PageToolbarProvider } from './components/PageToolbarContext'
+import { PageToolbarProvider } from './components/PageToolbarProvider'
 import LoginForm from './features/auth/LoginForm'
 import RequireAuth from './features/auth/RequireAuth'
 import PageEditor from './features/page/PageEditor'

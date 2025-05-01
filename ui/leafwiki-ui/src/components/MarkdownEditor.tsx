@@ -112,7 +112,7 @@ const MarkdownEditor = forwardRef<HTMLTextAreaElement, Props>(
           textarea.focus()
         })
       }
-    }, [insert])
+    }, [insert, onChange, value])
 
     useEffect(() => {
       return () => {

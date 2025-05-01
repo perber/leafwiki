@@ -1,6 +1,17 @@
 import { Link } from 'react-router-dom'
 
-export function MarkdownLink({ href, children, ...props }: any) {
+import { AnchorHTMLAttributes, ReactNode } from 'react'
+
+interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
+  href?: string
+  children?: ReactNode
+}
+
+export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
+  if (href === undefined) {
+    return <>{children}</>
+  }
+
   const isInternal =
     href &&
     !href.startsWith('http') &&

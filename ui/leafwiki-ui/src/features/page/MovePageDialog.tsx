@@ -28,7 +28,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
 
   const { tree, reloadTree } = useTreeStore()
   const [loading, setLoading] = useState(false)
-  const [_, setFieldErrors] = useState<Record<string, string>>({})
+  const [, setFieldErrors] = useState<Record<string, string>>({})
   const getPathById = useTreeStore((s) => s.getPathById)
   const pagePath = getPathById(pageId) || ''
   // get opened route from react router
@@ -36,7 +36,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
   const navigate = useNavigate()
 
   const parentId = useMemo(() => {
-    const findParent = (node: any): string | null => {
+    const findParent = (node: PageNode): string | null => {
       for (const child of node.children || []) {
         if (child.id === pageId) return node.id
         const found = findParent(child)
@@ -49,11 +49,11 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
     return findParent(tree)
   }, [tree, pageId])
 
+  const [newParentId, setNewParentId] = useState<string>(parentId || '')
+
   if (!tree) return null
 
   if (!parentId) return null
-
-  const [newParentId, setNewParentId] = useState<string>(parentId)
 
   const handleMove = async () => {
     if (!newParentId || newParentId === parentId) return
@@ -74,7 +74,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
 
       toast.success('Page moved successfully')
       closeDialog()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error moving page')
     } finally {

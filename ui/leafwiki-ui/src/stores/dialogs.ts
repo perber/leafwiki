@@ -5,15 +5,18 @@ import { create } from 'zustand'
 
 type DialogsStore = {
   dialogType: string | null
-  dialogProps: any | null
-  openDialog: (dialogType: string, dialogProps?: any) => void
+  dialogProps: Record<string, unknown> | null
+  openDialog: (
+    dialogType: string,
+    dialogProps?: Record<string, unknown>,
+  ) => void
   closeDialog: () => void
 }
 
 export const useDialogsStore = create<DialogsStore>((set) => ({
   dialogType: null,
   dialogProps: null,
-  openDialog: (dialogType: string, dialogProps?: any) => {
+  openDialog: (dialogType: string, dialogProps?: Record<string, unknown>) => {
     set({ dialogType, dialogProps })
   },
   closeDialog: () => {

@@ -23,7 +23,7 @@ export default function LoginForm() {
       const { token, refresh_token, user } = await login(identifier, password)
       setAuth(token, refresh_token, user)
       navigate('/') // redirect after login
-    } catch (err: any) {
+    } catch {
       setError('Invalid credentials')
     } finally {
       setLoading(false)

@@ -1,7 +1,7 @@
 import { getPageByPath } from '@/lib/api'
 // import "highlight.js/styles/github.css"
 import { MarkdownLink } from '@/components/MarkdownLink'
-import { usePageToolbar } from '@/components/PageToolbarContext'
+import { usePageToolbar } from '@/components/usePageToolbar'
 import React, { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useLocation } from 'react-router-dom'
@@ -14,7 +14,15 @@ export default function PageViewer() {
   const { pathname } = useLocation()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState<any>(null)
+
+  interface Page {
+    id: string
+    path: string
+    title: string
+    content: string
+  }
+
+  const [page, setPage] = useState<Page | null>(null)
   const { setContent, clearContent } = usePageToolbar()
 
   useEffect(() => {
@@ -24,9 +32,30 @@ export default function PageViewer() {
     const path = pathname.slice(1) // remove leading /
 
     getPageByPath(path)
-      .then(setPage)
+      .then((data) => {
+        if (isPage(data)) {
+          setPage(data)
+        } else {
+          throw new Error('Invalid page data')
+        }
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
+
+    function isPage(data: unknown): data is Page {
+      return (
+        typeof data === 'object' &&
+        data !== null &&
+        'id' in data &&
+        typeof data.id === 'string' &&
+        'path' in data &&
+        typeof data.path === 'string' &&
+        'title' in data &&
+        typeof data.title === 'string' &&
+        'content' in data &&
+        typeof data.content === 'string'
+      )
+    }
   }, [pathname])
 
   useEffect(() => {
@@ -44,7 +73,7 @@ export default function PageViewer() {
     return () => {
       clearContent()
     }
-  }, [page, setContent])
+  }, [page, setContent, clearContent])
 
   useEffect(() => {
     if (!page) {

@@ -1,7 +1,7 @@
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { DialogManger } from '@/components/DialogManager'
-import { usePageToolbar } from '@/components/PageToolbarContext'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { usePageToolbar } from '@/components/usePageToolbar'
 import UserToolbar from '@/components/UserToolbar'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'

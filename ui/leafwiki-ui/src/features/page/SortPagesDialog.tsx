@@ -27,7 +27,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
 
   // Loading state
   const [loading, setLoading] = useState(false)
-  const [_, setFieldErrors] = useState<Record<string, string>>({})
+  const [, setFieldErrors] = useState<Record<string, string>>({})
 
   // Reload tree state from zustand store
   const reloadTree = useTreeStore((s) => s.reloadTree)

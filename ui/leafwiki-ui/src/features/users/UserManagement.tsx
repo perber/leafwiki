@@ -24,7 +24,7 @@ export default function UserManagement() {
     return () => {
       reset()
     }
-  }, [loadUsers])
+  }, [loadUsers, reset])
 
   return (
     <>

@@ -32,7 +32,7 @@ export function DeletePageDialog({
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [deleteRecursive, setDeleteRecursive] = useState(false)
-  const [_, setFieldErrors] = useState<Record<string, string>>({})
+  const [, setFieldErrors] = useState<Record<string, string>>({})
 
   if (!page) return null
   const hasChildren = page.children?.length > 0
