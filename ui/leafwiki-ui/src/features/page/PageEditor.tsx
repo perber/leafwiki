@@ -1,6 +1,5 @@
 import { EditorTitleBar } from '@/components/EditorTitleBar'
 import MarkdownEditor from '@/components/MarkdownEditor'
-import { usePageToolbar } from '@/components/PageToolbarContext'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
+import { usePageToolbar } from '@/components/usePageToolbar'
 import { getPageByPath, updatePage } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDialogsStore } from '@/stores/dialogs'

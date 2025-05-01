@@ -1,7 +1,7 @@
 import { getPageByPath } from '@/lib/api'
 // import "highlight.js/styles/github.css"
 import { MarkdownLink } from '@/components/MarkdownLink'
-import { usePageToolbar } from '@/components/PageToolbarContext'
+import { usePageToolbar } from '@/components/usePageToolbar'
 import React, { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useLocation } from 'react-router-dom'
