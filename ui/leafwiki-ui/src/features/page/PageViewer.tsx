@@ -44,7 +44,7 @@ export default function PageViewer() {
     return () => {
       clearContent()
     }
-  }, [page, setContent])
+  }, [page, setContent, clearContent])
 
   useEffect(() => {
     if (!page) {
