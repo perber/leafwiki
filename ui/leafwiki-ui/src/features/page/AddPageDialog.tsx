@@ -66,7 +66,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
       navigate(`/e/${fullPath}`)
       closeDialog()
       resetForm()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error creating page')
       setLoading(false)
