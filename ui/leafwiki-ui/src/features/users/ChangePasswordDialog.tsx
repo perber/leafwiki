@@ -12,7 +12,7 @@ import {
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useUserStore } from '@/stores/users'
 import { DialogDescription } from '@radix-ui/react-dialog'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 type Props = {
   userId: string
@@ -28,6 +28,18 @@ export function ChangePasswordDialog({ userId, username }: Props) {
 
   const { users, updateUser } = useUserStore()
   const user = users.find((u) => u.id === userId)
+
+  const resetForm = useCallback(() => {
+    setPassword('')
+    setConfirm('')
+    setFieldErrors({})
+  }, [])
+
+  useEffect(() => {
+    if (open) {
+      resetForm()
+    }
+  }, [open, resetForm])
 
   if (!user) return null
 
@@ -67,18 +79,6 @@ export function ChangePasswordDialog({ userId, username }: Props) {
       setLoading(false)
     }
   }
-
-  const resetForm = () => {
-    setPassword('')
-    setConfirm('')
-    setFieldErrors({})
-  }
-
-  useEffect(() => {
-    if (open) {
-      resetForm()
-    }
-  }, [open])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
