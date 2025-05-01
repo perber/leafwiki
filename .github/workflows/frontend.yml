@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Lint with ESLint
-        run: npm run lint  
+        run: npm run lint -- --max-warnings=0
 
       - name: Run Prettier check
         run: npx prettier --check src/**
