@@ -24,7 +24,7 @@ export async function fetchWithAuth(
   path: string,
   options: RequestInit = {},
   retry = true,
-): Promise<any> {
+): Promise<unknown> {
   const store = useAuthStore.getState()
   const token = store.token
   const logout = store.logout
@@ -60,7 +60,7 @@ export async function fetchWithAuth(
   }
 
   if (!res.ok) {
-    let errorBody: any = null
+    let errorBody: { error?: string; message?: string } | null = null
 
     try {
       errorBody = await res.json()
@@ -121,7 +121,7 @@ export type PageNode = {
 }
 
 export async function fetchTree(): Promise<PageNode> {
-  return await fetchWithAuth(`/api/tree`)
+  return await fetchWithAuth(`/api/tree`) as PageNode
 }
 
 export async function suggestSlug(
@@ -132,8 +132,9 @@ export async function suggestSlug(
     const data = await fetchWithAuth(
       `/api/pages/slug-suggestion?parentID=${parentId}&title=${encodeURIComponent(title)}`,
     )
-    return data.slug
-  } catch (e) {
+    const typedData = data as { slug: string }
+    return typedData.slug
+  } catch {
     throw new Error('Slug suggestion failed')
   }
 }
@@ -143,7 +144,7 @@ export async function getPageByPath(path: string) {
     return await fetchWithAuth(
       `/api/pages/by-path?path=${encodeURIComponent(path)}`,
     )
-  } catch (e) {
+  } catch {
     throw new Error('Page not found')
   }
 }
@@ -157,16 +158,14 @@ export async function createPage({
   slug: string
   parentId: string | null
 }) {
-  try {
-    if (parentId === '') parentId = null
-    return await fetchWithAuth(`/api/pages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, slug, parentId }),
-    })
-  } catch (e) {
-    throw e
-  }
+  if (parentId === '') parentId = null
+  
+  return await fetchWithAuth(`/api/pages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, slug, parentId }),
+  })
+
 }
 
 export async function updatePage(
@@ -238,8 +237,8 @@ export type User = {
 
 export async function getUsers(): Promise<User[]> {
   try {
-    return await fetchWithAuth('/api/users')
-  } catch (e) {
+    return await fetchWithAuth('/api/users') as User[]
+  } catch {
     throw new Error('User fetch failed')
   }
 }
@@ -287,29 +286,22 @@ export async function uploadAsset(pageId: string, file: File) {
       method: 'POST',
       body: form,
     })
-  } catch (e) {
+  } catch {
     throw new Error('Asset upload failed')
   }
 }
 
 export async function getAssets(pageId: string): Promise<string[]> {
-  try {
-    const data = await fetchWithAuth(`/api/pages/${pageId}/assets`, {})
-    return data.files
-  } catch (e) {
-    throw new Error('Asset fetch failed')
-  }
+  const data = await fetchWithAuth(`/api/pages/${pageId}/assets`, {})
+  const typedData = data as { files: string[] }
+  return typedData.files
 }
 
 export async function deleteAsset(pageId: string, filename: string) {
-  try {
-    await fetchWithAuth(
-      `/api/pages/${pageId}/assets/${encodeURIComponent(filename)}`,
-      {
-        method: 'DELETE',
-      },
-    )
-  } catch (e) {
-    throw new Error('Asset deletion failed')
-  }
+  return await fetchWithAuth(
+    `/api/pages/${pageId}/assets/${encodeURIComponent(filename)}`,
+    {
+      method: 'DELETE',
+    },
+  )
 }
