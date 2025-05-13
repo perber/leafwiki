@@ -67,7 +67,7 @@ You can change the data directory with the `--data-dir` flag.
 If you need to reset the admin password, you can do so by running:
 
 ```bash
-./leafwiki-linux-amd64 reset-admin-password
+./leafwiki reset-admin-password
 ```
 
 ### ⚙️ CLI Flags
