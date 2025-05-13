@@ -1,0 +1,55 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Install frontend dependencies
+        run: |
+          cd ui/leafwiki-ui
+          npm ci
+
+      - name: ⚙️ Build frontend
+        run: |
+          cd ui/leafwiki-ui
+          npm run build
+
+      - name: 🚀 Start frontend server (preview mode)
+        run: |
+          cd ui/leafwiki-ui
+          npm run preview &
+        env:
+          NODE_ENV: production
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.23.4'
+
+      - name: 🔧 Build and run backend
+        run: |
+          cd cmd/leafwiki
+          go run main.go --jwt-secret=supersecret &
+        env:
+          LEAFWIKI_PORT: 8080
+
+      - name: 🧪 Run Playwright tests
+        run: |
+          cd ui/leafwiki-ui
+          npx playwright install --with-deps
+          npx playwright test
