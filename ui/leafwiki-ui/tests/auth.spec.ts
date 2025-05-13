@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 
 const user = "admin";
-//const password = "gD$Z#xcvQtJEU6SS"
 const password = "admin"
 
 const login = async (page) => {
