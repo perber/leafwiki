@@ -4,7 +4,7 @@ WORKDIR /app
 COPY ./ui/leafwiki-ui/package*.json ./
 RUN npm install
 COPY ./ui/leafwiki-ui/ ./
-RUN npm run build
+RUN VITE_API_URL=/ npm run build
 
 # Step 2: Backend + Build binary
 FROM golang:1.23 AS backend-build

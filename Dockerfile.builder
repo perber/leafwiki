@@ -8,7 +8,7 @@ COPY ./ui/leafwiki-ui/package-lock.json ./package-lock.json
 RUN npm install
 
 COPY ./ui/leafwiki-ui/ ./
-RUN npm run build
+RUN VITE_API_URL=/ npm run build
 
 # Stage 2: Go backend build
 FROM golang:1.23 AS builder
