@@ -20,7 +20,7 @@ func printUsage() {
 
 	Options:
 	--port             Port to run the server on (default: 8080)
-	--data-dir         Path to storage directory (default: ./data)
+	--data-dir         Path to data directory (default: ./data)
 	--admin-password   Initial admin password (used only if no admin exists)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
 
