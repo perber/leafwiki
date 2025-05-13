@@ -1,4 +1,4 @@
-name: E2E Tests
+name: Frontend E2E
 
 on:
   push:
