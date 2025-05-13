@@ -35,3 +35,5 @@ dist/*
 data/
 
 __debug*
+
+**/test-results/*

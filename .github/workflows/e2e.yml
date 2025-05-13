@@ -1,0 +1,68 @@
+name: Frontend E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Install frontend dependencies
+        run: |
+          cd ui/leafwiki-ui
+          npm ci
+
+      - name: ⚙️ Build frontend
+        run: |
+          cd ui/leafwiki-ui
+          npm run build
+
+      - name: 🚀 Start frontend server (preview mode)
+        run: |
+          cd ui/leafwiki-ui
+          npm run preview &
+          # Wait for the frontend server to be ready
+          for i in {1..30}; do
+            if curl -s http://localhost:4173 > /dev/null; then
+              echo "Frontend server is ready!"
+              break
+            fi
+            echo "Waiting for frontend server to start..."
+            sleep 2
+          done
+          if ! curl -s http://localhost:4173 > /dev/null; then
+            echo "Frontend server failed to start in time." >&2
+            exit 1
+          fi
+        env:
+          NODE_ENV: production
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.23.4'
+
+      - name: 🔧 Build and run backend
+        run: |
+          cd cmd/leafwiki
+          go run main.go --jwt-secret=supersecret &
+        env:
+          LEAFWIKI_PORT: 8080
+
+      - name: 🧪 Run Playwright tests
+        run: |
+          cd ui/leafwiki-ui
+          npx playwright install --with-deps
+          npx playwright test
