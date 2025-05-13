@@ -33,6 +33,19 @@ jobs:
         run: |
           cd ui/leafwiki-ui
           npm run preview &
+          # Wait for the frontend server to be ready
+          for i in {1..30}; do
+            if curl -s http://localhost:4173 > /dev/null; then
+              echo "Frontend server is ready!"
+              break
+            fi
+            echo "Waiting for frontend server to start..."
+            sleep 2
+          done
+          if ! curl -s http://localhost:4173 > /dev/null; then
+            echo "Frontend server failed to start in time." >&2
+            exit 1
+          fi
         env:
           NODE_ENV: production
 
