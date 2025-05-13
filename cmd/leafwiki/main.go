@@ -35,19 +35,19 @@ func main() {
 
 	// flags
 	portFlag := flag.String("port", "", "port to run the server on")
-	storageFlag := flag.String("data-dir", "", "path to data directory")
+	dataDirFlag := flag.String("data-dir", "", "path to data directory")
 	adminPasswordFlag := flag.String("admin-password", "", "initial admin password")
 	jwtSecretFlag := flag.String("jwt-secret", "", "JWT secret for authentication")
 	flag.Parse()
 
 	port := getOrFallback(*portFlag, "LEAFWIKI_PORT", "8080")
-	storageDir := getOrFallback(*storageFlag, "LEAFWIKI_DATA_DIR", "./data")
+	dataDir := getOrFallback(*dataDirFlag, "LEAFWIKI_DATA_DIR", "./data")
 	adminPassword := getOrFallback(*adminPasswordFlag, "LEAFWIKI_ADMIN_PASSWORD", "admin")
 	jwtSecret := getOrFallback(*jwtSecretFlag, "LEAFWIKI_JWT_SECRET", "")
 
-	// Check if storage directory exists
-	if _, err := os.Stat(storageDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(storageDir, 0755); err != nil {
+	// Check if data directory exists
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
 			log.Fatalf("Failed to create storage directory: %v", err)
 		}
 	}
@@ -57,7 +57,7 @@ func main() {
 		switch args[0] {
 		case "reset-admin-password":
 			// Note: No JWT secret needed for this command
-			w, err := wiki.NewWiki(storageDir, adminPassword, "")
+			w, err := wiki.NewWiki(dataDir, adminPassword, "")
 			if err != nil {
 				log.Fatalf("Failed to initialize Wiki: %v", err)
 			}
@@ -85,7 +85,7 @@ func main() {
 	}
 
 	// needs to get injected by environment variable later
-	w, err := wiki.NewWiki(storageDir, adminPassword, jwtSecret)
+	w, err := wiki.NewWiki(dataDir, adminPassword, jwtSecret)
 	if err != nil {
 		log.Fatalf("Failed to initialize Wiki: %v", err)
 	}
