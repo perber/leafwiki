@@ -55,21 +55,27 @@ It’s not trying to be everything — just a solid, minimal wiki for people who
 
 ```
 # Download the latest release from GitHub
-wget https://github.com/perber/leafwiki/releases/latest/download/leafwiki-linux-amd64
-chmod +x leafwiki-linux-amd64
-./leafwiki-linux-amd64 --jwt-secret=yoursecret
+chmod +x leafwiki
+./leafwiki --jwt-secret=yoursecret
 ```
 
-Default port is `:8080`, and the default data directory is `./data`.
+Default port is `8080`, and the default data directory is `./data`.
 You can change the data directory with the `--data-dir` flag.
 
+
+### Reset Admin Password
+If you need to reset the admin password, you can do so by running:
+
+```bash
+./leafwiki reset-admin-password
+```
 
 ### ⚙️ CLI Flags
 
 | Flag               | Description                                 | Default       |
 |--------------------|---------------------------------------------|---------------|
 | `--jwt-secret`     | Secret used for signing JWTs (required)     | –             |
-| `--port`           | Port the server listens on                  | `:8080`       |
+| `--port`           | Port the server listens on                  | `8080`        |
 | `--data-dir`       | Directory where data is stored              | `./data`      |
 
 ### 🌱 Environment Variables
@@ -79,7 +85,7 @@ Instead of CLI flags, you can also configure LeafWiki using environment variable
 | Variable                 | Description                                                  | Default    |
 |--------------------------|--------------------------------------------------------------|------------|
 | `LEAFWIKI_PORT`          | Port the server listens on                                   | `8080`     |
-| `LEAFWIKI_STORAGE_DIR`   | Path to the data storage directory                           | `./data`   |
+| `LEAFWIKI_DATA_DIR`      | Path to the data storage directory                           | `./data`   |
 | `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | `admin`    |
 | `LEAFWIKI_JWT_SECRET`    | Secret used to sign JWT tokens *(required)*                  | –          |
 
