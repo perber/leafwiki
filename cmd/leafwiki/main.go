@@ -48,7 +48,7 @@ func main() {
 	// Check if data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			log.Fatalf("Failed to create storage directory: %v", err)
+			log.Fatalf("Failed to create data directory: %v", err)
 		}
 	}
 
