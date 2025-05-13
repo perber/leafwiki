@@ -10,12 +10,10 @@ export function DialogManger() {
 
   return (
     <>
-      {dialogType === 'add' && <AddPageDialog {...dialogProps} />}
-      {dialogType === 'sort' && <SortPagesDialog {...dialogProps} />}
-      {dialogType === 'move' && <MovePageDialog {...dialogProps} />}
-      {dialogType === 'edit-page-metadata' && (
-        <EditPageMetadataDialog {...dialogProps} />
-      )}
+      {dialogType === 'add' && <AddPageDialog {...(dialogProps as React.ComponentProps<typeof AddPageDialog>)} />}
+      {dialogType === 'sort' && <SortPagesDialog {...(dialogProps as React.ComponentProps<typeof SortPagesDialog>)} />}
+      {dialogType === 'move' && <MovePageDialog {...(dialogProps as React.ComponentProps<typeof MovePageDialog>)} />}
+      {dialogType === 'edit-page-metadata' && <EditPageMetadataDialog {...(dialogProps as React.ComponentProps<typeof EditPageMetadataDialog>)} />}
     </>
   )
 }
