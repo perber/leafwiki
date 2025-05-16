@@ -1,4 +1,5 @@
 import { EditorTitleBar } from '@/components/EditorTitleBar'
+// import MarkdownEditor from '@/components/MarkdownEditor'
 import MarkdownEditor from '@/components/MarkdownEditor'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
@@ -36,7 +37,7 @@ export default function PageEditor() {
   const navigate = useNavigate()
   const [markdown, setMarkdown] = useState('')
   const [isNavigatingAway, setIsNavigatingAway] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [assetModalOpen, setAssetModalOpen] = useState(false)
@@ -46,6 +47,8 @@ export default function PageEditor() {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
     null,
   )
+
+  const initialContentRef = useRef<string | null>(null)
 
   const openDialog = useDialogsStore((state) => state.openDialog)
   const findPageInTreeByPath = useTreeStore((state) => state.getPageByPath)
@@ -180,6 +183,14 @@ export default function PageEditor() {
     showUnsavedDialog,
     assetModalOpen,
   ])
+
+  // We set the initial content of the page editor
+  useEffect(() => {
+    if (page) {
+      initialContentRef.current = page.content
+      setMarkdown(page.content)
+    }
+  }, [page])
 
   // The user clicks the edit button in the title bar
   // We open the edit page metadata dialog
@@ -340,16 +351,13 @@ export default function PageEditor() {
               + Add Asset
             </Button>
           </div>
-          <MarkdownEditor
-            ref={textareaRef}
-            value={markdown}
-            onChange={(val) => {
-              setMarkdown(val)
-
-              if (inserted) setInserted(null) // reset after insert
-            }}
-            insert={inserted}
-          />
+          {page && initialContentRef.current && (
+            <MarkdownEditor
+              initialValue={initialContentRef.current || ''}
+              onChange={(val) => setMarkdown(val)}
+              insert={inserted}
+            />
+          )}
         </div>
         <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
           <DialogContent
@@ -371,6 +379,7 @@ export default function PageEditor() {
               pageId={page.id}
               onInsert={(md) => {
                 setInserted(md)
+                setTimeout(() => setInserted(null), 10) // Reset for next insert
                 setAssetModalOpen(false)
               }}
             />
@@ -385,14 +394,14 @@ export default function PageEditor() {
             setShowUnsavedDialog(false)
             setPendingNavigation(null)
             // set focus back to the editor
-            requestAnimationFrame(() => {
-              const el = textareaRef.current
-              if (el) {
-                el.focus()
-                el.classList.add('flash-border')
-                setTimeout(() => el.classList.remove('flash-border'), 400)
-              }
-            })
+            // requestAnimationFrame(() => {
+            //   const el = textareaRef.current
+            //   if (el) {
+            //     el.focus()
+            //     el.classList.add('flash-border')
+            //     setTimeout(() => el.classList.remove('flash-border'), 400)
+            //   }
+            // })
           }}
           onConfirm={() => {
             // if the user confirms, and not outstanding navigation
