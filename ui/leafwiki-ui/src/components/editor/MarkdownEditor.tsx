@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
+import { MarkdownLink } from '../MarkdownLink'
 import MarkdownCodeEditor from './MarkdownCodeEditor'
-import { MarkdownLink } from './MarkdownLink'
 
 type Props = {
   initialValue?: string
