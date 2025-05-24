@@ -1,6 +1,6 @@
 import { EditorTitleBar } from '@/components/EditorTitleBar'
 // import MarkdownEditor from '@/components/MarkdownEditor'
-import MarkdownEditor from '@/components/MarkdownEditor'
+import MarkdownEditor from '@/components/editor/MarkdownEditor'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import {
