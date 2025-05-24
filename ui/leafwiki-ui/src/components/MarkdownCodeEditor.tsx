@@ -78,6 +78,10 @@ export default function MarkdownCodeEditor({
 
     viewRef.current = view
 
+    requestAnimationFrame(() => {
+      view.focus()
+    })
+
     return () => {
       view.destroy()
       viewRef.current = null
