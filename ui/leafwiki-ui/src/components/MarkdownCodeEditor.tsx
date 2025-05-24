@@ -64,7 +64,9 @@ export default function MarkdownCodeEditor({
           '&': { height: '100%' },
           '.cm-editor': { height: '100%' },
           '.cm-scroller': { height: '100%' },
-          '.cm-focused': { outline: 'none' },
+          '&.cm-focused': {
+            outline: 'none',
+          },
         }),
       ],
     })
