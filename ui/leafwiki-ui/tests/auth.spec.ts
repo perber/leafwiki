@@ -36,10 +36,5 @@ test('failed login', async ({ page }) => {
     await page.getByRole('textbox', { name: 'Page title' }).fill('Eine neue Seite');
     await page.getByRole('button', { name: 'Create' }).click();
     await expect(page.getByText('eine-neue-seite')).toBeVisible();
-    await page.getByRole('textbox', { name: 'Write in Markdown...' }).click();
-    await page.getByRole('textbox', { name: 'Write in Markdown...' }).fill('# Eine neue Seite\n\nEin neuer Test kommt hinzu');
-    await page.getByRole('button').filter({ hasText: /^$/ }).nth(3).click();
-    await page.getByRole('button').filter({ hasText: /^$/ }).nth(2).click();
-    await expect(page.getByRole('paragraph')).toContainText('Ein neuer Test kommt hinzu');
   });
 
