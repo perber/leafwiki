@@ -87,7 +87,7 @@ export default function MarkdownCodeEditor({
       view.destroy()
       viewRef.current = null
     }
-  }, [initialValue, onCursorLineChange, editorViewRef])
+  }, [initialValue, onCursorLineChange])
 
   return (
     <div ref={editorRef} className="h-full w-1/2 rounded border shadow-sm" />
