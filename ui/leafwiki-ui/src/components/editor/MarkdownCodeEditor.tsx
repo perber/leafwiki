@@ -14,12 +14,12 @@ type MarkdownCodeEditorProps = {
   initialValue: string
   onChange: (value: string) => void
   onCursorLineChange?: (line: number) => void
-  insert?: string | null
+  editorViewRef: React.RefObject<EditorView | null>
 }
 
 export default function MarkdownCodeEditor({
   initialValue,
-  insert,
+  editorViewRef,
   onChange,
   onCursorLineChange,
 }: MarkdownCodeEditorProps) {
@@ -77,6 +77,7 @@ export default function MarkdownCodeEditor({
     })
 
     viewRef.current = view
+    editorViewRef.current = view
 
     requestAnimationFrame(() => {
       view.focus()
@@ -86,23 +87,7 @@ export default function MarkdownCodeEditor({
       view.destroy()
       viewRef.current = null
     }
-  }, [initialValue, onCursorLineChange])
-
-  // Sync external value only when it comes from outside (not typed in editor)
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view || !insert) return
-
-    const { from } = view.state.selection.main
-    view.dispatch({
-      changes: { from, insert },
-      selection: { anchor: from + insert.length },
-    })
-
-    const newDoc = view.state.doc.toString()
-    valueRef.current = newDoc
-    onChangeRef.current(newDoc)
-  }, [insert])
+  }, [initialValue, onCursorLineChange, editorViewRef])
 
   return (
     <div ref={editorRef} className="h-full w-1/2 rounded border shadow-sm" />
