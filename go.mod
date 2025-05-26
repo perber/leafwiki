@@ -4,7 +4,7 @@ go 1.23.4
 
 require (
 	github.com/gin-contrib/cors v1.7.4
-	github.com/gin-gonic/gin v1.10.0
+	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/gosimple/slug v1.15.0
 	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569
