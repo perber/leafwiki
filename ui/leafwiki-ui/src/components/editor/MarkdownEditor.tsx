@@ -1,120 +1,152 @@
 import { remarkLineNumber } from '@/lib/remarkLineNumber'
 import { useDebounce } from '@/lib/useDebounce'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { EditorView } from '@codemirror/view'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { MarkdownLink } from '../MarkdownLink'
 import MarkdownCodeEditor from './MarkdownCodeEditor'
 
+export type MarkdownEditorRef = {
+  insertAtCursor: (text: string) => void
+  getMarkdown: () => string
+  focus: () => void
+}
+
 type Props = {
   initialValue?: string
   onChange: (newValue: string) => void
-  insert?: string | null
 }
 
-export default function MarkdownEditor({
-  initialValue = '',
-  onChange,
-  insert,
-}: Props) {
-  const previewRef = useRef<HTMLDivElement>(null)
-  const rafRef = useRef<number | null>(null)
+const MarkdownEditor = forwardRef<MarkdownEditorRef, Props>(
+  ({ initialValue = '', onChange }, ref) => {
+    const previewRef = useRef<HTMLDivElement>(null)
+    const editorViewRef = useRef<EditorView | null>(null)
+    const rafRef = useRef<number | null>(null)
 
-  const [markdown, setMarkdown] = useState(initialValue)
-  const debouncedPreview = useDebounce(markdown, 100)
+    const [markdown, setMarkdown] = useState(initialValue)
+    const debouncedPreview = useDebounce(markdown, 100)
 
-  const handleEditorChange = useCallback(
-    (val: string) => {
-      setMarkdown(val)
-      onChange(val)
-    },
-    [onChange],
-  )
+    const handleEditorChange = useCallback(
+      (val: string) => {
+        setMarkdown(val)
+        onChange(val)
+      },
+      [onChange],
+    )
 
-  const onCursorLineChange = useCallback((line: number) => {
-    scrollPreviewToLine(line)
-  }, [])
+    useImperativeHandle(ref, () => ({
+      insertAtCursor: (text: string) => {
+        const view = editorViewRef.current
+        if (!view) return
+        const { from } = view.state.selection.main
+        view.dispatch({
+          changes: { from, insert: text },
+          selection: { anchor: from + text.length },
+        })
+        const newDoc = view.state.doc.toString()
+        setMarkdown(newDoc)
+        onChange(newDoc)
+      },
+      getMarkdown: () => editorViewRef.current?.state.doc.toString() || '',
+      focus: () => editorViewRef.current?.focus(),
+    }))
 
-  const scrollPreviewToLine = (line: number) => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    const onCursorLineChange = useCallback((line: number) => {
+      scrollPreviewToLine(line)
+    }, [])
 
-    rafRef.current = requestAnimationFrame(() => {
-      const preview = previewRef.current
-      if (!preview) return
+    const scrollPreviewToLine = (line: number) => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
 
-      let target = preview.querySelector(
-        `[data-line='${line}']`,
-      ) as HTMLElement | null
+      rafRef.current = requestAnimationFrame(() => {
+        const preview = previewRef.current
+        if (!preview) return
 
-      if (!target) {
-        for (let i = line - 1; i > 0; i--) {
-          const fallback = preview.querySelector(
-            `[data-line='${i}']`,
-          ) as HTMLElement | null
-          if (fallback) {
-            target = fallback
-            break
+        let target = preview.querySelector(
+          `[data-line='${line}']`,
+        ) as HTMLElement | null
+
+        if (!target) {
+          for (let i = line - 1; i > 0; i--) {
+            const fallback = preview.querySelector(
+              `[data-line='${i}']`,
+            ) as HTMLElement | null
+            if (fallback) {
+              target = fallback
+              break
+            }
           }
         }
-      }
 
-      if (target) {
-        const table = target.closest('table')
-        let offsetTop = 0
+        if (target) {
+          const table = target.closest('table')
+          let offsetTop = 0
 
-        if (table && preview.contains(table)) {
-          const previewRect = preview.getBoundingClientRect()
-          const targetRect = target.getBoundingClientRect()
-          offsetTop = targetRect.top - previewRect.top + preview.scrollTop
-        } else {
-          offsetTop = target.offsetTop
+          if (table && preview.contains(table)) {
+            const previewRect = preview.getBoundingClientRect()
+            const targetRect = target.getBoundingClientRect()
+            offsetTop = targetRect.top - previewRect.top + preview.scrollTop
+          } else {
+            offsetTop = target.offsetTop
+          }
+
+          const targetHeight = target.offsetHeight
+          const containerHeight = preview.clientHeight
+          const desiredScrollTop =
+            offsetTop - containerHeight / 2 + targetHeight / 2
+
+          const threshold = 16
+          const distance = Math.abs(preview.scrollTop - desiredScrollTop)
+
+          if (distance > threshold) {
+            preview.scrollTo({ top: desiredScrollTop, behavior: 'smooth' })
+          }
         }
-
-        const targetHeight = target.offsetHeight
-        const containerHeight = preview.clientHeight
-        const desiredScrollTop =
-          offsetTop - containerHeight / 2 + targetHeight / 2
-
-        const threshold = 16
-        const distance = Math.abs(preview.scrollTop - desiredScrollTop)
-
-        if (distance > threshold) {
-          preview.scrollTo({ top: desiredScrollTop, behavior: 'smooth' })
-        }
-      }
-    })
-  }
-
-  useEffect(() => {
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      })
     }
-  }, [])
 
-  return (
-    <div className="flex h-full gap-1">
-      <MarkdownCodeEditor
-        initialValue={initialValue}
-        onChange={handleEditorChange}
-        onCursorLineChange={onCursorLineChange}
-        insert={insert}
-      />
+    useEffect(() => {
+      return () => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      }
+    }, [])
 
-      <div
-        ref={previewRef}
-        className="prose prose-lg w-1/2 max-w-none overflow-auto rounded border border-gray-200 bg-white p-4 leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0"
-      >
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkLineNumber]}
-          rehypePlugins={[rehypeHighlight]}
-          components={{
-            a: MarkdownLink,
-          }}
+    return (
+      <div className="flex h-full gap-1">
+        <MarkdownCodeEditor
+          initialValue={initialValue}
+          onChange={handleEditorChange}
+          onCursorLineChange={onCursorLineChange}
+          editorViewRef={editorViewRef}
+        />
+
+        <div
+          ref={previewRef}
+          className="prose prose-lg w-1/2 max-w-none overflow-auto rounded border border-gray-200 bg-white p-4 leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0"
         >
-          {debouncedPreview}
-        </ReactMarkdown>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkLineNumber]}
+            rehypePlugins={[rehypeHighlight]}
+            components={{
+              a: MarkdownLink,
+            }}
+          >
+            {debouncedPreview}
+          </ReactMarkdown>
+        </div>
       </div>
-    </div>
-  )
-}
+    )
+  },
+)
+
+MarkdownEditor.displayName = 'MarkdownEditor'
+export default MarkdownEditor

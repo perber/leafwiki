@@ -1,6 +1,8 @@
 import { EditorTitleBar } from '@/components/EditorTitleBar'
 // import MarkdownEditor from '@/components/MarkdownEditor'
-import MarkdownEditor from '@/components/editor/MarkdownEditor'
+import MarkdownEditor, {
+  MarkdownEditorRef,
+} from '@/components/editor/MarkdownEditor'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,11 +35,11 @@ export default function PageEditor() {
   }
 
   const [page, setPage] = useState<Page | null>(null)
-  const [inserted, setInserted] = useState<string | null>(null)
+
   const navigate = useNavigate()
   const [markdown, setMarkdown] = useState('')
   const [isNavigatingAway, setIsNavigatingAway] = useState(false)
-  // const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const editorRef = useRef<MarkdownEditorRef>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [assetModalOpen, setAssetModalOpen] = useState(false)
@@ -353,9 +355,9 @@ export default function PageEditor() {
           </div>
           {page && initialContentRef.current && (
             <MarkdownEditor
+              ref={editorRef}
               initialValue={initialContentRef.current || ''}
               onChange={(val) => setMarkdown(val)}
-              insert={inserted}
             />
           )}
         </div>
@@ -378,8 +380,7 @@ export default function PageEditor() {
             <AssetManager
               pageId={page.id}
               onInsert={(md) => {
-                setInserted(md)
-                setTimeout(() => setInserted(null), 10) // Reset for next insert
+                editorRef.current?.insertAtCursor(md)
                 setAssetModalOpen(false)
               }}
             />
@@ -394,14 +395,9 @@ export default function PageEditor() {
             setShowUnsavedDialog(false)
             setPendingNavigation(null)
             // set focus back to the editor
-            // requestAnimationFrame(() => {
-            //   const el = textareaRef.current
-            //   if (el) {
-            //     el.focus()
-            //     el.classList.add('flash-border')
-            //     setTimeout(() => el.classList.remove('flash-border'), 400)
-            //   }
-            // })
+            requestAnimationFrame(() => {
+              editorRef.current?.focus()
+            })
           }}
           onConfirm={() => {
             // if the user confirms, and not outstanding navigation
