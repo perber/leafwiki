@@ -33,7 +33,7 @@
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.3",
-    "tailwind-merge": "^3.0.2",
+    "tailwind-merge": "^3.3.0",
     "tailwindcss-animate": "^1.0.7",
     "unist-util-visit": "^5.0.0",
     "zustand": "^5.0.5"
