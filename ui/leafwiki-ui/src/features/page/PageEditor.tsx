@@ -5,24 +5,16 @@ import MarkdownEditor, {
 } from '@/components/editor/MarkdownEditor'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import { getPageByPath, updatePage } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { DialogDescription } from '@radix-ui/react-dialog'
 import { Save, X } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { AssetManager } from './AssetManager'
 
 export default function PageEditor() {
   const { '*': path } = useParams()
@@ -42,7 +34,6 @@ export default function PageEditor() {
   const editorRef = useRef<MarkdownEditorRef>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [assetModalOpen, setAssetModalOpen] = useState(false)
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const [, setFieldErrors] = useState<Record<string, string>>({})
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
@@ -61,7 +52,7 @@ export default function PageEditor() {
   const { setContent, clearContent, setTitleBar, clearTitleBar } =
     usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => {})
+  const handleSaveRef = useRef<() => void>(() => { })
 
   const onMetaDataChange = useCallback((title: string, slug: string) => {
     setTitle(title)
@@ -167,7 +158,7 @@ export default function PageEditor() {
     const handleEscape = async (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
 
-      if (!showUnsavedDialog && !assetModalOpen) {
+      if (!showUnsavedDialog) {
         await reloadTree()
         handleNavigateAway(parentPath ? `/${parentPath}/${slug}` : '/' + slug)
       }
@@ -183,7 +174,6 @@ export default function PageEditor() {
     handleNavigateAway,
     reloadTree,
     showUnsavedDialog,
-    assetModalOpen,
   ])
 
   // We set the initial content of the page editor
@@ -346,46 +336,15 @@ export default function PageEditor() {
 
   return (
     <>
-      <div className="flex h-[calc(100vh-180px)] gap-6">
-        <div className="flex flex-1 flex-col gap-2">
-          <div className="flex justify-end pb-2">
-            <Button variant="outline" onClick={() => setAssetModalOpen(true)}>
-              + Add Asset
-            </Button>
-          </div>
-          {page && initialContentRef.current && (
-            <MarkdownEditor
-              ref={editorRef}
-              initialValue={initialContentRef.current || ''}
-              onChange={(val) => setMarkdown(val)}
-            />
-          )}
-        </div>
-        <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
-          <DialogContent
-            className="max-w-2xl"
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.stopPropagation()
-                e.preventDefault()
-              }
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>Add Asset</DialogTitle>
-              <DialogDescription>
-                Upload or select an asset to insert into the page.
-              </DialogDescription>
-            </DialogHeader>
-            <AssetManager
-              pageId={page.id}
-              onInsert={(md) => {
-                editorRef.current?.insertAtCursor(md)
-                setAssetModalOpen(false)
-              }}
-            />
-          </DialogContent>
-        </Dialog>
+      <div>
+        {page && initialContentRef.current && (
+          <MarkdownEditor
+            ref={editorRef}
+            pageId={page.id}
+            initialValue={initialContentRef.current || ''}
+            onChange={(val) => setMarkdown(val)}
+          />
+        )}
       </div>
       {!isNavigatingAway && (
         <UnsavedChangesDialog
