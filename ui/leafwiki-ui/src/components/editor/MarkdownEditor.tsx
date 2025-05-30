@@ -27,10 +27,11 @@ export type MarkdownEditorRef = {
 type Props = {
   initialValue?: string
   onChange: (newValue: string) => void
+  pageId: string
 }
 
 const MarkdownEditor = (
-  { initialValue = '', onChange }: Props,
+  { initialValue = '', onChange, pageId  }: Props,
   ref: React.ForwardedRef<MarkdownEditorRef>,
 ) => {
   const previewRef = useRef<HTMLDivElement>(null)
@@ -157,7 +158,7 @@ const MarkdownEditor = (
 
   return (
     <div className="flex h-full w-full flex-col">
-      <MarkdownToolbar editorRef={ref as React.RefObject<MarkdownEditorRef>} />
+      <MarkdownToolbar editorRef={ref as React.RefObject<MarkdownEditorRef>} pageId={pageId} />
       <div className="flex flex-1">
         <MarkdownCodeEditor
           initialValue={initialValue}
