@@ -1,7 +1,17 @@
 import { Button } from '@/components/ui/button'
 import { AssetManager } from '@/features/page/AssetManager'
 import { DialogDescription, DialogTitle } from '@radix-ui/react-dialog'
-import { Bold, Code, Image, Italic, Link, Redo, Strikethrough, Table, Undo } from 'lucide-react'
+import {
+  Bold,
+  Code,
+  Image,
+  Italic,
+  Link,
+  Redo,
+  Strikethrough,
+  Table,
+  Undo,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { TooltipWrapper } from '../TooltipWrapper'
 import { Dialog, DialogContent, DialogHeader } from '../ui/dialog'
@@ -16,8 +26,8 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
   const [assetModalOpen, setAssetModalOpen] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
-  
-  const toolbarButtonStyle = "text-white hover:text-white hover:bg-zinc-800"
+
+  const toolbarButtonStyle = 'text-white hover:text-white hover:bg-zinc-800'
 
   const insertHeading = (level: 1 | 2 | 3) => {
     const prefix = '#'.repeat(level) + ' '
@@ -31,7 +41,7 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
       setCanUndo(editor.canUndo())
       setCanRedo(editor.canRedo())
     }
-  
+
     const interval = setInterval(check, 300)
     return () => clearInterval(interval)
   }, [editorRef])
@@ -44,26 +54,51 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
     <>
       <div className="sticky top-0 z-10 flex gap-1.5 border-b border-zinc-700 bg-zinc-900 p-2 shadow-sm">
         <TooltipWrapper label="Bold" side="top" align="center">
-          <Button variant="ghost" size="icon" onClick={() => editorRef.current?.insertWrappedText('**')} className={toolbarButtonStyle}>
-            <Bold className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => editorRef.current?.insertWrappedText('**')}
+            className={toolbarButtonStyle}
+          >
+            <Bold className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Italic" side="top" align="center">
-          <Button variant="ghost" size="icon" onClick={() => editorRef.current?.insertWrappedText('_')} className={toolbarButtonStyle}>
-            <Italic className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => editorRef.current?.insertWrappedText('_')}
+            className={toolbarButtonStyle}
+          >
+            <Italic className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Strike through" side="top" align="center">
-          <Button variant="ghost" size="icon" onClick={() => editorRef.current?.insertWrappedText('~~')} className={toolbarButtonStyle}>
-            <Strikethrough className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => editorRef.current?.insertWrappedText('~~')}
+            className={toolbarButtonStyle}
+          >
+            <Strikethrough className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Link" side="top" align="center">
-          <Button variant="ghost" size="icon" className={toolbarButtonStyle} onClick={() => editorRef.current?.insertWrappedText('[', '](https://example.com)')}>
-            <Link className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className={toolbarButtonStyle}
+            onClick={() =>
+              editorRef.current?.insertWrappedText(
+                '[',
+                '](https://example.com)',
+              )
+            }
+          >
+            <Link className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
-        <div className="mx-1 h-5 w-px bg-white/30 self-center" />
+        <div className="mx-1 h-5 w-px self-center bg-white/30" />
         <TooltipWrapper label="Headline - H1" side="top" align="center">
           <Button
             variant="ghost"
@@ -94,10 +129,15 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
             H3
           </Button>
         </TooltipWrapper>
-        <div className="mx-1 h-5 w-px bg-white/30 self-center" />
+        <div className="mx-1 h-5 w-px self-center bg-white/30" />
         <TooltipWrapper label="Table" side="top" align="center">
-          <Button variant="ghost" size="icon" onClick={() => editorRef.current?.insertAtCursor(tableMarkdown)} className={toolbarButtonStyle}>
-            <Table className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => editorRef.current?.insertAtCursor(tableMarkdown)}
+            className={toolbarButtonStyle}
+          >
+            <Table className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Codeblock" side="top" align="center">
@@ -105,25 +145,44 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
             variant="ghost"
             size="icon"
             className={toolbarButtonStyle}
-            onClick={() => editorRef.current?.insertWrappedText('```\n', '\n```')}
+            onClick={() =>
+              editorRef.current?.insertWrappedText('```\n', '\n```')
+            }
           >
-            <Code className="w-4 h-4" />
+            <Code className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Add Image or File" side="top" align="center">
-          <Button variant="ghost" size="icon" onClick={() => setAssetModalOpen(true)} className={toolbarButtonStyle}>
-            <Image className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setAssetModalOpen(true)}
+            className={toolbarButtonStyle}
+          >
+            <Image className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
-        <div className="mx-1 h-5 w-px bg-white/30 self-center" />
+        <div className="mx-1 h-5 w-px self-center bg-white/30" />
         <TooltipWrapper label="Undo" side="top" align="center">
-          <Button variant="ghost" size="icon" onClick={() => editorRef.current?.undo()} className={toolbarButtonStyle} disabled={!canUndo}>
-            <Undo className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => editorRef.current?.undo()}
+            className={toolbarButtonStyle}
+            disabled={!canUndo}
+          >
+            <Undo className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Redo" side="top" align="center">
-          <Button variant="ghost" size="icon" onClick={() => editorRef.current?.redo()} className={toolbarButtonStyle} disabled={!canRedo}>
-            <Redo className="w-4 h-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => editorRef.current?.redo()}
+            className={toolbarButtonStyle}
+            disabled={!canRedo}
+          >
+            <Redo className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
       </div>
