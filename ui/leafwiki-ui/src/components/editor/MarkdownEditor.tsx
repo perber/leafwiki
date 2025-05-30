@@ -8,7 +8,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState
+  useState,
 } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
@@ -36,7 +36,7 @@ type Props = {
 }
 
 const MarkdownEditor = (
-  { initialValue = '', onChange, pageId  }: Props,
+  { initialValue = '', onChange, pageId }: Props,
   ref: React.ForwardedRef<MarkdownEditorRef>,
 ) => {
   const previewRef = useRef<HTMLDivElement>(null)
@@ -102,10 +102,12 @@ const MarkdownEditor = (
     canUndo: () => {
       const view = editorViewRef.current
       if (!view) return false
-      const hist = view.state.field(historyField, false) as {
-        done: unknown[]
-        undone: unknown[]
-      } | undefined
+      const hist = view.state.field(historyField, false) as
+        | {
+            done: unknown[]
+            undone: unknown[]
+          }
+        | undefined
 
       if (!hist || typeof hist !== 'object') return false
       // Not sure why this is > 1, but it seems to work
@@ -117,10 +119,12 @@ const MarkdownEditor = (
     canRedo: () => {
       const view = editorViewRef.current
       if (!view) return false
-      const hist = view.state.field(historyField, false) as {
-        done: unknown[]
-        undone: unknown[]
-      } | undefined
+      const hist = view.state.field(historyField, false) as
+        | {
+            done: unknown[]
+            undone: unknown[]
+          }
+        | undefined
 
       if (!hist || typeof hist !== 'object') return false
 
@@ -202,8 +206,11 @@ const MarkdownEditor = (
 
   return (
     <div className="flex h-full w-full flex-col">
-      <MarkdownToolbar editorRef={ref as React.RefObject<MarkdownEditorRef>} pageId={pageId} />
-      <div className="flex flex-1 max-h-full h-full overflow-auto">
+      <MarkdownToolbar
+        editorRef={ref as React.RefObject<MarkdownEditorRef>}
+        pageId={pageId}
+      />
+      <div className="flex h-full max-h-full flex-1 overflow-auto">
         <MarkdownCodeEditor
           initialValue={initialValue}
           onChange={handleEditorChange}
@@ -229,6 +236,5 @@ const MarkdownEditor = (
     </div>
   )
 }
-
 
 export default forwardRef<MarkdownEditorRef, Props>(MarkdownEditor)
