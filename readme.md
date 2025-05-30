@@ -126,12 +126,16 @@ go run main.go
 - [x] Asset management (images, files)
 - [x] Basic JWT auth (session-based)
 
+### ✅ v0.2.0 – Improved Editor Experience
+- [x] Use CodeMirror for Markdown editing
+- [x] Add Toolbar with common actions like bold, italic, links, etc.
+- [x] Allow Undo/Redo actions
 
 ### 🧪 Future Ideas
+- [ ] Automatic import of existing Markdown files
 - [ ] Optimistic locking (conflict resolution)
 - [ ] Versioning (history)
 - [ ] Upload multiple files
-- [ ] Editor Improvements (Undo/Redo, ...)
 - [ ] Syntax Highlighting
 - [ ] Full-text search
 - [ ] TOC on page
