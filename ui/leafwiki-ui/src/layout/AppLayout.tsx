@@ -20,7 +20,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(frame)
   }, [location.pathname])
 
-  const mainContainerStyle = !isEditor?"flex-1 overflow-auto p-6": "flex-1 h-screen overflow-hidden";
+  const mainContainerStyle = !isEditor
+    ? 'flex-1 overflow-auto p-6'
+    : 'flex-1 h-screen overflow-hidden'
 
   return (
     <TooltipProvider delayDuration={300}>

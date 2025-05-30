@@ -52,7 +52,7 @@ export default function PageEditor() {
   const { setContent, clearContent, setTitleBar, clearTitleBar } =
     usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => { })
+  const handleSaveRef = useRef<() => void>(() => {})
 
   const onMetaDataChange = useCallback((title: string, slug: string) => {
     setTitle(title)
@@ -168,13 +168,7 @@ export default function PageEditor() {
 
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [
-    parentPath,
-    slug,
-    handleNavigateAway,
-    reloadTree,
-    showUnsavedDialog,
-  ])
+  }, [parentPath, slug, handleNavigateAway, reloadTree, showUnsavedDialog])
 
   // We set the initial content of the page editor
   useEffect(() => {
@@ -336,7 +330,7 @@ export default function PageEditor() {
 
   return (
     <>
-      <div className='h-full overflow-hidden'>
+      <div className="h-full overflow-hidden">
         {page && initialContentRef.current && (
           <MarkdownEditor
             ref={editorRef}
