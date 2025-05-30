@@ -2,7 +2,7 @@ import {
   defaultKeymap,
   history,
   historyKeymap,
-  indentWithTab,
+  indentWithTab
 } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorState } from '@codemirror/state'
@@ -21,7 +21,7 @@ export default function MarkdownCodeEditor({
   initialValue,
   editorViewRef,
   onChange,
-  onCursorLineChange,
+  onCursorLineChange
 }: MarkdownCodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
