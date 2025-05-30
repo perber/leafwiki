@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { AssetManager } from '@/features/page/AssetManager'
 import { DialogDescription, DialogTitle } from '@radix-ui/react-dialog'
-import { Bold, Code, Image, Italic, Strikethrough, Table } from 'lucide-react'
+import { Bold, Code, Image, Italic, Link, Strikethrough, Table } from 'lucide-react'
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader } from '../ui/dialog'
 import { MarkdownEditorRef } from './MarkdownEditor'
@@ -28,7 +28,7 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
   return (
     <>
       <div className="sticky top-0 z-10 flex gap-1.5 border-b border-zinc-700 bg-zinc-900 p-2 shadow-sm">
-        <Button variant="ghost" size="icon" onClick={() => editorRef.current?.insertWrappedText('**')}  className={toolbarButtonStyle}>
+        <Button variant="ghost" size="icon" onClick={() => editorRef.current?.insertWrappedText('**')} className={toolbarButtonStyle}>
           <Bold className="w-4 h-4" />
         </Button>
         <Button variant="ghost" size="icon" onClick={() => editorRef.current?.insertWrappedText('_')} className={toolbarButtonStyle}>
@@ -36,6 +36,9 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
         </Button>
         <Button variant="ghost" size="icon" onClick={() => editorRef.current?.insertWrappedText('~~')} className={toolbarButtonStyle}>
           <Strikethrough className="w-4 h-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className={toolbarButtonStyle} onClick={() => editorRef.current?.insertWrappedText('[', '](https://example.com)')}>
+          <Link className="w-4 h-4" />
         </Button>
         <div className="mx-1 h-5 w-px bg-white/30 self-center" />
         <Button
@@ -74,10 +77,10 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
         >
           <Code className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => setAssetModalOpen(true)}  className={toolbarButtonStyle}>
+        <Button variant="ghost" size="icon" onClick={() => setAssetModalOpen(true)} className={toolbarButtonStyle}>
           <Image className="w-4 h-4" />
         </Button>
-      </div>
+      </div >
 
       <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
         <DialogContent
