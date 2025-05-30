@@ -159,7 +159,7 @@ const MarkdownEditor = (
   return (
     <div className="flex h-full w-full flex-col">
       <MarkdownToolbar editorRef={ref as React.RefObject<MarkdownEditorRef>} pageId={pageId} />
-      <div className="flex flex-1">
+      <div className="flex flex-1 max-h-full h-full overflow-auto">
         <MarkdownCodeEditor
           initialValue={initialValue}
           onChange={handleEditorChange}
