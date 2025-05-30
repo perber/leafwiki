@@ -20,6 +20,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(frame)
   }, [location.pathname])
 
+  const mainContainerStyle = !isEditor?"flex-1 overflow-auto p-6": "flex-1 h-screen overflow-hidden";
+
   return (
     <TooltipProvider delayDuration={300}>
       <DialogManger />
@@ -88,7 +90,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto p-6">{children}</main>
+          <main className={mainContainerStyle}>{children}</main>
         </motion.div>
       </div>
     </TooltipProvider>
