@@ -1,5 +1,6 @@
 import { remarkLineNumber } from '@/lib/remarkLineNumber'
 import { useDebounce } from '@/lib/useDebounce'
+import { historyField, redo, undo } from '@codemirror/commands'
 import { EditorView } from '@codemirror/view'
 import {
   forwardRef,
@@ -22,6 +23,10 @@ export type MarkdownEditorRef = {
   insertWrappedText: (before: string, after?: string) => void
   editorViewRef: React.RefObject<EditorView | null>
   focus: () => void
+  undo: () => void
+  redo: () => void
+  canUndo: () => boolean
+  canRedo: () => boolean
 }
 
 type Props = {
@@ -94,6 +99,45 @@ const MarkdownEditor = (
     editorViewRef: editorViewRef,
     getMarkdown: () => editorViewRef.current?.state.doc.toString() || '',
     focus: () => editorViewRef.current?.focus(),
+    canUndo: () => {
+      const view = editorViewRef.current
+      if (!view) return false
+      const hist = view.state.field(historyField, false) as {
+        done: unknown[]
+        undone: unknown[]
+      } | undefined
+
+      if (!hist || typeof hist !== 'object') return false
+      // Not sure why this is > 1, but it seems to work
+      // It might be because the initial state counts as a change
+      // or because the first change is always recorded in the history
+
+      return hist?.done?.length > 1
+    },
+    canRedo: () => {
+      const view = editorViewRef.current
+      if (!view) return false
+      const hist = view.state.field(historyField, false) as {
+        done: unknown[]
+        undone: unknown[]
+      } | undefined
+
+      if (!hist || typeof hist !== 'object') return false
+
+      return hist?.undone?.length > 0
+    },
+    undo: () => {
+      const view = editorViewRef.current
+      if (view) {
+        undo(view)
+      }
+    },
+    redo: () => {
+      const view = editorViewRef.current
+      if (view) {
+        redo(view)
+      }
+    },
   }))
 
   const onCursorLineChange = useCallback((line: number) => {

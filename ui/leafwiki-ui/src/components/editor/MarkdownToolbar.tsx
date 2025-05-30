@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { AssetManager } from '@/features/page/AssetManager'
 import { DialogDescription, DialogTitle } from '@radix-ui/react-dialog'
-import { Bold, Code, Image, Italic, Link, Strikethrough, Table } from 'lucide-react'
-import { useState } from 'react'
+import { Bold, Code, Image, Italic, Link, Redo, Strikethrough, Table, Undo } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { TooltipWrapper } from '../TooltipWrapper'
 import { Dialog, DialogContent, DialogHeader } from '../ui/dialog'
 import { MarkdownEditorRef } from './MarkdownEditor'
@@ -14,13 +14,27 @@ type Props = {
 
 export default function MarkdownToolbar({ editorRef, pageId }: Props) {
   const [assetModalOpen, setAssetModalOpen] = useState(false)
-
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+  
   const toolbarButtonStyle = "text-white hover:text-white hover:bg-zinc-800"
 
   const insertHeading = (level: 1 | 2 | 3) => {
     const prefix = '#'.repeat(level) + ' '
     editorRef.current?.insertWrappedText(prefix, '')
   }
+
+  useEffect(() => {
+    const check = () => {
+      const editor = editorRef.current
+      if (!editor) return
+      setCanUndo(editor.canUndo())
+      setCanRedo(editor.canRedo())
+    }
+  
+    const interval = setInterval(check, 300)
+    return () => clearInterval(interval)
+  }, [editorRef])
 
   const tableMarkdown = `| Header 1 | Header 2 |
 |----------|----------|
@@ -101,7 +115,18 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
             <Image className="w-4 h-4" />
           </Button>
         </TooltipWrapper>
-      </div >
+        <div className="mx-1 h-5 w-px bg-white/30 self-center" />
+        <TooltipWrapper label="Undo" side="top" align="center">
+          <Button variant="ghost" size="icon" onClick={() => editorRef.current?.undo()} className={toolbarButtonStyle} disabled={!canUndo}>
+            <Undo className="w-4 h-4" />
+          </Button>
+        </TooltipWrapper>
+        <TooltipWrapper label="Redo" side="top" align="center">
+          <Button variant="ghost" size="icon" onClick={() => editorRef.current?.redo()} className={toolbarButtonStyle} disabled={!canRedo}>
+            <Redo className="w-4 h-4" />
+          </Button>
+        </TooltipWrapper>
+      </div>
 
       <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
         <DialogContent
