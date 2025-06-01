@@ -135,7 +135,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
       ) : assets.length === 0 ? (
         <p className="text-xs italic text-gray-400">No assets yet</p>
       ) : (
-        <ul className="space-y-2 overflow-auto h-96">
+        <ul className="h-96 space-y-2 overflow-auto">
           {assets.map((filename) => (
             <AssetItem
               key={filename}
