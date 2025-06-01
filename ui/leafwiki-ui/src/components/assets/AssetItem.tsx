@@ -13,21 +13,25 @@ type Props = {
     filename: string
     onReload: () => void
     onInsert: (md: string) => void
+    isRenamingRef: React.RefObject<boolean>
+
 }
 
-export function AssetItem({ pageId, filename, onReload, onInsert }: Props) {
+export function AssetItem({ pageId, filename, onReload, onInsert, isRenamingRef }: Props) {
     const assetUrl = filename
     const ext = filename.split('.').pop()?.toLowerCase()
     const isImage = imageExtensions.includes(ext ?? '')
     const baseName = filename.split('/').pop() ?? filename
 
     const [isEditing, setIsEditing] = useState(false)
+    isRenamingRef.current = isEditing
     const [newName, setNewName] = useState(baseName.replace(/\.[^/.]+$/, ''))
 
     const handleRename = async () => {
         try {
             const newFilename = `${newName}.${ext}`
             if (newFilename === baseName) {
+                isRenamingRef.current = false
                 setIsEditing(false)
                 return
             }
@@ -39,6 +43,7 @@ export function AssetItem({ pageId, filename, onReload, onInsert }: Props) {
             toast.error('Rename failed')
             console.error('Rename failed', err)
         } finally {
+            isRenamingRef.current = false
             setIsEditing(false)
         }
     }
@@ -143,6 +148,7 @@ export function AssetItem({ pageId, filename, onReload, onInsert }: Props) {
                     onClick={(e) => {
                         e.stopPropagation()
                         setNewName(baseName.replace(/\.[^/.]+$/, ''))
+                        isRenamingRef.current = true
                         setIsEditing(true)
                     }}
                     title="Rename"
