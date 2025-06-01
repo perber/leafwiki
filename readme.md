@@ -131,10 +131,11 @@ go run main.go
 - [x] Add Toolbar with common actions like bold, italic, links, etc.
 - [x] Allow Undo/Redo actions
 
-### ✅ v0.3.1 – Improved Asset Handling
+### ✅ v0.3.2 – Improved Asset Handling
 - [x] Allow uploading multiple files at once
 - [x] Allow renaming of uploaded files
 - [x] Fix caching issues with uploaded assets
+- [x] Fix syntax highlighting in preview
 
 ### Upcoming Features in Version 0.4.0
 - [ ] Add Search functionality for page titles and content
