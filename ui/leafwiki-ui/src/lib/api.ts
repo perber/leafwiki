@@ -310,12 +310,12 @@ export async function renameAsset(
   oldFilename: string,
   newFilename: string,
 ) {
-  return await fetchWithAuth(
-    `/api/pages/${pageId}/assets/rename`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ old_filename: oldFilename, new_filename: newFilename }),
-    },
-  )
+  return await fetchWithAuth(`/api/pages/${pageId}/assets/rename`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      old_filename: oldFilename,
+      new_filename: newFilename,
+    }),
+  })
 }
