@@ -62,16 +62,15 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
   }
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) await handleUploadFile(file)
+    const files = Array.from(event.target.files ?? [])
+    await Promise.all(files.map(handleUploadFile))
     if (fileInput.current) fileInput.current.value = ''
   }
 
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDragging(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file) await handleUploadFile(file)
+    await Promise.all(Array.from(e.dataTransfer.files ?? []).map(handleUploadFile))
   }
 
   return (
@@ -107,6 +106,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
           ref={fileInput}
           onChange={handleUpload}
           className="hidden"
+          multiple
         />
       </div>
 
@@ -115,7 +115,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
       ) : assets.length === 0 ? (
         <p className="text-xs italic text-gray-400">No assets yet</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2 overflow-auto h-96">
           {assets.map((filename) => (
             <AssetItem
               key={filename}
