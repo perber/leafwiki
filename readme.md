@@ -131,6 +131,15 @@ go run main.go
 - [x] Add Toolbar with common actions like bold, italic, links, etc.
 - [x] Allow Undo/Redo actions
 
+### ✅ v0.3.0 – Improved Asset Handling
+- [x] Allow uploading multiple files at once
+- [x] Allow renaming of uploaded files
+
+### Upcoming Features in Version 0.4.0
+- [ ] Add Search functionality for page titles and content
+- [ ] Syntax Highlighting for code blocks (f.g. JavaScript, Python, etc.)
+- [ ] Add a Table of Contents (TOC)
+
 ### 🧪 Future Ideas
 - [ ] Automatic import of existing Markdown files
 - [ ] Optimistic locking (conflict resolution)
