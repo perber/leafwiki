@@ -146,3 +146,11 @@ body {
   outline-offset: 2px;
   transition: outline 0.2s ease-in-out;
 }
+
+/**
+Highlight styles
+**/
+
+.hljs {
+  background: #1f2937 !important;
+}

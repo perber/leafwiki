@@ -1,4 +1,5 @@
 import { remarkLineNumber } from '@/lib/remarkLineNumber'
+import 'highlight.js/styles/github-dark.css'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
