@@ -44,11 +44,27 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/leafwiki:$VERSION
           docker push ghcr.io/${{ github.repository_owner }}/leafwiki:latest
 
+      - name: Get latest tag before current one
+        id: latest
+        run: |
+          TAGS=$(git tag --sort=-creatordate)
+          CURRENT="${{ github.ref_name }}"
+          PREVIOUS=""
+          for tag in $TAGS; do
+            if [ "$tag" = "$CURRENT" ]; then continue; fi
+            PREVIOUS=$tag
+            break
+          done
+          echo "Found previous tag: $PREVIOUS"
+          echo "tag=$PREVIOUS" >> $GITHUB_OUTPUT
+
       - name: Generate changelog from commits
         id: changelog
         uses: heinrichreimer/action-github-changelog-generator@v2.3
         with:
           token: ${{ secrets.CHANGELOG_GITHUB_TOKEN }}
+          sinceTag: ${{ steps.latest.outputs.tag }}
+          dueTag: ${{ github.ref_name }}
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
