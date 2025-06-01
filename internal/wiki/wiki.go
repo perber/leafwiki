@@ -359,6 +359,14 @@ func (w *Wiki) ListAssets(pageID string) ([]string, error) {
 	return w.asset.ListAssetsForPage(page)
 }
 
+func (w *Wiki) RenameAsset(pageID string, oldFilename, newFilename string) (string, error) {
+	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
+	if err != nil {
+		return "", err
+	}
+	return w.asset.RenameAsset(page, oldFilename, newFilename)
+}
+
 func (w *Wiki) DeleteAsset(pageID string, filename string) error {
 	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
 	if err != nil {
