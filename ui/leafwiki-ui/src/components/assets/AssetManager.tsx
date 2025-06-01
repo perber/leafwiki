@@ -7,9 +7,10 @@ import { AssetItem } from './AssetItem'
 type Props = {
   pageId: string
   onInsert?: (md: string) => void // optionaler Callback fürs Markdown
+  isRenamingRef: React.RefObject<boolean>
 }
 
-export function AssetManager({ pageId, onInsert }: Props) {
+export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
   const [assets, setAssets] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -113,6 +114,7 @@ export function AssetManager({ pageId, onInsert }: Props) {
               pageId={pageId}
               onReload={loadAssets}
               onInsert={(md) => onInsert?.(md)}
+              isRenamingRef={isRenamingRef}
             />
           ))}
         </ul>
