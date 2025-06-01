@@ -17,7 +17,17 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
   const dropRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
+  const [editingFilename, setEditingFilename] = useState<string | null>(null)
 
+
+  const handleSetEditingFilename = (filename: string | null) => {
+    if (filename) {
+      isRenamingRef.current = true
+    } else {
+      isRenamingRef.current = false
+    }
+    setEditingFilename(filename)
+  }
 
   const loadAssets = useCallback(async () => {
     setLoading(true)
@@ -111,10 +121,11 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
             <AssetItem
               key={filename}
               filename={filename}
+              editingFilename={editingFilename}
+              setEditingFilename={handleSetEditingFilename}
               pageId={pageId}
               onReload={loadAssets}
               onInsert={(md) => onInsert?.(md)}
-              isRenamingRef={isRenamingRef}
             />
           ))}
         </ul>
