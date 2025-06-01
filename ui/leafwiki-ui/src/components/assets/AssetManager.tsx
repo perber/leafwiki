@@ -18,6 +18,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
   const [isDragging, setIsDragging] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   const [editingFilename, setEditingFilename] = useState<string | null>(null)
+  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
 
   const handleSetEditingFilename = (filename: string | null) => {
     if (filename) {
@@ -53,11 +54,19 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
       return
     }
 
+    setUploadingFiles(prev => new Set(prev).add(file.name))
+
     try {
       await uploadAsset(pageId, file)
       await loadAssets()
     } catch (err) {
       console.error('Upload failed', err)
+    } finally {
+      setUploadingFiles(prev => {
+        const next = new Set(prev)
+        next.delete(file.name)
+        return next
+      })
     }
   }
 
@@ -108,6 +117,11 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
           className="hidden"
           multiple
         />
+        {uploadingFiles.size > 0 && (
+          <div className="text-xs text-blue-600">
+            Uploading {uploadingFiles.size} file{uploadingFiles.size > 1 ? 's' : ''}…
+          </div>
+        )}
       </div>
 
       {loading ? (
