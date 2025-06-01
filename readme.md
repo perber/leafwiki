@@ -144,7 +144,6 @@ go run main.go
 - [ ] Automatic import of existing Markdown files
 - [ ] Optimistic locking (conflict resolution)
 - [ ] Versioning (history)
-- [ ] Upload multiple files
 - [ ] Syntax Highlighting
 - [ ] Full-text search
 - [ ] TOC on page
