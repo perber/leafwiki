@@ -14,7 +14,9 @@ export function MarkdownImage({ src = '', alt, ...rest }: Props) {
     const checkVersion = async () => {
       try {
         const v = Date.now()
-        setVersionedSrc(`${src}?v=${v}`)
+        const url = new URL(src, location.origin)
+        url.searchParams.set('v', v)
+        setVersionedSrc(url.toString())
       } catch {
         setVersionedSrc(src) // fallback
       }
