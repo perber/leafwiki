@@ -54,7 +54,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
       return
     }
 
-    setUploadingFiles(prev => new Set(prev).add(file.name))
+    setUploadingFiles((prev) => new Set(prev).add(file.name))
 
     try {
       await uploadAsset(pageId, file)
@@ -62,7 +62,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
     } catch (err) {
       console.error('Upload failed', err)
     } finally {
-      setUploadingFiles(prev => {
+      setUploadingFiles((prev) => {
         const next = new Set(prev)
         next.delete(file.name)
         return next
@@ -79,7 +79,9 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDragging(false)
-    await Promise.all(Array.from(e.dataTransfer.files ?? []).map(handleUploadFile))
+    await Promise.all(
+      Array.from(e.dataTransfer.files ?? []).map(handleUploadFile),
+    )
   }
 
   return (
@@ -119,7 +121,8 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
         />
         {uploadingFiles.size > 0 && (
           <div className="text-xs text-blue-600">
-            Uploading {uploadingFiles.size} file{uploadingFiles.size > 1 ? 's' : ''}…
+            Uploading {uploadingFiles.size} file
+            {uploadingFiles.size > 1 ? 's' : ''}…
           </div>
         )}
       </div>
