@@ -39,9 +39,15 @@ export function AssetItem({ pageId, filename, onReload, onInsert, isRenamingRef 
             await renameAsset(pageId, baseName, newFilename)
             toast.success('Asset renamed')
             onReload()
-        } catch (err) {
-            toast.error('Rename failed')
-            console.error('Rename failed', err)
+        } catch (err: unknown) {
+            if (err instanceof Error) {
+                toast.error(`Rename failed: ${err.message}`)
+                console.error('Rename failed', err)
+            } else {
+                if (typeof err === 'object' && err !== null && 'error' in err) {
+                    toast.error(`Rename failed: ${(err as { error: string }).error}`)
+                }
+            }
         } finally {
             isRenamingRef.current = false
             setIsEditing(false)
