@@ -19,7 +19,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
   const [isHovered, setIsHovered] = useState(false)
   const [editingFilename, setEditingFilename] = useState<string | null>(null)
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
-
+  
   const handleSetEditingFilename = (filename: string | null) => {
     if (filename) {
       isRenamingRef.current = true
@@ -129,6 +129,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
       ) : assets.length === 0 ? (
         <p className="text-xs italic text-gray-400">No assets yet</p>
       ) : (
+
         <ul className="space-y-2 overflow-auto h-96">
           {assets.map((filename) => (
             <AssetItem
