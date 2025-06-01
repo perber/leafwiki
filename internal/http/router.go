@@ -87,6 +87,7 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 		// Assets
 		requiresAuthGroup.POST("/pages/:id/assets", api.UploadAssetHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/:id/assets", api.ListAssetsHandler(wikiInstance))
+		requiresAuthGroup.PUT("/pages/:id/assets/rename", api.RenameAssetHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", api.DeleteAssetHandler(wikiInstance))
 
 	}
