@@ -19,7 +19,6 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
   const [isHovered, setIsHovered] = useState(false)
   const [editingFilename, setEditingFilename] = useState<string | null>(null)
 
-
   const handleSetEditingFilename = (filename: string | null) => {
     if (filename) {
       isRenamingRef.current = true
@@ -68,7 +67,6 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
     if (fileInput.current) fileInput.current.value = ''
   }
 
-
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDragging(false)
@@ -94,12 +92,13 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => fileInput.current?.click()}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${isDragging
-          ? 'border-blue-400 bg-blue-50 text-blue-600'
-          : isHovered
-            ? 'border-gray-300 bg-gray-50'
-            : 'border-gray-200 hover:bg-gray-50'
-          }`}
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${
+          isDragging
+            ? 'border-blue-400 bg-blue-50 text-blue-600'
+            : isHovered
+              ? 'border-gray-300 bg-gray-50'
+              : 'border-gray-200 hover:bg-gray-50'
+        }`}
       >
         <UploadCloud className="mb-2" size={20} />
         <p className="text-xs">Drop files here or click to upload</p>

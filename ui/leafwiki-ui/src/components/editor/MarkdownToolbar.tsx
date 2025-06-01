@@ -189,15 +189,17 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
       </div>
 
       <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
-        <DialogContent className="max-w-2xl" onEscapeKeyDown={(e) => {
-          if (isRenamingRef.current) {
-            e.preventDefault()
-          } else {
-            setAssetModalOpen(false)
-            e.preventDefault()
-            e.stopPropagation()
-          }
-        }}
+        <DialogContent
+          className="max-w-2xl"
+          onEscapeKeyDown={(e) => {
+            if (isRenamingRef.current) {
+              e.preventDefault()
+            } else {
+              setAssetModalOpen(false)
+              e.preventDefault()
+              e.stopPropagation()
+            }
+          }}
         >
           <DialogHeader>
             <DialogTitle>Add Asset</DialogTitle>
