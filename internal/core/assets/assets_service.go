@@ -150,3 +150,44 @@ func (s *AssetService) DeleteAllAssetsForPage(page *tree.PageNode) error {
 	}
 	return nil
 }
+
+// RenameAsset renames an asset file for a given page.
+func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename string) (string, error) {
+	assetPath, err := s.getAssetPagePath(page)
+	if err != nil {
+		return "", fmt.Errorf("could not rename asset: %w", err)
+	}
+
+	oldFullPath := path.Join(assetPath, oldFilename)
+	newFullPath := path.Join(assetPath, newFilename)
+
+	// Ensure that the new filename has the same extension as the old one
+	oldExt := path.Ext(oldFilename)
+	newExt := path.Ext(newFilename)
+	if oldExt != newExt {
+		return "", fmt.Errorf("new asset must have the same extension as the old one: %s", oldExt)
+	}
+
+	// Used for slug validation
+	// The extension is not part of the slug, so we remove it
+	newFilenameWithoutExt := newFilename[:len(newFilename)-len(newExt)]
+	// Ensure that the new asset is a valid filename (slug)
+	if err := s.slugger.IsValidSlug(newFilenameWithoutExt); err != nil {
+		return "", fmt.Errorf("invalid asset name: %s", newFilename)
+	}
+
+	// Ensure that no file with the new name already exists
+	if _, err := os.Stat(newFullPath); !os.IsNotExist(err) {
+		return "", fmt.Errorf("new asset already exists: %s", newFilename)
+	}
+
+	if _, err := os.Stat(oldFullPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("old asset does not exist: %s", oldFilename)
+	}
+
+	if err := os.Rename(oldFullPath, newFullPath); err != nil {
+		return "", fmt.Errorf("could not rename asset: %w", err)
+	}
+
+	return s.buildPublicPath(page, newFilename), nil
+}
