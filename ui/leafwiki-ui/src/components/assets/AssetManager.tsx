@@ -139,7 +139,6 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
               pageId={pageId}
               onReload={loadAssets}
               onInsert={(md) => onInsert?.(md)}
-              isRenamingRef={isRenamingRef}
             />
           ))}
         </ul>
