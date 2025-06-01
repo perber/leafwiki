@@ -1,5 +1,5 @@
+import { AssetManager } from '@/components/assets/AssetManager'
 import { Button } from '@/components/ui/button'
-import { AssetManager } from '@/features/page/AssetManager'
 import { DialogDescription, DialogTitle } from '@radix-ui/react-dialog'
 import {
   Bold,
