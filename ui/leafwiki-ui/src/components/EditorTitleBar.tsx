@@ -20,7 +20,7 @@ export function EditorTitleBar({ title, slug, onEditClicked, isDirty }: Props) {
           className="absolute -right-6 top-1/2 -translate-y-1/2 text-gray-400 transition-transform duration-200 ease-in-out group-hover:text-gray-600"
         />
         {isDirty && (
-          <span className="ml-2 text-xs text-yellow-600">(Bearbeitet)</span>
+          <span className="ml-2 text-xs text-yellow-600">(Changes)</span>
         )}
       </button>
 
