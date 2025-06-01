@@ -29,20 +29,23 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
     setEditingFilename(filename)
   }
 
-  const loadAssets = useCallback(async () => {
-    setLoading(true)
-    try {
-      const result = await getAssets(pageId)
-      setAssets(result)
-    } catch (err) {
-      console.error('Failed to load assets', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [pageId])
+  const loadAssets = useCallback(
+    async (showLoading = false) => {
+      if (showLoading) setLoading(true)
+      try {
+        const result = await getAssets(pageId)
+        setAssets(result)
+      } catch (err) {
+        console.error('Failed to load assets', err)
+      } finally {
+        if (showLoading) setLoading(false)
+      }
+    },
+    [pageId],
+  )
 
   useEffect(() => {
-    loadAssets()
+    loadAssets(true)
   }, [pageId, loadAssets])
 
   const handleUploadFile = async (file: File) => {
@@ -58,7 +61,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
 
     try {
       await uploadAsset(pageId, file)
-      await loadAssets()
+      await loadAssets(false)
     } catch (err) {
       console.error('Upload failed', err)
     } finally {
