@@ -19,10 +19,15 @@ import { MarkdownEditorRef } from './MarkdownEditor'
 
 type Props = {
   editorRef: React.RefObject<MarkdownEditorRef>
+  onAssetVersionChange?: (version: number) => void
   pageId: string
 }
 
-export default function MarkdownToolbar({ editorRef, pageId }: Props) {
+export default function MarkdownToolbar({
+  editorRef,
+  onAssetVersionChange,
+  pageId,
+}: Props) {
   const [assetModalOpen, setAssetModalOpen] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
@@ -46,6 +51,15 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
     const interval = setInterval(check, 300)
     return () => clearInterval(interval)
   }, [editorRef])
+
+  // Update asset version when modal opens
+  // This is to ensure that the preview updates when assets are changed
+  // Otherwise the preview might show stale assets (e.g., images) - Caching Issue
+  useEffect(() => {
+    if (onAssetVersionChange) {
+      onAssetVersionChange(Date.now() || 0)
+    }
+  }, [onAssetVersionChange, assetModalOpen])
 
   const tableMarkdown = `| Header 1 | Header 2 |
 |----------|----------|

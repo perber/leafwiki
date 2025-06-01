@@ -1,12 +1,9 @@
 import { getPageByPath } from '@/lib/api'
 // import "highlight.js/styles/github.css"
-import { MarkdownLink } from '@/components/MarkdownLink'
+import MarkdownPreview from '@/components/preview/MarkdownPreview'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import React, { useEffect, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
 import { useLocation } from 'react-router-dom'
-import rehypeHighlight from 'rehype-highlight'
-import remarkGfm from 'remark-gfm'
 import { DeletePageDialog } from './DeletePageDialog'
 import { EditPageButton } from './EditPageButton'
 
@@ -90,14 +87,7 @@ export default function PageViewer() {
   return (
     <>
       <article className="prose prose-lg max-w-none leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0">
-        <ReactMarkdown
-          children={page.content}
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
-          components={{
-            a: MarkdownLink,
-          }}
-        />
+        <MarkdownPreview content={page.content} />
       </article>
     </>
   )

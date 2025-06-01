@@ -1,4 +1,3 @@
-import { remarkLineNumber } from '@/lib/remarkLineNumber'
 import { useDebounce } from '@/lib/useDebounce'
 import { historyField, redo, undo } from '@codemirror/commands'
 import { EditorView } from '@codemirror/view'
@@ -10,10 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import ReactMarkdown from 'react-markdown'
-import rehypeHighlight from 'rehype-highlight'
-import remarkGfm from 'remark-gfm'
-import { MarkdownLink } from '../MarkdownLink'
+import MarkdownPreview from '../preview/MarkdownPreview'
 import MarkdownCodeEditor from './MarkdownCodeEditor'
 import MarkdownToolbar from './MarkdownToolbar'
 
@@ -42,6 +38,7 @@ const MarkdownEditor = (
   const previewRef = useRef<HTMLDivElement>(null)
   const editorViewRef = useRef<EditorView | null>(null)
   const rafRef = useRef<number | null>(null)
+  const [assetVersion, setAssetVersion] = useState(() => Date.now()) // Initial version based on current timestamp
 
   const [markdown, setMarkdown] = useState(initialValue)
   const debouncedPreview = useDebounce(markdown, 100)
@@ -148,6 +145,16 @@ const MarkdownEditor = (
     scrollPreviewToLine(line)
   }, [])
 
+  const onAssetVersionChange = useCallback(
+    (version: number) => {
+      // Update the asset version to trigger a re-render of the preview
+      // This is useful when images or other assets change
+      // The preview will re-render with the new assets
+      setAssetVersion(version)
+    },
+    [setAssetVersion],
+  )
+
   const scrollPreviewToLine = (line: number) => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
 
@@ -209,6 +216,7 @@ const MarkdownEditor = (
       <MarkdownToolbar
         editorRef={ref as React.RefObject<MarkdownEditorRef>}
         pageId={pageId}
+        onAssetVersionChange={onAssetVersionChange}
       />
       <div className="flex h-full max-h-full flex-1 overflow-auto">
         <MarkdownCodeEditor
@@ -222,15 +230,7 @@ const MarkdownEditor = (
           ref={previewRef}
           className="prose prose-lg w-1/2 max-w-none overflow-auto rounded border border-gray-200 bg-white p-4 leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0"
         >
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkLineNumber]}
-            rehypePlugins={[rehypeHighlight]}
-            components={{
-              a: MarkdownLink,
-            }}
-          >
-            {debouncedPreview}
-          </ReactMarkdown>
+          <MarkdownPreview content={debouncedPreview} key={assetVersion} />
         </div>
       </div>
     </div>
