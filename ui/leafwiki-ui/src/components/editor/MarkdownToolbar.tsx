@@ -12,7 +12,7 @@ import {
   Table,
   Undo,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { TooltipWrapper } from '../TooltipWrapper'
 import { Dialog, DialogContent, DialogHeader } from '../ui/dialog'
 import { MarkdownEditorRef } from './MarkdownEditor'
@@ -26,6 +26,7 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
   const [assetModalOpen, setAssetModalOpen] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
+  const isRenamingRef = useRef(false)
 
   const toolbarButtonStyle = 'text-white hover:text-white hover:bg-zinc-800'
 
@@ -188,14 +189,15 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
       </div>
 
       <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
-        <DialogContent
-          className="max-w-2xl"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              e.stopPropagation()
-              e.preventDefault()
-            }
-          }}
+        <DialogContent className="max-w-2xl" onEscapeKeyDown={(e) => {
+          if (isRenamingRef.current) {
+            e.preventDefault()
+          } else {
+            setAssetModalOpen(false)
+            e.preventDefault()
+            e.stopPropagation()
+          }
+        }}
         >
           <DialogHeader>
             <DialogTitle>Add Asset</DialogTitle>
@@ -209,6 +211,7 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
               editorRef.current?.insertAtCursor(md)
               setAssetModalOpen(false)
             }}
+            isRenamingRef={isRenamingRef}
           />
         </DialogContent>
       </Dialog>
