@@ -36,6 +36,7 @@ export function AssetItem({
     try {
       const newFilename = `${newName}.${ext}`
       if (newFilename === baseName) {
+        setEditingFilename(null)
         return
       }
 
