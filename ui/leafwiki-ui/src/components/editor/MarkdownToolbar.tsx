@@ -202,7 +202,7 @@ export default function MarkdownToolbar({ editorRef, pageId }: Props) {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Add Asset</DialogTitle>
+            <DialogTitle>Asset Manager</DialogTitle>
             <DialogDescription>
               Upload or select an asset to insert into the page.
             </DialogDescription>
