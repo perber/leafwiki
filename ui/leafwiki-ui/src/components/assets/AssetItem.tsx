@@ -11,28 +11,25 @@ const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
 type Props = {
     pageId: string
     filename: string
+    editingFilename: string | null
+    setEditingFilename: (filename: string | null) => void
     onReload: () => void
     onInsert: (md: string) => void
-    isRenamingRef: React.RefObject<boolean>
-
 }
 
-export function AssetItem({ pageId, filename, onReload, onInsert, isRenamingRef }: Props) {
+export function AssetItem({ pageId, filename,editingFilename, setEditingFilename, onReload, onInsert }: Props) {
     const assetUrl = filename
     const ext = filename.split('.').pop()?.toLowerCase()
     const isImage = imageExtensions.includes(ext ?? '')
     const baseName = filename.split('/').pop() ?? filename
+    const isEditing = editingFilename === filename
 
-    const [isEditing, setIsEditing] = useState(false)
-    isRenamingRef.current = isEditing
     const [newName, setNewName] = useState(baseName.replace(/\.[^/.]+$/, ''))
 
     const handleRename = async () => {
         try {
             const newFilename = `${newName}.${ext}`
             if (newFilename === baseName) {
-                isRenamingRef.current = false
-                setIsEditing(false)
                 return
             }
 
@@ -48,9 +45,6 @@ export function AssetItem({ pageId, filename, onReload, onInsert, isRenamingRef 
                     toast.error(`Rename failed: ${(err as { error: string }).error}`)
                 }
             }
-        } finally {
-            isRenamingRef.current = false
-            setIsEditing(false)
         }
     }
 
@@ -109,7 +103,7 @@ export function AssetItem({ pageId, filename, onReload, onInsert, isRenamingRef 
                             if (e.key === 'Escape') {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                setIsEditing(false)
+                                setEditingFilename(null)
                                 setNewName(baseName.replace(/\.[^/.]+$/, ''))
                             }
                         }}
@@ -138,7 +132,7 @@ export function AssetItem({ pageId, filename, onReload, onInsert, isRenamingRef 
                         size="icon"
                         className="text-red-600 hover:text-red-600"
                         onClick={() => {
-                            setIsEditing(false)
+                            setEditingFilename(null)
                             setNewName(baseName.replace(/\.[^/.]+$/, ''))
                         }}
                         title="Cancel"
@@ -154,8 +148,7 @@ export function AssetItem({ pageId, filename, onReload, onInsert, isRenamingRef 
                     onClick={(e) => {
                         e.stopPropagation()
                         setNewName(baseName.replace(/\.[^/.]+$/, ''))
-                        isRenamingRef.current = true
-                        setIsEditing(true)
+                        setEditingFilename(filename)
                     }}
                     title="Rename"
                 >
