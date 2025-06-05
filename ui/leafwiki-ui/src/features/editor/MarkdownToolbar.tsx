@@ -1,6 +1,12 @@
-import { AssetManager } from '@/components/assets/AssetManager'
+import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
-import { DialogDescription, DialogTitle } from '@radix-ui/react-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Bold,
   Code,
@@ -13,8 +19,7 @@ import {
   Undo,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { TooltipWrapper } from '../TooltipWrapper'
-import { Dialog, DialogContent, DialogHeader } from '../ui/dialog'
+import { AssetManager } from '../assets/AssetManager'
 import { MarkdownEditorRef } from './MarkdownEditor'
 
 type Props = {
