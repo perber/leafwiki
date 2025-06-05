@@ -129,26 +129,27 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
           </div>
         )}
       </div>
-
-      {loading ? (
-        <p className="text-xs text-gray-500">Loading assets…</p>
-      ) : assets.length === 0 ? (
-        <p className="text-xs italic text-gray-400">No assets yet</p>
-      ) : (
-        <ul className="h-96 space-y-2 overflow-auto">
-          {assets.map((filename) => (
-            <AssetItem
-              key={filename}
-              filename={filename}
-              editingFilename={editingFilename}
-              setEditingFilename={handleSetEditingFilename}
-              pageId={pageId}
-              onReload={loadAssets}
-              onInsert={(md) => onInsert?.(md)}
-            />
-          ))}
-        </ul>
-      )}
+      <div className="h-96">
+        {loading ? (
+          <p className="text-xs text-gray-500">Loading assets…</p>
+        ) : assets.length === 0 ? (
+          <p className="text-xs italic text-gray-400">No assets yet</p>
+        ) : (
+          <ul className="h-full space-y-2 overflow-auto">
+            {assets.map((filename) => (
+              <AssetItem
+                key={filename}
+                filename={filename}
+                editingFilename={editingFilename}
+                setEditingFilename={handleSetEditingFilename}
+                pageId={pageId}
+                onReload={loadAssets}
+                onInsert={(md) => onInsert?.(md)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
       <p className="mt-2 text-xs italic text-gray-500">
         Tip: Double-click on an asset to insert it into the page.
       </p>
