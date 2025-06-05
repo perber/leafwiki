@@ -1,6 +1,6 @@
 # 🌿 LeafWiki
 
-**A lightweight, tree-based Markdown wiki – no database, no Docker, just a single Go binary.**
+**A lightweight, tree-based Markdown wiki – no database, just a single Go binary.**
 
 LeafWiki is designed for teams and individuals who want a clean, fast, and self-hosted knowledge base — with full control over structure, content, and deployment.
 
