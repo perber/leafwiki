@@ -1,8 +1,4 @@
 import { EditorTitleBar } from '@/components/EditorTitleBar'
-// import MarkdownEditor from '@/components/MarkdownEditor'
-import MarkdownEditor, {
-  MarkdownEditorRef,
-} from '@/components/editor/MarkdownEditor'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
@@ -15,6 +11,7 @@ import { Save, X } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import MarkdownEditor, { MarkdownEditorRef } from '../editor/MarkdownEditor'
 
 export default function PageEditor() {
   const { '*': path } = useParams()

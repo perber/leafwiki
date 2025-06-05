@@ -1,9 +1,9 @@
 import { getPageByPath } from '@/lib/api'
 // import "highlight.js/styles/github.css"
-import MarkdownPreview from '@/components/preview/MarkdownPreview'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import MarkdownPreview from '../preview/MarkdownPreview'
 import { DeletePageDialog } from './DeletePageDialog'
 import { EditPageButton } from './EditPageButton'
 
