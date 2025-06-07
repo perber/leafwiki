@@ -10,15 +10,18 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/search"
 )
 
 type Wiki struct {
-	tree       *tree.TreeService
-	slug       *tree.SlugService
-	auth       *auth.AuthService
-	user       *auth.UserService
-	asset      *assets.AssetService
-	storageDir string
+	tree        *tree.TreeService
+	slug        *tree.SlugService
+	auth        *auth.AuthService
+	user        *auth.UserService
+	asset       *assets.AssetService
+	searchIndex *search.SQLiteIndex
+	status      *search.IndexingStatus
+	storageDir  string
 }
 
 // Email-RegEx (Basic-Check, nicht RFC-konform, aber gut genug)
@@ -55,14 +58,32 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string) (*Wiki, 
 
 	assetService := assets.NewAssetService(storageDir, slugService)
 
+	sqliteIndex, err := search.NewSQLiteIndex(storageDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init search index: %w", err)
+	}
+
+	// status object for indexing
+	status := search.NewIndexingStatus()
+
+	// starts the indexing process in a separate goroutine
+	go func() {
+		err := search.BuildAndRunIndexer(treeService, sqliteIndex, storageDir, 4, status)
+		if err != nil {
+			log.Printf("indexing failed: %v", err)
+		}
+	}()
+
 	// Initialize the wiki service
 	wiki := &Wiki{
-		tree:       treeService,
-		slug:       slugService,
-		user:       userService,
-		auth:       authService,
-		asset:      assetService,
-		storageDir: storageDir,
+		tree:        treeService,
+		slug:        slugService,
+		user:        userService,
+		auth:        authService,
+		asset:       assetService,
+		storageDir:  storageDir,
+		searchIndex: sqliteIndex,
+		status:      status,
 	}
 
 	// Ensure the welcome page exists
@@ -375,6 +396,14 @@ func (w *Wiki) DeleteAsset(pageID string, filename string) error {
 	return w.asset.DeleteAsset(page, filename)
 }
 
+func (w *Wiki) GetIndexingStatus() *search.IndexingStatus {
+	return w.status.Snapshot()
+}
+
+func (w *Wiki) IsIndexingActive() bool {
+	return w.status != nil && w.status.IsActive()
+}
+
 func (w *Wiki) GetUserService() *auth.UserService {
 	return w.user
 }
@@ -392,5 +421,9 @@ func (w *Wiki) GetStorageDir() string {
 }
 
 func (w *Wiki) Close() error {
-	return w.user.Close()
+	w.status.Finish()
+	if err := w.user.Close(); err != nil {
+		return err
+	}
+	return w.searchIndex.Close()
 }
