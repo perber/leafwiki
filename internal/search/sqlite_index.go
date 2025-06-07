@@ -3,11 +3,13 @@ package search
 import (
 	"database/sql"
 	"path"
+	"sync"
 
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
 type SQLiteIndex struct {
+	mu         sync.Mutex
 	storageDir string
 	filename   string
 	db         *sql.DB
@@ -93,6 +95,9 @@ func (s *SQLiteIndex) IndexPage(path string, pageID string, title string, conten
 	if s.db == nil {
 		return sql.ErrConnDone
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	_, err := s.db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
 	if err != nil {
