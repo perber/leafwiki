@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"mime/multipart"
+	"path"
 	"regexp"
 
 	"github.com/perber/wiki/internal/core/assets"
@@ -68,7 +69,7 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string) (*Wiki, 
 
 	// starts the indexing process in a separate goroutine
 	go func() {
-		err := search.BuildAndRunIndexer(treeService, sqliteIndex, storageDir, 4, status)
+		err := search.BuildAndRunIndexer(treeService, sqliteIndex, path.Join(storageDir, "root"), 4, status)
 		if err != nil {
 			log.Printf("indexing failed: %v", err)
 		}
