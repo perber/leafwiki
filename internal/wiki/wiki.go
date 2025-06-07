@@ -405,6 +405,13 @@ func (w *Wiki) IsIndexingActive() bool {
 	return w.status != nil && w.status.IsActive()
 }
 
+func (w *Wiki) Search(query string, limit, offset int) (*search.SearchResult, error) {
+	if w.searchIndex == nil {
+		return nil, fmt.Errorf("search index not available")
+	}
+	return w.searchIndex.Search(query, limit, offset)
+}
+
 func (w *Wiki) GetUserService() *auth.UserService {
 	return w.user
 }
