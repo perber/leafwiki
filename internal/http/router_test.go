@@ -1015,3 +1015,25 @@ func TestAssetEndpoints(t *testing.T) {
 		t.Errorf("Expected asset to be deleted, got: %v", listResp2["files"])
 	}
 }
+
+// Lets check the indexing status
+func TestIndexingStatusEndpoint(t *testing.T) {
+	// Lets call /api/search/status
+	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey")
+	router := NewRouter(wikiInstance)
+
+	// Default Admin holen
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/search/status", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var status map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	if status["active"] == nil {
+		t.Errorf("Expected 'active' field in response, got: %v", status)
+	}
+}
