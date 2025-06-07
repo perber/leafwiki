@@ -105,6 +105,9 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 		requiresAuthGroup.PUT("/pages/:id/assets/rename", api.RenameAssetHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", api.DeleteAssetHandler(wikiInstance))
 
+		// Search
+		requiresAuthGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))
+
 	}
 
 	// If frontend embedding is enabled, serve it on all unknown routes
