@@ -110,3 +110,53 @@ func (s *SQLiteIndex) IndexPage(path string, pageID string, title string, conten
 
 	return err
 }
+
+func (s *SQLiteIndex) Search(query string, limit, offset int) (*SearchResult, error) {
+	if s.db == nil {
+		return nil, sql.ErrConnDone
+	}
+
+	sr := &SearchResult{}
+
+	// 1. Count total matches
+	var total int
+	countQuery := `SELECT COUNT(*) FROM pages WHERE pages MATCH ?;`
+	if err := s.db.QueryRow(countQuery, query).Scan(&total); err != nil {
+		return nil, err
+	}
+
+	sr.Count = total
+
+	// 2. Search with rank + highlight
+	searchQuery := `
+		SELECT pageID, path, 
+		       highlight(pages, 2, '<b>', '</b>') AS highlighted_title,
+		       snippet(pages, 3, '<b>', '</b>', '...', 64) AS excerpt,
+		       bm25(pages, 10.0, 1.0) AS rank
+		FROM pages
+		WHERE pages MATCH ?
+		ORDER BY rank ASC
+		LIMIT ? OFFSET ?;
+	`
+
+	rows, err := s.db.Query(searchQuery, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []SearchResultItem
+	for rows.Next() {
+		var r SearchResultItem
+		if err := rows.Scan(&r.PageID, &r.Path, &r.Title, &r.Excerpt, &r.Rank); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+
+	sr.Items = results
+	sr.Limit = limit
+	sr.Offset = offset
+
+	return sr, err
+}
