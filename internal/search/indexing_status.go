@@ -7,10 +7,10 @@ import (
 
 type IndexingStatus struct {
 	mu         sync.RWMutex
-	Active     bool      // Indicates if indexing is currently active
-	Indexed    int       // Number of pages indexed
-	Failed     int       // Number of pages that failed to index
-	FinishedAt time.Time // Timestamp when indexing finished
+	Active     bool      `json:"active"`      // Indicates if indexing is currently active
+	Indexed    int       `json:"indexed"`     // Number of pages indexed
+	Failed     int       `json:"failed"`      // Number of pages that failed to index
+	FinishedAt time.Time `json:"finished_at"` // Timestamp when indexing finished
 }
 
 func NewIndexingStatus() *IndexingStatus {
