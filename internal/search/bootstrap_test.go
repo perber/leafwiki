@@ -34,8 +34,10 @@ func TestBuildAndRunIndexer_BasicIndexing(t *testing.T) {
 	}
 	defer index.Close()
 
+	status := NewIndexingStatus()
+
 	corePath := filepath.Join(tmp, "root")
-	err = BuildAndRunIndexer(treeSvc, index, corePath, 2)
+	err = BuildAndRunIndexer(treeSvc, index, corePath, 2, status)
 	if err != nil {
 		t.Fatalf("BuildAndRunIndexer failed: %v", err)
 	}
@@ -52,4 +54,14 @@ func TestBuildAndRunIndexer_BasicIndexing(t *testing.T) {
 	if !strings.Contains(text, "Hello Search") {
 		t.Errorf("expected content to contain 'Hello Search', got %q", text)
 	}
+
+	snap := status.Snapshot()
+	if snap.Active {
+		t.Errorf("expected indexing to be inactive, got active")
+	}
+
+	if snap.Indexed < 1 {
+		t.Errorf("expected at least 1 indexed page, got %d", snap.Indexed)
+	}
+
 }
