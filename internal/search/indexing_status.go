@@ -49,6 +49,13 @@ func (s *IndexingStatus) Fail() {
 	s.Failed++
 }
 
+// IsActive returns true if indexing is currently active.
+func (s *IndexingStatus) IsActive() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.Active
+}
+
 func (s *IndexingStatus) Snapshot() *IndexingStatus {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
