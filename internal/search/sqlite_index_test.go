@@ -43,3 +43,44 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 		t.Errorf("expected content %s, got %s", content, gotContent)
 	}
 }
+
+func TestSQLiteIndex_Search(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer index.Close()
+
+	// Index two pages
+	err = index.IndexPage("notes/alpha.md", "alpha1", "Alpha Search Test", "This content is about SQLite search.")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	err = index.IndexPage("notes/beta.md", "beta2", "Unrelated Page", "This content is not about the search term.")
+	if err != nil {
+		t.Fatalf("failed to index beta page: %v", err)
+	}
+
+	// Perform search
+	result, err := index.Search("content:search", 10, 0)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	// Assertions
+	if result.Count != 2 {
+		t.Errorf("expected 2 result, got %d", result.Count)
+	}
+
+	if len(result.Items) != 2 {
+		t.Fatalf("expected 2 result item, got %d", len(result.Items))
+	}
+
+	item := result.Items[0]
+	if item.PageID != "alpha1" {
+		t.Errorf("expected PageID alpha1, got %s", item.PageID)
+	}
+}
