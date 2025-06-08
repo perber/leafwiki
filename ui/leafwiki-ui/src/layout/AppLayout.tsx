@@ -6,7 +6,7 @@ import UserToolbar from '@/components/UserToolbar'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import Sidebar from './Sidebar'
+import Sidebar from '../features/sidebar/Sidebar'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { content, titleBar } = usePageToolbar()

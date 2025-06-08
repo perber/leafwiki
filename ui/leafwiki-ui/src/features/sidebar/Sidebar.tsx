@@ -1,4 +1,4 @@
-import TreeView from '../features/tree/TreeView'
+import TreeView from '../tree/TreeView'
 
 export default function Sidebar() {
   return (
