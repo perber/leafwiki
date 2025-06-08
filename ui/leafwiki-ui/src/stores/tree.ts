@@ -7,9 +7,6 @@ type TreeStore = {
   tree: PageNode | null
   loading: boolean
   error: string | null
-  searchQuery: string
-  setSearchQuery: (query: string) => void
-  clearSearch: () => void
   reloadTree: () => Promise<void>
   toggleNode: (id: string) => void
   isNodeOpen: (id: string) => boolean
@@ -43,34 +40,6 @@ export const useTreeStore = create<TreeStore>()(
         }
 
         set({ openNodeIds: Array.from(current) })
-      },
-
-      searchQuery: '',
-
-      setSearchQuery: (query: string) => {
-        const wasEmpty = get().searchQuery === ''
-        const isNowEmpty = query === ''
-
-        if (wasEmpty && !isNowEmpty) {
-          set({ prevOpenNodeIds: get().openNodeIds })
-        }
-
-        if (!wasEmpty && isNowEmpty) {
-          const previous = get().prevOpenNodeIds
-          if (previous) {
-            set({ openNodeIds: previous, prevOpenNodeIds: null })
-          }
-        }
-
-        set({ searchQuery: query })
-      },
-
-      clearSearch: () => {
-        const previous = get().prevOpenNodeIds
-        if (previous) {
-          set({ openNodeIds: previous, prevOpenNodeIds: null })
-        }
-        set({ searchQuery: '' })
       },
 
       isNodeOpen: (id: string) => {
