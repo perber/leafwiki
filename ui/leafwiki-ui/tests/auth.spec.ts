@@ -26,7 +26,7 @@ test('failed login', async ({ page }) => {
 
   test('successful login', async ({ page }) => {
     await login(page);
-    await expect(page.getByRole('button', { name: 'A' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'A' }).nth(0)).toBeVisible();
   });
 
 
