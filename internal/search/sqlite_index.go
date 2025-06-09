@@ -118,6 +118,23 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 	return err
 }
 
+func (s *SQLiteIndex) RemovePage(pageID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
+	return err
+}
+
+func (s *SQLiteIndex) RemovePageByFilePath(filePath string) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	res, err := s.db.Exec(`DELETE FROM pages WHERE filepath = ?`, filePath)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, error) {
 	if s.db == nil {
 		return nil, sql.ErrConnDone

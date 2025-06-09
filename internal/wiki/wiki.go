@@ -75,6 +75,13 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string) (*Wiki, 
 		}
 	}()
 
+	// Start the file watcher for indexing
+	go func() {
+		if err := search.StartWatcher(path.Join(storageDir, "root"), treeService, sqliteIndex, status); err != nil {
+			log.Printf("failed to start file watcher: %v", err)
+		}
+	}()
+
 	// Initialize the wiki service
 	wiki := &Wiki{
 		tree:        treeService,
