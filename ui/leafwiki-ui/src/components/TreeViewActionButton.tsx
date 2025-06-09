@@ -18,6 +18,7 @@ export function TreeViewActionButton({
           type="button"
           onClick={() => onClick()}
           className="btn-treeview"
+          aria-label={tooltip}
         >
           {icon}
         </button>

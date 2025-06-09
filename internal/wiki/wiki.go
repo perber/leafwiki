@@ -68,6 +68,7 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 	// status object for indexing
 	status := search.NewIndexingStatus()
 
+	var searchWatcher *search.Watcher
 	if enableSearchIndexing {
 		// starts the indexing process in a separate goroutine
 		go func() {
@@ -78,12 +79,13 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 		}()
 
 		// Start the file watcher for indexing
-		watcher, err := search.NewWatcher(path.Join(storageDir, "root"), treeService, sqliteIndex, status)
+		var err error
+		searchWatcher, err = search.NewWatcher(path.Join(storageDir, "root"), treeService, sqliteIndex, status)
 		if err != nil {
 			log.Printf("failed to create file watcher: %v", err)
 		} else {
 			go func() {
-				if err := watcher.Start(); err != nil {
+				if err := searchWatcher.Start(); err != nil {
 					log.Printf("failed to start file watcher: %v", err)
 				}
 			}()
@@ -92,14 +94,15 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 
 	// Initialize the wiki service
 	wiki := &Wiki{
-		tree:        treeService,
-		slug:        slugService,
-		user:        userService,
-		auth:        authService,
-		asset:       assetService,
-		storageDir:  storageDir,
-		searchIndex: sqliteIndex,
-		status:      status,
+		tree:          treeService,
+		slug:          slugService,
+		user:          userService,
+		auth:          authService,
+		asset:         assetService,
+		storageDir:    storageDir,
+		searchIndex:   sqliteIndex,
+		status:        status,
+		searchWatcher: searchWatcher,
 	}
 
 	// Ensure the welcome page exists
