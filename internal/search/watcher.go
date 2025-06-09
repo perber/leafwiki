@@ -24,12 +24,7 @@ func NewWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteInde
 		TreeService: treeService,
 		Index:       index,
 		Status:      status,
-	}
-
-	var err error
-	watcher.watcher, err = fsnotify.NewWatcher()
-	if err != nil {
-		return nil, err
+		watcher:     nil,
 	}
 
 	return watcher, nil
