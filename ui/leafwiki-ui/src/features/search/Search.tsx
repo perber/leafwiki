@@ -1,8 +1,5 @@
 import { Pagination } from '@/components/Pagination'
-import {
-  searchPages,
-  SearchResultItem
-} from '@/lib/api'
+import { searchPages, SearchResultItem } from '@/lib/api'
 import { useDebounce } from '@/lib/useDebounce'
 import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
