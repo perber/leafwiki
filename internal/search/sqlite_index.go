@@ -3,6 +3,7 @@ package search
 import (
 	"database/sql"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/microcosm-cc/bluemonday"
@@ -151,13 +152,12 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 
 	sr.Count = total
 
-	// 2. Search with rank + highlight
 	searchQuery := `
 		SELECT pageID, 
-			   path, 
-		       highlight(pages, 3, '<b>', '</b>') AS highlighted_title,
-		       snippet(pages, 4, '<b>', '</b>', '...', 16) AS excerpt,
-		       bm25(pages, 10.0, 1.0) AS rank
+			path, 
+			highlight(pages, 3, '<b>', '</b>') AS highlighted_title,
+			snippet(pages, 4, '<b>', '</b>', '...', 16) AS excerpt,
+			bm25(pages, 10.0, 1.0) AS rank
 		FROM pages
 		WHERE pages MATCH ?
 		ORDER BY rank ASC
@@ -181,6 +181,24 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 
 	if results == nil {
 		results = []SearchResultItem{}
+	}
+
+	// Order the results by rank
+	// When the query is matching the title it should be ranked higher
+	for i := range results {
+		// Check if the query is part of the title
+		if strings.Contains(strings.ToLower(results[i].Title), strings.ToLower(query)) {
+			results[i].Rank += 1000 // Boost rank for titles that match the query
+		}
+	}
+
+	// Sort results by rank in descending order
+	for i := 0; i < len(results)-1; i++ {
+		for j := i + 1; j < len(results); j++ {
+			if results[i].Rank < results[j].Rank {
+				results[i], results[j] = results[j], results[i] // Swap
+			}
+		}
 	}
 
 	sr.Items = results
