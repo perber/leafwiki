@@ -4,7 +4,7 @@ VERSION ?= v0.1.0
 RELEASE_DIR := releases
 DOCKER_BUILDER := Dockerfile.builder
 
-# At the moment we only can test it on linux/amd64 and windows/amd64
+# At the moment we can test on linux/amd64, linux/arm64, and windows/amd64
 PLATFORMS := \
   linux/amd64 \
   linux/arm64 \
