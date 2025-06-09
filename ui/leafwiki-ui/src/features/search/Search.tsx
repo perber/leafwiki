@@ -22,9 +22,17 @@ export default function Search() {
   const debouncedQuery = useDebounce(query, 300)
 
   useEffect(() => {
-    getSearchStatus()
-      .then(setStatus)
-      .catch((err) => console.error('Status fetch failed', err))
+    const fetchStatus = async () => {
+      try {
+        const newStatus = await getSearchStatus()
+        setStatus(newStatus)
+      } catch (err) {
+        console.error('Status fetch failed', err)
+      }
+    }
+    fetchStatus()
+    const interval = setInterval(fetchStatus, 2000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
