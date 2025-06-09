@@ -79,6 +79,8 @@ jobs:
           files: |
             releases/leafwiki-${{ github.ref_name }}-linux-amd64
             releases/leafwiki-${{ github.ref_name }}-linux-amd64.sha256
+            releases/leafwiki-${{ github.ref_name }}-linux-arm64
+            releases/leafwiki-${{ github.ref_name }}-linux-arm64.sha256
             releases/leafwiki-${{ github.ref_name }}-windows-amd64.exe
             releases/leafwiki-${{ github.ref_name }}-windows-amd64.exe.sha256
         env:

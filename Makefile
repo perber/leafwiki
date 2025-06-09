@@ -7,6 +7,7 @@ DOCKER_BUILDER := Dockerfile.builder
 # At the moment we only can test it on linux/amd64 and windows/amd64
 PLATFORMS := \
   linux/amd64 \
+  linux/arm64 \
   windows/amd64
 
 all: build
