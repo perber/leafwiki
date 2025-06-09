@@ -61,7 +61,7 @@ func main() {
 		switch args[0] {
 		case "reset-admin-password":
 			// Note: No JWT secret needed for this command
-			w, err := wiki.NewWiki(dataDir, adminPassword, "", true)
+			w, err := wiki.NewWiki(dataDir, adminPassword, "", false)
 			if err != nil {
 				log.Fatalf("Failed to initialize Wiki: %v", err)
 			}
