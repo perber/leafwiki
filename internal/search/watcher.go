@@ -10,20 +10,44 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 )
 
-func StartWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteIndex, status *IndexingStatus) error {
-	watcher, err := fsnotify.NewWatcher()
+type Watcher struct {
+	DataDir     string
+	TreeService *tree.TreeService
+	Index       *SQLiteIndex
+	Status      *IndexingStatus
+	watcher     *fsnotify.Watcher
+}
+
+func NewWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteIndex, status *IndexingStatus) (*Watcher, error) {
+	watcher := &Watcher{
+		DataDir:     dataDir,
+		TreeService: treeService,
+		Index:       index,
+		Status:      status,
+	}
+
+	var err error
+	watcher.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
+		return nil, err
+	}
+
+	return watcher, nil
+}
+
+func (w *Watcher) Start() error {
+	var err error
+	if w.watcher, err = fsnotify.NewWatcher(); err != nil {
 		return err
 	}
 
-	// Initial: Alle Verzeichnisse überwachen
-	err = filepath.Walk(dataDir, func(p string, info os.FileInfo, err error) error {
+	err = filepath.Walk(w.DataDir, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Printf("[watcher] walk error: %v", err)
 			return nil
 		}
 		if info.IsDir() {
-			if err := watcher.Add(p); err != nil {
+			if err := w.watcher.Add(p); err != nil {
 				log.Printf("[watcher] add error: %v", err)
 			}
 		}
@@ -36,7 +60,7 @@ func StartWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteIn
 	go func() {
 		for {
 			select {
-			case event, ok := <-watcher.Events:
+			case event, ok := <-w.watcher.Events:
 				if !ok {
 					return
 				}
@@ -47,18 +71,18 @@ func StartWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteIn
 				info, statErr := os.Stat(eventPath)
 				isDir := statErr == nil && info.IsDir()
 
-				// Neues Verzeichnis oder verschobenes?
+				// New Directory or Moved
 				if (event.Op&(fsnotify.Create|fsnotify.Rename) != 0) && isDir {
-					// Rekursiv beobachten
+					// Watch recursive
 					log.Printf("[watcher] watching new dir: %s", eventPath)
 					if err := filepath.Walk(eventPath, func(p string, i os.FileInfo, _ error) error {
 						if i.IsDir() {
-							if err := watcher.Add(p); err != nil {
+							if err := w.watcher.Add(p); err != nil {
 								log.Printf("[watcher] add error: %v", err)
 								return nil // continue walking
 							}
 						} else if filepath.Ext(p) == ".md" {
-							reindexFile(p, dataDir, treeService, index, status)
+							reindexFile(p, w.DataDir, w.TreeService, w.Index, w.Status)
 						}
 						return nil
 					}); err != nil {
@@ -67,20 +91,19 @@ func StartWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteIn
 					continue
 				}
 
-				// Dateiänderungen
 				if filepath.Ext(eventPath) != ".md" {
 					continue
 				}
 
 				switch {
 				case event.Op&(fsnotify.Create|fsnotify.Write) != 0:
-					reindexFile(eventPath, dataDir, treeService, index, status)
+					reindexFile(eventPath, w.DataDir, w.TreeService, w.Index, w.Status)
 
 				case event.Op&fsnotify.Remove != 0:
-					relPath, err := filepath.Rel(dataDir, eventPath)
+					relPath, err := filepath.Rel(w.DataDir, eventPath)
 					if err == nil {
 						log.Printf("[watcher] file removed: %s", relPath)
-						cnt, err := index.RemovePageByFilePath(relPath)
+						cnt, err := w.Index.RemovePageByFilePath(relPath)
 						if err != nil {
 							log.Printf("[watcher] remove error: %v", err)
 						} else {
@@ -89,10 +112,10 @@ func StartWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteIn
 					}
 
 				case event.Op&fsnotify.Rename != 0 && !isDir:
-					relPath, err := filepath.Rel(dataDir, eventPath)
+					relPath, err := filepath.Rel(w.DataDir, eventPath)
 					if err == nil {
 						log.Printf("[watcher] file renamed/removed: %s", relPath)
-						cnt, err := index.RemovePageByFilePath(relPath)
+						cnt, err := w.Index.RemovePageByFilePath(relPath)
 						if err != nil {
 							log.Printf("[watcher] remove error: %v", err)
 						} else {
@@ -101,7 +124,7 @@ func StartWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteIn
 					}
 				}
 
-			case err, ok := <-watcher.Errors:
+			case err, ok := <-w.watcher.Errors:
 				if !ok {
 					return
 				}
@@ -110,7 +133,14 @@ func StartWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteIn
 		}
 	}()
 
-	log.Println("[watcher] started watching:", dataDir)
+	log.Println("[watcher] started watching:", w.DataDir)
+	return nil
+}
+
+func (w *Watcher) Stop() error {
+	if w.watcher != nil {
+		return w.watcher.Close()
+	}
 	return nil
 }
 
