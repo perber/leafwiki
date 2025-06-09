@@ -8,7 +8,7 @@ import (
 
 func setupTestWiki(t *testing.T) *Wiki {
 	tempDir := t.TempDir()
-	w, err := NewWiki(tempDir, "admin", "secretkey")
+	w, err := NewWiki(tempDir, "admin", "secretkey", false)
 	if err != nil {
 		t.Fatalf("Failed to create wiki: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestWiki_SuggestSlug_Conflict(t *testing.T) {
 
 func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	tmpDir := t.TempDir()
-	wiki, err := NewWiki(tmpDir, "admin", "secretkey")
+	wiki, err := NewWiki(tmpDir, "admin", "secretkey", false)
 	if err != nil {
 		t.Fatalf("Failed to initialize Wiki: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestWiki_ResetAdminPasswordWithoutJWTSecret(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Verwende Dummy-Secret
-	wiki, err := NewWiki(tempDir, "supersecure", "")
+	wiki, err := NewWiki(tempDir, "supersecure", "", false)
 	if err != nil {
 		t.Fatalf("Failed to initialize Wiki: %v", err)
 	}
