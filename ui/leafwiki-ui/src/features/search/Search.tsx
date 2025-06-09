@@ -1,9 +1,7 @@
 import { Pagination } from '@/components/Pagination'
 import {
-  getSearchStatus,
-  IndexingStatus,
   searchPages,
-  SearchResultItem,
+  SearchResultItem
 } from '@/lib/api'
 import { useDebounce } from '@/lib/useDebounce'
 import { X } from 'lucide-react'
@@ -12,7 +10,6 @@ import SearchResultCard from './SearchResultCard'
 
 export default function Search() {
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<null | IndexingStatus>(null)
   const [limit, setLimit] = useState<number>(10)
   const [loading, setLoading] = useState<boolean>(false)
   const [totalCount, setTotalCount] = useState<number>(0)
@@ -20,20 +17,6 @@ export default function Search() {
   const [page, setPage] = useState(0) // 0-based
 
   const debouncedQuery = useDebounce(query, 300)
-
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const newStatus = await getSearchStatus()
-        setStatus(newStatus)
-      } catch (err) {
-        console.error('Status fetch failed', err)
-      }
-    }
-    fetchStatus()
-    const interval = setInterval(fetchStatus, 2000)
-    return () => clearInterval(interval)
-  }, [])
 
   useEffect(() => {
     if (debouncedQuery) {
@@ -74,7 +57,6 @@ export default function Search() {
           placeholder="Search..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          disabled={status?.active}
           className="w-full rounded border px-2 py-1 pr-8"
         />
         {query && (
@@ -88,20 +70,6 @@ export default function Search() {
         )}
       </div>
 
-      {status && (
-        <div className="mb-2 text-sm">
-          {status.active ? (
-            <span className="text-yellow-500">Indexing in progress…</span>
-          ) : (
-            <>
-              <span className="text-green-600">
-                {status.indexed} pages indexed
-              </span>
-              <span className="text-gray-500"> ({status.failed} failed)</span>
-            </>
-          )}
-        </div>
-      )}
       {loading && (
         <div className="text-sm text-gray-500">Loading results...</div>
       )}
