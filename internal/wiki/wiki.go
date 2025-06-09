@@ -15,14 +15,15 @@ import (
 )
 
 type Wiki struct {
-	tree        *tree.TreeService
-	slug        *tree.SlugService
-	auth        *auth.AuthService
-	user        *auth.UserService
-	asset       *assets.AssetService
-	searchIndex *search.SQLiteIndex
-	status      *search.IndexingStatus
-	storageDir  string
+	tree          *tree.TreeService
+	slug          *tree.SlugService
+	auth          *auth.AuthService
+	user          *auth.UserService
+	asset         *assets.AssetService
+	searchIndex   *search.SQLiteIndex
+	status        *search.IndexingStatus
+	storageDir    string
+	searchWatcher *search.Watcher
 }
 
 // Email-RegEx (Basic-Check, nicht RFC-konform, aber gut genug)
@@ -77,11 +78,16 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 		}()
 
 		// Start the file watcher for indexing
-		go func() {
-			if err := search.StartWatcher(path.Join(storageDir, "root"), treeService, sqliteIndex, status); err != nil {
-				log.Printf("failed to start file watcher: %v", err)
-			}
-		}()
+		watcher, err := search.NewWatcher(path.Join(storageDir, "root"), treeService, sqliteIndex, status)
+		if err != nil {
+			log.Printf("failed to create file watcher: %v", err)
+		} else {
+			go func() {
+				if err := watcher.Start(); err != nil {
+					log.Printf("failed to start file watcher: %v", err)
+				}
+			}()
+		}
 	}
 
 	// Initialize the wiki service
@@ -442,5 +448,12 @@ func (w *Wiki) Close() error {
 	if err := w.user.Close(); err != nil {
 		return err
 	}
+
+	if w.searchWatcher != nil {
+		if err := w.searchWatcher.Stop(); err != nil {
+			log.Printf("error stopping search watcher: %v", err)
+		}
+	}
+
 	return w.searchIndex.Close()
 }
