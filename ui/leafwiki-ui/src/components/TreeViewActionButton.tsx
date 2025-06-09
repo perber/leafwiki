@@ -14,7 +14,9 @@ export function TreeViewActionButton({
   return (
     <div className="group mr-2 flex">
       <TooltipWrapper label={tooltip} side="top" align="start">
-        <button onClick={() => onClick()}>{icon}</button>
+        <button onClick={() => onClick()} className="btn-treeview">
+          {icon}
+        </button>
       </TooltipWrapper>
     </div>
   )
