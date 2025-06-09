@@ -107,6 +107,7 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 
 		// Search
 		requiresAuthGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))
+		requiresAuthGroup.GET("/search", api.SearchHandler(wikiInstance))
 
 	}
 
