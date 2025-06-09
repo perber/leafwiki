@@ -29,7 +29,7 @@ type Wiki struct {
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
 var defaultAdminPassword = "admin"
 
-func NewWiki(storageDir string, adminPassword string, jwtSecret string) (*Wiki, error) {
+func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSearchIndexing bool) (*Wiki, error) {
 	// Initialize the user store
 	store, err := auth.NewUserStore(storageDir)
 	if err != nil {
@@ -67,20 +67,22 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string) (*Wiki, 
 	// status object for indexing
 	status := search.NewIndexingStatus()
 
-	// starts the indexing process in a separate goroutine
-	go func() {
-		err := search.BuildAndRunIndexer(treeService, sqliteIndex, path.Join(storageDir, "root"), 4, status)
-		if err != nil {
-			log.Printf("indexing failed: %v", err)
-		}
-	}()
+	if enableSearchIndexing {
+		// starts the indexing process in a separate goroutine
+		go func() {
+			err := search.BuildAndRunIndexer(treeService, sqliteIndex, path.Join(storageDir, "root"), 4, status)
+			if err != nil {
+				log.Printf("indexing failed: %v", err)
+			}
+		}()
 
-	// Start the file watcher for indexing
-	go func() {
-		if err := search.StartWatcher(path.Join(storageDir, "root"), treeService, sqliteIndex, status); err != nil {
-			log.Printf("failed to start file watcher: %v", err)
-		}
-	}()
+		// Start the file watcher for indexing
+		go func() {
+			if err := search.StartWatcher(path.Join(storageDir, "root"), treeService, sqliteIndex, status); err != nil {
+				log.Printf("failed to start file watcher: %v", err)
+			}
+		}()
+	}
 
 	// Initialize the wiki service
 	wiki := &Wiki{
