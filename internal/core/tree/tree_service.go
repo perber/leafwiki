@@ -45,6 +45,18 @@ func (p *PageNode) IsChildOf(childID string, recusive bool) bool {
 	return false
 }
 
+func (p *PageNode) CalculatePath() string {
+	// Calculate the path of the entry
+	// The path is the slug of the entry and its parent's path
+	if p.Parent == nil {
+		if p.Slug == "" || p.Slug == "root" {
+			return ""
+		}
+		return p.Slug
+	}
+	return p.Parent.CalculatePath() + "/" + p.Slug
+}
+
 type Page struct {
 	*PageNode
 	Content string `json:"content"`

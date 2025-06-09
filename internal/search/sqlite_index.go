@@ -5,6 +5,8 @@ import (
 	"path"
 	"sync"
 
+	"github.com/microcosm-cc/bluemonday"
+	"github.com/russross/blackfriday/v2"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
@@ -60,6 +62,7 @@ func (s *SQLiteIndex) ensureSchema() error {
 	_, err = s.db.Exec(`
 		CREATE VIRTUAL TABLE IF NOT EXISTS pages USING fts5(
 			path UNINDEXED,
+			filepath UNINDEXED,
 			pageID,
 			title,
 			content
@@ -91,7 +94,7 @@ func (s *SQLiteIndex) GetDB() *sql.DB {
 	return s.db
 }
 
-func (s *SQLiteIndex) IndexPage(path string, pageID string, title string, content string) error {
+func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, title string, content string) error {
 	if s.db == nil {
 		return sql.ErrConnDone
 	}
@@ -103,15 +106,19 @@ func (s *SQLiteIndex) IndexPage(path string, pageID string, title string, conten
 	if err != nil {
 		return err
 	}
+
+	plaintext := string(blackfriday.Run([]byte(content)))
+	sanitized := bluemonday.StrictPolicy().Sanitize(plaintext)
+
 	_, err = s.db.Exec(`
-		INSERT INTO pages (path, pageID, title, content)
-		VALUES (?, ?, ?, ?);
-	`, path, pageID, title, content)
+		INSERT INTO pages (path, filepath, pageID, title, content)
+		VALUES (?, ?, ?, ?, ?);
+	`, path, filePath, pageID, title, sanitized)
 
 	return err
 }
 
-func (s *SQLiteIndex) Search(query string, limit, offset int) (*SearchResult, error) {
+func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, error) {
 	if s.db == nil {
 		return nil, sql.ErrConnDone
 	}
@@ -129,9 +136,10 @@ func (s *SQLiteIndex) Search(query string, limit, offset int) (*SearchResult, er
 
 	// 2. Search with rank + highlight
 	searchQuery := `
-		SELECT pageID, path, 
-		       highlight(pages, 2, '<b>', '</b>') AS highlighted_title,
-		       snippet(pages, 3, '<b>', '</b>', '...', 64) AS excerpt,
+		SELECT pageID, 
+			   path, 
+		       highlight(pages, 3, '<b>', '</b>') AS highlighted_title,
+		       snippet(pages, 4, '<b>', '</b>', '...', 16) AS excerpt,
 		       bm25(pages, 10.0, 1.0) AS rank
 		FROM pages
 		WHERE pages MATCH ?
@@ -152,6 +160,10 @@ func (s *SQLiteIndex) Search(query string, limit, offset int) (*SearchResult, er
 			return nil, err
 		}
 		results = append(results, r)
+	}
+
+	if results == nil {
+		results = []SearchResultItem{}
 	}
 
 	sr.Items = results

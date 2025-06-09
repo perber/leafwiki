@@ -1,6 +1,7 @@
 package search
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -18,8 +19,9 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 	pageID := "test123"
 	title := "Test Page"
 	content := "This is a **test** page."
+	expectedContent := "This is a test page."
 
-	err = index.IndexPage(path, pageID, title, content)
+	err = index.IndexPage(path, path, pageID, title, content)
 	if err != nil {
 		t.Fatalf("IndexPage failed: %v", err)
 	}
@@ -39,8 +41,8 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 	if gotTitle != title {
 		t.Errorf("expected title %s, got %s", title, gotTitle)
 	}
-	if gotContent != content {
-		t.Errorf("expected content %s, got %s", content, gotContent)
+	if !strings.HasPrefix(gotContent, expectedContent) {
+		t.Errorf("expected content '%s', got '%s'", expectedContent, gotContent)
 	}
 }
 
@@ -54,18 +56,18 @@ func TestSQLiteIndex_Search(t *testing.T) {
 	defer index.Close()
 
 	// Index two pages
-	err = index.IndexPage("notes/alpha.md", "alpha1", "Alpha Search Test", "This content is about SQLite search.")
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", "This content is about SQLite search.")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	err = index.IndexPage("notes/beta.md", "beta2", "Unrelated Page", "This content is not about the search term.")
+	err = index.IndexPage("notes/beta", "notes/beta.md", "beta2", "Unrelated Page", "This content is not about the search term.")
 	if err != nil {
 		t.Fatalf("failed to index beta page: %v", err)
 	}
 
 	// Perform search
-	result, err := index.Search("content:search", 10, 0)
+	result, err := index.Search("content:search", 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}

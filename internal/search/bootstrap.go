@@ -31,7 +31,10 @@ func BuildAndRunIndexer(treeService *tree.TreeService, sqliteIndex *SQLiteIndex,
 			return nil
 		}
 
-		if err := sqliteIndex.IndexPage(rel, page.ID, page.Title, string(content)); err != nil {
+		// Get path by PageID
+		pagePath := page.CalculatePath()
+
+		if err := sqliteIndex.IndexPage(pagePath, rel, page.ID, page.Title, string(content)); err != nil {
 			log.Printf("[indexer] error indexing page %s: %v", rel, err)
 			status.Fail()
 			return err
