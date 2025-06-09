@@ -51,14 +51,19 @@ func StartWatcher(dataDir string, treeService *tree.TreeService, index *SQLiteIn
 				if (event.Op&(fsnotify.Create|fsnotify.Rename) != 0) && isDir {
 					// Rekursiv beobachten
 					log.Printf("[watcher] watching new dir: %s", eventPath)
-					filepath.Walk(eventPath, func(p string, i os.FileInfo, _ error) error {
+					if err := filepath.Walk(eventPath, func(p string, i os.FileInfo, _ error) error {
 						if i.IsDir() {
-							watcher.Add(p)
+							if err := watcher.Add(p); err != nil {
+								log.Printf("[watcher] add error: %v", err)
+								return nil // continue walking
+							}
 						} else if filepath.Ext(p) == ".md" {
 							reindexFile(p, dataDir, treeService, index, status)
 						}
 						return nil
-					})
+					}); err != nil {
+						log.Printf("[watcher] walk error: %v", err)
+					}
 					continue
 				}
 
