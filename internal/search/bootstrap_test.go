@@ -42,7 +42,7 @@ func TestBuildAndRunIndexer_BasicIndexing(t *testing.T) {
 		t.Fatalf("BuildAndRunIndexer failed: %v", err)
 	}
 
-	row := index.GetDB().QueryRow(`SELECT title, content FROM pages WHERE path = ?`, "docs.md")
+	row := index.GetDB().QueryRow(`SELECT title, content FROM pages WHERE filePath = ?`, "docs.md")
 	var title, text string
 	if err := row.Scan(&title, &text); err != nil {
 		t.Fatalf("Query failed: %v", err)
