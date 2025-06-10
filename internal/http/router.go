@@ -113,7 +113,11 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 				c.Status(http.StatusNotFound)
 				return
 			}
-			stat, _ := file.Stat()
+			stat, err := file.Stat()
+			if err != nil {
+				c.Status(http.StatusInternalServerError)
+				return
+			}
 
 			c.DataFromReader(http.StatusOK, stat.Size(), "image/svg+xml", file, nil)
 		})
