@@ -69,6 +69,8 @@ You can change the data directory with the `--data-dir` flag.
 
 > ✅ Native ARM64 builds are available in the [Releases](https://github.com/perber/leafwiki/releases) section.
 
+### Default admin user
+
 The first time you run LeafWiki, it will create an admin user with the default password `admin`.
 
 You can change this password later in the admin settings or by using the CLI:
