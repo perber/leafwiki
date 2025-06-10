@@ -6,7 +6,7 @@ LeafWiki is designed for teams and individuals who want a clean, fast, and self-
 
 ---
 
-![Leafwiki](./preview.gif)
+![LeafWiki](./preview.gif)
 
 ---
 
@@ -15,6 +15,11 @@ LeafWiki is designed for teams and individuals who want a clean, fast, and self-
 > **MVP released – actively developed** 
 LeafWiki is usable and already powers knowledge workflows, but is still in early public stages.  
 Expect improvements, polishing, and community feedback over the next releases.
+
+LeafWiki now builds and runs natively on:
+- **Linux (x86_64 and ARM64)**
+- **Windows (x86_64)**
+- **Raspberry Pi (tested with 64-bit OS)**
 
 ---
 
@@ -62,6 +67,18 @@ chmod +x leafwiki
 Default port is `8080`, and the default data directory is `./data`.
 You can change the data directory with the `--data-dir` flag.
 
+> ✅ Native ARM64 builds are available in the [Releases](https://github.com/perber/leafwiki/releases) section.
+
+The first time you run LeafWiki, it will create an admin user with the default password `admin`.
+
+You can change this password later in the admin settings or by using the CLI:
+
+```bash
+./leafwiki --admin-password=newpassword --jwt-secret=yoursecret
+```
+
+> Note: `--admin-password` (or the `LEAFWIKI_ADMIN_PASSWORD` env var) is only used on first startup, when no admin user exists yet.
+
 
 ### Reset Admin Password
 If you need to reset the admin password, you can do so by running:
@@ -73,10 +90,12 @@ If you need to reset the admin password, you can do so by running:
 ### ⚙️ CLI Flags
 
 | Flag               | Description                                 | Default       |
-|--------------------|---------------------------------------------|---------------|
-| `--jwt-secret`     | Secret used for signing JWTs (required)     | –             |
-| `--port`           | Port the server listens on                  | `8080`        |
-| `--data-dir`       | Directory where data is stored              | `./data`      |
+|--------------------|-------------------------------------------------------------|---------------|
+| `--jwt-secret`     | Secret used for signing JWTs (required)                     | –             |
+| `--port`           | Port the server listens on                                  | `8080`        |
+| `--data-dir`       | Directory where data is stored                              | `./data`      |
+| `--admin-password` | Initial admin password (used only if no admin exists)       | `admin`       |
+   
 
 ### 🌱 Environment Variables
 
@@ -131,11 +150,13 @@ go run main.go
 - [x] Add Toolbar with common actions like bold, italic, links, etc.
 - [x] Allow Undo/Redo actions
 
-### ✅ v0.3.2 – Improved Asset Handling
+### ✅ v0.3.4 – Improved Asset Handling
 - [x] Allow uploading multiple files at once
 - [x] Allow renaming of uploaded files
 - [x] Fix caching issues with uploaded assets
 - [x] Fix syntax highlighting in preview
+- [x] Fix FavIcon not displayed
+- [x] ARM64 support for Raspberry Pi and other ARM devices (thanks @nahaktarun)
 
 ### Upcoming Features in Version 0.4.0
 - [ ] Add Search functionality for page titles and content
@@ -146,9 +167,6 @@ go run main.go
 - [ ] Automatic import of existing Markdown files
 - [ ] Optimistic locking (conflict resolution)
 - [ ] Versioning (history)
-- [ ] Syntax Highlighting
-- [ ] Full-text search
-- [ ] TOC on page
 - [ ] Git integration
 - [ ] Automatic update of links
 
