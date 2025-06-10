@@ -157,7 +157,7 @@ go run main.go
 - [x] Allow renaming of uploaded files
 - [x] Fix caching issues with uploaded assets
 - [x] Fix syntax highlighting in preview
-- [x] Fix FavIcon not displayed
+- [x] Fix favicon not displayed
 - [x] ARM64 support for Raspberry Pi and other ARM devices (thanks @nahaktarun)
 
 ### Upcoming Features in Version 0.4.0
