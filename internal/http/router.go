@@ -106,7 +106,17 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 
 		// Serve the embedded frontend files js, css, ...
 		router.StaticFS("/static", http.FS(staticFS))
-		router.StaticFS("/favicon.svg", http.FS(fsys))
+
+		router.GET("/favicon.svg", func(c *gin.Context) {
+			file, err := fsys.Open("favicon.svg")
+			if err != nil {
+				c.Status(http.StatusNotFound)
+				return
+			}
+			stat, _ := file.Stat()
+
+			c.DataFromReader(http.StatusOK, stat.Size(), "image/svg+xml", file, nil)
+		})
 
 		router.NoRoute(func(c *gin.Context) {
 			if c.Request.Method == http.MethodGet &&
