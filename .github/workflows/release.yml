@@ -70,7 +70,9 @@ jobs:
           dueTag: ${{ github.ref_name }}
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        # use pinned version because of issue described here:
+        # https://github.com/softprops/action-gh-release/issues/628
+        uses: softprops/action-gh-release@v2.2.2
         if: github.ref_type == 'tag'
         with:
           tag_name: ${{ github.ref_name }}
