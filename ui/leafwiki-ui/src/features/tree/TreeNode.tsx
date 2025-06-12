@@ -18,7 +18,6 @@ export const TreeNode = React.memo(function TreeNode({
   node,
   level = 0,
 }: Props) {
-
   const { isNodeOpen, toggleNode, searchQuery } = useTreeStore()
   const hasChildren = node.children && node.children.length > 0
   const [hovered, setHovered] = useState(false)
