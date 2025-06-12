@@ -91,12 +91,13 @@ If you need to reset the admin password, you can do so by running:
 
 ### ⚙️ CLI Flags
 
-| Flag               | Description                                 | Default       |
+| Flag               | Description                                                 | Default       |
 |--------------------|-------------------------------------------------------------|---------------|
 | `--jwt-secret`     | Secret used for signing JWTs (required)                     | –             |
 | `--port`           | Port the server listens on                                  | `8080`        |
 | `--data-dir`       | Directory where data is stored                              | `./data`      |
 | `--admin-password` | Initial admin password (used only if no admin exists)       | `admin`       |
+| `--public-access`  | Allow public access to the wiki (no auth required)          | `false`       |
    
 
 ### 🌱 Environment Variables
@@ -109,6 +110,7 @@ Instead of CLI flags, you can also configure LeafWiki using environment variable
 | `LEAFWIKI_DATA_DIR`      | Path to the data storage directory                           | `./data`   |
 | `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | `admin`    |
 | `LEAFWIKI_JWT_SECRET`    | Secret used to sign JWT tokens *(required)*                  | –          |
+| `LEAFWIKI_PUBLIC_ACCESS` | Allow public access to the wiki (no auth required)           | `false`    |
 
 These environment variables override the default values and are especially useful in containerized or production environments.
 
