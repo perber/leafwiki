@@ -17,7 +17,18 @@ export default function UserToolbar() {
   const navigate = useNavigate()
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  if (!user) return null
+  if (!user) {
+    // renders the login 
+    return (<div className="ml-auto flex items-center gap-4">
+      <span className="text-sm text-red-500">Not logged in</span>
+      <button
+        className="text-sm text-black-500 rounded hover:bg-grenn-500 focus:outline-none"
+        onClick={() => navigate('/login')}
+      >
+        Login
+      </button>
+    </div>)
+  }
 
   const handleChangePasswordDialog = () => {
     setDialogOpen(!dialogOpen)
