@@ -187,6 +187,16 @@ go run main.go
 Contributions, discussions and feedback are very welcome.  
 This project is still early – feel free to open issues or ideas!
 
+We now have an official [Discord server](https://discord.gg/NcX9AEgp)  
+→ ask questions, get help, contribute, or just say hi.
+
+Main channels:
+- `#welcome` – Say hi, introduce yourself
+- `#general` – General discussion about LeafWiki (ideas, feedback, off-topic, ...)
+- `#support` – Help with issues, questions, or troubleshooting
+- `#release-announcements` – Updates on new releases, features, and improvements
+- `#questions` – Any questions about the code, structure, roadmap, or contributing
+
 ---
 
 ## 📬 Stay in the Loop
