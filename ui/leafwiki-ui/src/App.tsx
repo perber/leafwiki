@@ -17,11 +17,12 @@ import { usePublicAccessStore } from './stores/publicAccess'
 
 function App() {
   const publicAccessLoaded = usePublicAccessStore((s) => s.loaded)
+  const setLoaded = usePublicAccessStore((s) => s.setLoaded)
   const setPublicAccess = usePublicAccessStore((s) => s.setPublicAccess)
 
   const isLoggedIn = useAuthStore((s) => !!s.user)
   const isReadOnly = useIsReadOnly()
-  const allowViewerOnly = isReadOnly && !isLoggedIn
+  const isReadOnlyViewer = isReadOnly && !isLoggedIn
 
   useEffect(() => {
     getConfig()
@@ -39,9 +40,9 @@ function App() {
         setPublicAccess(false) // Fallback to false if config fails
       })
       .finally(() => {
-        usePublicAccessStore.getState().setLoaded(true)
+        setLoaded(true) // Mark public access as loaded
       })
-  }, [setPublicAccess])
+  }, [setPublicAccess, setLoaded])
 
   if (!publicAccessLoaded) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
 
@@ -53,7 +54,7 @@ function App() {
         <Route
           path="/*"
           element={
-            allowViewerOnly ? (
+            isReadOnlyViewer ? (
               <PageToolbarProvider>
                 <AppLayout>
                   <Routes>
