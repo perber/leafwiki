@@ -73,19 +73,22 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 	requiresAuthGroup := router.Group("/api")
 	requiresAuthGroup.Use(middleware.RequireAuth(wikiInstance))
 	{
+		// If public access is disabled, we need to ensure that the tree and pages routes are protected
+		// and require authentication. If public access is enabled, these routes are already handled
+		if !publicAccess {
+			requiresAuthGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
+		}
+
 		// Pages
 		requiresAuthGroup.POST("/pages", api.CreatePageHandler(wikiInstance))
-		requiresAuthGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id", api.UpdatePageHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id", api.DeletePageHandler(wikiInstance))
-		requiresAuthGroup.GET("pages/by-path", api.GetPageByPathHandler(wikiInstance))
 
 		requiresAuthGroup.PUT("/pages/:id/move", api.MovePageHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id/sort", api.SortPagesHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/slug-suggestion", api.SuggestSlugHandler(wikiInstance))
-
-		// Tree
-		requiresAuthGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
 
 		// User
 		requiresAuthGroup.POST("/users", middleware.RequireAdmin(wikiInstance), api.CreateUserHandler(wikiInstance))
