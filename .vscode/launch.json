@@ -12,6 +12,14 @@
             "program": "${workspaceFolder}/cmd/leafwiki/main.go",
             "args": ["--jwt-secret", "secretkey"],
         },
+        {
+            "name": "Launch leafwiki with public pages",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/leafwiki/main.go",
+            "args": ["--jwt-secret", "secretkey", "--public-access", "true"],
+        },
         // admin reset
         {
             "name": "Admin reset",
