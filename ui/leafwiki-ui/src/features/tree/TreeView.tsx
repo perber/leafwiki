@@ -1,6 +1,7 @@
 import { TreeViewActionButton } from '@/components/TreeViewActionButton'
 import { filterTreeWithOpenNodes, getAncestorIds } from '@/lib/treeUtils'
 import { useDebounce } from '@/lib/useDebounce'
+import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { List, Plus } from 'lucide-react'
@@ -25,6 +26,9 @@ export default function TreeView() {
   const [inputValue, setInputValue] = useState(searchQuery)
 
   const debouncedSearchQuery = useDebounce(inputValue, 300)
+
+  const readOnlyMode = useIsReadOnly()
+
 
   useEffect(() => {
     if (!tree || !currentPath) return
@@ -83,30 +87,31 @@ export default function TreeView() {
   } else {
     toRender = (
       <div className="mt-4 space-y-1">
-        <div className="flex">
-          <TreeViewActionButton
-            icon={
-              <Plus
-                size={20}
-                className="cursor-pointer text-gray-500 hover:text-gray-800"
-              />
-            }
-            tooltip="Create new page"
-            onClick={() => openDialog('add', { parentId: '' })}
-          />
-          {filteredTree !== null && (
+        {!readOnlyMode && (
+          <div className="flex">
             <TreeViewActionButton
               icon={
-                <List
+                <Plus
                   size={20}
                   className="cursor-pointer text-gray-500 hover:text-gray-800"
                 />
               }
-              tooltip="Sort pages"
-              onClick={() => openDialog('sort', { parent: filteredTree })}
+              tooltip="Create new page"
+              onClick={() => openDialog('add', { parentId: '' })}
             />
-          )}
-        </div>
+            {filteredTree !== null && (
+              <TreeViewActionButton
+                icon={
+                  <List
+                    size={20}
+                    className="cursor-pointer text-gray-500 hover:text-gray-800"
+                  />
+                }
+                tooltip="Sort pages"
+                onClick={() => openDialog('sort', { parent: filteredTree })}
+              />
+            )}
+          </div>)}
         {filteredTree?.children.map((node) => (
           <TreeNode key={node.id} node={node} />
         ))}
