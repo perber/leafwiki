@@ -319,3 +319,9 @@ export async function renameAsset(
     }),
   })
 }
+
+export async function getConfig(): Promise<{ publicAccess: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/api/config`)
+  if (!res.ok) throw new Error('Could not load config')
+  return await res.json()
+}
