@@ -1,6 +1,7 @@
 import { getPageByPath } from '@/lib/api'
 // import "highlight.js/styles/github.css"
 import { usePageToolbar } from '@/components/usePageToolbar'
+import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import MarkdownPreview from '../preview/MarkdownPreview'
@@ -11,6 +12,8 @@ export default function PageViewer() {
   const { pathname } = useLocation()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const readOnlyMode = useIsReadOnly()
 
   interface Page {
     id: string
@@ -57,6 +60,9 @@ export default function PageViewer() {
 
   useEffect(() => {
     if (!page) return
+    if (readOnlyMode) {
+      return
+    }
 
     const redirectUrl = page.path.split('/').slice(0, -1).join('/')
 
@@ -70,7 +76,7 @@ export default function PageViewer() {
     return () => {
       clearContent()
     }
-  }, [page, setContent, clearContent])
+  }, [page, setContent, clearContent, readOnlyMode])
 
   useEffect(() => {
     if (!page) {
