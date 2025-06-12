@@ -29,7 +29,6 @@ export default function TreeView() {
 
   const readOnlyMode = useIsReadOnly()
 
-
   useEffect(() => {
     if (!tree || !currentPath) return
 
@@ -111,7 +110,8 @@ export default function TreeView() {
                 onClick={() => openDialog('sort', { parent: filteredTree })}
               />
             )}
-          </div>)}
+          </div>
+        )}
         {filteredTree?.children.map((node) => (
           <TreeNode key={node.id} node={node} />
         ))}
