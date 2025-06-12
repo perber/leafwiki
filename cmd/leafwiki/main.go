@@ -23,11 +23,13 @@ func printUsage() {
 	--data-dir         Path to data directory (default: ./data)
 	--admin-password   Initial admin password (used only if no admin exists)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
+	--public-access    Allow public access to the wiki only with read access (default: false)
 
 	Environment variables:
 	LEAFWIKI_PORT
 	LEAFWIKI_DATA_DIR
 	LEAFWIKI_ADMIN_PASSWORD
+	LEAFWIKI_PUBLIC_ACCESS
 	`)
 }
 
@@ -38,12 +40,14 @@ func main() {
 	dataDirFlag := flag.String("data-dir", "", "path to data directory")
 	adminPasswordFlag := flag.String("admin-password", "", "initial admin password")
 	jwtSecretFlag := flag.String("jwt-secret", "", "JWT secret for authentication")
+	publicAccessFlag := flag.String("public-access", "false", "allow public access to the wiki with read access (default: false)")
 	flag.Parse()
 
 	port := getOrFallback(*portFlag, "LEAFWIKI_PORT", "8080")
 	dataDir := getOrFallback(*dataDirFlag, "LEAFWIKI_DATA_DIR", "./data")
 	adminPassword := getOrFallback(*adminPasswordFlag, "LEAFWIKI_ADMIN_PASSWORD", "admin")
 	jwtSecret := getOrFallback(*jwtSecretFlag, "LEAFWIKI_JWT_SECRET", "")
+	publicAccess := getOrFallback(*publicAccessFlag, "LEAFWIKI_PUBLIC_ACCESS", "false")
 
 	// Check if data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
@@ -91,7 +95,7 @@ func main() {
 	}
 	defer w.Close()
 
-	router := http.NewRouter(w)
+	router := http.NewRouter(w, publicAccess == "true")
 
 	// Start server
 	if err := router.Run(":" + port); err != nil {
