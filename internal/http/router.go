@@ -30,7 +30,7 @@ var EmbedFrontend = "false"
 // Environment is a flag to set the environment
 var Environment = "development"
 
-func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
+func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 	if Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
@@ -56,6 +56,18 @@ func NewRouter(wikiInstance *wiki.Wiki) *gin.Engine {
 		// Auth
 		nonAuthApiGroup.POST("/auth/login", api.LoginUserHandler(wikiInstance))
 		nonAuthApiGroup.POST("/auth/refresh-token", api.RefreshTokenUserHandler(wikiInstance))
+		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
+			c.JSON(200, gin.H{"publicAccess": publicAccess})
+		})
+
+		// PUBLIC READ ACCESS (if enabled via flag or env):
+		// These routes are accessible without authentication when publicAccess == true.
+		// Only safe, read-only operations are allowed here (GET tree/pages).
+		if publicAccess {
+			nonAuthApiGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
+			nonAuthApiGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
+			nonAuthApiGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
+		}
 	}
 
 	requiresAuthGroup := router.Group("/api")
