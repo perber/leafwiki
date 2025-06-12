@@ -23,9 +23,9 @@ export default function UserToolbar() {
       <div className="ml-auto flex items-center gap-4">
         <span className="text-sm text-red-500">Not logged in</span>
         <button
+          type="button"
           className="rounded bg-green-500 p-2 text-sm text-white hover:bg-green-600 focus:outline-none"
           onClick={() => navigate('/login')}
-        >
           Login
         </button>
       </div>
