@@ -26,6 +26,7 @@ export default function UserToolbar() {
           type="button"
           className="rounded bg-green-500 p-2 text-sm text-white hover:bg-green-600 focus:outline-none"
           onClick={() => navigate('/login')}
+        >
           Login
         </button>
       </div>
