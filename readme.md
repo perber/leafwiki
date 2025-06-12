@@ -187,6 +187,8 @@ go run main.go
 Contributions, discussions and feedback are very welcome.  
 This project is still early – feel free to open issues or ideas!
 
+## 💬 Chat on Discord
+
 We now have an official [Discord server](https://discord.gg/NcX9AEgp)  
 → ask questions, get help, contribute, or just say hi.
 
