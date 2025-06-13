@@ -54,7 +54,6 @@ export default function TreeView() {
                   className="cursor-pointer text-gray-500 hover:text-gray-800"
                 />
               }
-
               tooltip="Create new page"
               onClick={() => openDialog('add', { parentId: '' })}
             />
@@ -71,7 +70,7 @@ export default function TreeView() {
               />
             )}
           </div>
-        )}        
+        )}
         {tree?.children.map((node) => <TreeNode key={node.id} node={node} />)}
       </div>
     </>
