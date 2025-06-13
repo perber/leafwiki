@@ -67,6 +67,10 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 			nonAuthApiGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
+
+			// Search
+			nonAuthApiGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))
+			nonAuthApiGroup.GET("/search", api.SearchHandler(wikiInstance))
 		}
 	}
 
@@ -79,6 +83,10 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 			requiresAuthGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
+
+			// Search
+			requiresAuthGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))
+			requiresAuthGroup.GET("/search", api.SearchHandler(wikiInstance))
 		}
 
 		// Pages
@@ -104,11 +112,6 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 		requiresAuthGroup.GET("/pages/:id/assets", api.ListAssetsHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id/assets/rename", api.RenameAssetHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", api.DeleteAssetHandler(wikiInstance))
-
-		// Search
-		requiresAuthGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))
-		requiresAuthGroup.GET("/search", api.SearchHandler(wikiInstance))
-
 	}
 
 	// If frontend embedding is enabled, serve it on all unknown routes
