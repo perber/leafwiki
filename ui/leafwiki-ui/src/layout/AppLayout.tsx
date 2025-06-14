@@ -1,17 +1,24 @@
-import Breadcrumbs from '@/components/Breadcrumbs'
 import { DialogManger } from '@/components/DialogManager'
+import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import UserToolbar from '@/components/UserToolbar'
-import { AnimatePresence, motion } from 'framer-motion'
+import Sidebar from '@/features/sidebar/Sidebar'
+import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
+import { useSidebarStore } from '@/stores/sidebar'
+import { MenuIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
-import Sidebar from '../features/sidebar/Sidebar'
+import { Link, useLocation } from 'react-router-dom'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { content, titleBar } = usePageToolbar()
   const location = useLocation()
   const [isEditor, setIsEditor] = useState(location.pathname.startsWith('/e/'))
+
+  const sidebarVisible = useSidebarStore((s) => s.sidebarVisible)
+  const setSidebarVisible = useSidebarStore((s) => s.setSidebarVisible)
+
+  useAutoCloseSidebarOnMobile()
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -20,80 +27,60 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(frame)
   }, [location.pathname])
 
-  const mainContainerStyle = !isEditor
-    ? 'flex-1 overflow-auto p-6'
-    : 'flex-1 h-screen overflow-hidden'
+  const mainContainerStyle = !isEditor ? 'overflow-auto p-6' : 'overflow-hidden'
 
   return (
     <TooltipProvider delayDuration={300}>
       <DialogManger />
-      <div className="relative h-screen w-full overflow-y-auto bg-gray-50 font-sans text-gray-900">
-        <motion.aside
-          key={'sidebar'}
-          className="fixed bottom-0 left-0 top-0 z-20 h-full w-96 overflow-y-auto border-r border-gray-300 bg-gray-100 p-4 shadow-md"
-          animate={{
-            x: isEditor ? '-100%' : '0%',
-            opacity: isEditor ? 0 : 1,
-          }}
-          transition={{ duration: 0.2, ease: 'easeInOut' }}
-          style={{ willChange: 'transform, opacity' }}
+      {/* Header */}
+      <header className="h-[85px] border-b bg-white p-4 shadow-sm">
+        <div className="flex h-full items-center justify-start">
+          <div className="flex min-h-full w-6 items-center">
+            {/* Sidebar Toggle Button */}
+            <Button
+              variant={'secondary'}
+              className="relative z-20 p-2 text-gray-500 hover:text-gray-800 focus:outline-none"
+              onClick={() => setSidebarVisible?.(!sidebarVisible)}
+              aria-label="Toggle Sidebar"
+            >
+              <MenuIcon className="h-5 w-5" />
+            </Button>
+          </div>
+          {/* Left side: Logo and Title */}
+          <div className="ml-6 mr-6 flex min-h-full items-center gap-2">
+            <h2 className="text-xl font-bold">
+              <Link to="/">
+                🌿 <span className="max-md:hidden">LeafWiki</span>
+              </Link>
+            </h2>
+          </div>
+          <div className="flex min-h-full flex-1 items-center justify-center">
+            {titleBar}
+          </div>
+          <div className="flex min-h-full items-center gap-4">
+            {content}
+            <UserToolbar />
+          </div>
+        </div>
+      </header>
+      <div className="flex h-[calc(100vh-85px)] transition-all duration-200">
+        <div
+          className={`z-20 h-full overflow-hidden border-r border-gray-200 bg-white transition-all duration-200 max-sm:fixed ${
+            sidebarVisible ? 'w-96' : 'w-0'
+          }`}
         >
-          <Sidebar />
-        </motion.aside>
-
-        {/* Main-Content */}
-        <motion.div
-          key={'content'}
-          className="absolute inset-0 z-10 flex flex-col"
-          animate={{
-            width: isEditor ? '100%' : 'calc(100% - 384px)',
-            x: isEditor ? 0 : 384, // ≈ Sidebar-Offset / subtile slide*/
-          }}
-          transition={{ duration: 0.2, ease: 'easeInOut' }}
-          style={{ willChange: 'transform' }}
-        >
-          <header className="min-h-[85px] border-b bg-white p-4 shadow-sm">
-            <div className="flex h-full items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Breadcrumbs />
-              </div>
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={'titlebar'}
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 4 }}
-                  transition={{ duration: 0.4 }}
-                  className="flex items-center gap-2"
-                >
-                  {titleBar && (
-                    <div className="flex flex-1 items-center justify-center">
-                      {titleBar}
-                    </div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-
-              <div className="flex items-center gap-4">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={'buttons'}
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 4 }}
-                    transition={{ duration: 0.4 }}
-                    className="flex items-center gap-2"
-                  >
-                    {content}
-                  </motion.div>
-                </AnimatePresence>
-                <UserToolbar />
-              </div>
+          <div className="h-full w-96 overflow-auto">
+            <div className="p-4">
+              <Sidebar />
             </div>
-          </header>
+          </div>
+        </div>
 
-          <main className={mainContainerStyle}>{children}</main>
-        </motion.div>
+        <main
+          className={`${mainContainerStyle} flex-1 transition-all duration-200`}
+        >
+          {children}
+        </main>
       </div>
     </TooltipProvider>
   )

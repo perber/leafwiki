@@ -1,6 +1,7 @@
 import { useDebounce } from '@/lib/useDebounce'
 import { historyField, redo, undo } from '@codemirror/commands'
 import { EditorView } from '@codemirror/view'
+import { Code2, Eye } from 'lucide-react'
 import {
   forwardRef,
   useCallback,
@@ -42,6 +43,8 @@ const MarkdownEditor = (
 
   const [markdown, setMarkdown] = useState(initialValue)
   const debouncedPreview = useDebounce(markdown, 100)
+
+  const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
 
   const handleEditorChange = useCallback(
     (val: string) => {
@@ -213,24 +216,71 @@ const MarkdownEditor = (
 
   return (
     <div className="flex h-full w-full flex-col">
-      <MarkdownToolbar
-        editorRef={ref as React.RefObject<MarkdownEditorRef>}
-        pageId={pageId}
-        onAssetVersionChange={onAssetVersionChange}
-      />
-      <div className="flex h-full max-h-full flex-1 overflow-auto">
-        <MarkdownCodeEditor
-          initialValue={initialValue}
-          onChange={handleEditorChange}
-          onCursorLineChange={onCursorLineChange}
-          editorViewRef={editorViewRef}
+      <div className="mb-2 flex border-b text-sm md:hidden">
+        {[
+          { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
+          { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as 'editor' | 'preview')}
+            className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${
+              activeTab === tab.id
+                ? 'border-green-600 font-semibold text-green-600'
+                : 'border-transparent text-gray-500 hover:text-black'
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="block h-full w-full md:hidden">
+        {activeTab === 'editor' && (
+          <>
+            <MarkdownToolbar
+              editorRef={ref as React.RefObject<MarkdownEditorRef>}
+              pageId={pageId}
+              onAssetVersionChange={onAssetVersionChange}
+            />
+            <MarkdownCodeEditor
+              initialValue={initialValue}
+              onChange={handleEditorChange}
+              onCursorLineChange={onCursorLineChange}
+              editorViewRef={editorViewRef}
+            />
+          </>
+        )}
+        {activeTab === 'preview' && (
+          <div
+            ref={previewRef}
+            className="prose prose-lg h-full overflow-auto p-4"
+          >
+            <MarkdownPreview content={debouncedPreview} key={assetVersion} />
+          </div>
+        )}
+      </div>
+      <div className="h-full w-full max-md:hidden">
+        <MarkdownToolbar
+          editorRef={ref as React.RefObject<MarkdownEditorRef>}
+          pageId={pageId}
+          onAssetVersionChange={onAssetVersionChange}
         />
-
-        <div
-          ref={previewRef}
-          className="prose prose-lg w-1/2 max-w-none overflow-auto rounded border border-gray-200 bg-white p-4 leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0"
-        >
-          <MarkdownPreview content={debouncedPreview} key={assetVersion} />
+        <div className="flex h-full max-h-full w-full overflow-auto">
+          <div className="w-1/2 max-w-none overflow-auto border-r border-gray-200">
+            <MarkdownCodeEditor
+              initialValue={initialValue}
+              onChange={handleEditorChange}
+              onCursorLineChange={onCursorLineChange}
+              editorViewRef={editorViewRef}
+            />
+          </div>
+          <div
+            ref={previewRef}
+            className="prose prose-lg w-1/2 max-w-none overflow-auto rounded border border-gray-200 bg-white p-4 leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0"
+          >
+            <MarkdownPreview content={debouncedPreview} key={assetVersion} />
+          </div>
         </div>
       </div>
     </div>

@@ -13,8 +13,7 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside key={'sidebar'}>
-      <h2 className="mb-4 text-xl font-bold">🌿 LeafWiki</h2>
+    <aside key={'sidebar'} className="h-full">
       <div className="mb-4 flex border-b text-sm">
         {tabs.map((tab) => (
           <button
@@ -33,10 +32,10 @@ export default function Sidebar() {
       </div>
 
       {/* Content */}
-      <div className={sidebarMode === 'tree' ? 'block' : 'hidden'}>
+      <div className={sidebarMode === 'tree' ? 'block h-full' : 'hidden'}>
         <TreeView />
       </div>
-      <div className={sidebarMode === 'search' ? 'block' : 'hidden'}>
+      <div className={sidebarMode === 'search' ? 'block h-full' : 'hidden'}>
         <Search />
       </div>
     </aside>

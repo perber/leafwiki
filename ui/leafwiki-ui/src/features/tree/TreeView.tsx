@@ -44,7 +44,7 @@ export default function TreeView() {
 
   return (
     <>
-      <div className="mt-4 space-y-1">
+      <div className="mt-4 h-full space-y-1">
         {!readOnlyMode && (
           <div className="flex">
             <TreeViewActionButton
@@ -71,7 +71,9 @@ export default function TreeView() {
             )}
           </div>
         )}
-        {tree?.children.map((node) => <TreeNode key={node.id} node={node} />)}
+        <div className="h-full">
+          {tree?.children.map((node) => <TreeNode key={node.id} node={node} />)}
+        </div>
       </div>
     </>
   )
