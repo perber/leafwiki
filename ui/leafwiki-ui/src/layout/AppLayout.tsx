@@ -1,4 +1,3 @@
-import Breadcrumbs from '@/components/Breadcrumbs'
 import { DialogManger } from '@/components/DialogManager'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -34,7 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <DialogManger />
       {/* Header */}
       <header className="h-[85px] border-b bg-white p-4 shadow-sm">
-        <div className="flex h-full items-center justify-between">
+        <div className="flex h-full items-center justify-start">
           <div className="flex items-center w-6 min-h-full">
             {/* Sidebar Toggle Button */}
             <Button
@@ -47,18 +46,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Button>
           </div>
           {/* Left side: Logo and Title */}
-          <div className="flex items-center gap-2 flex-1 ml-6 min-h-full">
+          <div className="flex items-center gap-2 ml-6 mr-6 min-h-full">
             <h2 className="text-xl font-bold"><Link to="/">🌿 LeafWiki</Link></h2>
           </div>
-          {/* Left side: Breadcrumbs and Title Bar */}
-          <div className="flex flex-1 items-center gap-2 min-h-full">
-            <Breadcrumbs />
+          <div className="flex flex-1 items-center justify-center min-h-full">
+            {titleBar}
           </div>
-          {titleBar && (
-            <div className="flex flex-1 items-center justify-center min-h-full">
-              {titleBar}
-            </div>
-          )}
           <div className="flex items-center gap-4 min-h-full">
             {content}
             <UserToolbar />
