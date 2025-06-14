@@ -13,16 +13,17 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside key={'sidebar'} className='h-full'>
+    <aside key={'sidebar'} className="h-full">
       <div className="mb-4 flex border-b text-sm">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setSidebarMode(tab.id)}
-            className={`-mb-px flex items-center gap-1 border-b-2 px-3 py-1.5 ${sidebarMode === tab.id
-              ? 'border-green-600 font-semibold text-green-600'
-              : 'border-transparent text-gray-500 hover:text-black'
-              }`}
+            className={`-mb-px flex items-center gap-1 border-b-2 px-3 py-1.5 ${
+              sidebarMode === tab.id
+                ? 'border-green-600 font-semibold text-green-600'
+                : 'border-transparent text-gray-500 hover:text-black'
+            }`}
           >
             {tab.icon}
             {tab.label}

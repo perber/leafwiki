@@ -8,7 +8,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState
+  useState,
 } from 'react'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import MarkdownCodeEditor from './MarkdownCodeEditor'
@@ -104,9 +104,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-          done: unknown[]
-          undone: unknown[]
-        }
+            done: unknown[]
+            undone: unknown[]
+          }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false
@@ -121,9 +121,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-          done: unknown[]
-          undone: unknown[]
-        }
+            done: unknown[]
+            undone: unknown[]
+          }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false
@@ -224,17 +224,18 @@ const MarkdownEditor = (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as 'editor' | 'preview')}
-            className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${activeTab === tab.id
-              ? 'border-green-600 font-semibold text-green-600'
-              : 'border-transparent text-gray-500 hover:text-black'
-              }`}
+            className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${
+              activeTab === tab.id
+                ? 'border-green-600 font-semibold text-green-600'
+                : 'border-transparent text-gray-500 hover:text-black'
+            }`}
           >
             {tab.icon}
             {tab.label}
           </button>
         ))}
       </div>
-      <div className="block w-full h-full md:hidden">
+      <div className="block h-full w-full md:hidden">
         {activeTab === 'editor' && (
           <>
             <MarkdownToolbar
@@ -259,7 +260,7 @@ const MarkdownEditor = (
           </div>
         )}
       </div>
-      <div className='w-full h-full max-md:hidden'>
+      <div className="h-full w-full max-md:hidden">
         <MarkdownToolbar
           editorRef={ref as React.RefObject<MarkdownEditorRef>}
           pageId={pageId}
@@ -267,12 +268,12 @@ const MarkdownEditor = (
         />
         <div className="flex h-full max-h-full w-full overflow-auto">
           <div className="w-1/2 max-w-none overflow-auto border-r border-gray-200">
-          <MarkdownCodeEditor
-            initialValue={initialValue}
-            onChange={handleEditorChange}
-            onCursorLineChange={onCursorLineChange}
-            editorViewRef={editorViewRef}
-          />
+            <MarkdownCodeEditor
+              initialValue={initialValue}
+              onChange={handleEditorChange}
+              onCursorLineChange={onCursorLineChange}
+              editorViewRef={editorViewRef}
+            />
           </div>
           <div
             ref={previewRef}

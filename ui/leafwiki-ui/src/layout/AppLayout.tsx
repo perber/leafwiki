@@ -27,9 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(frame)
   }, [location.pathname])
 
-  const mainContainerStyle = !isEditor
-    ? 'overflow-auto p-6'
-    : 'overflow-hidden'
+  const mainContainerStyle = !isEditor ? 'overflow-auto p-6' : 'overflow-hidden'
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -37,11 +35,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Header */}
       <header className="h-[85px] border-b bg-white p-4 shadow-sm">
         <div className="flex h-full items-center justify-start">
-          <div className="flex items-center w-6 min-h-full">
+          <div className="flex min-h-full w-6 items-center">
             {/* Sidebar Toggle Button */}
             <Button
               variant={'secondary'}
-              className="p-2 text-gray-500 hover:text-gray-800 focus:outline-none relative z-20"
+              className="relative z-20 p-2 text-gray-500 hover:text-gray-800 focus:outline-none"
               onClick={() => setSidebarVisible?.(!sidebarVisible)}
               aria-label="Toggle Sidebar"
             >
@@ -49,13 +47,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Button>
           </div>
           {/* Left side: Logo and Title */}
-          <div className="flex items-center gap-2 ml-6 mr-6 min-h-full">
-            <h2 className="text-xl font-bold"><Link to="/">🌿 <span className='max-md:hidden'>LeafWiki</span></Link></h2>
+          <div className="ml-6 mr-6 flex min-h-full items-center gap-2">
+            <h2 className="text-xl font-bold">
+              <Link to="/">
+                🌿 <span className="max-md:hidden">LeafWiki</span>
+              </Link>
+            </h2>
           </div>
-          <div className="flex flex-1 items-center justify-center min-h-full">
+          <div className="flex min-h-full flex-1 items-center justify-center">
             {titleBar}
           </div>
-          <div className="flex items-center gap-4 min-h-full">
+          <div className="flex min-h-full items-center gap-4">
             {content}
             <UserToolbar />
           </div>
@@ -63,17 +65,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </header>
       <div className="flex h-[calc(100vh-85px)] transition-all duration-200">
         <div
-          className={`border-r z-20 border-gray-200 bg-white transition-all duration-200 overflow-hidden max-sm:fixed h-full ${sidebarVisible ? 'w-96' : 'w-0'
-            }`}
+          className={`z-20 h-full overflow-hidden border-r border-gray-200 bg-white transition-all duration-200 max-sm:fixed ${
+            sidebarVisible ? 'w-96' : 'w-0'
+          }`}
         >
-          <div className="h-full overflow-auto w-96">
-            <div className='p-4'>
+          <div className="h-full w-96 overflow-auto">
+            <div className="p-4">
               <Sidebar />
             </div>
           </div>
         </div>
 
-        <main className={`${mainContainerStyle} flex-1  transition-all duration-200`}>
+        <main
+          className={`${mainContainerStyle} flex-1 transition-all duration-200`}
+        >
           {children}
         </main>
       </div>
