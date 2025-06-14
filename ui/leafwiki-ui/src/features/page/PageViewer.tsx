@@ -1,5 +1,6 @@
 import { getPageByPath } from '@/lib/api'
 // import "highlight.js/styles/github.css"
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import React, { useEffect, useState } from 'react'
@@ -92,6 +93,9 @@ export default function PageViewer() {
 
   return (
     <>
+      <div className="mb-6">
+        <Breadcrumbs />
+      </div>
       <article className="prose prose-lg max-w-none leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0">
         <MarkdownPreview content={page.content} />
       </article>
