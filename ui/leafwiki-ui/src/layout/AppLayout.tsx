@@ -38,7 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Sidebar Toggle Button */}
             <Button
               variant={'secondary'}
-              className="p-2 text-gray-500 hover:text-gray-800 focus:outline-none"
+              className="p-2 text-gray-500 hover:text-gray-800 focus:outline-none relative z-20"
               onClick={() => setSidebarVisible?.(!sidebarVisible)}
               aria-label="Toggle Sidebar"
             >
@@ -60,7 +60,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </header>
       <div className="flex h-[calc(100vh-85px)] transition-all duration-200">
         <div
-          className={`border-r border-gray-200 bg-white transition-all duration-200 overflow-hidden ${sidebarVisible ? 'w-96' : 'w-0'
+          className={`border-r z-20 border-gray-200 bg-white transition-all duration-200 overflow-hidden max-sm:fixed h-full ${sidebarVisible ? 'w-96' : 'w-0'
             }`}
         >
           <div className="h-full overflow-auto w-96">
