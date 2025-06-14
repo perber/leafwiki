@@ -123,7 +123,7 @@ export default function MarkdownToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className={toolbarButtonStyle}
+            className={toolbarButtonStyle + ' max-md:hidden'}
             onClick={() => insertHeading(1)}
           >
             H1
@@ -133,7 +133,7 @@ export default function MarkdownToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className={toolbarButtonStyle}
+            className={toolbarButtonStyle + ' max-md:hidden'}
             onClick={() => insertHeading(2)}
           >
             H2
@@ -143,13 +143,13 @@ export default function MarkdownToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className={toolbarButtonStyle}
+            className={toolbarButtonStyle + ' max-md:hidden'}
             onClick={() => insertHeading(3)}
           >
             H3
           </Button>
         </TooltipWrapper>
-        <div className="mx-1 h-5 w-px self-center bg-white/30" />
+        <div className="mx-1 h-5 w-px self-center bg-white/30 max-md:hidden" />
         <TooltipWrapper label="Table" side="top" align="center">
           <Button
             variant="ghost"
