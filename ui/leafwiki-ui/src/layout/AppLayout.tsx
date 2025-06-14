@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import UserToolbar from '@/components/UserToolbar'
 import Sidebar from '@/features/sidebar/Sidebar'
+import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useSidebarStore } from '@/stores/sidebar'
 import { MenuIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -16,6 +17,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const sidebarVisible = useSidebarStore((s) => s.sidebarVisible)
   const setSidebarVisible = useSidebarStore((s) => s.setSidebarVisible)
+
+  useAutoCloseSidebarOnMobile()
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
