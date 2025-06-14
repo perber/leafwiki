@@ -27,7 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const mainContainerStyle = !isEditor
     ? 'overflow-auto p-6'
-    : 'h-screen overflow-hidden'
+    : 'overflow-hidden'
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -72,12 +72,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         >
           <div className="h-full overflow-auto w-96">
             <div className='p-4'>
-                <Sidebar />
+              <Sidebar />
             </div>
           </div>
         </div>
 
-        <main className={`${mainContainerStyle} flex-1 transition-all duration-200`}>
+        <main className={`${mainContainerStyle} flex-1  transition-all duration-200`}>
           {children}
         </main>
       </div>

@@ -71,7 +71,7 @@ export default function TreeView() {
             )}
           </div>
         )}
-        <div className="h-[calc(100%-85px)]">
+        <div className="h-full">
           {tree?.children.map((node) => <TreeNode key={node.id} node={node} />)}
         </div>
       </div>
