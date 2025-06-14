@@ -26,8 +26,11 @@ export default function PageViewer() {
   const [page, setPage] = useState<Page | null>(null)
   const { setContent, clearContent } = usePageToolbar()
 
+  console.log("changed", pathname)
+
   useEffect(() => {
     setLoading(true)
+    setPage(null)
     setError(null)
 
     const path = pathname.slice(1) // remove leading /
