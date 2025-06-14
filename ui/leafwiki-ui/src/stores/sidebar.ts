@@ -27,6 +27,6 @@ export const useSidebarStore = create<SidebarStore>()(
         sidebarVisible: state.sidebarVisible,
         sidebarMode: state.sidebarMode,
       }),
-    }
-  )
+    },
+  ),
 )

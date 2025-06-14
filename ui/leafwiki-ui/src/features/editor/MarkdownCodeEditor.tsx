@@ -89,7 +89,5 @@ export default function MarkdownCodeEditor({
     }
   }, [initialValue, onCursorLineChange, editorViewRef])
 
-  return (
-    <div ref={editorRef} className="h-full w-full rounded shadow-sm" />
-  )
+  return <div ref={editorRef} className="h-full w-full rounded shadow-sm" />
 }
