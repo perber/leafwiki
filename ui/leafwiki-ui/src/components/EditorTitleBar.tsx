@@ -9,7 +9,7 @@ type Props = {
 
 export function EditorTitleBar({ title, slug, onEditClicked, isDirty }: Props) {
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center flex-1">
       <button
         onClick={() => onEditClicked()}
         className="group relative flex items-center gap-1 text-base font-semibold text-gray-800 hover:underline"
