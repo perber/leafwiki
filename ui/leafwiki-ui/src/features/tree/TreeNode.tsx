@@ -81,7 +81,7 @@ export const TreeNode = React.memo(function TreeNode({
             <TreeViewActionButton
               icon={
                 <Move
-                  size={20}
+                  size={16}
                   className="cursor-pointer text-gray-500 hover:text-gray-800"
                 />
               }

@@ -46,7 +46,7 @@ export default function Search() {
   }
 
   return (
-    <div>
+    <div className='h-full'>
       <div className="relative mb-2">
         <input
           autoFocus
@@ -66,42 +66,43 @@ export default function Search() {
           </button>
         )}
       </div>
+      <div>
+        {loading && (
+          <div className="text-sm text-gray-500">Loading results...</div>
+        )}
 
-      {loading && (
-        <div className="text-sm text-gray-500">Loading results...</div>
-      )}
-
-      {!loading && query && results.length === 0 && (
-        <div className="text-sm text-gray-500">
-          No results found for "<strong>{query}</strong>"
-        </div>
-      )}
-
-      {!loading && results.length > 0 && (
-        <div className="mb-2 text-sm">
-          Found <strong>{totalCount}</strong> result
-          {totalCount !== 1 ? 's' : ''} for "<strong>{query}</strong>"
-        </div>
-      )}
-
-      {!loading && results.length > 0 && (
-        <>
-          <div className="space-y-4">
-            {results.map((item) => {
-              if (item.page_id && item.path && item.title) {
-                return <SearchResultCard key={item.page_id} item={item} />
-              }
-              return <></>
-            })}
+        {!loading && query && results.length === 0 && (
+          <div className="text-sm text-gray-500">
+            No results found for "<strong>{query}</strong>"
           </div>
-          <Pagination
-            total={totalCount}
-            page={page}
-            limit={limit}
-            onPageChange={(newPage) => setPage(newPage)}
-          />
-        </>
-      )}
+        )}
+
+        {!loading && results.length > 0 && (
+          <div className="mb-2 text-sm">
+            Found <strong>{totalCount}</strong> result
+            {totalCount !== 1 ? 's' : ''} for "<strong>{query}</strong>"
+          </div>
+        )}
+
+        {!loading && results.length > 0 && (
+          <>
+            <div className="space-y-4">
+              {results.map((item) => {
+                if (item.page_id && item.path && item.title) {
+                  return <SearchResultCard key={item.page_id} item={item} />
+                }
+                return <></>
+              })}
+            </div>
+            <Pagination
+              total={totalCount}
+              page={page}
+              limit={limit}
+              onPageChange={(newPage) => setPage(newPage)}
+            />
+          </>
+        )}
+      </div>
     </div>
   )
 }
