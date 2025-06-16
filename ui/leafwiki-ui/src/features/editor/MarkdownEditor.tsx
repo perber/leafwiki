@@ -4,6 +4,7 @@ import { EditorView } from '@codemirror/view'
 import { Code2, Eye } from 'lucide-react'
 import {
   forwardRef,
+  JSX,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -104,9 +105,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-            done: unknown[]
-            undone: unknown[]
-          }
+          done: unknown[]
+          undone: unknown[]
+        }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false
@@ -121,9 +122,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-            done: unknown[]
-            undone: unknown[]
-          }
+          done: unknown[]
+          undone: unknown[]
+        }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false
@@ -214,8 +215,40 @@ const MarkdownEditor = (
     }
   }, [])
 
+  const renderToolbar = ():JSX.Element => {
+    return (<MarkdownToolbar
+        editorRef={ref as React.RefObject<MarkdownEditorRef>}
+        pageId={pageId}
+        onAssetVersionChange={onAssetVersionChange}
+      />
+    )
+  }
+
+  const renderEditor = (toolbar: boolean = true): JSX.Element => {
+    return (<>
+      {toolbar && (renderToolbar())}
+      <MarkdownCodeEditor
+        initialValue={initialValue}
+        onChange={handleEditorChange}
+        onCursorLineChange={onCursorLineChange}
+        editorViewRef={editorViewRef}
+      />
+    </>)
+  }
+
+  const renderPreview = (): JSX.Element => {
+    return (
+      <div
+        ref={previewRef}
+        className="prose prose-lg h-full p-4"
+      >
+        <MarkdownPreview content={debouncedPreview} key={assetVersion} />
+      </div>
+    )
+  }
+
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="flex h-full w-full flex-col overflow-hidden">
       <div className="mb-2 flex border-b text-sm md:hidden">
         {[
           { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
@@ -224,11 +257,10 @@ const MarkdownEditor = (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as 'editor' | 'preview')}
-            className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${
-              activeTab === tab.id
+            className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${activeTab === tab.id
                 ? 'border-green-600 font-semibold text-green-600'
                 : 'border-transparent text-gray-500 hover:text-black'
-            }`}
+              }`}
           >
             {tab.icon}
             {tab.label}
@@ -236,50 +268,16 @@ const MarkdownEditor = (
         ))}
       </div>
       <div className="block h-full w-full md:hidden">
-        {activeTab === 'editor' && (
-          <>
-            <MarkdownToolbar
-              editorRef={ref as React.RefObject<MarkdownEditorRef>}
-              pageId={pageId}
-              onAssetVersionChange={onAssetVersionChange}
-            />
-            <MarkdownCodeEditor
-              initialValue={initialValue}
-              onChange={handleEditorChange}
-              onCursorLineChange={onCursorLineChange}
-              editorViewRef={editorViewRef}
-            />
-          </>
-        )}
-        {activeTab === 'preview' && (
-          <div
-            ref={previewRef}
-            className="prose prose-lg h-full overflow-auto p-4"
-          >
-            <MarkdownPreview content={debouncedPreview} key={assetVersion} />
-          </div>
-        )}
+        {activeTab === 'editor' ? renderEditor(true) : renderPreview()}
       </div>
       <div className="h-full w-full max-md:hidden">
-        <MarkdownToolbar
-          editorRef={ref as React.RefObject<MarkdownEditorRef>}
-          pageId={pageId}
-          onAssetVersionChange={onAssetVersionChange}
-        />
-        <div className="flex h-full max-h-full w-full overflow-auto">
+        {renderToolbar()}
+        <div className="flex h-full w-full">
           <div className="w-1/2 max-w-none overflow-auto border-r border-gray-200">
-            <MarkdownCodeEditor
-              initialValue={initialValue}
-              onChange={handleEditorChange}
-              onCursorLineChange={onCursorLineChange}
-              editorViewRef={editorViewRef}
-            />
+            {renderEditor(false)}
           </div>
-          <div
-            ref={previewRef}
-            className="prose prose-lg w-1/2 max-w-none overflow-auto rounded border border-gray-200 bg-white p-4 leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mb-0 [&_ol_ol]:mt-0 [&_ol_ul]:mt-0 [&_ul>li::marker]:text-gray-800 [&_ul_ol]:mb-0 [&_ul_ul]:mb-0 [&_ul_ul]:mt-0"
-          >
-            <MarkdownPreview content={debouncedPreview} key={assetVersion} />
+          <div className="w-1/2 max-w-none h-full overflow-auto">
+            {renderPreview()}
           </div>
         </div>
       </div>

@@ -327,7 +327,7 @@ export default function PageEditor() {
 
   return (
     <>
-      <div className="h-full overflow-hidden">
+      <div className="pageEditor h-full">
         {page && initialContentRef.current && (
           <MarkdownEditor
             ref={editorRef}
