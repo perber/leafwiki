@@ -241,7 +241,7 @@ const MarkdownEditor = (
 
   const renderPreview = (): JSX.Element => {
     return (
-      <div ref={previewRef} className="prose prose-lg h-full p-4">
+      <div ref={previewRef} className="prose prose-base box-content h-full p-4">
         <MarkdownPreview content={debouncedPreview} key={assetVersion} />
       </div>
     )
@@ -249,35 +249,41 @@ const MarkdownEditor = (
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
-      <div className="mb-2 flex border-b text-sm md:hidden">
-        {[
-          { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
-          { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as 'editor' | 'preview')}
-            className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${
-              activeTab === tab.id
-                ? 'border-green-600 font-semibold text-green-600'
-                : 'border-transparent text-gray-500 hover:text-black'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+      {/* Mobile */}
+      <div className="flex h-full w-full flex-col md:hidden">
+        {/* Mobile Tabs */}
+        <div className="mb-2 flex border-b text-sm md:hidden">
+          {[
+            { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
+            { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as 'editor' | 'preview')}
+              className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${
+                activeTab === tab.id
+                  ? 'border-green-600 font-semibold text-green-600'
+                  : 'border-transparent text-gray-500 hover:text-black'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {activeTab === 'editor' ? renderToolbar() : null}
+        <div className="flex max-w-none flex-1 overflow-auto">
+          {activeTab === 'editor' ? renderEditor(false) : renderPreview()}
+        </div>
       </div>
-      <div className="block h-full w-full md:hidden">
-        {activeTab === 'editor' ? renderEditor(true) : renderPreview()}
-      </div>
-      <div className="h-full w-full max-md:hidden">
+      {/* Desktop */}
+      <div className="flex h-full w-full flex-col max-md:hidden">
         {renderToolbar()}
-        <div className="flex h-full w-full">
-          <div className="w-1/2 max-w-none overflow-auto border-r border-gray-200">
+        <div className="flex w-full overflow-hidden">
+          <div className="w-1/2 max-w-none overflow-auto">
             {renderEditor(false)}
           </div>
-          <div className="h-full w-1/2 max-w-none overflow-auto">
+          <div className="w-1/2 max-w-none overflow-auto">
             {renderPreview()}
           </div>
         </div>
