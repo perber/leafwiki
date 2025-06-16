@@ -40,7 +40,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Button
               variant={'secondary'}
               className="relative z-20 p-2 text-gray-500 hover:text-gray-800 focus:outline-none"
-              onClick={() => setSidebarVisible?.(!sidebarVisible)}
+              onClick={() => setSidebarVisible(!sidebarVisible)}
               aria-label="Toggle Sidebar"
             >
               <MenuIcon className="h-5 w-5" />
