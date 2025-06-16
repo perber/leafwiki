@@ -105,9 +105,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-          done: unknown[]
-          undone: unknown[]
-        }
+            done: unknown[]
+            undone: unknown[]
+          }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false
@@ -122,9 +122,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-          done: unknown[]
-          undone: unknown[]
-        }
+            done: unknown[]
+            undone: unknown[]
+          }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false
@@ -215,8 +215,9 @@ const MarkdownEditor = (
     }
   }, [])
 
-  const renderToolbar = ():JSX.Element => {
-    return (<MarkdownToolbar
+  const renderToolbar = (): JSX.Element => {
+    return (
+      <MarkdownToolbar
         editorRef={ref as React.RefObject<MarkdownEditorRef>}
         pageId={pageId}
         onAssetVersionChange={onAssetVersionChange}
@@ -225,23 +226,22 @@ const MarkdownEditor = (
   }
 
   const renderEditor = (toolbar: boolean = true): JSX.Element => {
-    return (<>
-      {toolbar && (renderToolbar())}
-      <MarkdownCodeEditor
-        initialValue={initialValue}
-        onChange={handleEditorChange}
-        onCursorLineChange={onCursorLineChange}
-        editorViewRef={editorViewRef}
-      />
-    </>)
+    return (
+      <>
+        {toolbar && renderToolbar()}
+        <MarkdownCodeEditor
+          initialValue={initialValue}
+          onChange={handleEditorChange}
+          onCursorLineChange={onCursorLineChange}
+          editorViewRef={editorViewRef}
+        />
+      </>
+    )
   }
 
   const renderPreview = (): JSX.Element => {
     return (
-      <div
-        ref={previewRef}
-        className="prose prose-lg h-full p-4"
-      >
+      <div ref={previewRef} className="prose prose-lg h-full p-4">
         <MarkdownPreview content={debouncedPreview} key={assetVersion} />
       </div>
     )
@@ -257,10 +257,11 @@ const MarkdownEditor = (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as 'editor' | 'preview')}
-            className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${activeTab === tab.id
+            className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${
+              activeTab === tab.id
                 ? 'border-green-600 font-semibold text-green-600'
                 : 'border-transparent text-gray-500 hover:text-black'
-              }`}
+            }`}
           >
             {tab.icon}
             {tab.label}
@@ -276,7 +277,7 @@ const MarkdownEditor = (
           <div className="w-1/2 max-w-none overflow-auto border-r border-gray-200">
             {renderEditor(false)}
           </div>
-          <div className="w-1/2 max-w-none h-full overflow-auto">
+          <div className="h-full w-1/2 max-w-none overflow-auto">
             {renderPreview()}
           </div>
         </div>
