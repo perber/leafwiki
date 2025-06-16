@@ -8,7 +8,7 @@ export function useAutoCloseSidebarOnMobile() {
 
   useEffect(() => {
     if (window.innerWidth < 768) {
-      setSidebarVisible?.(false)
+      setSidebarVisible(false)
     }
   }, [location.pathname, setSidebarVisible])
 }
