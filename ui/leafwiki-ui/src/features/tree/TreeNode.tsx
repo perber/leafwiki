@@ -1,5 +1,6 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { TreeViewActionButton } from '@/components/TreeViewActionButton'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useMeasure } from '@/lib/useMeasure'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -25,6 +26,8 @@ export const TreeNode = React.memo(function TreeNode({
   const isActive = `/${node.path}` === pathname
   const open = isNodeOpen(node.id)
   const openDialog = useDialogsStore((state) => state.openDialog)
+
+  const isMobile = useIsMobile()
 
   const [ref] = useMeasure<HTMLDivElement>()
   const readOnlyMode = useIsReadOnly()
@@ -66,7 +69,7 @@ export const TreeNode = React.memo(function TreeNode({
           {linkText}
         </div>
 
-        {hovered && !readOnlyMode && (
+        {(hovered || isMobile) && !readOnlyMode && (
           <div className="flex gap-0">
             <TreeViewActionButton
               icon={
