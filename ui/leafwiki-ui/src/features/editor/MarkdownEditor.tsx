@@ -37,7 +37,14 @@ const MarkdownEditor = (
   { initialValue = '', onChange, pageId }: Props,
   ref: React.ForwardedRef<MarkdownEditorRef>,
 ) => {
-  const previewRef = useRef<HTMLDivElement>(null)
+  const previewRef = useRef<HTMLDivElement | null>(null)
+
+  const setPreviewRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      previewRef.current = node
+    }
+  }, [])
+
   const editorViewRef = useRef<EditorView | null>(null)
   const rafRef = useRef<number | null>(null)
   const [assetVersion, setAssetVersion] = useState(() => Date.now()) // Initial version based on current timestamp
@@ -215,7 +222,7 @@ const MarkdownEditor = (
     }
   }, [])
 
-  const renderToolbar = (): JSX.Element => {
+  const renderToolbar = useCallback((): JSX.Element => {
     return (
       <MarkdownToolbar
         editorRef={ref as React.RefObject<MarkdownEditorRef>}
@@ -223,29 +230,37 @@ const MarkdownEditor = (
         onAssetVersionChange={onAssetVersionChange}
       />
     )
-  }
+  }, [onAssetVersionChange, pageId, ref])
 
-  const renderEditor = (toolbar: boolean = true): JSX.Element => {
-    return (
-      <>
-        {toolbar && renderToolbar()}
-        <MarkdownCodeEditor
-          initialValue={initialValue}
-          onChange={handleEditorChange}
-          onCursorLineChange={onCursorLineChange}
-          editorViewRef={editorViewRef}
-        />
-      </>
-    )
-  }
+  const renderEditor = useCallback(
+    (toolbar: boolean = true): JSX.Element => {
+      return (
+        <>
+          {toolbar && renderToolbar()}
+          <MarkdownCodeEditor
+            initialValue={initialValue}
+            onChange={handleEditorChange}
+            onCursorLineChange={onCursorLineChange}
+            editorViewRef={editorViewRef}
+          />
+        </>
+      )
+    },
+    [handleEditorChange, initialValue, onCursorLineChange, renderToolbar],
+  )
 
-  const renderPreview = (): JSX.Element => {
+  const renderPreview = useCallback((): JSX.Element => {
     return (
-      <div ref={previewRef} className="prose prose-base box-content h-full p-4">
-        <MarkdownPreview content={debouncedPreview} key={assetVersion} />
+      <div
+        ref={setPreviewRef}
+        className="prose prose-base box-content h-full w-full overflow-auto"
+      >
+        <div className="p-4">
+          <MarkdownPreview content={debouncedPreview} key={assetVersion} />
+        </div>
       </div>
     )
-  }
+  }, [assetVersion, debouncedPreview, setPreviewRef])
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
@@ -283,9 +298,7 @@ const MarkdownEditor = (
           <div className="w-1/2 max-w-none overflow-auto">
             {renderEditor(false)}
           </div>
-          <div className="w-1/2 max-w-none overflow-auto">
-            {renderPreview()}
-          </div>
+          <div className="w-1/2 max-w-none">{renderPreview()}</div>
         </div>
       </div>
     </div>
