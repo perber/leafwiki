@@ -294,11 +294,11 @@ const MarkdownEditor = (
       {/* Desktop */}
       <div className="flex h-full w-full flex-col max-md:hidden">
         {renderToolbar()}
-        <div className="flex w-full overflow-hidden">
-          <div className="w-1/2 max-w-none overflow-auto">
+        <div className="flex w-full overflow-hidden flex-1">
+          <div className="w-1/2 flex flex-1 max-w-none overflow-auto">
             {renderEditor(false)}
           </div>
-          <div className="w-1/2 max-w-none">{renderPreview()}</div>
+          <div className="w-1/2 max-w-none flex-1">{renderPreview()}</div>
         </div>
       </div>
     </div>
