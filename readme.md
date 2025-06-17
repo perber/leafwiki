@@ -34,6 +34,9 @@ LeafWiki now builds and runs natively on:
 - ⚙️ Single statically-linked Go binary (no dependencies)
 - 🚀 Easily self-hosted (Docker or standalone)
 - 🔁 Session auth with JWT tokens + refresh
+- 🔍 Search functionality for page titles and content
+- 📱 Mobile-friendly design
+- 🌐 Public pages (viewable without login)
 
 ---
 
