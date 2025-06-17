@@ -267,7 +267,7 @@ const MarkdownEditor = (
       {/* Mobile */}
       <div className="flex h-full w-full flex-col md:hidden">
         {/* Mobile Tabs */}
-        <div className="mb-2 flex border-b text-sm md:hidden">
+        <div className="mb-2 flex border-b text-sm md:hidden" role="tablist">
           {[
             { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
             { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
