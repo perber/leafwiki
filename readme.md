@@ -165,7 +165,7 @@ go run main.go
 - [x] Fix favicon not displayed
 - [x] ARM64 support for Raspberry Pi and other ARM devices (thanks @nahaktarun)
 
-### Upcoming Features in Version 0.4.1
+### ✅ v0.4.1 – Ready for Dogfooding
 - [x] Add Search functionality for page titles and content
 - [x] Add Mobile optimizations for better usability
 - [x] Allow Public Pages (viewable pages without login)
