@@ -37,7 +37,7 @@ export function EditorTitleBar({ title, slug, onEditClicked, isDirty }: Props) {
           )}
         </TooltipWrapper>
       </button>
-      <span className="mt-1 max-w-[15vw] truncate rounded bg-gray-200 px-2 py-0.5 font-mono text-xs text-gray-700 sm:max-w-[40vw]">
+      <span className="mt-1 max-w-[15vw] truncate inline-block rounded bg-gray-200 px-2 py-0.5 font-mono text-xs text-gray-700 sm:max-w-[40vw]">
         {slug}
       </span>
     </div>
