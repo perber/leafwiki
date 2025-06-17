@@ -162,10 +162,15 @@ go run main.go
 - [x] Fix favicon not displayed
 - [x] ARM64 support for Raspberry Pi and other ARM devices (thanks @nahaktarun)
 
-### Upcoming Features in Version 0.4.0
-- [ ] Add Search functionality for page titles and content
-- [ ] Syntax Highlighting for code blocks (f.g. JavaScript, Python, etc.)
-- [ ] Add a Table of Contents (TOC)
+### Upcoming Features in Version 0.4.1
+- [x] Add Search functionality for page titles and content
+- [x] Add Mobile optimizations for better usability
+- [x] Allow Public Pages (viewable pages without login)
+
+### Upcoming Features in Version 0.5.0
+- [ ] Static pages (Required for SEO and public pages)
+- [ ] Dogfooding (using LeafWiki to document LeafWiki)
+- [ ] Show case release
 
 ### 🧪 Future Ideas
 - [ ] Automatic import of existing Markdown files
