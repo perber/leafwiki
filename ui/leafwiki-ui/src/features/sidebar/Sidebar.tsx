@@ -1,5 +1,6 @@
 import { useSidebarStore } from '@/stores/sidebar'
 import { FolderTree, Search as SearchIcon } from 'lucide-react'
+import { JSX } from 'react'
 import Search from '../search/Search'
 import TreeView from '../tree/TreeView'
 
@@ -7,7 +8,7 @@ export default function Sidebar() {
   const sidebarMode = useSidebarStore((state) => state.sidebarMode)
   const setSidebarMode = useSidebarStore((state) => state.setSidebarMode)
 
-  const tabs = [
+  const tabs: { id: 'tree' | 'search'; label: string; icon: JSX.Element }[] = [
     { id: 'tree', label: 'Tree', icon: <FolderTree size={16} /> },
     { id: 'search', label: 'Search', icon: <SearchIcon size={16} /> },
   ]
