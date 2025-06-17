@@ -42,6 +42,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               className="relative z-20 p-2 text-gray-500 hover:text-gray-800 focus:outline-none"
               onClick={() => setSidebarVisible(!sidebarVisible)}
               aria-label="Toggle Sidebar"
+              aria-expanded={sidebarVisible}
             >
               <MenuIcon className="h-5 w-5" />
             </Button>
