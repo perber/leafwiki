@@ -54,6 +54,10 @@ const MarkdownEditor = (
 
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
 
+  useEffect(() => {
+    setMarkdown(initialValue)
+  }, [initialValue])
+
   const handleEditorChange = useCallback(
     (val: string) => {
       setMarkdown(val)
