@@ -20,7 +20,7 @@ export function EditorTitleBar({ title, slug, onEditClicked, isDirty }: Props) {
       >
         <TooltipWrapper label={title} side="top" align="start">
           {title && (
-            <span className="max-w-[15vw] truncate sm:max-w-[40vw]">
+            <span className="inline-block max-w-[15vw] truncate sm:max-w-[40vw]">
               {title}
             </span>
           )}
