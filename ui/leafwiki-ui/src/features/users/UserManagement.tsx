@@ -34,7 +34,7 @@ export default function UserManagement() {
         <div className="flex justify-end">
           <UserFormDialog />
         </div>
-        <div className="mt-4 overflow-hidden rounded-md border shadow">
+        <div className="mt-4 rounded-md border shadow">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-100 text-left">
