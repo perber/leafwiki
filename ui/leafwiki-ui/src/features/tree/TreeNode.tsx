@@ -43,7 +43,7 @@ export const TreeNode = React.memo(function TreeNode({
   )
 
   return (
-    <div>
+    <>
       <div
         className={`flex cursor-pointer items-center rounded-lg pb-1 pt-1 text-base transition-all duration-200 ease-in-out ${
           isActive
@@ -120,6 +120,6 @@ export const TreeNode = React.memo(function TreeNode({
             <TreeNode key={child.id} node={child} level={level + 1} />
           ))}
       </div>
-    </div>
+    </>
   )
 })

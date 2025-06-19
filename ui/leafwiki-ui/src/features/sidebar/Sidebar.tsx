@@ -14,8 +14,8 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside key={'sidebar'} className="h-full">
-      <div className="mb-4 flex border-b text-sm">
+    <aside key={'sidebar'} className="flex flex-1 flex-col pb-2">
+      <div className="flex border-b pb-2 pl-4 pt-1 text-sm">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -33,10 +33,14 @@ export default function Sidebar() {
       </div>
 
       {/* Content */}
-      <div className={sidebarMode === 'tree' ? 'block h-full' : 'hidden'}>
+      <div
+        className={sidebarMode === 'tree' ? 'flex flex-1 flex-col' : 'hidden'}
+      >
         <TreeView />
       </div>
-      <div className={sidebarMode === 'search' ? 'block h-full' : 'hidden'}>
+      <div
+        className={sidebarMode === 'search' ? 'flex flex-1 flex-col' : 'hidden'}
+      >
         <Search />
       </div>
     </aside>

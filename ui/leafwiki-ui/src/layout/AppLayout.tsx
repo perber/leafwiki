@@ -66,15 +66,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </header>
       <div className="flex h-[calc(100vh-85px)] transition-all duration-200">
         <div
-          className={`z-20 h-full overflow-hidden border-r border-gray-200 bg-white transition-all duration-200 max-sm:fixed ${
+          className={`z-20 h-full overflow-auto border-r border-gray-200 bg-white transition-all duration-200 max-sm:fixed max-sm:h-[calc(100vh-85px)] ${
             sidebarVisible ? 'w-96' : 'w-0'
           }`}
         >
-          <div className="h-full w-96 overflow-auto">
-            <div className="p-4">
-              <Sidebar />
-            </div>
-          </div>
+          <Sidebar />
         </div>
 
         <main
