@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 
-export function useIsMobile(breakpoint: number = 768): boolean {
+export function useIsMobile(): boolean {
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const handleResize = () => setIsMobile(window.innerWidth < breakpoint)
-      setIsMobile(window.innerWidth < breakpoint) // Initial update
-      window.addEventListener('resize', handleResize)
-      return () => window.removeEventListener('resize', handleResize)
+    if (typeof window === 'undefined') {
+      return () => {}
     }
-  }, [breakpoint])
+    const media = window.matchMedia('(max-width: 767px)')
+
+    const handleChange = () => setIsMobile(media.matches)
+
+    handleChange() // initial
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
 
   return isMobile
 }

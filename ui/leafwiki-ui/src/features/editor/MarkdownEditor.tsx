@@ -274,12 +274,15 @@ const MarkdownEditor = (
   // * I will leave the issue open for now. (You can validate this by resizing the window in the edit mode)
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
+    <div
+      className="flex h-full w-full flex-col overflow-hidden"
+      key={isMobile ? 'mobile' : 'desktop'}
+    >
       {/* Mobile */}
       {isMobile && (
-        <div className="flex h-full w-full flex-col md:hidden">
+        <div className="flex h-full w-full flex-col">
           {/* Mobile Tabs */}
-          <div className="mb-2 flex border-b text-sm md:hidden" role="tablist">
+          <div className="mb-2 flex border-b text-sm" role="tablist">
             {[
               { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
               { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
@@ -301,13 +304,13 @@ const MarkdownEditor = (
           {activeTab === 'editor' ? renderToolbar() : null}
           <div className="flex max-w-none flex-1 overflow-auto">
             <div
-              className={activeTab === 'editor' ? 'block' : 'hidden'}
+              className={activeTab === 'editor' ? 'block w-full' : 'hidden'}
               key="editor"
             >
               {renderEditor(false)}
             </div>
             <div
-              className={activeTab === 'preview' ? 'block' : 'hidden'}
+              className={activeTab === 'preview' ? 'block w-full' : 'hidden'}
               key="preview"
             >
               {renderPreview()}
@@ -316,7 +319,7 @@ const MarkdownEditor = (
         </div>
       )}
       {!isMobile && (
-        <div className="flex h-full w-full flex-col max-md:hidden">
+        <div className="flex h-full w-full flex-col">
           {renderToolbar()}
           <div className="flex w-full flex-1 overflow-hidden">
             <div className="flex w-1/2 max-w-none flex-1 overflow-auto">
