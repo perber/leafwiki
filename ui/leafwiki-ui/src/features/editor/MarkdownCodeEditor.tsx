@@ -9,6 +9,7 @@ import { EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, keymap } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
+import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 
 type MarkdownCodeEditorProps = {
   initialValue: string
@@ -51,13 +52,66 @@ export default function MarkdownCodeEditor({
       }
     })
 
+    const customShortcuts = [
+      {
+        key: 'Mod-b',
+        run: () => {
+          const view = editorViewRef.current
+          if (!view) return false
+          insertWrappedText(view, '**', '**')
+          return true
+        },
+      },
+      {
+        key: 'Mod-i',
+        run: () => {
+          const view = editorViewRef.current
+          if (!view) return false
+          insertWrappedText(view, '_', '_')
+          return true
+        },
+      },
+      {
+        key: 'Mod-Alt-1',
+        run: () => {
+          const view = editorViewRef.current
+          if (!view) return false
+          insertHeadingAtStart(view, 1)
+          return true
+        },
+      },
+      {
+        key: 'Mod-Alt-2',
+        run: () => {
+          const view = editorViewRef.current
+          if (!view) return false
+          insertHeadingAtStart(view, 2)
+          return true
+        },
+      },
+      {
+        key: 'Mod-Alt-3',
+        run: () => {
+          const view = editorViewRef.current
+          if (!view) return false
+          insertHeadingAtStart(view, 3)
+          return true
+        },
+      },
+    ]
+
     const state = EditorState.create({
       doc: initialValue,
       extensions: [
         oneDark,
         markdown(),
         history(),
-        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        keymap.of([
+          ...customShortcuts,
+          indentWithTab,
+          ...historyKeymap,
+          ...defaultKeymap,
+        ]),
         EditorView.lineWrapping,
         updateListener,
         EditorView.theme({
