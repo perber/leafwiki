@@ -240,7 +240,6 @@ const MarkdownEditor = (
 
   const renderEditor = useCallback(
     (toolbar: boolean = true): JSX.Element => {
-      console.log('Rendering editor with toolbar:', toolbar)
       return (
         <>
           {toolbar && renderToolbar()}
