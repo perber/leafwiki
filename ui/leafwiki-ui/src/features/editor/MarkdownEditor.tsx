@@ -240,6 +240,7 @@ const MarkdownEditor = (
 
   const renderEditor = useCallback(
     (toolbar: boolean = true): JSX.Element => {
+      console.log('Rendering editor with toolbar:', toolbar)
       return (
         <>
           {toolbar && renderToolbar()}
@@ -299,7 +300,18 @@ const MarkdownEditor = (
           </div>
           {activeTab === 'editor' ? renderToolbar() : null}
           <div className="flex max-w-none flex-1 overflow-auto">
-            {activeTab === 'editor' ? renderEditor(false) : renderPreview()}
+            <div
+              className={activeTab === 'editor' ? 'block' : 'hidden'}
+              key="editor"
+            >
+              {renderEditor(false)}
+            </div>
+            <div
+              className={activeTab === 'preview' ? 'block' : 'hidden'}
+              key="preview"
+            >
+              {renderPreview()}
+            </div>
           </div>
         </div>
       )}
