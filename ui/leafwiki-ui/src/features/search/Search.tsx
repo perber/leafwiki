@@ -46,7 +46,7 @@ export default function Search() {
   }
 
   return (
-    <div className="h-full">
+    <div className="ml-4 mr-4 mt-4">
       <div className="relative mb-2">
         <input
           autoFocus
