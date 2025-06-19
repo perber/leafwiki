@@ -268,9 +268,9 @@ const MarkdownEditor = (
     )
   }, [assetVersion, debouncedPreview, setPreviewRef])
 
-// TODO: Known Issues:
-// * When we resize the window, the preview does not update immediately.
-// * I will leave the issue open for now. (You can validate this by resizing the window in the edit mode)
+  // TODO: Known Issues:
+  // * When we resize the window, the preview does not update immediately.
+  // * I will leave the issue open for now. (You can validate this by resizing the window in the edit mode)
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
