@@ -1,4 +1,5 @@
 import { useDebounce } from '@/lib/useDebounce'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { historyField, redo, undo } from '@codemirror/commands'
 import { EditorView } from '@codemirror/view'
 import { Code2, Eye } from 'lucide-react'
@@ -51,6 +52,7 @@ const MarkdownEditor = (
 
   const [markdown, setMarkdown] = useState(initialValue)
   const debouncedPreview = useDebounce(markdown, 100)
+  const isMobile = useIsMobile()
 
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
 
@@ -266,45 +268,54 @@ const MarkdownEditor = (
     )
   }, [assetVersion, debouncedPreview, setPreviewRef])
 
+  /*
+    Known Issues:
+    * When we resize the window, the preview does not update immediately.
+    * I will leave the issue open for now. (You can validate this by resizing the window in the edit mode)
+  **/
+
   return (
     <div className="flex h-full w-full flex-col overflow-hidden">
       {/* Mobile */}
-      <div className="flex h-full w-full flex-col md:hidden">
-        {/* Mobile Tabs */}
-        <div className="mb-2 flex border-b text-sm md:hidden" role="tablist">
-          {[
-            { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
-            { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as 'editor' | 'preview')}
-              className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${
-                activeTab === tab.id
-                  ? 'border-green-600 font-semibold text-green-600'
-                  : 'border-transparent text-gray-500 hover:text-black'
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        {activeTab === 'editor' ? renderToolbar() : null}
-        <div className="flex max-w-none flex-1 overflow-auto">
-          {activeTab === 'editor' ? renderEditor(false) : renderPreview()}
-        </div>
-      </div>
-      {/* Desktop */}
-      <div className="flex h-full w-full flex-col max-md:hidden">
-        {renderToolbar()}
-        <div className="flex w-full flex-1 overflow-hidden">
-          <div className="flex w-1/2 max-w-none flex-1 overflow-auto">
-            {renderEditor(false)}
+      {isMobile && (
+        <div className="flex h-full w-full flex-col md:hidden">
+          {/* Mobile Tabs */}
+          <div className="mb-2 flex border-b text-sm md:hidden" role="tablist">
+            {[
+              { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
+              { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as 'editor' | 'preview')}
+                className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${
+                  activeTab === tab.id
+                    ? 'border-green-600 font-semibold text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-black'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
           </div>
-          <div className="w-1/2 max-w-none flex-1">{renderPreview()}</div>
+          {activeTab === 'editor' ? renderToolbar() : null}
+          <div className="flex max-w-none flex-1 overflow-auto">
+            {activeTab === 'editor' ? renderEditor(false) : renderPreview()}
+          </div>
         </div>
-      </div>
+      )}
+      {!isMobile && (
+        <div className="flex h-full w-full flex-col max-md:hidden">
+          {renderToolbar()}
+          <div className="flex w-full flex-1 overflow-hidden">
+            <div className="flex w-1/2 max-w-none flex-1 overflow-auto">
+              {renderEditor(false)}
+            </div>
+            <div className="w-1/2 max-w-none flex-1">{renderPreview()}</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
