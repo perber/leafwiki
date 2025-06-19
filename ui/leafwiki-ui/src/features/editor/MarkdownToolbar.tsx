@@ -40,11 +40,6 @@ export default function MarkdownToolbar({
 
   const toolbarButtonStyle = 'text-white hover:text-white hover:bg-zinc-800'
 
-  const insertHeading = (level: 1 | 2 | 3) => {
-    const prefix = '#'.repeat(level) + ' '
-    editorRef.current?.insertWrappedText(prefix, '')
-  }
-
   useEffect(() => {
     const check = () => {
       const editor = editorRef.current
@@ -73,7 +68,7 @@ export default function MarkdownToolbar({
   return (
     <>
       <div className="sticky top-0 z-10 flex gap-1.5 border-b border-zinc-700 bg-zinc-900 p-2 shadow-sm">
-        <TooltipWrapper label="Bold" side="top" align="center">
+        <TooltipWrapper label="Bold (Ctrl+B)" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
@@ -83,7 +78,7 @@ export default function MarkdownToolbar({
             <Bold className="h-4 w-4" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Italic" side="top" align="center">
+        <TooltipWrapper label="Italic (Ctrl+I)" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
@@ -119,32 +114,44 @@ export default function MarkdownToolbar({
           </Button>
         </TooltipWrapper>
         <div className="mx-1 h-5 w-px self-center bg-white/30" />
-        <TooltipWrapper label="Headline - H1" side="top" align="center">
+        <TooltipWrapper
+          label="Headline - H1 (Ctrl + Alt + 1)"
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
             className={toolbarButtonStyle + ' max-md:hidden'}
-            onClick={() => insertHeading(1)}
+            onClick={() => editorRef.current?.insertHeading(1)}
           >
             H1
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Headline - H2" side="top" align="center">
+        <TooltipWrapper
+          label="Headline - H2 (Ctrl + Alt + 2)"
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
             className={toolbarButtonStyle + ' max-md:hidden'}
-            onClick={() => insertHeading(2)}
+            onClick={() => editorRef.current?.insertHeading(2)}
           >
             H2
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Headline - H3" side="top" align="center">
+        <TooltipWrapper
+          label="Headline - H3 (Ctrl + Alt + 3)"
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
             className={toolbarButtonStyle + ' max-md:hidden'}
-            onClick={() => insertHeading(3)}
+            onClick={() => editorRef.current?.insertHeading(3)}
           >
             H3
           </Button>

@@ -15,11 +15,13 @@ import {
 import MarkdownPreview from '../preview/MarkdownPreview'
 import MarkdownCodeEditor from './MarkdownCodeEditor'
 import MarkdownToolbar from './MarkdownToolbar'
+import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 
 export type MarkdownEditorRef = {
   insertAtCursor: (text: string) => void
   getMarkdown: () => string
   insertWrappedText: (before: string, after?: string) => void
+  insertHeading: (level: 1 | 2 | 3) => void
   editorViewRef: React.RefObject<EditorView | null>
   focus: () => void
   undo: () => void
@@ -85,26 +87,16 @@ const MarkdownEditor = (
     insertWrappedText: (before: string, after = before) => {
       const view = editorViewRef.current
       if (!view) return
-      const { from, to } = view.state.selection.main
-      const hasSelection = from !== to
-      const selected = view.state.doc.sliceString(from, to)
-
-      let insertText = ''
-      let cursorPos = from
-
-      if (hasSelection) {
-        insertText = `${before}${selected}${after}`
-        cursorPos = from + insertText.length
-      } else {
-        insertText = `${before}${after}`
-        cursorPos = from + before.length
-      }
-
-      view.dispatch({
-        changes: { from, to, insert: insertText },
-        selection: { anchor: cursorPos },
-      })
-
+      insertWrappedText(view, before, after)
+      const newDoc = view.state.doc.toString()
+      setMarkdown(newDoc)
+      onChange(newDoc)
+      editorViewRef.current?.focus()
+    },
+    insertHeading: (level: 1 | 2 | 3) => {
+      const view = editorViewRef.current
+      if (!view) return
+      insertHeadingAtStart(view, level)
       const newDoc = view.state.doc.toString()
       setMarkdown(newDoc)
       onChange(newDoc)
