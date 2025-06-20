@@ -5,6 +5,7 @@ import { usePageToolbar } from '@/components/usePageToolbar'
 import UserToolbar from '@/components/UserToolbar'
 import Sidebar from '@/features/sidebar/Sidebar'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useSidebarStore } from '@/stores/sidebar'
 import { MenuIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -17,6 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const sidebarVisible = useSidebarStore((s) => s.sidebarVisible)
   const setSidebarVisible = useSidebarStore((s) => s.setSidebarVisible)
+  const isMobile = useIsMobile()
 
   useAutoCloseSidebarOnMobile()
 
@@ -27,7 +29,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(frame)
   }, [location.pathname])
 
-  const mainContainerStyle = !isEditor ? 'overflow-auto p-6' : 'overflow-hidden'
+  let mainContainerStyle = !isEditor ? 'overflow-auto p-6' : 'overflow-hidden'
+
+  // If on mobile and sidebar is visible, hide overflow to prevent double scrollbars
+  if (isMobile && sidebarVisible) {
+    mainContainerStyle += ' overflow-hidden'
+  }
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -72,7 +79,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         >
           <Sidebar />
         </div>
-
+        {/* Overlay for mobile sidebar */}
+        {isMobile && sidebarVisible && (
+          <div
+            className="fixed inset-0 z-10 bg-black/50 top-[85px] max-sm:h-[calc(100vh-85px)]"
+          />
+        )}
+        {/* Main content area */}
         <main
           className={`${mainContainerStyle} flex-1 transition-all duration-200`}
         >
