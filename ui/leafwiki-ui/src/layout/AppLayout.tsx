@@ -5,6 +5,7 @@ import { usePageToolbar } from '@/components/usePageToolbar'
 import UserToolbar from '@/components/UserToolbar'
 import Sidebar from '@/features/sidebar/Sidebar'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useSidebarStore } from '@/stores/sidebar'
 import { MenuIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -17,6 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const sidebarVisible = useSidebarStore((s) => s.sidebarVisible)
   const setSidebarVisible = useSidebarStore((s) => s.setSidebarVisible)
+  const isMobile = useIsMobile()
 
   useAutoCloseSidebarOnMobile()
 
@@ -27,13 +29,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(frame)
   }, [location.pathname])
 
-  const mainContainerStyle = !isEditor ? 'overflow-auto p-6' : 'overflow-hidden'
+  let mainContainerStyle = !isEditor ? 'overflow-auto p-6' : 'overflow-hidden'
+
+  // If on mobile and sidebar is visible, hide overflow to prevent double scrollbars
+  if (isMobile && sidebarVisible) {
+    mainContainerStyle += ' overflow-hidden'
+  }
 
   return (
     <TooltipProvider delayDuration={300}>
       <DialogManger />
       {/* Header */}
-      <header className="h-[85px] border-b bg-white p-4 shadow-sm">
+      <header className="fixed z-50 h-[85px] w-full border-b bg-white p-4 shadow-sm">
         <div className="flex h-full items-center justify-start">
           <div className="flex min-h-full w-6 items-center">
             {/* Sidebar Toggle Button */}
@@ -64,6 +71,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
+      <div className="h-[85px] w-full" />
       <div className="flex h-[calc(100vh-85px)] transition-all duration-200">
         <div
           className={`z-20 h-full overflow-auto border-r border-gray-200 bg-white transition-all duration-200 max-sm:fixed max-sm:h-[calc(100vh-85px)] ${
@@ -72,7 +80,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         >
           <Sidebar />
         </div>
-
+        {/* Overlay for mobile sidebar */}
+        {isMobile && sidebarVisible && (
+          <div className="fixed inset-0 top-[85px] z-10 bg-black/50 max-sm:h-[calc(100vh-85px)]" />
+        )}
+        {/* Main content area */}
         <main
           className={`${mainContainerStyle} flex-1 transition-all duration-200`}
         >

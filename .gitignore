@@ -37,3 +37,6 @@ data/
 __debug*
 
 **/test-results/*
+
+
+local

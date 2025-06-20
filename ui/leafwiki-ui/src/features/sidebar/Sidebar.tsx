@@ -14,34 +14,50 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside key={'sidebar'} className="flex flex-1 flex-col pb-2">
-      <div className="flex border-b pb-2 pl-4 pt-1 text-sm">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setSidebarMode(tab.id)}
-            className={`-mb-px flex items-center gap-1 border-b-2 px-3 py-1.5 ${
-              sidebarMode === tab.id
-                ? 'border-green-600 font-semibold text-green-600'
-                : 'border-transparent text-gray-500 hover:text-black'
-            }`}
+    <aside key={'sidebar'}>
+      {/*
+        Our sidebar has always the same width, so we can use a fixed width.
+        This will help us to avoid layout shifts when the sidebar is toggled.
+        I can't use w-96 because it would add a scrollbar, because the container above is adding a border-right.
+      */}
+      <div className="ml-4 block w-[345px]">
+        <div className="pb-2 pt-2">
+          {' '}
+          {/* Padding Container */}
+          <div className="flex border-b text-sm">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSidebarMode(tab.id)}
+                className={`-mb-px flex items-center gap-1 border-b-2 px-3 py-1.5 ${
+                  sidebarMode === tab.id
+                    ? 'border-green-600 font-semibold text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-black'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="sidebar-content">
+          {/* Content */}
+          <div
+            className={
+              sidebarMode === 'tree' ? 'flex flex-1 flex-col' : 'hidden'
+            }
           >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div
-        className={sidebarMode === 'tree' ? 'flex flex-1 flex-col' : 'hidden'}
-      >
-        <TreeView />
-      </div>
-      <div
-        className={sidebarMode === 'search' ? 'flex flex-1 flex-col' : 'hidden'}
-      >
-        <Search />
+            <TreeView />
+          </div>
+          <div
+            className={
+              sidebarMode === 'search' ? 'flex flex-1 flex-col' : 'hidden'
+            }
+          >
+            <Search />
+          </div>
+        </div>
       </div>
     </aside>
   )
