@@ -20,17 +20,20 @@ export default function Sidebar() {
         This will help us to avoid layout shifts when the sidebar is toggled.
         I can't use w-96 because it would add a scrollbar, because the container above is adding a border-right.
       */}
-      <div className="block w-[345px] ml-4">
-        <div className="pt-2 pb-2"> {/* Padding Container */}
+      <div className="ml-4 block w-[345px]">
+        <div className="pb-2 pt-2">
+          {' '}
+          {/* Padding Container */}
           <div className="flex border-b text-sm">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setSidebarMode(tab.id)}
-                className={`-mb-px flex items-center gap-1 border-b-2 px-3 py-1.5 ${sidebarMode === tab.id
-                  ? 'border-green-600 font-semibold text-green-600'
-                  : 'border-transparent text-gray-500 hover:text-black'
-                  }`}
+                className={`-mb-px flex items-center gap-1 border-b-2 px-3 py-1.5 ${
+                  sidebarMode === tab.id
+                    ? 'border-green-600 font-semibold text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-black'
+                }`}
               >
                 {tab.icon}
                 {tab.label}
@@ -41,12 +44,16 @@ export default function Sidebar() {
         <div className="sidebar-content">
           {/* Content */}
           <div
-            className={sidebarMode === 'tree' ? 'flex flex-1 flex-col' : 'hidden'}
+            className={
+              sidebarMode === 'tree' ? 'flex flex-1 flex-col' : 'hidden'
+            }
           >
             <TreeView />
           </div>
           <div
-            className={sidebarMode === 'search' ? 'flex flex-1 flex-col' : 'hidden'}
+            className={
+              sidebarMode === 'search' ? 'flex flex-1 flex-col' : 'hidden'
+            }
           >
             <Search />
           </div>
