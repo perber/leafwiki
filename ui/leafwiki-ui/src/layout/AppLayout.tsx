@@ -40,7 +40,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <TooltipProvider delayDuration={300}>
       <DialogManger />
       {/* Header */}
-      <header className="h-[85px] border-b bg-white p-4 shadow-sm">
+      <header className="h-[85px] border-b bg-white p-4 shadow-sm fixed w-full z-50">
         <div className="flex h-full items-center justify-start">
           <div className="flex min-h-full w-6 items-center">
             {/* Sidebar Toggle Button */}
@@ -71,6 +71,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
+      <div className='h-[85px] w-full' />
       <div className="flex h-[calc(100vh-85px)] transition-all duration-200">
         <div
           className={`z-20 h-full overflow-auto border-r border-gray-200 bg-white transition-all duration-200 max-sm:fixed max-sm:h-[calc(100vh-85px)] ${
