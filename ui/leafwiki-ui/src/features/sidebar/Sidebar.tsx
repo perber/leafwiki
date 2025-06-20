@@ -20,8 +20,8 @@ export default function Sidebar() {
         This will help us to avoid layout shifts when the sidebar is toggled.
         I can't use w-96 because it would add a scrollbar, because the container above is adding a border-right.
       */}
-      <div className="w-385px">
-        <div className="pt-2 p-4 pb-2"> {/* Padding Container */}
+      <div className="block w-[345px] ml-4">
+        <div className="pt-2 pb-2"> {/* Padding Container */}
           <div className="flex border-b text-sm">
             {tabs.map((tab) => (
               <button
@@ -38,7 +38,7 @@ export default function Sidebar() {
             ))}
           </div>
         </div>
-        <div className="pl-4 pr-4">
+        <div className="sidebar-content">
           {/* Content */}
           <div
             className={sidebarMode === 'tree' ? 'flex flex-1 flex-col' : 'hidden'}
