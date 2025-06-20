@@ -44,7 +44,7 @@ export default function TreeView() {
 
   return (
     <>
-      <div className="ml-4 mr-4 mt-4">
+      <div className="mt-2 mb-2">
         {!readOnlyMode && (
           <div className="mb-1 flex">
             <TreeViewActionButton

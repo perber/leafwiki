@@ -46,8 +46,8 @@ export default function Search() {
   }
 
   return (
-    <div className="ml-4 mr-4 mt-4">
-      <div className="relative mb-2">
+    <div className="mt-2">
+      <div className="relative mb-4">
         <input
           autoFocus
           type="text"
@@ -66,7 +66,7 @@ export default function Search() {
           </button>
         )}
       </div>
-      <div>
+      <div className="mb-4">
         {loading && (
           <div className="text-sm text-gray-500">Loading results...</div>
         )}
