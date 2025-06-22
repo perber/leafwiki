@@ -13,8 +13,12 @@ LeafWiki is designed for teams and individuals who want a clean, fast, and self-
 ## 📦 Status
 
 > **MVP released – actively developed** 
-LeafWiki is usable and already powers knowledge workflows, but is still in early public stages.  
-Expect improvements, polishing, and community feedback over the next releases.
+> LeafWiki is already powering real documentation workflows — but it’s still in early development.
+> It's **not yet production-ready** for mission-critical teams.
+>
+> Expect active development, some rough edges, and fast iteration.
+> 
+> Want to try it and help shape it? You’re more than welcome.
 
 LeafWiki now builds and runs natively on:
 - **Linux (x86_64 and ARM64)**
