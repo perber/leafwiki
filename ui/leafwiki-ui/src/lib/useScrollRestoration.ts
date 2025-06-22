@@ -10,7 +10,7 @@ import { useEffect } from 'react'
 export function useScrollRestoration(
   pathname: string,
   isLoading: boolean,
-  containerId: string = 'scroll-container',
+  containerId: string = DEFAULT_SCROLL_CONTAINER_ID,
 ) {
   useLayoutEffect(() => {
     if (isLoading) return
