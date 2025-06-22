@@ -12,7 +12,7 @@ export function useScrollRestoration(
   isLoading: boolean,
   containerId: string = 'scroll-container',
 ) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isLoading) return
 
     const el = document.getElementById(containerId)
