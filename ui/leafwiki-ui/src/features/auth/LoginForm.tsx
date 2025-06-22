@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { login } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 export default function LoginForm() {
@@ -13,6 +13,14 @@ export default function LoginForm() {
 
   const navigate = useNavigate()
   const setAuth = useAuthStore((state) => state.setAuth)
+  const token = useAuthStore((s) => s.token)
+
+  // Redirect to home if already logged in
+  useEffect(() => {
+    if (token) {
+      navigate('/')
+    }
+  }, [token, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,7 +30,6 @@ export default function LoginForm() {
     try {
       const { token, refresh_token, user } = await login(identifier, password)
       setAuth(token, refresh_token, user)
-      navigate('/') // redirect after login
     } catch {
       setError('Invalid credentials')
     } finally {

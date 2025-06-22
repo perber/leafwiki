@@ -1,15 +1,8 @@
-import { useEffect } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { useEffect, useMemo } from 'react'
+import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './App.css'
-import { PageToolbarProvider } from './components/PageToolbarProvider'
-import LoginForm from './features/auth/LoginForm'
-import RequireAuth from './features/auth/RequireAuth'
-import PageEditor from './features/page/PageEditor'
-import PageViewer from './features/page/PageViewer'
-import RootRedirect from './features/page/RootRedirect'
-import UserManagement from './features/users/UserManagement'
-import AppLayout from './layout/AppLayout'
+import { createLeafWikiRouter } from './features/router/router'
 import { getConfig } from './lib/api'
 import { useIsReadOnly } from './lib/useIsReadOnly'
 import { useAuthStore } from './stores/auth'
@@ -44,43 +37,18 @@ function App() {
       })
   }, [setPublicAccess, setLoaded])
 
+  const router = useMemo(
+    () => createLeafWikiRouter(isReadOnlyViewer),
+    [isReadOnlyViewer],
+  )
+
   if (!publicAccessLoaded) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
 
   return (
-    <BrowserRouter>
+    <>
       <Toaster richColors position="bottom-right" />
-      <Routes>
-        <Route path="/login" element={<LoginForm />} />
-        <Route
-          path="/*"
-          element={
-            isReadOnlyViewer ? (
-              <PageToolbarProvider>
-                <AppLayout>
-                  <Routes>
-                    <Route path="/" element={<RootRedirect />} />
-                    <Route path="*" element={<PageViewer />} />
-                  </Routes>
-                </AppLayout>
-              </PageToolbarProvider>
-            ) : (
-              <RequireAuth>
-                <PageToolbarProvider>
-                  <AppLayout>
-                    <Routes>
-                      <Route path="/users" element={<UserManagement />} />
-                      <Route path="/" element={<RootRedirect />} />
-                      <Route path="/e/*" element={<PageEditor />} />
-                      <Route path="*" element={<PageViewer />} />
-                    </Routes>
-                  </AppLayout>
-                </PageToolbarProvider>
-              </RequireAuth>
-            )
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+      <RouterProvider router={router} />
+    </>
   )
 }
 
