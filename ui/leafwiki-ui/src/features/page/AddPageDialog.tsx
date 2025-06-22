@@ -28,6 +28,9 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [loading, setLoading] = useState(false)
+  const [slugLoading, setSlugLoading] = useState(false)
+  const [lastSlugTitle, setLastSlugTitle] = useState('')
+  const [slugTouched, setSlugTouched] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
@@ -35,19 +38,25 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
 
   const debouncedTitle = useDebounce(title, 300)
 
+  const isCreateButtonDisabled = !title || !slug || loading || (!slugTouched && (slugLoading || title !== lastSlugTitle))
+
   useEffect(() => {
-    if (debouncedTitle.trim() === '') return
+    if (debouncedTitle.trim() === '' || slugTouched) return
     const generateSlug = async () => {
       try {
+        setSlugLoading(true)
+        setLastSlugTitle(debouncedTitle)
         const suggestion = await suggestSlug(parentId, debouncedTitle)
         setSlug(suggestion)
       } catch {
         toast.error('Error generating slug')
+      } finally {
+        setSlugLoading(false)
       }
     }
 
     generateSlug()
-  }, [debouncedTitle, parentId])
+  }, [debouncedTitle, slugTouched, parentId])
 
   const handleTitleChange = async (val: string) => {
     setTitle(val)
@@ -55,7 +64,13 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
   }
 
   const handleCreate = async () => {
-    if (!title || !slug) return
+    if (!title) return
+
+    if (!slugTouched && (slugLoading || title !== lastSlugTitle)) {
+      toast.warning('Please wait until the slug is fully generated.')
+      return
+    }
+
     setLoading(true)
     setFieldErrors({})
     try {
@@ -81,6 +96,8 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
   const resetForm = () => {
     setTitle('')
     setSlug('')
+    setSlugTouched(false)
+    setLastSlugTitle('')
     setFieldErrors({})
     setLoading(false)
   }
@@ -125,6 +142,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
             value={slug}
             onChange={(val) => {
               setSlug(val)
+              setSlugTouched(true)
               setFieldErrors((prev) => ({ ...prev, slug: '' }))
             }}
             placeholder="Page slug"
@@ -140,7 +158,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
             onCancel={handleCancel}
             onSave={handleCreate}
             saveLabel={loading ? 'Creating…' : 'Create'}
-            disabled={!title || !slug || loading}
+            disabled={isCreateButtonDisabled}
             loading={loading}
           />
         </div>
