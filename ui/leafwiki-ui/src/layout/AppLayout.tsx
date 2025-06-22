@@ -87,6 +87,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Main content area */}
         <main
           className={`${mainContainerStyle} flex-1 transition-all duration-200`}
+          id="scroll-container"
         >
           {children}
         </main>

@@ -3,6 +3,7 @@ import { getPageByPath } from '@/lib/api'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import MarkdownPreview from '../preview/MarkdownPreview'
@@ -25,6 +26,8 @@ export default function PageViewer() {
 
   const [page, setPage] = useState<Page | null>(null)
   const { setContent, clearContent } = usePageToolbar()
+
+  useScrollRestoration(pathname, loading)
 
   useEffect(() => {
     setLoading(true)
