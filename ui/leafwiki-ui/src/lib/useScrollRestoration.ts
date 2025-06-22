@@ -1,12 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 
-/**
- * Restores and saves scroll position for a custom scroll container.
- *
- * @param pathname - current route path
- * @param isLoading - whether the page is still loading (delays restoration)
- * @param containerId - the DOM id of the scroll container (default: 'scroll-container')
- */
+const DEFAULT_SCROLL_CONTAINER_ID = 'scroll-container'
+
 export function useScrollRestoration(
   pathname: string,
   isLoading: boolean,
