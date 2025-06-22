@@ -201,7 +201,7 @@ This project is still early – feel free to open issues or ideas!
 
 ## 💬 Chat on Discord
 
-We now have an official [Discord server](https://discord.gg/NcX9AEgp)  
+We now have an official [Discord server](https://discord.gg/gX7Sw3PjUP)
 → ask questions, get help, contribute, or just say hi.
 
 Main channels:
