@@ -14,6 +14,9 @@ type AuthService struct {
 	secretKey   []byte
 }
 
+const ACCESS_TOKEN_LIFETIME = time.Hour * 1
+const REFRESH_TOKEN_LIFETIME = time.Hour * 24 * 7
+
 func NewAuthService(userService *UserService, secret string) *AuthService {
 	return &AuthService{
 		userService: userService,
@@ -36,12 +39,12 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	// Clear sensitive information from user object
 	user.Password = "" // Clear password from user object
 
-	accessToken, err := a.generateToken(user, time.Hour*1, "access")
+	accessToken, err := a.generateToken(user, ACCESS_TOKEN_LIFETIME, "access")
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := a.generateToken(user, time.Hour*24*7, "refresh")
+	refreshToken, err := a.generateToken(user, REFRESH_TOKEN_LIFETIME, "refresh")
 	if err != nil {
 		return nil, err
 	}
@@ -77,12 +80,12 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 	// Clear sensitive information from user object
 	user.Password = "" // Clear password from user object
 
-	newAccessToken, err := a.generateToken(user, time.Hour*1, "access")
+	newAccessToken, err := a.generateToken(user, ACCESS_TOKEN_LIFETIME, "access")
 	if err != nil {
 		return nil, err
 	}
 
-	newRefreshToken, err := a.generateToken(user, time.Hour*24*7, "refresh")
+	newRefreshToken, err := a.generateToken(user, REFRESH_TOKEN_LIFETIME, "refresh")
 	if err != nil {
 		return nil, err
 	}
