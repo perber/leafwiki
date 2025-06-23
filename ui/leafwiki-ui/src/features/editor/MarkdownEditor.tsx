@@ -58,8 +58,10 @@ const MarkdownEditor = (
 
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
 
+  // Set initial markdown value when component mounts
+  // This sets the initial value only once
   useEffect(() => {
-    setMarkdown(initialValue)
+    setMarkdown((prev) => (prev === '' ? initialValue : prev))
   }, [initialValue])
 
   const handleEditorChange = useCallback(

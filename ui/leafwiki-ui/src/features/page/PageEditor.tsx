@@ -179,8 +179,9 @@ export default function PageEditor() {
   }, [parentPath, slug, handleNavigateAway, reloadTree, showUnsavedDialog])
 
   // We set the initial content of the page editor
+  // This is only done once when the page is loaded
   useEffect(() => {
-    if (page) {
+    if (page && initialContentRef.current === null) {
       initialContentRef.current = page.content
       initialSlugRef.current = page.slug
       setMarkdown(page.content)
