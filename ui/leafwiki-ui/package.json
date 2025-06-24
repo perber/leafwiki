@@ -15,7 +15,7 @@
     "@codemirror/highlight": "^0.19.8",
     "@codemirror/lang-markdown": "^6.3.2",
     "@codemirror/state": "^6.5.2",
-    "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/theme-one-dark": "^6.1.3",
     "@codemirror/view": "^6.36.8",
     "@fontsource/inter": "^5.2.5",
     "@radix-ui/react-alert-dialog": "^1.1.14",
