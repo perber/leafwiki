@@ -82,7 +82,10 @@ export default function PageEditor() {
     handleSaveRef.current = async () => {
       if (!isDirty || !page) return
       try {
-        // toast.info('Saving page...')
+        // We check if the title has changed
+        // If the title has changed, we need to update the page in the tree
+        const pageTitleChanged: boolean = title !== page.title
+
         await updatePage(page.id, title, slug, markdown)
         toast.success('Page saved successfully!')
         // Set new page content after save
@@ -100,7 +103,10 @@ export default function PageEditor() {
         // We need to set the initialSlugRef to the new slug
         initialSlugRef.current = slug
         window.history.replaceState(null, '', newPath)
-        await reloadTree()
+        // We reload the tree only when the title has changed
+        if (pageTitleChanged) {
+          await reloadTree()
+        }
       } catch (err) {
         console.warn(err)
         handleFieldErrors(err, setFieldErrors, 'Error saving page')
