@@ -35,12 +35,26 @@ export async function fetchWithAuth(
   }
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  })
+  // Save the original body
+  let originalBody = options.body
+  if (
+    options.body &&
+    typeof options.body === 'object' &&
+    !(options.body instanceof FormData)
+  ) {
+    originalBody = JSON.stringify(options.body)
+  }
 
-  // Auto-Refresh bei 401
+  const doFetch = async (): Promise<Response> => {
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+      body: originalBody,
+    })
+  }
+
+  let res = await doFetch()
+
   if (res.status === 401 && retry) {
     if (!isRefreshing) {
       isRefreshing = true
@@ -52,7 +66,10 @@ export async function fetchWithAuth(
 
     try {
       await refreshPromise
-      return fetchWithAuth(path, options, false) // Retry once
+      const newToken = useAuthStore.getState().token
+      if (newToken) headers.set('Authorization', `Bearer ${newToken}`)
+
+      res = await doFetch()
     } catch {
       logout()
       throw new Error('Unauthorized')
@@ -61,7 +78,6 @@ export async function fetchWithAuth(
 
   if (!res.ok) {
     let errorBody: { error?: string; message?: string } | null = null
-
     try {
       errorBody = await res.json()
     } catch {
@@ -69,13 +85,8 @@ export async function fetchWithAuth(
       throw new Error(text || 'Request failed')
     }
 
-    if (errorBody?.error === 'validation_error') {
-      throw errorBody
-    }
-
-    if (errorBody?.error) {
-      throw errorBody
-    }
+    if (errorBody?.error === 'validation_error') throw errorBody
+    if (errorBody?.error) throw errorBody
 
     throw new Error(errorBody?.message || 'Request failed')
   }
