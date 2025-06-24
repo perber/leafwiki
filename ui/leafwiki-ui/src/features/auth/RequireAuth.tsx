@@ -17,6 +17,7 @@ export default function RequireAuth({ children }: Props) {
 
   if (!token && isRefreshing) {
     toast.info('Refreshing session, please wait...')
+    return null // Return a loading state while refreshing
   }
 
   return <>{children}</>
