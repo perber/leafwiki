@@ -39,6 +39,7 @@ export default function PageEditor() {
   )
 
   const initialContentRef = useRef<string | null>(null)
+  const initialSlugRef = useRef<string | null>(null)
 
   const openDialog = useDialogsStore((state) => state.openDialog)
   const findPageInTreeByPath = useTreeStore((state) => state.getPageByPath)
@@ -113,7 +114,7 @@ export default function PageEditor() {
     handleSaveRef.current = async () => {
       if (!isDirty || !page) return
       try {
-        toast.info('Saving page...')
+        // toast.info('Saving page...')
         await updatePage(page.id, title, slug, markdown)
         toast.success('Page saved successfully!')
         // Set new page content after save
@@ -126,16 +127,22 @@ export default function PageEditor() {
 
         // The slug might have changed, so we need to update the path
         const newPath = `/e${parentPath}/${slug}`
+        // We set the path of the initialSlugRef
+        // Page is stored in the tree by path
+        // We need to set the initialSlugRef to the new slug
+        initialSlugRef.current = slug
         // We don't want to redirect the user to the new path
         // because we are already on the page
-
         window.history.replaceState(null, '', newPath)
+
+        // Reload the tree to reflect the changes
+        await reloadTree()
       } catch (err) {
         console.warn(err)
         handleFieldErrors(err, setFieldErrors, 'Error saving page')
       }
     }
-  }, [page, title, slug, markdown, parentPath, isDirty])
+  }, [page, title, slug, markdown, parentPath, isDirty, reloadTree])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -157,7 +164,11 @@ export default function PageEditor() {
 
       if (!showUnsavedDialog) {
         await reloadTree()
-        handleNavigateAway(parentPath ? `/${parentPath}/${slug}` : '/' + slug)
+        handleNavigateAway(
+          parentPath
+            ? `/${parentPath}/${initialSlugRef.current}`
+            : '/' + initialSlugRef.current,
+        )
       }
 
       e.preventDefault()
@@ -171,6 +182,7 @@ export default function PageEditor() {
   useEffect(() => {
     if (page) {
       initialContentRef.current = page.content
+      initialSlugRef.current = page.slug
       setMarkdown(page.content)
     }
   }, [page])
@@ -234,8 +246,11 @@ export default function PageEditor() {
               // When the user presses the close button
               // we want to navigate away from the page
               // handleNavigateAway will check if the user has unsaved changes and show the dialog
+
               handleNavigateAway(
-                parentPath ? `/${parentPath}/${slug}` : '/' + slug,
+                parentPath
+                  ? `/${parentPath}/${initialSlugRef.current}`
+                  : '/' + initialSlugRef.current,
               )
             }}
           >
@@ -287,6 +302,7 @@ export default function PageEditor() {
         setMarkdown(content)
         setTitle(title)
         setSlug(slug)
+        initialSlugRef.current = slug
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))

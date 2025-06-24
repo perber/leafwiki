@@ -7,12 +7,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { suggestSlug } from '@/lib/api'
-import { useDebounce } from '@/lib/useDebounce'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
+import { useCallback, useState } from 'react'
+import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
 type EditPageMetadataDialogProps = {
   parentId: string
@@ -27,42 +25,31 @@ export function EditPageMetadataDialog({
   slug: propSlug,
   onChange,
 }: EditPageMetadataDialogProps) {
-  // Dialog state from zustand store
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
   const open = useDialogsStore((s) => s.dialogType === 'edit-page-metadata')
 
   const [title, setTitle] = useState(propTitle)
   const [slug, setSlug] = useState(propSlug)
+  const [slugTouched, setSlugTouched] = useState(false)
+  const [slugLoading, setSlugLoading] = useState(false)
+  const [lastSlugTitle, setLastSlugTitle] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-  const debouncedTitle = useDebounce(title, 300)
+  const isSaveDisabled =
+    !title ||
+    !slug ||
+    (!slugTouched && (slugLoading || title !== lastSlugTitle))
 
-  useEffect(() => {
-    // If the title is the same as the propTitle, do not suggest a new slug
-    // This prevents the slug from being suggested when the title is the same
-    // This occurs when the user opens the dialog and the title is already set
-    if (propTitle === title) {
-      return
-    }
-
-    if (debouncedTitle.trim() === '') return
-    const generateSlug = async () => {
-      try {
-        const suggestion = await suggestSlug(parentId, debouncedTitle)
-        setSlug(suggestion)
-      } catch {
-        toast.error('Error generating slug')
-      }
-    }
-
-    generateSlug()
-  }, [debouncedTitle, parentId, propTitle, title])
-
-  const handleTitleChange = async (val: string) => {
+  const handleTitleChange = (val: string) => {
     setTitle(val)
     setFieldErrors((prev) => ({ ...prev, title: '' }))
   }
+
+  const handleSlugChange = useCallback((val: string) => {
+    setSlug(val)
+    setFieldErrors((prev) => ({ ...prev, slug: '' }))
+  }, [])
 
   const handleCancel = () => {
     resetForm()
@@ -72,6 +59,8 @@ export function EditPageMetadataDialog({
   const resetForm = () => {
     setTitle(propTitle)
     setSlug(propSlug)
+    setSlugTouched(false)
+    setLastSlugTitle('')
     setFieldErrors({})
   }
 
@@ -87,7 +76,7 @@ export function EditPageMetadataDialog({
     >
       <DialogContent
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && title && slug) {
+          if (e.key === 'Enter' && !e.shiftKey && !isSaveDisabled) {
             e.preventDefault()
             onChange(title, slug)
             closeDialog()
@@ -98,34 +87,36 @@ export function EditPageMetadataDialog({
           <DialogTitle>Edit page metadata</DialogTitle>
           <DialogDescription>Change metadata of the page</DialogDescription>
         </DialogHeader>
+
         <div className="space-y-4">
           <FormInput
-            autoFocus={true}
+            autoFocus
             label="Title"
             value={title}
-            onChange={(val) => {
-              handleTitleChange(val)
-              setFieldErrors((prev) => ({ ...prev, title: '' }))
-            }}
+            onChange={handleTitleChange}
             placeholder="Page title"
             error={fieldErrors.title}
           />
 
-          <FormInput
-            label="Slug"
-            value={slug}
-            onChange={(val) => {
-              setSlug(val)
-              setFieldErrors((prev) => ({ ...prev, slug: '' }))
-            }}
-            placeholder="Page slug"
+          <SlugInputWithSuggestion
+            title={title}
+            slug={slug}
+            parentId={parentId}
+            initialTitle={propTitle}
+            enableSlugSuggestion={true}
+            onSlugChange={handleSlugChange}
+            onSlugTouchedChange={setSlugTouched}
+            onSlugLoadingChange={setSlugLoading}
+            onLastSlugTitleChange={setLastSlugTitle}
             error={fieldErrors.slug}
           />
         </div>
+
         <span className="text-sm text-gray-500">
           Path: {parentPath !== '' && `${parentPath}/`}
           {slug && `${slug}`}
         </span>
+
         <div className="mt-4 flex justify-end">
           <FormActions
             onCancel={handleCancel}
@@ -133,8 +124,8 @@ export function EditPageMetadataDialog({
               onChange(title, slug)
               closeDialog()
             }}
-            saveLabel={'Change'}
-            disabled={!title || !slug}
+            saveLabel="Change"
+            disabled={isSaveDisabled}
             loading={false}
           />
         </div>
