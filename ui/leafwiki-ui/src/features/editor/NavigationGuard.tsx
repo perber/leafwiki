@@ -5,9 +5,7 @@
 
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { useEffect, useState } from 'react'
-import {
-  useBlocker,
-} from 'react-router-dom'
+import { useBlocker } from 'react-router-dom'
 import { useExternalUnloadBlocker } from './useExternalUnloadBlocker'
 
 type NavigationGuardProps = {
@@ -15,7 +13,10 @@ type NavigationGuardProps = {
   onNavigate: (path: string) => void
 }
 
-export default function NavigationGuard({ when, onNavigate }: NavigationGuardProps) {
+export default function NavigationGuard({
+  when,
+  onNavigate,
+}: NavigationGuardProps) {
   const blocker = useBlocker(() => when)
   const [showDialog, setShowDialog] = useState(false)
   const [nextPath, setNextPath] = useState<string | null>(null)

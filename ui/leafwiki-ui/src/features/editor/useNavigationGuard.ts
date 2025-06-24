@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-    useBlocker
-} from 'react-router-dom'
+import { useBlocker } from 'react-router-dom'
 
 export function useNavigationGuard(shouldBlock: boolean) {
   const blocker = useBlocker(() => shouldBlock)
@@ -23,7 +21,7 @@ export function useNavigationGuard(shouldBlock: boolean) {
   const onCancel = () => {
     setShowDialog(false)
     if (blocker.proceed) {
-     blocker.reset()
+      blocker.reset()
     }
   }
 

@@ -45,7 +45,7 @@ export default function PageEditor() {
   const { setContent, clearContent, setTitleBar, clearTitleBar } =
     usePageToolbar()
 
-  const handleSaveRef = useRef<() => void>(() => { })
+  const handleSaveRef = useRef<() => void>(() => {})
 
   const onMetaDataChange = useCallback((title: string, slug: string) => {
     setTitle(title)
@@ -100,8 +100,7 @@ export default function PageEditor() {
         // We need to set the initialSlugRef to the new slug
         initialSlugRef.current = slug
         window.history.replaceState(null, '', newPath)
-
-        // Reload the tree to reflect the changes
+        await reloadTree()
       } catch (err) {
         console.warn(err)
         handleFieldErrors(err, setFieldErrors, 'Error saving page')
@@ -210,7 +209,16 @@ export default function PageEditor() {
     return () => {
       clearContent()
     }
-  }, [page, path, parentPath, slug, setContent, isDirty, clearContent, navigate])
+  }, [
+    page,
+    path,
+    parentPath,
+    slug,
+    setContent,
+    isDirty,
+    clearContent,
+    navigate,
+  ])
 
   // We load the page by path
   useEffect(() => {
@@ -269,9 +277,13 @@ export default function PageEditor() {
 
   return (
     <>
-      <NavigationGuard when={isDirty} onNavigate={async (path) => {
-        await reloadTree(); navigate(path)
-      }} />
+      <NavigationGuard
+        when={isDirty}
+        onNavigate={async (path) => {
+          await reloadTree()
+          navigate(path)
+        }}
+      />
       <div className="pageEditor h-full w-full overflow-hidden">
         {page && initialContentRef.current && (
           <MarkdownEditor
