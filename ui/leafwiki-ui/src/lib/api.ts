@@ -23,7 +23,7 @@ let refreshPromise: Promise<void> | null = null
 export async function fetchWithAuth(
   path: string,
   options: RequestInit = {},
-  retry = true
+  retry = true,
 ): Promise<unknown> {
   const store = useAuthStore.getState()
   const token = store.token
