@@ -186,7 +186,11 @@ export default function PageEditor() {
             onClick={async () => {
               // When the user presses the close button
               // we want to navigate away from the page
-              navigate(parentPath ? `/${parentPath}/${slug}` : '/' + slug)
+              navigate(
+                parentPath
+                  ? `/${parentPath}/${initialSlugRef.current}`
+                  : '/' + initialSlugRef.current,
+              )
             }}
           >
             <X />
