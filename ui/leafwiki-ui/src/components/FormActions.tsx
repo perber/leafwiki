@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 
 export function FormActions({
+  children,
   onCancel,
   onSave,
   saveLabel = 'Save',
@@ -9,6 +10,7 @@ export function FormActions({
   disabled = false,
   autoFocus = '',
 }: {
+  children?: React.ReactNode
   onCancel: () => void
   onSave: () => void
   saveLabel?: string
@@ -26,6 +28,7 @@ export function FormActions({
       >
         Cancel
       </Button>
+      {children}
       <Button
         onClick={onSave}
         disabled={loading || disabled}

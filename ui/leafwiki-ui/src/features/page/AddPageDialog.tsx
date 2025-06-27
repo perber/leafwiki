@@ -1,5 +1,6 @@
 import { FormActions } from '@/components/FormActions'
 import { FormInput } from '@/components/FormInput'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,7 @@ import { createPage } from '@/lib/api'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
+import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -56,7 +58,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
     setFieldErrors((prev) => ({ ...prev, slug: '' }))
   }, [])
 
-  const handleCreate = async () => {
+  const handleCreate = async (redirect: boolean = true) => {
     if (!title) return
 
     if (!slug) {
@@ -75,8 +77,10 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
       await createPage({ title, slug, parentId })
       toast.success('Page created')
       await reloadTree()
-      const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
-      navigate(`/e/${fullPath}`)
+      if (redirect) {
+        const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
+        navigate(`/e/${fullPath}`)
+      }
       closeDialog()
       resetForm()
     } catch (err: unknown) {
@@ -114,7 +118,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !isCreateButtonDisabled) {
             e.preventDefault()
-            handleCreate()
+            handleCreate(true)
           }
         }}
       >
@@ -152,11 +156,23 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
         <div className="mt-4 flex justify-end">
           <FormActions
             onCancel={handleCancel}
-            onSave={handleCreate}
-            saveLabel={loading ? 'Creating…' : 'Create'}
+            onSave={async () => await handleCreate(true)}
+            saveLabel={loading ? 'Creating…' : 'Create & Edit Page'}
             disabled={isCreateButtonDisabled}
             loading={loading}
-          />
+          >
+            <Button
+              onClick={async () => await handleCreate(false)}
+              variant="default"
+              disabled={isCreateButtonDisabled}
+            >
+              {loading ? 'Creating...' : 'Create'}{' '}
+              {loading &&
+                (loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null)}
+            </Button>
+          </FormActions>
         </div>
       </DialogContent>
     </Dialog>
