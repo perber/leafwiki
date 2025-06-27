@@ -1,4 +1,4 @@
-import { TreeViewActionButton } from '@/components/TreeViewActionButton'
+import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { getAncestorIds } from '@/lib/treeUtils'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'

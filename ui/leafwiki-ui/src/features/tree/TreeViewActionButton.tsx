@@ -1,4 +1,4 @@
-import { TooltipWrapper } from './TooltipWrapper'
+import { TooltipWrapper } from '@/components/TooltipWrapper'
 
 type TreeViewActionButtonProps = {
   onClick: () => void
