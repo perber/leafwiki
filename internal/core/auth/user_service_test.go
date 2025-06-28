@@ -92,8 +92,8 @@ func TestUserService_DeleteUser(t *testing.T) {
 	// admin should not be deletable
 	admin, _ := service.CreateUser("admin", "admin@example.com", "secret", "admin")
 	err := service.DeleteUser(admin.ID)
-	if err != ErrUserInvalidRole {
-		t.Errorf("Expected ErrUserInvalidRole when deleting admin, got: %v", err)
+	if err != ErrUserAdminCannotBeDeleted {
+		t.Errorf("Expected ErrUserAdminCannotBeDeleted when deleting admin, got: %v", err)
 	}
 
 	editor, _ := service.CreateUser("editor", "editor@example.com", "secret", "editor")
