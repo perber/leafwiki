@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/users'
 import { AlertDialogDescription } from '@radix-ui/react-alert-dialog'
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 type Props = {
   userId: string
@@ -33,9 +34,16 @@ export function DeleteUserButton({ userId, username }: Props) {
     try {
       await deleteUser(userId)
       setOpen(false)
-    } catch (err) {
-      console.error('Error deleting user:', err)
-      // Optionally show an error message to the user
+    } catch (err: { error?: string } | unknown) {
+      if (err && typeof err === 'object' && 'error' in err) {
+        // Handle specific error message if available
+        console.error('Error deleting user:', (err as { error: string }).error)
+        toast.error(err.error as string)
+      } else {
+        // Handle generic error
+        console.error('Error deleting user:', err)
+        toast.error('Failed to delete user. Please try again.')
+      }
     } finally {
       setLoading(false)
     }

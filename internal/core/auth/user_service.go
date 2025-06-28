@@ -181,7 +181,7 @@ func (s *UserService) DeleteUser(id string) error {
 	}
 	// Check if user is admin
 	if user.HasRole(RoleAdmin) {
-		return ErrUserInvalidRole
+		return ErrUserAdminCannotBeDeleted
 	}
 	// Delete user from store
 	err = s.store.DeleteUser(id)
