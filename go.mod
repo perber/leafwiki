@@ -11,6 +11,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569
+	github.com/yuin/goldmark v1.7.12
 	golang.org/x/crypto v0.39.0
 	modernc.org/sqlite v1.38.0
 )

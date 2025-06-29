@@ -3,12 +3,11 @@ package http
 import (
 	"embed"
 	"io/fs"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/ssr"
 	"github.com/perber/wiki/internal/http/api"
 	"github.com/perber/wiki/internal/http/middleware"
 	"github.com/perber/wiki/internal/wiki"
@@ -48,8 +47,6 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 			MaxAge:           12 * time.Hour,
 		}))
 	}
-
-	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
 
 	nonAuthApiGroup := router.Group("/api")
 	{
@@ -114,61 +111,30 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", api.DeleteAssetHandler(wikiInstance))
 	}
 
-	// If frontend embedding is enabled, serve it on all unknown routes
-	if EmbedFrontend == "true" {
-		fsys, err := fs.Sub(frontend, "dist")
-		if err != nil {
-			panic("failed to create sub FS: " + err.Error())
-		}
-
-		staticFS, err := fs.Sub(frontend, "dist/static")
-		if err != nil {
-			panic("failed to create sub FS: " + err.Error())
-		}
-
-		// Serve the embedded frontend files js, css, ...
-		router.StaticFS("/static", http.FS(staticFS))
-
-		router.GET("/favicon.svg", func(c *gin.Context) {
-			file, err := fsys.Open("favicon.svg")
-			if err != nil {
-				c.Status(http.StatusNotFound)
-				return
-			}
-			stat, err := file.Stat()
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
-				return
-			}
-
-			c.DataFromReader(http.StatusOK, stat.Size(), "image/svg+xml", file, nil)
-		})
-
-		router.NoRoute(func(c *gin.Context) {
-			if c.Request.Method == http.MethodGet &&
-				!strings.HasPrefix(c.Request.URL.Path, "/api") &&
-				!strings.HasPrefix(c.Request.URL.Path, "/assets") &&
-				!strings.HasPrefix(c.Request.URL.Path, "/static") {
-
-				c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-				data, err := fs.ReadFile(fsys, "index.html")
-				if err != nil {
-					c.Status(http.StatusNotFound)
-					return
-				}
-				c.Data(http.StatusOK, "text/html; charset=utf-8", data)
-
-				// serve index.html
-				// endless redirect see issue:
-				// https://github.com/gin-gonic/gin/issues/2654
-				// c.FileFromFS("index.html", http.FS(fsys))
-
-			} else {
-				c.String(http.StatusNotFound, "Page not found")
-			}
-		})
-
+	var embeddedFS fs.FS
+	var err error
+	embeddedFS, err = serveFrontend(router, wikiInstance)
+	if err != nil {
+		panic("Failed to serve embedded frontend: " + err.Error())
 	}
+
+	router.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+
+		if !publicAccess {
+			ssr.RenderEmptySSRPage(c, embeddedFS, Environment)
+			return
+		}
+
+		switch {
+		case ssr.IsFrontendRoute(path):
+			ssr.RenderEmptySSRPage(c, embeddedFS, Environment)
+		case ssr.IsSSRPath(path):
+			ssr.RenderSSRPage(c, embeddedFS, wikiInstance, Environment)
+		default:
+			ssr.RenderNotFoundSSRPage(c, embeddedFS, Environment)
+		}
+	})
 
 	return router
 }

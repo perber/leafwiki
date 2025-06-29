@@ -28,8 +28,8 @@ releases/*
 !releases/.gitkeep
 
 
-dist/*
-!dist/.gitkeep
+dist/**
+
 
 # data dir
 data/

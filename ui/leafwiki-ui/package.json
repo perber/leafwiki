@@ -4,11 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "format": "prettier --write src/**"
+    "format": "prettier --write src/**",
+    "build-dev": "cross-env NODE_ENV=development vite build",
+    "build-watch": "cross-env NODE_ENV=development vite build --watch"
   },
   "dependencies": {
     "@codemirror/commands": "^6.8.1",
@@ -56,6 +56,7 @@
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.5.0",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^7.0.3",
     "eslint": "^9.29.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.20",

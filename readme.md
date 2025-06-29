@@ -134,9 +134,12 @@ cd leafwiki
 
 cd ui/leafwiki-ui
 npm install
-npm run dev   # Starts Vite dev server on http://localhost:5173
+npm run build-watch // This will generate the UI files into the `./dist` folder at the root and continue watching for changes.
+
 
 # 3. In another terminal, start the backend
+The backend requires the generate UI files to be present.  
+To generate the UI files, run: `npm run build-watch` in the `ui/leafwiki-ui` directory.
 
 cd ../../cmd/leafwiki
 go run main.go
