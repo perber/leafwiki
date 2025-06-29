@@ -169,12 +169,16 @@ go run main.go
 - [x] Fix favicon not displayed
 - [x] ARM64 support for Raspberry Pi and other ARM devices (thanks @nahaktarun)
 
-### ✅ v0.4.2 – Ready for Dogfooding
+### ✅ v0.4.4 – Ready for Dogfooding
 - [x] Add Search functionality for page titles and content
 - [x] Add Mobile optimizations for better usability
 - [x] Allow Public Pages (viewable pages without login)
 - [x] Add shortcuts in the editor (e.g. Ctrl+S to save, Ctrl+B for bold, Ctrl+Z for undo, ...)
 - [x] Smaller improvements and bugfixes in the UI
+- [x] Added "Create & Edit" option to dialog to allow creating structure before editing
+- [x] Warn user about unsaved changes when navigating away (via `beforeunload` and `react-router`)
+- [x] Updated the tree view design – it now has a more documentation-style look
+
 
 ### Upcoming Features in Version 0.5.0
 - [ ] Static pages (Required for SEO and public pages)
