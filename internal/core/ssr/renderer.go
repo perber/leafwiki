@@ -31,40 +31,43 @@ func loadTemplate(fileSys fs.FS, environment string) {
 	}
 }
 
-func IsFrontendRoute(path string) bool {
+// IsInteractiveRoute checks if the given path is an interactive route
+// (i.e., a route that should be handled by the frontend).
+func IsInteractiveRoute(path string) bool {
 	// Define known frontend routes (match react-router-dom)
 	path = strings.TrimSuffix(path, "/")
 
-	if path == "/login" || path == "/users" || path == "/" {
+	if strings.HasPrefix(path, "/users") {
 		return true
 	}
 	if strings.HasPrefix(path, "/e/") {
 		return true
 	}
 	// fallback route: catch-all
-	return true // because "*" maps to PageViewer
+	return false
 }
 
-func IsSSRPath(p string) bool {
-	return !strings.HasPrefix(p, "/api/") &&
-		!strings.HasPrefix(p, "/e/") &&
-		!strings.HasPrefix(p, "/assets/") &&
-		!strings.HasPrefix(p, "/static/") &&
-		!strings.HasPrefix(p, "/favicon") &&
-		!strings.HasPrefix(p, "/@vite/") &&
-		!strings.HasPrefix(p, "/@react/") &&
-		!strings.HasPrefix(p, "/src/") &&
-		!strings.HasSuffix(p, ".js") &&
-		!strings.HasSuffix(p, ".ts") &&
-		!strings.HasSuffix(p, ".tsx") &&
-		!strings.HasSuffix(p, ".css") &&
-		!strings.HasSuffix(p, ".map") &&
-		!strings.HasSuffix(p, ".ico") &&
-		!strings.HasSuffix(p, ".svg")
+func IsStaticContentPath(p string) bool {
+	return strings.HasPrefix(p, "/assets/") ||
+		strings.HasPrefix(p, "/static/") ||
+		strings.HasPrefix(p, "/favicon") ||
+		strings.HasPrefix(p, "/@vite/") ||
+		strings.HasPrefix(p, "/@react/") ||
+		strings.HasPrefix(p, "/src/") ||
+		strings.HasSuffix(p, ".js") ||
+		strings.HasSuffix(p, ".ts") ||
+		strings.HasSuffix(p, ".tsx") ||
+		strings.HasSuffix(p, ".css") ||
+		strings.HasSuffix(p, ".map") ||
+		strings.HasSuffix(p, ".ico") ||
+		strings.HasSuffix(p, ".svg")
+}
+
+func IsApiPath(p string) bool {
+	return strings.HasPrefix(p, "/api/")
 }
 
 func RenderSSRPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environment string) {
-	c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	path := strings.TrimPrefix(c.Request.URL.Path, "/")
 
 	log.Print("SSRHandler called with path: " + path)
@@ -73,12 +76,12 @@ func RenderSSRPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, envir
 	if path == "" {
 		if wikiInstance.GetTree() == nil {
 			log.Print("Wiki instance has no tree set")
-			c.Status(http.StatusNotFound)
+			RenderNotFoundSSRPage(c, fileSys, environment)
 			return
 		}
 		if len(wikiInstance.GetTree().Children) == 0 {
 			log.Print("Wiki instance has no pages")
-			c.Status(http.StatusNotFound)
+			RenderNotFoundSSRPage(c, fileSys, environment)
 			return
 		}
 
@@ -115,11 +118,15 @@ func renderPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environm
 		Content:     template.HTML(htmlBuf.String()),
 	}
 
-	if err = tmpl.Execute(c.Writer, data); err != nil {
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, data); err != nil {
 		log.Printf("Error executing template: %v", err)
 		c.String(http.StatusInternalServerError, "Template rendering error")
 		return
 	}
+
+	c.Status(http.StatusOK)
+	c.Writer.Write(rendered.Bytes())
 }
 
 func RenderEmptySSRPage(c *gin.Context, fileSys fs.FS, environment string) {
@@ -132,11 +139,15 @@ func RenderEmptySSRPage(c *gin.Context, fileSys fs.FS, environment string) {
 		Content:     "",
 	}
 
-	if err := tmpl.Execute(c.Writer, data); err != nil {
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, data); err != nil {
 		log.Printf("Error executing template: %v", err)
 		c.String(http.StatusInternalServerError, "Template rendering error")
 		return
 	}
+
+	c.Status(http.StatusOK)
+	c.Writer.Write(rendered.Bytes())
 }
 
 func RenderNotFoundSSRPage(c *gin.Context, fileSys fs.FS, environment string) {
@@ -149,9 +160,13 @@ func RenderNotFoundSSRPage(c *gin.Context, fileSys fs.FS, environment string) {
 		Content:     "The page you are looking for does not exist.",
 	}
 
-	if err := tmpl.Execute(c.Writer, data); err != nil {
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, data); err != nil {
 		log.Printf("Error executing template: %v", err)
 		c.String(http.StatusInternalServerError, "Template rendering error")
 		return
 	}
+
+	c.Status(http.StatusNotFound)
+	c.Writer.Write(rendered.Bytes())
 }

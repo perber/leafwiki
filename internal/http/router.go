@@ -121,17 +121,20 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 	router.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path
 
+		// If public access is disabled, we will render an empty SSR page
 		if !publicAccess {
 			ssr.RenderEmptySSRPage(c, embeddedFS, Environment)
 			return
 		}
 
 		switch {
-		case ssr.IsFrontendRoute(path):
+		case ssr.IsInteractiveRoute(path):
 			ssr.RenderEmptySSRPage(c, embeddedFS, Environment)
-		case ssr.IsSSRPath(path):
+		case !ssr.IsStaticContentPath(path) && !ssr.IsApiPath(path):
 			ssr.RenderSSRPage(c, embeddedFS, wikiInstance, Environment)
 		default:
+			// api or static content is already handled by the API or static file server
+			// So we will render a 404 page for any other route
 			ssr.RenderNotFoundSSRPage(c, embeddedFS, Environment)
 		}
 	})
