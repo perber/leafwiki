@@ -122,7 +122,12 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 	router.NoRoute(func(c *gin.Context) {
 		url := c.Request.URL.Path
 		userIsLoggedIn := false
-		pageExists := wikiInstance.DoesPageExist(url)
+
+		if ssr.IsApiPath(url) {
+			// If the path is an API we will render a json error response
+			c.JSON(404, gin.H{"error": "API endpoint not found"})
+			return
+		}
 
 		if ssr.IsAuthPath(url) {
 			// If the path is an authentication-related path, we render the SPA page
@@ -147,6 +152,7 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 			return
 		}
 
+		pageExists := wikiInstance.DoesPageExist(url)
 		if publicAccess {
 			// If the user is not logged in but public access is enabled, we render the public page
 			if pageExists {
@@ -158,8 +164,10 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 			return
 		}
 
-		// If the user is not logged in and public access is disabled, we render the SPA page
-		ssr.RenderSPAPage(c, embeddedFS, Environment)
+		// If the user is not logged in and public access is disabled, we render a 404 error
+		// This is a fallback for any non-authenticated user trying to access a page
+
+		ssr.RenderForbiddenPage(c, embeddedFS, Environment)
 	})
 
 	return router

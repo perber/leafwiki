@@ -239,11 +239,15 @@ func (w *Wiki) GetPage(id string) (*tree.Page, error) {
 }
 
 func (w *Wiki) FindByPath(route string) (*tree.Page, error) {
+	if route == "" && w.tree.GetTree() != nil && len(w.tree.GetTree().Children) > 0 {
+		root := w.tree.GetTree().Children[0]
+		return w.tree.GetPage(root.ID)
+	}
+
 	return w.tree.FindPageByRoutePath(w.tree.GetTree().Children, route)
 }
 
 func (w *Wiki) DoesPageExist(path string) bool {
-
 	// remove the first slash if it exists
 	if len(path) > 0 && path[0] == '/' {
 		path = path[1:]

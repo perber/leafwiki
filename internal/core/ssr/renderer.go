@@ -15,17 +15,18 @@ import (
 
 var mdRenderer = goldmark.New()
 
-var tmpl *template.Template
+var spaTemplate *template.Template
+var publicTemplate *template.Template
 
 func loadPublicTemplate(fileSys fs.FS, environment string) {
 	var err error
 	if environment == "production" {
-		if tmpl != nil {
+		if publicTemplate != nil {
 			return
 		}
 	}
 
-	tmpl, err = template.ParseFS(fileSys, "index.public.html")
+	publicTemplate, err = template.ParseFS(fileSys, "index.public.html")
 	if err != nil {
 		panic("could not parse template: " + err.Error())
 	}
@@ -34,12 +35,12 @@ func loadPublicTemplate(fileSys fs.FS, environment string) {
 func loadSPATemplate(fileSys fs.FS, environment string) {
 	var err error
 	if environment == "production" {
-		if tmpl != nil {
+		if spaTemplate != nil {
 			return
 		}
 	}
 
-	tmpl, err = template.ParseFS(fileSys, "index.html")
+	spaTemplate, err = template.ParseFS(fileSys, "index.html")
 	if err != nil {
 		panic("could not parse template: " + err.Error())
 	}
@@ -65,22 +66,6 @@ func IsInteractiveRoute(path string) bool {
 func IsAuthPath(path string) bool {
 	path = strings.TrimSuffix(path, "/")
 	return strings.HasPrefix(path, "/login")
-}
-
-func IsStaticContentPath(p string) bool {
-	return strings.HasPrefix(p, "/assets/") ||
-		strings.HasPrefix(p, "/static/") ||
-		strings.HasPrefix(p, "/favicon") ||
-		strings.HasPrefix(p, "/@vite/") ||
-		strings.HasPrefix(p, "/@react/") ||
-		strings.HasPrefix(p, "/src/") ||
-		strings.HasSuffix(p, ".js") ||
-		strings.HasSuffix(p, ".ts") ||
-		strings.HasSuffix(p, ".tsx") ||
-		strings.HasSuffix(p, ".css") ||
-		strings.HasSuffix(p, ".map") ||
-		strings.HasSuffix(p, ".ico") ||
-		strings.HasSuffix(p, ".svg")
 }
 
 func IsApiPath(p string) bool {
@@ -139,7 +124,7 @@ func renderPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environm
 	}
 
 	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, data); err != nil {
+	if err := publicTemplate.Execute(&rendered, data); err != nil {
 		log.Printf("Error executing template: %v", err)
 		c.String(http.StatusInternalServerError, "Template rendering error")
 		return
@@ -160,13 +145,34 @@ func RenderNotFoundPublicPage(c *gin.Context, fileSys fs.FS, environment string)
 	}
 
 	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, data); err != nil {
+	if err := publicTemplate.Execute(&rendered, data); err != nil {
 		log.Printf("Error executing template: %v", err)
 		c.String(http.StatusInternalServerError, "Template rendering error")
 		return
 	}
 
 	c.Status(http.StatusNotFound)
+	c.Writer.Write(rendered.Bytes())
+}
+
+func RenderForbiddenPage(c *gin.Context, fileSys fs.FS, environment string) {
+	// Initialize the template if not already done
+	loadPublicTemplate(fileSys, environment)
+
+	data := TemplateData{
+		Title:       "Forbidden",
+		Description: "You do not have permission to access this page.",
+		Content:     "You do not have permission to access this page.",
+	}
+
+	var rendered bytes.Buffer
+	if err := publicTemplate.Execute(&rendered, data); err != nil {
+		log.Printf("Error executing template: %v", err)
+		c.String(http.StatusInternalServerError, "Template rendering error")
+		return
+	}
+
+	c.Status(http.StatusForbidden)
 	c.Writer.Write(rendered.Bytes())
 }
 
@@ -181,7 +187,7 @@ func RenderSPAPage(c *gin.Context, fileSys fs.FS, environment string) {
 	}
 
 	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, data); err != nil {
+	if err := spaTemplate.Execute(&rendered, data); err != nil {
 		log.Printf("Error executing template: %v", err)
 		c.String(http.StatusInternalServerError, "Template rendering error")
 		return
