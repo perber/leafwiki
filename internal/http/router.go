@@ -96,7 +96,8 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 		requiresAuthGroup.PUT("/pages/:id/sort", api.SortPagesHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/slug-suggestion", api.SuggestSlugHandler(wikiInstance))
 
-		// User
+		// UserLoggedIn is only stored
+		// FIXME: Doesn't work yet
 		requiresAuthGroup.POST("/users", middleware.RequireAdmin(wikiInstance), api.CreateUserHandler(wikiInstance))
 		requiresAuthGroup.GET("/users", middleware.RequireAdmin(wikiInstance), api.GetUsersHandler(wikiInstance))
 		requiresAuthGroup.PUT("/users/:id", middleware.RequireSelfOrAdmin(wikiInstance), api.UpdateUserHandler(wikiInstance))
@@ -146,6 +147,8 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 			userIsLoggedIn = true
 		}
 
+		// UserLoggedIn is only stored
+		// FIXME: Doesn't work yet -> because we don't have a session store yet
 		if userIsLoggedIn {
 			// the user is logged in, so we render the SPA page
 			ssr.RenderSPAPage(c, embeddedFS, Environment)

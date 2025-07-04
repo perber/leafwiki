@@ -13,10 +13,16 @@ import (
 	"github.com/yuin/goldmark"
 )
 
-var mdRenderer = goldmark.New()
+var mdRenderer goldmark.Markdown
+var breadcrumbsRenderer *BreadcrumbsRenderer
 
 var spaTemplate *template.Template
 var publicTemplate *template.Template
+
+func init() {
+	mdRenderer = goldmark.New(goldmark.WithExtensions())
+	breadcrumbsRenderer = NewBreadcrumbsRenderer()
+}
 
 func loadPublicTemplate(fileSys fs.FS, environment string) {
 	var err error
@@ -121,6 +127,7 @@ func renderPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environm
 		Title:       page.Title + " - Leafwiki",
 		Description: "",
 		Content:     template.HTML(htmlBuf.String()),
+		Breadcrumbs: template.HTML(buildBreadcrumbs(path, wikiInstance)),
 	}
 
 	var rendered bytes.Buffer
@@ -132,6 +139,36 @@ func renderPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environm
 
 	c.Status(http.StatusOK)
 	c.Writer.Write(rendered.Bytes())
+}
+
+func buildBreadcrumbs(path string, wikiInstance *wiki.Wiki) string {
+	crumbs := []Breadcrumb{}
+	if path == "" {
+		return breadcrumbsRenderer.Render(crumbs)
+	}
+
+	// Split the path into segments
+	segments := strings.Split(path, "/")
+	currentPath := ""
+
+	for _, segment := range segments {
+		if segment == "" {
+			continue // Skip empty segments
+		}
+		currentPath += segment + "/"
+
+		page, err := wikiInstance.FindByPath(strings.TrimSuffix(currentPath, "/"))
+		if err != nil || page == nil {
+			continue // Skip if page not found
+		}
+
+		crumbs = append(crumbs, Breadcrumb{
+			Title: page.Title,
+			URL:   currentPath,
+		})
+	}
+
+	return breadcrumbsRenderer.Render(crumbs)
 }
 
 func RenderNotFoundPublicPage(c *gin.Context, fileSys fs.FS, environment string) {
