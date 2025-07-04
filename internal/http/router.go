@@ -164,14 +164,9 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 			return
 		}
 
-		if !publicAccess {
-			ssr.RenderSPAPage(c, embeddedFS, Environment)
-			return
-		}
+		// public access it disabled. We will render the SPA page.
+		ssr.RenderSPAPage(c, embeddedFS, Environment)
 
-		// If the user is not logged in and public access is disabled, we render a 404 error
-		// This is a fallback for any non-authenticated user trying to access a page
-		ssr.RenderForbiddenPage(c, embeddedFS, Environment)
 	})
 
 	return router
