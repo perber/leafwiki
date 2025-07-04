@@ -164,7 +164,7 @@ func buildBreadcrumbs(path string, wikiInstance *wiki.Wiki) string {
 
 		crumbs = append(crumbs, Breadcrumb{
 			Title: page.Title,
-			URL:   currentPath,
+			URL:   strings.TrimSuffix(currentPath, "/"),
 		})
 	}
 

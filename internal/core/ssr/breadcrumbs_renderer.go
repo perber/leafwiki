@@ -21,10 +21,10 @@ func (r *BreadcrumbsRenderer) Render(breadcrumbs []Breadcrumb) string {
 	result += "<ol class=\"flex flex-wrap items-center gap-1\">"
 	for index, crumb := range breadcrumbs {
 		result += "<li class=\"flex items-center gap-1\">"
+		result += "<span>/</span>"
 		if (len(breadcrumbs) - 1) == index {
 			result += "<span class=\"font-semibold text-gray-700\">" + crumb.Title + "</span>"
 		} else {
-			result += "<span>/</span>"
 			result += "<a class=\"text-gray-700 hover:underline\" href=\"/" + crumb.URL + "\" data-discover=\"true\">" + crumb.Title + "</a>"
 		}
 		result += "</li>"
