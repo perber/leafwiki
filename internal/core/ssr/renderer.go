@@ -17,7 +17,21 @@ var mdRenderer = goldmark.New()
 
 var tmpl *template.Template
 
-func loadTemplate(fileSys fs.FS, environment string) {
+func loadPublicTemplate(fileSys fs.FS, environment string) {
+	var err error
+	if environment == "production" {
+		if tmpl != nil {
+			return
+		}
+	}
+
+	tmpl, err = template.ParseFS(fileSys, "index.public.html")
+	if err != nil {
+		panic("could not parse template: " + err.Error())
+	}
+}
+
+func loadSPATemplate(fileSys fs.FS, environment string) {
 	var err error
 	if environment == "production" {
 		if tmpl != nil {
@@ -47,6 +61,12 @@ func IsInteractiveRoute(path string) bool {
 	return false
 }
 
+// IsAuthPath checks if the page is an authentication-related path.
+func IsAuthPath(path string) bool {
+	path = strings.TrimSuffix(path, "/")
+	return strings.HasPrefix(path, "/login")
+}
+
 func IsStaticContentPath(p string) bool {
 	return strings.HasPrefix(p, "/assets/") ||
 		strings.HasPrefix(p, "/static/") ||
@@ -67,7 +87,7 @@ func IsApiPath(p string) bool {
 	return strings.HasPrefix(p, "/api/")
 }
 
-func RenderSSRPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environment string) {
+func RenderPublicPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environment string) {
 	path := strings.TrimPrefix(c.Request.URL.Path, "/")
 
 	log.Print("SSRHandler called with path: " + path)
@@ -76,12 +96,12 @@ func RenderSSRPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, envir
 	if path == "" {
 		if wikiInstance.GetTree() == nil {
 			log.Print("Wiki instance has no tree set")
-			RenderNotFoundSSRPage(c, fileSys, environment)
+			RenderNotFoundPublicPage(c, fileSys, environment)
 			return
 		}
 		if len(wikiInstance.GetTree().Children) == 0 {
 			log.Print("Wiki instance has no pages")
-			RenderNotFoundSSRPage(c, fileSys, environment)
+			RenderNotFoundPublicPage(c, fileSys, environment)
 			return
 		}
 
@@ -96,13 +116,13 @@ func RenderSSRPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, envir
 
 func renderPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environment string, path string) {
 	// Initialize the template if not already done
-	loadTemplate(fileSys, environment)
+	loadPublicTemplate(fileSys, environment)
 
 	// Render the SSR page
 	page, err := wikiInstance.FindByPath(path)
 	if err != nil || page == nil {
 		log.Printf("Error finding page by path '%s': %v", path, err)
-		RenderNotFoundSSRPage(c, fileSys, environment)
+		RenderNotFoundPublicPage(c, fileSys, environment)
 		return
 	}
 
@@ -129,30 +149,9 @@ func renderPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environm
 	c.Writer.Write(rendered.Bytes())
 }
 
-func RenderEmptySSRPage(c *gin.Context, fileSys fs.FS, environment string) {
+func RenderNotFoundPublicPage(c *gin.Context, fileSys fs.FS, environment string) {
 	// Initialize the template if not already done
-	loadTemplate(fileSys, environment)
-
-	data := TemplateData{
-		Title:       "Leafwiki",
-		Description: "",
-		Content:     "",
-	}
-
-	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, data); err != nil {
-		log.Printf("Error executing template: %v", err)
-		c.String(http.StatusInternalServerError, "Template rendering error")
-		return
-	}
-
-	c.Status(http.StatusOK)
-	c.Writer.Write(rendered.Bytes())
-}
-
-func RenderNotFoundSSRPage(c *gin.Context, fileSys fs.FS, environment string) {
-	// Initialize the template if not already done
-	loadTemplate(fileSys, environment)
+	loadPublicTemplate(fileSys, environment)
 
 	data := TemplateData{
 		Title:       "Page Not Found",
@@ -168,5 +167,26 @@ func RenderNotFoundSSRPage(c *gin.Context, fileSys fs.FS, environment string) {
 	}
 
 	c.Status(http.StatusNotFound)
+	c.Writer.Write(rendered.Bytes())
+}
+
+func RenderSPAPage(c *gin.Context, fileSys fs.FS, environment string) {
+	// Initialize the template if not already done
+	loadSPATemplate(fileSys, environment)
+
+	data := TemplateData{
+		Title:       "Leafwiki",
+		Description: "A modern wiki platform",
+		Content:     "",
+	}
+
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, data); err != nil {
+		log.Printf("Error executing template: %v", err)
+		c.String(http.StatusInternalServerError, "Template rendering error")
+		return
+	}
+
+	c.Status(http.StatusOK)
 	c.Writer.Write(rendered.Bytes())
 }

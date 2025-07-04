@@ -3,6 +3,7 @@ package http
 import (
 	"embed"
 	"io/fs"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -119,24 +120,46 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 	}
 
 	router.NoRoute(func(c *gin.Context) {
-		path := c.Request.URL.Path
+		url := c.Request.URL.Path
+		userIsLoggedIn := false
+		pageExists := wikiInstance.DoesPageExist(url)
 
-		// If public access is disabled, we will render an empty SSR page
-		if !publicAccess {
-			ssr.RenderEmptySSRPage(c, embeddedFS, Environment)
+		if ssr.IsAuthPath(url) {
+			// If the path is an authentication-related path, we render the SPA page
+			ssr.RenderSPAPage(c, embeddedFS, Environment)
 			return
 		}
 
-		switch {
-		case ssr.IsInteractiveRoute(path):
-			ssr.RenderEmptySSRPage(c, embeddedFS, Environment)
-		case !ssr.IsStaticContentPath(path) && !ssr.IsApiPath(path):
-			ssr.RenderSSRPage(c, embeddedFS, wikiInstance, Environment)
-		default:
-			// api or static content is already handled by the API or static file server
-			// So we will render a 404 page for any other route
-			ssr.RenderNotFoundSSRPage(c, embeddedFS, Environment)
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			userIsLoggedIn = false
 		}
+
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+		user, err := wikiInstance.GetAuthService().ValidateToken(token)
+		if err == nil && user != nil {
+			userIsLoggedIn = true
+		}
+
+		if userIsLoggedIn {
+			// the user is logged in, so we render the SPA page
+			ssr.RenderSPAPage(c, embeddedFS, Environment)
+			return
+		}
+
+		if publicAccess {
+			// If the user is not logged in but public access is enabled, we render the public page
+			if pageExists {
+				ssr.RenderPublicPage(c, embeddedFS, wikiInstance, Environment)
+				return
+			}
+
+			ssr.RenderNotFoundPublicPage(c, embeddedFS, Environment)
+			return
+		}
+
+		// If the user is not logged in and public access is disabled, we render the SPA page
+		ssr.RenderSPAPage(c, embeddedFS, Environment)
 	})
 
 	return router

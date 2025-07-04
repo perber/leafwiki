@@ -242,6 +242,21 @@ func (w *Wiki) FindByPath(route string) (*tree.Page, error) {
 	return w.tree.FindPageByRoutePath(w.tree.GetTree().Children, route)
 }
 
+func (w *Wiki) DoesPageExist(path string) bool {
+
+	// remove the first slash if it exists
+	if len(path) > 0 && path[0] == '/' {
+		path = path[1:]
+	}
+
+	// Check if the page exists in the wiki instance
+	page, err := w.FindByPath(path)
+	if err != nil || page == nil {
+		return false
+	}
+	return true
+}
+
 func (w *Wiki) SuggestSlug(parentID string, title string) (string, error) {
 	// if no parentID is set or it's the root page
 	// We don't need to look for a page id

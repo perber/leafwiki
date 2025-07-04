@@ -6,4 +6,6 @@ type TemplateData struct {
 	Title       string
 	Description string
 	Content     template.HTML
+	Breadcrumbs template.HTML
+	Navigation  template.HTML
 }
