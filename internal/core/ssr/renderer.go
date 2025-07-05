@@ -15,6 +15,7 @@ import (
 
 var mdRenderer goldmark.Markdown
 var breadcrumbsRenderer *BreadcrumbsRenderer
+var sidebarRenderer *SidebarRenderer
 
 var spaTemplate *template.Template
 var publicTemplate *template.Template
@@ -22,6 +23,7 @@ var publicTemplate *template.Template
 func init() {
 	mdRenderer = goldmark.New(goldmark.WithExtensions())
 	breadcrumbsRenderer = NewBreadcrumbsRenderer()
+	sidebarRenderer = NewSidebarRenderer()
 }
 
 func loadPublicTemplate(fileSys fs.FS, environment string) {
@@ -128,6 +130,7 @@ func renderPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environm
 		Description: "",
 		Content:     template.HTML(htmlBuf.String()),
 		Breadcrumbs: template.HTML(buildBreadcrumbs(path, wikiInstance)),
+		Sidebar:     template.HTML(buildSidebar()),
 	}
 
 	var rendered bytes.Buffer
@@ -169,6 +172,21 @@ func buildBreadcrumbs(path string, wikiInstance *wiki.Wiki) string {
 	}
 
 	return breadcrumbsRenderer.Render(crumbs)
+}
+
+func buildSidebar() string {
+	tabs := []Tabs{
+		{
+			title: "Tree",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-tree" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"></path><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"></path><path d="M3 5a2 2 0 0 0 2 2h3"></path><path d="M3 3v13a2 2 0 0 0 2 2h3"></path></svg>`,
+		},
+		{
+			title: "Search",
+			svg:   `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>`,
+		},
+	}
+
+	return sidebarRenderer.Render(tabs)
 }
 
 func RenderNotFoundPublicPage(c *gin.Context, fileSys fs.FS, environment string) {
