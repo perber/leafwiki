@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/wiki"
 	"github.com/yuin/goldmark"
 )
@@ -130,7 +131,7 @@ func renderPage(c *gin.Context, fileSys fs.FS, wikiInstance *wiki.Wiki, environm
 		Description: "",
 		Content:     template.HTML(htmlBuf.String()),
 		Breadcrumbs: template.HTML(buildBreadcrumbs(path, wikiInstance)),
-		Sidebar:     template.HTML(buildSidebar()),
+		Sidebar:     template.HTML(buildSidebar(wikiInstance)),
 	}
 
 	var rendered bytes.Buffer
@@ -174,7 +175,7 @@ func buildBreadcrumbs(path string, wikiInstance *wiki.Wiki) string {
 	return breadcrumbsRenderer.Render(crumbs)
 }
 
-func buildSidebar() string {
+func buildSidebar(wikiInstance *wiki.Wiki) string {
 	tabs := []Tabs{
 		{
 			title: "Tree",
@@ -186,7 +187,32 @@ func buildSidebar() string {
 		},
 	}
 
-	return sidebarRenderer.Render(tabs)
+	navigationItems := buildNavigation(wikiInstance, nil)
+
+	return sidebarRenderer.Render(tabs, navigationItems)
+}
+
+func buildNavigation(wikiInstance *wiki.Wiki, data *tree.PageNode) []NavigationItem {
+	// fetch tree from the wiki instance
+	if data == nil {
+		tree := wikiInstance.GetTree()
+		if tree == nil {
+			return []NavigationItem{}
+		}
+
+		data = tree
+	}
+
+	navigationItems := []NavigationItem{}
+	for _, child := range data.Children {
+		navigationItems = append(navigationItems, NavigationItem{
+			Title:    child.Title,
+			URL:      "/" + child.Slug,
+			Children: buildNavigation(wikiInstance, child),
+		})
+	}
+
+	return navigationItems
 }
 
 func RenderNotFoundPublicPage(c *gin.Context, fileSys fs.FS, environment string) {
