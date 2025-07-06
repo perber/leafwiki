@@ -496,6 +496,20 @@ func (r *NavigationRenderer) RenderItem(items []NavigationItem, depth int) strin
 	var htmlBuilder strings.Builder
 	for _, item := range items {
 		paddingLeft := depth * 16 // 16px padding for each depth level
+
+		fontStyle := "text-sm"
+		fontColor := "text-gray-500"
+
+		if depth == 0 {
+			fontStyle = "text-base font-semibold"
+			fontColor = ""
+		}
+
+		if depth == 1 {
+			fontStyle = "text-sm"
+			fontColor = "text-gray-800"
+		}
+
 		htmlBuilder.WriteString(fmt.Sprintf("<div class=\"relative flex cursor-pointer items-center pb-1 pt-1 transition-all duration-200 ease-in-out text-gray-800 hover:bg-gray-100\" style=\"padding-left: %dpx;\">\n", paddingLeft))
 		htmlBuilder.WriteString("<div class=\"absolute bottom-0 top-0 w-[2px] bg-gray-200\" style=\"left: 8px;\"></div>\n")
 		htmlBuilder.WriteString("<div class=\"flex flex-1 items-center gap-2 pl-4\">\n")
@@ -504,7 +518,7 @@ func (r *NavigationRenderer) RenderItem(items []NavigationItem, depth int) strin
 			htmlBuilder.WriteString("<path d=\"m18 15-6-6-6 6\"></path>\n")
 			htmlBuilder.WriteString("</svg>\n")
 		}
-		htmlBuilder.WriteString(fmt.Sprintf("<div class=\"flex\"><a href=\"%s\" data-discover=\"true\"><span class=\"block max-w-[200px] overflow-hidden truncate text-ellipsis text-sm\">%s</span></a></div>\n", item.URL, item.Title))
+		htmlBuilder.WriteString(fmt.Sprintf("<div class=\"flex\"><a href=\"%s\" data-discover=\"true\"><span class=\"block max-w-[200px] overflow-hidden truncate text-ellipsis %s %s\">%s</span></a></div>\n", fontColor, fontStyle, item.URL, item.Title))
 		htmlBuilder.WriteString("</div>\n")
 		if len(item.Children) > 0 {
 			htmlBuilder.WriteString("<div class=\"ml-4 pl-2 hidden\">\n")

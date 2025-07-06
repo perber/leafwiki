@@ -22,7 +22,7 @@ func (r *SidebarRenderer) Render(tabs []Tabs, navigationItems []NavigationItem) 
 		return ""
 	}
 
-	result := "<div class=\"flex flex-col w-64 bg-white border-r border-gray-200\">"
+	result := "<div class=\"flex flex-col w-64 bg-white\">"
 	result += r.TabsRenderer.Render(tabs)
 	result += "<div class=\"flex-1 overflow-y-auto\">"
 	result += "<!-- Sidebar content goes here -->"
