@@ -70,7 +70,7 @@ export function DeletePageDialog({
         <Button
           variant="destructive"
           size="icon"
-          className="h-8 w-8 rounded-full shadow-sm"
+          className="h-8 w-8 rounded-full shadow-xs"
         >
           <TooltipWrapper label="Delete page" side="top" align="center">
             <Trash2 />

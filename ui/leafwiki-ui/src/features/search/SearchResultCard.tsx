@@ -7,7 +7,7 @@ export default function SearchResultCard({ item }: { item: SearchResultItem }) {
   return (
     <Link
       to={`${item.path}`}
-      className={`block rounded-xl border p-4 shadow-sm transition ${
+      className={`block rounded-xl border p-4 shadow-xs transition ${
         isActive
           ? 'border-green-600 bg-green-50'
           : 'border-gray-200 hover:border-green-600 hover:shadow-md'

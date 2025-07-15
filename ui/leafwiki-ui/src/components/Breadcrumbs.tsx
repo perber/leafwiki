@@ -40,7 +40,7 @@ export default function Breadcrumbs() {
   const breadcrumbs = buildBreadcrumbs()
 
   return (
-    <nav className="flex w-full flex-1 flex-grow text-sm text-gray-500">
+    <nav className="flex w-full flex-1 grow text-sm text-gray-500">
       <ol className="flex flex-wrap items-center gap-1">
         {breadcrumbs.map((crumb, index) => (
           <li key={crumb.path} className="flex items-center gap-1">

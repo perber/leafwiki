@@ -67,7 +67,7 @@ export default function MarkdownToolbar({
 
   return (
     <>
-      <div className="sticky top-0 z-10 flex gap-1.5 border-b border-zinc-700 bg-zinc-900 p-2 shadow-sm">
+      <div className="sticky top-0 z-10 flex gap-1.5 border-b border-zinc-700 bg-zinc-900 p-2 shadow-xs">
         <TooltipWrapper label="Bold (Ctrl+B)" side="top" align="center">
           <Button
             variant="ghost"
