@@ -75,7 +75,7 @@
 @layer utilities {
   html,
   body {
-    @apply bg-wiki-bg font-sans text-wiki-text;
+    @apply bg-wiki-bg text-wiki-text font-sans;
   }
 
   .prose {

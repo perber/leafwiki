@@ -55,7 +55,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Button>
           </div>
           {/* Left side: Logo and Title */}
-          <div className="ml-6 mr-6 flex min-h-full items-center gap-2">
+          <div className="mr-6 ml-6 flex min-h-full items-center gap-2">
             <h2 className="text-xl font-bold">
               <Link to="/">
                 🌿 <span className="max-md:hidden">LeafWiki</span>

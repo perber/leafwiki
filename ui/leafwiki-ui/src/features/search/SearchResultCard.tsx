@@ -14,11 +14,11 @@ export default function SearchResultCard({ item }: { item: SearchResultItem }) {
       }`}
     >
       <div
-        className="mb-1 whitespace-normal break-words text-lg font-semibold text-green-700"
+        className="mb-1 text-lg font-semibold break-words whitespace-normal text-green-700"
         dangerouslySetInnerHTML={{ __html: item.title }}
       />
       <div
-        className="mb-2 whitespace-normal break-words text-sm text-gray-600"
+        className="mb-2 text-sm break-words whitespace-normal text-gray-600"
         dangerouslySetInnerHTML={{ __html: item.excerpt }}
       />
       <div className="mt-2 text-xs text-gray-400">

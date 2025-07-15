@@ -26,7 +26,7 @@ export function EditorTitleBar({ title, slug, onEditClicked, isDirty }: Props) {
           )}
           <Pencil
             size={16}
-            className="absolute -right-6 top-1/2 -translate-y-1/2 text-gray-400 transition-transform duration-200 ease-in-out group-hover:text-gray-600"
+            className="absolute top-1/2 -right-6 -translate-y-1/2 text-gray-400 transition-transform duration-200 ease-in-out group-hover:text-gray-600"
           />
           {isDirty && !isMobile && (
             <span className="ml-2 text-xs text-yellow-600">(Changes)</span>

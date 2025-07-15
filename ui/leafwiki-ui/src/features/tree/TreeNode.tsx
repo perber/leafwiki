@@ -38,7 +38,7 @@ export const TreeNode = React.memo(function TreeNode({
     <TooltipWrapper label={node.title} side="top" align="start">
       <Link to={`/${node.path}`}>
         <span
-          className={`block max-w-[200px] overflow-hidden truncate text-ellipsis ${
+          className={`block max-w-[200px] truncate overflow-hidden text-ellipsis ${
             level === 0
               ? 'text-base font-semibold'
               : level === 1
@@ -55,7 +55,7 @@ export const TreeNode = React.memo(function TreeNode({
   return (
     <>
       <div
-        className={`relative flex cursor-pointer items-center pb-1 pt-1 transition-all duration-200 ease-in-out ${
+        className={`relative flex cursor-pointer items-center pt-1 pb-1 transition-all duration-200 ease-in-out ${
           isActive
             ? 'font-semibold text-green-700'
             : 'text-gray-800 hover:bg-gray-100'
@@ -65,7 +65,7 @@ export const TreeNode = React.memo(function TreeNode({
         onMouseLeave={() => setHovered(false)}
       >
         <div
-          className={`absolute bottom-0 top-0 w-[2px] ${
+          className={`absolute top-0 bottom-0 w-[2px] ${
             isActive ? 'bg-green-600' : 'bg-gray-200'
           }`}
           style={{ left: markerOffset }}

@@ -133,7 +133,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
         {loading ? (
           <p className="text-xs text-gray-500">Loading assets…</p>
         ) : assets.length === 0 ? (
-          <p className="text-xs italic text-gray-400">No assets yet</p>
+          <p className="text-xs text-gray-400 italic">No assets yet</p>
         ) : (
           <ul className="h-full space-y-2 overflow-y-auto">
             {assets.map((filename) => (
@@ -150,7 +150,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
           </ul>
         )}
       </div>
-      <p className="mt-2 text-xs italic text-gray-500">
+      <p className="mt-2 text-xs text-gray-500 italic">
         Tip: Double-click on an asset to insert it into the page.
       </p>
     </div>
