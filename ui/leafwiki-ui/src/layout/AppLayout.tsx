@@ -40,13 +40,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <TooltipProvider delayDuration={300}>
       <DialogManger />
       {/* Header */}
-      <header className="fixed z-50 h-[85px] w-full border-b bg-white p-4 shadow-sm">
+      <header className="fixed z-50 h-[85px] w-full border-b bg-white p-4 shadow-xs">
         <div className="flex h-full items-center justify-start">
           <div className="flex min-h-full w-6 items-center">
             {/* Sidebar Toggle Button */}
             <Button
               variant={'secondary'}
-              className="relative z-20 p-2 text-gray-500 hover:text-gray-800 focus:outline-none"
+              className="relative z-20 p-2 text-gray-500 hover:text-gray-800 focus:outline-hidden"
               onClick={() => setSidebarVisible(!sidebarVisible)}
               aria-label="Toggle Sidebar"
               aria-expanded={sidebarVisible}
@@ -55,7 +55,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Button>
           </div>
           {/* Left side: Logo and Title */}
-          <div className="ml-6 mr-6 flex min-h-full items-center gap-2">
+          <div className="mr-6 ml-6 flex min-h-full items-center gap-2">
             <h2 className="text-xl font-bold">
               <Link to="/">
                 🌿 <span className="max-md:hidden">LeafWiki</span>

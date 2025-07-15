@@ -24,7 +24,7 @@ export default function UserToolbar() {
         <span className="text-sm text-red-500">Not logged in</span>
         <button
           type="button"
-          className="rounded bg-green-500 p-2 text-sm text-white hover:bg-green-600 focus:outline-none"
+          className="rounded bg-green-500 p-2 text-sm text-white hover:bg-green-600 focus:outline-hidden"
           onClick={() => navigate('/login')}
         >
           Login
@@ -45,7 +45,7 @@ export default function UserToolbar() {
   return (
     <div className="ml-auto flex items-center gap-4">
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center space-x-2 focus:outline-none">
+        <DropdownMenuTrigger className="flex items-center space-x-2 focus:outline-hidden">
           <Avatar className="h-8 w-8">
             <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
           </Avatar>

@@ -1,32 +1,111 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-html,
-body {
-  @apply bg-wiki-bg font-sans text-wiki-text;
+@plugin 'tailwindcss-animate';
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-wiki-bg: #f9fafb;
+  --color-wiki-surface: #ffffff;
+  --color-wiki-border: #e5e7eb;
+  --color-wiki-text: #111827;
+  --color-wiki-accent: #4ade80;
+  --color-wiki-muted: #6b7280;
+
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --font-sans: InterVariable, system-ui, sans-serif;
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
 }
 
-.prose {
-  @apply max-w-none;
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
 }
 
-/* Spezifische Stile für Tabellen innerhalb von Markdown */
-.prose table {
-  @apply w-full border-collapse border border-gray-300;
+@layer utilities {
+  html,
+  body {
+    @apply bg-wiki-bg text-wiki-text font-sans;
+  }
+
+  .prose {
+    @apply max-w-none;
+  }
+
+  /* Spezifische Stile für Tabellen innerhalb von Markdown */
+  .prose table {
+    @apply w-full border-collapse border border-gray-300;
+  }
+
+  .prose th,
+  .prose td {
+    @apply border border-gray-300 px-4 py-2;
+  }
+
+  .prose tr:nth-child(odd) {
+    @apply bg-gray-100;
+  }
+
+  .prose tr:nth-child(even) {
+    @apply bg-white;
+  }
 }
 
-.prose th,
-.prose td {
-  @apply border border-gray-300 px-4 py-2;
-}
-
-.prose tr:nth-child(odd) {
-  @apply bg-gray-100;
-}
-
-.prose tr:nth-child(even) {
-  @apply bg-white;
+@layer base {
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 @layer base {

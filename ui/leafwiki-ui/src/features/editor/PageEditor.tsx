@@ -187,7 +187,7 @@ export default function PageEditor() {
         <TooltipWrapper label="Close (ESC)" side="top" align="center">
           <Button
             variant="destructive"
-            className="h-8 w-8 rounded-full shadow-sm"
+            className="h-8 w-8 rounded-full shadow-xs"
             size="icon"
             onClick={async () => {
               // When the user presses the close button

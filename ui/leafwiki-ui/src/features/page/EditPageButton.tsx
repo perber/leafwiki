@@ -21,7 +21,7 @@ export function EditPageButton({ path }: { path: string }) {
   return (
     <TooltipWrapper label="Edit page (Ctrl + e)" side="top" align="center">
       <Button
-        className="h-8 w-8 rounded-full shadow-sm"
+        className="h-8 w-8 rounded-full shadow-xs"
         variant="default"
         size="icon"
         onClick={() => navigate(`/e/${path}`)}

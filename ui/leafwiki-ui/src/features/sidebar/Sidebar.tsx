@@ -21,7 +21,7 @@ export default function Sidebar() {
         I can't use w-96 because it would add a scrollbar, because the container above is adding a border-right.
       */}
       <div className="ml-4 block w-[345px]">
-        <div className="pb-2 pt-2">
+        <div className="pt-2 pb-2">
           {' '}
           {/* Padding Container */}
           <div className="flex border-b text-sm">

@@ -59,7 +59,7 @@ export default function Search() {
         {query && (
           <button
             onClick={clearSearch}
-            className="absolute right-1 top-1/2 -translate-y-1/2 text-sm text-gray-500 hover:text-black"
+            className="absolute top-1/2 right-1 -translate-y-1/2 text-sm text-gray-500 hover:text-black"
             title="Clear"
           >
             <X size={16} />

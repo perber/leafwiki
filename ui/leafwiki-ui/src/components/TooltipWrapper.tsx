@@ -23,7 +23,7 @@ export function TooltipWrapper({ label, children, side, align }: Props) {
       <TooltipContent
         side={tooltipSide}
         align={tooltipAlign}
-        className="bg-gray-700 pb-1 pl-2 pr-2 pt-1"
+        className="bg-gray-700 pt-1 pr-2 pb-1 pl-2"
       >
         {label}
       </TooltipContent>

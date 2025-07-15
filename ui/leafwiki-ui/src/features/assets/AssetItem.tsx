@@ -114,7 +114,7 @@ export function AssetItem({
                 setNewName(baseName.replace(/\.[^/.]+$/, ''))
               }
             }}
-            className="w-full border-b border-gray-300 bg-transparent text-sm text-gray-800 focus:outline-none"
+            className="w-full border-b border-gray-300 bg-transparent text-sm text-gray-800 focus:outline-hidden"
           />
         ) : (
           <span className="truncate text-sm text-gray-800 hover:underline">
