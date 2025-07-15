@@ -101,8 +101,11 @@
   }
 }
 
-button {
-  @apply cursor-pointer;
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 @layer base {
