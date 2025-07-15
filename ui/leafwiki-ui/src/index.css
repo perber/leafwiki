@@ -101,6 +101,10 @@
   }
 }
 
+button {
+  @apply cursor-pointer;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
