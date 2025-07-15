@@ -73,8 +73,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </header>
       <div className="h-[85px] w-full" />
       <div className="flex h-[calc(100vh-85px)] transition-all duration-200">
+        {/* ml-[-1px] is used to prevent a border when the sidebar is closed */}
         <div
-          className={`z-20 h-full overflow-auto border-r border-gray-200 bg-white transition-all duration-200 max-sm:fixed max-sm:h-[calc(100vh-85px)] ${
+          className={`z-20 ml-[-1px] h-full overflow-auto border-r border-l-0 border-gray-200 bg-white transition-all duration-200 max-sm:fixed max-sm:h-[calc(100vh-85px)] ${
             sidebarVisible ? 'w-96' : 'w-0'
           }`}
         >
