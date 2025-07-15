@@ -12,12 +12,12 @@ export function PrintPageButton() {
         onClick={() => {
           if (typeof window.print === 'function') {
             try {
-              window.print();
+              window.print()
             } catch (error) {
-              console.error("Failed to print the page:", error);
+              console.error('Failed to print the page:', error)
             }
           } else {
-            console.error("Printing is not supported in this environment.");
+            console.error('Printing is not supported in this environment.')
           }
         }}
       >
