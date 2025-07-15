@@ -211,6 +211,12 @@
   }
 }
 
+@layer content {
+  main a {
+    @apply text-green-600 hover:text-green-800 no-underline;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
