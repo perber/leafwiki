@@ -9,7 +9,17 @@ export function PrintPageButton() {
         className="h-8 w-8 rounded-full shadow-xs"
         variant="default"
         size="icon"
-        onClick={() => window.print()}
+        onClick={() => {
+          if (typeof window.print === 'function') {
+            try {
+              window.print();
+            } catch (error) {
+              console.error("Failed to print the page:", error);
+            }
+          } else {
+            console.error("Printing is not supported in this environment.");
+          }
+        }}
       >
         <Printer size={20} />
       </Button>
