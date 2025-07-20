@@ -61,9 +61,6 @@ jobs:
           echo "Found previous tag: $PREVIOUS"
           echo "tag=$PREVIOUS" >> $GITHUB_OUTPUT
 
-      - name: Debug GitHub ref
-        run: echo "github.ref: ${{ github.ref }} — github.ref_name: ${{ github.ref_name }}"
-
       - name: Generate simple changelog from git commits
         id: changelog
         run: |
