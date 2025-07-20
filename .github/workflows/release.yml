@@ -68,8 +68,21 @@ jobs:
         id: changelog
         run: |
           git fetch --tags
-          echo "Generating changelog from commits between ${{ steps.latest.outputs.tag }} and ${{ github.ref_name }}"
+          echo "Validating tags: ${{ steps.latest.outputs.tag }} and ${{ github.ref_name }}"
 
+          # Validate the existence of the previous tag
+          if ! git rev-parse --verify ${{ steps.latest.outputs.tag }} >/dev/null 2>&1; then
+            echo "Error: Previous tag ${{ steps.latest.outputs.tag }} does not exist." >&2
+            exit 1
+          fi
+
+          # Validate the existence of the current tag
+          if ! git rev-parse --verify ${{ github.ref_name }} >/dev/null 2>&1; then
+            echo "Error: Current tag ${{ github.ref_name }} does not exist." >&2
+            exit 1
+          fi
+
+          echo "Generating changelog from commits between ${{ steps.latest.outputs.tag }} and ${{ github.ref_name }}"
           LOG=$(git log ${{ steps.latest.outputs.tag }}..${{ github.ref_name }} --pretty=format:"- %s (%an)")
           echo "$LOG" > changelog.txt
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
