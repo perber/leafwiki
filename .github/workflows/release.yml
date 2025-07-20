@@ -84,7 +84,7 @@ jobs:
 
           echo "Generating changelog from commits between ${{ steps.latest.outputs.tag }} and ${{ github.ref_name }}"
           LOG=$(git log ${{ steps.latest.outputs.tag }}..${{ github.ref_name }} --pretty=format:"- %s (%an)")
-          echo "$LOG" > changelog.txt
+          # Removed unused changelog.txt file creation
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$LOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
