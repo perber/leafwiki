@@ -49,7 +49,7 @@ jobs:
       - name: Get latest tag before current one
         id: latest
         run: |
-          TAGS=$(git tag --sort=-creatordate)
+          TAGS=$(git tag --sort=-v:refname)
           echo "Available tags: $TAGS"
           CURRENT="${{ github.ref_name }}"
           PREVIOUS=""
@@ -61,13 +61,20 @@ jobs:
           echo "Found previous tag: $PREVIOUS"
           echo "tag=$PREVIOUS" >> $GITHUB_OUTPUT
 
-      - name: Generate changelog from commits
+      - name: Debug GitHub ref
+        run: echo "github.ref: ${{ github.ref }} — github.ref_name: ${{ github.ref_name }}"
+
+      - name: Generate simple changelog from git commits
         id: changelog
-        uses: heinrichreimer/action-github-changelog-generator@v2.3
-        with:
-          token: ${{ secrets.CHANGELOG_GITHUB_TOKEN }}
-          sinceTag: ${{ steps.latest.outputs.tag }}
-          dueTag: ${{ github.ref_name }}
+        run: |
+          git fetch --tags
+          echo "Generating changelog from commits between ${{ steps.latest.outputs.tag }} and ${{ github.ref_name }}"
+
+          LOG=$(git log ${{ steps.latest.outputs.tag }}..${{ github.ref_name }} --pretty=format:"- %s (%an)")
+          echo "$LOG" > changelog.txt
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Publish GitHub Release
         # use pinned version because of issue described here:
