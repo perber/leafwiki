@@ -9,6 +9,7 @@ import { useLocation } from 'react-router-dom'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { DeletePageDialog } from './DeletePageDialog'
 import { EditPageButton } from './EditPageButton'
+import { PrintPageButton } from './PrintPageButton'
 
 export default function PageViewer() {
   const { pathname } = useLocation()
@@ -73,6 +74,7 @@ export default function PageViewer() {
 
     setContent(
       <React.Fragment key="viewing">
+        <PrintPageButton />
         <DeletePageDialog pageId={page.id} redirectUrl={redirectUrl} />
         <EditPageButton path={page.path} />
       </React.Fragment>,

@@ -239,3 +239,39 @@ Highlight styles
 .hljs {
   background: #1f2937 !important;
 }
+
+@media print {
+  @page {
+    margin: 1cm;
+  }
+
+  html,
+  body {
+    background-color: #ffffff;
+    margin: 0;
+  }
+
+  .breadcrumbs-nav {
+    margin-top: 20px;
+  }
+
+  header,
+  aside,
+  .sidebar-wrapper {
+    display: none;
+  }
+  .content-wrapper {
+    width: 100%;
+    overflow: visible;
+    height: auto;
+    padding: 0;
+  }
+  main {
+    width: 100%;
+    padding: 0;
+    border: 0;
+  }
+  .space-between-header-and-main {
+    height: 0;
+  }
+}
