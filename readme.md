@@ -41,6 +41,7 @@ LeafWiki now builds and runs natively on:
 - 🔍 Search functionality for page titles and content
 - 📱 Mobile-friendly design
 - 🌐 Public pages (viewable without login)
+- 🖨️ Print view support
 
 ---
 
@@ -169,7 +170,7 @@ go run main.go
 - [x] Fix favicon not displayed
 - [x] ARM64 support for Raspberry Pi and other ARM devices (thanks @nahaktarun)
 
-### ✅ v0.4.4 – Ready for Dogfooding
+### ✅ v0.4.6 – Ready for Dogfooding
 - [x] Add Search functionality for page titles and content
 - [x] Add Mobile optimizations for better usability
 - [x] Allow Public Pages (viewable pages without login)
@@ -178,6 +179,7 @@ go run main.go
 - [x] Added "Create & Edit" option to dialog to allow creating structure before editing
 - [x] Warn user about unsaved changes when navigating away (via `beforeunload` and `react-router`)
 - [x] Updated the tree view design – it now has a more documentation-style look
+- [x] Print view support for pages (print-friendly layout)
 
 
 ### Upcoming Features in Version 0.5.0
