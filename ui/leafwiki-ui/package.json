@@ -30,7 +30,7 @@
     "@types/codemirror": "^5.60.15",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.23.5",
+    "framer-motion": "^12.23.12",
     "lucide-react": "^0.525.0",
     "next-themes": "^0.4.6",
     "react": "^19.0.0",
