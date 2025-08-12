@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -294,7 +295,10 @@ func TestUpdatePageEndpoint(t *testing.T) {
 	if resp["slug"] != "updated-title" {
 		t.Errorf("Expected updated slug, got %q", resp["slug"])
 	}
-	if resp["content"] != "# Updated Content\nWith **Markdown** support." {
+
+	clean := tree.StripFrontMatter([]byte(resp["content"].(string)))
+
+	if string(clean) != "# Updated Content\nWith **Markdown** support." {
 		t.Errorf("Expected updated content, got %q", resp["content"])
 	}
 }

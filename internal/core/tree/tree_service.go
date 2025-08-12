@@ -255,13 +255,13 @@ func (t *TreeService) UpdatePage(id string, title string, slug string, content s
 		return ErrPageAlreadyExists
 	}
 
+	// Update the page
+	page.Title = title
+
 	// Update the entry in the filesystem!
 	if err := t.store.UpdatePage(page, slug, content); err != nil {
 		return fmt.Errorf("could not update page entry: %v", err)
 	}
-
-	// Update the page
-	page.Title = title
 	page.Slug = slug
 
 	// Save the tree
@@ -462,6 +462,16 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 
 	// Reindex the positions
 	t.ReindexPositions(parent)
+
+	// Update Frontmatter in Files!
+	for _, child := range parent.Children {
+		if filePath, err := t.store.getFilePath(child); err == nil {
+			_ = UpdateFrontMatterOnFile(filePath, true, func(fm *FrontMatter) error {
+				fm.Position = child.Position
+				return nil
+			})
+		}
+	}
 
 	// Save the tree
 	return t.SaveTree()
