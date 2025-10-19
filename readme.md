@@ -102,6 +102,7 @@ If you need to reset the admin password, you can do so by running:
 | Flag               | Description                                                 | Default       |
 |--------------------|-------------------------------------------------------------|---------------|
 | `--jwt-secret`     | Secret used for signing JWTs (required)                     | –             |
+| `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
 | `--port`           | Port the server listens on                                  | `8080`        |
 | `--data-dir`       | Directory where data is stored                              | `./data`      |
 | `--admin-password` | Initial admin password (used only if no admin exists)       | `admin`       |
@@ -114,6 +115,7 @@ Instead of CLI flags, you can also configure LeafWiki using environment variable
 
 | Variable                 | Description                                                  | Default    |
 |--------------------------|--------------------------------------------------------------|------------|
+| `LEAFWIKI_HOST`          | Host/IP address the server binds to                          | `0.0.0.0`  |
 | `LEAFWIKI_PORT`          | Port the server listens on                                   | `8080`     |
 | `LEAFWIKI_DATA_DIR`      | Path to the data storage directory                           | `./data`   |
 | `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | `admin`    |
@@ -121,6 +123,21 @@ Instead of CLI flags, you can also configure LeafWiki using environment variable
 | `LEAFWIKI_PUBLIC_ACCESS` | Allow public access to the wiki (no auth required)           | `false`    |
 
 These environment variables override the default values and are especially useful in containerized or production environments.
+
+Binding to localhost behind a reverse proxy
+-------------------------------------------
+
+If you run a reverse proxy (nginx, Caddy, Traefik) in front of LeafWiki, you may want the Go server to only listen on the loopback interface. You can do that with the `--host` flag or the `LEAFWIKI_HOST` env var:
+
+```bash
+# bind to localhost only
+LEAFWIKI_HOST=127.0.0.1 ./leafwiki --jwt-secret=yoursecret
+
+# or with the CLI flag
+./leafwiki --host 127.0.0.1 --jwt-secret=yoursecret
+```
+
+When bound to `127.0.0.1`, the server will only listen on localhost and won't be directly reachable from the public internet; the reverse proxy can forward requests from the external interface.
 
 
 ## 🚀 Quick Start (Dev)

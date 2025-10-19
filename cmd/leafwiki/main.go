@@ -14,11 +14,12 @@ func printUsage() {
 	fmt.Println(`LeafWiki – lightweight selfhosted wiki 🌿
 
 	Usage:
-	leafwiki [--port <PORT>] [--data-dir <DIR>] [--admin-password <PASSWORD>]
+	leafwiki [--host <HOST>] [--port <PORT>] [--data-dir <DIR>] [--admin-password <PASSWORD>]
 	leafwiki reset-admin-password
 	leafwiki --help
 
 	Options:
+	--host             Host/IP address to bind the server to (default: 0.0.0.0)
 	--port             Port to run the server on (default: 8080)
 	--data-dir         Path to data directory (default: ./data)
 	--admin-password   Initial admin password (used only if no admin exists)
@@ -26,6 +27,7 @@ func printUsage() {
 	--public-access    Allow public access to the wiki only with read access (default: false)
 
 	Environment variables:
+	LEAFWIKI_HOST
 	LEAFWIKI_PORT
 	LEAFWIKI_DATA_DIR
 	LEAFWIKI_ADMIN_PASSWORD
@@ -36,6 +38,7 @@ func printUsage() {
 func main() {
 
 	// flags
+	hostFlag := flag.String("host", "", "host/IP address to bind the server to (e.g. 127.0.0.1 or 0.0.0.0)")
 	portFlag := flag.String("port", "", "port to run the server on")
 	dataDirFlag := flag.String("data-dir", "", "path to data directory")
 	adminPasswordFlag := flag.String("admin-password", "", "initial admin password")
@@ -44,6 +47,7 @@ func main() {
 	flag.Parse()
 
 	port := getOrFallback(*portFlag, "LEAFWIKI_PORT", "8080")
+	host := getOrFallback(*hostFlag, "LEAFWIKI_HOST", "0.0.0.0")
 	dataDir := getOrFallback(*dataDirFlag, "LEAFWIKI_DATA_DIR", "./data")
 	adminPassword := getOrFallback(*adminPasswordFlag, "LEAFWIKI_ADMIN_PASSWORD", "admin")
 	jwtSecret := getOrFallback(*jwtSecretFlag, "LEAFWIKI_JWT_SECRET", "")
@@ -97,8 +101,11 @@ func main() {
 
 	router := http.NewRouter(w, publicAccess == "true")
 
+	// Start server - combine host and port
+	listenAddr := host + ":" + port
+
 	// Start server
-	if err := router.Run(":" + port); err != nil {
+	if err := router.Run(listenAddr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
