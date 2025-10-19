@@ -21,7 +21,7 @@ LeafWiki is designed for teams and individuals who want a clean, fast, and self-
 > - Usability improvements
 > - Testing and CI improvements 
 > 
-> In the long term, additional features like versioning, improved diagram support (e.g. Mermaid), ... are planned —  
+> In the long term, additional features like versioning, improved diagram support (e.g. Mermaid), … are planned —  
 > but they’ll be introduced gradually, with stability taking priority.  
 > 
 > Want to try it and help shape it? You’re more than welcome.
