@@ -65,7 +65,7 @@
     "tailwindcss": "^4.1.11",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.46.1",
-    "vite": "^7.0.0"
+    "vite": "^7.1.10"
   },
   "description": "leafwiki",
   "main": "eslint.config.js",
