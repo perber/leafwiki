@@ -74,16 +74,16 @@ It’s not trying to be everything — just a solid, minimal wiki for people who
 
 LeafWiki is often compared to simple Markdown viewers or file browsers - but it’s built for a very different purpose.
 
-| | Markdown Reader | LeafWiki |
-|:--|:--|
-| **Purpose** | Read static `.md` files | Create and manage a structured wiki |
-| **Data source** | Reads directly from disk | Uses Markdown files as storage, but manages structure internally |
-| **Structure** | Flat folder view | True tree of folders and pages |
-| **Editing** | External text editor | Built-in Markdown editor with live preview |
-| **Uploads** | Not supported | Per-page assets (images, files) |
-| **Search** | File names only | Indexed full-text search (titles + content) |
-| **Hosting** | Static / local | Self-hosted Go web app |
-| **Access** | No authentication | Role-based access (admin / editor) |
+|                 | Markdown Reader             | LeafWiki                                                         |
+|-----------------|-----------------------------| -----------------------------------------------------------------|
+| **Purpose**     | Read static `.md` files     | Create and manage a structured wiki                              |
+| **Data source** | Reads directly from disk    | Uses Markdown files as storage, but manages structure internally |
+| **Structure**   | Flat folder view            | True tree of folders and pages                                   |
+| **Editing**     | External text editor        | Built-in Markdown editor with live preview                       |
+| **Uploads**     | Not supported               | Per-page assets (images, files)                                  |
+| **Search**      | File names only             | Indexed full-text search (titles + content)                      |
+| **Hosting**     | Static / local              | Self-hosted Go web app                                           |
+| **Access**      | No authentication           | Role-based access (admin / editor)                               |
 
 > LeafWiki doesn’t just *read* Markdown files — it **organizes, edits, and serves** them.  
 > It’s not a viewer, but a small wiki engine that happens to store everything as Markdown.
