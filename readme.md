@@ -12,11 +12,17 @@ LeafWiki is designed for teams and individuals who want a clean, fast, and self-
 
 ## 📦 Status
 
-> **MVP released – actively developed** 
-> LeafWiki is already powering real documentation workflows — but it’s still in early development.
-> It's **not yet production-ready** for mission-critical teams.
+> **Feature complete – evolving carefully** 
+> LeafWiki has reached functional completeness for its original vision and is already powering real documentation workflows.  
+> Development now focuses on steady refinement rather than rapid feature growth.
 >
-> Expect active development, some rough edges, and fast iteration.
+> The current focus is on: 
+> - Stability and reliability 
+> - Usability improvements
+> - Testing and CI improvements 
+> 
+> In the long term, additional features like versioning, improved diagram support (e.g. Mermaid), … are planned —  
+> but they’ll be introduced gradually, with stability taking priority.  
 > 
 > Want to try it and help shape it? You’re more than welcome.
 
@@ -61,6 +67,26 @@ After trying out tools like Wiki.js, Confluence, and DokuWiki, I wanted somethin
 - 🛠️ Something teams can actually self-host without DevOps pain
 
 It’s not trying to be everything — just a solid, minimal wiki for people who want **clarity over complexity.**
+
+---
+
+## 💡 LeafWiki vs. Markdown Readers
+
+LeafWiki is often compared to simple Markdown viewers or file browsers - but it’s built for a very different purpose.
+
+|                 | Markdown Reader             | LeafWiki                                                         |
+|-----------------|-----------------------------| -----------------------------------------------------------------|
+| **Purpose**     | Read static `.md` files     | Create and manage a structured wiki                              |
+| **Data source** | Reads directly from disk    | Uses Markdown files as storage, but manages structure internally |
+| **Structure**   | Flat folder view            | True tree of folders and pages                                   |
+| **Editing**     | External text editor        | Built-in Markdown editor with live preview                       |
+| **Uploads**     | Not supported               | Per-page assets (images, files)                                  |
+| **Search**      | File names only             | Indexed full-text search (titles + content)                      |
+| **Hosting**     | Static / local              | Self-hosted Go web app                                           |
+| **Access**      | No authentication           | Role-based access (admin / editor)                               |
+
+> LeafWiki doesn’t just *read* Markdown files — it **organizes, edits, and serves** them.  
+> It’s not a viewer, but a small wiki engine that happens to store everything as Markdown.
 
 ---
 
@@ -198,19 +224,6 @@ go run main.go
 - [x] Updated the tree view design – it now has a more documentation-style look
 - [x] Print view support for pages (print-friendly layout)
 
-
-### Upcoming Features in Version 0.5.0
-- [ ] Static pages (Required for SEO and public pages)
-- [ ] Dogfooding (using LeafWiki to document LeafWiki)
-- [ ] Showcase release
-
-### 🧪 Future Ideas
-- [ ] Automatic import of existing Markdown files
-- [ ] Optimistic locking (conflict resolution)
-- [ ] Versioning (history)
-- [ ] Git integration
-- [ ] Automatic update of links
-
 ---
 
 ## 🧠 Philosophy
@@ -225,20 +238,6 @@ go run main.go
 
 Contributions, discussions and feedback are very welcome.  
 This project is still early – feel free to open issues or ideas!
-
-## 💬 Chat on Discord
-
-We now have an official [Discord server](https://discord.gg/gX7Sw3PjUP)
-→ ask questions, get help, contribute, or just say hi.
-
-Main channels:
-- `#welcome` – Say hi, introduce yourself
-- `#general` – General discussion about LeafWiki (ideas, feedback, off-topic, ...)
-- `#support` – Help with issues, questions, or troubleshooting
-- `#release-announcements` – Updates on new releases, features, and improvements
-- `#questions` – Any questions about the code, structure, roadmap, or contributing
-
----
 
 ## 📬 Stay in the Loop
 
