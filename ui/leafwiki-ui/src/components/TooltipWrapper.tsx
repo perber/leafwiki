@@ -26,7 +26,7 @@ export function TooltipWrapper({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className={clsx("flex", parentClassName)}>{children}</div>
+        <div className={clsx('flex', parentClassName)}>{children}</div>
       </TooltipTrigger>
       <TooltipContent
         side={tooltipSide}
