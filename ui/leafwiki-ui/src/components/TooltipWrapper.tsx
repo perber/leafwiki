@@ -3,6 +3,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import clsx from 'clsx'
 import { ReactNode } from 'react'
 
 type Props = {
@@ -25,7 +26,7 @@ export function TooltipWrapper({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className={`flex ${parentClassName}`}>{children}</div>
+        <div className={clsx("flex", parentClassName)}>{children}</div>
       </TooltipTrigger>
       <TooltipContent
         side={tooltipSide}
