@@ -13,6 +13,7 @@
   --color-wiki-accent: #4ade80;
   --color-wiki-muted: #6b7280;
 
+  --color-success: var(--color-green-600);
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
 
@@ -230,6 +231,15 @@
   outline: 2px solid #10b981; /* green-500 */
   outline-offset: 2px;
   transition: outline 0.2s ease-in-out;
+}
+
+.inline-code {
+  @apply rounded bg-gray-200 p-0.5 px-1 font-mono text-xs font-medium text-gray-700;
+}
+
+.inline-code::after,
+.inline-code::before {
+  content: '';
 }
 
 /**

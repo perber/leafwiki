@@ -206,7 +206,7 @@ export default function PageEditor() {
           <Button
             onClick={() => handleSaveRef.current()}
             variant="default"
-            className="h-8 w-8 rounded-full shadow-md"
+            className={'bg-success h-8 w-8 rounded-full shadow-md'}
             size="icon"
             disabled={!isDirty}
           >

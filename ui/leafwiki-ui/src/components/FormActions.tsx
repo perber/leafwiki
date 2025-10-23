@@ -6,6 +6,7 @@ export function FormActions({
   onCancel,
   onSave,
   saveLabel = 'Save',
+  saveVariant = 'default',
   loading = false,
   disabled = false,
   autoFocus = '',
@@ -13,6 +14,7 @@ export function FormActions({
   children?: React.ReactNode
   onCancel: () => void
   onSave: () => void
+  saveVariant?: string
   saveLabel?: string
   loading?: boolean
   disabled?: boolean
@@ -32,6 +34,15 @@ export function FormActions({
       <Button
         onClick={onSave}
         disabled={loading || disabled}
+        variant={
+          saveVariant as
+            | 'default'
+            | 'destructive'
+            | 'outline'
+            | 'ghost'
+            | 'link'
+            | 'secondary'
+        }
         autoFocus={autoFocus == 'save'}
       >
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

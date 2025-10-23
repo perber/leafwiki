@@ -74,8 +74,8 @@ export default function PageViewer() {
 
     setContent(
       <React.Fragment key="viewing">
-        <PrintPageButton />
         <DeletePageDialog pageId={page.id} redirectUrl={redirectUrl} />
+        <PrintPageButton />
         <EditPageButton path={page.path} />
       </React.Fragment>,
     )
