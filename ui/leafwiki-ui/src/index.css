@@ -232,6 +232,15 @@
   transition: outline 0.2s ease-in-out;
 }
 
+.inline-code {
+  @apply rounded bg-gray-200 p-0.5 px-1 font-mono text-xs font-medium text-gray-700;
+}
+
+.inline-code::after,
+.inline-code::before {
+  content: '';
+}
+
 /**
 Highlight styles
 **/

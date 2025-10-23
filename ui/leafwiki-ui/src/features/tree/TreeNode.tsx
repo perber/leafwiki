@@ -35,8 +35,13 @@ export const TreeNode = React.memo(function TreeNode({
   const markerOffset = 8 // Distance from left for the vertical line
 
   const linkText = (
-    <TooltipWrapper label={node.title} side="top" align="start">
-      <Link to={`/${node.path}`}>
+    <TooltipWrapper
+      label={node.title}
+      side="top"
+      align="start"
+      parentClassName="w-full"
+    >
+      <Link to={`/${node.path}`} className="w-full">
         <span
           className={`block max-w-[200px] truncate overflow-hidden text-ellipsis ${
             level === 0
@@ -71,7 +76,7 @@ export const TreeNode = React.memo(function TreeNode({
           style={{ left: markerOffset }}
         />
 
-        <div className="flex flex-1 items-center gap-2 pl-4">
+        <div className="flex w-full flex-1 items-center gap-2 pl-4">
           {hasChildren && (
             <ChevronUp
               size={16}
@@ -85,7 +90,7 @@ export const TreeNode = React.memo(function TreeNode({
         </div>
 
         {(hovered || isMobile) && !readOnlyMode && (
-          <div className="flex gap-0">
+          <div className="absolute right-0 flex items-center gap-1 rounded-md bg-gray-50 pt-2 pr-1 pb-2 pl-1 shadow-md">
             <TreeViewActionButton
               icon={
                 <Plus

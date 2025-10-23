@@ -102,9 +102,11 @@ export function DeletePageDialog({
           <FormActions
             onCancel={handleCancel}
             onSave={handleDelete}
+            saveVariant={'destructive'}
             saveLabel={loading ? 'Deleting...' : 'Delete'}
             disabled={loading}
             loading={loading}
+            autoFocus="cancel"
           />
         </div>
       </AlertDialogContent>

@@ -18,6 +18,17 @@ export default function MarkdownPreview({ content }: Props) {
       components={{
         a: MarkdownLink,
         img: MarkdownImage,
+        code: (props) => {
+          const { className, children } = props
+          if (className?.includes('language-')) {
+            return (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            )
+          }
+          return <code className="inline-code">{children}</code>
+        },
       }}
     >
       {content}
