@@ -30,6 +30,7 @@ func printUsage() {
 	LEAFWIKI_HOST
 	LEAFWIKI_PORT
 	LEAFWIKI_DATA_DIR
+	LEAFWIKI_JWT_SECRET
 	LEAFWIKI_ADMIN_PASSWORD
 	LEAFWIKI_PUBLIC_ACCESS
 	`)
@@ -82,7 +83,7 @@ func main() {
 			printUsage()
 			return
 		default:
-			fmt.Printf("Unknown command: %s\n\n", args[1])
+			fmt.Printf("Unknown command: %s\n\n", args[0])
 			printUsage()
 			return
 		}
