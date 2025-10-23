@@ -13,6 +13,7 @@
   --color-wiki-accent: #4ade80;
   --color-wiki-muted: #6b7280;
 
+  --color-success: var(--color-green-600);
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
 
