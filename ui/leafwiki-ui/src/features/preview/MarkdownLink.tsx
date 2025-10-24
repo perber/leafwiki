@@ -26,7 +26,6 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     !href.startsWith('mailto:') &&
     !href.startsWith('#')
 
-
   const handleOpenCreatePageDialog = (path: string) => {
     // Only allowed when the user is logged in.
     if (!user) {
@@ -54,7 +53,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     /*
       First we need to check if it is a relative link or an absolute link.
     */
-    const absoluteHref =  href.startsWith('/')
+    const absoluteHref = href.startsWith('/')
     let normalizedHref = href
     if (!absoluteHref) {
       // For relative links, we need to add the current path as prefix.
@@ -74,7 +73,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
         }
       }
       const resolvedPath = basePathSegments.join('/')
-      
+
       // We calculate it to an absolute path
       normalizedHref = resolvedPath.startsWith('/')
         ? resolvedPath
@@ -97,11 +96,12 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     const pageExists = !!page
     if (!pageExists) {
       return (
-        <Button variant="link" 
+        <Button
+          variant="link"
           onClick={() => {
             handleOpenCreatePageDialog(normalizedTargetPath)
           }}
-          className="text-red-600 text-base p-0 m-0 no-underline hover:no-underline dark:text-red-400"
+          className="m-0 p-0 text-base text-red-600 no-underline hover:no-underline dark:text-red-400"
         >
           {children}
         </Button>
