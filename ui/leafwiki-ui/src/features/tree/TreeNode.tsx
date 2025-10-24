@@ -58,7 +58,7 @@ export const TreeNode = React.memo(function TreeNode({
     </TooltipWrapper>
   )
 
-  const treeActionButtonStyle = isMobile ? '' : ' pt-2 pr-1 pb-2 pl-1'
+  const treeActionButtonStyle = isMobile ? '' : 'p-2 px-1'
 
   return (
     <>
