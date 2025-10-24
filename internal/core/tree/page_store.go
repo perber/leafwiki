@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 )
 
 type PageStore struct {
@@ -128,14 +129,11 @@ func (f *PageStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 		return fmt.Errorf("file already exists: %v", err)
 	}
 
-	// Create the file
-	file, err := os.Create(newFilename)
-	if err != nil {
-		return fmt.Errorf("could not create file: %v", err)
-	}
-	defer file.Close()
-	if _, err := file.Write([]byte("# " + newEntry.Title + "\n")); err != nil {
-		return fmt.Errorf("could not write to file: %v", err)
+	now := time.Now().UTC()
+	fm := NewFrontMatter(newEntry.Title, newEntry.ID, newEntry.Slug, newEntry.Position, now, now)
+
+	if err := WriteFrontMatterAndBody(newFilename, fm, []byte("# "+newEntry.Title+"\n")); err != nil {
+		return fmt.Errorf("could not write page: %w", err)
 	}
 
 	return nil
@@ -187,13 +185,44 @@ func (f *PageStore) UpdatePage(entry *PageNode, slug string, content string) err
 		return fmt.Errorf("file not found: %v", err)
 	}
 
+	// Parse Frontmatter
+	existing, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("could not read file: %v", err)
+	}
+
+	fm, _, ok := ParseFrontMatter(existing)
+	if !ok {
+		created := time.Now().UTC()
+		if info, err2 := os.Stat(filePath); err2 == nil {
+			created = info.ModTime().UTC()
+		}
+		fm = FrontMatter{
+			Title:     entry.Title,
+			ID:        entry.ID,
+			Slug:      entry.Slug,
+			Position:  entry.Position,
+			CreatedAt: created,
+		}
+	}
+
+	fm.Title = entry.Title
+	fm.ID = entry.ID
+	fm.Slug = slug
+	fm.Position = entry.Position
+	fm.UpdatedAt = time.Now().UTC()
+
 	// Update the file content
 	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("could not open file: %v", err)
 	}
 	defer file.Close()
-	if _, err := file.Write([]byte(content)); err != nil {
+
+	if _, err := file.Write(fm.Write()); err != nil {
+		return fmt.Errorf("could not write frontmatter: %v", err)
+	}
+	if _, err := file.Write([]byte(StripFrontMatter([]byte(content)))); err != nil {
 		return fmt.Errorf("could not write to file: %v", err)
 	}
 
@@ -253,6 +282,16 @@ func (f *PageStore) MovePage(entry *PageNode, parentEntry *PageNode) error {
 	} else {
 		src = currentPath
 		dest = path.Join(parentPath, entry.Slug)
+	}
+
+	if strings.HasSuffix(src, ".md") {
+		_ = UpdateFrontMatterOnFile(src, true, func(fm *FrontMatter) error {
+			fm.Position = entry.Position
+			fm.Title = entry.Title
+			fm.Slug = entry.Slug
+			fm.ID = entry.ID
+			return nil
+		})
 	}
 
 	// Move the file to the parentPath

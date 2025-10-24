@@ -189,7 +189,10 @@ func TestTreeService_UpdatePage_ContentAndSlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read file: %v", err)
 	}
-	if string(data) != newContent {
+
+	clean := StripFrontMatter(data)
+
+	if string(clean) != newContent {
 		t.Errorf("Expected content %q, got %q", newContent, string(data))
 	}
 }
