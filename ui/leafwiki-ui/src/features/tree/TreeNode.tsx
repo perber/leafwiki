@@ -5,6 +5,7 @@ import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useMeasure } from '@/lib/useMeasure'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
+import clsx from 'clsx'
 import { ChevronUp, List, Move, Plus } from 'lucide-react'
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
@@ -57,6 +58,8 @@ export const TreeNode = React.memo(function TreeNode({
     </TooltipWrapper>
   )
 
+  const treeActionButtonStyle = isMobile ? '' : 'p-2 px-1'
+
   return (
     <>
       <div
@@ -90,7 +93,12 @@ export const TreeNode = React.memo(function TreeNode({
         </div>
 
         {(hovered || isMobile) && !readOnlyMode && (
-          <div className="absolute right-0 flex items-center gap-1 rounded-md bg-gray-50 pt-2 pr-1 pb-2 pl-1 shadow-md">
+          <div
+            className={clsx(
+              `absolute right-0 flex items-center gap-1 rounded-md bg-gray-50 shadow-md`,
+              treeActionButtonStyle,
+            )}
+          >
             <TreeViewActionButton
               icon={
                 <Plus
