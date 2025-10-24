@@ -77,7 +77,6 @@ export function CreatePageByPathDialog({
     } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error creating page')
-      setLoading(false)
     } finally {
       setLoading(false)
     }
