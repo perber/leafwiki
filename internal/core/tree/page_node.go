@@ -25,12 +25,12 @@ func (p *PageNode) ChildAlreadyExists(slug string) bool {
 	return false
 }
 
-func (p *PageNode) IsChildOf(childID string, recusive bool) bool {
+func (p *PageNode) IsChildOf(childID string, recursive bool) bool {
 	for _, child := range p.Children {
 		if child.ID == childID {
 			return true
 		}
-		if recusive && child.IsChildOf(childID, recusive) {
+		if recursive && child.IsChildOf(childID, recursive) {
 			return true
 		}
 	}
