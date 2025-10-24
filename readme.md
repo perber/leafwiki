@@ -230,8 +230,8 @@ go run main.go
 
 ### ✅ v0.4.8 – UX Improvements
 - [x] Several dependencies updates
-- [x] Not Found page now suggests creating a new page
-- [x] links to non-existing pages now show a create page dialog
+- [x] Not Found page now suggests creating a new page - thanks @magnus-madsen for the suggestion!
+- [x] links to non-existing pages now show a create page dialog - thanks @magnus-madsen for the suggestion!
 - [x] smaller UI improvements and bugfixes (e.g. green save button, ...)
 
 ---
