@@ -282,7 +282,6 @@ func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (
 // LookupPagePath looks up a path in the tree and returns a PathLookup struct
 // that contains information about the path and its segments and whether they exist
 func (t *TreeService) LookupPagePath(entry []*PageNode, p string) (*PathLookup, error) {
-
 	path := strings.TrimSpace(p)
 	path = strings.Trim(path, "/")
 	if path == "" {
@@ -359,6 +358,69 @@ func (t *TreeService) LookupPagePath(entry []*PageNode, p string) (*PathLookup, 
 	}
 
 	return lookup, nil
+}
+
+func (t *TreeService) EnsurePagePath(p string, targetTitle string) (*EnsurePathResult, error) {
+	if t.tree == nil {
+		return nil, ErrTreeNotLoaded
+	}
+
+	// Lookup the path
+	lookup, err := t.LookupPagePath(t.tree.Children, p)
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup page path: %v", err)
+	}
+
+	// If the path exists, return the existing page
+	if lookup.Exists {
+		page, err := t.FindPageByID(t.tree.Children, *lookup.Segments[len(lookup.Segments)-1].ID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find existing page by ID: %v", err)
+		}
+		return &EnsurePathResult{
+			Exists: true,
+			Page:   page,
+		}, nil
+	}
+
+	// If the path does not exist, create it
+	var currentID *string
+	for i, segment := range lookup.Segments {
+
+		if segment.Exists {
+			// If the segment exists, use it
+			currentID = segment.ID
+			continue
+		}
+
+		// Create the segment
+		title := segment.Slug
+		if i == len(lookup.Segments)-1 {
+			// If this is the last segment, use the targetTitle
+			title = targetTitle
+		}
+
+		// If the segment does not exist, create it
+		newPageID, err := t.CreatePage(currentID, title, segment.Slug)
+		if err != nil {
+			return nil, fmt.Errorf("could not create page: %v", err)
+		}
+		currentID = newPageID
+
+		// If this is the last segment, return the current page
+		if i == len(lookup.Segments)-1 {
+			page, err := t.FindPageByID(t.tree.Children, *currentID)
+			if err != nil {
+				return nil, fmt.Errorf("could not find created page by ID: %v", err)
+			}
+			return &EnsurePathResult{
+				Exists: true,
+				Page:   page,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("could not ensure page path: %v", err)
 }
 
 // MovePage moves a page to another parent

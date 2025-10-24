@@ -689,3 +689,117 @@ func TestTreeService_LookupPath_OnlyOneSegment(t *testing.T) {
 		t.Errorf("expected segment to exist with correct Slug")
 	}
 }
+
+func TestTreeService_EnsurePagePath_Successful(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	_, _ = service.CreatePage(nil, "Home", "home")
+	home := service.GetTree().Children[0]
+	_, _ = service.CreatePage(&home.ID, "About", "about")
+
+	result, err := service.EnsurePagePath("home/about/team", "Team")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !result.Exists {
+		t.Errorf("expected path to not exist initially")
+	}
+	if result.Page == nil || result.Page.Slug != "team" || result.Page.Title != "Team" {
+		t.Errorf("expected created page with correct Slug and Title")
+	}
+
+	// Verify the page was actually created in the tree
+	about := home.Children[0]
+	if len(about.Children) != 1 || about.Children[0].Slug != "team" {
+		t.Errorf("expected 'team' page to be a child of 'about'")
+	}
+}
+
+func TestTreeService_EnsurePagePath_AlreadyExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	_, _ = service.CreatePage(nil, "Home", "home")
+	home := service.GetTree().Children[0]
+	_, _ = service.CreatePage(&home.ID, "About", "about")
+	about := home.Children[0]
+	_, _ = service.CreatePage(&about.ID, "Team", "team")
+
+	result, err := service.EnsurePagePath("home/about/team", "Team")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !result.Exists {
+		t.Errorf("expected path to exist")
+	}
+	if result.Page == nil || result.Page.Slug != "team" {
+		t.Errorf("expected existing page with correct Slug")
+	}
+}
+
+func TestTreeService_EnsurePagePath_PartialExistence(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	_, _ = service.CreatePage(nil, "Home", "home")
+	home := service.GetTree().Children[0]
+	_, _ = service.CreatePage(&home.ID, "About", "about")
+
+	result, err := service.EnsurePagePath("home/about/team/members", "Members")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !result.Exists {
+		t.Errorf("expected full path to not exist")
+	}
+	if result.Page == nil || result.Page.Slug != "members" || result.Page.Title != "Members" {
+		t.Errorf("expected created 'members' page with correct Slug and Title")
+	}
+
+	// Verify the intermediate 'team' page was also created
+	about := home.Children[0]
+	if len(about.Children) != 1 || about.Children[0].Slug != "team" {
+		t.Errorf("expected 'team' page to be a child of 'about'")
+	}
+	team := about.Children[0]
+	if len(team.Children) != 1 || team.Children[0].Slug != "members" {
+		t.Errorf("expected 'members' page to be a child of 'team'")
+	}
+}
+
+func TestTreeService_EnsurePagePath_EmptyPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	result, err := service.EnsurePagePath("", "Root")
+	if err == nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != nil {
+		t.Errorf("expected nil result for empty path")
+	}
+}
+
+func TestTreeService_EnsurePagePath_PathStartingWithSlash(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	result, err := service.EnsurePagePath("/leading/slash", "Invalid")
+	if err != nil {
+		t.Fatalf("expected error for invalid path, got nil")
+	}
+
+	if result == nil {
+		t.Errorf("expected nil result for invalid path")
+	}
+}
