@@ -420,7 +420,7 @@ func (t *TreeService) EnsurePagePath(p string, targetTitle string) (*EnsurePathR
 		}
 	}
 
-	return nil, fmt.Errorf("could not ensure page path: %v", err)
+	return nil, fmt.Errorf("could not ensure page path")
 }
 
 // MovePage moves a page to another parent
