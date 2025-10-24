@@ -781,7 +781,7 @@ func TestTreeService_EnsurePagePath_EmptyPath(t *testing.T) {
 
 	result, err := service.EnsurePagePath("", "Root")
 	if err == nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("expected error for empty path, got nil")
 	}
 
 	if result != nil {
