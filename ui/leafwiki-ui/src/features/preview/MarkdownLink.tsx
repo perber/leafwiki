@@ -1,5 +1,9 @@
 import { Link } from 'react-router-dom'
 
+import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/stores/auth'
+import { useDialogsStore } from '@/stores/dialogs'
+import { useTreeStore } from '@/stores/tree'
 import { AnchorHTMLAttributes, ReactNode } from 'react'
 
 interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
@@ -8,6 +12,10 @@ interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
 }
 
 export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
+  const openDialog = useDialogsStore((s) => s.openDialog)
+  const getPageByPath = useTreeStore((s) => s.getPageByPath)
+  const user = useAuthStore((s) => s.user)
+
   if (href === undefined) {
     return <>{children}</>
   }
@@ -18,8 +26,14 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     !href.startsWith('mailto:') &&
     !href.startsWith('#')
 
-  // Normalize relative hrefs to absolute
-  const normalizedHref = href.startsWith('/') ? href : '/' + href // turn "leafwiki/roadmap" into "/leafwiki/roadmap"
+
+  const handleOpenCreatePageDialog = (path: string) => {
+    // Only allowed when the user is logged in.
+    if (!user) {
+      return
+    }
+    openDialog('create-by-path', { initialPath: path, readOnlyPath: true })
+  }
 
   if (isInternal) {
     // check if it is a asset link
@@ -34,6 +48,63 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
         >
           {children}
         </a>
+      )
+    }
+
+    /*
+      First we need to check if it is a relative link or an absolute link.
+    */
+    const absoluteHref =  href.startsWith('/')
+    let normalizedHref = href
+    if (!absoluteHref) {
+      // For relative links, we need to add the current path as prefix.
+      const currentPath = window.location.pathname.startsWith('/e/')
+        ? window.location.pathname.slice(3) // remove leading /e/
+        : window.location.pathname
+
+      const basePath = currentPath
+      // When the path contains ../ or ./ we need to resolve it
+      const segments = href.split('/')
+      const basePathSegments = basePath.split('/')
+      for (const segment of segments) {
+        if (segment === '..') {
+          basePathSegments.pop()
+        } else if (segment !== '.') {
+          basePathSegments.push(segment)
+        }
+      }
+      const resolvedPath = basePathSegments.join('/')
+      
+      // We calculate it to an absolute path
+      normalizedHref = resolvedPath.startsWith('/')
+        ? resolvedPath
+        : '/' + resolvedPath
+    }
+
+    // When a page link is internal and not an asset link and the page doesn't exist yet,
+    // we will color the link in red and offer to create the page. Via the CreatePageByPathDialog.
+    // We should handle and calculate relative paths here as well.
+    // normalizedHref contains now the absolute path. We can use it directly.
+
+    // normalizedTargetPath is the path without leading /, without query and hash
+    const normalizedTargetPath = normalizedHref
+      .split('?')[0]
+      .split('#')[0]
+      .replace(/^\/+/, '')
+
+    // Check if the page exists
+    const page = getPageByPath(normalizedTargetPath)
+    const pageExists = !!page
+    if (!pageExists) {
+      return (
+        <Button variant="link" 
+          onClick={() => {
+            handleOpenCreatePageDialog(normalizedTargetPath)
+          }}
+          className="text-red-600 text-base p-0 m-0 no-underline hover:no-underline dark:text-red-400"
+        >
+          {children}
+        </Button>
       )
     }
 

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
+import { useAuthStore } from '@/stores/auth'
 import { useDialogsStore } from '@/stores/dialogs'
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -18,6 +19,7 @@ export default function PageViewer() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const openDialog = useDialogsStore((state) => state.openDialog)
+  const user = useAuthStore((s) => s.user)
 
   const readOnlyMode = useIsReadOnly()
 
@@ -104,21 +106,25 @@ export default function PageViewer() {
         <p className="text-sm text-gray-500">
           The page you are looking for does not exist.
         </p>
-        <p className="text-sm text-gray-500">
-          Create the page by clicking the button below.
-        </p>
-        <Button
-          className="mt-4"
-          onClick={() =>
-            openDialog('create-by-path', {
-              initialPath: pathname,
-              readOnlyPath: true,
-            })
-          }
-          variant={'outline'}
-        >
-          Create Page
-        </Button>
+        {user && (
+          <>
+            <p className="text-sm text-gray-500">
+              Create the page by clicking the button below.
+            </p>
+            <Button
+              className="mt-4"
+              onClick={() =>
+                openDialog('create-by-path', {
+                  initialPath: pathname,
+                  readOnlyPath: true,
+                })
+              }
+              variant={'outline'}
+            >
+              Create Page
+            </Button>
+          </>
+        )}
       </div>
     )
   }
