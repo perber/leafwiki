@@ -176,7 +176,13 @@ export function CreatePageByPathDialog({
           <FormActions
             onCancel={handleCancel}
             onSave={async () => await handleCreate(forwardToEditMode || false)}
-            saveLabel={loading ? 'Creating…' : !forwardToEditMode ? 'Create' : 'Create & Edit'}
+            saveLabel={
+              loading
+                ? 'Creating…'
+                : !forwardToEditMode
+                  ? 'Create'
+                  : 'Create & Edit'
+            }
             disabled={isCreateButtonDisabled}
             loading={loading}
           ></FormActions>

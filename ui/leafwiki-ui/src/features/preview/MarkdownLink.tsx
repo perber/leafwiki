@@ -30,7 +30,11 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     !href.startsWith('#')
 
   const handleOpenCreatePageDialog = (path: string, editMode: boolean) => {
-    openDialog('create-by-path', { initialPath: path, readOnlyPath: true, forwardToEditMode: !editMode })
+    openDialog('create-by-path', {
+      initialPath: path,
+      readOnlyPath: true,
+      forwardToEditMode: !editMode,
+    })
   }
 
   if (isInternal) {
