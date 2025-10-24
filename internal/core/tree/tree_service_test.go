@@ -566,7 +566,7 @@ func TestTreeService_LookupPath_Exists(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	// Baumstruktur erstellen
+	// Create tree structure
 	_, _ = service.CreatePage(nil, "Home", "home")
 	home := service.GetTree().Children[0]
 	_, _ = service.CreatePage(&home.ID, "About", "about")
