@@ -1,4 +1,4 @@
-import { SearchResultItem } from '@/lib/api'
+import { SearchResultItem } from '@/lib/api/search'
 import { Link, useLocation } from 'react-router-dom'
 
 export default function SearchResultCard({ item }: { item: SearchResultItem }) {

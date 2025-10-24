@@ -1,9 +1,12 @@
-import { getPageByPath } from '@/lib/api'
+import { getPageByPath } from '@/lib/api/pages'
 // import "highlight.js/styles/github.css"
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { Button } from '@/components/ui/button'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
+import { useAuthStore } from '@/stores/auth'
+import { useDialogsStore } from '@/stores/dialogs'
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import MarkdownPreview from '../preview/MarkdownPreview'
@@ -15,6 +18,8 @@ export default function PageViewer() {
   const { pathname } = useLocation()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const openDialog = useDialogsStore((state) => state.openDialog)
+  const user = useAuthStore((s) => s.user)
 
   const readOnlyMode = useIsReadOnly()
 
@@ -94,8 +99,39 @@ export default function PageViewer() {
   }, [page])
 
   if (loading) return <p className="text-sm text-gray-500">Loading...</p>
-  if (error) return <p className="text-sm text-red-500">Error: {error}</p>
-  if (!page) return <p className="text-sm text-gray-500">No page found</p>
+  if (!page) {
+    return (
+      <div>
+        <h1 className="text-1xl mb-2 font-bold text-red-500">Page Not Found</h1>
+        <p className="text-sm text-gray-500">
+          The page you are looking for does not exist.
+        </p>
+        {user && (
+          <>
+            <p className="text-sm text-gray-500">
+              Create the page by clicking the button below.
+            </p>
+            <Button
+              className="mt-4"
+              onClick={() =>
+                openDialog('create-by-path', {
+                  initialPath: pathname,
+                  readOnlyPath: true,
+                  forwardToEditMode: true,
+                })
+              }
+              variant={'outline'}
+            >
+              Create Page
+            </Button>
+          </>
+        )}
+      </div>
+    )
+  }
+  if (error) {
+    return <p className="text-sm text-red-500">Error: {error}</p>
+  }
 
   return (
     <>

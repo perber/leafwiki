@@ -1,4 +1,4 @@
-import { getAssets, uploadAsset } from '@/lib/api'
+import { getAssets, uploadAsset } from '@/lib/api/assets'
 import { UploadCloud } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'

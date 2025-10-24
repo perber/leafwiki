@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { User } from '@/lib/api'
+import { User } from '@/lib/api/users'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useAuthStore } from '@/stores/auth'
 import { useUserStore } from '@/stores/users'

@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { deletePage } from '@/lib/api'
+import { deletePage } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useTreeStore } from '@/stores/tree'
 import { Trash2 } from 'lucide-react'

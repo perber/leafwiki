@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"path"
 	"regexp"
+	"strings"
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
@@ -200,6 +201,55 @@ func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Pa
 	return w.tree.GetPage(*id)
 }
 
+func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, error) {
+	ve := errors.NewValidationErrors()
+
+	cleanTargetPath := strings.Trim(strings.TrimSpace(targetPath), "/")
+	if cleanTargetPath == "" {
+		ve.Add("path", "Path must not be empty")
+	}
+
+	cleanTargetTitle := strings.TrimSpace(targetTitle)
+	if cleanTargetTitle == "" {
+		ve.Add("title", "Title must not be empty")
+	}
+
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
+	lookup, err := w.tree.LookupPagePath(w.tree.GetTree().Children, cleanTargetPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the path exists, return the last page
+	if lookup.Exists {
+		return w.GetPage(*lookup.Segments[len(lookup.Segments)-1].ID)
+	}
+
+	// Check if not existing segments have a valid slug
+	for _, segment := range lookup.Segments {
+		if !segment.Exists {
+			if err := w.slug.IsValidSlug(segment.Slug); err != nil {
+				ve.Add("path", fmt.Sprintf("Invalid slug '%s': %s", segment.Slug, err.Error()))
+			}
+		}
+	}
+
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
+	// Now we create the missing segments
+	result, err := w.tree.EnsurePagePath(cleanTargetPath, cleanTargetTitle)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.tree.GetPage(result.Page.ID)
+}
+
 func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
 	err := w.tree.UpdatePage(id, title, slug, content)
 	if err != nil {
@@ -240,6 +290,10 @@ func (w *Wiki) GetPage(id string) (*tree.Page, error) {
 
 func (w *Wiki) FindByPath(route string) (*tree.Page, error) {
 	return w.tree.FindPageByRoutePath(w.tree.GetTree().Children, route)
+}
+
+func (w *Wiki) LookupPagePath(path string) (*tree.PathLookup, error) {
+	return w.tree.LookupPagePath(w.tree.GetTree().Children, path)
 }
 
 func (w *Wiki) SuggestSlug(parentID string, title string) (string, error) {

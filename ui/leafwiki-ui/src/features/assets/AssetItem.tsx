@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { deleteAsset, renameAsset } from '@/lib/api'
+import { deleteAsset, renameAsset } from '@/lib/api/assets'
 import { Check, FileText, Pencil, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
