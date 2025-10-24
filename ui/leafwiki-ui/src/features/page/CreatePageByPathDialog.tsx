@@ -15,15 +15,18 @@ import { useTreeStore } from '@/stores/tree'
 import { Check, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 type CreatePageByPathDialogProps = {
   initialPath?: string
   readOnlyPath?: boolean
+  forwardToEditMode?: boolean
 }
 
 export function CreatePageByPathDialog({
   initialPath,
   readOnlyPath,
+  forwardToEditMode,
 }: CreatePageByPathDialogProps) {
   // Dialog state from zustand store
   const closeDialog = useDialogsStore((s) => s.closeDialog)
@@ -73,6 +76,8 @@ export function CreatePageByPathDialog({
         const cleanPath = path.startsWith('/') ? path.slice(1) : path
         navigate(`/e/${cleanPath}`)
       }
+
+      toast.success('Page created successfully')
       closeDialog()
     } catch (err: unknown) {
       console.warn(err)
@@ -170,8 +175,8 @@ export function CreatePageByPathDialog({
         <div className="mt-4 flex justify-end">
           <FormActions
             onCancel={handleCancel}
-            onSave={async () => await handleCreate(true)}
-            saveLabel={loading ? 'Creating…' : 'Create & Edit Page'}
+            onSave={async () => await handleCreate(forwardToEditMode || false)}
+            saveLabel={loading ? 'Creating…' : !forwardToEditMode ? 'Create' : 'Create & Edit'}
             disabled={isCreateButtonDisabled}
             loading={loading}
           ></FormActions>

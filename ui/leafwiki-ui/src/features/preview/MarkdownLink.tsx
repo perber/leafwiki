@@ -17,6 +17,8 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
   const user = useAuthStore((s) => s.user)
 
+  const editMode = window.location.pathname.startsWith('/e/')
+
   if (href === undefined) {
     return <>{children}</>
   }
@@ -27,8 +29,8 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     !href.startsWith('mailto:') &&
     !href.startsWith('#')
 
-  const handleOpenCreatePageDialog = (path: string) => {
-    openDialog('create-by-path', { initialPath: path, readOnlyPath: true })
+  const handleOpenCreatePageDialog = (path: string, editMode: boolean) => {
+    openDialog('create-by-path', { initialPath: path, readOnlyPath: true, forwardToEditMode: !editMode })
   }
 
   if (isInternal) {
@@ -96,7 +98,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
         <Button
           variant="link"
           onClick={() => {
-            handleOpenCreatePageDialog(normalizedTargetPath)
+            handleOpenCreatePageDialog(normalizedTargetPath, editMode)
           }}
           className="m-0 p-0 text-base text-red-600 no-underline hover:no-underline dark:text-red-400"
         >
