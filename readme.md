@@ -224,6 +224,10 @@ go run main.go
 - [x] Updated the tree view design – it now has a more documentation-style look
 - [x] Print view support for pages (print-friendly layout)
 
+### ✅ v0.4.7 – Stabilize
+- [x] Several dependencies updates
+- [x] Allow to configure `--host` to bind to specific IP (e.g. `--host 127.0.0.1`) - thanks @magnus-madsen for the suggestion!
+
 ---
 
 ## 🧠 Philosophy
