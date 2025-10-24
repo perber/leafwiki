@@ -705,7 +705,7 @@ func TestTreeService_EnsurePagePath_Successful(t *testing.T) {
 	}
 
 	if !result.Exists {
-		t.Errorf("expected path to not exist initially")
+		t.Errorf("expected path to exist after creation")
 	}
 	if result.Page == nil || result.Page.Slug != "team" || result.Page.Title != "Team" {
 		t.Errorf("expected created page with correct Slug and Title")
