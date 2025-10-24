@@ -757,7 +757,7 @@ func TestTreeService_EnsurePagePath_PartialExistence(t *testing.T) {
 	}
 
 	if !result.Exists {
-		t.Errorf("expected full path to not exist")
+		t.Errorf("expected full path to exist after creation")
 	}
 	if result.Page == nil || result.Page.Slug != "members" || result.Page.Title != "Members" {
 		t.Errorf("expected created 'members' page with correct Slug and Title")
