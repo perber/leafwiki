@@ -70,7 +70,17 @@ func (w *Watcher) Start() error {
 				if (event.Op&(fsnotify.Create|fsnotify.Rename) != 0) && isDir {
 					// Watch recursive
 					log.Printf("[watcher] watching new dir: %s", eventPath)
-					if err := filepath.Walk(eventPath, func(p string, i os.FileInfo, _ error) error {
+					if err := filepath.Walk(eventPath, func(p string, i os.FileInfo, walkErr error) error {
+						if walkErr != nil {
+							// Log and keep walking other files/dirs
+							log.Printf("[watcher] walk error for %s: %v", p, walkErr)
+							return nil
+						}
+						if i == nil {
+							// Nothing to do for this node
+							return nil
+						}
+
 						if i.IsDir() {
 							if err := w.watcher.Add(p); err != nil {
 								log.Printf("[watcher] add error: %v", err)
