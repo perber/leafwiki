@@ -584,7 +584,7 @@ func TestTreeService_LookupPath_Exists(t *testing.T) {
 	if len(lookup.Segments) != 3 {
 		t.Errorf("expected 3 segments, got %d", len(lookup.Segments))
 	}
-	if !lookup.Segments[2].Exists || lookup.Segments[2].ID == nil || *&lookup.Segments[2].Slug != "team" {
+	if !lookup.Segments[2].Exists || lookup.Segments[2].ID == nil || lookup.Segments[2].Slug != "team" {
 		t.Errorf("expected last segment to exist with correct Slug")
 	}
 }
@@ -610,10 +610,10 @@ func TestTreeService_LookupPath_NotExists(t *testing.T) {
 	if len(lookup.Segments) != 3 {
 		t.Errorf("expected 3 segments, got %d", len(lookup.Segments))
 	}
-	if !lookup.Segments[1].Exists || lookup.Segments[1].ID == nil || *&lookup.Segments[1].Slug != "about" {
+	if !lookup.Segments[1].Exists || lookup.Segments[1].ID == nil || lookup.Segments[1].Slug != "about" {
 		t.Errorf("expected second segment to exist with correct Slug")
 	}
-	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil || *&lookup.Segments[2].Slug != "contact" {
+	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil || lookup.Segments[2].Slug != "contact" {
 		t.Errorf("expected last segment to not exist with correct Slug")
 	}
 }
@@ -656,13 +656,13 @@ func TestTreeService_LookupPath_DeeperMissingPath(t *testing.T) {
 	if len(lookup.Segments) != 4 {
 		t.Errorf("expected 4 segments, got %d", len(lookup.Segments))
 	}
-	if !lookup.Segments[1].Exists || lookup.Segments[1].ID == nil || *&lookup.Segments[1].Slug != "about" {
+	if !lookup.Segments[1].Exists || lookup.Segments[1].ID == nil || lookup.Segments[1].Slug != "about" {
 		t.Errorf("expected second segment to exist with correct Slug")
 	}
-	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil || *&lookup.Segments[2].Slug != "team" {
+	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil || lookup.Segments[2].Slug != "team" {
 		t.Errorf("expected third segment to not exist with correct Slug")
 	}
-	if lookup.Segments[3].Exists || lookup.Segments[3].ID != nil || *&lookup.Segments[3].Slug != "members" {
+	if lookup.Segments[3].Exists || lookup.Segments[3].ID != nil || lookup.Segments[3].Slug != "members" {
 		t.Errorf("expected last segment to not exist with correct Slug")
 	}
 }
@@ -685,7 +685,7 @@ func TestTreeService_LookupPath_OnlyOneSegment(t *testing.T) {
 	if len(lookup.Segments) != 1 {
 		t.Errorf("expected 1 segment, got %d", len(lookup.Segments))
 	}
-	if !lookup.Segments[0].Exists || lookup.Segments[0].ID == nil || *&lookup.Segments[0].Slug != "home" {
+	if !lookup.Segments[0].Exists || lookup.Segments[0].ID == nil || lookup.Segments[0].Slug != "home" {
 		t.Errorf("expected segment to exist with correct Slug")
 	}
 }

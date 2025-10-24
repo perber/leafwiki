@@ -328,17 +328,15 @@ func (t *TreeService) LookupPagePath(entry []*PageNode, p string) (*PathLookup, 
 		lookup.Segments[i] = segment
 
 		// Check if the segment exists in the current entry
-		if entry != nil {
-			for _, e := range entry {
-				if e.Slug == part {
-					// Segment exists
-					lookup.Segments[i].Exists = true
-					lookup.Segments[i].ID = &e.ID
+		for _, e := range entry {
+			if e.Slug == part {
+				// Segment exists
+				lookup.Segments[i].Exists = true
+				lookup.Segments[i].ID = &e.ID
 
-					// Move to the next entry
-					entry = e.Children
-					break
-				}
+				// Move to the next entry
+				entry = e.Children
+				break
 			}
 		}
 
