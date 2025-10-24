@@ -281,8 +281,10 @@ func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (
 
 // LookupPagePath looks up a path in the tree and returns a PathLookup struct
 // that contains information about the path and its segments and whether they exist
-func (t *TreeService) LookupPagePath(entry []*PageNode, path string) (*PathLookup, error) {
+func (t *TreeService) LookupPagePath(entry []*PageNode, p string) (*PathLookup, error) {
 
+	path := strings.TrimSpace(p)
+	path = strings.Trim(path, "/")
 	if path == "" {
 		return &PathLookup{
 			Path:     path,
@@ -290,6 +292,9 @@ func (t *TreeService) LookupPagePath(entry []*PageNode, path string) (*PathLooku
 			Exists:   false,
 		}, nil
 	}
+
+	// remove double slashes
+	path = strings.ReplaceAll(path, "//", "/")
 
 	// Split the path into parts
 	pathParts := strings.Split(path, "/")
@@ -309,6 +314,10 @@ func (t *TreeService) LookupPagePath(entry []*PageNode, path string) (*PathLooku
 
 	// Check each segment in the path
 	for i, part := range pathParts {
+		if part == "" || part == "." || part == ".." {
+			return nil, fmt.Errorf("invalid path segment: %q", part)
+		}
+
 		// Find the segment in the tree
 		segment := PathSegment{
 			Slug:   part,
