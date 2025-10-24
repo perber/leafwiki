@@ -8,6 +8,7 @@ type FormInputProps = {
   error?: string
   type?: string
   autoFocus?: boolean
+  readOnly?: boolean
 }
 
 export function FormInput({
@@ -18,6 +19,7 @@ export function FormInput({
   placeholder,
   error,
   type = 'text',
+  readOnly = false,
 }: FormInputProps) {
   return (
     <div className="space-y-1">
@@ -32,6 +34,7 @@ export function FormInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        readOnly={readOnly}
         className={error ? 'border-red-500' : ''}
       />
       {error && <p className="text-sm text-red-500">{error}</p>}

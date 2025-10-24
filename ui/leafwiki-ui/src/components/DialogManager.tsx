@@ -1,4 +1,5 @@
 import { AddPageDialog } from '@/features/page/AddPageDialog'
+import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
 import { EditPageMetadataDialog } from '@/features/page/EditPageMetadataDialog'
 import { MovePageDialog } from '@/features/page/MovePageDialog'
 import { SortPagesDialog } from '@/features/page/SortPagesDialog'
@@ -23,6 +24,13 @@ export function DialogManger() {
       {dialogType === 'move' && (
         <MovePageDialog
           {...(dialogProps as React.ComponentProps<typeof MovePageDialog>)}
+        />
+      )}
+      {dialogType === 'create-by-path' && (
+        <CreatePageByPathDialog
+          {...(dialogProps as React.ComponentProps<
+            typeof CreatePageByPathDialog
+          >)}
         />
       )}
       {dialogType === 'edit-page-metadata' && (

@@ -98,3 +98,27 @@ export async function sortPages(parentId: string, orderedIDs: string[]) {
     body: JSON.stringify({ orderedIDs }),
   })
 }
+
+export type PathLookupResult = {
+  path: string
+  exists: boolean
+  segments: { slug: string; id?: string; exists: boolean }[]
+}
+
+export async function lookupPath(path: string): Promise<PathLookupResult> {
+  return (await fetchWithAuth(
+    `/api/pages/lookup?path=${encodeURIComponent(path)}`,
+  )) as {
+    path: string
+    exists: boolean
+    segments: { slug: string; id?: string; exists: boolean }[]
+  }
+}
+
+export async function ensurePage(path: string, targetTitle: string) {
+  return await fetchWithAuth(`/api/pages/ensure`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, targetTitle }),
+  })
+}
