@@ -117,6 +117,7 @@ export default function PageViewer() {
                 openDialog('create-by-path', {
                   initialPath: pathname,
                   readOnlyPath: true,
+                  forwardToEditMode: true,
                 })
               }
               variant={'outline'}
