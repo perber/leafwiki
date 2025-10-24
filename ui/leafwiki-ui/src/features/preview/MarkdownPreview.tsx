@@ -27,7 +27,11 @@ export default function MarkdownPreview({ content }: Props) {
               </code>
             )
           }
-          return <code className="inline-code">{children}</code>
+          if (children && typeof children === 'string' && children.includes('\n')) {
+            return <code>{children}</code>
+          } else {
+              return <code className="inline-code">{children}</code>
+          }         
         },
       }}
     >
