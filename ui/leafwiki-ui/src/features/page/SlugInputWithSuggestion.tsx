@@ -1,5 +1,5 @@
 import { FormInput } from '@/components/FormInput'
-import { suggestSlug } from '@/lib/api'
+import { suggestSlug } from '@/lib/api/pages'
 import { useDebounce } from '@/lib/useDebounce'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'

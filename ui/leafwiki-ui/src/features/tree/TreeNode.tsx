@@ -1,5 +1,6 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
+import { PageNode } from '@/lib/api/pages'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useMeasure } from '@/lib/useMeasure'
@@ -8,7 +9,6 @@ import { useTreeStore } from '@/stores/tree'
 import { ChevronUp, List, Move, Plus } from 'lucide-react'
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { PageNode } from '../../lib/api'
 
 type Props = {
   node: PageNode

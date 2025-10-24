@@ -1,4 +1,4 @@
-import { fetchTree, PageNode } from '@/lib/api'
+import { fetchTree, PageNode } from '@/lib/api/pages'
 import { assignParentIds } from '@/lib/treeUtils'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'

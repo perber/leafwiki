@@ -1,4 +1,4 @@
-import { getPageByPath } from '@/lib/api'
+import { getPageByPath } from '@/lib/api/pages'
 // import "highlight.js/styles/github.css"
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { usePageToolbar } from '@/components/usePageToolbar'

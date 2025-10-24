@@ -1,4 +1,4 @@
-import { PageNode } from '@/lib/api'
+import { PageNode } from '@/lib/api/pages'
 
 export function getAncestorIds(tree: PageNode, pageId: string): string[] {
   const byId = new Map<string, PageNode>()
