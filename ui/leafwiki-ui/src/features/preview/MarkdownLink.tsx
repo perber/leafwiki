@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
+import clsx from 'clsx'
 import { AnchorHTMLAttributes, ReactNode } from 'react'
 
 interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
@@ -27,10 +28,6 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     !href.startsWith('#')
 
   const handleOpenCreatePageDialog = (path: string) => {
-    // Only allowed when the user is logged in.
-    if (!user) {
-      return
-    }
     openDialog('create-by-path', { initialPath: path, readOnlyPath: true })
   }
 
@@ -94,7 +91,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     // Check if the page exists
     const page = getPageByPath(normalizedTargetPath)
     const pageExists = !!page
-    if (!pageExists) {
+    if (!pageExists && user) {
       return (
         <Button
           variant="link"
@@ -112,7 +109,10 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
       <Link
         to={normalizedHref}
         {...props}
-        className="text-blue-600 no-underline hover:underline dark:text-blue-400"
+        className={clsx(
+          'no-underline hover:underline dark:text-blue-400',
+          !user && !pageExists && '!text-red-600',
+        )}
       >
         {children}
       </Link>
