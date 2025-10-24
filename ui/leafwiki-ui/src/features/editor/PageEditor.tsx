@@ -97,7 +97,13 @@ export default function PageEditor() {
         })
 
         // The slug might have changed, so we need to update the path
-        const newPath = `/e${parentPath}/${slug}`
+        // Check if the parentPath starts with a slash and remove it
+        const parentAndSlugPath = `${parentPath}/${slug}`
+        const redirectPath = parentAndSlugPath.startsWith('/')
+          ? parentAndSlugPath.slice(1)
+          : parentAndSlugPath
+        const newPath = `/e/${redirectPath}`
+
         // We set the path of the initialSlugRef
         // Page is stored in the tree by path
         // We need to set the initialSlugRef to the new slug
