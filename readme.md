@@ -228,6 +228,19 @@ go run main.go
 - [x] Several dependencies updates
 - [x] Allow to configure `--host` to bind to specific IP (e.g. `--host 127.0.0.1`) - thanks @magnus-madsen for the suggestion!
 
+### ✅ v0.4.8 – UX Improvements
+- [x] Several dependencies updates
+- [x] not found page now suggests creating a new page
+- [x] links to non-existing pages now show a create page dialog
+- [x] smaller UI improvements and bugfixes (e.g. green save button, ...)
+
+---
+
+### 🛠️ v0.5.0 – Planned
+- [ ] Mermaid diagram support
+- [ ] Documentation and offering setup guides for nginx, raspberry pi, ...
+
+
 ---
 
 ## 🧠 Philosophy
