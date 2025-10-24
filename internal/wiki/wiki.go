@@ -242,6 +242,10 @@ func (w *Wiki) FindByPath(route string) (*tree.Page, error) {
 	return w.tree.FindPageByRoutePath(w.tree.GetTree().Children, route)
 }
 
+func (w *Wiki) LookupPagePath(path string) (*tree.PathLookup, error) {
+	return w.tree.LookupPagePath(w.tree.GetTree().Children, path)
+}
+
 func (w *Wiki) SuggestSlug(parentID string, title string) (string, error) {
 	// if no parentID is set or it's the root page
 	// We don't need to look for a page id

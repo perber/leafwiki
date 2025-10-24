@@ -8,60 +8,6 @@ import (
 	"github.com/perber/wiki/internal/core/shared"
 )
 
-// PageNode represents a single node in the tree
-// It has an ID, a parent, a path, and children
-// The ID is a unique identifier for the entry
-type PageNode struct {
-	ID       string      `json:"id"`       // Unique identifier for the entry
-	Title    string      `json:"title"`    // Title is the name of the entry
-	Slug     string      `json:"slug"`     // Slug is the path of the entry
-	Children []*PageNode `json:"children"` // Children are the children of the entry
-	Position int         `json:"position"` // Position is the position of the entry
-	Parent   *PageNode   `json:"-"`
-}
-
-func (p *PageNode) HasChildren() bool {
-	return len(p.Children) > 0
-}
-
-func (p *PageNode) ChildAlreadyExists(slug string) bool {
-	for _, child := range p.Children {
-		if child.Slug == slug {
-			return true
-		}
-	}
-	return false
-}
-
-func (p *PageNode) IsChildOf(childID string, recusive bool) bool {
-	for _, child := range p.Children {
-		if child.ID == childID {
-			return true
-		}
-		if recusive && child.IsChildOf(childID, recusive) {
-			return true
-		}
-	}
-	return false
-}
-
-func (p *PageNode) CalculatePath() string {
-	// Calculate the path of the entry
-	// The path is the slug of the entry and its parent's path
-	if p.Parent == nil {
-		if p.Slug == "" || p.Slug == "root" {
-			return ""
-		}
-		return p.Slug
-	}
-	return p.Parent.CalculatePath() + "/" + p.Slug
-}
-
-type Page struct {
-	*PageNode
-	Content string `json:"content"`
-}
-
 // TreeService is our main component for handling tree operations
 // We use this service to create pages, delete pages, update pages, etc.
 type TreeService struct {
@@ -331,6 +277,81 @@ func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (
 	}
 
 	return findEntry(t.tree.Children, routePart)
+}
+
+// LookupPagePath looks up a path in the tree and returns a PathLookup struct
+// that contains information about the path and its segments and whether they exist
+func (t *TreeService) LookupPagePath(entry []*PageNode, path string) (*PathLookup, error) {
+
+	if path == "" {
+		return &PathLookup{
+			Path:     path,
+			Segments: []PathSegment{},
+			Exists:   false,
+		}, nil
+	}
+
+	// Split the path into parts
+	pathParts := strings.Split(path, "/")
+	if len(pathParts) == 0 {
+		return &PathLookup{
+			Path:     path,
+			Segments: []PathSegment{},
+			Exists:   false,
+		}, nil
+	}
+
+	lookup := &PathLookup{
+		Path:     path,
+		Segments: make([]PathSegment, len(pathParts)),
+		Exists:   true,
+	}
+
+	// Check each segment in the path
+	for i, part := range pathParts {
+		// Find the segment in the tree
+		segment := PathSegment{
+			Slug:   part,
+			Exists: false,
+		}
+
+		// push the segment to the lookup
+		lookup.Segments[i] = segment
+
+		// Check if the segment exists in the current entry
+		if entry != nil {
+			for _, e := range entry {
+				if e.Slug == part {
+					// Segment exists
+					lookup.Segments[i].Exists = true
+					lookup.Segments[i].ID = &e.ID
+
+					// Move to the next entry
+					entry = e.Children
+					break
+				}
+			}
+		}
+
+		// If the segment does not exist, set the pathExists flag to false
+		if !lookup.Segments[i].Exists {
+			// No need to check further segments
+			// Set all remaining segments to non-existing
+			for j := i + 1; j < len(pathParts); j++ {
+				lookup.Segments[j] = PathSegment{
+					Slug:   pathParts[j],
+					Exists: false,
+				}
+			}
+
+			lookup.Exists = false
+
+			// Set entry to nil to avoid further checks
+			entry = nil
+		}
+	}
+
+	return lookup, nil
 }
 
 // MovePage moves a page to another parent

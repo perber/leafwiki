@@ -66,6 +66,7 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 		if publicAccess {
 			nonAuthApiGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
+			nonAuthApiGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
 
 			// Search
@@ -82,6 +83,7 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 		if !publicAccess {
 			requiresAuthGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
 
 			// Search

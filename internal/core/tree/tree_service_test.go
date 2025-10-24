@@ -560,3 +560,132 @@ func TestTreeService_SortPages_TreeNotLoaded(t *testing.T) {
 		t.Errorf("expected ErrTreeNotLoaded, got: %v", err)
 	}
 }
+
+func TestTreeService_LookupPath_Exists(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	// Baumstruktur erstellen
+	_, _ = service.CreatePage(nil, "Home", "home")
+	home := service.GetTree().Children[0]
+	_, _ = service.CreatePage(&home.ID, "About", "about")
+	about := home.Children[0]
+	_, _ = service.CreatePage(&about.ID, "Team", "team")
+
+	lookup, err := service.LookupPagePath(service.GetTree().Children, "home/about/team")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !lookup.Exists {
+		t.Errorf("expected path to exist")
+	}
+	if len(lookup.Segments) != 3 {
+		t.Errorf("expected 3 segments, got %d", len(lookup.Segments))
+	}
+	if !lookup.Segments[2].Exists || lookup.Segments[2].ID == nil || *&lookup.Segments[2].Slug != "team" {
+		t.Errorf("expected last segment to exist with correct Slug")
+	}
+}
+
+func TestTreeService_LookupPath_NotExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	// Baumstruktur erstellen
+	_, _ = service.CreatePage(nil, "Home", "home")
+	home := service.GetTree().Children[0]
+	_, _ = service.CreatePage(&home.ID, "About", "about")
+
+	lookup, err := service.LookupPagePath(service.GetTree().Children, "home/about/contact")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if lookup.Exists {
+		t.Errorf("expected path to not exist")
+	}
+	if len(lookup.Segments) != 3 {
+		t.Errorf("expected 3 segments, got %d", len(lookup.Segments))
+	}
+	if !lookup.Segments[1].Exists || lookup.Segments[1].ID == nil || *&lookup.Segments[1].Slug != "about" {
+		t.Errorf("expected second segment to exist with correct Slug")
+	}
+	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil || *&lookup.Segments[2].Slug != "contact" {
+		t.Errorf("expected last segment to not exist with correct Slug")
+	}
+}
+
+func TestTreeService_LookupPath_EmptyPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	lookup, err := service.LookupPagePath(service.GetTree().Children, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if lookup.Exists {
+		t.Errorf("expected empty path to not exist")
+	}
+	if len(lookup.Segments) != 0 {
+		t.Errorf("expected 0 segments, got %d", len(lookup.Segments))
+	}
+}
+
+func TestTreeService_LookupPath_DeeperMissingPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	_, _ = service.CreatePage(nil, "Home", "home")
+	home := service.GetTree().Children[0]
+	_, _ = service.CreatePage(&home.ID, "About", "about")
+
+	lookup, err := service.LookupPagePath(service.GetTree().Children, "home/about/team/members")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if lookup.Exists {
+		t.Errorf("expected path to not exist")
+	}
+	if len(lookup.Segments) != 4 {
+		t.Errorf("expected 4 segments, got %d", len(lookup.Segments))
+	}
+	if !lookup.Segments[1].Exists || lookup.Segments[1].ID == nil || *&lookup.Segments[1].Slug != "about" {
+		t.Errorf("expected second segment to exist with correct Slug")
+	}
+	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil || *&lookup.Segments[2].Slug != "team" {
+		t.Errorf("expected third segment to not exist with correct Slug")
+	}
+	if lookup.Segments[3].Exists || lookup.Segments[3].ID != nil || *&lookup.Segments[3].Slug != "members" {
+		t.Errorf("expected last segment to not exist with correct Slug")
+	}
+}
+
+func TestTreeService_LookupPath_OnlyOneSegment(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	_, _ = service.CreatePage(nil, "Home", "home")
+
+	lookup, err := service.LookupPagePath(service.GetTree().Children, "home")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !lookup.Exists {
+		t.Errorf("expected path to exist")
+	}
+	if len(lookup.Segments) != 1 {
+		t.Errorf("expected 1 segment, got %d", len(lookup.Segments))
+	}
+	if !lookup.Segments[0].Exists || lookup.Segments[0].ID == nil || *&lookup.Segments[0].Slug != "home" {
+		t.Errorf("expected segment to exist with correct Slug")
+	}
+}
