@@ -1,5 +1,6 @@
 import { FormActions } from '@/components/FormActions'
 import { FormInput } from '@/components/FormInput'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,9 @@ import { createPage, Page, PageNode, updatePage } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
+import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PageSelect } from './PageSelect'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
@@ -33,6 +36,7 @@ export function CopyPageDialog({
   const open = useDialogsStore((s) => s.dialogType === 'copy-page')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const parentPath = useTreeStore((s) => s.getPathById(targetParentID) || '')
+  const navigate = useNavigate()
 
   const { tree, reloadTree } = useTreeStore()
 
@@ -89,7 +93,7 @@ export function CopyPageDialog({
     closeDialog()
   }
 
-  const handleCopy = async () => {
+  const handleCopy = async (redirect: boolean) => {
     if (!title) return
 
     if (!slug) {
@@ -116,6 +120,10 @@ export function CopyPageDialog({
       )
       toast.success('Page copied')
       await reloadTree()
+      if (redirect) {
+        const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
+        navigate(`/e/${fullPath}`)
+      }
       closeDialog()
       resetForm()
     } catch (err: unknown) {
@@ -181,11 +189,23 @@ export function CopyPageDialog({
         <div className="mt-4 flex justify-end">
           <FormActions
             onCancel={handleCancel}
-            onSave={async () => await handleCopy()}
-            saveLabel={loading ? 'Copying...' : 'Copy && Edit Page'}
+            onSave={async () => await handleCopy(true)}
+            saveLabel={loading ? 'Copying...' : 'Copy & Edit Page'}
             disabled={isCopyButtonDisabled}
             loading={loading}
-          />
+          >
+            <Button
+              onClick={async () => await handleCopy(false)}
+              variant="default"
+              disabled={isCopyButtonDisabled}
+            >
+              {loading ? 'Copying...' : 'Copy'}{' '}
+              {loading &&
+                (loading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null)}
+            </Button>
+          </FormActions>
         </div>
       </DialogContent>
     </Dialog>
