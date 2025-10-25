@@ -1,4 +1,5 @@
 import { AddPageDialog } from '@/features/page/AddPageDialog'
+import { CopyPageDialog } from '@/features/page/CopyPageDialog'
 import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
 import { EditPageMetadataDialog } from '@/features/page/EditPageMetadataDialog'
 import { MovePageDialog } from '@/features/page/MovePageDialog'
@@ -31,6 +32,11 @@ export function DialogManger() {
           {...(dialogProps as React.ComponentProps<
             typeof CreatePageByPathDialog
           >)}
+        />
+      )}
+      {dialogType === 'copy-page' && (
+        <CopyPageDialog
+          {...(dialogProps as React.ComponentProps<typeof CopyPageDialog>)}
         />
       )}
       {dialogType === 'edit-page-metadata' && (
