@@ -7,19 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { createPage, Page, PageNode, updatePage } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { JSX, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { PageSelect } from './PageSelect'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
 export function CopyPageDialog({
@@ -38,6 +32,7 @@ export function CopyPageDialog({
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const open = useDialogsStore((s) => s.dialogType === 'copy-page')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const parentPath = useTreeStore((s) => s.getPathById(targetParentID) || '')
 
   const { tree, reloadTree } = useTreeStore()
 
@@ -110,7 +105,7 @@ export function CopyPageDialog({
     setLoading(true)
     setFieldErrors({})
     try {
-      const newPage = await createPage({ title, slug, parentId: targetParentID  })
+      const newPage = await createPage({ title, slug, parentId: targetParentID })
 
       const p = newPage as Page
       await updatePage(
@@ -129,32 +124,6 @@ export function CopyPageDialog({
       setLoading(false)
     }
   }
-
-  const selectOptions = useMemo(() => {
-    if (!tree) return null
-    const renderOptions = (node: PageNode, depth = 1): JSX.Element[] => {
-      const indent = '—'.repeat(depth)
-      const options = [
-        <SelectItem key={node.id} value={node.id}>
-          {indent} {node.title}
-        </SelectItem>,
-      ]
-      if (node.children?.length) {
-        for (const child of node.children) {
-          options.push(...renderOptions(child, depth + 1))
-        }
-      }
-      return options
-    }
-    return (
-      <>
-        <SelectItem key="root" value="root">
-          ⬆️ Top Level
-        </SelectItem>
-        {tree.children?.flatMap((child) => renderOptions(child))}
-      </>
-    )
-  }, [tree])
 
   useEffect(() => {
     if (sourcePage && sourcePage.title) {
@@ -201,24 +170,22 @@ export function CopyPageDialog({
           onLastSlugTitleChange={setLastSlugTitle}
           error={fieldErrors.slug}
         />
-        <Select value={targetParentID} onValueChange={setTargetParentID}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select new parent..." />
-          </SelectTrigger>
-          <SelectContent>
-            {selectOptions}
-          </SelectContent>
-        </Select>
+        <PageSelect
+          pageID={targetParentID}
+          onChange={setTargetParentID}
+        />
+        <span className="text-sm text-gray-500">
+          Path: {parentPath !== '' && `${parentPath}/`}
+          {slug && `${slug}`}
+        </span>
         <div className="mt-4 flex justify-end">
           <FormActions
             onCancel={handleCancel}
             onSave={async () => await handleCopy()}
-            saveLabel={loading ? 'Copying...' : 'Copy Page'}
+            saveLabel={loading ? 'Copying...' : 'Copy && Edit Page'}
             disabled={isCopyButtonDisabled}
             loading={loading}
-          >
-
-          </FormActions>
+          />
         </div>
       </DialogContent>
     </Dialog>
