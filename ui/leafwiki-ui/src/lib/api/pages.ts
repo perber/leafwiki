@@ -9,6 +9,13 @@ export type PageNode = {
   children: PageNode[]
 }
 
+export interface Page {
+  id: string
+  path: string
+  title: string
+  content: string
+}
+
 export async function fetchTree(): Promise<PageNode> {
   return (await fetchWithAuth(`/api/tree`)) as PageNode
 }
