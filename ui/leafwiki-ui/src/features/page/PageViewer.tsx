@@ -1,4 +1,4 @@
-import { getPageByPath } from '@/lib/api/pages'
+import { getPageByPath, Page } from '@/lib/api/pages'
 // import "highlight.js/styles/github.css"
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import React, { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import MarkdownPreview from '../preview/MarkdownPreview'
+import { CopyPageButton } from './CopyPageButton'
 import { DeletePageDialog } from './DeletePageDialog'
 import { EditPageButton } from './EditPageButton'
 import { PrintPageButton } from './PrintPageButton'
@@ -22,13 +23,6 @@ export default function PageViewer() {
   const user = useAuthStore((s) => s.user)
 
   const readOnlyMode = useIsReadOnly()
-
-  interface Page {
-    id: string
-    path: string
-    title: string
-    content: string
-  }
 
   const [page, setPage] = useState<Page | null>(null)
   const { setContent, clearContent } = usePageToolbar()
@@ -80,6 +74,7 @@ export default function PageViewer() {
     setContent(
       <React.Fragment key="viewing">
         <DeletePageDialog pageId={page.id} redirectUrl={redirectUrl} />
+        <CopyPageButton sourcePage={page} />
         <PrintPageButton />
         <EditPageButton path={page.path} />
       </React.Fragment>,
