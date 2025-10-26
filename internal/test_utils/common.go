@@ -6,7 +6,7 @@ import (
 	"mime/multipart"
 )
 
-// createMultipartFile simulates a real file upload using multipart encoding
+// CreateMultipartFile simulates a real file upload using multipart encoding
 func CreateMultipartFile(filename string, content []byte) (multipart.File, string, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
