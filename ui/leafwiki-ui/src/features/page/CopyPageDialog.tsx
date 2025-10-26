@@ -115,7 +115,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
       resetForm()
     } catch (err: unknown) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, 'Error creating page')
+      handleFieldErrors(err, setFieldErrors, 'Error copying page')
       setLoading(false)
     }
   }
