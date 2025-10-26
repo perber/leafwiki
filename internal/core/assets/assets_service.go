@@ -210,25 +210,34 @@ func (s *AssetService) CopyAllAssets(sourcePage *tree.PageNode, targetPage *tree
 	}
 
 	for _, entry := range entries {
-		sourceFilePath := path.Join(sourceAssetPath, entry.Name())
-		targetFilePath := path.Join(targetAssetPath, entry.Name())
-
-		sourceFile, err := os.Open(sourceFilePath)
-		if err != nil {
-			return fmt.Errorf("could not open source asset file: %w", err)
+		if entry.IsDir() {
+			continue // skip directories
 		}
-		defer sourceFile.Close()
-
-		targetFile, err := os.Create(targetFilePath)
-		if err != nil {
-			return fmt.Errorf("could not create target asset file: %w", err)
-		}
-		defer targetFile.Close()
-
-		if _, err := io.Copy(targetFile, sourceFile); err != nil {
-			return fmt.Errorf("could not copy asset file: %w", err)
+		if err := s.copySingleAsset(sourceAssetPath, targetAssetPath, entry); err != nil {
+			return fmt.Errorf("could not copy asset %s: %w", entry.Name(), err)
 		}
 	}
 
 	return nil
+}
+
+func (s *AssetService) copySingleAsset(sourceAssetPath string, targetAssetPath string, entry os.DirEntry) error {
+	sourceFilePath := path.Join(sourceAssetPath, entry.Name())
+	targetFilePath := path.Join(targetAssetPath, entry.Name())
+
+	sourceFile, err := os.Open(sourceFilePath)
+	if err != nil {
+		return fmt.Errorf("could not open source asset file: %w", err)
+	}
+	defer sourceFile.Close()
+
+	targetFile, err := os.Create(targetFilePath)
+	if err != nil {
+		return fmt.Errorf("could not create target asset file: %w", err)
+	}
+	defer targetFile.Close()
+
+	if _, err := io.Copy(targetFile, sourceFile); err != nil {
+		return fmt.Errorf("could not copy asset file: %w", err)
+	}
 }
