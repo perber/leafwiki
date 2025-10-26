@@ -259,6 +259,58 @@ func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
 	return w.tree.GetPage(id)
 }
 
+func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title string, slug string) (*tree.Page, error) {
+	// Validate the request
+	ve := errors.NewValidationErrors()
+	if title == "" {
+		ve.Add("title", "Title must not be empty")
+	}
+	if err := w.slug.IsValidSlug(slug); err != nil {
+		ve.Add("slug", err.Error())
+	}
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
+	// Find the current page
+	page, err := w.tree.GetPage(currentPageID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a copy of the page
+	copyID, err := w.tree.CreatePage(targetParentID, title, slug)
+	if err != nil {
+		return nil, err
+	}
+	cleanup := func() { _ = w.tree.DeletePage(*copyID, false) }
+
+	// Get the copied page
+	copy, err := w.tree.GetPage(*copyID)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+
+	// Copy assets!
+	if err := w.asset.CopyAllAssets(page.PageNode, copy.PageNode); err != nil {
+		cleanup()
+		return nil, err
+	}
+
+	// Update the content to point to the new asset paths
+	updatedContent := strings.ReplaceAll(page.Content, "/assets/"+page.ID+"/", "/assets/"+copy.ID+"/")
+
+	// Write the content to the copied page
+	if err := w.tree.UpdatePage(copy.ID, copy.Title, copy.Slug, updatedContent); err != nil {
+		cleanup()
+		_ = w.asset.DeleteAllAssetsForPage(copy.PageNode)
+		return nil, err
+	}
+
+	return copy, nil
+}
+
 func (w *Wiki) DeletePage(id string, recursive bool) error {
 	page, err := w.tree.GetPage(id)
 	if err != nil {

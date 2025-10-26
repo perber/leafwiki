@@ -6,20 +6,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { movePage, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { JSX, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { PageSelect } from './PageSelect'
 
 export function MovePageDialog({ pageId }: { pageId: string }) {
   // Dialog state from zustand store
@@ -86,23 +80,6 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
     closeDialog()
   }
 
-  const renderOptions = (node: PageNode, depth = 1): JSX.Element[] => {
-    const indent = '—'.repeat(depth)
-    const options = [
-      <SelectItem key={node.id} value={node.id}>
-        {indent} {node.title}
-      </SelectItem>,
-    ]
-
-    if (node.children?.length) {
-      node.children.forEach((child) => {
-        options.push(...renderOptions(child, depth + 1))
-      })
-    }
-
-    return options
-  }
-
   return (
     <Dialog
       open={open}
@@ -117,18 +94,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
           <DialogTitle>Move Page</DialogTitle>
         </DialogHeader>
         <DialogDescription>Select a new parent for this page</DialogDescription>
-        <Select value={newParentId} onValueChange={setNewParentId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select new parent..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem key="root" value="root">
-              ⬆️ Top Level
-            </SelectItem>
-            {tree && tree.children.map((child) => renderOptions(child))}
-          </SelectContent>
-        </Select>
-
+        <PageSelect pageID={newParentId} onChange={setNewParentId} />
         <div className="mt-4 flex justify-end">
           <FormActions
             onCancel={handleCancel}

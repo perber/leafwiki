@@ -9,6 +9,13 @@ export type PageNode = {
   children: PageNode[]
 }
 
+export interface Page {
+  id: string
+  path: string
+  title: string
+  content: string
+}
+
 export async function fetchTree(): Promise<PageNode> {
   return (await fetchWithAuth(`/api/tree`)) as PageNode
 }
@@ -53,6 +60,24 @@ export async function createPage({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, slug, parentId }),
+  })
+}
+
+export async function copyPage(
+  id: string,
+  targetParentId: string | null,
+  targetTitle: string,
+  targetSlug: string,
+) {
+  if (targetParentId === '' || targetParentId === 'root') targetParentId = null
+  return await fetchWithAuth(`/api/pages/copy/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      targetParentId,
+      title: targetTitle,
+      slug: targetSlug,
+    }),
   })
 }
 
