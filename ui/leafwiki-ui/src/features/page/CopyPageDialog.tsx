@@ -78,10 +78,6 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
   }, [tree, sourcePage.id])
 
   useEffect(() => {
-    console.log(
-      '[CopyPageDialog] Setting target parent ID to source page parent ID:',
-      parentId,
-    )
     if (parentId) {
       setTargetParentID(parentId)
     }
