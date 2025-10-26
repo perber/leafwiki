@@ -69,7 +69,7 @@ export async function copyPage(
   targetTitle: string,
   targetSlug: string,
 ) {
-  if (targetParentId === '' || targetParentId == 'root') targetParentId = null
+  if (targetParentId === '' || targetParentId === 'root') targetParentId = null
   return await fetchWithAuth(`/api/pages/copy/${id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
