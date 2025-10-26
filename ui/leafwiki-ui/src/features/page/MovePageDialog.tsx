@@ -94,10 +94,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
           <DialogTitle>Move Page</DialogTitle>
         </DialogHeader>
         <DialogDescription>Select a new parent for this page</DialogDescription>
-        <PageSelect
-          pageID={newParentId}
-          onChange={setNewParentId}
-        />
+        <PageSelect pageID={newParentId} onChange={setNewParentId} />
         <div className="mt-4 flex justify-end">
           <FormActions
             onCancel={handleCancel}

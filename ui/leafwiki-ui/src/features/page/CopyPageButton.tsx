@@ -4,11 +4,7 @@ import { Page } from '@/lib/api/pages'
 import { useDialogsStore } from '@/stores/dialogs'
 import { Copy } from 'lucide-react'
 
-export function CopyPageButton({
-  sourcePage,
-}: {
-  sourcePage: Page
-}) {
+export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
   const openDialog = useDialogsStore((s) => s.openDialog)
 
   return (

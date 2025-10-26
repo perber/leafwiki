@@ -19,11 +19,7 @@ import { toast } from 'sonner'
 import { PageSelect } from './PageSelect'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
-export function CopyPageDialog({
-  sourcePage,
-}: {
-  sourcePage: Page
-}) {
+export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
   // Dialog state from zustand store
   const [targetParentID, setTargetParentID] = useState<string>('root')
   const [title, setTitle] = useState<string>('')
@@ -82,7 +78,10 @@ export function CopyPageDialog({
   }, [tree, sourcePage.id])
 
   useEffect(() => {
-    console.log('[CopyPageDialog] Setting target parent ID to source page parent ID:', parentId)
+    console.log(
+      '[CopyPageDialog] Setting target parent ID to source page parent ID:',
+      parentId,
+    )
     if (parentId) {
       setTargetParentID(parentId)
     }
@@ -109,15 +108,14 @@ export function CopyPageDialog({
     setLoading(true)
     setFieldErrors({})
     try {
-      const newPage = await createPage({ title, slug, parentId: targetParentID })
-
-      const p = newPage as Page
-      await updatePage(
-        p.id,
+      const newPage = await createPage({
         title,
         slug,
-        sourcePage.content,
-      )
+        parentId: targetParentID,
+      })
+
+      const p = newPage as Page
+      await updatePage(p.id, title, slug, sourcePage.content)
       toast.success('Page copied')
       await reloadTree()
       if (redirect) {
@@ -148,7 +146,6 @@ export function CopyPageDialog({
       open={open}
       onOpenChange={(open) => {
         if (!open) {
-
           closeDialog()
         }
       }}
@@ -178,10 +175,7 @@ export function CopyPageDialog({
           onLastSlugTitleChange={setLastSlugTitle}
           error={fieldErrors.slug}
         />
-        <PageSelect
-          pageID={targetParentID}
-          onChange={setTargetParentID}
-        />
+        <PageSelect pageID={targetParentID} onChange={setTargetParentID} />
         <span className="text-sm text-gray-500">
           Path: {parentPath !== '' && `${parentPath}/`}
           {slug && `${slug}`}
