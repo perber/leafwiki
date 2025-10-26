@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	verrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func setupTestWiki(t *testing.T) *Wiki {
@@ -278,6 +280,91 @@ func TestWiki_SortPages(t *testing.T) {
 	sortedChildren := parent.Children
 	if sortedChildren[0].ID != child2.ID || sortedChildren[1].ID != child1.ID {
 		t.Errorf("Expected order [child2, child1], got [%s, %s]", sortedChildren[0].Slug, sortedChildren[1].Slug)
+	}
+}
+
+func TestWiki_CopyPages(t *testing.T) {
+	w := setupTestWiki(t)
+	original, _ := w.CreatePage(nil, "Original", "original")
+
+	copied, err := w.CopyPage(original.ID, nil, "Copy of Original", "copy-of-original")
+	if err != nil {
+		t.Fatalf("CopyPage failed: %v", err)
+	}
+
+	if copied.Title != "Copy of Original" {
+		t.Errorf("Expected title 'Copy of Original', got %q", copied.Title)
+	}
+	if copied.Slug != "copy-of-original" {
+		t.Errorf("Expected slug 'copy-of-original', got %q", copied.Slug)
+	}
+	if copied.ID == original.ID {
+		t.Error("Expected different ID for copied page")
+	}
+}
+
+func TestWiki_CopyPages_WithParent(t *testing.T) {
+	w := setupTestWiki(t)
+	parent, _ := w.CreatePage(nil, "Parent", "parent")
+	original, _ := w.CreatePage(nil, "Original", "original")
+
+	copied, err := w.CopyPage(original.ID, &parent.ID, "Copy of Original", "copy-of-original")
+	if err != nil {
+		t.Fatalf("CopyPage with parent failed: %v", err)
+	}
+
+	if copied.Parent.ID != parent.ID {
+		t.Errorf("Expected parent ID %q, got %q", parent.ID, copied.Parent.ID)
+	}
+}
+
+func TestWiki_CopyPages_NonExistentSource(t *testing.T) {
+	w := setupTestWiki(t)
+	_, err := w.CopyPage("non-existent-id", nil, "Copy", "copy")
+	if err == nil {
+		t.Error("Expected error for non-existent source page, got none")
+	}
+}
+
+func TestWiki_CopyPages_WithAssets(t *testing.T) {
+	w := setupTestWiki(t)
+	original, _ := w.CreatePage(nil, "Original", "original")
+
+	originalNode := tree.PageNode{
+		ID:    original.ID,
+		Title: original.Title,
+		Slug:  original.Slug,
+	}
+
+	file, _, err := test_utils.CreateMultipartFile("image.png", []byte("image content"))
+	if err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+	defer file.Close()
+
+	// Save asset for the original page
+	if _, err := w.GetAssetService().SaveAssetForPage(&originalNode, file, "image.png"); err != nil {
+		t.Fatalf("Failed to save asset for original page: %v", err)
+	}
+
+	copied, err := w.CopyPage(original.ID, nil, "Copy of Original", "copy-of-original")
+	if err != nil {
+		t.Fatalf("CopyPage failed: %v", err)
+	}
+
+	copiedNode := tree.PageNode{
+		ID:    copied.ID,
+		Title: copied.Title,
+		Slug:  copied.Slug,
+	}
+
+	// Check if the asset was copied
+	copiedAssetPath, err := w.GetAssetService().ListAssetsForPage(&copiedNode)
+	if err != nil {
+		t.Fatalf("Failed to list assets for copied page: %v", err)
+	}
+	if len(copiedAssetPath) != 1 {
+		t.Errorf("Expected 1 asset for copied page, got %d", len(copiedAssetPath))
 	}
 }
 

@@ -1,45 +1,14 @@
 package assets
 
 import (
-	"bytes"
-	"fmt"
-	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/test_utils"
 )
-
-// createMultipartFile simulates a real file upload using multipart encoding
-func createMultipartFile(filename string, content []byte) (multipart.File, string, error) {
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	part, err := writer.CreateFormFile("file", filename)
-	if err != nil {
-		return nil, "", err
-	}
-	if _, err := part.Write(content); err != nil {
-		return nil, "", err
-	}
-	writer.Close()
-
-	reader := multipart.NewReader(body, writer.Boundary())
-	form, err := reader.ReadForm(10 << 20)
-	if err != nil {
-		return nil, "", err
-	}
-
-	files := form.File["file"]
-	if len(files) == 0 {
-		return nil, "", fmt.Errorf("no file found in form")
-	}
-
-	f, err := files[0].Open()
-	return f, files[0].Filename, err
-}
 
 func TestSaveAndListAsset(t *testing.T) {
 	tmp := t.TempDir()
@@ -54,7 +23,7 @@ func TestSaveAndListAsset(t *testing.T) {
 	}
 	service := NewAssetService(tmp, tree.NewSlugService())
 
-	file, name, err := createMultipartFile("my-image.png", []byte("hello image"))
+	file, name, err := test_utils.CreateMultipartFile("my-image.png", []byte("hello image"))
 	if err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
@@ -92,7 +61,7 @@ func TestDeletePageAndEnsureAllAssetsAreDeleted(t *testing.T) {
 	}
 	service := NewAssetService(tmp, tree.NewSlugService())
 
-	file, name, err := createMultipartFile("my-image.png", []byte("hello image"))
+	file, name, err := test_utils.CreateMultipartFile("my-image.png", []byte("hello image"))
 	if err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
@@ -124,9 +93,9 @@ func TestSlugCollision(t *testing.T) {
 	service := NewAssetService(tmp, tree.NewSlugService())
 
 	for i := 0; i < 3; i++ {
-		file, name, err := createMultipartFile("logo.png", []byte("image"))
+		file, name, err := test_utils.CreateMultipartFile("logo.png", []byte("image"))
 		if err != nil {
-			t.Fatalf("createMultipartFile failed: %v", err)
+			t.Fatalf("test_utils.CreateMultipartFile failed: %v", err)
 		}
 		defer file.Close()
 
@@ -159,7 +128,7 @@ func TestAssetRename(t *testing.T) {
 	}
 	service := NewAssetService(tmp, tree.NewSlugService())
 
-	file, name, err := createMultipartFile("old-name.png", []byte("old image"))
+	file, name, err := test_utils.CreateMultipartFile("old-name.png", []byte("old image"))
 	if err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}

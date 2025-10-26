@@ -94,6 +94,7 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 		// Pages
 		requiresAuthGroup.POST("/pages", api.CreatePageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/ensure", api.EnsurePageHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/copy", api.CopyPageHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id", api.UpdatePageHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id", api.DeletePageHandler(wikiInstance))
 
