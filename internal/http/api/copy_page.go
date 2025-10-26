@@ -22,7 +22,7 @@ func CopyPageHandler(w *wiki.Wiki) gin.HandlerFunc {
 		}
 
 		var normalizedTargetID *string = nil
-		if req.TargetParentID != nil && (*req.TargetParentID == "" || *req.TargetParentID == "root") {
+		if req.TargetParentID != nil && (*req.TargetParentID != "" && *req.TargetParentID != "root") {
 			normalizedTargetID = req.TargetParentID
 		}
 

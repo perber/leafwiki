@@ -63,6 +63,29 @@ export async function createPage({
   })
 }
 
+export async function copyPage(
+  id: string,
+  targetParentId: string | null,
+  targetTitle: string,
+  targetSlug: string,
+) {
+  if (targetParentId === '' || targetParentId == 'root') targetParentId = null
+
+  console.log(targetParentId)
+  console.log(targetTitle)
+  console.log(targetSlug)
+
+  return await fetchWithAuth(`/api/pages/copy/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      targetParentId,
+      title: targetTitle,
+      slug: targetSlug,
+    }),
+  })
+}
+
 export async function updatePage(
   id: string,
   title: string,

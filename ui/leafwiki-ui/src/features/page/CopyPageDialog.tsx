@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { createPage, Page, PageNode, updatePage } from '@/lib/api/pages'
+import { copyPage, Page, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
@@ -108,14 +108,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
     setLoading(true)
     setFieldErrors({})
     try {
-      const newPage = await createPage({
-        title,
-        slug,
-        parentId: targetParentID,
-      })
-
-      const p = newPage as Page
-      await updatePage(p.id, title, slug, sourcePage.content)
+      await copyPage(sourcePage.id, targetParentID, title, slug)
       toast.success('Page copied')
       await reloadTree()
       if (redirect) {
