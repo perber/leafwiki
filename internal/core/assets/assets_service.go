@@ -240,4 +240,6 @@ func (s *AssetService) copySingleAsset(sourceAssetPath string, targetAssetPath s
 	if _, err := io.Copy(targetFile, sourceFile); err != nil {
 		return fmt.Errorf("could not copy asset file: %w", err)
 	}
+
+	return nil
 }
