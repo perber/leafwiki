@@ -92,6 +92,16 @@ LeafWiki is often compared to simple Markdown viewers or file browsers - but it�
 
 ## 🛠️ Installation (Production)
 
+### Quick install
+```bash
+curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && sudo chmod +x ./install.sh && sudo ./install.sh --archi amd64
+```
+
+This command performs a quick installation of LeafWiki on the target machine. The installer script accepts the `--archi` flag to specify the target architecture (e.g. `amd64`, `arm64`).
+
+---
+### Manual installation
+
 ```
 # Download the latest release from GitHub
 chmod +x leafwiki
