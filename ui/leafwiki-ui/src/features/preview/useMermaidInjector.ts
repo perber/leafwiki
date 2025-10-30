@@ -37,20 +37,22 @@ export function useMermaidInjector({
   const lastDataLineRef = useRef<string | null>(null)
   const mermaidInitializedRef = useRef(false)
 
-  // Initialize mermaid only once
-  if (!mermaidInitializedRef.current) {
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      theme: 'dark',
-      deterministicIds: true,
-      deterministicIDSeed: 'leafwiki',
-    })
-    mermaid.setParseErrorHandler((err) => {
-      console.warn('Mermaid parse error:', err)
-    })
-  }
-  mermaidInitializedRef.current = true
+  // Initialize mermaid only once in useEffect to avoid issues with React Strict Mode
+  useEffect(() => {
+    if (!mermaidInitializedRef.current) {
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: 'dark',
+        deterministicIds: true,
+        deterministicIDSeed: 'leafwiki',
+      })
+      mermaid.setParseErrorHandler((err) => {
+        console.warn('Mermaid parse error:', err)
+      })
+      mermaidInitializedRef.current = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!containerRef) return
