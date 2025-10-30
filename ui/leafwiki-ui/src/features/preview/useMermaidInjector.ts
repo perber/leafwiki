@@ -67,6 +67,14 @@ export function useMermaidInjector({
       if (lastHashRef.current === codeHash) {
         if (lastDataLineRef.current !== dataLine) {
           // Replace data-line of existing SVG in the list of svgs
+          const oldSVG = el.querySelector('svg')
+          if (oldSVG) {
+            if (dataLine != null) {
+              oldSVG.setAttribute('data-line', String(dataLine))
+            } else {
+              oldSVG.removeAttribute('data-line')
+            }
+          }
           lastDataLineRef.current = dataLine
         }
         return // No need to re-render
