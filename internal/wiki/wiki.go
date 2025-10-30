@@ -251,6 +251,19 @@ func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, er
 }
 
 func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
+
+	// Validate the request
+	ve := errors.NewValidationErrors()
+	if title == "" {
+		ve.Add("title", "Title must not be empty")
+	}
+	if err := w.slug.IsValidSlug(slug); err != nil {
+		ve.Add("slug", err.Error())
+	}
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
 	err := w.tree.UpdatePage(id, title, slug, content)
 	if err != nil {
 		return nil, err
