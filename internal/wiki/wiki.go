@@ -467,6 +467,17 @@ func (w *Wiki) DeleteUser(id string) error {
 }
 
 func (w *Wiki) UpdatePassword(id, password string) error {
+	ve := errors.NewValidationErrors()
+	if password == "" {
+		ve.Add("password", "Password must not be empty")
+	} else if len(password) < 8 {
+		ve.Add("password", "Password must be at least 8 characters long")
+	}
+
+	if ve.HasErrors() {
+		return ve
+	}
+
 	return w.user.UpdatePassword(id, password)
 }
 
