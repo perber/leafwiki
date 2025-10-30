@@ -79,7 +79,7 @@ export function useMermaidInjector({
       }
       await mermaid.parse(normalizedCode)
       const { svg }: RenderResult = await mermaid.render(
-        `mermaid-${codeHash}`,
+        `mermaid-${codeHash}-${dataLine || '0'}`,
         normalizedCode,
         sandbox,
       )
