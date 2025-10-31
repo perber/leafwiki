@@ -99,7 +99,7 @@ case "$ARCH" in
         EXEC_NAME="leafwiki-v$VERSION-linux-arm64"
         ;;
     *)
-        echo "The archtecture $ARCH is not supported"
+        echo "The architecture $ARCH is not supported"
         exit 1
         ;;
 esac
