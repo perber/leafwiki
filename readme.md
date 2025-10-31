@@ -94,10 +94,18 @@ LeafWiki is often compared to simple Markdown viewers or file browsers - but it�
 
 ### Quick install
 ```bash
-curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && sudo chmod +x ./install.sh && sudo ./install.sh --archi amd64
+curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh --archi amd64
 ```
 
 This command performs a quick installation of LeafWiki on the target machine. The installer script accepts the `--archi` flag to specify the target architecture (e.g. `amd64`, `arm64`).
+
+### ⚠️ Attention — Security
+
+Sensitive information (JWT token, administrator password) appears in plain text in the *_systemd_* file `/etc/systemd/system/leafwiki.service`.
+Make sure that this file is accessible only to authorized users.
+
+ >The installation script has been tested on Ubuntu. 
+ >If you test the script on other distributions or architectures, please provide feedback by opening an issue on the GitHub repository — this will help us improve compatibility and documentation.
 
 ---
 ### Manual installation
