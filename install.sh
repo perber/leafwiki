@@ -75,7 +75,7 @@ read -rsp "Which JWT password do you want to use: " JWT_PASSWORD
 echo
 read -rsp "Which admin password do you want to use: " ADMIN_PASSWORD
 echo
-read -rp "Should people without an account have read access? (default: n) Y/n: " RESPONSE
+read -rp "Should people without an account have read access? (default: n) y/N: " RESPONSE
 if [[ $RESPONSE == "y" || $RESPONSE == "Y" ]]; then
     PUBLIC_ACCESS="true"
 else
