@@ -44,9 +44,8 @@ while [[ $# -gt 0 ]]; do
             exit 1;
             ;;
         *)
-            usage
             echo "Error: Unknown option '$1'"
-            exit 1;
+            usage
             ;;
     esac
 done
