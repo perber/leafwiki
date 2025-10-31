@@ -2,8 +2,8 @@
 
 # Usage function
 usage() {
-    echo "Usage: $0 [-arch|--arch <architecture>] [-version|--version <version>]"
-    echo "  -arch, --arch         Specify the system architecture (default: amd64). Supported values: amd64, arm64"
+    echo "Usage: $0 -arch|--arch <architecture> [-version|--version <version>]"
+    echo "  -arch, --arch         Specify the system architecture. Supported values: amd64, arm64"
     echo "  -version, --version   Specify the LeafWiki version to install (default: latest)"
     exit 1
 }
