@@ -89,14 +89,14 @@ fi
 
 case "$ARCH" in 
     "amd64")
-        wget https://github.com/perber/leafwiki/releases/download/v0.4.8/leafwiki-v$VERSION-linux-amd64 || exit 1
-        chmod +x ./leafwiki-v0.4.8-linux-amd64
-        EXEC_NAME="leafwiki-v0.4.8-linux-amd64"
+        wget https://github.com/perber/leafwiki/releases/download/v$VERSION/leafwiki-v$VERSION-linux-amd64 || exit 1
+        chmod +x ./leafwiki-v$VERSION-linux-amd64
+        EXEC_NAME="leafwiki-v$VERSION-linux-amd64"
         ;;
     "arm64")
         wget https://github.com/perber/leafwiki/releases/download/v$VERSION/leafwiki-v$VERSION-linux-arm64 || exit 1
-        chmod +x ./leafwiki-v0.4.8-linux-arm64
-        EXEC_NAME="leafwiki-v0.4.8-linux-arm64"
+        chmod +x ./leafwiki-v$VERSION-linux-arm64
+        EXEC_NAME="leafwiki-v$VERSION-linux-arm64"
         ;;
     *)
         echo "The archtecture $ARCH is not supported"
