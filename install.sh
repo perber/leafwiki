@@ -1,13 +1,29 @@
 #!/bin/bash
 
-ARCH="amd64"
+# Usage function
+usage() {
+    echo "Usage: $0 [-arch|--arch <architecture>] [-version|--version <version>]"
+    echo "  -arch, --arch         Specify the system architecture (default: amd64). Supported values: amd64, arm64"
+    echo "  -version, --version   Specify the LeafWiki version to install (default: latest)"
+    exit 1
+}
+
+ARCH=""
 PUBLIC_ACCESS="false"
 DATA_DIR="$PWD/data"
 EXEC_NAME=""
-LATEST_VERSION=$(curl -s https://api.github.com/repos/perber/leafwiki/releases/latest \
-  | grep '"tag_name":' \
-  | sed -E 's/.*"v([^"]+)".*/\1/')
-VERSION=$LATEST_VERSION
+
+# test wget is installed
+if ! command -v wget &> /dev/null; then
+    echo "Error: wget is not installed. Please install wget and try again."
+    exit 1
+fi
+
+# test if systemctl is installed
+if ! command -v systemctl &> /dev/null; then
+    echo "Error: systemctl is not installed. This script requires systemd to manage the LeafWiki service."
+    exit 1
+fi
 
 while [[ $# -gt 0 ]]; do
     case "$1" in 
@@ -16,22 +32,44 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -version|--version)
+            if [[ -z "$2" ]]; then
+                echo "Error: --version requires a non-empty option argument."
+                usage
+            fi
             VERSION="$2"
             shift 2
             ;;
         -help|--help)
-            echo "You need to include the option with either -arch or --arch beforehand."
-            echo "Example: ./install.sh --arch arm64"
+            usage
             exit 1;
             ;;
         *)
-            echo "Invalid options"
-            echo "You need to include the option with either -arch or --arch beforehand."
-            echo "Example: ./install.sh --arch arm64"
+            usage
+            echo "Error: Unknown option '$1'"
             exit 1;
             ;;
     esac
 done
+
+# Validate architecture
+if [[ -z "$ARCH" ]]; then
+    usage
+    echo "Error: Architecture not specified."
+    exit 1
+fi
+if [[ "$ARCH" != "amd64" && "$ARCH" != "arm64" ]]; then
+    echo "Error: Unsupported architecture '$ARCH'. Supported values are: amd64, arm64"
+    exit 1
+fi
+
+# If no version is specified, get the latest version from GitHub
+if [[ -z "$VERSION" ]]; then
+    LATEST_VERSION=$(curl -s https://api.github.com/repos/perber/leafwiki/releases/latest \
+    | grep '"tag_name":' \
+    | sed -E 's/.*"v([^"]+)".*/\1/')
+    VERSION=$LATEST_VERSION
+fi
+
 
 read -rsp "Which JWT password do you want to use: " JWT_PASSWORD
 echo
