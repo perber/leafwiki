@@ -250,6 +250,13 @@ Highlight styles
   background: #1f2937 !important;
 }
 
+.my-4 svg {
+  display: block;
+}
+.my-4 {
+  contain: content;
+}
+
 @media print {
   @page {
     margin: 1cm;
