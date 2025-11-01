@@ -29,7 +29,7 @@ export async function suggestSlug(
     if (!currentId) currentId = ''
 
     const data = await fetchWithAuth(
-      `/api/pages/slug-suggestion?parentID=${parentId}&title=${encodeURIComponent(title)}&${currentId ? `currentID=${currentId}` : ''}`,
+      `/api/pages/slug-suggestion?parentID=${parentId}&title=${encodeURIComponent(title)}${currentId ? `&currentID=${currentId}` : ''}`,
     )
     const typedData = data as { slug: string }
     return typedData.slug
