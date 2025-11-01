@@ -150,11 +150,12 @@ export default function PageEditor() {
   const onEditTitleClicked = useCallback(() => {
     openDialog('edit-page-metadata', {
       title,
+      currentId: page?.id,
       slug,
       parentId,
       onChange: onMetaDataChange,
     })
-  }, [title, slug, parentId, onMetaDataChange, openDialog])
+  }, [title, slug, parentId, onMetaDataChange, openDialog, page?.id])
 
   // We set the title bar and content of the page editor
   useEffect(() => {

@@ -28,12 +28,12 @@ func NewSlugService() *SlugService {
 }
 
 // GenerateUniqueSlug returns a slug that doesn't conflict with siblings of the given parent
-func (s *SlugService) GenerateUniqueSlug(parent *PageNode, desired string) string {
+func (s *SlugService) GenerateUniqueSlug(parent *PageNode, currentID, desired string) string {
 	slug := normalizeSlug(desired)
 	original := slug
 	i := 1
 
-	for hasSlugConflict(parent, slug) || s.IsValidSlug(slug) != nil {
+	for hasSlugConflict(parent, currentID, slug) || s.IsValidSlug(slug) != nil {
 		slug = fmt.Sprintf("%s-%d", original, i)
 		i++
 	}
@@ -70,9 +70,9 @@ func normalizeSlug(title string) string {
 }
 
 // Checks if the given slug already exists among parent's children
-func hasSlugConflict(parent *PageNode, slug string) bool {
+func hasSlugConflict(parent *PageNode, currentID string, slug string) bool {
 	for _, child := range parent.Children {
-		if child.Slug == slug {
+		if child.Slug == slug && child.ID != currentID {
 			return true
 		}
 	}
