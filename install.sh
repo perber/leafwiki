@@ -6,7 +6,7 @@ usage() {
     echo "  -arch, --arch         Specify the system architecture. Supported values: amd64, arm64"
     echo "  -version, --version   Specify the LeafWiki version to install (default: latest)"
     echo "  -host, --host         Specify the host address on which LeafWiki will be hosted"
-    echo " -port, --port          Specify the port on which LeafWiki will be hosted"
+    echo "  -port, --port          Specify the port on which LeafWiki will be hosted"
     exit 1
 }
 
@@ -134,7 +134,7 @@ WantedBy=multi-user.target
 systemctl enable leafwiki
 systemctl start leafwiki
 IS_ACTIVE=$(systemctl is-active leafwiki)
-if [[ "$IS_ACTIVE" == "failed" ]];then
+if [[ "$IS_ACTIVE" == "failed" ]]; then
     echo "Installation failed: "
     echo $(systemctl status leafwiki)
 else

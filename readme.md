@@ -97,9 +97,15 @@ LeafWiki is often compared to simple Markdown viewers or file browsers - but it�
 curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh --arch amd64
 ```
 
-This command performs a quick installation of LeafWiki on the target machine. The installer script accepts the `--arch` flag to specify the target architecture (e.g. `amd64`, `arm64`).
+This command performs a quick installation of LeafWiki on the target machine.
 
-> By default LeafWiki runs on port `8080`.
+### ⚙️ Flags
+
+| Flag               | Description                                                 | Default       |
+|--------------------|-------------------------------------------------------------|---------------|
+| `--arch`           | Target architecture for the binary (e.g. `amd64`, `arm64`)  |       -       |
+| `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
+| `--port`           | Port the server listens on                                  | `8080`        |
 
 #### ⚠️ Attention — Security
 
