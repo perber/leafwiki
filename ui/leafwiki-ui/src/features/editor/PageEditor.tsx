@@ -152,7 +152,7 @@ export default function PageEditor() {
 
     openDialog('edit-page-metadata', {
       title,
-      currentId: page?.id,
+      currentId: page.id,
       slug,
       parentId,
       onChange: onMetaDataChange,
