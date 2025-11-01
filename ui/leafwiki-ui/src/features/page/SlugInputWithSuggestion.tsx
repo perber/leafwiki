@@ -9,7 +9,6 @@ type Props = {
   slug: string
   parentId: string
   currentId?: string
-  initialTitle?: string
   enableSlugSuggestion?: boolean
   onSlugChange: (slug: string) => void
   onSlugTouchedChange?: (touched: boolean) => void
@@ -23,7 +22,6 @@ export function SlugInputWithSuggestion({
   slug,
   currentId,
   parentId,
-  initialTitle = '',
   enableSlugSuggestion = true,
   onSlugChange,
   onSlugTouchedChange,
@@ -66,7 +64,6 @@ export function SlugInputWithSuggestion({
     onSlugChange,
     onLastSlugTitleChange,
     enableSlugSuggestion,
-    initialTitle,
   ])
 
   const handleChange = (val: string) => {

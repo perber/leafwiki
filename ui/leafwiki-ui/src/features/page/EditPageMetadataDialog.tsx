@@ -105,7 +105,6 @@ export function EditPageMetadataDialog({
             slug={slug}
             currentId={currentId}
             parentId={parentId}
-            initialTitle={propTitle}
             enableSlugSuggestion={true}
             onSlugChange={handleSlugChange}
             onSlugTouchedChange={setSlugTouched}
