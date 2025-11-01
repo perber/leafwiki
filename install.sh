@@ -2,9 +2,11 @@
 
 # Usage function
 usage() {
-    echo "Usage: $0 -arch|--arch <architecture> [-version|--version <version>]"
+    echo "Usage: $0 -arch|--arch <architecture> [-version|--version <version>] [-host|--host <host>] [-port|--port <port>]"
     echo "  -arch, --arch         Specify the system architecture. Supported values: amd64, arm64"
     echo "  -version, --version   Specify the LeafWiki version to install (default: latest)"
+    echo "  -host, --host         Specify the host address on which LeafWiki will be hosted"
+    echo " -port, --port          Specify the port on which LeafWiki will be hosted"
     exit 1
 }
 
@@ -12,6 +14,8 @@ ARCH=""
 PUBLIC_ACCESS="false"
 DATA_DIR="$PWD/data"
 EXEC_NAME=""
+PORT="8080"
+HOST="0.0.0.0"
 
 # test wget is installed
 if ! command -v wget &> /dev/null; then
@@ -37,6 +41,14 @@ while [[ $# -gt 0 ]]; do
                 usage
             fi
             VERSION="$2"
+            shift 2
+            ;;
+        -host|--host)
+            HOST="$2"
+            shift 2
+            ;;
+        -port|--port)
+            PORT="$2"
             shift 2
             ;;
         -help|--help)
@@ -112,7 +124,7 @@ After=network.target
 
 [Service]
 User=$RUN_USER
-ExecStart=$(realpath $PWD)/$EXEC_NAME --data-dir=$DATA_DIR --jwt-secret=\"$JWT_PASSWORD\" --public-access=$PUBLIC_ACCESS --admin-password=$ADMIN_PASSWORD
+ExecStart=$(realpath $PWD)/$EXEC_NAME --data-dir=$DATA_DIR --jwt-secret=\"$JWT_PASSWORD\" --public-access=$PUBLIC_ACCESS --admin-password=$ADMIN_PASSWORD --port=$PORT --host=$HOST
 Restart=on-failure
 
 [Install]
@@ -121,3 +133,15 @@ WantedBy=multi-user.target
 
 systemctl enable leafwiki
 systemctl start leafwiki
+IS_ACTIVE=$(systemctl is-active leafwiki)
+if [[ "$IS_ACTIVE" == "failed" ]];then
+    echo "Installation failed: "
+    echo $(systemctl status leafwiki)
+else
+    echo "leafWiki installation completed!"
+    echo "Host: $HOST"
+    echo "Port: $PORT"
+    echo "DataDirectory: $DATA_DIR"
+    echo "Status : $IS_ACTIVE"
+fi
+
