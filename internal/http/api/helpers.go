@@ -43,7 +43,7 @@ func respondWithError(c *gin.Context, err error) {
 func ToAPIPage(p *tree.Page) *Page {
 	return &Page{
 		PageNode: p.PageNode,
-		Content:  p.Content,
+		Content:  string(tree.StripFrontMatter([]byte(p.Content))),
 		Path:     buildPathFromNode(p.PageNode),
 	}
 }
