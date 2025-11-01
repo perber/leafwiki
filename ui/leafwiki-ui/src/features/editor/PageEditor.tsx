@@ -148,6 +148,8 @@ export default function PageEditor() {
   // when the user clicks save
   // This will set the new title and slug in the editor
   const onEditTitleClicked = useCallback(() => {
+    if (!title || !slug || !page?.id) return
+
     openDialog('edit-page-metadata', {
       title,
       currentId: page?.id,
