@@ -6,7 +6,7 @@ usage() {
     echo "  -arch, --arch         Specify the system architecture. Supported values: amd64, arm64"
     echo "  -version, --version   Specify the LeafWiki version to install (default: latest)"
     echo "  -host, --host         Specify the host address on which LeafWiki will be hosted"
-    echo "  -port, --port          Specify the port on which LeafWiki will be hosted"
+    echo "  -port, --port         Specify the port on which LeafWiki will be hosted"
     exit 1
 }
 
@@ -48,6 +48,10 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -port|--port)
+            if ! [[ "$2" =~ ^[0-9]+$ ]] || [ "$2" -lt 1 ] || [ "$2" -gt 65535 ]; then
+                echo "Error: --port requires a valid port number (1-65535)."
+                usage
+            fi
             PORT="$2"
             shift 2
             ;;
@@ -136,7 +140,7 @@ systemctl start leafwiki
 IS_ACTIVE=$(systemctl is-active leafwiki)
 if [[ "$IS_ACTIVE" == "failed" ]]; then
     echo "Installation failed: "
-    echo $(systemctl status leafwiki)
+    systemctl status leafwiki
 else
     echo "leafWiki installation completed!"
     echo "Host: $HOST"
