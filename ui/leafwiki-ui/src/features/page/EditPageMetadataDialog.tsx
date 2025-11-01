@@ -14,7 +14,7 @@ import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
 type EditPageMetadataDialogProps = {
   parentId: string
-  currentId: string
+  currentId?: string
   title: string
   slug: string
   onChange: (title: string, slug: string) => void
