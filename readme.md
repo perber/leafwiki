@@ -99,7 +99,7 @@ curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o in
 
 This command performs a quick installation of LeafWiki on the target machine. The installer script accepts the `--arch` flag to specify the target architecture (e.g. `amd64`, `arm64`).
 
-> per default LeafWiki runs on port `8080`.
+> By default LeafWiki runs on port `8080`.
 
 #### ⚠️ Attention — Security
 
