@@ -8,7 +8,7 @@ type Props = {
   title: string
   slug: string
   parentId: string
-  initialTitle?: string
+  currentId?: string
   enableSlugSuggestion?: boolean
   onSlugChange: (slug: string) => void
   onSlugTouchedChange?: (touched: boolean) => void
@@ -20,8 +20,8 @@ type Props = {
 export function SlugInputWithSuggestion({
   title,
   slug,
+  currentId,
   parentId,
-  initialTitle = '',
   enableSlugSuggestion = true,
   onSlugChange,
   onSlugTouchedChange,
@@ -33,19 +33,18 @@ export function SlugInputWithSuggestion({
   const debouncedTitle = useDebounce(title, 300)
 
   useEffect(() => {
-    if (
-      !enableSlugSuggestion ||
-      slugTouched ||
-      debouncedTitle.trim() === '' ||
-      debouncedTitle === initialTitle
-    ) {
+    if (!enableSlugSuggestion || slugTouched || debouncedTitle.trim() === '') {
       return
     }
 
     const generateSlug = async () => {
       try {
         onSlugLoadingChange?.(true)
-        const suggestion = await suggestSlug(parentId, debouncedTitle)
+        const suggestion = await suggestSlug(
+          parentId,
+          debouncedTitle,
+          currentId,
+        )
         onSlugChange(suggestion)
         onLastSlugTitleChange?.(debouncedTitle)
       } catch {
@@ -60,11 +59,11 @@ export function SlugInputWithSuggestion({
     debouncedTitle,
     slugTouched,
     parentId,
+    currentId,
     onSlugLoadingChange,
     onSlugChange,
     onLastSlugTitleChange,
     enableSlugSuggestion,
-    initialTitle,
   ])
 
   const handleChange = (val: string) => {

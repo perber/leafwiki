@@ -23,10 +23,13 @@ export async function fetchTree(): Promise<PageNode> {
 export async function suggestSlug(
   parentId: string,
   title: string,
+  currentId?: string,
 ): Promise<string> {
   try {
+    if (!currentId) currentId = ''
+
     const data = await fetchWithAuth(
-      `/api/pages/slug-suggestion?parentID=${parentId}&title=${encodeURIComponent(title)}`,
+      `/api/pages/slug-suggestion?parentID=${parentId}&title=${encodeURIComponent(title)}${currentId ? `&currentID=${currentId}` : ''}`,
     )
     const typedData = data as { slug: string }
     return typedData.slug

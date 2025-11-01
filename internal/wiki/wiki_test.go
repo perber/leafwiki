@@ -170,7 +170,7 @@ func TestWiki_UpdatePage(t *testing.T) {
 
 func TestWiki_SuggestSlug_Unique(t *testing.T) {
 	w := setupTestWiki(t)
-	slug, err := w.SuggestSlug("root", "My Page")
+	slug, err := w.SuggestSlug("root", "", "My Page")
 	if err != nil {
 		t.Fatalf("SuggestSlug failed: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestWiki_SuggestSlug_Conflict(t *testing.T) {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
-	slug, err := w.SuggestSlug(root.ID, "My Page")
+	slug, err := w.SuggestSlug(root.ID, "", "My Page")
 	if err != nil {
 		t.Fatalf("SuggestSlug failed: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	backend := arch.Children[0]
 
 	// Jetzt dort einen Slug vorschlagen
-	slug, err := wiki.SuggestSlug(backend.ID, "Data Layer")
+	slug, err := wiki.SuggestSlug(backend.ID, "", "Data Layer")
 	if err != nil {
 		t.Fatalf("SuggestSlug failed: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 		t.Fatalf("Failed to create 'Data Layer': %v", err)
 	}
 
-	slug2, err := wiki.SuggestSlug(backend.ID, "Data Layer")
+	slug2, err := wiki.SuggestSlug(backend.ID, "", "Data Layer")
 	if err != nil {
 		t.Fatalf("SuggestSlug 2 failed: %v", err)
 	}

@@ -10,6 +10,7 @@ import (
 func SuggestSlugHandler(w *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		parentID := c.Query("parentID")
+		currentID := c.Query("currentID")
 		title := c.Query("title")
 
 		if title == "" {
@@ -17,7 +18,7 @@ func SuggestSlugHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		slug, err := w.SuggestSlug(parentID, title)
+		slug, err := w.SuggestSlug(parentID, currentID, title)
 		if err != nil {
 			respondWithError(c, err)
 			return

@@ -361,11 +361,11 @@ func (w *Wiki) LookupPagePath(path string) (*tree.PathLookup, error) {
 	return w.tree.LookupPagePath(w.tree.GetTree().Children, path)
 }
 
-func (w *Wiki) SuggestSlug(parentID string, title string) (string, error) {
+func (w *Wiki) SuggestSlug(parentID string, currentID string, title string) (string, error) {
 	// if no parentID is set or it's the root page
 	// We don't need to look for a page id
 	if parentID == "" || parentID == "root" {
-		return w.slug.GenerateUniqueSlug(w.tree.GetTree(), title), nil
+		return w.slug.GenerateUniqueSlug(w.tree.GetTree(), currentID, title), nil
 	}
 
 	parent, err := w.tree.FindPageByID(w.tree.GetTree().Children, parentID)
@@ -373,7 +373,7 @@ func (w *Wiki) SuggestSlug(parentID string, title string) (string, error) {
 		return "", fmt.Errorf("parent not found: %w", err)
 	}
 
-	return w.slug.GenerateUniqueSlug(parent, title), nil
+	return w.slug.GenerateUniqueSlug(parent, currentID, title), nil
 }
 
 func (w *Wiki) Login(identifier, password string) (*auth.AuthToken, error) {
