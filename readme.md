@@ -262,7 +262,7 @@ go run main.go
 
 ---
 
-### 🛠️ v0.5.0 – Planned
+### 🛠️ Planned
 - [ ] Mermaid diagram support
 - [ ] Documentation and offering setup guides for nginx, raspberry pi, ...
 
