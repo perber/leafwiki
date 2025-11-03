@@ -12,7 +12,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569
 	golang.org/x/crypto v0.43.0
-	modernc.org/sqlite v1.39.1
+	modernc.org/sqlite v1.40.0
 )
 
 require (
