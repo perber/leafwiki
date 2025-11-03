@@ -41,8 +41,10 @@ func TestPageStore_CreatePage(t *testing.T) {
 		t.Fatalf("Failed to read file: %v", err)
 	}
 
+	clean := StripFrontMatter(content)
+
 	expected := "# Hello World\n"
-	if string(content) != expected {
+	if string(clean) != expected {
 		t.Errorf("Unexpected file content. Got: %q, Expected: %q", string(content), expected)
 	}
 }
@@ -253,7 +255,8 @@ func TestPageStore_UpdatePage_ContentOnly(t *testing.T) {
 		t.Fatalf("Could not read updated file: %v", err)
 	}
 
-	if string(data) != newContent {
+	clean := StripFrontMatter(data)
+	if string(clean) != newContent {
 		t.Errorf("Expected content %q, got %q", newContent, string(data))
 	}
 }
