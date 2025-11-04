@@ -11,7 +11,7 @@ COPY ./ui/leafwiki-ui/ ./
 RUN VITE_API_URL=/ npm run build
 
 # Stage 2: Go backend build
-FROM golang:1.24 AS builder
+FROM golang:1.24-alpine AS builder
 
 ARG GOOS
 ARG GOARCH
