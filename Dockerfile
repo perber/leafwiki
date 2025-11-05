@@ -24,6 +24,6 @@ COPY --from=backend-build /out/leafwiki /app/leafwiki
 
 EXPOSE 8080
 
-USER nobody:nobody /app/leafwiki
+RUN mkdir -p /app/data && chmod 777 /app/data
 
 ENTRYPOINT ["/app/leafwiki"]
