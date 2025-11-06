@@ -105,6 +105,13 @@ LeafWiki is often compared to simple Markdown viewers or file browsers - but it�
 
 ## 🛠️ Installation (Production)
 
+You can install LeafWiki in several environments.  
+Below are some examples to get you started.
+
+### Setup Examples
+- [Install LeafWiki with nginx on Ubuntu](docs/install/nginx.md)
+- [Install LeafWiki on a Raspberry Pi](docs/install/raspberry.md)
+
 ### Quick install
 ```bash
 curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh --arch amd64
