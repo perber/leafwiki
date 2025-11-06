@@ -158,7 +158,7 @@ server {
 }
 ```
 
-Now Leafwiki is available securely at:  
+Now LeafWiki is available securely at:  
 ➡️ **https://demo.leafwiki.com**
 
 ---
