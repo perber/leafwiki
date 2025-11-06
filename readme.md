@@ -33,6 +33,20 @@ LeafWiki now builds and runs natively on:
 
 ---
 
+## 🧪 Live Demo
+
+> **Test it yourself – no setup required!**  
+> A public demo of LeafWiki is available here:
+
+🌐 **[demo.leafwiki.com](https://demo.leafwiki.com)**  
+**Username:** `demo-user`  
+**Password:** `demo123!`  
+
+> ⚙️ The demo instance resets automatically every hour,  
+> so feel free to experiment — all changes are temporary.
+
+---
+
 ## ✨ Features
 
 - 🧾 Markdown-first with live editor + preview
