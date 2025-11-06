@@ -26,7 +26,7 @@ During installation, you’ll be prompted for:
 When complete, LeafWiki will be running as a systemd service:
 
 ```
-Host: 0.0.0.0
+Host: 127.0.0.1
 Port: 8080
 DataDirectory: /root/data
 Status: active
