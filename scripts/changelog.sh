@@ -25,14 +25,31 @@ fi
 # Collect commits
 COMMITS=$(git log "$PREVIOUS_TAG".."$CURRENT_TAG" --pretty=format:"%s (@%an)")
 
-# Categorize
-FEATURES=$(echo "$COMMITS" | grep -Ei '^feat|feature' || true)
-FIXES=$(echo "$COMMITS" | grep -Ei '^fix|bug' || true)
-DOCS=$(echo "$COMMITS" | grep -Ei '^docs' || true)
-REFACTOR=$(echo "$COMMITS" | grep -Ei '^refactor' || true)
-TESTS=$(echo "$COMMITS" | grep -Ei '^test' || true)
-CHORES=$(echo "$COMMITS" | grep -Ei '^chore' || true)
-OTHERS=$(echo "$COMMITS" | grep -Evi '^(feat|fix|bug|docs|refactor|test|chore)' || true)
+# Categorize exclusively
+FEATURES=""
+FIXES=""
+DOCS=""
+REFACTOR=""
+TESTS=""
+CHORES=""
+OTHERS=""
+while IFS= read -r commit; do
+  if [[ "$commit" =~ ^feat ]]; then
+    FEATURES+="$commit"$'\n'
+  elif [[ "$commit" =~ ^fix ]]; then
+    FIXES+="$commit"$'\n'
+  elif [[ "$commit" =~ ^docs ]]; then
+    DOCS+="$commit"$'\n'
+  elif [[ "$commit" =~ ^refactor ]]; then
+    REFACTOR+="$commit"$'\n'
+  elif [[ "$commit" =~ ^test ]]; then
+    TESTS+="$commit"$'\n'
+  elif [[ "$commit" =~ ^chore ]]; then
+    CHORES+="$commit"$'\n'
+  else
+    OTHERS+="$commit"$'\n'
+  fi
+done <<< "$COMMITS"
 
 # Build markdown file
 OUTFILE="changelog.md"
@@ -43,37 +60,37 @@ OUTFILE="changelog.md"
 
   if [ -n "$FEATURES" ]; then
     echo "### ✨ Features"
-    echo "$FEATURES" | sed 's/^/- /'
+    echo "$FEATURES" | sed '/^$/d; s/^/- /'
     echo ""
   fi
   if [ -n "$FIXES" ]; then
     echo "### 🐛 Bug Fixes"
-    echo "$FIXES" | sed 's/^/- /'
+    echo "$FIXES" | sed '/^$/d; s/^/- /'
     echo ""
   fi
   if [ -n "$DOCS" ]; then
     echo "### 🧾 Documentation"
-    echo "$DOCS" | sed 's/^/- /'
+    echo "$DOCS" | sed '/^$/d; s/^/- /'
     echo ""
   fi
   if [ -n "$REFACTOR" ]; then
     echo "### 🔧 Refactoring"
-    echo "$REFACTOR" | sed 's/^/- /'
+    echo "$REFACTOR" | sed '/^$/d; s/^/- /'
     echo ""
   fi
   if [ -n "$TESTS" ]; then
     echo "### 🧪 Tests"
-    echo "$TESTS" | sed 's/^/- /'
+    echo "$TESTS" | sed '/^$/d; s/^/- /'
     echo ""
   fi
   if [ -n "$CHORES" ]; then
     echo "### 🧰 Chores"
-    echo "$CHORES" | sed 's/^/- /'
+    echo "$CHORES" | sed '/^$/d; s/^/- /'
     echo ""
   fi
   if [ -n "$OTHERS" ]; then
     echo "### 🔹 Other Changes"
-    echo "$OTHERS" | sed 's/^/- /'
+    echo "$OTHERS" | sed '/^$/d; s/^/- /'
     echo ""
   fi
 } > "$OUTFILE"
