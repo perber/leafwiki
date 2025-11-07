@@ -7,14 +7,22 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/assets': 'http://localhost:8080', // dein Go-Backend
+      '/assets': 'http://localhost:8080', // your go backend
     },
   },
+  optimizeDeps: {
+    include: ['mermaid', 'dagre-d3-es'],
+  },
   build: {
-    assetsDir: 'static', // <--- hier änderst du das Zielverzeichnis
+    assetsDir: 'static', // <--- here you change the target directory
     rollupOptions: {
       output: {
-        assetFileNames: 'static/[name].[hash][extname]', // optional: für konsistente Benennung
+        chunkFileNames: 'static/[name]-[hash].js',
+        entryFileNames: 'static/[name]-[hash].js',
+        assetFileNames: 'static/[name].[hash][extname]',
+        manualChunks: {
+          mermaid: ['mermaid', 'dagre-d3-es'],
+        },
       },
     },
   },
