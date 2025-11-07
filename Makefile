@@ -79,7 +79,7 @@ help:
 	@echo "  make clean      – Clean all generated files"
 	@echo "  make test       – Run all Go tests"
 	@echo "  make run        – Run development server"
-	@echo "  make docker-build-publish    – Build and push multi-arch Docker image",
+	@echo "  make docker-build-publish    – Build and push multi-arch Docker image"
 	@echo "  make changelog – Generate changelog"
 
 .PHONY: all build run clean test fmt lint help docker-build-publish changelog
