@@ -315,6 +315,7 @@ A special thanks for this release goes out to @Hugo-Galley.
 He improved the documentation and the onboarding experience a lot! 
 
 - [x] Mermaid.js diagram support
+- [x] Copy page functionality added
 - [x] Installation script added for binary - thanks to @Hugo-Galley
 - [x] Improved docker builds with multi-arch support (amd64 + arm64)
 - [x] Several UI/UX improvements and bugfixes
