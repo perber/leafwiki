@@ -70,4 +70,4 @@ help:
 	@echo "  make run        – Run development server"
 	@echo "  make docker-build-publish    – Build final Docker image"
 
-.PHONY: all build run clean test fmt lint help
+.PHONY: all build run clean test fmt lint help docker-build-publish
