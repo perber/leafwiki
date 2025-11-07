@@ -136,6 +136,29 @@ Make sure that this file is accessible only to authorized users.
  >If you test the script on other distributions or architectures, please provide feedback by opening an issue on the GitHub repository — this will help us improve compatibility and documentation.
 
 ---
+
+
+
+### Docker installation
+
+You can run LeafWiki in a Docker container:
+
+```bash
+docker run -p 8080:8080 ghcr.io/perber/leafwiki:latest --jwt-secret=yoursecret
+```
+
+By default, the container runs as root. You can specify a custom data directory using the `--data-dir` option.
+
+If you want to avoid running as root, add `-u 1000:1000`:
+
+```bash
+docker run -p 8080:8080 -u 1000:1000 \
+  ghcr.io/perber/leafwiki:latest --jwt-secret=yoursecret
+```
+
+By default the data directory inside the container will be `app/data/`
+
+---
 ### Manual installation
 
 ```
