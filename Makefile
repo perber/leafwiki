@@ -52,9 +52,17 @@ $(PLATFORMS):
 	 echo "📦 Compressed: zip and tar.gz"
 
 # Final production Docker image
-docker-prod:
-	docker build -f Dockerfile -t leafwiki:$(VERSION) --target final .
-	docker tag leafwiki:$(VERSION) leafwiki:latest
+docker-build-publish:
+ifndef REPO_OWNER
+	$(error REPO_OWNER is not set. Usage: make docker-build-publish VERSION=vX.Y.Z REPO_OWNER=your_github_username)
+endif
+	docker buildx build \
+		--platform linux/amd64,linux/arm64 \
+		--file Dockerfile \
+		--target final \
+		--tag ghcr.io/$(REPO_OWNER)/leafwiki:$(VERSION) \
+		--tag ghcr.io/$(REPO_OWNER)/leafwiki:latest \
+		--push .
 
 help:
 	@echo "Available commands:"
@@ -63,6 +71,6 @@ help:
 	@echo "  make clean      – Clean all generated files"
 	@echo "  make test       – Run all Go tests"
 	@echo "  make run        – Run development server"
-	@echo "  make docker-prod    – Build final Docker image"
+	@echo "  make docker-build-publish    – Build and push multi-arch Docker image"
 
-.PHONY: all build run clean test fmt lint help
+.PHONY: all build run clean test fmt lint help docker-build-publish
