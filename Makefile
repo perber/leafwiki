@@ -53,6 +53,9 @@ $(PLATFORMS):
 
 # Final production Docker image
 docker-build-publish: 
+ifndef REPO_OWNER
+	$(error REPO_OWNER is not set. Usage: make docker-prod VERSION=vX.Y.Z REPO_OWNER=your_dockerhub_username)
+endif
 	docker buildx build \
 		--platform linux/amd64,linux/arm64 \
 		--file Dockerfile \
