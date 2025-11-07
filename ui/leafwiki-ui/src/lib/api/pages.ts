@@ -6,7 +6,7 @@ export type PageNode = {
   slug: string
   path: string
   parentId?: string | null
-  children: PageNode[]
+  children: PageNode[] | null
 }
 
 export interface Page {

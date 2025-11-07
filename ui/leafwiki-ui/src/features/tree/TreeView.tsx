@@ -71,9 +71,9 @@ export default function TreeView() {
             )}
           </div>
         )}
-        {tree !== null &&
-          tree.children &&
-          tree?.children.map((node) => <TreeNode key={node.id} node={node} />)}
+        {
+          tree?.children?.map((node) => <TreeNode key={node.id} node={node} />)
+        }
       </div>
     </>
   )
