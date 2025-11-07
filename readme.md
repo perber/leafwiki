@@ -312,7 +312,7 @@ go run main.go
 ### ✅ v0.4.9 – Mermaid Support, UX Improvements & Easier Installation
 
 A special thanks for this release goes out to @Hugo-Galley.
-He improved the documentation and the onboarding expirience a lot! 
+He improved the documentation and the onboarding experience a lot! 
 
 - [x] Mermaid.js diagram support
 - [x] Installation script added for binary - thanks to @Hugo-Galley
