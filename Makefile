@@ -71,7 +71,7 @@ changelog:
 		exit 1; \
 	fi
 	@./scripts/changelog.sh $(PREVIOUS) $(CURRENT)
-	
+
 help:
 	@echo "Available commands:"
 	@echo "  make build      – Build binary for current system"
@@ -79,13 +79,7 @@ help:
 	@echo "  make clean      – Clean all generated files"
 	@echo "  make test       – Run all Go tests"
 	@echo "  make run        – Run development server"
-<<<<<<< Updated upstream
-	@echo "  make docker-build-publish    – Build and push multi-arch Docker image"
-
-.PHONY: all build run clean test fmt lint help docker-build-publish
-=======
+	@echo "  make docker-build-publish    – Build and push multi-arch Docker image",
 	@echo "  make changelog – Generate changelog"
-	@echo "  make docker-prod    – Build final Docker image"
 
-.PHONY: all build run clean test fmt lint help changelog
->>>>>>> Stashed changes
+.PHONY: all build run clean test fmt lint help docker-build-publish changelog
