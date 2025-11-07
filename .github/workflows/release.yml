@@ -39,12 +39,8 @@ jobs:
       - name: Build & Push Docker image
         run: |
           VERSION=${GITHUB_REF##*/}  # extract v0.1.0
-          echo "Building Docker image with version $VERSION"
-          make docker-prod VERSION=$VERSION
-          docker tag leafwiki:$VERSION ghcr.io/${{ github.repository_owner }}/leafwiki:$VERSION
-          docker tag leafwiki:$VERSION ghcr.io/${{ github.repository_owner }}/leafwiki:latest
-          docker push ghcr.io/${{ github.repository_owner }}/leafwiki:$VERSION
-          docker push ghcr.io/${{ github.repository_owner }}/leafwiki:latest
+          echo "Building Multi-Arch Docker image with version $VERSION"
+          make docker-build-publish VERSION=$VERSION REPO_OWNER=${{ github.repository_owner }}
 
       - name: Get latest tag before current one
         id: latest
