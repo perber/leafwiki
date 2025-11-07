@@ -235,6 +235,12 @@ go run main.go
 
 ## 🗺️ Roadmap
 
+### Planned
+- [ ] Improve release & test process (CI/CD)
+- [ ] Bug fixes and UX improvements based on user feedback
+
+----
+
 ### ✅ v0.1.0 – MVP
 - [x] Tree-based page structure
 - [x] Markdown file creation
@@ -280,12 +286,12 @@ go run main.go
 - [x] links to non-existing pages now show a create page dialog - thanks @magnus-madsen for the suggestion!
 - [x] smaller UI improvements and bugfixes (e.g. green save button, ...)
 
----
-
-### 🛠️ Planned
-- [ ] Mermaid diagram support
-- [ ] Documentation and offering setup guides for nginx, raspberry pi, ...
-
+### ✅ v0.4.8 – Mermaid Support, UX Improvements & Easier Installation
+- [x] Mermaid.js diagram support
+- [x] Installation script added for binary - thanks to @Hugo-Galley
+- [x] Improved docker builds with multi-arch support (amd64 + arm64)
+- [x] Several UI/UX improvements and bugfixes
+- [x] Stability improvements and dependency updates
 
 ---
 
