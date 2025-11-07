@@ -136,9 +136,10 @@ export const TreeNode = React.memo(function TreeNode({
       </div>
 
       <div ref={ref} className={`ml-4 pl-2 ${!open ? 'hidden' : ''}`}>
-        {hasChildren && node.children?.map((child) => (
-          <TreeNode key={child.id} node={child} level={level + 1} />
-        ))}
+        {hasChildren &&
+          node.children?.map((child) => (
+            <TreeNode key={child.id} node={child} level={level + 1} />
+          ))}
       </div>
     </>
   )
