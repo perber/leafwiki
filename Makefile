@@ -52,7 +52,7 @@ $(PLATFORMS):
 	 echo "📦 Compressed: zip and tar.gz"
 
 # Final production Docker image
-docker-build-publish: 
+docker-build-publish:
 ifndef REPO_OWNER
 	$(error REPO_OWNER is not set. Usage: make docker-build-publish VERSION=vX.Y.Z REPO_OWNER=your_dockerhub_username)
 endif
