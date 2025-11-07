@@ -1,8 +1,8 @@
 # 🌿 LeafWiki
 
-**A lightweight, tree-based Markdown wiki – no database, just a single Go binary.**
+**A lightweight, tree-based wiki that keeps your content in plain Markdown - no database, just a single Go binary.**
 
-LeafWiki is designed for teams and individuals who want a clean, fast, and self-hosted knowledge base — with full control over structure, content, and deployment.
+LeafWiki is designed for teams and individuals who want a clean, fast, and self-hosted knowledge base - with full control over structure, content, and deployment.
 
 ---
 
@@ -21,7 +21,7 @@ LeafWiki is designed for teams and individuals who want a clean, fast, and self-
 > - Usability improvements
 > - Testing and CI improvements 
 > 
-> In the long term, additional features like versioning, improved diagram support (e.g. Mermaid), … are planned —  
+> In the long term, additional features like versioning, … are planned -  
 > but they’ll be introduced gradually, with stability taking priority.  
 > 
 > Want to try it and help shape it? You’re more than welcome.
@@ -42,7 +42,7 @@ LeafWiki now builds and runs natively on:
 
 > Login credentials are displayed on the demo site's login page.  
 > ⚙️ The demo instance resets automatically every hour,   
-> so feel free to experiment — all changes are temporary.  
+> so feel free to experiment - all changes are temporary.  
 
 ---
 
@@ -51,7 +51,7 @@ LeafWiki now builds and runs natively on:
 - 🧾 Markdown-first with live editor + preview
 - 🌲 True tree-structured pages (nested folders)
 - 🔒 Role-based access (admin / editor)
-- 🧠 no DB required
+- 🧠 no database required
 - 📂 Per-page assets with upload support
 - 🖼️ Embed images and files with Markdown
 - ⚙️ Single statically-linked Go binary (no dependencies)
@@ -61,6 +61,7 @@ LeafWiki now builds and runs natively on:
 - 📱 Mobile-friendly design
 - 🌐 Public pages (viewable without login)
 - 🖨️ Print view support
+- 🧩 Mermaid.js diagram support
 
 ---
 
@@ -72,14 +73,14 @@ After trying out tools like Wiki.js, Confluence, and DokuWiki, I wanted somethin
 - Why should setup be a weekend project?
 - Why can't a wiki just be file-based and fast?
 
-**LeafWiki** was born out of that frustration — and the desire to have:
+**LeafWiki** was born out of that frustration - and the desire to have:
 
 - 🧾 Clean Markdown files, organized in folders
 - 🧠 A real tree structure, not a flat list
 - ⚙️ A single binary with no external dependencies
 - 🛠️ Something teams can actually self-host without DevOps pain
 
-It’s not trying to be everything — just a solid, minimal wiki for people who want **clarity over complexity.**
+It’s not trying to be everything - just a solid, minimal wiki for people who want **clarity over complexity.**
 
 ---
 
@@ -89,16 +90,16 @@ LeafWiki is often compared to simple Markdown viewers or file browsers - but it�
 
 |                 | Markdown Reader             | LeafWiki                                                         |
 |-----------------|-----------------------------| -----------------------------------------------------------------|
-| **Purpose**     | Read static `.md` files     | Create and manage a structured wiki                              |
-| **Data source** | Reads directly from disk    | Uses Markdown files as storage, but manages structure internally |
-| **Structure**   | Flat folder view            | True tree of folders and pages                                   |
+| **Purpose**     | Read static `.md` files     | Create, organize, and serve a structured wiki                    |
+| **Data source** | Reads directly from disk    | Stores pages as Markdown, but manages structure internally       |
+| **Structure**   | Flat folder view            | True tree of pages & subpages                                    |
 | **Editing**     | External text editor        | Built-in Markdown editor with live preview                       |
 | **Uploads**     | Not supported               | Per-page assets (images, files)                                  |
 | **Search**      | File names only             | Indexed full-text search (titles + content)                      |
 | **Hosting**     | Static / local              | Self-hosted Go web app                                           |
 | **Access**      | No authentication           | Role-based access (admin / editor)                               |
 
-> LeafWiki doesn’t just *read* Markdown files — it **organizes, edits, and serves** them.  
+> LeafWiki doesn’t just *display* Markdown files - it **organizes, edits, and serves** them.  
 > It’s not a viewer, but a small wiki engine that happens to store everything as Markdown.
 
 ---
@@ -127,17 +128,15 @@ This command performs a quick installation of LeafWiki on the target machine.
 | `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
 | `--port`           | Port the server listens on                                  | `8080`        |
 
-#### ⚠️ Attention — Security
+#### ⚠️ Attention - Security
 
 Sensitive information (JWT token, administrator password) appears in plain text in the *_systemd_* file `/etc/systemd/system/leafwiki.service`.
 Make sure that this file is accessible only to authorized users.
 
  >The installation script has been tested on Ubuntu. 
- >If you test the script on other distributions or architectures, please provide feedback by opening an issue on the GitHub repository — this will help us improve compatibility and documentation.
+ >If you test the script on other distributions or architectures, please provide feedback by opening an issue on the GitHub repository - this will help us improve compatibility and documentation.
 
 ---
-
-
 
 ### Docker installation
 
@@ -159,6 +158,7 @@ docker run -p 8080:8080 -u 1000:1000 \
 By default the data directory inside the container will be `app/data/`
 
 ---
+
 ### Manual installation
 
 ```
@@ -327,6 +327,9 @@ He improved the documentation and the onboarding experience a lot!
 - **Simple to run**: No container, no DB, just Go
 - **Simple to host**: You know where your data is
 - **Simple to trust**: Markdown is portable & future-proof
+
+
+Your knowledge should live in files you own - not in a database you maintain.
 
 ---
 
