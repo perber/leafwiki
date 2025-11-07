@@ -1,6 +1,8 @@
 # 🌿 LeafWiki
 
-**A lightweight, tree-based wiki that keeps your content in plain Markdown - no database, just a single Go binary.**
+**A lightweight, tree-based wiki that keeps your content in plain Markdown - fast, clean, and self-hosted**  
+
+> *Run your knowledge base in 5 minutes - no database, just a single Go binary.*
 
 LeafWiki is designed for teams and individuals who want a clean, fast, and self-hosted knowledge base - with full control over structure, content, and deployment.
 
@@ -51,7 +53,7 @@ LeafWiki now builds and runs natively on:
 - 🧾 Markdown-first with live editor + preview
 - 🌲 True tree-structured pages (nested folders)
 - 🔒 Role-based access (admin / editor)
-- 🧠 no database required
+- 🧠 No database required
 - 📂 Per-page assets with upload support
 - 🖼️ Embed images and files with Markdown
 - ⚙️ Single statically-linked Go binary (no dependencies)
