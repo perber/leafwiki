@@ -23,7 +23,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
   const open = useDialogsStore((s) => s.dialogType === 'sort')
 
   // State to manage the order of the pages
-  const [order, setOrder] = useState(parent.children.map((c) => c.id))
+  const [order, setOrder] = useState(parent.children?.map((c) => c.id) || [])
 
   // Loading state
   const [loading, setLoading] = useState(false)
@@ -37,7 +37,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
       setOrder([])
       return
     }
-    setOrder(parent.children.map((c) => c.id))
+    setOrder(parent.children?.map((c) => c.id) || [])
   }, [parent])
 
   const onOpenChangeDialog = (open: boolean) => {
@@ -91,7 +91,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
           }}
         >
           {order.map((id, i) => {
-            const node = parent.children.find((c) => c.id === id)
+            const node = parent.children?.find((c) => c.id === id)
             if (!node) return null
             return (
               <li

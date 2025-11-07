@@ -73,7 +73,7 @@ export const TreeNode = React.memo(function TreeNode({
         onMouseLeave={() => setHovered(false)}
       >
         <div
-          className={`absolute top-0 bottom-0 w-[2px] ${
+          className={`absolute top-0 bottom-0 w-0.5 ${
             isActive ? 'bg-green-600' : 'bg-gray-200'
           }`}
           style={{ left: markerOffset }}
@@ -137,7 +137,7 @@ export const TreeNode = React.memo(function TreeNode({
 
       <div ref={ref} className={`ml-4 pl-2 ${!open ? 'hidden' : ''}`}>
         {hasChildren &&
-          node.children.map((child) => (
+          node.children?.map((child) => (
             <TreeNode key={child.id} node={child} level={level + 1} />
           ))}
       </div>

@@ -35,7 +35,7 @@ export function DeletePageDialog({
   const [, setFieldErrors] = useState<Record<string, string>>({})
 
   if (!page) return null
-  const hasChildren = page.children?.length > 0
+  const hasChildren = (page.children?.length ?? 0) > 0
 
   const handleDelete = async () => {
     setLoading(true)
