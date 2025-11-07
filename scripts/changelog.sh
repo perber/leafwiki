@@ -1,4 +1,28 @@
 #!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# changelog.sh
+#
+# Purpose:
+#   Generates a categorized changelog in markdown format from git commit messages
+#   between two tags.
+#
+# Expected commit message format:
+#   Uses Conventional Commits prefixes for categorization:
+#     feat:      New features
+#     fix:       Bug fixes
+#     docs:      Documentation changes
+#     refactor:  Code refactoring
+#     test:      Test-related changes
+#     chore:     Maintenance tasks
+#   Any commit not matching these prefixes is categorized as "Other Changes".
+#
+# Usage:
+#   ./changelog.sh <previous_tag> <current_tag>
+#
+# Output:
+#   Writes a markdown changelog to 'changelog.md' in the current directory.
+# -----------------------------------------------------------------------------
 set -euo pipefail
 
 # === Configuration ===
