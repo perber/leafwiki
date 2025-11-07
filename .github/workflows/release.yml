@@ -57,29 +57,12 @@ jobs:
           echo "Found previous tag: $PREVIOUS"
           echo "tag=$PREVIOUS" >> $GITHUB_OUTPUT
 
-      - name: Generate simple changelog from git commits
+      - name: Generate categorized changelog
         id: changelog
         run: |
-          git fetch --tags
-          echo "Validating tags: ${{ steps.latest.outputs.tag }} and ${{ github.ref_name }}"
-
-          # Validate the existence of the previous tag
-          if ! git rev-parse --verify ${{ steps.latest.outputs.tag }} >/dev/null 2>&1; then
-            echo "Error: Previous tag ${{ steps.latest.outputs.tag }} does not exist." >&2
-            exit 1
-          fi
-
-          # Validate the existence of the current tag
-          if ! git rev-parse --verify ${{ github.ref_name }} >/dev/null 2>&1; then
-            echo "Error: Current tag ${{ github.ref_name }} does not exist." >&2
-            exit 1
-          fi
-
-          echo "Generating changelog from commits between ${{ steps.latest.outputs.tag }} and ${{ github.ref_name }}"
-          LOG=$(git log ${{ steps.latest.outputs.tag }}..${{ github.ref_name }} --pretty=format:"- %s (%an)")
-          # Removed unused changelog.txt file creation
+          make changelog PREVIOUS=${{ steps.latest.outputs.tag }} CURRENT=${{ github.ref_name }}
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          echo "$LOG" >> $GITHUB_OUTPUT
+          cat changelog.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Publish GitHub Release
