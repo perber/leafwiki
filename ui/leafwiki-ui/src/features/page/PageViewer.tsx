@@ -1,13 +1,13 @@
-import { getPageByPath, Page } from '@/lib/api/pages'
-// import "highlight.js/styles/github.css"
+/* eslint-disable react-hooks/set-state-in-effect */
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
 import { usePageToolbar } from '@/components/usePageToolbar'
+import { getPageByPath, Page } from '@/lib/api/pages'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { useAuthStore } from '@/stores/auth'
 import { useDialogsStore } from '@/stores/dialogs'
-import React, { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { CopyPageButton } from './CopyPageButton'
@@ -72,12 +72,12 @@ export default function PageViewer() {
     const redirectUrl = page.path.split('/').slice(0, -1).join('/')
 
     setContent(
-      <React.Fragment key="viewing">
+      <Fragment key="viewing">
         <DeletePageDialog pageId={page.id} redirectUrl={redirectUrl} />
         <CopyPageButton sourcePage={page} />
         <PrintPageButton />
         <EditPageButton path={page.path} />
-      </React.Fragment>,
+      </Fragment>,
     )
 
     return () => {

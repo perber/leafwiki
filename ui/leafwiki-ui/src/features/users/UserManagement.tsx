@@ -8,10 +8,9 @@ import { UserFormDialog } from './UserFormDialog'
 
 export default function UserManagement() {
   const { users, loadUsers, reset } = useUserStore()
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
     loadUsers()
       .catch((err) => {
         console.warn(err)

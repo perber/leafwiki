@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs */
 import { EditorTitleBar } from '@/components/EditorTitleBar'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
@@ -7,7 +8,7 @@ import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Save, X } from 'lucide-react'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
@@ -192,7 +193,7 @@ export default function PageEditor() {
   useEffect(() => {
     if (!page) return
     setContent(
-      <React.Fragment key="editing">
+      <div key="editing" className="flex items-center gap-2">
         <TooltipWrapper label="Close (ESC)" side="top" align="center">
           <Button
             variant="destructive"
@@ -222,7 +223,7 @@ export default function PageEditor() {
             <Save />
           </Button>
         </TooltipWrapper>
-      </React.Fragment>,
+      </div>,
     )
 
     return () => {

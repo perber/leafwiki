@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useDebounce } from '@/lib/useDebounce'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { historyField, redo, undo } from '@codemirror/commands'
@@ -152,10 +154,6 @@ const MarkdownEditor = (
     },
   }))
 
-  const onCursorLineChange = useCallback((line: number) => {
-    scrollPreviewToLine(line)
-  }, [])
-
   const onAssetVersionChange = useCallback(
     (version: number) => {
       // Update the asset version to trigger a re-render of the preview
@@ -215,6 +213,10 @@ const MarkdownEditor = (
       }
     })
   }
+
+  const onCursorLineChange = useCallback((line: number) => {
+    scrollPreviewToLine(line)
+  }, [])
 
   useEffect(() => {
     return () => {
