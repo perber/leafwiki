@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /**
  * Blocks navigation (internal + external) if `when === true`.
  * Calls `onNavigate(path)` if user confirms internal navigation.

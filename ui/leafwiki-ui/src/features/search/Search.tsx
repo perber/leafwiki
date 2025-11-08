@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { Pagination } from '@/components/Pagination'
 import { searchPages, SearchResultItem } from '@/lib/api/search'
 import { useDebounce } from '@/lib/useDebounce'
