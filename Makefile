@@ -72,14 +72,19 @@ changelog:
 	fi
 	@./scripts/changelog.sh $(PREVIOUS) $(CURRENT)
 
+run-e2e:
+	@echo "🚀 Starting end-to-end tests..."
+	@./e2e/run.sh
+
 help:
 	@echo "Available commands:"
 	@echo "  make build      – Build binary for current system"
 	@echo "  make release    – Cross-compile binaries for all platforms (via Docker)"
 	@echo "  make clean      – Clean all generated files"
 	@echo "  make test       – Run all Go tests"
+	@echo "  make run-e2e    – Run end-to-end tests (using Docker)"
 	@echo "  make run        – Run development server"
 	@echo "  make docker-build-publish    – Build and push multi-arch Docker image"
 	@echo "  make changelog – Generate changelog"
 
-.PHONY: all build run clean test fmt lint help docker-build-publish changelog
+.PHONY: all build run clean test fmt lint help docker-build-publish changelog run-e2e
