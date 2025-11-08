@@ -1,7 +1,8 @@
 version: 2
 updates:
+  # Backend dependencies
   - package-ecosystem: "gomod"
-    directory: "/" # Rootverzeichnis mit go.mod
+    directory: "/"
     schedule:
       interval: "weekly"
     labels:
@@ -10,6 +11,15 @@ updates:
     commit-message:
       prefix: "chore"
 
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+
+  # Frontend dependencies
   - package-ecosystem: "npm"
     directory: "/ui/leafwiki-ui"
     schedule:
@@ -17,5 +27,16 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
+    commit-message:
+      prefix: "chore"
+
+  # End-to-end tests
+  - package-ecosystem: "npm"
+    directory: "/e2e"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "e2e"
     commit-message:
       prefix: "chore"
