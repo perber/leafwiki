@@ -5,6 +5,7 @@ type FormInputProps = {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  testid?: string
   error?: string
   type?: string
   autoFocus?: boolean
@@ -16,6 +17,7 @@ export function FormInput({
   value,
   autoFocus,
   onChange,
+  testid,
   placeholder,
   error,
   type = 'text',
@@ -36,6 +38,7 @@ export function FormInput({
         placeholder={placeholder}
         readOnly={readOnly}
         className={error ? 'border-red-500' : ''}
+        data-testid={testid}
       />
       {error && <p className="text-sm text-red-500">{error}</p>}
     </div>

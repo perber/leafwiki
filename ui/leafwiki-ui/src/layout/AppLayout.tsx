@@ -50,6 +50,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={() => setSidebarVisible(!sidebarVisible)}
               aria-label="Toggle Sidebar"
               aria-expanded={sidebarVisible}
+              data-testid="sidebar-toggle-button"
             >
               <MenuIcon className="h-5 w-5" />
             </Button>

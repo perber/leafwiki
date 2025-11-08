@@ -14,7 +14,7 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside key={'sidebar'}>
+    <aside key={'sidebar'} data-testid="sidebar">
       {/*
         Our sidebar has always the same width, so we can use a fixed width.
         This will help us to avoid layout shifts when the sidebar is toggled.

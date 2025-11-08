@@ -46,7 +46,7 @@ export default function UserToolbar() {
     <div className="ml-auto flex items-center gap-4">
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center space-x-2 focus:outline-hidden">
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-8 w-8" data-testid="user-toolbar-avatar">
             <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
           </Avatar>
         </DropdownMenuTrigger>
@@ -65,7 +65,11 @@ export default function UserToolbar() {
           >
             Change Own Password
           </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={handleLogout}
+            data-testid="user-toolbar-logout"
+          >
             Logout
           </DropdownMenuItem>
         </DropdownMenuContent>

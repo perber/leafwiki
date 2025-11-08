@@ -1,30 +1,11 @@
-import { Page, expect, test } from '@playwright/test';
+import test from '@playwright/test';
+import LoginPage from '../pages/LoginPage';
 
-const user = 'admin';
-const password = 'admin';
-
-const login = async (page: Page) => {
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Username or Email' }).click();
-  await page.getByRole('textbox', { name: 'Username or Email' }).fill(user);
-  await page.getByRole('textbox', { name: 'Username or Email' }).press('Tab');
-  await page.getByRole('textbox', { name: 'Password' }).click();
-  await page.getByRole('textbox', { name: 'Password' }).fill(password);
-  await page.getByRole('button', { name: 'Login' }).click();
-};
+const user = process.env.E2E_ADMIN_USER || 'admin';
 
 test('failed login', async ({ page }) => {
-  await page.goto('/login');
-  await page.getByRole('textbox', { name: 'Username or Email' }).click();
-  await page.getByRole('textbox', { name: 'Username or Email' }).fill(user);
-  await page.getByRole('textbox', { name: 'Username or Email' }).press('Tab');
-  await page.getByRole('textbox', { name: 'Password' }).fill('failed');
-  await page.getByRole('textbox', { name: 'Password' }).press('Enter');
-  await page.getByRole('button', { name: 'Login' }).click();
-  await expect(page.getByRole('paragraph')).toContainText('Invalid credentials');
-});
-
-test('successful login', async ({ page }) => {
-  await login(page);
-  await expect(page.getByRole('button', { name: 'A' }).nth(0)).toBeVisible();
+  const loginPage = new LoginPage(page);
+  await loginPage.goto();
+  await loginPage.login(user, 'failed');
+  await loginPage.expectInvalidCredentialsError();
 });

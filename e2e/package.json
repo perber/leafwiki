@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "description": "End-to-end tests for LeafWiki",
   "scripts": {
-    "lint": "eslint 'tests/**/*.ts' --max-warnings=0",
-    "lint:fix": "eslint 'tests/**/*.ts' --fix",
-    "format": "prettier \"tests/**/*.{ts,tsx,js,jsx}\" --write",
-    "format:check": "prettier \"tests/**/*.{ts,tsx,js,jsx}\" --check",
+    "lint": "eslint '{tests, pages}/**/*.ts' --max-warnings=0",
+    "lint:fix": "eslint '{tests, pages}/**/*.ts' --fix",
+    "format": "prettier \"{tests, pages}/**/*.{ts,tsx,js,jsx}\" --write",
+    "format:check": "prettier \"{tests, pages}/**/*.{ts,tsx,js,jsx}\" --check",
     "install:browsers": "playwright install --with-deps"
   },
   "devDependencies": {

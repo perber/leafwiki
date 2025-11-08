@@ -71,6 +71,7 @@ export function DeletePageDialog({
           variant="destructive"
           size="icon"
           className="h-8 w-8 rounded-full shadow-xs"
+          data-testid="delete-page-button"
         >
           <TooltipWrapper label="Delete page" side="top" align="center">
             <Trash2 />
@@ -100,6 +101,7 @@ export function DeletePageDialog({
 
         <div className="mt-4 flex justify-end">
           <FormActions
+            testidPrefix="delete-page-dialog"
             onCancel={handleCancel}
             onSave={handleDelete}
             saveVariant={'destructive'}

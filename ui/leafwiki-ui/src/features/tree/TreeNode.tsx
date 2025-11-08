@@ -42,7 +42,11 @@ export const TreeNode = React.memo(function TreeNode({
       align="start"
       parentClassName="w-full"
     >
-      <Link to={`/${node.path}`} className="w-full">
+      <Link
+        to={`/${node.path}`}
+        className="w-full"
+        data-testid={`tree-node-link-${node.id}`}
+      >
         <span
           className={`block max-w-[200px] truncate overflow-hidden text-ellipsis ${
             level === 0
@@ -100,6 +104,7 @@ export const TreeNode = React.memo(function TreeNode({
             )}
           >
             <TreeViewActionButton
+              actionName="add"
               icon={
                 <Plus
                   size={20}
@@ -110,6 +115,7 @@ export const TreeNode = React.memo(function TreeNode({
               onClick={() => openDialog('add', { parentId: node.id })}
             />
             <TreeViewActionButton
+              actionName="move"
               icon={
                 <Move
                   size={16}
@@ -121,6 +127,7 @@ export const TreeNode = React.memo(function TreeNode({
             />
             {hasChildren && (
               <TreeViewActionButton
+                actionName="sort"
                 icon={
                   <List
                     size={20}

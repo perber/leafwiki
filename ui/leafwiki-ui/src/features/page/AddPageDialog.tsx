@@ -135,12 +135,14 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
               handleTitleChange(val)
               setFieldErrors((prev) => ({ ...prev, title: '' }))
             }}
+            testid="add-page-title-input"
             placeholder="Page title"
             error={fieldErrors.title}
           />
           <SlugInputWithSuggestion
             title={title}
             slug={slug}
+            testid="add-page-slug-input"
             parentId={parentId}
             onSlugChange={handleSlugChange}
             onSlugTouchedChange={setSlugTouched}
@@ -149,7 +151,10 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
             error={fieldErrors.slug}
           />
         </div>
-        <span className="text-sm text-gray-500">
+        <span
+          className="text-sm text-gray-500"
+          data-testid="add-page-path-display"
+        >
           Path: {parentPath !== '' && `${parentPath}/`}
           {slug && `${slug}`}
         </span>
@@ -165,6 +170,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
               onClick={async () => await handleCreate(false)}
               variant="default"
               disabled={isCreateButtonDisabled}
+              data-testid="add-page-create-button-without-redirect"
             >
               {loading ? 'Creating...' : 'Create'}{' '}
               {loading &&
