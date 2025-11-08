@@ -1,5 +1,5 @@
 # Step 1: Frontend
-FROM node:23-alpine AS frontend-build
+FROM node:25-alpine AS frontend-build
 WORKDIR /app
 COPY ./ui/leafwiki-ui/package*.json ./
 RUN npm install
