@@ -31,6 +31,46 @@ test.describe('Authenticated', () => {
     await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
   });
 
+  test('create-subpage', async ({ page }) => {
+    const parentTitle = `Parent Page ${Date.now()}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(parentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await treeView.createSubPageOfParent(parentTitle, `Child Page of ${parentTitle}`);
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
+  });
+
+  test('sort-pages', async ({ page }) => {
+    const parentTitle = `Sort Parent Page ${Date.now()}`;
+    const childPages = ['Banana', 'Apple', 'Cherry', 'Date'];
+    const desiredOrder = ['Apple', 'Banana', 'Cherry', 'Date'];
+
+    // Create parent page
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(parentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+
+    // Create child pages
+    await treeView.createMultipleSubPagesOfParent(parentTitle, childPages);
+    await treeView.expectNumberOfTreeNodes(curNodeCount + childPages.length + 1);
+
+    // Sort child pages
+    await treeView.sortPagesOfParent(parentTitle, desiredOrder);
+  });
+
   test('view-page', async ({ page }) => {
     const title = `Page To View ${Date.now()}`;
 

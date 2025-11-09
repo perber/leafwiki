@@ -5,7 +5,7 @@ const headless = process.env.E2E_HEADLESS !== 'false';
 
 export default defineConfig({
   testDir: './tests',
-  timeout: 10000,
+  timeout: 1*60*1000, // 1 minute per test
   use: {
     baseURL,
     headless,
