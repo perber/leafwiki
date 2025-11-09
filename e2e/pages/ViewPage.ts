@@ -24,4 +24,9 @@ export default class ViewPage {
     const deleteButton = this.page.locator('button[data-testid="delete-page-button"]');
     await deleteButton.click();
   }
+
+  async clickCopyPageButton() {
+    const copyButton = this.page.locator('button[data-testid="copy-page-button"]');
+    await copyButton.click();
+  }
 }

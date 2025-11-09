@@ -1,5 +1,6 @@
 import test from '@playwright/test';
 import AddPageDialog from '../pages/AddPageDialog';
+import CopyPageDialog from '../pages/CopyPageDialog';
 import DeletePageDialog from '../pages/DeletePageDialog';
 import LoginPage from '../pages/LoginPage';
 import TreeView from '../pages/TreeView';
@@ -88,6 +89,34 @@ test.describe('Authenticated', () => {
     const viewPage = new ViewPage(page);
     const pageTitle = await viewPage.getTitle();
     test.expect(pageTitle).toBe(title);
+  });
+
+  test('copy-page', async ({ page }) => {
+    const title = `Page To Copy ${Date.now()}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await treeView.clickPageByTitle(title);
+
+    const viewPage = new ViewPage(page);
+    const pageTitle = await viewPage.getTitle();
+    test.expect(pageTitle).toBe(title);
+
+    const copyPageDialog = new CopyPageDialog(page);
+    await viewPage.clickCopyPageButton();
+
+    const newTitle = `Copy of ${title}`;
+    await copyPageDialog.fillTitle(newTitle);
+    await copyPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
   });
 
   test('delete-page', async ({ page }) => {
