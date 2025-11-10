@@ -9,3 +9,5 @@ test('failed login', async ({ page }) => {
   await loginPage.login(user, 'failed');
   await loginPage.expectInvalidCredentialsError();
 });
+
+// logout test

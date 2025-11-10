@@ -91,6 +91,7 @@ export function DeletePageDialog({
           <div className="space-y-1 text-sm text-gray-600">
             <label className="flex items-center gap-2">
               <Checkbox
+                data-testid="delete-page-dialog-recursive-delete-checkbox"
                 checked={deleteRecursive}
                 onCheckedChange={(val) => setDeleteRecursive(!!val)}
               />

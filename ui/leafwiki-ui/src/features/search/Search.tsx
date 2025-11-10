@@ -54,6 +54,7 @@ export default function Search() {
           type="text"
           placeholder="Search..."
           value={query}
+          data-testid="search-input"
           onChange={(e) => setQuery(e.target.value)}
           className="w-full rounded border px-2 py-1 pr-8"
         />
@@ -62,6 +63,7 @@ export default function Search() {
             onClick={clearSearch}
             className="absolute top-1/2 right-1 -translate-y-1/2 text-sm text-gray-500 hover:text-black"
             title="Clear"
+            data-testid="search-clear-button"
           >
             <X size={16} />
           </button>

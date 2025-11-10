@@ -8,6 +8,16 @@ export default class DeletePageDialog {
         return this.page.locator('text=Are you sure you want to delete this page? This action cannot be undone.').isVisible();
     }
 
+    async checkboxRecursiveDelete() {
+        return this.page.locator('button[data-testid="delete-page-dialog-recursive-delete-checkbox"]');
+    }
+
+    async confirmNestedDeletion() {
+        const checkbox = await this.checkboxRecursiveDelete();
+        await checkbox.click();
+        await this.confirmDeletion();
+    }
+
     async abortDeletion() {
         const cancelButton = this.page.locator('button[data-testid="delete-page-dialog-cancel-button"]');
         await cancelButton.click();

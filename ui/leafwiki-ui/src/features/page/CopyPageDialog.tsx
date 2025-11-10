@@ -146,7 +146,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
         </DialogHeader>
         <DialogDescription>Create a copy of this page</DialogDescription>
         <FormInput
-          testid='copy-page-dialog-title-input'
+          testid="copy-page-dialog-title-input"
           autoFocus={true}
           label="Title"
           value={title}
@@ -157,7 +157,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
           error={fieldErrors.title}
         />
         <SlugInputWithSuggestion
-          testid='copy-page-dialog-slug-input'
+          testid="copy-page-dialog-slug-input"
           title={title}
           slug={slug}
           parentId={targetParentID}
@@ -174,7 +174,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
         </span>
         <div className="mt-4 flex justify-end">
           <FormActions
-            testidPrefix='copy-page-dialog'
+            testidPrefix="copy-page-dialog"
             onCancel={handleCancel}
             onSave={async () => await handleCopy(true)}
             saveLabel={loading ? 'Copying...' : 'Copy & Edit Page'}

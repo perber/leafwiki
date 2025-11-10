@@ -160,7 +160,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
         </span>
         <div className="mt-4 flex justify-end">
           <FormActions
-            testidPrefix='add-page-dialog'
+            testidPrefix="add-page-dialog"
             onCancel={handleCancel}
             onSave={async () => await handleCreate(true)}
             saveLabel={loading ? 'Creating…' : 'Create & Edit Page'}

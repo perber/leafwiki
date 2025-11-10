@@ -1,5 +1,6 @@
 import { expect, Page } from '@playwright/test';
 import AddPageDialog from './AddPageDialog';
+import MovePageDialog from './MovePageDialog';
 import SortPageDialog from './SortPageDialog';
 
 export default class TreeView {
@@ -97,6 +98,28 @@ export default class TreeView {
 
         await sortPageDialog.saveSorting();
         await this.page.waitForTimeout(5000); // wait for sorting to be applied
+    }
+
+    async movePageToTopLevel(parentPage: string, pageTitle: string) {
+
+        await this.expandNodeByTitle(parentPage);
+
+        const nodeRow = this.page
+            .locator('div[data-testid^="tree-node-"]')
+            .filter({ hasText: pageTitle })
+            .first();
+
+        await nodeRow.scrollIntoViewIfNeeded();
+        await nodeRow.hover(); // oder mouse.move, s.u.
+
+        const moveButton = nodeRow.locator('button[data-testid="tree-view-action-button-move"]');
+        await moveButton.click({ force: true });
+
+        const movePageDialog = new MovePageDialog(this.page);
+        await movePageDialog.selectNewParentAsTopLevel();
+        await movePageDialog.clickMoveButton();
+
+        await this.page.waitForTimeout(5000); // wait for move to be applied
     }
 
     async expectNumberOfTreeNodes(expectedCount: number) {

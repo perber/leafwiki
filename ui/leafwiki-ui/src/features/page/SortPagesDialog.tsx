@@ -99,7 +99,10 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
                 className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 transition hover:shadow-xs"
                 data-testid={`sort-page-item-${id}`}
               >
-                <span className="truncate text-sm text-gray-800" data-testid={`sort-page-title-${id}`}>
+                <span
+                  className="truncate text-sm text-gray-800"
+                  data-testid={`sort-page-title-${id}`}
+                >
                   {node.title}
                 </span>
                 <div className="flex gap-1">
@@ -129,7 +132,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
         <DialogFooter>
           <div className="mt-4 flex justify-end">
             <FormActions
-              testidPrefix='sort-pages-dialog'
+              testidPrefix="sort-pages-dialog"
               onCancel={() => closeDialog()}
               onSave={handleSave}
               saveLabel={loading ? 'Saving...' : 'Save'}

@@ -197,6 +197,7 @@ export default function PageEditor() {
         <TooltipWrapper label="Close (ESC)" side="top" align="center">
           <Button
             variant="destructive"
+            data-testid="close-edit-page-button"
             className="h-8 w-8 rounded-full shadow-xs"
             size="icon"
             onClick={async () => {
@@ -215,6 +216,7 @@ export default function PageEditor() {
         <TooltipWrapper label="Save (Ctrl+S)" side="top" align="center">
           <Button
             onClick={() => handleSaveRef.current()}
+            data-testid="save-page-button"
             variant="default"
             className={'bg-success h-8 w-8 rounded-full shadow-md'}
             size="icon"

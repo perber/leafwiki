@@ -151,6 +151,7 @@ export function CreatePageByPathDialog({
         <div className="space-y-4">
           <FormInput
             autoFocus={true}
+            testid="create-page-by-path-title-input"
             label="Title"
             value={title}
             onChange={(val) => {
@@ -161,6 +162,7 @@ export function CreatePageByPathDialog({
             error={fieldErrors.title}
           />
           <FormInput
+            testid="create-page-by-path-path-input"
             label="Path"
             value={path}
             readOnly={readOnlyPath}
@@ -174,6 +176,7 @@ export function CreatePageByPathDialog({
         </div>
         <div className="mt-4 flex justify-end">
           <FormActions
+            testidPrefix="create-page-by-path-dialog"
             onCancel={handleCancel}
             onSave={async () => await handleCreate(forwardToEditMode || false)}
             saveLabel={

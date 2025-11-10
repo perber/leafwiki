@@ -97,6 +97,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
         <PageSelect pageID={newParentId} onChange={setNewParentId} />
         <div className="mt-4 flex justify-end">
           <FormActions
+            testidPrefix="move-page-dialog"
             onCancel={handleCancel}
             onSave={handleMove}
             saveLabel={loading ? 'Moving...' : 'Move'}
