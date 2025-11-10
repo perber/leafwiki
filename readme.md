@@ -20,7 +20,7 @@ The project isn’t *feature-complete yet*.
 Right now, the focus is on **refining what’s there**, improving **stability**, and evolving the platform carefully toward a truly developer-friendly knowledge base.
 
 **Current priorities:**  
-- Stability and relability
+- Stability and reliability
 - UX/UI and usability improvements
 - Testing, CI, and quality assurance
 
