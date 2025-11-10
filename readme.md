@@ -67,7 +67,7 @@ LeafWiki and of course I are looking for **contributors** who want to help bring
 
 LeafWiki now builds and runs natively on:
 - **Linux (x86_64 and ARM64)**
-- **Windows (x86_64)** - We are using Leafwiki on linux machines.
+- **Windows (x86_64)**
 - **Raspberry Pi (tested with 64-bit OS)**
 
 ---
