@@ -27,7 +27,7 @@ Right now, the focus is on **refining what’s there**, improving **stability**,
 The editor and admin features are already in place, but collaboration is still basic - currently following a “last-write-wins” approach.
 Team-ready features like versioning, ... are planned for future iterations.
 
-LeafWiki and of course I are looking for **contributors** who want to help bring this vision to life - by refining existing features, fixing bus, or experimenting with new ideas. 
+LeafWiki and of course I are looking for **contributors** who want to help bring this vision to life - by refining existing features, fixing bugs, or experimenting with new ideas. 
 
 > **LeafWiki** is stable, growing and open for collaboration 🌿 
 
