@@ -12,28 +12,24 @@ LeafWiki is designed for teams and individuals who want a clean, fast, and self-
 
 ---
 
-## 📦 Status
+## 🌿 Growing with Purpose
 
-> **Feature complete – evolving carefully** 
-> LeafWiki has reached functional completeness for its original vision and is already powering real documentation workflows.  
-> Development now focuses on steady refinement rather than rapid feature growth.
->
-> The current focus is on: 
-> - Stability and reliability 
-> - Usability improvements
-> - Testing and CI improvements 
-> 
-> In the long term, additional features like versioning, … are planned -  
-> but they’ll be introduced gradually, with stability taking priority.  
-> 
-> Want to try it and help shape it? You’re more than welcome.
+LeafWiki has reached a **stable and usable foundation**, and it’s already being used by developers to organize and document their knowledge.  
 
-LeafWiki now builds and runs natively on:
-- **Linux (x86_64 and ARM64)**
-- **Windows (x86_64)**
-- **Raspberry Pi (tested with 64-bit OS)**
+The project isn’t *feature-complete yet*.  
+Right now, the focus is on **refining what’s there**, improving **stability**, and evolving the platform carefully toward a truly developer-friendly knowledge base.
 
----
+**Current priorities:**  
+- Stability and reliability
+- UX/UI and usability improvements
+- Testing, CI, and quality assurance
+
+The editor and admin features are already in place, but collaboration is still basic - currently following a “last-write-wins” approach.
+Team-ready features like versioning, ... are planned for future iterations.
+
+LeafWiki and of course I are looking for **contributors** who want to help bring this vision to life - by refining existing features, fixing bugs, or experimenting with new ideas. 
+
+> **LeafWiki** is stable, growing and open for collaboration 🌿 
 
 ## 🧪 Live Demo
 
@@ -64,6 +60,15 @@ LeafWiki now builds and runs natively on:
 - 🌐 Public pages (viewable without login)
 - 🖨️ Print view support
 - 🧩 Mermaid.js diagram support
+
+---
+
+### Available Builds
+
+LeafWiki now builds and runs natively on:
+- **Linux (x86_64 and ARM64)**
+- **Windows (x86_64)**
+- **Raspberry Pi (tested with 64-bit OS)**
 
 ---
 
