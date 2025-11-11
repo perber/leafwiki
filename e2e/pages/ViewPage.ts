@@ -16,6 +16,20 @@ export default class ViewPage {
     await this.page.getByTestId('user-toolbar-avatar').waitFor({ state: 'visible' });
   }
 
+  async clickUserToolbarAvatar() {
+    const avatar = this.page.getByTestId('user-toolbar-avatar');
+    await avatar.click();
+  }
+
+  async logout() {
+    const logoutButton = this.page.getByTestId('user-toolbar-logout');
+    await logoutButton.click();
+  }
+
+  async expectLoggedOut() {
+    return !await this.isUserLoggedIn();
+  }
+
   async getTitle() {
     return this.page.locator('article>h1').innerText();
   }
