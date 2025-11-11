@@ -86,6 +86,22 @@ if [[ -z "$VERSION" ]]; then
 fi
 
 
+echo "___________________________________________________"
+echo "|       __               _____       ___ __   _   |";
+echo "|      / /   ___  ____ _/ __/ |     / (_) /__(_). |";
+echo "|     / /   / _ \\/ __ \`/ /_ | | /| / / / //_/ /   |";
+echo "|    / /___/  __/ /_/ / __/ | |/ |/ / / ,< / /    |";
+echo "|.  /_____/\\___/\\__,_/_/    |__/|__/_/_/|_/_/     |";
+echo "|_________________________________________________|";
+echo ""
+                                   
+echo "========================================"
+echo "   LeafWiki — Installer"
+echo "========================================"
+echo ""
+echo ""
+
+
 read -rsp "Which JWT password do you want to use: " JWT_PASSWORD
 echo
 read -rsp "Which admin password do you want to use: " ADMIN_PASSWORD
