@@ -181,6 +181,7 @@ export default function MarkdownToolbar({
         </TooltipWrapper>
         <TooltipWrapper label="Add Image or File" side="top" align="center">
           <Button
+            data-testid="open-asset-manager-button"
             variant="ghost"
             size="icon"
             onClick={() => setAssetModalOpen(true)}

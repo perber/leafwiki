@@ -13,6 +13,8 @@ import ViewPage from '../pages/ViewPage';
 const user = process.env.E2E_ADMIN_USER || 'admin';
 const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
 
+const currentDir = __dirname;
+
 test.describe('Authenticated', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
@@ -394,6 +396,37 @@ graph TD;
     await searchView.clearSearch();
   });
 
-  // test asset upload
-  // test asset use in page
+  test('test-asset-upload-and-use-in-page', async ({ page }) => {
+    const title = `Page With Asset ${Date.now()}`;
+    // const assetFileName = 'test-image.png';
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await treeView.clickPageByTitle(title);
+    let viewPage = new ViewPage(page);
+    const pageTitle = await viewPage.getTitle();
+    test.expect(pageTitle).toBe(title);
+    await viewPage.clickEditPageButton();
+    // pause to see the editor
+    const editPage = new EditPage(page);
+    // Opens asset manager in edit mode
+    editPage.openAssetManager();
+    // Upload asset
+    await editPage.uploadAsset(currentDir + '/../assets/upload-test.png');
+    await editPage.listAmountOfAssets().then((count) => {
+      test.expect(count).toBeGreaterThan(0);
+    });
+    // Insert first asset into page
+    await editPage.insertFirstAssetIntoPage();
+    await editPage.savePage();
+    await editPage.closeEditor();
+    viewPage = new ViewPage(page);
+    await viewPage.amountOfImages().then((count) => {
+      test.expect(count).toBeGreaterThan(0);
+    });
+  });
 });

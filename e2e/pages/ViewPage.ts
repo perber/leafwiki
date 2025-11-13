@@ -47,6 +47,8 @@ export default class ViewPage {
   async clickEditPageButton() {
     const editButton = this.page.locator('button[data-testid="edit-page-button"]');
     await editButton.click();
+    // wait for editor to load
+    await this.page.locator('.cm-editor').waitFor({ state: 'visible' });
   }
 
   async getContent() {
@@ -56,6 +58,11 @@ export default class ViewPage {
   async amountOfSVGElements(): Promise<number> {
     await this.page.waitForSelector('article svg', { state: 'visible' });
     return this.page.locator('article svg').count();
+  }
+
+  async amountOfImages(): Promise<number> {
+    await this.page.waitForSelector('article img', { state: 'visible', timeout: 5000 });
+    return this.page.locator('article img').count();
   }
 
   async switchToSearchTab() {
