@@ -1,5 +1,4 @@
-import { Page } from "@playwright/test";
-
+import { Page } from '@playwright/test';
 
 export default class EditPage {
   constructor(private page: Page) {}
@@ -32,12 +31,15 @@ export default class EditPage {
 
     const [fileChooser] = await Promise.all([
       this.page.waitForEvent('filechooser'),
-      dropzone.click()  // trigger the picker
+      dropzone.click(), // trigger the picker
     ]);
 
     await fileChooser.setFiles(filePath);
     // wait until the asset appears in the list
-    await this.page.locator('li[data-testid="asset-item"]').first().waitFor({ state: 'visible', timeout: 5000 });
+    await this.page
+      .locator('li[data-testid="asset-item"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 });
   }
 
   async listAmountOfAssets(): Promise<number> {
@@ -49,5 +51,4 @@ export default class EditPage {
     const firstAsset = this.page.locator('li[data-testid="asset-item"]').first();
     await firstAsset.dblclick();
   }
-
 }

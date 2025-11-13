@@ -1,5 +1,4 @@
-import { Page } from "@playwright/test";
-
+import { Page } from '@playwright/test';
 
 export default class ViewPage {
   constructor(private page: Page) {}
@@ -27,7 +26,7 @@ export default class ViewPage {
   }
 
   async isLoggedOut() {
-    return !await this.isUserLoggedIn();
+    return !(await this.isUserLoggedIn());
   }
 
   async getTitle() {
