@@ -26,7 +26,7 @@ export default class ViewPage {
     await logoutButton.click();
   }
 
-  async expectLoggedOut() {
+  async isLoggedOut() {
     return !await this.isUserLoggedIn();
   }
 

@@ -4,7 +4,6 @@ export default class MovePageDialog {
     constructor(private page: Page) { }
 
     async getParentSelection() {
-        // <button type="button" role="combobox" aria-controls="radix-_r_638_" aria-expanded="false" aria-autocomplete="none" dir="ltr" data-state="closed" class="border-input ring-offset-background focus:ring-ring data-placeholder:text-muted-foreground flex h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs focus:ring-1 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50 [&amp;>span]:line-clamp-1"><span style="pointer-events: none;">— mermaid</span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down h-4 w-4 opacity-50" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
         return this.page.locator('button[role="combobox"]');
     }
 
