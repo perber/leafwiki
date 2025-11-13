@@ -159,23 +159,27 @@ for the page edited at ${new Date().toISOString()}
     const editPage = new EditPage(page);
     await editPage.writeContent(newContent);
 
-    page.on('dialog', async (dialog) => {
-      test.expect(dialog.type()).toBe('beforeunload');
-      await dialog.dismiss();
+    let dialogType: string | undefined;
 
-      // Editor jetzt "sauber" schließen
-      await editPage.closeEditor();
+    page.once('dialog', (dialog) => {
+      dialogType = dialog.type();
+      dialog.dismiss().catch(() => {
+        // Ignore errors from dismissing the dialog
+      });
     });
 
-    page.goto('/').catch((error) => {
-      // Ignore the navigation error caused by dialog dismissal
-      if (!error.message.includes('ERR_ABORTED')) {
-        throw error;
-      }
-    });
+    let navError: unknown = null;
+
+    try {
+      await page.goto('/');
+    } catch (e) {
+      navError = e;
+    }
+
+    test.expect(dialogType).toBe('beforeunload');
+
+    test.expect(String((navError as Error)?.message ?? '')).toMatch(/ERR_ABORTED/);
   });
-
-  // test mermaid
 
   test('create-page-with-mermaid', async ({ page }) => {
     const title = `Page With Mermaid ${Date.now()}`;
