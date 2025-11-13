@@ -255,7 +255,7 @@ const MarkdownEditor = (
     return (
       <div
         ref={setPreviewRef}
-        className="prose prose-base box-content h-full w-full overflow-auto"
+        className="prose prose-base custom-scrollbar box-content h-full w-full overflow-auto"
       >
         <div className="p-4">
           <MarkdownPreview content={debouncedPreview} key={assetVersion} />
@@ -297,7 +297,7 @@ const MarkdownEditor = (
             ))}
           </div>
           {activeTab === 'editor' ? renderToolbar() : null}
-          <div className="flex max-w-none flex-1 overflow-auto">
+          <div className="custom-scrollbar flex max-w-none flex-1 overflow-auto">
             <div
               className={activeTab === 'editor' ? 'block w-full' : 'hidden'}
               key="editor"
@@ -317,9 +317,14 @@ const MarkdownEditor = (
         <div className="flex h-full w-full flex-col">
           {renderToolbar()}
           <div className="flex w-full flex-1 overflow-hidden">
-            <div className="flex w-1/2 max-w-none flex-1 overflow-auto">
+            <div className="custom-scrollbar flex w-1/2 max-w-none flex-1 overflow-auto">
               {renderEditor(false)}
             </div>
+            {/* Divider */}
+            <div
+              className="h-full w-1 bg-gray-300"
+              id="editor-preview-divider"
+            ></div>
             <div className="w-1/2 max-w-none flex-1">{renderPreview()}</div>
           </div>
         </div>

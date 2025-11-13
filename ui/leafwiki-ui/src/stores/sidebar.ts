@@ -5,11 +5,19 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+export const DEFAULT_SIDEBAR_WIDTH = 345
+export const MIN_SIDEBAR_WIDTH = 220
+export const MAX_SIDEBAR_WIDTH = 800
+
 type SidebarStore = {
   sidebarMode: 'tree' | 'search'
   setSidebarMode: (mode: 'tree' | 'search') => void
+
   sidebarVisible: boolean
   setSidebarVisible: (visible: boolean) => void
+
+  sidebarWidth: number
+  setSidebarWidth: (width: number) => void
 }
 
 export const useSidebarStore = create<SidebarStore>()(
@@ -20,12 +28,22 @@ export const useSidebarStore = create<SidebarStore>()(
 
       sidebarVisible: false,
       setSidebarVisible: (visible) => set({ sidebarVisible: visible }),
+
+      sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+      setSidebarWidth: (width) => {
+        const clamped = Math.min(
+          MAX_SIDEBAR_WIDTH,
+          Math.max(MIN_SIDEBAR_WIDTH, width),
+        )
+        set({ sidebarWidth: clamped })
+      },
     }),
     {
       name: 'leafwiki-sidebar', // localStorage key
       partialize: (state) => ({
         sidebarVisible: state.sidebarVisible,
         sidebarMode: state.sidebarMode,
+        sidebarWidth: state.sidebarWidth,
       }),
     },
   ),

@@ -44,39 +44,37 @@ export default function TreeView() {
 
   return (
     <>
-      <div className="mt-2 mb-2">
-        {!readOnlyMode && (
-          <div className="mb-1 flex">
+      {!readOnlyMode && (
+        <div className="mb-2 flex">
+          <TreeViewActionButton
+            actionName="add"
+            icon={
+              <Plus
+                size={20}
+                className="cursor-pointer text-gray-500 hover:text-gray-800"
+              />
+            }
+            tooltip="Create new page"
+            onClick={() => openDialog('add', { parentId: '' })}
+          />
+          {tree && (
             <TreeViewActionButton
-              actionName="add"
+              actionName="sort"
               icon={
-                <Plus
+                <List
                   size={20}
                   className="cursor-pointer text-gray-500 hover:text-gray-800"
                 />
               }
-              tooltip="Create new page"
-              onClick={() => openDialog('add', { parentId: '' })}
+              tooltip="Sort pages"
+              onClick={() => openDialog('sort', { parent: tree })}
             />
-            {tree !== null && (
-              <TreeViewActionButton
-                actionName="sort"
-                icon={
-                  <List
-                    size={20}
-                    className="cursor-pointer text-gray-500 hover:text-gray-800"
-                  />
-                }
-                tooltip="Sort pages"
-                onClick={() => openDialog('sort', { parent: tree })}
-              />
-            )}
-          </div>
-        )}
-        {tree?.children?.map((node) => (
-          <TreeNode key={node.id} node={node} />
-        ))}
-      </div>
+          )}
+        </div>
+      )}
+      {tree?.children?.map((node) => (
+        <TreeNode key={node.id} node={node} />
+      ))}
     </>
   )
 }

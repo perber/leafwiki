@@ -3,7 +3,6 @@ import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { PageNode } from '@/lib/api/pages'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
-import { useMeasure } from '@/lib/useMeasure'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
@@ -29,7 +28,6 @@ export const TreeNode = React.memo(function TreeNode({
   const openDialog = useDialogsStore((state) => state.openDialog)
 
   const isMobile = useIsMobile()
-  const [ref] = useMeasure<HTMLDivElement>()
   const readOnlyMode = useIsReadOnly()
 
   const indent = level * 16
@@ -40,7 +38,7 @@ export const TreeNode = React.memo(function TreeNode({
       label={node.title}
       side="top"
       align="start"
-      parentClassName="w-full"
+      parentClassName="w-full flex-1 overflow-hidden"
     >
       <Link
         to={`/${node.path}`}
@@ -48,12 +46,18 @@ export const TreeNode = React.memo(function TreeNode({
         data-testid={`tree-node-link-${node.id}`}
       >
         <span
-          className={`block max-w-[200px] truncate overflow-hidden text-ellipsis ${
+          className={`block truncate overflow-hidden text-ellipsis ${
             level === 0
-              ? 'text-base font-semibold'
+              ? isActive
+                ? 'text-sm text-green-700'
+                : 'text-sm'
               : level === 1
-                ? 'text-sm text-gray-800'
-                : 'text-sm text-gray-500'
+                ? isActive
+                  ? 'text-sm text-green-700'
+                  : 'text-sm text-gray-800'
+                : isActive
+                  ? 'text-sm text-green-700'
+                  : 'text-sm text-gray-500'
           }`}
         >
           {node.title || 'Untitled Page'}
@@ -67,10 +71,8 @@ export const TreeNode = React.memo(function TreeNode({
   return (
     <>
       <div
-        className={`relative flex cursor-pointer items-center pt-1 pb-1 transition-all duration-200 ease-in-out ${
-          isActive
-            ? 'font-semibold text-green-700'
-            : 'text-gray-800 hover:bg-gray-100'
+        className={`relative flex cursor-pointer items-center pt-1 pb-1 transition-all ${
+          isActive ? 'text-green-700' : 'text-gray-800 hover:bg-gray-100'
         }`}
         data-testid={`tree-node-${node.id}`}
         style={{ paddingLeft: indent }}
@@ -89,9 +91,9 @@ export const TreeNode = React.memo(function TreeNode({
             <ChevronUp
               data-testid={`tree-node-toggle-icon-${node.id}`}
               size={16}
-              className={`transition-transform ${
+              className={`shrink-0 transition-transform ${
                 open ? 'rotate-180' : 'rotate-90'
-              }`}
+              } -ml-1`}
               onClick={() => hasChildren && toggleNode(node.id)}
             />
           )}
@@ -109,7 +111,7 @@ export const TreeNode = React.memo(function TreeNode({
               actionName="add"
               icon={
                 <Plus
-                  size={20}
+                  size={18}
                   className="cursor-pointer text-gray-500 hover:text-gray-800"
                 />
               }
@@ -132,7 +134,7 @@ export const TreeNode = React.memo(function TreeNode({
                 actionName="sort"
                 icon={
                   <List
-                    size={20}
+                    size={16}
                     className="cursor-pointer text-gray-500 hover:text-gray-800"
                   />
                 }
@@ -144,7 +146,7 @@ export const TreeNode = React.memo(function TreeNode({
         )}
       </div>
 
-      <div ref={ref} className={`ml-4 pl-2 ${!open ? 'hidden' : ''}`}>
+      <div className={`ml-4 pl-2 ${!open ? 'hidden' : ''}`}>
         {hasChildren &&
           node.children?.map((child) => (
             <TreeNode key={child.id} node={child} level={level + 1} />
