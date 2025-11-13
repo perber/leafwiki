@@ -354,7 +354,7 @@ graph TD;
     test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
     await deletePageDialog.confirmDeletion();
 
-    // The dialog stays open, because we neeed to confirm nested deletion
+    // The dialog stays open, because we need to confirm nested deletion
     test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
 
     await deletePageDialog.confirmNestedDeletion();
