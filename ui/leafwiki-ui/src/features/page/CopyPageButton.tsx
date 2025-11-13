@@ -13,6 +13,7 @@ export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
         className="h-8 w-8 rounded-full shadow-xs"
         variant="default"
         size="icon"
+        data-testid="copy-page-button"
         onClick={() => {
           openDialog('copy-page', { sourcePage })
         }}

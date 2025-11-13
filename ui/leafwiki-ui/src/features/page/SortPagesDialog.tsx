@@ -97,20 +97,26 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
               <li
                 key={id}
                 className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 transition hover:shadow-xs"
+                data-testid={`sort-page-item-${id}`}
               >
-                <span className="truncate text-sm text-gray-800">
+                <span
+                  className="truncate text-sm text-gray-800"
+                  data-testid={`sort-page-title-${id}`}
+                >
                   {node.title}
                 </span>
                 <div className="flex gap-1">
                   <Button
                     variant="ghost"
                     size="sm"
+                    data-testid={`move-up-button-${id}`}
                     onClick={() => move(i, -1)}
                     disabled={i === 0}
                   >
                     <ArrowUp size={14} />
                   </Button>
                   <Button
+                    data-testid={`move-down-button-${id}`}
                     variant="ghost"
                     size="sm"
                     onClick={() => move(i, 1)}
@@ -126,6 +132,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
         <DialogFooter>
           <div className="mt-4 flex justify-end">
             <FormActions
+              testidPrefix="sort-pages-dialog"
               onCancel={() => closeDialog()}
               onSave={handleSave}
               saveLabel={loading ? 'Saving...' : 'Save'}

@@ -79,6 +79,7 @@ export function AssetItem({
     <li
       className="group flex items-center justify-between gap-2 rounded-md px-2 py-1 transition hover:bg-gray-100"
       onDoubleClick={handleInsertMarkdown}
+      data-testid="asset-item"
     >
       <div className="flex flex-1 items-center gap-1">
         {isImage ? (

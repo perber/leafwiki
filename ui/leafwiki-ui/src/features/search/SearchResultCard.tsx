@@ -7,6 +7,7 @@ export default function SearchResultCard({ item }: { item: SearchResultItem }) {
   return (
     <Link
       to={`${item.path}`}
+      data-testid={`search-result-card-${item.page_id}`}
       className={`block rounded-xl border p-4 shadow-xs transition ${
         isActive
           ? 'border-green-600 bg-green-50'
@@ -15,6 +16,7 @@ export default function SearchResultCard({ item }: { item: SearchResultItem }) {
     >
       <div
         className="mb-1 text-lg font-semibold break-words whitespace-normal text-green-700"
+        data-testid={`search-result-card-title-${item.page_id}`}
         dangerouslySetInnerHTML={{ __html: item.title }}
       />
       <div

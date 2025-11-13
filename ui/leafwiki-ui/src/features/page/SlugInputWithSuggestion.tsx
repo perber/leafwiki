@@ -8,6 +8,7 @@ type Props = {
   title: string
   slug: string
   parentId: string
+  testid?: string
   currentId?: string
   enableSlugSuggestion?: boolean
   onSlugChange: (slug: string) => void
@@ -21,6 +22,7 @@ export function SlugInputWithSuggestion({
   title,
   slug,
   currentId,
+  testid,
   parentId,
   enableSlugSuggestion = true,
   onSlugChange,
@@ -78,6 +80,7 @@ export function SlugInputWithSuggestion({
       value={slug}
       onChange={handleChange}
       placeholder="Page slug"
+      testid={testid}
       error={error}
     />
   )

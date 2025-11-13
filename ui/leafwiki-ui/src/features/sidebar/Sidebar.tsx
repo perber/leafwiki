@@ -14,7 +14,7 @@ export default function Sidebar() {
   ]
 
   return (
-    <aside key={'sidebar'}>
+    <aside key={'sidebar'} data-testid="sidebar">
       {/*
         Our sidebar has always the same width, so we can use a fixed width.
         This will help us to avoid layout shifts when the sidebar is toggled.
@@ -28,6 +28,7 @@ export default function Sidebar() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
+                data-testid={`sidebar-${tab.id}-tab-button`}
                 onClick={() => setSidebarMode(tab.id)}
                 className={`-mb-px flex items-center gap-1 border-b-2 px-3 py-1.5 ${
                   sidebarMode === tab.id

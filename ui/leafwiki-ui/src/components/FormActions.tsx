@@ -5,6 +5,7 @@ export function FormActions({
   children,
   onCancel,
   onSave,
+  testidPrefix,
   saveLabel = 'Save',
   saveVariant = 'default',
   loading = false,
@@ -18,6 +19,7 @@ export function FormActions({
   saveLabel?: string
   loading?: boolean
   disabled?: boolean
+  testidPrefix?: string
   autoFocus?: 'cancel' | 'save' | ''
 }) {
   return (
@@ -27,6 +29,7 @@ export function FormActions({
         onClick={onCancel}
         disabled={loading}
         autoFocus={autoFocus == 'cancel'}
+        data-testid={testidPrefix ? `${testidPrefix}-cancel-button` : undefined}
       >
         Cancel
       </Button>
@@ -44,6 +47,7 @@ export function FormActions({
             | 'secondary'
         }
         autoFocus={autoFocus == 'save'}
+        data-testid={testidPrefix ? `${testidPrefix}-save-button` : undefined}
       >
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {saveLabel}

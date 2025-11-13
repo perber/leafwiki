@@ -51,6 +51,7 @@ export default function LoginForm() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required
+              data-testid="login-identifier"
             />
           </div>
 
@@ -61,12 +62,18 @@ export default function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              data-testid="login-password"
             />
           </div>
 
           {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading}
+            data-testid="login-submit"
+          >
             {loading ? 'Logging in...' : 'Login'}
           </Button>
         </form>

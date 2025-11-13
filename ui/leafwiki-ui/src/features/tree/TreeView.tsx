@@ -48,6 +48,7 @@ export default function TreeView() {
         {!readOnlyMode && (
           <div className="mb-1 flex">
             <TreeViewActionButton
+              actionName="add"
               icon={
                 <Plus
                   size={20}
@@ -59,6 +60,7 @@ export default function TreeView() {
             />
             {tree !== null && (
               <TreeViewActionButton
+                actionName="sort"
                 icon={
                   <List
                     size={20}

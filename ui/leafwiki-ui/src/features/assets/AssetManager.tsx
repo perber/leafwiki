@@ -91,6 +91,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
     <div className="space-y-3 text-sm">
       <div className="font-semibold text-gray-700">Assets</div>
       <div
+        data-testid="asset-upload-dropzone"
         ref={dropRef}
         onDragOver={(e) => {
           e.preventDefault()
