@@ -129,7 +129,7 @@ export function CreatePageByPathDialog({
           {lookup && !lookup.exists && lookup.segments.length > 0 && (
             <>
               <strong className="text-small">Result of path lookup:</strong>
-              <ul className="mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md bg-gray-100 p-1">
+              <ul className="custom-scrollbar mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md bg-gray-100 p-1">
                 {lookup.segments.map((segment, index) => (
                   <li
                     key={index}

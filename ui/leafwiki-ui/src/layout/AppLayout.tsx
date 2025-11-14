@@ -6,21 +6,104 @@ import UserToolbar from '@/components/UserToolbar'
 import Sidebar from '@/features/sidebar/Sidebar'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { useSidebarStore } from '@/stores/sidebar'
+import {
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  useSidebarStore,
+} from '@/stores/sidebar'
 import { MenuIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+
+export const MOBILE_SIDEBAR_WIDTH = 320
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { content, titleBar } = usePageToolbar()
   const location = useLocation()
   const [isEditor, setIsEditor] = useState(location.pathname.startsWith('/e/'))
 
+  // store resize handler in onMouseMove, onMouseUp in useRef
+  const resizeHandlerRef = useRef<{
+    onMouseMove: (e: MouseEvent) => void
+    onMouseUp: (e: MouseEvent) => void
+  } | null>(null)
+
+  const [resizing, setResizing] = useState(false)
+  const [hoveringResize, setHoveringResize] = useState(false)
+
   const sidebarVisible = useSidebarStore((s) => s.sidebarVisible)
   const setSidebarVisible = useSidebarStore((s) => s.setSidebarVisible)
+  const sidebarWidth = useSidebarStore((s) => s.sidebarWidth)
+  const setSidebarWidth = useSidebarStore((s) => s.setSidebarWidth)
   const isMobile = useIsMobile()
 
   useAutoCloseSidebarOnMobile()
+
+  const sidebarContainerRef = useRef<HTMLDivElement | null>(null)
+  const liveSidebarWidthRef = useRef(sidebarWidth)
+
+  const handleSidebarResize = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!sidebarVisible || isMobile) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const startX = e.clientX
+    const startWidth = sidebarWidth
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX
+
+      const viewportWidth = window.innerWidth
+      const maxWidth = Math.min(viewportWidth - 320, MAX_SIDEBAR_WIDTH) // min. 320px for main content should remain
+      const minWidth = MIN_SIDEBAR_WIDTH
+
+      const nextWidth = Math.min(
+        maxWidth,
+        Math.max(minWidth, startWidth + delta),
+      )
+      liveSidebarWidthRef.current = nextWidth
+
+      if (sidebarContainerRef.current) {
+        sidebarContainerRef.current.style.width = `${nextWidth}px`
+      }
+    }
+
+    const onMouseUp = () => {
+      setSidebarWidth(liveSidebarWidthRef.current)
+      setResizing(false)
+      setHoveringResize(false)
+      resizeHandlerRef.current = null
+    }
+
+    resizeHandlerRef.current = { onMouseMove, onMouseUp }
+    setResizing(true)
+  }
+
+  useEffect(() => {
+    if (!resizing || !resizeHandlerRef.current) return
+
+    const { onMouseMove, onMouseUp } = resizeHandlerRef.current
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [resizing])
+
+  // cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (resizeHandlerRef.current) {
+        const { onMouseMove, onMouseUp } = resizeHandlerRef.current
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -29,12 +112,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(frame)
   }, [location.pathname])
 
-  let mainContainerStyle = !isEditor ? 'overflow-auto p-6' : 'overflow-hidden'
+  useEffect(() => {
+    liveSidebarWidthRef.current = sidebarWidth
+  }, [sidebarWidth])
+
+  let mainContainerStyle = !isEditor
+    ? 'overflow-auto p-6 custom-scrollbar'
+    : 'overflow-hidden'
 
   // If on mobile and sidebar is visible, hide overflow to prevent double scrollbars
   if (isMobile && sidebarVisible) {
     mainContainerStyle += ' overflow-hidden'
   }
+
+  const effectiveSidebarWidth = !sidebarVisible
+    ? 0
+    : isMobile
+      ? MOBILE_SIDEBAR_WIDTH
+      : sidebarWidth
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -73,18 +168,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div className="space-between-header-and-main h-[85px] w-full" />
-      <div className="content-wrapper flex h-[calc(100vh-85px)] transition-all duration-200">
-        {/* ml-[-1px] is used to prevent a border when the sidebar is closed */}
+      <div className="content-wrapper flex h-[calc(100dvh-85px)] transition-all duration-200">
         <div
-          className={`sidebar-wrapper z-20 ml-[-1px] h-full overflow-auto border-r border-gray-200 bg-white transition-all duration-200 max-sm:fixed max-sm:h-[calc(100vh-85px)] ${
-            sidebarVisible ? 'w-96' : 'w-0'
-          }`}
+          ref={sidebarContainerRef}
+          className={
+            'custom-scrollbar relative z-20 box-border h-full overflow-auto bg-white pr-1 max-sm:fixed max-sm:h-[calc(100dvh-85px)]' +
+            (resizing ? '' : ' transition-[width] duration-200')
+          }
+          style={{
+            width: effectiveSidebarWidth,
+            pointerEvents: sidebarVisible ? 'auto' : 'none',
+            marginLeft:
+              isMobile && !sidebarVisible
+                ? '-4px' /* is used to prevent a border when the sidebar is closed */
+                : '',
+          }}
         >
+          {!isMobile && sidebarVisible && (
+            <div
+              className="absolute inset-y-0 right-0 flex w-1 cursor-col-resize items-center justify-center"
+              onMouseDown={handleSidebarResize}
+              onMouseEnter={() => setHoveringResize(true)}
+              onMouseLeave={() => {
+                if (!resizeHandlerRef.current) setHoveringResize(false)
+              }}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize sidebar"
+              data-testid="sidebar-resize-handle"
+            >
+              <div
+                className={
+                  'pointer-events-none my-4 h-full w-full transition-colors ' +
+                  (hoveringResize || resizing ? 'bg-green-400' : 'bg-gray-300')
+                }
+              />
+            </div>
+          )}
           <Sidebar />
         </div>
+
         {/* Overlay for mobile sidebar */}
         {isMobile && sidebarVisible && (
-          <div className="fixed inset-0 top-[85px] z-10 bg-black/50 max-sm:h-[calc(100vh-85px)]" />
+          <div className="fixed inset-0 top-[85px] z-10 bg-black/50 max-sm:h-[calc(100dvh-85px)]" />
         )}
         {/* Main content area */}
         <main
