@@ -18,7 +18,8 @@ export default function Sidebar() {
     <aside
       key={'sidebar'}
       data-testid="sidebar"
-      className="sidebar-container flex h-full w-full flex-col overflow-hidden bg-white"
+      id="sidebar"
+      className="flex h-full w-full flex-col overflow-hidden bg-white"
     >
       {/*
         The actual width is controlled by the parent container (AppLayout)
