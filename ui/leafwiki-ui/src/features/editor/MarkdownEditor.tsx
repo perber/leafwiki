@@ -148,7 +148,7 @@ const MarkdownEditor = (
         }
       }
     },
-    [onChange, pageId, setMarkdown],
+    [onChange, pageId, setMarkdown, editorViewRef],
   )
 
   // Set initial markdown value when component mounts
