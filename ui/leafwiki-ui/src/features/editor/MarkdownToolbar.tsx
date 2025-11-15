@@ -265,6 +265,9 @@ export default function MarkdownToolbar({
               editorRef.current?.insertAtCursor(md)
               setAssetModalOpen(false)
             }}
+            onFilenameChange={(before, after) => {
+              editorRef.current?.replaceFilenameInMarkdown?.(before, after)
+            }}
             isRenamingRef={isRenamingRef}
           />
         </DialogContent>

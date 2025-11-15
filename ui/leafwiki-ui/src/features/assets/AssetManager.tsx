@@ -8,10 +8,16 @@ import { AssetItem } from './AssetItem'
 type Props = {
   pageId: string
   onInsert?: (md: string) => void // optionaler Callback fürs Markdown
+  onFilenameChange?: (before: string, after: string) => void
   isRenamingRef: React.RefObject<boolean>
 }
 
-export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
+export function AssetManager({
+  pageId,
+  onInsert,
+  onFilenameChange,
+  isRenamingRef,
+}: Props) {
   const [assets, setAssets] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -134,7 +140,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
         ) : assets.length === 0 ? (
           <p className="text-xs text-gray-400 italic">No assets yet</p>
         ) : (
-          <ul className="h-full space-y-2 overflow-y-auto">
+          <ul className="custom-scrollbar h-full space-y-2 overflow-y-auto">
             {assets.map((filename) => (
               <AssetItem
                 key={filename}
@@ -144,6 +150,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
                 pageId={pageId}
                 onReload={loadAssets}
                 onInsert={(md) => onInsert?.(md)}
+                onFilenameChange={onFilenameChange}
               />
             ))}
           </ul>

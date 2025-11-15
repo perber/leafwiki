@@ -1,3 +1,4 @@
+import { IMAGE_EXTENSIONS } from '@/lib/config'
 import { cn } from '@/lib/utils' // Falls du clsx oder cn helper hast
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { FileText } from 'lucide-react'
@@ -9,7 +10,7 @@ type Props = {
   className?: string
 }
 
-const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
+const imageExtensions = IMAGE_EXTENSIONS
 
 export function AssetPreviewTooltip({ url, name, children, className }: Props) {
   const ext = url.split('.').pop()?.toLowerCase() ?? ''
