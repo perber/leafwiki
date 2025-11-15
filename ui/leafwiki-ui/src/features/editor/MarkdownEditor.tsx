@@ -19,6 +19,8 @@ import MarkdownCodeEditor from './MarkdownCodeEditor'
 import MarkdownToolbar from './MarkdownToolbar'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 
+import { useEditorStore } from '@/stores/editor'
+
 export type MarkdownEditorRef = {
   insertAtCursor: (text: string) => void
   getMarkdown: () => string
@@ -57,6 +59,8 @@ const MarkdownEditor = (
   const [markdown, setMarkdown] = useState(initialValue)
   const debouncedPreview = useDebounce(markdown, 100)
   const isMobile = useIsMobile()
+
+  const { previewVisible: showPreview, togglePreview } = useEditorStore()
 
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
 
@@ -229,10 +233,12 @@ const MarkdownEditor = (
       <MarkdownToolbar
         editorRef={ref as React.RefObject<MarkdownEditorRef>}
         pageId={pageId}
+        onTogglePreview={togglePreview}
+        previewVisible={showPreview}
         onAssetVersionChange={onAssetVersionChange}
       />
     )
-  }, [onAssetVersionChange, pageId, ref])
+  }, [onAssetVersionChange, pageId, ref, showPreview, togglePreview])
 
   const renderEditor = useCallback(
     (toolbar: boolean = true): JSX.Element => {
@@ -317,15 +323,20 @@ const MarkdownEditor = (
         <div className="flex h-full w-full flex-col">
           {renderToolbar()}
           <div className="flex w-full flex-1 overflow-hidden">
-            <div className="custom-scrollbar flex w-1/2 max-w-none flex-1 overflow-auto">
+            <div
+              className={`custom-scrollbar flex ${showPreview ? 'w-1/2' : 'w-full'} max-w-none flex-1 overflow-auto`}
+            >
               {renderEditor(false)}
             </div>
-            {/* Divider */}
-            <div
-              className="h-full w-1 bg-gray-300"
-              id="editor-preview-divider"
-            ></div>
-            <div className="w-1/2 max-w-none flex-1">{renderPreview()}</div>
+            {showPreview && (
+              <>
+                <div
+                  className="h-full w-1 bg-gray-300"
+                  id="editor-preview-divider"
+                ></div>
+                <div className="w-1/2 max-w-none flex-1">{renderPreview()}</div>
+              </>
+            )}
           </div>
         </div>
       )}
