@@ -36,8 +36,8 @@ export const TreeNode = React.memo(function TreeNode({
   const linkText = (
     <TooltipWrapper
       label={node.title}
-      side="top"
-      align="start"
+      side="bottom"
+      align="center"
       parentClassName="w-full flex-1 overflow-hidden"
     >
       <Link
