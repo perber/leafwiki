@@ -10,8 +10,8 @@ export const MIN_SIDEBAR_WIDTH = 220
 export const MAX_SIDEBAR_WIDTH = 800
 
 type SidebarStore = {
-  sidebarMode: 'tree' | 'search'
-  setSidebarMode: (mode: 'tree' | 'search') => void
+  sidebarMode: string
+  setSidebarMode: (mode: string) => void
 
   sidebarVisible: boolean
   setSidebarVisible: (visible: boolean) => void

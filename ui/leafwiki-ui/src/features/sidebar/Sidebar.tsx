@@ -1,18 +1,26 @@
 import ScrollableContainer from '@/components/ScrollableContainer'
+import { panelItemRegistry } from '@/lib/registries'
 import { useSidebarStore } from '@/stores/sidebar'
-import { FolderTree, Search as SearchIcon } from 'lucide-react'
-import { JSX } from 'react'
-import Search from '../search/Search'
-import TreeView from '../tree/TreeView'
+import { JSX, useMemo } from 'react'
+
+const registeredItems = panelItemRegistry.getAllItems()
 
 export default function Sidebar() {
   const sidebarMode = useSidebarStore((state) => state.sidebarMode)
   const setSidebarMode = useSidebarStore((state) => state.setSidebarMode)
 
-  const tabs: { id: 'tree' | 'search'; label: string; icon: JSX.Element }[] = [
-    { id: 'tree', label: 'Tree', icon: <FolderTree size={16} /> },
-    { id: 'search', label: 'Search', icon: <SearchIcon size={16} /> },
-  ]
+  const items = registeredItems
+
+  const tabs: { id: string; label: string; icon: () => JSX.Element }[] =
+    useMemo(
+      () =>
+        items.map((item) => ({
+          id: item.id,
+          label: item.label,
+          icon: item.icon,
+        })),
+      [items],
+    )
 
   return (
     <aside
@@ -42,7 +50,7 @@ export default function Sidebar() {
                     : 'border-transparent text-gray-500 hover:text-black'
                 }`}
               >
-                {tab.icon}
+                {tab.icon()}
                 {tab.label}
               </button>
             ))}
@@ -54,12 +62,11 @@ export default function Sidebar() {
         */}
         <div className={`sidebar-content h-[calc(100%-48px)] w-full`}>
           {/* Content */}
-          <ScrollableContainer hidden={sidebarMode !== 'tree'}>
-            <TreeView />
-          </ScrollableContainer>
-          <ScrollableContainer hidden={sidebarMode !== 'search'}>
-            <Search />
-          </ScrollableContainer>
+          {items.map((item) => (
+            <ScrollableContainer key={item.id} hidden={sidebarMode !== item.id}>
+              {item.render({})}
+            </ScrollableContainer>
+          ))}
         </div>
       </div>
     </aside>
