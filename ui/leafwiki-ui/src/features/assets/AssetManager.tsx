@@ -1,4 +1,5 @@
 import { getAssets, uploadAsset } from '@/lib/api/assets'
+import { MAX_UPLOAD_SIZE, MAX_UPLOAD_SIZE_MB } from '@/lib/config'
 import { UploadCloud } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -49,9 +50,6 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
   }, [pageId, loadAssets])
 
   const handleUploadFile = async (file: File) => {
-    const MAX_UPLOAD_SIZE_MB = 50
-    const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
-
     if (file.size > MAX_UPLOAD_SIZE) {
       toast.error(`File too large. Max ${MAX_UPLOAD_SIZE_MB}MB allowed.`)
       return
