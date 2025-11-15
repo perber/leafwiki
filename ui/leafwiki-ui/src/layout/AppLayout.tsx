@@ -171,6 +171,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="content-wrapper flex h-[calc(100dvh-85px)] transition-all duration-200">
         <div
           ref={sidebarContainerRef}
+          id="sidebar-container"
           className={
             'custom-scrollbar relative z-20 box-border h-full overflow-auto bg-white pr-1 max-sm:fixed max-sm:h-[calc(100dvh-85px)]' +
             (resizing ? '' : ' transition-[width] duration-200')
