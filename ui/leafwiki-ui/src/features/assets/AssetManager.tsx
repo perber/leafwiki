@@ -7,7 +7,7 @@ import { AssetItem } from './AssetItem'
 
 type Props = {
   pageId: string
-  onInsert?: (md: string) => void // optionaler Callback fürs Markdown
+  onInsert?: (md: string) => void // optional callback for markdown insertion
   onFilenameChange?: (before: string, after: string) => void
   isRenamingRef: React.RefObject<boolean>
 }
