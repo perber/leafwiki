@@ -1,13 +1,20 @@
 import { fetchWithAuth } from './auth'
 
-export async function uploadAsset(pageId: string, file: File) {
+export type UploadAssetResponse = {
+  file: string
+}
+
+export async function uploadAsset(
+  pageId: string,
+  file: File,
+): Promise<UploadAssetResponse> {
   const form = new FormData()
   form.append('file', file)
   try {
-    return await fetchWithAuth(`/api/pages/${pageId}/assets`, {
+    return (await fetchWithAuth(`/api/pages/${pageId}/assets`, {
       method: 'POST',
       body: form,
-    })
+    })) as UploadAssetResponse
   } catch {
     throw new Error('Asset upload failed')
   }

@@ -1,11 +1,12 @@
 import { Button } from '@/components/ui/button'
 import { deleteAsset, renameAsset } from '@/lib/api/assets'
+import { IMAGE_EXTENSIONS } from '@/lib/config'
 import { Check, FileText, Pencil, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AssetPreviewTooltip } from './AssetPreviewTooltip'
 
-const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']
+const imageExtensions = IMAGE_EXTENSIONS
 
 type Props = {
   pageId: string
@@ -14,6 +15,7 @@ type Props = {
   setEditingFilename: (filename: string | null) => void
   onReload: () => void
   onInsert: (md: string) => void
+  onFilenameChange?: (before: string, after: string) => void
 }
 
 export function AssetItem({
@@ -23,6 +25,7 @@ export function AssetItem({
   setEditingFilename,
   onReload,
   onInsert,
+  onFilenameChange,
 }: Props) {
   const assetUrl = filename
   const ext = filename.split('.').pop()?.toLowerCase()
@@ -42,6 +45,7 @@ export function AssetItem({
 
       await renameAsset(pageId, baseName, newFilename)
       toast.success('Asset renamed')
+      onFilenameChange?.(baseName, newFilename)
       onReload()
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -118,7 +122,7 @@ export function AssetItem({
             className="w-full border-b border-gray-300 bg-transparent text-sm text-gray-800 focus:outline-hidden"
           />
         ) : (
-          <span className="truncate text-sm text-gray-800 hover:underline">
+          <span className="cursor-pointer truncate text-sm text-gray-800 hover:underline">
             {baseName}
           </span>
         )}

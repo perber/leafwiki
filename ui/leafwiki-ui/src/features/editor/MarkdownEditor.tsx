@@ -6,6 +6,7 @@ import { historyField, redo, undo } from '@codemirror/commands'
 import { EditorView } from '@codemirror/view'
 import { Code2, Eye } from 'lucide-react'
 import {
+  ClipboardEvent,
   forwardRef,
   JSX,
   useCallback,
@@ -19,13 +20,21 @@ import MarkdownCodeEditor from './MarkdownCodeEditor'
 import MarkdownToolbar from './MarkdownToolbar'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 
+import { uploadAsset, UploadAssetResponse } from '@/lib/api/assets'
+import {
+  IMAGE_EXTENSIONS,
+  MAX_UPLOAD_SIZE,
+  MAX_UPLOAD_SIZE_MB,
+} from '@/lib/config'
 import { useEditorStore } from '@/stores/editor'
+import { toast } from 'sonner'
 
 export type MarkdownEditorRef = {
   insertAtCursor: (text: string) => void
   getMarkdown: () => string
   insertWrappedText: (before: string, after?: string) => void
   insertHeading: (level: 1 | 2 | 3) => void
+  replaceFilenameInMarkdown?: (before: string, after: string) => void
   editorViewRef: React.RefObject<EditorView | null>
   focus: () => void
   undo: () => void
@@ -63,6 +72,83 @@ const MarkdownEditor = (
   const { previewVisible: showPreview, togglePreview } = useEditorStore()
 
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
+
+  // Handles paste requests.
+  // This allows to paste images from clipboard directly into the editor.
+  const handlePaste = useCallback(
+    async (event: ClipboardEvent<HTMLDivElement>) => {
+      const { clipboardData } = event
+      if (!clipboardData) return
+
+      const files: File[] = []
+
+      if (clipboardData.files && clipboardData.files.length > 0) {
+        files.push(...Array.from(clipboardData.files))
+      } else if (clipboardData.items && clipboardData.items.length > 0) {
+        Array.from(clipboardData.items).forEach((item) => {
+          if (item.kind === 'file') {
+            const file = item.getAsFile()
+            if (file) {
+              files.push(file)
+            }
+          }
+        })
+      }
+
+      if (files.length === 0) {
+        return
+      }
+
+      // We take over the paste event to handle image files
+      event.preventDefault()
+      event.stopPropagation()
+
+      // Process each file
+      for (const file of files) {
+        if (file.size > MAX_UPLOAD_SIZE) {
+          toast.error(`File too large. Max ${MAX_UPLOAD_SIZE_MB}MB allowed.`)
+          continue
+        }
+
+        // Upload each file
+        try {
+          const res: UploadAssetResponse = await uploadAsset(pageId, file)
+
+          toast.success(`Uploaded ${file.name}`)
+
+          // The result of uploadAsset looks like this:
+          // {"file":"/assets/0NmpvSivg/preview-scrollbar.gif"}
+          const uploadedFile = res.file
+          const ext = file.name.split('.').pop()?.toLowerCase()
+
+          const isImage =
+            file.type.startsWith('image/') ||
+            IMAGE_EXTENSIONS.includes(ext ?? '')
+
+          const markdown = isImage
+            ? `![${file.name}](${uploadedFile})\n`
+            : `[${file.name}](${uploadedFile})\n`
+
+          const view = editorViewRef.current
+          if (!view) continue
+          const { from } = view.state.selection.main
+          view.dispatch({
+            changes: { from, insert: markdown },
+            selection: { anchor: from + markdown.length },
+          })
+
+          const newDoc = view.state.doc.toString()
+          setMarkdown(newDoc)
+          onChange(newDoc)
+          editorViewRef.current?.focus()
+        } catch (err) {
+          console.error('Upload failed', err)
+          toast.error(`Failed to upload ${file.name}`)
+        }
+      }
+    },
+    [onChange, pageId, setMarkdown, editorViewRef],
+  )
 
   // Set initial markdown value when component mounts
   // This sets the initial value only once
@@ -109,6 +195,26 @@ const MarkdownEditor = (
       setMarkdown(newDoc)
       onChange(newDoc)
       editorViewRef.current?.focus()
+    },
+    replaceFilenameInMarkdown: (before: string, after: string) => {
+      const view = editorViewRef.current
+      if (!view) return
+      const docText = view.state.doc.toString()
+
+      // Just replace the filename.
+      // The path remains unchanged, but the filename has to start with '/'
+      const regex = new RegExp(`(!?\\[.*?\\]\\(.*?/?)/${before}(\\))`, 'g')
+
+      const newFilename = after.startsWith('/') ? after.slice(1) : after
+      const updatedText = docText.replace(regex, `$1/${newFilename}$2`)
+
+      // Replace the entire document content
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: updatedText },
+      })
+
+      setMarkdown(updatedText)
+      onChange(updatedText)
     },
     editorViewRef: editorViewRef,
     getMarkdown: () => editorViewRef.current?.state.doc.toString() || '',
@@ -278,6 +384,7 @@ const MarkdownEditor = (
     <div
       className="flex h-full w-full flex-col overflow-hidden"
       key={isMobile ? 'mobile' : 'desktop'}
+      onPaste={handlePaste}
     >
       {/* Mobile */}
       {isMobile && (

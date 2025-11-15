@@ -1,4 +1,5 @@
 import { getAssets, uploadAsset } from '@/lib/api/assets'
+import { MAX_UPLOAD_SIZE, MAX_UPLOAD_SIZE_MB } from '@/lib/config'
 import { UploadCloud } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -6,11 +7,17 @@ import { AssetItem } from './AssetItem'
 
 type Props = {
   pageId: string
-  onInsert?: (md: string) => void // optionaler Callback fürs Markdown
+  onInsert?: (md: string) => void // optional callback for markdown insertion
+  onFilenameChange?: (before: string, after: string) => void
   isRenamingRef: React.RefObject<boolean>
 }
 
-export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
+export function AssetManager({
+  pageId,
+  onInsert,
+  onFilenameChange,
+  isRenamingRef,
+}: Props) {
   const [assets, setAssets] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -49,9 +56,6 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
   }, [pageId, loadAssets])
 
   const handleUploadFile = async (file: File) => {
-    const MAX_UPLOAD_SIZE_MB = 50
-    const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
-
     if (file.size > MAX_UPLOAD_SIZE) {
       toast.error(`File too large. Max ${MAX_UPLOAD_SIZE_MB}MB allowed.`)
       return
@@ -136,7 +140,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
         ) : assets.length === 0 ? (
           <p className="text-xs text-gray-400 italic">No assets yet</p>
         ) : (
-          <ul className="h-full space-y-2 overflow-y-auto">
+          <ul className="custom-scrollbar h-full space-y-2 overflow-y-auto">
             {assets.map((filename) => (
               <AssetItem
                 key={filename}
@@ -146,6 +150,7 @@ export function AssetManager({ pageId, onInsert, isRenamingRef }: Props) {
                 pageId={pageId}
                 onReload={loadAssets}
                 onInsert={(md) => onInsert?.(md)}
+                onFilenameChange={onFilenameChange}
               />
             ))}
           </ul>
