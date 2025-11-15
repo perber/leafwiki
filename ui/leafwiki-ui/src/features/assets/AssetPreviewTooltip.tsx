@@ -1,5 +1,5 @@
 import { IMAGE_EXTENSIONS } from '@/lib/config'
-import { cn } from '@/lib/utils' // Falls du clsx oder cn helper hast
+import { cn } from '@/lib/utils' // If you have clsx or cn helper
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { FileText } from 'lucide-react'
 
