@@ -10,6 +10,8 @@ import {
 import {
   Bold,
   Code,
+  Eye,
+  EyeOff,
   Image,
   Italic,
   Link,
@@ -26,12 +28,16 @@ type Props = {
   editorRef: React.RefObject<MarkdownEditorRef>
   onAssetVersionChange?: (version: number) => void
   pageId: string
+  previewVisible: boolean
+  onTogglePreview: () => void
 }
 
 export default function MarkdownToolbar({
   editorRef,
   onAssetVersionChange,
   pageId,
+  previewVisible,
+  onTogglePreview,
 }: Props) {
   const [assetModalOpen, setAssetModalOpen] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
@@ -211,6 +217,25 @@ export default function MarkdownToolbar({
             disabled={!canRedo}
           >
             <Redo className="h-4 w-4" />
+          </Button>
+        </TooltipWrapper>
+        <div className="mx-1 h-5 w-px self-center bg-white/30" />
+        <TooltipWrapper
+          label={previewVisible ? 'Hide preview' : 'Show preview'}
+          side="top"
+          align="center"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onTogglePreview}
+            className={toolbarButtonStyle + ' max-md:hidden'}
+          >
+            {!previewVisible ? (
+              <Eye className="h-4 w-4" />
+            ) : (
+              <EyeOff className="h-4 w-4" />
+            )}
           </Button>
         </TooltipWrapper>
       </div>
