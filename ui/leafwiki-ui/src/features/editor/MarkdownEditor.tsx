@@ -131,7 +131,7 @@ const MarkdownEditor = (
             : `[${file.name}](${uploadedFile})\n`
 
           const view = editorViewRef.current
-          if (!view) return
+          if (!view) continue
           const { from } = view.state.selection.main
           view.dispatch({
             changes: { from, insert: markdown },
