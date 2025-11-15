@@ -35,7 +35,6 @@ export type MarkdownEditorRef = {
   insertWrappedText: (before: string, after?: string) => void
   insertHeading: (level: 1 | 2 | 3) => void
   replaceFilenameInMarkdown?: (before: string, after: string) => void
-  replaceFilenameInMarkdown?: (before: string, after: string) => void
   editorViewRef: React.RefObject<EditorView | null>
   focus: () => void
   undo: () => void
