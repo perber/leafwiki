@@ -102,6 +102,10 @@ export const TreeNode = React.memo(function TreeNode({
               onClick={() => hasChildren && toggleNode(node.id)}
             />
           )}
+          {
+            // add empty space to align with nodes that have children
+            !hasChildren && <div className="-ml-1 w-4" />
+          }
           {linkText}
         </div>
 
