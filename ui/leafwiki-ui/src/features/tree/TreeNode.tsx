@@ -42,7 +42,7 @@ export const TreeNode = React.memo(function TreeNode({
     >
       <Link
         to={`/${node.path}`}
-        className="w-full pt-1 pb-1"
+        className="w-full py-1"
         data-testid={`tree-node-link-${node.id}`}
       >
         <span
