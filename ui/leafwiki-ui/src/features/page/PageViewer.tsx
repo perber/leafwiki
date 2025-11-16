@@ -12,7 +12,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { CopyPageButton } from './CopyPageButton'
-import { DeletePageDialog } from './DeletePageDialog'
+import { DeletePageButton } from './DeletePageButton'
 import { EditPageButton } from './EditPageButton'
 import { PrintPageButton } from './PrintPageButton'
 
@@ -74,7 +74,7 @@ export default function PageViewer() {
 
     setContent(
       <Fragment key="viewing">
-        <DeletePageDialog pageId={page.id} redirectUrl={redirectUrl} />
+        <DeletePageButton pageId={page.id} redirectUrl={redirectUrl} />
         <CopyPageButton sourcePage={page} />
         <PrintPageButton />
         <EditPageButton path={page.path} />

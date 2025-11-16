@@ -1,35 +1,40 @@
 import { FormActions } from '@/components/FormActions'
-import { TooltipWrapper } from '@/components/TooltipWrapper'
 import {
   AlertDialog,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { deletePage } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_DELETE_PAGE_CONFIRMATION } from '@/lib/registries'
+import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
+export type DeletePageDialogProps = {
+  pageId: string
+  redirectUrl: string
+}
+
 export function DeletePageDialog({
   pageId,
   redirectUrl,
-}: {
-  pageId: string
-  redirectUrl: string
-}) {
+}: DeletePageDialogProps) {
+  // Dialog state from zustand store
+  const closeDialog = useDialogsStore((s) => s.closeDialog)
+  const open = useDialogsStore(
+    (s) => s.dialogType === DIALOG_DELETE_PAGE_CONFIRMATION,
+  )
+
   const navigate = useNavigate()
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const page = useTreeStore((s) => s.getPageById(pageId))
 
-  const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [deleteRecursive, setDeleteRecursive] = useState(false)
   const [, setFieldErrors] = useState<Record<string, string>>({})
@@ -44,7 +49,7 @@ export function DeletePageDialog({
       toast.success('Page deleted successfully')
       navigate(`/${redirectUrl}`)
       await reloadTree()
-      setOpen(false)
+      closeDialog()
     } catch (err) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error deleting page')
@@ -54,30 +59,20 @@ export function DeletePageDialog({
   }
 
   const handleCancel = () => {
-    setOpen(false)
+    closeDialog()
     setLoading(false)
   }
 
   return (
     <AlertDialog
       open={open}
-      onOpenChange={(o) => {
-        setOpen(o)
-        if (o === true) setDeleteRecursive(false)
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setDeleteRecursive(false) // Reset recursive delete option
+          closeDialog()
+        }
       }}
     >
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="destructive"
-          size="icon"
-          className="h-8 w-8 rounded-full shadow-xs"
-          data-testid="delete-page-button"
-        >
-          <TooltipWrapper label="Delete page" side="top" align="center">
-            <Trash2 />
-          </TooltipWrapper>
-        </Button>
-      </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Page?</AlertDialogTitle>
