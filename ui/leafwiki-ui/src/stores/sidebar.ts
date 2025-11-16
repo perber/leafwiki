@@ -2,6 +2,7 @@
 // This store manages sidebar state: visibility and active mode (tree/search).
 // The state is persisted across sessions using localStorage.
 
+import { SIDEBAR_TREE_PANEL_ID } from '@/lib/registries'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -23,7 +24,7 @@ type SidebarStore = {
 export const useSidebarStore = create<SidebarStore>()(
   persist(
     (set) => ({
-      sidebarMode: 'tree',
+      sidebarMode: SIDEBAR_TREE_PANEL_ID,
       setSidebarMode: (mode) => set({ sidebarMode: mode }),
 
       sidebarVisible: false,

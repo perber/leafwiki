@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { useAuthStore } from '@/stores/auth'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
@@ -30,7 +31,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     !href.startsWith('#')
 
   const handleOpenCreatePageDialog = (path: string, editMode: boolean) => {
-    openDialog('create-by-path', {
+    openDialog(DIALOG_CREATE_PAGE_BY_PATH, {
       initialPath: path,
       readOnlyPath: true,
       forwardToEditMode: !editMode,

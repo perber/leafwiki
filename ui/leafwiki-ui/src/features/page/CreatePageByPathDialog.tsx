@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import { ensurePage, lookupPath, PathLookupResult } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { useDebounce } from '@/lib/useDebounce'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
@@ -30,7 +31,7 @@ export function CreatePageByPathDialog({
 }: CreatePageByPathDialogProps) {
   // Dialog state from zustand store
   const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore((s) => s.dialogType === 'create-by-path')
+  const open = useDialogsStore((s) => s.dialogType === DIALOG_CREATE_PAGE_BY_PATH)
   const navigate = useNavigate()
 
   // read the last segment from the initial path as title

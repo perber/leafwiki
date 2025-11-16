@@ -1,6 +1,7 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { PageNode } from '@/lib/api/pages'
+import { DIALOG_ADD_PAGE, DIALOG_MOVE_PAGE, DIALOG_SORT_PAGES } from '@/lib/registries'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -116,7 +117,7 @@ export const TreeNode = React.memo(function TreeNode({
                 />
               }
               tooltip="Create new page"
-              onClick={() => openDialog('add', { parentId: node.id })}
+              onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: node.id })}
             />
             <TreeViewActionButton
               actionName="move"
@@ -127,7 +128,7 @@ export const TreeNode = React.memo(function TreeNode({
                 />
               }
               tooltip="Move page to new parent"
-              onClick={() => openDialog('move', { pageId: node.id })}
+              onClick={() => openDialog(DIALOG_MOVE_PAGE, { pageId: node.id })}
             />
             {hasChildren && (
               <TreeViewActionButton
@@ -139,7 +140,7 @@ export const TreeNode = React.memo(function TreeNode({
                   />
                 }
                 tooltip="Sort pages"
-                onClick={() => openDialog('sort', { parent: node })}
+                onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: node })}
               />
             )}
           </div>

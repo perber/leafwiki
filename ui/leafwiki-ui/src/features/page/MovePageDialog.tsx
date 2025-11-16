@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { movePage, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_MOVE_PAGE } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { useMemo, useState } from 'react'
@@ -18,7 +19,7 @@ import { PageSelect } from './PageSelect'
 export function MovePageDialog({ pageId }: { pageId: string }) {
   // Dialog state from zustand store
   const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore((s) => s.dialogType === 'move')
+  const open = useDialogsStore((s) => s.dialogType === DIALOG_MOVE_PAGE)
 
   const { tree, reloadTree } = useTreeStore()
   const [loading, setLoading] = useState(false)

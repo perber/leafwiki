@@ -1,4 +1,5 @@
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
+import { DIALOG_ADD_PAGE, DIALOG_SORT_PAGES } from '@/lib/registries'
 import { getAncestorIds } from '@/lib/treeUtils'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -55,7 +56,7 @@ export default function TreeView() {
               />
             }
             tooltip="Create new page"
-            onClick={() => openDialog('add', { parentId: '' })}
+            onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: '' })}
           />
           {tree && (
             <TreeViewActionButton
@@ -67,7 +68,7 @@ export default function TreeView() {
                 />
               }
               tooltip="Sort pages"
-              onClick={() => openDialog('sort', { parent: tree })}
+              onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: tree })}
             />
           )}
         </div>

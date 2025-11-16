@@ -16,8 +16,11 @@ export const dialogRegistry = new DialogRegistry()
 
 // Register sidebar panel items here
 
+export const SIDEBAR_TREE_PANEL_ID = 'tree'
+export const SIDEBAR_SEARCH_PANEL_ID = 'search'
+
 panelItemRegistry.register({
-  id: 'tree',
+  id: SIDEBAR_TREE_PANEL_ID,
   label: 'Tree',
   icon: () => <FolderTree size={16} />,
   render: () => {
@@ -26,7 +29,7 @@ panelItemRegistry.register({
 })
 
 panelItemRegistry.register({
-  id: 'search',
+  id: SIDEBAR_SEARCH_PANEL_ID,
   label: 'Search',
   icon: () => <SearchIcon size={16} />,
   render: () => <Search />,
@@ -34,43 +37,50 @@ panelItemRegistry.register({
 
 // Register application wide dialogs here using dialogRegistry.register(...)
 
+export const DIALOG_ADD_PAGE = 'add-page'
+export const DIALOG_SORT_PAGES = 'sort-pages'
+export const DIALOG_MOVE_PAGE = 'move-page'
+export const DIALOG_CREATE_PAGE_BY_PATH = 'create-page-by-path'
+export const DIALOG_COPY_PAGE = 'copy-page'
+export const DIALOG_EDIT_PAGE_METADATA = 'edit-page-metadata'
+
 dialogRegistry.register({
-  type: 'add',
+  type: DIALOG_ADD_PAGE,
   render: (props) => {
     return <AddPageDialog {...(props as React.ComponentProps<typeof AddPageDialog>)} />
   },
 })
 
 dialogRegistry.register({
-  type: 'sort',
+  type: DIALOG_SORT_PAGES,
   render: (props) => {
     return <SortPagesDialog {...(props as React.ComponentProps<typeof SortPagesDialog>)} />
   },
 })
 
 dialogRegistry.register({
-  type: 'move',
+  type: DIALOG_MOVE_PAGE,
   render: (props) => {
     return <MovePageDialog {...(props as React.ComponentProps<typeof MovePageDialog>)} />
   },
 })
 
 dialogRegistry.register({
-  type: 'create-by-path',
+  type: DIALOG_CREATE_PAGE_BY_PATH,
   render: (props) => {
     return <CreatePageByPathDialog {...(props as React.ComponentProps<typeof CreatePageByPathDialog>)} />
   },
 })
 
 dialogRegistry.register({
-  type: 'copy-page',
+  type: DIALOG_COPY_PAGE,
   render: (props) => {
     return <CopyPageDialog {...(props as React.ComponentProps<typeof CopyPageDialog>)} />
   },
 })
 
 dialogRegistry.register({
-  type: 'edit-page-metadata',
+  type: DIALOG_EDIT_PAGE_METADATA,
   render: (props) => {
     return <EditPageMetadataDialog {...(props as React.ComponentProps<typeof EditPageMetadataDialog>)} />
   },

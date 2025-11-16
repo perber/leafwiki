@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import { getPageByPath, updatePage } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Save, X } from 'lucide-react'
@@ -151,7 +152,7 @@ export default function PageEditor() {
   const onEditTitleClicked = useCallback(() => {
     if (!title || !slug || !page?.id) return
 
-    openDialog('edit-page-metadata', {
+    openDialog(DIALOG_EDIT_PAGE_METADATA, {
       title,
       currentId: page.id,
       slug,
