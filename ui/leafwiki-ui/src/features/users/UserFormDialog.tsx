@@ -1,28 +1,30 @@
 import { FormActions } from '@/components/FormActions'
 import { FormInput } from '@/components/FormInput'
-import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { User } from '@/lib/api/users'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_USER_FORM } from '@/lib/registries'
 import { useAuthStore } from '@/stores/auth'
+import { useDialogsStore } from '@/stores/dialogs'
 import { useUserStore } from '@/stores/users'
 import { DialogDescription } from '@radix-ui/react-dialog'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
-type Props = {
+type UserFormDialogProps = {
   user?: User
 }
 
-export function UserFormDialog({ user }: Props) {
+export function UserFormDialog({ user }: UserFormDialogProps) {
   const isEdit = !!user
-  const [open, setOpen] = useState(false)
+  // Dialog state from zustand store
+  const closeDialog = useDialogsStore((s) => s.closeDialog)
+  const open = useDialogsStore((s) => s.dialogType === DIALOG_USER_FORM)
 
   const [username, setUsername] = useState(user?.username || '')
   const [email, setEmail] = useState(user?.email || '')
@@ -54,7 +56,7 @@ export function UserFormDialog({ user }: Props) {
       } else {
         await createUser(userData)
       }
-      setOpen(false)
+      closeDialog()
       toast.success('User saved successfully')
     } catch (err) {
       console.warn(err)
@@ -65,7 +67,7 @@ export function UserFormDialog({ user }: Props) {
   }
 
   const handleCancel = () => {
-    setOpen(false)
+    closeDialog()
   }
 
   const resetForm = (user: User | null) => {
@@ -98,19 +100,11 @@ export function UserFormDialog({ user }: Props) {
     <Dialog
       open={open}
       onOpenChange={(isOpen) => {
-        setOpen(isOpen)
+        if (!isOpen) {
+          closeDialog()
+        }
       }}
     >
-      <DialogTrigger asChild>
-        {isEdit ? (
-          <Button size="sm" variant="outline">
-            Edit User
-          </Button>
-        ) : (
-          <Button variant="default">New User</Button>
-        )}
-      </DialogTrigger>
-
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit User' : 'New User'}</DialogTitle>
