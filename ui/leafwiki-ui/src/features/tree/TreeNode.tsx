@@ -35,7 +35,7 @@ export const TreeNode = React.memo(function TreeNode({
   const isMobile = useIsMobile()
   const readOnlyMode = useIsReadOnly()
 
-  const indent = level * 4
+  const indent = 4
   const markerOffset = 8 // Distance from left for the vertical line
 
   const linkText = (
