@@ -8,18 +8,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
 import { useAuthStore } from '@/stores/auth'
+import { useDialogsStore } from '@/stores/dialogs'
 import { useUserStore } from '@/stores/users'
 import { DialogDescription } from '@radix-ui/react-dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
-type Props = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
+export function ChangeOwnPasswordDialog() {
+  // Dialog state from zustand store
+  const closeDialog = useDialogsStore((s) => s.closeDialog)
+  const open = useDialogsStore(
+    (s) => s.dialogType === DIALOG_CHANGE_OWN_PASSWORD,
+  )
 
-export function ChangeOnwnPasswordDialog({ open, onOpenChange }: Props) {
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -75,7 +78,7 @@ export function ChangeOnwnPasswordDialog({ open, onOpenChange }: Props) {
     try {
       await changeOwnPassword(oldPassword, newPassword)
       toast.success('Password changed successfully')
-      onOpenChange(false)
+      closeDialog()
     } catch (err) {
       console.warn(err)
       setOldPassword('')
@@ -88,7 +91,14 @@ export function ChangeOnwnPasswordDialog({ open, onOpenChange }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          closeDialog()
+        }
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Change Own Password</DialogTitle>
@@ -127,7 +137,7 @@ export function ChangeOnwnPasswordDialog({ open, onOpenChange }: Props) {
 
         <DialogFooter className="pt-4">
           <FormActions
-            onCancel={() => onOpenChange(false)}
+            onCancel={() => closeDialog()}
             onSave={handleChange}
             saveLabel={loading ? 'Saving...' : 'Save'}
             disabled={
