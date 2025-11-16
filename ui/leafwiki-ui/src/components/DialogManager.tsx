@@ -3,7 +3,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 
 const dialogs = dialogRegistry.getAllDialogs()
 
-export function DialogManger() {
+export function DialogManager() {
   const dialogType = useDialogsStore((state) => state.dialogType)
   const dialogProps = useDialogsStore((state) => state.dialogProps)
 
@@ -13,8 +13,7 @@ export function DialogManger() {
         if (dialog.type !== dialogType) {
           return null
         }
-        const DialogComponent = dialog.render
-        return <DialogComponent key={dialog.type} {...dialogProps} />
+        return dialog.render({ key: dialog.type, ...dialogProps })
       })}
     </>
   )

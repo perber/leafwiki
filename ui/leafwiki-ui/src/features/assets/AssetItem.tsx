@@ -13,6 +13,7 @@ type Props = {
   filename: string
   editingFilename: string | null
   setEditingFilename: (filename: string | null) => void
+  onAssetVersionChange?: () => void
   onReload: () => void
   onInsert: (md: string) => void
   onFilenameChange?: (before: string, after: string) => void
@@ -26,6 +27,7 @@ export function AssetItem({
   onReload,
   onInsert,
   onFilenameChange,
+  onAssetVersionChange,
 }: Props) {
   const assetUrl = filename
   const ext = filename.split('.').pop()?.toLowerCase()
@@ -46,6 +48,9 @@ export function AssetItem({
       await renameAsset(pageId, baseName, newFilename)
       toast.success('Asset renamed')
       onFilenameChange?.(baseName, newFilename)
+      if (onAssetVersionChange) {
+        onAssetVersionChange()
+      }
       onReload()
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -64,6 +69,9 @@ export function AssetItem({
       await deleteAsset(pageId, baseName)
       toast.success('Asset deleted')
       onReload()
+      if (onAssetVersionChange) {
+        onAssetVersionChange()
+      }
     } catch (err) {
       toast.error('Delete failed')
       console.error('Delete failed', err)

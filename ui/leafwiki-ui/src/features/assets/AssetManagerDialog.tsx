@@ -15,11 +15,12 @@ export type AssetManagerDialogProps = {
     insertAtCursor: (md: string) => void
     replaceFilenameInMarkdown?: (before: string, after: string) => void
   }>
+  onAssetVersionChange: () => void
   isRenamingRef: React.RefObject<boolean>
 }
 
 export function AssetManagerDialog(props: AssetManagerDialogProps) {
-  const { pageId, editorRef, isRenamingRef } = props
+  const { pageId, editorRef, onAssetVersionChange, isRenamingRef } = props
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const open = useDialogsStore((s) => s.dialogType === DIALOG_ASSET_MANAGER)
 
@@ -52,6 +53,7 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
         </DialogHeader>
         <AssetManager
           pageId={pageId}
+          onAssetVersionChange={onAssetVersionChange}
           onInsert={(md) => {
             editorRef.current?.insertAtCursor(md)
             closeDialog()
