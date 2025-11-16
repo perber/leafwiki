@@ -9,6 +9,7 @@ import { MovePageDialog } from '@/features/page/MovePageDialog'
 import { SortPagesDialog } from '@/features/page/SortPagesDialog'
 import Search from '@/features/search/Search'
 import TreeView from '@/features/tree/TreeView'
+import { ChangeOwnPasswordDialog } from '@/features/users/ChangeOwnPasswordDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
 import { FolderTree, Search as SearchIcon } from 'lucide-react'
@@ -47,6 +48,7 @@ export const DIALOG_COPY_PAGE = 'copy-page'
 export const DIALOG_EDIT_PAGE_METADATA = 'edit-page-metadata'
 export const DIALOG_ASSET_MANAGER = 'asset-manager'
 export const DIALOG_DELETE_PAGE_CONFIRMATION = 'delete-page-confirmation'
+export const DIALOG_CHANGE_OWN_PASSWORD = 'change-own-password'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -133,5 +135,12 @@ dialogRegistry.register({
         {...(props as React.ComponentProps<typeof DeletePageDialog>)}
       />
     )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_CHANGE_OWN_PASSWORD,
+  render: () => {
+    return <ChangeOwnPasswordDialog />
   },
 })
