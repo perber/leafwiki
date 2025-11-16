@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import { ChangePasswordButton } from './ChangePasswordButton'
 import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
-// import { UserFormDialog } from "./UserFormDialog"
 
 export default function UserManagement() {
   const { users, loadUsers, reset } = useUserStore()
@@ -76,10 +75,7 @@ export default function UserManagement() {
                         <div className="flex gap-2">
                           <CreateEditUserButton user={user} />
                           <ChangePasswordButton user={user} />
-                          <DeleteUserButton
-                            userId={user.id}
-                            username={user.username}
-                          />
+                          <DeleteUserButton user={user} />
                         </div>
                       </td>
                     </tr>

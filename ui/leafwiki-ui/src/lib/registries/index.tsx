@@ -11,6 +11,7 @@ import Search from '@/features/search/Search'
 import TreeView from '@/features/tree/TreeView'
 import { ChangeOwnPasswordDialog } from '@/features/users/ChangeOwnPasswordDialog'
 import { ChangePasswordDialog } from '@/features/users/ChangePasswordDialog'
+import { DeleteUserDialog } from '@/features/users/DeleteUserDialog'
 import { UserFormDialog } from '@/features/users/UserFormDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
@@ -53,6 +54,7 @@ export const DIALOG_DELETE_PAGE_CONFIRMATION = 'delete-page-confirmation'
 export const DIALOG_CHANGE_OWN_PASSWORD = 'change-own-password'
 export const DIALOG_USER_FORM = 'user-form'
 export const DIALOG_CHANGE_USER_PASSWORD = 'change-user-password'
+export const DIALOG_DELETE_USER_CONFIRMATION = 'delete-user-confirmation'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -166,6 +168,17 @@ dialogRegistry.register({
     return (
       <ChangePasswordDialog
         {...(props as React.ComponentProps<typeof ChangePasswordDialog>)}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_DELETE_USER_CONFIRMATION,
+  render: (props) => {
+    return (
+      <DeleteUserDialog
+        {...(props as React.ComponentProps<typeof DeleteUserDialog>)}
       />
     )
   },
