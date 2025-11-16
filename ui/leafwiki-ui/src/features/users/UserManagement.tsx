@@ -1,7 +1,7 @@
 import { useUserStore } from '@/stores/users'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { ChangePasswordDialog } from './ChangePasswordDialog'
+import { ChangePasswordButton } from './ChangePasswordButton'
 import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
 // import { UserFormDialog } from "./UserFormDialog"
@@ -75,10 +75,7 @@ export default function UserManagement() {
                       <td className="p-3">
                         <div className="flex gap-2">
                           <CreateEditUserButton user={user} />
-                          <ChangePasswordDialog
-                            userId={user.id}
-                            username={user.username}
-                          />
+                          <ChangePasswordButton user={user} />
                           <DeleteUserButton
                             userId={user.id}
                             username={user.username}

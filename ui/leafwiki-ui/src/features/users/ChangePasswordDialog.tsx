@@ -1,32 +1,40 @@
 import { FormActions } from '@/components/FormActions'
 import { FormInput } from '@/components/FormInput'
-import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_CHANGE_USER_PASSWORD } from '@/lib/registries'
+import { useDialogsStore } from '@/stores/dialogs'
 import { useUserStore } from '@/stores/users'
 import { DialogDescription } from '@radix-ui/react-dialog'
 import { useCallback, useEffect, useState } from 'react'
 
-type Props = {
+type ChangePasswordDialogProps = {
   userId: string
   username: string
 }
 
-export function ChangePasswordDialog({ userId, username }: Props) {
-  const [open, setOpen] = useState(false)
+export function ChangePasswordDialog({
+  userId,
+  username,
+}: ChangePasswordDialogProps) {
+  const closeDialog = useDialogsStore((s) => s.closeDialog)
+  const open = useDialogsStore(
+    (s) => s.dialogType === DIALOG_CHANGE_USER_PASSWORD,
+  )
+
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
 
   const { users, updateUser } = useUserStore()
+
   const user = users.find((u) => u.id === userId)
 
   const resetForm = useCallback(() => {
@@ -71,7 +79,7 @@ export function ChangePasswordDialog({ userId, username }: Props) {
         ...user,
         password,
       })
-      setOpen(false)
+      closeDialog()
     } catch (err) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error updating password')
@@ -81,13 +89,15 @@ export function ChangePasswordDialog({ userId, username }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="secondary">
-          Change Password
-        </Button>
-      </DialogTrigger>
-
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          closeDialog()
+          resetForm()
+        }
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Change password for user {username}</DialogTitle>
@@ -118,7 +128,10 @@ export function ChangePasswordDialog({ userId, username }: Props) {
 
         <DialogFooter className="pt-4">
           <FormActions
-            onCancel={() => setOpen(false)}
+            onCancel={() => {
+              closeDialog()
+              resetForm()
+            }}
             onSave={handleChange}
             saveLabel={loading ? 'Saving...' : 'Save'}
             disabled={
