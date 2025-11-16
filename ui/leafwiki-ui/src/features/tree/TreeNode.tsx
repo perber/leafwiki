@@ -1,7 +1,11 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { PageNode } from '@/lib/api/pages'
-import { DIALOG_ADD_PAGE, DIALOG_MOVE_PAGE, DIALOG_SORT_PAGES } from '@/lib/registries'
+import {
+  DIALOG_ADD_PAGE,
+  DIALOG_MOVE_PAGE,
+  DIALOG_SORT_PAGES,
+} from '@/lib/registries'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'

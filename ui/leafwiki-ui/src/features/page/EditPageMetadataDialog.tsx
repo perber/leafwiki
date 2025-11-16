@@ -30,7 +30,9 @@ export function EditPageMetadataDialog({
 }: EditPageMetadataDialogProps) {
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
-  const open = useDialogsStore((s) => s.dialogType === DIALOG_EDIT_PAGE_METADATA)
+  const open = useDialogsStore(
+    (s) => s.dialogType === DIALOG_EDIT_PAGE_METADATA,
+  )
 
   const [title, setTitle] = useState(propTitle)
   const [slug, setSlug] = useState(propSlug)

@@ -1,7 +1,7 @@
 // dialogRegistry
 // A registry for dialog components to be used in the application.
 
-import { JSX } from "react/jsx-runtime"
+import { JSX } from 'react/jsx-runtime'
 
 export interface Dialog {
   type: string

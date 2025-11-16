@@ -9,6 +9,7 @@ type Props = {
   pageId: string
   onInsert?: (md: string) => void // optional callback for markdown insertion
   onFilenameChange?: (before: string, after: string) => void
+  onAssetVersionChange?: (version: number) => void
   isRenamingRef: React.RefObject<boolean>
 }
 
@@ -17,6 +18,7 @@ export function AssetManager({
   onInsert,
   onFilenameChange,
   isRenamingRef,
+  onAssetVersionChange,
 }: Props) {
   const [assets, setAssets] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -149,7 +151,11 @@ export function AssetManager({
                 setEditingFilename={handleSetEditingFilename}
                 pageId={pageId}
                 onReload={loadAssets}
-                onInsert={(md) => onInsert?.(md)}
+                onInsert={(md) => {
+                  onInsert?.(md)
+                  // inform parent about asset change
+                  onAssetVersionChange?.(Date.now() || 0)
+                }}
                 onFilenameChange={onFilenameChange}
               />
             ))}

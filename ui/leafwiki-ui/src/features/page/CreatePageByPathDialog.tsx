@@ -31,7 +31,9 @@ export function CreatePageByPathDialog({
 }: CreatePageByPathDialogProps) {
   // Dialog state from zustand store
   const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore((s) => s.dialogType === DIALOG_CREATE_PAGE_BY_PATH)
+  const open = useDialogsStore(
+    (s) => s.dialogType === DIALOG_CREATE_PAGE_BY_PATH,
+  )
   const navigate = useNavigate()
 
   // read the last segment from the initial path as title
