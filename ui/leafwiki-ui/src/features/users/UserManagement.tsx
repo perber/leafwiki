@@ -2,8 +2,8 @@ import { useUserStore } from '@/stores/users'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { ChangePasswordDialog } from './ChangePasswordDialog'
+import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
-import { UserFormDialog } from './UserFormDialog'
 // import { UserFormDialog } from "./UserFormDialog"
 
 export default function UserManagement() {
@@ -31,7 +31,7 @@ export default function UserManagement() {
       <div className="mx-auto max-w-4xl">
         <h1 className="mb-4 text-2xl font-bold">User Management</h1>
         <div className="flex justify-end">
-          <UserFormDialog />
+          <CreateEditUserButton />
         </div>
         <div className="mt-4 rounded-md border shadow-sm">
           <div className="overflow-x-auto">
@@ -74,7 +74,7 @@ export default function UserManagement() {
                       </td>
                       <td className="p-3">
                         <div className="flex gap-2">
-                          <UserFormDialog user={user} />
+                          <CreateEditUserButton user={user} />
                           <ChangePasswordDialog
                             userId={user.id}
                             username={user.username}
