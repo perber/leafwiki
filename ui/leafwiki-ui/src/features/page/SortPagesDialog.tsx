@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { PageNode, sortPages } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_SORT_PAGES } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { ArrowDown, ArrowUp } from 'lucide-react'
@@ -20,7 +21,7 @@ import { toast } from 'sonner'
 export function SortPagesDialog({ parent }: { parent: PageNode }) {
   // Dialog state from zustand store
   const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore((s) => s.dialogType === 'sort')
+  const open = useDialogsStore((s) => s.dialogType === DIALOG_SORT_PAGES)
 
   // State to manage the order of the pages
   const [order, setOrder] = useState(parent.children?.map((c) => c.id) || [])

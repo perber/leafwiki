@@ -1,4 +1,4 @@
-import { DialogManger } from '@/components/DialogManager'
+import { DialogManager } from '@/components/DialogManager'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { usePageToolbar } from '@/components/usePageToolbar'
@@ -133,7 +133,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <DialogManger />
+      <DialogManager />
       {/* Header */}
       <header className="fixed z-50 h-[85px] w-full border-b bg-white p-4 shadow-xs">
         <div className="flex h-full items-center justify-start">

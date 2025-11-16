@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useState } from 'react'
@@ -29,7 +30,9 @@ export function EditPageMetadataDialog({
 }: EditPageMetadataDialogProps) {
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
-  const open = useDialogsStore((s) => s.dialogType === 'edit-page-metadata')
+  const open = useDialogsStore(
+    (s) => s.dialogType === DIALOG_EDIT_PAGE_METADATA,
+  )
 
   const [title, setTitle] = useState(propTitle)
   const [slug, setSlug] = useState(propSlug)

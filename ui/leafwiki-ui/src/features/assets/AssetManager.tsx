@@ -9,6 +9,7 @@ type Props = {
   pageId: string
   onInsert?: (md: string) => void // optional callback for markdown insertion
   onFilenameChange?: (before: string, after: string) => void
+  onAssetVersionChange?: () => void
   isRenamingRef: React.RefObject<boolean>
 }
 
@@ -16,6 +17,7 @@ export function AssetManager({
   pageId,
   onInsert,
   onFilenameChange,
+  onAssetVersionChange,
   isRenamingRef,
 }: Props) {
   const [assets, setAssets] = useState<string[]>([])
@@ -66,6 +68,9 @@ export function AssetManager({
     try {
       await uploadAsset(pageId, file)
       await loadAssets(false)
+      if (onAssetVersionChange) {
+        onAssetVersionChange()
+      }
     } catch (err) {
       console.error('Upload failed', err)
     } finally {
@@ -149,7 +154,10 @@ export function AssetManager({
                 setEditingFilename={handleSetEditingFilename}
                 pageId={pageId}
                 onReload={loadAssets}
-                onInsert={(md) => onInsert?.(md)}
+                onAssetVersionChange={onAssetVersionChange}
+                onInsert={(md) => {
+                  onInsert?.(md)
+                }}
                 onFilenameChange={onFilenameChange}
               />
             ))}

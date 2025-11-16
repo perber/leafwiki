@@ -1,12 +1,7 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { DIALOG_ASSET_MANAGER } from '@/lib/registries'
+import { useDialogsStore } from '@/stores/dialogs'
 import {
   Bold,
   Code,
@@ -20,8 +15,7 @@ import {
   Table,
   Undo,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { AssetManager } from '../assets/AssetManager'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MarkdownEditorRef } from './MarkdownEditor'
 
 type Props = {
@@ -39,7 +33,7 @@ export default function MarkdownToolbar({
   previewVisible,
   onTogglePreview,
 }: Props) {
-  const [assetModalOpen, setAssetModalOpen] = useState(false)
+  const openDialog = useDialogsStore((state) => state.openDialog)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const isRenamingRef = useRef(false)
@@ -61,11 +55,11 @@ export default function MarkdownToolbar({
   // Update asset version when modal opens
   // This is to ensure that the preview updates when assets are changed
   // Otherwise the preview might show stale assets (e.g., images) - Caching Issue
-  useEffect(() => {
+  const assetChangedHandler = useCallback(() => {
     if (onAssetVersionChange) {
       onAssetVersionChange(Date.now() || 0)
     }
-  }, [onAssetVersionChange, assetModalOpen])
+  }, [onAssetVersionChange])
 
   const tableMarkdown = `| Header 1 | Header 2 |
 |----------|----------|
@@ -190,7 +184,14 @@ export default function MarkdownToolbar({
             data-testid="open-asset-manager-button"
             variant="ghost"
             size="icon"
-            onClick={() => setAssetModalOpen(true)}
+            onClick={() =>
+              openDialog(DIALOG_ASSET_MANAGER, {
+                pageId,
+                editorRef,
+                isRenamingRef,
+                onAssetVersionChange: assetChangedHandler,
+              })
+            }
             className={toolbarButtonStyle}
           >
             <Image className="h-4 w-4" />
@@ -239,39 +240,6 @@ export default function MarkdownToolbar({
           </Button>
         </TooltipWrapper>
       </div>
-
-      <Dialog open={assetModalOpen} onOpenChange={setAssetModalOpen}>
-        <DialogContent
-          className="max-w-2xl"
-          onEscapeKeyDown={(e) => {
-            if (isRenamingRef.current) {
-              e.preventDefault()
-            } else {
-              setAssetModalOpen(false)
-              e.preventDefault()
-              e.stopPropagation()
-            }
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>Asset Manager</DialogTitle>
-            <DialogDescription>
-              Upload or select an asset to insert into the page.
-            </DialogDescription>
-          </DialogHeader>
-          <AssetManager
-            pageId={pageId}
-            onInsert={(md) => {
-              editorRef.current?.insertAtCursor(md)
-              setAssetModalOpen(false)
-            }}
-            onFilenameChange={(before, after) => {
-              editorRef.current?.replaceFilenameInMarkdown?.(before, after)
-            }}
-            isRenamingRef={isRenamingRef}
-          />
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

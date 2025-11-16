@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { createPage } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_ADD_PAGE } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Loader2 } from 'lucide-react'
@@ -25,7 +26,7 @@ type AddPageDialogProps = {
 export function AddPageDialog({ parentId }: AddPageDialogProps) {
   // Dialog state from zustand store
   const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore((s) => s.dialogType === 'add')
+  const open = useDialogsStore((s) => s.dialogType === DIALOG_ADD_PAGE)
 
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')

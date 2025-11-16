@@ -3,6 +3,7 @@ import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import { getPageByPath, Page } from '@/lib/api/pages'
+import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { useAuthStore } from '@/stores/auth'
@@ -109,7 +110,7 @@ export default function PageViewer() {
             <Button
               className="mt-4"
               onClick={() =>
-                openDialog('create-by-path', {
+                openDialog(DIALOG_CREATE_PAGE_BY_PATH, {
                   initialPath: pathname,
                   readOnlyPath: true,
                   forwardToEditMode: true,

@@ -1,6 +1,7 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import { Page } from '@/lib/api/pages'
+import { DIALOG_COPY_PAGE } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { Copy } from 'lucide-react'
 
@@ -15,7 +16,7 @@ export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
         size="icon"
         data-testid="copy-page-button"
         onClick={() => {
-          openDialog('copy-page', { sourcePage })
+          openDialog(DIALOG_COPY_PAGE, { sourcePage })
         }}
       >
         <Copy size={20} />

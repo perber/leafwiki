@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { copyPage, Page, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { DIALOG_COPY_PAGE } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Loader2 } from 'lucide-react'
@@ -30,7 +31,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
   const [slugTouched, setSlugTouched] = useState<boolean>(false)
   const [lastSlugTitle, setLastSlugTitle] = useState<string>('')
   const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore((s) => s.dialogType === 'copy-page')
+  const open = useDialogsStore((s) => s.dialogType === DIALOG_COPY_PAGE)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const parentPath = useTreeStore((s) => s.getPathById(targetParentID) || '')
   const navigate = useNavigate()
