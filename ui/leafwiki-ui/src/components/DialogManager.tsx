@@ -13,7 +13,7 @@ export function DialogManager() {
         if (dialog.type !== dialogType) {
           return null
         }
-        return dialog.render({ key: dialog.type, ...dialogProps })
+        return dialog.render({ ...dialogProps })
       })}
     </>
   )
