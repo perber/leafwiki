@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { usePageToolbar } from '@/components/usePageToolbar'
 import UserToolbar from '@/components/UserToolbar'
 import Sidebar from '@/features/sidebar/Sidebar'
+import { useAppMode } from '@/lib/useAppMode'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useIsMobile } from '@/lib/useIsMobile'
 import {
@@ -13,14 +14,14 @@ import {
 } from '@/stores/sidebar'
 import { MenuIcon } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 export const MOBILE_SIDEBAR_WIDTH = 320
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { content, titleBar } = usePageToolbar()
-  const location = useLocation()
-  const [isEditor, setIsEditor] = useState(location.pathname.startsWith('/e/'))
+  const appMode = useAppMode()
+  const [isEditor, setIsEditor] = useState(appMode === 'edit')
 
   // store resize handler in onMouseMove, onMouseUp in useRef
   const resizeHandlerRef = useRef<{
@@ -107,10 +108,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      setIsEditor(location.pathname.startsWith('/e/'))
+      setIsEditor(appMode === 'edit')
     })
     return () => cancelAnimationFrame(frame)
-  }, [location.pathname])
+  }, [appMode])
 
   useEffect(() => {
     liveSidebarWidthRef.current = sidebarWidth

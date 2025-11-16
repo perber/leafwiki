@@ -10,6 +10,7 @@ import {
 import { ensurePage, lookupPath, PathLookupResult } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
+import { buildEditUrl } from '@/lib/urlUtil'
 import { useDebounce } from '@/lib/useDebounce'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
@@ -75,9 +76,7 @@ export function CreatePageByPathDialog({
       await reloadTree()
       // On success, close the dialog
       if (editAfterCreate) {
-        // strip leading /
-        const cleanPath = path.startsWith('/') ? path.slice(1) : path
-        navigate(`/e/${cleanPath}`)
+        navigate(buildEditUrl(path))
       }
 
       toast.success('Page created successfully')

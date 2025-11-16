@@ -1,5 +1,6 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
+import { buildEditUrl } from '@/lib/urlUtil'
 import { Pencil } from 'lucide-react'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -11,7 +12,7 @@ export function EditPageButton({ path }: { path: string }) {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
         e.preventDefault()
-        navigate(`/e/${path}`)
+        navigate(buildEditUrl(path))
       }
     }
     window.addEventListener('keydown', handler)
@@ -25,7 +26,7 @@ export function EditPageButton({ path }: { path: string }) {
         className="h-8 w-8 rounded-full shadow-xs"
         variant="default"
         size="icon"
-        onClick={() => navigate(`/e/${path}`)}
+        onClick={() => navigate(buildEditUrl(path))}
       >
         <Pencil size={20} />
       </Button>
