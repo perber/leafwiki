@@ -1,3 +1,4 @@
+import { useAppMode } from '@/lib/useAppMode'
 import { useTreeStore } from '@/stores/tree'
 import { Link, useLocation } from 'react-router-dom'
 
@@ -5,21 +6,15 @@ export default function Breadcrumbs() {
   const { pathname } = useLocation()
   const { tree } = useTreeStore()
 
+  const appMode = useAppMode()
+
   if (!tree || !tree.children) return null
 
-  // if the pathname starts with /e/ remove it
-  let onEditor = false
-  let segments = []
-  if (pathname.startsWith('/e/')) {
-    segments = pathname.slice(2).slice(1).split('/').filter(Boolean)
-    onEditor = true
-  } else {
-    segments = pathname.slice(1).split('/').filter(Boolean)
-  }
-
-  if (onEditor) {
+  if (appMode === 'edit') {
     return null
   }
+
+  const segments = pathname.slice(1).split('/').filter(Boolean)
 
   const buildBreadcrumbs = () => {
     const crumbs = []

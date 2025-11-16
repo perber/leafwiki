@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
+import { buildViewUrl } from '@/lib/urlUtil'
+import { useAppMode } from '@/lib/useAppMode'
 import { useAuthStore } from '@/stores/auth'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
@@ -18,7 +20,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
   const user = useAuthStore((s) => s.user)
 
-  const editMode = window.location.pathname.startsWith('/e/')
+  const editMode = useAppMode() === 'edit'
 
   if (href === undefined) {
     return <>{children}</>
@@ -61,9 +63,11 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     let normalizedHref = href
     if (!absoluteHref) {
       // For relative links, we need to add the current path as prefix.
-      const currentPath = window.location.pathname.startsWith('/e/')
-        ? window.location.pathname.slice(3) // remove leading /e/
-        : window.location.pathname
+      let currentPath = buildViewUrl(window.location.pathname)
+      // remove leading / to make path relative
+      if (currentPath.startsWith('/')) {
+        currentPath = currentPath.slice(1)
+      }
 
       const basePath = currentPath
       // When the path contains ../ or ./ we need to resolve it

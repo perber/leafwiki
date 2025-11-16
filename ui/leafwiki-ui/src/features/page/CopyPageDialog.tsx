@@ -12,6 +12,7 @@ import {
 import { copyPage, Page, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_COPY_PAGE } from '@/lib/registries'
+import { buildEditUrl } from '@/lib/urlUtil'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Loader2 } from 'lucide-react'
@@ -111,7 +112,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
       await reloadTree()
       if (redirect) {
         const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
-        navigate(`/e/${fullPath}`)
+        navigate(buildEditUrl(fullPath))
       }
       closeDialog()
       resetForm()

@@ -11,6 +11,7 @@ import {
 import { createPage } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
+import { buildEditUrl } from '@/lib/urlUtil'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Loader2 } from 'lucide-react'
@@ -80,7 +81,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
       await reloadTree()
       if (redirect) {
         const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
-        navigate(`/e/${fullPath}`)
+        navigate(buildEditUrl(fullPath))
       }
       closeDialog()
       resetForm()

@@ -6,6 +6,7 @@ import { usePageToolbar } from '@/components/usePageToolbar'
 import { getPageByPath, updatePage } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
+import { buildEditUrl } from '@/lib/urlUtil'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Save, X } from 'lucide-react'
@@ -99,12 +100,7 @@ export default function PageEditor() {
         })
 
         // The slug might have changed, so we need to update the path
-        // Check if the parentPath starts with a slash and remove it
-        const parentAndSlugPath = `${parentPath}/${slug}`
-        const redirectPath = parentAndSlugPath.startsWith('/')
-          ? parentAndSlugPath.slice(1)
-          : parentAndSlugPath
-        const newPath = `/e/${redirectPath}`
+        const newPath = buildEditUrl(`${parentPath}/${slug}`)
 
         // We set the path of the initialSlugRef
         // Page is stored in the tree by path
