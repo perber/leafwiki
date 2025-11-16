@@ -42,7 +42,7 @@ export const TreeNode = React.memo(function TreeNode({
     >
       <Link
         to={`/${node.path}`}
-        className="w-full"
+        className="w-full py-1"
         data-testid={`tree-node-link-${node.id}`}
       >
         <span
@@ -71,7 +71,7 @@ export const TreeNode = React.memo(function TreeNode({
   return (
     <>
       <div
-        className={`relative flex cursor-pointer items-center pt-1 pb-1 transition-all ${
+        className={`relative flex cursor-pointer items-center transition-all ${
           isActive ? 'text-green-700' : 'text-gray-800 hover:bg-gray-100'
         }`}
         data-testid={`tree-node-${node.id}`}
