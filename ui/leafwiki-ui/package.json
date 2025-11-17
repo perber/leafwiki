@@ -55,7 +55,7 @@
     "@tailwindcss/vite": "^4.1.15",
     "@types/node": "^24.0.4",
     "@types/react": "^19.1.5",
-    "@types/react-dom": "^19.2.2",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.0",
     "eslint": "^9.29.0",
     "eslint-plugin-react-hooks": "^7.0.1",
