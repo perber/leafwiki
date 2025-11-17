@@ -13,6 +13,7 @@ import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
 import { buildEditUrl } from '@/lib/urlUtil'
 import { useDialogsStore } from '@/stores/dialogs'
+import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useTreeStore } from '@/stores/tree'
 import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -28,7 +29,8 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
   // Dialog state from zustand store
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const open = useDialogsStore((s) => s.dialogType === DIALOG_ADD_PAGE)
-
+  const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
+  const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [loading, setLoading] = useState(false)
@@ -51,16 +53,21 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
     setFieldErrors((prev) => ({ ...prev, title: '' }))
   }
 
-  useEffect(() => {
-    console.debug('[AddPageDialog] slugLoading changed:', slugLoading)
-  }, [slugLoading])
+  const resetForm = useCallback(() => {
+    setTitle('')
+    setSlug('')
+    setSlugTouched(false)
+    setLastSlugTitle('')
+    setFieldErrors({})
+    setLoading(false)
+  }, [])
 
   const handleSlugChange = useCallback((val: string) => {
     setSlug(val)
     setFieldErrors((prev) => ({ ...prev, slug: '' }))
   }, [])
 
-  const handleCreate = async (redirect: boolean = true) => {
+  const handleCreate = useCallback(async (redirect: boolean = true) => {
     if (!title) return
 
     if (!slug) {
@@ -90,21 +97,38 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
       handleFieldErrors(err, setFieldErrors, 'Error creating page')
       setLoading(false)
     }
-  }
+  }, [title, slug, parentId, slugTouched, slugLoading, lastSlugTitle, reloadTree, parentPath, navigate, closeDialog, resetForm])
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     resetForm()
     closeDialog()
-  }
+  }, [resetForm, closeDialog])
 
-  const resetForm = () => {
-    setTitle('')
-    setSlug('')
-    setSlugTouched(false)
-    setLastSlugTitle('')
-    setFieldErrors({})
-    setLoading(false)
-  }
+  useEffect(() => {
+    const closeHotKey: HotKeyDefinition = {
+      keyCombo: 'Escape',
+      enabled: open,
+      action: () => {
+        handleCancel()
+      },
+    }
+
+    const submitHotKey: HotKeyDefinition = {
+      keyCombo: 'Enter',
+      enabled: open && !isCreateButtonDisabled,
+      action: async () => {
+        await handleCreate()
+      },
+    }
+
+    registerHotkey(closeHotKey)
+    registerHotkey(submitHotKey)
+
+    return () => {
+      unregisterHotkey(closeHotKey.keyCombo)
+      unregisterHotkey(submitHotKey.keyCombo)
+    }
+  }, [open, isCreateButtonDisabled, handleCreate, handleCancel, registerHotkey, unregisterHotkey])
 
   return (
     <Dialog
@@ -116,14 +140,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
         }
       }}
     >
-      <DialogContent
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !isCreateButtonDisabled) {
-            e.preventDefault()
-            handleCreate(true)
-          }
-        }}
-      >
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Create a new page</DialogTitle>
           <DialogDescription>Enter the title of the new page</DialogDescription>
