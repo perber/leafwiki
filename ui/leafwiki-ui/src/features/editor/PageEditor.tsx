@@ -39,6 +39,10 @@ export default function PageEditor() {
   const initialContentRef = useRef<string | null>(null)
   const initialSlugRef = useRef<string | null>(null)
 
+  // stores the current page id
+  // it used to identify if the page has changed
+  const pageIdRef = useRef<string | null>(null)
+
   const openDialog = useDialogsStore((state) => state.openDialog)
   const findPageInTreeByPath = useTreeStore((state) => state.getPageByPath)
 
@@ -132,6 +136,13 @@ export default function PageEditor() {
   // We set the initial content of the page editor
   // This is only done once when the page is loaded
   useEffect(() => {
+    if (pageIdRef.current !== page?.id) {
+      // Page has changed, reset initial content
+      initialContentRef.current = null
+      initialSlugRef.current = null
+      pageIdRef.current = page?.id || null
+    }
+
     if (page && initialContentRef.current === null) {
       initialContentRef.current = page.content
       initialSlugRef.current = page.slug
