@@ -40,7 +40,7 @@ export default function PageEditor() {
   const initialSlugRef = useRef<string | null>(null)
 
   // stores the current page id
-  // it used to identify if the page has changed
+  // it is used to identify if the page has changed
   const pageIdRef = useRef<string | null>(null)
 
   const openDialog = useDialogsStore((state) => state.openDialog)
