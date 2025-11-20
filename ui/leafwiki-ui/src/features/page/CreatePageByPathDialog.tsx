@@ -1,18 +1,10 @@
-import { FormActions } from '@/components/FormActions'
+import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { ensurePage, lookupPath, PathLookupResult } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { buildEditUrl } from '@/lib/urlUtil'
 import { useDebounce } from '@/lib/useDebounce'
-import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Check, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -31,10 +23,6 @@ export function CreatePageByPathDialog({
   forwardToEditMode,
 }: CreatePageByPathDialogProps) {
   // Dialog state from zustand store
-  const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore(
-    (s) => s.dialogType === DIALOG_CREATE_PAGE_BY_PATH,
-  )
   const navigate = useNavigate()
 
   // read the last segment from the initial path as title
@@ -62,11 +50,7 @@ export function CreatePageByPathDialog({
 
   const isCreateButtonDisabled = !title || !path || loading
 
-  const handleCancel = () => {
-    closeDialog()
-  }
-
-  const handleCreate = async (editAfterCreate: boolean) => {
+  const handleCreate = async (): Promise<boolean> => {
     setLoading(true)
     setFieldErrors({})
 
@@ -75,15 +59,16 @@ export function CreatePageByPathDialog({
       await ensurePage(path, title)
       await reloadTree()
       // On success, close the dialog
-      if (editAfterCreate) {
+      if (forwardToEditMode) {
         navigate(buildEditUrl(path))
       }
 
       toast.success('Page created successfully')
-      closeDialog()
+      return true
     } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error creating page')
+      return false
     } finally {
       setLoading(false)
     }
@@ -109,19 +94,36 @@ export function CreatePageByPathDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          closeDialog()
-        }
+    <BaseDialog
+      dialogTitle="Create a new page"
+      dialogDescription="Please enter the title"
+      dialogType={DIALOG_CREATE_PAGE_BY_PATH}
+      onClose={() => true}
+      onConfirm={async (): Promise<boolean> => {
+        return await handleCreate()
       }}
+      testidPrefix="create-page-by-path-dialog"
+      cancelButton={{
+        label: 'Cancel',
+        variant: 'outline',
+        disabled: loading,
+        autoFocus: false,
+      }}
+      buttons={[
+        {
+          label: loading
+            ? 'Creating...'
+            : !forwardToEditMode
+              ? 'Create'
+              : 'Create & Edit',
+          actionType: 'confirm',
+          autoFocus: true,
+          loading,
+          disabled: isCreateButtonDisabled,
+          variant: 'default',
+        },
+      ]}
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create a new page</DialogTitle>
-          <DialogDescription>Please enter the title</DialogDescription>
-        </DialogHeader>
         <div>
           {lookup?.exists && (
             <div className="rounded bg-red-100 p-4 text-sm text-red-800">
@@ -176,23 +178,6 @@ export function CreatePageByPathDialog({
             error={fieldErrors.path}
           />
         </div>
-        <div className="mt-4 flex justify-end">
-          <FormActions
-            testidPrefix="create-page-by-path-dialog"
-            onCancel={handleCancel}
-            onSave={async () => await handleCreate(forwardToEditMode || false)}
-            saveLabel={
-              loading
-                ? 'Creating…'
-                : !forwardToEditMode
-                  ? 'Create'
-                  : 'Create & Edit'
-            }
-            disabled={isCreateButtonDisabled}
-            loading={loading}
-          ></FormActions>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </BaseDialog>
   )
 }
