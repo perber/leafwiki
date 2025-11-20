@@ -1,16 +1,8 @@
-import { FormActions } from '@/components/FormActions'
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import BaseDialog from '@/components/BaseDialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { deletePage } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_DELETE_PAGE_CONFIRMATION } from '@/lib/registries'
-import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -26,11 +18,6 @@ export function DeletePageDialog({
   redirectUrl,
 }: DeletePageDialogProps) {
   // Dialog state from zustand store
-  const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore(
-    (s) => s.dialogType === DIALOG_DELETE_PAGE_CONFIRMATION,
-  )
-
   const navigate = useNavigate()
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const page = useTreeStore((s) => s.getPageById(pageId))
@@ -42,14 +29,14 @@ export function DeletePageDialog({
   if (!page) return null
   const hasChildren = (page.children?.length ?? 0) > 0
 
-  const handleDelete = async () => {
+  const handleDelete = async (): Promise<boolean> => {
     setLoading(true)
     try {
       await deletePage(pageId, deleteRecursive)
       toast.success('Page deleted successfully')
       navigate(`/${redirectUrl}`)
       await reloadTree()
-      closeDialog()
+      return true
     } catch (err) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error deleting page')
@@ -58,56 +45,47 @@ export function DeletePageDialog({
     }
   }
 
-  const handleCancel = () => {
-    closeDialog()
-    setLoading(false)
-  }
-
   return (
-    <AlertDialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setDeleteRecursive(false) // Reset recursive delete option
-          closeDialog()
-        }
+    <BaseDialog
+      dialogType={DIALOG_DELETE_PAGE_CONFIRMATION}
+      dialogTitle="Delete Page?"
+      dialogDescription="Are you sure you want to delete this page? This action cannot be undone."
+      defaultAction="cancel"
+      onClose={() => true}
+      onConfirm={async (): Promise<boolean> => {
+        return await handleDelete()
       }}
+      testidPrefix="delete-page-dialog"
+      cancelButton={{
+        label: 'Cancel',
+        variant: 'outline',
+        disabled: loading,
+        autoFocus: true,
+        loading
+      }}
+      buttons={[
+        {
+          label: loading ? 'Deleting...' : 'Delete',
+          actionType: 'confirm',
+          autoFocus: false,
+          loading,
+          disabled: loading,
+          variant: 'destructive',
+        },
+      ]}
     >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete Page?</AlertDialogTitle>
-        </AlertDialogHeader>
-        <AlertDialogDescription>
-          Are you sure you want to delete this page? This action cannot be
-          undone.
-        </AlertDialogDescription>
-
-        {hasChildren && (
-          <div className="space-y-1 text-sm text-gray-600">
-            <label className="flex items-center gap-2">
-              <Checkbox
-                data-testid="delete-page-dialog-recursive-delete-checkbox"
-                checked={deleteRecursive}
-                onCheckedChange={(val) => setDeleteRecursive(!!val)}
-              />
-              Also delete all subpages
-            </label>
-          </div>
-        )}
-
-        <div className="mt-4 flex justify-end">
-          <FormActions
-            testidPrefix="delete-page-dialog"
-            onCancel={handleCancel}
-            onSave={handleDelete}
-            saveVariant={'destructive'}
-            saveLabel={loading ? 'Deleting...' : 'Delete'}
-            disabled={loading}
-            loading={loading}
-            autoFocus="cancel"
-          />
+      {hasChildren && (
+        <div className="space-y-1 text-sm text-gray-600">
+          <label className="flex items-center gap-2">
+            <Checkbox
+              data-testid="delete-page-dialog-recursive-delete-checkbox"
+              checked={deleteRecursive}
+              onCheckedChange={(val) => setDeleteRecursive(!!val)}
+            />
+            Also delete all subpages
+          </label>
         </div>
-      </AlertDialogContent>
-    </AlertDialog>
+      )}
+    </BaseDialog>
   )
 }
