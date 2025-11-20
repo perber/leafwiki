@@ -1,0 +1,170 @@
+// BaseDialog
+
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
+import { useDialogsStore } from '@/stores/dialogs'
+import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
+import { Loader2 } from 'lucide-react'
+import { ReactNode, useEffect } from 'react'
+import { Button } from './ui/button'
+
+
+// A generic dialog component that can be used as a base for other dialogs.
+// It provides a consistent structure and styling for dialogs in the application.
+// It also registers hotkeys for dialog actions like confirm and cancel.
+
+export type BaseDialogProps = {
+    dialogTitle: string
+    dialogDescription: string
+    dialogType: string
+    testidPrefix?: string
+    onClose: () => boolean
+    onConfirm: (type: string) => Promise<boolean>
+    children?: ReactNode
+    cancelButton: BaseDialogCancelButton
+    buttons?: BaseDialogConfirmButton[]
+}
+
+export type BaseDialogCancelButton = {
+    label?: string
+    variant?: 'default' | 'destructive' | 'outline' | 'ghost' | 'link' | 'secondary'
+    loading?: boolean
+    disabled?: boolean
+    autoFocus?: boolean
+}
+
+export type BaseDialogConfirmButton = {
+    label: string
+    variant?: 'default' | 'destructive' | 'outline' | 'ghost' | 'link' | 'secondary'
+    loading?: boolean
+    disabled?: boolean
+    autoFocus?: boolean
+    actionType: string // 'confirm' | 'cancel' | 'custom' -> we pass this to the confirmation / cancellation handlers
+}
+
+export default function BaseDialog({
+    dialogTitle,
+    dialogDescription,
+    dialogType,
+    onClose,
+    onConfirm,
+    children,
+    testidPrefix,
+    cancelButton,
+    buttons,
+}: BaseDialogProps) {
+    const closeDialog = useDialogsStore((s) => s.closeDialog)
+    const open = useDialogsStore((s) => s.dialogType === dialogType)
+    const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
+    const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
+
+    useEffect(() => {
+        const confirmHotkey: HotKeyDefinition = {
+            keyCombo: 'Enter',
+            enabled: true,
+            action: async () => {
+                if (open) {
+                    const result = await onConfirm('confirm')
+                    if (result) {
+                        closeDialog()
+                    }
+                }
+            },
+        }
+        const cancelHotkey: HotKeyDefinition = {
+            keyCombo: 'Escape',
+            enabled: true,
+            action: () => {
+                if (open) {
+                    onClose()
+                    closeDialog()
+                }
+            },
+        }
+        registerHotkey(confirmHotkey)
+        registerHotkey(cancelHotkey)
+
+        return () => {
+            unregisterHotkey(confirmHotkey.keyCombo)
+            unregisterHotkey(cancelHotkey.keyCombo)
+        }
+    }, [open, onClose, onConfirm, closeDialog, dialogType, registerHotkey, unregisterHotkey])
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(isOpen) => {
+                if (!isOpen) {
+                    onClose()
+                    closeDialog()
+                }
+            }}
+        >
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{dialogTitle}</DialogTitle>
+                    <DialogDescription>{dialogDescription}</DialogDescription>
+                </DialogHeader>
+                {children}
+                <div className="mt-6 flex justify-end gap-2">
+                    {cancelButton && (
+                        <Button
+                            autoFocus={cancelButton.autoFocus}
+                            onClick={() => {
+                                const result = onClose()
+                                if (result) {
+                                    closeDialog()
+                                }
+                            }}
+                            disabled={cancelButton.loading || cancelButton.disabled}
+                            data-testid={testidPrefix ? `${testidPrefix}-cancel-button` : undefined}
+                            variant={
+                                cancelButton.variant as
+                                | 'default'
+                                | 'destructive'
+                                | 'outline'
+                                | 'ghost'
+                                | 'link'
+                                | 'secondary'
+                            }
+                        >
+                            {cancelButton.label}
+                        </Button>
+                    )}
+                    {buttons?.map((button, index) => (
+                        <Button
+                            key={index}
+                            onClick={async () => {
+                                const result = await onConfirm(button.actionType)
+                                if (result) {
+                                    closeDialog()
+                                }
+                            }}
+                            disabled={button.loading || button.disabled}
+                            variant={
+                                button.variant as
+                                | 'default'
+                                | 'destructive'
+                                | 'outline'
+                                | 'ghost'
+                                | 'link'
+                                | 'secondary'
+                            }
+                            autoFocus={button.autoFocus}
+                            data-testid={testidPrefix ? `${testidPrefix}-button-${button.actionType}` : undefined}
+                        >
+                            {button.loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {button.label}
+                        </Button>
+                    ))}
+                </div>
+            </DialogContent>
+        </Dialog>
+
+    )
+}
