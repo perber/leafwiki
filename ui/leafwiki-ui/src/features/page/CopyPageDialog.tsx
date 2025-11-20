@@ -1,21 +1,11 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { FormActions } from '@/components/FormActions'
+import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { copyPage, Page, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_COPY_PAGE } from '@/lib/registries'
 import { buildEditUrl } from '@/lib/urlUtil'
-import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -31,8 +21,6 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
   const [slugLoading, setSlugLoading] = useState<boolean>(false)
   const [slugTouched, setSlugTouched] = useState<boolean>(false)
   const [lastSlugTitle, setLastSlugTitle] = useState<string>('')
-  const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore((s) => s.dialogType === DIALOG_COPY_PAGE)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const parentPath = useTreeStore((s) => s.getPathById(targetParentID) || '')
   const navigate = useNavigate()
@@ -88,20 +76,20 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
 
   const handleCancel = () => {
     resetForm()
-    closeDialog()
+    return true
   }
 
-  const handleCopy = async (redirect: boolean) => {
-    if (!title) return
+  const handleCopy = async (redirect: boolean): Promise<boolean> => {
+    if (!title) return false
 
     if (!slug) {
       toast.error('Slug could not be generated. Please enter it manually.')
-      return
+      return false
     }
 
     if (!slugTouched && (slugLoading || title !== lastSlugTitle)) {
       toast.warning('Please wait until the slug is fully generated.')
-      return
+      return false
     }
 
     setLoading(true)
@@ -114,12 +102,13 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
         const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
         navigate(buildEditUrl(fullPath))
       }
-      closeDialog()
       resetForm()
+      return true
     } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error copying page')
       setLoading(false)
+      return false
     }
   }
 
@@ -134,19 +123,22 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
   if (!tree) return null
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(open) => {
-        if (!open) {
-          closeDialog()
-        }
+    <BaseDialog
+      dialogTitle="Copy Page"
+      dialogDescription="Create a copy of this page"
+      dialogType={DIALOG_COPY_PAGE}
+      onClose={handleCancel}
+      onConfirm={async (): Promise<boolean> => {
+        await handleCopy(true)
+        return true
       }}
+      testidPrefix="copy-page-dialog"
+      cancelButton={{ label: "Cancel", variant: "outline", disabled: loading, autoFocus: false }}
+      buttons={[
+        { label: loading ? "Copying..." : "Copy & Edit Page", actionType: "confirm", autoFocus: true, loading, disabled: isCopyButtonDisabled, variant: "default" },
+      ]}
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Copy Page</DialogTitle>
-        </DialogHeader>
-        <DialogDescription>Create a copy of this page</DialogDescription>
+
         <FormInput
           testid="copy-page-dialog-title-input"
           autoFocus={true}
@@ -174,27 +166,6 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
           Path: {parentPath !== '' && `${parentPath}/`}
           {slug && `${slug}`}
         </span>
-        <div className="mt-4 flex justify-end">
-          <FormActions
-            testidPrefix="copy-page-dialog"
-            onCancel={handleCancel}
-            onSave={async () => await handleCopy(true)}
-            saveLabel={loading ? 'Copying...' : 'Copy & Edit Page'}
-            disabled={isCopyButtonDisabled}
-            loading={loading}
-          >
-            <Button
-              onClick={async () => await handleCopy(false)}
-              variant="default"
-              disabled={isCopyButtonDisabled}
-              data-testid="copy-page-dialog-create-button"
-            >
-              {loading ? 'Copying...' : 'Copy'}{' '}
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            </Button>
-          </FormActions>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </BaseDialog>
   )
 }
