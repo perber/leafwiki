@@ -1,15 +1,7 @@
-import { FormActions } from '@/components/FormActions'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import BaseDialog from '@/components/BaseDialog'
 import { movePage, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_MOVE_PAGE } from '@/lib/registries'
-import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -17,10 +9,6 @@ import { toast } from 'sonner'
 import { PageSelect } from './PageSelect'
 
 export function MovePageDialog({ pageId }: { pageId: string }) {
-  // Dialog state from zustand store
-  const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore((s) => s.dialogType === DIALOG_MOVE_PAGE)
-
   const { tree, reloadTree } = useTreeStore()
   const [loading, setLoading] = useState(false)
   const [, setFieldErrors] = useState<Record<string, string>>({})
@@ -68,7 +56,6 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
       }
 
       toast.success('Page moved successfully')
-      closeDialog()
     } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error moving page')
@@ -77,36 +64,24 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
     }
   }
 
-  const handleCancel = () => {
-    closeDialog()
-  }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(open) => {
-        if (!open) {
-          closeDialog()
+    <BaseDialog
+      dialogType={DIALOG_MOVE_PAGE}
+      dialogTitle="Move Page"
+      dialogDescription="Select a new parent for this page"
+      onClose={() => true}
+      onConfirm={async (type) => {
+        if (type === 'confirm') {
+          await handleMove()
+          return true
         }
+        return false
       }}
+      cancelButton={{ label: 'Cancel', variant: 'outline', autoFocus: false }}
+      buttons={[{ label: 'Move', actionType: 'confirm', disabled: newParentId === parentId || loading, variant: 'default', autoFocus: true }]}
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Move Page</DialogTitle>
-        </DialogHeader>
-        <DialogDescription>Select a new parent for this page</DialogDescription>
-        <PageSelect pageID={newParentId} onChange={setNewParentId} />
-        <div className="mt-4 flex justify-end">
-          <FormActions
-            testidPrefix="move-page-dialog"
-            onCancel={handleCancel}
-            onSave={handleMove}
-            saveLabel={loading ? 'Moving...' : 'Move'}
-            disabled={newParentId === parentId || loading}
-            loading={loading}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+      <PageSelect pageID={newParentId} onChange={setNewParentId} />
+    </BaseDialog>
   )
 }
