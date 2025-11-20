@@ -40,6 +40,7 @@ export function DeletePageDialog({
     } catch (err) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error deleting page')
+      return false
     } finally {
       setLoading(false)
     }
@@ -50,7 +51,6 @@ export function DeletePageDialog({
       dialogType={DIALOG_DELETE_PAGE_CONFIRMATION}
       dialogTitle="Delete Page?"
       dialogDescription="Are you sure you want to delete this page? This action cannot be undone."
-      defaultAction="cancel"
       onClose={() => true}
       onConfirm={async (): Promise<boolean> => {
         return await handleDelete()
