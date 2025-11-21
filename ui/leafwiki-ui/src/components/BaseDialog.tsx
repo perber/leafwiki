@@ -21,6 +21,7 @@ export type BaseDialogProps = {
   dialogTitle: string
   dialogDescription: string
   dialogType: string
+  defaultAction?: 'confirm' | 'cancel'
   testidPrefix?: string
   onClose: () => boolean
   onConfirm: (type: string) => Promise<boolean>
@@ -64,6 +65,7 @@ export default function BaseDialog({
   dialogType,
   onClose,
   onConfirm,
+  defaultAction='confirm',
   children,
   testidPrefix,
   cancelButton,
@@ -80,6 +82,12 @@ export default function BaseDialog({
       enabled: true,
       action: async () => {
         if (open) {
+          if (defaultAction === 'cancel') {
+            onClose()
+            closeDialog()
+            return
+          }
+          
           const result = await onConfirm('confirm')
           if (result) {
             closeDialog()

@@ -55,6 +55,7 @@ export function DeletePageDialog({
       onConfirm={async (): Promise<boolean> => {
         return await handleDelete()
       }}
+      defaultAction="cancel"
       testidPrefix="delete-page-dialog"
       cancelButton={{
         label: 'Cancel',
