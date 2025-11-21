@@ -337,7 +337,7 @@ He improved the documentation and the onboarding experience a lot!
 - [x] Allow to upload files by using **CTRL+V** in the codemirror editor
 - [x] Improve position for tooltip in the treeview
 - [x] Add toggle to **show & hide the preview**
-- [x] Add **resizable scrollbar** to sidebar - thanks @magnus-madsen for the suggestion!
+- [x] Add **resizable sidebar** - thanks @magnus-madsen for the suggestion!
 - [x] Various bug fixes and UX/UI improvements
 - [x] better e2e test coverage
 - [x] Dependency updates across the project
