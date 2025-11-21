@@ -330,7 +330,7 @@ He improved the documentation and the onboarding experience a lot!
 - [x] Several UI/UX improvements and bugfixes
 - [x] Stability improvements and dependency updates
 
-### ✅ v0.4.10 – Clipboard Image/File Uploads, Resizable Scrollbar and other UX Improvements
+### ✅ v0.4.10 – Clipboard Image/File Uploads, Resizable Sidebar and other UX Improvements
 
 - [x] Docker images now have labels and annotations - thanks @Hugo-Galley
 - [x] Installer now has a welcome message - thanks @Hugo-Galley
