@@ -51,7 +51,7 @@ LeafWiki and of course I are looking for **contributors** who want to help bring
 - 🔒 Role-based access (admin / editor)
 - 🧠 No database required
 - 📂 Per-page assets with upload support
-- 🖼️ Embed images and files with Markdown
+- 🖼️ Embed images and files via Markdown or paste-to-upload (CTRL+V)
 - ⚙️ Single statically-linked Go binary (no dependencies)
 - 🚀 Easily self-hosted (Docker or standalone)
 - 🔁 Session auth with JWT tokens + refresh
@@ -60,6 +60,7 @@ LeafWiki and of course I are looking for **contributors** who want to help bring
 - 🌐 Public pages (viewable without login)
 - 🖨️ Print view support
 - 🧩 Mermaid.js diagram support
+- 🎨 Resizable sidebar
 
 ---
 
@@ -266,8 +267,9 @@ go run main.go
 ## 🗺️ Roadmap
 
 ### Planned
-- [ ] Improve release & test process (CI/CD)
-- [ ] Bug fixes and UX improvements based on user feedback
+- [ ] Global Keyboard Shortcuts (e.g. Ctrl+F for search, ...)
+- [ ] Further UI/UX improvements
+- [ ] Your ideas are welcome! Open an issue or start a discussion!
 
 ----
 
@@ -327,6 +329,18 @@ He improved the documentation and the onboarding experience a lot!
 - [x] Improved docker builds with multi-arch support (amd64 + arm64)
 - [x] Several UI/UX improvements and bugfixes
 - [x] Stability improvements and dependency updates
+
+### ✅ v0.4.10 – Clipboard Image/File Uploads, Resizable Sidebar and other UX Improvements
+
+- [x] Docker images now have labels and annotations - thanks @Hugo-Galley
+- [x] Installer now has a welcome message - thanks @Hugo-Galley
+- [x] Allow to upload files by using **CTRL+V** in the codemirror editor
+- [x] Improve position for tooltip in the treeview
+- [x] Add toggle to **show & hide the preview**
+- [x] Add **resizable sidebar** - thanks @magnus-madsen for the suggestion!
+- [x] Various bug fixes and UX/UI improvements
+- [x] Better e2e test coverage
+- [x] Dependency updates across the project
 
 ---
 
