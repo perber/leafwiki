@@ -339,7 +339,7 @@ He improved the documentation and the onboarding experience a lot!
 - [x] Add toggle to **show & hide the preview**
 - [x] Add **resizable sidebar** - thanks @magnus-madsen for the suggestion!
 - [x] Various bug fixes and UX/UI improvements
-- [x] better e2e test coverage
+- [x] Better e2e test coverage
 - [x] Dependency updates across the project
 
 ---
