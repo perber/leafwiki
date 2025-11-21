@@ -64,7 +64,6 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
     }
   }
 
-
   return (
     <BaseDialog
       dialogType={DIALOG_MOVE_PAGE}
@@ -79,7 +78,15 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
         return false
       }}
       cancelButton={{ label: 'Cancel', variant: 'outline', autoFocus: false }}
-      buttons={[{ label: 'Move', actionType: 'confirm', disabled: newParentId === parentId || loading, variant: 'default', autoFocus: true }]}
+      buttons={[
+        {
+          label: 'Move',
+          actionType: 'confirm',
+          disabled: newParentId === parentId || loading,
+          variant: 'default',
+          autoFocus: true,
+        },
+      ]}
     >
       <PageSelect pageID={newParentId} onChange={setNewParentId} />
     </BaseDialog>

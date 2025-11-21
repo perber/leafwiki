@@ -61,7 +61,7 @@ export function DeletePageDialog({
         variant: 'outline',
         disabled: loading,
         autoFocus: true,
-        loading
+        loading,
       }}
       buttons={[
         {

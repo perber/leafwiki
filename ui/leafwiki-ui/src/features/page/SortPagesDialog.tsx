@@ -66,7 +66,15 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
         return false
       }}
       cancelButton={{ label: 'Cancel', variant: 'outline', autoFocus: false }}
-      buttons={[{ label: 'Save', actionType: 'confirm', disabled: loading, variant: 'default', autoFocus: true }]}
+      buttons={[
+        {
+          label: 'Save',
+          actionType: 'confirm',
+          disabled: loading,
+          variant: 'default',
+          autoFocus: true,
+        },
+      ]}
     >
       <ul
         className="custom-scrollbar space-y-2"

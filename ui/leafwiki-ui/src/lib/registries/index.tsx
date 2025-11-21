@@ -28,7 +28,7 @@ export const SIDEBAR_SEARCH_PANEL_ID = 'search'
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
   label: 'Explorer',
-  hotkey: 'Mod+Shift+E', 
+  hotkey: 'Mod+Shift+E',
   icon: () => <FolderTree size={16} />,
   render: () => {
     return <TreeView />

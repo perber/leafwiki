@@ -133,39 +133,50 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
         return true
       }}
       testidPrefix="copy-page-dialog"
-      cancelButton={{ label: "Cancel", variant: "outline", disabled: loading, autoFocus: false }}
+      cancelButton={{
+        label: 'Cancel',
+        variant: 'outline',
+        disabled: loading,
+        autoFocus: false,
+      }}
       buttons={[
-        { label: loading ? "Copying..." : "Copy & Edit Page", actionType: "confirm", autoFocus: true, loading, disabled: isCopyButtonDisabled, variant: "default" },
+        {
+          label: loading ? 'Copying...' : 'Copy & Edit Page',
+          actionType: 'confirm',
+          autoFocus: true,
+          loading,
+          disabled: isCopyButtonDisabled,
+          variant: 'default',
+        },
       ]}
     >
-
-        <FormInput
-          testid="copy-page-dialog-title-input"
-          autoFocus={true}
-          label="Title"
-          value={title}
-          onChange={(val) => {
-            handleTitleChange(val)
-          }}
-          placeholder="Page title"
-          error={fieldErrors.title}
-        />
-        <SlugInputWithSuggestion
-          testid="copy-page-dialog-slug-input"
-          title={title}
-          slug={slug}
-          parentId={targetParentID}
-          onSlugChange={handleSlugChange}
-          onSlugTouchedChange={setSlugTouched}
-          onSlugLoadingChange={setSlugLoading}
-          onLastSlugTitleChange={setLastSlugTitle}
-          error={fieldErrors.slug}
-        />
-        <PageSelect pageID={targetParentID} onChange={setTargetParentID} />
-        <span className="text-sm text-gray-500">
-          Path: {parentPath !== '' && `${parentPath}/`}
-          {slug && `${slug}`}
-        </span>
+      <FormInput
+        testid="copy-page-dialog-title-input"
+        autoFocus={true}
+        label="Title"
+        value={title}
+        onChange={(val) => {
+          handleTitleChange(val)
+        }}
+        placeholder="Page title"
+        error={fieldErrors.title}
+      />
+      <SlugInputWithSuggestion
+        testid="copy-page-dialog-slug-input"
+        title={title}
+        slug={slug}
+        parentId={targetParentID}
+        onSlugChange={handleSlugChange}
+        onSlugTouchedChange={setSlugTouched}
+        onSlugLoadingChange={setSlugLoading}
+        onLastSlugTitleChange={setLastSlugTitle}
+        error={fieldErrors.slug}
+      />
+      <PageSelect pageID={targetParentID} onChange={setTargetParentID} />
+      <span className="text-sm text-gray-500">
+        Path: {parentPath !== '' && `${parentPath}/`}
+        {slug && `${slug}`}
+      </span>
     </BaseDialog>
   )
 }

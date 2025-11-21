@@ -51,44 +51,57 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
     setFieldErrors((prev) => ({ ...prev, slug: '' }))
   }, [])
 
-  const handleCreate = useCallback(async (redirect: boolean = true): Promise<boolean> => {
-    if (!title) return false
+  const handleCreate = useCallback(
+    async (redirect: boolean = true): Promise<boolean> => {
+      if (!title) return false
 
-    if (!slug) {
-      toast.error('Slug could not be generated. Please enter it manually.')
-      return false
-    }
-
-    if (!slugTouched && (slugLoading || title !== lastSlugTitle)) {
-      toast.warning('Please wait until the slug is fully generated.')
-      return false
-    }
-
-    setLoading(true)
-    setFieldErrors({})
-    try {
-      await createPage({ title, slug, parentId })
-      toast.success('Page created')
-      await reloadTree()
-      if (redirect) {
-        const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
-        navigate(buildEditUrl(fullPath))
+      if (!slug) {
+        toast.error('Slug could not be generated. Please enter it manually.')
+        return false
       }
-      resetForm()
-      return true
-    } catch (err: unknown) {
-      console.warn(err)
-      handleFieldErrors(err, setFieldErrors, 'Error creating page')
-      setLoading(false)
-      return false
-    }
-  }, [title, slug, parentId, slugTouched, slugLoading, lastSlugTitle, reloadTree, parentPath, navigate, resetForm])
+
+      if (!slugTouched && (slugLoading || title !== lastSlugTitle)) {
+        toast.warning('Please wait until the slug is fully generated.')
+        return false
+      }
+
+      setLoading(true)
+      setFieldErrors({})
+      try {
+        await createPage({ title, slug, parentId })
+        toast.success('Page created')
+        await reloadTree()
+        if (redirect) {
+          const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
+          navigate(buildEditUrl(fullPath))
+        }
+        resetForm()
+        return true
+      } catch (err: unknown) {
+        console.warn(err)
+        handleFieldErrors(err, setFieldErrors, 'Error creating page')
+        setLoading(false)
+        return false
+      }
+    },
+    [
+      title,
+      slug,
+      parentId,
+      slugTouched,
+      slugLoading,
+      lastSlugTitle,
+      reloadTree,
+      parentPath,
+      navigate,
+      resetForm,
+    ],
+  )
 
   const handleCancel = useCallback(() => {
     resetForm()
     return true
   }, [resetForm])
-
 
   return (
     <BaseDialog
@@ -97,13 +110,32 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
       dialogType={DIALOG_ADD_PAGE}
       onClose={handleCancel}
       onConfirm={async (actionType: string): Promise<boolean> => {
-        return await handleCreate(actionType !== "no-redirect")
+        return await handleCreate(actionType !== 'no-redirect')
       }}
       testidPrefix="add-page-dialog"
-      cancelButton={{ label: "Cancel", variant: "outline", disabled: loading, autoFocus: false }}
+      cancelButton={{
+        label: 'Cancel',
+        variant: 'outline',
+        disabled: loading,
+        autoFocus: false,
+      }}
       buttons={[
-        { label: "Create", actionType: "no-redirect", autoFocus: true, loading, disabled: isCreateButtonDisabled, variant: "default" },
-        { label: "Create & Edit Page", actionType: "confirm", autoFocus: false, loading, disabled: isCreateButtonDisabled, variant: "default" },
+        {
+          label: 'Create',
+          actionType: 'no-redirect',
+          autoFocus: true,
+          loading,
+          disabled: isCreateButtonDisabled,
+          variant: 'default',
+        },
+        {
+          label: 'Create & Edit Page',
+          actionType: 'confirm',
+          autoFocus: false,
+          loading,
+          disabled: isCreateButtonDisabled,
+          variant: 'default',
+        },
       ]}
     >
       <div className="space-y-4">

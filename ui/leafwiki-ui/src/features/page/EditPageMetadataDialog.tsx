@@ -69,36 +69,44 @@ export function EditPageMetadataDialog({
         return false
       }}
       cancelButton={{ label: 'Cancel', variant: 'outline', autoFocus: false }}
-      buttons={[{ label: 'Change', actionType: 'confirm', disabled: isSaveDisabled, variant: 'default', autoFocus: true }]}
+      buttons={[
+        {
+          label: 'Change',
+          actionType: 'confirm',
+          disabled: isSaveDisabled,
+          variant: 'default',
+          autoFocus: true,
+        },
+      ]}
     >
-        <div className="space-y-4">
-          <FormInput
-            autoFocus
-            label="Title"
-            value={title}
-            onChange={handleTitleChange}
-            placeholder="Page title"
-            error={fieldErrors.title}
-          />
+      <div className="space-y-4">
+        <FormInput
+          autoFocus
+          label="Title"
+          value={title}
+          onChange={handleTitleChange}
+          placeholder="Page title"
+          error={fieldErrors.title}
+        />
 
-          <SlugInputWithSuggestion
-            title={title}
-            slug={slug}
-            currentId={currentId}
-            parentId={parentId}
-            enableSlugSuggestion={true}
-            onSlugChange={handleSlugChange}
-            onSlugTouchedChange={setSlugTouched}
-            onSlugLoadingChange={setSlugLoading}
-            onLastSlugTitleChange={setLastSlugTitle}
-            error={fieldErrors.slug}
-          />
-        </div>
+        <SlugInputWithSuggestion
+          title={title}
+          slug={slug}
+          currentId={currentId}
+          parentId={parentId}
+          enableSlugSuggestion={true}
+          onSlugChange={handleSlugChange}
+          onSlugTouchedChange={setSlugTouched}
+          onSlugLoadingChange={setSlugLoading}
+          onLastSlugTitleChange={setLastSlugTitle}
+          error={fieldErrors.slug}
+        />
+      </div>
 
-        <span className="text-sm text-gray-500">
-          Path: {parentPath !== '' && `${parentPath}/`}
-          {slug && `${slug}`}
-        </span>
+      <span className="text-sm text-gray-500">
+        Path: {parentPath !== '' && `${parentPath}/`}
+        {slug && `${slug}`}
+      </span>
     </BaseDialog>
   )
 }

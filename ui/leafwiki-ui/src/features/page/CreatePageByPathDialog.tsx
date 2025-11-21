@@ -124,60 +124,60 @@ export function CreatePageByPathDialog({
         },
       ]}
     >
-        <div>
-          {lookup?.exists && (
-            <div className="rounded bg-red-100 p-4 text-sm text-red-800">
-              A page already exists at this path.
-            </div>
-          )}
-          {lookup && !lookup.exists && lookup.segments.length > 0 && (
-            <>
-              <strong className="text-small">Result of path lookup:</strong>
-              <ul className="custom-scrollbar mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md bg-gray-100 p-1">
-                {lookup.segments.map((segment, index) => (
-                  <li
-                    key={index}
-                    className="mb-1 flex items-center gap-1 text-xs"
-                  >
-                    {segment.exists ? (
-                      <Check className="text-green-600" size={12} />
-                    ) : (
-                      <X className="text-red-600" size={12} />
-                    )}{' '}
-                    <span className="font-mono">{segment.slug}</span>{' '}
-                    {segment.exists ? 'exists' : 'will be created'}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-        <div className="space-y-4">
-          <FormInput
-            autoFocus={true}
-            testid="create-page-by-path-title-input"
-            label="Title"
-            value={title}
-            onChange={(val) => {
-              handleTitleChange(val)
-              setFieldErrors((prev) => ({ ...prev, title: '' }))
-            }}
-            placeholder="Page title"
-            error={fieldErrors.title}
-          />
-          <FormInput
-            testid="create-page-by-path-path-input"
-            label="Path"
-            value={path}
-            readOnly={readOnlyPath}
-            onChange={(val) => {
-              setPath(val)
-              setFieldErrors((prev) => ({ ...prev, path: '' }))
-            }}
-            placeholder="Page path"
-            error={fieldErrors.path}
-          />
-        </div>
+      <div>
+        {lookup?.exists && (
+          <div className="rounded bg-red-100 p-4 text-sm text-red-800">
+            A page already exists at this path.
+          </div>
+        )}
+        {lookup && !lookup.exists && lookup.segments.length > 0 && (
+          <>
+            <strong className="text-small">Result of path lookup:</strong>
+            <ul className="custom-scrollbar mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md bg-gray-100 p-1">
+              {lookup.segments.map((segment, index) => (
+                <li
+                  key={index}
+                  className="mb-1 flex items-center gap-1 text-xs"
+                >
+                  {segment.exists ? (
+                    <Check className="text-green-600" size={12} />
+                  ) : (
+                    <X className="text-red-600" size={12} />
+                  )}{' '}
+                  <span className="font-mono">{segment.slug}</span>{' '}
+                  {segment.exists ? 'exists' : 'will be created'}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+      <div className="space-y-4">
+        <FormInput
+          autoFocus={true}
+          testid="create-page-by-path-title-input"
+          label="Title"
+          value={title}
+          onChange={(val) => {
+            handleTitleChange(val)
+            setFieldErrors((prev) => ({ ...prev, title: '' }))
+          }}
+          placeholder="Page title"
+          error={fieldErrors.title}
+        />
+        <FormInput
+          testid="create-page-by-path-path-input"
+          label="Path"
+          value={path}
+          readOnly={readOnlyPath}
+          onChange={(val) => {
+            setPath(val)
+            setFieldErrors((prev) => ({ ...prev, path: '' }))
+          }}
+          placeholder="Page path"
+          error={fieldErrors.path}
+        />
+      </div>
     </BaseDialog>
   )
 }
