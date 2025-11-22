@@ -95,14 +95,12 @@ export default function PageEditor() {
   })
 
   const closeEditMode = useCallback(() => {
-    if (!isDirty || !page) {
-      navigate(
-        parentPath
-          ? `/${parentPath}/${initialSlugRef.current}`
-          : '/' + initialSlugRef.current,
-      )
-    }
-  }, [isDirty, page, parentPath, navigate])
+    navigate(
+      parentPath
+        ? `/${parentPath}/${initialSlugRef.current}`
+        : '/' + initialSlugRef.current,
+    )
+  }, [parentPath, navigate])
 
   useEffect(() => {
     handleSaveRef.current = async () => {
