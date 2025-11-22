@@ -64,7 +64,8 @@ dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
   render: (props) => {
     return (
-      <AddPageDialog key={DIALOG_ADD_PAGE}
+      <AddPageDialog
+        key={DIALOG_ADD_PAGE}
         {...(props as React.ComponentProps<typeof AddPageDialog>)}
       />
     )
@@ -75,7 +76,8 @@ dialogRegistry.register({
   type: DIALOG_SORT_PAGES,
   render: (props) => {
     return (
-      <SortPagesDialog key={DIALOG_SORT_PAGES}
+      <SortPagesDialog
+        key={DIALOG_SORT_PAGES}
         {...(props as React.ComponentProps<typeof SortPagesDialog>)}
       />
     )
@@ -86,7 +88,8 @@ dialogRegistry.register({
   type: DIALOG_MOVE_PAGE,
   render: (props) => {
     return (
-      <MovePageDialog key={DIALOG_MOVE_PAGE}
+      <MovePageDialog
+        key={DIALOG_MOVE_PAGE}
         {...(props as React.ComponentProps<typeof MovePageDialog>)}
       />
     )
@@ -97,7 +100,8 @@ dialogRegistry.register({
   type: DIALOG_CREATE_PAGE_BY_PATH,
   render: (props) => {
     return (
-      <CreatePageByPathDialog key={DIALOG_CREATE_PAGE_BY_PATH}
+      <CreatePageByPathDialog
+        key={DIALOG_CREATE_PAGE_BY_PATH}
         {...(props as React.ComponentProps<typeof CreatePageByPathDialog>)}
       />
     )
@@ -108,7 +112,8 @@ dialogRegistry.register({
   type: DIALOG_COPY_PAGE,
   render: (props) => {
     return (
-      <CopyPageDialog key={DIALOG_COPY_PAGE}
+      <CopyPageDialog
+        key={DIALOG_COPY_PAGE}
         {...(props as React.ComponentProps<typeof CopyPageDialog>)}
       />
     )
@@ -119,7 +124,8 @@ dialogRegistry.register({
   type: DIALOG_EDIT_PAGE_METADATA,
   render: (props) => {
     return (
-      <EditPageMetadataDialog key={DIALOG_EDIT_PAGE_METADATA}
+      <EditPageMetadataDialog
+        key={DIALOG_EDIT_PAGE_METADATA}
         {...(props as React.ComponentProps<typeof EditPageMetadataDialog>)}
       />
     )
@@ -130,7 +136,8 @@ dialogRegistry.register({
   type: DIALOG_ASSET_MANAGER,
   render: (props) => {
     return (
-      <AssetManagerDialog key={DIALOG_ASSET_MANAGER}
+      <AssetManagerDialog
+        key={DIALOG_ASSET_MANAGER}
         {...(props as React.ComponentProps<typeof AssetManagerDialog>)}
       />
     )
@@ -141,7 +148,8 @@ dialogRegistry.register({
   type: DIALOG_DELETE_PAGE_CONFIRMATION,
   render: (props) => {
     return (
-      <DeletePageDialog key={DIALOG_DELETE_PAGE_CONFIRMATION}
+      <DeletePageDialog
+        key={DIALOG_DELETE_PAGE_CONFIRMATION}
         {...(props as React.ComponentProps<typeof DeletePageDialog>)}
       />
     )
@@ -159,7 +167,8 @@ dialogRegistry.register({
   type: DIALOG_USER_FORM,
   render: (props) => {
     return (
-      <UserFormDialog key={DIALOG_USER_FORM}
+      <UserFormDialog
+        key={DIALOG_USER_FORM}
         {...(props as React.ComponentProps<typeof UserFormDialog>)}
       />
     )
@@ -170,7 +179,8 @@ dialogRegistry.register({
   type: DIALOG_CHANGE_USER_PASSWORD,
   render: (props) => {
     return (
-      <ChangePasswordDialog key={DIALOG_CHANGE_USER_PASSWORD}
+      <ChangePasswordDialog
+        key={DIALOG_CHANGE_USER_PASSWORD}
         {...(props as React.ComponentProps<typeof ChangePasswordDialog>)}
       />
     )
@@ -181,7 +191,8 @@ dialogRegistry.register({
   type: DIALOG_DELETE_USER_CONFIRMATION,
   render: (props) => {
     return (
-      <DeleteUserDialog key={DIALOG_DELETE_USER_CONFIRMATION}
+      <DeleteUserDialog
+        key={DIALOG_DELETE_USER_CONFIRMATION}
         {...(props as React.ComponentProps<typeof DeleteUserDialog>)}
       />
     )
@@ -192,7 +203,8 @@ dialogRegistry.register({
   type: DIALOG_UNSAVED_CHANGES,
   render: (props) => {
     return (
-      <UnsavedChangesDialog key={DIALOG_UNSAVED_CHANGES}
+      <UnsavedChangesDialog
+        key={DIALOG_UNSAVED_CHANGES}
         {...(props as React.ComponentProps<typeof UnsavedChangesDialog>)}
       />
     )

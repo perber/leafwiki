@@ -16,6 +16,8 @@ export function HotKeyHandler() {
     currentMode = 'dialog'
   }
 
+  console.debug('Registered Hotkeys:', registeredHotkeys)
+
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const keyCombo = []
@@ -32,6 +34,7 @@ export function HotKeyHandler() {
       // if a button is focused, we should not trigger hotkeys except for Escape
       const activeElement = document.activeElement
       if (
+        currentMode !== 'edit' && // only block in non-edit modes
         activeElement &&
         (activeElement.tagName === 'BUTTON' ||
           (activeElement.tagName === 'INPUT' && currentMode !== 'dialog') ||
@@ -41,8 +44,13 @@ export function HotKeyHandler() {
       ) {
         // The user is focused on a button or input, do not trigger hotkeys
         // If the Escape key is pressed, we allow it to propagate for dialog closing
+        console.debug(
+          `Hotkey ${comboString} ignored due to focus on input element`,
+        )
         return
       }
+
+      console.log(`Hotkey pressed: ${comboString} in mode ${currentMode}`)
 
       const registredKey = registeredHotkeys[comboString] as
         | HotKeyDefinition
@@ -52,6 +60,7 @@ export function HotKeyHandler() {
         registredKey.enabled &&
         registredKey.mode.includes(currentMode)
       ) {
+        console.debug(`Hotkey ${comboString} triggered`)
         e.stopPropagation()
         e.preventDefault()
         registredKey.action()

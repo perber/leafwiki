@@ -15,6 +15,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
 import useNavigationGuardHandler from './useNavigationGuardHandler'
+import { usePageEditorHotKeys } from './usePageEditorHotKeys'
 
 export default function PageEditor() {
   const { '*': path } = useParams()
@@ -93,6 +94,16 @@ export default function PageEditor() {
     },
   })
 
+  const closeEditMode = useCallback(() => {
+    if (!isDirty || !page) {
+      navigate(
+        parentPath
+          ? `/${parentPath}/${initialSlugRef.current}`
+          : '/' + initialSlugRef.current,
+      )
+    }
+  }, [isDirty, page, parentPath, navigate])
+
   useEffect(() => {
     handleSaveRef.current = async () => {
       if (!isDirty || !page) return
@@ -129,17 +140,6 @@ export default function PageEditor() {
       }
     }
   }, [page, title, slug, markdown, parentPath, isDirty, reloadTree])
-
-  useEffect(() => {
-    const handler = async (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        handleSaveRef.current()
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
 
   // We set the initial content of the page editor
   // This is only done once when the page is loaded
@@ -219,11 +219,7 @@ export default function PageEditor() {
             onClick={async () => {
               // When the user presses the close button
               // we want to navigate away from the page
-              navigate(
-                parentPath
-                  ? `/${parentPath}/${initialSlugRef.current}`
-                  : '/' + initialSlugRef.current,
-              )
+              closeEditMode()
             }}
           >
             <X />
@@ -256,6 +252,7 @@ export default function PageEditor() {
     isDirty,
     clearContent,
     navigate,
+    closeEditMode,
   ])
 
   // We load the page by path
@@ -293,6 +290,15 @@ export default function PageEditor() {
       document.title = 'LeafWiki'
     }
   }, [title])
+
+  usePageEditorHotKeys({
+    onSave: () => {
+      handleSaveRef.current()
+    },
+    onCancel: () => {
+      closeEditMode()
+    },
+  })
 
   if (loading)
     return (
