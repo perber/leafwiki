@@ -19,7 +19,6 @@ export function usePageEditorHotKeys(options: PageEditorHotKeysOptions) {
       enabled: true,
       mode: [mode],
       action: () => {
-        console.log('Save hotkey triggered')
         onSave()
       },
     }
@@ -36,10 +35,7 @@ export function usePageEditorHotKeys(options: PageEditorHotKeysOptions) {
     registerHotkey(saveHotkey)
     registerHotkey(cancelHotkey)
 
-    console.log('Registered page editor hotkeys')
-
     return () => {
-      console.log('Unregistered page editor hotkeys')
       unregisterHotkey(saveHotkey.keyCombo)
       unregisterHotkey(cancelHotkey.keyCombo)
     }

@@ -16,8 +16,6 @@ export function HotKeyHandler() {
     currentMode = 'dialog'
   }
 
-  console.debug('Registered Hotkeys:', registeredHotkeys)
-
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const keyCombo = []
@@ -52,8 +50,6 @@ export function HotKeyHandler() {
         return
       }
 
-      console.log(`Hotkey pressed: ${comboString} in mode ${currentMode}`)
-
       const registredKey = registeredHotkeys[comboString] as
         | HotKeyDefinition
         | undefined
@@ -62,7 +58,6 @@ export function HotKeyHandler() {
         registredKey.enabled &&
         registredKey.mode.includes(currentMode)
       ) {
-        console.debug(`Hotkey ${comboString} triggered`)
         e.stopPropagation()
         e.preventDefault()
         registredKey.action()

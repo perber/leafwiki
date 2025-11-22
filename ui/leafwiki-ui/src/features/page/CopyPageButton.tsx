@@ -19,7 +19,6 @@ export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
       enabled: true,
       mode: ['view'],
       action: () => {
-        console.log('Copy page hotkey triggered')
         openDialog(DIALOG_COPY_PAGE, { sourcePage })
       },
     }
