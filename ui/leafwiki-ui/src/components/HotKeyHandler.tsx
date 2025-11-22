@@ -2,15 +2,18 @@
 // It registers event listeners for keydown events and calls the actions defined in the hotkey map.
 
 import { useAppMode } from '@/lib/useAppMode'
+import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useCallback, useEffect } from 'react'
 
 export function HotKeyHandler() {
   const appMode = useAppMode()
+  const isDialogOpen = useDialogsStore((state) => state.isAnyDialogOpen())
   const registeredHotkeys = useHotKeysStore((state) => state.registeredHotkeys)
 
-  if (appMode === 'edit') {
-    console.log('editor mode')
+  let currentMode = appMode
+  if (isDialogOpen) {
+    currentMode = 'dialog'
   }
   console.log('registered hotkeys:', registeredHotkeys)
   const onKeyDown = useCallback(
@@ -31,13 +34,17 @@ export function HotKeyHandler() {
       const registredKey = registeredHotkeys[comboString] as
         | HotKeyDefinition
         | undefined
-      if (registredKey && registredKey.enabled) {
+      if (
+        registredKey &&
+        registredKey.enabled &&
+        registredKey.mode.includes(currentMode)
+      ) {
         e.preventDefault()
         console.log('hotkey matched:', comboString)
         registredKey.action()
       }
     },
-    [registeredHotkeys],
+    [registeredHotkeys, currentMode],
   )
 
   useEffect(() => {

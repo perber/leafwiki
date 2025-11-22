@@ -36,7 +36,12 @@ export default function Sidebar() {
           setSidebarMode(item.id)
         }
 
-        const hotKeyDef = { keyCombo: hotkey, enabled: true, action }
+        const hotKeyDef = {
+          keyCombo: hotkey,
+          enabled: true,
+          action,
+          mode: ['view', 'edit'],
+        }
 
         registerHotkey(hotKeyDef)
         return () => {

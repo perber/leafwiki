@@ -80,6 +80,7 @@ export default function BaseDialog({
     const confirmHotkey: HotKeyDefinition = {
       keyCombo: 'Enter',
       enabled: true,
+      mode: ['dialog'],
       action: async () => {
         if (open) {
           if (defaultAction === 'cancel') {
@@ -98,6 +99,7 @@ export default function BaseDialog({
     const cancelHotkey: HotKeyDefinition = {
       keyCombo: 'Escape',
       enabled: true,
+      mode: ['dialog'],
       action: () => {
         if (open) {
           onClose()
