@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
-import useNavigationGuardHandler from './useNavigationGuardHandler'
+import useNavigationGuard from './useNavigationGuard'
 import { usePageEditorHotKeys } from './usePageEditorHotKeys'
 
 export default function PageEditor() {
@@ -86,11 +86,10 @@ export default function PageEditor() {
     )
   }, [page, title, slug, markdown])
 
-  useNavigationGuardHandler({
+  useNavigationGuard({
     when: isDirty,
-    onNavigate: async (path) => {
+    onNavigate: async () => {
       await reloadTree()
-      navigate(path)
     },
   })
 
