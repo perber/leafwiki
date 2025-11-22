@@ -37,7 +37,11 @@ export function DeletePageButton({
   }, [openDialog, pageId, redirectUrl, registerHotkey, unregisterHotkey])
 
   return (
-    <TooltipWrapper label="Delete page (Ctrl + Delete)" side="top" align="center">
+    <TooltipWrapper
+      label="Delete page (Ctrl + Delete)"
+      side="top"
+      align="center"
+    >
       <Button
         className="h-8 w-8 rounded-full shadow-xs"
         variant="destructive"

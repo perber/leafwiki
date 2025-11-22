@@ -3,18 +3,29 @@ import { Pagination } from '@/components/Pagination'
 import { searchPages, SearchResultItem } from '@/lib/api/search'
 import { useDebounce } from '@/lib/useDebounce'
 import { X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import SearchResultCard from './SearchResultCard'
 
-export default function Search() {
+type SearchProps = {
+  active: boolean
+}
+
+export default function Search({ active }: SearchProps) {
   const [query, setQuery] = useState('')
   const [limit, setLimit] = useState<number>(10)
   const [loading, setLoading] = useState<boolean>(false)
   const [totalCount, setTotalCount] = useState<number>(0)
   const [results, setResults] = useState<SearchResultItem[]>([])
   const [page, setPage] = useState(0) // 0-based
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
 
   const debouncedQuery = useDebounce(query, 300)
+
+  useEffect(() => {
+    if (active) {
+      searchInputRef.current?.focus()
+    }
+  }, [active])
 
   useEffect(() => {
     if (debouncedQuery) {
@@ -50,6 +61,7 @@ export default function Search() {
     <div className="mt-2">
       <div className="relative mb-4">
         <input
+          ref={searchInputRef}
           autoFocus
           type="text"
           placeholder="Search..."

@@ -93,7 +93,7 @@ export default function Sidebar() {
           {/* Content */}
           {items.map((item) => (
             <ScrollableContainer key={item.id} hidden={sidebarMode !== item.id}>
-              {item.render({})}
+              {item.render({ active: sidebarMode === item.id })}
             </ScrollableContainer>
           ))}
         </div>

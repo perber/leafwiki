@@ -37,7 +37,9 @@ export function HotKeyHandler() {
         currentMode !== 'edit' && // only block in non-edit modes
         activeElement &&
         (activeElement.tagName === 'BUTTON' ||
-          (activeElement.tagName === 'INPUT' && currentMode !== 'dialog') ||
+          (activeElement.tagName === 'INPUT' &&
+            currentMode !== 'dialog' &&
+            currentMode !== 'view') ||
           activeElement.tagName === 'TEXTAREA' ||
           activeElement.getAttribute('contenteditable') === 'true') &&
         comboString !== 'Escape'

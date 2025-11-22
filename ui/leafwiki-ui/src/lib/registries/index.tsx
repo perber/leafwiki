@@ -41,7 +41,10 @@ panelItemRegistry.register({
   label: 'Search',
   hotkey: 'Mod+Shift+F',
   icon: () => <SearchIcon size={16} />,
-  render: () => <Search />,
+  render: (props: unknown) => {
+    const SearchProps = props as React.ComponentProps<typeof Search>
+    return <Search {...SearchProps} />
+  },
 })
 
 // Register application wide dialogs here using dialogRegistry.register(...)

@@ -10,7 +10,6 @@ import { useEffect } from 'react'
 export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
   const openDialog = useDialogsStore((s) => s.openDialog)
 
-
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
@@ -20,7 +19,7 @@ export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
       enabled: true,
       mode: ['view'],
       action: () => {
-        console.log("Copy page hotkey triggered")
+        console.log('Copy page hotkey triggered')
         openDialog(DIALOG_COPY_PAGE, { sourcePage })
       },
     }
@@ -32,7 +31,11 @@ export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
   }, [openDialog, sourcePage, registerHotkey, unregisterHotkey])
 
   return (
-    <TooltipWrapper label="Copy page (Ctrl + Alt + D)" side="top" align="center">
+    <TooltipWrapper
+      label="Copy page (Ctrl + Alt + D)"
+      side="top"
+      align="center"
+    >
       <Button
         className="h-8 w-8 rounded-full shadow-xs"
         variant="default"
