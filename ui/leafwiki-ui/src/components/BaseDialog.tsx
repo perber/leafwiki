@@ -135,7 +135,12 @@ export default function BaseDialog({
         }
       }}
     >
-      <DialogContent>
+      <DialogContent
+        onEscapeKeyDown={(e: KeyboardEvent) => {
+          // The dialog isn't responsible to handle key events!
+          e.preventDefault()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>

@@ -62,7 +62,6 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
       unregisterHotkey(cancelHotkey.keyCombo)
       unregisterHotkey(enterHotkey.keyCombo)
     }
-
   }, [open, isRenamingRef, registerHotkey, unregisterHotkey, closeDialog])
 
   return (
@@ -76,6 +75,11 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
     >
       <DialogContent
         className="max-w-2xl"
+        onEscapeKeyDown={(e: KeyboardEvent) => {
+          if (isRenamingRef.current) {
+            e.preventDefault()
+          }
+        }}
       >
         <DialogHeader>
           <DialogTitle>Asset Manager</DialogTitle>

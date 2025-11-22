@@ -18,7 +18,6 @@ export function HotKeyHandler() {
   console.log('registered hotkeys:', registeredHotkeys)
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      console.log('key down', e.key)
       const keyCombo = []
       // Construct key combo string like 'Mod+Shift+K'
       // 'Mod' represents 'Ctrl' on Windows/Linux and 'Meta' on Mac
@@ -29,22 +28,19 @@ export function HotKeyHandler() {
 
       keyCombo.push(e.key)
       const comboString = keyCombo.join('+')
-      console.log('constructed key combo:', comboString)
 
       // if a button is focused, we should not trigger hotkeys except for Escape
       const activeElement = document.activeElement
       if (
         activeElement &&
         (activeElement.tagName === 'BUTTON' ||
-          activeElement.tagName === 'INPUT' ||
+          (activeElement.tagName === 'INPUT' && currentMode !== 'dialog') ||
           activeElement.tagName === 'TEXTAREA' ||
           activeElement.getAttribute('contenteditable') === 'true') &&
         comboString !== 'Escape'
       ) {
-        console.log(
-          'element focused, not triggering hotkey:',
-          activeElement.tagName,
-        )
+        // The user is focused on a button or input, do not trigger hotkeys
+        // If the Escape key is pressed, we allow it to propagate for dialog closing
         return
       }
 
@@ -56,8 +52,8 @@ export function HotKeyHandler() {
         registredKey.enabled &&
         registredKey.mode.includes(currentMode)
       ) {
+        e.stopPropagation()
         e.preventDefault()
-        console.log('hotkey matched:', comboString)
         registredKey.action()
       }
     },
@@ -66,10 +62,8 @@ export function HotKeyHandler() {
 
   useEffect(() => {
     window.addEventListener('keydown', onKeyDown)
-    console.log('added keydown listener')
     return () => {
       window.removeEventListener('keydown', onKeyDown)
-      console.log('removed keydown listener')
     }
   }, [onKeyDown])
 
