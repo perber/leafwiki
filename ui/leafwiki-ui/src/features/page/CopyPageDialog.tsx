@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
 import { copyPage, Page, PageNode } from '@/lib/api/pages'
@@ -80,16 +79,16 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
   }
 
   const handleCopy = async (redirect: boolean): Promise<boolean> => {
-    if (!title) return false
+    if (!title) return false // Should not happen due to button disabling
 
     if (!slug) {
       toast.error('Slug could not be generated. Please enter it manually.')
-      return false
+      return false // Should not happen due to button disabling
     }
 
     if (!slugTouched && (slugLoading || title !== lastSlugTitle)) {
       toast.warning('Please wait until the slug is fully generated.')
-      return false
+      return false // Should not happen due to button disabling
     }
 
     setLoading(true)
@@ -103,12 +102,13 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
         navigate(buildEditUrl(fullPath))
       }
       resetForm()
-      return true
+      return true // Close the dialog
     } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error copying page')
+      return false // Keep the dialog open
+    } finally {
       setLoading(false)
-      return false
     }
   }
 
@@ -129,8 +129,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
       dialogType={DIALOG_COPY_PAGE}
       onClose={handleCancel}
       onConfirm={async (): Promise<boolean> => {
-        await handleCopy(true)
-        return true
+        return await handleCopy(true)
       }}
       testidPrefix="copy-page-dialog"
       cancelButton={{

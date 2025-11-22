@@ -25,8 +25,8 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
   const { user: currentUser } = useAuthStore()
   const isOwnUser = user?.id === currentUser?.id
 
-  const handleSubmit = async () => {
-    if (!username || !email || (!isEdit && !password)) return
+  const handleSubmit = async (): Promise<boolean> => {
+    if (!username || !email || (!isEdit && !password)) return false // Should not happen due to button disabling
 
     const userData = {
       id: user?.id || '',
@@ -37,7 +37,6 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
     }
 
     setLoading(true)
-
     try {
       if (isEdit) {
         await updateUser({ ...userData, password: password || undefined })
@@ -45,9 +44,11 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
         await createUser(userData)
       }
       toast.success('User saved successfully')
+      return true // Close the dialog
     } catch (err) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error saving user')
+      return false // Keep the dialog open
     } finally {
       setLoading(false)
     }
@@ -60,8 +61,7 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
       dialogDescription={isEdit ? 'Edit user details' : 'Create a new user'}
       onClose={() => true}
       onConfirm={async (): Promise<boolean> => {
-        await handleSubmit()
-        return true
+        return await handleSubmit()
       }}
       testidPrefix="user-form-dialog"
       cancelButton={{ label: 'Cancel' }}

@@ -19,7 +19,7 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
     try {
       await deleteUser(userId)
       toast.success('User deleted successfully')
-      return true
+      return true // Close the dialog
     } catch (err: { error?: string } | unknown) {
       if (err && typeof err === 'object' && 'error' in err) {
         // Handle specific error message if available
@@ -31,7 +31,7 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
         toast.error('Failed to delete user. Please try again.')
       }
 
-      return false
+      return false // Keep the dialog open
     } finally {
       setLoading(false)
     }
@@ -44,8 +44,7 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
       dialogDescription="Are you sure you want to delete this user? This action cannot be undone."
       onClose={() => true}
       onConfirm={async (): Promise<boolean> => {
-        await handleDelete()
-        return true
+        return await handleDelete()
       }}
       defaultAction="cancel"
       testidPrefix="delete-user-dialog"

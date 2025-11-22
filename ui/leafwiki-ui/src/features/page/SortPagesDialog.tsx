@@ -38,15 +38,17 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
     setOrder(newOrder)
   }
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<boolean> => {
     setLoading(true)
     try {
       await sortPages(parent.id, order)
       await reloadTree()
       toast.success('Pages sorted successfully')
+      return true // Close the dialog
     } catch (err) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error moving page')
+      return false // Keep the dialog open
     } finally {
       setLoading(false)
     }
@@ -60,8 +62,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
       onClose={() => true}
       onConfirm={async (type) => {
         if (type === 'confirm') {
-          await handleSave()
-          return true
+          return await handleSave()
         }
         return false
       }}

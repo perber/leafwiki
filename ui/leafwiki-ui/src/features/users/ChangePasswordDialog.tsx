@@ -60,11 +60,11 @@ export function ChangePasswordDialog({
         ...user,
         password,
       })
-      return true
+      return true // Close the dialog
     } catch (err) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error updating password')
-      return false
+      return false // Keep the dialog open
     } finally {
       setLoading(false)
     }

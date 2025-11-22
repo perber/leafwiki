@@ -38,8 +38,9 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
 
   if (!parentId) return null
 
-  const handleMove = async () => {
-    if (!newParentId || newParentId === parentId) return
+  const handleMove = async (): Promise<boolean> => {
+    if (!newParentId || newParentId === parentId) return false // No change
+
     setLoading(true)
     try {
       await movePage(pageId, newParentId)
@@ -56,9 +57,11 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
       }
 
       toast.success('Page moved successfully')
+      return true // Close the dialog
     } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error moving page')
+      return false // Keep the dialog open
     } finally {
       setLoading(false)
     }
@@ -72,8 +75,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
       onClose={() => true}
       onConfirm={async (type) => {
         if (type === 'confirm') {
-          await handleMove()
-          return true
+          return await handleMove()
         }
         return false
       }}

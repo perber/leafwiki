@@ -53,16 +53,16 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
 
   const handleCreate = useCallback(
     async (redirect: boolean = true): Promise<boolean> => {
-      if (!title) return false
+      if (!title) return false // Should not happen due to button disabling
 
       if (!slug) {
         toast.error('Slug could not be generated. Please enter it manually.')
-        return false
+        return false // Should not happen due to button disabling
       }
 
       if (!slugTouched && (slugLoading || title !== lastSlugTitle)) {
         toast.warning('Please wait until the slug is fully generated.')
-        return false
+        return false // Should not happen due to button disabling
       }
 
       setLoading(true)
@@ -76,12 +76,13 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
           navigate(buildEditUrl(fullPath))
         }
         resetForm()
-        return true
+        return true // Close the dialog
       } catch (err: unknown) {
         console.warn(err)
         handleFieldErrors(err, setFieldErrors, 'Error creating page')
+        return false // Keep the dialog open
+      } finally {
         setLoading(false)
-        return false
       }
     },
     [

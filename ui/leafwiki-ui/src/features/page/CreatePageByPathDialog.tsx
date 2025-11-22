@@ -64,11 +64,11 @@ export function CreatePageByPathDialog({
       }
 
       toast.success('Page created successfully')
-      return true
+      return true // Close the dialog
     } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, 'Error creating page')
-      return false
+      return false // Keep the dialog open
     } finally {
       setLoading(false)
     }
