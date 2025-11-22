@@ -31,6 +31,23 @@ export function HotKeyHandler() {
       const comboString = keyCombo.join('+')
       console.log('constructed key combo:', comboString)
 
+      // if a button is focused, we should not trigger hotkeys except for Escape
+      const activeElement = document.activeElement
+      if (
+        activeElement &&
+        (activeElement.tagName === 'BUTTON' ||
+          activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.getAttribute('contenteditable') === 'true') &&
+        comboString !== 'Escape'
+      ) {
+        console.log(
+          'element focused, not triggering hotkey:',
+          activeElement.tagName,
+        )
+        return
+      }
+
       const registredKey = registeredHotkeys[comboString] as
         | HotKeyDefinition
         | undefined
