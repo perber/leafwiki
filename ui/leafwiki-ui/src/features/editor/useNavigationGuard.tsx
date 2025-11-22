@@ -28,7 +28,7 @@ export default function useNavigationGuard({
   // onCancel resets the navigation blocker
   // so the user stays on the current page
   const onCancel = useCallback(() => {
-    if (blocker.state == "blocked" && blocker.reset) {
+    if (blocker.state === 'blocked' && blocker.reset) {
       blocker.reset()
       console.log('Navigation cancelled', blocker)
     }
@@ -64,6 +64,5 @@ export default function useNavigationGuard({
       onConfirm,
       onCancel,
     })
-  }, [blocker.state, blocker.location,onConfirm, onCancel, openDialog])
-
+  }, [blocker.state, blocker.location, onConfirm, onCancel, openDialog])
 }
