@@ -44,11 +44,17 @@ export default function Sidebar() {
         }
 
         registerHotkey(hotKeyDef)
-        return () => {
-          unregisterHotkey(hotKeyDef.keyCombo)
-        }
       }
     })
+
+    return () => {
+      items.forEach((item) => {
+        const hotkey = (item as PanelItem).hotkey as string | undefined
+        if (hotkey) {
+          unregisterHotkey(hotkey)
+        }
+      })
+    }
   }, [items, registerHotkey, unregisterHotkey, setSidebarMode])
 
   return (
