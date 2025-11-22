@@ -43,6 +43,7 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
         }
       },
     }
+
     registerHotkey(cancelHotkey)
 
     const enterHotkey: HotKeyDefinition = {
@@ -76,9 +77,7 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
       <DialogContent
         className="max-w-2xl"
         onEscapeKeyDown={(e: KeyboardEvent) => {
-          if (isRenamingRef.current) {
-            e.preventDefault()
-          }
+          e.preventDefault()
         }}
       >
         <DialogHeader>

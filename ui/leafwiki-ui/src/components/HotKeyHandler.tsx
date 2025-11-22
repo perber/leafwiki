@@ -50,17 +50,27 @@ export function HotKeyHandler() {
         return
       }
 
-      const registredKey = registeredHotkeys[comboString] as
-        | HotKeyDefinition
+      const registeredKeys = registeredHotkeys[comboString] as
+        | HotKeyDefinition[]
         | undefined
+
+      if (!registeredKeys || registeredKeys.length === 0) {
+        return
+      }
+
+      const registeredKey =
+        registeredKeys[
+          registeredKeys.length - 1
+        ] /* get the last registered hotkey */
+
       if (
-        registredKey &&
-        registredKey.enabled &&
-        registredKey.mode.includes(currentMode)
+        registeredKey &&
+        registeredKey.enabled &&
+        registeredKey.mode.includes(currentMode)
       ) {
         e.stopPropagation()
         e.preventDefault()
-        registredKey.action()
+        registeredKey.action()
       }
     },
     [registeredHotkeys, currentMode],
