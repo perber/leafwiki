@@ -15,7 +15,7 @@ export function HotKeyHandler() {
   if (isDialogOpen) {
     currentMode = 'dialog'
   }
-  console.log('registered hotkeys:', registeredHotkeys)
+
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const keyCombo = []

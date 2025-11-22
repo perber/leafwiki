@@ -1,4 +1,5 @@
 // register sidebar panel items
+import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
 import { AddPageDialog } from '@/features/page/AddPageDialog'
 import { CopyPageDialog } from '@/features/page/CopyPageDialog'
@@ -57,6 +58,7 @@ export const DIALOG_CHANGE_OWN_PASSWORD = 'change-own-password'
 export const DIALOG_USER_FORM = 'user-form'
 export const DIALOG_CHANGE_USER_PASSWORD = 'change-user-password'
 export const DIALOG_DELETE_USER_CONFIRMATION = 'delete-user-confirmation'
+export const DIALOG_UNSAVED_CHANGES = 'unsaved-changes'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -181,6 +183,17 @@ dialogRegistry.register({
     return (
       <DeleteUserDialog
         {...(props as React.ComponentProps<typeof DeleteUserDialog>)}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_UNSAVED_CHANGES,
+  render: (props) => {
+    return (
+      <UnsavedChangesDialog
+        {...(props as React.ComponentProps<typeof UnsavedChangesDialog>)}
       />
     )
   },

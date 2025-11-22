@@ -1,54 +1,41 @@
-import { FormActions } from '@/components/FormActions'
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { DIALOG_UNSAVED_CHANGES } from '@/lib/registries'
+import BaseDialog from './BaseDialog'
 
 type UnsavedChangesDialogProps = {
-  open: boolean
   onConfirm: () => void
   onCancel: () => void
-  loading?: boolean
 }
 
 export function UnsavedChangesDialog({
-  open,
   onConfirm,
   onCancel,
-  loading = false,
 }: UnsavedChangesDialogProps) {
   return (
-    <AlertDialog open={open} onOpenChange={(val) => !val && onCancel()}>
-      <AlertDialogContent
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.stopPropagation()
-            e.preventDefault()
-          }
-        }}
-      >
-        <AlertDialogHeader>
-          <AlertDialogTitle>Unsave changes?</AlertDialogTitle>
-        </AlertDialogHeader>
-        <AlertDialogDescription>
-          You have unsaved changes. Are you sure you want to leave this page?
-          Unsaved data will be lost.
-        </AlertDialogDescription>
-
-        <div className="mt-4 flex justify-end">
-          <FormActions
-            onCancel={onCancel}
-            onSave={onConfirm}
-            saveLabel="Leave anyway"
-            disabled={loading}
-            loading={loading}
-            autoFocus="cancel"
-          />
-        </div>
-      </AlertDialogContent>
-    </AlertDialog>
+    <BaseDialog
+      dialogTitle="Unsaved changes"
+      dialogDescription="You have unsaved changes. Are you sure you want to leave this page? Unsaved data will be lost."
+      dialogType={DIALOG_UNSAVED_CHANGES}
+      onClose={() => {
+        onCancel()
+        return true
+      }}
+      onConfirm={async () => {
+        onConfirm()
+        return true
+      }}
+      cancelButton={{
+        label: 'Cancel',
+        autoFocus: true,
+      }}
+      buttons={[
+        {
+          label: 'Leave anyway',
+          variant: 'destructive',
+          actionType: 'confirm',
+          disabled: false,
+          loading: false,
+        },
+      ]}
+    ></BaseDialog>
   )
 }
