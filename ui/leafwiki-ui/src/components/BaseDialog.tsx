@@ -65,7 +65,7 @@ export default function BaseDialog({
   dialogType,
   onClose,
   onConfirm,
-  defaultAction='confirm',
+  defaultAction = 'confirm',
   children,
   testidPrefix,
   cancelButton,
@@ -87,7 +87,7 @@ export default function BaseDialog({
             closeDialog()
             return
           }
-          
+
           const result = await onConfirm('confirm')
           if (result) {
             closeDialog()
@@ -120,6 +120,7 @@ export default function BaseDialog({
     dialogType,
     registerHotkey,
     unregisterHotkey,
+    defaultAction,
   ])
 
   return (

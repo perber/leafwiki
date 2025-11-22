@@ -1,28 +1,13 @@
-import { FormActions } from '@/components/FormActions'
+import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
 import { useAuthStore } from '@/stores/auth'
-import { useDialogsStore } from '@/stores/dialogs'
 import { useUserStore } from '@/stores/users'
-import { DialogDescription } from '@radix-ui/react-dialog'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 
 export function ChangeOwnPasswordDialog() {
-  // Dialog state from zustand store
-  const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore(
-    (s) => s.dialogType === DIALOG_CHANGE_OWN_PASSWORD,
-  )
-
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -32,18 +17,13 @@ export function ChangeOwnPasswordDialog() {
   const { user } = useAuthStore()
   const { changeOwnPassword } = useUserStore()
 
-  const resetForm = useCallback(() => {
+  const resetForm = useCallback((): boolean => {
     setOldPassword('')
     setNewPassword('')
     setConfirm('')
     setFieldErrors({})
+    return true
   }, [])
-
-  useEffect(() => {
-    if (open) {
-      resetForm()
-    }
-  }, [open, resetForm])
 
   if (!user) return null
 
@@ -73,85 +53,84 @@ export function ChangeOwnPasswordDialog() {
     }
   }
 
-  const handleChange = async () => {
+  const handleChange = async (): Promise<boolean> => {
     setLoading(true)
     try {
       await changeOwnPassword(oldPassword, newPassword)
       toast.success('Password changed successfully')
-      closeDialog()
+      return true
     } catch (err) {
       console.warn(err)
       setOldPassword('')
       setNewPassword('')
       setConfirm('')
       handleFieldErrors(err, setFieldErrors, 'Error updating password')
+      return false
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          closeDialog()
-        }
+    <BaseDialog
+      dialogType={DIALOG_CHANGE_OWN_PASSWORD}
+      defaultAction="cancel"
+      dialogTitle="Change Own Password"
+      dialogDescription="Change your password. Make sure to remember it!"
+      testidPrefix="create-page-by-path-dialog"
+      cancelButton={{
+        label: 'Cancel',
+        variant: 'outline',
+        disabled: loading,
+        autoFocus: false,
+      }}
+      buttons={[
+        {
+          label: loading ? 'Saving...' : 'Save',
+          actionType: 'confirm',
+          autoFocus: true,
+          loading,
+          disabled:
+            loading ||
+            !oldPassword ||
+            !newPassword ||
+            newPassword !== confirm ||
+            fieldErrors.newPassword !== '' ||
+            fieldErrors.confirm !== '',
+        },
+      ]}
+      onClose={resetForm}
+      onConfirm={async (): Promise<boolean> => {
+        return await handleChange()
       }}
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Change Own Password</DialogTitle>
-          <DialogDescription>
-            Change your password. Make sure to remember it!
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3 pt-2">
-          <FormInput
-            autoFocus={true}
-            label="Old Password"
-            type="password"
-            value={oldPassword}
-            onChange={handleOldPasswordChange}
-            placeholder="Old Password"
-            error={fieldErrors.oldPassword}
-          />
-          <FormInput
-            label="New Password"
-            type="password"
-            value={newPassword}
-            onChange={handleNewPasswordChange}
-            placeholder="New Password"
-            error={fieldErrors.newPassword}
-          />
-          <FormInput
-            label="Confirm Password"
-            type="password"
-            value={confirm}
-            onChange={handleConfirmChange}
-            placeholder="Confirm Password"
-            error={fieldErrors.confirm}
-          />
-        </div>
-
-        <DialogFooter className="pt-4">
-          <FormActions
-            onCancel={() => closeDialog()}
-            onSave={handleChange}
-            saveLabel={loading ? 'Saving...' : 'Save'}
-            disabled={
-              loading ||
-              !oldPassword ||
-              !newPassword ||
-              newPassword !== confirm ||
-              fieldErrors.newPassword !== '' ||
-              fieldErrors.confirm !== ''
-            }
-            loading={loading}
-          />
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <div className="space-y-3 pt-2">
+        <FormInput
+          autoFocus={true}
+          label="Old Password"
+          type="password"
+          value={oldPassword}
+          onChange={handleOldPasswordChange}
+          placeholder="Old Password"
+          error={fieldErrors.oldPassword}
+        />
+        <FormInput
+          label="New Password"
+          type="password"
+          value={newPassword}
+          onChange={handleNewPasswordChange}
+          placeholder="New Password"
+          error={fieldErrors.newPassword}
+        />
+        <FormInput
+          label="Confirm Password"
+          type="password"
+          value={confirm}
+          onChange={handleConfirmChange}
+          placeholder="Confirm Password"
+          error={fieldErrors.confirm}
+        />
+      </div>
+    </BaseDialog>
   )
 }

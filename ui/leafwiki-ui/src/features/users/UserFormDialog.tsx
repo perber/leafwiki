@@ -1,19 +1,11 @@
-import { FormActions } from '@/components/FormActions'
+import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { User } from '@/lib/api/users'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_USER_FORM } from '@/lib/registries'
 import { useAuthStore } from '@/stores/auth'
-import { useDialogsStore } from '@/stores/dialogs'
 import { useUserStore } from '@/stores/users'
-import { DialogDescription } from '@radix-ui/react-dialog'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 
 type UserFormDialogProps = {
@@ -22,10 +14,6 @@ type UserFormDialogProps = {
 
 export function UserFormDialog({ user }: UserFormDialogProps) {
   const isEdit = !!user
-  // Dialog state from zustand store
-  const closeDialog = useDialogsStore((s) => s.closeDialog)
-  const open = useDialogsStore((s) => s.dialogType === DIALOG_USER_FORM)
-
   const [username, setUsername] = useState(user?.username || '')
   const [email, setEmail] = useState(user?.email || '')
   const [password, setPassword] = useState('')
@@ -56,7 +44,6 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
       } else {
         await createUser(userData)
       }
-      closeDialog()
       toast.success('User saved successfully')
     } catch (err) {
       console.warn(err)
@@ -66,117 +53,79 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
     }
   }
 
-  const handleCancel = () => {
-    closeDialog()
-  }
-
-  const resetForm = (user: User | null) => {
-    if (user) {
-      setUsername(user.username)
-      setEmail(user.email)
-      setPassword('')
-      setRole(user.role)
-    } else {
-      setUsername('')
-      setEmail('')
-      setPassword('')
-      setRole('editor')
-    }
-  }
-
-  useEffect(() => {
-    if (open) {
-      setFieldErrors({})
-      setLoading(false)
-      if (isEdit) {
-        resetForm(user!)
-      } else {
-        resetForm(null)
-      }
-    }
-  }, [open, isEdit, user])
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          closeDialog()
-        }
+    <BaseDialog
+      dialogType={DIALOG_USER_FORM}
+      dialogTitle={isEdit ? 'Edit User' : 'New User'}
+      dialogDescription={isEdit ? 'Edit user details' : 'Create a new user'}
+      onClose={() => true}
+      onConfirm={async (): Promise<boolean> => {
+        await handleSubmit()
+        return true
       }}
+      testidPrefix="user-form-dialog"
+      cancelButton={{ label: 'Cancel' }}
+      buttons={[
+        {
+          label: 'Save',
+          actionType: 'confirm',
+          loading,
+          disabled: loading || !username || !email || (!isEdit && !password),
+        },
+      ]}
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit User' : 'New User'}</DialogTitle>
-        </DialogHeader>
-        <DialogDescription>
-          {isEdit ? 'Edit user details' : 'Create a new user'}
-        </DialogDescription>
-
-        <div className="space-y-4 pt-2">
+      <div className="space-y-4 pt-2">
+        <FormInput
+          autoFocus={true}
+          label="username"
+          value={username}
+          onChange={(val) => {
+            setUsername(val)
+            setFieldErrors((prev) => ({ ...prev, username: '' }))
+          }}
+          placeholder="username"
+          error={fieldErrors.username}
+        />
+        <FormInput
+          label="email"
+          value={email}
+          onChange={(val) => {
+            setEmail(val)
+            setFieldErrors((prev) => ({ ...prev, email: '' }))
+          }}
+          placeholder="email"
+          error={fieldErrors.email}
+        />
+        {!isEdit && (
           <FormInput
-            autoFocus={true}
-            label="username"
-            value={username}
+            label="password"
+            value={password}
             onChange={(val) => {
-              setUsername(val)
-              setFieldErrors((prev) => ({ ...prev, username: '' }))
+              setPassword(val)
+              setFieldErrors((prev) => ({ ...prev, password: '' }))
             }}
-            placeholder="username"
-            error={fieldErrors.username}
+            placeholder="password"
+            error={fieldErrors.password}
+            type="password"
           />
-          <FormInput
-            label="email"
-            value={email}
-            onChange={(val) => {
-              setEmail(val)
-              setFieldErrors((prev) => ({ ...prev, email: '' }))
-            }}
-            placeholder="email"
-            error={fieldErrors.email}
-          />
-          {!isEdit && (
-            <FormInput
-              label="password"
-              value={password}
-              onChange={(val) => {
-                setPassword(val)
-                setFieldErrors((prev) => ({ ...prev, password: '' }))
-              }}
-              placeholder="password"
-              error={fieldErrors.password}
-              type="password"
-            />
-          )}
+        )}
 
-          <select
-            className={`w-full rounded-md border border-gray-300 px-3 py-2 text-sm ${fieldErrors.role ? 'border-red-500' : ''}`}
-            value={role}
-            onChange={(e) => {
-              setRole(e.target.value as 'admin' | 'editor')
-              setFieldErrors((prev) => ({ ...prev, role: '' }))
-            }}
-            disabled={isOwnUser}
-          >
-            <option value="editor">Editor</option>
-            <option value="admin">Admin</option>
-          </select>
-          {fieldErrors.role && (
-            <p className="mt-1 text-sm text-red-500">{fieldErrors.role}</p>
-          )}
-          <div className="flex justify-end gap-2 pt-2">
-            <FormActions
-              onCancel={handleCancel}
-              onSave={handleSubmit}
-              saveLabel={loading ? 'Saving...' : 'Save'}
-              disabled={
-                loading || !username || !email || (!isEdit && !password)
-              }
-              loading={loading}
-            />
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        <select
+          className={`w-full rounded-md border border-gray-300 px-3 py-2 text-sm ${fieldErrors.role ? 'border-red-500' : ''}`}
+          value={role}
+          onChange={(e) => {
+            setRole(e.target.value as 'admin' | 'editor')
+            setFieldErrors((prev) => ({ ...prev, role: '' }))
+          }}
+          disabled={isOwnUser}
+        >
+          <option value="editor">Editor</option>
+          <option value="admin">Admin</option>
+        </select>
+        {fieldErrors.role && (
+          <p className="mt-1 text-sm text-red-500">{fieldErrors.role}</p>
+        )}
+      </div>
+    </BaseDialog>
   )
 }
