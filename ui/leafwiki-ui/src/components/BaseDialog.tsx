@@ -104,7 +104,7 @@ export default function BaseDialog({
           return
         }
         const hasEnabledButton = buttons.some(
-          (button) => !button.disabled && !button.loading
+          (button) => !button.disabled && !button.loading,
         )
         if (!hasEnabledButton) {
           return
