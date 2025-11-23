@@ -66,7 +66,7 @@ func (s *SlugService) IsValidSlug(slug string) error {
 
 // normalizeSlug creates a URL-friendly slug (can be improved)
 func normalizeSlug(title string) string {
-	return slug.MakeLang(title, "de")
+	return slug.Make(title)
 }
 
 // Checks if the given slug already exists among parent's children
