@@ -77,7 +77,7 @@ export function ChangeOwnPasswordDialog() {
       defaultAction="cancel"
       dialogTitle="Change Own Password"
       dialogDescription="Change your password. Make sure to remember it!"
-      testidPrefix="create-page-by-path-dialog"
+      testidPrefix="change-own-password-dialog"
       cancelButton={{
         label: 'Cancel',
         variant: 'outline',

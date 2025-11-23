@@ -39,7 +39,6 @@ export type BaseDialogCancelButton = {
     | 'ghost'
     | 'link'
     | 'secondary'
-  loading?: boolean
   disabled?: boolean
   autoFocus?: boolean
 }
@@ -156,7 +155,7 @@ export default function BaseDialog({
                   closeDialog()
                 }
               }}
-              disabled={cancelButton.loading || cancelButton.disabled}
+              disabled={cancelButton.disabled}
               data-testid={
                 testidPrefix ? `${testidPrefix}-button-cancel` : undefined
               }

@@ -80,7 +80,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
         }
         return false
       }}
-      cancelButton={{ label: 'Cancel', variant: 'outline', autoFocus: false }}
+      cancelButton={{ label: 'Cancel', variant: 'outline', autoFocus: false, disabled: loading }}
       buttons={[
         {
           label: 'Move',

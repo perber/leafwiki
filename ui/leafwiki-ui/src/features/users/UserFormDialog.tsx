@@ -64,7 +64,7 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
         return await handleSubmit()
       }}
       testidPrefix="user-form-dialog"
-      cancelButton={{ label: 'Cancel' }}
+      cancelButton={{ label: 'Cancel', variant: 'outline', disabled: loading }}
       buttons={[
         {
           label: 'Save',
