@@ -28,34 +28,43 @@ export default function Sidebar() {
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
+  // Memoize hotkey definitions with stable action functions
+  const hotKeyDefs = useMemo(
+    () =>
+      items
+        .map((item) => {
+          const hotkey = (item as PanelItem).hotkey as string | undefined
+          if (!hotkey) return null
+          // Memoize the action function for each item
+          const action = () => {
+            setSidebarMode(item.id)
+          }
+          return {
+            keyCombo: hotkey,
+            enabled: true,
+            action,
+            mode: ['view', 'edit'],
+          }
+        })
+        .filter(Boolean) as {
+          keyCombo: string
+          enabled: boolean
+          action: () => void
+          mode: string[]
+        }[],
+    [items, setSidebarMode],
+  )
+
   useEffect(() => {
-    items.forEach((item) => {
-      const hotkey = (item as PanelItem).hotkey as string | undefined
-      if (hotkey) {
-        const action = () => {
-          setSidebarMode(item.id)
-        }
-
-        const hotKeyDef = {
-          keyCombo: hotkey,
-          enabled: true,
-          action,
-          mode: ['view', 'edit'],
-        }
-
-        registerHotkey(hotKeyDef)
-      }
+    hotKeyDefs.forEach((hotKeyDef) => {
+      registerHotkey(hotKeyDef)
     })
-
     return () => {
-      items.forEach((item) => {
-        const hotkey = (item as PanelItem).hotkey as string | undefined
-        if (hotkey) {
-          unregisterHotkey(hotkey)
-        }
+      hotKeyDefs.forEach((hotKeyDef) => {
+        unregisterHotkey(hotKeyDef.keyCombo)
       })
     }
-  }, [items, registerHotkey, unregisterHotkey, setSidebarMode])
+  }, [hotKeyDefs, registerHotkey, unregisterHotkey])
 
   return (
     <aside
