@@ -12,7 +12,7 @@ export default class CopyPageDialog {
   }
 
   async getCreateButton() {
-    return this.page.locator('button[data-testid="copy-page-dialog-create-button"]');
+    return this.page.locator('button[data-testid="copy-page-dialog-button-confirm"]');
   }
 
   async fillTitle(title: string) {

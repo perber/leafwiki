@@ -6,6 +6,7 @@ import { JSX } from 'react'
 export interface PanelItem {
   id: string
   label: string
+  hotkey?: string
   icon: () => JSX.Element
   render: (props: unknown) => JSX.Element
 }

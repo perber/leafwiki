@@ -19,7 +19,7 @@ export default class MovePageDialog {
   }
 
   async clickMoveButton() {
-    const moveButton = this.page.locator('button[data-testid="move-page-dialog-save-button"]');
+    const moveButton = this.page.locator('button[data-testid="move-page-dialog-button-confirm"]');
     await moveButton.click();
   }
 }

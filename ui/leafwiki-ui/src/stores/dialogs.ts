@@ -10,14 +10,18 @@ type DialogsStore = {
     dialogType: string,
     dialogProps?: Record<string, unknown>,
   ) => void
+  isAnyDialogOpen: () => boolean
   closeDialog: () => void
 }
 
-export const useDialogsStore = create<DialogsStore>((set) => ({
+export const useDialogsStore = create<DialogsStore>((set, get) => ({
   dialogType: null,
   dialogProps: null,
   openDialog: (dialogType: string, dialogProps?: Record<string, unknown>) => {
     set({ dialogType, dialogProps })
+  },
+  isAnyDialogOpen: () => {
+    return get().dialogType !== null
   },
   closeDialog: () => {
     set({ dialogType: null, dialogProps: null })

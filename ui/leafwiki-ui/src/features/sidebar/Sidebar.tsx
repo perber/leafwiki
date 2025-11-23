@@ -1,7 +1,9 @@
 import ScrollableContainer from '@/components/ScrollableContainer'
 import { panelItemRegistry } from '@/lib/registries'
+import { PanelItem } from '@/lib/registries/panelItemRegistry'
+import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSidebarStore } from '@/stores/sidebar'
-import { JSX, useMemo } from 'react'
+import { JSX, useEffect, useMemo } from 'react'
 
 const registeredItems = panelItemRegistry.getAllItems()
 
@@ -21,6 +23,39 @@ export default function Sidebar() {
         })),
       [items],
     )
+
+  // add hotkeys for each tab
+  const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
+  const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
+
+  useEffect(() => {
+    items.forEach((item) => {
+      const hotkey = (item as PanelItem).hotkey as string | undefined
+      if (hotkey) {
+        const action = () => {
+          setSidebarMode(item.id)
+        }
+
+        const hotKeyDef = {
+          keyCombo: hotkey,
+          enabled: true,
+          action,
+          mode: ['view', 'edit'],
+        }
+
+        registerHotkey(hotKeyDef)
+      }
+    })
+
+    return () => {
+      items.forEach((item) => {
+        const hotkey = (item as PanelItem).hotkey as string | undefined
+        if (hotkey) {
+          unregisterHotkey(hotkey)
+        }
+      })
+    }
+  }, [items, registerHotkey, unregisterHotkey, setSidebarMode])
 
   return (
     <aside
@@ -64,7 +99,7 @@ export default function Sidebar() {
           {/* Content */}
           {items.map((item) => (
             <ScrollableContainer key={item.id} hidden={sidebarMode !== item.id}>
-              {item.render({})}
+              {item.render({ active: sidebarMode === item.id })}
             </ScrollableContainer>
           ))}
         </div>

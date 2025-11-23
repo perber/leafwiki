@@ -12,7 +12,7 @@ export default class LoginPage {
   }
 
   async getCreateButton() {
-    return this.page.locator('button[data-testid="add-page-create-button-without-redirect"]');
+    return this.page.locator('button[data-testid="add-page-dialog-button-no-redirect"]');
   }
 
   async fillTitle(title: string) {

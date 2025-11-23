@@ -1,4 +1,5 @@
 // register sidebar panel items
+import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
 import { AddPageDialog } from '@/features/page/AddPageDialog'
 import { CopyPageDialog } from '@/features/page/CopyPageDialog'
@@ -27,7 +28,8 @@ export const SIDEBAR_SEARCH_PANEL_ID = 'search'
 
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
-  label: 'Tree',
+  label: 'Explorer',
+  hotkey: 'Mod+Shift+E',
   icon: () => <FolderTree size={16} />,
   render: () => {
     return <TreeView />
@@ -37,8 +39,12 @@ panelItemRegistry.register({
 panelItemRegistry.register({
   id: SIDEBAR_SEARCH_PANEL_ID,
   label: 'Search',
+  hotkey: 'Mod+Shift+F',
   icon: () => <SearchIcon size={16} />,
-  render: () => <Search />,
+  render: (props: unknown) => {
+    const SearchProps = props as React.ComponentProps<typeof Search>
+    return <Search {...SearchProps} />
+  },
 })
 
 // Register application wide dialogs here using dialogRegistry.register(...)
@@ -55,12 +61,14 @@ export const DIALOG_CHANGE_OWN_PASSWORD = 'change-own-password'
 export const DIALOG_USER_FORM = 'user-form'
 export const DIALOG_CHANGE_USER_PASSWORD = 'change-user-password'
 export const DIALOG_DELETE_USER_CONFIRMATION = 'delete-user-confirmation'
+export const DIALOG_UNSAVED_CHANGES = 'unsaved-changes'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
   render: (props) => {
     return (
       <AddPageDialog
+        key={DIALOG_ADD_PAGE}
         {...(props as React.ComponentProps<typeof AddPageDialog>)}
       />
     )
@@ -72,6 +80,7 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <SortPagesDialog
+        key={DIALOG_SORT_PAGES}
         {...(props as React.ComponentProps<typeof SortPagesDialog>)}
       />
     )
@@ -83,6 +92,7 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <MovePageDialog
+        key={DIALOG_MOVE_PAGE}
         {...(props as React.ComponentProps<typeof MovePageDialog>)}
       />
     )
@@ -94,6 +104,7 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <CreatePageByPathDialog
+        key={DIALOG_CREATE_PAGE_BY_PATH}
         {...(props as React.ComponentProps<typeof CreatePageByPathDialog>)}
       />
     )
@@ -105,6 +116,7 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <CopyPageDialog
+        key={DIALOG_COPY_PAGE}
         {...(props as React.ComponentProps<typeof CopyPageDialog>)}
       />
     )
@@ -116,6 +128,7 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <EditPageMetadataDialog
+        key={DIALOG_EDIT_PAGE_METADATA}
         {...(props as React.ComponentProps<typeof EditPageMetadataDialog>)}
       />
     )
@@ -127,6 +140,7 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <AssetManagerDialog
+        key={DIALOG_ASSET_MANAGER}
         {...(props as React.ComponentProps<typeof AssetManagerDialog>)}
       />
     )
@@ -138,6 +152,7 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <DeletePageDialog
+        key={DIALOG_DELETE_PAGE_CONFIRMATION}
         {...(props as React.ComponentProps<typeof DeletePageDialog>)}
       />
     )
@@ -147,7 +162,7 @@ dialogRegistry.register({
 dialogRegistry.register({
   type: DIALOG_CHANGE_OWN_PASSWORD,
   render: () => {
-    return <ChangeOwnPasswordDialog />
+    return <ChangeOwnPasswordDialog key={DIALOG_CHANGE_OWN_PASSWORD} />
   },
 })
 
@@ -156,6 +171,7 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <UserFormDialog
+        key={DIALOG_USER_FORM}
         {...(props as React.ComponentProps<typeof UserFormDialog>)}
       />
     )
@@ -167,6 +183,7 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <ChangePasswordDialog
+        key={DIALOG_CHANGE_USER_PASSWORD}
         {...(props as React.ComponentProps<typeof ChangePasswordDialog>)}
       />
     )
@@ -178,7 +195,20 @@ dialogRegistry.register({
   render: (props) => {
     return (
       <DeleteUserDialog
+        key={DIALOG_DELETE_USER_CONFIRMATION}
         {...(props as React.ComponentProps<typeof DeleteUserDialog>)}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_UNSAVED_CHANGES,
+  render: (props) => {
+    return (
+      <UnsavedChangesDialog
+        key={DIALOG_UNSAVED_CHANGES}
+        {...(props as React.ComponentProps<typeof UnsavedChangesDialog>)}
       />
     )
   },
