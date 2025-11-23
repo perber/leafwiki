@@ -122,7 +122,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
         {...props}
         className={clsx(
           'no-underline hover:underline dark:text-blue-400',
-          !user && !pageExists && '!text-red-600',
+          !user && !pageExists && 'text-red-600!',
         )}
       >
         {children}

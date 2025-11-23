@@ -15,6 +15,7 @@ import { CopyPageButton } from './CopyPageButton'
 import { DeletePageButton } from './DeletePageButton'
 import { EditPageButton } from './EditPageButton'
 import { PrintPageButton } from './PrintPageButton'
+import { useScrollToHeadline } from './useScrollToHeadline'
 
 export default function PageViewer() {
   const { pathname } = useLocation()
@@ -29,6 +30,7 @@ export default function PageViewer() {
   const { setContent, clearContent } = usePageToolbar()
 
   useScrollRestoration(pathname, loading)
+  useScrollToHeadline({ content: page?.content || '', isLoading: loading })
 
   useEffect(() => {
     setLoading(true)
@@ -134,7 +136,10 @@ export default function PageViewer() {
       <div className="mb-6">
         <Breadcrumbs />
       </div>
-      <article className="page-view prose prose-base max-w-none leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mt-0 [&_ol_ol]:mb-0 [&_ol_ul]:mt-0 [&_ul_ol]:mb-0 [&_ul_ul]:mt-0 [&_ul_ul]:mb-0 [&_ul>li::marker]:text-gray-800">
+      <article
+        id="page-view"
+        className="page-view prose prose-base max-w-none leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mt-0 [&_ol_ol]:mb-0 [&_ol_ul]:mt-0 [&_ul_ol]:mb-0 [&_ul_ul]:mt-0 [&_ul_ul]:mb-0 [&_ul>li::marker]:text-gray-800"
+      >
         <MarkdownPreview content={page.content} />
       </article>
     </>

@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
+import Headline from './Headline'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
 import MermaidBlock from './MermaidBlock'
@@ -18,6 +19,60 @@ export default function MarkdownPreview({ content }: Props) {
     () => ({
       a: MarkdownLink,
       img: MarkdownImage,
+      h1: ({
+        children,
+        ...props
+      }: ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => (
+        <Headline level={1} {...props}>
+          {children}
+        </Headline>
+      ),
+      h2: ({
+        children,
+        ...props
+      }: ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => (
+        <Headline level={2} {...props}>
+          {children}
+        </Headline>
+      ),
+      h3: ({
+        children,
+        ...props
+      }: ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => (
+        <Headline level={3} {...props}>
+          {children}
+        </Headline>
+      ),
+      h4: ({
+        children,
+        ...props
+      }: ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => (
+        <Headline level={4} {...props}>
+          {children}
+        </Headline>
+      ),
+      h5: ({
+        children,
+        ...props
+      }: ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => (
+        <Headline level={5} {...props}>
+          {children}
+        </Headline>
+      ),
+      h6: ({
+        children,
+        ...props
+      }: ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => (
+        <Headline level={6} {...props}>
+          {children}
+        </Headline>
+      ),
       code: (
         props: JSX.IntrinsicAttributes &
           ClassAttributes<HTMLElement> &
