@@ -93,7 +93,10 @@ export default function BaseDialog({
         }
 
         // Check if any confirm buttons are enabled before executing
-        const hasEnabledButton = buttons?.some(
+        if (!buttons || buttons.length === 0) {
+          return
+        }
+        const hasEnabledButton = buttons.some(
           (button) => !button.disabled && !button.loading
         )
         if (!hasEnabledButton) {
