@@ -29,25 +29,24 @@ export function HotKeyHandler() {
       keyCombo.push(e.key)
       const comboString = keyCombo.join('+')
 
-      // if a button is focused, we should not trigger hotkeys except for Escape
-      const activeElement = document.activeElement
-      if (
-        currentMode !== 'edit' && // only block in non-edit modes
-        activeElement &&
-        (activeElement.tagName === 'BUTTON' ||
-          (activeElement.tagName === 'INPUT' &&
-            currentMode !== 'dialog' &&
-            currentMode !== 'view') ||
-          activeElement.tagName === 'TEXTAREA' ||
-          activeElement.getAttribute('contenteditable') === 'true') &&
-        comboString !== 'Escape'
-      ) {
-        // The user is focused on a button or input, do not trigger hotkeys
-        // If the Escape key is pressed, we allow it to propagate for dialog closing
-        console.debug(
-          `Hotkey ${comboString} ignored due to focus on input element`,
-        )
-        return
+      // Always allow Escape
+      if (comboString !== 'Escape') {
+        // if the focus in on an button or texarea, we don't trigger hotkeys
+        // this allows normal typing and button interactions
+        // On input fields, we allow hotkeys to function normally
+        const activeElement = document.activeElement
+        if (
+          activeElement &&
+          (
+            activeElement.tagName === 'BUTTON' ||
+            activeElement.tagName === 'TEXTAREA'
+          )
+        ) {
+          console.debug(
+            `Hotkey ${comboString} ignored due to focus on button or textarea`,
+          )
+          return
+        }
       }
 
       const registeredKeys = registeredHotkeys[comboString] as
