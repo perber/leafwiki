@@ -1,10 +1,10 @@
 import { Paperclip } from 'lucide-react'
 import { ReactNode, useMemo } from 'react'
 import { JSX } from 'react/jsx-runtime'
-import { useHeadlineId } from './HeadlineIdContext'
+import { useHeadlineId } from './useHeadlineId'
 
 // Utility function to generate slugs from headline text
-const slugfiy = (text: string) => {
+const slugify = (text: string) => {
   // replace special characters like ä, ö, ü, ß etc. with ae, oe, ue, ss
   const specialChars = {
     ö: 'o',
@@ -33,7 +33,7 @@ function getText(node: ReactNode): string {
     return node.map(getText).join('')
   }
   if (node && typeof node === 'object' && 'props' in node) {
-    // @ts-ignore: node is a ReactElement
+    // @ts-expect-error -- props exist
     return getText(node.props.children)
   }
   return ''
@@ -53,13 +53,13 @@ export default function Headline({
   const text = getText(children)
   const Tag = `h${level}` as keyof JSX.IntrinsicElements
   const { getUniqueId } = useHeadlineId()
-  
+
   // Use useMemo to ensure we only generate the unique ID once per render
   const slug = useMemo(() => {
-    const baseSlug = slugfiy(text)
+    const baseSlug = slugify(text)
     return getUniqueId(baseSlug)
   }, [text, getUniqueId])
-  
+
   return (
     <Tag id={slug} className="anchor" data-line={dataLine}>
       <a className="no-underline hover:underline" href={`#${slug}`}>
