@@ -12,7 +12,7 @@ export function UnsavedChangesDialog({
 }: UnsavedChangesDialogProps) {
   return (
     <BaseDialog
-      dialogTitle="Unsaved changes"
+      dialogTitle="Unsaved Changes"
       dialogDescription="You have unsaved changes. Are you sure you want to leave this page? Unsaved data will be lost."
       dialogType={DIALOG_UNSAVED_CHANGES}
       onClose={() => {
