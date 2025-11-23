@@ -30,7 +30,9 @@ export default class DeletePageDialog {
   }
 
   async confirmDeletion() {
-    const deleteButton = this.page.locator('button[data-testid="delete-page-dialog-button-confirm"]');
+    const deleteButton = this.page.locator(
+      'button[data-testid="delete-page-dialog-button-confirm"]',
+    );
     await deleteButton.click();
     // We will be redirected to another page, so wait a bit
     await this.page.waitForTimeout(1000);
