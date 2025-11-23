@@ -92,6 +92,14 @@ export default function BaseDialog({
           return
         }
 
+        // Check if any confirm buttons are enabled before executing
+        const hasEnabledButton = buttons?.some(
+          (button) => !button.disabled && !button.loading
+        )
+        if (!hasEnabledButton) {
+          return
+        }
+
         const result = await onConfirm('confirm')
         if (result) {
           closeDialog()
@@ -123,6 +131,7 @@ export default function BaseDialog({
     registerHotkey,
     unregisterHotkey,
     defaultAction,
+    buttons,
   ])
 
   return (
