@@ -1,7 +1,7 @@
 // useAppMode returns the current application mode.
 import { useLocation } from 'react-router-dom'
 
-export type AppMode = 'edit' | 'view'
+export type AppMode = 'edit' | 'view' | 'dialog'
 
 // based on the current route it will return the app mode
 export function useAppMode(): AppMode {

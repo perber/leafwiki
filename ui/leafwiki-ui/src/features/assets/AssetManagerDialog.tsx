@@ -7,6 +7,8 @@ import {
 } from '@/components/ui/dialog'
 import { DIALOG_ASSET_MANAGER } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
+import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
+import { useEffect } from 'react'
 import { AssetManager } from './AssetManager'
 
 export type AssetManagerDialogProps = {
@@ -23,6 +25,30 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
   const { pageId, editorRef, onAssetVersionChange, isRenamingRef } = props
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const open = useDialogsStore((s) => s.dialogType === DIALOG_ASSET_MANAGER)
+  const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
+  const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
+
+  useEffect(() => {
+    if (open) {
+      isRenamingRef.current = false
+    }
+
+    const cancelHotkey: HotKeyDefinition = {
+      keyCombo: 'Escape',
+      enabled: true,
+      mode: ['dialog'],
+      action: () => {
+        if (open) {
+          closeDialog()
+        }
+      },
+    }
+
+    registerHotkey(cancelHotkey)
+    return () => {
+      unregisterHotkey(cancelHotkey.keyCombo)
+    }
+  }, [open, isRenamingRef, registerHotkey, unregisterHotkey, closeDialog])
 
   return (
     <Dialog
@@ -35,14 +61,8 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
     >
       <DialogContent
         className="max-w-2xl"
-        onEscapeKeyDown={(e) => {
-          if (isRenamingRef.current) {
-            e.preventDefault()
-          } else {
-            closeDialog()
-            e.preventDefault()
-            e.stopPropagation()
-          }
+        onEscapeKeyDown={(e: KeyboardEvent) => {
+          e.preventDefault()
         }}
       >
         <DialogHeader>

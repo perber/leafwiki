@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button'
 import { deleteAsset, renameAsset } from '@/lib/api/assets'
 import { IMAGE_EXTENSIONS } from '@/lib/config'
+import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { Check, FileText, Pencil, Trash2, X } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AssetPreviewTooltip } from './AssetPreviewTooltip'
 
@@ -34,10 +35,12 @@ export function AssetItem({
   const isImage = imageExtensions.includes(ext ?? '')
   const baseName = filename.split('/').pop() ?? filename
   const isEditing = editingFilename === filename
+  const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
+  const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
   const [newName, setNewName] = useState(baseName.replace(/\.[^/.]+$/, ''))
 
-  const handleRename = async () => {
+  const handleRename = useCallback(async () => {
     try {
       const newFilename = `${newName}.${ext}`
       if (newFilename === baseName) {
@@ -62,7 +65,16 @@ export function AssetItem({
         }
       }
     }
-  }
+  }, [
+    pageId,
+    baseName,
+    newName,
+    ext,
+    onReload,
+    onFilenameChange,
+    onAssetVersionChange,
+    setEditingFilename,
+  ])
 
   const handleDelete = async () => {
     try {
@@ -86,6 +98,43 @@ export function AssetItem({
       onInsert(markdown)
     }
   }
+
+  useEffect(() => {
+    if (!isEditing) return
+
+    const enterHotkey: HotKeyDefinition = {
+      keyCombo: 'Enter',
+      enabled: true,
+      mode: ['dialog'],
+      action: () => {
+        handleRename()
+      },
+    }
+    registerHotkey(enterHotkey)
+
+    const escapeHotkey: HotKeyDefinition = {
+      keyCombo: 'Escape',
+      enabled: true,
+      mode: ['dialog'],
+      action: () => {
+        setEditingFilename(null)
+        setNewName(baseName.replace(/\.[^/.]+$/, ''))
+      },
+    }
+    registerHotkey(escapeHotkey)
+
+    return () => {
+      unregisterHotkey(enterHotkey.keyCombo)
+      unregisterHotkey(escapeHotkey.keyCombo)
+    }
+  }, [
+    isEditing,
+    baseName,
+    registerHotkey,
+    unregisterHotkey,
+    handleRename,
+    setEditingFilename,
+  ])
 
   return (
     <li
@@ -115,18 +164,6 @@ export function AssetItem({
             autoFocus={true}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            onKeyDownCapture={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                handleRename()
-              }
-              if (e.key === 'Escape') {
-                e.preventDefault()
-                e.stopPropagation()
-                setEditingFilename(null)
-                setNewName(baseName.replace(/\.[^/.]+$/, ''))
-              }
-            }}
             className="w-full border-b border-gray-300 bg-transparent text-sm text-gray-800 focus:outline-hidden"
           />
         ) : (

@@ -1,14 +1,6 @@
-import { FormActions } from '@/components/FormActions'
+import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
-import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useState } from 'react'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
@@ -28,11 +20,7 @@ export function EditPageMetadataDialog({
   slug: propSlug,
   onChange,
 }: EditPageMetadataDialogProps) {
-  const closeDialog = useDialogsStore((s) => s.closeDialog)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
-  const open = useDialogsStore(
-    (s) => s.dialogType === DIALOG_EDIT_PAGE_METADATA,
-  )
 
   const [title, setTitle] = useState(propTitle)
   const [slug, setSlug] = useState(propSlug)
@@ -56,11 +44,6 @@ export function EditPageMetadataDialog({
     setFieldErrors((prev) => ({ ...prev, slug: '' }))
   }, [])
 
-  const handleCancel = () => {
-    resetForm()
-    closeDialog()
-  }
-
   const resetForm = () => {
     setTitle(propTitle)
     setSlug(propSlug)
@@ -70,71 +53,60 @@ export function EditPageMetadataDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          resetForm()
-          closeDialog()
-        }
+    <BaseDialog
+      dialogType={DIALOG_EDIT_PAGE_METADATA}
+      dialogTitle="Edit page metadata"
+      dialogDescription="Change metadata of the page"
+      onClose={() => {
+        resetForm()
+        return true
       }}
+      onConfirm={async (type) => {
+        if (type === 'confirm') {
+          onChange(title, slug)
+          return true
+        }
+        return false
+      }}
+      cancelButton={{ label: 'Cancel', variant: 'outline', autoFocus: false }}
+      buttons={[
+        {
+          label: 'Change',
+          actionType: 'confirm',
+          disabled: isSaveDisabled,
+          variant: 'default',
+          autoFocus: true,
+        },
+      ]}
     >
-      <DialogContent
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !isSaveDisabled) {
-            e.preventDefault()
-            onChange(title, slug)
-            closeDialog()
-          }
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle>Edit page metadata</DialogTitle>
-          <DialogDescription>Change metadata of the page</DialogDescription>
-        </DialogHeader>
+      <div className="space-y-4">
+        <FormInput
+          autoFocus
+          label="Title"
+          value={title}
+          onChange={handleTitleChange}
+          placeholder="Page title"
+          error={fieldErrors.title}
+        />
 
-        <div className="space-y-4">
-          <FormInput
-            autoFocus
-            label="Title"
-            value={title}
-            onChange={handleTitleChange}
-            placeholder="Page title"
-            error={fieldErrors.title}
-          />
+        <SlugInputWithSuggestion
+          title={title}
+          slug={slug}
+          currentId={currentId}
+          parentId={parentId}
+          enableSlugSuggestion={true}
+          onSlugChange={handleSlugChange}
+          onSlugTouchedChange={setSlugTouched}
+          onSlugLoadingChange={setSlugLoading}
+          onLastSlugTitleChange={setLastSlugTitle}
+          error={fieldErrors.slug}
+        />
+      </div>
 
-          <SlugInputWithSuggestion
-            title={title}
-            slug={slug}
-            currentId={currentId}
-            parentId={parentId}
-            enableSlugSuggestion={true}
-            onSlugChange={handleSlugChange}
-            onSlugTouchedChange={setSlugTouched}
-            onSlugLoadingChange={setSlugLoading}
-            onLastSlugTitleChange={setLastSlugTitle}
-            error={fieldErrors.slug}
-          />
-        </div>
-
-        <span className="text-sm text-gray-500">
-          Path: {parentPath !== '' && `${parentPath}/`}
-          {slug && `${slug}`}
-        </span>
-
-        <div className="mt-4 flex justify-end">
-          <FormActions
-            onCancel={handleCancel}
-            onSave={() => {
-              onChange(title, slug)
-              closeDialog()
-            }}
-            saveLabel="Change"
-            disabled={isSaveDisabled}
-            loading={false}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+      <span className="text-sm text-gray-500">
+        Path: {parentPath !== '' && `${parentPath}/`}
+        {slug && `${slug}`}
+      </span>
+    </BaseDialog>
   )
 }

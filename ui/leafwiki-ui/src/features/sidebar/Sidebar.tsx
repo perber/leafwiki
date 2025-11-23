@@ -1,7 +1,9 @@
 import ScrollableContainer from '@/components/ScrollableContainer'
 import { panelItemRegistry } from '@/lib/registries'
+import { PanelItem } from '@/lib/registries/panelItemRegistry'
+import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSidebarStore } from '@/stores/sidebar'
-import { JSX, useMemo } from 'react'
+import { JSX, useEffect, useMemo } from 'react'
 
 const registeredItems = panelItemRegistry.getAllItems()
 
@@ -21,6 +23,54 @@ export default function Sidebar() {
         })),
       [items],
     )
+
+  // add hotkeys for each tab
+  const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
+  const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
+
+  // Create stable action functions outside of the map using useMemo
+  // This prevents actions from being recreated on every render
+  const actions = useMemo(() => {
+    const actionMap = new Map<string, () => void>()
+    items.forEach((item) => {
+      actionMap.set(item.id, () => setSidebarMode(item.id))
+    })
+    return actionMap
+  }, [items, setSidebarMode])
+
+  // Memoize hotkey definitions using the stable actions
+  const hotKeyDefs = useMemo(
+    () =>
+      items
+        .map((item) => {
+          const hotkey = (item as PanelItem).hotkey as string | undefined
+          if (!hotkey) return null
+          return {
+            keyCombo: hotkey,
+            enabled: true,
+            action: actions.get(item.id)!,
+            mode: ['view', 'edit'],
+          }
+        })
+        .filter(Boolean) as {
+        keyCombo: string
+        enabled: boolean
+        action: () => void
+        mode: string[]
+      }[],
+    [items, actions],
+  )
+
+  useEffect(() => {
+    hotKeyDefs.forEach((hotKeyDef) => {
+      registerHotkey(hotKeyDef)
+    })
+    return () => {
+      hotKeyDefs.forEach((hotKeyDef) => {
+        unregisterHotkey(hotKeyDef.keyCombo)
+      })
+    }
+  }, [hotKeyDefs, registerHotkey, unregisterHotkey])
 
   return (
     <aside
@@ -64,7 +114,7 @@ export default function Sidebar() {
           {/* Content */}
           {items.map((item) => (
             <ScrollableContainer key={item.id} hidden={sidebarMode !== item.id}>
-              {item.render({})}
+              {item.render({ active: sidebarMode === item.id })}
             </ScrollableContainer>
           ))}
         </div>
