@@ -32,7 +32,8 @@ export function ChangePasswordDialog({
 
   if (!user) return null
 
-  const submitDisabled = loading ||
+  const submitDisabled =
+    loading ||
     password.length < 8 ||
     password !== confirm ||
     fieldErrors.password !== '' ||
@@ -98,7 +99,7 @@ export function ChangePasswordDialog({
           actionType: 'confirm',
           autoFocus: false,
           loading,
-          disabled: submitDisabled
+          disabled: submitDisabled,
         },
       ]}
     >

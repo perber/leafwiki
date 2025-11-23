@@ -127,7 +127,6 @@ export function AssetItem({
       unregisterHotkey(enterHotkey.keyCombo)
       unregisterHotkey(escapeHotkey.keyCombo)
     }
-
   }, [
     isEditing,
     baseName,

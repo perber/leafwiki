@@ -47,11 +47,11 @@ export default function Sidebar() {
           }
         })
         .filter(Boolean) as {
-          keyCombo: string
-          enabled: boolean
-          action: () => void
-          mode: string[]
-        }[],
+        keyCombo: string
+        enabled: boolean
+        action: () => void
+        mode: string[]
+      }[],
     [items, setSidebarMode],
   )
 
