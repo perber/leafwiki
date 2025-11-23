@@ -64,11 +64,9 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
         onEscapeKeyDown={(e: KeyboardEvent) => {
           e.preventDefault()
         }}
-        onKeyDown={
-          (e: React.KeyboardEvent<HTMLDivElement>) => {
-            e.preventDefault()
-          }
-        }
+        onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+          e.preventDefault()
+        }}
       >
         <DialogHeader>
           <DialogTitle>Asset Manager</DialogTitle>

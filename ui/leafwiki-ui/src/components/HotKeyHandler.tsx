@@ -37,10 +37,8 @@ export function HotKeyHandler() {
         const activeElement = document.activeElement
         if (
           activeElement &&
-          (
-            activeElement.tagName === 'BUTTON' ||
-            activeElement.tagName === 'TEXTAREA'
-          )
+          (activeElement.tagName === 'BUTTON' ||
+            activeElement.tagName === 'TEXTAREA')
         ) {
           console.debug(
             `Hotkey ${comboString} ignored due to focus on button or textarea`,
