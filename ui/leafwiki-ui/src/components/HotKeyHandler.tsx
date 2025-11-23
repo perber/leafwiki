@@ -40,9 +40,6 @@ export function HotKeyHandler() {
           (activeElement.tagName === 'BUTTON' ||
             activeElement.tagName === 'TEXTAREA')
         ) {
-          console.debug(
-            `Hotkey ${comboString} ignored due to focus on button or textarea`,
-          )
           return
         }
       }

@@ -100,33 +100,34 @@ export function AssetItem({
   }
 
   useEffect(() => {
-    if (isEditing) {
-      const enterHotkey: HotKeyDefinition = {
-        keyCombo: 'Enter',
-        enabled: true,
-        mode: ['dialog'],
-        action: () => {
-          handleRename()
-        },
-      }
-      registerHotkey(enterHotkey)
+    if (!isEditing) return
 
-      const escapeHotkey: HotKeyDefinition = {
-        keyCombo: 'Escape',
-        enabled: true,
-        mode: ['dialog'],
-        action: () => {
-          setEditingFilename(null)
-          setNewName(baseName.replace(/\.[^/.]+$/, ''))
-        },
-      }
-      registerHotkey(escapeHotkey)
-
-      return () => {
-        unregisterHotkey(enterHotkey.keyCombo)
-        unregisterHotkey(escapeHotkey.keyCombo)
-      }
+    const enterHotkey: HotKeyDefinition = {
+      keyCombo: 'Enter',
+      enabled: true,
+      mode: ['dialog'],
+      action: () => {
+        handleRename()
+      },
     }
+    registerHotkey(enterHotkey)
+
+    const escapeHotkey: HotKeyDefinition = {
+      keyCombo: 'Escape',
+      enabled: true,
+      mode: ['dialog'],
+      action: () => {
+        setEditingFilename(null)
+        setNewName(baseName.replace(/\.[^/.]+$/, ''))
+      },
+    }
+    registerHotkey(escapeHotkey)
+
+    return () => {
+      unregisterHotkey(enterHotkey.keyCombo)
+      unregisterHotkey(escapeHotkey.keyCombo)
+    }
+
   }, [
     isEditing,
     baseName,
