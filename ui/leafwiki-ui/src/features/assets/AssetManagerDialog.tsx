@@ -45,23 +45,8 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
     }
 
     registerHotkey(cancelHotkey)
-
-    const enterHotkey: HotKeyDefinition = {
-      keyCombo: 'Enter',
-      enabled: true,
-      mode: ['dialog'],
-      action: () => {
-        if (open && isRenamingRef.current) {
-          // prevent dialog close when renaming
-          return
-        }
-      },
-    }
-    registerHotkey(enterHotkey)
-
     return () => {
       unregisterHotkey(cancelHotkey.keyCombo)
-      unregisterHotkey(enterHotkey.keyCombo)
     }
   }, [open, isRenamingRef, registerHotkey, unregisterHotkey, closeDialog])
 
@@ -79,6 +64,11 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
         onEscapeKeyDown={(e: KeyboardEvent) => {
           e.preventDefault()
         }}
+        onKeyDown={
+          (e: React.KeyboardEvent<HTMLDivElement>) => {
+            e.preventDefault()
+          }
+        }
       >
         <DialogHeader>
           <DialogTitle>Asset Manager</DialogTitle>
