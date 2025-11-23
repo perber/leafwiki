@@ -32,6 +32,12 @@ export function ChangePasswordDialog({
 
   if (!user) return null
 
+  const submitDisabled = loading ||
+    password.length < 8 ||
+    password !== confirm ||
+    fieldErrors.password !== '' ||
+    fieldErrors.confirm !== ''
+
   const handlePasswordChange = (val: string) => {
     setPassword(val)
     if (val.length < 8) {
@@ -83,7 +89,7 @@ export function ChangePasswordDialog({
       cancelButton={{
         label: 'Cancel',
         variant: 'outline',
-        disabled: loading,
+        disabled: submitDisabled,
         autoFocus: true,
       }}
       buttons={[
@@ -92,12 +98,7 @@ export function ChangePasswordDialog({
           actionType: 'confirm',
           autoFocus: false,
           loading,
-          disabled:
-            loading ||
-            password.length < 8 ||
-            password !== confirm ||
-            fieldErrors.password !== '' ||
-            fieldErrors.confirm !== '',
+          disabled: submitDisabled
         },
       ]}
     >
