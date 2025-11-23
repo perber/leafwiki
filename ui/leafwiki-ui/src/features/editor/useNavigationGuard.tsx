@@ -29,7 +29,6 @@ export default function useNavigationGuard({
   const onCancel = useCallback(() => {
     if (blocker.state === 'blocked' && blocker.reset) {
       blocker.reset()
-      console.log('Navigation cancelled', blocker)
     }
   }, [blocker])
 
