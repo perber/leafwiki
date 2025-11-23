@@ -1,5 +1,4 @@
-import { TooltipWrapper } from '@/components/TooltipWrapper'
-import { Button } from '@/components/ui/button'
+import { PageToolbarButton } from '@/components/PageToolbarButton'
 import { Page } from '@/lib/api/pages'
 import { DIALOG_COPY_PAGE } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -30,22 +29,13 @@ export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
   }, [openDialog, sourcePage, registerHotkey, unregisterHotkey])
 
   return (
-    <TooltipWrapper
-      label="Copy page (Ctrl + Shift + S)"
-      side="top"
-      align="center"
-    >
-      <Button
-        className="h-8 w-8 rounded-full shadow-xs"
-        variant="default"
-        size="icon"
-        data-testid="copy-page-button"
-        onClick={() => {
-          openDialog(DIALOG_COPY_PAGE, { sourcePage })
-        }}
-      >
-        <Copy size={20} />
-      </Button>
-    </TooltipWrapper>
+    <PageToolbarButton
+      label="Copy page"
+      hotkey="Ctrl + Shift + S"
+      onClick={() => {
+        openDialog(DIALOG_COPY_PAGE, { sourcePage })
+      }}
+      icon={<Copy size={20} />}
+    />
   )
 }

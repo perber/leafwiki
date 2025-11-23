@@ -213,6 +213,7 @@ export default function PageEditor() {
             data-testid="close-edit-page-button"
             className="h-8 w-8 rounded-full shadow-xs"
             size="icon"
+            aria-label="Close"
             onClick={async () => {
               // When the user presses the close button
               // we want to navigate away from the page
@@ -226,6 +227,7 @@ export default function PageEditor() {
           <Button
             onClick={() => handleSaveRef.current()}
             data-testid="save-page-button"
+            aria-label="Save"
             variant="default"
             className={'bg-success h-8 w-8 rounded-full shadow-md'}
             size="icon"
