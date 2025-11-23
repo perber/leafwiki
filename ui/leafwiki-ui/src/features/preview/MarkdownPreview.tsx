@@ -6,7 +6,6 @@ import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import Headline from './Headline'
-import { HeadlineIdProvider } from './HeadlineIdProvider'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
 import MermaidBlock from './MermaidBlock'
@@ -110,7 +109,7 @@ export default function MarkdownPreview({ content }: Props) {
   )
 
   return (
-    <HeadlineIdProvider>
+    <>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkLineNumber]}
         rehypePlugins={[rehypeHighlight]}
@@ -119,6 +118,6 @@ export default function MarkdownPreview({ content }: Props) {
         {content}
       </ReactMarkdown>
       <div id="mermaid-renderer"></div>
-    </HeadlineIdProvider>
+    </>
   )
 }

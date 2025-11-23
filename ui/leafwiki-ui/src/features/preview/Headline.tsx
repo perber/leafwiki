@@ -1,7 +1,6 @@
 import { Paperclip } from 'lucide-react'
-import { ReactNode, useMemo } from 'react'
+import { ReactNode } from 'react'
 import { JSX } from 'react/jsx-runtime'
-import { useHeadlineId } from './useHeadlineId'
 
 // Utility function to generate slugs from headline text
 const slugify = (text: string) => {
@@ -52,13 +51,7 @@ export default function Headline({
 }: HeadlineProps) {
   const text = getText(children)
   const Tag = `h${level}` as keyof JSX.IntrinsicElements
-  const { getUniqueId } = useHeadlineId()
-
-  // Use useMemo to ensure we only generate the unique ID once per render
-  const slug = useMemo(() => {
-    const baseSlug = slugify(text)
-    return getUniqueId(baseSlug)
-  }, [text, getUniqueId])
+  const slug = slugify(text)
 
   return (
     <Tag id={slug} className="anchor" data-line={dataLine}>
