@@ -28,17 +28,25 @@ export default function Sidebar() {
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
-  // Memoize hotkey definitions with stable action functions
+  // Create stable action functions outside of the map using useMemo
+  // This prevents actions from being recreated on every render
+  const actions = useMemo(() => {
+    const actionMap = new Map<string, () => void>()
+    items.forEach((item) => {
+      actionMap.set(item.id, () => setSidebarMode(item.id))
+    })
+    return actionMap
+  }, [items, setSidebarMode])
+
+  // Memoize hotkey definitions using the stable actions
   const hotKeyDefs = useMemo(
     () =>
       items
         .map((item) => {
           const hotkey = (item as PanelItem).hotkey as string | undefined
           if (!hotkey) return null
-          // Memoize the action function for each item
-          const action = () => {
-            setSidebarMode(item.id)
-          }
+          const action = actions.get(item.id)
+          if (!action) return null
           return {
             keyCombo: hotkey,
             enabled: true,
@@ -52,7 +60,7 @@ export default function Sidebar() {
         action: () => void
         mode: string[]
       }[],
-    [items, setSidebarMode],
+    [items, actions],
   )
 
   useEffect(() => {
