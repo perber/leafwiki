@@ -7,10 +7,10 @@ import { useEffect, useRef, useState } from 'react'
 import SearchResultCard from './SearchResultCard'
 
 type SearchProps = {
-  active: boolean
+  active?: boolean
 }
 
-export default function Search({ active }: SearchProps) {
+export default function Search({ active = false }: SearchProps) {
   const [query, setQuery] = useState('')
   const [limit, setLimit] = useState<number>(10)
   const [loading, setLoading] = useState<boolean>(false)
