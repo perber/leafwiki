@@ -45,12 +45,10 @@ export default function Sidebar() {
         .map((item) => {
           const hotkey = (item as PanelItem).hotkey as string | undefined
           if (!hotkey) return null
-          const action = actions.get(item.id)
-          if (!action) return null
           return {
             keyCombo: hotkey,
             enabled: true,
-            action,
+            action: actions.get(item.id)!,
             mode: ['view', 'edit'],
           }
         })
