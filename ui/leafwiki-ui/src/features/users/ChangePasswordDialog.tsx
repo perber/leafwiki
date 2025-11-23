@@ -90,7 +90,7 @@ export function ChangePasswordDialog({
       cancelButton={{
         label: 'Cancel',
         variant: 'outline',
-        disabled: submitDisabled,
+        disabled: loading,
         autoFocus: true,
       }}
       buttons={[
