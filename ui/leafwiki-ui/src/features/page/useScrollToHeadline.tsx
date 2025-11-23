@@ -53,7 +53,6 @@ function scrollToHeadline(hash: string) {
       if (elapsedTime < maxTotalTime) {
         setTimeout(checkHeight, interval)
       } else {
-        console.log('Max wait time reached. Proceeding with scroll.')
         callback()
       }
     }
