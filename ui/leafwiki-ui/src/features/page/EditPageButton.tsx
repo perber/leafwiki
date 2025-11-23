@@ -1,5 +1,4 @@
-import { TooltipWrapper } from '@/components/TooltipWrapper'
-import { Button } from '@/components/ui/button'
+import { PageToolbarButton } from '@/components/PageToolbarButton'
 import { buildEditUrl } from '@/lib/urlUtil'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { Pencil } from 'lucide-react'
@@ -31,16 +30,11 @@ export function EditPageButton({ path }: { path: string }) {
   }, [navigate, path, registerHotkey, unregisterHotkey])
 
   return (
-    <TooltipWrapper label="Edit page (Ctrl + e)" side="top" align="center">
-      <Button
-        data-testid="edit-page-button"
-        className="h-8 w-8 rounded-full shadow-xs"
-        variant="default"
-        size="icon"
-        onClick={() => navigate(buildEditUrl(path))}
-      >
-        <Pencil size={20} />
-      </Button>
-    </TooltipWrapper>
+    <PageToolbarButton
+      label="Edit page"
+      hotkey="Ctrl+E"
+      onClick={() => navigate(buildEditUrl(path))}
+      icon={<Pencil size={20} />}
+    />
   )
 }
