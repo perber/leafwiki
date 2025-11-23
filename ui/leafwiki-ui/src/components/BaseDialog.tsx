@@ -76,22 +76,25 @@ export default function BaseDialog({
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
   useEffect(() => {
+    // Only register hotkeys when the dialog is open
+    if (!open) {
+      return
+    }
+
     const confirmHotkey: HotKeyDefinition = {
       keyCombo: 'Enter',
       enabled: true,
       mode: ['dialog'],
       action: async () => {
-        if (open) {
-          if (defaultAction === 'cancel') {
-            onClose()
-            closeDialog()
-            return
-          }
+        if (defaultAction === 'cancel') {
+          onClose()
+          closeDialog()
+          return
+        }
 
-          const result = await onConfirm('confirm')
-          if (result) {
-            closeDialog()
-          }
+        const result = await onConfirm('confirm')
+        if (result) {
+          closeDialog()
         }
       },
     }
@@ -100,10 +103,8 @@ export default function BaseDialog({
       enabled: true,
       mode: ['dialog'],
       action: () => {
-        if (open) {
-          onClose()
-          closeDialog()
-        }
+        onClose()
+        closeDialog()
       },
     }
     registerHotkey(confirmHotkey)
