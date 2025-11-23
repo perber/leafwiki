@@ -5,7 +5,7 @@ export default class CreatePageByPathDialog {
 
   async clickCreate() {
     const createButton = this.page.locator(
-      'button[data-testid="create-page-by-path-dialog-save-button"]',
+      'button[data-testid="create-page-by-path-dialog-button-confirm"]',
     );
     await createButton.click();
     await this.page.waitForTimeout(600); // wait for creation to complete

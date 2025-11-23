@@ -98,11 +98,11 @@ export function CreatePageByPathDialog({
       dialogTitle="Create a new page"
       dialogDescription="Please enter the title"
       dialogType={DIALOG_CREATE_PAGE_BY_PATH}
+      testidPrefix="create-page-by-path-dialog"
       onClose={() => true}
       onConfirm={async (): Promise<boolean> => {
         return await handleCreate()
       }}
-      testidPrefix="create-page-by-path-dialog"
       cancelButton={{
         label: 'Cancel',
         variant: 'outline',

@@ -158,7 +158,7 @@ export default function BaseDialog({
               }}
               disabled={cancelButton.loading || cancelButton.disabled}
               data-testid={
-                testidPrefix ? `${testidPrefix}-cancel-button` : undefined
+                testidPrefix ? `${testidPrefix}-button-cancel` : undefined
               }
               variant={
                 cancelButton.variant as

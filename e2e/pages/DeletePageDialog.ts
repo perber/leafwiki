@@ -22,7 +22,7 @@ export default class DeletePageDialog {
 
   async abortDeletion() {
     const cancelButton = this.page.locator(
-      'button[data-testid="delete-page-dialog-cancel-button"]',
+      'button[data-testid="delete-page-dialog-button-cancel"]',
     );
     await cancelButton.click();
     // Wait a 600 ms to ensure the dialog has processed the deletion
@@ -30,7 +30,7 @@ export default class DeletePageDialog {
   }
 
   async confirmDeletion() {
-    const deleteButton = this.page.locator('button[data-testid="delete-page-dialog-save-button"]');
+    const deleteButton = this.page.locator('button[data-testid="delete-page-dialog-button-confirm"]');
     await deleteButton.click();
     // We will be redirected to another page, so wait a bit
     await this.page.waitForTimeout(1000);

@@ -70,6 +70,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
   return (
     <BaseDialog
       dialogType={DIALOG_MOVE_PAGE}
+      testidPrefix="move-page-dialog"
       dialogTitle="Move Page"
       dialogDescription="Select a new parent for this page"
       onClose={() => true}

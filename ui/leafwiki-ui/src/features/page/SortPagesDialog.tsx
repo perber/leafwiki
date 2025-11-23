@@ -57,6 +57,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
   return (
     <BaseDialog
       dialogType={DIALOG_SORT_PAGES}
+      testidPrefix='sort-pages-dialog'
       dialogTitle="Sort Pages"
       dialogDescription="Sort the pages by clicking the arrows. The order will be saved after you click 'Save'."
       onClose={() => true}
