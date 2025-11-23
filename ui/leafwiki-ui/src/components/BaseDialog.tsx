@@ -173,9 +173,9 @@ export default function BaseDialog({
               {cancelButton.label}
             </Button>
           )}
-          {buttons?.map((button, index) => (
+          {buttons?.map((button) => (
             <Button
-              key={index}
+              key={button.actionType}
               onClick={async () => {
                 const result = await onConfirm(button.actionType)
                 if (result) {
