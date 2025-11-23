@@ -60,7 +60,7 @@ function scrollToHeadline(hash: string) {
     setTimeout(checkHeight, interval)
   }
 
-  waitUntilHeightStabilizes(contentContainer!, scroll)
+  waitUntilHeightStabilizes(contentContainer, scroll)
 
   function scroll() {
     if (!contentContainer || !headlineElement) return
