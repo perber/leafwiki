@@ -38,7 +38,7 @@ export function DeletePageButton({
   return (
     <PageToolbarButton
       label="Delete page"
-      hotkey="Ctrl + Delete"
+      hotkey="Ctrl+Delete"
       onClick={() => {
         openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, { pageId, redirectUrl })
       }}
