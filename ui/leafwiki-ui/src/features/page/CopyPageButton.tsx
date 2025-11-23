@@ -31,7 +31,7 @@ export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
 
   return (
     <TooltipWrapper
-      label="Copy page (Ctrl + Alt + D)"
+      label="Copy page (Ctrl + Shift + S)"
       side="top"
       align="center"
     >
