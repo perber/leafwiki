@@ -254,7 +254,7 @@
 
   main article .anchor:hover a,
   #markdown-preview-container .anchor:hover a {
-    @apply text-zinc-700;
+    @apply text-zinc-700 dark:text-zinc-300;
   }
 
   main article .anchor a span,
