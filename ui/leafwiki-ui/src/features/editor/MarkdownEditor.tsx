@@ -368,6 +368,7 @@ const MarkdownEditor = (
       <div
         ref={setPreviewRef}
         className="prose prose-base custom-scrollbar box-content h-full w-full overflow-auto"
+        id="markdown-preview-container"
       >
         <div className="p-4">
           <MarkdownPreview content={debouncedPreview} key={assetVersion} />
