@@ -67,7 +67,12 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
         }
         return false
       }}
-      cancelButton={{ label: 'Cancel', variant: 'outline', autoFocus: false, disabled: loading }}
+      cancelButton={{
+        label: 'Cancel',
+        variant: 'outline',
+        autoFocus: false,
+        disabled: loading,
+      }}
       buttons={[
         {
           label: 'Save',
