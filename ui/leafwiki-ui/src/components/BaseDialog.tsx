@@ -55,7 +55,14 @@ export type BaseDialogConfirmButton = {
   loading?: boolean
   disabled?: boolean
   autoFocus?: boolean
-  actionType: string // 'confirm' | 'cancel' | 'custom' -> we pass this to the confirmation / cancellation handlers
+  /**
+   * The type of action this button represents. This value is passed to the `onConfirm` handler
+   * to distinguish between different action buttons. Common values include:
+   * - 'confirm': for the main confirmation action
+   * - 'cancel': for a cancellation action
+   * - 'custom': for any custom action
+   */
+  actionType: string
 }
 
 export default function BaseDialog({
