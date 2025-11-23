@@ -32,7 +32,7 @@ export function EditPageButton({ path }: { path: string }) {
   return (
     <PageToolbarButton
       label="Edit page"
-      hotkey="Ctrl + E"
+      hotkey="Ctrl+E"
       onClick={() => navigate(buildEditUrl(path))}
       icon={<Pencil size={20} />}
     />
