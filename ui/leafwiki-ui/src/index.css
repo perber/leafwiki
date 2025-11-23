@@ -266,7 +266,7 @@
     @apply -left-5;
     @apply top-1/2;
     @apply -translate-y-1/2;
-    @apply text-gray-600;
+    @apply text-gray-600 dark:text-gray-400;
   }
 
   main article .anchor a:hover span {
