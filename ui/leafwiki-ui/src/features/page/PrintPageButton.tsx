@@ -5,7 +5,7 @@ export function PrintPageButton() {
   return (
     <PageToolbarButton
       label="Print page"
-      hotkey="Ctrl + P"
+      hotkey="Ctrl+P"
       onClick={() => {
         if (typeof window.print === 'function') {
           try {
