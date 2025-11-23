@@ -31,7 +31,7 @@ export function CopyPageButton({ sourcePage }: { sourcePage: Page }) {
   return (
     <PageToolbarButton
       label="Copy page"
-      hotkey="Ctrl + Shift + S"
+      hotkey="Ctrl+Shift+S"
       onClick={() => {
         openDialog(DIALOG_COPY_PAGE, { sourcePage })
       }}
