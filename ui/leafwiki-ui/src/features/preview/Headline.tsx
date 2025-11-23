@@ -53,7 +53,7 @@ export default function Headline({
   const Tag = `h${level}` as keyof JSX.IntrinsicElements
   const slug = slugfiy(text)
   return (
-    <Tag id={slugfiy(text)} className="anchor" data-line={dataLine}>
+    <Tag id={slug} className="anchor" data-line={dataLine}>
       <a className="no-underline hover:underline" href={`#${slug}`}>
         {children}
         <span className="absolute top-1/2 -left-5 -translate-y-1/2 text-gray-600">
