@@ -1,9 +1,9 @@
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom'
 import LoginForm from '../auth/LoginForm'
 import PageEditor from '../editor/PageEditor'
-import PageViewer from '../page/PageViewer'
 import RootRedirect from '../page/RootRedirect'
 import UserManagement from '../users/UserManagement'
+import PageViewer from '../viewer/PageViewer'
 import AuthWrapper from './RouterAuthWrapper'
 import ReadOnlyWrapper from './RouterReadOnlyWrapper'
 

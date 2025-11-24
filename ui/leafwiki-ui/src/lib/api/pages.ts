@@ -11,6 +11,7 @@ export type PageNode = {
 
 export interface Page {
   id: string
+  slug: string
   path: string
   title: string
   content: string
@@ -38,11 +39,11 @@ export async function suggestSlug(
   }
 }
 
-export async function getPageByPath(path: string) {
+export async function getPageByPath(path: string): Promise<Page> {
   try {
-    return await fetchWithAuth(
+    return (await fetchWithAuth(
       `/api/pages/by-path?path=${encodeURIComponent(path)}`,
-    )
+    )) as Page
   } catch {
     throw new Error('Page not found')
   }
@@ -89,12 +90,12 @@ export async function updatePage(
   title: string,
   slug: string,
   content: string,
-) {
-  return await fetchWithAuth(`/api/pages/${id}`, {
+): Promise<Page | null> {
+  return (await fetchWithAuth(`/api/pages/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, slug, content }),
-  })
+  })) as Page | null
 }
 
 export async function deletePage(id: string, recursive: boolean) {
