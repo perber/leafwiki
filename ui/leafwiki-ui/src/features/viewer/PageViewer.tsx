@@ -54,23 +54,30 @@ export default function PageViewer() {
     loadPageData?.(path)
   }, [pathname, loadPageData])
 
-  if (loading) return <Loader />
+  if (loading)
+    return (
+      <div className="p-6">
+        <Loader />
+      </div>
+    )
 
-  if (!page) return <Page404 />
+  if (!page)
+    return (
+      <div className="p-6">
+        <Page404 />
+      </div>
+    )
 
-  if (error) return <p className="p-2 text-sm text-red-500">Error: {error}</p>
+  if (error) return <p className="p-6 text-sm text-red-500">Error: {error}</p>
 
   return (
-    <>
+    <div className="p-6">
       <div className="mb-6">
         <Breadcrumbs />
       </div>
-      <article
-        id="page-view"
-        className="page-view prose prose-base max-w-none leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mt-0 [&_ol_ol]:mb-0 [&_ol_ul]:mt-0 [&_ul_ol]:mb-0 [&_ul_ul]:mt-0 [&_ul_ul]:mb-0 [&_ul>li::marker]:text-gray-800"
-      >
+      <article className="prose prose-base max-w-none leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mt-0 [&_ol_ol]:mb-0 [&_ol_ul]:mt-0 [&_ul_ol]:mb-0 [&_ul_ul]:mt-0 [&_ul_ul]:mb-0 [&_ul>li::marker]:text-gray-800">
         <MarkdownPreview content={page.content} />
       </article>
-    </>
+    </div>
   )
 }

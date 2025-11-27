@@ -81,11 +81,21 @@ export default function PageEditor() {
     [setContent],
   )
 
-  if (loading) return <Loader />
+  if (loading)
+    return (
+      <div className="p-6">
+        <Loader />
+      </div>
+    )
 
-  if (error) return <p className="p-2 text-sm text-red-500">Error: {error}</p>
+  if (error) return <p className="p-6 text-sm text-red-500">Error: {error}</p>
 
-  if (!initialPage) return <Page404 />
+  if (!initialPage)
+    return (
+      <div className="p-6">
+        <Page404 />
+      </div>
+    )
 
   return (
     <>

@@ -119,7 +119,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [sidebarWidth])
 
   let mainContainerStyle = !isEditor
-    ? 'overflow-auto p-6 custom-scrollbar'
+    ? 'overflow-auto custom-scrollbar'
     : 'overflow-hidden'
 
   // If on mobile and sidebar is visible, hide overflow to prevent double scrollbars
@@ -171,7 +171,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div className="space-between-header-and-main h-[85px] w-full" />
-      <div className="content-wrapper flex h-[calc(100dvh-85px)] transition-all duration-200">
+      <div className="content-wrapper flex h-[calc(100dvh-85px)]">
         <div
           ref={sidebarContainerRef}
           id="sidebar-container"
