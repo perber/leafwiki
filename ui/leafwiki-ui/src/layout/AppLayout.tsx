@@ -2,9 +2,10 @@ import { DialogManager } from '@/components/DialogManager'
 import { HotKeyHandler } from '@/components/HotKeyHandler'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { usePageToolbar } from '@/components/usePageToolbar'
 import UserToolbar from '@/components/UserToolbar'
+import { EditorTitleBar } from '@/features/editor/EditorTitleBar'
 import Sidebar from '@/features/sidebar/Sidebar'
+import { Toolbar } from '@/features/toolbar/Toolbar'
 import { useAppMode } from '@/lib/useAppMode'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -20,7 +21,6 @@ import { Link } from 'react-router-dom'
 export const MOBILE_SIDEBAR_WIDTH = 320
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { content, titleBar } = usePageToolbar()
   const appMode = useAppMode()
   const [isEditor, setIsEditor] = useState(appMode === 'edit')
 
@@ -162,10 +162,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </h2>
           </div>
           <div className="flex min-h-full flex-1 items-center justify-center">
-            {titleBar}
+            <EditorTitleBar />
           </div>
           <div className="flex min-h-full items-center gap-4">
-            {content}
+            <Toolbar />
             <UserToolbar />
           </div>
         </div>
