@@ -29,7 +29,11 @@ export default function Breadcrumbs() {
       current = match
     }
 
-    return crumbs
+    if (segments.length == crumbs.length) {
+      return crumbs
+    }
+
+    return []
   }
 
   const breadcrumbs = buildBreadcrumbs()
