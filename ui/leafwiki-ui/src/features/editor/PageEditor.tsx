@@ -85,7 +85,7 @@ export default function PageEditor() {
 
   if (error) return <p className="p-2 text-sm text-red-500">Error: {error}</p>
 
-  if (!initialPage || error) return <Page404 />
+  if (!initialPage) return <Page404 />
 
   return (
     <>
