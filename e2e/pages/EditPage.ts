@@ -17,7 +17,7 @@ export default class EditPage {
   }
 
   async closeEditor() {
-    const closeButton = this.page.locator('button[data-testid="close-edit-page-button"]');
+    const closeButton = this.page.locator('button[data-testid="close-editor-button"]');
     await closeButton.click();
   }
 
