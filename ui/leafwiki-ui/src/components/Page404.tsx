@@ -19,7 +19,7 @@ export default function Page404() {
       <p className="text-sm text-gray-500">
         The page you are looking for does not exist.
       </p>
-      {(user && !readOnlyMode && appMode === 'view') && (
+      {user && !readOnlyMode && appMode === 'view' && (
         <>
           <p className="text-sm text-gray-500">
             Create the page by clicking the button below.

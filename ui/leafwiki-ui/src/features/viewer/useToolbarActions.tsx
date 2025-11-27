@@ -37,7 +37,7 @@ export function useToolbarActions({
       {
         id: 'delete-page',
         label: 'Delete Page',
-        hotkey: 'Ctrl+D',
+        hotkey: 'Ctrl+Delete',
         icon: <Trash2 size={18} />,
         variant: 'outline',
         className: 'hover:text-red-600 hover:bg-red-100 hover:border-red-300',
@@ -46,7 +46,7 @@ export function useToolbarActions({
       {
         id: 'copy-page',
         label: 'Copy Page',
-        hotkey: 'Ctrl+Shift+C',
+        hotkey: 'Ctrl+Shift+S',
         icon: <Copy size={18} />,
         variant: 'outline',
         action: copyPage,
