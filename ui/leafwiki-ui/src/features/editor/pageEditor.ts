@@ -91,7 +91,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     }
   },
   loadPageData: async (path: string) => {
-    set({ error: null, page: null })
+    set({ error: null, page: null, initialPage: null })
     useProgressbarStore.getState().setLoading(true)
     try {
       const page = await getPageByPath(path)
