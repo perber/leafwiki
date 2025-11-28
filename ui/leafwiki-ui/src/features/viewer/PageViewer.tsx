@@ -10,6 +10,7 @@ import { useCallback, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import Breadcrumbs from './Breadcrumbs'
+import { useDelayedVisibility } from './useDelayedVisibility'
 import { useScrollToHeadline } from './useScrollToHeadline'
 import { useSetPageTitle } from './useSetPageTitle'
 import { useToolbarActions } from './useToolbarActions'
@@ -44,6 +45,12 @@ export default function PageViewer() {
     }, [page, openDialog]),
   }
 
+    // zeigt Skeleton nur bei "langsam" + mind. 150ms
+  const showLoader = useDelayedVisibility(loading, {
+    delay: 180,
+    minVisible: 200,
+  })
+
   useScrollRestoration(pathname, loading)
   useScrollToHeadline({ content: page?.content || '', isLoading: loading })
   useToolbarActions(actions)
@@ -59,17 +66,17 @@ export default function PageViewer() {
       <div>
         <Breadcrumbs />
       </div>
-      {loading && (
+      {showLoader && (
         <div className="mt-6">
           <Loader />
         </div>
       )}
-      {!loading && page && !error && (
+      {!showLoader && !loading && page && !error && (
         <article className="prose prose-base mt-6 max-w-none leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mt-0 [&_ol_ol]:mb-0 [&_ol_ul]:mt-0 [&_ul_ol]:mb-0 [&_ul_ul]:mt-0 [&_ul_ul]:mb-0 [&_ul>li::marker]:text-gray-800">
           <MarkdownPreview content={page.content} />
         </article>
       )}
-      {!loading && !page && (
+      {!showLoader && !loading && !page && (
         <div>
           <Page404 />
         </div>
