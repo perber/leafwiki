@@ -48,6 +48,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
 
     set({ error: null })
     try {
+      useProgressbarStore.getState().setLoading(true)
       const titleChanged = page.title !== title
       const slugChanged = page.slug !== slug
 
@@ -85,6 +86,8 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       }
 
       throw err
+    } finally {
+      useProgressbarStore.getState().setLoading(false)
     }
   },
   loadPageData: async (path: string) => {
