@@ -10,7 +10,6 @@ export interface ProgressbarState {
 
 export const useProgressbarStore = create<ProgressbarState>((set) => ({
   loading: false,
-  displayProgressbar: false,
   setLoading: (loading: boolean) => {
     set({ loading })
   },
