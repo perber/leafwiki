@@ -74,6 +74,8 @@ export default function Progressbar() {
 
     return () => {
       clearShowTimer()
+      clearHideTimer()
+      clearIntervalTimer()
     }
     // we want to run this effect only when 'loading' changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
