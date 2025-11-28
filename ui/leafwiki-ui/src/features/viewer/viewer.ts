@@ -20,7 +20,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   loadPageData: async (path: string) => {
-    set({ loading: true, error: null, page: null })
+    set({ loading: true, error: null })
     try {
       const page = await getPageByPath(path)
       set({ page })
