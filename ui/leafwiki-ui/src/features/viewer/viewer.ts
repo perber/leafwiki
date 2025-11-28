@@ -3,24 +3,22 @@
 
 import { getPageByPath, Page } from '@/lib/api/pages'
 import { create } from 'zustand'
+import { useProgressbarStore } from '../progressbar/progressbar'
 
 interface ViewerState {
-  loading: boolean
   error: string | null
   page: Page | null
-  setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   loadPageData?: (path: string) => Promise<void>
 }
 
 export const useViewerStore = create<ViewerState>((set) => ({
-  loading: true,
   error: null,
   page: null,
-  setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   loadPageData: async (path: string) => {
-    set({ loading: true, error: null })
+    useProgressbarStore.getState().setLoading(true)
+    set({ error: null })
     try {
       const page = await getPageByPath(path)
       set({ page })
@@ -31,7 +29,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
         set({ error: 'An unknown error occurred' })
       }
     } finally {
-      set({ loading: false })
+      useProgressbarStore.getState().setLoading(false)
     }
   },
 }))

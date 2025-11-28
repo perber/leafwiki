@@ -8,6 +8,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useCallback, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import MarkdownPreview from '../preview/MarkdownPreview'
+import { useProgressbarStore } from '../progressbar/progressbar'
 import Breadcrumbs from './Breadcrumbs'
 import { useScrollToHeadline } from './useScrollToHeadline'
 import { useSetPageTitle } from './useSetPageTitle'
@@ -18,7 +19,7 @@ export default function PageViewer() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
-  const loading = useViewerStore((s) => s.loading)
+  const loading = useProgressbarStore((s) => s.loading)
   const error = useViewerStore((s) => s.error)
   const page = useViewerStore((s) => s.page)
   const loadPageData = useViewerStore((s) => s.loadPageData)
