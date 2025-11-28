@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom'
 import { useViewerStore } from './viewer'
 
 export default function Breadcrumbs() {
-  const tree = useTreeStore(s => s.tree)
-  const page = useViewerStore(s => s.page)
+  const tree = useTreeStore((s) => s.tree)
+  const page = useViewerStore((s) => s.page)
 
   const appMode = useAppMode()
 
