@@ -54,11 +54,14 @@ export default function PageViewer() {
     loadPageData?.(path)
   }, [pathname, loadPageData])
 
+  if (error) return <p className="p-6 text-red-500">Error: {error}</p>
+
   return (
     <div className="p-6">
       <div>
         <Breadcrumbs />
       </div>
+
       {/* we keep the content also during loading to avoid flickering */}
       {page && !error && (
         <article className="prose prose-base mt-6 max-w-none leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mt-0 [&_ol_ol]:mb-0 [&_ol_ul]:mt-0 [&_ul_ol]:mb-0 [&_ul_ul]:mt-0 [&_ul_ul]:mb-0 [&_ul>li::marker]:text-gray-800">
