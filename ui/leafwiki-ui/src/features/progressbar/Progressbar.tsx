@@ -15,7 +15,7 @@ export default function Progressbar() {
   const hideTimerRef = useRef<TimeoutId | null>(null)
   const intervalRef = useRef<IntervalId | null>(null)
 
-  // Helper zum Aufräumen
+  // Helper functions for cleanup
   const clearShowTimer = () => {
     if (showTimerRef.current) {
       clearTimeout(showTimerRef.current)
