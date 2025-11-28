@@ -1,6 +1,6 @@
 import { remarkLineNumber } from '@/features/preview/remarkLineNumber'
 import 'highlight.js/styles/github-dark.css'
-import { ClassAttributes, HTMLAttributes, useMemo } from 'react'
+import { ClassAttributes, HTMLAttributes, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
@@ -12,12 +12,21 @@ import MermaidBlock from './MermaidBlock'
 
 type Props = {
   content: string
+  path?: string
 }
 
-export default function MarkdownPreview({ content }: Props) {
+export default function MarkdownPreview({ content, path }: Props) {
+  const markdownLink = useCallback(
+    (
+      props: ClassAttributes<HTMLAnchorElement> &
+        HTMLAttributes<HTMLAnchorElement>,
+    ) => <MarkdownLink path={path} {...props} />,
+    [path],
+  )
+
   const components = useMemo(
     () => ({
-      a: MarkdownLink,
+      a: markdownLink,
       img: MarkdownImage,
       h1: ({
         children,
@@ -105,7 +114,7 @@ export default function MarkdownPreview({ content }: Props) {
         )
       },
     }),
-    [],
+    [markdownLink],
   )
 
   return (

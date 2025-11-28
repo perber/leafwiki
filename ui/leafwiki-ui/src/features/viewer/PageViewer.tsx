@@ -73,7 +73,7 @@ export default function PageViewer() {
       {/* we keep the content also during loading to avoid flickering */}
       {page && !error && (
         <article className="prose prose-base mt-6 max-w-none leading-relaxed [&_img]:h-auto [&_img]:max-w-full [&_li]:leading-snug [&_ol_ol]:mt-0 [&_ol_ol]:mb-0 [&_ol_ul]:mt-0 [&_ul_ol]:mb-0 [&_ul_ul]:mt-0 [&_ul_ul]:mb-0 [&_ul>li::marker]:text-gray-800">
-          <MarkdownPreview content={page.content} />
+          <MarkdownPreview content={page.content} path={page.path} />
         </article>
       )}
       {renderError()}
