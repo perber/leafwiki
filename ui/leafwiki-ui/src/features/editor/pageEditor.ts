@@ -4,9 +4,9 @@
 import { getPageByPath, Page, updatePage } from '@/lib/api/pages'
 import { useTreeStore } from '@/stores/tree'
 import { create } from 'zustand'
+import { useProgressbarStore } from '../progressbar/progressbar'
 
 interface PageEditorState {
-  loading: boolean // is the page data being loaded/saved
   title: string // current title in the editor
   slug: string // current slug in the editor
   content: string // current markdown content in the editor
@@ -16,7 +16,6 @@ interface PageEditorState {
   setTitle: (title: string) => void // set the current title
   setSlug: (slug: string) => void // set the current slug
   setContent: (content: string) => void // set the current markdown content
-  setLoading: (loading: boolean) => void // set the loading state
   setError: (error: string | null) => void // set the error message
   setPage: (page: Page | null) => void // set the current page
   savePage: () => Promise<Page | null | undefined> // save the current page
@@ -30,7 +29,6 @@ const isDirtyState = (s: PageEditorState) => {
 }
 
 export const usePageEditorStore = create<PageEditorState>((set, get) => ({
-  loading: true,
   error: null,
   page: null,
   title: '',
@@ -42,7 +40,6 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   setTitle: (title) => set({ title }),
   setSlug: (slug) => set({ slug }),
   setContent: (content) => set({ content }),
-  setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   setPage: (page) => set({ page }),
   savePage: async () => {
@@ -91,7 +88,8 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     }
   },
   loadPageData: async (path: string) => {
-    set({ loading: true, error: null, page: null })
+    set({ error: null, page: null })
+    useProgressbarStore.getState().setLoading(true)
     try {
       const page = await getPageByPath(path)
       set({
@@ -108,7 +106,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         set({ error: 'An unknown error occurred' })
       }
     } finally {
-      set({ loading: false })
+      useProgressbarStore.getState().setLoading(false)
     }
   },
 }))

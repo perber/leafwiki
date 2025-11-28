@@ -1,10 +1,10 @@
 import Page404 from '@/components/Page404'
-import Loader from '@/components/PageLoader'
 import { buildEditUrl } from '@/lib/urlUtil'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { useProgressbarStore } from '../progressbar/progressbar'
 import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
 import { usePageEditorStore } from './pageEditor'
 import useNavigationGuard from './useNavigationGuard'
@@ -20,7 +20,7 @@ export default function PageEditor() {
   const setContent = usePageEditorStore((s) => s.setContent)
   const loadPageData = usePageEditorStore((s) => s.loadPageData)
   const initialPage = usePageEditorStore((s) => s.initialPage) // contains the initial page data when loaded
-  const loading = usePageEditorStore((s) => s.loading)
+  const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
   const page = usePageEditorStore((s) => s.page)
   const dirty = usePageEditorStore((s) => {
@@ -81,16 +81,9 @@ export default function PageEditor() {
     [setContent],
   )
 
-  if (loading)
-    return (
-      <div className="p-6">
-        <Loader />
-      </div>
-    )
-
   if (error) return <p className="p-6 text-sm text-red-500">Error: {error}</p>
 
-  if (!initialPage)
+  if (!initialPage && !loading)
     return (
       <div className="p-6">
         <Page404 />
