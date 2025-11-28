@@ -54,7 +54,15 @@ export default function PageViewer() {
     loadPageData?.(path)
   }, [pathname, loadPageData])
 
-  if (error) return <p className="p-6 text-red-500">Error: {error}</p>
+  const renderError = () => {
+    if (!loading && !page) {
+      return <Page404 />
+    }
+    if (!loading && error) {
+      return <p className="p-6 text-red-500">Error: {error}</p>
+    }
+    return null
+  }
 
   return (
     <div className="p-6">
@@ -68,12 +76,7 @@ export default function PageViewer() {
           <MarkdownPreview content={page.content} />
         </article>
       )}
-      {/* We show the 404 page only when not loading and no page is found */}
-      {!loading && !page && (
-        <div>
-          <Page404 />
-        </div>
-      )}
+      {renderError()}
     </div>
   )
 }
