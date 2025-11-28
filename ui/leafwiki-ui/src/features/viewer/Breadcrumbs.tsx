@@ -1,20 +1,21 @@
 import { useAppMode } from '@/lib/useAppMode'
 import { useTreeStore } from '@/stores/tree'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { useViewerStore } from './viewer'
 
 export default function Breadcrumbs() {
-  const { pathname } = useLocation()
-  const { tree } = useTreeStore()
+  const tree = useTreeStore(s => s.tree)
+  const page = useViewerStore(s => s.page)
 
   const appMode = useAppMode()
 
-  if (!tree || !tree.children) return null
+  if (!page || !tree || !tree.children) return null
 
   if (appMode === 'edit') {
     return null
   }
 
-  const segments = pathname.slice(1).split('/').filter(Boolean)
+  const segments = page.path.split('/').filter(Boolean)
 
   const buildBreadcrumbs = () => {
     const crumbs = []
@@ -29,11 +30,7 @@ export default function Breadcrumbs() {
       current = match
     }
 
-    if (segments.length == crumbs.length) {
-      return crumbs
-    }
-
-    return []
+    return crumbs
   }
 
   const breadcrumbs = buildBreadcrumbs()
