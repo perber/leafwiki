@@ -28,6 +28,7 @@ import {
 } from '@/lib/config'
 import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
+import { usePageEditorStore } from './pageEditor'
 
 export type MarkdownEditorRef = {
   insertAtCursor: (text: string) => void
@@ -60,7 +61,7 @@ const MarkdownEditor = (
       previewRef.current = node
     }
   }, [])
-
+  const path = usePageEditorStore((s) => s.page?.path)
   const editorViewRef = useRef<EditorView | null>(null)
   const rafRef = useRef<number | null>(null)
   const [assetVersion, setAssetVersion] = useState(() => Date.now()) // Initial version based on current timestamp
@@ -371,11 +372,15 @@ const MarkdownEditor = (
         id="markdown-preview-container"
       >
         <div className="p-4">
-          <MarkdownPreview content={debouncedPreview} key={assetVersion} />
+          <MarkdownPreview
+            content={debouncedPreview}
+            path={path}
+            key={assetVersion}
+          />
         </div>
       </div>
     )
-  }, [assetVersion, debouncedPreview, setPreviewRef])
+  }, [assetVersion, debouncedPreview, setPreviewRef, path])
 
   // TODO: Known Issues:
   // * When we resize the window, the preview does not update immediately.

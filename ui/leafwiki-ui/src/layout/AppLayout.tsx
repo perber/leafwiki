@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import UserToolbar from '@/components/UserToolbar'
 import { EditorTitleBar } from '@/features/editor/EditorTitleBar'
+import Progressbar from '@/features/progressbar/Progressbar'
 import Sidebar from '@/features/sidebar/Sidebar'
 import { Toolbar } from '@/features/toolbar/Toolbar'
 import { useAppMode } from '@/lib/useAppMode'
@@ -119,7 +120,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [sidebarWidth])
 
   let mainContainerStyle = !isEditor
-    ? 'overflow-auto p-6 custom-scrollbar'
+    ? 'overflow-auto custom-scrollbar'
     : 'overflow-hidden'
 
   // If on mobile and sidebar is visible, hide overflow to prevent double scrollbars
@@ -135,10 +136,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={300}>
+      <Progressbar />
       <HotKeyHandler />
       <DialogManager />
       {/* Header */}
-      <header className="fixed z-50 h-[85px] w-full border-b bg-white p-4 shadow-xs">
+      <header className="fixed z-20 h-[85px] w-full border-b bg-white p-4 shadow-xs">
         <div className="flex h-full items-center justify-start">
           <div className="flex min-h-full w-6 items-center">
             {/* Sidebar Toggle Button */}
@@ -171,7 +173,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <div className="space-between-header-and-main h-[85px] w-full" />
-      <div className="content-wrapper flex h-[calc(100dvh-85px)] transition-all duration-200">
+      <div className="content-wrapper flex h-[calc(100dvh-85px)]">
         <div
           ref={sidebarContainerRef}
           id="sidebar-container"

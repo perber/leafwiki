@@ -13,6 +13,7 @@ import { AnchorHTMLAttributes, ReactNode } from 'react'
 interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string
   children?: ReactNode
+  path?: string
 }
 
 export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
@@ -63,7 +64,13 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     let normalizedHref = href
     if (!absoluteHref) {
       // For relative links, we need to add the current path as prefix.
-      let currentPath = buildViewUrl(window.location.pathname)
+      let currentPath: string
+      if (!props.path) {
+        currentPath = buildViewUrl(window.location.pathname)
+      } else {
+        currentPath = props.path
+      }
+
       // remove leading / to make path relative
       if (currentPath.startsWith('/')) {
         currentPath = currentPath.slice(1)
