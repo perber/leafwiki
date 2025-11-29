@@ -55,14 +55,14 @@ export const TreeNode = React.memo(function TreeNode({
             level === 0
               ? isActive
                 ? 'text-sm text-green-700'
-                : 'text-sm'
+                : 'text-sm text-gray-600'
               : level === 1
                 ? isActive
                   ? 'text-sm text-green-700'
-                  : 'text-sm text-gray-800'
+                  : 'text-sm text-gray-600'
                 : isActive
                   ? 'text-sm text-green-700'
-                  : 'text-sm text-gray-500'
+                  : 'text-sm text-gray-600'
           }`}
         >
           {node.title || 'Untitled Page'}

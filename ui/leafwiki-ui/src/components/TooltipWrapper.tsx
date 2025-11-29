@@ -3,6 +3,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useIsMobile } from '@/lib/useIsMobile'
 import clsx from 'clsx'
 import { ReactNode } from 'react'
 
@@ -23,6 +24,12 @@ export function TooltipWrapper({
 }: Props) {
   const tooltipSide = side || 'top'
   const tooltipAlign = align || 'start'
+  const isMobile = useIsMobile()
+
+  if (isMobile) {
+    return <>{children}</>
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>

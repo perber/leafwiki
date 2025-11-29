@@ -77,7 +77,7 @@ export default function Sidebar() {
       key={'sidebar'}
       data-testid="sidebar"
       id="sidebar"
-      className="flex h-full w-full flex-col overflow-hidden bg-white"
+      className="flex h-full w-full flex-col overflow-hidden bg-slate-50"
     >
       {/*
         The actual width is controlled by the parent container (AppLayout)
@@ -86,7 +86,7 @@ export default function Sidebar() {
       <div className="block h-full w-full">
         {' '}
         {/* Tab navigation */}
-        <div className="tab-navigation border-b bg-gray-50 p-2">
+        <div className="tab-navigation border-b border-b-gray-300 bg-slate-50 p-2">
           {/* Padding around the tabs */}
           <div className="flex text-sm">
             {tabs.map((tab) => (
