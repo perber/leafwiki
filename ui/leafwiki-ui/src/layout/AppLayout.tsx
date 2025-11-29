@@ -120,7 +120,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [sidebarWidth])
 
   let mainContainerStyle = !isEditor
-    ? 'overflow-auto custom-scrollbar'
+    ? 'overflow-auto custom-scrollbar border-l border-r border-t border-slate-200'
     : 'overflow-hidden'
 
   // If on mobile and sidebar is visible, hide overflow to prevent double scrollbars
@@ -140,13 +140,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <HotKeyHandler />
       <DialogManager />
       {/* Header */}
-      <header className="fixed z-20 h-[85px] w-full border-b bg-white p-4 shadow-xs">
+      <header className="fixed z-20 h-[85px] w-full border-b bg-slate-50 p-4">
         <div className="flex h-full items-center justify-start">
           <div className="flex min-h-full w-6 items-center">
             {/* Sidebar Toggle Button */}
             <Button
-              variant={'secondary'}
-              className="relative z-20 p-2 text-gray-500 hover:text-gray-800 focus:outline-hidden"
+              variant={'outline'}
+              className="relative z-20 p-2"
               onClick={() => setSidebarVisible(!sidebarVisible)}
               aria-label="Toggle Sidebar"
               aria-expanded={sidebarVisible}
@@ -220,7 +220,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
         {/* Main content area */}
         <main
-          className={`${mainContainerStyle} flex-1 transition-all duration-200`}
+          className={`${mainContainerStyle} flex-1 bg-white transition-all duration-200`}
           id="scroll-container"
         >
           {children}

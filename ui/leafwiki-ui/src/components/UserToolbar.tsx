@@ -42,8 +42,13 @@ export default function UserToolbar() {
     <div className="ml-auto flex items-center gap-4">
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center space-x-2 focus:outline-hidden">
-          <Avatar className="h-8 w-8" data-testid="user-toolbar-avatar">
-            <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
+          <Avatar
+            className="h-8 w-8 text-slate-700"
+            data-testid="user-toolbar-avatar"
+          >
+            <AvatarFallback className="bg-slate-200">
+              {user.username[0].toUpperCase()}
+            </AvatarFallback>
           </Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

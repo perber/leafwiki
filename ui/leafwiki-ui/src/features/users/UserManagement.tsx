@@ -27,7 +27,7 @@ export default function UserManagement() {
   return (
     <>
       <title>User Management - LeafWiki</title>
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto mt-6 max-w-4xl">
         <h1 className="mb-4 text-2xl font-bold">User Management</h1>
         <div className="flex justify-end">
           <CreateEditUserButton />

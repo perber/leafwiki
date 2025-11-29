@@ -65,7 +65,7 @@ export default function PageViewer() {
   }
 
   return (
-    <div className="p-6">
+    <div className="mx-auto max-w-6xl px-8 py-8">
       <div>
         <Breadcrumbs />
       </div>
