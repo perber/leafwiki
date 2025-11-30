@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { Pagination } from '@/components/Pagination'
+import { Input } from '@/components/ui/input'
 import { searchPages, SearchResultItem } from '@/lib/api/search'
 import { useDebounce } from '@/lib/useDebounce'
 import { X } from 'lucide-react'
@@ -60,7 +61,7 @@ export default function Search({ active = false }: SearchProps) {
   return (
     <div className="search">
       <div className="search__input-wrapper">
-        <input
+        <Input
           ref={searchInputRef}
           autoFocus
           type="text"
