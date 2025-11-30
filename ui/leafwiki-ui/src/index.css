@@ -46,48 +46,44 @@
   /** Leafwiki overwrites shadcn colors with Tailwind colors **/
   --color-destructive: var(--color-red-600);
   --color-destructive-foreground: var(--color-white);
-  --color-border: var(--color-gray-200);
+  --color-border: var(--color-slate-300);
 
   /* page content background and text colors */
   --color-page-bg: var(--color-white);
-  --color-page-text: var(--color-gray-900);
+  --color-page-text: var(--color-gray-950);
 
   /* Brand (Akzentfarbe) */
   --color-brand: var(--color-green-700);
-  /* #4CAF50 -  */
   --color-brand-dark: var(--color-green-800);
   --color-brand-light: var(--color-green-300);
-  /* #A5D6A7 */
 
   /* Panel / Surface */
   --color-surface: var(--color-slate-50);
-  /* slate-50 */
   --color-surface-alt: var(--color-slate-100);
-  /* slate-100 */
 
   /* Text / Border */
-  --color-interface-text: var(--color-gray-700);
-  /* gray-700 */
-  --color-surface-border: var(--color-gray-300);
-  /* gray-300 */
+  --color-interface-text: var(--color-slate-600);
+  --color-surface-border: var(--color-slate-300);
   --color-error: var(--color-red-600);
-  /* green-600 */
   --color-success: var(--color-green-600);
   --color-success-foreground: var(--color-white);
-  /* yellow-600 */
   --color-warning: var(--color-yellow-600);
-  /* markdown-toolbar-bg */
   --color-markdown-toolbar: #282c34;
   --color-markdown-toolbar-border: var(--color-zinc-900);
   --color-markdown-toolbar-text: var(--color-white);
 
-  --color-muted: var(--color-gray-500);
-  --color-muted-foreground: var(--color-gray-500);
+  --color-muted: var(--color-slate-500);
+  --color-muted-foreground: var(--color-slate-500);
   --color-table-header-bg: var(--color-slate-200);
-  --color-table-header-border: var(--color-gray-300);
+  --color-table-header-border: var(--color-slate-300);
 
-  --color-headline-anchor-icon: var(--color-gray-600);
-  --color-headline-anchor-icon-hover: var(--color-gray-900);
+  --color-headline-anchor-icon: var(--color-slate-600);
+  --color-headline-anchor-icon-hover: var(--color-slate-900);
+
+  --color-avatar-bg: var(--color-slate-200);
+  --color-avatar-foreground: var(--color-slate-700);
+
+  --color-tree-node-hover: var(--color-slate-200);
 }
 
 /* -------------------------------------------------------
@@ -202,7 +198,7 @@
   }
 
   .sidebar__tab-button--inactive {
-    @apply hover:text-brand border-transparent text-gray-500;
+    @apply hover:text-brand text-interface-text border-transparent;
   }
 
   .sidebar__content {
@@ -344,11 +340,15 @@
   }
 
   .user-toolbar__avatar {
-    @apply bg-surface-alt h-8 w-8;
+    @apply h-5 w-5;
+  }
+
+  .user-toolbar__avatar > span {
+    @apply bg-avatar-bg! text-avatar-foreground!;
   }
 
   .user-toolbar__avatar-fallback {
-    @apply bg-surface-alt font-medium;
+    @apply text-muted-foreground font-medium;
   }
 
   .user-toolbar__not-logged-in {
@@ -867,11 +867,11 @@
   }
 
   .breadcrumbs-nav__current {
-    @apply text-interface-text font-semibold;
+    @apply text-page-text font-semibold;
   }
 
   .breadcrumbs-nav__link {
-    @apply text-interface-text hover:underline;
+    @apply text-page-text hover:underline;
   }
 
   /* readonly input */
@@ -935,6 +935,110 @@
 
   .page-viewer__content ul > li::marker {
     color: var(--page-text);
+  }
+
+  .tree-view {
+    @apply w-full;
+  }
+
+  .tree-view__toolbar {
+    @apply mb-2 flex;
+  }
+
+  .tree-view__status {
+    @apply text-sm;
+  }
+
+  .tree-view__status--loading {
+    @apply text-muted;
+  }
+
+  .tree-view__status--error {
+    @apply text-error;
+  }
+
+  .tree-view__action-icon {
+    @apply text-muted hover:text-interface-text cursor-pointer;
+  }
+
+  .tree-view__nodes {
+    @apply w-full;
+  }
+
+  .tree-node {
+    @apply text-interface-text relative flex cursor-pointer items-center transition-all;
+  }
+
+  .tree-node--active {
+    @apply text-brand;
+  }
+
+  .tree-node--inactive {
+    @apply hover:bg-tree-node-hover;
+  }
+
+  .tree-node__marker {
+    @apply bg-surface-border absolute top-0 bottom-0 w-0.5;
+  }
+
+  .tree-node__marker--active {
+    @apply bg-brand/60;
+  }
+
+  .tree-node__main {
+    @apply flex w-full flex-1 items-center gap-2 pl-4;
+  }
+
+  .tree-node__toggle {
+    @apply text-muted -ml-1 shrink-0 transition-transform;
+  }
+
+  .tree-node__toggle--open {
+    @apply rotate-180;
+  }
+
+  .tree-node__toggle--closed {
+    @apply rotate-90;
+  }
+
+  .tree-node__toggle-spacer {
+    @apply -ml-1 w-4;
+  }
+
+  .tree-node__tooltip-parent {
+    @apply w-full flex-1 overflow-hidden;
+  }
+
+  .tree-node__link {
+    @apply w-full py-1;
+  }
+
+  .tree-node__title {
+    @apply text-interface-text block truncate overflow-hidden text-sm text-ellipsis;
+  }
+
+  .tree-node__title--active {
+    @apply text-brand;
+  }
+
+  .tree-node__actions {
+    @apply bg-surface absolute right-0 flex items-center gap-1 rounded-md shadow-md;
+  }
+
+  .tree-node__actions--compact {
+    @apply px-1 py-2;
+  }
+
+  .tree-node__action-icon {
+    @apply text-muted hover:text-interface-text cursor-pointer;
+  }
+
+  .tree-node__children {
+    @apply ml-4 pl-2;
+  }
+
+  .tree-node__children--closed {
+    @apply hidden;
   }
 }
 
@@ -1000,26 +1104,27 @@
     position: relative;
   }
 
+  main article .anchor a span svg {
+    @apply text-headline-anchor-icon;
+  }
+
   main article .anchor a,
   #markdown-preview-container .anchor a {
-    @apply text-interface-text;
+    @apply text-page-text;
   }
 
-  main article .anchor:hover a,
-  #markdown-preview-container .anchor:hover a {
-    @apply text-interface-text dark:text-interface-text;
+  #markdown-preview-container .anchor a span svg {
+    @apply hidden;
   }
 
-  main article .anchor a span,
-  #markdown-preview-container .anchor a span {
-    @apply text-headline-anchor-icon hover:text-headline-anchor-icon-hover absolute top-1/2 -left-5 -translate-y-1/2 opacity-0 transition-opacity duration-200;
+  main article .anchor a span {
+    @apply absolute top-1/2 -left-7 -translate-y-1/2 opacity-0 transition-opacity duration-200;
   }
 
   main article .anchor a:hover span {
     @apply opacity-100;
   }
 }
-
 /* -------------------------------------------------------
    PRINT LAYOUT
 ------------------------------------------------------- */
