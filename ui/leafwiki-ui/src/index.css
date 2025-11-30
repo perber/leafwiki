@@ -194,7 +194,7 @@
   }
 
   body {
-    @apply bg-background text-page-text font-sans;
+    @apply bg-page-bg text-page-text font-sans;
   }
 
   button:not(:disabled),
@@ -1159,6 +1159,10 @@
    CONTENT LAYER — Markdown anchor styling etc.
 ------------------------------------------------------- */
 @layer content {
+  main {
+    @apply bg-page-bg text-page-text;
+  }
+  
   main a {
     @apply text-brand hover:text-brand-dark no-underline;
   }
@@ -1200,7 +1204,6 @@
 
   html,
   body {
-    background-color: #ffffff;
     margin: 0;
   }
 
