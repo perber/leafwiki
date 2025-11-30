@@ -72,6 +72,8 @@
   --color-surface-border: var(--color-gray-300);
   /* gray-300 */
   --color-error: var(--color-red-600);
+  /* green-600 */
+  --color-success: var(--color-green-600);
 }
 
 
