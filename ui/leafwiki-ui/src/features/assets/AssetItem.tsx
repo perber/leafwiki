@@ -79,6 +79,7 @@ export function AssetItem({
       onAssetVersionChange?.()
     } catch (err) {
       toast.error('Delete failed')
+      console.error('Delete failed', err)
     }
   }
 

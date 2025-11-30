@@ -74,6 +74,8 @@
   --color-error: var(--color-red-600);
   /* green-600 */
   --color-success: var(--color-green-600);
+  /* yellow-600 */
+  --color-warning: var(--color-yellow-600);
 }
 
 
@@ -489,7 +491,33 @@
     @apply w-full;
   }
 
+  .editor-title-bar {
+    @apply flex flex-1 flex-col items-center;
+  }
 
+  .editor-title-bar__button {
+    @apply relative flex items-center gap-1 text-base font-semibold text-text hover:underline;
+  }
+
+  .editor-title-bar__title {
+    @apply inline-block max-w-[15vw] truncate sm:max-w-[40vw];
+  }
+
+  .editor-title-bar__icon {
+    @apply absolute top-1/2 -right-6 -translate-y-1/2 text-muted transition-transform duration-200 ease-in-out;
+  }
+
+  .editor-title-bar__button:hover .editor-title-bar__icon {
+    @apply text-text;
+  }
+
+  .editor-title-bar__dirty-indicator {
+    @apply ml-2 text-xs text-warning;
+  }
+
+  .editor-title-bar__slug {
+    @apply mt-1 inline-block max-w-[15vw] truncate rounded bg-surface-alt px-2 py-0.5 font-mono text-xs text-text sm:max-w-[40vw];
+  }
 }
 
 /* -------------------------------------------------------
