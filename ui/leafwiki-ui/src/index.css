@@ -276,8 +276,9 @@
   }
 
   .app-layout__main-content-area-viewer {
-    @apply border-surface-border overflow-auto border-t border-r border-l;
+    @apply border-surface-border overflow-auto;
   }
+    
 
   .app-layout__main-content-area-editor {
     @apply overflow-hidden;
