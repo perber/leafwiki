@@ -127,7 +127,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
           autoFocus: true,
           loading,
           disabled: isCreateButtonDisabled,
-          variant: 'default',
+          variant: 'secondary',
         },
         {
           label: 'Create & Edit Page',
