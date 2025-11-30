@@ -67,7 +67,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
     }
   }
 
-   return (
+  return (
     <BaseDialog
       dialogType={DIALOG_MOVE_PAGE}
       testidPrefix="move-page-dialog"

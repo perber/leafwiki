@@ -9,7 +9,6 @@
 /* Dark mode variant */
 @custom-variant dark (&:is(.dark *));
 
-
 /* -------------------------------------------------------
    TAILWIND THEME TOKENS (Design Tokens)
    → Nur hier definiert Tailwind neue Klassen
@@ -24,7 +23,7 @@
 
   /* Shadcn semantic colors (mapped to HSL vars) */
   --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
+  --color-foreground: var(--color-gray-900);
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
   --color-popover: hsl(var(--popover));
@@ -67,7 +66,7 @@
   /* slate-100 */
 
   /* Text / Border */
-  --color-text: var(--color-gray-700);
+  --color-interface-text: var(--color-gray-700);
   /* gray-700 */
   --color-surface-border: var(--color-gray-300);
   /* gray-300 */
@@ -86,8 +85,10 @@
   --color-muted-foreground: var(--color-gray-500);
   --color-table-header-bg: var(--color-slate-200);
   --color-table-header-border: var(--color-gray-300);
-}
 
+  --color-headline-anchor-icon: var(--color-gray-600);
+  --color-headline-anchor-icon-hover: var(--color-gray-900);
+}
 
 /* -------------------------------------------------------
    BASE LAYER — global defaults, Shadcn theme, dark mode
@@ -162,7 +163,7 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-page-text font-sans;
   }
 
   button:not(:disabled),
@@ -171,27 +172,25 @@
   }
 }
 
-
 /* -------------------------------------------------------
    COMPONENTS LAYER — Sidebar, custom UI parts
 ------------------------------------------------------- */
 @layer components {
-
   /* Sidebar */
   .sidebar {
-    @apply flex h-full w-full flex-col overflow-hidden bg-surface;
+    @apply bg-surface flex h-full w-full flex-col overflow-hidden;
   }
 
   .sidebar__inner {
-    @apply block h-full w-full bg-surface;
+    @apply bg-surface block h-full w-full;
   }
 
   .sidebar__tabs {
-    @apply border-b border-b-surface-border bg-surface pl-2 pr-2 h-12 flex items-center;
+    @apply border-b-surface-border bg-surface flex h-12 items-center border-b pr-2 pl-2;
   }
 
   .sidebar__tabs-list {
-    @apply flex text-sm bg-surface;
+    @apply bg-surface flex text-sm;
   }
 
   .sidebar__tab-button {
@@ -203,7 +202,7 @@
   }
 
   .sidebar__tab-button--inactive {
-    @apply border-transparent hover:text-brand text-gray-500;
+    @apply hover:text-brand border-transparent text-gray-500;
   }
 
   .sidebar__content {
@@ -212,7 +211,7 @@
 
   /* App Layout */
   .app-layout__header {
-    @apply fixed z-20 h-[85px] w-full border-b bg-surface p-4;
+    @apply bg-surface fixed z-20 h-[85px] w-full border-b p-4;
   }
 
   .app-layout__header-inner {
@@ -224,7 +223,7 @@
   }
 
   .app-layout__sidebar-toggle-button {
-    @apply relative z-20 p-2 h-5 w-5;
+    @apply relative z-20 h-5 w-5 p-2;
   }
 
   .app-layout__logo-n-title {
@@ -276,11 +275,11 @@
   }
 
   .app-layout__main-content-area {
-    @apply flex-1 transition-all duration-200
+    @apply flex-1 transition-all duration-200;
   }
 
   .app-layout__main-content-area-viewer {
-    @apply overflow-auto border-l border-r border-t border-surface-border;
+    @apply border-surface-border overflow-auto border-t border-r border-l;
   }
 
   .app-layout__main-content-area-editor {
@@ -298,11 +297,11 @@
   }
 
   .form-input__label {
-    @apply block text-sm font-medium text-text;
+    @apply text-interface-text block text-sm font-medium;
   }
 
   .form-input__error {
-    @apply text-sm text-error;
+    @apply text-error text-sm;
   }
 
   .form-input__input-error {
@@ -310,32 +309,33 @@
   }
 
   /** Page 404 **/
-  .page404 {}
+  .page404 {
+  }
 
   .page404__title {
-    @apply text-xl mb-2 text-error;
+    @apply text-error mb-2 text-xl;
   }
 
   .page404__text {
-    @apply text-sm text-text;
+    @apply text-page-text text-sm;
   }
 
   /** pagination **/
   .pagination {
-    @apply mt-4 flex items-center justify-center gap-2 text-sm text-text;
+    @apply text-interface-text mt-4 flex items-center justify-center gap-2 text-sm;
   }
 
   .pagination__button {
-    @apply rounded border border-surface-border px-2 py-1 text-text bg-surface hover:bg-surface-alt disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply border-surface-border text-interface-text bg-surface hover:bg-surface-alt rounded border px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .pagination__info {
-    @apply text-text;
+    @apply text-interface-text;
   }
 
   /* TooltipWrapper Component */
   .tooltip-wrapper__content {
-    @apply bg-surface-alt text-text px-2 py-1 rounded shadow-sm;
+    @apply bg-surface-alt text-interface-text rounded px-2 py-1 shadow-sm;
   }
 
   /* UserToolbar Component */
@@ -344,23 +344,23 @@
   }
 
   .user-toolbar__avatar {
-    @apply h-8 w-8 bg-surface-alt;
+    @apply bg-surface-alt h-8 w-8;
   }
 
   .user-toolbar__avatar-fallback {
-    @apply font-medium bg-surface-alt;
+    @apply bg-surface-alt font-medium;
   }
 
   .user-toolbar__not-logged-in {
-    @apply text-sm text-error;
+    @apply text-error text-sm;
   }
 
   .user-toolbar__login-button {
-    @apply rounded bg-brand text-sm text-white px-3 py-2 hover:bg-brand-dark;
+    @apply bg-brand hover:bg-brand-dark rounded px-3 py-2 text-sm text-white;
   }
 
   .user-toolbar__menu-item {
-    @apply cursor-pointer text-text hover:bg-surface-alt;
+    @apply text-interface-text hover:bg-surface-alt cursor-pointer;
   }
 
   .user-toolbar-dropdown-trigger {
@@ -370,23 +370,23 @@
   /* AssetItem Component */
 
   .asset-item {
-    @apply flex items-center justify-between gap-2 rounded-md px-2 py-1 transition bg-surface hover:bg-surface-alt cursor-pointer;
+    @apply bg-surface hover:bg-surface-alt flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1 transition;
   }
 
   .asset-item__preview-image {
-    @apply h-10 w-10 rounded border border-surface-border object-cover bg-surface-alt;
+    @apply border-surface-border bg-surface-alt h-10 w-10 rounded border object-cover;
   }
 
   .asset-item__preview-file {
-    @apply flex h-10 w-10 items-center justify-center rounded border border-surface-border bg-surface-alt text-muted;
+    @apply border-surface-border bg-surface-alt text-muted flex h-10 w-10 items-center justify-center rounded border;
   }
 
   .asset-item__filename {
-    @apply truncate text-sm text-text hover:underline;
+    @apply text-interface-text truncate text-sm hover:underline;
   }
 
   .asset-item__filename--editing-input {
-    @apply w-full border-b border-surface-border bg-transparent text-sm text-text focus:outline-hidden;
+    @apply border-surface-border text-interface-text w-full border-b bg-transparent text-sm focus:outline-hidden;
   }
 
   .asset-item__action-button {
@@ -407,15 +407,15 @@
 
   /* AssetManager Component */
   .asset-manager {
-    @apply space-y-3 text-sm text-text;
+    @apply text-interface-text space-y-3 text-sm;
   }
 
   .asset-manager__title {
-    @apply font-semibold text-text;
+    @apply text-interface-text font-semibold;
   }
 
   .asset-manager__dropzone {
-    @apply flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-surface-border p-4 text-center text-text transition bg-surface;
+    @apply border-surface-border text-interface-text bg-surface flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center transition;
   }
 
   .asset-manager__dropzone--dragging {
@@ -431,11 +431,11 @@
   }
 
   .asset-manager__dropzone-text {
-    @apply text-xs text-text;
+    @apply text-interface-text text-xs;
   }
 
   .asset-manager__dropzone-uploading {
-    @apply text-xs text-brand;
+    @apply text-brand text-xs;
   }
 
   .asset-manager__list-container {
@@ -443,11 +443,11 @@
   }
 
   .asset-manager__loading {
-    @apply text-xs text-muted;
+    @apply text-muted text-xs;
   }
 
   .asset-manager__empty {
-    @apply text-xs italic text-muted;
+    @apply text-muted text-xs italic;
   }
 
   .asset-manager__list {
@@ -455,7 +455,7 @@
   }
 
   .asset-manager__tip {
-    @apply mt-2 text-xs italic text-muted;
+    @apply text-muted mt-2 text-xs italic;
   }
 
   /** AssetManager Dialog **/
@@ -465,20 +465,20 @@
 
   /* AssetPreviewTooltip */
   .asset-preview-tooltip__content {
-    @apply z-50 max-w-sm rounded border border-surface-border bg-surface p-2 shadow-lg;
+    @apply border-surface-border bg-surface z-50 max-w-sm rounded border p-2 shadow-lg;
   }
 
   .asset-preview-tooltip__image {
-    @apply max-h-[300px] max-w-[300px] rounded border border-surface-border;
+    @apply border-surface-border max-h-[300px] max-w-[300px] rounded border;
   }
 
   .asset-preview-tooltip__file {
-    @apply flex items-center gap-2 text-sm text-text;
+    @apply text-interface-text flex items-center gap-2 text-sm;
   }
 
   /* Login Form*/
   .login {
-    @apply h-screen w-96 border-r border-surface-border bg-surface text-text shadow-md;
+    @apply border-surface-border bg-surface text-interface-text h-screen w-96 border-r shadow-md;
   }
 
   .login__form {
@@ -486,7 +486,7 @@
   }
 
   .login__title {
-    @apply mb-4 text-xl font-bold text-text;
+    @apply text-interface-text mb-4 text-xl font-bold;
   }
 
   .login__field {
@@ -494,7 +494,7 @@
   }
 
   .login__error {
-    @apply mb-4 text-sm text-error;
+    @apply text-error mb-4 text-sm;
   }
 
   .login__submit {
@@ -506,7 +506,7 @@
   }
 
   .editor-title-bar__button {
-    @apply relative flex items-center gap-1 text-base font-semibold text-text hover:underline;
+    @apply text-interface-text relative flex items-center gap-1 text-base font-semibold hover:underline;
   }
 
   .editor-title-bar__title {
@@ -514,19 +514,19 @@
   }
 
   .editor-title-bar__icon {
-    @apply absolute top-1/2 -right-6 -translate-y-1/2 text-muted transition-transform duration-200 ease-in-out;
+    @apply text-muted absolute top-1/2 -right-6 -translate-y-1/2 transition-transform duration-200 ease-in-out;
   }
 
   .editor-title-bar__button:hover .editor-title-bar__icon {
-    @apply text-text;
+    @apply text-interface-text;
   }
 
   .editor-title-bar__dirty-indicator {
-    @apply ml-2 text-xs text-warning;
+    @apply text-warning ml-2 text-xs;
   }
 
   .editor-title-bar__slug {
-    @apply mt-1 inline-block max-w-[15vw] truncate rounded bg-surface-alt px-2 py-0.5 font-mono text-xs text-text sm:max-w-[40vw];
+    @apply bg-surface-alt text-interface-text mt-1 inline-block max-w-[15vw] truncate rounded px-2 py-0.5 font-mono text-xs sm:max-w-[40vw];
   }
 
   /** Markdown Code Editor **/
@@ -545,7 +545,7 @@
   }
 
   .markdown-editor__tabs {
-    @apply mb-2 flex border-b border-surface-border text-sm text-text;
+    @apply border-surface-border text-interface-text mb-2 flex border-b text-sm;
   }
 
   .markdown-editor__tab-button {
@@ -557,7 +557,7 @@
   }
 
   .markdown-editor__tab-button--inactive {
-    @apply border-transparent text-text hover:text-brand;
+    @apply text-interface-text hover:text-brand border-transparent;
   }
 
   /* Shared scroll pane */
@@ -575,7 +575,7 @@
 
   /* Desktop mode */
   .markdown-editor__editor-pane {
-    @apply flex flex-1 max-w-none overflow-auto;
+    @apply flex max-w-none flex-1 overflow-auto;
   }
 
   .markdown-editor__editor-pane--half {
@@ -587,7 +587,7 @@
   }
 
   .markdown-editor__divider {
-    @apply h-full w-1 bg-surface-border;
+    @apply bg-surface-border h-full w-1;
   }
 
   .markdown-editor__preview-container {
@@ -605,7 +605,7 @@
 
   /* Markdown Editor Toolbar */
   .markdown-toolbar {
-    @apply sticky top-0 z-10 flex flex-wrap gap-1.5 border-b border-markdown-toolbar-border bg-markdown-toolbar pl-2 pr-2 shadow-xs min-h-12 items-center;
+    @apply border-markdown-toolbar-border bg-markdown-toolbar sticky top-0 z-10 flex min-h-12 flex-wrap items-center gap-1.5 border-b pr-2 pl-2 shadow-xs;
   }
 
   .markdown-toolbar__button {
@@ -617,7 +617,7 @@
   }
 
   .markdown-toolbar__separator {
-    @apply mx-1 h-5 w-px self-center bg-surface-border/60;
+    @apply bg-surface-border/60 mx-1 h-5 w-px self-center;
   }
 
   .markdown-toolbar__separator--desktop-only {
@@ -634,7 +634,7 @@
   }
 
   .page-editor__error {
-    @apply p-6 text-sm text-error;
+    @apply text-error p-6 text-sm;
   }
 
   .page-editor__not-found {
@@ -646,7 +646,7 @@
   }
 
   .toolbar-button__save-page {
-    @apply rounded-full! bg-success! text-success-foreground! hover:bg-success/80!;
+    @apply bg-success! text-success-foreground! hover:bg-success/80! rounded-full!;
   }
 
   /* Shared page dialog styles */
@@ -655,25 +655,25 @@
   }
 
   .dialog__path {
-    @apply text-xs text-muted font-mono;
+    @apply text-muted font-mono text-xs;
   }
 
   /* Add / Copy / Create-by-path dialogs */
 
   .create-page-by-path-dialog__alert {
-    @apply rounded-md bg-error/10 p-4 text-sm text-error;
+    @apply bg-error/10 text-error rounded-md p-4 text-sm;
   }
 
   .create-page-by-path-dialog__lookup-title {
-    @apply text-sm font-semibold text-text;
+    @apply text-interface-text text-sm font-semibold;
   }
 
   .create-page-by-path-dialog__lookup-list {
-    @apply mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md bg-surface-alt p-1;
+    @apply bg-surface-alt mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md p-1;
   }
 
   .create-page-by-path-dialog__lookup-item {
-    @apply mb-1 flex items-center gap-1 text-xs text-text;
+    @apply text-interface-text mb-1 flex items-center gap-1 text-xs;
   }
 
   .create-page-by-path-dialog__lookup-item-icon--ok {
@@ -691,7 +691,7 @@
   /* Delete dialog */
 
   .delete-page-dialog__recursive {
-    @apply space-y-1 text-sm text-muted;
+    @apply text-muted space-y-1 text-sm;
   }
 
   .delete-page-dialog__recursive-label {
@@ -705,11 +705,11 @@
   }
 
   .sort-pages-dialog__item {
-    @apply flex items-center justify-between rounded-lg border bg-surface px-3 py-2 transition hover:shadow-xs;
+    @apply bg-surface flex items-center justify-between rounded-lg border px-3 py-2 transition hover:shadow-xs;
   }
 
   .sort-pages-dialog__item-title {
-    @apply truncate text-sm text-text;
+    @apply text-interface-text truncate text-sm;
   }
 
   .sort-pages-dialog__item-actions {
@@ -727,11 +727,11 @@
   }
 
   .search__input {
-    @apply w-full rounded-md border border-surface-border bg-surface px-2 py-1 pr-8 text-sm text-text;
+    @apply border-surface-border bg-surface text-interface-text w-full rounded-md border px-2 py-1 pr-8 text-sm;
   }
 
   .search__clear-button {
-    @apply absolute top-1/2 right-1 -translate-y-1/2 text-sm text-muted hover:text-text;
+    @apply text-muted hover:text-interface-text absolute top-1/2 right-1 -translate-y-1/2 text-sm;
   }
 
   .search__body {
@@ -748,7 +748,7 @@
   }
 
   .search__result-summary {
-    @apply mb-2 text-sm text-text;
+    @apply text-interface-text mb-2 text-sm;
   }
 
   .search__results {
@@ -758,31 +758,31 @@
   /* SearchResultCard */
 
   .search-result-card {
-    @apply block rounded-sm border border-border bg-surface p-4 shadow-xs transition;
+    @apply border-border bg-surface block rounded-sm border p-4 shadow-xs transition;
   }
 
   .search-result-card--active {
-    @apply border-border shadow-md bg-surface-alt;
+    @apply border-border bg-surface-alt shadow-md;
   }
 
   .search-result-card--inactive {
-    @apply hover:shadow-md hover:bg-surface-alt;
+    @apply hover:bg-surface-alt hover:shadow-md;
   }
 
   .search-result-card__title {
-    @apply mb-1 break-words whitespace-normal text-base text-brand;
+    @apply text-brand mb-1 text-base break-words whitespace-normal;
   }
 
   .search-result-card__excerpt {
-    @apply mb-2 break-words whitespace-normal text-sm text-text;
+    @apply text-interface-text mb-2 text-sm break-words whitespace-normal;
   }
 
   .search-result-card__path {
-    @apply mt-2 text-xs text-muted;
+    @apply text-muted mt-2 text-xs;
   }
 
   .search-result-card b {
-    @apply font-semibold text-brand-dark;
+    @apply text-brand-dark font-semibold;
   }
 
   /* user management */
@@ -791,7 +791,7 @@
   }
 
   .user-management__title {
-    @apply mb-4 text-2xl font-bold text-text;
+    @apply text-interface-text mb-4 text-2xl font-bold;
   }
 
   .user-management__header-actions {
@@ -799,7 +799,7 @@
   }
 
   .user-management__table-card {
-    @apply mt-4 rounded-md border border-surface-border bg-surface shadow-sm;
+    @apply border-surface-border bg-surface mt-4 rounded-md border shadow-sm;
   }
 
   .user-management__table-scroll {
@@ -815,19 +815,19 @@
   }
 
   .user-management__table-header-cell {
-    @apply p-3 text-text;
+    @apply text-interface-text p-3;
   }
 
   .user-management__table-body-message {
-    @apply p-4 text-center text-muted;
+    @apply text-muted p-4 text-center;
   }
 
   .user-management__table-row {
-    @apply border-t border-surface-border;
+    @apply border-surface-border border-t;
   }
 
   .user-management__table-cell {
-    @apply p-3 text-text;
+    @apply text-interface-text p-3;
   }
 
   .user-management__actions-cell {
@@ -847,11 +847,11 @@
   }
 
   .user-management__role-pill--default {
-    @apply bg-surface-alt text-text;
+    @apply bg-surface-alt text-interface-text;
   }
 
   .breadcrumbs-nav {
-    @apply flex w-full flex-1 grow text-sm text-muted;
+    @apply text-muted flex w-full flex-1 grow text-sm;
   }
 
   .breadcrumbs-nav__list {
@@ -867,16 +867,16 @@
   }
 
   .breadcrumbs-nav__current {
-    @apply font-semibold text-text;
+    @apply text-interface-text font-semibold;
   }
 
   .breadcrumbs-nav__link {
-    @apply text-text hover:underline;
+    @apply text-interface-text hover:underline;
   }
 
   /* readonly input */
   input[readonly] {
-    @apply cursor-not-allowed bg-surface-alt!;
+    @apply bg-surface-alt! cursor-not-allowed;
   }
 
   .page-viewer {
@@ -884,11 +884,11 @@
   }
 
   .page-viewer__error {
-    @apply p-6 text-error;
+    @apply text-error p-6;
   }
 
   .page-viewer__content {
-    @apply prose prose-base mt-6 max-w-full leading-relaxed;
+    @apply prose prose-base text-page-text mt-6 max-w-full leading-relaxed;
   }
 
   /* Markdown content tweaks */
@@ -902,7 +902,7 @@
   }
 
   .table-wrapper {
-    @apply overflow-auto max-w-full;
+    @apply max-w-full overflow-auto;
   }
 
   .table-wrapper table {
@@ -911,7 +911,7 @@
 
   .table-wrapper tbody th,
   .table-wrapper tbody td {
-    @apply border border-border px-4 py-2;
+    @apply border-border border px-4 py-2;
   }
 
   .table-wrapper tbody tr:nth-child(odd) {
@@ -919,11 +919,11 @@
   }
 
   .table-wrapper thead tr {
-    @apply bg-table-header-bg text-left font-medium border border-table-header-border;
+    @apply bg-table-header-bg border-table-header-border border text-left font-medium;
   }
   .table-wrapper thead th,
   .table-wrapper thead td {
-    @apply border border-table-header-border px-4 py-2;
+    @apply border-table-header-border border px-4 py-2;
   }
 
   .page-viewer__content ol ol,
@@ -933,8 +933,8 @@
     @apply mt-0 mb-0;
   }
 
-  .page-viewer__content ul>li::marker {
-    color: var(--color-text);
+  .page-viewer__content ul > li::marker {
+    color: var(--page-text);
   }
 }
 
@@ -942,10 +942,9 @@
    UTILITIES LAYER — Markdown, tables, custom scrollbars
 ------------------------------------------------------- */
 @layer utilities {
-
   html,
   body {
-    @apply bg-page-bg text-text font-sans;
+    @apply bg-page-bg text-page-text font-sans;
   }
 
   /* Scrollbars */
@@ -988,13 +987,12 @@
   }
 }
 
-
 /* -------------------------------------------------------
    CONTENT LAYER — Markdown anchor styling etc.
 ------------------------------------------------------- */
 @layer content {
   main a {
-    @apply text-green-600 no-underline hover:text-green-800;
+    @apply text-brand hover:text-brand-dark no-underline;
   }
 
   main article .anchor,
@@ -1004,24 +1002,23 @@
 
   main article .anchor a,
   #markdown-preview-container .anchor a {
-    @apply text-foreground;
+    @apply text-interface-text;
   }
 
   main article .anchor:hover a,
   #markdown-preview-container .anchor:hover a {
-    @apply text-zinc-700 dark:text-zinc-300;
+    @apply text-interface-text dark:text-interface-text;
   }
 
   main article .anchor a span,
   #markdown-preview-container .anchor a span {
-    @apply opacity-0 transition-opacity duration-200 absolute -left-5 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-400;
+    @apply text-headline-anchor-icon hover:text-headline-anchor-icon-hover absolute top-1/2 -left-5 -translate-y-1/2 opacity-0 transition-opacity duration-200;
   }
 
   main article .anchor a:hover span {
     @apply opacity-100;
   }
 }
-
 
 /* -------------------------------------------------------
    PRINT LAYOUT

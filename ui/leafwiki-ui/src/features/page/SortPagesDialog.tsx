@@ -54,7 +54,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
     }
   }
 
-   return (
+  return (
     <BaseDialog
       dialogType={DIALOG_SORT_PAGES}
       testidPrefix="sort-pages-dialog"

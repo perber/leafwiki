@@ -59,7 +59,7 @@ export default function PageEditor() {
         toast.error('Error saving page')
       })
   }, [savePage])
-  
+
   const handleClose = useCallback(() => {
     if (page?.path) {
       navigate(`/${page.path}`)

@@ -225,9 +225,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-          done: unknown[]
-          undone: unknown[]
-        }
+            done: unknown[]
+            undone: unknown[]
+          }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false
@@ -242,9 +242,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-          done: unknown[]
-          undone: unknown[]
-        }
+            done: unknown[]
+            undone: unknown[]
+          }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false

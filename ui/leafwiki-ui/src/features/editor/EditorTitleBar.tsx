@@ -59,22 +59,14 @@ export function EditorTitleBar() {
     <div className="editor-title-bar">
       <button onClick={onEditClicked} className="editor-title-bar__button">
         <TooltipWrapper label={title} side="top" align="start">
-          {title && (
-            <span className="editor-title-bar__title">
-              {title}
-            </span>
-          )}
+          {title && <span className="editor-title-bar__title">{title}</span>}
           <Pencil size={16} className="editor-title-bar__icon" />
           {dirty && !isMobile && (
-            <span className="editor-title-bar__dirty-indicator">
-              (Changes)
-            </span>
+            <span className="editor-title-bar__dirty-indicator">(Changes)</span>
           )}
 
           {dirty && isMobile && (
-            <span className="editor-title-bar__dirty-indicator">
-              *
-            </span>
+            <span className="editor-title-bar__dirty-indicator">*</span>
           )}
         </TooltipWrapper>
       </button>

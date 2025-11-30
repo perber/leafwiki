@@ -46,7 +46,7 @@ export function DeletePageDialog({
     }
   }
 
-    return (
+  return (
     <BaseDialog
       dialogType={DIALOG_DELETE_PAGE_CONFIRMATION}
       dialogTitle="Delete Page?"

@@ -55,9 +55,12 @@ export default function Headline({
 
   return (
     <Tag id={slug} className="anchor" data-line={dataLine}>
-      <a className="no-underline hover:underline" href={`#${slug}`}>
+      <a
+        className="text-page-text no-underline hover:underline"
+        href={`#${slug}`}
+      >
         {children}
-        <span className="absolute top-1/2 -left-5 -translate-y-1/2 text-text">
+        <span className="text-interface-text absolute top-1/2 -left-5 -translate-y-1/2">
           <Paperclip size={18} />
         </span>
       </a>

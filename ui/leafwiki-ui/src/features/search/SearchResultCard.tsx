@@ -9,9 +9,7 @@ export default function SearchResultCard({ item }: { item: SearchResultItem }) {
       to={`${item.path}`}
       data-testid={`search-result-card-${item.page_id}`}
       className={`search-result-card ${
-        isActive
-          ? 'search-result-card--active'
-          : 'search-result-card--inactive'
+        isActive ? 'search-result-card--active' : 'search-result-card--inactive'
       }`}
     >
       <div

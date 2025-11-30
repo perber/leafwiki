@@ -111,7 +111,7 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
         )}
 
         <select
-          className={`w-full rounded-md border border-border px-3 py-2 text-sm ${fieldErrors.role ? 'border-error' : ''}`}
+          className={`border-border w-full rounded-md border px-3 py-2 text-sm ${fieldErrors.role ? 'border-error' : ''}`}
           value={role}
           onChange={(e) => {
             setRole(e.target.value as 'admin' | 'editor')
@@ -123,7 +123,7 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
           <option value="admin">Admin</option>
         </select>
         {fieldErrors.role && (
-          <p className="mt-1 text-sm text-error">{fieldErrors.role}</p>
+          <p className="text-error mt-1 text-sm">{fieldErrors.role}</p>
         )}
       </div>
     </BaseDialog>
