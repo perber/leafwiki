@@ -306,7 +306,6 @@
   }
 
   /** Page 404 **/
-  .page404 {}
 
   .page404__title {
     @apply text-error mb-2 text-xl;
