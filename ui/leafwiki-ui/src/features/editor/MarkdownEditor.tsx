@@ -225,9 +225,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-            done: unknown[]
-            undone: unknown[]
-          }
+          done: unknown[]
+          undone: unknown[]
+        }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false
@@ -242,9 +242,9 @@ const MarkdownEditor = (
       if (!view) return false
       const hist = view.state.field(historyField, false) as
         | {
-            done: unknown[]
-            undone: unknown[]
-          }
+          done: unknown[]
+          undone: unknown[]
+        }
         | undefined
 
       if (!hist || typeof hist !== 'object') return false
@@ -388,15 +388,15 @@ const MarkdownEditor = (
 
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden"
+      className="markdown-editor"
       key={isMobile ? 'mobile' : 'desktop'}
       onPaste={handlePaste}
     >
       {/* Mobile */}
       {isMobile && (
-        <div className="flex h-full w-full flex-col">
+        <div className="markdown-editor__mobile">
           {/* Mobile Tabs */}
-          <div className="mb-2 flex border-b text-sm" role="tablist">
+          <div className="markdown-editor__tabs" role="tablist">
             {[
               { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
               { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
@@ -404,27 +404,37 @@ const MarkdownEditor = (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as 'editor' | 'preview')}
-                className={`-mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5 ${
+                className={
                   activeTab === tab.id
-                    ? 'border-green-600 font-semibold text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-black'
-                }`}
+                    ? 'markdown-editor__tab-button markdown-editor__tab-button--active'
+                    : 'markdown-editor__tab-button markdown-editor__tab-button--inactive'
+                }
               >
                 {tab.icon}
                 {tab.label}
               </button>
             ))}
           </div>
+
           {activeTab === 'editor' ? renderToolbar() : null}
-          <div className="custom-scrollbar flex max-w-none flex-1 overflow-auto">
+
+          <div className="custom-scrollbar markdown-editor__pane-container">
             <div
-              className={activeTab === 'editor' ? 'block w-full' : 'hidden'}
+              className={
+                activeTab === 'editor'
+                  ? 'markdown-editor__pane'
+                  : 'markdown-editor__pane--hidden'
+              }
               key="editor"
             >
               {renderEditor(false)}
             </div>
             <div
-              className={activeTab === 'preview' ? 'block w-full' : 'hidden'}
+              className={
+                activeTab === 'preview'
+                  ? 'markdown-editor__pane'
+                  : 'markdown-editor__pane--hidden'
+              }
               key="preview"
             >
               {renderPreview()}
@@ -432,22 +442,31 @@ const MarkdownEditor = (
           </div>
         </div>
       )}
+
       {!isMobile && (
         <div className="flex h-full w-full flex-col">
           {renderToolbar()}
           <div className="flex w-full flex-1 overflow-hidden">
             <div
-              className={`custom-scrollbar flex ${showPreview ? 'w-1/2' : 'w-full'} max-w-none flex-1 overflow-auto`}
+              className={
+                showPreview
+                  ? 'custom-scrollbar markdown-editor__editor-pane markdown-editor__editor-pane--half'
+                  : 'custom-scrollbar markdown-editor__editor-pane markdown-editor__editor-pane--full'
+              }
             >
               {renderEditor(false)}
             </div>
+
             {showPreview && (
               <>
                 <div
-                  className="h-full w-1 bg-gray-300"
+                  className="markdown-editor__divider"
                   id="editor-preview-divider"
                 ></div>
-                <div className="w-1/2 max-w-none flex-1">{renderPreview()}</div>
+
+                <div className="markdown-editor__preview-container">
+                  {renderPreview()}
+                </div>
               </>
             )}
           </div>

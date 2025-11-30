@@ -143,5 +143,5 @@ export default function MarkdownCodeEditor({
     }
   }, [initialValue, onCursorLineChange, editorViewRef])
 
-  return <div ref={editorRef} className="h-full w-full rounded shadow-xs" />
+  return <div ref={editorRef} className="markdown-code-editor" />
 }

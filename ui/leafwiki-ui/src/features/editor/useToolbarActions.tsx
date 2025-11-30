@@ -47,7 +47,7 @@ export function useToolbarActions({
         icon: <X size={18} />,
         action: closePage,
         variant: 'destructive',
-        className: 'rounded-full',
+        className: 'toolbar-button__close-editor',
       },
       {
         id: 'save-page',
@@ -56,7 +56,7 @@ export function useToolbarActions({
         icon: <Save size={18} />,
         variant: 'default',
         disabled: !dirty,
-        className: 'rounded-full bg-success text-white hover:bg-success/80',
+        className: 'toolbar-button__save-page',
         action: savePage,
       },
     ])
