@@ -46,7 +46,7 @@ export function DeletePageDialog({
     }
   }
 
-  return (
+    return (
     <BaseDialog
       dialogType={DIALOG_DELETE_PAGE_CONFIRMATION}
       dialogTitle="Delete Page?"
@@ -75,8 +75,8 @@ export function DeletePageDialog({
       ]}
     >
       {hasChildren && (
-        <div className="space-y-1 text-sm text-gray-600">
-          <label className="flex items-center gap-2">
+        <div className="delete-page-dialog__recursive">
+          <label className="delete-page-dialog__recursive-label">
             <Checkbox
               data-testid="delete-page-dialog-recursive-delete-checkbox"
               checked={deleteRecursive}

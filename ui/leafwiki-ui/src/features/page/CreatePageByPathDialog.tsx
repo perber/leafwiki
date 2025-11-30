@@ -93,7 +93,7 @@ export function CreatePageByPathDialog({
     setTitle(val)
   }
 
-  return (
+   return (
     <BaseDialog
       dialogTitle="Create a new page"
       dialogDescription="Please enter the title"
@@ -126,25 +126,35 @@ export function CreatePageByPathDialog({
     >
       <div>
         {lookup?.exists && (
-          <div className="rounded bg-red-100 p-4 text-sm text-red-800">
+          <div className="create-page-by-path-dialog__alert">
             A page already exists at this path.
           </div>
         )}
         {lookup && !lookup.exists && lookup.segments.length > 0 && (
           <>
-            <strong className="text-small">Result of path lookup:</strong>
-            <ul className="custom-scrollbar mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md bg-gray-100 p-1">
+            <strong className="create-page-by-path-dialog__lookup-title">
+              Result of path lookup:
+            </strong>
+            <ul className="custom-scrollbar create-page-by-path-dialog__lookup-list">
               {lookup.segments.map((segment, index) => (
                 <li
                   key={index}
-                  className="mb-1 flex items-center gap-1 text-xs"
+                  className="create-page-by-path-dialog__lookup-item"
                 >
                   {segment.exists ? (
-                    <Check className="text-green-600" size={12} />
+                    <Check
+                      className="create-page-by-path-dialog__lookup-item-icon--ok"
+                      size={12}
+                    />
                   ) : (
-                    <X className="text-red-600" size={12} />
+                    <X
+                      className="create-page-by-path-dialog__lookup-item-icon--missing"
+                      size={12}
+                    />
                   )}{' '}
-                  <span className="font-mono">{segment.slug}</span>{' '}
+                  <span className="create-page-by-path-dialog__lookup-item-slug">
+                    {segment.slug}
+                  </span>{' '}
                   {segment.exists ? 'exists' : 'will be created'}
                 </li>
               ))}
@@ -152,7 +162,7 @@ export function CreatePageByPathDialog({
           </>
         )}
       </div>
-      <div className="space-y-4">
+      <div className="page-dialog__fields">
         <FormInput
           autoFocus={true}
           testid="create-page-by-path-title-input"
