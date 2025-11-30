@@ -164,10 +164,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
           error={fieldErrors.slug}
         />
       </div>
-      <span
-        className="dialog__path"
-        data-testid="add-page-path-display"
-      >
+      <span className="dialog__path" data-testid="add-page-path-display">
         Path: {parentPath !== '' && `${parentPath}/`}
         {slug && `${slug}`}
       </span>

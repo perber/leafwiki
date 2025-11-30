@@ -57,7 +57,7 @@ export default function Search({ active = false }: SearchProps) {
     setPage(0)
   }
 
-return (
+  return (
     <div className="search">
       <div className="search__input-wrapper">
         <input

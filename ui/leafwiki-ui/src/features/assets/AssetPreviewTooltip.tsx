@@ -28,11 +28,7 @@ export function AssetPreviewTooltip({ url, name, children, className }: Props) {
         className="asset-preview-tooltip__content"
       >
         {isImage ? (
-          <img
-            src={url}
-            alt={name}
-            className="asset-preview-tooltip__image"
-          />
+          <img src={url} alt={name} className="asset-preview-tooltip__image" />
         ) : (
           <div className="asset-preview-tooltip__file">
             <FileText size={16} /> {name}

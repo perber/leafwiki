@@ -122,7 +122,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
 
   if (!tree) return null
 
-    return (
+  return (
     <BaseDialog
       dialogTitle="Copy Page"
       dialogDescription="Create a copy of this page"

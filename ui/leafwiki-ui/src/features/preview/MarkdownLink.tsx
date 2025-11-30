@@ -50,7 +50,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
           {...props}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-brand no-underline hover:underline hover:text-brand-dark"
+          className="text-brand hover:text-brand-dark no-underline hover:underline"
         >
           {children}
         </a>
@@ -116,7 +116,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
           onClick={() => {
             handleOpenCreatePageDialog(normalizedTargetPath, editMode)
           }}
-          className="m-0 p-0 text-base text-error no-underline hover:no-underline hover:text-error/80"
+          className="text-error hover:text-error/80 m-0 p-0 text-base no-underline hover:no-underline"
         >
           {children}
         </Button>
@@ -143,7 +143,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
       {...props}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-brand no-underline hover:underline hover:text-brand-dark"
+      className="text-brand hover:text-brand-dark no-underline hover:underline"
     >
       {children}
     </a>

@@ -206,7 +206,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div
                 className={
                   'app-layout__sidebar-resize-handle ' +
-                  (hoveringResize || resizing ? 'app-layout__sidebar-resize-handle-hover' : 'app-layout__sidebar-resize-handle-default')
+                  (hoveringResize || resizing
+                    ? 'app-layout__sidebar-resize-handle-hover'
+                    : 'app-layout__sidebar-resize-handle-default')
                 }
               />
             </div>

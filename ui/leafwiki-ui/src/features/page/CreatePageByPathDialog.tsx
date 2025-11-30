@@ -93,7 +93,7 @@ export function CreatePageByPathDialog({
     setTitle(val)
   }
 
-   return (
+  return (
     <BaseDialog
       dialogTitle="Create a new page"
       dialogDescription="Please enter the title"

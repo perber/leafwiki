@@ -25,11 +25,7 @@ export function FormInput({
 }: FormInputProps) {
   return (
     <div className="form-input">
-      {label && (
-        <label className="form-input__label">
-          {label}
-        </label>
-      )}
+      {label && <label className="form-input__label">{label}</label>}
       <Input
         autoFocus={autoFocus || false}
         type={type}

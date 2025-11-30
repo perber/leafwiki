@@ -83,7 +83,8 @@ export default function MarkdownPreview({ content, path }: Props) {
         </Headline>
       ),
       table: (
-        props: ClassAttributes<HTMLTableElement> & HTMLAttributes<HTMLTableElement>,
+        props: ClassAttributes<HTMLTableElement> &
+          HTMLAttributes<HTMLTableElement>,
       ) => (
         <div className="table-wrapper custom-scrollbar">
           <table {...props} />

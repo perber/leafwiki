@@ -35,7 +35,7 @@ export default function Breadcrumbs() {
 
   const breadcrumbs = buildBreadcrumbs()
 
- return (
+  return (
     <nav className="breadcrumbs-nav">
       <ol className="breadcrumbs-nav__list">
         {breadcrumbs.map((crumb, index) => (
