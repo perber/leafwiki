@@ -64,7 +64,7 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
         },
       ]}
     >
-      <p className="text-sm text-gray-600">
+      <p className="text-sm text-muted">
         The user <strong>{username}</strong> will be permanently removed from
         the system.
       </p>

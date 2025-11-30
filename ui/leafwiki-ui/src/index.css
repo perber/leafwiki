@@ -33,21 +33,21 @@
   --color-primary-foreground: hsl(var(--primary-foreground));
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
-
+  --color-primary: hsl(var(--primary));
   --color-chart-1: hsl(var(--chart-1));
   --color-chart-2: hsl(var(--chart-2));
   --color-chart-3: hsl(var(--chart-3));
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
+
+  /** Leafwiki overwrites shadcn colors with Tailwind colors **/
+  --color-destructive: var(--color-red-600);
+  --color-destructive-foreground: var(--color-white);
+  --color-border: var(--color-gray-200);
 
   /* page content background and text colors */
   --color-page-bg: var(--color-white);
@@ -82,6 +82,10 @@
   --color-markdown-toolbar-border: var(--color-zinc-900);
   --color-markdown-toolbar-text: var(--color-white);
 
+  --color-muted: var(--color-gray-500);
+  --color-muted-foreground: var(--color-gray-500);
+  --color-table-header-bg: var(--color-slate-200);
+  --color-table-header-border: var(--color-gray-300);
 }
 
 
@@ -340,11 +344,11 @@
   }
 
   .user-toolbar__avatar {
-    @apply h-8 w-8 text-text;
+    @apply h-8 w-8 bg-surface-alt;
   }
 
   .user-toolbar__avatar-fallback {
-    @apply bg-surface-alt text-text font-medium;
+    @apply font-medium bg-surface-alt;
   }
 
   .user-toolbar__not-logged-in {
@@ -374,7 +378,7 @@
   }
 
   .asset-item__preview-file {
-    @apply flex h-10 w-10 items-center justify-center rounded border border-surface-border bg-surface-alt text-text/60;
+    @apply flex h-10 w-10 items-center justify-center rounded border border-surface-border bg-surface-alt text-muted;
   }
 
   .asset-item__filename {
@@ -386,19 +390,19 @@
   }
 
   .asset-item__action-button {
-    @apply text-text/40 hover:text-brand;
+    @apply text-muted! hover:text-brand!;
   }
 
   .asset-item__action-button--save {
-    @apply text-brand hover:text-brand-dark;
+    @apply text-brand! hover:text-brand-dark!;
   }
 
   .asset-item__action-button--cancel {
-    @apply text-error hover:text-error;
+    @apply text-error! hover:text-error!;
   }
 
   .asset-item__action-button--delete {
-    @apply text-text/40 hover:text-error;
+    @apply text-muted! hover:text-error!;
   }
 
   /* AssetManager Component */
@@ -645,13 +649,13 @@
     @apply rounded-full! bg-success! text-success-foreground! hover:bg-success/80!;
   }
 
-    /* Shared page dialog styles */
+  /* Shared page dialog styles */
   .page-dialog__fields {
     @apply space-y-4;
   }
 
   .dialog__path {
-    @apply text-xs text-text/70 font-mono;
+    @apply text-xs text-muted font-mono;
   }
 
   /* Add / Copy / Create-by-path dialogs */
@@ -687,7 +691,7 @@
   /* Delete dialog */
 
   .delete-page-dialog__recursive {
-    @apply space-y-1 text-sm text-text/70;
+    @apply space-y-1 text-sm text-muted;
   }
 
   .delete-page-dialog__recursive-label {
@@ -712,9 +716,225 @@
     @apply flex gap-1;
   }
 
+  /** Search **/
+
+  .search {
+    @apply mt-2;
+  }
+
+  .search__input-wrapper {
+    @apply relative mb-4;
+  }
+
+  .search__input {
+    @apply w-full rounded-md border border-surface-border bg-surface px-2 py-1 pr-8 text-sm text-text;
+  }
+
+  .search__clear-button {
+    @apply absolute top-1/2 right-1 -translate-y-1/2 text-sm text-muted hover:text-text;
+  }
+
+  .search__body {
+    @apply mb-4;
+  }
+
+  .search__status {
+    @apply text-sm;
+  }
+
+  .search__status--loading,
+  .search__status--empty {
+    @apply text-muted;
+  }
+
+  .search__result-summary {
+    @apply mb-2 text-sm text-text;
+  }
+
+  .search__results {
+    @apply space-y-4;
+  }
+
+  /* SearchResultCard */
+
+  .search-result-card {
+    @apply block rounded-sm border border-border bg-surface p-4 shadow-xs transition;
+  }
+
+  .search-result-card--active {
+    @apply border-border shadow-md bg-surface-alt;
+  }
+
+  .search-result-card--inactive {
+    @apply hover:shadow-md hover:bg-surface-alt;
+  }
+
+  .search-result-card__title {
+    @apply mb-1 break-words whitespace-normal text-base text-brand;
+  }
+
+  .search-result-card__excerpt {
+    @apply mb-2 break-words whitespace-normal text-sm text-text;
+  }
+
+  .search-result-card__path {
+    @apply mt-2 text-xs text-muted;
+  }
+
+  .search-result-card b {
+    @apply font-semibold text-brand-dark;
+  }
+
+  /* user management */
+  .user-management {
+    @apply mx-auto max-w-4xl p-6;
+  }
+
+  .user-management__title {
+    @apply mb-4 text-2xl font-bold text-text;
+  }
+
+  .user-management__header-actions {
+    @apply flex justify-end;
+  }
+
+  .user-management__table-card {
+    @apply mt-4 rounded-md border border-surface-border bg-surface shadow-sm;
+  }
+
+  .user-management__table-scroll {
+    @apply overflow-x-auto;
+  }
+
+  .user-management__table {
+    @apply w-full text-sm;
+  }
+
+  .user-management__table-head {
+    @apply bg-surface-alt text-left;
+  }
+
+  .user-management__table-header-cell {
+    @apply p-3 text-text;
+  }
+
+  .user-management__table-body-message {
+    @apply p-4 text-center text-muted;
+  }
+
+  .user-management__table-row {
+    @apply border-t border-surface-border;
+  }
+
+  .user-management__table-cell {
+    @apply p-3 text-text;
+  }
+
+  .user-management__actions-cell {
+    @apply p-3;
+  }
+
+  .user-management__actions {
+    @apply flex gap-2;
+  }
+
+  .user-management__role-pill {
+    @apply rounded px-2 py-1 text-xs font-medium;
+  }
+
+  .user-management__role-pill--admin {
+    @apply bg-brand/10 text-brand;
+  }
+
+  .user-management__role-pill--default {
+    @apply bg-surface-alt text-text;
+  }
+
+  .breadcrumbs-nav {
+    @apply flex w-full flex-1 grow text-sm text-muted;
+  }
+
+  .breadcrumbs-nav__list {
+    @apply flex flex-wrap items-center gap-1;
+  }
+
+  .breadcrumbs-nav__item {
+    @apply flex items-center gap-1;
+  }
+
+  .breadcrumbs-nav__separator {
+    @apply text-muted;
+  }
+
+  .breadcrumbs-nav__current {
+    @apply font-semibold text-text;
+  }
+
+  .breadcrumbs-nav__link {
+    @apply text-text hover:underline;
+  }
+
   /* readonly input */
   input[readonly] {
     @apply cursor-not-allowed bg-surface-alt!;
+  }
+
+  .page-viewer {
+    @apply mx-auto max-w-6xl px-8 py-8;
+  }
+
+  .page-viewer__error {
+    @apply p-6 text-error;
+  }
+
+  .page-viewer__content {
+    @apply prose prose-base mt-6 max-w-full leading-relaxed;
+  }
+
+  /* Markdown content tweaks */
+  .page-viewer__content img {
+    height: auto;
+    max-width: 100%;
+  }
+
+  .page-viewer__content li {
+    @apply leading-snug;
+  }
+
+  .table-wrapper {
+    @apply overflow-auto max-w-full;
+  }
+
+  .table-wrapper table {
+    @apply w-full border-collapse;
+  }
+
+  .table-wrapper tbody th,
+  .table-wrapper tbody td {
+    @apply border border-border px-4 py-2;
+  }
+
+  .table-wrapper tbody tr:nth-child(odd) {
+    @apply bg-surface-alt;
+  }
+
+  .table-wrapper thead tr {
+    @apply bg-table-header-bg text-left font-medium border border-table-header-border;
+  }
+  .table-wrapper thead th,
+  .table-wrapper thead td {
+    @apply border border-table-header-border px-4 py-2;
+  }
+
+  .page-viewer__content ol ol,
+  .page-viewer__content ol ul,
+  .page-viewer__content ul ol,
+  .page-viewer__content ul ul {
+    @apply mt-0 mb-0;
+  }
+
+  .page-viewer__content ul>li::marker {
+    color: var(--color-text);
   }
 }
 
@@ -725,28 +945,7 @@
 
   html,
   body {
-    @apply bg-page-bg text-page-text font-sans;
-  }
-
-  .prose {
-    @apply max-w-none;
-  }
-
-  .prose table {
-    @apply w-full border-collapse border border-gray-300;
-  }
-
-  .prose th,
-  .prose td {
-    @apply border border-gray-300 px-4 py-2;
-  }
-
-  .prose tr:nth-child(odd) {
-    @apply bg-gray-100;
-  }
-
-  .prose tr:nth-child(even) {
-    @apply bg-white;
+    @apply bg-page-bg text-text font-sans;
   }
 
   /* Scrollbars */

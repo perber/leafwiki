@@ -8,22 +8,22 @@ export default function SearchResultCard({ item }: { item: SearchResultItem }) {
     <Link
       to={`${item.path}`}
       data-testid={`search-result-card-${item.page_id}`}
-      className={`block rounded-xl border p-4 shadow-xs transition ${
+      className={`search-result-card ${
         isActive
-          ? 'border-green-600 bg-green-50'
-          : 'border-gray-200 hover:border-green-600 hover:shadow-md'
+          ? 'search-result-card--active'
+          : 'search-result-card--inactive'
       }`}
     >
       <div
-        className="mb-1 text-lg font-semibold break-words whitespace-normal text-green-700"
+        className="search-result-card__title"
         data-testid={`search-result-card-title-${item.page_id}`}
         dangerouslySetInnerHTML={{ __html: item.title }}
       />
       <div
-        className="mb-2 text-sm break-words whitespace-normal text-gray-600"
+        className="search-result-card__excerpt"
         dangerouslySetInnerHTML={{ __html: item.excerpt }}
       />
-      <div className="mt-2 text-xs text-gray-400">
+      <div className="search-result-card__path">
         {item.path.split('/').join(' / ')}
       </div>
     </Link>
