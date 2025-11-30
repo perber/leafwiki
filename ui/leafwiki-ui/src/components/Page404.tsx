@@ -14,14 +14,14 @@ export default function Page404() {
   const openDialog = useDialogsStore((s) => s.openDialog)
 
   return (
-    <div>
-      <h1 className="text-1xl mb-2 font-bold text-red-500">Page Not Found</h1>
-      <p className="text-sm text-gray-500">
+    <div className="page404">
+      <h1 className="page404__title">Page Not Found</h1>
+      <p className="page404__text">
         The page you are looking for does not exist.
       </p>
       {user && !readOnlyMode && appMode === 'view' && (
         <>
-          <p className="text-sm text-gray-500">
+          <p className="page404__text">
             Create the page by clicking the button below.
           </p>
           <Button

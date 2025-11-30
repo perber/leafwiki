@@ -71,6 +71,7 @@
   /* gray-700 */
   --color-surface-border: var(--color-gray-300);
   /* gray-300 */
+  --color-error: var(--color-red-600);
 }
 
 
@@ -251,11 +252,11 @@
   .app-layout__sidebar-resize-handle-hover {
     @apply bg-brand-light;
   }
-  
+
   .app-layout__sidebar-resize-handle-default {
     @apply bg-surface-border;
   }
-  
+
   .app-layout__sidebar-overlay-mobile {
     @apply fixed inset-0 top-[85px] z-10 bg-black/50 max-sm:h-[calc(100dvh-85px)];
   }
@@ -272,7 +273,91 @@
     @apply overflow-hidden;
   }
 
+  /** Base Dialog Styles **/
+  .base-dialog__footer {
+    @apply mt-6 flex justify-end gap-2;
+  }
+
+  /* Form Input Styles */
+  .form-input {
+    @apply space-y-1;
+  }
+
+  .form-input__label {
+    @apply block text-sm font-medium text-text;
+  }
+
+  .form-input__error {
+    @apply text-sm text-error;
+  }
+
+  .form-input__input-error {
+    @apply border-error;
+  }
+
+  /** Page 404 **/
+  .page404 {}
+
+  .page404__title {
+    @apply text-xl mb-2 text-error;
+  }
+
+  .page404__text {
+    @apply text-sm text-text;
+  }
+
+  /** pagination **/
+  .pagination {
+    @apply mt-4 flex items-center justify-center gap-2 text-sm text-text;
+  }
+
+  .pagination__button {
+    @apply rounded border border-surface-border px-2 py-1 text-text bg-surface hover:bg-surface-alt disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .pagination__info {
+    @apply text-text;
+  }
+
+  /* TooltipWrapper Component */
+  .tooltip-wrapper__content {
+    @apply bg-surface-alt text-text px-2 py-1 rounded shadow-sm;
+  }
+
+  /* UserToolbar Component */
+  .user-toolbar {
+    @apply ml-auto flex items-center gap-4;
+  }
+
+  .user-toolbar__avatar {
+    @apply h-8 w-8 text-text;
+  }
+
+  .user-toolbar__avatar-fallback {
+    @apply bg-surface-alt text-text font-medium;
+  }
+
+  /* Not logged in text */
+  .user-toolbar__not-logged-in {
+    @apply text-sm text-error;
+  }
+
+  /* Login button */
+  .user-toolbar__login-button {
+    @apply rounded bg-brand text-sm text-white px-3 py-2 hover:bg-brand-dark;
+  }
+
+  /* Dropdown items */
+  .user-toolbar__menu-item {
+    @apply cursor-pointer text-text hover:bg-surface-alt;
+  }
+
+  .user-toolbar-dropdown-trigger {
+    @apply flex items-center space-x-2 focus:outline-hidden;
+  }
+
 }
+
 /* -------------------------------------------------------
    UTILITIES LAYER — Markdown, tables, custom scrollbars
 ------------------------------------------------------- */
