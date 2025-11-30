@@ -462,6 +462,31 @@
     @apply flex items-center gap-2 text-sm text-text;
   }
 
+  /* Login Form*/
+  .login {
+    @apply h-screen w-96 border-r border-surface-border bg-surface text-text shadow-md;
+  }
+
+  .login__form {
+    @apply w-full p-4;
+  }
+
+  .login__title {
+    @apply mb-4 text-xl font-bold text-text;
+  }
+
+  .login__field {
+    @apply mb-4;
+  }
+
+  .login__error {
+    @apply mb-4 text-sm text-error;
+  }
+
+  .login__submit {
+    @apply w-full;
+  }
+
 
 }
 
