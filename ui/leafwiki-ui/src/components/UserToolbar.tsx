@@ -20,11 +20,11 @@ export default function UserToolbar() {
   if (!user) {
     // renders the login
     return (
-      <div className="ml-auto flex items-center gap-4">
-        <span className="text-sm text-red-500">Not logged in</span>
+      <div className="user-toolbar">
+        <span className="user-toolbar__not-logged-in">Not logged in</span>
         <button
           type="button"
-          className="rounded bg-green-500 p-2 text-sm text-white hover:bg-green-600 focus:outline-hidden"
+          className="user-toolbar__login-button"
           onClick={() => navigate('/login')}
         >
           Login
@@ -39,14 +39,14 @@ export default function UserToolbar() {
   }
 
   return (
-    <div className="ml-auto flex items-center gap-4">
+    <div className="user-toolbar">
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center space-x-2 focus:outline-hidden">
+        <DropdownMenuTrigger className="user-toolbar__dropdown-trigger">
           <Avatar
-            className="h-8 w-8 text-slate-700"
+            className="user-toolbar__avatar"
             data-testid="user-toolbar-avatar"
           >
-            <AvatarFallback className="bg-slate-200">
+            <AvatarFallback className="user-toolbar__avatar-fallback">
               {user.username[0].toUpperCase()}
             </AvatarFallback>
           </Avatar>

@@ -38,7 +38,7 @@ export function TooltipWrapper({
       <TooltipContent
         side={tooltipSide}
         align={tooltipAlign}
-        className="bg-gray-700 pt-1 pr-2 pb-1 pl-2"
+        className="tooltip-wrapper__content"
       >
         {label}
       </TooltipContent>
