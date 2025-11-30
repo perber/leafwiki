@@ -82,6 +82,13 @@ export default function MarkdownPreview({ content, path }: Props) {
           {children}
         </Headline>
       ),
+      table: (
+        props: ClassAttributes<HTMLTableElement> & HTMLAttributes<HTMLTableElement>,
+      ) => (
+        <div className="table-wrapper custom-scrollbar">
+          <table {...props} />
+        </div>
+      ),
       code: (
         props: JSX.IntrinsicAttributes &
           ClassAttributes<HTMLElement> &

@@ -167,7 +167,7 @@ export function AssetItem({
       {isEditing ? (
         <>
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
             className="asset-item__action-button asset-item__action-button--save"
             onClick={handleRename}
@@ -176,7 +176,7 @@ export function AssetItem({
             <Check size={16} />
           </Button>
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
             className="asset-item__action-button asset-item__action-button--cancel"
             onClick={() => {
@@ -189,33 +189,34 @@ export function AssetItem({
           </Button>
         </>
       ) : (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="asset-item__action-button"
-          onClick={(e) => {
-            e.stopPropagation()
-            setNewName(baseName.replace(/\.[^/.]+$/, ''))
-            setEditingFilename(filename)
-          }}
-          title="Rename"
-        >
-          <Pencil size={16} />
-        </Button>
+        <>
+          <Button
+            variant="outline"
+            size="icon"
+            className="asset-item__action-button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setNewName(baseName.replace(/\.[^/.]+$/, ''))
+              setEditingFilename(filename)
+            }}
+            title="Rename"
+          >
+            <Pencil size={16} />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="asset-item__action-button asset-item__action-button--delete"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleDelete()
+            }}
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </Button>
+        </>
       )}
-
-      <Button
-        variant="ghost"
-        size="icon"
-        className="asset-item__action-button asset-item__action-button--delete"
-        onClick={(e) => {
-          e.stopPropagation()
-          handleDelete()
-        }}
-        title="Delete"
-      >
-        <Trash2 size={16} />
-      </Button>
     </li>
   )
 }
