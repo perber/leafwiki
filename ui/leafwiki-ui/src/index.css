@@ -172,6 +172,7 @@
    COMPONENTS LAYER — Sidebar, custom UI parts
 ------------------------------------------------------- */
 @layer components {
+
   /* Sidebar */
   .sidebar {
     @apply bg-surface flex h-full w-full flex-col overflow-hidden;
@@ -305,8 +306,7 @@
   }
 
   /** Page 404 **/
-  .page404 {
-  }
+  .page404 {}
 
   .page404__title {
     @apply text-error mb-2 text-xl;
@@ -343,7 +343,7 @@
     @apply h-5 w-5;
   }
 
-  .user-toolbar__avatar > span {
+  .user-toolbar__avatar>span {
     @apply bg-avatar-bg! text-avatar-foreground!;
   }
 
@@ -897,10 +897,6 @@
     max-width: 100%;
   }
 
-  .page-viewer__content li {
-    @apply leading-snug;
-  }
-
   .table-wrapper {
     @apply max-w-full overflow-auto;
   }
@@ -909,21 +905,28 @@
     @apply w-full border-collapse;
   }
 
-  .table-wrapper tbody th,
-  .table-wrapper tbody td {
-    @apply border-border border px-4 py-2;
-  }
-
   .table-wrapper tbody tr:nth-child(odd) {
     @apply bg-surface-alt;
   }
 
-  .table-wrapper thead tr {
-    @apply bg-table-header-bg border-table-header-border border text-left font-medium;
+
+  .table-wrapper th,
+  .table-wrapper td {
+    @apply border border-border px-4 py-2;
   }
-  .table-wrapper thead th,
-  .table-wrapper thead td {
-    @apply border-table-header-border border px-4 py-2;
+
+  .table-wrapper thead {
+    @apply bg-table-header-bg;
+  }
+
+  .table-wrapper th:first-child,
+  .table-wrapper td:first-child {
+    @apply pl-4!;
+  }
+
+  .table-wrapper th:last-child,
+  .table-wrapper td:last-child {
+    @apply pr-4!;
   }
 
   .page-viewer__content ol ol,
@@ -933,8 +936,13 @@
     @apply mt-0 mb-0;
   }
 
-  .page-viewer__content ul > li::marker {
-    color: var(--page-text);
+
+  .page-viewer__content li::marker {
+    @apply text-page-text;
+  }
+
+  .page-viewer__content ul li {
+    @apply list-disc ;
   }
 
   .tree-view {
@@ -1046,6 +1054,7 @@
    UTILITIES LAYER — Markdown, tables, custom scrollbars
 ------------------------------------------------------- */
 @layer utilities {
+
   html,
   body {
     @apply bg-page-bg text-page-text font-sans;
@@ -1125,6 +1134,7 @@
     @apply opacity-100;
   }
 }
+
 /* -------------------------------------------------------
    PRINT LAYOUT
 ------------------------------------------------------- */
