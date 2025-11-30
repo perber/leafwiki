@@ -15,7 +15,6 @@ export default function LoginForm() {
   const setAuth = useAuthStore((state) => state.setAuth)
   const token = useAuthStore((s) => s.token)
 
-  // Redirect to home if already logged in
   useEffect(() => {
     if (token) {
       navigate('/')
@@ -40,11 +39,11 @@ export default function LoginForm() {
   return (
     <>
       <title>Login - LeafWiki</title>
-      <div className="h-screen w-96 border-r border-gray-200 bg-white font-sans text-gray-900 shadow-md">
-        <form onSubmit={handleSubmit} className="w-full p-4">
-          <h1 className="mb-4 text-xl font-bold">🌿 LeafWiki</h1>
+      <div className="login">
+        <form onSubmit={handleSubmit} className="login__form">
+          <h1 className="login__title">🌿 LeafWiki</h1>
 
-          <div className="mb-4">
+          <div className="login__field">
             <Input
               type="text"
               placeholder="Username or Email"
@@ -55,7 +54,7 @@ export default function LoginForm() {
             />
           </div>
 
-          <div className="mb-4">
+          <div className="login__field">
             <Input
               type="password"
               placeholder="Password"
@@ -66,11 +65,11 @@ export default function LoginForm() {
             />
           </div>
 
-          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+          {error && <p className="login__error">{error}</p>}
 
           <Button
             type="submit"
-            className="w-full"
+            className="login__submit"
             disabled={loading}
             data-testid="login-submit"
           >
