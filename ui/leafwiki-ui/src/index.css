@@ -337,17 +337,14 @@
     @apply bg-surface-alt text-text font-medium;
   }
 
-  /* Not logged in text */
   .user-toolbar__not-logged-in {
     @apply text-sm text-error;
   }
 
-  /* Login button */
   .user-toolbar__login-button {
     @apply rounded bg-brand text-sm text-white px-3 py-2 hover:bg-brand-dark;
   }
 
-  /* Dropdown items */
   .user-toolbar__menu-item {
     @apply cursor-pointer text-text hover:bg-surface-alt;
   }
@@ -355,6 +352,116 @@
   .user-toolbar-dropdown-trigger {
     @apply flex items-center space-x-2 focus:outline-hidden;
   }
+
+  /* AssetItem Component */
+
+  .asset-item {
+    @apply flex items-center justify-between gap-2 rounded-md px-2 py-1 transition bg-surface hover:bg-surface-alt cursor-pointer;
+  }
+
+  .asset-item__preview-image {
+    @apply h-10 w-10 rounded border border-surface-border object-cover bg-surface-alt;
+  }
+
+  .asset-item__preview-file {
+    @apply flex h-10 w-10 items-center justify-center rounded border border-surface-border bg-surface-alt text-text/60;
+  }
+
+  .asset-item__filename {
+    @apply truncate text-sm text-text hover:underline;
+  }
+
+  .asset-item__filename--editing-input {
+    @apply w-full border-b border-surface-border bg-transparent text-sm text-text focus:outline-hidden;
+  }
+
+  .asset-item__action-button {
+    @apply text-text/40 hover:text-brand;
+  }
+
+  .asset-item__action-button--save {
+    @apply text-brand hover:text-brand-dark;
+  }
+
+  .asset-item__action-button--cancel {
+    @apply text-error hover:text-error;
+  }
+
+  .asset-item__action-button--delete {
+    @apply text-text/40 hover:text-error;
+  }
+
+  /* AssetManager Component */
+  .asset-manager {
+    @apply space-y-3 text-sm text-text;
+  }
+
+  .asset-manager__title {
+    @apply font-semibold text-text;
+  }
+
+  .asset-manager__dropzone {
+    @apply flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-surface-border p-4 text-center text-text transition bg-surface;
+  }
+
+  .asset-manager__dropzone--dragging {
+    @apply border-brand bg-brand/5 text-brand;
+  }
+
+  .asset-manager__dropzone--hover {
+    @apply border-surface-border bg-surface-alt;
+  }
+
+  .asset-manager__dropzone-icon {
+    @apply mb-2;
+  }
+
+  .asset-manager__dropzone-text {
+    @apply text-xs text-text;
+  }
+
+  .asset-manager__dropzone-uploading {
+    @apply text-xs text-brand;
+  }
+
+  .asset-manager__list-container {
+    @apply h-96;
+  }
+
+  .asset-manager__loading {
+    @apply text-xs text-muted;
+  }
+
+  .asset-manager__empty {
+    @apply text-xs italic text-muted;
+  }
+
+  .asset-manager__list {
+    @apply h-full space-y-2 overflow-y-auto;
+  }
+
+  .asset-manager__tip {
+    @apply mt-2 text-xs italic text-muted;
+  }
+
+  /** AssetManager Dialog **/
+  .asset-manager-dialog__content {
+    @apply max-w-4xl;
+  }
+
+  /* AssetPreviewTooltip */
+  .asset-preview-tooltip__content {
+    @apply z-50 max-w-sm rounded border border-surface-border bg-surface p-2 shadow-lg;
+  }
+
+  .asset-preview-tooltip__image {
+    @apply max-h-[300px] max-w-[300px] rounded border border-surface-border;
+  }
+
+  .asset-preview-tooltip__file {
+    @apply flex items-center gap-2 text-sm text-text;
+  }
+
 
 }
 

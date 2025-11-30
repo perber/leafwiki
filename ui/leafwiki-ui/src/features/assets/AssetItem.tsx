@@ -51,18 +51,13 @@ export function AssetItem({
       await renameAsset(pageId, baseName, newFilename)
       toast.success('Asset renamed')
       onFilenameChange?.(baseName, newFilename)
-      if (onAssetVersionChange) {
-        onAssetVersionChange()
-      }
+      onAssetVersionChange?.()
       onReload()
     } catch (err: unknown) {
       if (err instanceof Error) {
         toast.error(`Rename failed: ${err.message}`)
-        console.error('Rename failed', err)
-      } else {
-        if (typeof err === 'object' && err !== null && 'error' in err) {
-          toast.error(`Rename failed: ${(err as { error: string }).error}`)
-        }
+      } else if (typeof err === 'object' && err !== null && 'error' in err) {
+        toast.error(`Rename failed: ${(err as { error: string }).error}`)
       }
     }
   }, [
@@ -81,24 +76,23 @@ export function AssetItem({
       await deleteAsset(pageId, baseName)
       toast.success('Asset deleted')
       onReload()
-      if (onAssetVersionChange) {
-        onAssetVersionChange()
-      }
+      onAssetVersionChange?.()
     } catch (err) {
       toast.error('Delete failed')
-      console.error('Delete failed', err)
     }
   }
 
   const handleInsertMarkdown = () => {
-    if (!isEditing) {
-      const markdown = isImage
-        ? `![${newName}](${assetUrl})\n`
-        : `[${baseName}](${assetUrl})\n`
-      onInsert(markdown)
-    }
+    if (isEditing) return
+
+    const markdown = isImage
+      ? `![${newName}](${assetUrl})\n`
+      : `[${baseName}](${assetUrl})\n`
+
+    onInsert(markdown)
   }
 
+  // hotkeys for rename
   useEffect(() => {
     if (!isEditing) return
 
@@ -106,11 +100,8 @@ export function AssetItem({
       keyCombo: 'Enter',
       enabled: true,
       mode: ['dialog'],
-      action: () => {
-        handleRename()
-      },
+      action: handleRename,
     }
-    registerHotkey(enterHotkey)
 
     const escapeHotkey: HotKeyDefinition = {
       keyCombo: 'Escape',
@@ -121,6 +112,7 @@ export function AssetItem({
         setNewName(baseName.replace(/\.[^/.]+$/, ''))
       },
     }
+    registerHotkey(enterHotkey)
     registerHotkey(escapeHotkey)
 
     return () => {
@@ -138,7 +130,7 @@ export function AssetItem({
 
   return (
     <li
-      className="group flex items-center justify-between gap-2 rounded-md px-2 py-1 transition hover:bg-gray-100"
+      className="group asset-item"
       onDoubleClick={handleInsertMarkdown}
       data-testid="asset-item"
     >
@@ -148,12 +140,12 @@ export function AssetItem({
             <img
               src={assetUrl}
               alt={baseName}
-              className="h-10 w-10 rounded border object-cover"
+              className="asset-item__preview-image"
             />
           </AssetPreviewTooltip>
         ) : (
           <AssetPreviewTooltip url={assetUrl} name={baseName}>
-            <div className="flex h-10 w-10 items-center justify-center rounded border bg-gray-100 text-gray-500">
+            <div className="asset-item__preview-file">
               <FileText size={18} />
             </div>
           </AssetPreviewTooltip>
@@ -161,15 +153,13 @@ export function AssetItem({
 
         {isEditing ? (
           <input
-            autoFocus={true}
+            autoFocus
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            className="w-full border-b border-gray-300 bg-transparent text-sm text-gray-800 focus:outline-hidden"
+            className="asset-item__filename--editing-input"
           />
         ) : (
-          <span className="cursor-pointer truncate text-sm text-gray-800 hover:underline">
-            {baseName}
-          </span>
+          <span className="asset-item__filename">{baseName}</span>
         )}
       </div>
 
@@ -178,7 +168,7 @@ export function AssetItem({
           <Button
             variant="ghost"
             size="icon"
-            className="text-green-600 hover:text-green-700"
+            className="asset-item__action-button asset-item__action-button--save"
             onClick={handleRename}
             title="Save"
           >
@@ -187,7 +177,7 @@ export function AssetItem({
           <Button
             variant="ghost"
             size="icon"
-            className="text-red-600 hover:text-red-600"
+            className="asset-item__action-button asset-item__action-button--cancel"
             onClick={() => {
               setEditingFilename(null)
               setNewName(baseName.replace(/\.[^/.]+$/, ''))
@@ -201,7 +191,7 @@ export function AssetItem({
         <Button
           variant="ghost"
           size="icon"
-          className="text-gray-400 hover:text-blue-600"
+          className="asset-item__action-button"
           onClick={(e) => {
             e.stopPropagation()
             setNewName(baseName.replace(/\.[^/.]+$/, ''))
@@ -216,7 +206,7 @@ export function AssetItem({
       <Button
         variant="ghost"
         size="icon"
-        className="text-gray-400 hover:text-red-600"
+        className="asset-item__action-button asset-item__action-button--delete"
         onClick={(e) => {
           e.stopPropagation()
           handleDelete()

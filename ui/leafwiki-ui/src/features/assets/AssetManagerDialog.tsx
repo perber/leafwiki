@@ -60,7 +60,7 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
       }}
     >
       <DialogContent
-        className="max-w-2xl"
+        className="asset-manager-dialog__content"
         onEscapeKeyDown={(e: KeyboardEvent) => {
           e.preventDefault()
         }}

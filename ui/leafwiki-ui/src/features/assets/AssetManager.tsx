@@ -7,7 +7,7 @@ import { AssetItem } from './AssetItem'
 
 type Props = {
   pageId: string
-  onInsert?: (md: string) => void // optional callback for markdown insertion
+  onInsert?: (md: string) => void
   onFilenameChange?: (before: string, after: string) => void
   onAssetVersionChange?: () => void
   isRenamingRef: React.RefObject<boolean>
@@ -30,11 +30,7 @@ export function AssetManager({
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
 
   const handleSetEditingFilename = (filename: string | null) => {
-    if (filename) {
-      isRenamingRef.current = true
-    } else {
-      isRenamingRef.current = false
-    }
+    isRenamingRef.current = !!filename
     setEditingFilename(filename)
   }
 
@@ -68,9 +64,7 @@ export function AssetManager({
     try {
       await uploadAsset(pageId, file)
       await loadAssets(false)
-      if (onAssetVersionChange) {
-        onAssetVersionChange()
-      }
+      onAssetVersionChange?.()
     } catch (err) {
       console.error('Upload failed', err)
     } finally {
@@ -96,9 +90,21 @@ export function AssetManager({
     )
   }
 
+  const dropzoneClassName = [
+    'asset-manager__dropzone',
+    isDragging
+      ? 'asset-manager__dropzone--dragging'
+      : isHovered
+        ? 'asset-manager__dropzone--hover'
+        : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className="space-y-3 text-sm">
-      <div className="font-semibold text-gray-700">Assets</div>
+    <div className="asset-manager">
+      <div className="asset-manager__title">Assets</div>
+
       <div
         data-testid="asset-upload-dropzone"
         ref={dropRef}
@@ -115,16 +121,12 @@ export function AssetManager({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => fileInput.current?.click()}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center text-gray-500 transition ${
-          isDragging
-            ? 'border-blue-400 bg-blue-50 text-blue-600'
-            : isHovered
-              ? 'border-gray-300 bg-gray-50'
-              : 'border-gray-200 hover:bg-gray-50'
-        }`}
+        className={dropzoneClassName}
       >
-        <UploadCloud className="mb-2" size={20} />
-        <p className="text-xs">Drop files here or click to upload</p>
+        <UploadCloud className="asset-manager__dropzone-icon" size={20} />
+        <p className="asset-manager__dropzone-text">
+          Drop files here or click to upload
+        </p>
         <input
           type="file"
           ref={fileInput}
@@ -133,19 +135,20 @@ export function AssetManager({
           multiple
         />
         {uploadingFiles.size > 0 && (
-          <div className="text-xs text-blue-600">
+          <div className="asset-manager__dropzone-uploading">
             Uploading {uploadingFiles.size} file
             {uploadingFiles.size > 1 ? 's' : ''}…
           </div>
         )}
       </div>
-      <div className="h-96">
+
+      <div className="asset-manager__list-container">
         {loading ? (
-          <p className="text-xs text-gray-500">Loading assets…</p>
+          <p className="asset-manager__loading">Loading assets…</p>
         ) : assets.length === 0 ? (
-          <p className="text-xs text-gray-400 italic">No assets yet</p>
+          <p className="asset-manager__empty">No assets yet</p>
         ) : (
-          <ul className="custom-scrollbar h-full space-y-2 overflow-y-auto">
+          <ul className="asset-manager__list custom-scrollbar">
             {assets.map((filename) => (
               <AssetItem
                 key={filename}
@@ -155,16 +158,15 @@ export function AssetManager({
                 pageId={pageId}
                 onReload={loadAssets}
                 onAssetVersionChange={onAssetVersionChange}
-                onInsert={(md) => {
-                  onInsert?.(md)
-                }}
+                onInsert={(md) => onInsert?.(md)}
                 onFilenameChange={onFilenameChange}
               />
             ))}
           </ul>
         )}
       </div>
-      <p className="mt-2 text-xs text-gray-500 italic">
+
+      <p className="asset-manager__tip">
         Tip: Double-click on an asset to insert it into the page.
       </p>
     </div>
