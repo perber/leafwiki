@@ -59,6 +59,7 @@ export default function PageEditor() {
         toast.error('Error saving page')
       })
   }, [savePage])
+  
   const handleClose = useCallback(() => {
     if (page?.path) {
       navigate(`/${page.path}`)
@@ -81,18 +82,18 @@ export default function PageEditor() {
     [setContent],
   )
 
-  if (error) return <p className="p-6 text-sm text-red-500">Error: {error}</p>
+  if (error) return <p className="page-editor__error">Error: {error}</p>
 
   if (!initialPage && !loading)
     return (
-      <div className="p-6">
+      <div className="page-editor__not-found">
         <Page404 />
       </div>
     )
 
   return (
     <>
-      <div className="pageEditor h-full w-full overflow-hidden">
+      <div className="page-editor">
         {initialPage && (
           <MarkdownEditor
             ref={editorRef}

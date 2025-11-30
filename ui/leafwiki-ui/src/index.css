@@ -74,8 +74,10 @@
   --color-error: var(--color-red-600);
   /* green-600 */
   --color-success: var(--color-green-600);
+  --color-success-foreground: var(--color-white);
   /* yellow-600 */
   --color-warning: var(--color-yellow-600);
+
 }
 
 
@@ -177,7 +179,7 @@
   }
 
   .sidebar__tabs {
-    @apply border-b border-b-surface-border bg-surface p-2;
+    @apply border-b border-b-surface-border bg-surface pl-2 pr-2 h-12 flex items-center;
   }
 
   .sidebar__tabs-list {
@@ -517,6 +519,126 @@
 
   .editor-title-bar__slug {
     @apply mt-1 inline-block max-w-[15vw] truncate rounded bg-surface-alt px-2 py-0.5 font-mono text-xs text-text sm:max-w-[40vw];
+  }
+
+  /** Markdown Code Editor **/
+  .markdown-code-editor {
+    @apply h-full w-full rounded shadow-xs;
+  }
+
+  /** markdown-editor **/
+  .markdown-editor {
+    @apply flex h-full w-full flex-col overflow-hidden;
+  }
+
+  /* Mobile layout */
+  .markdown-editor__mobile {
+    @apply flex h-full w-full flex-col;
+  }
+
+  .markdown-editor__tabs {
+    @apply mb-2 flex border-b border-surface-border text-sm text-text;
+  }
+
+  .markdown-editor__tab-button {
+    @apply -mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5;
+  }
+
+  .markdown-editor__tab-button--active {
+    @apply border-brand text-brand font-semibold;
+  }
+
+  .markdown-editor__tab-button--inactive {
+    @apply border-transparent text-muted hover:text-text;
+  }
+
+  /* Shared scroll pane */
+  .markdown-editor__pane-container {
+    @apply flex max-w-none flex-1 overflow-auto;
+  }
+
+  .markdown-editor__pane {
+    @apply w-full;
+  }
+
+  .markdown-editor__pane--hidden {
+    @apply hidden;
+  }
+
+  /* Desktop mode */
+  .markdown-editor__editor-pane {
+    @apply flex flex-1 max-w-none overflow-auto;
+  }
+
+  .markdown-editor__editor-pane--half {
+    @apply w-1/2;
+  }
+
+  .markdown-editor__editor-pane--full {
+    @apply w-full;
+  }
+
+  .markdown-editor__divider {
+    @apply h-full w-1 bg-surface-border;
+  }
+
+  .markdown-editor__preview-container {
+    @apply w-1/2 max-w-none flex-1;
+  }
+
+  /* Preview styling */
+  .markdown-editor__preview {
+    @apply prose prose-base box-content h-full w-full overflow-auto;
+  }
+
+  .markdown-editor__preview-inner {
+    @apply p-4;
+  }
+
+  /* Markdown Editor Toolbar */
+  .markdown-toolbar {
+    @apply sticky top-0 z-10 flex flex-wrap gap-1.5 border-b border-surface-border bg-surface-alt pl-2 pr-2 shadow-xs h-12 items-center;
+  }
+
+  .markdown-toolbar__button {
+    @apply text-text hover:text-text hover:bg-surface;
+  }
+
+  .markdown-toolbar__button--desktop-only {
+    @apply max-md:hidden;
+  }
+
+  .markdown-toolbar__separator {
+    @apply mx-1 h-5 w-px self-center bg-surface-border/60;
+  }
+
+  .markdown-toolbar__separator--desktop-only {
+    @apply max-md:hidden;
+  }
+
+  .markdown-toolbar__icon {
+    @apply h-4 w-4;
+  }
+
+  /** PageEditor **/
+  .page-editor {
+    @apply h-full w-full overflow-hidden;
+  }
+
+  .page-editor__error {
+    @apply p-6 text-sm text-error;
+  }
+
+  .page-editor__not-found {
+    @apply p-6;
+  }
+
+  .toolbar-button__close-editor {
+    @apply rounded-full!;
+  }
+
+  .toolbar-button__save-page {
+    @apply rounded-full! bg-success! text-success-foreground! hover:bg-success/80!;
   }
 }
 
