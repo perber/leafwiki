@@ -553,7 +553,7 @@
   }
 
   .markdown-editor__tab-button--inactive {
-    @apply border-transparent text-muted hover:text-text;
+    @apply border-transparent text-text hover:text-brand;
   }
 
   /* Shared scroll pane */
@@ -601,7 +601,7 @@
 
   /* Markdown Editor Toolbar */
   .markdown-toolbar {
-    @apply sticky top-0 z-10 flex flex-wrap gap-1.5 border-b border-markdown-toolbar-border bg-markdown-toolbar pl-2 pr-2 shadow-xs h-12 items-center;
+    @apply sticky top-0 z-10 flex flex-wrap gap-1.5 border-b border-markdown-toolbar-border bg-markdown-toolbar pl-2 pr-2 shadow-xs min-h-12 items-center;
   }
 
   .markdown-toolbar__button {
