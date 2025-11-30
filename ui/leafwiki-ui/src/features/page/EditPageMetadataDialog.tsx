@@ -79,7 +79,7 @@ export function EditPageMetadataDialog({
         },
       ]}
     >
-      <div className="space-y-4">
+      <div className="page-dialog__fields">
         <FormInput
           autoFocus
           label="Title"
@@ -103,7 +103,7 @@ export function EditPageMetadataDialog({
         />
       </div>
 
-      <span className="text-sm text-gray-500">
+      <span className="dialog__path">
         Path: {parentPath !== '' && `${parentPath}/`}
         {slug && `${slug}`}
       </span>

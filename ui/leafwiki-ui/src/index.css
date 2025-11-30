@@ -644,6 +644,78 @@
   .toolbar-button__save-page {
     @apply rounded-full! bg-success! text-success-foreground! hover:bg-success/80!;
   }
+
+    /* Shared page dialog styles */
+  .page-dialog__fields {
+    @apply space-y-4;
+  }
+
+  .dialog__path {
+    @apply text-xs text-text/70 font-mono;
+  }
+
+  /* Add / Copy / Create-by-path dialogs */
+
+  .create-page-by-path-dialog__alert {
+    @apply rounded-md bg-error/10 p-4 text-sm text-error;
+  }
+
+  .create-page-by-path-dialog__lookup-title {
+    @apply text-sm font-semibold text-text;
+  }
+
+  .create-page-by-path-dialog__lookup-list {
+    @apply mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md bg-surface-alt p-1;
+  }
+
+  .create-page-by-path-dialog__lookup-item {
+    @apply mb-1 flex items-center gap-1 text-xs text-text;
+  }
+
+  .create-page-by-path-dialog__lookup-item-icon--ok {
+    @apply text-success;
+  }
+
+  .create-page-by-path-dialog__lookup-item-icon--missing {
+    @apply text-error;
+  }
+
+  .create-page-by-path-dialog__lookup-item-slug {
+    @apply font-mono;
+  }
+
+  /* Delete dialog */
+
+  .delete-page-dialog__recursive {
+    @apply space-y-1 text-sm text-text/70;
+  }
+
+  .delete-page-dialog__recursive-label {
+    @apply flex items-center gap-2;
+  }
+
+  /* Sort pages dialog */
+
+  .sort-pages-dialog__list {
+    @apply space-y-2;
+  }
+
+  .sort-pages-dialog__item {
+    @apply flex items-center justify-between rounded-lg border bg-surface px-3 py-2 transition hover:shadow-xs;
+  }
+
+  .sort-pages-dialog__item-title {
+    @apply truncate text-sm text-text;
+  }
+
+  .sort-pages-dialog__item-actions {
+    @apply flex gap-1;
+  }
+
+  /* readonly input */
+  input[readonly] {
+    @apply cursor-not-allowed bg-surface-alt!;
+  }
 }
 
 /* -------------------------------------------------------

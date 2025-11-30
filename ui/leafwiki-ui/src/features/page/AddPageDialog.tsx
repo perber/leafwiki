@@ -139,7 +139,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
         },
       ]}
     >
-      <div className="space-y-4">
+      <div className="page-dialog__fields">
         <FormInput
           autoFocus={true}
           label="Title"
@@ -165,7 +165,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
         />
       </div>
       <span
-        className="text-sm text-gray-500"
+        className="dialog__path"
         data-testid="add-page-path-display"
       >
         Path: {parentPath !== '' && `${parentPath}/`}
