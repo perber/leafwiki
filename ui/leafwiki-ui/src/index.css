@@ -48,7 +48,7 @@
   --color-border: hsl(var(--border));
 
   /* page content background and text colors */
-  --color-page-bg: hsl(var(--card));
+  --color-page-bg: hsl(var(--background));
   --color-page-text: hsl(var(--foreground));
 
   /* Brand (Akzentfarbe) */
@@ -102,11 +102,11 @@
 @layer base {
   :root {
     /* ---- CORE APP BACKGROUND ---- */
-    --background: 210 40% 98%;
+    --background: 0 0% 100%;
     --foreground: 222 47% 11%;
 
     /* ---- SURFACES / CARDS ---- */
-    --card: 0 0% 100%;
+    --card: 210 40% 98%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
@@ -178,11 +178,11 @@
     --warning: 45 93% 47%;
     /* yellow-600 */
 
-    --markdown-toolbar: 226 11% 18%;
+    --markdown-toolbar: 210 40% 96%;
     /* #282c34 */
-    --markdown-toolbar-border: 0 0% 4%;
+    --markdown-toolbar-border: 214 32% 91%;
     /* zinc-900 */
-    --markdown-toolbar-text: 0 0% 100%;
+    --markdown-toolbar-text: 215 25% 27%;
     /* white */
 
     --muted: 215 16% 47%;
@@ -217,7 +217,7 @@
     /* helles, leicht warmes Weiß */
 
     /* ---- SURFACES / CARDS ---- */
-    --card: 222 22% 13%;
+    --card: 222 18% 22%;
     /* Content-Panel */
     --card-foreground: 210 20% 96%;
 
@@ -282,9 +282,9 @@
     --tooltip-border: 220 14% 30%;
 
     /* ---- GENERELLE SURFACES ---- */
-    --surface: 222 26% 9%;
+    --surface: 222 22% 12%;
     /* z.B. App-Frame */
-    --surface-alt: 222 22% 13%;
+    --surface-alt: 222 22% 16%;
     /* z.B. Cards, Sektionen */
 
     --interface-text: 220 8% 78%;
@@ -297,9 +297,9 @@
     --warning: 45 90% 55%;
 
     /* ---- MARKDOWN TOOLBAR ---- */
-    --markdown-toolbar: 222 18% 14%;
-    --markdown-toolbar-border: 222 18% 8%;
-    --markdown-toolbar-text: 0 0% 100%;
+    --markdown-toolbar: 222 22% 13%;
+    --markdown-toolbar-border: 220 14% 26%;
+    --markdown-toolbar-text: 220 8% 78%;
 
     /* ---- MUTED TEXT / ICONS ---- */
     --muted: 220 10% 60%;
@@ -785,7 +785,7 @@
   }
 
   .markdown-toolbar__button {
-    @apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80;
+    @apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80 hover:bg-markdown-toolbar-border!;
   }
 
   .markdown-toolbar__button--desktop-only {
@@ -1068,6 +1068,7 @@
   }
 
   /* Markdown content tweaks */
+  .markdown-editor__preview-container img,
   .page-viewer__content img {
     height: auto;
     max-width: 100%;
@@ -1105,6 +1106,10 @@
     @apply pr-4!;
   }
 
+  .markdown-editor__preview-container ol ol,
+  .markdown-editor__preview-container ol ul,
+  .markdown-editor__preview-container ul ol,
+  .markdown-editor__preview-container ul ul,
   .page-viewer__content ol ol,
   .page-viewer__content ol ul,
   .page-viewer__content ul ol,
@@ -1112,11 +1117,12 @@
     @apply mt-0 mb-0;
   }
 
-
+  .markdown-editor__preview-container li::marker,
   .page-viewer__content li::marker {
     @apply text-page-text;
   }
 
+  .markdown-editor__preview-container ul li,
   .page-viewer__content ul li {
     @apply list-disc;
   }
