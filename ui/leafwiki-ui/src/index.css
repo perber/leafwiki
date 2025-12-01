@@ -202,201 +202,126 @@
 
     --tree-node-hover: 213 34% 94%;
     /* slate-150 */
+
+    --scrollbar-thumb: 0 0% 40%;
+    /* dunkles Grau auf hellem Hintergrund */
+    --scrollbar-thumb-hover: 0 0% 25%;
+    /* etwas dunkler beim Hover */
   }
 
-
-  /*
-  DARK MODE 1
-  */
   .dark {
     /* ---- CORE APP BACKGROUND ---- */
-    --background: 222 47% 7%;
-    /* slate-950-ish */
-    --foreground: 210 40% 96%;
-    /* fast weiß, leicht warm */
+    /* Haupt-Hintergrund: tiefes, leicht blaugraues Anthrazit */
+    --background: 222 28% 8%;
+    /* ~ #0D1118 */
+    --foreground: 210 20% 96%;
+    /* helles, leicht warmes Weiß */
 
     /* ---- SURFACES / CARDS ---- */
-    --card: 222 47% 10%;
-    /* slate-900 */
-    --card-foreground: 210 40% 96%;
+    --card: 222 22% 13%;
+    /* Content-Panel */
+    --card-foreground: 210 20% 96%;
 
-    --popover: 222 47% 9%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 222 22% 15%;
+    --popover-foreground: 210 20% 96%;
 
     /* ---- BRAND COLOR (LeafWiki-Grün) ---- */
-    /* auf Dark etwas heller, damit es “glowt” */
-    --primary: 142 70% 45%;
-    /* etwa green-500/600 */
+    /* weniger Sättigung → nicht neon, aber klar als Akzent */
+    --primary: 142 45% 42%;
+    /* gedämpftes Brand-Grün */
     --primary-foreground: 0 0% 100%;
-    /* weiß */
 
     /* ---- SECONDARY / UI GRAYS ---- */
-    --secondary: 217 33% 17%;
-    /* slate-800 */
-    --secondary-foreground: 210 40% 96%;
+    /* Sidebar / Buttons / Pills */
+    --secondary: 222 16% 18%;
+    /* etwas heller als Background */
+    --secondary-foreground: 210 20% 96%;
 
-    --accent: 215 25% 23%;
-    /* dezente Hover-Flächen */
-    --accent-foreground: 210 40% 96%;
+    --accent: 222 18% 20%;
+    /* Hover-Flächen, Badges, etc. */
+    --accent-foreground: 210 20% 96%;
 
     /* ---- DANGER ---- */
-    --destructive: 0 72% 55%;
-    /* leicht heller red-500/600 */
+    --destructive: 0 68% 55%;
+    /* leicht gedämpftes Rot */
     --destructive-foreground: 0 0% 100%;
 
-    /* ---- INPUT/BORDER ---- */
-    --border: 217 19% 27%;
-    /* slate-700 */
-    --input: 217 19% 27%;
-    --ring: 142 70% 45%;
-    /* Fokus in Brand-Grün */
+    /* ---- INPUT / BORDER / FOCUS ---- */
+    --border: 220 14% 26%;
+    /* zarte, neutrale Border */
+    --input: 220 14% 22%;
+    /* Input-Felder */
+    --ring: 142 50% 45%;
+    /* Fokus: Brand-Grün, aber nicht zu knallig */
 
     /* ---- CHART COLORS ---- */
-    --chart-1: 142 70% 45%;
-    /* Brandgrün */
-    --chart-2: 173 58% 50%;
-    /* tealiger Ton, etwas heller */
-    --chart-3: 197 37% 55%;
-    /* blau */
-    --chart-4: 43 74% 60%;
-    /* gelb/orange */
-    --chart-5: 27 87% 62%;
-    /* orange/koralle */
+    --chart-1: 142 45% 45%;
+    /* Brand-Grün */
+    --chart-2: 200 40% 55%;
+    /* kühles Blau */
+    --chart-3: 20 65% 60%;
+    /* Orange */
+    --chart-4: 270 30% 60%;
+    /* Violett */
+    --chart-5: 45 80% 58%;
+    /* Gelb/Amber */
 
     /* ---- GLOBAL RADIUS ---- */
     --radius: 0.75rem;
 
     /* --- PAGE Surface --- */
-    --page-surface: 222 47% 7%;
-    /* wie --background */
+    --page-surface: 222 28% 8%;
+    /* wie Background, für Layout-Wrapper */
 
-    /* Brand (Akzentfarbe) */
-    --brand: 142 70% 45%;
-    --brand-dark: 143 64% 35%;
-    --brand-light: 142 77% 70%;
+    /* ---- BRAND Abstufungen ---- */
+    --brand: 142 45% 42%;
+    --brand-dark: 142 40% 32%;
+    --brand-light: 142 40% 70%;
 
-    --tooltip: 222 47% 12%;
-    /* leicht heller als Hintergrund */
-    --tooltip-border: 217 19% 35%;
+    /* ---- TOOLTIP ---- */
+    --tooltip: 222 22% 18%;
+    --tooltip-border: 220 14% 30%;
 
-    --surface: 222 47% 8%;
-    /* Basis-Surface für Layout */
-    --surface-alt: 222 36% 12%;
-    /* Alternativfläche (z.B. Sidebar) */
+    /* ---- GENERELLE SURFACES ---- */
+    --surface: 222 26% 9%;
+    /* z.B. App-Frame */
+    --surface-alt: 222 22% 13%;
+    /* z.B. Cards, Sektionen */
 
-    --interface-text: 210 40% 96%;
-    /* Standard-Text */
+    --interface-text: 220 8% 78%;
 
-    --surface-border: 217 19% 27%;
-    --error: 0 72% 55%;
-    --success: 142 76% 45%;
+    --surface-border: 220 14% 26%;
+
+    --error: 0 68% 55%;
+    --success: 142 50% 42%;
     --success-foreground: 0 0% 100%;
-    --warning: 45 93% 55%;
+    --warning: 45 90% 55%;
 
-    /* Markdown-Toolbar (etwas heller als ganzes UI) */
-    --markdown-toolbar: 220 13% 18%;
-    --markdown-toolbar-border: 0 0% 4%;
+    /* ---- MARKDOWN TOOLBAR ---- */
+    --markdown-toolbar: 222 18% 14%;
+    --markdown-toolbar-border: 222 18% 8%;
     --markdown-toolbar-text: 0 0% 100%;
 
-    /* Muted Text/Icons */
-    --muted: 215 16% 65%;
-    /* für Sekundärtext */
-    --muted-foreground: 215 16% 65%;
+    /* ---- MUTED TEXT / ICONS ---- */
+    --muted: 220 10% 60%;
+    /* Sekundärtext, Icons */
+    --muted-foreground: 220 10% 60%;
 
-    --headline-anchor-icon: 215 20% 70%;
-    --headline-anchor-icon-hover: 210 40% 96%;
+    /* ---- HEADLINE ANCHOR ICONS ---- */
+    --headline-anchor-icon: 220 12% 65%;
+    --headline-anchor-icon-hover: 210 20% 96%;
 
-    --avatar-bg: 217 19% 27%;
-    /* leicht hellere Bubble */
-    --avatar-foreground: 210 40% 96%;
+    /* ---- AVATAR ---- */
+    --avatar-bg: 222 16% 22%;
+    --avatar-foreground: 210 20% 96%;
 
-    --tree-node-hover: 217 25% 20%;
-    /* Sidebar-Hover (siehe Screenshot) */
-  }
+    /* ---- TREE / SIDEBAR HOVER ---- */
+    --tree-node-hover: 222 18% 18%;
 
-  /**
-  DARK MODE 2
-  **/
-
-  .dark-2 {
-    /* ---- CORE APP BACKGROUND ---- */
-    --background: 0 0% 6%;
-    /* fast schwarz, neutral */
-    --foreground: 0 0% 92%;
-    /* helles Neutralweiß */
-
-    /* ---- SURFACES / CARDS ---- */
-    --card: 0 0% 10%;
-    /* #1A1A1A */
-    --card-foreground: 0 0% 92%;
-
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 92%;
-
-    /* ---- BRAND COLOR (LeafWiki-Grün) ---- */
-    --primary: 142 70% 45%;
-    --primary-foreground: 0 0% 100%;
-
-    /* ---- SECONDARY / UI GRAYS ---- */
-    --secondary: 0 0% 16%;
-    /* neutral statt blau */
-    --secondary-foreground: 0 0% 92%;
-
-    --accent: 0 0% 18%;
-    --accent-foreground: 0 0% 92%;
-
-    /* ---- DESTRUCTIVE ---- */
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-
-    /* ---- INPUT/BORDER ---- */
-    --border: 0 0% 22%;
-    --input: 0 0% 22%;
-    --ring: 142 70% 45%;
-
-    /* ---- CHART COLORS ---- */
-    --chart-1: 142 70% 45%;
-    --chart-2: 160 20% 55%;
-    --chart-3: 0 0% 60%;
-    --chart-4: 45 80% 60%;
-    --chart-5: 20 80% 60%;
-
-    --page-surface: 0 0% 6%;
-
-    --brand: 142 70% 45%;
-    --brand-dark: 142 60% 30%;
-    --brand-light: 142 65% 70%;
-
-    --tooltip: 0 0% 14%;
-    --tooltip-border: 0 0% 28%;
-
-    --surface: 0 0% 8%;
-    --surface-alt: 0 0% 12%;
-
-    --interface-text: 0 0% 92%;
-
-    --surface-border: 0 0% 22%;
-
-    --error: 0 72% 55%;
-    --success: 142 76% 45%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 45 93% 55%;
-
-    --markdown-toolbar: 0 0% 14%;
-    --markdown-toolbar-border: 0 0% 5%;
-    --markdown-toolbar-text: 0 0% 100%;
-
-    --muted: 0 0% 55%;
-    --muted-foreground: 0 0% 55%;
-
-    --headline-anchor-icon: 0 0% 60%;
-    --headline-anchor-icon-hover: 0 0% 92%;
-
-    --avatar-bg: 0 0% 20%;
-    --avatar-foreground: 0 0% 92%;
-
-    --tree-node-hover: 0 0% 16%;
+    --scrollbar-thumb: 220 8% 40%;
+    /* mittelhelles Grau auf dunklem BG */
+    --scrollbar-thumb-hover: 220 8% 55%;
+    /* noch etwas heller beim Hover */
   }
 
 
@@ -1334,7 +1259,7 @@
   /* Scrollbars */
   .custom-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    scrollbar-color: hsl(var(--scrollbar-thumb)) transparent;
   }
 
   .custom-scrollbar::-webkit-scrollbar {
@@ -1347,12 +1272,12 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.18);
+    background: hsl(var(--scrollbar-thumb));
     border-radius: 9999px;
   }
 
   .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.28);
+    background: hsl(var(--scrollbar-thumb-hover));
   }
 
   /* Inline code */
