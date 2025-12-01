@@ -3,6 +3,7 @@ import { HotKeyHandler } from '@/components/HotKeyHandler'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import UserToolbar from '@/components/UserToolbar'
+import DesignToggle from '@/features/designtoggle/DesignToggle'
 import { EditorTitleBar } from '@/features/editor/EditorTitleBar'
 import Progressbar from '@/features/progressbar/Progressbar'
 import Sidebar from '@/features/sidebar/Sidebar'
@@ -167,6 +168,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <EditorTitleBar />
           </div>
           <div className="app-layout__editor-toolbar-container">
+            <DesignToggle />
             <Toolbar />
             <UserToolbar />
           </div>
