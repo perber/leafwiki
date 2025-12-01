@@ -25,6 +25,7 @@ export function UnsavedChangesDialog({
       }}
       cancelButton={{
         label: 'Cancel',
+        variant: 'secondary',
         autoFocus: true,
       }}
       buttons={[

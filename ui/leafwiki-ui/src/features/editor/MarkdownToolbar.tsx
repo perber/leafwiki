@@ -1,6 +1,7 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import { DIALOG_ASSET_MANAGER } from '@/lib/registries'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useDialogsStore } from '@/stores/dialogs'
 import {
   Bold,
@@ -37,6 +38,7 @@ export default function MarkdownToolbar({
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const isRenamingRef = useRef(false)
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     const check = () => {
@@ -218,25 +220,27 @@ export default function MarkdownToolbar({
             <Redo className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <div className="markdown-toolbar__separator" />
-        <TooltipWrapper
-          label={previewVisible ? 'Hide preview' : 'Show preview'}
-          side="top"
-          align="center"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onTogglePreview}
-            className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
-          >
-            {!previewVisible ? (
-              <Eye className="markdown-toolbar__icon" />
-            ) : (
-              <EyeOff className="markdown-toolbar__icon" />
-            )}
-          </Button>
-        </TooltipWrapper>
+        {!isMobile && (
+          <><div className="markdown-toolbar__separator" />
+            <TooltipWrapper
+              label={previewVisible ? 'Hide preview' : 'Show preview'}
+              side="top"
+              align="center"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onTogglePreview}
+                className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
+              >
+                {!previewVisible ? (
+                  <Eye className="markdown-toolbar__icon" />
+                ) : (
+                  <EyeOff className="markdown-toolbar__icon" />
+                )}
+              </Button>
+            </TooltipWrapper></>
+        )}
       </div>
     </>
   )
