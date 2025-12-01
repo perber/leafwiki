@@ -203,9 +203,8 @@
     --tree-node-hover: 213 34% 94%;
     /* slate-150 */
 
-    --scrollbar-thumb: 0 0% 40%;
-    /* dunkles Grau auf hellem Hintergrund */
-    --scrollbar-thumb-hover: 0 0% 25%;
+    --scrollbar-thumb: 214 20% 75%;
+    --scrollbar-thumb-hover: 214 20% 85%;
     /* etwas dunkler beim Hover */
   }
 
@@ -773,7 +772,7 @@
 
   /* Preview styling */
   .markdown-editor__preview {
-    @apply prose prose-base box-content h-full w-full overflow-auto;
+    @apply prose prose-base box-content h-full w-full overflow-auto dark:prose-invert;
   }
 
   .markdown-editor__preview-inner {
@@ -1065,7 +1064,7 @@
   }
 
   .page-viewer__content {
-    @apply prose prose-base text-page-text mt-6 max-w-full leading-relaxed;
+    @apply prose prose-base text-page-text mt-6 max-w-full leading-relaxed dark:prose-invert;
   }
 
   /* Markdown content tweaks */
