@@ -204,6 +204,10 @@
     /* slate-150 */
   }
 
+
+  /*
+  DARK MODE 1
+  */
   .dark {
     /* ---- CORE APP BACKGROUND ---- */
     --background: 222 47% 7%;
@@ -308,6 +312,91 @@
 
     --tree-node-hover: 217 25% 20%;
     /* Sidebar-Hover (siehe Screenshot) */
+  }
+
+  /**
+  DARK MODE 2
+  **/
+
+  .dark-2 {
+    /* ---- CORE APP BACKGROUND ---- */
+    --background: 0 0% 6%;
+    /* fast schwarz, neutral */
+    --foreground: 0 0% 92%;
+    /* helles Neutralweiß */
+
+    /* ---- SURFACES / CARDS ---- */
+    --card: 0 0% 10%;
+    /* #1A1A1A */
+    --card-foreground: 0 0% 92%;
+
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 92%;
+
+    /* ---- BRAND COLOR (LeafWiki-Grün) ---- */
+    --primary: 142 70% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    /* ---- SECONDARY / UI GRAYS ---- */
+    --secondary: 0 0% 16%;
+    /* neutral statt blau */
+    --secondary-foreground: 0 0% 92%;
+
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 92%;
+
+    /* ---- DESTRUCTIVE ---- */
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* ---- INPUT/BORDER ---- */
+    --border: 0 0% 22%;
+    --input: 0 0% 22%;
+    --ring: 142 70% 45%;
+
+    /* ---- CHART COLORS ---- */
+    --chart-1: 142 70% 45%;
+    --chart-2: 160 20% 55%;
+    --chart-3: 0 0% 60%;
+    --chart-4: 45 80% 60%;
+    --chart-5: 20 80% 60%;
+
+    --page-surface: 0 0% 6%;
+
+    --brand: 142 70% 45%;
+    --brand-dark: 142 60% 30%;
+    --brand-light: 142 65% 70%;
+
+    --tooltip: 0 0% 14%;
+    --tooltip-border: 0 0% 28%;
+
+    --surface: 0 0% 8%;
+    --surface-alt: 0 0% 12%;
+
+    --interface-text: 0 0% 92%;
+
+    --surface-border: 0 0% 22%;
+
+    --error: 0 72% 55%;
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 45 93% 55%;
+
+    --markdown-toolbar: 0 0% 14%;
+    --markdown-toolbar-border: 0 0% 5%;
+    --markdown-toolbar-text: 0 0% 100%;
+
+    --muted: 0 0% 55%;
+    --muted-foreground: 0 0% 55%;
+
+    --headline-anchor-icon: 0 0% 60%;
+    --headline-anchor-icon-hover: 0 0% 92%;
+
+    --avatar-bg: 0 0% 20%;
+    --avatar-foreground: 0 0% 92%;
+
+    --tree-node-hover: 0 0% 16%;
   }
 
 
