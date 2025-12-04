@@ -51,11 +51,12 @@ export default class ViewPage {
   }
 
   async getContent() {
+    await this.page.waitForSelector('article', { state: 'visible', timeout: 5000 });
     return this.page.locator('article').innerText();
   }
 
   async amountOfSVGElements(): Promise<number> {
-    await this.page.waitForSelector('article svg', { state: 'visible' });
+    await this.page.waitForSelector('article svg', { state: 'visible', timeout: 5000 });
     return this.page.locator('article svg').count();
   }
 
