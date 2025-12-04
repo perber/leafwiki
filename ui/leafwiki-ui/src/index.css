@@ -1295,9 +1295,12 @@
     content: '';
   }
 
-  /* Highlight.js */
-  .hljs {
+  code, pre {
     background: #1f2937 !important;
+  }
+
+  code.hljs {
+    @apply pl-0!;
   }
 }
 
