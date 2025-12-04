@@ -772,7 +772,7 @@
 
   /* Preview styling */
   .markdown-editor__preview {
-    @apply prose prose-base box-content h-full w-full overflow-auto dark:prose-invert;
+    @apply prose prose-base dark:prose-invert leading-relaxed box-content h-full w-full overflow-auto ;
   }
 
   .markdown-editor__preview-inner {
@@ -1285,9 +1285,15 @@
     background: hsl(var(--scrollbar-thumb-hover));
   }
 
+  .code, pre {
+    font-family: 'Courier New', Courier, monospace !important;
+  }
+
   /* Inline code */
   .inline-code {
-    @apply rounded bg-border p-0.5 px-1 font-mono text-xs font-medium text-foreground;
+    @apply rounded bg-border p-1 px-2 text-xs;
+    color: oklch(92.8% 0.006 264.531)!important;
+    font-weight: 500 !important;
   }
 
   .inline-code::after,
