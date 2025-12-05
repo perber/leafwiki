@@ -13,7 +13,16 @@ export default function DesignToggle() {
       aria-label={
         mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
       }
-      onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
+      onClick={() => {
+        const effectiveMode =
+          mode === 'system'
+            ? (window.matchMedia &&
+                window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light')
+            : mode;
+        setMode(effectiveMode === 'dark' ? 'light' : 'dark');
+      }}
     >
       <Moon
         className={mode === 'light' || mode === 'system' ? 'visible' : 'hidden'}
