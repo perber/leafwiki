@@ -77,27 +77,27 @@ export default function Sidebar() {
       key={'sidebar'}
       data-testid="sidebar"
       id="sidebar"
-      className="flex h-full w-full flex-col overflow-hidden bg-white"
+      className="sidebar"
     >
       {/*
         The actual width is controlled by the parent container (AppLayout)
         so this element just stretches to full width.
       */}
-      <div className="block h-full w-full">
+      <div className="sidebar__inner">
         {' '}
         {/* Tab navigation */}
-        <div className="tab-navigation border-b bg-gray-50 p-2">
+        <div className="sidebar__tabs">
           {/* Padding around the tabs */}
-          <div className="flex text-sm">
+          <div className="sidebar__tabs-list">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 data-testid={`sidebar-${tab.id}-tab-button`}
                 onClick={() => setSidebarMode(tab.id)}
-                className={`-mb-px flex items-center gap-1 px-3 py-1.5 ${
+                className={`sidebar__tab-button ${
                   sidebarMode === tab.id
-                    ? 'border-green-600 font-semibold text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-black'
+                    ? 'sidebar__tab-button--active'
+                    : 'sidebar__tab-button--inactive'
                 }`}
               >
                 {tab.icon()}
@@ -110,7 +110,7 @@ export default function Sidebar() {
             so the content area takes the rest of the height
             I can't use a variable here because TailwindCSS doesn't support that
         */}
-        <div className={`sidebar-content h-[calc(100%-48px)] w-full`}>
+        <div className={`sidebar__content`}>
           {/* Content */}
           {items.map((item) => (
             <ScrollableContainer key={item.id} hidden={sidebarMode !== item.id}>

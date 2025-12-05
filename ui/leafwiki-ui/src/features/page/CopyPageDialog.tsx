@@ -172,7 +172,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
         error={fieldErrors.slug}
       />
       <PageSelect pageID={targetParentID} onChange={setTargetParentID} />
-      <span className="text-sm text-gray-500">
+      <span className="dialog__path">
         Path: {parentPath !== '' && `${parentPath}/`}
         {slug && `${slug}`}
       </span>

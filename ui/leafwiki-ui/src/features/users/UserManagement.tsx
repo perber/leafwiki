@@ -4,10 +4,13 @@ import { toast } from 'sonner'
 import { ChangePasswordButton } from './ChangePasswordButton'
 import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
+import { useToolbarActions } from './useToolbarActions'
 
 export default function UserManagement() {
   const { users, loadUsers, reset } = useUserStore()
   const [loading, setLoading] = useState(true)
+
+  useToolbarActions()
 
   useEffect(() => {
     loadUsers()
@@ -27,33 +30,45 @@ export default function UserManagement() {
   return (
     <>
       <title>User Management - LeafWiki</title>
-      <div className="mx-auto max-w-4xl">
-        <h1 className="mb-4 text-2xl font-bold">User Management</h1>
-        <div className="flex justify-end">
+      <div className="user-management">
+        <h1 className="user-management__title">User Management</h1>
+
+        <div className="user-management__header-actions">
           <CreateEditUserButton />
         </div>
-        <div className="mt-4 rounded-md border shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100 text-left">
+
+        <div className="user-management__table-card">
+          <div className="user-management__table-scroll">
+            <table className="user-management__table">
+              <thead className="user-management__table-head">
                 <tr>
-                  <th className="p-3">Username</th>
-                  <th className="p-3">Email</th>
-                  <th className="p-3">Role</th>
-                  <th className="p-3">Actions</th>
+                  <th className="user-management__table-header-cell">
+                    Username
+                  </th>
+                  <th className="user-management__table-header-cell">Email</th>
+                  <th className="user-management__table-header-cell">Role</th>
+                  <th className="user-management__table-header-cell">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={4} className="p-4 text-center text-gray-500">
+                    <td
+                      colSpan={4}
+                      className="user-management__table-body-message"
+                    >
                       Loading users...
                     </td>
                   </tr>
                 )}
                 {!loading && users.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="p-4 text-center text-gray-500">
+                    <td
+                      colSpan={4}
+                      className="user-management__table-body-message"
+                    >
                       No users found.
                     </td>
                   </tr>
@@ -61,18 +76,26 @@ export default function UserManagement() {
                 {!loading &&
                   users.length > 0 &&
                   users.map((user) => (
-                    <tr key={user.id} className="border-t">
-                      <td className="p-3">{user.username}</td>
-                      <td className="p-3">{user.email}</td>
-                      <td className="p-3">
+                    <tr key={user.id} className="user-management__table-row">
+                      <td className="user-management__table-cell">
+                        {user.username}
+                      </td>
+                      <td className="user-management__table-cell">
+                        {user.email}
+                      </td>
+                      <td className="user-management__table-cell">
                         <span
-                          className={`rounded px-2 py-1 text-xs font-medium ${user.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}
+                          className={`user-management__role-pill ${
+                            user.role === 'admin'
+                              ? 'user-management__role-pill--admin'
+                              : 'user-management__role-pill--default'
+                          }`}
                         >
                           {user.role}
                         </span>
                       </td>
-                      <td className="p-3">
-                        <div className="flex gap-2">
+                      <td className="user-management__actions-cell">
+                        <div className="user-management__actions">
                           <CreateEditUserButton user={user} />
                           <ChangePasswordButton user={user} />
                           <DeleteUserButton user={user} />

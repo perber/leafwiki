@@ -127,7 +127,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
           autoFocus: true,
           loading,
           disabled: isCreateButtonDisabled,
-          variant: 'default',
+          variant: 'secondary',
         },
         {
           label: 'Create & Edit Page',
@@ -139,7 +139,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
         },
       ]}
     >
-      <div className="space-y-4">
+      <div className="page-dialog__fields">
         <FormInput
           autoFocus={true}
           label="Title"
@@ -164,10 +164,7 @@ export function AddPageDialog({ parentId }: AddPageDialogProps) {
           error={fieldErrors.slug}
         />
       </div>
-      <span
-        className="text-sm text-gray-500"
-        data-testid="add-page-path-display"
-      >
+      <span className="dialog__path" data-testid="add-page-path-display">
         Path: {parentPath !== '' && `${parentPath}/`}
         {slug && `${slug}`}
       </span>

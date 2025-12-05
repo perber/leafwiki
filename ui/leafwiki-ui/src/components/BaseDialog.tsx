@@ -165,7 +165,7 @@ export default function BaseDialog({
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
         {children}
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="base-dialog__footer">
           {cancelButton && (
             <Button
               autoFocus={cancelButton.autoFocus}

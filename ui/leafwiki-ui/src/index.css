@@ -1,245 +1,1233 @@
+/* -------------------------------------------------------
+   Tailwind Imports
+------------------------------------------------------- */
 @import 'tailwindcss';
 
 @plugin 'tailwindcss-animate';
 @plugin '@tailwindcss/typography';
 
+/* Dark mode variant */
 @custom-variant dark (&:is(.dark *));
 
+/* -------------------------------------------------------
+   TAILWIND THEME TOKENS (Design Tokens)
+------------------------------------------------------- */
 @theme {
-  --color-wiki-bg: #f9fafb;
-  --color-wiki-surface: #ffffff;
-  --color-wiki-border: #e5e7eb;
-  --color-wiki-text: #111827;
-  --color-wiki-accent: #4ade80;
-  --color-wiki-muted: #6b7280;
+  /* Typography + Radii */
+  --font-sans: InterVariable, system-ui, sans-serif;
+  --radius: 0.5rem;
+  --radius-lg: 0.5rem;
+  --radius-md: 0.375rem;
+  --radius-sm: 0.25rem;
 
-  --color-success: var(--color-green-600);
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-
+  /* Shadcn semantic colors (mapped to HSL vars) */
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
-
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
-
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
-
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
-
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
-
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-
-  --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
-
   --color-chart-1: hsl(var(--chart-1));
   --color-chart-2: hsl(var(--chart-2));
   --color-chart-3: hsl(var(--chart-3));
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
-  --font-sans: InterVariable, system-ui, sans-serif;
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
 
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --color-page-bg: hsl(var(--background));
+  --color-page-text: hsl(var(--foreground));
+
+  --color-brand: hsl(var(--brand));
+  --color-brand-dark: hsl(var(--brand-dark));
+  --color-brand-light: hsl(var(--brand-light));
+
+  --color-tooltip: hsl(var(--tooltip));
+  --color-tooltip-border: hsl(var(--tooltip-border));
+  --color-tooltip-text: hsl(var(--foreground));
+
+  --color-surface: hsl(var(--surface));
+  --color-surface-alt: hsl(var(--surface-alt));
+
+  --color-interface-text: hsl(var(--interface-text));
+  --color-surface-border: hsl(var(--surface-border));
+  --color-error: hsl(var(--error));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-markdown-toolbar: hsl(var(--markdown-toolbar));
+  --color-markdown-toolbar-border: hsl(var(--markdown-toolbar-border));
+  --color-markdown-toolbar-text: hsl(var(--markdown-toolbar-text));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-table-header-bg: hsl(var(--table-header-bg));
+  --color-table-header-border: hsl(var(--table-header-border));
+
+  --color-headline-anchor-icon: hsl(var(--headline-anchor-icon));
+  --color-headline-anchor-icon-hover: hsl(var(--headline-anchor-icon-hover));
+
+  --color-avatar-bg: hsl(var(--avatar-bg));
+  --color-avatar-foreground: hsl(var(--avatar-foreground));
+
+  --color-tree-node-hover: hsl(var(--tree-node-hover));
 }
 
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
+/* -------------------------------------------------------
+   BASE LAYER — global defaults, Shadcn theme, dark mode
+------------------------------------------------------- */
 @layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 210 40% 98%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 142 72% 29%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 63%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 142 72% 29%;
+    --chart-1: 142 70% 40%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+
+    /* ---- GLOBAL RADIUS ---- */
+    --radius: 0.75rem;
+
+    /* --- PAGE Surface **/
+    --page-surface: 0 0% 100%;
+
+    --brand: 142 72% 29%;
+    --brand-dark: 143 64% 24%;
+    --brand-light: 142 77% 73%;
+
+    --border: 214 32% 91%;
+    --tooltip: 142 40% 96%;
+    --tooltip-border: 142 35% 80%;
+
+    --surface: 210 40% 98%;
+    --surface-alt: 210 40% 96%;
+
+    --interface-text: 215 25% 27%;
+    --surface-border: 214 32% 91%;
+    --error: 0 72% 51%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 93% 47%;
+
+    --markdown-toolbar: 210 40% 96%;
+    --markdown-toolbar-border: 214 32% 91%;
+    --markdown-toolbar-text: 215 25% 27%;
+
+    --muted: 215 16% 47%;
+    --muted-foreground: 215 16% 47%;
+
+    --headline-anchor-icon: 215 20% 65%;
+    --headline-anchor-icon-hover: 217 33% 17%;
+
+    --avatar-bg: 214 20% 89%;
+    --avatar-foreground: 215 25% 27%;
+
+    --tree-node-hover: 213 34% 94%;
+    --scrollbar-thumb: 214 20% 75%;
+    --scrollbar-thumb-hover: 214 20% 85%;
+
+    --table-header-border: 214 32% 91%;
+  }
+
+  .dark {
+    /* ---- CORE APP BACKGROUND ---- */
+    --background: 222 28% 8%;
+    --foreground: 210 20% 96%;
+    /* ---- SURFACES / CARDS ---- */
+    --card: 222 18% 22%;
+    /* Content-Panel */
+    --card-foreground: 210 20% 96%;
+
+    --popover: 222 22% 15%;
+    --popover-foreground: 210 20% 96%;
+
+    /* ---- BRAND COLOR ---- */
+    --primary: 142 45% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 16% 18%;
+    --secondary-foreground: 210 20% 96%;
+    --accent: 222 18% 20%;
+    --accent-foreground: 210 20% 96%;
+    --destructive: 0 68% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 14% 26%;
+    --input: 220 14% 22%;
+    --ring: 142 50% 45%;
+    --chart-1: 142 45% 45%;
+    --chart-2: 200 40% 55%;
+    --chart-3: 20 65% 60%;
+    --chart-4: 270 30% 60%;
+    --chart-5: 45 80% 58%;
+
+    /* ---- GLOBAL RADIUS ---- */
+    --radius: 0.75rem;
+
+    /* --- PAGE Surface --- */
+    --page-surface: 222 28% 8%;
+
+    --brand: 142 45% 42%;
+    --brand-dark: 142 40% 32%;
+    --brand-light: 142 40% 70%;
+
+    /* ---- TOOLTIP ---- */
+    --tooltip: 222 22% 18%;
+    --tooltip-border: 220 14% 30%;
+
+    /* ---- GENERELLE SURFACES ---- */
+    --surface: 222 22% 12%;
+    /* z.B. App-Frame */
+    --surface-alt: 222 22% 16%;
+    --interface-text: 220 8% 78%;
+    --surface-border: 220 14% 26%;
+
+    --error: 0 68% 55%;
+    --success: 142 50% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 90% 55%;
+
+    /* ---- MARKDOWN TOOLBAR ---- */
+    --markdown-toolbar: 222 22% 13%;
+    --markdown-toolbar-border: 220 14% 26%;
+    --markdown-toolbar-text: 220 8% 78%;
+
+    /* ---- MUTED TEXT / ICONS ---- */
+    --muted: 220 10% 60%;
+    --muted-foreground: 220 10% 60%;
+
+    --headline-anchor-icon: 220 12% 65%;
+    --headline-anchor-icon-hover: 210 20% 96%;
+
+    /* ---- AVATAR ---- */
+    --avatar-bg: 222 16% 22%;
+    --avatar-foreground: 210 20% 96%;
+
+    /* ---- TREE / SIDEBAR HOVER ---- */
+    --tree-node-hover: 222 18% 18%;
+
+    --scrollbar-thumb: 220 8% 40%;
+    --scrollbar-thumb-hover: 220 8% 55%;
+
+    --table-header-border: 220 14% 26%;
+  }
+
+  /* Tailwind v4 border compatibility fix */
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: var(--color-border, currentcolor);
   }
-}
 
-@layer utilities {
-  html,
   body {
-    @apply bg-wiki-bg text-wiki-text font-sans;
+    @apply bg-page-bg text-page-text font-sans;
   }
 
-  .prose {
-    @apply max-w-none;
-  }
-
-  /* Spezifische Stile für Tabellen innerhalb von Markdown */
-  .prose table {
-    @apply w-full border-collapse border border-gray-300;
-  }
-
-  .prose th,
-  .prose td {
-    @apply border border-gray-300 px-4 py-2;
-  }
-
-  .prose tr:nth-child(odd) {
-    @apply bg-gray-100;
-  }
-
-  .prose tr:nth-child(even) {
-    @apply bg-white;
-  }
-}
-
-@layer base {
   button:not(:disabled),
   [role='button']:not(:disabled) {
     cursor: pointer;
   }
 }
 
-/* Firefox */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
-}
-
-/* WebKit (Chrome, Edge, Safari) */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.18);
-  border-radius: 9999px;
-}
-
-.custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.28);
-}
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-
-    --foreground: 0 0% 3.9%;
-
-    --card: 0 0% 100%;
-
-    --card-foreground: 0 0% 3.9%;
-
-    --popover: 0 0% 100%;
-
-    --popover-foreground: 0 0% 3.9%;
-
-    --primary: 0 0% 9%;
-
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 0 0% 96.1%;
-
-    --secondary-foreground: 0 0% 9%;
-
-    --muted: 0 0% 96.1%;
-
-    --muted-foreground: 0 0% 45.1%;
-
-    --accent: 0 0% 96.1%;
-
-    --accent-foreground: 0 0% 9%;
-
-    --destructive: 0 84.2% 60.2%;
-
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 0 0% 89.8%;
-
-    --input: 0 0% 89.8%;
-
-    --ring: 0 0% 3.9%;
-
-    --chart-1: 12 76% 61%;
-
-    --chart-2: 173 58% 39%;
-
-    --chart-3: 197 37% 24%;
-
-    --chart-4: 43 74% 66%;
-
-    --chart-5: 27 87% 67%;
-
-    --radius: 0.5rem;
+/* -------------------------------------------------------
+   COMPONENTS LAYER — Sidebar, custom UI parts
+------------------------------------------------------- */
+@layer components {
+  /* Sidebar */
+  .sidebar {
+    @apply bg-surface flex h-full w-full flex-col overflow-hidden;
   }
-  .dark {
-    --background: 0 0% 3.9%;
 
-    --foreground: 0 0% 98%;
+  .sidebar__inner {
+    @apply bg-surface block h-full w-full;
+  }
 
-    --card: 0 0% 3.9%;
+  .sidebar__tabs {
+    @apply border-b-surface-border bg-surface flex h-12 items-center border-b pr-2 pl-2;
+  }
 
-    --card-foreground: 0 0% 98%;
+  .sidebar__tabs-list {
+    @apply bg-surface flex text-sm;
+  }
 
-    --popover: 0 0% 3.9%;
+  .sidebar__tab-button {
+    @apply -mb-px flex items-center gap-1 px-3 py-1.5;
+  }
 
-    --popover-foreground: 0 0% 98%;
+  .sidebar__tab-button--active {
+    @apply text-brand border-brand hover:text-brand;
+  }
 
-    --primary: 0 0% 98%;
+  .sidebar__tab-button--inactive {
+    @apply hover:text-brand text-interface-text border-transparent;
+  }
 
-    --primary-foreground: 0 0% 9%;
+  .sidebar__content {
+    @apply h-[calc(100%-48px)] w-full;
+  }
 
-    --secondary: 0 0% 14.9%;
+  /* App Layout */
+  .app-layout__header {
+    @apply bg-surface fixed z-20 h-[85px] w-full border-b p-4;
+  }
 
-    --secondary-foreground: 0 0% 98%;
+  .app-layout__header-inner {
+    @apply flex h-full items-center justify-start;
+  }
 
-    --muted: 0 0% 14.9%;
+  .app-layout__sidebar-toggle-container {
+    @apply flex min-h-full w-6 items-center;
+  }
 
-    --muted-foreground: 0 0% 63.9%;
+  .app-layout__sidebar-toggle-button {
+    @apply relative z-20 h-5 w-5 p-2;
+  }
 
-    --accent: 0 0% 14.9%;
+  .app-layout__logo-n-title {
+    @apply mr-6 ml-6 flex min-h-full items-center gap-2;
+  }
 
-    --accent-foreground: 0 0% 98%;
+  .app-layout__logo-n-title h2 {
+    @apply text-xl font-bold;
+  }
 
-    --destructive: 0 62.8% 30.6%;
+  .app-layout__editor-title-bar-container {
+    @apply flex min-h-full flex-1 items-center justify-center;
+  }
 
-    --destructive-foreground: 0 0% 98%;
+  .app-layout__editor-toolbar-container {
+    @apply flex min-h-full items-center gap-4;
+  }
 
-    --border: 0 0% 14.9%;
+  .app-layout__header-spacer {
+    @apply h-[85px] w-full;
+  }
 
-    --input: 0 0% 14.9%;
+  .app-layout__content-wrapper {
+    @apply flex h-[calc(100dvh-85px)];
+  }
 
-    --ring: 0 0% 83.1%;
+  .app-layout__sidebar-container {
+    @apply relative z-20 box-border h-full overflow-auto pr-1 max-sm:fixed max-sm:h-[calc(100dvh-85px)];
+  }
 
-    --chart-1: 220 70% 50%;
+  .app-layout__sidebar-resizer {
+    @apply absolute inset-y-0 right-0 flex w-1 cursor-col-resize items-center justify-center;
+  }
 
-    --chart-2: 160 60% 45%;
+  .app-layout__sidebar-resize-handle {
+    @apply pointer-events-none my-4 h-full w-full transition-colors;
+  }
 
-    --chart-3: 30 80% 55%;
+  .app-layout__sidebar-resize-handle-hover {
+    @apply bg-brand-light;
+  }
 
-    --chart-4: 280 65% 60%;
+  .app-layout__sidebar-resize-handle-default {
+    @apply bg-surface-border;
+  }
 
-    --chart-5: 340 75% 55%;
+  .app-layout__sidebar-overlay-mobile {
+    @apply fixed inset-0 top-[85px] z-10 bg-black/50 max-sm:h-[calc(100dvh-85px)];
+  }
+
+  .app-layout__main-content-area {
+    @apply flex-1 transition-all duration-200;
+  }
+
+  .app-layout__main-content-area-viewer {
+    @apply border-surface-border overflow-auto;
+  }
+
+  .app-layout__main-content-area-editor {
+    @apply overflow-hidden;
+  }
+
+  /** Base Dialog Styles **/
+  .base-dialog__footer {
+    @apply mt-6 flex justify-end gap-2;
+  }
+
+  /* Form Input Styles */
+  .form-input {
+    @apply space-y-1;
+  }
+
+  .form-input__label {
+    @apply text-interface-text block text-sm font-medium;
+  }
+
+  .form-input__error {
+    @apply text-error text-sm;
+  }
+
+  .form-input__input-error {
+    @apply border-error;
+  }
+
+  /** Page 404 **/
+
+  .page404__title {
+    @apply text-error mb-2 text-xl;
+  }
+
+  .page404__text {
+    @apply text-page-text text-sm;
+  }
+
+  /** pagination **/
+  .pagination {
+    @apply text-interface-text mt-4 flex items-center justify-center gap-2 text-sm;
+  }
+
+  .pagination__button {
+    @apply border-surface-border text-interface-text bg-surface hover:bg-surface-alt rounded border px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .pagination__info {
+    @apply text-interface-text;
+  }
+
+  .tooltip-wrapper__content {
+    @apply bg-primary/10 border-primary/30 text-interface-text rounded border px-2 py-1 text-xs shadow-sm;
+  }
+
+  /* UserToolbar Component */
+  .user-toolbar {
+    @apply ml-auto flex items-center gap-4;
+  }
+
+  .user-toolbar__avatar {
+    @apply h-5 w-5;
+  }
+
+  .user-toolbar__avatar > span {
+    @apply bg-avatar-bg! text-avatar-foreground!;
+  }
+
+  .user-toolbar__avatar-fallback {
+    @apply text-muted-foreground font-medium;
+  }
+
+  .user-toolbar__not-logged-in {
+    @apply text-error text-sm;
+  }
+
+  .user-toolbar__login-button {
+    @apply bg-brand hover:bg-brand-dark rounded px-3 py-2 text-sm text-white;
+  }
+
+  .user-toolbar__menu-item {
+    @apply text-interface-text hover:bg-surface-alt cursor-pointer;
+  }
+
+  .user-toolbar-dropdown-trigger {
+    @apply flex items-center space-x-2 focus:outline-hidden;
+  }
+
+  /* AssetItem Component */
+
+  .asset-item {
+    @apply bg-surface hover:bg-surface-alt flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1 transition;
+  }
+
+  .asset-item__preview-image {
+    @apply border-surface-border bg-surface-alt h-10 w-10 rounded border object-cover;
+  }
+
+  .asset-item__preview-file {
+    @apply border-surface-border bg-surface-alt text-muted flex h-10 w-10 items-center justify-center rounded border;
+  }
+
+  .asset-item__filename {
+    @apply text-interface-text truncate text-sm hover:underline;
+  }
+
+  .asset-item__filename--editing-input {
+    @apply border-surface-border text-interface-text w-full border-b bg-transparent text-sm focus:outline-hidden;
+  }
+
+  .asset-item__action-button {
+    @apply text-muted! hover:text-brand!;
+  }
+
+  .asset-item__action-button--save {
+    @apply text-brand! hover:text-brand-dark!;
+  }
+
+  .asset-item__action-button--cancel {
+    @apply text-error! hover:text-error!;
+  }
+
+  .asset-item__action-button--delete {
+    @apply text-muted! hover:text-error!;
+  }
+
+  /* AssetManager Component */
+  .asset-manager {
+    @apply text-interface-text space-y-3 text-sm;
+  }
+
+  .asset-manager__title {
+    @apply text-interface-text font-semibold;
+  }
+
+  .asset-manager__dropzone {
+    @apply border-surface-border text-interface-text bg-surface flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center transition;
+  }
+
+  .asset-manager__dropzone--dragging {
+    @apply border-brand bg-brand/5 text-brand;
+  }
+
+  .asset-manager__dropzone--hover {
+    @apply border-surface-border bg-surface-alt;
+  }
+
+  .asset-manager__dropzone-icon {
+    @apply mb-2;
+  }
+
+  .asset-manager__dropzone-text {
+    @apply text-interface-text text-xs;
+  }
+
+  .asset-manager__dropzone-uploading {
+    @apply text-brand text-xs;
+  }
+
+  .asset-manager__list-container {
+    @apply h-96;
+  }
+
+  .asset-manager__loading {
+    @apply text-muted text-xs;
+  }
+
+  .asset-manager__empty {
+    @apply text-muted text-xs italic;
+  }
+
+  .asset-manager__list {
+    @apply h-full space-y-2 overflow-y-auto;
+  }
+
+  .asset-manager__tip {
+    @apply text-muted mt-2 text-xs italic;
+  }
+
+  /** AssetManager Dialog **/
+  .asset-manager-dialog__content {
+    @apply max-w-4xl;
+  }
+
+  /* AssetPreviewTooltip */
+  .asset-preview-tooltip__content {
+    @apply border-surface-border bg-surface z-50 max-w-sm rounded border p-2 shadow-lg;
+  }
+
+  .asset-preview-tooltip__image {
+    @apply border-surface-border max-h-[300px] max-w-[300px] rounded border;
+  }
+
+  .asset-preview-tooltip__file {
+    @apply text-interface-text flex items-center gap-2 text-sm;
+  }
+
+  /* Login Form*/
+  .login {
+    @apply border-surface-border bg-surface text-interface-text h-screen w-96 border-r shadow-md;
+  }
+
+  .login__form {
+    @apply w-full p-4;
+  }
+
+  .login__title {
+    @apply text-interface-text mb-4 text-xl font-bold;
+  }
+
+  .login__field {
+    @apply mb-4;
+  }
+
+  .login__error {
+    @apply text-error mb-4 text-sm;
+  }
+
+  .login__submit {
+    @apply w-full;
+  }
+
+  .editor-title-bar {
+    @apply flex flex-1 flex-col items-center;
+  }
+
+  .editor-title-bar__button {
+    @apply text-interface-text relative flex items-center gap-1 text-base font-semibold hover:underline;
+  }
+
+  .editor-title-bar__title {
+    @apply inline-block max-w-[15vw] truncate sm:max-w-[40vw];
+  }
+
+  .editor-title-bar__icon {
+    @apply text-muted absolute top-1/2 -right-6 -translate-y-1/2 transition-transform duration-200 ease-in-out;
+  }
+
+  .editor-title-bar__button:hover .editor-title-bar__icon {
+    @apply text-interface-text;
+  }
+
+  .editor-title-bar__dirty-indicator {
+    @apply text-warning ml-2 text-xs;
+  }
+
+  .editor-title-bar__slug {
+    @apply bg-surface-alt text-interface-text mt-1 inline-block max-w-[15vw] truncate rounded px-2 py-0.5 font-mono text-xs sm:max-w-[40vw];
+  }
+
+  /** Markdown Code Editor **/
+  .markdown-code-editor {
+    @apply h-full w-full rounded shadow-xs;
+  }
+
+  /** markdown-editor **/
+  .markdown-editor {
+    @apply flex h-full w-full flex-col overflow-hidden;
+  }
+
+  /* Mobile layout */
+  .markdown-editor__mobile {
+    @apply flex h-full w-full flex-col;
+  }
+
+  .markdown-editor__tabs {
+    @apply border-surface-border text-interface-text mb-2 flex border-b text-sm;
+  }
+
+  .markdown-editor__tab-button {
+    @apply -mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5;
+  }
+
+  .markdown-editor__tab-button--active {
+    @apply border-brand text-brand font-semibold;
+  }
+
+  .markdown-editor__tab-button--inactive {
+    @apply text-interface-text hover:text-brand border-transparent;
+  }
+
+  /* Shared scroll pane */
+  .markdown-editor__pane-container {
+    @apply flex max-w-none flex-1 overflow-auto;
+  }
+
+  .markdown-editor__pane {
+    @apply w-full;
+  }
+
+  .markdown-editor__pane--hidden {
+    @apply hidden;
+  }
+
+  /* Desktop mode */
+  .markdown-editor__editor-pane {
+    @apply flex max-w-none flex-1 overflow-auto;
+  }
+
+  .markdown-editor__editor-pane--half {
+    @apply w-1/2;
+  }
+
+  .markdown-editor__editor-pane--full {
+    @apply w-full;
+  }
+
+  .markdown-editor__divider {
+    @apply bg-surface-border h-full w-1;
+  }
+
+  .markdown-editor__preview-container {
+    @apply w-1/2 max-w-none flex-1;
+  }
+
+  /* Preview styling */
+  .markdown-editor__preview {
+    @apply prose prose-base dark:prose-invert box-content h-full w-full overflow-auto leading-relaxed;
+  }
+
+  .markdown-editor__preview-inner {
+    @apply p-4;
+  }
+
+  /* Markdown Editor Toolbar */
+  .markdown-toolbar {
+    @apply border-markdown-toolbar-border bg-markdown-toolbar sticky top-0 z-10 flex min-h-12 flex-wrap items-center gap-1.5 border-b pr-2 pl-2 shadow-xs;
+  }
+
+  .markdown-toolbar__button {
+    @apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80 hover:bg-markdown-toolbar-border!;
+  }
+
+  .markdown-toolbar__button--desktop-only {
+    @apply max-md:hidden;
+  }
+
+  .markdown-toolbar__separator {
+    @apply bg-surface-border/60 mx-1 h-5 w-px self-center;
+  }
+
+  .markdown-toolbar__separator--desktop-only {
+    @apply max-md:hidden;
+  }
+
+  .markdown-toolbar__icon {
+    @apply h-4 w-4;
+  }
+
+  /** PageEditor **/
+  .page-editor {
+    @apply h-full w-full overflow-hidden;
+  }
+
+  .page-editor__error {
+    @apply text-error p-6 text-sm;
+  }
+
+  .page-editor__not-found {
+    @apply p-6;
+  }
+
+  .toolbar-button__close-editor {
+    @apply rounded-full!;
+  }
+
+  .toolbar-button__save-page {
+    @apply bg-success! text-success-foreground! hover:bg-success/80! rounded-full!;
+  }
+
+  /* Shared page dialog styles */
+  .page-dialog__fields {
+    @apply space-y-4;
+  }
+
+  .dialog__path {
+    @apply text-muted font-mono text-xs;
+  }
+
+  /* Add / Copy / Create-by-path dialogs */
+
+  .create-page-by-path-dialog__alert {
+    @apply bg-error/10 text-error rounded-md p-4 text-sm;
+  }
+
+  .create-page-by-path-dialog__lookup-title {
+    @apply text-interface-text text-sm font-semibold;
+  }
+
+  .create-page-by-path-dialog__lookup-list {
+    @apply bg-surface-alt mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md p-1;
+  }
+
+  .create-page-by-path-dialog__lookup-item {
+    @apply text-interface-text mb-1 flex items-center gap-1 text-xs;
+  }
+
+  .create-page-by-path-dialog__lookup-item-icon--ok {
+    @apply text-success;
+  }
+
+  .create-page-by-path-dialog__lookup-item-icon--missing {
+    @apply text-error;
+  }
+
+  .create-page-by-path-dialog__lookup-item-slug {
+    @apply font-mono;
+  }
+
+  /* Delete dialog */
+
+  .delete-page-dialog__recursive {
+    @apply text-muted space-y-1 text-sm;
+  }
+
+  .delete-page-dialog__recursive-label {
+    @apply flex items-center gap-2;
+  }
+
+  /* Sort pages dialog */
+
+  .sort-pages-dialog__list {
+    @apply space-y-2;
+  }
+
+  .sort-pages-dialog__item {
+    @apply bg-surface flex items-center justify-between rounded-lg border px-3 py-2 transition hover:shadow-xs;
+  }
+
+  .sort-pages-dialog__item-title {
+    @apply text-interface-text truncate text-sm;
+  }
+
+  .sort-pages-dialog__item-actions {
+    @apply flex gap-1;
+  }
+
+  /** Search **/
+
+  .search {
+    @apply mt-2;
+  }
+
+  .search__input-wrapper {
+    @apply relative mb-4;
+  }
+
+  .search__input {
+    @apply border-surface-border bg-surface text-interface-text w-full rounded-md border px-2 py-1 pr-8 text-sm;
+  }
+
+  .search__clear-button {
+    @apply text-muted hover:text-interface-text absolute top-1/2 right-1 -translate-y-1/2 text-sm;
+  }
+
+  .search__body {
+    @apply mb-4;
+  }
+
+  .search__status {
+    @apply text-sm;
+  }
+
+  .search__status--loading,
+  .search__status--empty {
+    @apply text-muted;
+  }
+
+  .search__result-summary {
+    @apply text-interface-text mb-2 text-sm;
+  }
+
+  .search__results {
+    @apply space-y-4;
+  }
+
+  /* SearchResultCard */
+
+  .search-result-card {
+    @apply border-border bg-surface block rounded-sm border p-4 shadow-xs transition;
+  }
+
+  .search-result-card--active {
+    @apply border-border bg-surface-alt shadow-md;
+  }
+
+  .search-result-card--inactive {
+    @apply hover:bg-surface-alt hover:shadow-md;
+  }
+
+  .search-result-card__title {
+    @apply text-brand mb-1 text-base break-words whitespace-normal;
+  }
+
+  .search-result-card__excerpt {
+    @apply text-interface-text mb-2 text-sm break-words whitespace-normal;
+  }
+
+  .search-result-card__path {
+    @apply text-muted mt-2 text-xs;
+  }
+
+  .search-result-card b {
+    @apply text-brand-dark font-semibold;
+  }
+
+  /* user management */
+  .user-management {
+    @apply mx-auto max-w-4xl p-6;
+  }
+
+  .user-management__title {
+    @apply text-interface-text mb-4 text-2xl font-bold;
+  }
+
+  .user-management__header-actions {
+    @apply flex justify-end;
+  }
+
+  .user-management__table-card {
+    @apply border-surface-border bg-surface mt-4 rounded-md border shadow-sm;
+  }
+
+  .user-management__table-scroll {
+    @apply overflow-x-auto;
+  }
+
+  .user-management__table {
+    @apply w-full text-sm;
+  }
+
+  .user-management__table-head {
+    @apply bg-surface-alt text-left;
+  }
+
+  .user-management__table-header-cell {
+    @apply text-interface-text p-3;
+  }
+
+  .user-management__table-body-message {
+    @apply text-muted p-4 text-center;
+  }
+
+  .user-management__table-row {
+    @apply border-surface-border border-t;
+  }
+
+  .user-management__table-cell {
+    @apply text-interface-text p-3;
+  }
+
+  .user-management__actions-cell {
+    @apply p-3;
+  }
+
+  .user-management__actions {
+    @apply flex gap-2;
+  }
+
+  .user-management__role-pill {
+    @apply rounded px-2 py-1 text-xs font-medium;
+  }
+
+  .user-management__role-pill--admin {
+    @apply bg-brand/10 text-brand;
+  }
+
+  .user-management__role-pill--default {
+    @apply bg-surface-alt text-interface-text;
+  }
+
+  .breadcrumbs-nav {
+    @apply text-muted flex w-full flex-1 grow text-sm;
+  }
+
+  .breadcrumbs-nav__list {
+    @apply flex flex-wrap items-center gap-1;
+  }
+
+  .breadcrumbs-nav__item {
+    @apply flex items-center gap-1;
+  }
+
+  .breadcrumbs-nav__separator {
+    @apply text-muted;
+  }
+
+  .breadcrumbs-nav__current {
+    @apply text-page-text font-semibold;
+  }
+
+  .breadcrumbs-nav__link {
+    @apply text-page-text hover:underline;
+  }
+
+  /* readonly input */
+  input[readonly] {
+    @apply bg-surface-alt! cursor-not-allowed;
+  }
+
+  .page-viewer {
+    @apply mx-auto max-w-6xl px-8 py-8;
+  }
+
+  .page-viewer__error {
+    @apply text-error p-6;
+  }
+
+  .page-viewer__content {
+    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full leading-relaxed;
+  }
+
+  /* Markdown content tweaks */
+  .markdown-editor__preview-container img,
+  .page-viewer__content img {
+    height: auto;
+    max-width: 100%;
+  }
+
+  .table-wrapper {
+    @apply max-w-full overflow-auto;
+  }
+
+  .table-wrapper table {
+    @apply w-full border-collapse;
+  }
+
+  .table-wrapper tbody tr:nth-child(odd) {
+    @apply bg-surface-alt;
+  }
+
+  .table-wrapper th,
+  .table-wrapper td {
+    @apply border-border border px-4 py-2;
+  }
+
+  .table-wrapper thead {
+    @apply bg-table-header-bg;
+  }
+
+  .table-wrapper th:first-child,
+  .table-wrapper td:first-child {
+    @apply pl-4!;
+  }
+
+  .table-wrapper th:last-child,
+  .table-wrapper td:last-child {
+    @apply pr-4!;
+  }
+
+  .markdown-editor__preview-container ol ol,
+  .markdown-editor__preview-container ol ul,
+  .markdown-editor__preview-container ul ol,
+  .markdown-editor__preview-container ul ul,
+  .page-viewer__content ol ol,
+  .page-viewer__content ol ul,
+  .page-viewer__content ul ol,
+  .page-viewer__content ul ul {
+    @apply mt-0 mb-0;
+  }
+
+  .markdown-editor__preview-container li::marker,
+  .page-viewer__content li::marker {
+    @apply text-page-text;
+  }
+
+  .markdown-editor__preview-container ul li,
+  .page-viewer__content ul li {
+    @apply list-disc;
+  }
+
+  .tree-view {
+    @apply w-full;
+  }
+
+  .tree-view__toolbar {
+    @apply mb-2 flex;
+  }
+
+  .tree-view__status {
+    @apply text-sm;
+  }
+
+  .tree-view__status--loading {
+    @apply text-muted;
+  }
+
+  .tree-view__status--error {
+    @apply text-error;
+  }
+
+  .tree-view__action-icon {
+    @apply text-muted hover:text-interface-text cursor-pointer;
+  }
+
+  .tree-view__nodes {
+    @apply w-full;
+  }
+
+  .tree-node {
+    @apply text-interface-text relative flex cursor-pointer items-center transition-all;
+  }
+
+  .tree-node--active {
+    @apply text-brand;
+  }
+
+  .tree-node--inactive {
+    @apply hover:bg-tree-node-hover;
+  }
+
+  .tree-node__marker {
+    @apply bg-surface-border absolute top-0 bottom-0 w-0.5;
+  }
+
+  .tree-node__marker--active {
+    @apply bg-brand/60;
+  }
+
+  .tree-node__main {
+    @apply flex w-full flex-1 items-center gap-2 pl-4;
+  }
+
+  .tree-node__toggle {
+    @apply text-muted -ml-1 shrink-0 transition-transform;
+  }
+
+  .tree-node__toggle--open {
+    @apply rotate-180;
+  }
+
+  .tree-node__toggle--closed {
+    @apply rotate-90;
+  }
+
+  .tree-node__toggle-spacer {
+    @apply -ml-1 w-4;
+  }
+
+  .tree-node__tooltip-parent {
+    @apply w-full flex-1 overflow-hidden;
+  }
+
+  .tree-node__link {
+    @apply w-full py-1;
+  }
+
+  .tree-node__title {
+    @apply text-interface-text block truncate overflow-hidden text-sm text-ellipsis;
+  }
+
+  .tree-node__title--active {
+    @apply text-brand;
+  }
+
+  .tree-node__actions {
+    @apply bg-surface absolute right-0 flex items-center gap-1 rounded-md shadow-md;
+  }
+
+  .tree-node__actions--compact {
+    @apply px-1 py-2;
+  }
+
+  .tree-node__action-icon {
+    @apply text-muted hover:text-interface-text cursor-pointer;
+  }
+
+  .tree-node__children {
+    @apply ml-4 pl-2;
+  }
+
+  .tree-node__children--closed {
+    @apply hidden;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium;
+  }
+
+  /* grüner Primary-Button */
+  .btn--primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm;
+  }
+
+  /* neutraler grauer Button */
+  .btn--secondary {
+    @apply bg-surface text-interface-text border-surface-border hover:bg-surface-alt border shadow-xs;
+  }
+
+  /* gefährlich (Delete) */
+  .btn--danger {
+    @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm;
   }
 }
 
+/* -------------------------------------------------------
+   UTILITIES LAYER — Markdown, tables, custom scrollbars
+------------------------------------------------------- */
+@layer utilities {
+  html,
+  body {
+    @apply bg-page-bg text-page-text font-sans;
+  }
+
+  /* Scrollbars */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--scrollbar-thumb)) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--scrollbar-thumb));
+    border-radius: 9999px;
+  }
+
+  .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: hsl(var(--scrollbar-thumb-hover));
+  }
+
+  .code,
+  pre {
+    font-family: 'Courier New', Courier, monospace !important;
+  }
+
+  /* Inline code */
+  .inline-code {
+    @apply bg-border rounded p-1 px-2 text-xs;
+    color: oklch(92.8% 0.006 264.531) !important;
+    font-weight: 500 !important;
+  }
+
+  .inline-code::after,
+  .inline-code::before {
+    content: '';
+  }
+
+  code,
+  pre {
+    background: #1f2937 !important;
+  }
+
+  code.hljs {
+    @apply pl-0!;
+  }
+}
+
+/* -------------------------------------------------------
+   CONTENT LAYER — Markdown anchor styling etc.
+------------------------------------------------------- */
 @layer content {
+  main {
+    @apply bg-page-bg text-page-text;
+  }
+
   main a {
-    @apply text-green-600 no-underline hover:text-green-800;
+    @apply text-brand hover:text-brand-dark no-underline;
   }
 
   main article .anchor,
@@ -247,26 +1235,21 @@
     position: relative;
   }
 
+  main article .anchor a span svg {
+    @apply text-headline-anchor-icon;
+  }
+
   main article .anchor a,
   #markdown-preview-container .anchor a {
-    @apply text-foreground;
+    @apply text-page-text;
   }
 
-  main article .anchor:hover a,
-  #markdown-preview-container .anchor:hover a {
-    @apply text-zinc-700 dark:text-zinc-300;
+  #markdown-preview-container .anchor a span svg {
+    @apply hidden;
   }
 
-  main article .anchor a span,
-  #markdown-preview-container .anchor a span {
-    @apply opacity-0;
-    @apply transition-opacity;
-    @apply duration-200;
-    @apply absolute;
-    @apply -left-5;
-    @apply top-1/2;
-    @apply -translate-y-1/2;
-    @apply text-gray-600 dark:text-gray-400;
+  main article .anchor a span {
+    @apply absolute top-1/2 -left-7 -translate-y-1/2 opacity-0 transition-opacity duration-200;
   }
 
   main article .anchor a:hover span {
@@ -274,45 +1257,9 @@
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-
-.flash-border {
-  outline: 2px solid #10b981; /* green-500 */
-  outline-offset: 2px;
-  transition: outline 0.2s ease-in-out;
-}
-
-.inline-code {
-  @apply rounded bg-gray-200 p-0.5 px-1 font-mono text-xs font-medium text-gray-700;
-}
-
-.inline-code::after,
-.inline-code::before {
-  content: '';
-}
-
-/**
-Highlight styles
-**/
-
-.hljs {
-  background: #1f2937 !important;
-}
-
-.my-4 svg {
-  display: block;
-}
-.my-4 {
-  contain: content;
-}
-
+/* -------------------------------------------------------
+   PRINT LAYOUT
+------------------------------------------------------- */
 @media print {
   @page {
     margin: 1cm;
@@ -320,7 +1267,6 @@ Highlight styles
 
   html,
   body {
-    background-color: #ffffff;
     margin: 0;
   }
 
@@ -328,27 +1274,30 @@ Highlight styles
     margin-top: 20px;
   }
 
+  #sidebar-container,
+  header,
+  .sidebar-wrapper {
+    display: none;
+  }
+
   #sidebar-container {
     width: 0 !important;
   }
 
-  header,
-  #sidebar-container,
-  .sidebar-wrapper {
-    display: none;
-  }
-  .content-wrapper {
+  .app-layout__content-wrapper {
     width: 100%;
     overflow: visible;
     height: auto;
     padding: 0;
   }
+
   main {
     width: 100%;
     padding: 0;
     border: 0;
   }
-  .space-between-header-and-main {
+
+  .app-layout__header-spacer {
     height: 0;
   }
 }

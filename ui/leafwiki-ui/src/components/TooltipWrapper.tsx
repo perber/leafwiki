@@ -3,6 +3,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useIsMobile } from '@/lib/useIsMobile'
 import clsx from 'clsx'
 import { ReactNode } from 'react'
 
@@ -23,6 +24,12 @@ export function TooltipWrapper({
 }: Props) {
   const tooltipSide = side || 'top'
   const tooltipAlign = align || 'start'
+  const isMobile = useIsMobile()
+
+  if (isMobile) {
+    return <div className={clsx('flex', parentClassName)}>{children}</div>
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -31,7 +38,11 @@ export function TooltipWrapper({
       <TooltipContent
         side={tooltipSide}
         align={tooltipAlign}
-        className="bg-gray-700 pt-1 pr-2 pb-1 pl-2"
+        className={clsx(
+          'tooltip-wrapper__content',
+          'z-30 rounded-sm border px-2 py-1 text-xs shadow-sm',
+          'bg-tooltip border-tooltip-border text-tooltip-text',
+        )}
       >
         {label}
       </TooltipContent>

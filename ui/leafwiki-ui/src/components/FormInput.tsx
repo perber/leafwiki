@@ -24,12 +24,8 @@ export function FormInput({
   readOnly = false,
 }: FormInputProps) {
   return (
-    <div className="space-y-1">
-      {label && (
-        <label className="block text-sm font-medium text-gray-700">
-          {label}
-        </label>
-      )}
+    <div className="form-input">
+      {label && <label className="form-input__label">{label}</label>}
       <Input
         autoFocus={autoFocus || false}
         type={type}
@@ -37,10 +33,10 @@ export function FormInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         readOnly={readOnly}
-        className={error ? 'border-red-500' : ''}
+        className={error ? 'form-input__input-error' : ''}
         data-testid={testid}
       />
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="form-input__error">{error}</p>}
     </div>
   )
 }

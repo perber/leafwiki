@@ -1,6 +1,7 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import { DIALOG_ASSET_MANAGER } from '@/lib/registries'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useDialogsStore } from '@/stores/dialogs'
 import {
   Bold,
@@ -37,8 +38,7 @@ export default function MarkdownToolbar({
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const isRenamingRef = useRef(false)
-
-  const toolbarButtonStyle = 'text-white hover:text-white hover:bg-zinc-800'
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     const check = () => {
@@ -67,15 +67,15 @@ export default function MarkdownToolbar({
 
   return (
     <>
-      <div className="sticky top-0 z-10 flex flex-wrap gap-1.5 border-b border-zinc-900 bg-[#282c34] p-2 shadow-xs">
+      <div className="markdown-toolbar">
         <TooltipWrapper label="Bold (Ctrl+B)" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => editorRef.current?.insertWrappedText('**')}
-            className={toolbarButtonStyle}
+            className="markdown-toolbar__button"
           >
-            <Bold className="h-4 w-4" />
+            <Bold className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Italic (Ctrl+I)" side="top" align="center">
@@ -83,9 +83,9 @@ export default function MarkdownToolbar({
             variant="ghost"
             size="icon"
             onClick={() => editorRef.current?.insertWrappedText('_')}
-            className={toolbarButtonStyle}
+            className="markdown-toolbar__button"
           >
-            <Italic className="h-4 w-4" />
+            <Italic className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Strike through" side="top" align="center">
@@ -93,16 +93,16 @@ export default function MarkdownToolbar({
             variant="ghost"
             size="icon"
             onClick={() => editorRef.current?.insertWrappedText('~~')}
-            className={toolbarButtonStyle}
+            className="markdown-toolbar__button"
           >
-            <Strikethrough className="h-4 w-4" />
+            <Strikethrough className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Link" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
-            className={toolbarButtonStyle}
+            className="markdown-toolbar__button"
             onClick={() =>
               editorRef.current?.insertWrappedText(
                 '[',
@@ -110,10 +110,10 @@ export default function MarkdownToolbar({
               )
             }
           >
-            <Link className="h-4 w-4" />
+            <Link className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <div className="mx-1 h-5 w-px self-center bg-white/30" />
+        <div className="markdown-toolbar__separator" />
         <TooltipWrapper
           label="Headline - H1 (Ctrl + Alt + 1)"
           side="top"
@@ -122,7 +122,7 @@ export default function MarkdownToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className={toolbarButtonStyle + ' max-md:hidden'}
+            className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
             onClick={() => editorRef.current?.insertHeading(1)}
           >
             H1
@@ -136,7 +136,7 @@ export default function MarkdownToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className={toolbarButtonStyle + ' max-md:hidden'}
+            className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
             onClick={() => editorRef.current?.insertHeading(2)}
           >
             H2
@@ -150,33 +150,33 @@ export default function MarkdownToolbar({
           <Button
             variant="ghost"
             size="icon"
-            className={toolbarButtonStyle + ' max-md:hidden'}
+            className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
             onClick={() => editorRef.current?.insertHeading(3)}
           >
             H3
           </Button>
         </TooltipWrapper>
-        <div className="mx-1 h-5 w-px self-center bg-white/30 max-md:hidden" />
+        <div className="markdown-toolbar__separator markdown-toolbar__separator--desktop-only" />
         <TooltipWrapper label="Table" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => editorRef.current?.insertAtCursor(tableMarkdown)}
-            className={toolbarButtonStyle}
+            className="markdown-toolbar__button"
           >
-            <Table className="h-4 w-4" />
+            <Table className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Codeblock" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
-            className={toolbarButtonStyle}
+            className="markdown-toolbar__button"
             onClick={() =>
               editorRef.current?.insertWrappedText('```\n', '\n```')
             }
           >
-            <Code className="h-4 w-4" />
+            <Code className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Add Image or File" side="top" align="center">
@@ -192,21 +192,21 @@ export default function MarkdownToolbar({
                 onAssetVersionChange: assetChangedHandler,
               })
             }
-            className={toolbarButtonStyle}
+            className="markdown-toolbar__button"
           >
-            <Image className="h-4 w-4" />
+            <Image className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <div className="mx-1 h-5 w-px self-center bg-white/30" />
+        <div className="markdown-toolbar__separator" />
         <TooltipWrapper label="Undo" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => editorRef.current?.undo()}
-            className={toolbarButtonStyle}
+            className="markdown-toolbar__button"
             disabled={!canUndo}
           >
-            <Undo className="h-4 w-4" />
+            <Undo className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
         <TooltipWrapper label="Redo" side="top" align="center">
@@ -214,31 +214,35 @@ export default function MarkdownToolbar({
             variant="ghost"
             size="icon"
             onClick={() => editorRef.current?.redo()}
-            className={toolbarButtonStyle}
+            className="markdown-toolbar__button"
             disabled={!canRedo}
           >
-            <Redo className="h-4 w-4" />
+            <Redo className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <div className="mx-1 h-5 w-px self-center bg-white/30" />
-        <TooltipWrapper
-          label={previewVisible ? 'Hide preview' : 'Show preview'}
-          side="top"
-          align="center"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onTogglePreview}
-            className={toolbarButtonStyle + ' max-md:hidden'}
-          >
-            {!previewVisible ? (
-              <Eye className="h-4 w-4" />
-            ) : (
-              <EyeOff className="h-4 w-4" />
-            )}
-          </Button>
-        </TooltipWrapper>
+        {!isMobile && (
+          <>
+            <div className="markdown-toolbar__separator" />
+            <TooltipWrapper
+              label={previewVisible ? 'Hide preview' : 'Show preview'}
+              side="top"
+              align="center"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onTogglePreview}
+                className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
+              >
+                {!previewVisible ? (
+                  <Eye className="markdown-toolbar__icon" />
+                ) : (
+                  <EyeOff className="markdown-toolbar__icon" />
+                )}
+              </Button>
+            </TooltipWrapper>
+          </>
+        )}
       </div>
     </>
   )

@@ -39,43 +39,43 @@ export default function TreeView() {
     }
   }, [tree, reloadTree])
 
-  if (loading) return <p className="text-sm text-gray-500">Loading...</p>
+  if (loading)
+    return (
+      <p className="tree-view__status tree-view__status--loading">Loading...</p>
+    )
+
   if (error || !tree)
-    return <p className="text-sm text-red-500">Error: {error}</p>
+    return (
+      <p className="tree-view__status tree-view__status--error">
+        Error: {error}
+      </p>
+    )
 
   return (
-    <>
+    <div className="tree-view">
       {!readOnlyMode && (
-        <div className="mb-2 flex">
+        <div className="tree-view__toolbar">
           <TreeViewActionButton
             actionName="add"
-            icon={
-              <Plus
-                size={20}
-                className="cursor-pointer text-gray-500 hover:text-gray-800"
-              />
-            }
+            icon={<Plus size={20} className="tree-view__action-icon" />}
             tooltip="Create new page"
             onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: '' })}
           />
           {tree && (
             <TreeViewActionButton
               actionName="sort"
-              icon={
-                <List
-                  size={20}
-                  className="cursor-pointer text-gray-500 hover:text-gray-800"
-                />
-              }
+              icon={<List size={20} className="tree-view__action-icon" />}
               tooltip="Sort pages"
               onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: tree })}
             />
           )}
         </div>
       )}
-      {tree?.children?.map((node) => (
-        <TreeNode key={node.id} node={node} />
-      ))}
-    </>
+      <div className="tree-view__nodes">
+        {tree?.children?.map((node) => (
+          <TreeNode key={node.id} node={node} />
+        ))}
+      </div>
+    </div>
   )
 }

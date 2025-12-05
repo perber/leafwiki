@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { Pagination } from '@/components/Pagination'
+import { Input } from '@/components/ui/input'
 import { searchPages, SearchResultItem } from '@/lib/api/search'
 import { useDebounce } from '@/lib/useDebounce'
 import { X } from 'lucide-react'
@@ -58,9 +59,9 @@ export default function Search({ active = false }: SearchProps) {
   }
 
   return (
-    <div className="mt-2">
-      <div className="relative mb-4">
-        <input
+    <div className="search">
+      <div className="search__input-wrapper">
+        <Input
           ref={searchInputRef}
           autoFocus
           type="text"
@@ -68,12 +69,12 @@ export default function Search({ active = false }: SearchProps) {
           value={query}
           data-testid="search-input"
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded border px-2 py-1 pr-8"
+          className="search__input"
         />
         {query && (
           <button
             onClick={clearSearch}
-            className="absolute top-1/2 right-1 -translate-y-1/2 text-sm text-gray-500 hover:text-black"
+            className="search__clear-button"
             title="Clear"
             data-testid="search-clear-button"
           >
@@ -81,19 +82,21 @@ export default function Search({ active = false }: SearchProps) {
           </button>
         )}
       </div>
-      <div className="mb-4">
+      <div className="search__body">
         {loading && (
-          <div className="text-sm text-gray-500">Loading results...</div>
+          <div className="search__status search__status--loading">
+            Loading results...
+          </div>
         )}
 
         {!loading && query && results.length === 0 && (
-          <div className="text-sm text-gray-500">
+          <div className="search__status search__status--empty">
             No results found for "<strong>{query}</strong>"
           </div>
         )}
 
         {!loading && results.length > 0 && (
-          <div className="mb-2 text-sm">
+          <div className="search__result-summary">
             Found <strong>{totalCount}</strong> result
             {totalCount !== 1 ? 's' : ''} for "<strong>{query}</strong>"
           </div>
@@ -101,7 +104,7 @@ export default function Search({ active = false }: SearchProps) {
 
         {!loading && results.length > 0 && (
           <>
-            <div className="space-y-4">
+            <div className="search__results">
               {results.map((item) => {
                 if (item.page_id && item.path && item.title) {
                   return <SearchResultCard key={item.page_id} item={item} />

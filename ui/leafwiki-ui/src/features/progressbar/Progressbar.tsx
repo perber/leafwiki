@@ -107,7 +107,7 @@ export default function Progressbar() {
   return (
     <Progress
       value={value}
-      className="absolute top-0 left-0 z-50 h-1 rounded-none [&>div]:h-1 [&>div]:rounded-none [&>div]:bg-green-600"
+      className="[&>div]:bg-brand-dark absolute top-0 left-0 z-50 h-1 rounded-none [&>div]:h-1 [&>div]:rounded-none"
     />
   )
 }

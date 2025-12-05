@@ -8,7 +8,9 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, keymap } from '@codemirror/view'
+import { githubLight } from '@fsegurai/codemirror-theme-github-light'
 import { useEffect, useRef } from 'react'
+import { useDesignModeStore } from '../designtoggle/designmode'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 
 type MarkdownCodeEditorProps = {
@@ -28,6 +30,8 @@ export default function MarkdownCodeEditor({
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
   const valueRef = useRef(initialValue)
+
+  const designMode = useDesignModeStore((state) => state.mode)
 
   // Always use the latest onChange function
   useEffect(() => {
@@ -103,7 +107,7 @@ export default function MarkdownCodeEditor({
     const state = EditorState.create({
       doc: initialValue,
       extensions: [
-        oneDark,
+        designMode === 'light' ? githubLight : oneDark,
         markdown(),
         history(),
         keymap.of([
@@ -115,9 +119,27 @@ export default function MarkdownCodeEditor({
         EditorView.lineWrapping,
         updateListener,
         EditorView.theme({
-          '&': { height: '100%' },
+          '&': {
+            height: '100%',
+            backgroundColor: 'hsl(var(--surface-alt)) !important',
+            fontSize: '13px !important', // gleiche Größe wie githubLight
+            fontFamily: 'monospace !important',
+            color: 'hsl(var(--interface-text)) !important',
+          },
           '.cm-editor': { height: '100%' },
           '.cm-scroller': { height: '100%' },
+          '.cm-content': {
+            lineHeight: '1.5',
+          },
+          '.cm-line': {
+            lineHeight: '1.5',
+            paddingTop: '3px',
+            paddingBottom: '3px',
+            paddingLeft: '15px',
+          },
+          '.cm-gutters': {
+            lineHeight: '1.5',
+          },
           '&.cm-focused': {
             outline: 'none',
           },
@@ -141,7 +163,7 @@ export default function MarkdownCodeEditor({
       view.destroy()
       viewRef.current = null
     }
-  }, [initialValue, onCursorLineChange, editorViewRef])
+  }, [initialValue, onCursorLineChange, editorViewRef, designMode])
 
-  return <div ref={editorRef} className="h-full w-full rounded shadow-xs" />
+  return <div ref={editorRef} className="markdown-code-editor" />
 }

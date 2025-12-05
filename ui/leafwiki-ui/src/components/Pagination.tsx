@@ -13,11 +13,11 @@ export function Pagination({
   if (totalPages <= 1) return null
 
   return (
-    <div className="mt-4 flex items-center justify-center gap-2 text-sm">
+    <div className="pagination">
       <button
         onClick={() => onPageChange(Math.max(0, page - 1))}
         disabled={page === 0}
-        className="rounded border px-2 py-1 disabled:opacity-50"
+        className="pagination__button"
       >
         ← Prev
       </button>
@@ -27,7 +27,7 @@ export function Pagination({
       <button
         onClick={() => onPageChange(Math.min(totalPages - 1, page + 1))}
         disabled={page >= totalPages - 1}
-        className="rounded border px-2 py-1 disabled:opacity-50"
+        className="pagination__button"
       >
         Next →
       </button>

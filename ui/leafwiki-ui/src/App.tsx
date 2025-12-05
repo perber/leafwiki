@@ -7,6 +7,7 @@ import { createLeafWikiRouter } from './features/router/router'
 import { useIsReadOnly } from './lib/useIsReadOnly'
 import { useAuthStore } from './stores/auth'
 import { usePublicAccessStore } from './stores/publicAccess'
+import useApplyDesignMode from './useApplyDesignMode'
 
 function App() {
   const publicAccessLoaded = usePublicAccessStore((s) => s.loaded)
@@ -16,6 +17,8 @@ function App() {
   const isLoggedIn = useAuthStore((s) => !!s.user)
   const isReadOnly = useIsReadOnly()
   const isReadOnlyViewer = isReadOnly && !isLoggedIn
+
+  useApplyDesignMode()
 
   useEffect(() => {
     getConfig()

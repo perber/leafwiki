@@ -36,15 +36,15 @@ export default function Breadcrumbs() {
   const breadcrumbs = buildBreadcrumbs()
 
   return (
-    <nav className="breadcrumbs-nav flex w-full flex-1 grow text-sm text-gray-500">
-      <ol className="flex flex-wrap items-center gap-1">
+    <nav className="breadcrumbs-nav">
+      <ol className="breadcrumbs-nav__list">
         {breadcrumbs.map((crumb, index) => (
-          <li key={crumb.path} className="flex items-center gap-1">
-            <span>/</span>
+          <li key={crumb.path} className="breadcrumbs-nav__item">
+            <span className="breadcrumbs-nav__separator">/</span>
             {index === breadcrumbs.length - 1 ? (
-              <span className="font-semibold text-gray-700">{crumb.title}</span>
+              <span className="breadcrumbs-nav__current">{crumb.title}</span>
             ) : (
-              <Link to={crumb.path} className="text-gray-700 hover:underline">
+              <Link to={crumb.path} className="breadcrumbs-nav__link">
                 {crumb.title}
               </Link>
             )}

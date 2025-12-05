@@ -43,27 +43,17 @@ export const TreeNode = React.memo(function TreeNode({
       label={node.title}
       side="bottom"
       align="center"
-      parentClassName="w-full flex-1 overflow-hidden"
+      parentClassName="tree-node__tooltip-parent"
     >
       <Link
         to={`/${node.path}`}
-        className="w-full py-1"
+        className="tree-node__link"
         data-testid={`tree-node-link-${node.id}`}
       >
         <span
-          className={`block truncate overflow-hidden text-ellipsis ${
-            level === 0
-              ? isActive
-                ? 'text-sm text-green-700'
-                : 'text-sm'
-              : level === 1
-                ? isActive
-                  ? 'text-sm text-green-700'
-                  : 'text-sm text-gray-800'
-                : isActive
-                  ? 'text-sm text-green-700'
-                  : 'text-sm text-gray-500'
-          }`}
+          className={clsx('tree-node__title', {
+            'tree-node__title--active': isActive,
+          })}
         >
           {node.title || 'Untitled Page'}
         </span>
@@ -71,82 +61,64 @@ export const TreeNode = React.memo(function TreeNode({
     </TooltipWrapper>
   )
 
-  const treeActionButtonStyle = isMobile ? '' : 'p-2 px-1'
+  const treeActionButtonStyle = isMobile ? '' : 'tree-node__actions--compact'
 
   return (
     <>
       <div
-        className={`relative flex cursor-pointer items-center transition-all ${
-          isActive ? 'text-green-700' : 'text-gray-800 hover:bg-gray-100'
-        }`}
+        className={clsx('tree-node', {
+          'tree-node--active': isActive,
+          'tree-node--inactive': !isActive,
+        })}
         data-testid={`tree-node-${node.id}`}
         style={{ paddingLeft: indent }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
         <div
-          className={`absolute top-0 bottom-0 w-0.5 ${
-            isActive ? 'bg-green-600' : 'bg-gray-200'
-          }`}
+          className={clsx('tree-node__marker', {
+            'tree-node__marker--active': isActive,
+          })}
           style={{ left: markerOffset }}
         />
 
-        <div className="flex w-full flex-1 items-center gap-2 pl-4">
+        <div className="tree-node__main">
           {hasChildren && (
             <ChevronUp
               data-testid={`tree-node-toggle-icon-${node.id}`}
               size={16}
-              className={`shrink-0 transition-transform ${
-                open ? 'rotate-180' : 'rotate-90'
-              } -ml-1`}
+              className={clsx('tree-node__toggle', {
+                'tree-node__toggle--open': open,
+                'tree-node__toggle--closed': !open,
+              })}
               onClick={() => hasChildren && toggleNode(node.id)}
             />
           )}
           {
             // add empty space to align with nodes that have children
-            !hasChildren && <div className="-ml-1 w-4" />
+            !hasChildren && <div className="tree-node__toggle-spacer" />
           }
           {linkText}
         </div>
 
         {(hovered || isMobile) && !readOnlyMode && (
-          <div
-            className={clsx(
-              `absolute right-0 flex items-center gap-1 rounded-md bg-gray-50 shadow-md`,
-              treeActionButtonStyle,
-            )}
-          >
+          <div className={clsx('tree-node__actions', treeActionButtonStyle)}>
             <TreeViewActionButton
               actionName="add"
-              icon={
-                <Plus
-                  size={18}
-                  className="cursor-pointer text-gray-500 hover:text-gray-800"
-                />
-              }
+              icon={<Plus size={18} className="tree-node__action-icon" />}
               tooltip="Create new page"
               onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: node.id })}
             />
             <TreeViewActionButton
               actionName="move"
-              icon={
-                <Move
-                  size={16}
-                  className="cursor-pointer text-gray-500 hover:text-gray-800"
-                />
-              }
+              icon={<Move size={16} className="tree-node__action-icon" />}
               tooltip="Move page to new parent"
               onClick={() => openDialog(DIALOG_MOVE_PAGE, { pageId: node.id })}
             />
             {hasChildren && (
               <TreeViewActionButton
                 actionName="sort"
-                icon={
-                  <List
-                    size={16}
-                    className="cursor-pointer text-gray-500 hover:text-gray-800"
-                  />
-                }
+                icon={<List size={16} className="tree-node__action-icon" />}
                 tooltip="Sort pages"
                 onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: node })}
               />
@@ -155,7 +127,11 @@ export const TreeNode = React.memo(function TreeNode({
         )}
       </div>
 
-      <div className={`ml-4 pl-2 ${!open ? 'hidden' : ''}`}>
+      <div
+        className={clsx('tree-node__children', {
+          'tree-node__children--closed': !open,
+        })}
+      >
         {hasChildren &&
           node.children?.map((child) => (
             <TreeNode key={child.id} node={child} level={level + 1} />

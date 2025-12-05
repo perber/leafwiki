@@ -56,33 +56,21 @@ export function EditorTitleBar() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center">
-      <button
-        onClick={() => onEditClicked()}
-        className="group relative flex items-center gap-1 text-base font-semibold text-gray-800 hover:underline"
-      >
+    <div className="editor-title-bar">
+      <button onClick={onEditClicked} className="editor-title-bar__button">
         <TooltipWrapper label={title} side="top" align="start">
-          {title && (
-            <span className="inline-block max-w-[15vw] truncate sm:max-w-[40vw]">
-              {title}
-            </span>
-          )}
-          <Pencil
-            size={16}
-            className="absolute top-1/2 -right-6 -translate-y-1/2 text-gray-400 transition-transform duration-200 ease-in-out group-hover:text-gray-600"
-          />
+          {title && <span className="editor-title-bar__title">{title}</span>}
+          <Pencil size={16} className="editor-title-bar__icon" />
           {dirty && !isMobile && (
-            <span className="ml-2 text-xs text-yellow-600">(Changes)</span>
+            <span className="editor-title-bar__dirty-indicator">(Changes)</span>
           )}
 
           {dirty && isMobile && (
-            <span className="ml-2 text-xs text-yellow-600">*</span>
+            <span className="editor-title-bar__dirty-indicator">*</span>
           )}
         </TooltipWrapper>
       </button>
-      <span className="mt-1 inline-block max-w-[15vw] truncate rounded bg-gray-200 px-2 py-0.5 font-mono text-xs text-gray-700 sm:max-w-[40vw]">
-        {slug}
-      </span>
+      <span className="editor-title-bar__slug">{slug}</span>
     </div>
   )
 }

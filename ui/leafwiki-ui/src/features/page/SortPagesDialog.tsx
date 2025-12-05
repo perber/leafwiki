@@ -84,7 +84,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
       ]}
     >
       <ul
-        className="custom-scrollbar space-y-2"
+        className="custom-scrollbar sort-pages-dialog__list"
         style={{
           maxHeight: '400px',
           height: '400px',
@@ -97,16 +97,16 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
           return (
             <li
               key={id}
-              className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 transition hover:shadow-xs"
+              className="sort-pages-dialog__item"
               data-testid={`sort-page-item-${id}`}
             >
               <span
-                className="truncate text-sm text-gray-800"
+                className="sort-pages-dialog__item-title"
                 data-testid={`sort-page-title-${id}`}
               >
                 {node.title}
               </span>
-              <div className="flex gap-1">
+              <div className="sort-pages-dialog__item-actions">
                 <Button
                   variant="ghost"
                   size="sm"

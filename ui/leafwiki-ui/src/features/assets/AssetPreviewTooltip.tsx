@@ -1,5 +1,5 @@
 import { IMAGE_EXTENSIONS } from '@/lib/config'
-import { cn } from '@/lib/utils' // If you have clsx or cn helper
+import { cn } from '@/lib/utils'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { FileText } from 'lucide-react'
 
@@ -21,19 +21,16 @@ export function AssetPreviewTooltip({ url, name, children, className }: Props) {
       <Tooltip.Trigger asChild>
         <div className={cn('inline-block', className)}>{children}</div>
       </Tooltip.Trigger>
+
       <Tooltip.Content
         side="right"
         align="center"
-        className="z-50 max-w-sm rounded border bg-white p-2 shadow-lg"
+        className="asset-preview-tooltip__content"
       >
         {isImage ? (
-          <img
-            src={url}
-            alt={name}
-            className="max-h-[300px] max-w-[300px] rounded border"
-          />
+          <img src={url} alt={name} className="asset-preview-tooltip__image" />
         ) : (
-          <div className="flex items-center gap-2 text-sm text-gray-700">
+          <div className="asset-preview-tooltip__file">
             <FileText size={16} /> {name}
           </div>
         )}

@@ -3,6 +3,7 @@ import { HotKeyHandler } from '@/components/HotKeyHandler'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import UserToolbar from '@/components/UserToolbar'
+import DesignToggle from '@/features/designtoggle/DesignToggle'
 import { EditorTitleBar } from '@/features/editor/EditorTitleBar'
 import Progressbar from '@/features/progressbar/Progressbar'
 import Sidebar from '@/features/sidebar/Sidebar'
@@ -120,8 +121,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [sidebarWidth])
 
   let mainContainerStyle = !isEditor
-    ? 'overflow-auto custom-scrollbar'
-    : 'overflow-hidden'
+    ? 'custom-scrollbar app-layout__main-content-area-viewer'
+    : 'app-layout__main-content-area-editor'
 
   // If on mobile and sidebar is visible, hide overflow to prevent double scrollbars
   if (isMobile && sidebarVisible) {
@@ -140,45 +141,46 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <HotKeyHandler />
       <DialogManager />
       {/* Header */}
-      <header className="fixed z-20 h-[85px] w-full border-b bg-white p-4 shadow-xs">
-        <div className="flex h-full items-center justify-start">
-          <div className="flex min-h-full w-6 items-center">
+      <header className="app-layout__header">
+        <div className="app-layout__header-inner">
+          <div className="app-layout__sidebar-toggle-container">
             {/* Sidebar Toggle Button */}
             <Button
-              variant={'secondary'}
-              className="relative z-20 p-2 text-gray-500 hover:text-gray-800 focus:outline-hidden"
+              variant={'outline'}
+              className="app-layout__sidebar-toggle-button"
               onClick={() => setSidebarVisible(!sidebarVisible)}
               aria-label="Toggle Sidebar"
               aria-expanded={sidebarVisible}
               data-testid="sidebar-toggle-button"
             >
-              <MenuIcon className="h-5 w-5" />
+              <MenuIcon className="app-layout__sidebar-toggle-button-icon" />
             </Button>
           </div>
           {/* Left side: Logo and Title */}
-          <div className="mr-6 ml-6 flex min-h-full items-center gap-2">
-            <h2 className="text-xl font-bold">
+          <div className="app-layout__logo-n-title">
+            <h2>
               <Link to="/">
                 🌿 <span className="max-md:hidden">LeafWiki</span>
               </Link>
             </h2>
           </div>
-          <div className="flex min-h-full flex-1 items-center justify-center">
+          <div className="app-layout__editor-title-bar-container">
             <EditorTitleBar />
           </div>
-          <div className="flex min-h-full items-center gap-4">
+          <div className="app-layout__editor-toolbar-container">
+            <DesignToggle />
             <Toolbar />
             <UserToolbar />
           </div>
         </div>
       </header>
-      <div className="space-between-header-and-main h-[85px] w-full" />
-      <div className="content-wrapper flex h-[calc(100dvh-85px)]">
+      <div className="app-layout__header-spacer" />
+      <div className="app-layout__content-wrapper">
         <div
           ref={sidebarContainerRef}
           id="sidebar-container"
           className={
-            'custom-scrollbar relative z-20 box-border h-full overflow-auto bg-white pr-1 max-sm:fixed max-sm:h-[calc(100dvh-85px)]' +
+            'app-layout__sidebar-container ' +
             (resizing ? '' : ' transition-[width] duration-200')
           }
           style={{
@@ -192,7 +194,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         >
           {!isMobile && sidebarVisible && (
             <div
-              className="absolute inset-y-0 right-0 flex w-1 cursor-col-resize items-center justify-center"
+              className="app-layout__sidebar-resizer"
               onMouseDown={handleSidebarResize}
               onMouseEnter={() => setHoveringResize(true)}
               onMouseLeave={() => {
@@ -205,8 +207,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               <div
                 className={
-                  'pointer-events-none my-4 h-full w-full transition-colors ' +
-                  (hoveringResize || resizing ? 'bg-green-400' : 'bg-gray-300')
+                  'app-layout__sidebar-resize-handle ' +
+                  (hoveringResize || resizing
+                    ? 'app-layout__sidebar-resize-handle-hover'
+                    : 'app-layout__sidebar-resize-handle-default')
                 }
               />
             </div>
@@ -216,11 +220,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Overlay for mobile sidebar */}
         {isMobile && sidebarVisible && (
-          <div className="fixed inset-0 top-[85px] z-10 bg-black/50 max-sm:h-[calc(100dvh-85px)]" />
+          <div className="app-layout__sidebar-overlay-mobile" />
         )}
         {/* Main content area */}
         <main
-          className={`${mainContainerStyle} flex-1 transition-all duration-200`}
+          className={`${mainContainerStyle} app-layout__main-content-area`}
           id="scroll-container"
         >
           {children}
