@@ -27,7 +27,7 @@ export function TooltipWrapper({
   const isMobile = useIsMobile()
 
   if (isMobile) {
-    return <>{children}</>
+    return <div className={clsx('flex', parentClassName)}>{children}</div>
   }
 
   return (
