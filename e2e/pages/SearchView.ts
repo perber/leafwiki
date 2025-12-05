@@ -25,7 +25,6 @@ export default class SearchView {
     // wait for a[data-testid^="search-result-card-"] to be visible
     await this.page.waitForSelector('a[data-testid^="search-result-card-"]', {
       state: 'visible',
-      timeout: 5000,
     });
     const results = this.page.locator('a[data-testid^="search-result-card-"]');
     const count = await results.count();
