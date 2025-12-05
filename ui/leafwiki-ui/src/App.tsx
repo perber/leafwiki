@@ -47,7 +47,7 @@ function App() {
     [isReadOnlyViewer],
   )
 
-  if (!publicAccessLoaded || !designmode) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
+  if (!publicAccessLoaded) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
 
   return (
     <>
