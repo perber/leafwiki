@@ -11,7 +11,6 @@
 
 /* -------------------------------------------------------
    TAILWIND THEME TOKENS (Design Tokens)
-   → Nur hier definiert Tailwind neue Klassen
 ------------------------------------------------------- */
 @theme {
   /* Typography + Radii */
@@ -42,36 +41,24 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
-  /** Leafwiki overwrites shadcn colors with Tailwind colors **/
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --color-border: hsl(var(--border));
 
-  /* page content background and text colors */
   --color-page-bg: hsl(var(--background));
   --color-page-text: hsl(var(--foreground));
 
-  /* Brand (Akzentfarbe) */
   --color-brand: hsl(var(--brand));
   --color-brand-dark: hsl(var(--brand-dark));
   --color-brand-light: hsl(var(--brand-light));
-  /*
-  --color-tooltip: var(--color-slate-500);
-  --color-tooltip-border: var(--color-slate-600);
-  --color-tooltip-text: var(--color-white);
-*/
 
   --color-tooltip: hsl(var(--tooltip));
-  /* sehr helles Grün */
   --color-tooltip-border: hsl(var(--tooltip-border));
-  /* dezente grüne Border */
   --color-tooltip-text: hsl(var(--foreground));
 
-  /* Panel / Surface */
   --color-surface: hsl(var(--surface));
   --color-surface-alt: hsl(var(--surface-alt));
 
-  /* Text / Border */
   --color-interface-text: hsl(var(--interface-text));
   --color-surface-border: hsl(var(--surface-border));
   --color-error: hsl(var(--error));
@@ -85,7 +72,7 @@
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-table-header-bg: hsl(var(--table-header-bg));
-  --color-table-header-border: hsl(var(--color-table-header-border));
+  --color-table-header-border: hsl(var(--table-header-border));
 
   --color-headline-anchor-icon: hsl(var(--headline-anchor-icon));
   --color-headline-anchor-icon-hover: hsl(var(--headline-anchor-icon-hover));
@@ -101,39 +88,23 @@
 ------------------------------------------------------- */
 @layer base {
   :root {
-    /* ---- CORE APP BACKGROUND ---- */
     --background: 0 0% 100%;
     --foreground: 222 47% 11%;
-
-    /* ---- SURFACES / CARDS ---- */
     --card: 210 40% 98%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-
-    /* ---- BRAND COLOR (LeafWiki-Grün) ---- */
     --primary: 142 72% 29%;
-    /* etwa tailwind green-700 */
     --primary-foreground: 0 0% 100%;
-
-    /* ---- SECONDARY / UI GRAYS ---- */
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
-
     --accent: 210 40% 96%;
     --accent-foreground: 222 47% 11%;
-
-    /* ---- DANGER ---- */
     --destructive: 0 84% 63%;
     --destructive-foreground: 0 0% 98%;
-
-    /* ---- INPUT/BORDER ---- */
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 142 72% 29%;
-    /* Fokus in Brand-Grün */
-
-    /* ---- CHART COLORS ---- (kannst du bei Bedarf später tunen) */
     --chart-1: 142 70% 40%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -146,75 +117,46 @@
     /* --- PAGE Surface **/
     --page-surface: 0 0% 100%;
 
-    /* Brand (Akzentfarbe) */
     --brand: 142 72% 29%;
-    /*var(--color-green-700);*/
     --brand-dark: 143 64% 24%;
-    /*var(--color-green-800);*/
     --brand-light: 142 77% 73%;
-    /*var(--color-green-300);*/
 
     --border: 214 32% 91%;
-
     --tooltip: 142 40% 96%;
     --tooltip-border: 142 35% 80%;
 
     --surface: 210 40% 98%;
-    /* slate-50  */
     --surface-alt: 210 40% 96%;
-    /* slate-100 */
 
     --interface-text: 215 25% 27%;
-    /* slate-700 */
     --surface-border: 214 32% 91%;
-    /* slate-300 */
     --error: 0 72% 51%;
-    /* red-600 */
     --success: 142 76% 36%;
-    /* green-600 */
     --success-foreground: 0 0% 100%;
-    /* white */
     --warning: 45 93% 47%;
-    /* yellow-600 */
 
     --markdown-toolbar: 210 40% 96%;
-    /* #282c34 */
     --markdown-toolbar-border: 214 32% 91%;
-    /* zinc-900 */
     --markdown-toolbar-text: 215 25% 27%;
-    /* white */
 
     --muted: 215 16% 47%;
-    /* slate-500 */
     --muted-foreground: 215 16% 47%;
-    /* slate-500 */
 
     --headline-anchor-icon: 215 20% 65%;
-    /* slate-600 */
     --headline-anchor-icon-hover: 217 33% 17%;
-    /* slate-900 */
 
     --avatar-bg: 214 20% 89%;
-    /* slate-200 */
     --avatar-foreground: 215 25% 27%;
-    /* slate-700 */
 
     --tree-node-hover: 213 34% 94%;
-    /* slate-150 */
-
     --scrollbar-thumb: 214 20% 75%;
     --scrollbar-thumb-hover: 214 20% 85%;
-    /* etwas dunkler beim Hover */
   }
 
   .dark {
     /* ---- CORE APP BACKGROUND ---- */
-    /* Haupt-Hintergrund: tiefes, leicht blaugraues Anthrazit */
     --background: 222 28% 8%;
-    /* ~ #0D1118 */
     --foreground: 210 20% 96%;
-    /* helles, leicht warmes Weiß */
-
     /* ---- SURFACES / CARDS ---- */
     --card: 222 18% 22%;
     /* Content-Panel */
@@ -223,55 +165,30 @@
     --popover: 222 22% 15%;
     --popover-foreground: 210 20% 96%;
 
-    /* ---- BRAND COLOR (LeafWiki-Grün) ---- */
-    /* weniger Sättigung → nicht neon, aber klar als Akzent */
+    /* ---- BRAND COLOR ---- */
     --primary: 142 45% 42%;
-    /* gedämpftes Brand-Grün */
     --primary-foreground: 0 0% 100%;
-
-    /* ---- SECONDARY / UI GRAYS ---- */
-    /* Sidebar / Buttons / Pills */
     --secondary: 222 16% 18%;
-    /* etwas heller als Background */
     --secondary-foreground: 210 20% 96%;
-
     --accent: 222 18% 20%;
-    /* Hover-Flächen, Badges, etc. */
     --accent-foreground: 210 20% 96%;
-
-    /* ---- DANGER ---- */
     --destructive: 0 68% 55%;
-    /* leicht gedämpftes Rot */
     --destructive-foreground: 0 0% 100%;
-
-    /* ---- INPUT / BORDER / FOCUS ---- */
     --border: 220 14% 26%;
-    /* zarte, neutrale Border */
     --input: 220 14% 22%;
-    /* Input-Felder */
     --ring: 142 50% 45%;
-    /* Fokus: Brand-Grün, aber nicht zu knallig */
-
-    /* ---- CHART COLORS ---- */
     --chart-1: 142 45% 45%;
-    /* Brand-Grün */
     --chart-2: 200 40% 55%;
-    /* kühles Blau */
     --chart-3: 20 65% 60%;
-    /* Orange */
     --chart-4: 270 30% 60%;
-    /* Violett */
     --chart-5: 45 80% 58%;
-    /* Gelb/Amber */
 
     /* ---- GLOBAL RADIUS ---- */
     --radius: 0.75rem;
 
     /* --- PAGE Surface --- */
     --page-surface: 222 28% 8%;
-    /* wie Background, für Layout-Wrapper */
 
-    /* ---- BRAND Abstufungen ---- */
     --brand: 142 45% 42%;
     --brand-dark: 142 40% 32%;
     --brand-light: 142 40% 70%;
@@ -284,10 +201,7 @@
     --surface: 222 22% 12%;
     /* z.B. App-Frame */
     --surface-alt: 222 22% 16%;
-    /* z.B. Cards, Sektionen */
-
     --interface-text: 220 8% 78%;
-
     --surface-border: 220 14% 26%;
 
     --error: 0 68% 55%;
@@ -302,10 +216,8 @@
 
     /* ---- MUTED TEXT / ICONS ---- */
     --muted: 220 10% 60%;
-    /* Sekundärtext, Icons */
     --muted-foreground: 220 10% 60%;
 
-    /* ---- HEADLINE ANCHOR ICONS ---- */
     --headline-anchor-icon: 220 12% 65%;
     --headline-anchor-icon-hover: 210 20% 96%;
 
@@ -317,9 +229,7 @@
     --tree-node-hover: 222 18% 18%;
 
     --scrollbar-thumb: 220 8% 40%;
-    /* mittelhelles Grau auf dunklem BG */
     --scrollbar-thumb-hover: 220 8% 55%;
-    /* noch etwas heller beim Hover */
   }
 
   /* Tailwind v4 border compatibility fix */

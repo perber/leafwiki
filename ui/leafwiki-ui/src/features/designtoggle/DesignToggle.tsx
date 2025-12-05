@@ -10,7 +10,10 @@ export default function DesignToggle() {
     <Button
       variant="ghost"
       size="icon"
-      onClick={() => setMode(mode == 'dark' ? 'light' : 'dark')}
+      aria-label={
+        mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+      }
+      onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
     >
       <Moon
         className={mode === 'light' || mode === 'system' ? 'visible' : 'hidden'}

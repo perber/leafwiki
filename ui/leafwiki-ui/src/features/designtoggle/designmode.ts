@@ -4,7 +4,7 @@
  * per default if no mode is set, the system preference is used.
  */
 
-import { create } from 'zustand/react'
+import { create } from 'zustand'
 
 type DesignModeStore = {
   mode: 'light' | 'dark' | 'system'

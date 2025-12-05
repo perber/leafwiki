@@ -6,10 +6,10 @@ function applyDesignMode(mode: 'light' | 'dark' | 'system') {
 
   let appliedMode: 'light' | 'dark'
   if (mode === 'system') {
-    const prefersDark = window.matchMedia(
-      '(prefers-color-scheme: dark)',
+    const prefersLight = window.matchMedia(
+      '(prefers-color-scheme: light)',
     ).matches
-    appliedMode = prefersDark ? 'dark' : 'light'
+    appliedMode = prefersLight ? 'light' : 'dark'
   } else {
     appliedMode = mode
   }
