@@ -19,6 +19,7 @@ import {
 import { MenuIcon } from 'lucide-react'
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import useApplyDesignMode from './useApplyDesignMode'
 
 export const MOBILE_SIDEBAR_WIDTH = 320
 
@@ -42,6 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
 
   useAutoCloseSidebarOnMobile()
+  useApplyDesignMode()
 
   const sidebarContainerRef = useRef<HTMLDivElement | null>(null)
   const liveSidebarWidthRef = useRef(sidebarWidth)
