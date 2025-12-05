@@ -3,19 +3,24 @@ import { useEffect, useMemo } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './App.css'
+import { useDesignModeStore } from './features/designtoggle/designmode'
 import { createLeafWikiRouter } from './features/router/router'
 import { useIsReadOnly } from './lib/useIsReadOnly'
 import { useAuthStore } from './stores/auth'
 import { usePublicAccessStore } from './stores/publicAccess'
+import useApplyDesignMode from './useApplyDesignMode'
 
 function App() {
   const publicAccessLoaded = usePublicAccessStore((s) => s.loaded)
   const setLoaded = usePublicAccessStore((s) => s.setLoaded)
   const setPublicAccess = usePublicAccessStore((s) => s.setPublicAccess)
+  const designmode = useDesignModeStore((s) => s.mode)
 
   const isLoggedIn = useAuthStore((s) => !!s.user)
   const isReadOnly = useIsReadOnly()
   const isReadOnlyViewer = isReadOnly && !isLoggedIn
+
+  useApplyDesignMode()
 
   useEffect(() => {
     getConfig()
@@ -42,7 +47,7 @@ function App() {
     [isReadOnlyViewer],
   )
 
-  if (!publicAccessLoaded) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
+  if (!publicAccessLoaded || !designmode) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
 
   return (
     <>
