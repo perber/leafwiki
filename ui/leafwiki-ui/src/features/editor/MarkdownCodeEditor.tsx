@@ -124,7 +124,7 @@ export default function MarkdownCodeEditor({
             backgroundColor: 'hsl(var(--surface-alt)) !important',
             fontSize: '13px !important', // gleiche Größe wie githubLight
             fontFamily: 'monospace !important',
-            color: 'hsl(var(--surface-text)) !important',
+            color: 'hsl(var(--interface-text)) !important',
           },
           '.cm-editor': { height: '100%' },
           '.cm-scroller': { height: '100%' },
