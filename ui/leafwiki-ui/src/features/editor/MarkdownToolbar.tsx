@@ -221,7 +221,8 @@ export default function MarkdownToolbar({
           </Button>
         </TooltipWrapper>
         {!isMobile && (
-          <><div className="markdown-toolbar__separator" />
+          <>
+            <div className="markdown-toolbar__separator" />
             <TooltipWrapper
               label={previewVisible ? 'Hide preview' : 'Show preview'}
               side="top"
@@ -239,7 +240,8 @@ export default function MarkdownToolbar({
                   <EyeOff className="markdown-toolbar__icon" />
                 )}
               </Button>
-            </TooltipWrapper></>
+            </TooltipWrapper>
+          </>
         )}
       </div>
     </>

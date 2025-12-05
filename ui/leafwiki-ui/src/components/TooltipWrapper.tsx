@@ -38,8 +38,9 @@ export function TooltipWrapper({
       <TooltipContent
         side={tooltipSide}
         align={tooltipAlign}
-        className={clsx('tooltip-wrapper__content',
-          'z-30 rounded-sm px-2 py-1 text-xs shadow-sm border',
+        className={clsx(
+          'tooltip-wrapper__content',
+          'z-30 rounded-sm border px-2 py-1 text-xs shadow-sm',
           'bg-tooltip border-tooltip-border text-tooltip-text',
         )}
       >

@@ -4,11 +4,13 @@ import { toast } from 'sonner'
 import { ChangePasswordButton } from './ChangePasswordButton'
 import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
+import { useToolbarActions } from './useToolbarActions'
 
 export default function UserManagement() {
   const { users, loadUsers, reset } = useUserStore()
   const [loading, setLoading] = useState(true)
 
+  useToolbarActions()
 
   useEffect(() => {
     loadUsers()

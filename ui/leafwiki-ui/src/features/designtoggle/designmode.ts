@@ -4,7 +4,7 @@
  * per default if no mode is set, the system preference is used.
  */
 
-import { create } from "zustand/react"
+import { create } from 'zustand/react'
 
 type DesignModeStore = {
   mode: 'light' | 'dark' | 'system'
@@ -16,7 +16,9 @@ function applyDesignMode(mode: 'light' | 'dark' | 'system') {
 
   let appliedMode: 'light' | 'dark'
   if (mode === 'system') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const prefersDark = window.matchMedia(
+      '(prefers-color-scheme: dark)',
+    ).matches
     appliedMode = prefersDark ? 'dark' : 'light'
   } else {
     appliedMode = mode
@@ -30,7 +32,9 @@ function applyDesignMode(mode: 'light' | 'dark' | 'system') {
 }
 
 export const useDesignModeStore = create<DesignModeStore>((set) => ({
-  mode: (localStorage.getItem('design-mode') as 'light' | 'dark' | 'system') || 'system',
+  mode:
+    (localStorage.getItem('design-mode') as 'light' | 'dark' | 'system') ||
+    'system',
 
   setMode: (mode) => {
     localStorage.setItem('design-mode', mode)

@@ -33,8 +33,6 @@ export default function MarkdownCodeEditor({
 
   const designMode = useDesignModeStore((state) => state.mode)
 
-
-
   // Always use the latest onChange function
   useEffect(() => {
     onChangeRef.current = onChange
@@ -122,9 +120,11 @@ export default function MarkdownCodeEditor({
         updateListener,
         EditorView.theme({
           '&': {
-            height: '100%', backgroundColor: "hsl(var(--surface-alt)) !important", fontSize: "13px !important",   // gleiche Größe wie githubLight
-            fontFamily: "monospace !important",
-            color: "hsl(var(--surface-text)) !important",
+            height: '100%',
+            backgroundColor: 'hsl(var(--surface-alt)) !important',
+            fontSize: '13px !important', // gleiche Größe wie githubLight
+            fontFamily: 'monospace !important',
+            color: 'hsl(var(--surface-text)) !important',
           },
           '.cm-editor': { height: '100%' },
           '.cm-scroller': { height: '100%' },

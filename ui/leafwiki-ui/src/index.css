@@ -165,7 +165,6 @@
     /* slate-100 */
 
     --interface-text: 215 25% 27%;
-    ;
     /* slate-700 */
     --surface-border: 214 32% 91%;
     /* slate-300 */
@@ -323,7 +322,6 @@
     /* noch etwas heller beim Hover */
   }
 
-
   /* Tailwind v4 border compatibility fix */
   *,
   ::after,
@@ -347,7 +345,6 @@
    COMPONENTS LAYER — Sidebar, custom UI parts
 ------------------------------------------------------- */
 @layer components {
-
   /* Sidebar */
   .sidebar {
     @apply bg-surface flex h-full w-full flex-col overflow-hidden;
@@ -454,7 +451,6 @@
     @apply border-surface-border overflow-auto;
   }
 
-
   .app-layout__main-content-area-editor {
     @apply overflow-hidden;
   }
@@ -505,10 +501,8 @@
   }
 
   .tooltip-wrapper__content {
-    @apply rounded px-2 py-1 text-xs shadow-sm border bg-primary/10 border-primary/30 text-interface-text;
+    @apply bg-primary/10 border-primary/30 text-interface-text rounded border px-2 py-1 text-xs shadow-sm;
   }
-
-
 
   /* UserToolbar Component */
   .user-toolbar {
@@ -519,7 +513,7 @@
     @apply h-5 w-5;
   }
 
-  .user-toolbar__avatar>span {
+  .user-toolbar__avatar > span {
     @apply bg-avatar-bg! text-avatar-foreground!;
   }
 
@@ -772,7 +766,7 @@
 
   /* Preview styling */
   .markdown-editor__preview {
-    @apply prose prose-base dark:prose-invert leading-relaxed box-content h-full w-full overflow-auto ;
+    @apply prose prose-base dark:prose-invert box-content h-full w-full overflow-auto leading-relaxed;
   }
 
   .markdown-editor__preview-inner {
@@ -1064,7 +1058,7 @@
   }
 
   .page-viewer__content {
-    @apply prose prose-base text-page-text mt-6 max-w-full leading-relaxed dark:prose-invert;
+    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full leading-relaxed;
   }
 
   /* Markdown content tweaks */
@@ -1086,10 +1080,9 @@
     @apply bg-surface-alt;
   }
 
-
   .table-wrapper th,
   .table-wrapper td {
-    @apply border border-border px-4 py-2;
+    @apply border-border border px-4 py-2;
   }
 
   .table-wrapper thead {
@@ -1232,7 +1225,7 @@
   }
 
   .btn {
-    @apply inline-flex items-center justify-center rounded-md text-sm font-medium px-3 py-1.5;
+    @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium;
   }
 
   /* grüner Primary-Button */
@@ -1242,7 +1235,7 @@
 
   /* neutraler grauer Button */
   .btn--secondary {
-    @apply bg-surface text-interface-text border border-surface-border hover:bg-surface-alt shadow-xs;
+    @apply bg-surface text-interface-text border-surface-border hover:bg-surface-alt border shadow-xs;
   }
 
   /* gefährlich (Delete) */
@@ -1255,7 +1248,6 @@
    UTILITIES LAYER — Markdown, tables, custom scrollbars
 ------------------------------------------------------- */
 @layer utilities {
-
   html,
   body {
     @apply bg-page-bg text-page-text font-sans;
@@ -1285,14 +1277,15 @@
     background: hsl(var(--scrollbar-thumb-hover));
   }
 
-  .code, pre {
+  .code,
+  pre {
     font-family: 'Courier New', Courier, monospace !important;
   }
 
   /* Inline code */
   .inline-code {
-    @apply rounded bg-border p-1 px-2 text-xs;
-    color: oklch(92.8% 0.006 264.531)!important;
+    @apply bg-border rounded p-1 px-2 text-xs;
+    color: oklch(92.8% 0.006 264.531) !important;
     font-weight: 500 !important;
   }
 
@@ -1301,7 +1294,8 @@
     content: '';
   }
 
-  code, pre {
+  code,
+  pre {
     background: #1f2937 !important;
   }
 
