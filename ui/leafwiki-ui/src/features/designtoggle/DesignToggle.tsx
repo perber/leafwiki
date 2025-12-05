@@ -16,12 +16,12 @@ export default function DesignToggle() {
       onClick={() => {
         const effectiveMode =
           mode === 'system'
-            ? (window.matchMedia &&
-                window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light')
-            : mode;
-        setMode(effectiveMode === 'dark' ? 'light' : 'dark');
+            ? window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light'
+            : mode
+        setMode(effectiveMode === 'dark' ? 'light' : 'dark')
       }}
     >
       <Moon

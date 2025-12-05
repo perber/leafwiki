@@ -151,6 +151,8 @@
     --tree-node-hover: 213 34% 94%;
     --scrollbar-thumb: 214 20% 75%;
     --scrollbar-thumb-hover: 214 20% 85%;
+
+    --table-header-border: 214 32% 91%;
   }
 
   .dark {
@@ -230,6 +232,8 @@
 
     --scrollbar-thumb: 220 8% 40%;
     --scrollbar-thumb-hover: 220 8% 55%;
+
+    --table-header-border: 220 14% 26%;
   }
 
   /* Tailwind v4 border compatibility fix */
