@@ -23,7 +23,9 @@ export default class SearchView {
     // find all results
     // check if any contains the title
     // wait for a[data-testid^="search-result-card-"] to be visible
-    await this.page.waitForSelector('a[data-testid^="search-result-card-"]', { state: 'visible' });
+    await this.page.locator('a[data-testid^="search-result-card-"]').waitFor({
+      state: 'visible',
+    });
     const results = this.page.locator('a[data-testid^="search-result-card-"]');
     const count = await results.count();
     for (let i = 0; i < count; i++) {

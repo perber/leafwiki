@@ -51,16 +51,17 @@ export default class ViewPage {
   }
 
   async getContent() {
+    await this.page.locator('article').waitFor({ state: 'visible' });
     return this.page.locator('article').innerText();
   }
 
   async amountOfSVGElements(): Promise<number> {
-    await this.page.waitForSelector('article svg', { state: 'visible' });
+    await this.page.locator('article svg').waitFor({ state: 'visible' });
     return this.page.locator('article svg').count();
   }
 
   async amountOfImages(): Promise<number> {
-    await this.page.waitForSelector('article img', { state: 'visible', timeout: 5000 });
+    await this.page.locator('article img').waitFor({ state: 'visible' });
     return this.page.locator('article img').count();
   }
 

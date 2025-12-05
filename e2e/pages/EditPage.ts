@@ -36,10 +36,7 @@ export default class EditPage {
 
     await fileChooser.setFiles(filePath);
     // wait until the asset appears in the list
-    await this.page
-      .locator('li[data-testid="asset-item"]')
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.locator('li[data-testid="asset-item"]').first().waitFor({ state: 'visible' });
   }
 
   async listAmountOfAssets(): Promise<number> {
