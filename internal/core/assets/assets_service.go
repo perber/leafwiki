@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path"
+	"sync"
 
 	"github.com/perber/wiki/internal/core/tree"
 )
@@ -13,6 +14,8 @@ import (
 type AssetService struct {
 	assetsDir string
 	slugger   *tree.SlugService
+
+	mu sync.RWMutex
 }
 
 func NewAssetService(storageDir string, slugger *tree.SlugService) *AssetService {
@@ -66,6 +69,9 @@ func (s *AssetService) buildPublicPath(page *tree.PageNode, filename string) str
 
 // SaveAssetForPage saves a file under a page's slug-based path and returns its public URL.
 func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File, originalFilename string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	uploadPath, err := s.ensureAssetPagePathExists(page)
 	if err != nil {
 		return "", fmt.Errorf("could not upload file %w", err)
@@ -98,6 +104,9 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 
 // ListAssetsForPage returns the full paths of all assets for a given page
 func (s *AssetService) ListAssetsForPage(page *tree.PageNode) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	pagePath, err := s.getAssetPagePath(page)
 	if err != nil {
 		return []string{}, nil
@@ -120,6 +129,9 @@ func (s *AssetService) ListAssetsForPage(page *tree.PageNode) ([]string, error) 
 
 // DeleteAsset removes an asset file from disk
 func (s *AssetService) DeleteAsset(page *tree.PageNode, filename string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	assetPath, err := s.getAssetPagePath(page)
 	if err != nil {
 		return fmt.Errorf("asset not found: %s", filename)
@@ -141,6 +153,9 @@ func (s *AssetService) DeleteAsset(page *tree.PageNode, filename string) error {
 }
 
 func (s *AssetService) DeleteAllAssetsForPage(page *tree.PageNode) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	assetDir, err := s.getAssetPagePath(page)
 	if err != nil {
 		return fmt.Errorf("could not delete assets: %w", err)
@@ -153,6 +168,9 @@ func (s *AssetService) DeleteAllAssetsForPage(page *tree.PageNode) error {
 
 // RenameAsset renames an asset file for a given page.
 func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	assetPath, err := s.getAssetPagePath(page)
 	if err != nil {
 		return "", fmt.Errorf("could not rename asset: %w", err)
@@ -193,6 +211,9 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 }
 
 func (s *AssetService) CopyAllAssets(sourcePage *tree.PageNode, targetPage *tree.PageNode) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	sourceAssetPath, err := s.getAssetPagePath(sourcePage)
 	if err != nil {
 		// No assets to copy
