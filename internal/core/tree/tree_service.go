@@ -43,7 +43,6 @@ func (t *TreeService) LoadTree() error {
 }
 
 // SaveTree saves the tree to the storage directory
-// Lock must be held by the caller
 func (t *TreeService) SaveTree() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
