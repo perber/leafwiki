@@ -113,9 +113,7 @@ func (t *TreeService) createPageLocked(parentID *string, title string, slug stri
 		root.Children = append(root.Children, entry)
 
 		// Store Tree after adding page
-		if err := t.saveTreeLocked(); err != nil {
-			return nil, fmt.Errorf("could not save tree: %v", err)
-		}
+		// (Saving the tree is now the caller's responsibility)
 		return &entry.ID, nil
 	}
 
