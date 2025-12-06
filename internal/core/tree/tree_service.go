@@ -179,7 +179,7 @@ func (t *TreeService) findPageByIDLocked(entry []*PageNode, id string) (*PageNod
 }
 
 // DeletePage deletes a page from the tree
-func (t *TreeService) DeletePage(id string, recusive bool) error {
+func (t *TreeService) DeletePage(id string, recursive bool) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -194,7 +194,7 @@ func (t *TreeService) DeletePage(id string, recusive bool) error {
 	}
 
 	// Check if page has children
-	if page.HasChildren() && !recusive {
+	if page.HasChildren() && !recursive {
 		return ErrPageHasChildren
 	}
 
