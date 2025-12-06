@@ -25,6 +25,9 @@ func printUsage() {
 	--admin-password   Initial admin password (used only if no admin exists)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
 	--public-access    Allow public access to the wiki only with read access (default: false)
+	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
+	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
+	                         
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -33,6 +36,7 @@ func printUsage() {
 	LEAFWIKI_JWT_SECRET
 	LEAFWIKI_ADMIN_PASSWORD
 	LEAFWIKI_PUBLIC_ACCESS
+	LEAFWIKI_INJECT_CODE_IN_HEADER
 	`)
 }
 
@@ -45,6 +49,7 @@ func main() {
 	adminPasswordFlag := flag.String("admin-password", "", "initial admin password")
 	jwtSecretFlag := flag.String("jwt-secret", "", "JWT secret for authentication")
 	publicAccessFlag := flag.String("public-access", "false", "allow public access to the wiki with read access (default: false)")
+	injectCodeInHeaderFlag := flag.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")")
 	flag.Parse()
 
 	port := getOrFallback(*portFlag, "LEAFWIKI_PORT", "8080")
@@ -53,6 +58,7 @@ func main() {
 	adminPassword := getOrFallback(*adminPasswordFlag, "LEAFWIKI_ADMIN_PASSWORD", "admin")
 	jwtSecret := getOrFallback(*jwtSecretFlag, "LEAFWIKI_JWT_SECRET", "")
 	publicAccess := getOrFallback(*publicAccessFlag, "LEAFWIKI_PUBLIC_ACCESS", "false")
+	injectCodeInHeader := getOrFallback(*injectCodeInHeaderFlag, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
 
 	// Check if data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
@@ -100,7 +106,7 @@ func main() {
 	}
 	defer w.Close()
 
-	router := http.NewRouter(w, publicAccess == "true")
+	router := http.NewRouter(w, publicAccess == "true", injectCodeInHeader)
 
 	// Start server - combine host and port
 	listenAddr := host + ":" + port
