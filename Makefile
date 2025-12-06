@@ -4,11 +4,12 @@ VERSION ?= v0.1.0
 RELEASE_DIR := releases
 DOCKER_BUILDER := Dockerfile.builder
 
-# At the moment we can test on linux/amd64, linux/arm64, and windows/amd64
 PLATFORMS := \
   linux/amd64 \
   linux/arm64 \
-  windows/amd64
+  windows/amd64 \
+  darwin/amd64 \
+  darwin/arm64
 
 all: build
 
