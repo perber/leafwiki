@@ -217,7 +217,7 @@ func (t *TreeService) DeletePage(id string, recusive bool) error {
 		}
 	}
 
-	t.reindexPosition(parent)
+	t.reindexPositions(parent)
 
 	return t.saveTreeLocked()
 }
@@ -558,8 +558,8 @@ func (t *TreeService) MovePage(id string, parentID string) error {
 	newParent.Children = append(newParent.Children, page)
 	page.Parent = newParent
 	// Reindex the positions of the old parent
-	t.reindexPosition(newParent)
-	t.reindexPosition(oldParent)
+	t.reindexPositions(newParent)
+	t.reindexPositions(oldParent)
 
 	// Save the tree
 	return t.saveTreeLocked()
@@ -625,13 +625,13 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 	}
 
 	// Reindex the positions
-	t.reindexPosition(parent)
+	t.reindexPositions(parent)
 
 	// Save the tree
 	return t.saveTreeLocked()
 }
 
-func (t *TreeService) reindexPosition(parent *PageNode) {
+func (t *TreeService) reindexPositions(parent *PageNode) {
 	sort.SliceStable(parent.Children, func(i, j int) bool {
 		return parent.Children[i].Position < parent.Children[j].Position
 	})
