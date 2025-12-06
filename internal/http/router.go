@@ -3,6 +3,7 @@ package http
 import (
 	"embed"
 	"io/fs"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -30,7 +31,15 @@ var EmbedFrontend = "false"
 // Environment is a flag to set the environment
 var Environment = "development"
 
-func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
+// NewRouter creates a new HTTP router for the wiki application.
+// Parameters:
+//   - wikiInstance: the wiki instance to serve
+//   - publicAccess: when true, allows unauthenticated read-only access to wiki content
+//   - injectCodeInHeader: raw HTML code to inject before the closing </head> tag.
+//     WARNING: This code is inserted without sanitization. Only use with trusted input
+//     from administrators. Malicious code can lead to XSS vulnerabilities.
+//     Common use cases: analytics scripts, custom CSS, meta tags.
+func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader string) *gin.Engine {
 	if Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
@@ -160,6 +169,17 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool) *gin.Engine {
 					c.Status(http.StatusNotFound)
 					return
 				}
+
+				if injectCodeInHeader != "" {
+					html := string(data)
+					// replaces the closing </head> tag with the injected code
+					newHtml := strings.Replace(html, "</head>", "  "+injectCodeInHeader+"\n  </head>", 1)
+					if newHtml == html {
+						log.Printf("Warning: could not inject code into header, </head> tag not found")
+					}
+					data = []byte(newHtml)
+				}
+
 				c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 
 				// serve index.html
