@@ -483,6 +483,11 @@ func (t *TreeService) EnsurePagePath(p string, targetTitle string) (*EnsurePathR
 		}
 	}
 
+	// Save the tree
+	if err := t.saveTreeLocked(); err != nil {
+		return nil, fmt.Errorf("could not save tree: %v", err)
+	}
+
 	return nil, fmt.Errorf("could not ensure page path")
 }
 
