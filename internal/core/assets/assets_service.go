@@ -74,7 +74,7 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 
 	uploadPath, err := s.ensureAssetPagePathExists(page)
 	if err != nil {
-		return "", fmt.Errorf("could not upload file %w", err)
+		return "", fmt.Errorf("could not upload file: %w", err)
 	}
 
 	// Read existing filenames
