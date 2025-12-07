@@ -8,7 +8,7 @@ export default function DesignToggle() {
 
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="icon"
       aria-label={
         mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
