@@ -21,11 +21,6 @@ function scrollToHeadline(hash: string) {
   const contentContainer = document.querySelector('main') as HTMLElement | null
   if (!contentContainer) return
 
-  const headlineId = decodeURIComponent(hash.substring(1)) // remove leading #
-
-  const headlineElement = document.getElementById(headlineId)
-  if (!headlineElement) return // no such headline, do nothing
-
   function waitUntilHeightStabilizes(
     element: HTMLElement,
     callback: () => void,
@@ -60,9 +55,17 @@ function scrollToHeadline(hash: string) {
     setTimeout(checkHeight, interval)
   }
 
-  waitUntilHeightStabilizes(contentContainer, scroll)
+  waitUntilHeightStabilizes(contentContainer, () => {
+    const headlineId = decodeURIComponent(hash.substring(1)) // remove leading #
+    const headlineElement = document.getElementById(headlineId)
+    if (!headlineElement) {
+      console.warn(`Headline with id "${headlineId}" not found.`)
+      return
+    }
+    scroll(headlineElement)
+  })
 
-  function scroll() {
+  function scroll(headlineElement: HTMLElement) {
     if (!contentContainer || !headlineElement) return
 
     const contentRect = contentContainer.getBoundingClientRect()
