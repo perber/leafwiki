@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/perber/wiki/internal/backlinks"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/shared/errors"
@@ -25,9 +26,9 @@ type Wiki struct {
 	status        *search.IndexingStatus
 	storageDir    string
 	searchWatcher *search.Watcher
+	backlinks     *backlinks.BacklinkService
 }
 
-// Email-RegEx (Basic-Check, nicht RFC-konform, aber gut genug)
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
 var defaultAdminPassword = "admin"
 
@@ -60,6 +61,16 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 	slugService := tree.NewSlugService()
 
 	assetService := assets.NewAssetService(storageDir, slugService)
+
+	// Backlink Service
+	backlinkStore, err := backlinks.NewBacklinksStore(storageDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init backlinks store: %w", err)
+	}
+	backlinkService := backlinks.NewBacklinkService(storageDir, treeService, backlinkStore)
+	if err := backlinkService.IndexAllPages(); err != nil {
+		log.Printf("failed to index backlinks of pages: %v", err)
+	}
 
 	sqliteIndex, err := search.NewSQLiteIndex(storageDir)
 	if err != nil {
@@ -104,6 +115,7 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 		searchIndex:   sqliteIndex,
 		status:        status,
 		searchWatcher: searchWatcher,
+		backlinks:     backlinkService,
 	}
 
 	// Ensure the welcome page exists
@@ -269,7 +281,18 @@ func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
 		return nil, err
 	}
 
-	return w.tree.GetPage(id)
+	page, err := w.tree.GetPage(id)
+	if err != nil {
+		return page, err
+	}
+
+	if w.backlinks != nil {
+		if err := w.backlinks.UpdateBacklinksForPage(page, content); err != nil {
+			log.Printf("warning: failed to update backlinks for page %s: %v", id, err)
+		}
+	}
+
+	return page, nil
 }
 
 func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title string, slug string) (*tree.Page, error) {
@@ -338,6 +361,12 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 		log.Printf("warning: could not delete assets for page %s: %v", page.ID, err)
 	}
 
+	if w.backlinks != nil {
+		if err := w.backlinks.RemoveBacklinksForPage(id); err != nil {
+			log.Printf("warning: could not remove backlinks for page %s: %v", id, err)
+		}
+	}
+
 	return nil
 }
 
@@ -374,6 +403,20 @@ func (w *Wiki) SuggestSlug(parentID string, currentID string, title string) (str
 	}
 
 	return w.slug.GenerateUniqueSlug(parent, currentID, title), nil
+}
+
+func (w *Wiki) ReindexBacklinks() error {
+	if w.backlinks == nil {
+		return nil
+	}
+	return w.backlinks.IndexAllPages()
+}
+
+func (w *Wiki) GetBacklinks(pageID string) ([]backlinks.Backlink, error) {
+	if w.backlinks == nil {
+		return nil, fmt.Errorf("backlinks not available")
+	}
+	return w.backlinks.GetBacklinksForPage(pageID)
 }
 
 func (w *Wiki) Login(identifier, password string) (*auth.AuthToken, error) {
@@ -580,6 +623,12 @@ func (w *Wiki) Close() error {
 	w.status.Finish()
 	if err := w.user.Close(); err != nil {
 		return err
+	}
+
+	if w.backlinks != nil {
+		if err := w.backlinks.Close(); err != nil {
+			log.Printf("error closing backlinks: %v", err)
+		}
 	}
 
 	if w.searchWatcher != nil {
