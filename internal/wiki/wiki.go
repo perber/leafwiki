@@ -412,7 +412,7 @@ func (w *Wiki) ReindexBacklinks() error {
 	return w.backlinks.IndexAllPages()
 }
 
-func (w *Wiki) GetBacklinks(pageID string) ([]backlinks.Backlink, error) {
+func (w *Wiki) GetBacklinks(pageID string) (*backlinks.BacklinkResult, error) {
 	if w.backlinks == nil {
 		return nil, fmt.Errorf("backlinks not available")
 	}
