@@ -232,16 +232,16 @@ func TestBacklinkService_IndexAllPages_BuildsBacklinks(t *testing.T) {
 		t.Fatalf("IndexAllPages failed: %v", err)
 	}
 
-	backlinks, err := svc.GetBacklinksForPage(pageBID)
+	data, err := svc.GetBacklinksForPage(pageBID)
 	if err != nil {
 		t.Fatalf("GetBacklinksForPage failed: %v", err)
 	}
 
-	if len(backlinks) != 1 {
-		t.Fatalf("expected 1 backlink for pageB, got %d: %#v", len(backlinks), backlinks)
+	if len(data.Backlinks) != 1 {
+		t.Fatalf("expected 1 backlink for pageB, got %d: %#v", len(data.Backlinks), data.Backlinks)
 	}
 
-	bl := backlinks[0]
+	bl := data.Backlinks[0]
 	if bl.FromPageID != pageAID {
 		t.Errorf("FromPageID = %q, want %q", bl.FromPageID, pageAID)
 	}
@@ -274,13 +274,13 @@ func TestBacklinkService_IndexAllPages_ReplacesExistingBacklinks(t *testing.T) {
 		t.Fatalf("IndexAllPages (second) failed: %v", err)
 	}
 
-	backlinks, err := svc.GetBacklinksForPage(pageBID)
+	data, err := svc.GetBacklinksForPage(pageBID)
 	if err != nil {
 		t.Fatalf("GetBacklinksForPage failed: %v", err)
 	}
 
-	if len(backlinks) != 0 {
-		t.Fatalf("expected 0 backlinks after reindex, got %d: %#v", len(backlinks), backlinks)
+	if len(data.Backlinks) != 0 {
+		t.Fatalf("expected 0 backlinks after reindex, got %d: %#v", len(data.Backlinks), data.Backlinks)
 	}
 }
 func TestBacklinkService_UpdateBacklinksForPage_OnlyAffectsOnePage(t *testing.T) {
@@ -295,20 +295,20 @@ func TestBacklinkService_UpdateBacklinksForPage_OnlyAffectsOnePage(t *testing.T)
 		t.Fatalf("UpdateBacklinksForPage failed: %v", err)
 	}
 
-	backlinksB, err := svc.GetBacklinksForPage(pageBID)
+	dataB, err := svc.GetBacklinksForPage(pageBID)
 	if err != nil {
 		t.Fatalf("GetBacklinksForPage for B failed: %v", err)
 	}
-	if len(backlinksB) != 1 {
-		t.Fatalf("expected 1 backlink for B, got %d: %#v", len(backlinksB), backlinksB)
+	if len(dataB.Backlinks) != 1 {
+		t.Fatalf("expected 1 backlink for B, got %d: %#v", len(dataB.Backlinks), dataB.Backlinks)
 	}
 
-	backlinksA, err := svc.GetBacklinksForPage(pageAID)
+	dataA, err := svc.GetBacklinksForPage(pageAID)
 	if err != nil {
 		t.Fatalf("GetBacklinksForPage for A failed: %v", err)
 	}
-	if len(backlinksA) != 0 {
-		t.Fatalf("expected 0 backlinks for A, got %d: %#v", len(backlinksA), backlinksA)
+	if len(dataA.Backlinks) != 0 {
+		t.Fatalf("expected 0 backlinks for A, got %d: %#v", len(dataA.Backlinks), dataA.Backlinks)
 	}
 }
 
@@ -324,12 +324,12 @@ func TestBacklinkService_ClearBacklinks_RemovesAllBacklinks(t *testing.T) {
 		t.Fatalf("ClearBacklinks failed: %v", err)
 	}
 
-	backlinks, err := svc.GetBacklinksForPage(pageBID)
+	data, err := svc.GetBacklinksForPage(pageBID)
 	if err != nil {
 		t.Fatalf("GetBacklinksForPage failed: %v", err)
 	}
-	if len(backlinks) != 0 {
-		t.Fatalf("expected 0 backlinks after ClearBacklinks, got %d: %#v", len(backlinks), backlinks)
+	if len(data.Backlinks) != 0 {
+		t.Fatalf("expected 0 backlinks after ClearBacklinks, got %d: %#v", len(data.Backlinks), data.Backlinks)
 	}
 }
 
@@ -345,11 +345,11 @@ func TestBacklinkService_RemoveBacklinksForPage_RemovesIncomingAndOutgoing(t *te
 		t.Fatalf("RemoveBacklinksForPage failed: %v", err)
 	}
 
-	backlinksB, err := svc.GetBacklinksForPage(pageBID)
+	dataB, err := svc.GetBacklinksForPage(pageBID)
 	if err != nil {
 		t.Fatalf("GetBacklinksForPage failed: %v", err)
 	}
-	if len(backlinksB) != 0 {
-		t.Fatalf("expected 0 backlinks for B after removal, got %d: %#v", len(backlinksB), backlinksB)
+	if len(dataB.Backlinks) != 0 {
+		t.Fatalf("expected 0 backlinks for B after removal, got %d: %#v", len(dataB.Backlinks), dataB.Backlinks)
 	}
 }

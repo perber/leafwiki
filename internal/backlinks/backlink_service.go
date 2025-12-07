@@ -68,8 +68,9 @@ func (b *BacklinkService) ClearBacklinks() error {
 	return b.store.Clear()
 }
 
-func (b *BacklinkService) GetBacklinksForPage(pageID string) ([]Backlink, error) {
-	return b.store.GetBacklinksForPage(pageID)
+func (b *BacklinkService) GetBacklinksForPage(pageID string) (*BacklinkResult, error) {
+	backlinks, err := b.store.GetBacklinksForPage(pageID)
+	return toBacklinkResult(b.treeService, backlinks), err
 }
 
 func (b *BacklinkService) UpdateBacklinksForPage(page *tree.Page, content string) error {

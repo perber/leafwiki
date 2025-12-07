@@ -106,3 +106,34 @@ func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []stri
 	}
 	return targetLinks
 }
+
+func toBacklinkResult(tree *tree.TreeService, backlinks []Backlink) *BacklinkResult {
+	var items []BacklinkResultItem
+	for _, backlink := range backlinks {
+		item := toBacklinkResultItem(tree, backlink)
+		items = append(items, item)
+	}
+	return &BacklinkResult{
+		Backlinks: items,
+		Count:     len(items),
+	}
+}
+
+func toBacklinkResultItem(tree *tree.TreeService, backlink Backlink) BacklinkResultItem {
+	root := tree.GetTree()
+	if root == nil {
+		return BacklinkResultItem{}
+	}
+
+	page, err := tree.FindPageByID(root.Children, backlink.FromPageID)
+	if err != nil {
+		return BacklinkResultItem{}
+	}
+
+	return BacklinkResultItem{
+		FromPageID: backlink.FromPageID,
+		FromTitle:  backlink.FromTitle,
+		FromPath:   page.CalculatePath(),
+		ToPageID:   backlink.ToPageID,
+	}
+}
