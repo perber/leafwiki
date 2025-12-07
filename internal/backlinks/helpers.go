@@ -59,8 +59,18 @@ func normalizeLink(currentPath string, link string) string {
 		resolved = path.Clean(link[1:])
 	} else {
 		// Relative link: "../", "./", "child"
-		base := path.Dir(currentPath)
-		resolved = path.Clean(path.Join(base, link))
+		basePathSegments := strings.Split(currentPath, "/")
+		segments := strings.Split(link, "/")
+		for _, segment := range segments {
+			if segment == ".." {
+				if len(basePathSegments) > 0 {
+					basePathSegments = basePathSegments[:len(basePathSegments)-1]
+				}
+			} else if segment != "." {
+				basePathSegments = append(basePathSegments, segment)
+			}
+		}
+		resolved = path.Clean(strings.Join(basePathSegments, "/"))
 	}
 
 	return resolved
