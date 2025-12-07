@@ -42,9 +42,11 @@ func (b *BacklinkService) IndexAllPages() error {
 
 			targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
 
-			err = b.store.AddBacklinks(page.ID, page.Title, targets)
-			if err != nil {
-				return err
+			if len(targets) > 0 {
+				err = b.store.AddBacklinks(page.ID, page.Title, targets)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		for _, child := range node.Children {
