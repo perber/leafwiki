@@ -16,6 +16,38 @@ interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   path?: string
 }
 
+/**
+ * Resolves a relative Markdown link against the current page path.
+ *
+ * currentPath = the path of the current page (e.g. "/stoff/change")
+ * href        = the link written inside Markdown (e.g. "../andere-seite")
+ *
+ * Returns a normalized absolute path (e.g. "/andere-seite").
+ */
+function resolvePath(currentPath: string, href: string): string {
+  // Ensure the current path always starts with "/"
+  // The URL constructor requires a valid absolute base URL
+  const normalizedCurrent = currentPath.startsWith('/')
+    ? currentPath
+    : '/' + currentPath
+
+  /**
+   * IMPORTANT:
+   * When passing a URL like "/foo/bar" as base,
+   * the URL API treats the last segment ("bar") as a *file*,
+   * so the base directory becomes "/foo/".
+   *
+   * This matches browser behavior for resolving relative URLs.
+   */
+  const base = new URL(normalizedCurrent, window.location.origin)
+
+  // Resolve the href relative to the base URL
+  const url = new URL(href, base)
+
+  // Return only the pathname (no query, no hash)
+  return url.pathname
+}
+
 export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
@@ -56,49 +88,26 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
         </a>
       )
     }
-
     /*
       First we need to check if it is a relative link or an absolute link.
     */
-    const absoluteHref = href.startsWith('/')
     let normalizedHref = href
-    if (!absoluteHref) {
-      // For relative links, we need to add the current path as prefix.
-      let currentPath: string
-      if (!props.path) {
-        currentPath = buildViewUrl(window.location.pathname)
-      } else {
-        currentPath = props.path
-      }
+    if (href.startsWith('/')) {
+      // Already absolute (e.g. "/stoff/change")
+      normalizedHref = href
+    } else {
+      // Relative link (e.g. "../stoff/change", "child-page", "./foo")
+      const currentPath = props.path ?? buildViewUrl(window.location.pathname)
 
-      // remove leading / to make path relative
-      if (currentPath.startsWith('/')) {
-        currentPath = currentPath.slice(1)
-      }
-
-      const basePath = currentPath
-      // When the path contains ../ or ./ we need to resolve it
-      const segments = href.split('/')
-      const basePathSegments = basePath.split('/')
-      for (const segment of segments) {
-        if (segment === '..') {
-          basePathSegments.pop()
-        } else if (segment !== '.') {
-          basePathSegments.push(segment)
-        }
-      }
-      const resolvedPath = basePathSegments.join('/')
-
-      // We calculate it to an absolute path
-      normalizedHref = resolvedPath.startsWith('/')
-        ? resolvedPath
-        : '/' + resolvedPath
+      normalizedHref = resolvePath(currentPath, href)
     }
 
-    // When a page link is internal and not an asset link and the page doesn't exist yet,
-    // we will color the link in red and offer to create the page. Via the CreatePageByPathDialog.
-    // We should handle and calculate relative paths here as well.
-    // normalizedHref contains now the absolute path. We can use it directly.
+    /**
+     *  When a page link is internal and not an asset link and the page doesn't exist yet,
+     * we will color the link in red and offer to create the page. Via the CreatePageByPathDialog.
+     * we should handle and calculate relative paths here as well.
+     * normalizedHref contains now the absolute path. We can use it directly.
+     **/
 
     // normalizedTargetPath is the path without leading /, without query and hash
     const normalizedTargetPath = normalizedHref
@@ -141,7 +150,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     <a
       href={href}
       {...props}
-      target="_blank"
+      target={href.startsWith('#') ? undefined : '_blank'}
       rel="noopener noreferrer"
       className="text-brand hover:text-brand-dark no-underline hover:underline"
     >
