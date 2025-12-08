@@ -21,7 +21,7 @@ export async function fetchBacklinks(pageId: string): Promise<BacklinkResult> {
 
 export type OutgoingResult = {
   count: number
-  outgoing: OutgoingLinks[]
+  outgoings: OutgoingLinks[]
 }
 
 export type OutgoingLinks = {
