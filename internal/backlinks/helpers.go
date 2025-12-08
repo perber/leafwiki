@@ -146,3 +146,34 @@ func toBacklinkResultItem(tree *tree.TreeService, backlink Backlink) BacklinkRes
 		ToPageID:   backlink.ToPageID,
 	}
 }
+
+func toOutgoingLinkResult(tree *tree.TreeService, outgoings []Outgoing) *OutgoingResult {
+	var items []OutgoingResultItem
+	for _, outgoing := range outgoings {
+		item := toOutgoingResultItem(tree, outgoing)
+		items = append(items, item)
+	}
+	return &OutgoingResult{
+		Outgoings: items,
+		Count:     len(items),
+	}
+}
+
+func toOutgoingResultItem(tree *tree.TreeService, outgoing Outgoing) OutgoingResultItem {
+	root := tree.GetTree()
+	if root == nil {
+		return OutgoingResultItem{}
+	}
+
+	toPage, err := tree.FindPageByID(root.Children, outgoing.ToPageID)
+	if err != nil {
+		return OutgoingResultItem{}
+	}
+
+	return OutgoingResultItem{
+		ToPageID:    outgoing.ToPageID,
+		ToPageTitle: toPage.Title,
+		ToPath:      toPage.CalculatePath(),
+		FromPageID:  outgoing.FromPageID,
+	}
+}

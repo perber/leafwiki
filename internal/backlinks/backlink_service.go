@@ -73,6 +73,11 @@ func (b *BacklinkService) GetBacklinksForPage(pageID string) (*BacklinkResult, e
 	return toBacklinkResult(b.treeService, backlinks), err
 }
 
+func (b *BacklinkService) GetOutgoingLinksForPage(pageID string) (*OutgoingResult, error) {
+	outgoingLinks, err := b.store.GetOutgoingLinksForPage(pageID)
+	return toOutgoingLinkResult(b.treeService, outgoingLinks), err
+}
+
 func (b *BacklinkService) UpdateBacklinksForPage(page *tree.Page, content string) error {
 	links := extractLinksFromMarkdown(content)
 
