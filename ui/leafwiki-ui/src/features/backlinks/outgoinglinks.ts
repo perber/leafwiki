@@ -31,7 +31,8 @@ export const useOutgoingLinksStore = create<OutgoingLinksStore>((set) => ({
     set({ loading: true, error: null })
     try {
       const data = await fetchOutgoingLinks(pageId)
-      set({ outgoing: data.outgoing, count: data.count, loading: false })
+      console.log(data)
+      set({ outgoing: data.outgoings, count: data.count, loading: false })
     } catch (error: unknown) {
       if (error instanceof Error) {
         set({ error: error.message, loading: false })
