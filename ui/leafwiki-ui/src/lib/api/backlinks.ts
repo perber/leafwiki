@@ -18,3 +18,23 @@ export async function fetchBacklinks(pageId: string): Promise<BacklinkResult> {
     `/api/pages/${pageId}/backlinks`,
   )) as Promise<BacklinkResult>
 }
+
+export type OutgoingResult = {
+  count: number
+  outgoing: OutgoingLinks[]
+}
+
+export type OutgoingLinks = {
+  from_page_id: string
+  to_page_id: string
+  to_path: string
+  to_page_title: string
+}
+export async function fetchOutgoingLinks(
+  pageId: string,
+): Promise<OutgoingResult> {
+  if (!pageId) throw new Error('Page ID is required')
+  return (await fetchWithAuth(
+    `/api/pages/${pageId}/outgoing-links`,
+  )) as Promise<OutgoingResult>
+}
