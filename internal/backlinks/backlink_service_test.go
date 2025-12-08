@@ -41,6 +41,18 @@ With both: [Both](/docs/page5?foo=bar#section)
 	}
 }
 
+func TestNormalizeLink_RootLevelPageToSibling(t *testing.T) {
+	current := "leafwiki" // corresponds to /leafwiki
+	link := "mission"
+
+	got := normalizeLink(current, link)
+	want := "mission" // /mission
+
+	if got != want {
+		t.Errorf("normalizeLink(%q, %q) = %q, want %q", current, link, got, want)
+	}
+}
+
 func TestNormalizeLink_Absolute(t *testing.T) {
 	current := "docs/guide/page1"
 	link := "/docs/other/page2"

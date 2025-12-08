@@ -1,7 +1,7 @@
 package backlinks
 
 import (
-	"path"
+	"net/url"
 	"strings"
 
 	"github.com/perber/wiki/internal/core/tree"
@@ -47,37 +47,46 @@ func extractLinksFromMarkdown(content string) []string {
 	return links
 }
 
+// resolveURLPath resolves a relative link (href) against a currentPath,
+// using browser-like URL semantics. Returns a path starting with "/".
+func resolveURLPath(currentPath, href string) (string, error) {
+	// Ensure currentPath starts with "/"
+	if !strings.HasPrefix(currentPath, "/") {
+		currentPath = "/" + currentPath
+	}
+
+	// Fake origin, we only care about the path resolution
+	// This allows us to use the URL package to resolve paths correctly like a browser would
+	base, err := url.Parse("https://leafwiki.com" + currentPath)
+	if err != nil {
+		return "", err
+	}
+
+	ref, err := url.Parse(href)
+	if err != nil {
+		return "", err
+	}
+
+	resolved := base.ResolveReference(ref)
+	return resolved.Path, nil
+}
+
 func normalizeLink(currentPath string, link string) string {
 	if link == "" {
 		return ""
 	}
 
-	var resolved string
-
-	// Absolute link: "/foo/bar"
-	if strings.HasPrefix(link, "/") {
-		resolved = path.Clean(link[1:])
-	} else {
-		// Relative link: "../", "./", "child"
-		basePathSegments := strings.Split(currentPath, "/")
-		segments := strings.Split(link, "/")
-		for _, segment := range segments {
-			if segment == ".." {
-				if len(basePathSegments) > 0 {
-					basePathSegments = basePathSegments[:len(basePathSegments)-1]
-				}
-			} else if segment != "." {
-				basePathSegments = append(basePathSegments, segment)
-			}
-		}
-		resolved = path.Clean(strings.Join(basePathSegments, "/"))
+	resolvedPath, err := resolveURLPath(currentPath, link)
+	if err != nil {
+		return ""
 	}
 
-	return resolved
+	// strip leading "/"
+	return strings.TrimPrefix(resolvedPath, "/")
 }
 
 func resolveTargetLink(treeService *tree.TreeService, nodes []*tree.PageNode, normalizedLink string) *TargetLink {
-	page, err := treeService.FindPageByRoutePath(nodes, normalizedLink[1:])
+	page, err := treeService.FindPageByRoutePath(nodes, normalizedLink)
 	if err != nil || page == nil {
 		return nil
 	}
