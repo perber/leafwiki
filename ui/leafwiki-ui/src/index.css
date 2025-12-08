@@ -259,6 +259,7 @@
    COMPONENTS LAYER — Sidebar, custom UI parts
 ------------------------------------------------------- */
 @layer components {
+
   /* Sidebar */
   .sidebar {
     @apply bg-surface flex h-full w-full flex-col overflow-hidden;
@@ -427,7 +428,7 @@
     @apply h-5 w-5;
   }
 
-  .user-toolbar__avatar > span {
+  .user-toolbar__avatar>span {
     @apply bg-avatar-bg! text-avatar-foreground!;
   }
 
@@ -898,6 +899,43 @@
     @apply block;
   }
 
+  /* Outline Pane */
+  .outline_pane {
+    @apply text-interface-text w-full pt-2 text-sm;
+  }
+
+  .outline_pane__title {
+    @apply mb-2 text-lg font-medium;
+  }
+
+  .outline_pane__empty {
+    @apply text-muted text-xs italic;
+  }
+
+  .outline_pane__list {
+    @apply space-y-1;
+  }
+
+  .outline_pane__item {
+    @apply flex w-full;
+  }
+
+  .outline_pane__item--level-1 {
+    @apply pl-0 font-semibold;
+  }
+
+  .outline_pane__item--level-2 {
+    @apply pl-3;
+  }
+
+  .outline_pane__item--level-3 {
+    @apply pl-6 text-xs;
+  }
+
+  .outline_pane__link {
+    @apply bg-surface-alt hover:bg-tree-node-hover hover:text-brand relative mb-2 rounded-md pt-2 pr-5 pb-2 pl-2! block w-full;
+  }
+
   /* user management */
   .user-management {
     @apply mx-auto max-w-4xl p-6;
@@ -1191,6 +1229,7 @@
    UTILITIES LAYER — Markdown, tables, custom scrollbars
 ------------------------------------------------------- */
 @layer utilities {
+
   html,
   body {
     @apply bg-page-bg text-page-text font-sans;
@@ -1222,14 +1261,14 @@
 
   .code,
   pre {
-    font-family: 'Courier New', Courier, monospace !important;
+    font-family: 'Courier New', Courier, monospace!important;
   }
 
   /* Inline code */
   .inline-code {
     @apply bg-border rounded p-1 px-2 text-xs;
-    color: oklch(92.8% 0.006 264.531) !important;
-    font-weight: 500 !important;
+    color: oklch(92.8% 0.006 264.531)!important;
+    font-weight: 500!important;
   }
 
   .inline-code::after,
@@ -1239,7 +1278,7 @@
 
   code,
   pre {
-    background: #1f2937 !important;
+    background: #1f2937!important;
   }
 
   code.hljs {
@@ -1310,7 +1349,7 @@
   }
 
   #sidebar-container {
-    width: 0 !important;
+    width: 0!important;
   }
 
   .app-layout__content-wrapper {

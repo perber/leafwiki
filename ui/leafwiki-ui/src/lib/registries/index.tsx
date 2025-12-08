@@ -2,6 +2,7 @@
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
 import { BacklinkPane } from '@/features/backlinks/BacklinkPane'
+import { OutlinePane } from '@/features/outline/OutlinePane'
 import { AddPageDialog } from '@/features/page/AddPageDialog'
 import { CopyPageDialog } from '@/features/page/CopyPageDialog'
 import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
@@ -17,7 +18,7 @@ import { DeleteUserDialog } from '@/features/users/DeleteUserDialog'
 import { UserFormDialog } from '@/features/users/UserFormDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
-import { FolderTree, Search as SearchIcon, Undo2 } from 'lucide-react'
+import { FolderTree, ListTree, Search as SearchIcon, Undo2 } from 'lucide-react'
 
 export const panelItemRegistry = new PanelItemRegistry()
 export const dialogRegistry = new DialogRegistry()
@@ -27,6 +28,7 @@ export const dialogRegistry = new DialogRegistry()
 export const SIDEBAR_TREE_PANEL_ID = 'tree'
 export const SIDEBAR_SEARCH_PANEL_ID = 'search'
 export const SIDEBAR_BACKLINKS_PANEL_ID = 'backlinks'
+export const SIDEBAR_OUTLINE_PANEL_ID = 'outline'
 
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
@@ -57,6 +59,14 @@ panelItemRegistry.register({
   render: () => {
     return <BacklinkPane />
   },
+})
+
+panelItemRegistry.register({
+  id: SIDEBAR_OUTLINE_PANEL_ID,
+  label: 'Outline',
+  hotkey: 'Mod+Shift+O',
+  icon: () => <ListTree size={16} />, // irgendein Icon
+  render: () => <OutlinePane />,
 })
 
 // Register application wide dialogs here using dialogRegistry.register(...)
