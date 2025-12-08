@@ -154,6 +154,30 @@ func (s *BacklinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) 
 	return backlinks, nil
 }
 
+func (s *BacklinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM backlinks WHERE from_page_id = ?`, pageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var outgoings []Outgoing
+	for rows.Next() {
+		var o Outgoing
+		if err := rows.Scan(&o.FromPageID, &o.ToPageID, &o.FromTitle); err != nil {
+			return nil, err
+		}
+		outgoings = append(outgoings, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return outgoings, nil
+}
+
 func (s *BacklinksStore) GetDBConn() *sql.DB {
 	return s.db
 }

@@ -365,3 +365,133 @@ func TestBacklinkService_RemoveBacklinksForPage_RemovesIncomingAndOutgoing(t *te
 		t.Fatalf("expected 0 backlinks for B after removal, got %d: %#v", len(dataB.Backlinks), dataB.Backlinks)
 	}
 }
+
+func TestBacklinkService_GetOutgoingLinksForPage_ReturnsOutgoingLinks(t *testing.T) {
+	svc, ts, _ := setupBacklinkService(t)
+	pageAID, pageBID := createSimpleLinkedPages(t, ts)
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	result, err := svc.GetOutgoingLinksForPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage failed: %v", err)
+	}
+
+	if result == nil {
+		t.Fatalf("expected non-nil result")
+	}
+
+	if result.Count != 1 {
+		t.Fatalf("expected 1 outgoing link for pageA, got %d: %#v", result.Count, result.Outgoings)
+	}
+
+	item := result.Outgoings[0]
+
+	if item.FromPageID != pageAID {
+		t.Errorf("FromPageID = %q, want %q", item.FromPageID, pageAID)
+	}
+
+	if item.ToPageID != pageBID {
+		t.Errorf("ToPageID = %q, want %q", item.ToPageID, pageBID)
+	}
+
+	pageB, err := ts.GetPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetPage(pageB) failed: %v", err)
+	}
+	wantPath := pageB.CalculatePath()
+	if item.ToPath != wantPath {
+		t.Errorf("ToPath = %q, want %q", item.ToPath, wantPath)
+	}
+	if item.ToPageTitle != pageB.Title {
+		t.Errorf("ToPageTitle = %q, want %q", item.ToPageTitle, pageB.Title)
+	}
+}
+
+func TestBacklinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
+	svc, ts, _ := setupBacklinkService(t)
+
+	// einfache Seite ohne Links anlegen
+	aIDPtr, err := ts.CreatePage(nil, "Lonely Page", "lonely")
+	if err != nil {
+		t.Fatalf("CreatePage lonely failed: %v", err)
+	}
+	lonelyID := *aIDPtr
+
+	page, err := ts.GetPage(lonelyID)
+	if err != nil {
+		t.Fatalf("GetPage lonely failed: %v", err)
+	}
+
+	// Content ohne Links
+	if err := ts.UpdatePage(page.ID, page.Title, page.Slug, "Just some text, no links."); err != nil {
+		t.Fatalf("UpdatePage lonely failed: %v", err)
+	}
+
+	// Backlinks/Outgoings Index aufbauen
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	result, err := svc.GetOutgoingLinksForPage(lonelyID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage failed: %v", err)
+	}
+
+	if result == nil {
+		t.Fatalf("expected non-nil result")
+	}
+
+	if result.Count != 0 {
+		t.Fatalf("expected 0 outgoing links, got %d: %#v", result.Count, result.Outgoings)
+	}
+}
+
+func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
+	ts, page1ID, page2ID := setupTreeForBacklinksTest(t)
+
+	root := ts.GetTree()
+	if root == nil {
+		t.Fatalf("tree root is nil")
+	}
+
+	// Fake-Outgoing Eintrag: page1 → page2
+	outgoings := []Outgoing{
+		{
+			FromPageID: page1ID,
+			ToPageID:   page2ID,
+			FromTitle:  "Page 1",
+		},
+	}
+
+	result := toOutgoingLinkResult(ts, outgoings)
+	if result == nil {
+		t.Fatalf("expected non-nil result")
+	}
+	if result.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d", result.Count)
+	}
+
+	item := result.Outgoings[0]
+
+	if item.FromPageID != page1ID {
+		t.Errorf("FromPageID = %q, want %q", item.FromPageID, page1ID)
+	}
+	if item.ToPageID != page2ID {
+		t.Errorf("ToPageID = %q, want %q", item.ToPageID, page2ID)
+	}
+
+	// hier prüfen wir explizit, dass Title & Path aus dem Tree stammen
+	page2, err := ts.GetPage(page2ID)
+	if err != nil {
+		t.Fatalf("GetPage page2 failed: %v", err)
+	}
+	if item.ToPageTitle != page2.Title {
+		t.Errorf("ToPageTitle = %q, want %q", item.ToPageTitle, page2.Title)
+	}
+	if item.ToPath != page2.CalculatePath() {
+		t.Errorf("ToPath = %q, want %q", item.ToPath, page2.CalculatePath())
+	}
+}
