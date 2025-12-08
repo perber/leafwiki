@@ -419,6 +419,13 @@ func (w *Wiki) GetBacklinks(pageID string) (*backlinks.BacklinkResult, error) {
 	return w.backlinks.GetBacklinksForPage(pageID)
 }
 
+func (w *Wiki) GetOutgoingLinks(pageID string) (*backlinks.OutgoingResult, error) {
+	if w.backlinks == nil {
+		return nil, fmt.Errorf("outgoing links not available")
+	}
+	return w.backlinks.GetOutgoingLinksForPage(pageID)
+}
+
 func (w *Wiki) Login(identifier, password string) (*auth.AuthToken, error) {
 	return w.auth.Login(identifier, password)
 }
