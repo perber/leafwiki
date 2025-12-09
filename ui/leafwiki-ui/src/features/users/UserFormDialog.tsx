@@ -1,5 +1,12 @@
 import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { User } from '@/lib/api/users'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_USER_FORM } from '@/lib/registries'
@@ -109,22 +116,26 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
             type="password"
           />
         )}
-
-        <select
-          className={`border-border w-full rounded-md border px-3 py-2 text-sm ${fieldErrors.role ? 'border-error' : ''}`}
+        <Select
+          disabled={isOwnUser}
           value={role}
-          onChange={(e) => {
-            setRole(e.target.value as 'admin' | 'editor')
+          onValueChange={(role) => {
+            setRole(role as 'admin' | 'editor')
             setFieldErrors((prev) => ({ ...prev, role: '' }))
           }}
-          disabled={isOwnUser}
         >
-          <option value="editor">Editor</option>
-          <option value="admin">Admin</option>
-        </select>
-        {fieldErrors.role && (
-          <p className="text-error mt-1 text-sm">{fieldErrors.role}</p>
-        )}
+          <SelectTrigger>
+            <SelectValue placeholder="Select a role" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem key="editor" value="editor">
+              Editor
+            </SelectItem>
+            <SelectItem key="admin" value="admin">
+              Admin
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </BaseDialog>
   )
