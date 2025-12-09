@@ -1,35 +1,26 @@
 # 🌿 LeafWiki
 
-**A lightweight, tree-based wiki that keeps your content in plain Markdown - fast, clean, and self-hosted**  
+**A lightweight, modern, tree-based wiki that keeps your content in plain Markdown - fast, clean, and self-hosted**  
 
 > *Run your knowledge base in 5 minutes - no database, just a single Go binary.*
 
-LeafWiki is designed for teams and individuals who want a clean, fast, and self-hosted knowledge base - with full control over structure, content, and deployment.
+LeafWiki is designed for teams and individuals who want a clean, modern, fast, and self-hosted knowledge base - with full control over structure, content, and deployment.
 
 ---
 
-![LeafWiki](./preview.gif)
+![LeafWiki](./preview.png)
 
 ---
 
-## 🌿 Growing with Purpose
+**Mobile View:**
 
-LeafWiki has reached a **stable and usable foundation**, and it’s already being used by developers to organize and document their knowledge.  
+<p align="center">
+  <img src="./mobile-editor.png" width="260" />
+  <img src="./mobile-pageview.png" width="260" />
+  <img src="./mobile-navigation.png" width="260" />
+</p>
 
-The project isn’t *feature-complete yet*.  
-Right now, the focus is on **refining what’s there**, improving **stability**, and evolving the platform carefully toward a truly developer-friendly knowledge base.
-
-**Current priorities:**  
-- Stability and reliability
-- UX/UI and usability improvements
-- Testing, CI, and quality assurance
-
-The editor and admin features are already in place, but collaboration is still basic - currently following a “last-write-wins” approach.
-Team-ready features like versioning, ... are planned for future iterations.
-
-LeafWiki and of course I are looking for **contributors** who want to help bring this vision to life - by refining existing features, fixing bugs, or experimenting with new ideas. 
-
-> **LeafWiki** is stable, growing and open for collaboration 🌿 
+---
 
 ## 🧪 Live Demo
 
@@ -41,6 +32,28 @@ LeafWiki and of course I are looking for **contributors** who want to help bring
 > Login credentials are displayed on the demo site's login page.  
 > ⚙️ The demo instance resets automatically every hour,   
 > so feel free to experiment - all changes are temporary.  
+
+---
+
+## 🌿 Growing with Purpose
+
+LeafWiki has reached a **stable and usable foundation**, and it’s already being used by developers to organize and document their knowledge.  
+
+The project isn’t *feature-complete yet*.  
+Right now, the focus is on **refining what’s there**, improving **stability**, and evolving the platform carefully toward a truly developer-friendly knowledge base.
+
+**Current priorities:**  
+- Table of Contents support
+- Backlinks between pages
+- Outgoing links
+- History / Versioning of pages
+
+The editor and admin features are already in place, but collaboration is still basic - currently following a “last-write-wins” approach.
+Team-ready features like versioning, ... are planned for future iterations.
+
+LeafWiki and of course I are looking for **contributors** who want to help bring this vision to life - by refining existing features, fixing bugs, or experimenting with new ideas. 
+
+> **LeafWiki** is stable, growing and open for collaboration 🌿 
 
 ---
 
@@ -61,6 +74,7 @@ LeafWiki and of course I are looking for **contributors** who want to help bring
 - 🖨️ Print view support
 - 🧩 Mermaid.js diagram support
 - 🎨 Resizable sidebar
+- 🌗 Dark mode support
 
 ---
 
@@ -89,7 +103,7 @@ After trying out tools like Wiki.js, Confluence, and DokuWiki, I wanted somethin
 - ⚙️ A single binary with no external dependencies
 - 🛠️ Something teams can actually self-host without DevOps pain
 
-It’s not trying to be everything - just a solid, minimal wiki for people who want **clarity over complexity.**
+It’s not trying to be everything - just a solid, lightweight wiki for people who want **clarity over complexity.**
 
 ---
 
@@ -268,9 +282,11 @@ go run main.go
 ## 🗺️ Roadmap
 
 ### Planned
-- [ ] Global Keyboard Shortcuts (e.g. Ctrl+F for search, ...)
-- [ ] Further UI/UX improvements
-- [ ] Your ideas are welcome! Open an issue or start a discussion!
+- [ ] Table of Contents support
+- [ ] Backlinks between pages
+- [ ] Outgoing links
+- [ ] Versioning / history of pages
+- [ ] You have an idea? Open an issue or PR!
 
 ----
 
@@ -343,6 +359,14 @@ He improved the documentation and the onboarding experience a lot!
 - [x] Better e2e test coverage
 - [x] Dependency updates across the project
 
+### ✅ v0.5.0 – Dark mode, macOS Support and More
+
+- [x] Darkmode support
+- [x] Improve Docker labels and annotations - thanks @Hugo-Galley
+- [x] macOS builds (x86_64 + arm64)
+- [x] Anchor scrolling (jumping to headings in the page)
+- [x] Various bug fixes and UX/UI improvements
+- [x] Dependency updates across the project
 ---
 
 ## 🧠 Philosophy
