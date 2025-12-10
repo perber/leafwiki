@@ -166,16 +166,24 @@ Make sure that this file is accessible only to authorized users.
 You can run LeafWiki in a Docker container:
 
 ```bash
-docker run -p 8080:8080 ghcr.io/perber/leafwiki:latest --jwt-secret=yoursecret
+docker run -p 8080:8080 \
+    -v ~/leafwiki-data:/app/data \
+    ghcr.io/perber/leafwiki:latest \
+    --jwt-secret=yoursecret \
+    --admin-password=yourpassword
 ```
 
-By default, the container runs as root. You can specify a custom data directory using the `--data-dir` option.
+By default, the container runs as root. You can specify a custom data directory using the `--data-dir` option. If you specify a custom data directory, you must also update the volume mapping to point to your chosen directory.
 
 If you want to avoid running as root, add `-u 1000:1000`:
 
 ```bash
-docker run -p 8080:8080 -u 1000:1000 \
-  ghcr.io/perber/leafwiki:latest --jwt-secret=yoursecret
+docker run -p 8080:8080 \
+    -u 1000:1000 \
+    -v ~/leafwiki-data:/app/data \
+    ghcr.io/perber/leafwiki:latest \
+    --jwt-secret=yoursecret \
+    --admin-password=yourpassword
 ```
 
 By default the data directory inside the container will be `app/data/`
