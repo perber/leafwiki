@@ -9,6 +9,8 @@ import Headline from './Headline'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
 import MermaidBlock from './MermaidBlock'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
 
 type Props = {
   content: string
@@ -129,7 +131,7 @@ export default function MarkdownPreview({ content, path }: Props) {
     <>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkLineNumber]}
-        rehypePlugins={[rehypeHighlight]}
+        rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeHighlight]}
         components={components}
       >
         {content}
