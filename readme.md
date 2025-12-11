@@ -75,6 +75,7 @@ LeafWiki and of course I are looking for **contributors** who want to help bring
 - 🧩 Mermaid.js diagram support
 - 🎨 Resizable sidebar
 - 🌗 Dark mode support
+- 🌐 HTML support
 
 ---
 
