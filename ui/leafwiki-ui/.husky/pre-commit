@@ -1,0 +1,5 @@
+# switch to directory / .husky needs to run in the root level
+
+cd $(dirname "$0")
+
+npm run format
