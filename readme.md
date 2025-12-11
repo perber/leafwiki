@@ -278,9 +278,14 @@ cd leafwiki
 
 cd ui/leafwiki-ui
 npm install
-npm run dev   # Starts Vite dev server on http://localhost:5173
 
-# 3. In another terminal, start the backend
+# 3. Configure precommit hooks
+npm run prepare    # Sets up husky git hooks / Needs to be started from ui/leafwiki-ui folder
+
+# 4. Start the frontend in dev mode
+npm run dev
+
+# 5. In another terminal, start the backend
 
 cd ../../cmd/leafwiki
 go run main.go

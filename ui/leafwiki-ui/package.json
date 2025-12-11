@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
-    "format": "prettier --write src/**"
+    "format": "prettier --write src/**",
+    "prepare": "husky"
   },
   "dependencies": {
     "@codemirror/basic-setup": "^0.20.0",
@@ -64,6 +65,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.2.0",
+    "husky": "^9.1.7",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.7.1",
