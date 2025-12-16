@@ -1265,7 +1265,6 @@
     html,
     body {
       background: #fff !important;
-      color: #000 !important;
       color-scheme: light !important;
     }
 
@@ -1280,7 +1279,6 @@
     .page-viewer,
     .page-viewer__content {
       background: #fff !important;
-      color: #000 !important;
       overflow: visible;
     }
 
@@ -1296,24 +1294,90 @@
     html.dark,
     body.dark,
     .dark {
-      --background: var(--background) !important;
-      --foreground: var(--foreground) !important;
-      --surface: var(--surface) !important;
-      --surface-alt: var(--surface-alt) !important;
-      --interface-text: var(--interface-text) !important;
-      --border: var(--border) !important;
-      --muted: var(--muted) !important;
-      --muted-foreground: var(--muted-foreground) !important;
+      color-scheme: light !important;
+
+      --background: 0 0% 100% !important;
+      --foreground: 222 47% 11% !important;
+      --card: 210 40% 98% !important;
+      --card-foreground: 222 47% 11% !important;
+      --popover: 0 0% 100% !important;
+      --popover-foreground: 222 47% 11% !important;
+      --primary: 142 72% 29% !important;
+      --primary-foreground: 0 0% 100% !important;
+      --secondary: 210 40% 96% !important;
+      --secondary-foreground: 222 47% 11% !important;
+      --accent: 210 40% 96% !important;
+      --accent-foreground: 222 47% 11% !important;
+      --destructive: 0 84% 63% !important;
+      --destructive-foreground: 0 0% 98% !important;
+      --input: 214 32% 91% !important;
+      --ring: 142 72% 29% !important;
+      --chart-1: 142 70% 40% !important;
+      --chart-2: 173 58% 39% !important;
+      --chart-3: 197 37% 24% !important;
+      --chart-4: 43 74% 66% !important;
+      --chart-5: 27 87% 67% !important;
+
+      /* --- PAGE Surface **/
+      --page-surface: 0 0% 100% !important;
+
+      --brand: 142 72% 29% !important;
+      --brand-dark: 143 64% 24% !important;
+      --brand-light: 142 77% 73% !important;
+
+      --border: 214 32% 91% !important;
+      --tooltip: 142 40% 96% !important;
+      --tooltip-border: 142 35% 80% !important;
+
+      --surface: 210 40% 98% !important;
+      --surface-alt: 210 40% 96% !important;
+
+      --interface-text: 215 25% 27% !important;
+      --surface-border: 214 32% 91% !important;
+      --error: 0 72% 51% !important;
+      --success: 142 76% 36% !important;
+      --success-foreground: 0 0% 100% !important;
+      --warning: 45 93% 47% !important;
+
+      --markdown-toolbar: 210 40% 96% !important;
+      --markdown-toolbar-border: 214 32% 91% !important;
+      --markdown-toolbar-text: 215 25% 27% !important;
+
+      --muted: 215 16% 47% !important;
+      --muted-foreground: 215 16% 47% !important;
+
+      --headline-anchor-icon: 215 20% 65% !important;
+      --headline-anchor-icon-hover: 217 33% 17% !important;
+
+      --avatar-bg: 214 20% 89% !important;
+      --avatar-foreground: 215 25% 27% !important;
+
+      --tree-node-hover: 213 34% 94% !important;
+      --scrollbar-thumb: 214 20% 75% !important;
+      --scrollbar-thumb-hover: 214 20% 85% !important;
+
+      --table-header-border: 214 32% 91% !important;
     }
 
     .page-viewer__content,
     .markdown-editor__preview {
       --tw-prose-body: #000 !important;
       --tw-prose-headings: #000 !important;
+      --tw-prose-lead: #000 !important;
       --tw-prose-links: #000 !important;
-      --tw-prose-bold: #000 !important; /* nur Farbe */
+      --tw-prose-bold: #000 !important;
+      --tw-prose-quotes: #000 !important;
+      --tw-prose-quote-borders: #ccc !important;
       --tw-prose-code: #000 !important;
+      --tw-prose-pre-code: #000 !important;
+      --tw-prose-pre-bg: #f5f5f5 !important;
+      --tw-prose-hr: #ccc !important;
+      --tw-prose-th-borders: #ccc !important;
+      --tw-prose-td-borders: #ccc !important;
+      --tw-prose-bullets: #000 !important;
+      --tw-prose-counters: #000 !important;
     }
+
     .page-viewer__content strong,
     .markdown-editor__preview strong {
       font-weight: 700 !important;
@@ -1330,7 +1394,7 @@
     }
 
     .app-layout__header-spacer {
-      @apply h-0;
+      height: 0 !important;
     }
   }
 }
