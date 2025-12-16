@@ -1260,44 +1260,77 @@
 /* -------------------------------------------------------
    PRINT LAYOUT
 ------------------------------------------------------- */
-@media print {
-  @page {
-    margin: 1cm;
-  }
+@layer print {
+  @media print {
+    html,
+    body {
+      background: #fff !important;
+      color: #000 !important;
+      color-scheme: light !important;
+    }
 
-  html,
-  body {
-    margin: 0;
-  }
+    @page {
+      margin: 1cm;
+    }
 
-  .breadcrumbs-nav {
-    margin-top: 20px;
-  }
+    main,
+    article,
+    #root,
+    .app-layout__content-wrapper,
+    .page-viewer,
+    .page-viewer__content {
+      background: #fff !important;
+      color: #000 !important;
+      overflow: visible;
+    }
 
-  #sidebar-container,
-  header,
-  .sidebar-wrapper {
-    display: none;
-  }
+    main {
+      width: 100% !important;
+      padding: 0 !important;
+      border: 0 !important;
+    }
+    .app-layout__content-wrapper {
+      height: auto !important;
+    }
 
-  #sidebar-container {
-    width: 0 !important;
-  }
+    html.dark,
+    body.dark,
+    .dark {
+      --background: var(--background) !important;
+      --foreground: var(--foreground) !important;
+      --surface: var(--surface) !important;
+      --surface-alt: var(--surface-alt) !important;
+      --interface-text: var(--interface-text) !important;
+      --border: var(--border) !important;
+      --muted: var(--muted) !important;
+      --muted-foreground: var(--muted-foreground) !important;
+    }
 
-  .app-layout__content-wrapper {
-    width: 100%;
-    overflow: visible;
-    height: auto;
-    padding: 0;
-  }
+    .page-viewer__content,
+    .markdown-editor__preview {
+      --tw-prose-body: #000 !important;
+      --tw-prose-headings: #000 !important;
+      --tw-prose-links: #000 !important;
+      --tw-prose-bold: #000 !important; /* nur Farbe */
+      --tw-prose-code: #000 !important;
+    }
+    .page-viewer__content strong,
+    .markdown-editor__preview strong {
+      font-weight: 700 !important;
+    }
 
-  main {
-    width: 100%;
-    padding: 0;
-    border: 0;
-  }
+    * {
+      box-shadow: none !important;
+    }
 
-  .app-layout__header-spacer {
-    height: 0;
+    #sidebar-container,
+    header,
+    .sidebar-wrapper {
+      display: none !important;
+    }
+
+    .app-layout__header-spacer {
+      @apply h-0;
+    }
   }
 }

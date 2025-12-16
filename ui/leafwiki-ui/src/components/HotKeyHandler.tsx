@@ -19,6 +19,17 @@ export function HotKeyHandler() {
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const keyCombo = []
+
+      // Open print Dialog!
+      // It is a hotfix, because for some reason the layout is looking different when the browser is opening the printdialog!
+      const isPrint = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p'
+      if (isPrint) {
+        window.print()
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+
       // Construct key combo string like 'Mod+Shift+K'
       // 'Mod' represents 'Ctrl' on Windows/Linux and 'Meta' on Mac
       if (e.ctrlKey || e.metaKey) keyCombo.push('Mod')
