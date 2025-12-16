@@ -12,6 +12,14 @@ import { MarkdownLink } from './MarkdownLink'
 import MermaidBlock from './MermaidBlock'
 import { rehypeLineNumber } from './rehypeLineNumber'
 
+const schema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    '*': [...(defaultSchema.attributes?.['*'] || []), 'data-line'],
+  },
+}
+
 type Props = {
   content: string
   path?: string
@@ -127,22 +135,16 @@ export default function MarkdownPreview({ content, path }: Props) {
     [markdownLink],
   )
 
-  const schema = {
-    ...defaultSchema,
-    attributes: {
-      ...defaultSchema.attributes,
-      '*': [
-        ...(defaultSchema.attributes?.['*'] || []),
-        'data-line',
-      ],
-    },
-  }
-
   return (
     <>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, rehypeLineNumber, [rehypeSanitize, schema], rehypeHighlight]}
+        rehypePlugins={[
+          rehypeRaw,
+          rehypeLineNumber,
+          [rehypeSanitize, schema],
+          rehypeHighlight,
+        ]}
         components={components}
       >
         {content}
