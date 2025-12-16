@@ -1,16 +1,16 @@
-import { remarkLineNumber } from '@/features/preview/remarkLineNumber'
 import 'highlight.js/styles/github-dark.css'
 import { ClassAttributes, HTMLAttributes, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 import Headline from './Headline'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
 import MermaidBlock from './MermaidBlock'
-import rehypeRaw from 'rehype-raw'
-import rehypeSanitize from 'rehype-sanitize'
+import { rehypeLineNumber } from './rehypeLineNumber'
 
 type Props = {
   content: string
@@ -127,11 +127,22 @@ export default function MarkdownPreview({ content, path }: Props) {
     [markdownLink],
   )
 
+  const schema = {
+    ...defaultSchema,
+    attributes: {
+      ...defaultSchema.attributes,
+      '*': [
+        ...(defaultSchema.attributes?.['*'] || []),
+        'data-line',
+      ],
+    },
+  }
+
   return (
     <>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkLineNumber]}
-        rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeHighlight]}
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, rehypeLineNumber, [rehypeSanitize, schema], rehypeHighlight]}
         components={components}
       >
         {content}
