@@ -6,6 +6,8 @@ import {
   DIALOG_MOVE_PAGE,
   DIALOG_SORT_PAGES,
 } from '@/lib/registries'
+import { buildEditUrl, buildViewUrl } from '@/lib/urlUtil'
+import { useAppMode } from '@/lib/useAppMode'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -25,10 +27,17 @@ export const TreeNode = React.memo(function TreeNode({
   level = 0,
 }: Props) {
   const { isNodeOpen, toggleNode } = useTreeStore()
+  const appMode = useAppMode()
   const hasChildren = node.children && node.children.length > 0
   const [hovered, setHovered] = useState(false)
   const { pathname } = useLocation()
-  const isActive = `/${node.path}` === pathname
+
+  const currentPath =
+    appMode === 'edit'
+      ? buildEditUrl(node.path)
+      : buildViewUrl(node.path.startsWith('/') ? node.path : `/${node.path}`)
+
+  const isActive = currentPath === pathname
   const open = isNodeOpen(node.id)
   const openDialog = useDialogsStore((state) => state.openDialog)
 
