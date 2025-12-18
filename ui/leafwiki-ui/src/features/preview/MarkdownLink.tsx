@@ -16,6 +16,19 @@ interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   path?: string
 }
 
+function normalizeWikiPath(path: string): string {
+  // remove query/hash
+  let p = path.split('?')[0].split('#')[0]
+
+  // ensure leading slash
+  if (!p.startsWith('/')) p = '/' + p
+
+  // remove trailing slash (except root "/")
+  if (p.length > 1) p = p.replace(/\/+$/, '')
+
+  return p
+}
+
 /**
  * Resolves a relative Markdown link against the current page path.
  *
@@ -25,27 +38,19 @@ interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
  * Returns a normalized absolute path (e.g. "/andere-seite").
  */
 function resolvePath(currentPath: string, href: string): string {
-  // Ensure the current path always starts with "/"
-  // The URL constructor requires a valid absolute base URL
   const normalizedCurrent = currentPath.startsWith('/')
     ? currentPath
     : '/' + currentPath
 
-  /**
-   * IMPORTANT:
-   * When passing a URL like "/foo/bar" as base,
-   * the URL API treats the last segment ("bar") as a *file*,
-   * so the base directory becomes "/foo/".
-   *
-   * This matches browser behavior for resolving relative URLs.
-   */
-  const base = new URL(normalizedCurrent, window.location.origin)
+  // Treat currentPath as a "folder" by forcing a trailing slash.
+  // "/stoff/change" -> "/stoff/change/"
+  const folderBase = normalizedCurrent.endsWith('/')
+    ? normalizedCurrent
+    : normalizedCurrent + '/'
 
-  // Resolve the href relative to the base URL
+  const base = new URL(folderBase, window.location.origin)
   const url = new URL(href, base)
-
-  // Return only the pathname (no query, no hash)
-  return url.pathname
+  return normalizeWikiPath(url.pathname)
 }
 
 export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
@@ -94,10 +99,12 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     let normalizedHref = href
     if (href.startsWith('/')) {
       // Already absolute (e.g. "/stoff/change")
-      normalizedHref = href
+      normalizedHref = normalizeWikiPath(href)
     } else {
       // Relative link (e.g. "../stoff/change", "child-page", "./foo")
-      const currentPath = props.path ?? buildViewUrl(window.location.pathname)
+      console.log('props.path', props.path)
+      console.log('window.location.pathname', window.location.pathname)
+      const currentPath = normalizeWikiPath(props.path ?? buildViewUrl(window.location.pathname))
 
       normalizedHref = resolvePath(currentPath, href)
     }
@@ -110,10 +117,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
      **/
 
     // normalizedTargetPath is the path without leading /, without query and hash
-    const normalizedTargetPath = normalizedHref
-      .split('?')[0]
-      .split('#')[0]
-      .replace(/^\/+/, '')
+    const normalizedTargetPath = normalizeWikiPath(normalizedHref).slice(1)
 
     // Check if the page exists
     const page = getPageByPath(normalizedTargetPath)
