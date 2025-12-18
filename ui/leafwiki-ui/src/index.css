@@ -871,7 +871,7 @@
 
   /** backlink pane **/
   .backlinks__pane {
-    @apply text-interface-text w-full pt-2 text-sm;
+    @apply text-interface-text w-full pt-5 mt-10 text-sm border-t-3 border-border;
   }
 
   .backlinks__header h2 {
@@ -886,17 +886,14 @@
     @apply m-0 list-none p-0;
   }
 
-  .backlinks__item {
-    @apply bg-surface-alt hover:bg-tree-node-hover hover:text-brand relative mb-2 rounded-md pt-2 pr-5 pb-2 pl-2;
+  .backlinks__item a {
+    @apply hover:bg-tree-node-hover hover:text-brand text-interface-text! rounded-md pt-2 pr-5 pb-2 pl-2 inline-block;
   }
 
-  .backlinks__item_icon {
-    @apply absolute top-1/2 right-2 mr-2 h-4 w-4 -translate-y-1/2;
+  .backlinks__item .backlinks__icon {
+    @apply inline;
   }
 
-  .backlinks__content li a {
-    @apply block;
-  }
 
   /* user management */
   .user-management {

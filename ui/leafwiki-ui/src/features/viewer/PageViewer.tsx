@@ -7,6 +7,7 @@ import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useCallback, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { BacklinkInfo } from '../backlinks/BacklinkInfo'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import Breadcrumbs from './Breadcrumbs'
@@ -72,9 +73,12 @@ export default function PageViewer() {
 
       {/* we keep the content also during loading to avoid flickering */}
       {page && !error && (
-        <article className="page-viewer__content">
-          <MarkdownPreview content={page.content} path={page.path} />
-        </article>
+        <>
+          <article className="page-viewer__content">
+            <MarkdownPreview content={page.content} path={page.path} />
+          </article>
+          <BacklinkInfo />
+        </>
       )}
       {renderError()}
     </div>

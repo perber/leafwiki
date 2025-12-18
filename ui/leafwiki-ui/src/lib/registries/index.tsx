@@ -1,7 +1,6 @@
 // register sidebar panel items
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
-import { BacklinkPane } from '@/features/backlinks/BacklinkPane'
 import { AddPageDialog } from '@/features/page/AddPageDialog'
 import { CopyPageDialog } from '@/features/page/CopyPageDialog'
 import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
@@ -17,7 +16,7 @@ import { DeleteUserDialog } from '@/features/users/DeleteUserDialog'
 import { UserFormDialog } from '@/features/users/UserFormDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
-import { FolderTree, Search as SearchIcon, Undo2 } from 'lucide-react'
+import { FolderTree, Search as SearchIcon } from 'lucide-react'
 
 export const panelItemRegistry = new PanelItemRegistry()
 export const dialogRegistry = new DialogRegistry()
@@ -46,16 +45,6 @@ panelItemRegistry.register({
   render: (props: unknown) => {
     const SearchProps = props as React.ComponentProps<typeof Search>
     return <Search {...SearchProps} />
-  },
-})
-
-panelItemRegistry.register({
-  id: SIDEBAR_BACKLINKS_PANEL_ID,
-  label: 'Backlinks',
-  hotkey: 'Mod+Shift+B',
-  icon: () => <Undo2 size={16} />,
-  render: () => {
-    return <BacklinkPane />
   },
 })
 
