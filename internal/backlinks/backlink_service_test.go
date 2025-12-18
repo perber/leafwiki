@@ -46,7 +46,7 @@ func TestNormalizeLink_RootLevelPageToSibling(t *testing.T) {
 	link := "mission"
 
 	got := normalizeLink(current, link)
-	want := "mission" // /mission
+	want := "leafwiki/mission" // /mission
 
 	if got != want {
 		t.Errorf("normalizeLink(%q, %q) = %q, want %q", current, link, got, want)
@@ -70,7 +70,7 @@ func TestNormalizeLink_RelativeSameDir(t *testing.T) {
 	link := "page2"
 
 	got := normalizeLink(current, link)
-	want := "docs/guide/page2"
+	want := "docs/guide/page1/page2"
 
 	if got != want {
 		t.Errorf("normalizeLink(%q, %q) = %q, want %q", current, link, got, want)
@@ -82,7 +82,7 @@ func TestNormalizeLink_RelativeParentDir(t *testing.T) {
 	link := "../overview"
 
 	got := normalizeLink(current, link)
-	want := "docs/overview"
+	want := "docs/guide/overview"
 
 	if got != want {
 		t.Errorf("normalizeLink(%q, %q) = %q, want %q", current, link, got, want)
@@ -143,7 +143,7 @@ func TestResolveTargetLinks_FindsExistingTargets(t *testing.T) {
 	currentPath := page1.CalculatePath() // should be "docs/page1"
 
 	// we want to link from page1 to page2 using a relative link
-	links := []string{"./page2"}
+	links := []string{"../page2"}
 
 	targets := resolveTargetLinks(ts, currentPath, links)
 
@@ -219,7 +219,7 @@ func createSimpleLinkedPages(t *testing.T, ts *tree.TreeService) (pageAID, pageB
 	if err != nil {
 		t.Fatalf("GetPage a failed: %v", err)
 	}
-	contentA := "Link to B: [Go to B](b)"
+	contentA := "Link to B: [Go to B](/b)"
 	if err := ts.UpdatePage(aPage.ID, aPage.Title, aPage.Slug, contentA); err != nil {
 		t.Fatalf("UpdatePage a failed: %v", err)
 	}

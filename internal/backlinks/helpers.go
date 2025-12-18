@@ -47,17 +47,51 @@ func extractLinksFromMarkdown(content string) []string {
 	return links
 }
 
-// resolveURLPath resolves a relative link (href) against a currentPath,
-// using browser-like URL semantics. Returns a path starting with "/".
-func resolveURLPath(currentPath, href string) (string, error) {
-	// Ensure currentPath starts with "/"
-	if !strings.HasPrefix(currentPath, "/") {
-		currentPath = "/" + currentPath
+// normalizeWikiPath normalizes a wiki path:
+// - removes query/hash (if any)
+// - ensures leading "/"
+// - removes trailing "/" (except root "/")
+func normalizeWikiPath(p string) string {
+	if p == "" {
+		return ""
 	}
 
-	// Fake origin, we only care about the path resolution
-	// This allows us to use the URL package to resolve paths correctly like a browser would
-	base, err := url.Parse("https://leafwiki.com" + currentPath)
+	// strip hash/query defensively (caller already does, but keep consistent)
+	if i := strings.Index(p, "#"); i != -1 {
+		p = p[:i]
+	}
+	if i := strings.Index(p, "?"); i != -1 {
+		p = p[:i]
+	}
+
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+
+	// collapse multiple slashes
+	for strings.Contains(p, "//") {
+		p = strings.ReplaceAll(p, "//", "/")
+	}
+
+	// strip trailing slash except root
+	if len(p) > 1 {
+		p = strings.TrimRight(p, "/")
+	}
+
+	return p
+}
+
+// resolveURLPath resolves href against currentPath using "page is folder" semantics.
+func resolveURLPath(currentPath, href string) (string, error) {
+	currentPath = normalizeWikiPath(currentPath)
+
+	// treat currentPath as folder by forcing trailing slash
+	folderBase := currentPath
+	if !strings.HasSuffix(folderBase, "/") {
+		folderBase += "/"
+	}
+
+	base, err := url.Parse("https://leafwiki.com" + folderBase)
 	if err != nil {
 		return "", err
 	}
@@ -68,7 +102,9 @@ func resolveURLPath(currentPath, href string) (string, error) {
 	}
 
 	resolved := base.ResolveReference(ref)
-	return resolved.Path, nil
+
+	// normalize result path (strip trailing slash etc.)
+	return normalizeWikiPath(resolved.Path), nil
 }
 
 func normalizeLink(currentPath string, link string) string {
@@ -77,11 +113,11 @@ func normalizeLink(currentPath string, link string) string {
 	}
 
 	resolvedPath, err := resolveURLPath(currentPath, link)
-	if err != nil {
+	if err != nil || resolvedPath == "" {
 		return ""
 	}
 
-	// strip leading "/"
+	// strip leading "/" for your tree lookup
 	return strings.TrimPrefix(resolvedPath, "/")
 }
 
