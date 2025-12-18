@@ -369,12 +369,21 @@ He improved the documentation and the onboarding experience a lot!
 
 ### ✅ v0.5.0 – Dark mode, macOS Support and More
 
-- [x] Darkmode support
+- [x] Dark mode support
 - [x] Improve Docker labels and annotations - thanks @Hugo-Galley
 - [x] macOS builds (x86_64 + arm64)
 - [x] Anchor scrolling (jumping to headings in the page)
 - [x] Various bug fixes and UX/UI improvements
 - [x] Dependency updates across the project
+
+### ✅ v0.5.1 – HTML Support in Markdown, Bugfixes and Dependency Updates
+
+- [x] Add HTML support in Markdown pages - thanks @Hugo-Galley for the implementation!
+- [x] Fixed an issue with links in the editor
+- [x] Fixed print view for Dark mode
+- [x] Updated project dependencies
+- [x] Updated docker documentation in the readme - thanks @Hugo-Galley
+
 ---
 
 ## 🧠 Philosophy
