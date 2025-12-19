@@ -205,7 +205,3 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 
 	return outgoings, nil
 }
-
-func (s *LinksStore) GetDBConn() *sql.DB {
-	return s.db
-}
