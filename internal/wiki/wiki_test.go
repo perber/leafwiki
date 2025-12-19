@@ -452,7 +452,7 @@ func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
 
-	// 2) Reindex einmal, damit broken Links in der DB landen
+	// 2) Reindex once so that broken links are stored in the DB
 	if err := w.ReindexBacklinks(); err != nil {
 		t.Fatalf("ReindexBacklinks failed: %v", err)
 	}
