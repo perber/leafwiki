@@ -447,7 +447,7 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 	if item.ToPath != "" {
 		t.Errorf("ToPath = %q, want %q", item.ToPath, "")
 	}
-	if item.Broken != false {
+	if item.Broken {
 		t.Errorf("Broken = %v, want %v", item.Broken, false)
 	}
 }
