@@ -181,7 +181,7 @@ func TestResolveTargetLinks_IgnoresNonExistingTargets(t *testing.T) {
 	}
 }
 
-func setupBacklinkService(t *testing.T) (*BacklinkService, *tree.TreeService, *BacklinksStore) {
+func setupBacklinkService(t *testing.T) (*BacklinkService, *tree.TreeService, *LinksStore) {
 	t.Helper()
 
 	dataDir := t.TempDir()
@@ -191,9 +191,9 @@ func setupBacklinkService(t *testing.T) (*BacklinkService, *tree.TreeService, *B
 		t.Fatalf("LoadTree failed: %v", err)
 	}
 
-	store, err := NewBacklinksStore(dataDir)
+	store, err := NewLinksStore(dataDir)
 	if err != nil {
-		t.Fatalf("NewBacklinksStore failed: %v", err)
+		t.Fatalf("NewLinksStore failed: %v", err)
 	}
 
 	svc := NewBacklinkService(dataDir, ts, store)

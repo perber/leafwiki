@@ -7,10 +7,10 @@ import (
 type BacklinkService struct {
 	storageDir  string
 	treeService *tree.TreeService
-	store       *BacklinksStore
+	store       *LinksStore
 }
 
-func NewBacklinkService(storageDir string, treeService *tree.TreeService, store *BacklinksStore) *BacklinkService {
+func NewBacklinkService(storageDir string, treeService *tree.TreeService, store *LinksStore) *BacklinkService {
 	return &BacklinkService{
 		storageDir:  storageDir,
 		treeService: treeService,

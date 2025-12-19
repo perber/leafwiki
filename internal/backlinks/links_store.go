@@ -8,15 +8,15 @@ import (
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
-type BacklinksStore struct {
+type LinksStore struct {
 	mu         sync.Mutex
 	storageDir string
 	filename   string
 	db         *sql.DB
 }
 
-func NewBacklinksStore(storageDir string) (*BacklinksStore, error) {
-	s := &BacklinksStore{
+func NewLinksStore(storageDir string) (*LinksStore, error) {
+	s := &LinksStore{
 		storageDir: storageDir,
 		filename:   "backlinks.db",
 	}
@@ -37,7 +37,7 @@ func NewBacklinksStore(storageDir string) (*BacklinksStore, error) {
 
 }
 
-func (s *BacklinksStore) Connect() error {
+func (s *LinksStore) Connect() error {
 	// Database is already open and connected
 	if s.db != nil {
 		return nil
@@ -51,7 +51,7 @@ func (s *BacklinksStore) Connect() error {
 	return nil
 }
 
-func (s *BacklinksStore) ensureSchema() error {
+func (s *LinksStore) ensureSchema() error {
 	err := s.Connect()
 	if err != nil {
 		return err
@@ -68,12 +68,12 @@ func (s *BacklinksStore) ensureSchema() error {
 	return err
 }
 
-func (s *BacklinksStore) Clear() error {
+func (s *LinksStore) Clear() error {
 	_, err := s.db.Exec(`DELETE FROM backlinks`)
 	return err
 }
 
-func (s *BacklinksStore) Close() error {
+func (s *LinksStore) Close() error {
 	if s.db != nil {
 		err := s.db.Close()
 		if err != nil {
@@ -84,21 +84,21 @@ func (s *BacklinksStore) Close() error {
 	return nil
 }
 
-func (s *BacklinksStore) GetDB() *sql.DB {
+func (s *LinksStore) GetDB() *sql.DB {
 	if s.db == nil {
 		return nil
 	}
 	return s.db
 }
 
-func (s *BacklinksStore) RemoveBacklinks(pageID string) error {
+func (s *LinksStore) RemoveBacklinks(pageID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, err := s.db.Exec(`DELETE FROM backlinks WHERE from_page_id = ? OR to_page_id = ?`, pageID, pageID)
 	return err
 }
 
-func (s *BacklinksStore) AddBacklinks(fromPageID string, fromTitle string, toLinks []TargetLink) error {
+func (s *LinksStore) AddBacklinks(fromPageID string, fromTitle string, toLinks []TargetLink) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	tx, err := s.db.Begin()
@@ -130,7 +130,7 @@ func (s *BacklinksStore) AddBacklinks(fromPageID string, fromTitle string, toLin
 	return tx.Commit()
 }
 
-func (s *BacklinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
+func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM backlinks WHERE to_page_id = ?`, pageID)
@@ -154,7 +154,7 @@ func (s *BacklinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) 
 	return backlinks, nil
 }
 
-func (s *BacklinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) {
+func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM backlinks WHERE from_page_id = ?`, pageID)
@@ -178,6 +178,6 @@ func (s *BacklinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, err
 	return outgoings, nil
 }
 
-func (s *BacklinksStore) GetDBConn() *sql.DB {
+func (s *LinksStore) GetDBConn() *sql.DB {
 	return s.db
 }
