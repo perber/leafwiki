@@ -93,7 +93,6 @@ export default function Sidebar() {
             {tabs.map((tab) => (
               <TooltipWrapper label={tab.label} key={tab.id}>
                 <button
-                  key={tab.id}
                   data-testid={`sidebar-${tab.id}-tab-button`}
                   onClick={() => setSidebarMode(tab.id)}
                   className={`sidebar__tab-button ${
