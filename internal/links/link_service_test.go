@@ -447,6 +447,9 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 	if item.ToPath != "" {
 		t.Errorf("ToPath = %q, want %q", item.ToPath, "")
 	}
+	if item.Broken != false {
+		t.Errorf("Broken = %v, want %v", item.Broken, false)
+	}
 }
 
 func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T) {
