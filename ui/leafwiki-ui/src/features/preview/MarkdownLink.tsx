@@ -104,7 +104,9 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
       // Relative link (e.g. "../stoff/change", "child-page", "./foo")
       console.log('props.path', props.path)
       console.log('window.location.pathname', window.location.pathname)
-      const currentPath = normalizeWikiPath(props.path ?? buildViewUrl(window.location.pathname))
+      const currentPath = normalizeWikiPath(
+        props.path ?? buildViewUrl(window.location.pathname),
+      )
 
       normalizedHref = resolvePath(currentPath, href)
     }
