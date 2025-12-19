@@ -25,7 +25,6 @@ export const dialogRegistry = new DialogRegistry()
 
 export const SIDEBAR_TREE_PANEL_ID = 'tree'
 export const SIDEBAR_SEARCH_PANEL_ID = 'search'
-export const SIDEBAR_BACKLINKS_PANEL_ID = 'backlinks'
 
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
