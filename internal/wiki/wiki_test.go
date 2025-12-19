@@ -476,13 +476,13 @@ func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
 		t.Fatalf("expected /x/y to be broken before ensure, got map=%#v, out=%#v", byPath, out1.Outgoings)
 	}
 
-	// 3) EnsurePath legt /x und /x/y an und triggert Heal für alle neu erstellten Segmente
+	// 3) EnsurePath creates /x and /x/y and triggers Heal for all newly created segments
 	_, err = w.EnsurePath("/x/y", "X Y")
 	if err != nil {
 		t.Fatalf("EnsurePath failed: %v", err)
 	}
 
-	// 4) Ohne Reindex: Outgoing Links von A müssen jetzt resolved sein
+	// 4) Without reindexing: outgoing links from A should now be resolved
 	out2, err := w.GetOutgoingLinks(pageA.ID)
 	if err != nil {
 		t.Fatalf("GetOutgoingLinks (after ensure) failed: %v", err)
