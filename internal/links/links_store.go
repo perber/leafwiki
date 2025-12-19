@@ -68,7 +68,7 @@ func (s *LinksStore) ensureSchema() error {
             to_page_id   TEXT,
 			to_path	  	 TEXT NOT NULL,
             from_title   TEXT,
-			broken 	 INTEGER NOT  NULL DEFAULT 0,
+			broken 	     INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (from_page_id, to_path)
         );
 
