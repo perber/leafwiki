@@ -10,6 +10,7 @@ export type Backlink = {
   from_path: string
   to_page_id: string
   from_title: string
+  broken: boolean
 }
 
 export async function fetchBacklinks(pageId: string): Promise<BacklinkResult> {
