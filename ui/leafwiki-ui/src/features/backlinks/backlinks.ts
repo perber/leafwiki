@@ -1,10 +1,10 @@
 // zustands store to fetch the backlinks of a page
 
-import { fetchBacklinks, type Backlinks } from '@/lib/api/backlinks'
+import { fetchBacklinks, type Backlink } from '@/lib/api/backlinks'
 import { create } from 'zustand'
 
 type BacklinksStore = {
-  backlinks: Backlinks[]
+  backlinks: Backlink[]
   count: number
   loading: boolean
   error: string | null

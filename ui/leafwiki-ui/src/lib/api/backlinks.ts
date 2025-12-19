@@ -2,10 +2,10 @@ import { fetchWithAuth } from './auth'
 
 export type BacklinkResult = {
   count: number
-  backlinks: Backlinks[]
+  backlinks: Backlink[]
 }
 
-export type Backlinks = {
+export type Backlink = {
   from_page_id: string
   from_path: string
   to_page_id: string
