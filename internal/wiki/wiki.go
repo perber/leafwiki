@@ -213,14 +213,6 @@ func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Pa
 	return w.tree.GetPage(*id)
 }
 
-/***
-Wenn es über einen Link angelegt wird, dann brauchen wir die Seite von wo aus. es aufgerufen wird.
-Wobei das stimmt acuh nicht, weil ich kann ja von mehreren Seiten auf eine neue Seite linken.
-Also müssen wir entweder die broken links tracken. Und das dann anhand des Pfades matchen und erstellen.
-SO werden wir es machen.
-
-***/ //
-
 func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, error) {
 	ve := errors.NewValidationErrors()
 
