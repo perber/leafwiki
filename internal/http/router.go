@@ -77,6 +77,8 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 			nonAuthApiGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
+			nonAuthApiGroup.GET("/pages/:id/backlinks", api.GetBacklinksHandler(wikiInstance))
+			nonAuthApiGroup.GET("/pages/:id/outgoing-links", api.GetOutgoingLinksHandler(wikiInstance))
 
 			// Search
 			nonAuthApiGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))
@@ -94,6 +96,8 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 			requiresAuthGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/backlinks", api.GetBacklinksHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/outgoing-links", api.GetOutgoingLinksHandler(wikiInstance))
 
 			// Search
 			requiresAuthGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))

@@ -1,4 +1,5 @@
 import ScrollableContainer from '@/components/ScrollableContainer'
+import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { panelItemRegistry } from '@/lib/registries'
 import { PanelItem } from '@/lib/registries/panelItemRegistry'
 import { useHotKeysStore } from '@/stores/hotkeys'
@@ -90,19 +91,19 @@ export default function Sidebar() {
           {/* Padding around the tabs */}
           <div className="sidebar__tabs-list">
             {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                data-testid={`sidebar-${tab.id}-tab-button`}
-                onClick={() => setSidebarMode(tab.id)}
-                className={`sidebar__tab-button ${
-                  sidebarMode === tab.id
-                    ? 'sidebar__tab-button--active'
-                    : 'sidebar__tab-button--inactive'
-                }`}
-              >
-                {tab.icon()}
-                {tab.label}
-              </button>
+              <TooltipWrapper label={tab.label} key={tab.id}>
+                <button
+                  data-testid={`sidebar-${tab.id}-tab-button`}
+                  onClick={() => setSidebarMode(tab.id)}
+                  className={`sidebar__tab-button ${
+                    sidebarMode === tab.id
+                      ? 'sidebar__tab-button--active'
+                      : 'sidebar__tab-button--inactive'
+                  }`}
+                >
+                  {tab.icon()} {tab.label}
+                </button>
+              </TooltipWrapper>
             ))}
           </div>
         </div>

@@ -16,6 +16,43 @@ interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   path?: string
 }
 
+function normalizeWikiPath(path: string): string {
+  // remove query/hash
+  let p = path.split('?')[0].split('#')[0]
+
+  // ensure leading slash
+  if (!p.startsWith('/')) p = '/' + p
+
+  // remove trailing slash (except root "/")
+  if (p.length > 1) p = p.replace(/\/+$/, '')
+
+  return p
+}
+
+/**
+ * Resolves a relative Markdown link against the current page path.
+ *
+ * currentPath = the path of the current page (e.g. "/stoff/change")
+ * href        = the link written inside Markdown (e.g. "../andere-seite")
+ *
+ * Returns a normalized absolute path (e.g. "/andere-seite").
+ */
+function resolvePath(currentPath: string, href: string): string {
+  const normalizedCurrent = currentPath.startsWith('/')
+    ? currentPath
+    : '/' + currentPath
+
+  // Treat currentPath as a "folder" by forcing a trailing slash.
+  // "/stoff/change" -> "/stoff/change/"
+  const folderBase = normalizedCurrent.endsWith('/')
+    ? normalizedCurrent
+    : normalizedCurrent + '/'
+
+  const base = new URL(folderBase, window.location.origin)
+  const url = new URL(href, base)
+  return normalizeWikiPath(url.pathname)
+}
+
 export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
@@ -56,55 +93,31 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
         </a>
       )
     }
-
     /*
       First we need to check if it is a relative link or an absolute link.
     */
-    const absoluteHref = href.startsWith('/')
     let normalizedHref = href
-    if (!absoluteHref) {
-      // For relative links, we need to add the current path as prefix.
-      let currentPath: string
-      if (!props.path) {
-        currentPath = buildViewUrl(window.location.pathname)
-      } else {
-        currentPath = props.path
-      }
+    if (href.startsWith('/')) {
+      // Already absolute (e.g. "/stoff/change")
+      normalizedHref = normalizeWikiPath(href)
+    } else {
+      // Relative link (e.g. "../stoff/change", "child-page", "./foo")
+      const currentPath = normalizeWikiPath(
+        props.path ?? buildViewUrl(window.location.pathname),
+      )
 
-      // remove leading / to make path relative
-      if (currentPath.startsWith('/')) {
-        currentPath = currentPath.slice(1)
-      }
-
-      const basePath = currentPath
-      // When the path contains ../ or ./ we need to resolve it
-      const segments = href.split('/')
-      const basePathSegments = basePath.split('/')
-      for (const segment of segments) {
-        if (segment === '..') {
-          basePathSegments.pop()
-        } else if (segment !== '.') {
-          basePathSegments.push(segment)
-        }
-      }
-      const resolvedPath = basePathSegments.join('/')
-
-      // We calculate it to an absolute path
-      normalizedHref = resolvedPath.startsWith('/')
-        ? resolvedPath
-        : '/' + resolvedPath
+      normalizedHref = resolvePath(currentPath, href)
     }
 
-    // When a page link is internal and not an asset link and the page doesn't exist yet,
-    // we will color the link in red and offer to create the page. Via the CreatePageByPathDialog.
-    // We should handle and calculate relative paths here as well.
-    // normalizedHref contains now the absolute path. We can use it directly.
+    /**
+     *  When a page link is internal and not an asset link and the page doesn't exist yet,
+     * we will color the link in red and offer to create the page. Via the CreatePageByPathDialog.
+     * we should handle and calculate relative paths here as well.
+     * normalizedHref contains now the absolute path. We can use it directly.
+     **/
 
     // normalizedTargetPath is the path without leading /, without query and hash
-    const normalizedTargetPath = normalizedHref
-      .split('?')[0]
-      .split('#')[0]
-      .replace(/^\/+/, '')
+    const normalizedTargetPath = normalizeWikiPath(normalizedHref).slice(1)
 
     // Check if the page exists
     const page = getPageByPath(normalizedTargetPath)
@@ -141,7 +154,7 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     <a
       href={href}
       {...props}
-      target="_blank"
+      target={href.startsWith('#') ? undefined : '_blank'}
       rel="noopener noreferrer"
       className="text-brand hover:text-brand-dark no-underline hover:underline"
     >
