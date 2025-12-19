@@ -93,9 +93,9 @@ func (b *LinkService) RemoveLinksForPage(pageID string) error {
 	return b.store.RemoveLinks(pageID)
 }
 
-func (l *LinkService) HealOnPageCreate(page *tree.Page) error {
+func (b *LinkService) HealOnPageCreate(page *tree.Page) error {
 	toPath := normalizeWikiPath(page.CalculatePath())
-	return l.store.HealLinksForPath(toPath, page.ID)
+	return b.store.HealLinksForPath(toPath, page.ID)
 }
 
 func (b *LinkService) Close() error {
