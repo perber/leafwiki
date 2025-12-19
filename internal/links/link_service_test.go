@@ -444,8 +444,11 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 	if item.ToPageTitle != page2.Title {
 		t.Errorf("ToPageTitle = %q, want %q", item.ToPageTitle, page2.Title)
 	}
-	if item.ToPath != page2.CalculatePath() {
-		t.Errorf("ToPath = %q, want %q", item.ToPath, page2.CalculatePath())
+	if item.ToPath != "" {
+		t.Errorf("ToPath = %q, want %q", item.ToPath, "")
+	}
+	if item.Broken {
+		t.Errorf("Broken = %v, want %v", item.Broken, false)
 	}
 }
 

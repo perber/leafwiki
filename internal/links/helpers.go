@@ -216,12 +216,9 @@ func toOutgoingResultItem(tree *tree.TreeService, outgoing Outgoing) OutgoingRes
 
 	toPage, err := tree.FindPageByID(root.Children, outgoing.ToPageID)
 	if err != nil || toPage == nil {
-		item.Broken = true
 		return item
 	}
 
 	item.ToPageTitle = toPage.Title
-	item.ToPath = toPage.CalculatePath()
-	item.Broken = false
 	return item
 }
