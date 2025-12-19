@@ -2,6 +2,8 @@ package links
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"path"
 	"sync"
 
@@ -118,14 +120,24 @@ func (s *LinksStore) AddLinks(fromPageID string, fromTitle string, toLinks []Tar
 	// Clean up existing backlinks to avoid duplicates for the same from_page_id
 	_, err = tx.Exec(`DELETE FROM links WHERE from_page_id = ?`, fromPageID)
 	if err != nil {
-		tx.Rollback()
-		return err
+		rbErr := tx.Rollback()
+		base := fmt.Errorf("failed to clear existing links for page %s", fromPageID)
+
+		if rbErr != nil {
+			return errors.Join(base, err, rbErr)
+		}
+		return errors.Join(base, err)
 	}
 
 	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO links(from_page_id, to_page_id, to_path, from_title, broken) VALUES (?, ?, ?, ?, ?)`)
 	if err != nil {
-		tx.Rollback()
-		return err
+		rbErr := tx.Rollback()
+		base := fmt.Errorf("failed to prepare insert statement for links from page %s", fromPageID)
+
+		if rbErr != nil {
+			return errors.Join(base, err, rbErr)
+		}
+		return errors.Join(base, err)
 	}
 	defer stmt.Close()
 
@@ -137,8 +149,13 @@ func (s *LinksStore) AddLinks(fromPageID string, fromTitle string, toLinks []Tar
 
 		_, err := stmt.Exec(fromPageID, link.TargetPageID, link.TargetPagePath, fromTitle, brokenInt)
 		if err != nil {
-			tx.Rollback()
-			return err
+			rbErr := tx.Rollback()
+			base := fmt.Errorf("failed to insert link from %s to %s", fromPageID, link.TargetPageID)
+
+			if rbErr != nil {
+				return errors.Join(base, err, rbErr)
+			}
+			return errors.Join(base, err)
 		}
 	}
 
