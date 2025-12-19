@@ -29,6 +29,7 @@ export type OutgoingLinks = {
   to_page_id: string
   to_path: string
   to_page_title: string
+  broken: boolean
 }
 export async function fetchOutgoingLinks(
   pageId: string,
