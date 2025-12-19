@@ -33,13 +33,7 @@ func NewLinksStore(storageDir string) (*LinksStore, error) {
 		return nil, err
 	}
 
-	// Delete all existing entries
-	// This is a cleanup step to ensure the table is empty before indexing new data
-	if err := s.Clear(); err != nil {
-		return nil, err
-	}
 	return s, nil
-
 }
 
 func (s *LinksStore) Connect() error {
