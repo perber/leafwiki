@@ -452,7 +452,6 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 
-	// A existiert, B noch nicht
 	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage a failed: %v", err)
@@ -467,7 +466,6 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 		t.Fatalf("UpdatePage a failed: %v", err)
 	}
 
-	// Index: B fehlt -> outgoing broken
 	if err := svc.IndexAllPages(); err != nil {
 		t.Fatalf("IndexAllPages failed: %v", err)
 	}
@@ -489,7 +487,6 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 		t.Fatalf("expected empty ToPageID for broken link, got %q", out1.Outgoings[0].ToPageID)
 	}
 
-	// Jetzt B anlegen
 	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage b failed: %v", err)
@@ -504,7 +501,6 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 		t.Fatalf("UpdatePage b failed: %v", err)
 	}
 
-	// Reindex: jetzt sollte es resolved sein
 	if err := svc.IndexAllPages(); err != nil {
 		t.Fatalf("IndexAllPages (second) failed: %v", err)
 	}
@@ -523,7 +519,6 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 		t.Fatalf("expected ToPageID %q, got %q", pageBID, out2.Outgoings[0].ToPageID)
 	}
 
-	// Und Backlink bei B muss existieren
 	bl, err := svc.GetBacklinksForPage(pageBID)
 	if err != nil {
 		t.Fatalf("GetBacklinksForPage failed: %v", err)
