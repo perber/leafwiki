@@ -33,7 +33,9 @@ func NewLinksStore(storageDir string) (*LinksStore, error) {
 
 	// Delete all existing entries
 	// This is a cleanup step to ensure the table is empty before indexing new data
-	s.Clear()
+	if err := s.Clear(); err != nil {
+		return nil, err
+	}
 	return s, nil
 
 }
@@ -61,10 +63,16 @@ func (s *LinksStore) ensureSchema() error {
 	_, err = s.db.Exec(`
         CREATE TABLE IF NOT EXISTS links (
             from_page_id TEXT NOT NULL,
-            to_page_id   TEXT NOT NULL,
+            to_page_id   TEXT,
+			to_path	  	 TEXT NOT NULL,
             from_title   TEXT,
-            PRIMARY KEY (from_page_id, to_page_id)
+			broken 	 INTEGER NOT  NULL DEFAULT 0,
+            PRIMARY KEY (from_page_id, to_path)
         );
+
+		CREATE INDEX IF NOT EXISTS idx_links_to_page_id ON links(to_page_id);
+		CREATE INDEX IF NOT EXISTS idx_links_to_path    ON links(to_path);
+		CREATE INDEX IF NOT EXISTS idx_links_broken     ON links(broken);
 	`)
 	return err
 }
@@ -92,14 +100,14 @@ func (s *LinksStore) GetDB() *sql.DB {
 	return s.db
 }
 
-func (s *LinksStore) RemoveBacklinks(pageID string) error {
+func (s *LinksStore) RemoveLinks(pageID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, err := s.db.Exec(`DELETE FROM links WHERE from_page_id = ? OR to_page_id = ?`, pageID, pageID)
 	return err
 }
 
-func (s *LinksStore) AddBacklinks(fromPageID string, fromTitle string, toLinks []TargetLink) error {
+func (s *LinksStore) AddLinks(fromPageID string, fromTitle string, toLinks []TargetLink) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	tx, err := s.db.Begin()
@@ -114,14 +122,15 @@ func (s *LinksStore) AddBacklinks(fromPageID string, fromTitle string, toLinks [
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO links (from_page_id, to_page_id, from_title) VALUES (?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO links(from_page_id, to_page_id, to_path, from_title, broken) VALUES (?, ?, ?, ?, ?)`)
 	if err != nil {
+		tx.Rollback()
 		return err
 	}
 	defer stmt.Close()
 
 	for _, link := range toLinks {
-		_, err := stmt.Exec(fromPageID, link.TargetPageID, fromTitle)
+		_, err := stmt.Exec(fromPageID, link.TargetPageID, link.TargetPagePath, fromTitle, link.Broken)
 		if err != nil {
 			tx.Rollback()
 			return err
@@ -134,7 +143,7 @@ func (s *LinksStore) AddBacklinks(fromPageID string, fromTitle string, toLinks [
 func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM links WHERE to_page_id = ?`, pageID)
+	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM links WHERE to_page_id = ? and broken = 0`, pageID)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +167,7 @@ func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
 func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM links WHERE from_page_id = ?`, pageID)
+	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, to_path, from_title, broken FROM links WHERE from_page_id = ?`, pageID)
 	if err != nil {
 		return nil, err
 	}
@@ -167,9 +176,11 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 	var outgoings []Outgoing
 	for rows.Next() {
 		var o Outgoing
-		if err := rows.Scan(&o.FromPageID, &o.ToPageID, &o.FromTitle); err != nil {
+		var brokenInt int
+		if err := rows.Scan(&o.FromPageID, &o.ToPageID, &o.ToPath, &o.FromTitle, &brokenInt); err != nil {
 			return nil, err
 		}
+		o.Broken = brokenInt != 0
 		outgoings = append(outgoings, o)
 	}
 	if err := rows.Err(); err != nil {
