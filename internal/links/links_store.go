@@ -117,7 +117,7 @@ func (s *LinksStore) AddLinks(fromPageID string, fromTitle string, toLinks []Tar
 		return err
 	}
 
-	// Clean up existing backlinks to avoid duplicates for the same from_page_id
+	// Clean up existing links to avoid duplicates for the same from_page_id
 	_, err = tx.Exec(`DELETE FROM links WHERE from_page_id = ?`, fromPageID)
 	if err != nil {
 		rbErr := tx.Rollback()
