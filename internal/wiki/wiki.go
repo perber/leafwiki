@@ -8,11 +8,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/perber/wiki/internal/backlinks"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/search"
 )
 
@@ -26,7 +26,7 @@ type Wiki struct {
 	status        *search.IndexingStatus
 	storageDir    string
 	searchWatcher *search.Watcher
-	backlinks     *backlinks.BacklinkService
+	links         *links.LinkService
 }
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
@@ -63,13 +63,13 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 	assetService := assets.NewAssetService(storageDir, slugService)
 
 	// Backlink Service
-	linksStore, err := backlinks.NewLinksStore(storageDir)
+	linksStore, err := links.NewLinksStore(storageDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init backlinks store: %w", err)
+		return nil, fmt.Errorf("failed to init links store: %w", err)
 	}
-	backlinkService := backlinks.NewBacklinkService(storageDir, treeService, linksStore)
-	if err := backlinkService.IndexAllPages(); err != nil {
-		log.Printf("failed to index backlinks of pages: %v", err)
+	linkService := links.NewLinkService(storageDir, treeService, linksStore)
+	if err := linkService.IndexAllPages(); err != nil {
+		log.Printf("failed to index links of pages: %v", err)
 	}
 
 	sqliteIndex, err := search.NewSQLiteIndex(storageDir)
@@ -115,7 +115,7 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 		searchIndex:   sqliteIndex,
 		status:        status,
 		searchWatcher: searchWatcher,
-		backlinks:     backlinkService,
+		links:         linkService,
 	}
 
 	// Ensure the welcome page exists
@@ -294,8 +294,8 @@ func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
 		return page, err
 	}
 
-	if w.backlinks != nil {
-		if err := w.backlinks.UpdateBacklinksForPage(page, content); err != nil {
+	if w.links != nil {
+		if err := w.links.UpdateLinksForPage(page, content); err != nil {
 			log.Printf("warning: failed to update backlinks for page %s: %v", id, err)
 		}
 	}
@@ -369,8 +369,8 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 		log.Printf("warning: could not delete assets for page %s: %v", page.ID, err)
 	}
 
-	if w.backlinks != nil {
-		if err := w.backlinks.RemoveBacklinksForPage(id); err != nil {
+	if w.links != nil {
+		if err := w.links.RemoveLinksForPage(id); err != nil {
 			log.Printf("warning: could not remove backlinks for page %s: %v", id, err)
 		}
 	}
@@ -414,24 +414,24 @@ func (w *Wiki) SuggestSlug(parentID string, currentID string, title string) (str
 }
 
 func (w *Wiki) ReindexBacklinks() error {
-	if w.backlinks == nil {
+	if w.links == nil {
 		return nil
 	}
-	return w.backlinks.IndexAllPages()
+	return w.links.IndexAllPages()
 }
 
-func (w *Wiki) GetBacklinks(pageID string) (*backlinks.BacklinkResult, error) {
-	if w.backlinks == nil {
-		return nil, fmt.Errorf("backlinks not available")
+func (w *Wiki) GetBacklinks(pageID string) (*links.BacklinkResult, error) {
+	if w.links == nil {
+		return nil, fmt.Errorf("links not available")
 	}
-	return w.backlinks.GetBacklinksForPage(pageID)
+	return w.links.GetBacklinksForPage(pageID)
 }
 
-func (w *Wiki) GetOutgoingLinks(pageID string) (*backlinks.OutgoingResult, error) {
-	if w.backlinks == nil {
+func (w *Wiki) GetOutgoingLinks(pageID string) (*links.OutgoingResult, error) {
+	if w.links == nil {
 		return nil, fmt.Errorf("outgoing links not available")
 	}
-	return w.backlinks.GetOutgoingLinksForPage(pageID)
+	return w.links.GetOutgoingLinksForPage(pageID)
 }
 
 func (w *Wiki) Login(identifier, password string) (*auth.AuthToken, error) {
@@ -640,8 +640,8 @@ func (w *Wiki) Close() error {
 		return err
 	}
 
-	if w.backlinks != nil {
-		if err := w.backlinks.Close(); err != nil {
+	if w.links != nil {
+		if err := w.links.Close(); err != nil {
 			log.Printf("error closing backlinks: %v", err)
 		}
 	}

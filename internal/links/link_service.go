@@ -1,31 +1,31 @@
-package backlinks
+package links
 
 import (
 	"github.com/perber/wiki/internal/core/tree"
 )
 
-type BacklinkService struct {
+type LinkService struct {
 	storageDir  string
 	treeService *tree.TreeService
 	store       *LinksStore
 }
 
-func NewBacklinkService(storageDir string, treeService *tree.TreeService, store *LinksStore) *BacklinkService {
-	return &BacklinkService{
+func NewLinkService(storageDir string, treeService *tree.TreeService, store *LinksStore) *LinkService {
+	return &LinkService{
 		storageDir:  storageDir,
 		treeService: treeService,
 		store:       store,
 	}
 }
 
-func (b *BacklinkService) IndexAllPages() error {
+func (b *LinkService) IndexAllPages() error {
 	root := b.treeService.GetTree()
 
 	if root == nil {
 		return nil
 	}
 
-	// Clear existing backlinks
+	// Clear existing links
 	if err := b.store.Clear(); err != nil {
 		return err
 	}
@@ -42,11 +42,9 @@ func (b *BacklinkService) IndexAllPages() error {
 
 			targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
 
-			if len(targets) > 0 {
-				err = b.store.AddBacklinks(page.ID, page.Title, targets)
-				if err != nil {
-					return err
-				}
+			err = b.store.AddLinks(page.ID, page.Title, targets)
+			if err != nil {
+				return err
 			}
 		}
 		for _, child := range node.Children {
@@ -64,26 +62,26 @@ func (b *BacklinkService) IndexAllPages() error {
 	return nil
 }
 
-func (b *BacklinkService) ClearBacklinks() error {
+func (b *LinkService) ClearLinks() error {
 	return b.store.Clear()
 }
 
-func (b *BacklinkService) GetBacklinksForPage(pageID string) (*BacklinkResult, error) {
+func (b *LinkService) GetBacklinksForPage(pageID string) (*BacklinkResult, error) {
 	backlinks, err := b.store.GetBacklinksForPage(pageID)
 	return toBacklinkResult(b.treeService, backlinks), err
 }
 
-func (b *BacklinkService) GetOutgoingLinksForPage(pageID string) (*OutgoingResult, error) {
+func (b *LinkService) GetOutgoingLinksForPage(pageID string) (*OutgoingResult, error) {
 	outgoingLinks, err := b.store.GetOutgoingLinksForPage(pageID)
 	return toOutgoingLinkResult(b.treeService, outgoingLinks), err
 }
 
-func (b *BacklinkService) UpdateBacklinksForPage(page *tree.Page, content string) error {
+func (b *LinkService) UpdateLinksForPage(page *tree.Page, content string) error {
 	links := extractLinksFromMarkdown(content)
 
 	targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
 
-	err := b.store.AddBacklinks(page.ID, page.Title, targets)
+	err := b.store.AddLinks(page.ID, page.Title, targets)
 	if err != nil {
 		return err
 	}
@@ -91,11 +89,11 @@ func (b *BacklinkService) UpdateBacklinksForPage(page *tree.Page, content string
 	return nil
 }
 
-func (b *BacklinkService) RemoveBacklinksForPage(pageID string) error {
-	return b.store.RemoveBacklinks(pageID)
+func (b *LinkService) RemoveLinksForPage(pageID string) error {
+	return b.store.RemoveLinks(pageID)
 }
 
-func (b *BacklinkService) Close() error {
+func (b *LinkService) Close() error {
 	if b.store == nil {
 		return nil
 	}

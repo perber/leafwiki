@@ -1,4 +1,4 @@
-package backlinks
+package links
 
 type Backlink struct {
 	FromPageID string

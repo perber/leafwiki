@@ -1,4 +1,4 @@
-package backlinks
+package links
 
 import (
 	"database/sql"
@@ -130,7 +130,12 @@ func (s *LinksStore) AddLinks(fromPageID string, fromTitle string, toLinks []Tar
 	defer stmt.Close()
 
 	for _, link := range toLinks {
-		_, err := stmt.Exec(fromPageID, link.TargetPageID, link.TargetPagePath, fromTitle, link.Broken)
+		brokenInt := 0
+		if link.Broken {
+			brokenInt = 1
+		}
+
+		_, err := stmt.Exec(fromPageID, link.TargetPageID, link.TargetPagePath, fromTitle, brokenInt)
 		if err != nil {
 			tx.Rollback()
 			return err

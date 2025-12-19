@@ -1,4 +1,4 @@
-package backlinks
+package links
 
 import (
 	"net/url"
@@ -13,6 +13,7 @@ import (
 type TargetLink struct {
 	TargetPageID   string
 	TargetPagePath string
+	Broken         bool
 }
 
 var markdownParser = goldmark.New()
@@ -107,48 +108,46 @@ func resolveURLPath(currentPath, href string) (string, error) {
 	return normalizeWikiPath(resolved.Path), nil
 }
 
-func normalizeLink(currentPath string, link string) string {
-	if link == "" {
-		return ""
-	}
-
-	resolvedPath, err := resolveURLPath(currentPath, link)
-	if err != nil || resolvedPath == "" {
-		return ""
-	}
-
-	// strip leading "/" for your tree lookup
-	return strings.TrimPrefix(resolvedPath, "/")
-}
-
-func resolveTargetLink(treeService *tree.TreeService, nodes []*tree.PageNode, normalizedLink string) *TargetLink {
-	page, err := treeService.FindPageByRoutePath(nodes, normalizedLink)
-	if err != nil || page == nil {
-		return nil
-	}
-
-	return &TargetLink{
-		TargetPageID:   page.ID,
-		TargetPagePath: page.CalculatePath(),
-	}
-}
-
 func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []string) []TargetLink {
 	root := tree.GetTree()
 	if root == nil {
 		return nil
 	}
+
 	var targetLinks []TargetLink
+
 	for _, link := range links {
-		normalized := normalizeLink(currentPath, link)
-		if normalized == "" {
+		// resolve link against current path
+		resolvedPath, err := resolveURLPath(currentPath, link)
+		if err != nil || resolvedPath == "" {
 			continue
 		}
-		targetLink := resolveTargetLink(tree, root.Children, normalized)
-		if targetLink != nil {
-			targetLinks = append(targetLinks, *targetLink)
+
+		// normalize for lookup (by stripping leading "/")
+		normalizedForLookup := strings.TrimPrefix(resolvedPath, "/")
+		if normalizedForLookup == "" {
+			continue
+		}
+
+		// find page by route path
+		page, err := tree.FindPageByRoutePath(root.Children, normalizedForLookup)
+		if err == nil && page != nil {
+			// found page
+			targetLinks = append(targetLinks, TargetLink{
+				TargetPageID:   page.ID,
+				TargetPagePath: resolvedPath,
+				Broken:         false,
+			})
+		} else {
+			// not found, broken link
+			targetLinks = append(targetLinks, TargetLink{
+				TargetPageID:   "",
+				TargetPagePath: resolvedPath,
+				Broken:         true,
+			})
 		}
 	}
+
 	return targetLinks
 }
 
@@ -196,20 +195,30 @@ func toOutgoingLinkResult(tree *tree.TreeService, outgoings []Outgoing) *Outgoin
 }
 
 func toOutgoingResultItem(tree *tree.TreeService, outgoing Outgoing) OutgoingResultItem {
+	item := OutgoingResultItem{
+		ToPageID:   outgoing.ToPageID,
+		ToPath:     outgoing.ToPath,
+		Broken:     outgoing.Broken,
+		FromPageID: outgoing.FromPageID,
+	}
+
+	if outgoing.ToPageID == "" {
+		return item
+	}
+
 	root := tree.GetTree()
 	if root == nil {
-		return OutgoingResultItem{}
+		return item
 	}
 
 	toPage, err := tree.FindPageByID(root.Children, outgoing.ToPageID)
-	if err != nil {
-		return OutgoingResultItem{}
+	if err != nil || toPage == nil {
+		item.Broken = true
+		return item
 	}
 
-	return OutgoingResultItem{
-		ToPageID:    outgoing.ToPageID,
-		ToPageTitle: toPage.Title,
-		ToPath:      toPage.CalculatePath(),
-		FromPageID:  outgoing.FromPageID,
-	}
+	item.ToPageTitle = toPage.Title
+	item.ToPath = toPage.CalculatePath()
+	item.Broken = false
+	return item
 }

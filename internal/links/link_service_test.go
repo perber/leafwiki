@@ -1,4 +1,4 @@
-package backlinks
+package links
 
 import (
 	"testing"
@@ -41,68 +41,13 @@ With both: [Both](/docs/page5?foo=bar#section)
 	}
 }
 
-func TestNormalizeLink_RootLevelPageToSibling(t *testing.T) {
-	current := "leafwiki" // corresponds to /leafwiki
-	link := "mission"
-
-	got := normalizeLink(current, link)
-	want := "leafwiki/mission" // /mission
-
-	if got != want {
-		t.Errorf("normalizeLink(%q, %q) = %q, want %q", current, link, got, want)
-	}
-}
-
-func TestNormalizeLink_Absolute(t *testing.T) {
-	current := "docs/guide/page1"
-	link := "/docs/other/page2"
-
-	got := normalizeLink(current, link)
-	want := "docs/other/page2"
-
-	if got != want {
-		t.Errorf("normalizeLink(%q, %q) = %q, want %q", current, link, got, want)
-	}
-}
-
-func TestNormalizeLink_RelativeSameDir(t *testing.T) {
-	current := "docs/guide/page1"
-	link := "page2"
-
-	got := normalizeLink(current, link)
-	want := "docs/guide/page1/page2"
-
-	if got != want {
-		t.Errorf("normalizeLink(%q, %q) = %q, want %q", current, link, got, want)
-	}
-}
-
-func TestNormalizeLink_RelativeParentDir(t *testing.T) {
-	current := "docs/guide/page1"
-	link := "../overview"
-
-	got := normalizeLink(current, link)
-	want := "docs/guide/overview"
-
-	if got != want {
-		t.Errorf("normalizeLink(%q, %q) = %q, want %q", current, link, got, want)
-	}
-}
-
-func TestNormalizeLink_Empty(t *testing.T) {
-	got := normalizeLink("docs/guide/page1", "")
-	if got != "" {
-		t.Errorf("normalizeLink with empty link = %q, want empty string", got)
-	}
-}
-
 // helper to create a small tree structure:
 // root
 //
 //	└─ docs
 //	     ├─ page1
 //	     └─ page2
-func setupTreeForBacklinksTest(t *testing.T) (*tree.TreeService, string, string) {
+func setupTreeForLinksTest(t *testing.T) (*tree.TreeService, string, string) {
 	t.Helper()
 
 	storageDir := t.TempDir()
@@ -133,7 +78,7 @@ func setupTreeForBacklinksTest(t *testing.T) (*tree.TreeService, string, string)
 }
 
 func TestResolveTargetLinks_FindsExistingTargets(t *testing.T) {
-	ts, page1ID, page2ID := setupTreeForBacklinksTest(t)
+	ts, page1ID, page2ID := setupTreeForLinksTest(t)
 
 	// current page: docs/page1
 	page1, err := ts.GetPage(page1ID)
@@ -161,7 +106,7 @@ func TestResolveTargetLinks_FindsExistingTargets(t *testing.T) {
 }
 
 func TestResolveTargetLinks_IgnoresNonExistingTargets(t *testing.T) {
-	ts, page1ID, _ := setupTreeForBacklinksTest(t)
+	ts, page1ID, _ := setupTreeForLinksTest(t)
 
 	page1, err := ts.GetPage(page1ID)
 	if err != nil {
@@ -181,7 +126,7 @@ func TestResolveTargetLinks_IgnoresNonExistingTargets(t *testing.T) {
 	}
 }
 
-func setupBacklinkService(t *testing.T) (*BacklinkService, *tree.TreeService, *LinksStore) {
+func setupLinkService(t *testing.T) (*LinkService, *tree.TreeService, *LinksStore) {
 	t.Helper()
 
 	dataDir := t.TempDir()
@@ -196,7 +141,7 @@ func setupBacklinkService(t *testing.T) (*BacklinkService, *tree.TreeService, *L
 		t.Fatalf("NewLinksStore failed: %v", err)
 	}
 
-	svc := NewBacklinkService(dataDir, ts, store)
+	svc := NewLinkService(dataDir, ts, store)
 	return svc, ts, store
 }
 
@@ -236,8 +181,8 @@ func createSimpleLinkedPages(t *testing.T, ts *tree.TreeService) (pageAID, pageB
 	return pageAID, pageBID
 }
 
-func TestBacklinkService_IndexAllPages_BuildsBacklinks(t *testing.T) {
-	svc, ts, _ := setupBacklinkService(t)
+func TestLinkService_IndexAllPages_BuildsBacklinks(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
 	if err := svc.IndexAllPages(); err != nil {
@@ -267,7 +212,7 @@ func TestBacklinkService_IndexAllPages_BuildsBacklinks(t *testing.T) {
 
 // Testet, dass IndexAllPages alte Backlinks überschreibt (Clear + Reindex)
 func TestBacklinkService_IndexAllPages_ReplacesExistingBacklinks(t *testing.T) {
-	svc, ts, _ := setupBacklinkService(t)
+	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
 	if err := svc.IndexAllPages(); err != nil {
@@ -295,16 +240,16 @@ func TestBacklinkService_IndexAllPages_ReplacesExistingBacklinks(t *testing.T) {
 		t.Fatalf("expected 0 backlinks after reindex, got %d: %#v", len(data.Backlinks), data.Backlinks)
 	}
 }
-func TestBacklinkService_UpdateBacklinksForPage_OnlyAffectsOnePage(t *testing.T) {
-	svc, ts, _ := setupBacklinkService(t)
+func TestBacklinkService_UpdateLinksForPage_OnlyAffectsOnePage(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
 	pageA, err := ts.GetPage(pageAID)
 	if err != nil {
 		t.Fatalf("GetPage a failed: %v", err)
 	}
-	if err := svc.UpdateBacklinksForPage(pageA, pageA.Content); err != nil {
-		t.Fatalf("UpdateBacklinksForPage failed: %v", err)
+	if err := svc.UpdateLinksForPage(pageA, pageA.Content); err != nil {
+		t.Fatalf("UpdateLinksForPage failed: %v", err)
 	}
 
 	dataB, err := svc.GetBacklinksForPage(pageBID)
@@ -324,16 +269,16 @@ func TestBacklinkService_UpdateBacklinksForPage_OnlyAffectsOnePage(t *testing.T)
 	}
 }
 
-func TestBacklinkService_ClearBacklinks_RemovesAllBacklinks(t *testing.T) {
-	svc, ts, _ := setupBacklinkService(t)
+func TestLinkService_ClearLinks_RemovesAllLinks(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
 	_, pageBID := createSimpleLinkedPages(t, ts)
 
 	if err := svc.IndexAllPages(); err != nil {
 		t.Fatalf("IndexAllPages failed: %v", err)
 	}
 
-	if err := svc.ClearBacklinks(); err != nil {
-		t.Fatalf("ClearBacklinks failed: %v", err)
+	if err := svc.ClearLinks(); err != nil {
+		t.Fatalf("ClearLinks failed: %v", err)
 	}
 
 	data, err := svc.GetBacklinksForPage(pageBID)
@@ -346,15 +291,15 @@ func TestBacklinkService_ClearBacklinks_RemovesAllBacklinks(t *testing.T) {
 }
 
 func TestBacklinkService_RemoveBacklinksForPage_RemovesIncomingAndOutgoing(t *testing.T) {
-	svc, ts, _ := setupBacklinkService(t)
+	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
 	if err := svc.IndexAllPages(); err != nil {
 		t.Fatalf("IndexAllPages failed: %v", err)
 	}
 
-	if err := svc.RemoveBacklinksForPage(pageAID); err != nil {
-		t.Fatalf("RemoveBacklinksForPage failed: %v", err)
+	if err := svc.RemoveLinksForPage(pageAID); err != nil {
+		t.Fatalf("RemoveLinksForPage failed: %v", err)
 	}
 
 	dataB, err := svc.GetBacklinksForPage(pageBID)
@@ -367,7 +312,7 @@ func TestBacklinkService_RemoveBacklinksForPage_RemovesIncomingAndOutgoing(t *te
 }
 
 func TestBacklinkService_GetOutgoingLinksForPage_ReturnsOutgoingLinks(t *testing.T) {
-	svc, ts, _ := setupBacklinkService(t)
+	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
 	if err := svc.IndexAllPages(); err != nil {
@@ -411,7 +356,7 @@ func TestBacklinkService_GetOutgoingLinksForPage_ReturnsOutgoingLinks(t *testing
 }
 
 func TestBacklinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
-	svc, ts, _ := setupBacklinkService(t)
+	svc, ts, _ := setupLinkService(t)
 
 	// einfache Seite ohne Links anlegen
 	aIDPtr, err := ts.CreatePage(nil, "Lonely Page", "lonely")
@@ -450,7 +395,7 @@ func TestBacklinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
 }
 
 func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
-	ts, page1ID, page2ID := setupTreeForBacklinksTest(t)
+	ts, page1ID, page2ID := setupTreeForLinksTest(t)
 
 	root := ts.GetTree()
 	if root == nil {
