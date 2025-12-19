@@ -95,7 +95,7 @@ func resolveURLPath(currentPath, href string) (string, error) {
 		folderBase += "/"
 	}
 
-	base, err := url.Parse("https://leafwiki.com" + folderBase)
+	base, err := url.Parse("https://example.com" + folderBase)
 	if err != nil {
 		return "", err
 	}
