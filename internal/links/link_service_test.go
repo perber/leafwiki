@@ -105,7 +105,7 @@ func TestResolveTargetLinks_FindsExistingTargets(t *testing.T) {
 	}
 }
 
-func TestResolveTargetLinks_IgnoresNonExistingTargets(t *testing.T) {
+func TestResolveTargetLinks_ReturnsBrokenTargetsForNonExisting(t *testing.T) {
 	ts, page1ID, _ := setupTreeForLinksTest(t)
 
 	page1, err := ts.GetPage(page1ID)
@@ -121,8 +121,28 @@ func TestResolveTargetLinks_IgnoresNonExistingTargets(t *testing.T) {
 
 	targets := resolveTargetLinks(ts, currentPath, links)
 
-	if len(targets) != 0 {
-		t.Fatalf("expected 0 target links, got %d: %#v", len(targets), targets)
+	if len(targets) != 2 {
+		t.Fatalf("expected 2 target links, got %d: %#v", len(targets), targets)
+	}
+
+	if targets[0].Broken != true {
+		t.Errorf("targets[0].Broken = %v, want true", targets[0].Broken)
+	}
+	if targets[0].TargetPageID != "" {
+		t.Errorf("targets[0].TargetPageID = %q, want empty", targets[0].TargetPageID)
+	}
+	if targets[0].TargetPagePath != "/docs/page1/does-not-exist" {
+		t.Errorf("targets[0].TargetPagePath = %q, want %q", targets[0].TargetPagePath, "/docs/page1/does-not-exist")
+	}
+
+	if targets[1].Broken != true {
+		t.Errorf("targets[1].Broken = %v, want true", targets[1].Broken)
+	}
+	if targets[1].TargetPageID != "" {
+		t.Errorf("targets[1].TargetPageID = %q, want empty", targets[1].TargetPageID)
+	}
+	if targets[1].TargetPagePath != "/docs/unknown" {
+		t.Errorf("targets[1].TargetPagePath = %q, want %q", targets[1].TargetPagePath, "/docs/unknown")
 	}
 }
 
@@ -181,7 +201,7 @@ func createSimpleLinkedPages(t *testing.T, ts *tree.TreeService) (pageAID, pageB
 	return pageAID, pageBID
 }
 
-func TestLinkService_IndexAllPages_BuildsBacklinks(t *testing.T) {
+func TestLinkService_IndexAllPages_BuildsLinks(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
@@ -210,8 +230,7 @@ func TestLinkService_IndexAllPages_BuildsBacklinks(t *testing.T) {
 	}
 }
 
-// Testet, dass IndexAllPages alte Backlinks überschreibt (Clear + Reindex)
-func TestBacklinkService_IndexAllPages_ReplacesExistingBacklinks(t *testing.T) {
+func TestLinkService_IndexAllPages_ReplacesExistingLinks(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
@@ -240,7 +259,7 @@ func TestBacklinkService_IndexAllPages_ReplacesExistingBacklinks(t *testing.T) {
 		t.Fatalf("expected 0 backlinks after reindex, got %d: %#v", len(data.Backlinks), data.Backlinks)
 	}
 }
-func TestBacklinkService_UpdateLinksForPage_OnlyAffectsOnePage(t *testing.T) {
+func TestLinkService_UpdateLinksForPage_OnlyAffectsOnePage(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
@@ -290,7 +309,7 @@ func TestLinkService_ClearLinks_RemovesAllLinks(t *testing.T) {
 	}
 }
 
-func TestBacklinkService_RemoveBacklinksForPage_RemovesIncomingAndOutgoing(t *testing.T) {
+func TestLinkService_RemoveLinksForPage_RemovesIncomingAndOutgoing(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
@@ -311,7 +330,7 @@ func TestBacklinkService_RemoveBacklinksForPage_RemovesIncomingAndOutgoing(t *te
 	}
 }
 
-func TestBacklinkService_GetOutgoingLinksForPage_ReturnsOutgoingLinks(t *testing.T) {
+func TestLinkService_GetOutgoingLinksForPage_ReturnsOutgoingLinks(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
 
@@ -355,10 +374,9 @@ func TestBacklinkService_GetOutgoingLinksForPage_ReturnsOutgoingLinks(t *testing
 	}
 }
 
-func TestBacklinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
+func TestLinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 
-	// einfache Seite ohne Links anlegen
 	aIDPtr, err := ts.CreatePage(nil, "Lonely Page", "lonely")
 	if err != nil {
 		t.Fatalf("CreatePage lonely failed: %v", err)
@@ -370,12 +388,10 @@ func TestBacklinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
 		t.Fatalf("GetPage lonely failed: %v", err)
 	}
 
-	// Content ohne Links
 	if err := ts.UpdatePage(page.ID, page.Title, page.Slug, "Just some text, no links."); err != nil {
 		t.Fatalf("UpdatePage lonely failed: %v", err)
 	}
 
-	// Backlinks/Outgoings Index aufbauen
 	if err := svc.IndexAllPages(); err != nil {
 		t.Fatalf("IndexAllPages failed: %v", err)
 	}
@@ -402,14 +418,7 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 		t.Fatalf("tree root is nil")
 	}
 
-	// Fake-Outgoing Eintrag: page1 → page2
-	outgoings := []Outgoing{
-		{
-			FromPageID: page1ID,
-			ToPageID:   page2ID,
-			FromTitle:  "Page 1",
-		},
-	}
+	outgoings := []Outgoing{{FromPageID: page1ID, ToPageID: page2ID, FromTitle: "Page 1"}}
 
 	result := toOutgoingLinkResult(ts, outgoings)
 	if result == nil {
@@ -428,7 +437,6 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 		t.Errorf("ToPageID = %q, want %q", item.ToPageID, page2ID)
 	}
 
-	// hier prüfen wir explizit, dass Title & Path aus dem Tree stammen
 	page2, err := ts.GetPage(page2ID)
 	if err != nil {
 		t.Fatalf("GetPage page2 failed: %v", err)
@@ -438,5 +446,95 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 	}
 	if item.ToPath != page2.CalculatePath() {
 		t.Errorf("ToPath = %q, want %q", item.ToPath, page2.CalculatePath())
+	}
+}
+
+func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	// A existiert, B noch nicht
+	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage a failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	aPage, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage a failed: %v", err)
+	}
+	if err := ts.UpdatePage(aPage.ID, aPage.Title, aPage.Slug, "Link to B: [Go](/b)"); err != nil {
+		t.Fatalf("UpdatePage a failed: %v", err)
+	}
+
+	// Index: B fehlt -> outgoing broken
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	out1, err := svc.GetOutgoingLinksForPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage failed: %v", err)
+	}
+	if out1.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d: %#v", out1.Count, out1.Outgoings)
+	}
+	if out1.Outgoings[0].Broken != true {
+		t.Fatalf("expected outgoing to be broken, got %#v", out1.Outgoings[0])
+	}
+	if out1.Outgoings[0].ToPath != "/b" {
+		t.Fatalf("expected ToPath '/b', got %q", out1.Outgoings[0].ToPath)
+	}
+	if out1.Outgoings[0].ToPageID != "" {
+		t.Fatalf("expected empty ToPageID for broken link, got %q", out1.Outgoings[0].ToPageID)
+	}
+
+	// Jetzt B anlegen
+	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage b failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	bPage, err := ts.GetPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetPage b failed: %v", err)
+	}
+	if err := ts.UpdatePage(bPage.ID, bPage.Title, bPage.Slug, "# Page B"); err != nil {
+		t.Fatalf("UpdatePage b failed: %v", err)
+	}
+
+	// Reindex: jetzt sollte es resolved sein
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages (second) failed: %v", err)
+	}
+
+	out2, err := svc.GetOutgoingLinksForPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage (second) failed: %v", err)
+	}
+	if out2.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d: %#v", out2.Count, out2.Outgoings)
+	}
+	if out2.Outgoings[0].Broken != false {
+		t.Fatalf("expected outgoing to be resolved, got %#v", out2.Outgoings[0])
+	}
+	if out2.Outgoings[0].ToPageID != pageBID {
+		t.Fatalf("expected ToPageID %q, got %q", pageBID, out2.Outgoings[0].ToPageID)
+	}
+
+	// Und Backlink bei B muss existieren
+	bl, err := svc.GetBacklinksForPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetBacklinksForPage failed: %v", err)
+	}
+	if bl.Count != 1 {
+		t.Fatalf("expected 1 backlink, got %d: %#v", bl.Count, bl.Backlinks)
+	}
+	if bl.Backlinks[0].FromPageID != pageAID {
+		t.Fatalf("expected FromPageID %q, got %q", pageAID, bl.Backlinks[0].FromPageID)
+	}
+	if bl.Backlinks[0].ToPageID != pageBID {
+		t.Fatalf("expected ToPageID %q, got %q", pageBID, bl.Backlinks[0].ToPageID)
 	}
 }
