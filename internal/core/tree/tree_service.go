@@ -428,6 +428,8 @@ func (t *TreeService) EnsurePagePath(p string, targetTitle string) (*EnsurePathR
 		return nil, ErrTreeNotLoaded
 	}
 
+	created := []*PageNode{}
+
 	// Lookup the path
 	lookup, err := t.LookupPagePathLocked(t.tree.Children, p)
 	if err != nil {
@@ -469,6 +471,9 @@ func (t *TreeService) EnsurePagePath(p string, targetTitle string) (*EnsurePathR
 			return nil, fmt.Errorf("could not create page: %v", err)
 		}
 		currentID = newPageID
+		// Append the newly created page node to the created slice
+		// It is a synthetic PageNode with only ID, Slug and Title set
+		created = append(created, &PageNode{ID: *currentID, Slug: segment.Slug, Title: title})
 
 		// If this is the last segment, return the current page
 		if i == len(lookup.Segments)-1 {
@@ -476,9 +481,16 @@ func (t *TreeService) EnsurePagePath(p string, targetTitle string) (*EnsurePathR
 			if err != nil {
 				return nil, fmt.Errorf("could not find created page by ID: %v", err)
 			}
+
+			// Save the tree
+			if err := t.saveTreeLocked(); err != nil {
+				return nil, fmt.Errorf("could not save tree: %v", err)
+			}
+
 			return &EnsurePathResult{
-				Exists: true,
-				Page:   page,
+				Exists:  true,
+				Page:    page,
+				Created: created,
 			}, nil
 		}
 	}

@@ -436,3 +436,97 @@ func TestWiki_ResetAdminPasswordWithoutJWTSecret(t *testing.T) {
 		t.Error("Expected new password to be set, got empty string")
 	}
 }
+
+func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
+	w := setupTestWiki(t)
+	defer w.Close()
+
+	// 1) Page A mit Links auf /x und /x/y (existieren noch nicht)
+	pageA, err := w.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+
+	_, err = w.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Links: [X](/x) and [XY](/x/y)")
+	if err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// 2) Reindex once so that broken links are stored in the DB
+	if err := w.ReindexBacklinks(); err != nil {
+		t.Fatalf("ReindexBacklinks failed: %v", err)
+	}
+
+	out1, err := w.GetOutgoingLinks(pageA.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks failed: %v", err)
+	}
+	if out1.Count != 2 {
+		t.Fatalf("expected 2 outgoings before ensure, got %d: %#v", out1.Count, out1.Outgoings)
+	}
+
+	byPath := map[string]bool{}
+	for _, it := range out1.Outgoings {
+		byPath[it.ToPath] = it.Broken
+	}
+	if broken, ok := byPath["/x"]; !ok || broken != true {
+		t.Fatalf("expected /x to be broken before ensure, got map=%#v, out=%#v", byPath, out1.Outgoings)
+	}
+	if broken, ok := byPath["/x/y"]; !ok || broken != true {
+		t.Fatalf("expected /x/y to be broken before ensure, got map=%#v, out=%#v", byPath, out1.Outgoings)
+	}
+
+	// 3) EnsurePath creates /x and /x/y and triggers Heal for all newly created segments
+	_, err = w.EnsurePath("/x/y", "X Y")
+	if err != nil {
+		t.Fatalf("EnsurePath failed: %v", err)
+	}
+
+	// 4) Without reindexing: outgoing links from A should now be resolved
+	out2, err := w.GetOutgoingLinks(pageA.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks (after ensure) failed: %v", err)
+	}
+	if out2.Count != 2 {
+		t.Fatalf("expected 2 outgoings after ensure, got %d: %#v", out2.Count, out2.Outgoings)
+	}
+
+	var gotX, gotXY *struct {
+		broken bool
+		toPage string
+	}
+	for _, it := range out2.Outgoings {
+		if it.ToPath == "/x" {
+			gotX = &struct {
+				broken bool
+				toPage string
+			}{it.Broken, it.ToPageID}
+		}
+		if it.ToPath == "/x/y" {
+			gotXY = &struct {
+				broken bool
+				toPage string
+			}{it.Broken, it.ToPageID}
+		}
+	}
+
+	if gotX == nil {
+		t.Fatalf("missing outgoing to /x: %#v", out2.Outgoings)
+	}
+	if gotX.broken {
+		t.Fatalf("expected /x to be healed, got broken=true: %#v", out2.Outgoings)
+	}
+	if gotX.toPage == "" {
+		t.Fatalf("expected /x ToPageID to be set after heal, got empty: %#v", out2.Outgoings)
+	}
+
+	if gotXY == nil {
+		t.Fatalf("missing outgoing to /x/y: %#v", out2.Outgoings)
+	}
+	if gotXY.broken {
+		t.Fatalf("expected /x/y to be healed, got broken=true: %#v", out2.Outgoings)
+	}
+	if gotXY.toPage == "" {
+		t.Fatalf("expected /x/y ToPageID to be set after heal, got empty: %#v", out2.Outgoings)
+	}
+}

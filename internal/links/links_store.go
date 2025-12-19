@@ -205,3 +205,16 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 
 	return outgoings, nil
 }
+
+func (s *LinksStore) HealLinksForPath(toPath string, pageID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		UPDATE links
+		SET to_page_id = ?, broken = 0
+		WHERE to_path = ? AND broken = 1
+	`, pageID, toPath)
+
+	return err
+}
