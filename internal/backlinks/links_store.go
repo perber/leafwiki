@@ -18,7 +18,7 @@ type LinksStore struct {
 func NewLinksStore(storageDir string) (*LinksStore, error) {
 	s := &LinksStore{
 		storageDir: storageDir,
-		filename:   "backlinks.db",
+		filename:   "links.db",
 	}
 
 	err := s.Connect()
@@ -33,6 +33,7 @@ func NewLinksStore(storageDir string) (*LinksStore, error) {
 
 	// Delete all existing entries
 	// This is a cleanup step to ensure the table is empty before indexing new data
+	s.Clear()
 	return s, nil
 
 }
@@ -58,7 +59,7 @@ func (s *LinksStore) ensureSchema() error {
 	}
 	// Create the users table if it doesn't exist
 	_, err = s.db.Exec(`
-        CREATE TABLE IF NOT EXISTS backlinks (
+        CREATE TABLE IF NOT EXISTS links (
             from_page_id TEXT NOT NULL,
             to_page_id   TEXT NOT NULL,
             from_title   TEXT,
@@ -69,7 +70,7 @@ func (s *LinksStore) ensureSchema() error {
 }
 
 func (s *LinksStore) Clear() error {
-	_, err := s.db.Exec(`DELETE FROM backlinks`)
+	_, err := s.db.Exec(`DELETE FROM links`)
 	return err
 }
 
@@ -94,7 +95,7 @@ func (s *LinksStore) GetDB() *sql.DB {
 func (s *LinksStore) RemoveBacklinks(pageID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, err := s.db.Exec(`DELETE FROM backlinks WHERE from_page_id = ? OR to_page_id = ?`, pageID, pageID)
+	_, err := s.db.Exec(`DELETE FROM links WHERE from_page_id = ? OR to_page_id = ?`, pageID, pageID)
 	return err
 }
 
@@ -107,13 +108,13 @@ func (s *LinksStore) AddBacklinks(fromPageID string, fromTitle string, toLinks [
 	}
 
 	// Clean up existing backlinks to avoid duplicates for the same from_page_id
-	_, err = tx.Exec(`DELETE FROM backlinks WHERE from_page_id = ?`, fromPageID)
+	_, err = tx.Exec(`DELETE FROM links WHERE from_page_id = ?`, fromPageID)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO backlinks (from_page_id, to_page_id, from_title) VALUES (?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO links (from_page_id, to_page_id, from_title) VALUES (?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -133,7 +134,7 @@ func (s *LinksStore) AddBacklinks(fromPageID string, fromTitle string, toLinks [
 func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM backlinks WHERE to_page_id = ?`, pageID)
+	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM links WHERE to_page_id = ?`, pageID)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +158,7 @@ func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
 func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM backlinks WHERE from_page_id = ?`, pageID)
+	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, from_title FROM links WHERE from_page_id = ?`, pageID)
 	if err != nil {
 		return nil, err
 	}
