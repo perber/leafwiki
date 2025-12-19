@@ -222,7 +222,6 @@ func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Pa
 	}
 
 	return page, nil
-
 }
 
 func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, error) {
