@@ -210,7 +210,19 @@ func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Pa
 		return nil, err
 	}
 
-	return w.tree.GetPage(*id)
+	page, err := w.tree.GetPage(*id)
+	if err != nil {
+		return nil, err
+	}
+
+	if w.links != nil {
+		if err := w.links.HealOnPageCreate(page); err != nil {
+			log.Printf("warning: failed to heal links for page %s: %v", page.ID, err)
+		}
+	}
+
+	return page, nil
+
 }
 
 func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, error) {
@@ -259,7 +271,25 @@ func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, er
 		return nil, err
 	}
 
-	return w.tree.GetPage(result.Page.ID)
+	page, err := w.tree.GetPage(result.Page.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if w.links != nil {
+		for _, n := range result.Created {
+			p, err := w.tree.GetPage(n.ID)
+			if err != nil {
+				log.Printf("warning: failed to get page %s for healing links: %v", n.ID, err)
+				continue
+			}
+			if err := w.links.HealOnPageCreate(p); err != nil {
+				log.Printf("warning: failed to heal links for page %s: %v", n.ID, err)
+			}
+		}
+	}
+
+	return page, nil
 }
 
 func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
@@ -344,6 +374,12 @@ func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title stri
 		return nil, err
 	}
 
+	if w.links != nil {
+		if err := w.links.HealOnPageCreate(copy); err != nil {
+			log.Printf("warning: failed to heal links for page %s: %v", copy.ID, err)
+		}
+	}
+
 	return copy, nil
 }
 
@@ -363,7 +399,7 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 
 	if w.links != nil {
 		if err := w.links.RemoveLinksForPage(id); err != nil {
-			log.Printf("warning: could not remove backlinks for page %s: %v", id, err)
+			log.Printf("warning: could not remove links for page %s: %v", id, err)
 		}
 	}
 
@@ -634,7 +670,7 @@ func (w *Wiki) Close() error {
 
 	if w.links != nil {
 		if err := w.links.Close(); err != nil {
-			log.Printf("error closing backlinks: %v", err)
+			log.Printf("error closing links: %v", err)
 		}
 	}
 

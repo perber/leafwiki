@@ -533,3 +533,87 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 		t.Fatalf("expected ToPageID %q, got %q", pageBID, bl.Backlinks[0].ToPageID)
 	}
 }
+
+func TestLinkService_HealOnPageCreate_ResolvesBrokenLinksWithoutReindex(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link to B: [Go](/b)"); err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	out1, err := svc.GetOutgoingLinksForPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage failed: %v", err)
+	}
+	if out1.Count != 1 {
+		t.Fatalf("expected 1 outgoing for A, got %d: %#v", out1.Count, out1.Outgoings)
+	}
+
+	if out1.Outgoings[0].Broken != true {
+		t.Fatalf("expected outgoing to be broken before heal, got %#v", out1.Outgoings[0])
+	}
+	if out1.Outgoings[0].ToPath != "/b" {
+		t.Fatalf("expected ToPath '/b' before heal, got %q", out1.Outgoings[0].ToPath)
+	}
+	if out1.Outgoings[0].ToPageID != "" {
+		t.Fatalf("expected empty ToPageID before heal, got %q", out1.Outgoings[0].ToPageID)
+	}
+
+	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	pageB, err := ts.GetPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetPage B failed: %v", err)
+	}
+
+	if err := svc.HealOnPageCreate(pageB); err != nil {
+		t.Fatalf("HealOnPageCreate failed: %v", err)
+	}
+
+	out2, err := svc.GetOutgoingLinksForPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage (after heal) failed: %v", err)
+	}
+	if out2.Count != 1 {
+		t.Fatalf("expected 1 outgoing for A after heal, got %d: %#v", out2.Count, out2.Outgoings)
+	}
+
+	if out2.Outgoings[0].Broken != false {
+		t.Fatalf("expected outgoing to be resolved after heal, got %#v", out2.Outgoings[0])
+	}
+	if out2.Outgoings[0].ToPageID != pageBID {
+		t.Fatalf("expected ToPageID %q after heal, got %q", pageBID, out2.Outgoings[0].ToPageID)
+	}
+
+	bl, err := svc.GetBacklinksForPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetBacklinksForPage failed: %v", err)
+	}
+	if bl.Count != 1 {
+		t.Fatalf("expected 1 backlink for B after heal, got %d: %#v", bl.Count, bl.Backlinks)
+	}
+	if bl.Backlinks[0].FromPageID != pageAID {
+		t.Fatalf("expected backlink FromPageID %q, got %q", pageAID, bl.Backlinks[0].FromPageID)
+	}
+	if bl.Backlinks[0].ToPageID != pageBID {
+		t.Fatalf("expected backlink ToPageID %q, got %q", pageBID, bl.Backlinks[0].ToPageID)
+	}
+}
