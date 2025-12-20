@@ -566,8 +566,8 @@ func TestLinkService_HealOnPageCreate_ResolvesBrokenLinksWithoutReindex(t *testi
 		t.Fatalf("GetPage B failed: %v", err)
 	}
 
-	if err := svc.HealOnPageCreate(pageB); err != nil {
-		t.Fatalf("HealOnPageCreate failed: %v", err)
+	if err := svc.HealLinksForExactPath(pageB); err != nil {
+		t.Fatalf("HealLinksForExactPath failed: %v", err)
 	}
 
 	out2, err := svc.GetOutgoingLinksForPage(pageAID)

@@ -720,3 +720,185 @@ func TestWiki_DeletePage_Recursive_RemovesOutgoingForSubtree_AndBreaksIncomingBy
 		t.Fatalf("ToPageID = %q, want empty", got.ToPageID)
 	}
 }
+
+func TestWiki_RenamePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
+	w := setupTestWiki(t)
+	defer w.Close()
+
+	// Create A with links to /b (exists) and /b2 (does not exist yet)
+	a, err := w.CreatePage(nil, "A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	_, err = w.UpdatePage(a.ID, a.Title, a.Slug, "Links: [B](/b) and [B2](/b2)")
+	if err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Create B at /b
+	b, err := w.CreatePage(nil, "B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	_, err = w.UpdatePage(b.ID, b.Title, b.Slug, "# B")
+	if err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	// Index once so outgoing links exist + broken state is materialized
+	if err := w.ReindexBacklinks(); err != nil {
+		t.Fatalf("ReindexBacklinks failed: %v", err)
+	}
+
+	out1, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(A) failed: %v", err)
+	}
+	if out1.Count != 2 {
+		t.Fatalf("expected 2 outgoings before rename, got %d: %#v", out1.Count, out1.Outgoings)
+	}
+
+	byPath1 := map[string]struct {
+		broken bool
+		toID   string
+	}{}
+	for _, it := range out1.Outgoings {
+		byPath1[it.ToPath] = struct {
+			broken bool
+			toID   string
+		}{it.Broken, it.ToPageID}
+	}
+
+	if got, ok := byPath1["/b"]; !ok || got.broken {
+		t.Fatalf("expected /b to be valid before rename, got %#v", byPath1)
+	}
+	if got, ok := byPath1["/b2"]; !ok || !got.broken {
+		t.Fatalf("expected /b2 to be broken before rename, got %#v", byPath1)
+	}
+
+	// Rename B: /b -> /b2
+	_, err = w.UpdatePage(b.ID, b.Title, "b2", "# B (renamed)")
+	if err != nil {
+		t.Fatalf("Rename B failed: %v", err)
+	}
+
+	// Without reindex: outgoing from A should reflect:
+	// - /b becomes broken
+	// - /b2 becomes healed and points to B's ID
+	out2, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(A) after rename failed: %v", err)
+	}
+	if out2.Count != 2 {
+		t.Fatalf("expected 2 outgoings after rename, got %d: %#v", out2.Count, out2.Outgoings)
+	}
+
+	byPath2 := map[string]struct {
+		broken bool
+		toID   string
+	}{}
+	for _, it := range out2.Outgoings {
+		byPath2[it.ToPath] = struct {
+			broken bool
+			toID   string
+		}{it.Broken, it.ToPageID}
+	}
+
+	// old path broken
+	if got, ok := byPath2["/b"]; !ok || !got.broken || got.toID != "" {
+		t.Fatalf("expected /b to be broken with empty to_page_id after rename, got %#v", byPath2)
+	}
+
+	// new path healed
+	gotNew, ok := byPath2["/b2"]
+	if !ok || gotNew.broken || gotNew.toID == "" {
+		t.Fatalf("expected /b2 to be healed with to_page_id set, got %#v", byPath2)
+	}
+	if gotNew.toID != b.ID {
+		t.Fatalf("expected /b2 to resolve to page %q, got %q", b.ID, gotNew.toID)
+	}
+}
+
+func TestWiki_RenameSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
+	w := setupTestWiki(t)
+	defer w.Close()
+
+	// Create subtree: /docs/b
+	docs, err := w.CreatePage(nil, "Docs", "docs")
+	if err != nil {
+		t.Fatalf("CreatePage docs failed: %v", err)
+	}
+	b, err := w.CreatePage(&docs.ID, "B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage /docs/b failed: %v", err)
+	}
+	_, err = w.UpdatePage(b.ID, b.Title, b.Slug, "# B")
+	if err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	// Create A that links to old and future new subtree paths
+	a, err := w.CreatePage(nil, "A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	_, err = w.UpdatePage(a.ID, a.Title, a.Slug, "Links: [Old](/docs/b) and [New](/docs2/b)")
+	if err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Materialize graph state
+	if err := w.ReindexBacklinks(); err != nil {
+		t.Fatalf("ReindexBacklinks failed: %v", err)
+	}
+
+	out1, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(A) failed: %v", err)
+	}
+	if out1.Count != 2 {
+		t.Fatalf("expected 2 outgoings before rename, got %d: %#v", out1.Count, out1.Outgoings)
+	}
+
+	// Rename /docs -> /docs2
+	_, err = w.UpdatePage(docs.ID, docs.Title, "docs2", "# Docs")
+	if err != nil {
+		t.Fatalf("Rename docs failed: %v", err)
+	}
+
+	// Without reindex: A should now have
+	// - /docs/b broken
+	// - /docs2/b healed and resolves to the same page id as the child B
+	out2, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(A) after subtree rename failed: %v", err)
+	}
+	if out2.Count != 2 {
+		t.Fatalf("expected 2 outgoings after rename, got %d: %#v", out2.Count, out2.Outgoings)
+	}
+
+	byPath := map[string]struct {
+		broken bool
+		toID   string
+	}{}
+	for _, it := range out2.Outgoings {
+		byPath[it.ToPath] = struct {
+			broken bool
+			toID   string
+		}{it.Broken, it.ToPageID}
+	}
+
+	// old prefix path broken
+	if got, ok := byPath["/docs/b"]; !ok || !got.broken || got.toID != "" {
+		t.Fatalf("expected /docs/b broken with empty to_page_id, got %#v", byPath)
+	}
+
+	// new subpath healed
+	gotNew, ok := byPath["/docs2/b"]
+	if !ok || gotNew.broken || gotNew.toID == "" {
+		t.Fatalf("expected /docs2/b healed with to_page_id set, got %#v", byPath)
+	}
+	if gotNew.toID != b.ID {
+		t.Fatalf("expected /docs2/b to resolve to page %q, got %q", b.ID, gotNew.toID)
+	}
+}

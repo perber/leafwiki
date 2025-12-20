@@ -216,7 +216,7 @@ func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Pa
 	}
 
 	if w.links != nil {
-		if err := w.links.HealOnPageCreate(page); err != nil {
+		if err := w.links.HealLinksForExactPath(page); err != nil {
 			log.Printf("warning: failed to heal links for page %s: %v", page.ID, err)
 		}
 	}
@@ -282,7 +282,7 @@ func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, er
 				log.Printf("warning: failed to get page %s for healing links: %v", n.ID, err)
 				continue
 			}
-			if err := w.links.HealOnPageCreate(p); err != nil {
+			if err := w.links.HealLinksForExactPath(p); err != nil {
 				log.Printf("warning: failed to heal links for page %s: %v", n.ID, err)
 			}
 		}
@@ -305,23 +305,81 @@ func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
 		return nil, ve
 	}
 
-	err := w.tree.UpdatePage(id, title, slug, content)
+	// Get page before update
+	before, err := w.tree.GetPage(id)
 	if err != nil {
 		return nil, err
 	}
+	oldPrefix := before.CalculatePath()
+	renameOrPathChange := (slug != before.Slug)
 
-	page, err := w.tree.GetPage(id)
-	if err != nil {
-		return page, err
+	collectSubtreeIDs := func(node *tree.PageNode) []string {
+		var ids []string
+		var walk func(n *tree.PageNode)
+		walk = func(n *tree.PageNode) {
+			if n == nil {
+				return
+			}
+			if n.ID != "root" {
+				ids = append(ids, n.ID)
+			}
+			for _, c := range n.Children {
+				walk(c)
+			}
+		}
+		walk(node)
+		return ids
 	}
 
-	if w.links != nil {
-		if err := w.links.UpdateLinksForPage(page, content); err != nil {
-			log.Printf("warning: failed to update backlinks for page %s: %v", id, err)
+	var subtreeIDs []string
+	if renameOrPathChange {
+		subtreeIDs = collectSubtreeIDs(before.PageNode)
+		if len(subtreeIDs) == 0 {
+			subtreeIDs = []string{id}
 		}
 	}
 
-	return page, nil
+	if err = w.tree.UpdatePage(id, title, slug, content); err != nil {
+		return nil, err
+	}
+
+	after, err := w.tree.GetPage(id)
+	if err != nil {
+		return after, err
+	}
+
+	if w.links != nil {
+		if renameOrPathChange {
+			if oldPrefix != "" {
+				if err := w.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
+					log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
+				}
+			}
+
+			for _, pid := range subtreeIDs {
+				p, err := w.tree.GetPage(pid)
+				if err != nil {
+					log.Printf("warning: failed to get page %s for healing links: %v", pid, err)
+					continue
+				}
+				if err := w.links.UpdateLinksForPage(p, p.Content); err != nil {
+					log.Printf("warning: failed to update links for page %s: %v", pid, err)
+				}
+				if err := w.links.HealLinksForExactPath(p); err != nil {
+					log.Printf("warning: failed to heal links for page %s: %v", p.ID, err)
+				}
+			}
+		} else {
+			if err := w.links.UpdateLinksForPage(after, content); err != nil {
+				log.Printf("warning: failed to update links for page %s: %v", after.ID, err)
+			}
+			if err := w.links.HealLinksForExactPath(after); err != nil {
+				log.Printf("warning: failed to heal links for page %s: %v", after.ID, err)
+			}
+		}
+	}
+
+	return after, nil
 }
 
 func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title string, slug string) (*tree.Page, error) {
@@ -374,7 +432,7 @@ func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title stri
 	}
 
 	if w.links != nil {
-		if err := w.links.HealOnPageCreate(copy); err != nil {
+		if err := w.links.HealLinksForExactPath(copy); err != nil {
 			log.Printf("warning: failed to heal links for page %s: %v", copy.ID, err)
 		}
 	}
