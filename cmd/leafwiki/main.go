@@ -66,6 +66,10 @@ func main() {
 
 	publicAccess := resolveBool("public-access", *publicAccessFlag, visited, "LEAFWIKI_PUBLIC_ACCESS")
 
+	log.Printf("configuration: host=%q port=%q dataDir=%q publicAccess=%v injectHeader=%t",
+		host, port, dataDir, publicAccess, injectCodeInHeader != "",
+	)
+
 	// Check if data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
