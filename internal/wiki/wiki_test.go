@@ -530,3 +530,165 @@ func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
 		t.Fatalf("expected /x/y ToPageID to be set after heal, got empty: %#v", out2.Outgoings)
 	}
 }
+
+func TestWiki_DeletePage_NonRecursive_MarksIncomingBroken(t *testing.T) {
+	dataDir := t.TempDir()
+
+	w, err := NewWiki(dataDir, "admin", "secret", false)
+	if err != nil {
+		t.Fatalf("NewWiki failed: %v", err)
+	}
+	defer w.Close()
+
+	// Create A with link to /b
+	a, err := w.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	_, err = w.UpdatePage(a.ID, a.Title, a.Slug, "Link to B: [Go](/b)")
+	if err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Create B
+	b, err := w.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	_, err = w.UpdatePage(b.ID, b.Title, b.Slug, "# Page B")
+	if err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	// Ensure link index
+	if err := w.ReindexBacklinks(); err != nil {
+		t.Fatalf("ReindexBacklinks failed: %v", err)
+	}
+
+	// Delete B
+	if err := w.DeletePage(b.ID, false); err != nil {
+		t.Fatalf("DeletePage failed: %v", err)
+	}
+
+	// Outgoing links for A should still exist but be broken
+	out, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks failed: %v", err)
+	}
+	if out.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d", out.Count)
+	}
+
+	got := out.Outgoings[0]
+	if got.ToPath != "/b" {
+		t.Fatalf("ToPath = %q, want %q", got.ToPath, "/b")
+	}
+	if got.Broken != true {
+		t.Fatalf("Broken = %v, want true", got.Broken)
+	}
+	if got.ToPageID != "" {
+		t.Fatalf("ToPageID = %q, want empty", got.ToPageID)
+	}
+
+	// Backlinks for B must be 0 because query filters on broken=0/to_page_id match
+	bl, err := w.GetBacklinks(b.ID)
+	if err != nil {
+		t.Fatalf("GetBacklinks failed: %v", err)
+	}
+	if bl.Count != 0 {
+		t.Fatalf("expected 0 backlinks after delete, got %d", bl.Count)
+	}
+}
+
+func TestWiki_DeletePage_Recursive_RemovesOutgoingForSubtree_AndBreaksIncomingByPrefix(t *testing.T) {
+	dataDir := t.TempDir()
+
+	w, err := NewWiki(dataDir, "admin", "secret", false)
+	if err != nil {
+		t.Fatalf("NewWiki failed: %v", err)
+	}
+	defer w.Close()
+
+	// Create /docs
+	docs, err := w.CreatePage(nil, "Docs", "docs")
+	if err != nil {
+		t.Fatalf("CreatePage docs failed: %v", err)
+	}
+
+	// Create /docs/a and /docs/b
+	a, err := w.CreatePage(&docs.ID, "A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage a failed: %v", err)
+	}
+	b, err := w.CreatePage(&docs.ID, "B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage b failed: %v", err)
+	}
+
+	// A links to B inside subtree
+	_, err = w.UpdatePage(a.ID, a.Title, a.Slug, "Link to B: [B](/docs/b)")
+	if err != nil {
+		t.Fatalf("UpdatePage a failed: %v", err)
+	}
+	_, err = w.UpdatePage(b.ID, b.Title, b.Slug, "# B")
+	if err != nil {
+		t.Fatalf("UpdatePage b failed: %v", err)
+	}
+
+	// Create survivor /c with incoming link into subtree
+	c, err := w.CreatePage(nil, "C", "c")
+	if err != nil {
+		t.Fatalf("CreatePage c failed: %v", err)
+	}
+	_, err = w.UpdatePage(c.ID, c.Title, c.Slug, "Incoming link: [B](/docs/b)")
+	if err != nil {
+		t.Fatalf("UpdatePage c failed: %v", err)
+	}
+
+	if err := w.ReindexBacklinks(); err != nil {
+		t.Fatalf("ReindexBacklinks failed: %v", err)
+	}
+
+	// Sanity check: A has an outgoing link before delete
+	outA, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(a) before delete failed: %v", err)
+	}
+	if outA.Count != 1 {
+		t.Fatalf("expected 1 outgoing from a before delete, got %d", outA.Count)
+	}
+
+	// Delete /docs recursively
+	if err := w.DeletePage(docs.ID, true); err != nil {
+		t.Fatalf("DeletePage(docs, recursive) failed: %v", err)
+	}
+
+	// 1) Outgoing links FROM deleted child page must be gone
+	outAAfter, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(a) after delete failed: %v", err)
+	}
+	if outAAfter.Count != 0 {
+		t.Fatalf("expected 0 outgoing from deleted page a, got %d", outAAfter.Count)
+	}
+
+	// 2) Incoming link from survivor page /c into subtree must still exist, but be broken
+	outC, err := w.GetOutgoingLinks(c.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(c) after delete failed: %v", err)
+	}
+	if outC.Count != 1 {
+		t.Fatalf("expected 1 outgoing from c, got %d", outC.Count)
+	}
+
+	got := outC.Outgoings[0]
+	if got.ToPath != "/docs/b" {
+		t.Fatalf("ToPath = %q, want %q", got.ToPath, "/docs/b")
+	}
+	if got.Broken != true {
+		t.Fatalf("Broken = %v, want true", got.Broken)
+	}
+	if got.ToPageID != "" {
+		t.Fatalf("ToPageID = %q, want empty", got.ToPageID)
+	}
+}

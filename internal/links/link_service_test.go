@@ -309,27 +309,6 @@ func TestLinkService_ClearLinks_RemovesAllLinks(t *testing.T) {
 	}
 }
 
-func TestLinkService_RemoveLinksForPage_RemovesIncomingAndOutgoing(t *testing.T) {
-	svc, ts, _ := setupLinkService(t)
-	pageAID, pageBID := createSimpleLinkedPages(t, ts)
-
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages failed: %v", err)
-	}
-
-	if err := svc.RemoveLinksForPage(pageAID); err != nil {
-		t.Fatalf("RemoveLinksForPage failed: %v", err)
-	}
-
-	dataB, err := svc.GetBacklinksForPage(pageBID)
-	if err != nil {
-		t.Fatalf("GetBacklinksForPage failed: %v", err)
-	}
-	if len(dataB.Backlinks) != 0 {
-		t.Fatalf("expected 0 backlinks for B after removal, got %d: %#v", len(dataB.Backlinks), dataB.Backlinks)
-	}
-}
-
 func TestLinkService_GetOutgoingLinksForPage_ReturnsOutgoingLinks(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 	pageAID, pageBID := createSimpleLinkedPages(t, ts)
@@ -365,9 +344,8 @@ func TestLinkService_GetOutgoingLinksForPage_ReturnsOutgoingLinks(t *testing.T) 
 	if err != nil {
 		t.Fatalf("GetPage(pageB) failed: %v", err)
 	}
-	wantPath := pageB.CalculatePath()
-	if item.ToPath != wantPath {
-		t.Errorf("ToPath = %q, want %q", item.ToPath, wantPath)
+	if item.ToPath != "/b" {
+		t.Errorf("ToPath = %q, want %q", item.ToPath, "/b")
 	}
 	if item.ToPageTitle != pageB.Title {
 		t.Errorf("ToPageTitle = %q, want %q", item.ToPageTitle, pageB.Title)
@@ -418,7 +396,7 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 		t.Fatalf("tree root is nil")
 	}
 
-	outgoings := []Outgoing{{FromPageID: page1ID, ToPageID: page2ID, FromTitle: "Page 1"}}
+	outgoings := []Outgoing{{FromPageID: page1ID, ToPageID: page2ID, ToPath: "/docs/page2", Broken: false, FromTitle: "Page 1"}}
 
 	result := toOutgoingLinkResult(ts, outgoings)
 	if result == nil {
@@ -444,12 +422,13 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 	if item.ToPageTitle != page2.Title {
 		t.Errorf("ToPageTitle = %q, want %q", item.ToPageTitle, page2.Title)
 	}
-	if item.ToPath != "" {
+	if item.ToPath == "" {
 		t.Errorf("ToPath = %q, want %q", item.ToPath, "")
 	}
 	if item.Broken {
 		t.Errorf("Broken = %v, want %v", item.Broken, false)
 	}
+
 }
 
 func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T) {

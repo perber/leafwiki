@@ -89,8 +89,26 @@ func (b *LinkService) UpdateLinksForPage(page *tree.Page, content string) error 
 	return nil
 }
 
-func (b *LinkService) RemoveLinksForPage(pageID string) error {
-	return b.store.RemoveLinks(pageID)
+// DeleteOutgoingLinksForPage removes all outgoing link records for a page.
+func (l *LinkService) DeleteOutgoingLinksForPage(pageID string) error {
+	return l.store.DeleteOutgoingLinks(pageID)
+}
+
+// MarkIncomingLinksBrokenForPage marks all incoming links pointing to pageID as broken.
+func (l *LinkService) MarkIncomingLinksBrokenForPage(pageID string) error {
+	return l.store.MarkIncomingLinksBroken(pageID)
+}
+
+// MarkLinksBrokenForPath marks links pointing to an exact path as broken.
+func (l *LinkService) MarkLinksBrokenForPath(toPath string) error {
+	toPath = normalizeWikiPath(toPath)
+	return l.store.MarkLinksBrokenForPath(toPath)
+}
+
+// MarkLinksBrokenForPrefix marks all links under a prefix as broken (subtree move/delete).
+func (l *LinkService) MarkLinksBrokenForPrefix(prefix string) error {
+	prefix = normalizeWikiPath(prefix)
+	return l.store.MarkLinksBrokenForPrefix(prefix)
 }
 
 func (b *LinkService) HealOnPageCreate(page *tree.Page) error {
