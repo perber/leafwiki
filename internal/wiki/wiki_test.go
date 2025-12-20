@@ -902,3 +902,265 @@ func TestWiki_RenameSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 		t.Fatalf("expected /docs2/b to resolve to page %q, got %q", b.ID, gotNew.toID)
 	}
 }
+
+func TestWiki_MovePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
+	w := setupTestWiki(t)
+	defer w.Close()
+
+	// Create A that links to /b (old path) and /projects/b (future path)
+	a, err := w.CreatePage(nil, "A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	_, err = w.UpdatePage(a.ID, a.Title, a.Slug, "Links: [B](/b) and [B2](/projects/b)")
+	if err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Create B at /b
+	b, err := w.CreatePage(nil, "B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	_, err = w.UpdatePage(b.ID, b.Title, b.Slug, "# B")
+	if err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	// Create parent /projects (target)
+	projects, err := w.CreatePage(nil, "Projects", "projects")
+	if err != nil {
+		t.Fatalf("CreatePage projects failed: %v", err)
+	}
+
+	// Materialize links once (so broken links exist in DB)
+	if err := w.ReindexBacklinks(); err != nil {
+		t.Fatalf("ReindexBacklinks failed: %v", err)
+	}
+
+	// Sanity: /b should be valid, /projects/b should be broken before move
+	out1, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(A) failed: %v", err)
+	}
+	if out1.Count != 2 {
+		t.Fatalf("expected 2 outgoings before move, got %d: %#v", out1.Count, out1.Outgoings)
+	}
+
+	state1 := map[string]struct {
+		broken bool
+		toID   string
+	}{}
+	for _, it := range out1.Outgoings {
+		state1[it.ToPath] = struct {
+			broken bool
+			toID   string
+		}{it.Broken, it.ToPageID}
+	}
+
+	if got := state1["/b"]; got.broken || got.toID == "" {
+		t.Fatalf("expected /b valid before move, got %#v", state1)
+	}
+	if got := state1["/projects/b"]; !got.broken || got.toID != "" {
+		t.Fatalf("expected /projects/b broken before move, got %#v", state1)
+	}
+
+	// Move B under /projects => /projects/b now exists
+	if err := w.MovePage(b.ID, projects.ID); err != nil {
+		t.Fatalf("MovePage failed: %v", err)
+	}
+
+	// Without reindex: /b must become broken, /projects/b must be healed to B
+	out2, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(A) after move failed: %v", err)
+	}
+	if out2.Count != 2 {
+		t.Fatalf("expected 2 outgoings after move, got %d: %#v", out2.Count, out2.Outgoings)
+	}
+
+	state2 := map[string]struct {
+		broken bool
+		toID   string
+	}{}
+	for _, it := range out2.Outgoings {
+		state2[it.ToPath] = struct {
+			broken bool
+			toID   string
+		}{it.Broken, it.ToPageID}
+	}
+
+	// old path broken
+	if got := state2["/b"]; !got.broken || got.toID != "" {
+		t.Fatalf("expected /b broken after move (to_page_id empty), got %#v", state2)
+	}
+
+	// new path healed
+	if got := state2["/projects/b"]; got.broken || got.toID != b.ID {
+		t.Fatalf("expected /projects/b healed to page %q, got %#v", b.ID, state2)
+	}
+}
+
+func TestWiki_MoveSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
+	w := setupTestWiki(t)
+	defer w.Close()
+
+	// Create subtree /docs/b
+	docs, err := w.CreatePage(nil, "Docs", "docs")
+	if err != nil {
+		t.Fatalf("CreatePage docs failed: %v", err)
+	}
+	b, err := w.CreatePage(&docs.ID, "B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage /docs/b failed: %v", err)
+	}
+	_, err = w.UpdatePage(b.ID, b.Title, b.Slug, "# B")
+	if err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	// Create target parent /archive
+	archive, err := w.CreatePage(nil, "Archive", "archive")
+	if err != nil {
+		t.Fatalf("CreatePage archive failed: %v", err)
+	}
+
+	// Create A that links to old and future new subtree paths
+	a, err := w.CreatePage(nil, "A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	_, err = w.UpdatePage(a.ID, a.Title, a.Slug, "Links: [Old](/docs/b) and [New](/archive/docs/b)")
+	if err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Materialize graph
+	if err := w.ReindexBacklinks(); err != nil {
+		t.Fatalf("ReindexBacklinks failed: %v", err)
+	}
+
+	// Move /docs under /archive => /archive/docs/b exists, /docs/b disappears
+	if err := w.MovePage(docs.ID, archive.ID); err != nil {
+		t.Fatalf("MovePage(docs -> archive) failed: %v", err)
+	}
+
+	// Without reindex: A should now have /docs/b broken and /archive/docs/b healed to the same B id
+	out, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(A) after subtree move failed: %v", err)
+	}
+	if out.Count != 2 {
+		t.Fatalf("expected 2 outgoings after move, got %d: %#v", out.Count, out.Outgoings)
+	}
+
+	state := map[string]struct {
+		broken bool
+		toID   string
+	}{}
+	for _, it := range out.Outgoings {
+		state[it.ToPath] = struct {
+			broken bool
+			toID   string
+		}{it.Broken, it.ToPageID}
+	}
+
+	if got := state["/docs/b"]; !got.broken || got.toID != "" {
+		t.Fatalf("expected /docs/b broken after move, got %#v", state)
+	}
+
+	if got := state["/archive/docs/b"]; got.broken || got.toID != b.ID {
+		t.Fatalf("expected /archive/docs/b healed to page %q, got %#v", b.ID, state)
+	}
+}
+
+func TestWiki_MovePage_ReindexesRelativeLinks(t *testing.T) {
+	w := setupTestWiki(t)
+	defer w.Close()
+
+	// Create /docs with /docs/shared and /docs/a
+	docs, err := w.CreatePage(nil, "Docs", "docs")
+	if err != nil {
+		t.Fatalf("CreatePage docs failed: %v", err)
+	}
+
+	docsShared, err := w.CreatePage(&docs.ID, "Shared", "shared")
+	if err != nil {
+		t.Fatalf("CreatePage /docs/shared failed: %v", err)
+	}
+	_, err = w.UpdatePage(docsShared.ID, docsShared.Title, docsShared.Slug, "# Docs Shared")
+	if err != nil {
+		t.Fatalf("UpdatePage /docs/shared failed: %v", err)
+	}
+
+	a, err := w.CreatePage(&docs.ID, "A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage /docs/a failed: %v", err)
+	}
+	// Important: relative link
+	_, err = w.UpdatePage(a.ID, a.Title, a.Slug, "Relative: [S](../shared)")
+	if err != nil {
+		t.Fatalf("UpdatePage /docs/a failed: %v", err)
+	}
+
+	// Create /guide with /guide/shared (different page!)
+	guide, err := w.CreatePage(nil, "Guide", "guide")
+	if err != nil {
+		t.Fatalf("CreatePage guide failed: %v", err)
+	}
+
+	guideShared, err := w.CreatePage(&guide.ID, "Shared", "shared")
+	if err != nil {
+		t.Fatalf("CreatePage /guide/shared failed: %v", err)
+	}
+	_, err = w.UpdatePage(guideShared.ID, guideShared.Title, guideShared.Slug, "# Guide Shared")
+	if err != nil {
+		t.Fatalf("UpdatePage /guide/shared failed: %v", err)
+	}
+
+	// Materialize graph
+	if err := w.ReindexBacklinks(); err != nil {
+		t.Fatalf("ReindexBacklinks failed: %v", err)
+	}
+
+	// Before move: /docs/a's outgoing must resolve to /docs/shared
+	out1, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(/docs/a) before move failed: %v", err)
+	}
+	if out1.Count != 1 {
+		t.Fatalf("expected 1 outgoing before move, got %d: %#v", out1.Count, out1.Outgoings)
+	}
+	if out1.Outgoings[0].ToPath != "/docs/shared" {
+		t.Fatalf("ToPath before move = %q, want %q", out1.Outgoings[0].ToPath, "/docs/shared")
+	}
+	if out1.Outgoings[0].Broken {
+		t.Fatalf("expected link to be valid before move, got broken=true")
+	}
+	if out1.Outgoings[0].ToPageID != docsShared.ID {
+		t.Fatalf("ToPageID before move = %q, want %q", out1.Outgoings[0].ToPageID, docsShared.ID)
+	}
+
+	// Move /docs/a under /guide => page path becomes /guide/a
+	if err := w.MovePage(a.ID, guide.ID); err != nil {
+		t.Fatalf("MovePage(a -> guide) failed: %v", err)
+	}
+
+	// After move (without reindex): relative link must now resolve to /guide/shared
+	out2, err := w.GetOutgoingLinks(a.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(/guide/a) after move failed: %v", err)
+	}
+	if out2.Count != 1 {
+		t.Fatalf("expected 1 outgoing after move, got %d: %#v", out2.Count, out2.Outgoings)
+	}
+	if out2.Outgoings[0].ToPath != "/guide/shared" {
+		t.Fatalf("ToPath after move = %q, want %q", out2.Outgoings[0].ToPath, "/guide/shared")
+	}
+	if out2.Outgoings[0].Broken {
+		t.Fatalf("expected link to be valid after move, got broken=true")
+	}
+	if out2.Outgoings[0].ToPageID != guideShared.ID {
+		t.Fatalf("ToPageID after move = %q, want %q", out2.Outgoings[0].ToPageID, guideShared.ID)
+	}
+}
