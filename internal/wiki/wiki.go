@@ -558,9 +558,11 @@ func (w *Wiki) MovePage(id, parentID string) error {
 		return err
 	}
 
-	if oldPrefix != "" {
-		if err := w.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
-			log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
+	if w.links != nil {
+		if oldPrefix != "" {
+			if err := w.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
+				log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
+			}
 		}
 	}
 
