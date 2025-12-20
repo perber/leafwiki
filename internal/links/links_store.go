@@ -73,33 +73,67 @@ func (s *LinksStore) ensureSchema() error {
 	return err
 }
 
-func (s *LinksStore) Clear() error {
-	_, err := s.db.Exec(`DELETE FROM links`)
+// DeleteOutgoingLinks removes all links originating from the given page.
+// This is correct when the page itself is deleted (no source markdown left).
+func (s *LinksStore) DeleteOutgoingLinks(fromPageID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`DELETE FROM links WHERE from_page_id = ?`, fromPageID)
 	return err
 }
 
-func (s *LinksStore) Close() error {
-	if s.db != nil {
-		err := s.db.Close()
-		if err != nil {
-			return err
-		}
-		s.db = nil
-	}
-	return nil
-}
-
-func (s *LinksStore) GetDB() *sql.DB {
-	if s.db == nil {
-		return nil
-	}
-	return s.db
-}
-
-func (s *LinksStore) RemoveLinks(pageID string) error {
+// MarkIncomingLinksBroken marks links pointing to the given page as broken,
+// but keeps them (because the source markdown still contains them).
+func (s *LinksStore) MarkIncomingLinksBroken(toPageID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, err := s.db.Exec(`DELETE FROM links WHERE from_page_id = ? OR to_page_id = ?`, pageID, pageID)
+
+	_, err := s.db.Exec(`
+		UPDATE links
+		SET to_page_id = NULL,
+		    broken    = 1
+		WHERE to_page_id = ?
+		  AND broken = 0
+	`, toPageID)
+
+	return err
+}
+
+// MarkLinksBrokenForPath marks links that point to an exact path as broken.
+// Useful for delete/rename in strict mode.
+func (s *LinksStore) MarkLinksBrokenForPath(toPath string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		UPDATE links
+		SET to_page_id = NULL,
+		    broken    = 1
+		WHERE to_path = ?
+		  AND broken  = 0
+	`, toPath)
+
+	return err
+}
+
+// MarkLinksBrokenForPrefix marks links whose to_path is under the given prefix as broken.
+// Boundary-safe: matches either the prefix itself, or prefix + "/...".
+func (s *LinksStore) MarkLinksBrokenForPrefix(oldPrefix string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		UPDATE links
+		SET to_page_id = NULL,
+		    broken    = 1
+		WHERE broken = 0
+		  AND (
+		    to_path = ?
+		    OR to_path LIKE ? || '/%'
+		  )
+	`, oldPrefix, oldPrefix)
+
 	return err
 }
 
@@ -168,8 +202,14 @@ func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
 	var backlinks []Backlink
 	for rows.Next() {
 		var b Backlink
-		if err := rows.Scan(&b.FromPageID, &b.ToPageID, &b.FromTitle); err != nil {
+		var toPageID sql.NullString
+		if err := rows.Scan(&b.FromPageID, &toPageID, &b.FromTitle); err != nil {
 			return nil, err
+		}
+		if toPageID.Valid {
+			b.ToPageID = toPageID.String
+		} else {
+			b.ToPageID = ""
 		}
 		backlinks = append(backlinks, b)
 	}
@@ -183,7 +223,12 @@ func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
 func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rows, err := s.db.Query(`SELECT from_page_id, to_page_id, to_path, from_title, broken FROM links WHERE from_page_id = ?`, pageID)
+
+	rows, err := s.db.Query(`
+        SELECT from_page_id, to_page_id, to_path, from_title, broken
+        FROM links
+        WHERE from_page_id = ?
+    `, pageID)
 	if err != nil {
 		return nil, err
 	}
@@ -192,10 +237,19 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 	var outgoings []Outgoing
 	for rows.Next() {
 		var o Outgoing
+		var toPageID sql.NullString
 		var brokenInt int
-		if err := rows.Scan(&o.FromPageID, &o.ToPageID, &o.ToPath, &o.FromTitle, &brokenInt); err != nil {
+
+		if err := rows.Scan(&o.FromPageID, &toPageID, &o.ToPath, &o.FromTitle, &brokenInt); err != nil {
 			return nil, err
 		}
+
+		if toPageID.Valid {
+			o.ToPageID = toPageID.String
+		} else {
+			o.ToPageID = ""
+		}
+
 		o.Broken = brokenInt != 0
 		outgoings = append(outgoings, o)
 	}
@@ -217,4 +271,27 @@ func (s *LinksStore) HealLinksForPath(toPath string, pageID string) error {
 	`, pageID, toPath)
 
 	return err
+}
+
+func (s *LinksStore) Clear() error {
+	_, err := s.db.Exec(`DELETE FROM links`)
+	return err
+}
+
+func (s *LinksStore) Close() error {
+	if s.db != nil {
+		err := s.db.Close()
+		if err != nil {
+			return err
+		}
+		s.db = nil
+	}
+	return nil
+}
+
+func (s *LinksStore) GetDB() *sql.DB {
+	if s.db == nil {
+		return nil
+	}
+	return s.db
 }

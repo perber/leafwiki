@@ -158,7 +158,8 @@ func (s *AssetService) DeleteAllAssetsForPage(page *tree.PageNode) error {
 
 	assetDir, err := s.getAssetPagePath(page)
 	if err != nil {
-		return fmt.Errorf("could not delete assets: %w", err)
+		// no assets dir -> nothing to delete
+		return nil
 	}
 	if _, err := os.Stat(assetDir); err == nil {
 		return os.RemoveAll(assetDir)

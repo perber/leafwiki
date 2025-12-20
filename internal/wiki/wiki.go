@@ -383,23 +383,106 @@ func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title stri
 }
 
 func (w *Wiki) DeletePage(id string, recursive bool) error {
+	if id == "root" || id == "" {
+		return fmt.Errorf("cannot delete root page")
+	}
+
+	collectSubtreeIDs := func(node *tree.PageNode) []string {
+		var ids []string
+		var walk func(n *tree.PageNode)
+		walk = func(n *tree.PageNode) {
+			if n == nil {
+				return
+			}
+			if n.ID != "root" {
+				ids = append(ids, n.ID)
+			}
+			for _, c := range n.Children {
+				walk(c)
+			}
+		}
+		walk(node)
+		return ids
+	}
+
 	page, err := w.tree.GetPage(id)
 	if err != nil {
 		return err
+	}
+
+	var subtreeIDs []string
+	var oldPrefix string
+
+	if recursive {
+		root := w.tree.GetTree()
+		if root != nil {
+			node, err := w.tree.FindPageByID(root.Children, id)
+			if err == nil && node != nil {
+				subtreeIDs = collectSubtreeIDs(node)
+				oldPrefix = node.CalculatePath() // IMPORTANT: before delete
+			}
+		}
+	}
+
+	// If recursive, also handle subtree
+	// we need to mark links broken for all pages in the subtree
+	if recursive {
+
+		// No pages in subtree or empty oldPrefix
+		// add current page id to subtreeIDs to delete its links and assets as well
+		if len(subtreeIDs) == 0 || oldPrefix == "" {
+			subtreeIDs = []string{id}
+			oldPrefix = page.CalculatePath()
+		}
+
+		if err := w.tree.DeletePage(id, recursive); err != nil {
+			return err
+		}
+
+		if w.links != nil {
+			for _, pid := range subtreeIDs {
+				if err := w.links.DeleteOutgoingLinksForPage(pid); err != nil {
+					log.Printf("warning: could not delete outgoing links for page %s: %v", pid, err)
+				}
+			}
+			if oldPrefix != "" {
+				if err := w.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
+					log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
+				}
+			}
+		}
+
+		// Delete assets for all pages in the subtree
+		for _, pid := range subtreeIDs {
+			if err := w.asset.DeleteAllAssetsForPage(&tree.PageNode{ID: pid}); err != nil {
+				log.Printf("warning: could not delete assets for page %s: %v", pid, err)
+			}
+		}
+
+		return nil
 	}
 
 	if err := w.tree.DeletePage(id, recursive); err != nil {
 		return err
 	}
 
-	if err := w.asset.DeleteAllAssetsForPage(page.PageNode); err != nil {
-		log.Printf("warning: could not delete assets for page %s: %v", page.ID, err)
+	// non-recursive case
+	if w.links != nil {
+		// Delete outgoing links and mark incoming links as broken
+		if err := w.links.DeleteOutgoingLinksForPage(id); err != nil {
+			log.Printf("warning: could not delete outgoing links for page %s: %v", id, err)
+		}
+		if err := w.links.MarkIncomingLinksBrokenForPage(id); err != nil {
+			log.Printf("warning: could not mark incoming links broken for page %s: %v", id, err)
+		}
+		if err := w.links.MarkLinksBrokenForPath(page.CalculatePath()); err != nil {
+			log.Printf("warning: could not mark links broken for path %s: %v", page.CalculatePath(), err)
+		}
 	}
 
-	if w.links != nil {
-		if err := w.links.RemoveLinksForPage(id); err != nil {
-			log.Printf("warning: could not remove links for page %s: %v", id, err)
-		}
+	// Also delete all assets for the page
+	if err := w.asset.DeleteAllAssetsForPage(page.PageNode); err != nil {
+		log.Printf("warning: could not delete assets for page %s: %v", page.ID, err)
 	}
 
 	return nil
