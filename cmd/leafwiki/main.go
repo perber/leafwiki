@@ -66,7 +66,7 @@ func main() {
 
 	publicAccess := resolveBool("public-access", *publicAccessFlag, visited, "LEAFWIKI_PUBLIC_ACCESS")
 
-	log.Printf("configuration: host=%q port=%q dataDir=%q publicAccess=%v injectHeader=%t",
+	log.Printf("configuration: host=%q port=%q dataDir=%q publicAccess=%t injectHeader=%t",
 		host, port, dataDir, publicAccess, injectCodeInHeader != "",
 	)
 
