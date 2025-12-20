@@ -133,10 +133,7 @@ func resolveString(flagName, flagVal string, visited map[string]bool, envVar str
 	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
 		return env
 	}
-	if flagVal != "" {
-		return flagVal
-	}
-	// If flagVal is empty, return provided default
+	// Fall back to provided default when flag wasn't set and no env var is present
 	return def
 }
 
