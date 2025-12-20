@@ -468,7 +468,7 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 
 	// non-recursive case
 	if w.links != nil {
-		// Finally, mark incoming links as broken
+		// Delete outgoing links and mark incoming links as broken
 		if err := w.links.DeleteOutgoingLinksForPage(id); err != nil {
 			log.Printf("warning: could not delete outgoing links for page %s: %v", id, err)
 		}
