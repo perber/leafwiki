@@ -153,6 +153,34 @@ func TestWiki_DeletePage_Recursive(t *testing.T) {
 	}
 }
 
+func TestWiki_DeletePage_RootWithIDRoot(t *testing.T) {
+	w := setupTestWiki(t)
+
+	err := w.DeletePage("root", false)
+	if err == nil {
+		t.Error("Expected error when attempting to delete root page with ID 'root', got none")
+	}
+
+	expectedMsg := "cannot delete root page"
+	if err.Error() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
+func TestWiki_DeletePage_RootWithEmptyString(t *testing.T) {
+	w := setupTestWiki(t)
+
+	err := w.DeletePage("", false)
+	if err == nil {
+		t.Error("Expected error when attempting to delete root page with empty string ID, got none")
+	}
+
+	expectedMsg := "cannot delete root page"
+	if err.Error() != expectedMsg {
+		t.Errorf("Expected error message %q, got %q", expectedMsg, err.Error())
+	}
+}
+
 func TestWiki_UpdatePage(t *testing.T) {
 	w := setupTestWiki(t)
 	page, _ := w.CreatePage(nil, "Draft", "draft")
