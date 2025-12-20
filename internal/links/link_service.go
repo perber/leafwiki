@@ -111,7 +111,7 @@ func (b *LinkService) MarkLinksBrokenForPrefix(prefix string) error {
 	return b.store.MarkLinksBrokenForPrefix(prefix)
 }
 
-func (b *LinkService) HealOnPageCreate(page *tree.Page) error {
+func (b *LinkService) HealLinksForExactPath(page *tree.Page) error {
 	toPath := normalizeWikiPath(page.CalculatePath())
 	return b.store.HealLinksForPath(toPath, page.ID)
 }
