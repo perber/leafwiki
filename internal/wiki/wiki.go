@@ -426,7 +426,6 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 
 	// If recursive, also handle subtree
 	// we need to mark links broken for all pages in the subtree
-	// Delete assets for subtree pages as well
 	if recursive {
 
 		// No pages in subtree or empty oldPrefix
