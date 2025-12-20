@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/wiki"
@@ -48,17 +49,22 @@ func main() {
 	dataDirFlag := flag.String("data-dir", "", "path to data directory")
 	adminPasswordFlag := flag.String("admin-password", "", "initial admin password")
 	jwtSecretFlag := flag.String("jwt-secret", "", "JWT secret for authentication")
-	publicAccessFlag := flag.String("public-access", "false", "allow public access to the wiki with read access (default: false)")
+	publicAccessFlag := flag.Bool("public-access", false, "allow public access to the wiki with read access (default: false)")
 	injectCodeInHeaderFlag := flag.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")")
 	flag.Parse()
 
-	port := getOrFallback(*portFlag, "LEAFWIKI_PORT", "8080")
-	host := getOrFallback(*hostFlag, "LEAFWIKI_HOST", "0.0.0.0")
-	dataDir := getOrFallback(*dataDirFlag, "LEAFWIKI_DATA_DIR", "./data")
-	adminPassword := getOrFallback(*adminPasswordFlag, "LEAFWIKI_ADMIN_PASSWORD", "admin")
-	jwtSecret := getOrFallback(*jwtSecretFlag, "LEAFWIKI_JWT_SECRET", "")
-	publicAccess := getOrFallback(*publicAccessFlag, "LEAFWIKI_PUBLIC_ACCESS", "false")
-	injectCodeInHeader := getOrFallback(*injectCodeInHeaderFlag, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
+	// Track which flags were explicitly set on CLI
+	visited := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { visited[f.Name] = true })
+
+	host := resolveString("host", *hostFlag, visited, "LEAFWIKI_HOST", "0.0.0.0")
+	port := resolveString("port", *portFlag, visited, "LEAFWIKI_PORT", "8080")
+	dataDir := resolveString("data-dir", *dataDirFlag, visited, "LEAFWIKI_DATA_DIR", "./data")
+	adminPassword := resolveString("admin-password", *adminPasswordFlag, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
+	jwtSecret := resolveString("jwt-secret", *jwtSecretFlag, visited, "LEAFWIKI_JWT_SECRET", "")
+	injectCodeInHeader := resolveString("inject-code-in-header", *injectCodeInHeaderFlag, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
+
+	publicAccess := resolveBool("public-access", *publicAccessFlag, visited, "LEAFWIKI_PUBLIC_ACCESS")
 
 	// Check if data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
@@ -99,14 +105,14 @@ func main() {
 		log.Fatal("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
 	}
 
-	// needs to get injected by environment variable later
-	w, err := wiki.NewWiki(dataDir, adminPassword, jwtSecret, true)
+	enableSearchIndexing := true
+	w, err := wiki.NewWiki(dataDir, adminPassword, jwtSecret, enableSearchIndexing)
 	if err != nil {
 		log.Fatalf("Failed to initialize Wiki: %v", err)
 	}
 	defer w.Close()
 
-	router := http.NewRouter(w, publicAccess == "true", injectCodeInHeader)
+	router := http.NewRouter(w, publicAccess, injectCodeInHeader)
 
 	// Start server - combine host and port
 	listenAddr := host + ":" + port
@@ -117,12 +123,43 @@ func main() {
 	}
 }
 
-func getOrFallback(flagVal, envVar, def string) string {
-	if flagVal != "" {
+// CLI > ENV > default(flag)
+func resolveString(flagName, flagVal string, visited map[string]bool, envVar string, def string) string {
+	// If flag was explicitly set, it takes precedence
+	if visited[flagName] {
 		return flagVal
 	}
-	if env := os.Getenv(envVar); env != "" {
+	// Next, check environment variable
+	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
 		return env
 	}
+	// Fall back to provided default when flag wasn't set and no env var is present
 	return def
+}
+
+// CLI > ENV > default(flag)
+func resolveBool(flagName string, flagVal bool, visited map[string]bool, envVar string) bool {
+	if visited[flagName] {
+		return flagVal
+	}
+	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+		if b, ok := parseBool(env); ok {
+			return b
+		}
+		// If env var is set but invalid, fail fast (helps operators)
+		log.Fatalf("Invalid value for %s: %q (expected true/false/1/0/yes/no)", envVar, env)
+	}
+	return flagVal // default from flag
+}
+
+func parseBool(s string) (bool, bool) {
+	s = strings.TrimSpace(strings.ToLower(s))
+	switch s {
+	case "true", "1", "yes", "y", "on":
+		return true, true
+	case "false", "0", "no", "n", "off":
+		return false, true
+	}
+
+	return false, false
 }
