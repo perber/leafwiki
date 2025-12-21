@@ -73,12 +73,12 @@ export default function PageViewer() {
 
       {/* we keep the content also during loading to avoid flickering */}
       {page && !error && (
-        <>
+        <div className="page-viewer__body">
           <article className="page-viewer__content">
             <MarkdownPreview content={page.content} path={page.path} />
           </article>
           <BacklinkInfo />
-        </>
+        </div>
       )}
       {renderError()}
     </div>

@@ -358,7 +358,7 @@
   }
 
   .app-layout__main-content-area {
-    @apply flex-1 transition-all duration-200;
+    @apply flex flex-1 flex-col items-stretch transition-all duration-200;
   }
 
   .app-layout__main-content-area-viewer {
@@ -871,7 +871,7 @@
 
   /** backlink pane **/
   .backlinks__pane {
-    @apply text-interface-text border-border mt-10 w-full border-t-3 pt-5 text-sm;
+    @apply text-interface-text border-border mt-0 w-full border-t-3 pt-5 pb-5 text-sm;
   }
 
   .backlinks__header h2 {
@@ -989,7 +989,12 @@
   }
 
   .page-viewer {
-    @apply mx-auto max-w-6xl px-8 py-8;
+    @apply mx-auto w-full max-w-6xl px-8 py-8;
+    @apply flex min-h-full flex-col;
+  }
+
+  .page-viewer__body {
+    @apply flex min-h-0 flex-1 flex-col gap-8;
   }
 
   .page-viewer__error {
@@ -997,7 +1002,7 @@
   }
 
   .page-viewer__content {
-    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full leading-relaxed;
+    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full flex-1 leading-relaxed;
   }
 
   /* Markdown content tweaks */
