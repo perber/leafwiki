@@ -124,6 +124,8 @@ More advanced team features, such as versioning, are planned for future iteratio
 
 > **LeafWiki** is actively developed and open to collaboration 🌿 
 
+For a detailed history of changes and releases, see the [CHANGELOG](CHANGELOG.md).
+
 ---
 
 ## Installation

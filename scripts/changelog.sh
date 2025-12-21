@@ -76,7 +76,7 @@ while IFS= read -r commit; do
 done <<< "$COMMITS"
 
 # Build markdown file
-OUTFILE="changelog.md"
+OUTFILE="current_release_changelog.md"
 
 {
   echo "## 📝 Changelog for $CURRENT_TAG"
