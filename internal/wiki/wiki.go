@@ -32,6 +32,24 @@ type Wiki struct {
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
 var defaultAdminPassword = "admin"
 
+func collectSubtreeIDs(node *tree.PageNode) []string {
+	var ids []string
+	var walk func(n *tree.PageNode)
+	walk = func(n *tree.PageNode) {
+		if n == nil {
+			return
+		}
+		if n.ID != "root" {
+			ids = append(ids, n.ID)
+		}
+		for _, c := range n.Children {
+			walk(c)
+		}
+	}
+	walk(node)
+	return ids
+}
+
 func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSearchIndexing bool) (*Wiki, error) {
 	// Initialize the user store
 	store, err := auth.NewUserStore(storageDir)
@@ -313,24 +331,6 @@ func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
 	oldPrefix := before.CalculatePath()
 	renameOrPathChange := (slug != before.Slug)
 
-	collectSubtreeIDs := func(node *tree.PageNode) []string {
-		var ids []string
-		var walk func(n *tree.PageNode)
-		walk = func(n *tree.PageNode) {
-			if n == nil {
-				return
-			}
-			if n.ID != "root" {
-				ids = append(ids, n.ID)
-			}
-			for _, c := range n.Children {
-				walk(c)
-			}
-		}
-		walk(node)
-		return ids
-	}
-
 	var subtreeIDs []string
 	if renameOrPathChange {
 		subtreeIDs = collectSubtreeIDs(before.PageNode)
@@ -445,24 +445,6 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 		return fmt.Errorf("cannot delete root page")
 	}
 
-	collectSubtreeIDs := func(node *tree.PageNode) []string {
-		var ids []string
-		var walk func(n *tree.PageNode)
-		walk = func(n *tree.PageNode) {
-			if n == nil {
-				return
-			}
-			if n.ID != "root" {
-				ids = append(ids, n.ID)
-			}
-			for _, c := range n.Children {
-				walk(c)
-			}
-		}
-		walk(node)
-		return ids
-	}
-
 	page, err := w.tree.GetPage(id)
 	if err != nil {
 		return err
@@ -547,7 +529,65 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 }
 
 func (w *Wiki) MovePage(id, parentID string) error {
-	return w.tree.MovePage(id, parentID)
+	if id == "root" || id == "" {
+		return fmt.Errorf("cannot move root page")
+	}
+
+	// --- BEFORE: capture oldPrefix + subtree IDs (must be before the move) ---
+	var oldPrefix string
+	var subtreeIDs []string
+
+	root := w.tree.GetTree()
+	if root != nil {
+		node, err := w.tree.FindPageByID(root.Children, id)
+		if err == nil && node != nil {
+			oldPrefix = node.CalculatePath()
+			subtreeIDs = collectSubtreeIDs(node)
+		}
+	}
+
+	// If no pages in subtree, add current page id to subtreeIDs
+	if len(subtreeIDs) == 0 {
+		subtreeIDs = []string{id}
+		// try to get oldPrefix from full page (still before move)
+		if p, err := w.tree.GetPage(id); err == nil && oldPrefix == "" {
+			oldPrefix = p.CalculatePath()
+		}
+	}
+	if err := w.tree.MovePage(id, parentID); err != nil {
+		return err
+	}
+
+	if w.links != nil {
+		if oldPrefix != "" {
+			if err := w.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
+				log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
+			}
+		}
+	}
+
+	// For each page in the moved subtree:
+	// - reindex outgoing (relative links depend on path)
+	// - heal incoming for exact new path (existence-heal only)
+	for _, pid := range subtreeIDs {
+		p, err := w.tree.GetPage(pid)
+		if err != nil {
+			log.Printf("warning: failed to get page %s after move: %v", pid, err)
+			continue
+		}
+
+		if w.links != nil {
+			if err := w.links.UpdateLinksForPage(p, p.Content); err != nil {
+				log.Printf("warning: failed to update links for page %s: %v", pid, err)
+			}
+
+			if err := w.links.HealLinksForExactPath(p); err != nil {
+				log.Printf("warning: failed to heal links for page %s: %v", pid, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (w *Wiki) SortPages(parentID string, orderedIDs []string) error {
