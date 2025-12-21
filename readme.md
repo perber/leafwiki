@@ -1,12 +1,14 @@
 # 🌿 LeafWiki
 
-**A lightweight, modern, tree-based wiki that keeps your content in plain Markdown - fast, clean, and self-hosted**  
+**A lightweight, tree-based wiki that stores content as plain Markdown and is designed to be self-hosted.**  
 
-> *Run your knowledge base in 5 minutes - no database, just a single Go binary.*
+> *Run your knowledge base as a single Go binary, without requiring an external database.*
 
-LeafWiki is designed for teams and individuals who want a clean, modern, fast, and self-hosted knowledge base - with full control over structure, content, and deployment.
+LeafWiki is designed for individuals and small teams who want a self-hosted wiki with full control over structure, content, and deployment.
 
 ---
+
+## Preview
 
 ![LeafWiki](./preview.png)
 
@@ -22,129 +24,140 @@ LeafWiki is designed for teams and individuals who want a clean, modern, fast, a
 
 ---
 
-## 🧪 Live Demo
+## Live Demo
 
-> **Test it yourself – no setup required!**  
-> A public demo of LeafWiki is available here:  
+A public demo of LeafWiki is available here:
 
 🌐 **[demo.leafwiki.com](https://demo.leafwiki.com)**  
 
-> Login credentials are displayed on the demo site's login page.  
-> ⚙️ The demo instance resets automatically every hour,   
-> so feel free to experiment - all changes are temporary.  
+Login credentials are displayed on the demo site.  
+The demo instance resets automatically every hour, so all changes are temporary.
 
 ---
 
-## 🌿 Growing with Purpose
+## What LeafWiki is good for today
+
+LeafWiki works well today for: 
+- personal knowledge bases
+- project and technical documentation
+- structured notes and long-term knowledge organization
+
+---
+
+## Why Another Wiki?
+
+After using tools like Wiki.js, Confluence, and DokuWiki, the goal behind LeafWiki was to build something simpler and easier to operate.
+
+Many existing solutions rely on heavy infrastructure or databases, even though the core content is usually just Markdown files.
+
+In practice, writing documentation often comes with unnecessary friction. Authors are asked to configure too much upfront or to decide where assets belong before any content is written, which interrupts the writing flow.
+
+LeafWiki was designed around a few simple questions:
+- Why require a complex database for Markdown content?
+- Why should self-hosting a wiki require significant setup effort?
+- Why can’t structure and navigation be handled explicitly while keeping files portable?
+
+The result is a lightweight wiki engine with:
+- Plain Markdown files stored on disk
+- Explicit tree-based structure
+- A single binary with minimal dependencies
+- A focus on simple self-hosting
+
+LeafWiki intentionally prioritizes clarity and simplicity over feature completeness.
+
+---
+
+## Core principles
+
+LeafWiki is built around a small set of clear principles:
+
+- **Plain Markdown storage**  
+  All content is stored as Markdown files on disk. This avoids vendor lock-in and keeps your data portable and transparent.
+
+- **No external database required**  
+  LeafWiki uses SQLite internally and does not require running or managing a separate database service.
+
+- **Explicit structure management**  
+  Page hierarchy and ordering are managed explicitly, allowing pages to be reordered without relying on the filesystem layout alone.
+
+- **Self-hosted by design**
+  LeafWiki is designed to run on a single server with minimal operational overhead.
+
+---
+
+## What LeafWiki supports
+
+- Built-in Markdown editor
+- Tree-based navigation for structured content
+- Support for diagrams via Mermaid
+- Full-text search across page titles and content
+- Image and asset support
+- Dark mode and mobile-friendly UI
+- Separation between admin and editor users
+
+LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone service.
+
+---
+
+## What LeafWiki is not
+
+LeafWiki is not intended to be a full-featured enterprise documentation platform.
+
+It intentionally avoids complex workflows, real-time collaborative editing, and deeply configurable permission systems in order to stay simple, predictable, and easy to self-host.
+
+---
+
+## Growing with Purpose
 
 LeafWiki has reached a **stable and usable foundation**, and it’s already being used by developers to organize and document their knowledge.  
 
-The project isn’t *feature-complete yet*.  
-Right now, the focus is on **refining what’s there**, improving **stability**, and evolving the platform carefully toward a truly developer-friendly knowledge base.
+The project is **not feature-complete yet**, by design.  
+The current focus is on **refining existing functionality**, improving **stability**, and evolving the platform carefully toward a wiki for long-term use.
 
 **Current priorities:**  
 - Table of Contents support
 - Backlinks between pages
-- Outgoing links
 - History / Versioning of pages
 
-The editor and admin features are already in place, but collaboration is still basic - currently following a “last-write-wins” approach.
-Team-ready features like versioning, ... are planned for future iterations.
+The editor and admin features are in place, but collaboration is still basic and currently following a *last-write-wins* approach.
+More advanced team features, such as versioning, are planned for future iterations.
 
-LeafWiki and of course I are looking for **contributors** who want to help bring this vision to life - by refining existing features, fixing bugs, or experimenting with new ideas. 
-
-> **LeafWiki** is stable, growing and open for collaboration 🌿 
+> **LeafWiki** is actively developed and open to collaboration 🌿 
 
 ---
 
-## ✨ Features
+## Installation
 
-- 🧾 Markdown-first with live editor + preview
-- 🌲 True tree-structured pages (nested folders)
-- 🔒 Role-based access (admin / editor)
-- 🧠 No database required
-- 📂 Per-page assets with upload support
-- 🖼️ Embed images and files via Markdown or paste-to-upload (CTRL+V)
-- ⚙️ Single statically-linked Go binary (no dependencies)
-- 🚀 Easily self-hosted (Docker or standalone)
-- 🔁 Session auth with JWT tokens + refresh
-- 🔍 Search functionality for page titles and content
-- 📱 Mobile-friendly design
-- 🌐 Public pages (viewable without login)
-- 🖨️ Print view support
-- 🧩 Mermaid.js diagram support
-- 🎨 Resizable sidebar
-- 🌗 Dark mode support
-- 🌐 HTML support
+LeafWiki is distributed as a single Go binary and can be run directly on the host or via Docker.
+The sections below show a recommended quick start and a few common installation examples.
 
----
+### Quick start
 
-### Available Builds
+The easiest way to install LeafWiki is using the provided installation script:
 
-LeafWiki now builds and runs natively on:
-- **Linux (x86_64 and ARM64)**
-- **macOS (x86_64 and ARM64)**
-- **Windows (x86_64)**
-- **Raspberry Pi (tested with 64-bit OS)**
-
----
-
-## 💭 Why Another Wiki?
-
-After trying out tools like Wiki.js, Confluence, and DokuWiki, I wanted something simpler: no database, easy to host, Markdown-based, and truly Git-friendly.
-
-- Why use a database just to store Markdown?
-- Why should setup be a weekend project?
-- Why can't a wiki just be file-based and fast?
-
-**LeafWiki** was born out of that frustration - and the desire to have:
-
-- 🧾 Clean Markdown files, organized in folders
-- 🧠 A real tree structure, not a flat list
-- ⚙️ A single binary with no external dependencies
-- 🛠️ Something teams can actually self-host without DevOps pain
-
-It’s not trying to be everything - just a solid, lightweight wiki for people who want **clarity over complexity.**
-
----
-
-## 💡 LeafWiki vs. Markdown Readers
-
-LeafWiki is often compared to simple Markdown viewers or file browsers - but it’s built for a very different purpose.
-
-|                 | Markdown Reader             | LeafWiki                                                         |
-|-----------------|-----------------------------| -----------------------------------------------------------------|
-| **Purpose**     | Read static `.md` files     | Create, organize, and serve a structured wiki                    |
-| **Data source** | Reads directly from disk    | Stores pages as Markdown, but manages structure internally       |
-| **Structure**   | Flat folder view            | True tree of pages & subpages                                    |
-| **Editing**     | External text editor        | Built-in Markdown editor with live preview                       |
-| **Uploads**     | Not supported               | Per-page assets (images, files)                                  |
-| **Search**      | File names only             | Indexed full-text search (titles + content)                      |
-| **Hosting**     | Static / local              | Self-hosted Go web app                                           |
-| **Access**      | No authentication           | Role-based access (admin / editor)                               |
-
-> LeafWiki doesn’t just *display* Markdown files - it **organizes, edits, and serves** them.  
-> It’s not a viewer, but a small wiki engine that happens to store everything as Markdown.
-
----
-
-## 🛠️ Installation (Production)
-
-You can install LeafWiki in several environments.  
-Below are some examples to get you started.
-
-### Setup Examples
-- [Install LeafWiki with nginx on Ubuntu](docs/install/nginx.md)
-- [Install LeafWiki on a Raspberry Pi](docs/install/raspberry.md)
-
-### Quick install
 ```bash
 curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh --arch amd64
 ```
 
-This command performs a quick installation of LeafWiki on the target machine.
+This installs LeafWiki as a system service on the target machine.
+The service is started automatically after installation.
+> The installation script has been tested on Ubuntu.
+> Feedback for other distributions is welcome via GitHub issues.
 
-### ⚙️ Flags
+#### Deployment examples 
+- [Install LeafWiki with nginx on Ubuntu](docs/install/nginx.md)
+- [Install LeafWiki on a Raspberry Pi](docs/install/raspberry.md)
+
+
+#### Security notes
+
+Sensitive information such as the JWT secret and administrator password appears in plain text in the systemd service file `/etc/systemd/system/leafwiki.service`.
+Make sure that this file is accessible only to authorized users.
+
+#### Installer script options
+
+The installation script supports a small set of flags that control how LeafWiki is installed on the target system.
+These options are only used during installation and do not affect the runtime behavior of LeafWiki.
 
 | Flag               | Description                                                 | Default       |
 |--------------------|-------------------------------------------------------------|---------------|
@@ -152,19 +165,10 @@ This command performs a quick installation of LeafWiki on the target machine.
 | `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
 | `--port`           | Port the server listens on                                  | `8080`        |
 
-#### ⚠️ Attention - Security
 
-Sensitive information (JWT token, administrator password) appears in plain text in the *_systemd_* file `/etc/systemd/system/leafwiki.service`.
-Make sure that this file is accessible only to authorized users.
+### Docker
 
- >The installation script has been tested on Ubuntu. 
- >If you test the script on other distributions or architectures, please provide feedback by opening an issue on the GitHub repository - this will help us improve compatibility and documentation.
-
----
-
-### Docker installation
-
-You can run LeafWiki in a Docker container:
+You can run LeafWiki as a container using Docker.
 
 ```bash
 docker run -p 8080:8080 \
@@ -174,9 +178,12 @@ docker run -p 8080:8080 \
     --admin-password=yourpassword
 ```
 
-By default, the container runs as root. You can specify a custom data directory using the `--data-dir` option. If you specify a custom data directory, you must also update the volume mapping to point to your chosen directory.
+By default, the container runs as root and stores data in `/app/data`.
 
-If you want to avoid running as root, add `-u 1000:1000`:
+---
+
+**Running as non-root user**
+To avoid running the container as root, specify a user ID:
 
 ```bash
 docker run -p 8080:8080 \
@@ -187,14 +194,17 @@ docker run -p 8080:8080 \
     --admin-password=yourpassword
 ```
 
-By default the data directory inside the container will be `app/data/`
+Make sure that the mounted data directory is writable by the specified user.
+
+The data directory inside the container will be `/app/data`..
 
 ---
 
 ### Manual installation
 
+Download the latest release binary from GitHub, make it executable, and start the server:
+
 ```
-# Download the latest release from GitHub
 chmod +x leafwiki
 ./leafwiki --jwt-secret=yoursecret
 ```
@@ -202,13 +212,18 @@ chmod +x leafwiki
 Default port is `8080`, and the default data directory is `./data`.
 You can change the data directory with the `--data-dir` flag.
 
-> ✅ Native ARM64 builds are available in the [Releases](https://github.com/perber/leafwiki/releases) section.
+The JWT secret is required for authentication and should be kept secure.
+
+
+## Authentication and admin user
 
 ### Default admin user
 
-The first time you run LeafWiki, it will create an admin user with the default password `admin`.
+For security reasons, it is strongly recommended to change the default admin password after the first login.
 
-You can change this password later in the admin settings or by using the CLI:
+On first startup, LeafWiki creates an admin user with the default password `admin`.
+
+The password can be changed later via the admin settings or during startup using the CLI:
 
 ```bash
 ./leafwiki --admin-password=newpassword --jwt-secret=yoursecret
@@ -224,7 +239,12 @@ If you need to reset the admin password, you can do so by running:
 ./leafwiki reset-admin-password
 ```
 
-### ⚙️ CLI Flags
+## Runtime Configuration
+
+LeafWiki can be configured using command-line flags or environment variables.
+These options control how the server runs after installation.
+
+### CLI Flags
 
 | Flag               | Description                                                 | Default       |
 |--------------------|-------------------------------------------------------------|---------------|
@@ -236,9 +256,10 @@ If you need to reset the admin password, you can do so by running:
 | `--public-access`  | Allow public access to the wiki (no auth required)          | `false`       |
    
 
-### 🌱 Environment Variables
+### Environment Variables
 
-Instead of CLI flags, you can also configure LeafWiki using environment variables:
+The same configuration options can also be provided via environment variables.
+This is especially useful in containerized or production environments.
 
 | Variable                 | Description                                                  | Default    |
 |--------------------------|--------------------------------------------------------------|------------|
@@ -251,10 +272,9 @@ Instead of CLI flags, you can also configure LeafWiki using environment variable
 
 These environment variables override the default values and are especially useful in containerized or production environments.
 
-Binding to localhost behind a reverse proxy
--------------------------------------------
+## Reverse proxy setup
 
-If you run a reverse proxy (nginx, Caddy, Traefik) in front of LeafWiki, you may want the Go server to only listen on the loopback interface. You can do that with the `--host` flag or the `LEAFWIKI_HOST` env var:
+When running LeafWiki behind a reverse proxy (nginx, Caddy, Traefik), it is recommended to bind the server to the loopback interface only.
 
 ```bash
 # bind to localhost only
@@ -264,10 +284,11 @@ LEAFWIKI_HOST=127.0.0.1 ./leafwiki --jwt-secret=yoursecret
 ./leafwiki --host 127.0.0.1 --jwt-secret=yoursecret
 ```
 
-When bound to `127.0.0.1`, the server will only listen on localhost and won't be directly reachable from the public internet; the reverse proxy can forward requests from the external interface.
+When bound to `127.0.0.1`, the server is only accessible locally,
+while the reverse proxy handles public traffic.
 
 
-## 🚀 Quick Start (Dev)
+## Quick Start (Dev)
 
 ```
 # 1. Clone the repo
@@ -287,123 +308,25 @@ cd ../../cmd/leafwiki
 go run main.go
 ```
 
+---
 
-## 🗺️ Roadmap
+### Available Builds
 
-### Planned
-- [ ] Table of Contents support
-- [ ] Backlinks between pages
-- [ ] Outgoing links
-- [ ] Versioning / history of pages
-- [ ] You have an idea? Open an issue or PR!
+LeafWiki is available as a native binary for the following platforms:
 
-----
-
-### ✅ v0.1.0 – MVP
-- [x] Tree-based page structure
-- [x] Markdown file creation
-- [x] Slug + file path mapping
-- [x] Move / rename / delete logic
-- [x] Markdown editor with preview
-- [x] File/image uploads per page
-- [x] Simple page title search
-- [x] Asset management (images, files)
-- [x] Basic JWT auth (session-based)
-
-### ✅ v0.2.0 – Improved Editor Experience
-- [x] Use CodeMirror for Markdown editing
-- [x] Add Toolbar with common actions like bold, italic, links, etc.
-- [x] Allow Undo/Redo actions
-
-### ✅ v0.3.4 – Improved Asset Handling
-- [x] Allow uploading multiple files at once
-- [x] Allow renaming of uploaded files
-- [x] Fix caching issues with uploaded assets
-- [x] Fix syntax highlighting in preview
-- [x] Fix favicon not displayed
-- [x] ARM64 support for Raspberry Pi and other ARM devices (thanks @nahaktarun)
-
-### ✅ v0.4.6 – Ready for Dogfooding
-- [x] Add Search functionality for page titles and content
-- [x] Add Mobile optimizations for better usability
-- [x] Allow Public Pages (viewable pages without login)
-- [x] Add shortcuts in the editor (e.g. Ctrl+S to save, Ctrl+B for bold, Ctrl+Z for undo, ...)
-- [x] Smaller improvements and bugfixes in the UI
-- [x] Added "Create & Edit" option to dialog to allow creating structure before editing
-- [x] Warn user about unsaved changes when navigating away (via `beforeunload` and `react-router`)
-- [x] Updated the tree view design – it now has a more documentation-style look
-- [x] Print view support for pages (print-friendly layout)
-
-### ✅ v0.4.7 – Stabilize
-- [x] Several dependencies updates
-- [x] Allow to configure `--host` to bind to specific IP (e.g. `--host 127.0.0.1`) - thanks @magnus-madsen for the suggestion!
-
-### ✅ v0.4.8 – UX Improvements
-- [x] Several dependencies updates
-- [x] Not Found page now suggests creating a new page - thanks @magnus-madsen for the suggestion!
-- [x] links to non-existing pages now show a create page dialog - thanks @magnus-madsen for the suggestion!
-- [x] smaller UI improvements and bugfixes (e.g. green save button, ...)
-
-### ✅ v0.4.9 – Mermaid Support, UX Improvements & Easier Installation
-
-A special thanks for this release goes out to @Hugo-Galley.
-He improved the documentation and the onboarding experience a lot! 
-
-- [x] Mermaid.js diagram support
-- [x] Copy page functionality added
-- [x] Installation script added for binary - thanks to @Hugo-Galley
-- [x] Improved docker builds with multi-arch support (amd64 + arm64)
-- [x] Several UI/UX improvements and bugfixes
-- [x] Stability improvements and dependency updates
-
-### ✅ v0.4.10 – Clipboard Image/File Uploads, Resizable Sidebar and other UX Improvements
-
-- [x] Docker images now have labels and annotations - thanks @Hugo-Galley
-- [x] Installer now has a welcome message - thanks @Hugo-Galley
-- [x] Allow to upload files by using **CTRL+V** in the codemirror editor
-- [x] Improve position for tooltip in the treeview
-- [x] Add toggle to **show & hide the preview**
-- [x] Add **resizable sidebar** - thanks @magnus-madsen for the suggestion!
-- [x] Various bug fixes and UX/UI improvements
-- [x] Better e2e test coverage
-- [x] Dependency updates across the project
-
-### ✅ v0.5.0 – Dark mode, macOS Support and More
-
-- [x] Dark mode support
-- [x] Improve Docker labels and annotations - thanks @Hugo-Galley
-- [x] macOS builds (x86_64 + arm64)
-- [x] Anchor scrolling (jumping to headings in the page)
-- [x] Various bug fixes and UX/UI improvements
-- [x] Dependency updates across the project
-
-### ✅ v0.5.1 – HTML Support in Markdown, Bugfixes and Dependency Updates
-
-- [x] Add HTML support in Markdown pages - thanks @Hugo-Galley for the implementation!
-- [x] Fixed an issue with links in the editor
-- [x] Fixed print view for Dark mode
-- [x] Updated project dependencies
-- [x] Updated docker documentation in the readme - thanks @Hugo-Galley
+- **Linux (x86_64 and ARM64)**
+- **macOS (x86_64 and ARM64)**
+- **Windows (x86_64)**
+- **Raspberry Pi (tested with 64-bit OS)**
 
 ---
 
-## 🧠 Philosophy
+## Contributing
 
-- **Simple to run**: No container, no DB, just Go
-- **Simple to host**: You know where your data is
-- **Simple to trust**: Markdown is portable & future-proof
+Contributions, discussions, and feedback are very welcome.  
+If you have ideas, questions, or run into issues, feel free to open an issue or start a discussion.
 
+## Stay in the loop
 
-Your knowledge should live in files you own - not in a database you maintain.
+Follow the repository to get updates about new releases and ongoing development.
 
----
-
-## 🙋 Contributing
-
-Contributions, discussions and feedback are very welcome.  
-This project is still early – feel free to open issues or ideas!
-
-## 📬 Stay in the Loop
-
-> More updates coming soon.  
-> Watch the repo or drop a star ⭐ if you’re curious!
