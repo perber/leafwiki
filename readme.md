@@ -93,7 +93,7 @@ LeafWiki is built around a small set of clear principles:
 - Full-text search across page titles and content
 - Image and asset support
 - Dark mode and mobile-friendly UI
-- separation between admin and editor users
+- Separation between admin and editor users
 
 LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone service
 
