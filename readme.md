@@ -95,7 +95,7 @@ LeafWiki is built around a small set of clear principles:
 - Dark mode and mobile-friendly UI
 - Separation between admin and editor users
 
-LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone service
+LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone service.
 
 ---
 
