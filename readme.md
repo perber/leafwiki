@@ -46,7 +46,7 @@ LeafWiki works well today for:
 
 ## Why Another Wiki?
 
-After using tools like Wiki.js, Confluence, and DokuWiki, the goal behind LeafWiki was to build something simpler and easier to operate.
+After using several existing wiki and documentation tools, the goal behind LeafWiki was to build something simpler and easier to operate.
 
 Many existing solutions rely on heavy infrastructure or databases, even though the core content is usually just Markdown files.
 
