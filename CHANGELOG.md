@@ -1,7 +1,7 @@
 
 # Changelog
 
-This document records notable changes to LeafWiki,
+This document records notable changes to LeafWiki, organized by release.
 
 ## ✅ v0.1.0 – MVP
 - [x] Tree-based page structure
