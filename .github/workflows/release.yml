@@ -62,7 +62,7 @@ jobs:
         run: |
           make changelog PREVIOUS=${{ steps.latest.outputs.tag }} CURRENT=${{ github.ref_name }}
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat changelog.md >> $GITHUB_OUTPUT
+          cat current_release_changelog.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Publish GitHub Release
