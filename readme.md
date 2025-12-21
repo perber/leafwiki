@@ -274,8 +274,7 @@ These environment variables override the default values and are especially usefu
 
 ## Reverse proxy setup
 
-When running LeafWiki behind a reverse proxy (nginx, Caddy, Traefik),
-it is recommended to bind the server to the loopback interface only.
+When running LeafWiki behind a reverse proxy (nginx, Caddy, Traefik), it is recommended to bind the server to the loopback interface only.
 
 ```bash
 # bind to localhost only
