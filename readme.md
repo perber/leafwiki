@@ -111,7 +111,7 @@ It intentionally avoids complex workflows, real-time collaborative editing, and 
 
 LeafWiki has reached a **stable and usable foundation**, and it’s already being used by developers to organize and document their knowledge.  
 
-The project is  **not feature-complete yet**, by design.  
+The project is **not feature-complete yet**, by design.  
 The current focus is on **refining existing functionality**, improving **stability**, and evolving the platform carefully toward a wiki for long-term use.
 
 **Current priorities:**  
