@@ -89,6 +89,7 @@ LeafWiki is built around a small set of clear principles:
 
 - Built-in Markdown editor
 - Tree-based navigation for structured content
+- Public read-only access
 - Support for diagrams via Mermaid
 - Full-text search across page titles and content
 - Image and asset support
@@ -96,6 +97,9 @@ LeafWiki is built around a small set of clear principles:
 - Separation between admin and editor users
 
 LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone service.
+
+LeafWiki supports public read-only access for documentation use cases,
+while keeping editing and structure management restricted to authenticated users.
 
 ---
 
@@ -255,7 +259,7 @@ These options control how the server runs after installation.
 | `--port`           | Port the server listens on                                  | `8080`        |
 | `--data-dir`       | Directory where data is stored                              | `./data`      |
 | `--admin-password` | Initial admin password (used only if no admin exists)       | `admin`       |
-| `--public-access`  | Allow public access to the wiki (no auth required)          | `false`       |
+| `--public-access`  | Allow public read-only access                               | `false`       |
    
 
 ### Environment Variables
@@ -270,7 +274,7 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_DATA_DIR`      | Path to the data storage directory                           | `./data`   |
 | `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | `admin`    |
 | `LEAFWIKI_JWT_SECRET`    | Secret used to sign JWT tokens *(required)*                  | –          |
-| `LEAFWIKI_PUBLIC_ACCESS` | Allow public access to the wiki (no auth required)           | `false`    |
+| `LEAFWIKI_PUBLIC_ACCESS` | Allow public read-only access                                | `false`    |
 
 These environment variables override the default values and are especially useful in containerized or production environments.
 
