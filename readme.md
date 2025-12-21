@@ -196,7 +196,7 @@ docker run -p 8080:8080 \
 
 Make sure that the mounted data directory is writable by the specified user.
 
-The data directory inside the container will be `/app/data`.
+The data directory inside the container will be `/app/data`..
 
 ---
 
