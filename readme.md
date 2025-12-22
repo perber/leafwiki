@@ -1,10 +1,9 @@
 # 🌿 LeafWiki
 
-**A lightweight, tree-based wiki that stores content as plain Markdown and is designed to be self-hosted.**  
+**A lightweight, tree-based wiki for technical and operational documentation, designed to be self-hosted and evolving toward team-oriented use cases.**  
 
-> *Run your knowledge base as a single Go binary, without requiring an external database.*
 
-LeafWiki is designed for individuals and small teams who want a self-hosted wiki with full control over structure, content, and deployment.
+LeafWiki is designed for individuals and small teams who want a self-hosted wiki with full control over structure, content, and deployment, with a focus on technical and operational documentation.
 
 ---
 
@@ -38,9 +37,10 @@ The demo instance resets automatically every hour, so all changes are temporary.
 ## What LeafWiki is good for today
 
 LeafWiki works well today for: 
-- personal knowledge bases
-- project and technical documentation
-- structured notes and long-term knowledge organization
+- A personal knowledge base or wiki managed by one main maintainer
+- Project or technical documentation with low concurrent editing
+- Operational or engineering documentation maintained by a small team or a primary owner
+- Structured notes that benefit from explicit hierarchy and ordering
 
 ---
 
@@ -65,6 +65,10 @@ The result is a lightweight wiki engine with:
 
 LeafWiki intentionally prioritizes clarity and simplicity over feature completeness.
 
+In operational and engineering contexts, documentation often needs to be reliable, easy to update, and simple to operate over long periods of time.
+LeafWiki is designed to support these needs without introducing unnecessary operational complexity.
+
+
 ---
 
 ## Core principles
@@ -82,6 +86,13 @@ LeafWiki is built around a small set of clear principles:
 
 - **Self-hosted by design**
   LeafWiki is designed to run on a single server with minimal operational overhead.
+
+---
+
+### Data model
+
+LeafWiki stores page content as Markdown files and uses a combination of JSON and SQLite for navigation, metadata, and search.
+For details on the current model and its constraints, see [Known limitations](#known-limitations).
 
 ---
 
@@ -111,11 +122,10 @@ It intentionally avoids complex workflows, real-time collaborative editing, and 
 
 ---
 
-## Growing with Purpose
+## Project Status
 
-LeafWiki has reached a **stable and usable foundation**, and it’s already being used by developers to organize and document their knowledge.  
-
-The project is **not feature-complete yet**, by design.  
+LeafWiki provides a stable base for everyday use, but is not feature-complete yet.
+Some foundational features, especially around long-term content safety and collaboration, are still evolving and under active development.
 The current focus is on **refining existing functionality**, improving **stability**, and evolving the platform carefully toward a wiki for long-term use.
 
 **Current priorities:**  
@@ -129,6 +139,9 @@ More advanced team features, such as versioning, are planned for future iteratio
 > **LeafWiki** is actively developed and open to collaboration 🌿 
 
 For a detailed history of changes and releases, see the [CHANGELOG](CHANGELOG.md).
+
+Longer term, LeafWiki aims to better support team-oriented workflows common in operations and engineering environments, while preserving its focus on simplicity and predictability.
+
 
 ---
 
@@ -313,6 +326,30 @@ npm run dev   # Starts Vite dev server on http://localhost:5173
 cd ../../cmd/leafwiki
 go run main.go
 ```
+
+---
+
+## Known limitations
+
+LeafWiki intentionally focuses on simplicity and a well-defined scope.
+As a result, there are some important limitations to be aware of:
+
+- **No page history or versioning**  
+  Page edits overwrite previous content. Regular backups of the data directory are strongly recommended.
+
+- **Basic concurrent editing model**  
+  When multiple users edit the same page at the same time, the last saved version wins.
+  LeafWiki is best suited for single maintainers or low-concurrency use.
+
+- **Metadata stored outside Markdown files**  
+  While page content is stored as Markdown files on disk, navigation structure is stored as JSON, and user data, metadata, and search indexes are stored in SQLite.
+
+- **Limited permission model**  
+  LeafWiki does not provide fine-grained permissions or complex role-based access control.
+
+- **Security defaults require attention**  
+  Initial setup uses simple defaults intended for local or first-time use.
+  Admin credentials and secrets should be reviewed and secured before exposing LeafWiki publicly.
 
 ---
 
