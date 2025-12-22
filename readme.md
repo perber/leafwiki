@@ -91,8 +91,8 @@ LeafWiki is built around a small set of clear principles:
 
 ### Data model
 
-Markdown files store page content.
-Navigation structure is stored as JSON, while user data, metadata, and search indexes are stored in SQLite.
+LeafWiki stores page content as Markdown files and uses a combination of JSON and SQLite for navigation, metadata, and search.
+For details on the current model and its constraints, see [Known limitations](#known-limitations).
 
 ---
 
