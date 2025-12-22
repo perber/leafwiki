@@ -30,7 +30,6 @@ type Wiki struct {
 }
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
-var defaultAdminPassword = "admin"
 
 func collectSubtreeIDs(node *tree.PageNode) []string {
 	var ids []string
@@ -55,10 +54,6 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 	store, err := auth.NewUserStore(storageDir)
 	if err != nil {
 		return nil, err
-	}
-
-	if adminPassword == "" {
-		adminPassword = defaultAdminPassword
 	}
 
 	// Initialize the user service
