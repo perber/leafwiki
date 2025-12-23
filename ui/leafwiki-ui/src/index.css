@@ -894,6 +894,35 @@
     @apply inline;
   }
 
+  /* Backlinks pane extensions */
+  .backlinks__group {
+    @apply mt-4;
+  }
+
+  .backlinks__group-title {
+    @apply text-muted mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide;
+  }
+
+  .backlinks__subgroup-title {
+    @apply text-muted mt-3 mb-1 text-xs font-medium;
+  }
+
+  .backlinks__badge {
+    @apply bg-surface-alt border-surface-border text-interface-text rounded border px-2 py-0.5 text-[11px];
+  }
+
+  .backlinks__empty {
+    @apply text-muted text-xs italic;
+  }
+
+  .backlinks__item--broken a {
+    @apply text-error;
+  }
+
+  .backlinks__item--broken a:hover {
+    @apply hover:bg-error/10;
+  }
+
   /* user management */
   .user-management {
     @apply mx-auto max-w-4xl p-6;
