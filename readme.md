@@ -129,12 +129,12 @@ Some foundational features, especially around long-term content safety and colla
 The current focus is on **refining existing functionality**, improving **stability**, and evolving the platform carefully toward a wiki for long-term use.
 
 **Current priorities:**  
-- Table of Contents support
-- Backlinks between pages
-- History / Versioning of pages
+- Versioning
+- Operations Metadata
+- Optimistic Locking
 
 The editor and admin features are in place, but collaboration is still basic and currently following a *last-write-wins* approach.
-More advanced team features, such as versioning, are planned for future iterations.
+More advanced team features, such as versioning, are now active priorities and are being developed iteratively.
 
 > **LeafWiki** is actively developed and open to collaboration 🌿 
 
