@@ -88,3 +88,9 @@ He improved the documentation and the onboarding experience a lot!
 - [x] Fixed print view for Dark mode
 - [x] Updated project dependencies
 - [x] Updated docker documentation in the readme - thanks @Hugo-Galley
+
+## ✅ v0.6.0 – Backlink Support added
+
+- [x] Added backlink support
+- [x] Updated project dependencies
+- [x] Fail on missing flag `--admin-password` to avoid accidental public exposure
