@@ -887,11 +887,15 @@
   }
 
   .backlinks__item a {
-    @apply hover:bg-tree-node-hover hover:text-brand !text-interface-text inline-block rounded-md pt-2 pr-5 pb-2 pl-2;
+    @apply hover:bg-tree-node-hover hover:text-brand text-interface-text! inline-block rounded-md pt-2 pr-5 pb-2 pl-2 text-xs leading-snug;
   }
 
   .backlinks__item .backlinks__icon {
     @apply inline;
+  }
+
+  .backlinks__icon {
+    @apply scale-90 opacity-50;
   }
 
   /* Backlinks pane extensions */
