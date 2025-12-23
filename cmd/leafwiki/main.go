@@ -109,6 +109,10 @@ func main() {
 		log.Fatal("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
 	}
 
+	if adminPassword == "" {
+		log.Fatalf("admin password is required. Set it using using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
+	}
+
 	enableSearchIndexing := true
 	w, err := wiki.NewWiki(dataDir, adminPassword, jwtSecret, enableSearchIndexing)
 	if err != nil {
