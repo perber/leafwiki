@@ -182,6 +182,7 @@ func toBacklinkResultItem(tree *tree.TreeService, backlink Backlink) BacklinkRes
 		FromTitle:  backlink.FromTitle,
 		FromPath:   page.CalculatePath(),
 		ToPageID:   backlink.ToPageID,
+		Broken:     backlink.Broken,
 	}
 }
 

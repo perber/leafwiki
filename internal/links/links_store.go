@@ -260,6 +260,42 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 	return outgoings, nil
 }
 
+func (s *LinksStore) GetBrokenIncomingForPath(toPath string) ([]Backlink, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query(`
+		SELECT from_page_id, to_page_id, from_title
+		FROM links
+		WHERE to_path = ? AND broken = 1
+		ORDER BY from_title ASC
+	`, toPath)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var backlinks []Backlink
+	for rows.Next() {
+		var b Backlink
+		var toPageID sql.NullString
+		if err := rows.Scan(&b.FromPageID, &toPageID, &b.FromTitle); err != nil {
+			return nil, err
+		}
+		if toPageID.Valid {
+			b.ToPageID = toPageID.String
+		} else {
+			b.ToPageID = ""
+		}
+		backlinks = append(backlinks, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return backlinks, nil
+}
+
 func (s *LinksStore) HealLinksForPath(toPath string, pageID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
