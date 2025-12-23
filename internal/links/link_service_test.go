@@ -677,14 +677,14 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 	}
 
 	// Verify the links come from pages A and B
-	fromPageIDs := map[string]bool{}
+	fromPageIDs := map[string]struct{}{}
 	for _, link := range brokenLinks {
-		fromPageIDs[link.FromPageID] = true
+		fromPageIDs[link.FromPageID] = struct{}{}
 	}
-	if !fromPageIDs[pageAID] {
+	if _, found := fromPageIDs[pageAID]; !found {
 		t.Errorf("expected broken link from page A (%s)", pageAID)
 	}
-	if !fromPageIDs[pageBID] {
+	if _, found := fromPageIDs[pageBID]; !found {
 		t.Errorf("expected broken link from page B (%s)", pageBID)
 	}
 }
@@ -821,7 +821,8 @@ func TestLinksStore_GetBrokenIncomingForPath_OrdersByFromTitle(t *testing.T) {
 	}
 
 	// All three pages link to the same non-existent page
-	for _, id := range []string{*zIDPtr, *aIDPtr, *mIDPtr} {
+	pageIDs := []string{*zIDPtr, *aIDPtr, *mIDPtr}
+	for _, id := range pageIDs {
 		page, err := ts.GetPage(id)
 		if err != nil {
 			t.Fatalf("GetPage(%s) failed: %v", id, err)
