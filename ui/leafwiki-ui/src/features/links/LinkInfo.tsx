@@ -4,14 +4,15 @@ import { Link } from 'react-router-dom'
 import { useViewerStore } from '../viewer/viewer'
 import { useLinkStatusStore } from './linkstatus_store'
 
-
 export function BacklinkInfo() {
   const pageID = useViewerStore((s) => s.page?.id)
 
   const loading = useLinkStatusStore((s) => s.loading)
   const error = useLinkStatusStore((s) => s.error)
   const status = useLinkStatusStore((s) => s.status)
-  const fetchLinkStatusForPage = useLinkStatusStore((s) => s.fetchLinkStatusForPage)
+  const fetchLinkStatusForPage = useLinkStatusStore(
+    (s) => s.fetchLinkStatusForPage,
+  )
   const clear = useLinkStatusStore((s) => s.clear)
 
   useEffect(() => {
@@ -29,16 +30,15 @@ export function BacklinkInfo() {
   return (
     <div className="backlinks__pane">
       <div className="backlinks__header">
-        <h2 className="mb-2 text-lg font-medium">
-          Impact
-        </h2>
+        <h2 className="mb-2 text-lg font-medium">Impact</h2>
       </div>
 
       <div className="backlinks__content">
         {/* Referenced by */}
         <div className="backlinks__group">
           <div className="backlinks__group-title">
-            Referenced by <span className="backlinks__badge">{backlinks.length}</span>
+            Referenced by{' '}
+            <span className="backlinks__badge">{backlinks.length}</span>
           </div>
 
           {backlinks.length > 0 ? (
@@ -46,7 +46,8 @@ export function BacklinkInfo() {
               {backlinks.map((bl) => (
                 <li key={bl.from_page_id} className="backlinks__item">
                   <Link to={bl.from_path}>
-                    <Paperclip size={16} className="backlinks__icon" /> {bl.from_title}
+                    <Paperclip size={16} className="backlinks__icon" />{' '}
+                    {bl.from_title}
                   </Link>
                 </li>
               ))}
@@ -79,16 +80,23 @@ export function BacklinkInfo() {
             <>
               {brokenOutgoings.length > 0 && (
                 <>
-                  <div className="backlinks__subgroup-title">This page links to missing targets</div>
+                  <div className="backlinks__subgroup-title">
+                    This page links to missing targets
+                  </div>
                   <ul>
                     {brokenOutgoings.map((ol) => (
-                      <li key={ol.to_path} className="backlinks__item backlinks__item--broken">
+                      <li
+                        key={ol.to_path}
+                        className="backlinks__item backlinks__item--broken"
+                      >
                         <span className="backlinks__icon-inline">
                           <Link2Off size={16} className="backlinks__icon" />
                         </span>
                         <span className="ml-1">
                           {ol.to_page_title ? `${ol.to_page_title} ` : ''}
-                          <span className="text-muted font-mono text-xs">{ol.to_path}</span>
+                          <span className="text-muted font-mono text-xs">
+                            {ol.to_path}
+                          </span>
                         </span>
                       </li>
                     ))}
@@ -98,12 +106,18 @@ export function BacklinkInfo() {
 
               {brokenIncoming.length > 0 && (
                 <>
-                  <div className="backlinks__subgroup-title">Pages linking to an old path</div>
+                  <div className="backlinks__subgroup-title">
+                    Pages linking to an old path
+                  </div>
                   <ul>
                     {brokenIncoming.map((bl) => (
-                      <li key={bl.from_page_id} className="backlinks__item backlinks__item--broken">
+                      <li
+                        key={bl.from_page_id}
+                        className="backlinks__item backlinks__item--broken"
+                      >
                         <Link to={bl.from_path}>
-                          <Link2Off size={16} className="backlinks__icon" /> {bl.from_title}
+                          <Link2Off size={16} className="backlinks__icon" />{' '}
+                          {bl.from_title}
                         </Link>
                       </li>
                     ))}

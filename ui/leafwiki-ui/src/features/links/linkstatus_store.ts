@@ -26,7 +26,8 @@ export const useLinkStatusStore = create<LinkStatusStore>((set) => ({
       const data = await fetchLinkStatus(pageId)
       set({ status: data, loading: false })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to fetch link status'
+      const msg =
+        err instanceof Error ? err.message : 'Failed to fetch link status'
       set({ error: msg, loading: false })
     }
   },

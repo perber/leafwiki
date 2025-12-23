@@ -900,7 +900,7 @@
   }
 
   .backlinks__group-title {
-    @apply text-muted mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide;
+    @apply text-muted mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase;
   }
 
   .backlinks__subgroup-title {

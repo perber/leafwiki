@@ -31,7 +31,9 @@ export type LinkStatusResult = {
   counts: LinkStatusCounts
 }
 
-export async function fetchLinkStatus(pageId: string): Promise<LinkStatusResult> {
+export async function fetchLinkStatus(
+  pageId: string,
+): Promise<LinkStatusResult> {
   if (!pageId) throw new Error('Page ID is required')
   return (await fetchWithAuth(`/api/pages/${pageId}/links`)) as LinkStatusResult
 }
