@@ -599,3 +599,422 @@ func TestLinkService_HealOnPageCreate_ResolvesBrokenLinksWithoutReindex(t *testi
 		t.Fatalf("expected backlink ToPageID %q, got %q", pageBID, bl.Backlinks[0].ToPageID)
 	}
 }
+
+func TestLinkService_GetLinkStatusForPage_WithValidLinks(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	// Create page A that has a backlink from page C
+	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	// Create page B that page A links to
+	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	// Create page C that links to page A
+	cIDPtr, err := ts.CreatePage(nil, "Page C", "c")
+	if err != nil {
+		t.Fatalf("CreatePage C failed: %v", err)
+	}
+	pageCID := *cIDPtr
+
+	// Set up page A with a link to page B
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link to B: [Go to B](/b)"); err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Set up page C with a link to page A
+	pageC, err := ts.GetPage(pageCID)
+	if err != nil {
+		t.Fatalf("GetPage C failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageC.ID, pageC.Title, pageC.Slug, "Link to A: [Go to A](/a)"); err != nil {
+		t.Fatalf("UpdatePage C failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	// Test GetLinkStatusForPage for page A
+	result, err := svc.GetLinkStatusForPage(pageAID, "/a")
+	if err != nil {
+		t.Fatalf("GetLinkStatusForPage failed: %v", err)
+	}
+
+	// Verify backlinks (from C to A)
+	if len(result.Backlinks) != 1 {
+		t.Errorf("expected 1 backlink, got %d: %#v", len(result.Backlinks), result.Backlinks)
+	} else {
+		if result.Backlinks[0].FromPageID != pageCID {
+			t.Errorf("backlink FromPageID = %q, want %q", result.Backlinks[0].FromPageID, pageCID)
+		}
+	}
+
+	// Verify no broken incoming
+	if len(result.BrokenIncoming) != 0 {
+		t.Errorf("expected 0 broken incoming, got %d: %#v", len(result.BrokenIncoming), result.BrokenIncoming)
+	}
+
+	// Verify outgoing links (from A to B)
+	if len(result.Outgoings) != 1 {
+		t.Errorf("expected 1 outgoing, got %d: %#v", len(result.Outgoings), result.Outgoings)
+	} else {
+		if result.Outgoings[0].ToPageID != pageBID {
+			t.Errorf("outgoing ToPageID = %q, want %q", result.Outgoings[0].ToPageID, pageBID)
+		}
+		if result.Outgoings[0].Broken {
+			t.Errorf("outgoing should not be broken")
+		}
+	}
+
+	// Verify no broken outgoing
+	if len(result.BrokenOutgoings) != 0 {
+		t.Errorf("expected 0 broken outgoing, got %d: %#v", len(result.BrokenOutgoings), result.BrokenOutgoings)
+	}
+
+	// Verify counts
+	if result.Counts.Backlinks != 1 {
+		t.Errorf("Counts.Backlinks = %d, want 1", result.Counts.Backlinks)
+	}
+	if result.Counts.BrokenIncoming != 0 {
+		t.Errorf("Counts.BrokenIncoming = %d, want 0", result.Counts.BrokenIncoming)
+	}
+	if result.Counts.Outgoings != 1 {
+		t.Errorf("Counts.Outgoings = %d, want 1", result.Counts.Outgoings)
+	}
+	if result.Counts.BrokenOutgoings != 0 {
+		t.Errorf("Counts.BrokenOutgoings = %d, want 0", result.Counts.BrokenOutgoings)
+	}
+}
+
+func TestLinkService_GetLinkStatusForPage_WithBrokenLinks(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	// Create page A
+	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	// Create page B that will link to non-existent page A child
+	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	// Set up page A with broken outgoing links
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Broken link: [Missing](/missing)\nAnother broken: [Ghost](/ghost)"); err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Set up page B with a broken link pointing to where page A could have been
+	pageB, err := ts.GetPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetPage B failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageB.ID, pageB.Title, pageB.Slug, "Link to non-existent A child: [Go](/a/child)"); err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	// Test GetLinkStatusForPage for page A to see its broken outgoings
+	result, err := svc.GetLinkStatusForPage(pageAID, "/a")
+	if err != nil {
+		t.Fatalf("GetLinkStatusForPage failed: %v", err)
+	}
+
+	// Verify no valid backlinks
+	if len(result.Backlinks) != 0 {
+		t.Errorf("expected 0 backlinks, got %d: %#v", len(result.Backlinks), result.Backlinks)
+	}
+
+	// Verify no broken incoming for page A at /a
+	if len(result.BrokenIncoming) != 0 {
+		t.Errorf("expected 0 broken incoming for /a, got %d: %#v", len(result.BrokenIncoming), result.BrokenIncoming)
+	}
+
+	// Verify no valid outgoing
+	if len(result.Outgoings) != 0 {
+		t.Errorf("expected 0 valid outgoing, got %d: %#v", len(result.Outgoings), result.Outgoings)
+	}
+
+	// Verify broken outgoing links
+	if len(result.BrokenOutgoings) != 2 {
+		t.Errorf("expected 2 broken outgoing, got %d: %#v", len(result.BrokenOutgoings), result.BrokenOutgoings)
+	} else {
+		// Check that both broken links are present
+		paths := make(map[string]bool)
+		for _, out := range result.BrokenOutgoings {
+			if !out.Broken {
+				t.Errorf("outgoing should be marked as broken: %#v", out)
+			}
+			if out.ToPageID != "" {
+				t.Errorf("broken outgoing should have empty ToPageID, got %q", out.ToPageID)
+			}
+			paths[out.ToPath] = true
+		}
+		if !paths["/missing"] {
+			t.Errorf("missing path '/missing' in broken outgoings")
+		}
+		if !paths["/ghost"] {
+			t.Errorf("missing path '/ghost' in broken outgoings")
+		}
+	}
+
+	// Verify counts
+	if result.Counts.Backlinks != 0 {
+		t.Errorf("Counts.Backlinks = %d, want 0", result.Counts.Backlinks)
+	}
+	if result.Counts.BrokenIncoming != 0 {
+		t.Errorf("Counts.BrokenIncoming = %d, want 0", result.Counts.BrokenIncoming)
+	}
+	if result.Counts.Outgoings != 0 {
+		t.Errorf("Counts.Outgoings = %d, want 0", result.Counts.Outgoings)
+	}
+	if result.Counts.BrokenOutgoings != 2 {
+		t.Errorf("Counts.BrokenOutgoings = %d, want 2", result.Counts.BrokenOutgoings)
+	}
+}
+
+func TestLinkService_GetLinkStatusForPage_WithBrokenIncoming(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	// Create page B that will have a link pointing to a non-existent path /a/subpage
+	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	pageB, err := ts.GetPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetPage B failed: %v", err)
+	}
+	// Page B links to /a/subpage which doesn't exist
+	if err := ts.UpdatePage(pageB.ID, pageB.Title, pageB.Slug, "Link to non-existent: [Subpage](/a/subpage)"); err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	// Now query for the broken incoming links at path /a/subpage
+	result, err := svc.GetLinkStatusForPage("", "/a/subpage")
+	if err != nil {
+		t.Fatalf("GetLinkStatusForPage failed: %v", err)
+	}
+
+	// Verify no valid backlinks (since the page doesn't exist)
+	if len(result.Backlinks) != 0 {
+		t.Errorf("expected 0 backlinks, got %d: %#v", len(result.Backlinks), result.Backlinks)
+	}
+
+	// Verify broken incoming links
+	if len(result.BrokenIncoming) != 1 {
+		t.Errorf("expected 1 broken incoming, got %d: %#v", len(result.BrokenIncoming), result.BrokenIncoming)
+	} else {
+		if result.BrokenIncoming[0].FromPageID != pageBID {
+			t.Errorf("broken incoming FromPageID = %q, want %q", result.BrokenIncoming[0].FromPageID, pageBID)
+		}
+	}
+
+	// Verify no outgoing (since the page with ID "" doesn't exist)
+	if len(result.Outgoings) != 0 {
+		t.Errorf("expected 0 outgoing, got %d: %#v", len(result.Outgoings), result.Outgoings)
+	}
+
+	// Verify counts
+	if result.Counts.Backlinks != 0 {
+		t.Errorf("Counts.Backlinks = %d, want 0", result.Counts.Backlinks)
+	}
+	if result.Counts.BrokenIncoming != 1 {
+		t.Errorf("Counts.BrokenIncoming = %d, want 1", result.Counts.BrokenIncoming)
+	}
+	if result.Counts.Outgoings != 0 {
+		t.Errorf("Counts.Outgoings = %d, want 0", result.Counts.Outgoings)
+	}
+	if result.Counts.BrokenOutgoings != 0 {
+		t.Errorf("Counts.BrokenOutgoings = %d, want 0", result.Counts.BrokenOutgoings)
+	}
+}
+
+func TestLinkService_GetLinkStatusForPage_MixedLinks(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	// Create a more complex scenario with mixed link types
+	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	cIDPtr, err := ts.CreatePage(nil, "Page C", "c")
+	if err != nil {
+		t.Fatalf("CreatePage C failed: %v", err)
+	}
+	pageCID := *cIDPtr
+
+	// Page A has:
+	// - one valid outgoing link to B
+	// - one broken outgoing link
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Valid: [B](/b)\nBroken: [Missing](/missing)"); err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Page B links to page A (creates a backlink for A)
+	pageB, err := ts.GetPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetPage B failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageB.ID, pageB.Title, pageB.Slug, "Back to [A](/a)"); err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	// Page C links to page A (another backlink for A)
+	pageC, err := ts.GetPage(pageCID)
+	if err != nil {
+		t.Fatalf("GetPage C failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageC.ID, pageC.Title, pageC.Slug, "Also to [A](/a)"); err != nil {
+		t.Fatalf("UpdatePage C failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	// Test GetLinkStatusForPage for page A
+	result, err := svc.GetLinkStatusForPage(pageAID, "/a")
+	if err != nil {
+		t.Fatalf("GetLinkStatusForPage failed: %v", err)
+	}
+
+	// Verify backlinks (from B and C to A)
+	if len(result.Backlinks) != 2 {
+		t.Errorf("expected 2 backlinks, got %d: %#v", len(result.Backlinks), result.Backlinks)
+	}
+
+	// Verify no broken incoming
+	if len(result.BrokenIncoming) != 0 {
+		t.Errorf("expected 0 broken incoming, got %d: %#v", len(result.BrokenIncoming), result.BrokenIncoming)
+	}
+
+	// Verify one valid outgoing (to B)
+	if len(result.Outgoings) != 1 {
+		t.Errorf("expected 1 valid outgoing, got %d: %#v", len(result.Outgoings), result.Outgoings)
+	} else {
+		if result.Outgoings[0].ToPageID != pageBID {
+			t.Errorf("outgoing ToPageID = %q, want %q", result.Outgoings[0].ToPageID, pageBID)
+		}
+	}
+
+	// Verify one broken outgoing
+	if len(result.BrokenOutgoings) != 1 {
+		t.Errorf("expected 1 broken outgoing, got %d: %#v", len(result.BrokenOutgoings), result.BrokenOutgoings)
+	} else {
+		if result.BrokenOutgoings[0].ToPath != "/missing" {
+			t.Errorf("broken outgoing ToPath = %q, want '/missing'", result.BrokenOutgoings[0].ToPath)
+		}
+	}
+
+	// Verify counts
+	if result.Counts.Backlinks != 2 {
+		t.Errorf("Counts.Backlinks = %d, want 2", result.Counts.Backlinks)
+	}
+	if result.Counts.BrokenIncoming != 0 {
+		t.Errorf("Counts.BrokenIncoming = %d, want 0", result.Counts.BrokenIncoming)
+	}
+	if result.Counts.Outgoings != 1 {
+		t.Errorf("Counts.Outgoings = %d, want 1", result.Counts.Outgoings)
+	}
+	if result.Counts.BrokenOutgoings != 1 {
+		t.Errorf("Counts.BrokenOutgoings = %d, want 1", result.Counts.BrokenOutgoings)
+	}
+}
+
+func TestLinkService_GetLinkStatusForPage_NoLinks(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	// Create an isolated page with no links
+	aIDPtr, err := ts.CreatePage(nil, "Lonely Page", "lonely")
+	if err != nil {
+		t.Fatalf("CreatePage lonely failed: %v", err)
+	}
+	lonelyID := *aIDPtr
+
+	page, err := ts.GetPage(lonelyID)
+	if err != nil {
+		t.Fatalf("GetPage lonely failed: %v", err)
+	}
+	if err := ts.UpdatePage(page.ID, page.Title, page.Slug, "Just text, no links at all."); err != nil {
+		t.Fatalf("UpdatePage lonely failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	result, err := svc.GetLinkStatusForPage(lonelyID, "/lonely")
+	if err != nil {
+		t.Fatalf("GetLinkStatusForPage failed: %v", err)
+	}
+
+	// Verify everything is empty
+	if len(result.Backlinks) != 0 {
+		t.Errorf("expected 0 backlinks, got %d", len(result.Backlinks))
+	}
+	if len(result.BrokenIncoming) != 0 {
+		t.Errorf("expected 0 broken incoming, got %d", len(result.BrokenIncoming))
+	}
+	if len(result.Outgoings) != 0 {
+		t.Errorf("expected 0 outgoing, got %d", len(result.Outgoings))
+	}
+	if len(result.BrokenOutgoings) != 0 {
+		t.Errorf("expected 0 broken outgoing, got %d", len(result.BrokenOutgoings))
+	}
+
+	// Verify all counts are zero
+	if result.Counts.Backlinks != 0 {
+		t.Errorf("Counts.Backlinks = %d, want 0", result.Counts.Backlinks)
+	}
+	if result.Counts.BrokenIncoming != 0 {
+		t.Errorf("Counts.BrokenIncoming = %d, want 0", result.Counts.BrokenIncoming)
+	}
+	if result.Counts.Outgoings != 0 {
+		t.Errorf("Counts.Outgoings = %d, want 0", result.Counts.Outgoings)
+	}
+	if result.Counts.BrokenOutgoings != 0 {
+		t.Errorf("Counts.BrokenOutgoings = %d, want 0", result.Counts.BrokenOutgoings)
+	}
+}
