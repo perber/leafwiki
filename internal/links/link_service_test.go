@@ -599,3 +599,331 @@ func TestLinkService_HealOnPageCreate_ResolvesBrokenLinksWithoutReindex(t *testi
 		t.Fatalf("expected backlink ToPageID %q, got %q", pageBID, bl.Backlinks[0].ToPageID)
 	}
 }
+
+func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
+	svc, ts, store := setupLinkService(t)
+
+	// Create three pages: A, B, C
+	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	cIDPtr, err := ts.CreatePage(nil, "Page C", "c")
+	if err != nil {
+		t.Fatalf("CreatePage C failed: %v", err)
+	}
+	pageCID := *cIDPtr
+
+	// Update A and B to link to a non-existent page "/nonexistent"
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link: [Missing](/nonexistent)"); err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	pageB, err := ts.GetPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetPage B failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageB.ID, pageB.Title, pageB.Slug, "Link: [Missing](/nonexistent)"); err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	// Page C links to a different broken page
+	pageC, err := ts.GetPage(pageCID)
+	if err != nil {
+		t.Fatalf("GetPage C failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageC.ID, pageC.Title, pageC.Slug, "Link: [Other](/other-missing)"); err != nil {
+		t.Fatalf("UpdatePage C failed: %v", err)
+	}
+
+	// Index all pages to create broken links
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	// Test: GetBrokenIncomingForPath should return broken links for "/nonexistent"
+	brokenLinks, err := store.GetBrokenIncomingForPath("/nonexistent")
+	if err != nil {
+		t.Fatalf("GetBrokenIncomingForPath failed: %v", err)
+	}
+
+	if len(brokenLinks) != 2 {
+		t.Fatalf("expected 2 broken links for /nonexistent, got %d: %#v", len(brokenLinks), brokenLinks)
+	}
+
+	// Verify all returned links are marked as broken
+	for i, link := range brokenLinks {
+		if !link.Broken {
+			t.Errorf("brokenLinks[%d].Broken = %v, want true", i, link.Broken)
+		}
+		if link.ToPageID != "" {
+			t.Errorf("brokenLinks[%d].ToPageID = %q, want empty string for broken link", i, link.ToPageID)
+		}
+		if link.FromTitle == "" {
+			t.Errorf("brokenLinks[%d].FromTitle should not be empty", i)
+		}
+	}
+
+	// Verify the links come from pages A and B
+	fromPageIDs := map[string]bool{}
+	for _, link := range brokenLinks {
+		fromPageIDs[link.FromPageID] = true
+	}
+	if !fromPageIDs[pageAID] {
+		t.Errorf("expected broken link from page A (%s)", pageAID)
+	}
+	if !fromPageIDs[pageBID] {
+		t.Errorf("expected broken link from page B (%s)", pageBID)
+	}
+}
+
+func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
+	svc, ts, store := setupLinkService(t)
+
+	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	// Page A links to "/missing1"
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link: [Missing1](/missing1)"); err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Page B links to "/missing2"
+	pageB, err := ts.GetPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetPage B failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageB.ID, pageB.Title, pageB.Slug, "Link: [Missing2](/missing2)"); err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	// Test: Should only return broken links for "/missing1"
+	broken1, err := store.GetBrokenIncomingForPath("/missing1")
+	if err != nil {
+		t.Fatalf("GetBrokenIncomingForPath(/missing1) failed: %v", err)
+	}
+
+	if len(broken1) != 1 {
+		t.Fatalf("expected 1 broken link for /missing1, got %d: %#v", len(broken1), broken1)
+	}
+	if broken1[0].FromPageID != pageAID {
+		t.Errorf("broken link FromPageID = %q, want %q", broken1[0].FromPageID, pageAID)
+	}
+
+	// Test: Should only return broken links for "/missing2"
+	broken2, err := store.GetBrokenIncomingForPath("/missing2")
+	if err != nil {
+		t.Fatalf("GetBrokenIncomingForPath(/missing2) failed: %v", err)
+	}
+
+	if len(broken2) != 1 {
+		t.Fatalf("expected 1 broken link for /missing2, got %d: %#v", len(broken2), broken2)
+	}
+	if broken2[0].FromPageID != pageBID {
+		t.Errorf("broken link FromPageID = %q, want %q", broken2[0].FromPageID, pageBID)
+	}
+}
+
+func TestLinksStore_GetBrokenIncomingForPath_EmptyWhenNoBrokenLinks(t *testing.T) {
+	svc, ts, store := setupLinkService(t)
+
+	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	_, err = ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+
+	// Page A links to existing Page B (not broken)
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link: [To B](/b)"); err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	// Test: Should return empty for "/b" since the link is not broken
+	brokenLinks, err := store.GetBrokenIncomingForPath("/b")
+	if err != nil {
+		t.Fatalf("GetBrokenIncomingForPath failed: %v", err)
+	}
+
+	if len(brokenLinks) != 0 {
+		t.Fatalf("expected 0 broken links for /b (link exists), got %d: %#v", len(brokenLinks), brokenLinks)
+	}
+
+	// Test: Should return empty for a path that has no links at all
+	noLinks, err := store.GetBrokenIncomingForPath("/never-linked")
+	if err != nil {
+		t.Fatalf("GetBrokenIncomingForPath(/never-linked) failed: %v", err)
+	}
+
+	if len(noLinks) != 0 {
+		t.Fatalf("expected 0 broken links for /never-linked, got %d: %#v", len(noLinks), noLinks)
+	}
+}
+
+func TestLinksStore_GetBrokenIncomingForPath_OrdersByFromTitle(t *testing.T) {
+	svc, ts, store := setupLinkService(t)
+
+	// Create three pages with titles that should be ordered alphabetically
+	zIDPtr, err := ts.CreatePage(nil, "Zebra Page", "z")
+	if err != nil {
+		t.Fatalf("CreatePage Z failed: %v", err)
+	}
+
+	aIDPtr, err := ts.CreatePage(nil, "Alpha Page", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+
+	mIDPtr, err := ts.CreatePage(nil, "Middle Page", "m")
+	if err != nil {
+		t.Fatalf("CreatePage M failed: %v", err)
+	}
+
+	// All three pages link to the same non-existent page
+	for _, id := range []string{*zIDPtr, *aIDPtr, *mIDPtr} {
+		page, err := ts.GetPage(id)
+		if err != nil {
+			t.Fatalf("GetPage(%s) failed: %v", id, err)
+		}
+		if err := ts.UpdatePage(page.ID, page.Title, page.Slug, "Link: [Missing](/missing)"); err != nil {
+			t.Fatalf("UpdatePage(%s) failed: %v", id, err)
+		}
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	// Test: Results should be ordered by from_title ASC
+	brokenLinks, err := store.GetBrokenIncomingForPath("/missing")
+	if err != nil {
+		t.Fatalf("GetBrokenIncomingForPath failed: %v", err)
+	}
+
+	if len(brokenLinks) != 3 {
+		t.Fatalf("expected 3 broken links, got %d: %#v", len(brokenLinks), brokenLinks)
+	}
+
+	// Verify ordering: Alpha Page, Middle Page, Zebra Page
+	expectedTitles := []string{"Alpha Page", "Middle Page", "Zebra Page"}
+	for i, expected := range expectedTitles {
+		if brokenLinks[i].FromTitle != expected {
+			t.Errorf("brokenLinks[%d].FromTitle = %q, want %q", i, brokenLinks[i].FromTitle, expected)
+		}
+	}
+}
+
+func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *testing.T) {
+	svc, ts, store := setupLinkService(t)
+
+	// Create Page A that links to a non-existent page
+	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	if err != nil {
+		t.Fatalf("CreatePage A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link: [To B](/b)"); err != nil {
+		t.Fatalf("UpdatePage A failed: %v", err)
+	}
+
+	// Index - this creates a broken link since B doesn't exist
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages (first) failed: %v", err)
+	}
+
+	// Verify the broken link exists
+	brokenBefore, err := store.GetBrokenIncomingForPath("/b")
+	if err != nil {
+		t.Fatalf("GetBrokenIncomingForPath (before) failed: %v", err)
+	}
+	if len(brokenBefore) != 1 {
+		t.Fatalf("expected 1 broken link before creating B, got %d", len(brokenBefore))
+	}
+
+	// Now create Page B - this should heal the link
+	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	if err != nil {
+		t.Fatalf("CreatePage B failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	pageB, err := ts.GetPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetPage B failed: %v", err)
+	}
+	if err := ts.UpdatePage(pageB.ID, pageB.Title, pageB.Slug, "# Page B"); err != nil {
+		t.Fatalf("UpdatePage B failed: %v", err)
+	}
+
+	// Use HealLinksForExactPath to heal the broken link
+	if err := svc.HealLinksForExactPath(pageB); err != nil {
+		t.Fatalf("HealLinksForExactPath failed: %v", err)
+	}
+
+	// Verify the link is no longer broken
+	brokenAfter, err := store.GetBrokenIncomingForPath("/b")
+	if err != nil {
+		t.Fatalf("GetBrokenIncomingForPath (after) failed: %v", err)
+	}
+	if len(brokenAfter) != 0 {
+		t.Fatalf("expected 0 broken links after healing, got %d: %#v", len(brokenAfter), brokenAfter)
+	}
+
+	// Verify the link still exists but is not broken
+	backlinks, err := store.GetBacklinksForPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetBacklinksForPage failed: %v", err)
+	}
+	if len(backlinks) != 1 {
+		t.Fatalf("expected 1 resolved backlink, got %d: %#v", len(backlinks), backlinks)
+	}
+	if backlinks[0].FromPageID != pageAID {
+		t.Errorf("backlink FromPageID = %q, want %q", backlinks[0].FromPageID, pageAID)
+	}
+}
