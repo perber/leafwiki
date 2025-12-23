@@ -287,6 +287,7 @@ func (s *LinksStore) GetBrokenIncomingForPath(toPath string) ([]Backlink, error)
 		} else {
 			b.ToPageID = ""
 		}
+		b.Broken = true
 		backlinks = append(backlinks, b)
 	}
 	if err := rows.Err(); err != nil {
