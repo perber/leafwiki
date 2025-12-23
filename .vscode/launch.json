@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/leafwiki/main.go",
-            "args": ["--jwt-secret", "secretkey"],
+            "args": ["--jwt-secret=secretkey", "--admin-password=anewpassword"],
         },
         {
             "name": "Launch leafwiki with public pages",
@@ -18,7 +18,7 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/leafwiki/main.go",
-            "args": ["--jwt-secret", "secretkey", "--public-access", "true"],
+            "args": ["--jwt-secret=secretkey", "--public-access=true", "--admin-password=anewpassword"],
         },
         // admin reset
         {
