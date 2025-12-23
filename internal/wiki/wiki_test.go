@@ -481,8 +481,8 @@ func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
 	}
 
 	// 2) Reindex once so that broken links are stored in the DB
-	if err := w.ReindexBacklinks(); err != nil {
-		t.Fatalf("ReindexBacklinks failed: %v", err)
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
 	}
 
 	out1, err := w.GetOutgoingLinks(pageA.ID)
@@ -589,8 +589,8 @@ func TestWiki_DeletePage_NonRecursive_MarksIncomingBroken(t *testing.T) {
 	}
 
 	// Ensure link index
-	if err := w.ReindexBacklinks(); err != nil {
-		t.Fatalf("ReindexBacklinks failed: %v", err)
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
 	}
 
 	// Delete B
@@ -673,8 +673,8 @@ func TestWiki_DeletePage_Recursive_RemovesOutgoingForSubtree_AndBreaksIncomingBy
 		t.Fatalf("UpdatePage c failed: %v", err)
 	}
 
-	if err := w.ReindexBacklinks(); err != nil {
-		t.Fatalf("ReindexBacklinks failed: %v", err)
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
 	}
 
 	// Sanity check: A has an outgoing link before delete
@@ -746,8 +746,8 @@ func TestWiki_RenamePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 	}
 
 	// Index once so outgoing links exist + broken state is materialized
-	if err := w.ReindexBacklinks(); err != nil {
-		t.Fatalf("ReindexBacklinks failed: %v", err)
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
 	}
 
 	out1, err := w.GetOutgoingLinks(a.ID)
@@ -848,8 +848,8 @@ func TestWiki_RenameSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 	}
 
 	// Materialize graph state
-	if err := w.ReindexBacklinks(); err != nil {
-		t.Fatalf("ReindexBacklinks failed: %v", err)
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
 	}
 
 	out1, err := w.GetOutgoingLinks(a.ID)
@@ -934,8 +934,8 @@ func TestWiki_MovePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 	}
 
 	// Materialize links once (so broken links exist in DB)
-	if err := w.ReindexBacklinks(); err != nil {
-		t.Fatalf("ReindexBacklinks failed: %v", err)
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
 	}
 
 	// Sanity: /b should be valid, /projects/b should be broken before move
@@ -1036,8 +1036,8 @@ func TestWiki_MoveSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 	}
 
 	// Materialize graph
-	if err := w.ReindexBacklinks(); err != nil {
-		t.Fatalf("ReindexBacklinks failed: %v", err)
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
 	}
 
 	// Move /docs under /archive => /archive/docs/b exists, /docs/b disappears
@@ -1119,8 +1119,8 @@ func TestWiki_MovePage_ReindexesRelativeLinks(t *testing.T) {
 	}
 
 	// Materialize graph
-	if err := w.ReindexBacklinks(); err != nil {
-		t.Fatalf("ReindexBacklinks failed: %v", err)
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
 	}
 
 	// Before move: /docs/a's outgoing must resolve to /docs/shared

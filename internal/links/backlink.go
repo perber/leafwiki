@@ -4,6 +4,7 @@ type Backlink struct {
 	FromPageID string
 	ToPageID   string
 	FromTitle  string
+	Broken     bool
 }
 
 type BacklinkResult struct {

@@ -4,7 +4,7 @@
 import { getPageByPath, Page, updatePage } from '@/lib/api/pages'
 import { useTreeStore } from '@/stores/tree'
 import { create } from 'zustand'
-import { useBacklinksStore } from '../backlinks/backlinks'
+import { useLinkStatusStore } from '../links/linkstatus_store'
 import { useProgressbarStore } from '../progressbar/progressbar'
 
 interface PageEditorState {
@@ -81,9 +81,9 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       // reload backlinks
       const editorPageID = get().page?.id
       if (editorPageID) {
-        const fetchPageBacklinks =
-          useBacklinksStore.getState().fetchPageBacklinks
-        await fetchPageBacklinks(editorPageID)
+        const fetchLinkStatusForPage =
+          useLinkStatusStore.getState().fetchLinkStatusForPage
+        await fetchLinkStatusForPage(editorPageID)
       }
 
       return updatedPage

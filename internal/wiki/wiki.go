@@ -616,7 +616,7 @@ func (w *Wiki) SuggestSlug(parentID string, currentID string, title string) (str
 	return w.slug.GenerateUniqueSlug(parent, currentID, title), nil
 }
 
-func (w *Wiki) ReindexBacklinks() error {
+func (w *Wiki) ReindexLinks() error {
 	if w.links == nil {
 		return nil
 	}
@@ -635,6 +635,19 @@ func (w *Wiki) GetOutgoingLinks(pageID string) (*links.OutgoingResult, error) {
 		return nil, fmt.Errorf("outgoing links not available")
 	}
 	return w.links.GetOutgoingLinksForPage(pageID)
+}
+
+func (w *Wiki) GetLinkStatusForPage(pageID string) (*links.LinkStatusResult, error) {
+	if w.links == nil {
+		return nil, fmt.Errorf("link service not initialized")
+	}
+
+	page, err := w.tree.GetPage(pageID)
+	if err != nil {
+		return nil, err
+	}
+
+	return w.links.GetLinkStatusForPage(pageID, page.CalculatePath())
 }
 
 func (w *Wiki) Login(identifier, password string) (*auth.AuthToken, error) {

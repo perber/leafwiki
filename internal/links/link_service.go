@@ -76,6 +76,55 @@ func (b *LinkService) GetOutgoingLinksForPage(pageID string) (*OutgoingResult, e
 	return toOutgoingLinkResult(b.treeService, outgoingLinks), err
 }
 
+func (b *LinkService) GetLinkStatusForPage(pageID string, pagePath string) (*LinkStatusResult, error) {
+	pagePath = normalizeWikiPath(pagePath)
+
+	// 1) Valid inbound backlinks
+	validBacklinks, err := b.store.GetBacklinksForPage(pageID)
+	if err != nil {
+		return nil, err
+	}
+	validBacklinksResult := toBacklinkResult(b.treeService, validBacklinks)
+
+	// 2) Broken inbound
+	brokenIncoming, err := b.store.GetBrokenIncomingForPath(pagePath)
+	if err != nil {
+		return nil, err
+	}
+	brokenIncomingResult := toBacklinkResult(b.treeService, brokenIncoming)
+
+	// 3) Outgoings
+	outgoings, err := b.store.GetOutgoingLinksForPage(pageID)
+	if err != nil {
+		return nil, err
+	}
+	outgoingResult := toOutgoingLinkResult(b.treeService, outgoings)
+
+	// Split outgoing in broken/non-broken
+	okOut := make([]OutgoingResultItem, 0, len(outgoingResult.Outgoings))
+	brokenOut := make([]OutgoingResultItem, 0)
+	for _, it := range outgoingResult.Outgoings {
+		if it.Broken {
+			brokenOut = append(brokenOut, it)
+		} else {
+			okOut = append(okOut, it)
+		}
+	}
+
+	return &LinkStatusResult{
+		Backlinks:       validBacklinksResult.Backlinks,
+		BrokenIncoming:  brokenIncomingResult.Backlinks,
+		Outgoings:       okOut,
+		BrokenOutgoings: brokenOut,
+		Counts: LinkStatusCounts{
+			Backlinks:       len(validBacklinksResult.Backlinks),
+			BrokenIncoming:  len(brokenIncomingResult.Backlinks),
+			Outgoings:       len(okOut),
+			BrokenOutgoings: len(brokenOut),
+		},
+	}, nil
+}
+
 func (b *LinkService) UpdateLinksForPage(page *tree.Page, content string) error {
 	links := extractLinksFromMarkdown(content)
 
