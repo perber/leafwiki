@@ -225,7 +225,7 @@ Download the latest release binary from GitHub, make it executable, and start th
 
 ```
 chmod +x leafwiki
-./leafwiki --jwt-secret=yoursecret
+./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword
 ```
 
 Default port is `8080`, and the default data directory is `./data`.
@@ -235,21 +235,6 @@ The JWT secret is required for authentication and should be kept secure.
 
 
 ## Authentication and admin user
-
-### Default admin user
-
-For security reasons, it is strongly recommended to change the default admin password after the first login.
-
-On first startup, LeafWiki creates an admin user with the default password `admin`.
-
-The password can be changed later via the admin settings or during startup using the CLI:
-
-```bash
-./leafwiki --admin-password=newpassword --jwt-secret=yoursecret
-```
-
-> Note: `--admin-password` (or the `LEAFWIKI_ADMIN_PASSWORD` env var) is only used on first startup, when no admin user exists yet.
-
 
 ### Reset Admin Password
 If you need to reset the admin password, you can do so by running:
@@ -271,7 +256,7 @@ These options control how the server runs after installation.
 | `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
 | `--port`           | Port the server listens on                                  | `8080`        |
 | `--data-dir`       | Directory where data is stored                              | `./data`      |
-| `--admin-password` | Initial admin password (used only if no admin exists)       | `admin`       |
+| `--admin-password` | Initial admin password                                      | –             |
 | `--public-access`  | Allow public read-only access                               | `false`       |
    
 
@@ -285,7 +270,7 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_HOST`          | Host/IP address the server binds to                          | `0.0.0.0`  |
 | `LEAFWIKI_PORT`          | Port the server listens on                                   | `8080`     |
 | `LEAFWIKI_DATA_DIR`      | Path to the data storage directory                           | `./data`   |
-| `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | `admin`    |
+| `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | -          |
 | `LEAFWIKI_JWT_SECRET`    | Secret used to sign JWT tokens *(required)*                  | –          |
 | `LEAFWIKI_PUBLIC_ACCESS` | Allow public read-only access                                | `false`    |
 
@@ -297,10 +282,12 @@ When running LeafWiki behind a reverse proxy (nginx, Caddy, Traefik), it is reco
 
 ```bash
 # bind to localhost only
-LEAFWIKI_HOST=127.0.0.1 ./leafwiki --jwt-secret=yoursecret
+LEAFWIKI_HOST=127.0.0.1 ./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword
+```
 
 # or with the CLI flag
-./leafwiki --host 127.0.0.1 --jwt-secret=yoursecret
+```
+./leafwiki --host 127.0.0.1 --jwt-secret=yoursecret --admin-password=yourpassword
 ```
 
 When bound to `127.0.0.1`, the server is only accessible locally,
