@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/http/api"
@@ -25,10 +26,12 @@ var EmbedFrontend = "false"
 var Environment = "development"
 
 type RouterOptions struct {
-	PublicAccess            bool   // Whether the wiki allows public read access
-	InjectCodeInHeader      string // Raw HTML/JS code to inject into the <head> tag
-	AllowInsecure           bool   // Whether to allow insecure HTTP connections
-	HideLinkMetadataSection bool   // Whether to hide the link metadata section in the frontend UI
+	PublicAccess            bool          // Whether the wiki allows public read access
+	InjectCodeInHeader      string        // Raw HTML/JS code to inject into the <head> tag
+	AllowInsecure           bool          // Whether to allow insecure HTTP connections
+	AccessTokenTimeout      time.Duration // Duration for access token validity
+	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
+	HideLinkMetadataSection bool          // Whether to hide the link metadata section in the frontend UI
 }
 
 // NewRouter creates a new HTTP router for the wiki application.
