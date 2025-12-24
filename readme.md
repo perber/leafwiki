@@ -252,11 +252,11 @@ These options control how the server runs after installation.
 
 | Flag               | Description                                                 | Default       |
 |--------------------|-------------------------------------------------------------|---------------|
-| `--jwt-secret`     | Secret used for signing JWTs (required)                     | –             |
+| `--jwt-secret`     | Secret used for signing JWTs (required)                     | -             |
 | `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
 | `--port`           | Port the server listens on                                  | `8080`        |
 | `--data-dir`       | Directory where data is stored                              | `./data`      |
-| `--admin-password` | Initial admin password                                      | –             |
+| `--admin-password` | Initial admin password *(used only if no admin exists yet)* | -             |
 | `--public-access`  | Allow public read-only access                               | `false`       |
    
 
@@ -271,7 +271,7 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_PORT`          | Port the server listens on                                   | `8080`     |
 | `LEAFWIKI_DATA_DIR`      | Path to the data storage directory                           | `./data`   |
 | `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | -          |
-| `LEAFWIKI_JWT_SECRET`    | Secret used to sign JWT tokens *(required)*                  | –          |
+| `LEAFWIKI_JWT_SECRET`    | Secret used to sign JWT tokens *(required)*                  | -          |
 | `LEAFWIKI_PUBLIC_ACCESS` | Allow public read-only access                                | `false`    |
 
 These environment variables override the default values and are especially useful in containerized or production environments.
@@ -333,10 +333,6 @@ As a result, there are some important limitations to be aware of:
 
 - **Limited permission model**  
   LeafWiki does not provide fine-grained permissions or complex role-based access control.
-
-- **Security defaults require attention**  
-  Initial setup uses simple defaults intended for local or first-time use.
-  Admin credentials and secrets should be reviewed and secured before exposing LeafWiki publicly.
 
 ---
 
