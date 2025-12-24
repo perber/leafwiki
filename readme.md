@@ -181,7 +181,7 @@ These options are only used during installation and do not affect the runtime be
 | Flag               | Description                                                 | Default       |
 |--------------------|-------------------------------------------------------------|---------------|
 | `--arch`           | Target architecture for the binary (e.g. `amd64`, `arm64`)  |       -       |
-| `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
+| `--host`           | Host/IP address the server binds to                         | `127.0.0.1`   |
 | `--port`           | Port the server listens on                                  | `8080`        |
 
 
@@ -253,7 +253,7 @@ These options control how the server runs after installation.
 | Flag               | Description                                                 | Default       |
 |--------------------|-------------------------------------------------------------|---------------|
 | `--jwt-secret`     | Secret used for signing JWTs (required)                     | –             |
-| `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
+| `--host`           | Host/IP address the server binds to                         | `127.0.0.1`   |
 | `--port`           | Port the server listens on                                  | `8080`        |
 | `--data-dir`       | Directory where data is stored                              | `./data`      |
 | `--admin-password` | Initial admin password                                      | –             |
@@ -267,7 +267,7 @@ This is especially useful in containerized or production environments.
 
 | Variable                 | Description                                                  | Default    |
 |--------------------------|--------------------------------------------------------------|------------|
-| `LEAFWIKI_HOST`          | Host/IP address the server binds to                          | `0.0.0.0`  |
+| `LEAFWIKI_HOST`          | Host/IP address the server binds to                          | `127.0.0.1`|
 | `LEAFWIKI_PORT`          | Port the server listens on                                   | `8080`     |
 | `LEAFWIKI_DATA_DIR`      | Path to the data storage directory                           | `./data`   |
 | `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | -          |
