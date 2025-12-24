@@ -181,7 +181,7 @@ These options are only used during installation and do not affect the runtime be
 | Flag               | Description                                                 | Default       |
 |--------------------|-------------------------------------------------------------|---------------|
 | `--arch`           | Target architecture for the binary (e.g. `amd64`, `arm64`)  |       -       |
-| `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
+| `--host`           | Host/IP address the server binds to                         | `127.0.0.1`   |
 | `--port`           | Port the server listens on                                  | `8080`        |
 
 
