@@ -1,22 +1,20 @@
-import { useAuthStore } from '@/stores/auth'
+import { useSessionStore } from '@/stores/session'
 import { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
-import { toast } from 'sonner'
 
 type Props = {
   children: ReactNode
 }
 
 export default function RequireAuth({ children }: Props) {
-  const token = useAuthStore((state) => state.token)
-  const isRefreshing = useAuthStore((state) => state.isRefreshing)
+  const user = useSessionStore((state) => state.user)
+  const isRefreshing = useSessionStore((state) => state.isRefreshing)
 
-  if (!token && !isRefreshing) {
+  if (!user && !isRefreshing) {
     return <Navigate to="/login" replace />
   }
 
-  if (!token && isRefreshing) {
-    toast.info('Refreshing session, please wait...')
+  if (!user && isRefreshing) {
     return null // Return a loading state while refreshing
   }
 

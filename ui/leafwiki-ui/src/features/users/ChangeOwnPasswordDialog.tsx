@@ -2,7 +2,7 @@ import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
-import { useAuthStore } from '@/stores/auth'
+import { useSessionStore } from '@/stores/session'
 import { useUserStore } from '@/stores/users'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
@@ -14,7 +14,7 @@ export function ChangeOwnPasswordDialog() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
 
-  const { user } = useAuthStore()
+  const { user } = useSessionStore()
   const { changeOwnPassword } = useUserStore()
 
   const resetForm = useCallback((): boolean => {
