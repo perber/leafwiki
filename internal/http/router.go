@@ -6,9 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/http/api"
 	"github.com/perber/wiki/internal/http/middleware"
@@ -17,11 +15,6 @@ import (
 
 //go:embed dist/**
 var frontend embed.FS
-
-// EnableCors is a flag to enable or disable CORS
-// This is useful for testing purposes, where we might not want to enable CORS
-// During build time, we can set this to false to disable CORS
-var EnableCors = "true"
 
 // EmbedFrontend is a flag to enable or disable embedding the frontend
 // This is useful for testing purposes, where we might not want to embed the frontend
@@ -50,24 +43,16 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	}
 
 	router := gin.Default()
-	if EnableCors == "true" {
-		router.Use(cors.New(cors.Config{
-			AllowOrigins:     []string{"*"},
-			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-			ExposeHeaders:    []string{"Content-Length"},
-			AllowCredentials: true,
-			MaxAge:           12 * time.Hour,
-		}))
-	}
-
 	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
+
+	authCookies := middleware.NewAuthCookies(options.AllowInsecure)
 
 	nonAuthApiGroup := router.Group("/api")
 	{
 		// Auth
-		nonAuthApiGroup.POST("/auth/login", api.LoginUserHandler(wikiInstance))
-		nonAuthApiGroup.POST("/auth/refresh-token", api.RefreshTokenUserHandler(wikiInstance))
+		nonAuthApiGroup.POST("/auth/login", api.LoginUserHandler(wikiInstance, authCookies))
+		nonAuthApiGroup.POST("/auth/refresh-token", api.RefreshTokenUserHandler(wikiInstance, authCookies))
+		nonAuthApiGroup.POST("/auth/logout", api.LogoutUserHandler(authCookies))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
 			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection})
 		})
@@ -89,7 +74,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	}
 
 	requiresAuthGroup := router.Group("/api")
-	requiresAuthGroup.Use(middleware.RequireAuth(wikiInstance))
+	requiresAuthGroup.Use(middleware.RequireAuth(wikiInstance, authCookies))
 	{
 		// If public access is disabled, we need to ensure that the tree and pages routes are protected
 		// and require authentication. If public access is enabled, these routes are already handled

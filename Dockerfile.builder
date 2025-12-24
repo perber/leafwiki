@@ -33,5 +33,5 @@ COPY . .
 COPY --from=frontend /ui/dist ./internal/http/dist
 
 RUN go build \
-  -ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.EnableCors=false -X github.com/perber/wiki/internal/http.Environment=production" \
+  -ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production" \
   -o /out/${OUTPUT} ./cmd/leafwiki/main.go
