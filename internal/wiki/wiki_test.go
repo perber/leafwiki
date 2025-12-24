@@ -8,17 +8,21 @@ import (
 	"github.com/perber/wiki/internal/test_utils"
 )
 
-func setupTestWiki(t *testing.T) *Wiki {
-	tempDir := t.TempDir()
-	w, err := NewWiki(tempDir, "admin", "secretkey", false)
+func createWikiTestInstance(t *testing.T) *Wiki {
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:    t.TempDir(),
+		AdminPassword: "admin",
+		JWTSecret:     "secretkey",
+	})
 	if err != nil {
-		t.Fatalf("Failed to create wiki: %v", err)
+		t.Fatalf("Failed to create wiki instance: %v", err)
 	}
-	return w
+	return wikiInstance
 }
 
 func TestWiki_CreatePage_Root(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 
 	page, err := w.CreatePage(nil, "Home", "home")
 	if err != nil {
@@ -31,7 +35,8 @@ func TestWiki_CreatePage_Root(t *testing.T) {
 }
 
 func TestWiki_CreatePage_WithParent(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	rootPage, _ := w.CreatePage(nil, "Docs", "docs")
 
 	page, err := w.CreatePage(&rootPage.ID, "API-Doc", "api-doc")
@@ -45,7 +50,8 @@ func TestWiki_CreatePage_WithParent(t *testing.T) {
 }
 
 func TestWiki_CreatePage_EmptyTitle(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	_, err := w.CreatePage(nil, "", "empty")
 	if err == nil {
 		t.Error("Expected error for empty title, got none")
@@ -53,7 +59,8 @@ func TestWiki_CreatePage_EmptyTitle(t *testing.T) {
 }
 
 func TestWiki_CreatePage_ReservedSlug(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	_, err := w.CreatePage(nil, "Reserved", "e")
 	if err == nil {
 		t.Error("Expected error for reserved slug, got none")
@@ -70,7 +77,8 @@ func TestWiki_CreatePage_ReservedSlug(t *testing.T) {
 }
 
 func TestWiki_CreatePage_PageExists(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	_, _ = w.CreatePage(nil, "Duplicate", "duplicate")
 
 	_, err := w.CreatePage(nil, "Duplicate", "duplicate")
@@ -80,7 +88,8 @@ func TestWiki_CreatePage_PageExists(t *testing.T) {
 }
 
 func TestWiki_CreatePage_InvalidParent(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	invalidID := "not-real"
 	_, err := w.CreatePage(&invalidID, "Broken", "broken")
 	if err == nil {
@@ -89,7 +98,8 @@ func TestWiki_CreatePage_InvalidParent(t *testing.T) {
 }
 
 func TestWiki_GetPage_ValidID(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	page, _ := w.CreatePage(nil, "ReadMe", "readme")
 
 	found, err := w.GetPage(page.ID)
@@ -103,7 +113,8 @@ func TestWiki_GetPage_ValidID(t *testing.T) {
 }
 
 func TestWiki_GetPage_InvalidID(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	_, err := w.GetPage("unknown")
 	if err == nil {
 		t.Error("Expected error for unknown ID, got none")
@@ -111,7 +122,8 @@ func TestWiki_GetPage_InvalidID(t *testing.T) {
 }
 
 func TestWiki_MovePage_Valid(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	parent, _ := w.CreatePage(nil, "Projects", "projects")
 	child, _ := w.CreatePage(nil, "Old", "old")
 
@@ -122,7 +134,8 @@ func TestWiki_MovePage_Valid(t *testing.T) {
 }
 
 func TestWiki_DeletePage_Simple(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	page, _ := w.CreatePage(nil, "Trash", "trash")
 
 	err := w.DeletePage(page.ID, false)
@@ -132,7 +145,8 @@ func TestWiki_DeletePage_Simple(t *testing.T) {
 }
 
 func TestWiki_DeletePage_WithChildren(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	parent, _ := w.CreatePage(nil, "Parent", "parent")
 	_, _ = w.CreatePage(&parent.ID, "Child", "child")
 
@@ -143,7 +157,8 @@ func TestWiki_DeletePage_WithChildren(t *testing.T) {
 }
 
 func TestWiki_DeletePage_Recursive(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	parent, _ := w.CreatePage(nil, "Parent", "parent")
 	_, _ = w.CreatePage(&parent.ID, "Child", "child")
 
@@ -154,7 +169,8 @@ func TestWiki_DeletePage_Recursive(t *testing.T) {
 }
 
 func TestWiki_DeletePage_RootWithIDRoot(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 
 	err := w.DeletePage("root", false)
 	if err == nil {
@@ -168,7 +184,8 @@ func TestWiki_DeletePage_RootWithIDRoot(t *testing.T) {
 }
 
 func TestWiki_DeletePage_RootWithEmptyString(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 
 	err := w.DeletePage("", false)
 	if err == nil {
@@ -182,7 +199,9 @@ func TestWiki_DeletePage_RootWithEmptyString(t *testing.T) {
 }
 
 func TestWiki_UpdatePage(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+
 	page, _ := w.CreatePage(nil, "Draft", "draft")
 
 	page, err := w.UpdatePage(page.ID, "Final", "final", "# Updated")
@@ -197,7 +216,8 @@ func TestWiki_UpdatePage(t *testing.T) {
 }
 
 func TestWiki_SuggestSlug_Unique(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	slug, err := w.SuggestSlug("root", "", "My Page")
 	if err != nil {
 		t.Fatalf("SuggestSlug failed: %v", err)
@@ -208,7 +228,8 @@ func TestWiki_SuggestSlug_Unique(t *testing.T) {
 }
 
 func TestWiki_SuggestSlug_Conflict(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	root := w.GetTree()
 	_, err := w.CreatePage(nil, "My Page", "my-page")
 
@@ -226,28 +247,25 @@ func TestWiki_SuggestSlug_Conflict(t *testing.T) {
 }
 
 func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
-	tmpDir := t.TempDir()
-	wiki, err := NewWiki(tmpDir, "admin", "secretkey", false)
-	if err != nil {
-		t.Fatalf("Failed to initialize Wiki: %v", err)
-	}
+	w := createWikiTestInstance(t)
+	defer w.Close()
 
 	// Erstelle tiefere Struktur: root -> architecture -> backend
-	_, err = wiki.CreatePage(nil, "Architecture", "architecture")
+	_, err := w.CreatePage(nil, "Architecture", "architecture")
 	if err != nil {
 		t.Fatalf("Failed to create 'Architecture': %v", err)
 	}
-	root := wiki.GetTree()
+	root := w.GetTree()
 	arch := root.Children[0]
 
-	_, err = wiki.CreatePage(&arch.ID, "Backend", "backend")
+	_, err = w.CreatePage(&arch.ID, "Backend", "backend")
 	if err != nil {
 		t.Fatalf("Failed to create 'Backend': %v", err)
 	}
 	backend := arch.Children[0]
 
 	// Jetzt dort einen Slug vorschlagen
-	slug, err := wiki.SuggestSlug(backend.ID, "", "Data Layer")
+	slug, err := w.SuggestSlug(backend.ID, "", "Data Layer")
 	if err != nil {
 		t.Fatalf("SuggestSlug failed: %v", err)
 	}
@@ -257,12 +275,12 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	}
 
 	// Erzeuge ein zweites mit gleichem Namen → es muss nummeriert werden
-	_, err = wiki.CreatePage(&backend.ID, "Data Layer", "data-layer")
+	_, err = w.CreatePage(&backend.ID, "Data Layer", "data-layer")
 	if err != nil {
 		t.Fatalf("Failed to create 'Data Layer': %v", err)
 	}
 
-	slug2, err := wiki.SuggestSlug(backend.ID, "", "Data Layer")
+	slug2, err := w.SuggestSlug(backend.ID, "", "Data Layer")
 	if err != nil {
 		t.Fatalf("SuggestSlug 2 failed: %v", err)
 	}
@@ -273,7 +291,8 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 }
 
 func TestWiki_FindByPath_Valid(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	_, _ = w.CreatePage(nil, "Company", "company")
 
 	found, err := w.FindByPath("company")
@@ -286,7 +305,8 @@ func TestWiki_FindByPath_Valid(t *testing.T) {
 }
 
 func TestWiki_FindByPath_Invalid(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	_, err := w.FindByPath("does/not/exist")
 	if err == nil {
 		t.Error("Expected error for invalid path, got none")
@@ -294,7 +314,8 @@ func TestWiki_FindByPath_Invalid(t *testing.T) {
 }
 
 func TestWiki_SortPages(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	parent, _ := w.CreatePage(nil, "Parent", "parent")
 	child1, _ := w.CreatePage(&parent.ID, "Child1", "child1")
 	child2, _ := w.CreatePage(&parent.ID, "Child2", "child2")
@@ -312,7 +333,8 @@ func TestWiki_SortPages(t *testing.T) {
 }
 
 func TestWiki_CopyPages(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	original, _ := w.CreatePage(nil, "Original", "original")
 
 	copied, err := w.CopyPage(original.ID, nil, "Copy of Original", "copy-of-original")
@@ -332,7 +354,8 @@ func TestWiki_CopyPages(t *testing.T) {
 }
 
 func TestWiki_CopyPages_WithParent(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	parent, _ := w.CreatePage(nil, "Parent", "parent")
 	original, _ := w.CreatePage(nil, "Original", "original")
 
@@ -347,7 +370,8 @@ func TestWiki_CopyPages_WithParent(t *testing.T) {
 }
 
 func TestWiki_CopyPages_NonExistentSource(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	_, err := w.CopyPage("non-existent-id", nil, "Copy", "copy")
 	if err == nil {
 		t.Error("Expected error for non-existent source page, got none")
@@ -355,7 +379,8 @@ func TestWiki_CopyPages_NonExistentSource(t *testing.T) {
 }
 
 func TestWiki_CopyPages_WithAssets(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 	original, _ := w.CreatePage(nil, "Original", "original")
 
 	originalNode := tree.PageNode{
@@ -397,7 +422,8 @@ func TestWiki_CopyPages_WithAssets(t *testing.T) {
 }
 
 func TestWiki_InitDefaultAdmin_UsesGivenPassword(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 
 	_, err := w.GetUserService().GetUserByEmailOrUsernameAndPassword("admin", "admin")
 	if err != nil {
@@ -406,7 +432,8 @@ func TestWiki_InitDefaultAdmin_UsesGivenPassword(t *testing.T) {
 }
 
 func TestWiki_ResetAdminUserPassword_ChangesPassword(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 
 	original, err := w.GetUserService().GetUserByEmailOrUsernameAndPassword("admin", "admin")
 	if err != nil {
@@ -429,7 +456,8 @@ func TestWiki_ResetAdminUserPassword_ChangesPassword(t *testing.T) {
 }
 
 func TestWiki_Login_SuccessAndFailure(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
+	defer w.Close()
 
 	token, err := w.Login("admin", "admin")
 	if err != nil || token == nil {
@@ -443,16 +471,10 @@ func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 }
 
 func TestWiki_ResetAdminPasswordWithoutJWTSecret(t *testing.T) {
-	tempDir := t.TempDir()
+	w := createWikiTestInstance(t)
+	defer w.Close()
 
-	// Verwende Dummy-Secret
-	wiki, err := NewWiki(tempDir, "supersecure", "", false)
-	if err != nil {
-		t.Fatalf("Failed to initialize Wiki: %v", err)
-	}
-	defer wiki.Close()
-
-	user, err := wiki.ResetAdminUserPassword()
+	user, err := w.ResetAdminUserPassword()
 	if err != nil {
 		t.Fatalf("ResetAdminUserPassword failed: %v", err)
 	}
@@ -466,7 +488,7 @@ func TestWiki_ResetAdminPasswordWithoutJWTSecret(t *testing.T) {
 }
 
 func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
 	defer w.Close()
 
 	// 1) Page A mit Links auf /x und /x/y (existieren noch nicht)
@@ -560,12 +582,7 @@ func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
 }
 
 func TestWiki_DeletePage_NonRecursive_MarksIncomingBroken(t *testing.T) {
-	dataDir := t.TempDir()
-
-	w, err := NewWiki(dataDir, "admin", "secret", false)
-	if err != nil {
-		t.Fatalf("NewWiki failed: %v", err)
-	}
+	w := createWikiTestInstance(t)
 	defer w.Close()
 
 	// Create A with link to /b
@@ -629,12 +646,7 @@ func TestWiki_DeletePage_NonRecursive_MarksIncomingBroken(t *testing.T) {
 }
 
 func TestWiki_DeletePage_Recursive_RemovesOutgoingForSubtree_AndBreaksIncomingByPrefix(t *testing.T) {
-	dataDir := t.TempDir()
-
-	w, err := NewWiki(dataDir, "admin", "secret", false)
-	if err != nil {
-		t.Fatalf("NewWiki failed: %v", err)
-	}
+	w := createWikiTestInstance(t)
 	defer w.Close()
 
 	// Create /docs
@@ -722,7 +734,7 @@ func TestWiki_DeletePage_Recursive_RemovesOutgoingForSubtree_AndBreaksIncomingBy
 }
 
 func TestWiki_RenamePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
 	defer w.Close()
 
 	// Create A with links to /b (exists) and /b2 (does not exist yet)
@@ -820,7 +832,7 @@ func TestWiki_RenamePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 }
 
 func TestWiki_RenameSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
 	defer w.Close()
 
 	// Create subtree: /docs/b
@@ -904,7 +916,7 @@ func TestWiki_RenameSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 }
 
 func TestWiki_MovePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
 	defer w.Close()
 
 	// Create A that links to /b (old path) and /projects/b (future path)
@@ -1002,7 +1014,7 @@ func TestWiki_MovePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 }
 
 func TestWiki_MoveSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
 	defer w.Close()
 
 	// Create subtree /docs/b
@@ -1075,7 +1087,7 @@ func TestWiki_MoveSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 }
 
 func TestWiki_MovePage_ReindexesRelativeLinks(t *testing.T) {
-	w := setupTestWiki(t)
+	w := createWikiTestInstance(t)
 	defer w.Close()
 
 	// Create /docs with /docs/shared and /docs/a

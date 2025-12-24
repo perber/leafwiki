@@ -31,15 +31,17 @@ var EmbedFrontend = "false"
 // Environment is a flag to set the environment
 var Environment = "development"
 
+type RouterOptions struct {
+	PublicAccess       bool   // Whether the wiki allows public read access
+	InjectCodeInHeader string // Raw HTML/JS code to inject into the <head> tag
+	AllowInsecure      bool   // Whether to allow insecure HTTP connections
+}
+
 // NewRouter creates a new HTTP router for the wiki application.
 // Parameters:
 //   - wikiInstance: the wiki instance to serve
-//   - publicAccess: when true, allows unauthenticated read-only access to wiki content
-//   - injectCodeInHeader: raw HTML code to inject before the closing </head> tag.
-//     WARNING: This code is inserted without sanitization. Only use with trusted input
-//     from administrators. Malicious code can lead to XSS vulnerabilities.
-//     Common use cases: analytics scripts, custom CSS, meta tags.
-func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader string) *gin.Engine {
+//   - options: RouterOptions struct containing configuration options
+func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	if Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
@@ -66,13 +68,13 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 		nonAuthApiGroup.POST("/auth/login", api.LoginUserHandler(wikiInstance))
 		nonAuthApiGroup.POST("/auth/refresh-token", api.RefreshTokenUserHandler(wikiInstance))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
-			c.JSON(200, gin.H{"publicAccess": publicAccess})
+			c.JSON(200, gin.H{"publicAccess": options.PublicAccess})
 		})
 
 		// PUBLIC READ ACCESS (if enabled via flag or env):
-		// These routes are accessible without authentication when publicAccess == true.
+		// These routes are accessible without authentication when options.PublicAccess == true.
 		// Only safe, read-only operations are allowed here (GET tree/pages).
-		if publicAccess {
+		if options.PublicAccess {
 			nonAuthApiGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
@@ -90,7 +92,7 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 	{
 		// If public access is disabled, we need to ensure that the tree and pages routes are protected
 		// and require authentication. If public access is enabled, these routes are already handled
-		if !publicAccess {
+		if !options.PublicAccess {
 			requiresAuthGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
@@ -172,10 +174,10 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 					return
 				}
 
-				if injectCodeInHeader != "" {
+				if options.InjectCodeInHeader != "" {
 					html := string(data)
 					// replaces the closing </head> tag with the injected code
-					newHtml := strings.Replace(html, "</head>", "  "+injectCodeInHeader+"\n  </head>", 1)
+					newHtml := strings.Replace(html, "</head>", "  "+options.InjectCodeInHeader+"\n  </head>", 1)
 					if newHtml == html {
 						log.Printf("Warning: could not inject code into header, </head> tag not found")
 					}

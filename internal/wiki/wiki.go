@@ -49,43 +49,49 @@ func collectSubtreeIDs(node *tree.PageNode) []string {
 	return ids
 }
 
-func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSearchIndexing bool) (*Wiki, error) {
+type WikiOptions struct {
+	StorageDir    string // Path to storage directory
+	AdminPassword string // Initial admin password
+	JWTSecret     string // JWT secret for authentication
+}
+
+func NewWiki(options *WikiOptions) (*Wiki, error) {
 	// Initialize the user store
-	store, err := auth.NewUserStore(storageDir)
+	store, err := auth.NewUserStore(options.StorageDir)
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize the user service
 	userService := auth.NewUserService(store)
-	if err := userService.InitDefaultAdmin(adminPassword); err != nil {
+	if err := userService.InitDefaultAdmin(options.AdminPassword); err != nil {
 		return nil, err
 	}
 
 	// Initialize the auth service
-	authService := auth.NewAuthService(userService, jwtSecret)
+	authService := auth.NewAuthService(userService, options.JWTSecret)
 
 	// Initialize the tree service
-	treeService := tree.NewTreeService(storageDir)
+	treeService := tree.NewTreeService(options.StorageDir)
 	if err := treeService.LoadTree(); err != nil {
 		return nil, err
 	}
 
 	slugService := tree.NewSlugService()
 
-	assetService := assets.NewAssetService(storageDir, slugService)
+	assetService := assets.NewAssetService(options.StorageDir, slugService)
 
 	// Backlink Service
-	linksStore, err := links.NewLinksStore(storageDir)
+	linksStore, err := links.NewLinksStore(options.StorageDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init links store: %w", err)
 	}
-	linkService := links.NewLinkService(storageDir, treeService, linksStore)
+	linkService := links.NewLinkService(options.StorageDir, treeService, linksStore)
 	if err := linkService.IndexAllPages(); err != nil {
 		log.Printf("failed to index links of pages: %v", err)
 	}
 
-	sqliteIndex, err := search.NewSQLiteIndex(storageDir)
+	sqliteIndex, err := search.NewSQLiteIndex(options.StorageDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init search index: %w", err)
 	}
@@ -94,27 +100,24 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 	status := search.NewIndexingStatus()
 
 	var searchWatcher *search.Watcher
-	if enableSearchIndexing {
-		// starts the indexing process in a separate goroutine
+	// starts the indexing process in a separate goroutine
+	go func() {
+		err := search.BuildAndRunIndexer(treeService, sqliteIndex, path.Join(options.StorageDir, "root"), 4, status)
+		if err != nil {
+			log.Printf("indexing failed: %v", err)
+		}
+	}()
+
+	// Start the file watcher for indexing
+	searchWatcher, err = search.NewWatcher(path.Join(options.StorageDir, "root"), treeService, sqliteIndex, status)
+	if err != nil {
+		log.Printf("failed to create file watcher: %v", err)
+	} else {
 		go func() {
-			err := search.BuildAndRunIndexer(treeService, sqliteIndex, path.Join(storageDir, "root"), 4, status)
-			if err != nil {
-				log.Printf("indexing failed: %v", err)
+			if err := searchWatcher.Start(); err != nil {
+				log.Printf("failed to start file watcher: %v", err)
 			}
 		}()
-
-		// Start the file watcher for indexing
-		var err error
-		searchWatcher, err = search.NewWatcher(path.Join(storageDir, "root"), treeService, sqliteIndex, status)
-		if err != nil {
-			log.Printf("failed to create file watcher: %v", err)
-		} else {
-			go func() {
-				if err := searchWatcher.Start(); err != nil {
-					log.Printf("failed to start file watcher: %v", err)
-				}
-			}()
-		}
 	}
 
 	// Initialize the wiki service
@@ -124,7 +127,7 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 		user:          userService,
 		auth:          authService,
 		asset:         assetService,
-		storageDir:    storageDir,
+		storageDir:    options.StorageDir,
 		searchIndex:   sqliteIndex,
 		status:        status,
 		searchWatcher: searchWatcher,

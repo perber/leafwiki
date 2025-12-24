@@ -26,6 +26,7 @@ func printUsage() {
 	--admin-password   Initial admin password (used only if no admin exists)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
 	--public-access    Allow public access to the wiki only with read access (default: false)
+	--allow-insecure   Allow insecure HTTP connections (default: false)
 	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
 	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
 	                         
@@ -37,6 +38,7 @@ func printUsage() {
 	LEAFWIKI_JWT_SECRET
 	LEAFWIKI_ADMIN_PASSWORD
 	LEAFWIKI_PUBLIC_ACCESS
+	LEAFWIKI_ALLOW_INSECURE
 	LEAFWIKI_INJECT_CODE_IN_HEADER
 	`)
 }
@@ -50,6 +52,7 @@ func main() {
 	adminPasswordFlag := flag.String("admin-password", "", "initial admin password")
 	jwtSecretFlag := flag.String("jwt-secret", "", "JWT secret for authentication")
 	publicAccessFlag := flag.Bool("public-access", false, "allow public access to the wiki with read access (default: false)")
+	allowInsecureFlag := flag.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)")
 	injectCodeInHeaderFlag := flag.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")")
 	flag.Parse()
 
@@ -63,12 +66,16 @@ func main() {
 	adminPassword := resolveString("admin-password", *adminPasswordFlag, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
 	jwtSecret := resolveString("jwt-secret", *jwtSecretFlag, visited, "LEAFWIKI_JWT_SECRET", "")
 	injectCodeInHeader := resolveString("inject-code-in-header", *injectCodeInHeaderFlag, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
-
+	allowInsecure := resolveBool("allow-insecure", *allowInsecureFlag, visited, "LEAFWIKI_ALLOW_INSECURE")
 	publicAccess := resolveBool("public-access", *publicAccessFlag, visited, "LEAFWIKI_PUBLIC_ACCESS")
 
-	log.Printf("configuration: host=%q port=%q dataDir=%q publicAccess=%t injectHeader=%t",
-		host, port, dataDir, publicAccess, injectCodeInHeader != "",
+	log.Printf("configuration: host=%q port=%q dataDir=%q publicAccess=%t injectHeader=%t allowInsecure=%t",
+		host, port, dataDir, publicAccess, injectCodeInHeader != "", allowInsecure,
 	)
+
+	if allowInsecure {
+		log.Printf("WARNING: allow-insecure enabled. Auth cookies may be transmitted over plain HTTP (INSECURE).")
+	}
 
 	// Check if data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
@@ -82,7 +89,11 @@ func main() {
 		switch args[0] {
 		case "reset-admin-password":
 			// Note: No JWT secret needed for this command
-			w, err := wiki.NewWiki(dataDir, adminPassword, "", false)
+			w, err := wiki.NewWiki(&wiki.WikiOptions{
+				StorageDir:    dataDir,
+				JWTSecret:     "",
+				AdminPassword: adminPassword,
+			})
 			if err != nil {
 				log.Fatalf("Failed to initialize Wiki: %v", err)
 			}
@@ -113,14 +124,21 @@ func main() {
 		log.Fatalf("admin password is required. Set it using using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
 	}
 
-	enableSearchIndexing := true
-	w, err := wiki.NewWiki(dataDir, adminPassword, jwtSecret, enableSearchIndexing)
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:    dataDir,
+		AdminPassword: adminPassword,
+		JWTSecret:     jwtSecret,
+	})
 	if err != nil {
 		log.Fatalf("Failed to initialize Wiki: %v", err)
 	}
 	defer w.Close()
 
-	router := http.NewRouter(w, publicAccess, injectCodeInHeader)
+	router := http.NewRouter(w, http.RouterOptions{
+		PublicAccess:       publicAccess,
+		InjectCodeInHeader: injectCodeInHeader,
+		AllowInsecure:      allowInsecure,
+	})
 
 	// Start server - combine host and port
 	listenAddr := host + ":" + port
