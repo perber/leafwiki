@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/wiki"
@@ -15,7 +16,7 @@ func printUsage() {
 	fmt.Println(`LeafWiki – lightweight selfhosted wiki 🌿
 
 	Usage:
-	leafwiki [--host <HOST>] [--port <PORT>] [--data-dir <DIR>] [--admin-password <PASSWORD>]
+	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
 	leafwiki reset-admin-password
 	leafwiki --help
 
@@ -26,10 +27,11 @@ func printUsage() {
 	--admin-password   Initial admin password (used only if no admin exists)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
 	--public-access    Allow public access to the wiki only with read access (default: false)
-	--allow-insecure   Allow insecure HTTP connections (default: false)
+	--allow-insecure   Allow insecure HTTP connections (default: false)                      
+	--access-token-timeout  Access token timeout duration (e.g. 24h, 15m) (default: 15m)
+	--refresh-token-timeout Refresh token timeout duration (e.g. 168h, 7d) (default: 7d)
 	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
-	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
-	                         
+	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.	  
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -40,6 +42,8 @@ func printUsage() {
 	LEAFWIKI_PUBLIC_ACCESS
 	LEAFWIKI_ALLOW_INSECURE
 	LEAFWIKI_INJECT_CODE_IN_HEADER
+	LEAFWIKI_ACCESS_TOKEN_TIMEOUT
+	LEAFWIKI_REFRESH_TOKEN_TIMEOUT
 	`)
 }
 
@@ -54,6 +58,8 @@ func main() {
 	publicAccessFlag := flag.Bool("public-access", false, "allow public access to the wiki with read access (default: false)")
 	allowInsecureFlag := flag.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)")
 	injectCodeInHeaderFlag := flag.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")")
+	accessTokenTimeoutFlag := flag.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)")
+	refreshTokenTimeoutFlag := flag.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)")
 	flag.Parse()
 
 	// Track which flags were explicitly set on CLI
@@ -68,6 +74,8 @@ func main() {
 	injectCodeInHeader := resolveString("inject-code-in-header", *injectCodeInHeaderFlag, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
 	allowInsecure := resolveBool("allow-insecure", *allowInsecureFlag, visited, "LEAFWIKI_ALLOW_INSECURE")
 	publicAccess := resolveBool("public-access", *publicAccessFlag, visited, "LEAFWIKI_PUBLIC_ACCESS")
+	accessTokenTimeout := resolveDuration("access-token-timeout", *accessTokenTimeoutFlag, visited, "LEAFWIKI_ACCESS_TOKEN_TIMEOUT")
+	refreshTokenTimeout := resolveDuration("refresh-token-timeout", *refreshTokenTimeoutFlag, visited, "LEAFWIKI_REFRESH_TOKEN_TIMEOUT")
 
 	log.Printf("configuration: host=%q port=%q dataDir=%q publicAccess=%t injectHeader=%t allowInsecure=%t",
 		host, port, dataDir, publicAccess, injectCodeInHeader != "", allowInsecure,
@@ -135,9 +143,11 @@ func main() {
 	defer w.Close()
 
 	router := http.NewRouter(w, http.RouterOptions{
-		PublicAccess:       publicAccess,
-		InjectCodeInHeader: injectCodeInHeader,
-		AllowInsecure:      allowInsecure,
+		PublicAccess:        publicAccess,
+		InjectCodeInHeader:  injectCodeInHeader,
+		AllowInsecure:       allowInsecure,
+		AccessTokenTimeout:  accessTokenTimeout,
+		RefreshTokenTimeout: refreshTokenTimeout,
 	})
 
 	// Start server - combine host and port
@@ -178,6 +188,20 @@ func resolveBool(flagName string, flagVal bool, visited map[string]bool, envVar 
 	return flagVal // default from flag
 }
 
+func resolveDuration(flagName string, flagVal time.Duration, visited map[string]bool, envVar string) time.Duration {
+	if visited[flagName] {
+		return flagVal
+	}
+	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+		if d, ok := parseDuration(env); ok {
+			return d
+		}
+		// If env var is set but invalid, fail fast (helps operators)
+		log.Fatalf("Invalid value for %s: %q (expected duration like 24h, 15m)", envVar, env)
+	}
+	return flagVal // default from flag
+}
+
 func parseBool(s string) (bool, bool) {
 	s = strings.TrimSpace(strings.ToLower(s))
 	switch s {
@@ -188,4 +212,12 @@ func parseBool(s string) (bool, bool) {
 	}
 
 	return false, false
+}
+
+func parseDuration(s string) (time.Duration, bool) {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, false
+	}
+	return d, true
 }

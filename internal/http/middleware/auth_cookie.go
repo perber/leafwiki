@@ -17,12 +17,12 @@ type AuthCookies struct {
 	RefreshTTL    time.Duration
 }
 
-func NewAuthCookies(allowInsecure bool) *AuthCookies {
+func NewAuthCookies(allowInsecure bool, accessTTL, refreshTTL time.Duration) *AuthCookies {
 	return &AuthCookies{
 		AllowInsecure: allowInsecure,
 		SameSite:      http.SameSiteStrictMode,
-		AccessTTL:     time.Hour * 1,
-		RefreshTTL:    time.Hour * 24 * 7,
+		AccessTTL:     accessTTL,
+		RefreshTTL:    refreshTTL,
 	}
 }
 
