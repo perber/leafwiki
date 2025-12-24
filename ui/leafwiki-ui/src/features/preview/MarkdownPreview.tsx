@@ -16,7 +16,7 @@ const schema = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
-    '*': [...(defaultSchema.attributes?.['*'] || []), 'data-line'],
+    '*': [...(defaultSchema.attributes?.['*'] || []), 'data-line', 'style'],
   },
 }
 
