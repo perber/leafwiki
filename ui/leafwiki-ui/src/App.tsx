@@ -1,20 +1,25 @@
+import { createLeafWikiRouter } from '@/features/router/router'
 import { getConfig } from '@/lib/api/config'
+import { useBootstrapAuth } from '@/lib/bootstrapAuth'
+import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { usePublicAccessStore } from '@/stores/publicAccess'
+import { useSessionStore } from '@/stores/session'
+import useApplyDesignMode from '@/useApplyDesignMode'
 import { useEffect, useMemo } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './App.css'
-import { createLeafWikiRouter } from './features/router/router'
-import { useIsReadOnly } from './lib/useIsReadOnly'
-import { useAuthStore } from './stores/auth'
-import { usePublicAccessStore } from './stores/publicAccess'
-import useApplyDesignMode from './useApplyDesignMode'
 
 function App() {
+  // bootstrap authentication on app start -> session store
+  useBootstrapAuth()
+
   const publicAccessLoaded = usePublicAccessStore((s) => s.loaded)
   const setLoaded = usePublicAccessStore((s) => s.setLoaded)
   const setPublicAccess = usePublicAccessStore((s) => s.setPublicAccess)
 
-  const isLoggedIn = useAuthStore((s) => !!s.user)
+  const isLoggedIn = useSessionStore((s) => !!s.user)
+  const isRefreshing = useSessionStore((s) => s.isRefreshing)
   const isReadOnly = useIsReadOnly()
   const isReadOnlyViewer = isReadOnly && !isLoggedIn
 
@@ -46,6 +51,10 @@ function App() {
   )
 
   if (!publicAccessLoaded) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
+
+  if (isRefreshing) {
+    return null // avoid router flicker before bootstrapping finished
+  }
 
   return (
     <>

@@ -1,9 +1,8 @@
-import { useAuthStore } from '@/stores/auth'
+import { useSessionStore } from '@/stores/session'
 import { API_BASE_URL } from '../config'
 
 export type AuthResponse = {
-  token: string
-  refresh_token: string
+  message: string
   user: {
     id: string
     username: string
@@ -15,6 +14,7 @@ export type AuthResponse = {
 export async function login(identifier: string, password: string) {
   const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identifier, password }),
   })
@@ -23,14 +23,19 @@ export async function login(identifier: string, password: string) {
 
   const data: AuthResponse = await res.json()
 
-  const { setAuth } = useAuthStore.getState()
-  setAuth(data.token, data.refresh_token, data.user)
+  const { setUser } = useSessionStore.getState()
+  setUser(data.user)
 
   return data
 }
 
-export function logout() {
-  const { logout } = useAuthStore.getState()
+export async function logout() {
+  await fetch(`${API_BASE_URL}/api/auth/logout`, {
+    method: 'POST',
+    credentials: 'include',
+  }).catch(() => {})
+
+  const { logout } = useSessionStore.getState()
   logout()
 }
 
@@ -42,15 +47,13 @@ export async function fetchWithAuth(
   options: RequestInit = {},
   retry = true,
 ): Promise<unknown> {
-  const store = useAuthStore.getState()
-  const token = store.token
+  const store = useSessionStore.getState()
   const logout = store.logout
 
   const headers = new Headers(options.headers || {})
   if (!(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
-  if (token) headers.set('Authorization', `Bearer ${token}`)
 
   // Save the original body
   let originalBody = options.body
@@ -65,6 +68,7 @@ export async function fetchWithAuth(
   const doFetch = async (): Promise<Response> => {
     return fetch(`${API_BASE_URL}${path}`, {
       ...options,
+      credentials: 'include', // <<< wichtig
       headers,
       body: originalBody,
     })
@@ -83,9 +87,6 @@ export async function fetchWithAuth(
 
     try {
       await refreshPromise
-      const newToken = useAuthStore.getState().token
-      if (newToken) headers.set('Authorization', `Bearer ${newToken}`)
-
       res = await doFetch()
     } catch {
       logout()
@@ -104,7 +105,6 @@ export async function fetchWithAuth(
 
     if (errorBody?.error === 'validation_error') throw errorBody
     if (errorBody?.error) throw errorBody
-
     throw new Error(errorBody?.message || 'Request failed')
   }
 
@@ -116,24 +116,20 @@ export async function fetchWithAuth(
 }
 
 async function refreshAccessToken() {
-  const store = useAuthStore.getState()
-  const setRefreshing = useAuthStore.getState().setRefreshing
-  const refreshToken = store.refreshToken
-
-  if (!refreshToken) throw new Error('No refresh token available')
+  const store = useSessionStore.getState()
+  const setRefreshing = useSessionStore.getState().setRefreshing
 
   setRefreshing(true)
   try {
     const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: refreshToken }),
+      credentials: 'include',
     })
 
     if (!res.ok) throw new Error('Refresh failed')
 
     const data = await res.json()
-    store.setAuth(data.token, data.refresh_token, data.user)
+    store.setUser(data.user)
   } finally {
     setRefreshing(false)
   }
