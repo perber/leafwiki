@@ -144,6 +144,9 @@ func (s *SQLiteIndex) ensureSchema() error {
 }
 
 func (s *SQLiteIndex) Clear() error {
+	if err := s.Connect(); err != nil {
+		return err
+	}
 	_, err := s.db.Exec(`DELETE FROM pages`)
 	return err
 }
@@ -160,15 +163,13 @@ func (s *SQLiteIndex) Close() error {
 }
 
 func (s *SQLiteIndex) GetDB() *sql.DB {
-	if s.db == nil {
-		return nil
-	}
+	_ = s.Connect()
 	return s.db
 }
 
 func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, title string, content string) error {
-	if s.db == nil {
-		return sql.ErrConnDone
+	if err := s.Connect(); err != nil {
+		return err
 	}
 
 	s.mu.Lock()
@@ -195,6 +196,10 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 }
 
 func (s *SQLiteIndex) RemovePage(pageID string) error {
+	if err := s.Connect(); err != nil {
+		return err
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, err := s.db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
@@ -202,6 +207,10 @@ func (s *SQLiteIndex) RemovePage(pageID string) error {
 }
 
 func (s *SQLiteIndex) RemovePageByFilePath(filePath string) (int64, error) {
+	if err := s.Connect(); err != nil {
+		return 0, err
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	res, err := s.db.Exec(`DELETE FROM pages WHERE filepath = ?`, filePath)
@@ -212,8 +221,8 @@ func (s *SQLiteIndex) RemovePageByFilePath(filePath string) (int64, error) {
 }
 
 func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, error) {
-	if s.db == nil {
-		return nil, sql.ErrConnDone
+	if err := s.Connect(); err != nil {
+		return nil, err
 	}
 
 	sr := &SearchResult{}
