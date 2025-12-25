@@ -963,7 +963,7 @@ func TestRequireAdminMiddleware(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	// Default Admin versucht, Benutzer zu erstellen (sollte erlaubt sein)
+	// Default Admin create user should succeed
 	body := `{"username": "mod", "email": "mod@example.com", "password": "secretpassword", "role": "editor"}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
 

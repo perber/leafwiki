@@ -250,7 +250,7 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
 
-	// Erstelle tiefere Struktur: root -> architecture -> backend
+	// create a deep hierarchy of pages (Architecture -> Backend)
 	_, err := w.CreatePage(nil, "Architecture", "architecture")
 	if err != nil {
 		t.Fatalf("Failed to create 'Architecture': %v", err)
@@ -264,7 +264,7 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	}
 	backend := arch.Children[0]
 
-	// Jetzt dort einen Slug vorschlagen
+	// Now suggest a slug there
 	slug, err := w.SuggestSlug(backend.ID, "", "Data Layer")
 	if err != nil {
 		t.Fatalf("SuggestSlug failed: %v", err)
@@ -274,7 +274,7 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 		t.Errorf("Expected 'data-layer', got %q", slug)
 	}
 
-	// Erzeuge ein zweites mit gleichem Namen → es muss nummeriert werden
+	// Create a second one with the same name → it must be numbered
 	_, err = w.CreatePage(&backend.ID, "Data Layer", "data-layer")
 	if err != nil {
 		t.Fatalf("Failed to create 'Data Layer': %v", err)
@@ -491,7 +491,7 @@ func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
 
-	// 1) Page A mit Links auf /x und /x/y (existieren noch nicht)
+	// 1) Create page A with links to /x and /x/y (both non-existing)
 	pageA, err := w.CreatePage(nil, "Page A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
