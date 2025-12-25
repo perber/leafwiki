@@ -48,14 +48,17 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	router := gin.Default()
 	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
 
-	authCookies := middleware.NewAuthCookies(options.AllowInsecure)
+	authCookies := middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+
+	loginRateLimiter := middleware.NewRateLimiter(10, 5*time.Minute)
+	refreshRateLimiter := middleware.NewRateLimiter(30, time.Minute)
 
 	nonAuthApiGroup := router.Group("/api")
 	{
 		// Auth
-		nonAuthApiGroup.POST("/auth/login", api.LoginUserHandler(wikiInstance, authCookies))
-		nonAuthApiGroup.POST("/auth/refresh-token", api.RefreshTokenUserHandler(wikiInstance, authCookies))
-		nonAuthApiGroup.POST("/auth/logout", api.LogoutUserHandler(authCookies))
+		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies))
+		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies))
+		nonAuthApiGroup.POST("/auth/logout", api.LogoutUserHandler(wikiInstance, authCookies))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
 			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection})
 		})
