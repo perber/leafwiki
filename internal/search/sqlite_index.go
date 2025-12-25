@@ -59,7 +59,7 @@ func (s *SQLiteIndex) ensureSchema() error {
 	if err != nil {
 		return err
 	}
-	// Create the users table if it doesn't exist
+	// Create the fts table if it doesn't exist
 	_, err = s.db.Exec(`
 		CREATE VIRTUAL TABLE IF NOT EXISTS pages USING fts5(
 			path UNINDEXED,
