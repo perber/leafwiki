@@ -29,7 +29,7 @@ func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return NewRouter(w, RouterOptions{
 		PublicAccess:       false,
 		InjectCodeInHeader: "",
-		AllowInsecure:      false,
+		AllowInsecure:      true,
 	})
 }
 
@@ -45,11 +45,13 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 		t.Fatalf("Failed to login: %d - %s", loginRec.Code, loginRec.Body.String())
 	}
 
-	var loginResp map[string]interface{}
-	if err := json.Unmarshal(loginRec.Body.Bytes(), &loginResp); err != nil {
-		t.Fatalf("Invalid login response: %v", err)
+	loginRes := loginRec.Result()
+	defer loginRes.Body.Close()
+
+	cookies := loginRes.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies on login response, got none")
 	}
-	token := loginResp["token"].(string)
 
 	// Perform authenticated request
 	if body == nil {
@@ -57,7 +59,9 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 	}
 	req := httptest.NewRequest(method, url, body)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -754,13 +758,13 @@ func TestAuthLoginEndpoint(t *testing.T) {
 		t.Fatalf("Expected 200 OK for valid login, got %d", rec.Code)
 	}
 
-	var resp map[string]interface{}
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("Failed to parse JSON response: %v", err)
-	}
+	res := rec.Result()
+	defer res.Body.Close()
 
-	if _, ok := resp["token"]; !ok {
-		t.Errorf("Expected token in response, got: %v", resp)
+	// Prüfen, ob Cookies gesetzt wurden
+	cookies := res.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies to be set on login")
 	}
 }
 
@@ -786,33 +790,39 @@ func TestAuthRefreshToken(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	// Login
+	// 1) Login
 	loginBody := `{"identifier": "admin", "password": "admin"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
 	router.ServeHTTP(loginRec, loginReq)
 
-	var loginResp map[string]string
-	_ = json.Unmarshal(loginRec.Body.Bytes(), &loginResp)
-	originalToken := loginResp["token"]
-	refreshToken := loginResp["refresh_token"]
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on login, got %d", loginRec.Code)
+	}
 
-	// Refresh
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh-token", strings.NewReader(`{"token":"`+refreshToken+`"}`))
+	loginRes := loginRec.Result()
+	defer loginRes.Body.Close()
+	cookies := loginRes.Cookies()
+
+	// 2) Refresh mit denselben Cookies
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh-token", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
 	rec := httptest.NewRecorder()
-
 	router.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("Expected 200 OK on refresh, got %d", rec.Code)
+		t.Fatalf("Expected 200 OK on refresh, got %d - %s", rec.Code, rec.Body.String())
 	}
 
-	var refreshResp map[string]string
-	_ = json.Unmarshal(rec.Body.Bytes(), &refreshResp)
-
-	if refreshResp["token"] == originalToken {
-		t.Errorf("Expected new token, got same one")
+	// Optional: prüfen, dass neue Cookies gesetzt wurden
+	refreshRes := rec.Result()
+	defer refreshRes.Body.Close()
+	newCookies := refreshRes.Cookies()
+	if len(newCookies) == 0 {
+		t.Fatalf("Expected new auth cookies on refresh")
 	}
 }
 
@@ -1011,7 +1021,33 @@ func TestAssetEndpoints(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	// Step 1: Create page
+	// Step 0: Login als Admin und Cookies holen
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on login, got %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer loginRes.Body.Close()
+
+	cookies := loginRes.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies after login, got none")
+	}
+
+	addCookies := func(req *http.Request) {
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+	}
+
+	// Step 1: Create page direkt über Wiki-API
 	page, err := w.CreatePage(nil, "Assets Page", "assets-page")
 	if err != nil {
 		t.Fatalf("Failed to create page: %v", err)
@@ -1021,44 +1057,47 @@ func TestAssetEndpoints(t *testing.T) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	part, _ := writer.CreateFormFile("file", "testfile.txt")
+	part, err := writer.CreateFormFile("file", "testfile.txt")
+	if err != nil {
+		t.Fatalf("Failed to create form file: %v", err)
+	}
 	if _, err := part.Write([]byte("Hello, asset!")); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
-	writer.Close()
-
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	// Get Token for authentication
-	login := authenticatedRequest(t, router, http.MethodPost, "/api/auth/login", strings.NewReader(`{"identifier": "admin", "password": "admin"}`))
-	var loginResp map[string]interface{}
-	if err := json.Unmarshal(login.Body.Bytes(), &loginResp); err != nil {
-		t.Fatalf("Invalid login JSON: %v", err)
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Failed to close multipart writer: %v", err)
 	}
-	token := loginResp["token"].(string)
-	req.Header.Set("Authorization", "Bearer "+token)
 
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
+	uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	addCookies(uploadReq)
 
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("Expected 201 Created on upload, got %d - %s", rec.Code, rec.Body.String())
+	uploadRec := httptest.NewRecorder()
+	router.ServeHTTP(uploadRec, uploadReq)
+
+	if uploadRec.Code != http.StatusCreated {
+		t.Fatalf("Expected 201 Created on upload, got %d - %s", uploadRec.Code, uploadRec.Body.String())
 	}
 
 	var uploadResp map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &uploadResp); err != nil {
+	if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
 		t.Fatalf("Invalid upload JSON: %v", err)
 	}
 	if uploadResp["file"] == "" {
-		t.Error("Expected File in upload response")
+		t.Error("Expected file field in upload response")
 	}
 
 	// Step 3: List assets
-	listRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	listReq := httptest.NewRequest(http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	addCookies(listReq)
+
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+
 	if listRec.Code != http.StatusOK {
-		t.Fatalf("Expected 200 OK on listing, got %d", listRec.Code)
+		t.Fatalf("Expected 200 OK on listing, got %d - %s", listRec.Code, listRec.Body.String())
 	}
+
 	var listResp map[string][]string
 	if err := json.Unmarshal(listRec.Body.Bytes(), &listResp); err != nil {
 		t.Fatalf("Invalid listing JSON: %v", err)
@@ -1068,13 +1107,27 @@ func TestAssetEndpoints(t *testing.T) {
 	}
 
 	// Step 4: Delete asset
-	delRec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+page.ID+"/assets/testfile.txt", nil)
+	delReq := httptest.NewRequest(http.MethodDelete, "/api/pages/"+page.ID+"/assets/testfile.txt", nil)
+	addCookies(delReq)
+
+	delRec := httptest.NewRecorder()
+	router.ServeHTTP(delRec, delReq)
+
 	if delRec.Code != http.StatusOK {
-		t.Errorf("Expected 200 No Content on delete, got %d", delRec.Code)
+		t.Errorf("Expected 200 OK on delete, got %d - %s", delRec.Code, delRec.Body.String())
 	}
 
 	// Step 5: Verify asset is gone
-	listRec2 := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	listReq2 := httptest.NewRequest(http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	addCookies(listReq2)
+
+	listRec2 := httptest.NewRecorder()
+	router.ServeHTTP(listRec2, listReq2)
+
+	if listRec2.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on listing after delete, got %d - %s", listRec2.Code, listRec2.Body.String())
+	}
+
 	var listResp2 map[string][]string
 	if err := json.Unmarshal(listRec2.Body.Bytes(), &listResp2); err != nil {
 		t.Fatalf("Invalid listing JSON: %v", err)
