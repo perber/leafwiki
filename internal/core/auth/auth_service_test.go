@@ -18,7 +18,13 @@ func setupTestAuthService(t *testing.T) *AuthService {
 		t.Fatal(err)
 	}
 
-	authService := NewAuthService(userService, "mysecretkey")
+	// Create Session store
+	sessionStore, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	authService := NewAuthService(userService, sessionStore, "mysecretkey")
 	return authService
 }
 
