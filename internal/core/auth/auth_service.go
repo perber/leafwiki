@@ -194,7 +194,7 @@ func (a *AuthService) generateToken(user *User, duration time.Duration, typ stri
 		"exp":   time.Now().Add(duration).Unix(),
 		"iat":   time.Now().Unix(),
 		"typ":   typ,
-		"jti":   generateJTI(), // Unique identifier for the token
+		"jti":   jti, // Unique identifier for the token
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString(a.secretKey)
