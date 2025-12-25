@@ -89,7 +89,7 @@ func (s *SessionStore) IsActive(id, userID, tokenType string, now time.Time) (bo
 	`, id, userID, tokenType).Scan(&expiresAt, &revokedAt)
 
 	if err == sql.ErrNoRows {
-		// Keine bekannte Session -> behandeln wie revoked
+		// no such session
 		return false, nil
 	}
 	if err != nil {
