@@ -68,7 +68,7 @@ export async function fetchWithAuth(
   const doFetch = async (): Promise<Response> => {
     return fetch(`${API_BASE_URL}${path}`, {
       ...options,
-      credentials: 'include', // <<< wichtig
+      credentials: 'include',
       headers,
       body: originalBody,
     })
