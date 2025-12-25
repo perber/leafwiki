@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 COPY --from=frontend-build /app/dist ./internal/http/dist
 RUN CGO_ENABLED=0 go build \
-	-ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X -X github.com/perber/wiki/internal/http.Environment=production" \
+	-ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production" \
 	-o /out/leafwiki ./cmd/leafwiki/main.go
 
 # Step 3: Final image (small)
