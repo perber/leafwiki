@@ -453,7 +453,7 @@ func TestGetPageEndpoint(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	// Erstellt eine Page über Wiki (nicht direkt über HTTP)
+	// Create a page
 	_, err := w.CreatePage(nil, "Welcome", "welcome")
 	if err != nil {
 		t.Fatalf("Failed to create page: %v", err)
@@ -461,7 +461,7 @@ func TestGetPageEndpoint(t *testing.T) {
 
 	page := w.GetTree().Children[0]
 
-	// Page abrufen
+	// Get page
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID, nil)
 
 	if rec.Code != http.StatusOK {
@@ -515,7 +515,7 @@ func TestMovePageEndpoint(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	// Erstelle zwei Pages: root → a, root → b
+	// Create two pages a and b
 	_, err := w.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
@@ -528,14 +528,14 @@ func TestMovePageEndpoint(t *testing.T) {
 	a := w.GetTree().Children[0]
 	b := w.GetTree().Children[1]
 
-	// Verschiebe a → unter b
+	// Move a under b
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"`+b.ID+`"}`))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected status 200, got %d", rec.Code)
 	}
 
-	// Checke ob a jetzt Kind von b ist
+	// Check if a is now a child of b
 	if len(b.Children) != 1 || b.Children[0].ID != a.ID {
 		t.Errorf("Expected page to be moved under new parent")
 	}
@@ -645,7 +645,7 @@ func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
-	// Verschibe ConflictPage in root level
+	// move conflictPage under root (where section-b already exists)
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+conflictPage.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
 
 	if rec.Code != http.StatusBadRequest {
@@ -835,18 +835,18 @@ func TestCreateUser_DuplicateEmailOrUsername(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	// Erstellt initialen Benutzer
+	// Create initial user
 	payload := `{"username": "john", "email": "john@example.com", "password": "secret", "role": "editor"}`
 	_ = authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(payload))
 
-	// Versuch mit gleichem Benutzernamen
+	// Attempt with duplicate username
 	payloadDuplicate := `{"username": "john", "email": "john2@example.com", "password": "secret", "role": "editor"}`
 	rec1 := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(payloadDuplicate))
 	if rec1.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400 for duplicate username, got %d", rec1.Code)
 	}
 
-	// Versuch mit gleicher Email
+	// Attempt with duplicate email
 	payloadDuplicateEmail := `{"username": "johnny", "email": "john@example.com", "password": "secret", "role": "editor"}`
 	rec2 := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(payloadDuplicateEmail))
 	if rec2.Code != http.StatusBadRequest {
@@ -892,7 +892,7 @@ func TestUpdateUserEndpoint(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	// Benutzer anlegen
+	// Create user
 	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "editor"}`
 	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
 	var user map[string]interface{}
@@ -918,13 +918,13 @@ func TestDeleteUserEndpoint(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	// Benutzer anlegen
+	// Create user
 	create := `{"username": "todelete", "email": "delete@example.com", "password": "secrepassword", "role": "editor"}`
 	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
 	var user map[string]interface{}
 	_ = json.Unmarshal(resp.Body.Bytes(), &user)
 
-	// Benutzer löschen
+	// Delete user
 	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/users/"+user["id"].(string), nil)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("Expected 204 OK on delete, got %d", rec.Code)
@@ -936,7 +936,7 @@ func TestDeleteAdminUser_ShouldFail(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	// Default Admin holen
+	// Get default admin
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/users", nil)
 	var users []map[string]interface{}
 	_ = json.Unmarshal(rec.Body.Bytes(), &users)
@@ -952,7 +952,7 @@ func TestDeleteAdminUser_ShouldFail(t *testing.T) {
 		t.Fatal("No admin user found")
 	}
 
-	// Versuch den Admin zu löschen
+	// Attempt to delete the admin
 	recDel := authenticatedRequest(t, router, http.MethodDelete, "/api/users/"+adminID, nil)
 	if recDel.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400 when deleting admin user, got %d", recDel.Code)
