@@ -32,8 +32,9 @@ func NewRateLimiter(limit int, window time.Duration) gin.HandlerFunc {
 		rl.mu.Lock()
 		defer rl.mu.Unlock()
 
-		events := rl.hits[key][:0]
+		var events []time.Time
 		if old, ok := rl.hits[key]; ok {
+			events = old[:0]
 			for _, t := range old {
 				if t.After(cutoff) {
 					events = append(events, t)
