@@ -68,8 +68,14 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		return nil, err
 	}
 
+	// SessionStore
+	sessionStore, err := auth.NewSessionStore(options.StorageDir)
+	if err != nil {
+		return nil, err
+	}
+
 	// Initialize the auth service
-	authService := auth.NewAuthService(userService, options.JWTSecret)
+	authService := auth.NewAuthService(userService, sessionStore, options.JWTSecret)
 
 	// Initialize the tree service
 	treeService := tree.NewTreeService(options.StorageDir)
