@@ -77,17 +77,6 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		return nil, err
 	}
 
-	// Cleanup expired sessions periodically
-	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
-		defer ticker.Stop()
-		for range ticker.C {
-			if err := sessionStore.CleanupExpiredSessions(); err != nil {
-				log.Printf("failed to cleanup expired sessions: %v", err)
-			}
-		}
-	}()
-
 	// Initialize the auth service
 	authService := auth.NewAuthService(userService, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 
