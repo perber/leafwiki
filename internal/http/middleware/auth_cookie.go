@@ -3,6 +3,7 @@ package middleware
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,7 +31,16 @@ func (a *AuthCookies) requireSecure(c *gin.Context) (bool, error) {
 	if c.Request.TLS != nil {
 		return true, nil
 	}
-	if c.GetHeader("X-Forwarded-Proto") == "https" {
+	xfp := strings.ToLower(c.GetHeader("X-Forwarded-Proto"))
+	if strings.Contains(xfp, "https") {
+		return true, nil
+	}
+
+	if strings.EqualFold(c.GetHeader("X-Forwarded-Ssl"), "on") {
+		return true, nil
+	}
+
+	if strings.EqualFold(c.GetHeader("Front-End-Https"), "on") {
 		return true, nil
 	}
 	if a.AllowInsecure {

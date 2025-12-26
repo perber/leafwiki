@@ -2,6 +2,7 @@ package wiki
 
 import (
 	"testing"
+	"time"
 
 	verrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
@@ -10,9 +11,11 @@ import (
 
 func createWikiTestInstance(t *testing.T) *Wiki {
 	wikiInstance, err := NewWiki(&WikiOptions{
-		StorageDir:    t.TempDir(),
-		AdminPassword: "admin",
-		JWTSecret:     "secretkey",
+		StorageDir:          t.TempDir(),
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create wiki instance: %v", err)

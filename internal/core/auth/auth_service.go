@@ -11,19 +11,20 @@ import (
 )
 
 type AuthService struct {
-	userService  *UserService
-	sessionStore *SessionStore
-	secretKey    []byte
+	userService          *UserService
+	sessionStore         *SessionStore
+	secretKey            []byte
+	accessTokenLifetime  time.Duration
+	refreshTokenLifetime time.Duration
 }
 
-const accessTokenLifetime = time.Hour * 1
-const refreshTokenLifetime = time.Hour * 24 * 7
-
-func NewAuthService(userService *UserService, sessionStore *SessionStore, secret string) *AuthService {
+func NewAuthService(userService *UserService, sessionStore *SessionStore, secret string, accessTokenTimeout, refreshTokenTimeout time.Duration) *AuthService {
 	return &AuthService{
-		userService:  userService,
-		sessionStore: sessionStore,
-		secretKey:    []byte(secret),
+		userService:          userService,
+		sessionStore:         sessionStore,
+		secretKey:            []byte(secret),
+		accessTokenLifetime:  accessTokenTimeout,
+		refreshTokenLifetime: refreshTokenTimeout,
 	}
 }
 
@@ -42,12 +43,12 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	// Clear sensitive information from user object
 	user.Password = "" // Clear password from user object
 
-	accessToken, _, err := a.generateToken(user, accessTokenLifetime, "access")
+	accessToken, _, err := a.generateToken(user, a.accessTokenLifetime, "access")
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, refreshJTI, err := a.generateToken(user, refreshTokenLifetime, "refresh")
+	refreshToken, refreshJTI, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +58,7 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 		refreshJTI,
 		user.ID,
 		"refresh",
-		time.Now().Add(refreshTokenLifetime),
+		time.Now().Add(a.refreshTokenLifetime),
 	); err != nil {
 		return nil, err
 	}
@@ -108,12 +109,12 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 		log.Printf("Warning: failed to revoke used refresh token session: %v", err)
 	}
 
-	newAccessToken, _, err := a.generateToken(user, accessTokenLifetime, "access")
+	newAccessToken, _, err := a.generateToken(user, a.accessTokenLifetime, "access")
 	if err != nil {
 		return nil, err
 	}
 
-	newRefreshToken, newRefreshJTI, err := a.generateToken(user, refreshTokenLifetime, "refresh")
+	newRefreshToken, newRefreshJTI, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +123,7 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 		newRefreshJTI,
 		user.ID,
 		"refresh",
-		time.Now().Add(refreshTokenLifetime),
+		time.Now().Add(a.refreshTokenLifetime),
 	); err != nil {
 		return nil, err
 	}

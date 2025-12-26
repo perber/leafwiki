@@ -2,6 +2,7 @@ package auth
 
 import (
 	"testing"
+	"time"
 )
 
 func setupTestAuthService(t *testing.T) *AuthService {
@@ -24,7 +25,7 @@ func setupTestAuthService(t *testing.T) *AuthService {
 		t.Fatal(err)
 	}
 
-	authService := NewAuthService(userService, sessionStore, "mysecretkey")
+	authService := NewAuthService(userService, sessionStore, "mysecretkey", 1*time.Hour, 24*time.Hour*7)
 	return authService
 }
 

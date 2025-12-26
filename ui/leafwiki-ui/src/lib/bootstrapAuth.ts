@@ -23,9 +23,10 @@ export function useBootstrapAuth() {
 
         const data = await res.json()
         if (!cancelled) setUser(data.user)
-      } catch {
+      } catch (err) {
         // ignore
         // When refresh fails, user is not logged in, so we do nothing
+        console.debug('[bootstrapAuth] Refresh token failed:', err)
       } finally {
         if (!cancelled) setRefreshing(false)
       }
