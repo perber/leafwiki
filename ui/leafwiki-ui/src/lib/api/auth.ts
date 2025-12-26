@@ -19,7 +19,17 @@ export async function login(identifier: string, password: string) {
     body: JSON.stringify({ identifier, password }),
   })
 
-  if (!res.ok) throw new Error('Login failed')
+  if (!res.ok) {
+    let errorBody: { error?: string } | null = null
+    try {
+      errorBody = await res.json()
+    } catch {
+      throw new Error('Login failed')
+    }
+
+    if (errorBody?.error) throw new Error(errorBody.error)
+    throw new Error('Login failed')
+  }
 
   const data: AuthResponse = await res.json()
 
@@ -33,7 +43,7 @@ export async function logout() {
   await fetch(`${API_BASE_URL}/api/auth/logout`, {
     method: 'POST',
     credentials: 'include',
-  }).catch(() => { })
+  }).catch(() => {})
 
   const { logout } = useSessionStore.getState()
   logout()
@@ -89,6 +99,7 @@ export async function fetchWithAuth(
       await refreshPromise
       res = await doFetch()
     } catch {
+      // Refresh token failed, log out the user
       logout()
       throw new Error('Unauthorized')
     }
@@ -124,6 +135,7 @@ async function refreshAccessToken() {
   })
 
   if (!res.ok) {
+    // No logout here, handled in fetchWithAuth
     throw new Error('Refresh failed')
   }
 

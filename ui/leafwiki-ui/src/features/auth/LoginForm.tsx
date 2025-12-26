@@ -2,8 +2,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { login } from '@/lib/api/auth'
 import { useSessionStore } from '@/stores/session'
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 
 export default function LoginForm() {
   const [identifier, setIdentifier] = useState('')
@@ -14,11 +14,10 @@ export default function LoginForm() {
   const navigate = useNavigate()
   const user = useSessionStore((s) => s.user)
 
-  useEffect(() => {
-    if (user) {
-      navigate('/')
-    }
-  }, [user, navigate])
+  // If already logged in, redirect to home
+  if (user) {
+    return <Navigate to="/" replace />
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,8 +27,10 @@ export default function LoginForm() {
     try {
       // user already set in the store by the login function
       await login(identifier, password)
-    } catch {
-      setError('Invalid credentials')
+      // Redirect to home page after successful login
+      navigate('/')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
       setLoading(false)
     }
