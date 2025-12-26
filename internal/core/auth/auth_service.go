@@ -104,11 +104,6 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 
 	user.Password = "" // Clear password from user object
 
-	err = a.sessionStore.RevokeSession(jti)
-	if err != nil {
-		log.Printf("Warning: failed to revoke used refresh token session: %v", err)
-	}
-
 	newAccessToken, _, err := a.generateToken(user, a.accessTokenLifetime, "access")
 	if err != nil {
 		return nil, err
@@ -126,6 +121,12 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 		time.Now().Add(a.refreshTokenLifetime),
 	); err != nil {
 		return nil, err
+	}
+
+	// Revoke the old refresh token only after successfully creating the new session
+	err = a.sessionStore.RevokeSession(jti)
+	if err != nil {
+		log.Printf("Warning: failed to revoke used refresh token session: %v", err)
 	}
 
 	return &AuthToken{
