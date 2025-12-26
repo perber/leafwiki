@@ -33,6 +33,10 @@ func NewSessionStore(storageDir string) (*SessionStore, error) {
 
 	err := s.ensureSchema()
 	if err != nil {
+		// Ensure any opened database connection is closed on error
+		if s.db != nil {
+			_ = s.db.Close()
+		}
 		cancel()
 		return nil, err
 	}
