@@ -35,7 +35,9 @@ func NewSessionStore(storageDir string) (*SessionStore, error) {
 		// Close any database connection that may have been opened
 		s.mu.Lock()
 		if s.db != nil {
-			s.db.Close()
+			if closeErr := s.db.Close(); closeErr != nil {
+				log.Printf("failed to close database during cleanup: %v", closeErr)
+			}
 			s.db = nil
 		}
 		s.mu.Unlock()
