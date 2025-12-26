@@ -33,13 +33,13 @@ export async function logout() {
   await fetch(`${API_BASE_URL}/api/auth/logout`, {
     method: 'POST',
     credentials: 'include',
-  }).catch(() => {})
+  }).catch(() => { })
 
   const { logout } = useSessionStore.getState()
   logout()
 }
 
-let isRefreshing = false
+let isRefreshing = false // to prevent multiple simultaneous refreshes
 let refreshPromise: Promise<void> | null = null
 
 export async function fetchWithAuth(
@@ -117,9 +117,7 @@ export async function fetchWithAuth(
 
 async function refreshAccessToken() {
   const store = useSessionStore.getState()
-  const setRefreshing = useSessionStore.getState().setRefreshing
 
-  setRefreshing(true)
   try {
     const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
       method: 'POST',
@@ -130,7 +128,8 @@ async function refreshAccessToken() {
 
     const data = await res.json()
     store.setUser(data.user)
-  } finally {
-    setRefreshing(false)
+  } catch (err) {
+    store.logout()
+    console.error('Refresh token failed:', err)
   }
 }
