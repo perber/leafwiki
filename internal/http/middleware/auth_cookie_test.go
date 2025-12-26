@@ -703,7 +703,7 @@ func TestAuthCookies_ReadRefresh_MissingCookie(t *testing.T) {
 
 func TestAuthCookies_CustomTTL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	
+
 	accessTTL := 30 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
 	auth := NewAuthCookies(false, accessTTL, refreshTTL)
