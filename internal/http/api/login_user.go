@@ -26,8 +26,13 @@ func LoginUserHandler(wikiInstance *wiki.Wiki, authCookies *middleware.AuthCooki
 		}
 
 		data, err := wikiInstance.Login(req.Identifier, req.Password)
-		if err != nil {
+		if err != nil && err == auth.ErrUserInvalidCredentials {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+			return
+		}
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to login"})
 			return
 		}
 
