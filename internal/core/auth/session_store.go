@@ -134,7 +134,8 @@ func (s *SessionStore) RevokeAllSessionsForUser(userID string) error {
 	return err
 }
 
-func (s *SessionStore) CleanupExpiredSessions(now time.Time) error {
+func (s *SessionStore) CleanupExpiredSessions() error {
+	now := time.Now()
 	if err := s.Connect(); err != nil {
 		return err
 	}
