@@ -32,6 +32,13 @@ func NewSessionStore(storageDir string) (*SessionStore, error) {
 	err := s.ensureSchema()
 	if err != nil {
 		cancel()
+		// Close any database connection that may have been opened
+		s.mu.Lock()
+		if s.db != nil {
+			s.db.Close()
+			s.db = nil
+		}
+		s.mu.Unlock()
 		return nil, err
 	}
 
@@ -100,7 +107,7 @@ func (s *SessionStore) Close() error {
 	// Close the database connection
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
 			return err
