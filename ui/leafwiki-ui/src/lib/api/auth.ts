@@ -118,18 +118,15 @@ export async function fetchWithAuth(
 async function refreshAccessToken() {
   const store = useSessionStore.getState()
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
-      method: 'POST',
-      credentials: 'include',
-    })
+  const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
+    method: 'POST',
+    credentials: 'include',
+  })
 
-    if (!res.ok) throw new Error('Refresh failed')
-
-    const data = await res.json()
-    store.setUser(data.user)
-  } catch (err) {
-    store.logout()
-    console.error('Refresh token failed:', err)
+  if (!res.ok) {
+    throw new Error('Refresh failed')
   }
+
+  const data = await res.json()
+  store.setUser(data.user)
 }
