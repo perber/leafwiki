@@ -98,9 +98,11 @@ func main() {
 		case "reset-admin-password":
 			// Note: No JWT secret needed for this command
 			w, err := wiki.NewWiki(&wiki.WikiOptions{
-				StorageDir:    dataDir,
-				JWTSecret:     "",
-				AdminPassword: adminPassword,
+				StorageDir:          dataDir,
+				JWTSecret:           "",
+				AdminPassword:       adminPassword,
+				AccessTokenTimeout:  accessTokenTimeout,
+				RefreshTokenTimeout: refreshTokenTimeout,
 			})
 			if err != nil {
 				log.Fatalf("Failed to initialize Wiki: %v", err)
@@ -129,13 +131,15 @@ func main() {
 	}
 
 	if adminPassword == "" {
-		log.Fatalf("admin password is required. Set it using using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
+		log.Fatalf("admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
 	}
 
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
-		StorageDir:    dataDir,
-		AdminPassword: adminPassword,
-		JWTSecret:     jwtSecret,
+		StorageDir:          dataDir,
+		AdminPassword:       adminPassword,
+		JWTSecret:           jwtSecret,
+		AccessTokenTimeout:  accessTokenTimeout,
+		RefreshTokenTimeout: refreshTokenTimeout,
 	})
 	if err != nil {
 		log.Fatalf("Failed to initialize Wiki: %v", err)

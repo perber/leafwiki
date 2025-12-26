@@ -50,6 +50,11 @@ func (s *SessionStore) ensureSchema() error {
 			expires_at INTEGER NOT NULL,  -- unix sec
 			revoked_at INTEGER            -- unix sec, NULL = active
 		);
+
+		CREATE INDEX IF NOT EXISTS sessions_user_id_idx
+			ON sessions(user_id);
+		CREATE INDEX IF NOT EXISTS sessions_user_id_token_type_idx
+			ON sessions(user_id, token_type);
 	`)
 	return err
 }
@@ -126,5 +131,16 @@ func (s *SessionStore) RevokeAllSessionsForUser(userID string) error {
 		SET revoked_at = ?
 		WHERE user_id = ? AND revoked_at IS NULL;
 	`, time.Now().Unix(), userID)
+	return err
+}
+
+func (s *SessionStore) CleanupExpiredSessions(now time.Time) error {
+	if err := s.Connect(); err != nil {
+		return err
+	}
+	_, err := s.db.Exec(`
+		DELETE FROM sessions
+		WHERE expires_at <= ?;
+	`, now.Unix())
 	return err
 }

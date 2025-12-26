@@ -7,6 +7,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
@@ -50,9 +51,11 @@ func collectSubtreeIDs(node *tree.PageNode) []string {
 }
 
 type WikiOptions struct {
-	StorageDir    string // Path to storage directory
-	AdminPassword string // Initial admin password
-	JWTSecret     string // JWT secret for authentication
+	StorageDir          string        // Path to storage directory
+	AdminPassword       string        // Initial admin password
+	JWTSecret           string        // JWT secret for authentication
+	AccessTokenTimeout  time.Duration // Access token timeout duration
+	RefreshTokenTimeout time.Duration // Refresh token timeout duration
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
@@ -75,7 +78,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	}
 
 	// Initialize the auth service
-	authService := auth.NewAuthService(userService, sessionStore, options.JWTSecret)
+	authService := auth.NewAuthService(userService, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 
 	// Initialize the tree service
 	treeService := tree.NewTreeService(options.StorageDir)

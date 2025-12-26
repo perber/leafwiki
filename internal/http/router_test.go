@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/wiki"
@@ -15,9 +16,11 @@ import (
 
 func createWikiTestInstance(t *testing.T) *wiki.Wiki {
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
-		StorageDir:    t.TempDir(),
-		AdminPassword: "admin",
-		JWTSecret:     "secretkey",
+		StorageDir:          t.TempDir(),
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create wiki instance: %v", err)
@@ -27,9 +30,11 @@ func createWikiTestInstance(t *testing.T) *wiki.Wiki {
 
 func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return NewRouter(w, RouterOptions{
-		PublicAccess:       false,
-		InjectCodeInHeader: "",
-		AllowInsecure:      true,
+		PublicAccess:        false,
+		InjectCodeInHeader:  "",
+		AllowInsecure:       true,
+		AccessTokenTimeout:  15 * time.Minute,   // 15 minutes
+		RefreshTokenTimeout: 7 * 24 * time.Hour, // 7 days
 	})
 }
 
