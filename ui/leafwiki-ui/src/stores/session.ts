@@ -1,3 +1,4 @@
+import * as authAPI from '@/lib/api/auth'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -23,7 +24,15 @@ export const useSessionStore = create<SessionState>()(
       isRefreshing: false,
       setRefreshing: (value) => set({ isRefreshing: value }),
       setUser: (user) => set({ user }),
-      logout: () => set({ user: null }),
+      logout: async () => {
+        try {
+          await authAPI.logout()
+        } catch (err) {
+          console.warn('Logout failed:', err)
+        } finally {
+          set({ user: null })
+        }
+      },
     }),
     {
       name: 'session-storage',
