@@ -34,17 +34,9 @@ func NewSessionStore(storageDir string) (*SessionStore, error) {
 		// Ensure any opened database connection is closed on error
 		if s.db != nil {
 			_ = s.db.Close()
-		}
-		cancel()
-		// Close any database connection that may have been opened
-		s.mu.Lock()
-		if s.db != nil {
-			if closeErr := s.db.Close(); closeErr != nil {
-				log.Printf("failed to close database during cleanup: %v", closeErr)
-			}
 			s.db = nil
 		}
-		s.mu.Unlock()
+		cancel()
 		return nil, err
 	}
 

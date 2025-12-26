@@ -131,6 +131,7 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 	err = a.sessionStore.RevokeSession(jti)
 	if err != nil {
 		log.Printf("Warning: failed to revoke used refresh token session: %v", err)
+    return nil, errors.New("failed to revoke refresh token session")
 	}
 
 	return &AuthToken{
