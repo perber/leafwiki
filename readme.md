@@ -312,12 +312,14 @@ npm run dev   # Starts Vite dev server on http://localhost:5173
 # 3. In another terminal, start the backend
 
 cd ../../cmd/leafwiki
-go run main.go
+
+go run main.go --jwt-secret=yoursecret --public-access=true --allow-insecure=true --admin-password=yourpassword
 
 # Note: The backend binds to 127.0.0.1 by default for security.
 # If you need to access it from a different machine or network interface
 # (e.g., testing on mobile or from another device), use:
 # go run main.go --host=0.0.0.0
+
 ```
 
 ---
