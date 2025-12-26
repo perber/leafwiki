@@ -94,13 +94,9 @@ func (s *SessionStore) ensureSchema() error {
 
 func (s *SessionStore) Close() error {
 	// Signal the cleanup goroutine to stop
-	if s.cancel != nil {
-		s.cancel()
-	}
+	s.cancel()
 	// Wait for the cleanup goroutine to finish
-	if s.done != nil {
-		<-s.done
-	}
+	<-s.done
 	// Close the database connection
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
