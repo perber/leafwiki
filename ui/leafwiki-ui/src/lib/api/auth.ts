@@ -44,9 +44,6 @@ export async function logout() {
     method: 'POST',
     credentials: 'include',
   }).catch(() => {})
-
-  const { logout } = useSessionStore.getState()
-  logout()
 }
 
 let isRefreshing = false // to prevent multiple simultaneous refreshes
