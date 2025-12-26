@@ -50,8 +50,8 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 
 	authCookies := middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 
-	loginRateLimiter := middleware.NewRateLimiter(10, 5*time.Minute)
-	refreshRateLimiter := middleware.NewRateLimiter(30, time.Minute)
+	loginRateLimiter := middleware.NewRateLimiter(10, 5*time.Minute) // limit to 10 login attempts per 5 minutes per IP
+	refreshRateLimiter := middleware.NewRateLimiter(30, time.Minute) // limit to 30 refresh attempts per minute per IP
 
 	nonAuthApiGroup := router.Group("/api")
 	{
