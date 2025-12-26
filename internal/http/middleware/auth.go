@@ -2,22 +2,19 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
 
-func RequireAuth(wikiInstance *wiki.Wiki) gin.HandlerFunc {
+func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid Authorization header"})
+		token, err := authCookies.ReadAccess(c)
+		if err != nil || token == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid access token"})
 			return
 		}
-
-		token := strings.TrimPrefix(authHeader, "Bearer ")
 
 		user, err := wikiInstance.GetAuthService().ValidateToken(token)
 		if err != nil {

@@ -577,10 +577,6 @@
     @apply mb-4;
   }
 
-  .login__error {
-    @apply text-error mb-4 text-sm;
-  }
-
   .login__submit {
     @apply w-full;
   }

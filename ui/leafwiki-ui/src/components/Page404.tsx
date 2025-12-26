@@ -2,12 +2,12 @@ import { Button } from '@/components/ui/button'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
-import { useAuthStore } from '@/stores/auth'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useSessionStore } from '@/stores/session'
 import { useLocation } from 'react-router-dom'
 
 export default function Page404() {
-  const user = useAuthStore((s) => s.user)
+  const user = useSessionStore((s) => s.user)
   const readOnlyMode = useIsReadOnly()
   const appMode = useAppMode()
   const { pathname } = useLocation()

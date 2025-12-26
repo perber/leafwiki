@@ -4,23 +4,27 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type AuthService struct {
-	userService *UserService
-	secretKey   []byte
+	userService          *UserService
+	sessionStore         *SessionStore
+	secretKey            []byte
+	accessTokenLifetime  time.Duration
+	refreshTokenLifetime time.Duration
 }
 
-const accessTokenLifetime = time.Hour * 1
-const refreshTokenLifetime = time.Hour * 24 * 7
-
-func NewAuthService(userService *UserService, secret string) *AuthService {
+func NewAuthService(userService *UserService, sessionStore *SessionStore, secret string, accessTokenTimeout, refreshTokenTimeout time.Duration) *AuthService {
 	return &AuthService{
-		userService: userService,
-		secretKey:   []byte(secret),
+		userService:          userService,
+		sessionStore:         sessionStore,
+		secretKey:            []byte(secret),
+		accessTokenLifetime:  accessTokenTimeout,
+		refreshTokenLifetime: refreshTokenTimeout,
 	}
 }
 
@@ -39,13 +43,23 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	// Clear sensitive information from user object
 	user.Password = "" // Clear password from user object
 
-	accessToken, err := a.generateToken(user, accessTokenLifetime, "access")
+	accessToken, _, err := a.generateToken(user, a.accessTokenLifetime, "access")
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := a.generateToken(user, refreshTokenLifetime, "refresh")
+	refreshToken, refreshJTI, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
 	if err != nil {
+		return nil, err
+	}
+
+	// store refresh token session
+	if err := a.sessionStore.CreateSession(
+		refreshJTI,
+		user.ID,
+		"refresh",
+		time.Now().Add(a.refreshTokenLifetime),
+	); err != nil {
 		return nil, err
 	}
 
@@ -72,22 +86,52 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 		return nil, ErrInvalidToken
 	}
 
+	jti, ok := claims["jti"].(string)
+	if !ok || jti == "" {
+		return nil, ErrInvalidToken
+	}
+
+	// Check if the refresh token session is active
+	active, err := a.sessionStore.IsActive(jti, userID, "refresh", time.Now())
+	if err != nil || !active {
+		return nil, ErrInvalidToken
+	}
+
 	user, err := a.userService.GetUserByID(userID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
 
-	// Clear sensitive information from user object
 	user.Password = "" // Clear password from user object
 
-	newAccessToken, err := a.generateToken(user, accessTokenLifetime, "access")
+	newAccessToken, _, err := a.generateToken(user, a.accessTokenLifetime, "access")
 	if err != nil {
 		return nil, err
 	}
 
-	newRefreshToken, err := a.generateToken(user, refreshTokenLifetime, "refresh")
+	newRefreshToken, newRefreshJTI, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
 	if err != nil {
 		return nil, err
+	}
+
+	if err := a.sessionStore.CreateSession(
+		newRefreshJTI,
+		user.ID,
+		"refresh",
+		time.Now().Add(a.refreshTokenLifetime),
+	); err != nil {
+		return nil, err
+	}
+
+	// Revoke the old refresh token only after successfully creating the new session.
+	// This ensures that if token generation or session creation fails, the old token
+	// remains valid and the user can retry. If revocation fails, we log a warning but
+	// don't fail the refresh operation - the old token will expire naturally, and
+	// having two valid tokens temporarily is safer than logging the user out.
+	err = a.sessionStore.RevokeSession(jti)
+	if err != nil {
+		log.Printf("Warning: failed to revoke used refresh token session: %v", err)
+    return nil, errors.New("failed to revoke refresh token session")
 	}
 
 	return &AuthToken{
@@ -95,6 +139,29 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 		RefreshToken: newRefreshToken,
 		User:         user.ToPublicUser(),
 	}, nil
+}
+
+func (a *AuthService) RevokeRefreshToken(tokenString string) error {
+	claims, err := a.parseClaims(tokenString)
+	if err != nil {
+		return ErrInvalidToken
+	}
+
+	typ, ok := claims["typ"].(string)
+	if !ok || typ != "refresh" {
+		return ErrInvalidToken
+	}
+
+	jti, ok := claims["jti"].(string)
+	if !ok || jti == "" {
+		return ErrInvalidToken
+	}
+
+	return a.sessionStore.RevokeSession(jti)
+}
+
+func (a *AuthService) RevokeAllUserSessions(userID string) error {
+	return a.sessionStore.RevokeAllSessionsForUser(userID)
 }
 
 func generateJTI() string {
@@ -125,7 +192,8 @@ func (a *AuthService) parseClaims(tokenString string) (jwt.MapClaims, error) {
 	return claims, nil
 }
 
-func (a *AuthService) generateToken(user *User, duration time.Duration, typ string) (string, error) {
+func (a *AuthService) generateToken(user *User, duration time.Duration, typ string) (string, string, error) {
+	jti := generateJTI()
 	claims := jwt.MapClaims{
 		"sub":   user.ID,
 		"role":  user.Role,
@@ -133,10 +201,14 @@ func (a *AuthService) generateToken(user *User, duration time.Duration, typ stri
 		"exp":   time.Now().Add(duration).Unix(),
 		"iat":   time.Now().Unix(),
 		"typ":   typ,
-		"jti":   generateJTI(), // Unique identifier for the token
+		"jti":   jti, // Unique identifier for the token
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(a.secretKey)
+	signed, err := token.SignedString(a.secretKey)
+	if err != nil {
+		return "", "", err
+	}
+	return signed, jti, nil
 }
 
 func (a *AuthService) ValidateToken(tokenString string) (*User, error) {

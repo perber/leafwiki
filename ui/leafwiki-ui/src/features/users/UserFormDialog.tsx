@@ -10,7 +10,7 @@ import {
 import { User } from '@/lib/api/users'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_USER_FORM } from '@/lib/registries'
-import { useAuthStore } from '@/stores/auth'
+import { useSessionStore } from '@/stores/session'
 import { useUserStore } from '@/stores/users'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -29,7 +29,7 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
   const [loading, setLoading] = useState(false)
 
   const { createUser, updateUser } = useUserStore()
-  const { user: currentUser } = useAuthStore()
+  const { user: currentUser } = useSessionStore()
   const isOwnUser = user?.id === currentUser?.id
 
   const handleSubmit = async (): Promise<boolean> => {

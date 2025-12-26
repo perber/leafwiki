@@ -7,7 +7,16 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/assets': 'http://localhost:8080', // your go backend
+      '/assets': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      }
     },
   },
   optimizeDeps: {

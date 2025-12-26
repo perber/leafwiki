@@ -250,14 +250,18 @@ These options control how the server runs after installation.
 
 ### CLI Flags
 
-| Flag               | Description                                                 | Default       |
-|--------------------|-------------------------------------------------------------|---------------|
-| `--jwt-secret`     | Secret used for signing JWTs (required)                     | –             |
-| `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
-| `--port`           | Port the server listens on                                  | `8080`        |
-| `--data-dir`       | Directory where data is stored                              | `./data`      |
-| `--admin-password` | Initial admin password                                      | –             |
-| `--public-access`  | Allow public read-only access                               | `false`       |
+| Flag                      | Description                                                                    | Default       | Released in   |
+|---------------------------|--------------------------------------------------------------------------------|---------------|---------------|
+| `--jwt-secret`            | Secret used for signing JWTs (required)                                        | –             | -             |
+| `--host`                  | Host/IP address the server binds to                                            | `0.0.0.0`     | -             |
+| `--port`                  | Port the server listens on                                                     | `8080`        | -             |
+| `--data-dir`              | Directory where data is stored                                                 | `./data`      | -             |
+| `--admin-password`        | Initial admin password                                                         | –             | -             |
+| `--public-access`         | Allow public read-only access                                                  | `false`       | -             |
+| `--inject-code-in-header` | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS)        | `""`          | v0.6.0        |
+| `--allow-insecure`        | Allow insecure HTTP connections                                                | `false`       | v0.7.0        |
+| `--access-token-timeout`  | Access token timeout duration (e.g. 24h, 15m)                                  | `15m`         | v0.7.0        |
+| `--refresh-token-timeout` | Refresh token timeout duration (e.g. 168h, 7d)                                 | `7d`          | v0.7.0        |
    
 
 ### Environment Variables
@@ -265,14 +269,18 @@ These options control how the server runs after installation.
 The same configuration options can also be provided via environment variables.
 This is especially useful in containerized or production environments.
 
-| Variable                 | Description                                                  | Default    |
-|--------------------------|--------------------------------------------------------------|------------|
-| `LEAFWIKI_HOST`          | Host/IP address the server binds to                          | `0.0.0.0`  |
-| `LEAFWIKI_PORT`          | Port the server listens on                                   | `8080`     |
-| `LEAFWIKI_DATA_DIR`      | Path to the data storage directory                           | `./data`   |
-| `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | -          |
-| `LEAFWIKI_JWT_SECRET`    | Secret used to sign JWT tokens *(required)*                  | –          |
-| `LEAFWIKI_PUBLIC_ACCESS` | Allow public read-only access                                | `false`    |
+| Variable                         | Description                                                             | Default    | Released in   |
+|----------------------------------|-------------------------------------------------------------------------|------------|---------------|
+| `LEAFWIKI_HOST`                  | Host/IP address the server binds to                                     | `0.0.0.0`  | -             |
+| `LEAFWIKI_PORT`                  | Port the server listens on                                              | `8080`     | -             |
+| `LEAFWIKI_DATA_DIR`              | Path to the data storage directory                                      | `./data`   | -             |
+| `LEAFWIKI_ADMIN_PASSWORD`        | Initial admin password *(used only if no admin exists yet)*             | -          | -             |
+| `LEAFWIKI_JWT_SECRET`            | Secret used to sign JWT tokens *(required)*                             | –          | -             |
+| `LEAFWIKI_PUBLIC_ACCESS`         | Allow public read-only access                                           | `false`    | -             |
+| `LEAFWIKI_INJECT_CODE_IN_HEADER` | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`       | v0.6.0        |
+| `LEAFWIKI_ALLOW_INSECURE`        | Allow insecure HTTP connections                                         | `false`    | v0.7.0        |
+| `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`  | Access token timeout duration (e.g. 24h, 15m)                           | `15m`      | v0.7.0        |
+| `LEAFWIKI_REFRESH_TOKEN_TIMEOUT` | Refresh token timeout duration (e.g. 168h, 7d)                          | `7d`       | v0.7.0        |
 
 These environment variables override the default values and are especially useful in containerized or production environments.
 
@@ -311,7 +319,7 @@ npm run dev   # Starts Vite dev server on http://localhost:5173
 # 3. In another terminal, start the backend
 
 cd ../../cmd/leafwiki
-go run main.go
+go run main.go --jwt-secret=yoursecret --public-access=true --allow-insecure=true --admin-password=yourpassword
 ```
 
 ---
