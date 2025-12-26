@@ -336,8 +336,8 @@ func TestAuthCookies_Set_Secure(t *testing.T) {
 	if !refreshCookie.Secure {
 		t.Error("Expected refresh cookie to be Secure")
 	}
-	if refreshCookie.Path != "/api/auth/refresh-token" {
-		t.Errorf("Expected refresh cookie path '/api/auth/refresh-token', got '%s'", refreshCookie.Path)
+	if refreshCookie.Path != "/" {
+		t.Errorf("Expected refresh cookie path '/', got '%s'", refreshCookie.Path)
 	}
 	if refreshCookie.SameSite != http.SameSiteStrictMode {
 		t.Errorf("Expected refresh cookie SameSite StrictMode, got %v", refreshCookie.SameSite)
