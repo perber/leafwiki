@@ -254,19 +254,19 @@ These options control how the server runs after installation.
 
 ### CLI Flags
 
-| Flag                            | Description                                                            | Default       | Since Version |
-|---------------------------------|------------------------------------------------------------------------|---------------|---------------|
-| `--jwt-secret`                  | Secret used for signing JWTs (required)                                | –             | –             |
-| `--host`                        | Host/IP address the server binds to                                    | `127.0.0.1`   | –             |
-| `--port`                        | Port the server listens on                                             | `8080`        | –             |
-| `--data-dir`                    | Directory where data is stored                                         | `./data`      | –             |
-| `--admin-password`              | Initial admin password *(used only if no admin exists)* (required)     | –             | –             |
-| `--public-access`               | Allow public read-only access                                          | `false`       | –             |
-| `--hide-link-metadata-section`  | Hide link metadata section                                             | `false`       | –             |
-| `--inject-code-in-header`      | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`          | v0.6.0        |
-| `--allow-insecure`              | Allow insecure HTTP connections                                        | `false`       | v0.7.0        |
-| `--access-token-timeout`        | Access token timeout duration (e.g. 24h, 15m)                          | `15m`         | v0.7.0        |
-| `--refresh-token-timeout`       | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`          | v0.7.0        |
+| Flag                            | Description                                                            | Default       | Available since   |
+|---------------------------------|------------------------------------------------------------------------|---------------|-------------------|
+| `--jwt-secret`                  | Secret used for signing JWTs (required)                                | –             | –                 |
+| `--host`                        | Host/IP address the server binds to                                    | `127.0.0.1`   | –                 |
+| `--port`                        | Port the server listens on                                             | `8080`        | –                 |
+| `--data-dir`                    | Directory where data is stored                                         | `./data`      | –                 |
+| `--admin-password`              | Initial admin password *(used only if no admin exists)* (required)     | –             | –                 |
+| `--public-access`               | Allow public read-only access                                          | `false`       | –                 |
+| `--hide-link-metadata-section`  | Hide link metadata section                                             | `false`       | –                 |
+| `--inject-code-in-header`      | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`          | v0.6.0            |
+| `--allow-insecure`              | Allow insecure HTTP connections                                        | `false`       | v0.7.0            |
+| `--access-token-timeout`        | Access token timeout duration (e.g. 24h, 15m)                          | `15m`         | v0.7.0            |
+| `--refresh-token-timeout`       | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`          | v0.7.0            |
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
 
@@ -275,19 +275,19 @@ These options control how the server runs after installation.
 The same configuration options can also be provided via environment variables.
 This is especially useful in containerized or production environments.
 
-| Variable                               | Description                                                             | Default    | Since Version |
-|----------------------------------------|-------------------------------------------------------------------------|------------|---------------|
-| `LEAFWIKI_HOST`                        | Host/IP address the server binds to                                     | `127.0.0.1`| -             |
-| `LEAFWIKI_PORT`                        | Port the server listens on                                              | `8080`     | -             |
-| `LEAFWIKI_DATA_DIR`                    | Path to the data storage directory                                      | `./data`   | -             |
-| `LEAFWIKI_ADMIN_PASSWORD`              | Initial admin password *(used only if no admin exists yet)* (required)  | –          | -             |
-| `LEAFWIKI_JWT_SECRET`                  | Secret used to sign JWT tokens *(required)*                             | –          | -             |
-| `LEAFWIKI_PUBLIC_ACCESS`               | Allow public read-only access                                           | `false`    | -             |
-| `LEAFWIKI_HIDE_LINK_METADATA_SECTION`  | Hide link metadata section                                              | `false`    | -             |
-| `LEAFWIKI_INJECT_CODE_IN_HEADER`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`       | v0.6.0        |
-| `LEAFWIKI_ALLOW_INSECURE`               | Allow insecure HTTP connections                                        | `false`    | v0.7.0        |
-| `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`         | Access token timeout duration (e.g. 24h, 15m)                          | `15m`      | v0.7.0        |
-| `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`        | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`       | v0.7.0        |
+| Variable                               | Description                                                             | Default    | Available since |
+|----------------------------------------|-------------------------------------------------------------------------|------------|-----------------|
+| `LEAFWIKI_HOST`                        | Host/IP address the server binds to                                     | `127.0.0.1`| -               |
+| `LEAFWIKI_PORT`                        | Port the server listens on                                              | `8080`     | -               |
+| `LEAFWIKI_DATA_DIR`                    | Path to the data storage directory                                      | `./data`   | -               |
+| `LEAFWIKI_ADMIN_PASSWORD`              | Initial admin password *(used only if no admin exists yet)* (required)  | –          | -               |
+| `LEAFWIKI_JWT_SECRET`                  | Secret used to sign JWT tokens *(required)*                             | –          | -               |
+| `LEAFWIKI_PUBLIC_ACCESS`               | Allow public read-only access                                           | `false`    | -               |
+| `LEAFWIKI_HIDE_LINK_METADATA_SECTION`  | Hide link metadata section                                              | `false`    | -               |
+| `LEAFWIKI_INJECT_CODE_IN_HEADER`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`       | v0.6.0          |
+| `LEAFWIKI_ALLOW_INSECURE`               | Allow insecure HTTP connections                                        | `false`    | v0.7.0          |
+| `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`         | Access token timeout duration (e.g. 24h, 15m)                          | `15m`      | v0.7.0          |
+| `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`        | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`       | v0.7.0          |
 
 
 These environment variables override the default values and are especially useful in containerized or production environments.
