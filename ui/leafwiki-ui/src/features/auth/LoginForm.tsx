@@ -4,11 +4,11 @@ import { login } from '@/lib/api/auth'
 import { useSessionStore } from '@/stores/session'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 export default function LoginForm() {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const navigate = useNavigate()
@@ -22,7 +22,6 @@ export default function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
 
     try {
       // user already set in the store by the login function
@@ -30,7 +29,7 @@ export default function LoginForm() {
       // Redirect to home page after successful login
       navigate('/')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      toast.error(err instanceof Error ? err.message : 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -70,8 +69,6 @@ export default function LoginForm() {
               spellCheck={false}
             />
           </div>
-
-          {error && <p className="login__error">{error}</p>}
 
           <Button
             type="submit"
