@@ -15,12 +15,47 @@ type rateLimiter struct {
 	window time.Duration
 }
 
+func (rl *rateLimiter) cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	cutoff := time.Now().Add(-rl.window)
+
+	for key, events := range rl.hits {
+		n := 0
+		for _, t := range events {
+			if t.After(cutoff) {
+				// keep this event within the active window
+				events[n] = t
+				n++
+			}
+		}
+
+		if n == 0 {
+			// no more events in the current window for this key; remove entry
+			delete(rl.hits, key)
+		} else {
+			// shrink slice to the kept events
+			rl.hits[key] = events[:n]
+		}
+	}
+}
+
 func NewRateLimiter(limit int, window time.Duration) gin.HandlerFunc {
 	rl := &rateLimiter{
 		hits:   make(map[string][]time.Time),
 		limit:  limit,
 		window: window,
 	}
+
+	go func() {
+		ticker := time.NewTicker(window)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			rl.cleanup()
+		}
+	}()
 
 	return func(c *gin.Context) {
 		// currently we use the clientIP

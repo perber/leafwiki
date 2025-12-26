@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"log"
 	"path"
 	"time"
 
@@ -22,7 +23,25 @@ func NewSessionStore(storageDir string) (*SessionStore, error) {
 	if err := s.Connect(); err != nil {
 		return nil, err
 	}
-	return s, s.ensureSchema()
+
+	err := s.ensureSchema()
+	if err != nil {
+		return nil, err
+	}
+
+	// Cleanup expired sessions periodically
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := s.CleanupExpiredSessions(); err != nil {
+				log.Printf("failed to cleanup expired sessions: %v", err)
+			}
+		}
+	}()
+
+	return s, nil
+
 }
 
 func (s *SessionStore) Connect() error {
