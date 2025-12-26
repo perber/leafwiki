@@ -250,7 +250,7 @@ These options control how the server runs after installation.
 
 ### CLI Flags
 
-| Flag                      | Description                                                                    | Default       | Since Version |
+| Flag                      | Description                                                                    | Default       | Released in   |
 |---------------------------|--------------------------------------------------------------------------------|---------------|---------------|
 | `--jwt-secret`            | Secret used for signing JWTs (required)                                        | –             | -             |
 | `--host`                  | Host/IP address the server binds to                                            | `0.0.0.0`     | -             |
@@ -269,7 +269,7 @@ These options control how the server runs after installation.
 The same configuration options can also be provided via environment variables.
 This is especially useful in containerized or production environments.
 
-| Variable                         | Description                                                             | Default    | Since Version |
+| Variable                         | Description                                                             | Default    | Released in   |
 |----------------------------------|-------------------------------------------------------------------------|------------|---------------|
 | `LEAFWIKI_HOST`                  | Host/IP address the server binds to                                     | `0.0.0.0`  | -             |
 | `LEAFWIKI_PORT`                  | Port the server listens on                                              | `8080`     | -             |
