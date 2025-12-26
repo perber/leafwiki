@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"path"
@@ -13,29 +14,42 @@ type SessionStore struct {
 	storageDir string
 	filename   string
 	db         *sql.DB
+	cancel     context.CancelFunc
+	done       chan struct{}
 }
 
 func NewSessionStore(storageDir string) (*SessionStore, error) {
+	ctx, cancel := context.WithCancel(context.Background())
 	s := &SessionStore{
 		storageDir: storageDir,
 		filename:   "sessions.db",
+		cancel:     cancel,
+		done:       make(chan struct{}),
 	}
 	if err := s.Connect(); err != nil {
+		cancel()
 		return nil, err
 	}
 
 	err := s.ensureSchema()
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	// Cleanup expired sessions periodically
 	go func() {
+		defer close(s.done)
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
-		for range ticker.C {
-			if err := s.CleanupExpiredSessions(); err != nil {
-				log.Printf("failed to cleanup expired sessions: %v", err)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := s.CleanupExpiredSessions(); err != nil {
+					log.Printf("failed to cleanup expired sessions: %v", err)
+				}
 			}
 		}
 	}()
@@ -79,6 +93,15 @@ func (s *SessionStore) ensureSchema() error {
 }
 
 func (s *SessionStore) Close() error {
+	// Signal the cleanup goroutine to stop
+	if s.cancel != nil {
+		s.cancel()
+	}
+	// Wait for the cleanup goroutine to finish
+	if s.done != nil {
+		<-s.done
+	}
+	// Close the database connection
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
 			return err
