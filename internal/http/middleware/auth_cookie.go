@@ -77,7 +77,7 @@ func (a *AuthCookies) Set(c *gin.Context, accessToken, refreshToken string) erro
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     refreshName,
 		Value:    refreshToken,
-		Path:     "/api/auth/refresh-token",
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: a.SameSite,
@@ -108,7 +108,7 @@ func (a *AuthCookies) Clear(c *gin.Context) error {
 	}
 
 	expire(accessName, "/")
-	expire(refreshName, "/api/auth/refresh-token")
+	expire(refreshName, "/")
 	return nil
 }
 
