@@ -18,6 +18,7 @@ var reservedSlugs = map[string]bool{
 	"index":  true,
 	"users":  true,
 	"user":   true,
+	"login":  true,
 }
 
 type SlugService struct {
