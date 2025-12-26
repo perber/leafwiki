@@ -48,16 +48,9 @@ func NewRateLimiter(limit int, window time.Duration) gin.HandlerFunc {
 		window: window,
 	}
 
-	go func() {
-		ticker := time.NewTicker(window)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			rl.cleanup()
-		}
-	}()
-
 	return func(c *gin.Context) {
+		// perform cleanup based on the current time before processing this request
+		rl.cleanup()
 		// currently we use the clientIP
 		// the rate limiting is not set on every endpoint, so this is acceptable
 		key := c.ClientIP()
