@@ -12,7 +12,7 @@ type UserInfo = {
 type SessionState = {
   isRefreshing: boolean
   user: UserInfo | null
-  setUser: (user: UserInfo) => void
+  setUser: (user: UserInfo | null) => void
   setRefreshing: (value: boolean) => void
   logout: () => void
 }
