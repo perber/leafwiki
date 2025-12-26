@@ -49,7 +49,10 @@ export default function LoginForm() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required
+              name='identifier'
+              autoComplete='username'
               data-testid="login-identifier"
+              spellCheck={false}
             />
           </div>
 
@@ -57,10 +60,13 @@ export default function LoginForm() {
             <Input
               type="password"
               placeholder="Password"
+              name='password'
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               data-testid="login-password"
+              autoComplete='current-password'
+              spellCheck={false}
             />
           </div>
 
