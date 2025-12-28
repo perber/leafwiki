@@ -19,6 +19,7 @@ start_docker() {
     --name wiki-e2e-tests \
     -v e2e-tests-data:/app/data \
     wiki-e2e-tests \
+    --allow-insecure=true \
     --jwt-secret=e2e-tests-secret \
     --admin-password=admin
 
