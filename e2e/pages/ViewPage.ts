@@ -5,6 +5,7 @@ export default class ViewPage {
 
   async goto(pagePath: string = '/') {
     await this.page.goto(`${pagePath}`);
+    await this.page.locator('article').waitFor({ state: 'visible' });
   }
 
   async isUserLoggedIn(): Promise<boolean> {
