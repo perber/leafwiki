@@ -10,7 +10,7 @@ type ConfigStore = {
 
 export const useConfigStore = create<ConfigStore>((set) => ({
   publicAccess: false,
-  hideLinkMetadataSection: true,
+  hideLinkMetadataSection: false,
   loading: false,
 
   loadConfig: async () => {
