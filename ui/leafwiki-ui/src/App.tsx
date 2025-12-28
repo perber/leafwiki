@@ -9,7 +9,7 @@ import { useConfigStore } from './stores/config'
 import useApplyDesignMode from './useApplyDesignMode'
 
 function App() {
-  const configLoading = useConfigStore((s) => s.loading)
+  const configHasLoaded = useConfigStore((s) => s.hasLoaded)
   const loadConfig = useConfigStore((s) => s.loadConfig)
 
   const isLoggedIn = useAuthStore((s) => !!s.user)
@@ -26,7 +26,7 @@ function App() {
     [isReadOnlyViewer],
   )
 
-  if (configLoading) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
+  if (!configHasLoaded) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
 
   return (
     <>
