@@ -39,7 +39,8 @@ var Environment = "development"
 //     WARNING: This code is inserted without sanitization. Only use with trusted input
 //     from administrators. Malicious code can lead to XSS vulnerabilities.
 //     Common use cases: analytics scripts, custom CSS, meta tags.
-func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader string) *gin.Engine {
+//   - hideLinkMetadataSection: when true, hides the link metadata section in the frontend UI.
+func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader string, hideLinkMetadataSection bool) *gin.Engine {
 	if Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
@@ -66,7 +67,7 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 		nonAuthApiGroup.POST("/auth/login", api.LoginUserHandler(wikiInstance))
 		nonAuthApiGroup.POST("/auth/refresh-token", api.RefreshTokenUserHandler(wikiInstance))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
-			c.JSON(200, gin.H{"publicAccess": publicAccess})
+			c.JSON(200, gin.H{"publicAccess": publicAccess, "hideLinkMetadataSection": hideLinkMetadataSection})
 		})
 
 		// Branding (public, no auth required)

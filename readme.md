@@ -247,14 +247,15 @@ These options control how the server runs after installation.
 
 ### CLI Flags
 
-| Flag               | Description                                                 | Default       |
-|--------------------|-------------------------------------------------------------|---------------|
-| `--jwt-secret`     | Secret used for signing JWTs (required)                     | –             |
-| `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
-| `--port`           | Port the server listens on                                  | `8080`        |
-| `--data-dir`       | Directory where data is stored                              | `./data`      |
-| `--admin-password` | Initial admin password                                      | –             |
-| `--public-access`  | Allow public read-only access                               | `false`       |
+| Flag                            | Description                                                 | Default       |
+|---------------------------------|-------------------------------------------------------------|---------------|
+| `--jwt-secret`                  | Secret used for signing JWTs (required)                     | –             |
+| `--host`                        | Host/IP address the server binds to                         | `0.0.0.0`     |
+| `--port`                        | Port the server listens on                                  | `8080`        |
+| `--data-dir`                    | Directory where data is stored                              | `./data`      |
+| `--admin-password`              | Initial admin password (used only if no admin exists)       | `admin`       |
+| `--public-access`               | Allow public read-only access                               | `false`       |
+| `--hide-link-metadata-section`  | Hide link metadata section                                  | `false`       |
    
 
 ### Environment Variables
@@ -262,14 +263,15 @@ These options control how the server runs after installation.
 The same configuration options can also be provided via environment variables.
 This is especially useful in containerized or production environments.
 
-| Variable                 | Description                                                  | Default    |
-|--------------------------|--------------------------------------------------------------|------------|
-| `LEAFWIKI_HOST`          | Host/IP address the server binds to                          | `0.0.0.0`  |
-| `LEAFWIKI_PORT`          | Port the server listens on                                   | `8080`     |
-| `LEAFWIKI_DATA_DIR`      | Path to the data storage directory                           | `./data`   |
-| `LEAFWIKI_ADMIN_PASSWORD`| Initial admin password *(used only if no admin exists yet)*  | -          |
-| `LEAFWIKI_JWT_SECRET`    | Secret used to sign JWT tokens *(required)*                  | –          |
-| `LEAFWIKI_PUBLIC_ACCESS` | Allow public read-only access                                | `false`    |
+| Variable                               | Description                                                  | Default    |
+|----------------------------------------|--------------------------------------------------------------|------------|
+| `LEAFWIKI_HOST`                        | Host/IP address the server binds to                          | `0.0.0.0`  |
+| `LEAFWIKI_PORT`                        | Port the server listens on                                   | `8080`     |
+| `LEAFWIKI_DATA_DIR`                    | Path to the data storage directory                           | `./data`   |
+| `LEAFWIKI_ADMIN_PASSWORD`              | Initial admin password *(used only if no admin exists yet)*  | `admin`    |
+| `LEAFWIKI_JWT_SECRET`                  | Secret used to sign JWT tokens *(required)*                  | –          |
+| `LEAFWIKI_PUBLIC_ACCESS`               | Allow public read-only access                                | `false`    |
+| `LEAFWIKI_HIDE_LINK_METADATA_SECTION`  | Hide link metadata section                                   | `false`    |
 
 These environment variables override the default values and are especially useful in containerized or production environments.
 
