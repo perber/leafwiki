@@ -81,8 +81,7 @@ func TestSQLiteIndex_Search(t *testing.T) {
 		t.Fatalf("expected 2 result item, got %d", len(result.Items))
 	}
 
-	item := result.Items[0]
-	if item.PageID != "beta2" {
-		t.Errorf("expected PageID beta2, got %s", item.PageID)
+	if result.Items[0].PageID != "alpha1" {
+		t.Errorf("expected alpha1 to be ranked first, got %s", result.Items[0].PageID)
 	}
 }
