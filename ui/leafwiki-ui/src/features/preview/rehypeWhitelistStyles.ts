@@ -56,8 +56,7 @@ function sanitizeStyle(style: string): string | undefined {
     if (!ALLOWED_STYLE_PROPS.has(prop)) continue
 
     // Optional extra paranoia: reject obviously sketchy values
-    const lowerVal = value.toLowerCase()
-    if (lowerVal.includes('url(') || lowerVal.includes('expression(')) continue
+    if (/(url|expression)\s*\(/i.test(value)) continue
 
     safe.push(`${prop}: ${value}`)
   }
