@@ -11,12 +11,13 @@ import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
 import MermaidBlock from './MermaidBlock'
 import { rehypeLineNumber } from './rehypeLineNumber'
+import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 
 const schema = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
-    '*': [...(defaultSchema.attributes?.['*'] || []), 'data-line'],
+    '*': [...(defaultSchema.attributes?.['*'] || []), 'data-line', 'style'],
   },
 }
 
@@ -143,6 +144,7 @@ export default function MarkdownPreview({ content, path }: Props) {
           rehypeRaw,
           rehypeLineNumber,
           [rehypeSanitize, schema],
+          rehypeWhitelistStyles,
           rehypeHighlight,
         ]}
         components={components}
