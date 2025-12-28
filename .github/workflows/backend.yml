@@ -4,11 +4,14 @@ on:
   pull_request:
     branches:
       - main
+      - release/*
+      - releases/*
 
   push:
     branches:
       - main
-
+      - release/*
+      - releases/*
 jobs: 
   lint-go:
     runs-on: ubuntu-latest
