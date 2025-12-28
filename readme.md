@@ -299,6 +299,11 @@ npm run dev   # Starts Vite dev server on http://localhost:5173
 
 cd ../../cmd/leafwiki
 go run main.go
+
+# Note: The backend binds to 127.0.0.1 by default for security.
+# If you need to access it from a different machine or network interface
+# (e.g., testing on mobile or from another device), use:
+# go run main.go --host=0.0.0.0
 ```
 
 ---
