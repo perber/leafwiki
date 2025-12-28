@@ -33,8 +33,6 @@ const ALLOWED_STYLE_PROPS = new Set([
   'line-height',
   'letter-spacing',
   'word-spacing',
-  'float',
-  'clear',
   'display',
   'vertical-align',
 ])
