@@ -100,3 +100,4 @@ He improved the documentation and the onboarding experience a lot!
 - [x] Changed default server host binding from `0.0.0.0` to `127.0.0.1` for safer local defaults (configure `--host` to expose externally)
 - [x] Added `hide-link-metadata-section` flag to disable backlink section rendering
 - [x] Allow some CSS attributes in markdown
+- [x] Improved search ranking and use fuzzy search
