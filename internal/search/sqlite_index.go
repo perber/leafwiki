@@ -169,10 +169,10 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 		return err
 	}
 
-	// Headings aus dem Markdown
+	// Headings extracted from the Markdown
 	headings := extractHeadings(content)
 
-	// Body als Plaintext (deine bisherige Logik)
+	// Body as plain text (existing logic)
 	html := blackfriday.Run([]byte(content))
 	sanitizedBody := bluemonday.StrictPolicy().Sanitize(string(html))
 
