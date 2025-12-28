@@ -883,7 +883,7 @@
   }
 
   .backlinks__item a {
-    @apply text-xs text-muted-foreground! hover:text-brand! px-0 py-0 no-underline;
+    @apply text-muted-foreground! hover:text-brand! px-0 py-0 text-xs no-underline;
   }
 
   .backlinks__item a:hover {
@@ -895,7 +895,7 @@
   }
 
   .backlinks__icon {
-    @apply scale-75 opacity-40 mr-1;
+    @apply mr-1 scale-75 opacity-40;
   }
 
   /* Backlinks pane extensions */
@@ -904,7 +904,7 @@
   }
 
   .backlinks__group-title {
-    @apply text-muted text-xs font-normal normal-case tracking-normal mb-1;
+    @apply text-muted mb-1 text-xs font-normal tracking-normal normal-case;
   }
 
   .backlinks__subgroup-title {

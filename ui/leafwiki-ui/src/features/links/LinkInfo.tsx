@@ -7,7 +7,9 @@ import { useLinkStatusStore } from './linkstatus_store'
 
 export function BacklinkInfo() {
   const pageID = useViewerStore((s) => s.page?.id)
-  const hideLinkMetadataSection = useConfigStore((s) => s.hideLinkMetadataSection)
+  const hideLinkMetadataSection = useConfigStore(
+    (s) => s.hideLinkMetadataSection,
+  )
 
   const loading = useLinkStatusStore((s) => s.loading)
   const error = useLinkStatusStore((s) => s.error)
@@ -28,7 +30,6 @@ export function BacklinkInfo() {
     fetchLinkStatusForPage(pageID)
   }, [fetchLinkStatusForPage, pageID, clear, hideLinkMetadataSection])
 
-
   // if the link impact feature is disabled, do not show anything - return null
   if (hideLinkMetadataSection) return null
   const backlinks = status?.backlinks ?? []
@@ -36,7 +37,11 @@ export function BacklinkInfo() {
   const brokenOutgoings = status?.broken_outgoings ?? []
 
   // Render backlinks and broken links only if a link is present
-  if (backlinks.length === 0 && brokenIncoming.length === 0 && brokenOutgoings.length === 0) {
+  if (
+    backlinks.length === 0 &&
+    brokenIncoming.length === 0 &&
+    brokenOutgoings.length === 0
+  ) {
     return null
   }
 
