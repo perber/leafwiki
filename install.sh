@@ -15,7 +15,7 @@ PUBLIC_ACCESS="false"
 DATA_DIR="$PWD/data"
 EXEC_NAME=""
 PORT="8080"
-HOST="0.0.0.0"
+HOST="127.0.0.1"
 
 # test wget is installed
 if ! command -v wget &> /dev/null; then

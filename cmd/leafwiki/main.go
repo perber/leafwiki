@@ -20,7 +20,7 @@ func printUsage() {
 	leafwiki --help
 
 	Options:
-	--host             Host/IP address to bind the server to (default: 0.0.0.0)
+	--host             Host/IP address to bind the server to (default: 127.0.0.1)
 	--port             Port to run the server on (default: 8080)
 	--data-dir         Path to data directory (default: ./data)
 	--admin-password   Initial admin password (used only if no admin exists)
@@ -58,7 +58,7 @@ func main() {
 	visited := map[string]bool{}
 	flag.Visit(func(f *flag.Flag) { visited[f.Name] = true })
 
-	host := resolveString("host", *hostFlag, visited, "LEAFWIKI_HOST", "0.0.0.0")
+	host := resolveString("host", *hostFlag, visited, "LEAFWIKI_HOST", "127.0.0.1")
 	port := resolveString("port", *portFlag, visited, "LEAFWIKI_PORT", "8080")
 	dataDir := resolveString("data-dir", *dataDirFlag, visited, "LEAFWIKI_DATA_DIR", "./data")
 	adminPassword := resolveString("admin-password", *adminPasswordFlag, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
