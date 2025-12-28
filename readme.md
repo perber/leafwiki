@@ -181,7 +181,7 @@ These options are only used during installation and do not affect the runtime be
 | Flag               | Description                                                 | Default       |
 |--------------------|-------------------------------------------------------------|---------------|
 | `--arch`           | Target architecture for the binary (e.g. `amd64`, `arm64`)  |       -       |
-| `--host`           | Host/IP address the server binds to                         | `0.0.0.0`     |
+| `--host`           | Host/IP address the server binds to                         | `127.0.0.1`   |
 | `--port`           | Port the server listens on                                  | `8080`        |
 
 
@@ -194,7 +194,8 @@ docker run -p 8080:8080 \
     -v ~/leafwiki-data:/app/data \
     ghcr.io/perber/leafwiki:latest \
     --jwt-secret=yoursecret \
-    --admin-password=yourpassword
+    --admin-password=yourpassword \
+    --host=0.0.0.0
 ```
 
 By default, the container runs as root and stores data in `/app/data`.
@@ -225,7 +226,13 @@ Download the latest release binary from GitHub, make it executable, and start th
 
 ```
 chmod +x leafwiki
-./leafwiki --jwt-secret=yoursecret
+./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword
+```
+
+**Note:** By default, the server listens on `127.0.0.1`, which means it will only be accessible from localhost. If you want to access the server from other machines on your network, add `--host=0.0.0.0` to the command:
+
+```
+./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --host=0.0.0.0
 ```
 
 Default port is `8080`, and the default data directory is `./data`.
@@ -235,21 +242,6 @@ The JWT secret is required for authentication and should be kept secure.
 
 
 ## Authentication and admin user
-
-### Default admin user
-
-For security reasons, it is strongly recommended to change the default admin password after the first login.
-
-On first startup, LeafWiki creates an admin user with the default password `admin`.
-
-The password can be changed later via the admin settings or during startup using the CLI:
-
-```bash
-./leafwiki --admin-password=newpassword --jwt-secret=yoursecret
-```
-
-> Note: `--admin-password` (or the `LEAFWIKI_ADMIN_PASSWORD` env var) is only used on first startup, when no admin user exists yet.
-
 
 ### Reset Admin Password
 If you need to reset the admin password, you can do so by running:
@@ -268,12 +260,13 @@ These options control how the server runs after installation.
 | Flag                            | Description                                                 | Default       |
 |---------------------------------|-------------------------------------------------------------|---------------|
 | `--jwt-secret`                  | Secret used for signing JWTs (required)                     | –             |
-| `--host`                        | Host/IP address the server binds to                         | `0.0.0.0`     |
+| `--host`                        | Host/IP address the server binds to                         | `127.0.0.1`   |
 | `--port`                        | Port the server listens on                                  | `8080`        |
 | `--data-dir`                    | Directory where data is stored                              | `./data`      |
 | `--admin-password`              | Initial admin password (used only if no admin exists)       | `admin`       |
 | `--public-access`               | Allow public read-only access                               | `false`       |
 | `--hide-link-metadata-section`  | Hide link metadata section                                  | `false`       |
+
    
 
 ### Environment Variables
@@ -283,7 +276,7 @@ This is especially useful in containerized or production environments.
 
 | Variable                               | Description                                                  | Default    |
 |----------------------------------------|--------------------------------------------------------------|------------|
-| `LEAFWIKI_HOST`                        | Host/IP address the server binds to                          | `0.0.0.0`  |
+| `LEAFWIKI_HOST`                        | Host/IP address the server binds to                          | `127.0.0.1`|
 | `LEAFWIKI_PORT`                        | Port the server listens on                                   | `8080`     |
 | `LEAFWIKI_DATA_DIR`                    | Path to the data storage directory                           | `./data`   |
 | `LEAFWIKI_ADMIN_PASSWORD`              | Initial admin password *(used only if no admin exists yet)*  | `admin`    |
@@ -292,21 +285,6 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_HIDE_LINK_METADATA_SECTION`  | Hide link metadata section                                   | `false`    |
 
 These environment variables override the default values and are especially useful in containerized or production environments.
-
-## Reverse proxy setup
-
-When running LeafWiki behind a reverse proxy (nginx, Caddy, Traefik), it is recommended to bind the server to the loopback interface only.
-
-```bash
-# bind to localhost only
-LEAFWIKI_HOST=127.0.0.1 ./leafwiki --jwt-secret=yoursecret
-
-# or with the CLI flag
-./leafwiki --host 127.0.0.1 --jwt-secret=yoursecret
-```
-
-When bound to `127.0.0.1`, the server is only accessible locally,
-while the reverse proxy handles public traffic.
 
 
 ## Quick Start (Dev)
@@ -327,6 +305,11 @@ npm run dev   # Starts Vite dev server on http://localhost:5173
 
 cd ../../cmd/leafwiki
 go run main.go
+
+# Note: The backend binds to 127.0.0.1 by default for security.
+# If you need to access it from a different machine or network interface
+# (e.g., testing on mobile or from another device), use:
+# go run main.go --host=0.0.0.0
 ```
 
 ---
