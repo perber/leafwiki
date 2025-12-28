@@ -4,8 +4,10 @@ on:
   pull_request:
     branches:
       - main
+      - release/*
+      - releases/*
   push:
-    branches: [main]
+    branches: [main, release/*, releases/*]
 
 jobs:
   lint-frontend:

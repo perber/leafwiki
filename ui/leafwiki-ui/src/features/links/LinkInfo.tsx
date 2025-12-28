@@ -1,3 +1,4 @@
+import { useConfigStore } from '@/stores/config'
 import { Link2Off, Paperclip } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
@@ -6,33 +7,46 @@ import { useLinkStatusStore } from './linkstatus_store'
 
 export function BacklinkInfo() {
   const pageID = useViewerStore((s) => s.page?.id)
+  const hideLinkMetadataSection = useConfigStore(
+    (s) => s.hideLinkMetadataSection,
+  )
 
   const loading = useLinkStatusStore((s) => s.loading)
   const error = useLinkStatusStore((s) => s.error)
   const status = useLinkStatusStore((s) => s.status)
+
   const fetchLinkStatusForPage = useLinkStatusStore(
     (s) => s.fetchLinkStatusForPage,
   )
   const clear = useLinkStatusStore((s) => s.clear)
 
   useEffect(() => {
-    if (!pageID) {
+    // Clear link status when there is no page or the link metadata section is hidden,
+    // and fetch link status when a page is selected and the section is visible.
+    if (!pageID || hideLinkMetadataSection) {
       clear()
       return
     }
     fetchLinkStatusForPage(pageID)
-  }, [fetchLinkStatusForPage, pageID, clear])
+  }, [fetchLinkStatusForPage, pageID, clear, hideLinkMetadataSection])
 
+  // if the link impact feature is disabled, do not show anything - return null
+  if (hideLinkMetadataSection) return null
   const backlinks = status?.backlinks ?? []
   const brokenIncoming = status?.broken_incoming ?? []
   const brokenOutgoings = status?.broken_outgoings ?? []
 
+  // Render backlinks and broken links only if a link is present
+  if (
+    backlinks.length === 0 &&
+    brokenIncoming.length === 0 &&
+    brokenOutgoings.length === 0
+  ) {
+    return null
+  }
+
   return (
     <div className="backlinks__pane">
-      <div className="backlinks__header">
-        <h2 className="mb-2 text-lg font-medium">Impact</h2>
-      </div>
-
       <div className="backlinks__content">
         {/* Referenced by */}
         <div className="backlinks__group">
