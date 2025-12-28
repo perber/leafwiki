@@ -51,6 +51,7 @@ func main() {
 	jwtSecretFlag := flag.String("jwt-secret", "", "JWT secret for authentication")
 	publicAccessFlag := flag.Bool("public-access", false, "allow public access to the wiki with read access (default: false)")
 	injectCodeInHeaderFlag := flag.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")")
+	hideLinkMetadataSectionFlag := flag.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)")
 	flag.Parse()
 
 	// Track which flags were explicitly set on CLI
@@ -65,9 +66,10 @@ func main() {
 	injectCodeInHeader := resolveString("inject-code-in-header", *injectCodeInHeaderFlag, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
 
 	publicAccess := resolveBool("public-access", *publicAccessFlag, visited, "LEAFWIKI_PUBLIC_ACCESS")
+	hideLinkMetadataSection := resolveBool("hide-link-metadata-section", *hideLinkMetadataSectionFlag, visited, "LEAFWIKI_HIDE_LINK_METADATA_SECTION")
 
-	log.Printf("configuration: host=%q port=%q dataDir=%q publicAccess=%t injectHeader=%t",
-		host, port, dataDir, publicAccess, injectCodeInHeader != "",
+	log.Printf("configuration: host=%q port=%q dataDir=%q publicAccess=%t injectHeader=%t hideLinkMetadataSection=%t",
+		host, port, dataDir, publicAccess, injectCodeInHeader != "", hideLinkMetadataSection,
 	)
 
 	// Check if data directory exists
@@ -120,7 +122,7 @@ func main() {
 	}
 	defer w.Close()
 
-	router := http.NewRouter(w, publicAccess, injectCodeInHeader)
+	router := http.NewRouter(w, publicAccess, injectCodeInHeader, hideLinkMetadataSection)
 
 	// Start server - combine host and port
 	listenAddr := host + ":" + port

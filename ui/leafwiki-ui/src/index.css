@@ -871,15 +871,11 @@
 
   /** backlink pane **/
   .backlinks__pane {
-    @apply text-interface-text border-border mt-0 w-full border-t-3 pt-5 pb-5 text-sm;
-  }
-
-  .backlinks__header h2 {
-    @apply mb-2 text-lg font-medium;
+    @apply text-interface-text border-border mt-0 w-full border-t pt-2 pb-1 text-sm;
   }
 
   .backlinks__content {
-    @apply px-0;
+    @apply flex flex-col gap-2 sm:flex-row sm:gap-8;
   }
 
   .backlinks__content ul {
@@ -887,7 +883,11 @@
   }
 
   .backlinks__item a {
-    @apply hover:bg-tree-node-hover hover:text-brand text-interface-text! inline-block rounded-md pt-2 pr-5 pb-2 pl-2 text-xs leading-snug;
+    @apply text-muted-foreground! hover:text-brand! px-0 py-0 text-xs no-underline;
+  }
+
+  .backlinks__item a:hover {
+    background: transparent !important;
   }
 
   .backlinks__item .backlinks__icon {
@@ -895,16 +895,16 @@
   }
 
   .backlinks__icon {
-    @apply scale-90 opacity-50;
+    @apply mr-1 scale-75 opacity-40;
   }
 
   /* Backlinks pane extensions */
   .backlinks__group {
-    @apply mt-4;
+    @apply w-full sm:w-1/2;
   }
 
   .backlinks__group-title {
-    @apply text-muted mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase;
+    @apply text-muted mb-1 text-xs font-normal tracking-normal normal-case;
   }
 
   .backlinks__subgroup-title {
@@ -1022,7 +1022,7 @@
   }
 
   .page-viewer {
-    @apply mx-auto w-full max-w-6xl px-8 py-8;
+    @apply mx-auto w-full max-w-6xl px-8 pt-8 pb-0;
     @apply flex min-h-full flex-col;
   }
 

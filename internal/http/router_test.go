@@ -45,7 +45,7 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 
 func TestCreatePageEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	title := "Getting Started"
 	expectedSlug := "getting-started"
@@ -78,7 +78,7 @@ func TestCreatePageEndpoint(t *testing.T) {
 
 func TestCreatePageEndpoint_MissingTitle(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `{"title": ""}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(body))
@@ -90,7 +90,7 @@ func TestCreatePageEndpoint_MissingTitle(t *testing.T) {
 
 func TestCreatePageEndpoint_InvalidJSON(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `this is not valid json`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(body))
@@ -102,7 +102,7 @@ func TestCreatePageEndpoint_InvalidJSON(t *testing.T) {
 
 func TestCreatePageEndpoint_PageAlreadyExists(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `{"title": "Page Exists", "slug": "page-exists"}`
 	rec1 := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(body))
@@ -120,7 +120,7 @@ func TestCreatePageEndpoint_PageAlreadyExists(t *testing.T) {
 
 func TestGetTreeEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/tree", nil)
 
@@ -153,7 +153,7 @@ func TestGetTreeEndpoint(t *testing.T) {
 
 func TestSuggestSlugEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/slug-suggestion?title=NewPage", nil)
 
@@ -177,7 +177,7 @@ func TestSuggestSlugEndpoint(t *testing.T) {
 
 func TestSuggestSlugEndpoint_MissingTitle(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/slug-suggestion", nil)
 
@@ -188,7 +188,7 @@ func TestSuggestSlugEndpoint_MissingTitle(t *testing.T) {
 
 func TestDeletePageEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	_, err := wikiInstance.CreatePage(nil, "Delete Me", "delete-me")
 	if err != nil {
@@ -208,7 +208,7 @@ func TestDeletePageEndpoint(t *testing.T) {
 
 func TestDeletePageEndpoint_NotFound(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/not-found-id", nil)
 
@@ -219,7 +219,7 @@ func TestDeletePageEndpoint_NotFound(t *testing.T) {
 
 func TestDeletePageEndpoint_HasChildren(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	parent, err := wikiInstance.CreatePage(nil, "Parent", "parent")
 	if err != nil {
@@ -239,7 +239,7 @@ func TestDeletePageEndpoint_HasChildren(t *testing.T) {
 
 func TestDeletePageEndpoint_Recursive(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	parent, err := wikiInstance.CreatePage(nil, "Parent", "parent")
 	if err != nil {
@@ -262,7 +262,7 @@ func TestDeletePageEndpoint_Recursive(t *testing.T) {
 
 func TestUpdatePageEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	_, err := wikiInstance.CreatePage(nil, "Original Title", "original-title")
 	if err != nil {
@@ -301,7 +301,7 @@ func TestUpdatePageEndpoint(t *testing.T) {
 
 func TestUpdatePage_NotFound(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `{"title": "Updated", "slug": "updated", "content": "New content"}`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/not-found-id", strings.NewReader(string(body)))
@@ -312,7 +312,7 @@ func TestUpdatePage_NotFound(t *testing.T) {
 
 func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Create a page
 	created, err := wikiInstance.CreatePage(nil, "Immutable Slug", "immutable-slug")
@@ -346,7 +346,7 @@ func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
 
 func TestUpdatePage_PageAlreadyExists(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	_, err := wikiInstance.CreatePage(nil, "Original Title", "original-title")
 	if err != nil {
@@ -375,7 +375,7 @@ func TestUpdatePage_PageAlreadyExists(t *testing.T) {
 
 func TestUpdatePage_InvalidJSON(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `this is not valid json`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/invalid-id", strings.NewReader(string(body)))
@@ -387,7 +387,7 @@ func TestUpdatePage_InvalidJSON(t *testing.T) {
 
 func TestUpdatePage_MissingTitle(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `{"slug": "updated", "content": "New content"}`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-title", strings.NewReader(string(body)))
@@ -398,7 +398,7 @@ func TestUpdatePage_MissingTitle(t *testing.T) {
 
 func TestUpdatePage_MissingSlug(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `{"title": "Updated", "content": "New content"}`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-slug", strings.NewReader(string(body)))
@@ -410,7 +410,7 @@ func TestUpdatePage_MissingSlug(t *testing.T) {
 
 func TestGetPageEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Erstellt eine Page über Wiki (nicht direkt über HTTP)
 	_, err := wikiInstance.CreatePage(nil, "Welcome", "welcome")
@@ -447,7 +447,7 @@ func TestGetPageEndpoint(t *testing.T) {
 
 func TestGetPageEndpoint_NotFound(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/not-found-id", nil)
 
@@ -458,7 +458,7 @@ func TestGetPageEndpoint_NotFound(t *testing.T) {
 
 func TestGetPageEndpoint_MissingID(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/", nil)
 
@@ -469,7 +469,7 @@ func TestGetPageEndpoint_MissingID(t *testing.T) {
 
 func TestMovePageEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Erstelle zwei Pages: root → a, root → b
 	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
@@ -499,7 +499,7 @@ func TestMovePageEndpoint(t *testing.T) {
 
 func TestMovePageEndpoint_NotFound(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/not-found-id/move", strings.NewReader(`{"parentId":"root"}`))
 
@@ -510,7 +510,7 @@ func TestMovePageEndpoint_NotFound(t *testing.T) {
 
 func TestMovePageEndpoint_InvalidJSON(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/invalid-id/move", strings.NewReader(`this is not valid json`))
 
@@ -521,7 +521,7 @@ func TestMovePageEndpoint_InvalidJSON(t *testing.T) {
 
 func TestMovePageEndpoint_MissingParentID(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-parent/move", strings.NewReader(`{"parentId":""}`))
 
@@ -532,7 +532,7 @@ func TestMovePageEndpoint_MissingParentID(t *testing.T) {
 
 func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
@@ -552,7 +552,7 @@ func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 
 func TestMovePageEndpoint_CircularReference(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
@@ -576,7 +576,7 @@ func TestMovePageEndpoint_CircularReference(t *testing.T) {
 
 func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
@@ -605,7 +605,7 @@ func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 
 func TestMovePage_InTheSamePlace(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
@@ -622,7 +622,7 @@ func TestMovePage_InTheSamePlace(t *testing.T) {
 
 func TestSortPagesEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Create pages
 	page1, err := wikiInstance.CreatePage(nil, "Page 1", "page-1")
@@ -689,7 +689,7 @@ func TestSortPagesEndpoint(t *testing.T) {
 
 func TestAuthLoginEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `{"identifier": "admin", "password": "admin"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
@@ -714,7 +714,7 @@ func TestAuthLoginEndpoint(t *testing.T) {
 
 func TestAuthLogin_InvalidCredentials(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `{"identifier": "admin", "password": "wrong"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
@@ -730,7 +730,7 @@ func TestAuthLogin_InvalidCredentials(t *testing.T) {
 
 func TestAuthRefreshToken(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Login
 	loginBody := `{"identifier": "admin", "password": "admin"}`
@@ -764,7 +764,7 @@ func TestAuthRefreshToken(t *testing.T) {
 
 func TestCreateUserEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `{"username": "john", "email": "john@example.com", "password": "secret123", "role": "editor"}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
@@ -776,7 +776,7 @@ func TestCreateUserEndpoint(t *testing.T) {
 
 func TestCreateUser_DuplicateEmailOrUsername(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Erstellt initialen Benutzer
 	payload := `{"username": "john", "email": "john@example.com", "password": "secret", "role": "editor"}`
@@ -799,7 +799,7 @@ func TestCreateUser_DuplicateEmailOrUsername(t *testing.T) {
 
 func TestCreateUser_InvalidRole(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	body := `{"username": "sam", "email": "sam@example.com", "password": "secret", "role": "viewer"}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
@@ -811,7 +811,7 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 
 func TestGetUsersEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/users", nil)
 	if rec.Code != http.StatusOK {
@@ -830,7 +830,7 @@ func TestGetUsersEndpoint(t *testing.T) {
 
 func TestUpdateUserEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Benutzer anlegen
 	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "editor"}`
@@ -855,7 +855,7 @@ func TestUpdateUserEndpoint(t *testing.T) {
 
 func TestDeleteUserEndpoint(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Benutzer anlegen
 	create := `{"username": "todelete", "email": "delete@example.com", "password": "secrepassword", "role": "editor"}`
@@ -872,7 +872,7 @@ func TestDeleteUserEndpoint(t *testing.T) {
 
 func TestDeleteAdminUser_ShouldFail(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Default Admin holen
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/users", nil)
@@ -899,7 +899,7 @@ func TestDeleteAdminUser_ShouldFail(t *testing.T) {
 
 func TestRequireAdminMiddleware(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Default Admin versucht, Benutzer zu erstellen (sollte erlaubt sein)
 	body := `{"username": "mod", "email": "mod@example.com", "password": "secretpassword", "role": "editor"}`
@@ -912,7 +912,7 @@ func TestRequireAdminMiddleware(t *testing.T) {
 
 func TestRequireAuthMiddleware_Unauthorized(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Request ohne Token
 	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(`{"title": "Oops", "slug": "oops"}`))
@@ -928,7 +928,7 @@ func TestRequireAuthMiddleware_Unauthorized(t *testing.T) {
 
 func TestRequireAuthMiddleware_InvalidToken(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(`{"title": "Bad", "slug": "bad"}`))
 	req.Header.Set("Authorization", "Bearer invalidtoken")
@@ -944,7 +944,7 @@ func TestRequireAuthMiddleware_InvalidToken(t *testing.T) {
 
 func TestAssetEndpoints(t *testing.T) {
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Step 1: Create page
 	page, err := wikiInstance.CreatePage(nil, "Assets Page", "assets-page")
@@ -1023,7 +1023,7 @@ func TestAssetEndpoints(t *testing.T) {
 func TestIndexingStatusEndpoint(t *testing.T) {
 	// Lets call /api/search/status
 	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "")
+	router := NewRouter(wikiInstance, false, "", false)
 
 	// Default Admin holen
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/search/status", nil)
