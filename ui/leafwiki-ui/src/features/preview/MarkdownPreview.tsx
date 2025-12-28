@@ -143,8 +143,8 @@ export default function MarkdownPreview({ content, path }: Props) {
         rehypePlugins={[
           rehypeRaw,
           rehypeLineNumber,
-          [rehypeSanitize, schema],
           rehypeWhitelistStyles,
+          [rehypeSanitize, schema],
           rehypeHighlight,
         ]}
         components={components}
