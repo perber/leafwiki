@@ -19,7 +19,8 @@ export function BacklinkInfo() {
   const clear = useLinkStatusStore((s) => s.clear)
 
   useEffect(() => {
-    // Fetch link status when pageID changes or when link metadata section is hidden/shown
+    // Clear link status when there is no page or the link metadata section is hidden,
+    // and fetch link status when a page is selected and the section is visible.
     if (!pageID || hideLinkMetadataSection) {
       clear()
       return
