@@ -9,10 +9,11 @@ import (
 )
 
 type rateLimiter struct {
-	mu     sync.Mutex
-	hits   map[string][]time.Time
-	limit  int
-	window time.Duration
+	mu             sync.Mutex
+	hits           map[string][]time.Time
+	limit          int
+	window         time.Duration
+	resetOnSuccess bool
 }
 
 func (rl *rateLimiter) cleanup() {
@@ -41,11 +42,12 @@ func (rl *rateLimiter) cleanup() {
 	}
 }
 
-func NewRateLimiter(limit int, window time.Duration) gin.HandlerFunc {
+func NewRateLimiter(limit int, window time.Duration, resetOnSuccess bool) gin.HandlerFunc {
 	rl := &rateLimiter{
-		hits:   make(map[string][]time.Time),
-		limit:  limit,
-		window: window,
+		hits:           make(map[string][]time.Time),
+		limit:          limit,
+		window:         window,
+		resetOnSuccess: resetOnSuccess,
 	}
 
 	return func(c *gin.Context) {
@@ -58,7 +60,6 @@ func NewRateLimiter(limit int, window time.Duration) gin.HandlerFunc {
 		cutoff := now.Add(-rl.window)
 
 		rl.mu.Lock()
-		defer rl.mu.Unlock()
 
 		var events []time.Time
 		if old, ok := rl.hits[key]; ok {
@@ -78,7 +79,14 @@ func NewRateLimiter(limit int, window time.Duration) gin.HandlerFunc {
 
 		events = append(events, now)
 		rl.hits[key] = events
-
+		rl.mu.Unlock()
 		c.Next()
+
+		rl.mu.Lock()
+		// on success, we can optionally reset the rate limit count for this key
+		if rl.resetOnSuccess && c.Writer.Status() >= 200 && c.Writer.Status() < 300 {
+			delete(rl.hits, key)
+		}
+		rl.mu.Unlock()
 	}
 }
