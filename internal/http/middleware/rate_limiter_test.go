@@ -13,7 +13,7 @@ func TestRateLimiter_NewKey(t *testing.T) {
 	// This test ensures that the rate limiter doesn't panic when encountering a new key
 	gin.SetMode(gin.TestMode)
 
-	limiter := NewRateLimiter(3, time.Minute)
+	limiter := NewRateLimiter(3, time.Minute, false)
 
 	// Create a test router with the rate limiter
 	router := gin.New()
@@ -37,7 +37,7 @@ func TestRateLimiter_NewKey(t *testing.T) {
 func TestRateLimiter_ExceedsLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	limiter := NewRateLimiter(3, time.Minute)
+	limiter := NewRateLimiter(3, time.Minute, false)
 
 	router := gin.New()
 	router.Use(limiter)
@@ -74,7 +74,7 @@ func TestRateLimiter_WindowExpires(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// Use a very short window for testing
-	limiter := NewRateLimiter(2, 100*time.Millisecond)
+	limiter := NewRateLimiter(2, 100*time.Millisecond, false)
 
 	router := gin.New()
 	router.Use(limiter)
