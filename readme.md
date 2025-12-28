@@ -229,6 +229,12 @@ chmod +x leafwiki
 ./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword
 ```
 
+**Note:** By default, the server listens on `127.0.0.1`, which means it will only be accessible from localhost. If you want to access the server from other machines on your network, add `--host=0.0.0.0` to the command:
+
+```
+./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --host=0.0.0.0
+```
+
 Default port is `8080`, and the default data directory is `./data`.
 You can change the data directory with the `--data-dir` flag.
 
