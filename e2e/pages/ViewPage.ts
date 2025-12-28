@@ -24,6 +24,7 @@ export default class ViewPage {
   async logout() {
     const logoutButton = this.page.getByTestId('user-toolbar-logout');
     await logoutButton.click();
+      await this.page.locator('input[data-testid="login-identifier"]').waitFor({ state: 'visible' });
   }
 
   async isLoggedOut() {
