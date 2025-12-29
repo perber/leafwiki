@@ -129,6 +129,7 @@ func (s *SQLiteIndex) ensureSchema() error {
 	}
 	// Create the users table if it doesn't exist
 	_, err = s.db.Exec(`
+		DROP TABLE IF EXISTS pages;
 		CREATE VIRTUAL TABLE IF NOT EXISTS pages USING fts5(
 			path UNINDEXED,
 			filepath UNINDEXED,
