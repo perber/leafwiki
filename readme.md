@@ -1,9 +1,19 @@
 # 🌿 LeafWiki
 
-**A lightweight, tree-based wiki for technical and operational documentation, designed to be self-hosted and evolving toward team-oriented use cases.**  
+**A self-hosted Dev Wiki built for developers — tree-based, fast, and powered by plain Markdown.**  
 
+LeafWiki provides a personal, self-hosted documentation space — storing pages as plain Markdown files on your own infrastructure, without requiring an external database.
 
-LeafWiki is designed for individuals and small teams who want a self-hosted wiki with full control over structure, content, and deployment, with a focus on technical and operational documentation.
+---
+
+## Live Demo
+
+A public demo of LeafWiki is available here:
+
+🌐 **[demo.leafwiki.com](https://demo.leafwiki.com)**  
+
+Login credentials are displayed on the demo site.  
+The demo instance resets automatically every hour, so all changes are temporary.
 
 ---
 
@@ -23,34 +33,26 @@ LeafWiki is designed for individuals and small teams who want a self-hosted wiki
 
 ---
 
-## Live Demo
-
-A public demo of LeafWiki is available here:
-
-🌐 **[demo.leafwiki.com](https://demo.leafwiki.com)**  
-
-Login credentials are displayed on the demo site.  
-The demo instance resets automatically every hour, so all changes are temporary.
-
----
-
 ## What LeafWiki is good for today
 
-LeafWiki works well today for: 
-- A personal knowledge base or wiki managed by one main maintainer
-- Project or technical documentation with low concurrent editing
-- Operational or engineering documentation maintained by a small team or a primary owner
-- Structured notes that benefit from explicit hierarchy and ordering
+LeafWiki focuses on personal and small-team documentation use cases today.  
+Team features and collaboration may evolve based on real-world needs.
+
+LeafWiki is currently well-suited for:
+- Personal technical notes, documentation and ideas
+- Project documentation maintained by one main contributor
+- Runbooks, operational knowledge and engineering guides for small teams
+- Structured content that benefit from explicit hierarchy and ordering
 
 ---
 
 ## Why Another Wiki?
 
-After using several existing wiki and documentation tools, the goal behind LeafWiki was to build something simpler and easier to operate.
+Many existing wiki tools feel heavier than the problem they solve.  
+They require databases, plugins, workflows or complex deployment setups.  
 
-Many existing solutions rely on heavy infrastructure or databases, even though the core content is usually just Markdown files.
-
-In practice, writing documentation often comes with unnecessary friction. Authors are asked to configure too much upfront or to decide where assets belong before any content is written, which interrupts the writing flow.
+That adds friction before writing has even started.  
+You have to pick structure, configure storage, and think about operations instead of capturing knowledge while the context is fresh.  
 
 LeafWiki was designed around a few simple questions:
 - Why require a complex database for Markdown content?
@@ -58,16 +60,13 @@ LeafWiki was designed around a few simple questions:
 - Why can’t structure and navigation be handled explicitly while keeping files portable?
 
 The result is a lightweight wiki engine with:
-- Plain Markdown files stored on disk
+- Markdown files stored directly on disk
 - Explicit tree-based structure
-- A single binary with minimal dependencies
-- A focus on simple self-hosting
+- A single Go binary or container deployment
+- Minimal operational overhead
 
-LeafWiki intentionally prioritizes clarity and simplicity over feature completeness.
 
-In operational and engineering contexts, documentation often needs to be reliable, easy to update, and simple to operate over long periods of time.
-LeafWiki is designed to support these needs without introducing unnecessary operational complexity.
-
+LeafWiki intentionally prioritizes writing flow, simplicity and long-term maintainability over feature complexity.
 
 ---
 
@@ -106,42 +105,40 @@ For details on the current model and its constraints, see [Known limitations](#k
 - Image and asset support
 - Dark mode and mobile-friendly UI
 - Separation between admin and editor users
+- Keyboard shortcuts for common actions (like saving with Ctrl+S, ...)
 
-LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone service.
 
-LeafWiki supports public read-only access for documentation use cases,
-while keeping editing and structure management restricted to authenticated users.
-
----
+LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone binary.
+LeafWiki supports public read-only access for documentation use cases, while keeping editing and structure management restricted to authenticated users.
 
 ## What LeafWiki is not
 
-LeafWiki is not intended to be a full-featured enterprise documentation platform.
+LeafWiki does not aim to be a large enterprise documentation system.
 
-It intentionally avoids complex workflows, real-time collaborative editing, and deeply configurable permission systems in order to stay simple, predictable, and easy to self-host.
+It intentionally avoids complex workflows, real-time collaborative editing, and advanced permission models to maintain simplicity, predictability, and low operational overhead.
 
 ---
 
 ## Project Status
 
-LeafWiki provides a stable base for everyday use, but is not feature-complete yet.
-Some foundational features, especially around long-term content safety and collaboration, are still evolving and under active development.
-The current focus is on **refining existing functionality**, improving **stability**, and evolving the platform carefully toward a wiki for long-term use.
+LeafWiki is stable for everyday use as a personal or primary-owner wiki.  
+The core feature set — writing, structure, search, ... is actively maintained and production-ready.
+
+Collaboration is currently limited and follows a *last-write-wins* approach.  
+More advanced team-oriented capabilities are under development, with a focus on durability and predictable behavior.
+
 
 **Current priorities:**  
 - Versioning
-- Operations Metadata
-- Optimistic Locking
+- Operations metadata (created/updated info)
+- Conflict handling for concurrent edits (optimistic locking)
 
-The editor and admin features are in place, but collaboration is still basic and currently following a *last-write-wins* approach.
-More advanced team features, such as versioning, are now active priorities and are being developed iteratively.
+Development is iterative and guided by real-world use.  
+The platform will evolve cautiously toward team workflows while maintaining its principles of simplicity and low operational overhead.
 
 > **LeafWiki** is actively developed and open to collaboration 🌿 
 
-For a detailed history of changes and releases, see the [CHANGELOG](CHANGELOG.md).
-
-Longer term, LeafWiki aims to better support team-oriented workflows common in operations and engineering environments, while preserving its focus on simplicity and predictability.
-
+See the [CHANGELOG](CHANGELOG.md) for release details.
 
 ---
 
@@ -285,7 +282,7 @@ When running LeafWiki behind a reverse proxy (nginx, Caddy, Traefik), it is reco
 LEAFWIKI_HOST=127.0.0.1 ./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword
 ```
 
-# or with the CLI flag
+**or with the CLI flag**  
 ```
 ./leafwiki --host 127.0.0.1 --jwt-secret=yoursecret --admin-password=yourpassword
 ```
@@ -316,27 +313,43 @@ go run main.go
 
 ---
 
+### Keyboard Shortcuts
+
+| Action                     | Shortcut                                   |
+|----------------------------|--------------------------------------------|
+| Switch to Edit Mode        | `Ctrl + E` (or `Cmd + E`)                  |
+| Switch to Search Pane      | `Ctrl + Shift + F` (or `Cmd + F`)          |
+| Switch to Navigation Pane  | `Ctrl + Shift + E` (or `Cmd + Shift + E`)  |
+| Save Page                  | `Ctrl + S` (or `Cmd + S`)                  |
+| Bold Text                  | `Ctrl + B` (or `Cmd + B`)                  |
+| Italic Text                | `Ctrl + I` (or `Cmd + I`)                  |
+| Headline 1                 | `Ctrl + Alt + 1` (or `Cmd + Alt + 1`)      |
+| Headline 2                 | `Ctrl + Alt + 2` (or `Cmd + Alt + 2`)      |
+| Headline 3                 | `Ctrl + Alt + 3` (or `Cmd + Alt + 3`)      |
+
+`Ctrl+V` / `Cmd+V` for pasting images or files is also supported in the editor.
+`Esc` can be used to exit modals, dialogs or the edit mode.
+
+More shortcuts may be added in future releases.
+
+---
+
 ## Known limitations
 
-LeafWiki intentionally focuses on simplicity and a well-defined scope.
-As a result, there are some important limitations to be aware of:
+LeafWiki focuses on simplicity with a well-defined scope.  
+As a result, the following limitations apply today:
 
-- **No page history or versioning**  
-  Page edits overwrite previous content. Regular backups of the data directory are strongly recommended.
+- **No built-in page history or versioning**  
+  Saving changes overwrites the previous state. Versioning is a planned feature.
 
-- **Basic concurrent editing model**  
-  When multiple users edit the same page at the same time, the last saved version wins.
-  LeafWiki is best suited for single maintainers or low-concurrency use.
+- **Basic concurrency handling**  
+  Edits follow a last-write-wins model. Best suited for single maintainers or low-concurrency use.
 
-- **Metadata stored outside Markdown files**  
-  While page content is stored as Markdown files on disk, navigation structure is stored as JSON, and user data, metadata, and search indexes are stored in SQLite.
+- **Metadata not fully embedded in Markdown**  
+  Page content is plain Markdown, but structure, metadata, user accounts, and search indexes are stored in SQLite.
 
-- **Limited permission model**  
-  LeafWiki does not provide fine-grained permissions or complex role-based access control.
-
-- **Security defaults require attention**  
-  Initial setup uses simple defaults intended for local or first-time use.
-  Admin credentials and secrets should be reviewed and secured before exposing LeafWiki publicly.
+- **Minimal access control**  
+  No role-based permissions or fine-grained restrictions at this time.
 
 ---
 
