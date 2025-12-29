@@ -105,13 +105,11 @@ For details on the current model and its constraints, see [Known limitations](#k
 - Image and asset support
 - Dark mode and mobile-friendly UI
 - Separation between admin and editor users
+- Keyboard shortcuts for common actions (like saving with Ctrl+S, ...)
 
-LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone service.
 
-LeafWiki supports public read-only access for documentation use cases,
-while keeping editing and structure management restricted to authenticated users.
-
----
+LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone binary.
+LeafWiki supports public read-only access for documentation use cases, while keeping editing and structure management restricted to authenticated users.
 
 ## What LeafWiki is not
 
@@ -284,7 +282,7 @@ When running LeafWiki behind a reverse proxy (nginx, Caddy, Traefik), it is reco
 LEAFWIKI_HOST=127.0.0.1 ./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword
 ```
 
-# or with the CLI flag
+**or with the CLI flag**  
 ```
 ./leafwiki --host 127.0.0.1 --jwt-secret=yoursecret --admin-password=yourpassword
 ```
@@ -312,6 +310,27 @@ npm run dev   # Starts Vite dev server on http://localhost:5173
 cd ../../cmd/leafwiki
 go run main.go
 ```
+
+---
+
+### Keyboard Shortcuts
+
+| Action                     | Shortcut                                   |
+|----------------------------|--------------------------------------------|
+| Switch to Edit Mode        | `Ctrl + E` (or `Cmd + E`)                  |
+| Switch to Search Pane      | `Ctrl + Shift + F` (or `Cmd + F`)          |
+| Switch to Navigation Pane  | `Ctrl + Shift + E` (or `Cmd + E`)          |
+| Save Page                  | `Ctrl + S` (or `Cmd + S`)                  |
+| Bold Text                  | `Ctrl + B` (or `Cmd + B`)                  |
+| Italic Text                | `Ctrl + I` (or `Cmd + I`)                  |
+| Headline 1                 | `Ctrl + Alt + 1` (or `Cmd + Alt + 1`)      |
+| Headline 2                 | `Ctrl + Alt + 2` (or `Cmd + Alt + 2`)      |
+| Headline 3                 | `Ctrl + Alt + 3` (or `Cmd + Alt + 3`)      |
+
+`Ctrl+V` / `Cmd+V` for pasting images or files is also supported in the editor.
+`Esc` can be used to exit modals, dialogs or the edit mode.
+
+More shortcuts may be added in future releases.
 
 ---
 
