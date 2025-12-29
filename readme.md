@@ -318,7 +318,7 @@ go run main.go
 | Action                     | Shortcut                                   |
 |----------------------------|--------------------------------------------|
 | Switch to Edit Mode        | `Ctrl + E` (or `Cmd + E`)                  |
-| Switch to Search Pane      | `Ctrl + Shift + F` (or `Cmd + F`)          |
+| Switch to Search Pane      | `Ctrl + Shift + F` (or `Cmd + Shift + F`)  |
 | Switch to Navigation Pane  | `Ctrl + Shift + E` (or `Cmd + Shift + E`)  |
 | Save Page                  | `Ctrl + S` (or `Cmd + S`)                  |
 | Bold Text                  | `Ctrl + B` (or `Cmd + B`)                  |
