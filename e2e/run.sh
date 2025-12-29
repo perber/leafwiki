@@ -20,8 +20,7 @@ start_docker() {
     -v e2e-tests-data:/app/data \
     wiki-e2e-tests \
     --jwt-secret=e2e-tests-secret \
-    --admin-password=admin \
-    --host=0.0.0.0
+    --admin-password=admin
 
   echo "✅ Container started on http://localhost:8085"
 }
