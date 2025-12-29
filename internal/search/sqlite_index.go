@@ -12,6 +12,8 @@ import (
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
+var sanitize = bluemonday.StrictPolicy()
+
 type SQLiteIndex struct {
 	mu         sync.Mutex
 	storageDir string
@@ -32,12 +34,20 @@ func extractHeadings(markdown string) string {
 		}
 
 		var headingText bytes.Buffer
-		for c := n.FirstChild; c != nil; c = c.Next {
-			if c.Literal != nil {
-				headingText.Write(c.Literal)
-				headingText.WriteByte(' ')
+
+		var walk func(c *blackfriday.Node)
+		walk = func(c *blackfriday.Node) {
+			for ; c != nil; c = c.Next {
+				if c.Literal != nil {
+					headingText.Write(c.Literal)
+					headingText.WriteByte(' ')
+				}
+				if c.FirstChild != nil {
+					walk(c.FirstChild)
+				}
 			}
 		}
+		walk(n.FirstChild)
 
 		text := strings.TrimSpace(headingText.String())
 		if text != "" {
@@ -48,9 +58,7 @@ func extractHeadings(markdown string) string {
 		return blackfriday.GoToNext
 	})
 
-	// Sanitize the headings to remove any unwanted HTML
-	p := bluemonday.StrictPolicy()
-	return p.Sanitize(buf.String())
+	return sanitize.Sanitize(buf.String())
 }
 
 func buildFuzzyQuery(q string) string {
@@ -60,9 +68,9 @@ func buildFuzzyQuery(q string) string {
 	}
 
 	// if the query contains special FTS5 syntax, return as is
-	if strings.ContainsAny(q, "\"*()") ||
-		strings.Contains(q, " OR ") ||
-		strings.Contains(q, " AND ") {
+	if strings.ContainsAny(q, "\"*():") ||
+		strings.Contains(strings.ToUpper(q), " OR ") ||
+		strings.Contains(strings.ToUpper(q), " AND ") {
 		return q
 	}
 
@@ -174,7 +182,7 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 
 	// Body as plain text (existing logic)
 	html := blackfriday.Run([]byte(content))
-	sanitizedBody := bluemonday.StrictPolicy().Sanitize(string(html))
+	sanitizedBody := sanitize.Sanitize(string(html))
 
 	_, err = s.db.Exec(`
 		INSERT INTO pages (path, filepath, pageID, title, headings, content)
@@ -224,7 +232,7 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 			path,
 			highlight(pages, 3, '<b>', '</b>') AS highlighted_title,
 			snippet(pages, 5, '<b>', '</b>', '...', 16) AS excerpt,
-			bm25(pages, 5.0, 3.0, 1.0) AS bm25_score
+			bm25(pages, 0.0, 5.0, 3.0, 1.0) AS bm25_score
 		FROM pages
 		WHERE pages MATCH ?
 		ORDER BY bm25_score ASC
@@ -246,7 +254,11 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 			return nil, err
 		}
 		// Convert bm25 score to a rank (lower score = higher rank)
+		if bm25Score < 0 {
+			bm25Score = 0
+		}
 		r.Rank = 1.0 / (1.0 + bm25Score)
+
 		results = append(results, r)
 	}
 	if err := rows.Err(); err != nil {
