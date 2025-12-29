@@ -3,6 +3,7 @@ package search
 import (
 	"bytes"
 	"database/sql"
+	"log"
 	"path"
 	"strings"
 	"sync"
@@ -233,7 +234,14 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 			path,
 			highlight(pages, 3, '<b>', '</b>') AS highlighted_title,
 			snippet(pages, 5, '<b>', '</b>', '...', 16) AS excerpt,
-			bm25(pages, 0.0, 5.0, 3.0, 1.0) AS bm25_score
+			bm25(pages,
+				0.0,  -- path
+				0.0,  -- filepath
+				0.0,  -- pageID
+				20.0, -- title
+				5.0,   -- headings
+				1.0    -- content
+			) AS bm25_score
 		FROM pages
 		WHERE pages MATCH ?
 		ORDER BY bm25_score ASC
@@ -254,11 +262,14 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 		if err := rows.Scan(&r.PageID, &r.Path, &r.Title, &r.Excerpt, &bm25Score); err != nil {
 			return nil, err
 		}
+
 		// Convert bm25 score to a rank (lower score = higher rank)
 		if bm25Score < 0 {
 			bm25Score = 0
 		}
 		r.Rank = 1.0 / (1.0 + bm25Score)
+
+		log.Printf("pageID=%s title=%q bm25=%f rank=%f", r.PageID, r.Title, bm25Score, r.Rank)
 
 		results = append(results, r)
 	}
