@@ -191,11 +191,11 @@ docker run -p 8080:8080 \
     -v ~/leafwiki-data:/app/data \
     ghcr.io/perber/leafwiki:latest \
     --jwt-secret=yoursecret \
-    --admin-password=yourpassword \
-    --host=0.0.0.0
+    --admin-password=yourpassword
 ```
 
-By default, the container runs as root and stores data in `/app/data`.
+By default, the container binds to `0.0.0.0` so the wiki is reachable from your network.
+The data directory inside the container is `/app/data`.
 
 ---
 
@@ -264,7 +264,7 @@ These options control how the server runs after installation.
 | `--public-access`               | Allow public read-only access                               | `false`       |
 | `--hide-link-metadata-section`  | Hide link metadata section                                  | `false`       |
 
-   
+> When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
 
 ### Environment Variables
 
@@ -283,7 +283,8 @@ This is especially useful in containerized or production environments.
 
 These environment variables override the default values and are especially useful in containerized or production environments.
 
----
+> When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
+
 
 ## Quick Start (Dev)
 

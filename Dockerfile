@@ -22,6 +22,9 @@ FROM alpine:3.23 AS final
 WORKDIR /app
 COPY --from=backend-build /out/leafwiki /app/leafwiki
 
+COPY ./docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 EXPOSE 8080
 
 RUN mkdir -p /app/data && chmod 777 /app/data
@@ -32,4 +35,4 @@ LABEL org.opencontainers.image.title="LeafWiki" \
       org.opencontainers.image.source="https://github.com/perber/leafwiki" \
       org.opencontainers.image.licenses="MIT"
 
-ENTRYPOINT ["/app/leafwiki"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
