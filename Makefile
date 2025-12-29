@@ -64,7 +64,7 @@ endif
 		--tag ghcr.io/$(REPO_OWNER)/leafwiki:$(VERSION) \
 		--tag ghcr.io/$(REPO_OWNER)/leafwiki:latest \
 		--annotation "index:org.opencontainers.image.title=LeafWiki" \
-		--annotation "index:org.opencontainers.image.description=A lightweight, self-hosted wiki built in Go - tree-based, fast, and storing content in plain Markdown." \
+		--annotation "index:org.opencontainers.image.description=A self-hosted Dev Wiki built for developers — tree-based, fast, and powered by plain Markdown." \
 		--push .
 
 # Generate markdown changelog between two tags
