@@ -31,5 +31,5 @@ if [ "$has_host_arg" = false ] && [ -z "${LEAFWIKI_HOST:-}" ]; then
 fi
 
 # start the main application and pass all arguments to it
-log "Executing command: /app/leafwiki $*"
+log "Executing /app/leafwiki"
 exec /app/leafwiki "$@"
