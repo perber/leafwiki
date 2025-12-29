@@ -36,15 +36,6 @@ export function BacklinkInfo() {
   const brokenIncoming = status?.broken_incoming ?? []
   const brokenOutgoings = status?.broken_outgoings ?? []
 
-  // Render backlinks and broken links only if a link is present
-  if (
-    backlinks.length === 0 &&
-    brokenIncoming.length === 0 &&
-    brokenOutgoings.length === 0
-  ) {
-    return null
-  }
-
   return (
     <div className="backlinks__pane">
       <div className="backlinks__content">
