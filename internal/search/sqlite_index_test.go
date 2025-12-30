@@ -1,8 +1,11 @@
 package search
 
 import (
+	"database/sql"
 	"strings"
 	"testing"
+
+	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
 func TestSQLiteIndex_IndexPage(t *testing.T) {
@@ -26,7 +29,17 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 		t.Fatalf("IndexPage failed: %v", err)
 	}
 
-	row := index.GetDB().QueryRow(`SELECT path, title, content FROM pages WHERE pageID = ?`, pageID)
+	var row *sql.Row
+
+	if err := index.withDB(func(db *sql.DB) error {
+		row = db.QueryRow(`SELECT path, title, content FROM pages WHERE pageID = ?`, pageID)
+		if row == nil {
+			t.Fatalf("no data found for pageID %s", pageID)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("failed to read indexed data: %v", err)
+	}
 
 	var gotPath, gotTitle, gotContent string
 	err = row.Scan(&gotPath, &gotTitle, &gotContent)

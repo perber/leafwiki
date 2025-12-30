@@ -153,16 +153,7 @@ func (s *SQLiteIndex) Close() error {
 	return nil
 }
 
-func (s *SQLiteIndex) GetDB() *sql.DB {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.db
-}
-
 func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, title string, content string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	// Headings extracted from the Markdown
 	headings := extractHeadings(content)
 
@@ -171,12 +162,12 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 	sanitizedBody := sanitize.Sanitize(string(html))
 
 	return s.withDB(func(db *sql.DB) error {
-		_, err := s.db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
+		_, err := db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
 		if err != nil {
 			return err
 		}
 
-		_, err = s.db.Exec(`
+		_, err = db.Exec(`
 		INSERT INTO pages (path, filepath, pageID, title, headings, content)
 		VALUES (?, ?, ?, ?, ?, ?);
 	`, path, filePath, pageID, title, headings, sanitizedBody)
@@ -210,6 +201,16 @@ func (s *SQLiteIndex) RemovePageByFilePath(filePath string) (int64, error) {
 }
 
 func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, error) {
+
+	if strings.TrimSpace(query) == "" {
+		return &SearchResult{
+			Count:  0,
+			Items:  []SearchResultItem{},
+			Offset: offset,
+			Limit:  limit,
+		}, nil
+	}
+
 	sr := &SearchResult{}
 	ftsQuery := buildFuzzyQuery(query)
 
@@ -217,7 +218,7 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 		var total int
 
 		countQuery := `SELECT COUNT(*) FROM pages WHERE pages MATCH ?;`
-		if err := s.db.QueryRow(countQuery, ftsQuery).Scan(&total); err != nil {
+		if err := db.QueryRow(countQuery, ftsQuery).Scan(&total); err != nil {
 			return err
 		}
 		sr.Count = total
@@ -242,7 +243,7 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 		LIMIT ? OFFSET ?;
 	`
 
-		rows, err := s.db.Query(searchQuery, ftsQuery, limit, offset)
+		rows, err := db.Query(searchQuery, ftsQuery, limit, offset)
 		if err != nil {
 			return err
 		}
