@@ -45,7 +45,7 @@ func TestCSRFMiddleware_BlocksPostWithoutCookie(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/protected", nil)
-	req.TLS = &tls.ConnectionState{} // damit requireSecure in Read "secure" annimmt
+	req.TLS = &tls.ConnectionState{} // ensure requireSecure in Read treats the request as "secure"
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
