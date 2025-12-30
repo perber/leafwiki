@@ -24,6 +24,11 @@ test.describe('Authenticated', () => {
     await viewPage.expectUserLoggedIn();
   });
 
+  test.afterEach(async ({ page }) => {
+    const viewPage = new ViewPage(page);
+    await viewPage.logout();
+  });
+
   test('create-page', async ({ page }) => {
     const title = `My New Page ${Date.now()}`;
 

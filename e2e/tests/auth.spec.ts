@@ -19,7 +19,6 @@ test('logout', async ({ page }) => {
   await loginPage.login(user, password);
   const viewPage = new ViewPage(page);
   await viewPage.expectUserLoggedIn();
-  await viewPage.clickUserToolbarAvatar();
   await viewPage.logout();
   const loggedOut = await viewPage.isLoggedOut();
   test.expect(loggedOut).toBe(true);

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/wiki"
@@ -15,7 +16,7 @@ func printUsage() {
 	fmt.Println(`LeafWiki – lightweight selfhosted wiki 🌿
 
 	Usage:
-	leafwiki [--host <HOST>] [--port <PORT>] [--data-dir <DIR>] [--admin-password <PASSWORD>]
+	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
 	leafwiki reset-admin-password
 	leafwiki --help
 
@@ -26,9 +27,11 @@ func printUsage() {
 	--admin-password   Initial admin password (used only if no admin exists)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
 	--public-access    Allow public access to the wiki only with read access (default: false)
+	--allow-insecure   Allow insecure HTTP connections (default: false)                      
+	--access-token-timeout  Access token timeout duration (e.g. 24h, 15m) (default: 15m)
+	--refresh-token-timeout Refresh token timeout duration (e.g. 168h, 7d) (default: 7d)
 	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
-	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
-	                         
+	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.	  
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -37,7 +40,10 @@ func printUsage() {
 	LEAFWIKI_JWT_SECRET
 	LEAFWIKI_ADMIN_PASSWORD
 	LEAFWIKI_PUBLIC_ACCESS
+	LEAFWIKI_ALLOW_INSECURE
 	LEAFWIKI_INJECT_CODE_IN_HEADER
+	LEAFWIKI_ACCESS_TOKEN_TIMEOUT
+	LEAFWIKI_REFRESH_TOKEN_TIMEOUT
 	`)
 }
 
@@ -50,8 +56,11 @@ func main() {
 	adminPasswordFlag := flag.String("admin-password", "", "initial admin password")
 	jwtSecretFlag := flag.String("jwt-secret", "", "JWT secret for authentication")
 	publicAccessFlag := flag.Bool("public-access", false, "allow public access to the wiki with read access (default: false)")
+	allowInsecureFlag := flag.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)")
 	injectCodeInHeaderFlag := flag.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")")
 	hideLinkMetadataSectionFlag := flag.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)")
+	accessTokenTimeoutFlag := flag.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)")
+	refreshTokenTimeoutFlag := flag.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)")
 	flag.Parse()
 
 	// Track which flags were explicitly set on CLI
@@ -64,13 +73,19 @@ func main() {
 	adminPassword := resolveString("admin-password", *adminPasswordFlag, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
 	jwtSecret := resolveString("jwt-secret", *jwtSecretFlag, visited, "LEAFWIKI_JWT_SECRET", "")
 	injectCodeInHeader := resolveString("inject-code-in-header", *injectCodeInHeaderFlag, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
-
+	allowInsecure := resolveBool("allow-insecure", *allowInsecureFlag, visited, "LEAFWIKI_ALLOW_INSECURE")
 	publicAccess := resolveBool("public-access", *publicAccessFlag, visited, "LEAFWIKI_PUBLIC_ACCESS")
 	hideLinkMetadataSection := resolveBool("hide-link-metadata-section", *hideLinkMetadataSectionFlag, visited, "LEAFWIKI_HIDE_LINK_METADATA_SECTION")
+	accessTokenTimeout := resolveDuration("access-token-timeout", *accessTokenTimeoutFlag, visited, "LEAFWIKI_ACCESS_TOKEN_TIMEOUT")
+	refreshTokenTimeout := resolveDuration("refresh-token-timeout", *refreshTokenTimeoutFlag, visited, "LEAFWIKI_REFRESH_TOKEN_TIMEOUT")
 
-	log.Printf("configuration: host=%q port=%q dataDir=%q publicAccess=%t injectHeader=%t hideLinkMetadataSection=%t",
-		host, port, dataDir, publicAccess, injectCodeInHeader != "", hideLinkMetadataSection,
+	log.Printf("configuration: host=%q port=%q allowInsecure=%t dataDir=%q publicAccess=%t injectHeader=%t hideLinkMetadataSection=%t ",
+		host, port, allowInsecure, dataDir, publicAccess, injectCodeInHeader != "", hideLinkMetadataSection,
 	)
+
+	if allowInsecure {
+		log.Printf("WARNING: allow-insecure enabled. Auth cookies may be transmitted over plain HTTP (INSECURE).")
+	}
 
 	// Check if data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
@@ -84,7 +99,13 @@ func main() {
 		switch args[0] {
 		case "reset-admin-password":
 			// Note: No JWT secret needed for this command
-			w, err := wiki.NewWiki(dataDir, adminPassword, "", false)
+			w, err := wiki.NewWiki(&wiki.WikiOptions{
+				StorageDir:          dataDir,
+				JWTSecret:           "",
+				AdminPassword:       adminPassword,
+				AccessTokenTimeout:  accessTokenTimeout,
+				RefreshTokenTimeout: refreshTokenTimeout,
+			})
 			if err != nil {
 				log.Fatalf("Failed to initialize Wiki: %v", err)
 			}
@@ -112,17 +133,29 @@ func main() {
 	}
 
 	if adminPassword == "" {
-		log.Fatalf("admin password is required. Set it using using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
+		log.Fatalf("admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
 	}
 
-	enableSearchIndexing := true
-	w, err := wiki.NewWiki(dataDir, adminPassword, jwtSecret, enableSearchIndexing)
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:          dataDir,
+		AdminPassword:       adminPassword,
+		JWTSecret:           jwtSecret,
+		AccessTokenTimeout:  accessTokenTimeout,
+		RefreshTokenTimeout: refreshTokenTimeout,
+	})
 	if err != nil {
 		log.Fatalf("Failed to initialize Wiki: %v", err)
 	}
 	defer w.Close()
 
-	router := http.NewRouter(w, publicAccess, injectCodeInHeader, hideLinkMetadataSection)
+	router := http.NewRouter(w, http.RouterOptions{
+		PublicAccess:            publicAccess,
+		InjectCodeInHeader:      injectCodeInHeader,
+		AllowInsecure:           allowInsecure,
+		HideLinkMetadataSection: hideLinkMetadataSection,
+		AccessTokenTimeout:      accessTokenTimeout,
+		RefreshTokenTimeout:     refreshTokenTimeout,
+	})
 
 	// Start server - combine host and port
 	listenAddr := host + ":" + port
@@ -162,6 +195,20 @@ func resolveBool(flagName string, flagVal bool, visited map[string]bool, envVar 
 	return flagVal // default from flag
 }
 
+func resolveDuration(flagName string, flagVal time.Duration, visited map[string]bool, envVar string) time.Duration {
+	if visited[flagName] {
+		return flagVal
+	}
+	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+		if d, ok := parseDuration(env); ok {
+			return d
+		}
+		// If env var is set but invalid, fail fast (helps operators)
+		log.Fatalf("Invalid value for %s: %q (expected duration like 24h, 15m)", envVar, env)
+	}
+	return flagVal // default from flag
+}
+
 func parseBool(s string) (bool, bool) {
 	s = strings.TrimSpace(strings.ToLower(s))
 	switch s {
@@ -172,4 +219,12 @@ func parseBool(s string) (bool, bool) {
 	}
 
 	return false, false
+}
+
+func parseDuration(s string) (time.Duration, bool) {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, false
+	}
+	return d, true
 }
