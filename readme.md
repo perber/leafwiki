@@ -263,8 +263,8 @@ These options control how the server runs after installation.
 | `--admin-password`              | Initial admin password *(used only if no admin exists)* (required)     | –             | –                 |
 | `--public-access`               | Allow public read-only access                                          | `false`       | –                 |
 | `--hide-link-metadata-section`  | Hide link metadata section                                             | `false`       | –                 |
-| `--inject-code-in-header`      | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`          | v0.6.0            |
-| `--allow-insecure`              | Allow insecure HTTP connections                                        | `false`       | v0.7.0            |
+| `--inject-code-in-header`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS)| `""`          | v0.6.0            |
+| `--allow-insecure`              | ⚠️ disables Secure Cookies.                                            | `false`       | v0.7.0            |
 | `--access-token-timeout`        | Access token timeout duration (e.g. 24h, 15m)                          | `15m`         | v0.7.0            |
 | `--refresh-token-timeout`       | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`          | v0.7.0            |
 
@@ -285,14 +285,22 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_PUBLIC_ACCESS`               | Allow public read-only access                                           | `false`    | -               |
 | `LEAFWIKI_HIDE_LINK_METADATA_SECTION`  | Hide link metadata section                                              | `false`    | -               |
 | `LEAFWIKI_INJECT_CODE_IN_HEADER`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`       | v0.6.0          |
-| `LEAFWIKI_ALLOW_INSECURE`               | Allow insecure HTTP connections                                        | `false`    | v0.7.0          |
-| `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`         | Access token timeout duration (e.g. 24h, 15m)                          | `15m`      | v0.7.0          |
-| `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`        | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`       | v0.7.0          |
+| `LEAFWIKI_ALLOW_INSECURE`              | ⚠️ disables Secure Cookies.                                             | `false`    | v0.7.0          |
+| `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`        | Access token timeout duration (e.g. 24h, 15m)                           | `15m`      | v0.7.0          |
+| `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`       | Refresh token timeout duration (e.g. 168h, 7d)                          | `7d`       | v0.7.0          |
 
 
 These environment variables override the default values and are especially useful in containerized or production environments.
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
+
+### Security notes
+
+⚠️ Since v0.7.0 LeafWiki requires **HTTPS** because authentication uses Secure Cookies.
+When served over plain HTTP, login and refresh flows will fail unless you explicitly allow insecure mode:
+`--allow-insecure=true` or `LEAFWIKI_ALLOW_INSECURE=true`.
+
+Use insecure mode only for local testing or trusted networks.
 
 
 ## Quick Start (Dev)

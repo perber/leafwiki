@@ -27,7 +27,7 @@ export default class ViewPage {
     await avatar.click();
   }
 
-async logout() {
+  async logout() {
     const loginField = this.page.locator('input[data-testid="login-identifier"]');
 
     // Already logged out?
