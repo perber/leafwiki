@@ -64,6 +64,24 @@ func RequireSelfOrAdmin(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 	}
 }
 
+func RequireEditorOrAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userValue, exists := c.Get("user")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
+			return
+		}
+
+		user, ok := userValue.(*auth.User)
+		if !ok || !(user.HasRole(auth.RoleAdmin) || user.HasRole(auth.RoleEditor)) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Editor or Admin role required"})
+			return
+		}
+
+		c.Next()
+	}
+}
+
 func RequireSelf(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userValue, exists := c.Get("user")
