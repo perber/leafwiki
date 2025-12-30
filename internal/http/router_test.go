@@ -1101,10 +1101,10 @@ func TestAssetEndpoints(t *testing.T) {
 	addCookies := func(req *http.Request) {
 		for _, c := range cookies {
 			req.AddCookie(c)
+		}
 
-			if req.Method != http.MethodGet && req.Method != http.MethodHead && req.Method != http.MethodOptions {
-				req.Header.Set("X-CSRF-Token", csrfToken)
-			}
+		if req.Method != http.MethodGet && req.Method != http.MethodHead && req.Method != http.MethodOptions {
+			req.Header.Set("X-CSRF-Token", csrfToken)
 		}
 	}
 
