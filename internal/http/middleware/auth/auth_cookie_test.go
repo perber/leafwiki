@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/http/middleware/utils"
 )
 
-func TestAuthCookies_RequireSecure_TLS(t *testing.T) {
+func Test_RequireSecure_TLS(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
-		secure, err := auth.requireSecure(c)
+		secure, err := utils.RequireSecure(c, false)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -35,13 +35,12 @@ func TestAuthCookies_RequireSecure_TLS(t *testing.T) {
 	}
 }
 
-func TestAuthCookies_RequireSecure_XForwardedProto(t *testing.T) {
+func Test_RequireSecure_XForwardedProto(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
-		secure, err := auth.requireSecure(c)
+		secure, err := utils.RequireSecure(c, false)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -81,13 +80,12 @@ func TestAuthCookies_RequireSecure_XForwardedProto(t *testing.T) {
 	}
 }
 
-func TestAuthCookies_RequireSecure_XForwardedSsl(t *testing.T) {
+func Test_RequireSecure_XForwardedSsl(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
-		secure, err := auth.requireSecure(c)
+		secure, err := utils.RequireSecure(c, false)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -128,13 +126,12 @@ func TestAuthCookies_RequireSecure_XForwardedSsl(t *testing.T) {
 	}
 }
 
-func TestAuthCookies_RequireSecure_FrontEndHttps(t *testing.T) {
+func Test_RequireSecure_FrontEndHttps(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
-		secure, err := auth.requireSecure(c)
+		secure, err := utils.RequireSecure(c, false)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -175,13 +172,12 @@ func TestAuthCookies_RequireSecure_FrontEndHttps(t *testing.T) {
 	}
 }
 
-func TestAuthCookies_RequireSecure_AllowInsecure(t *testing.T) {
+func Test_RequireSecure_AllowInsecure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
-		secure, err := auth.requireSecure(c)
+		secure, err := utils.RequireSecure(c, true)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -201,15 +197,14 @@ func TestAuthCookies_RequireSecure_AllowInsecure(t *testing.T) {
 	}
 }
 
-func TestAuthCookies_RequireSecure_ErrorWhenHTTPSRequired(t *testing.T) {
+func Test_RequireSecure_ErrorWhenHTTPSRequired(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
-		secure, err := auth.requireSecure(c)
+		secure, err := utils.RequireSecure(c, false)
 		if err != nil {
-			if err == ErrHTTPSRequired {
+			if err == utils.ErrHTTPSRequired {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}

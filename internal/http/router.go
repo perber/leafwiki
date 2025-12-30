@@ -10,7 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/http/api"
-	"github.com/perber/wiki/internal/http/middleware"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/http/middleware/security"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -48,17 +49,17 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	router := gin.Default()
 	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
 
-	authCookies := middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+	authCookies := auth_middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+	csrfCookie := security.NewCSRFCookie(options.AllowInsecure, options.AccessTokenTimeout)
 
-	loginRateLimiter := middleware.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
-	refreshRateLimiter := middleware.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
+	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
+	refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
 
 	nonAuthApiGroup := router.Group("/api")
 	{
 		// Auth
-		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies))
-		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies))
-		nonAuthApiGroup.POST("/auth/logout", api.LogoutUserHandler(wikiInstance, authCookies))
+		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies, csrfCookie))
+		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
 			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection})
 		})
@@ -83,7 +84,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	}
 
 	requiresAuthGroup := router.Group("/api")
-	requiresAuthGroup.Use(middleware.RequireAuth(wikiInstance, authCookies))
+	requiresAuthGroup.Use(auth_middleware.RequireAuth(wikiInstance, authCookies), security.CSRFMiddleware(csrfCookie))
 	{
 		// If public access is disabled, we need to ensure that the tree and pages routes are protected
 		// and require authentication. If public access is enabled, these routes are already handled
@@ -99,6 +100,9 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			requiresAuthGroup.GET("/search", api.SearchHandler(wikiInstance))
 		}
 
+		// Auth
+		requiresAuthGroup.POST("/auth/logout", api.LogoutUserHandler(wikiInstance, authCookies, csrfCookie))
+
 		// Pages
 		requiresAuthGroup.POST("/pages", api.CreatePageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/ensure", api.EnsurePageHandler(wikiInstance))
@@ -111,10 +115,10 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.GET("/pages/slug-suggestion", api.SuggestSlugHandler(wikiInstance))
 
 		// User
-		requiresAuthGroup.POST("/users", middleware.RequireAdmin(wikiInstance), api.CreateUserHandler(wikiInstance))
-		requiresAuthGroup.GET("/users", middleware.RequireAdmin(wikiInstance), api.GetUsersHandler(wikiInstance))
-		requiresAuthGroup.PUT("/users/:id", middleware.RequireSelfOrAdmin(wikiInstance), api.UpdateUserHandler(wikiInstance))
-		requiresAuthGroup.DELETE("/users/:id", middleware.RequireAdmin(wikiInstance), api.DeleteUserHandler(wikiInstance))
+		requiresAuthGroup.POST("/users", auth_middleware.RequireAdmin(wikiInstance), api.CreateUserHandler(wikiInstance))
+		requiresAuthGroup.GET("/users", auth_middleware.RequireAdmin(wikiInstance), api.GetUsersHandler(wikiInstance))
+		requiresAuthGroup.PUT("/users/:id", auth_middleware.RequireSelfOrAdmin(wikiInstance), api.UpdateUserHandler(wikiInstance))
+		requiresAuthGroup.DELETE("/users/:id", auth_middleware.RequireAdmin(wikiInstance), api.DeleteUserHandler(wikiInstance))
 
 		// Change Own Password
 		requiresAuthGroup.PUT("/users/me/password", api.ChangeOwnPasswordUserHandler(wikiInstance))
@@ -188,12 +192,6 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 				}
 
 				c.Data(http.StatusOK, "text/html; charset=utf-8", data)
-
-				// serve index.html
-				// endless redirect see issue:
-				// https://github.com/gin-gonic/gin/issues/2654
-				// c.FileFromFS("index.html", http.FS(fsys))
-
 			} else {
 				c.String(http.StatusNotFound, "Page not found")
 			}
