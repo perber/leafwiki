@@ -5,6 +5,7 @@ export default class LoginPage {
 
   async goto() {
     await this.page.goto('/login');
+    await this.page.locator('input[data-testid="login-identifier"]').waitFor({ state: 'visible' });
   }
 
   async getUsernameInput() {
