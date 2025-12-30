@@ -15,7 +15,7 @@ export type AuthResponse = {
 function getCsrfTokenFromCookie(): string | null {
   if (typeof document === 'undefined') return null
 
-  // erst __Host-Variante versuchen, dann „normale“
+  // first try the __Host variant, then the "normal" one
   const hostMatch =
     document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
     document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/)
