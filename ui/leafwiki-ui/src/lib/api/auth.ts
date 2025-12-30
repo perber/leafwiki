@@ -11,6 +11,23 @@ export type AuthResponse = {
   }
 }
 
+// Helper to get CSRF token from cookie
+function getCsrfTokenFromCookie(): string | null {
+  if (typeof document === 'undefined') return null
+
+  // first try the __Host variant, then the "normal" one
+  const hostMatch =
+    document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+    document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/)
+
+  if (!hostMatch) return null
+  try {
+    return decodeURIComponent(hostMatch[1])
+  } catch {
+    return hostMatch[1]
+  }
+}
+
 export async function login(identifier: string, password: string) {
   const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
@@ -40,9 +57,14 @@ export async function login(identifier: string, password: string) {
 }
 
 export async function logout() {
+  const headers = new Headers()
+  const csrfToken = getCsrfTokenFromCookie()
+  if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
+
   await fetch(`${API_BASE_URL}/api/auth/logout`, {
     method: 'POST',
     credentials: 'include',
+    headers,
   }).catch(() => {})
 }
 
@@ -60,6 +82,14 @@ export async function fetchWithAuth(
   const headers = new Headers(options.headers || {})
   if (!(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
+  }
+
+  const method = (options.method || 'GET').toUpperCase()
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const csrfToken = getCsrfTokenFromCookie()
+    if (csrfToken) {
+      headers.set('X-CSRF-Token', csrfToken)
+    }
   }
 
   // Save the original body
@@ -98,6 +128,8 @@ export async function fetchWithAuth(
     } catch {
       // Refresh token failed, log out the user
       logout()
+      const { setUser } = useSessionStore.getState()
+      setUser(null)
       throw new Error('Unauthorized')
     }
   }

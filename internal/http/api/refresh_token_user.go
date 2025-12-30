@@ -5,7 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/auth"
-	"github.com/perber/wiki/internal/http/middleware"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/http/middleware/security"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -14,7 +15,7 @@ type RefreshUserResponse struct {
 	User    *auth.PublicUser `json:"user"`
 }
 
-func RefreshTokenUserHandler(wikiInstance *wiki.Wiki, authCookies *middleware.AuthCookies) gin.HandlerFunc {
+func RefreshTokenUserHandler(wikiInstance *wiki.Wiki, authCookies *auth_middleware.AuthCookies, csrfCookie *security.CSRFCookie) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rt, err := authCookies.ReadRefresh(c)
 		if err != nil || rt == "" {
@@ -25,6 +26,11 @@ func RefreshTokenUserHandler(wikiInstance *wiki.Wiki, authCookies *middleware.Au
 		data, err := wikiInstance.RefreshToken(rt)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			return
+		}
+
+		if _, err := csrfCookie.Issue(c); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
 			return
 		}
 
