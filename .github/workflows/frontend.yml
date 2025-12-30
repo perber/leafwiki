@@ -6,8 +6,6 @@ on:
       - main
       - release/*
       - releases/*
-  push:
-    branches: [main, release/*, releases/*]
 
 jobs:
   lint-frontend:
