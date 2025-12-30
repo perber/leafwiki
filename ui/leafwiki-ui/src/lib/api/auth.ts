@@ -158,14 +158,9 @@ export async function fetchWithAuth(
 async function refreshAccessToken() {
   const store = useSessionStore.getState()
 
-  const headers = new Headers()
-  const csrfToken = getCsrfTokenFromCookie()
-  if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
-
   const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
     method: 'POST',
     credentials: 'include',
-    headers,
   })
 
   if (!res.ok) {

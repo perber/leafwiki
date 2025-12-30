@@ -59,7 +59,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	{
 		// Auth
 		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies, csrfCookie))
-		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, security.CSRFMiddleware(csrfCookie), api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
+		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
 			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection})
 		})
