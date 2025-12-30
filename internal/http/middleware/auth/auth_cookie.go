@@ -1,15 +1,12 @@
 package middleware
 
 import (
-	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/http/middleware/utils"
 )
-
-var ErrHTTPSRequired = errors.New("https is required for secure cookies")
 
 type AuthCookies struct {
 	AllowInsecure bool
@@ -27,28 +24,6 @@ func NewAuthCookies(allowInsecure bool, accessTTL, refreshTTL time.Duration) *Au
 	}
 }
 
-func (a *AuthCookies) requireSecure(c *gin.Context) (bool, error) {
-	if c.Request.TLS != nil {
-		return true, nil
-	}
-	xfp := strings.ToLower(c.GetHeader("X-Forwarded-Proto"))
-	if strings.Contains(xfp, "https") {
-		return true, nil
-	}
-
-	if strings.EqualFold(c.GetHeader("X-Forwarded-Ssl"), "on") {
-		return true, nil
-	}
-
-	if strings.EqualFold(c.GetHeader("Front-End-Https"), "on") {
-		return true, nil
-	}
-	if a.AllowInsecure {
-		return false, nil
-	}
-	return false, ErrHTTPSRequired
-}
-
 func (a *AuthCookies) cookieNames(secure bool) (access, refresh string) {
 	if secure {
 		return "__Host-leafwiki_at", "__Host-leafwiki_rt"
@@ -57,7 +32,7 @@ func (a *AuthCookies) cookieNames(secure bool) (access, refresh string) {
 }
 
 func (a *AuthCookies) Set(c *gin.Context, accessToken, refreshToken string) error {
-	secure, err := a.requireSecure(c)
+	secure, err := utils.RequireSecure(c, a.AllowInsecure)
 	if err != nil {
 		return err
 	}
@@ -88,7 +63,7 @@ func (a *AuthCookies) Set(c *gin.Context, accessToken, refreshToken string) erro
 }
 
 func (a *AuthCookies) Clear(c *gin.Context) error {
-	secure, err := a.requireSecure(c)
+	secure, err := utils.RequireSecure(c, a.AllowInsecure)
 	if err != nil {
 		return err
 	}
@@ -113,7 +88,7 @@ func (a *AuthCookies) Clear(c *gin.Context) error {
 }
 
 func (a *AuthCookies) ReadAccess(c *gin.Context) (string, error) {
-	secure, err := a.requireSecure(c)
+	secure, err := utils.RequireSecure(c, a.AllowInsecure)
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +97,7 @@ func (a *AuthCookies) ReadAccess(c *gin.Context) (string, error) {
 }
 
 func (a *AuthCookies) ReadRefresh(c *gin.Context) (string, error) {
-	secure, err := a.requireSecure(c)
+	secure, err := utils.RequireSecure(c, a.AllowInsecure)
 	if err != nil {
 		return "", err
 	}

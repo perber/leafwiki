@@ -5,7 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/auth"
-	"github.com/perber/wiki/internal/http/middleware"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/http/middleware/security"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -14,7 +15,7 @@ type LoginUserResponse struct {
 	User    *auth.PublicUser `json:"user"`
 }
 
-func LoginUserHandler(wikiInstance *wiki.Wiki, authCookies *middleware.AuthCookies) gin.HandlerFunc {
+func LoginUserHandler(wikiInstance *wiki.Wiki, authCookies *auth_middleware.AuthCookies, csrfCookie *security.CSRFCookie) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Identifier string `json:"identifier" binding:"required"` // can be username or email
@@ -33,6 +34,11 @@ func LoginUserHandler(wikiInstance *wiki.Wiki, authCookies *middleware.AuthCooki
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to login"})
+			return
+		}
+
+		if _, err := csrfCookie.Issue(c); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
 			return
 		}
 
