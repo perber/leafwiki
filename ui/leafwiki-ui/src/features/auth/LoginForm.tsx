@@ -1,36 +1,35 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { login } from '@/lib/api/auth'
-import { useAuthStore } from '@/stores/auth'
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useSessionStore } from '@/stores/session'
+import { useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 export default function LoginForm() {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const navigate = useNavigate()
-  const setAuth = useAuthStore((state) => state.setAuth)
-  const token = useAuthStore((s) => s.token)
+  const user = useSessionStore((s) => s.user)
 
-  useEffect(() => {
-    if (token) {
-      navigate('/')
-    }
-  }, [token, navigate])
+  // If already logged in, redirect to home
+  if (user) {
+    return <Navigate to="/" replace />
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
 
     try {
-      const { token, refresh_token, user } = await login(identifier, password)
-      setAuth(token, refresh_token, user)
-    } catch {
-      setError('Invalid credentials')
+      // user already set in the store by the login function
+      await login(identifier, password)
+      // Redirect to home page after successful login
+      navigate('/')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -50,7 +49,10 @@ export default function LoginForm() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required
+              name="identifier"
+              autoComplete="username"
               data-testid="login-identifier"
+              spellCheck={false}
             />
           </div>
 
@@ -58,14 +60,15 @@ export default function LoginForm() {
             <Input
               type="password"
               placeholder="Password"
+              name="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               data-testid="login-password"
+              autoComplete="current-password"
+              spellCheck={false}
             />
           </div>
-
-          {error && <p className="login__error">{error}</p>}
 
           <Button
             type="submit"

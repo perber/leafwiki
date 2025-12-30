@@ -8,9 +8,36 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/wiki"
 )
+
+func createWikiTestInstance(t *testing.T) *wiki.Wiki {
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:          t.TempDir(),
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	return w
+}
+
+func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
+	return NewRouter(w, RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,   // 15 minutes
+		RefreshTokenTimeout:     7 * 24 * time.Hour, // 7 days
+		HideLinkMetadataSection: false,
+	})
+}
 
 func authenticatedRequest(t *testing.T, router http.Handler, method, url string, body *strings.Reader) *httptest.ResponseRecorder {
 	// Login
@@ -24,11 +51,13 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 		t.Fatalf("Failed to login: %d - %s", loginRec.Code, loginRec.Body.String())
 	}
 
-	var loginResp map[string]interface{}
-	if err := json.Unmarshal(loginRec.Body.Bytes(), &loginResp); err != nil {
-		t.Fatalf("Invalid login response: %v", err)
+	loginRes := loginRec.Result()
+	defer loginRes.Body.Close()
+
+	cookies := loginRes.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies on login response, got none")
 	}
-	token := loginResp["token"].(string)
 
 	// Perform authenticated request
 	if body == nil {
@@ -36,7 +65,9 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 	}
 	req := httptest.NewRequest(method, url, body)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -44,8 +75,9 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 }
 
 func TestCreatePageEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	title := "Getting Started"
 	expectedSlug := "getting-started"
@@ -77,8 +109,9 @@ func TestCreatePageEndpoint(t *testing.T) {
 }
 
 func TestCreatePageEndpoint_MissingTitle(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `{"title": ""}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(body))
@@ -89,8 +122,9 @@ func TestCreatePageEndpoint_MissingTitle(t *testing.T) {
 }
 
 func TestCreatePageEndpoint_InvalidJSON(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `this is not valid json`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(body))
@@ -101,8 +135,9 @@ func TestCreatePageEndpoint_InvalidJSON(t *testing.T) {
 }
 
 func TestCreatePageEndpoint_PageAlreadyExists(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `{"title": "Page Exists", "slug": "page-exists"}`
 	rec1 := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(body))
@@ -119,8 +154,9 @@ func TestCreatePageEndpoint_PageAlreadyExists(t *testing.T) {
 }
 
 func TestGetTreeEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/tree", nil)
 
@@ -152,8 +188,9 @@ func TestGetTreeEndpoint(t *testing.T) {
 }
 
 func TestSuggestSlugEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/slug-suggestion?title=NewPage", nil)
 
@@ -176,8 +213,9 @@ func TestSuggestSlugEndpoint(t *testing.T) {
 }
 
 func TestSuggestSlugEndpoint_MissingTitle(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/slug-suggestion", nil)
 
@@ -187,28 +225,30 @@ func TestSuggestSlugEndpoint_MissingTitle(t *testing.T) {
 }
 
 func TestDeletePageEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	_, err := wikiInstance.CreatePage(nil, "Delete Me", "delete-me")
+	_, err := w.CreatePage(nil, "Delete Me", "delete-me")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	page := wikiInstance.GetTree().Children[0]
+	page := w.GetTree().Children[0]
 	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+page.ID, nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK, got %d", rec.Code)
 	}
 
-	if _, err := wikiInstance.GetPage(page.ID); err == nil {
+	if _, err := w.GetPage(page.ID); err == nil {
 		t.Fatalf("Expected page to be deleted")
 	}
 }
 
 func TestDeletePageEndpoint_NotFound(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/not-found-id", nil)
 
@@ -218,14 +258,15 @@ func TestDeletePageEndpoint_NotFound(t *testing.T) {
 }
 
 func TestDeletePageEndpoint_HasChildren(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	parent, err := wikiInstance.CreatePage(nil, "Parent", "parent")
+	parent, err := w.CreatePage(nil, "Parent", "parent")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	_, err = wikiInstance.CreatePage(&parent.ID, "Child", "child")
+	_, err = w.CreatePage(&parent.ID, "Child", "child")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -238,14 +279,15 @@ func TestDeletePageEndpoint_HasChildren(t *testing.T) {
 }
 
 func TestDeletePageEndpoint_Recursive(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	parent, err := wikiInstance.CreatePage(nil, "Parent", "parent")
+	parent, err := w.CreatePage(nil, "Parent", "parent")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	_, err = wikiInstance.CreatePage(&parent.ID, "Child", "child")
+	_, err = w.CreatePage(&parent.ID, "Child", "child")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -255,20 +297,21 @@ func TestDeletePageEndpoint_Recursive(t *testing.T) {
 		t.Fatalf("Expected 200 OK, got %d", rec.Code)
 	}
 
-	if _, err := wikiInstance.GetPage(parent.ID); err == nil {
+	if _, err := w.GetPage(parent.ID); err == nil {
 		t.Fatalf("Expected page to be deleted")
 	}
 }
 
 func TestUpdatePageEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	_, err := wikiInstance.CreatePage(nil, "Original Title", "original-title")
+	_, err := w.CreatePage(nil, "Original Title", "original-title")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	page := wikiInstance.GetTree().Children[0]
+	page := w.GetTree().Children[0]
 
 	payload := map[string]string{
 		"title":   "Updated Title",
@@ -300,8 +343,9 @@ func TestUpdatePageEndpoint(t *testing.T) {
 }
 
 func TestUpdatePage_NotFound(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `{"title": "Updated", "slug": "updated", "content": "New content"}`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/not-found-id", strings.NewReader(string(body)))
@@ -311,11 +355,12 @@ func TestUpdatePage_NotFound(t *testing.T) {
 }
 
 func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	// Create a page
-	created, err := wikiInstance.CreatePage(nil, "Immutable Slug", "immutable-slug")
+	created, err := w.CreatePage(nil, "Immutable Slug", "immutable-slug")
 	if err != nil {
 		t.Fatalf("Failed to create page: %v", err)
 	}
@@ -345,16 +390,17 @@ func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
 }
 
 func TestUpdatePage_PageAlreadyExists(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	_, err := wikiInstance.CreatePage(nil, "Original Title", "original-title")
+	_, err := w.CreatePage(nil, "Original Title", "original-title")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	page := wikiInstance.GetTree().Children[0]
+	page := w.GetTree().Children[0]
 
-	_, err = wikiInstance.CreatePage(nil, "Conflict Title", "conflict-title")
+	_, err = w.CreatePage(nil, "Conflict Title", "conflict-title")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -374,8 +420,9 @@ func TestUpdatePage_PageAlreadyExists(t *testing.T) {
 }
 
 func TestUpdatePage_InvalidJSON(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `this is not valid json`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/invalid-id", strings.NewReader(string(body)))
@@ -386,8 +433,9 @@ func TestUpdatePage_InvalidJSON(t *testing.T) {
 }
 
 func TestUpdatePage_MissingTitle(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `{"slug": "updated", "content": "New content"}`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-title", strings.NewReader(string(body)))
@@ -397,8 +445,9 @@ func TestUpdatePage_MissingTitle(t *testing.T) {
 }
 
 func TestUpdatePage_MissingSlug(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `{"title": "Updated", "content": "New content"}`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-slug", strings.NewReader(string(body)))
@@ -409,18 +458,19 @@ func TestUpdatePage_MissingSlug(t *testing.T) {
 }
 
 func TestGetPageEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	// Erstellt eine Page über Wiki (nicht direkt über HTTP)
-	_, err := wikiInstance.CreatePage(nil, "Welcome", "welcome")
+	// Create a page
+	_, err := w.CreatePage(nil, "Welcome", "welcome")
 	if err != nil {
 		t.Fatalf("Failed to create page: %v", err)
 	}
 
-	page := wikiInstance.GetTree().Children[0]
+	page := w.GetTree().Children[0]
 
-	// Page abrufen
+	// Get page
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID, nil)
 
 	if rec.Code != http.StatusOK {
@@ -446,8 +496,9 @@ func TestGetPageEndpoint(t *testing.T) {
 }
 
 func TestGetPageEndpoint_NotFound(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/not-found-id", nil)
 
@@ -457,8 +508,9 @@ func TestGetPageEndpoint_NotFound(t *testing.T) {
 }
 
 func TestGetPageEndpoint_MissingID(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/", nil)
 
@@ -468,38 +520,40 @@ func TestGetPageEndpoint_MissingID(t *testing.T) {
 }
 
 func TestMovePageEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	// Erstelle zwei Pages: root → a, root → b
-	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
+	// Create two pages a and b
+	_, err := w.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	_, err = wikiInstance.CreatePage(nil, "Section B", "section-b")
+	_, err = w.CreatePage(nil, "Section B", "section-b")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
-	a := wikiInstance.GetTree().Children[0]
-	b := wikiInstance.GetTree().Children[1]
+	a := w.GetTree().Children[0]
+	b := w.GetTree().Children[1]
 
-	// Verschiebe a → unter b
+	// Move a under b
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"`+b.ID+`"}`))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected status 200, got %d", rec.Code)
 	}
 
-	// Checke ob a jetzt Kind von b ist
+	// Check if a is now a child of b
 	if len(b.Children) != 1 || b.Children[0].ID != a.ID {
 		t.Errorf("Expected page to be moved under new parent")
 	}
 }
 
 func TestMovePageEndpoint_NotFound(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/not-found-id/move", strings.NewReader(`{"parentId":"root"}`))
 
@@ -509,8 +563,9 @@ func TestMovePageEndpoint_NotFound(t *testing.T) {
 }
 
 func TestMovePageEndpoint_InvalidJSON(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/invalid-id/move", strings.NewReader(`this is not valid json`))
 
@@ -520,8 +575,9 @@ func TestMovePageEndpoint_InvalidJSON(t *testing.T) {
 }
 
 func TestMovePageEndpoint_MissingParentID(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-parent/move", strings.NewReader(`{"parentId":""}`))
 
@@ -531,14 +587,15 @@ func TestMovePageEndpoint_MissingParentID(t *testing.T) {
 }
 
 func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
+	_, err := w.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	a := wikiInstance.GetTree().Children[0]
+	a := w.GetTree().Children[0]
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"not-found-id"}`))
 
@@ -551,16 +608,17 @@ func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 }
 
 func TestMovePageEndpoint_CircularReference(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
+	_, err := w.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	a := wikiInstance.GetTree().Children[0]
+	a := w.GetTree().Children[0]
 
-	_, err = wikiInstance.CreatePage(&a.ID, "Section B", "section-b")
+	_, err = w.CreatePage(&a.ID, "Section B", "section-b")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -575,27 +633,28 @@ func TestMovePageEndpoint_CircularReference(t *testing.T) {
 }
 
 func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
+	_, err := w.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	a := wikiInstance.GetTree().Children[0]
+	a := w.GetTree().Children[0]
 
-	_, err = wikiInstance.CreatePage(nil, "Section B", "section-b")
+	_, err = w.CreatePage(nil, "Section B", "section-b")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
 	// Create Conflict Page in b
-	conflictPage, err := wikiInstance.CreatePage(&a.ID, "Section B", "section-b")
+	conflictPage, err := w.CreatePage(&a.ID, "Section B", "section-b")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
-	// Verschibe ConflictPage in root level
+	// move conflictPage under root (where section-b already exists)
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+conflictPage.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
 
 	if rec.Code != http.StatusBadRequest {
@@ -604,14 +663,15 @@ func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 }
 
 func TestMovePage_InTheSamePlace(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	_, err := wikiInstance.CreatePage(nil, "Section A", "section-a")
+	_, err := w.CreatePage(nil, "Section A", "section-a")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	a := wikiInstance.GetTree().Children[0]
+	a := w.GetTree().Children[0]
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
 
@@ -621,31 +681,32 @@ func TestMovePage_InTheSamePlace(t *testing.T) {
 }
 
 func TestSortPagesEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	// Create pages
-	page1, err := wikiInstance.CreatePage(nil, "Page 1", "page-1")
+	page1, err := w.CreatePage(nil, "Page 1", "page-1")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	page2, err := wikiInstance.CreatePage(nil, "Page 2", "page-2")
+	page2, err := w.CreatePage(nil, "Page 2", "page-2")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	page3, err := wikiInstance.CreatePage(nil, "Page 3", "page-3")
+	page3, err := w.CreatePage(nil, "Page 3", "page-3")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
 	// Get Welcome Page by path
-	welcomePage, err := wikiInstance.FindByPath("welcome-to-leaf-wiki")
+	welcomePage, err := w.FindByPath("welcome-to-leaf-wiki")
 	if err != nil {
 		t.Fatalf("FindByPath failed: %v", err)
 	}
 
 	// Delete Welcome Page
-	err = wikiInstance.DeletePage(welcomePage.ID, false)
+	err = w.DeletePage(welcomePage.ID, false)
 	if err != nil {
 		t.Fatalf("DeletePage failed: %v", err)
 	}
@@ -671,7 +732,7 @@ func TestSortPagesEndpoint(t *testing.T) {
 		t.Errorf("Expected success message, got: %v", resp["message"])
 	}
 
-	tree := wikiInstance.GetTree()
+	tree := w.GetTree()
 	if len(tree.Children) != 3 {
 		t.Fatalf("Expected 3 children in root, got: %d", len(tree.Children))
 	}
@@ -688,8 +749,9 @@ func TestSortPagesEndpoint(t *testing.T) {
 }
 
 func TestAuthLoginEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `{"identifier": "admin", "password": "admin"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
@@ -702,19 +764,20 @@ func TestAuthLoginEndpoint(t *testing.T) {
 		t.Fatalf("Expected 200 OK for valid login, got %d", rec.Code)
 	}
 
-	var resp map[string]interface{}
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("Failed to parse JSON response: %v", err)
-	}
+	res := rec.Result()
+	defer res.Body.Close()
 
-	if _, ok := resp["token"]; !ok {
-		t.Errorf("Expected token in response, got: %v", resp)
+	// Prüfen, ob Cookies gesetzt wurden
+	cookies := res.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies to be set on login")
 	}
 }
 
 func TestAuthLogin_InvalidCredentials(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `{"identifier": "admin", "password": "wrong"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
@@ -729,42 +792,50 @@ func TestAuthLogin_InvalidCredentials(t *testing.T) {
 }
 
 func TestAuthRefreshToken(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	// Login
+	// 1) Login
 	loginBody := `{"identifier": "admin", "password": "admin"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
 	router.ServeHTTP(loginRec, loginReq)
 
-	var loginResp map[string]string
-	_ = json.Unmarshal(loginRec.Body.Bytes(), &loginResp)
-	originalToken := loginResp["token"]
-	refreshToken := loginResp["refresh_token"]
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on login, got %d", loginRec.Code)
+	}
 
-	// Refresh
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh-token", strings.NewReader(`{"token":"`+refreshToken+`"}`))
+	loginRes := loginRec.Result()
+	defer loginRes.Body.Close()
+	cookies := loginRes.Cookies()
+
+	// 2) Refresh mit denselben Cookies
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh-token", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
 	rec := httptest.NewRecorder()
-
 	router.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("Expected 200 OK on refresh, got %d", rec.Code)
+		t.Fatalf("Expected 200 OK on refresh, got %d - %s", rec.Code, rec.Body.String())
 	}
 
-	var refreshResp map[string]string
-	_ = json.Unmarshal(rec.Body.Bytes(), &refreshResp)
-
-	if refreshResp["token"] == originalToken {
-		t.Errorf("Expected new token, got same one")
+	// Optional: prüfen, dass neue Cookies gesetzt wurden
+	refreshRes := rec.Result()
+	defer refreshRes.Body.Close()
+	newCookies := refreshRes.Cookies()
+	if len(newCookies) == 0 {
+		t.Fatalf("Expected new auth cookies on refresh")
 	}
 }
 
 func TestCreateUserEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `{"username": "john", "email": "john@example.com", "password": "secret123", "role": "editor"}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
@@ -775,21 +846,22 @@ func TestCreateUserEndpoint(t *testing.T) {
 }
 
 func TestCreateUser_DuplicateEmailOrUsername(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	// Erstellt initialen Benutzer
+	// Create initial user
 	payload := `{"username": "john", "email": "john@example.com", "password": "secret", "role": "editor"}`
 	_ = authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(payload))
 
-	// Versuch mit gleichem Benutzernamen
+	// Attempt with duplicate username
 	payloadDuplicate := `{"username": "john", "email": "john2@example.com", "password": "secret", "role": "editor"}`
 	rec1 := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(payloadDuplicate))
 	if rec1.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400 for duplicate username, got %d", rec1.Code)
 	}
 
-	// Versuch mit gleicher Email
+	// Attempt with duplicate email
 	payloadDuplicateEmail := `{"username": "johnny", "email": "john@example.com", "password": "secret", "role": "editor"}`
 	rec2 := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(payloadDuplicateEmail))
 	if rec2.Code != http.StatusBadRequest {
@@ -798,8 +870,9 @@ func TestCreateUser_DuplicateEmailOrUsername(t *testing.T) {
 }
 
 func TestCreateUser_InvalidRole(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	body := `{"username": "sam", "email": "sam@example.com", "password": "secret", "role": "viewer"}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
@@ -810,8 +883,9 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 }
 
 func TestGetUsersEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/users", nil)
 	if rec.Code != http.StatusOK {
@@ -829,10 +903,11 @@ func TestGetUsersEndpoint(t *testing.T) {
 }
 
 func TestUpdateUserEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	// Benutzer anlegen
+	// Create user
 	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "editor"}`
 	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
 	var user map[string]interface{}
@@ -854,16 +929,17 @@ func TestUpdateUserEndpoint(t *testing.T) {
 }
 
 func TestDeleteUserEndpoint(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	// Benutzer anlegen
+	// Create user
 	create := `{"username": "todelete", "email": "delete@example.com", "password": "secrepassword", "role": "editor"}`
 	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
 	var user map[string]interface{}
 	_ = json.Unmarshal(resp.Body.Bytes(), &user)
 
-	// Benutzer löschen
+	// Delete user
 	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/users/"+user["id"].(string), nil)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("Expected 204 OK on delete, got %d", rec.Code)
@@ -871,10 +947,11 @@ func TestDeleteUserEndpoint(t *testing.T) {
 }
 
 func TestDeleteAdminUser_ShouldFail(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	// Default Admin holen
+	// Get default admin
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/users", nil)
 	var users []map[string]interface{}
 	_ = json.Unmarshal(rec.Body.Bytes(), &users)
@@ -890,7 +967,7 @@ func TestDeleteAdminUser_ShouldFail(t *testing.T) {
 		t.Fatal("No admin user found")
 	}
 
-	// Versuch den Admin zu löschen
+	// Attempt to delete the admin
 	recDel := authenticatedRequest(t, router, http.MethodDelete, "/api/users/"+adminID, nil)
 	if recDel.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400 when deleting admin user, got %d", recDel.Code)
@@ -898,10 +975,11 @@ func TestDeleteAdminUser_ShouldFail(t *testing.T) {
 }
 
 func TestRequireAdminMiddleware(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	// Default Admin versucht, Benutzer zu erstellen (sollte erlaubt sein)
+	// Default Admin create user should succeed
 	body := `{"username": "mod", "email": "mod@example.com", "password": "secretpassword", "role": "editor"}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
 
@@ -911,8 +989,9 @@ func TestRequireAdminMiddleware(t *testing.T) {
 }
 
 func TestRequireAuthMiddleware_Unauthorized(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	// Request ohne Token
 	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(`{"title": "Oops", "slug": "oops"}`))
@@ -927,8 +1006,9 @@ func TestRequireAuthMiddleware_Unauthorized(t *testing.T) {
 }
 
 func TestRequireAuthMiddleware_InvalidToken(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(`{"title": "Bad", "slug": "bad"}`))
 	req.Header.Set("Authorization", "Bearer invalidtoken")
@@ -943,11 +1023,38 @@ func TestRequireAuthMiddleware_InvalidToken(t *testing.T) {
 }
 
 func TestAssetEndpoints(t *testing.T) {
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
-	// Step 1: Create page
-	page, err := wikiInstance.CreatePage(nil, "Assets Page", "assets-page")
+	// Step 0: Login als Admin und Cookies holen
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on login, got %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer loginRes.Body.Close()
+
+	cookies := loginRes.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies after login, got none")
+	}
+
+	addCookies := func(req *http.Request) {
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+	}
+
+	// Step 1: Create page direkt über Wiki-API
+	page, err := w.CreatePage(nil, "Assets Page", "assets-page")
 	if err != nil {
 		t.Fatalf("Failed to create page: %v", err)
 	}
@@ -956,44 +1063,47 @@ func TestAssetEndpoints(t *testing.T) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	part, _ := writer.CreateFormFile("file", "testfile.txt")
+	part, err := writer.CreateFormFile("file", "testfile.txt")
+	if err != nil {
+		t.Fatalf("Failed to create form file: %v", err)
+	}
 	if _, err := part.Write([]byte("Hello, asset!")); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
-	writer.Close()
-
-	req := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	// Get Token for authentication
-	login := authenticatedRequest(t, router, http.MethodPost, "/api/auth/login", strings.NewReader(`{"identifier": "admin", "password": "admin"}`))
-	var loginResp map[string]interface{}
-	if err := json.Unmarshal(login.Body.Bytes(), &loginResp); err != nil {
-		t.Fatalf("Invalid login JSON: %v", err)
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Failed to close multipart writer: %v", err)
 	}
-	token := loginResp["token"].(string)
-	req.Header.Set("Authorization", "Bearer "+token)
 
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
+	uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	addCookies(uploadReq)
 
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("Expected 201 Created on upload, got %d - %s", rec.Code, rec.Body.String())
+	uploadRec := httptest.NewRecorder()
+	router.ServeHTTP(uploadRec, uploadReq)
+
+	if uploadRec.Code != http.StatusCreated {
+		t.Fatalf("Expected 201 Created on upload, got %d - %s", uploadRec.Code, uploadRec.Body.String())
 	}
 
 	var uploadResp map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &uploadResp); err != nil {
+	if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
 		t.Fatalf("Invalid upload JSON: %v", err)
 	}
 	if uploadResp["file"] == "" {
-		t.Error("Expected File in upload response")
+		t.Error("Expected file field in upload response")
 	}
 
 	// Step 3: List assets
-	listRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	listReq := httptest.NewRequest(http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	addCookies(listReq)
+
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+
 	if listRec.Code != http.StatusOK {
-		t.Fatalf("Expected 200 OK on listing, got %d", listRec.Code)
+		t.Fatalf("Expected 200 OK on listing, got %d - %s", listRec.Code, listRec.Body.String())
 	}
+
 	var listResp map[string][]string
 	if err := json.Unmarshal(listRec.Body.Bytes(), &listResp); err != nil {
 		t.Fatalf("Invalid listing JSON: %v", err)
@@ -1003,13 +1113,27 @@ func TestAssetEndpoints(t *testing.T) {
 	}
 
 	// Step 4: Delete asset
-	delRec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+page.ID+"/assets/testfile.txt", nil)
+	delReq := httptest.NewRequest(http.MethodDelete, "/api/pages/"+page.ID+"/assets/testfile.txt", nil)
+	addCookies(delReq)
+
+	delRec := httptest.NewRecorder()
+	router.ServeHTTP(delRec, delReq)
+
 	if delRec.Code != http.StatusOK {
-		t.Errorf("Expected 200 No Content on delete, got %d", delRec.Code)
+		t.Errorf("Expected 200 OK on delete, got %d - %s", delRec.Code, delRec.Body.String())
 	}
 
 	// Step 5: Verify asset is gone
-	listRec2 := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	listReq2 := httptest.NewRequest(http.MethodGet, "/api/pages/"+page.ID+"/assets", nil)
+	addCookies(listReq2)
+
+	listRec2 := httptest.NewRecorder()
+	router.ServeHTTP(listRec2, listReq2)
+
+	if listRec2.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on listing after delete, got %d - %s", listRec2.Code, listRec2.Body.String())
+	}
+
 	var listResp2 map[string][]string
 	if err := json.Unmarshal(listRec2.Body.Bytes(), &listResp2); err != nil {
 		t.Fatalf("Invalid listing JSON: %v", err)
@@ -1022,8 +1146,9 @@ func TestAssetEndpoints(t *testing.T) {
 // Lets check the indexing status
 func TestIndexingStatusEndpoint(t *testing.T) {
 	// Lets call /api/search/status
-	wikiInstance, _ := wiki.NewWiki(t.TempDir(), "admin", "secretkey", false)
-	router := NewRouter(wikiInstance, false, "", false)
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
 
 	// Default Admin holen
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/search/status", nil)
