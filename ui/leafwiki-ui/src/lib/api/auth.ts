@@ -57,9 +57,14 @@ export async function login(identifier: string, password: string) {
 }
 
 export async function logout() {
+  const headers = new Headers()
+  const csrfToken = getCsrfTokenFromCookie()
+  if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
+
   await fetch(`${API_BASE_URL}/api/auth/logout`, {
     method: 'POST',
     credentials: 'include',
+    headers,
   }).catch(() => {})
 }
 
@@ -123,6 +128,8 @@ export async function fetchWithAuth(
     } catch {
       // Refresh token failed, log out the user
       logout()
+      const { setUser } = useSessionStore.getState()
+      setUser(null)
       throw new Error('Unauthorized')
     }
   }

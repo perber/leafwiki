@@ -829,11 +829,30 @@ func TestAuthRefreshToken(t *testing.T) {
 	defer loginRes.Body.Close()
 	cookies := loginRes.Cookies()
 
-	// 2) Refresh mit denselben Cookies
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies on login response, got none")
+	}
+
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+
+	if csrfToken == "" {
+		t.Fatalf("Expected CSRF token after login, got none")
+	}
+
+	// call refresh token endpoint with cookies from login
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh-token", nil)
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
+	req.Header.Set("X-CSRF-Token", csrfToken)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -841,7 +860,7 @@ func TestAuthRefreshToken(t *testing.T) {
 		t.Fatalf("Expected 200 OK on refresh, got %d - %s", rec.Code, rec.Body.String())
 	}
 
-	// Optional: prüfen, dass neue Cookies gesetzt wurden
+	// optional: check if new cookies are set
 	refreshRes := rec.Result()
 	defer refreshRes.Body.Close()
 	newCookies := refreshRes.Cookies()

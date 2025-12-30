@@ -59,8 +59,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	{
 		// Auth
 		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies, csrfCookie))
-		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
-		nonAuthApiGroup.POST("/auth/logout", api.LogoutUserHandler(wikiInstance, authCookies, csrfCookie))
+		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, security.CSRFMiddleware(csrfCookie), api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
 			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection})
 		})
@@ -97,6 +96,9 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			requiresAuthGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))
 			requiresAuthGroup.GET("/search", api.SearchHandler(wikiInstance))
 		}
+
+		// Auth
+		requiresAuthGroup.POST("/auth/logout", api.LogoutUserHandler(wikiInstance, authCookies, csrfCookie))
 
 		// Pages
 		requiresAuthGroup.POST("/pages", api.CreatePageHandler(wikiInstance))
