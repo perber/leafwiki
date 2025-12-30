@@ -7,11 +7,6 @@ on:
       - release/*
       - releases/*
 
-  push:
-    branches:
-      - main
-      - release/*
-      - releases/*
 jobs: 
   lint-go:
     runs-on: ubuntu-latest
