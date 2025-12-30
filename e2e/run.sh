@@ -39,7 +39,6 @@ run_playwright_tests() {
   E2E_BASE_URL="http://localhost:8085" \
   E2E_ADMIN_USER="admin" \
   E2E_ADMIN_PASSWORD="admin" \
-  E2E_HEADLESS="false" \
   npx playwright test
 }
 

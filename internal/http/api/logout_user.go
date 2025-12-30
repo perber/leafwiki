@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,11 +18,15 @@ func LogoutUserHandler(w *wiki.Wiki, authCookies *middleware.AuthCookies) gin.Ha
 		refreshToken, _ := authCookies.ReadRefresh(c)
 		if refreshToken != "" {
 			// revoke the refresh token session
-			_ = w.GetAuthService().RevokeRefreshToken(refreshToken)
+			err := w.GetAuthService().RevokeRefreshToken(refreshToken)
+			if err != nil {
+				log.Printf("[INFO] Unable to revoke the refresh token: %v", err)
+			}
 		}
 
 		// clear cookies!
 		if err := authCookies.Clear(c); err != nil {
+			log.Printf("[INFO] Unable to clear auth cookies: %v", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

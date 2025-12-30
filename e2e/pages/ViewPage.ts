@@ -9,7 +9,12 @@ export default class ViewPage {
   }
 
   async isUserLoggedIn(): Promise<boolean> {
-    return this.page.getByTestId('user-toolbar-avatar').isVisible();
+    const avatar = this.page.getByTestId('user-toolbar-avatar');
+    try {
+      return await avatar.isVisible({ timeout: 1000 });
+    } catch {
+      return false;
+    }
   }
 
   async expectUserLoggedIn() {
@@ -18,17 +23,56 @@ export default class ViewPage {
 
   async clickUserToolbarAvatar() {
     const avatar = this.page.getByTestId('user-toolbar-avatar');
+    await avatar.waitFor({ state: 'visible' });
     await avatar.click();
   }
 
-  async logout() {
+async logout() {
+    const loginField = this.page.locator('input[data-testid="login-identifier"]');
+
+    // Already logged out?
+    try {
+      if (await loginField.isVisible({ timeout: 1000 })) {
+        return;
+      }
+    } catch {
+      // if the locator does not exist yet, ignore
+    }
+
+    const avatar = this.page.getByTestId('user-toolbar-avatar');
+
+    // wait for avatar to be visible
+    let avatarVisible = false;
+    try {
+      avatarVisible = await avatar.isVisible({ timeout: 2000 });
+    } catch {
+      avatarVisible = false;
+    }
+
+    if (!avatarVisible) {
+      // not logged in / wrong page / page already gone
+      return;
+    }
+
+    // 3) Open dropdown
+    await avatar.click();
+
+    // 4) Click logout button
     const logoutButton = this.page.getByTestId('user-toolbar-logout');
+    await logoutButton.waitFor({ state: 'visible', timeout: 2000 });
     await logoutButton.click();
-    await this.page.locator('input[data-testid="login-identifier"]').waitFor({ state: 'visible' });
+
+    // 5) Wait for login field again
+    await loginField.waitFor({ state: 'visible' });
   }
 
   async isLoggedOut() {
-    return !(await this.isUserLoggedIn());
+    const loginField = this.page.locator('input[data-testid="login-identifier"]');
+    try {
+      return await loginField.isVisible({ timeout: 1000 });
+    } catch {
+      return false;
+    }
   }
 
   async getTitle() {
@@ -58,8 +102,8 @@ export default class ViewPage {
   }
 
   async amountOfSVGElements(): Promise<number> {
-    await this.page.locator('article svg').waitFor({ state: 'visible' });
-    return this.page.locator('article svg').count();
+    await this.page.locator('article .my-4 svg').waitFor({ state: 'visible' });
+    return this.page.locator('article .my-4 svg').count();
   }
 
   async amountOfImages(): Promise<number> {
