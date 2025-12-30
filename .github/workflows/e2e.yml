@@ -1,10 +1,11 @@
 name: Frontend E2E
 
 on:
-  push:
-    branches: [main, release/*, releases/*]
   pull_request:
-    branches: [main, release/*, releases/*]
+    branches: 
+      - main
+      - release/*
+      - releases/*
 
 jobs:
   lint-e2e-tests:
