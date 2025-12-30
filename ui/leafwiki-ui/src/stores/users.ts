@@ -1,7 +1,7 @@
 import * as authAPI from '@/lib/api/auth'
 import * as userAPI from '@/lib/api/users'
 import { create } from 'zustand'
-import { useAuthStore } from './auth'
+import { useSessionStore } from './session'
 
 type UserStore = {
   users: userAPI.User[]
@@ -40,12 +40,11 @@ export const useUserStore = create<UserStore>((set, get) => ({
 
   changeOwnPassword: async (oldPassword, newPassword) => {
     await userAPI.changeOwnPassword(oldPassword, newPassword)
-    // relogin user
-    const { user, logout, setAuth } = useAuthStore.getState()
-    if (user && user.username) {
+
+    const { user, logout } = useSessionStore.getState()
+    if (user?.username) {
       try {
-        const auth = await authAPI.login(user.username, newPassword)
-        setAuth(auth.token, auth.refresh_token, auth.user)
+        await authAPI.login(user.username, newPassword)
       } catch (err) {
         console.warn(err)
         logout()

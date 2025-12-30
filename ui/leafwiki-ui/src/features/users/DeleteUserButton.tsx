@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { User } from '@/lib/api/users'
 import { DIALOG_DELETE_USER_CONFIRMATION } from '@/lib/registries'
-import { useAuthStore } from '@/stores/auth'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useSessionStore } from '@/stores/session'
 
 type DeleteUserButtonProps = {
   user: User
@@ -11,7 +11,7 @@ type DeleteUserButtonProps = {
 export function DeleteUserButton({ user }: DeleteUserButtonProps) {
   const openDialog = useDialogsStore((s) => s.openDialog)
 
-  const { user: currentUser } = useAuthStore()
+  const { user: currentUser } = useSessionStore()
   if (currentUser?.id === user.id) return null
 
   return (

@@ -1,12 +1,14 @@
 package search
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
+	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
 func TestBuildAndRunIndexer_BasicIndexing(t *testing.T) {
@@ -42,9 +44,17 @@ func TestBuildAndRunIndexer_BasicIndexing(t *testing.T) {
 		t.Fatalf("BuildAndRunIndexer failed: %v", err)
 	}
 
-	row := index.GetDB().QueryRow(`SELECT title, content FROM pages WHERE filePath = ?`, "docs.md")
 	var title, text string
-	if err := row.Scan(&title, &text); err != nil {
+
+	if err := index.withDB(func(db *sql.DB) error {
+
+		row := db.QueryRow(`SELECT title, content FROM pages WHERE filePath = ?`, "docs.md")
+		if err := row.Scan(&title, &text); err != nil {
+			return err
+		}
+		return nil
+
+	}); err != nil {
 		t.Fatalf("Query failed: %v", err)
 	}
 

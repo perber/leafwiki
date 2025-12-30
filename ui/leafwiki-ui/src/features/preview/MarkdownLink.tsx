@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { buildViewUrl } from '@/lib/urlUtil'
 import { useAppMode } from '@/lib/useAppMode'
-import { useAuthStore } from '@/stores/auth'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useSessionStore } from '@/stores/session'
 import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { AnchorHTMLAttributes, ReactNode } from 'react'
@@ -56,7 +56,7 @@ function resolvePath(currentPath: string, href: string): string {
 export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
-  const user = useAuthStore((s) => s.user)
+  const user = useSessionStore((s) => s.user)
 
   const editMode = useAppMode() === 'edit'
 

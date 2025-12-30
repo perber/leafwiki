@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/http/api"
 	"github.com/perber/wiki/internal/http/middleware"
@@ -18,11 +17,6 @@ import (
 //go:embed dist/**
 var frontend embed.FS
 
-// EnableCors is a flag to enable or disable CORS
-// This is useful for testing purposes, where we might not want to enable CORS
-// During build time, we can set this to false to disable CORS
-var EnableCors = "true"
-
 // EmbedFrontend is a flag to enable or disable embedding the frontend
 // This is useful for testing purposes, where we might not want to embed the frontend
 // During build time, we can set this to false to disable embedding the frontend
@@ -31,16 +25,20 @@ var EmbedFrontend = "false"
 // Environment is a flag to set the environment
 var Environment = "development"
 
+type RouterOptions struct {
+	PublicAccess            bool          // Whether the wiki allows public read access
+	InjectCodeInHeader      string        // Raw HTML/JS code to inject into the <head> tag
+	AllowInsecure           bool          // Whether to allow insecure HTTP connections
+	AccessTokenTimeout      time.Duration // Duration for access token validity
+	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
+	HideLinkMetadataSection bool          // Whether to hide the link metadata section in the frontend UI
+}
+
 // NewRouter creates a new HTTP router for the wiki application.
 // Parameters:
 //   - wikiInstance: the wiki instance to serve
-//   - publicAccess: when true, allows unauthenticated read-only access to wiki content
-//   - injectCodeInHeader: raw HTML code to inject before the closing </head> tag.
-//     WARNING: This code is inserted without sanitization. Only use with trusted input
-//     from administrators. Malicious code can lead to XSS vulnerabilities.
-//     Common use cases: analytics scripts, custom CSS, meta tags.
-//   - hideLinkMetadataSection: when true, hides the link metadata section in the frontend UI.
-func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader string, hideLinkMetadataSection bool) *gin.Engine {
+//   - options: RouterOptions struct containing configuration options
+func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	if Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
@@ -48,35 +46,30 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 	}
 
 	router := gin.Default()
-	if EnableCors == "true" {
-		router.Use(cors.New(cors.Config{
-			AllowOrigins:     []string{"*"},
-			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-			ExposeHeaders:    []string{"Content-Length"},
-			AllowCredentials: true,
-			MaxAge:           12 * time.Hour,
-		}))
-	}
-
 	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
+
+	authCookies := middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+
+	loginRateLimiter := middleware.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
+	refreshRateLimiter := middleware.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
 
 	nonAuthApiGroup := router.Group("/api")
 	{
 		// Auth
-		nonAuthApiGroup.POST("/auth/login", api.LoginUserHandler(wikiInstance))
-		nonAuthApiGroup.POST("/auth/refresh-token", api.RefreshTokenUserHandler(wikiInstance))
+		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies))
+		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies))
+		nonAuthApiGroup.POST("/auth/logout", api.LogoutUserHandler(wikiInstance, authCookies))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
-			c.JSON(200, gin.H{"publicAccess": publicAccess, "hideLinkMetadataSection": hideLinkMetadataSection})
+			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection})
 		})
 
 		// Branding (public, no auth required)
 		nonAuthApiGroup.GET("/branding", api.GetBrandingHandler(wikiInstance))
 
 		// PUBLIC READ ACCESS (if enabled via flag or env):
-		// These routes are accessible without authentication when publicAccess == true.
+		// These routes are accessible without authentication when options.PublicAccess == true.
 		// Only safe, read-only operations are allowed here (GET tree/pages).
-		if publicAccess {
+		if options.PublicAccess {
 			nonAuthApiGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
 			nonAuthApiGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
@@ -90,11 +83,11 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 	}
 
 	requiresAuthGroup := router.Group("/api")
-	requiresAuthGroup.Use(middleware.RequireAuth(wikiInstance))
+	requiresAuthGroup.Use(middleware.RequireAuth(wikiInstance, authCookies))
 	{
 		// If public access is disabled, we need to ensure that the tree and pages routes are protected
 		// and require authentication. If public access is enabled, these routes are already handled
-		if !publicAccess {
+		if !options.PublicAccess {
 			requiresAuthGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
 			requiresAuthGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
@@ -184,10 +177,10 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 					return
 				}
 
-				if injectCodeInHeader != "" {
+				if options.InjectCodeInHeader != "" {
 					html := string(data)
 					// replaces the closing </head> tag with the injected code
-					newHtml := strings.Replace(html, "</head>", "  "+injectCodeInHeader+"\n  </head>", 1)
+					newHtml := strings.Replace(html, "</head>", "  "+options.InjectCodeInHeader+"\n  </head>", 1)
 					if newHtml == html {
 						log.Printf("Warning: could not inject code into header, </head> tag not found")
 					}

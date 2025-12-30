@@ -586,10 +586,13 @@
     @apply h-6 w-auto inline-block align-middle;
   }
 
+<<<<<<< HEAD
   .login__field {
     @apply mb-4;
   }
 
+=======
+>>>>>>> 406e8dc (feat: add secure cookie + session DB based authentication with rate limiting (#486))
   .login__submit {
     @apply w-full;
   }
