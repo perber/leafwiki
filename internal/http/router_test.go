@@ -59,6 +59,20 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 		t.Fatalf("Expected auth cookies on login response, got none")
 	}
 
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+
+	if csrfToken == "" {
+		t.Fatalf("Expected CSRF token after login, got none")
+	}
+
 	// Perform authenticated request
 	if body == nil {
 		body = strings.NewReader("")
@@ -67,6 +81,10 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 	req.Header.Set("Content-Type", "application/json")
 	for _, cookie := range cookies {
 		req.AddCookie(cookie)
+	}
+
+	if method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions {
+		req.Header.Set("X-CSRF-Token", csrfToken)
 	}
 
 	rec := httptest.NewRecorder()
@@ -1047,9 +1065,27 @@ func TestAssetEndpoints(t *testing.T) {
 		t.Fatalf("Expected auth cookies after login, got none")
 	}
 
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+
+	if csrfToken == "" {
+		t.Fatalf("Expected CSRF token after login, got none")
+	}
+
 	addCookies := func(req *http.Request) {
 		for _, c := range cookies {
 			req.AddCookie(c)
+
+			if req.Method != http.MethodGet && req.Method != http.MethodHead && req.Method != http.MethodOptions {
+				req.Header.Set("X-CSRF-Token", csrfToken)
+			}
 		}
 	}
 

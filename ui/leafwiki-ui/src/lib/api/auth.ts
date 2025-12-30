@@ -11,6 +11,23 @@ export type AuthResponse = {
   }
 }
 
+// Helper to get CSRF token from cookie
+function getCsrfTokenFromCookie(): string | null {
+  if (typeof document === 'undefined') return null
+
+  // erst __Host-Variante versuchen, dann „normale“
+  const hostMatch =
+    document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+    document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/)
+
+  if (!hostMatch) return null
+  try {
+    return decodeURIComponent(hostMatch[1])
+  } catch {
+    return hostMatch[1]
+  }
+}
+
 export async function login(identifier: string, password: string) {
   const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
@@ -60,6 +77,14 @@ export async function fetchWithAuth(
   const headers = new Headers(options.headers || {})
   if (!(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
+  }
+
+  const method = (options.method || 'GET').toUpperCase()
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const csrfToken = getCsrfTokenFromCookie()
+    if (csrfToken) {
+      headers.set('X-CSRF-Token', csrfToken)
+    }
   }
 
   // Save the original body
@@ -126,9 +151,14 @@ export async function fetchWithAuth(
 async function refreshAccessToken() {
   const store = useSessionStore.getState()
 
+  const headers = new Headers()
+  const csrfToken = getCsrfTokenFromCookie()
+  if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
+
   const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
     method: 'POST',
     credentials: 'include',
+    headers,
   })
 
   if (!res.ok) {
