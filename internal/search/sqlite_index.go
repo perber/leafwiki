@@ -94,13 +94,12 @@ func NewSQLiteIndex(storageDir string) (*SQLiteIndex, error) {
 	}
 
 	// Ensure the schema is created
+	// Drops and recreates the pages table
 	if err := s.ensureSchema(); err != nil {
 		return nil, err
 	}
 
-	// Delete all existing entries
-	// This is a cleanup step to ensure the table is empty before indexing new data
-	return s, s.Clear()
+	return s, nil
 }
 
 func (s *SQLiteIndex) withDB(fn func(db *sql.DB) error) error {
