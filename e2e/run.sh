@@ -30,6 +30,7 @@ stop_docker() {
   echo "🛑 Stopping Docker container..."
   docker stop wiki-e2e-tests >/dev/null 2>&1 || true
   docker rm wiki-e2e-tests >/dev/null 2>&1 || true
+  docker rmi wiki-e2e-tests >/dev/null 2>&1 || true
 }
 
 run_playwright_tests() {
@@ -38,6 +39,7 @@ run_playwright_tests() {
   E2E_BASE_URL="http://localhost:8085" \
   E2E_ADMIN_USER="admin" \
   E2E_ADMIN_PASSWORD="admin" \
+  E2E_HEADLESS="false" \
   npx playwright test
 }
 
