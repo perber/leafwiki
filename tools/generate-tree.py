@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 Script to generate tree.json for LeafWiki from markdown files.
