@@ -285,6 +285,51 @@ These environment variables override the default values and are especially usefu
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
 
+## Migrating existing Markdown content (community tool)
+
+If you already have an existing folder of Markdown files, you can bootstrap a LeafWiki navigation tree using a small community-contributed helper script.
+
+
+> **Community Tool**  
+> Useful for **initial migration** from existing Markdown structures into LeafWiki.  
+> Optional, provided “as is”. Contributions are welcome
+
+The script:
+- Scans a Markdown directory (default: `data/root`)
+- Normalizes folder/file names to LeafWiki conventions (lowercase, hyphens)
+- Ensures every folder has an `index.md`
+- Generates a `data/tree.json` so LeafWiki can navigate the structure
+
+Location: `tools/generate-tree.py`
+
+### preview changes (dry-run mode)
+You can preview the changes without modifying any files using the `--preview` flag:
+
+```bash
+python3 tools/generate-tree.py --root data/root --preview
+```
+
+This will:
+- show proposed renames, skipped files and added index.md files
+- print a preview of the generated tree
+- perform no changes.
+
+### Generate tree.json and normalize Markdown structure
+To actually apply the changes and generate `tree.json`, run:
+
+```bash
+python3 tools/generate-tree.py --root data/root --output data/tree.json
+```
+
+**Notes:**
+- It will rename files/folders to enforce LeafWiki naming conventions (lowercase, hyphens)
+- It will create blank `index.md` files in folders that lack them.
+- This is intended as a one-time import step
+- For ongoing structure management, use LeafWiki's UI.
+
+> Contributed in [#523](https://github.com/perber/leafwiki/issues/523) - thanks to @nicgord
+
+---
 
 ## Quick Start (Dev)
 
