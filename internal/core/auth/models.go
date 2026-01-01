@@ -34,11 +34,13 @@ func (u *User) ToPublicUser() *PublicUser {
 const (
 	RoleAdmin  = "admin"
 	RoleEditor = "editor"
+	RoleViewer = "viewer"
 )
 
 var validRoles = map[string]bool{
 	RoleAdmin:  true,
 	RoleEditor: true,
+	RoleViewer: true,
 }
 
 func IsValidRole(role string) bool {

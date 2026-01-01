@@ -28,7 +28,7 @@ func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies) gin.HandlerF
 	}
 }
 
-func RequireAdmin(wikiInstance *wiki.Wiki) gin.HandlerFunc {
+func RequireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userValue, exists := c.Get("user")
 		if !exists {
@@ -46,7 +46,7 @@ func RequireAdmin(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 	}
 }
 
-func RequireSelfOrAdmin(wikiInstance *wiki.Wiki) gin.HandlerFunc {
+func RequireSelfOrAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userValue, exists := c.Get("user")
 		if !exists {
@@ -64,7 +64,25 @@ func RequireSelfOrAdmin(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 	}
 }
 
-func RequireSelf(wikiInstance *wiki.Wiki) gin.HandlerFunc {
+func RequireEditorOrAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userValue, exists := c.Get("user")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
+			return
+		}
+
+		user, ok := userValue.(*auth.User)
+		if !ok || !(user.HasRole(auth.RoleAdmin) || user.HasRole(auth.RoleEditor)) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Editor or Admin role required"})
+			return
+		}
+
+		c.Next()
+	}
+}
+
+func RequireSelf() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userValue, exists := c.Get("user")
 		if !exists {
