@@ -28,7 +28,7 @@ func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies) gin.HandlerF
 	}
 }
 
-func RequireAdmin(wikiInstance *wiki.Wiki) gin.HandlerFunc {
+func RequireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userValue, exists := c.Get("user")
 		if !exists {
@@ -46,7 +46,7 @@ func RequireAdmin(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 	}
 }
 
-func RequireSelfOrAdmin(wikiInstance *wiki.Wiki) gin.HandlerFunc {
+func RequireSelfOrAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userValue, exists := c.Get("user")
 		if !exists {
@@ -82,7 +82,7 @@ func RequireEditorOrAdmin() gin.HandlerFunc {
 	}
 }
 
-func RequireSelf(wikiInstance *wiki.Wiki) gin.HandlerFunc {
+func RequireSelf() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userValue, exists := c.Get("user")
 		if !exists {
