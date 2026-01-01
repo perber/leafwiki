@@ -295,10 +295,10 @@ If you already have an existing folder of Markdown files, you can bootstrap a Le
 > Optional, provided “as is”. Contributions are welcome
 
 The script:
-- scans a Markdown directory (default: `data/root`)
-- normalizes folder/file names to LeafWiki conventions (lowercase, hyphens)
-- ensures every folder has an `index.md`
-- generates a `data/tree.json` so LeafWiki can navigate the structure
+- Scans a Markdown directory (default: `data/root`)
+- Normalizes folder/file names to LeafWiki conventions (lowercase, hyphens)
+- Ensures every folder has an `index.md`
+- Generates a `data/tree.json` so LeafWiki can navigate the structure
 
 Location: `tools/generate-tree.py`
 
