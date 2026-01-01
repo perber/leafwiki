@@ -104,35 +104,37 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.POST("/auth/logout", api.LogoutUserHandler(wikiInstance, authCookies, csrfCookie))
 
 		// Pages
-		requiresAuthGroup.POST("/pages", api.CreatePageHandler(wikiInstance))
-		requiresAuthGroup.POST("/pages/ensure", api.EnsurePageHandler(wikiInstance))
-		requiresAuthGroup.POST("/pages/copy/:id", api.CopyPageHandler(wikiInstance))
-		requiresAuthGroup.PUT("/pages/:id", api.UpdatePageHandler(wikiInstance))
-		requiresAuthGroup.DELETE("/pages/:id", api.DeletePageHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages", auth_middleware.RequireEditorOrAdmin(), api.CreatePageHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/ensure", auth_middleware.RequireEditorOrAdmin(), api.EnsurePageHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/copy/:id", auth_middleware.RequireEditorOrAdmin(), api.CopyPageHandler(wikiInstance))
+		requiresAuthGroup.PUT("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.UpdatePageHandler(wikiInstance))
+		requiresAuthGroup.DELETE("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.DeletePageHandler(wikiInstance))
 
-		requiresAuthGroup.PUT("/pages/:id/move", api.MovePageHandler(wikiInstance))
-		requiresAuthGroup.PUT("/pages/:id/sort", api.SortPagesHandler(wikiInstance))
-		requiresAuthGroup.GET("/pages/slug-suggestion", api.SuggestSlugHandler(wikiInstance))
+		requiresAuthGroup.PUT("/pages/:id/move", auth_middleware.RequireEditorOrAdmin(), api.MovePageHandler(wikiInstance))
+		requiresAuthGroup.PUT("/pages/:id/sort", auth_middleware.RequireEditorOrAdmin(), api.SortPagesHandler(wikiInstance))
+		requiresAuthGroup.GET("/pages/slug-suggestion", auth_middleware.RequireEditorOrAdmin(), api.SuggestSlugHandler(wikiInstance))
 
 		// User
-		requiresAuthGroup.POST("/users", auth_middleware.RequireAdmin(wikiInstance), api.CreateUserHandler(wikiInstance))
-		requiresAuthGroup.GET("/users", auth_middleware.RequireAdmin(wikiInstance), api.GetUsersHandler(wikiInstance))
-		requiresAuthGroup.PUT("/users/:id", auth_middleware.RequireSelfOrAdmin(wikiInstance), api.UpdateUserHandler(wikiInstance))
-		requiresAuthGroup.DELETE("/users/:id", auth_middleware.RequireAdmin(wikiInstance), api.DeleteUserHandler(wikiInstance))
+		requiresAuthGroup.POST("/users", auth_middleware.RequireAdmin(), api.CreateUserHandler(wikiInstance))
+		requiresAuthGroup.GET("/users", auth_middleware.RequireAdmin(), api.GetUsersHandler(wikiInstance))
+		requiresAuthGroup.PUT("/users/:id", auth_middleware.RequireSelfOrAdmin(), api.UpdateUserHandler(wikiInstance))
+		requiresAuthGroup.DELETE("/users/:id", auth_middleware.RequireAdmin(), api.DeleteUserHandler(wikiInstance))
 
 		// Change Own Password
 		requiresAuthGroup.PUT("/users/me/password", api.ChangeOwnPasswordUserHandler(wikiInstance))
 
 		// Assets
-		requiresAuthGroup.POST("/pages/:id/assets", api.UploadAssetHandler(wikiInstance))
-		requiresAuthGroup.GET("/pages/:id/assets", api.ListAssetsHandler(wikiInstance))
-		requiresAuthGroup.PUT("/pages/:id/assets/rename", api.RenameAssetHandler(wikiInstance))
-		requiresAuthGroup.DELETE("/pages/:id/assets/:name", api.DeleteAssetHandler(wikiInstance))
+
+		// Assets
+		requiresAuthGroup.POST("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.UploadAssetHandler(wikiInstance))
+		requiresAuthGroup.GET("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.ListAssetsHandler(wikiInstance))
+		requiresAuthGroup.PUT("/pages/:id/assets/rename", auth_middleware.RequireEditorOrAdmin(), api.RenameAssetHandler(wikiInstance))
+		requiresAuthGroup.DELETE("/pages/:id/assets/:name", auth_middleware.RequireEditorOrAdmin(), api.DeleteAssetHandler(wikiInstance))
 
 		// Branding (admin only)
-		requiresAuthGroup.PUT("/branding", middleware.RequireAdmin(wikiInstance), api.UpdateBrandingHandler(wikiInstance))
-		requiresAuthGroup.POST("/branding/logo", middleware.RequireAdmin(wikiInstance), api.UploadBrandingLogoHandler(wikiInstance))
-		requiresAuthGroup.POST("/branding/favicon", middleware.RequireAdmin(wikiInstance), api.UploadBrandingFaviconHandler(wikiInstance))
+		requiresAuthGroup.PUT("/branding", auth_middleware.RequireAdmin(), api.UpdateBrandingHandler(wikiInstance))
+		requiresAuthGroup.POST("/branding/logo", auth_middleware.RequireAdmin(), api.UploadBrandingLogoHandler(wikiInstance))
+		requiresAuthGroup.POST("/branding/favicon", auth_middleware.RequireAdmin(), api.UploadBrandingFaviconHandler(wikiInstance))
 	}
 
 	// Serve branding assets (logos, favicons)

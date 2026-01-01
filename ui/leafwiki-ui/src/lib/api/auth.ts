@@ -7,7 +7,7 @@ export type AuthResponse = {
     id: string
     username: string
     email: string
-    role: 'admin' | 'editor'
+    role: 'admin' | 'editor' | 'viewer'
   }
 }
 

@@ -4,7 +4,7 @@ export type User = {
   id: string
   username: string
   email: string
-  role: 'admin' | 'editor'
+  role: 'admin' | 'editor' | 'viewer'
 }
 
 export async function getUsers(): Promise<User[]> {
