@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -94,8 +95,12 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 
 func authenticatedRequestAs(t *testing.T, router http.Handler, username, password, method, url string, body *strings.Reader) *httptest.ResponseRecorder {
 	// Login with specific credentials
-	loginBody := `{"identifier": "` + username + `", "password": "` + password + `"}`
-	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginData := map[string]string{
+		"identifier": username,
+		"password":   password,
+	}
+	loginBodyBytes, _ := json.Marshal(loginData)
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(loginBodyBytes))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
 	router.ServeHTTP(loginRec, loginReq)
@@ -127,10 +132,11 @@ func authenticatedRequestAs(t *testing.T, router http.Handler, username, passwor
 	}
 
 	// Perform authenticated request
-	if body == nil {
-		body = strings.NewReader("")
+	var reqBody io.Reader
+	if body != nil {
+		reqBody = body
 	}
-	req := httptest.NewRequest(method, url, body)
+	req := httptest.NewRequest(method, url, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 	for _, cookie := range cookies {
 		req.AddCookie(cookie)
