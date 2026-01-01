@@ -92,6 +92,59 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 	return rec
 }
 
+func authenticatedRequestAs(t *testing.T, router http.Handler, username, password, method, url string, body *strings.Reader) *httptest.ResponseRecorder {
+	// Login with specific credentials
+	loginBody := `{"identifier": "` + username + `", "password": "` + password + `"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Failed to login as %s: %d - %s", username, loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer loginRes.Body.Close()
+
+	cookies := loginRes.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies on login response, got none")
+	}
+
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+
+	if csrfToken == "" {
+		t.Fatalf("Expected CSRF token after login, got none")
+	}
+
+	// Perform authenticated request
+	if body == nil {
+		body = strings.NewReader("")
+	}
+	req := httptest.NewRequest(method, url, body)
+	req.Header.Set("Content-Type", "application/json")
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+
+	if method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions {
+		req.Header.Set("X-CSRF-Token", csrfToken)
+	}
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
 func TestCreatePageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
@@ -954,6 +1007,97 @@ func TestUpdateUser_RoleToViewer(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK for user update, got %d", rec.Code)
+	}
+}
+
+func TestViewer_CannotCreatePage(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	// Create a viewer user
+	createUserBody := `{"username": "vieweruser", "email": "viewer@example.com", "password": "viewerpass", "role": "viewer"}`
+	authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createUserBody))
+
+	// Try to create a page as viewer
+	pageBody := `{"title": "Test Page", "slug": "test-page"}`
+	rec := authenticatedRequestAs(t, router, "vieweruser", "viewerpass", http.MethodPost, "/api/pages", strings.NewReader(pageBody))
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected 403 Forbidden for viewer creating page, got %d", rec.Code)
+	}
+}
+
+func TestViewer_CannotUploadAsset(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	// Create a viewer user
+	createUserBody := `{"username": "vieweruser2", "email": "viewer2@example.com", "password": "viewerpass2", "role": "viewer"}`
+	authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createUserBody))
+
+	// First create a page as admin to have a page ID
+	pageBody := `{"title": "Test Page for Assets", "slug": "test-page-assets"}`
+	pageResp := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(pageBody))
+	var page map[string]interface{}
+	_ = json.Unmarshal(pageResp.Body.Bytes(), &page)
+	pageID := page["id"].(string)
+
+	// Try to upload an asset as viewer
+	rec := authenticatedRequestAs(t, router, "vieweruser2", "viewerpass2", http.MethodPost, "/api/pages/"+pageID+"/assets", strings.NewReader(""))
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected 403 Forbidden for viewer uploading asset, got %d", rec.Code)
+	}
+}
+
+func TestViewer_CannotUpdatePage(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	// Create a viewer user
+	createUserBody := `{"username": "vieweruser3", "email": "viewer3@example.com", "password": "viewerpass3", "role": "viewer"}`
+	authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createUserBody))
+
+	// First create a page as admin
+	pageBody := `{"title": "Test Page to Update", "slug": "test-page-update"}`
+	pageResp := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(pageBody))
+	var page map[string]interface{}
+	_ = json.Unmarshal(pageResp.Body.Bytes(), &page)
+	pageID := page["id"].(string)
+
+	// Try to update the page as viewer
+	updateBody := `{"title": "Updated Title", "slug": "updated-slug"}`
+	rec := authenticatedRequestAs(t, router, "vieweruser3", "viewerpass3", http.MethodPut, "/api/pages/"+pageID, strings.NewReader(updateBody))
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected 403 Forbidden for viewer updating page, got %d", rec.Code)
+	}
+}
+
+func TestViewer_CannotDeletePage(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	// Create a viewer user
+	createUserBody := `{"username": "vieweruser4", "email": "viewer4@example.com", "password": "viewerpass4", "role": "viewer"}`
+	authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createUserBody))
+
+	// First create a page as admin
+	pageBody := `{"title": "Test Page to Delete", "slug": "test-page-delete"}`
+	pageResp := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(pageBody))
+	var page map[string]interface{}
+	_ = json.Unmarshal(pageResp.Body.Bytes(), &page)
+	pageID := page["id"].(string)
+
+	// Try to delete the page as viewer
+	rec := authenticatedRequestAs(t, router, "vieweruser4", "viewerpass4", http.MethodDelete, "/api/pages/"+pageID, nil)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected 403 Forbidden for viewer deleting page, got %d", rec.Code)
 	}
 }
 
