@@ -911,11 +911,49 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	body := `{"username": "sam", "email": "sam@example.com", "password": "secret", "role": "viewer"}`
+	body := `{"username": "sam", "email": "sam@example.com", "password": "secret1234", "role": "undefined"}`
 	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400 Bad Request for invalid role, got %d", rec.Code)
+	}
+}
+
+func TestCreateUser_WithViewerRole(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	body := `{"username": "vieweruser", "email": "viewer@example.com", "password": "secret1234", "role": "viewer"}`
+	rec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(body))
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("Expected 201 Created for viewer role, got %d", rec.Code)
+	}
+}
+
+func TestUpdateUser_RoleToViewer(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	// Create user
+	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "editor"}`
+	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
+	var user map[string]interface{}
+	_ = json.Unmarshal(resp.Body.Bytes(), &user)
+
+	updatePayload := map[string]string{
+		"username": "jane-updated",
+		"email":    "jane-updated@example.com",
+		"password": "newpassword",
+		"role":     "viewer",
+	}
+	data, _ := json.Marshal(updatePayload)
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/users/"+user["id"].(string), strings.NewReader(string(data)))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for user update, got %d", rec.Code)
 	}
 }
 
