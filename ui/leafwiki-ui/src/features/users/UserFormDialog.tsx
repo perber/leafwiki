@@ -24,7 +24,9 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
   const [username, setUsername] = useState(user?.username || '')
   const [email, setEmail] = useState(user?.email || '')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<'admin' | 'editor'>(user?.role || 'editor')
+  const [role, setRole] = useState<'admin' | 'editor' | 'viewer'>(
+    user?.role || 'editor',
+  )
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
 
@@ -120,7 +122,7 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
           disabled={isOwnUser}
           value={role}
           onValueChange={(role) => {
-            setRole(role as 'admin' | 'editor')
+            setRole(role as 'admin' | 'editor' | 'viewer')
             setFieldErrors((prev) => ({ ...prev, role: '' }))
           }}
         >
@@ -128,6 +130,9 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
             <SelectValue placeholder="Select a role" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem key="viewer" value="viewer">
+              Viewer
+            </SelectItem>
             <SelectItem key="editor" value="editor">
               Editor
             </SelectItem>

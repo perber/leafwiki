@@ -6,7 +6,7 @@ type UserInfo = {
   id: string
   username: string
   email: string
-  role: 'admin' | 'editor'
+  role: 'admin' | 'editor' | 'viewer'
 }
 
 type SessionState = {
