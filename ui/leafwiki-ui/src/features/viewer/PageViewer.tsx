@@ -1,4 +1,5 @@
 import Page404 from '@/components/Page404'
+import { formatRelativeTime } from '@/lib/formatDate'
 import {
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
@@ -65,10 +66,27 @@ export default function PageViewer() {
     return null
   }
 
+  const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
+  const createdRelative = formatRelativeTime(page?.metadata?.createdAt)
+
   return (
     <div className="page-viewer">
-      <div>
+      <div className="page-viewer__header">
         <Breadcrumbs />
+        {page && (createdRelative || updatedRelative) && (
+          <div className="page-viewer__metadata">
+            {createdRelative && (
+              <span className="page-viewer__metadata-item">
+                Created {createdRelative}
+              </span>
+            )}
+            {updatedRelative && (
+              <span className="page-viewer__metadata-item">
+                Updated {updatedRelative}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* we keep the content also during loading to avoid flickering */}

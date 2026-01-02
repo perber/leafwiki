@@ -1,5 +1,15 @@
 package tree
 
+import "time"
+
+// PageMetadata hält einfache Metadaten zu einer Seite.
+type PageMetadata struct {
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+	CreatorID    string    `json:"creatorId"`
+	LastAuthorID string    `json:"lastAuthorId"`
+}
+
 // PageNode represents a single node in the tree
 // It has an ID, a parent, a path, and children
 // The ID is a unique identifier for the entry
@@ -10,6 +20,8 @@ type PageNode struct {
 	Children []*PageNode `json:"children"` // Children are the children of the entry
 	Position int         `json:"position"` // Position is the position of the entry
 	Parent   *PageNode   `json:"-"`
+
+	Metadata PageMetadata `json:"metadata"` // Metadata holds metadata about the page
 }
 
 func (p *PageNode) HasChildren() bool {

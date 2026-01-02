@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	verrors "github.com/perber/wiki/internal/core/shared/errors"
@@ -75,6 +76,12 @@ func ToAPINode(node *tree.PageNode, parentPath string) *Node {
 		Slug:     node.Slug,
 		Path:     path,
 		Position: node.Position,
+		Metadata: NodeMetadata{
+			CreatedAt:    node.Metadata.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:    node.Metadata.UpdatedAt.Format(time.RFC3339),
+			CreatorID:    node.Metadata.CreatorID,
+			LastAuthorID: node.Metadata.LastAuthorID,
+		},
 	}
 
 	for _, child := range node.Children {
