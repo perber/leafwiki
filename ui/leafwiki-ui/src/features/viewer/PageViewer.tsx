@@ -17,8 +17,8 @@ import { useSetPageTitle } from './useSetPageTitle'
 import { useToolbarActions } from './useToolbarActions'
 import { useViewerStore } from './viewer'
 
-function displayUser(label?: { username: string }, fallbackId?: string) {
-  return label?.username || fallbackId || null
+function displayUser(label?: { username: string }) {
+  return label?.username || null
 }
 
 export default function PageViewer() {
