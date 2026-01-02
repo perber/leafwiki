@@ -73,9 +73,8 @@ export default function PageViewer() {
   const editorName = displayUser(page?.metadata?.lastAuthor)
 
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
-  const createdRelative = formatRelativeTime(page?.metadata?.createdAt)
 
-  const showUpdated = updatedRelative && updatedRelative !== createdRelative
+  const showUpdated = updatedRelative
 
   return (
     <div className="page-viewer">
