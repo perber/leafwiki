@@ -14,8 +14,10 @@ func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies, authDisabled
 		if authDisabled {
 			if _, exists := c.Get("user"); exists {
 				c.Next()
-				return
+			} else {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated and auth is disabled"})
 			}
+			return
 		}
 
 		token, err := authCookies.ReadAccess(c)
