@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -20,7 +21,12 @@ func EnsurePageHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		result, err := wikiInstance.EnsurePath(req.Path, req.TargetTitle)
+		user := auth_middleware.MustGetUser(c)
+		if user == nil {
+			return
+		}
+
+		result, err := wikiInstance.EnsurePath(user.ID, req.Path, req.TargetTitle)
 		if err != nil {
 			respondWithError(c, err)
 			return

@@ -19,7 +19,7 @@ func TestBuildAndRunIndexer_BasicIndexing(t *testing.T) {
 		t.Fatalf("failed to load tree: %v", err)
 	}
 
-	_, err := treeSvc.CreatePage(nil, "Docs", "docs")
+	_, err := treeSvc.CreatePage("system", nil, "Docs", "docs")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}

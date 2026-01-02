@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -21,7 +22,12 @@ func UpdatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		page, err := w.UpdatePage(id, req.Title, req.Slug, req.Content)
+		user := auth_middleware.MustGetUser(c)
+		if user == nil {
+			return
+		}
+
+		page, err := w.UpdatePage(user.ID, id, req.Title, req.Slug, req.Content)
 		if err != nil {
 			respondWithError(c, err)
 			return

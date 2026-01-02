@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -26,8 +27,13 @@ func CopyPageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			normalizedTargetID = req.TargetParentID
 		}
 
+		user := auth_middleware.MustGetUser(c)
+		if user == nil {
+			return
+		}
+
 		currentPageID := c.Param("id")
-		page, err := w.CopyPage(currentPageID, normalizedTargetID, req.Title, req.Slug)
+		page, err := w.CopyPage(user.ID, currentPageID, normalizedTargetID, req.Title, req.Slug)
 		if err != nil {
 			respondWithError(c, err)
 			return
