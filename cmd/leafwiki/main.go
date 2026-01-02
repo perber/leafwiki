@@ -85,7 +85,7 @@ func main() {
 	hideLinkMetadataSection := resolveBool("hide-link-metadata-section", *hideLinkMetadataSectionFlag, visited, "LEAFWIKI_HIDE_LINK_METADATA_SECTION")
 	accessTokenTimeout := resolveDuration("access-token-timeout", *accessTokenTimeoutFlag, visited, "LEAFWIKI_ACCESS_TOKEN_TIMEOUT")
 	refreshTokenTimeout := resolveDuration("refresh-token-timeout", *refreshTokenTimeoutFlag, visited, "LEAFWIKI_REFRESH_TOKEN_TIMEOUT")
-	// If disable-auth is set, override relevant settings
+	// If disable-auth is set, later logic will override publicAccess accordingly
 	disableAuth := resolveBool("disable-auth", *disableAuthFlag, visited, "LEAFWIKI_DISABLE_AUTH")
 
 	args := flag.Args()
