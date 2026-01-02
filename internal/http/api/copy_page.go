@@ -39,6 +39,6 @@ func CopyPageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusCreated, ToAPIPage(page))
+		c.JSON(http.StatusCreated, ToAPIPage(page, w.GetUserResolver()))
 	}
 }

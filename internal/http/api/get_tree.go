@@ -10,6 +10,6 @@ import (
 func GetTreeHandler(w *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tree := w.GetTree()
-		c.JSON(http.StatusOK, ToAPINode(tree, ""))
+		c.JSON(http.StatusOK, ToAPINode(tree, "", w.GetUserResolver()))
 	}
 }

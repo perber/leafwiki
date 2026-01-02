@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/auth"
 	verrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 )
@@ -41,11 +42,11 @@ func respondWithError(c *gin.Context, err error) {
 	}
 }
 
-func ToAPIPage(p *tree.Page) *Page {
+func ToAPIPage(p *tree.Page, userResolver *auth.UserResolver) *Page {
 	return &Page{
-		PageNode: p.PageNode,
-		Content:  p.Content,
-		Path:     buildPathFromNode(p.PageNode),
+		Node:    ToAPINode(p.PageNode, "", userResolver),
+		Content: p.Content,
+		Path:    buildPathFromNode(p.PageNode),
 	}
 }
 
@@ -59,7 +60,7 @@ func buildPathFromNode(node *tree.PageNode) string {
 	return strings.Join(parts, "/")
 }
 
-func ToAPINode(node *tree.PageNode, parentPath string) *Node {
+func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserResolver) *Node {
 	path := node.Slug
 
 	if node.Slug == "root" {
@@ -68,6 +69,12 @@ func ToAPINode(node *tree.PageNode, parentPath string) *Node {
 
 	if node.Slug != "root" && parentPath != "" {
 		path = parentPath + "/" + node.Slug
+	}
+
+	var creator, lastAuthor *auth.UserLabel
+	if userResolver != nil {
+		creator, _ = userResolver.ResolveUserLabel(node.Metadata.CreatorID)
+		lastAuthor, _ = userResolver.ResolveUserLabel(node.Metadata.LastAuthorID)
 	}
 
 	apiNode := &Node{
@@ -81,11 +88,13 @@ func ToAPINode(node *tree.PageNode, parentPath string) *Node {
 			UpdatedAt:    node.Metadata.UpdatedAt.Format(time.RFC3339),
 			CreatorID:    node.Metadata.CreatorID,
 			LastAuthorID: node.Metadata.LastAuthorID,
+			Creator:      creator,
+			LastAuthor:   lastAuthor,
 		},
 	}
 
 	for _, child := range node.Children {
-		apiNode.Children = append(apiNode.Children, ToAPINode(child, path))
+		apiNode.Children = append(apiNode.Children, ToAPINode(child, path, userResolver))
 	}
 
 	return apiNode

@@ -17,6 +17,10 @@ import { useSetPageTitle } from './useSetPageTitle'
 import { useToolbarActions } from './useToolbarActions'
 import { useViewerStore } from './viewer'
 
+function displayUser(label?: { username: string }, fallbackId?: string) {
+  return label?.username || fallbackId || null
+}
+
 export default function PageViewer() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
@@ -66,23 +70,25 @@ export default function PageViewer() {
     return null
   }
 
+  const editorName = displayUser(page?.metadata?.lastAuthor)
+
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
   const createdRelative = formatRelativeTime(page?.metadata?.createdAt)
+
+  const showUpdated = updatedRelative && updatedRelative !== createdRelative
 
   return (
     <div className="page-viewer">
       <div className="page-viewer__header">
         <Breadcrumbs />
-        {page && (createdRelative || updatedRelative) && (
+        {page && showUpdated && (
           <div className="page-viewer__metadata">
-            {createdRelative && (
+            {showUpdated && (
               <span className="page-viewer__metadata-item">
-                Created {createdRelative}
-              </span>
-            )}
-            {updatedRelative && (
-              <span className="page-viewer__metadata-item">
-                Updated {updatedRelative}
+                Updated{' '}
+                {editorName
+                  ? `by ${editorName} · ${updatedRelative}`
+                  : updatedRelative}
               </span>
             )}
           </div>

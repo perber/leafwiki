@@ -21,6 +21,7 @@ type Wiki struct {
 	tree          *tree.TreeService
 	slug          *tree.SlugService
 	auth          *auth.AuthService
+	userResolver  *auth.UserResolver
 	user          *auth.UserService
 	asset         *assets.AssetService
 	searchIndex   *search.SQLiteIndex
@@ -70,6 +71,11 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	// Initialize the user service
 	userService := auth.NewUserService(store)
 	if err := userService.InitDefaultAdmin(options.AdminPassword); err != nil {
+		return nil, err
+	}
+
+	userResolver, err := auth.NewUserResolver(userService)
+	if err != nil {
 		return nil, err
 	}
 
@@ -137,6 +143,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		slug:          slugService,
 		user:          userService,
 		auth:          authService,
+		userResolver:  userResolver,
 		asset:         assetService,
 		storageDir:    options.StorageDir,
 		searchIndex:   sqliteIndex,
@@ -708,6 +715,11 @@ func (w *Wiki) CreateUser(username, email, password, role string) (*auth.PublicU
 		return nil, err
 	}
 
+	// Reload the user resolver cache
+	if err := w.userResolver.Reload(); err != nil {
+		log.Printf("warning: could not reload user resolver cache: %v", err)
+	}
+
 	return user.ToPublicUser(), nil
 }
 
@@ -735,6 +747,11 @@ func (w *Wiki) UpdateUser(id, username, email, password, role string) (*auth.Pub
 		return nil, err
 	}
 
+	// Reload the user resolver cache
+	if err := w.userResolver.Reload(); err != nil {
+		log.Printf("warning: could not reload user resolver cache: %v", err)
+	}
+
 	return user.ToPublicUser(), nil
 }
 
@@ -759,7 +776,17 @@ func (w *Wiki) ChangeOwnPassword(id, oldPassword, newPassword string) error {
 }
 
 func (w *Wiki) DeleteUser(id string) error {
-	return w.user.DeleteUser(id)
+	err := w.user.DeleteUser(id)
+	if err != nil {
+		return err
+	}
+
+	// Reload the user resolver cache
+	if err := w.userResolver.Reload(); err != nil {
+		log.Printf("warning: could not reload user resolver cache: %v", err)
+	}
+
+	return nil
 }
 
 func (w *Wiki) UpdatePassword(id, password string) error {
@@ -866,6 +893,10 @@ func (w *Wiki) GetAuthService() *auth.AuthService {
 
 func (w *Wiki) GetAssetService() *assets.AssetService {
 	return w.asset
+}
+
+func (w *Wiki) GetUserResolver() *auth.UserResolver {
+	return w.userResolver
 }
 
 func (w *Wiki) GetStorageDir() string {

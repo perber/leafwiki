@@ -5,6 +5,14 @@ export type PageMetadata = {
   updatedAt: string
   creatorId: string
   lastAuthorId: string
+  creator?: {
+    id: string
+    username: string
+  }
+  lastAuthor?: {
+    id: string
+    username: string
+  }
 }
 
 export type PageNode = {

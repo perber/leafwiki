@@ -13,7 +13,7 @@ type EnsurePageRequest struct {
 	TargetTitle string `json:"targetTitle" binding:"required"`
 }
 
-func EnsurePageHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
+func EnsurePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req EnsurePageRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -26,12 +26,12 @@ func EnsurePageHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		result, err := wikiInstance.EnsurePath(user.ID, req.Path, req.TargetTitle)
+		result, err := w.EnsurePath(user.ID, req.Path, req.TargetTitle)
 		if err != nil {
 			respondWithError(c, err)
 			return
 		}
 
-		c.JSON(http.StatusOK, ToAPIPage(result))
+		c.JSON(http.StatusOK, ToAPIPage(result, w.GetUserResolver()))
 	}
 }

@@ -33,6 +33,6 @@ func UpdatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, ToAPIPage(page))
+		c.JSON(http.StatusOK, ToAPIPage(page, w.GetUserResolver()))
 	}
 }
