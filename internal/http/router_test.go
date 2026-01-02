@@ -1216,7 +1216,7 @@ func TestRequireAdminMiddleware(t *testing.T) {
 func TestRequireAdminMiddleware_BlockedWhenAuthDisabled(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	
+
 	// Create router with auth disabled
 	router := NewRouter(w, RouterOptions{
 		PublicAccess:            false,

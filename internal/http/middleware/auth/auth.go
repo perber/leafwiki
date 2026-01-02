@@ -64,6 +64,12 @@ func RequireAdmin(authDisabled bool) gin.HandlerFunc {
 
 func RequireSelfOrAdmin(authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Block all user management operations when authentication is disabled
+		if authDisabled {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User management is not available when authentication is disabled"})
+			return
+		}
+
 		userValue, exists := c.Get("user")
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
@@ -82,12 +88,6 @@ func RequireSelfOrAdmin(authDisabled bool) gin.HandlerFunc {
 		// Allow users to access their own resources
 		if isSelf {
 			c.Next()
-			return
-		}
-
-		// For non-self access (admin operations), block if auth is disabled
-		if authDisabled {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Admin operations are not available when authentication is disabled"})
 			return
 		}
 
