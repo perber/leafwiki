@@ -1,5 +1,20 @@
 import { fetchWithAuth } from './auth'
 
+export type PageMetadata = {
+  createdAt: string
+  updatedAt: string
+  creatorId: string
+  lastAuthorId: string
+  creator?: {
+    id: string
+    username: string
+  }
+  lastAuthor?: {
+    id: string
+    username: string
+  }
+}
+
 export type PageNode = {
   id: string
   title: string
@@ -7,6 +22,8 @@ export type PageNode = {
   path: string
   parentId?: string | null
   children: PageNode[] | null
+
+  metadata?: PageMetadata // optional metadata, because older API responses may not have it
 }
 
 export interface Page {
@@ -15,6 +32,7 @@ export interface Page {
   path: string
   title: string
   content: string
+  metadata?: PageMetadata // optional metadata, because older API responses may not have it
 }
 
 export async function fetchTree(): Promise<PageNode> {

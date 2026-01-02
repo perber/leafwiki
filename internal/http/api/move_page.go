@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -25,7 +26,12 @@ func MovePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		if err := w.MovePage(id, req.NewParentID); err != nil {
+		user := auth_middleware.MustGetUser(c)
+		if user == nil {
+			return
+		}
+
+		if err := w.MovePage(user.ID, id, req.NewParentID); err != nil {
 			respondWithError(c, err)
 			return
 		}
