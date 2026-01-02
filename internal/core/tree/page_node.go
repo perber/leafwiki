@@ -2,7 +2,7 @@ package tree
 
 import "time"
 
-// PageMetadata hält einfache Metadaten zu einer Seite.
+// PageMetadata holds simple metadata for a page.
 type PageMetadata struct {
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
