@@ -86,7 +86,7 @@ func (t *TreeService) migrateTreeToV1Schema() error {
 	// Backfill metadata for all pages
 	var backfillMetadata func(node *PageNode) error
 	backfillMetadata = func(node *PageNode) error {
-		// If metadata is already set, skip
+		// If CreatedAt is already set, assume metadata was backfilled and skip
 		if !node.Metadata.CreatedAt.IsZero() {
 			return nil
 		}
