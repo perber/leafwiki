@@ -117,3 +117,73 @@ func TestUserService_InitDefaultAdmin(t *testing.T) {
 		t.Errorf("Expected default admin user, got: %+v", users)
 	}
 }
+
+func TestUserService_ResetAdminUserPassword(t *testing.T) {
+	service := setupTestUserService(t)
+
+	// Create initial admin user
+	_, err := service.CreateUser("admin", "admin@example.com", "oldpassword", "admin")
+	if err != nil {
+		t.Fatalf("Failed to create admin user: %v", err)
+	}
+
+	// Reset admin password
+	adminUser, err := service.ResetAdminUserPassword()
+	if err != nil {
+		t.Fatalf("ResetAdminUserPassword failed: %v", err)
+	}
+
+	if adminUser.Username != "admin" {
+		t.Errorf("Expected username 'admin', got: %s", adminUser.Username)
+	}
+
+	if adminUser.Password == "" {
+		t.Errorf("Expected a new password to be generated, got empty string")
+	}
+
+	if adminUser.Password == "oldpassword" {
+		t.Errorf("Expected password to be different from old password")
+	}
+
+	// Verify we can log in with the new password
+	_, err = service.GetUserByEmailOrUsernameAndPassword("admin", adminUser.Password)
+	if err != nil {
+		t.Errorf("Failed to login with new password: %v", err)
+	}
+
+	// Verify old password no longer works
+	_, err = service.GetUserByEmailOrUsernameAndPassword("admin", "oldpassword")
+	if err != ErrUserInvalidCredentials {
+		t.Errorf("Expected ErrUserInvalidCredentials for old password, got: %v", err)
+	}
+}
+
+func TestUserService_ResetAdminUserPassword_NoAdmin(t *testing.T) {
+	service := setupTestUserService(t)
+
+	// Don't create an admin user first - test should create one
+
+	// Reset admin password (should create new admin)
+	adminUser, err := service.ResetAdminUserPassword()
+	if err != nil {
+		t.Fatalf("ResetAdminUserPassword failed: %v", err)
+	}
+
+	if adminUser.Username != "admin" {
+		t.Errorf("Expected username 'admin', got: %s", adminUser.Username)
+	}
+
+	if adminUser.Email != "admin@localhost" {
+		t.Errorf("Expected email 'admin@localhost', got: %s", adminUser.Email)
+	}
+
+	if adminUser.Password == "" {
+		t.Errorf("Expected a new password to be generated, got empty string")
+	}
+
+	// Verify we can log in with the new password
+	_, err = service.GetUserByEmailOrUsernameAndPassword("admin", adminUser.Password)
+	if err != nil {
+		t.Errorf("Failed to login with new password: %v", err)
+	}
+}
