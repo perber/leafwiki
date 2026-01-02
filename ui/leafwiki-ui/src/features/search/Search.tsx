@@ -38,7 +38,7 @@ export default function Search({ active = false }: SearchProps) {
       setLoading(true)
       searchPages(debouncedQuery, page * limit, limit)
         .then((data) => {
-          setResults(data.items)
+          setResults(data.items || [])
           setTotalCount(data.count)
         })
         .catch((err) => console.error('Search failed', err))

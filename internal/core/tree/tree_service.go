@@ -2,9 +2,12 @@ package tree
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/perber/wiki/internal/core/shared"
 )
@@ -39,7 +42,94 @@ func (t *TreeService) LoadTree() error {
 	// Load the tree from the storage directory
 	var err error
 	t.tree, err = t.store.LoadTree(t.treeFilename)
+	if err != nil {
+		return err
+	}
+
+	// Load the schema version
+	log.Printf("Checking schema version...")
+	schema, err := loadSchema(t.storageDir)
+	if err != nil {
+		log.Printf("Error loading schema: %v", err)
+		return err
+	}
+
+	if schema.Version < CurrentSchemaVersion {
+		log.Printf("Migrating schema from version %d to %d...", schema.Version, CurrentSchemaVersion)
+		if err := t.migrate(schema.Version); err != nil {
+			log.Printf("Error migrating schema: %v", err)
+			return err
+		}
+
+		// migration was successful, update schema version
+		if err := saveSchema(t.storageDir, CurrentSchemaVersion); err != nil {
+			log.Printf("Error saving schema: %v", err)
+			return err
+		}
+
+		return t.saveTreeLocked()
+	}
+
 	return err
+}
+
+func (t *TreeService) migrate(fromVersion int) error {
+	if fromVersion < 1 {
+		if err := t.migrateTreeToV1Schema(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *TreeService) migrateTreeToV1Schema() error {
+	// Backfill metadata for all pages
+	var backfillMetadata func(node *PageNode) error
+	backfillMetadata = func(node *PageNode) error {
+		// If CreatedAt is already set, assume metadata was backfilled and skip
+		if !node.Metadata.CreatedAt.IsZero() {
+			return nil
+		}
+
+		// Read creation and modification times from the filesystem
+		// and set them in the metadata
+		filePath, err := t.store.getFilePath(node)
+		if err != nil {
+			// Log the error and continue
+			// We still want to backfill metadata for other nodes
+			// but we cannot do it for this node
+			log.Printf("could not get file path for node %s: %v", node.ID, err)
+			return nil
+		}
+
+		// The default value is set to now
+		createdAt := time.Now().UTC()
+		updatedAt := time.Now().UTC()
+
+		// Try to read file info; on error, log non-NotExist issues and keep defaults
+		if info, err := os.Stat(filePath); err == nil {
+			createdAt = info.ModTime().UTC()
+			updatedAt = info.ModTime().UTC()
+		} else if !os.IsNotExist(err) {
+			log.Printf("could not stat file for node %s at path %s: %v", node.ID, filePath, err)
+		}
+
+		node.Metadata = PageMetadata{
+			CreatedAt: createdAt,
+			UpdatedAt: updatedAt,
+		}
+
+		// Recurse into children
+		for _, child := range node.Children {
+			if err := backfillMetadata(child); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return backfillMetadata(t.tree)
 }
 
 // SaveTree saves the tree to the storage directory
@@ -56,11 +146,11 @@ func (t *TreeService) saveTreeLocked() error {
 }
 
 // Create Page adds a new page to the tree
-func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*string, error) {
+func (t *TreeService) CreatePage(userID string, parentID *string, title string, slug string) (*string, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	result, err := t.createPageLocked(parentID, title, slug)
+	result, err := t.createPageLocked(userID, parentID, title, slug)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +164,7 @@ func (t *TreeService) CreatePage(parentID *string, title string, slug string) (*
 
 // createPageLocked creates a new page under the given parent
 // Lock must be held by the caller
-func (t *TreeService) createPageLocked(parentID *string, title string, slug string) (*string, error) {
+func (t *TreeService) createPageLocked(userID string, parentID *string, title string, slug string) (*string, error) {
 
 	if t.tree == nil {
 		return nil, ErrTreeNotLoaded
@@ -97,6 +187,8 @@ func (t *TreeService) createPageLocked(parentID *string, title string, slug stri
 			return nil, fmt.Errorf("could not generate unique ID: %v", err)
 		}
 
+		now := time.Now().UTC()
+
 		entry := &PageNode{
 			ID:       id,
 			Title:    title,
@@ -104,6 +196,12 @@ func (t *TreeService) createPageLocked(parentID *string, title string, slug stri
 			Slug:     slug,
 			Position: len(root.Children), // Set the position to the end of the list
 			Children: []*PageNode{},
+			Metadata: PageMetadata{
+				CreatedAt:    now,
+				UpdatedAt:    now,
+				CreatorID:    userID,
+				LastAuthorID: userID,
+			},
 		}
 
 		if err := t.store.CreatePage(root, entry); err != nil {
@@ -133,6 +231,7 @@ func (t *TreeService) createPageLocked(parentID *string, title string, slug stri
 		return nil, fmt.Errorf("could not generate unique ID: %v", err)
 	}
 
+	now := time.Now().UTC()
 	entry := &PageNode{
 		ID:       id,
 		Slug:     slug,
@@ -140,6 +239,12 @@ func (t *TreeService) createPageLocked(parentID *string, title string, slug stri
 		Parent:   parent,
 		Position: len(parent.Children), // Set the position to the end of the list
 		Children: []*PageNode{},
+		Metadata: PageMetadata{
+			CreatedAt:    now,
+			UpdatedAt:    now,
+			CreatorID:    userID,
+			LastAuthorID: userID,
+		},
 	}
 
 	if err := t.store.CreatePage(parent, entry); err != nil {
@@ -179,7 +284,7 @@ func (t *TreeService) findPageByIDLocked(entry []*PageNode, id string) (*PageNod
 }
 
 // DeletePage deletes a page from the tree
-func (t *TreeService) DeletePage(id string, recursive bool) error {
+func (t *TreeService) DeletePage(userID string, id string, recursive bool) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -223,7 +328,7 @@ func (t *TreeService) DeletePage(id string, recursive bool) error {
 }
 
 // UpdatePage updates a page in the tree
-func (t *TreeService) UpdatePage(id string, title string, slug string, content string) error {
+func (t *TreeService) UpdatePage(userID string, id string, title string, slug string, content string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -250,7 +355,9 @@ func (t *TreeService) UpdatePage(id string, title string, slug string, content s
 	// Update the page
 	page.Title = title
 	page.Slug = slug
-
+	// Update metadata
+	page.Metadata.UpdatedAt = time.Now().UTC()
+	page.Metadata.LastAuthorID = userID
 	// Save the tree
 	return t.saveTreeLocked()
 }
@@ -420,7 +527,7 @@ func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLo
 	return lookup, nil
 }
 
-func (t *TreeService) EnsurePagePath(p string, targetTitle string) (*EnsurePathResult, error) {
+func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string) (*EnsurePathResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -466,7 +573,7 @@ func (t *TreeService) EnsurePagePath(p string, targetTitle string) (*EnsurePathR
 		}
 
 		// If the segment does not exist, create it
-		newPageID, err := t.createPageLocked(currentID, title, segment.Slug)
+		newPageID, err := t.createPageLocked(userID, currentID, title, segment.Slug)
 		if err != nil {
 			return nil, fmt.Errorf("could not create page: %v", err)
 		}
@@ -504,7 +611,7 @@ func (t *TreeService) EnsurePagePath(p string, targetTitle string) (*EnsurePathR
 }
 
 // MovePage moves a page to another parent
-func (t *TreeService) MovePage(id string, parentID string) error {
+func (t *TreeService) MovePage(userID string, id string, parentID string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -569,6 +676,11 @@ func (t *TreeService) MovePage(id string, parentID string) error {
 	page.Position = len(newParent.Children)
 	newParent.Children = append(newParent.Children, page)
 	page.Parent = newParent
+
+	// Update Metadata of the moved page
+	page.Metadata.UpdatedAt = time.Now().UTC()
+	page.Metadata.LastAuthorID = userID
+
 	// Reindex the positions of the old parent
 	t.reindexPositions(newParent)
 	t.reindexPositions(oldParent)

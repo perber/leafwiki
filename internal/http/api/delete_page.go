@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -17,7 +18,12 @@ func DeletePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		if err := w.DeletePage(id, recursive); err != nil {
+		user := auth_middleware.MustGetUser(c)
+		if user == nil {
+			return
+		}
+
+		if err := w.DeletePage(user.ID, id, recursive); err != nil {
 			respondWithError(c, err)
 			return
 		}
