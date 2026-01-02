@@ -38,8 +38,14 @@ func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies, authDisabled
 	}
 }
 
-func RequireAdmin() gin.HandlerFunc {
+func RequireAdmin(authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Explicitly block admin operations when authentication is disabled
+		if authDisabled {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Admin operations are not available when authentication is disabled"})
+			return
+		}
+
 		userValue, exists := c.Get("user")
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
