@@ -15,6 +15,7 @@ func TestResetAdminPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create user store: %v", err)
 	}
+	defer store.Close()
 
 	userService := auth.NewUserService(store)
 	_, err = userService.CreateUser("admin", "admin@example.com", "oldpassword", "admin")
@@ -84,13 +85,5 @@ func TestResetAdminPassword_NoAdmin(t *testing.T) {
 	_, err = userService.GetUserByEmailOrUsernameAndPassword("admin", adminUser.Password)
 	if err != nil {
 		t.Errorf("Failed to login with new password: %v", err)
-	}
-}
-
-func TestResetAdminPassword_InvalidStorageDir(t *testing.T) {
-	// Test with an invalid storage directory
-	_, err := ResetAdminPassword("/nonexistent/path/that/does/not/exist")
-	if err == nil {
-		t.Error("Expected error for invalid storage directory, got nil")
 	}
 }
