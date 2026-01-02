@@ -1213,6 +1213,51 @@ func TestRequireAdminMiddleware(t *testing.T) {
 	}
 }
 
+func TestRequireAdminMiddleware_BlockedWhenAuthDisabled(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+
+	// Create router with auth disabled
+	router := NewRouter(w, RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		AuthDisabled:            true, // Auth is disabled
+	})
+
+	// Test POST /api/users (admin-only endpoint)
+	createUserBody := `{"username": "testuser", "email": "test@example.com", "password": "password", "role": "editor"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/users", strings.NewReader(createUserBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected 403 Forbidden for POST /api/users when auth disabled, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	// Test GET /api/users (admin-only endpoint)
+	req = httptest.NewRequest(http.MethodGet, "/api/users", nil)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected 403 Forbidden for GET /api/users when auth disabled, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	// Test DELETE /api/users/:id (admin-only endpoint)
+	req = httptest.NewRequest(http.MethodDelete, "/api/users/some-user-id", nil)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("Expected 403 Forbidden for DELETE /api/users/:id when auth disabled, got %d - %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestRequireAuthMiddleware_Unauthorized(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()

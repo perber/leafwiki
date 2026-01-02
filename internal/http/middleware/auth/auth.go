@@ -38,8 +38,14 @@ func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies, authDisabled
 	}
 }
 
-func RequireAdmin() gin.HandlerFunc {
+func RequireAdmin(authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Explicitly block admin operations when authentication is disabled
+		if authDisabled {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Admin operations are not available when authentication is disabled"})
+			return
+		}
+
 		userValue, exists := c.Get("user")
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
@@ -56,8 +62,14 @@ func RequireAdmin() gin.HandlerFunc {
 	}
 }
 
-func RequireSelfOrAdmin() gin.HandlerFunc {
+func RequireSelfOrAdmin(authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Block all user management operations when authentication is disabled
+		if authDisabled {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User management is not available when authentication is disabled"})
+			return
+		}
+
 		userValue, exists := c.Get("user")
 		if !exists {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
@@ -65,7 +77,22 @@ func RequireSelfOrAdmin() gin.HandlerFunc {
 		}
 
 		user, ok := userValue.(*auth.User)
-		if !ok || (!user.HasRole(auth.RoleAdmin) && user.ID != c.Param("id")) {
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid user"})
+			return
+		}
+
+		// Check if user is trying to access their own resource
+		isSelf := user.ID == c.Param("id")
+
+		// Allow users to access their own resources
+		if isSelf {
+			c.Next()
+			return
+		}
+
+		// Check if user has admin privileges for accessing other users
+		if !user.HasRole(auth.RoleAdmin) {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Admin privileges required"})
 			return
 		}
