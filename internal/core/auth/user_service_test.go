@@ -120,6 +120,7 @@ func TestUserService_InitDefaultAdmin(t *testing.T) {
 
 func TestUserService_ResetAdminUserPassword(t *testing.T) {
 	service := setupTestUserService(t)
+	defer service.Close()
 
 	// Create initial admin user
 	_, err := service.CreateUser("admin", "admin@example.com", "oldpassword", "admin")
@@ -160,6 +161,7 @@ func TestUserService_ResetAdminUserPassword(t *testing.T) {
 
 func TestUserService_ResetAdminUserPassword_NoAdmin(t *testing.T) {
 	service := setupTestUserService(t)
+	defer service.Close()
 
 	// Don't create an admin user first - test should create one
 
