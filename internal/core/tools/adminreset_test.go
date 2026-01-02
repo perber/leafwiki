@@ -15,14 +15,19 @@ func TestResetAdminPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create user store: %v", err)
 	}
-	defer store.Close()
 
 	userService := auth.NewUserService(store)
 	_, err = userService.CreateUser("admin", "admin@example.com", "oldpassword", "admin")
 	if err != nil {
+		store.Close()
 		t.Fatalf("Failed to create admin user: %v", err)
 	}
-	store.Close()
+
+	// Close the store before ResetAdminPassword opens it
+	err = store.Close()
+	if err != nil {
+		t.Fatalf("Failed to close store: %v", err)
+	}
 
 	// Now test ResetAdminPassword
 	adminUser, err := ResetAdminPassword(tempDir)
