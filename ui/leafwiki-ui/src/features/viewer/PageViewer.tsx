@@ -83,14 +83,12 @@ export default function PageViewer() {
         <Breadcrumbs />
         {page && showUpdated && (
           <div className="page-viewer__metadata">
-            {showUpdated && (
-              <span className="page-viewer__metadata-item">
-                Updated{' '}
-                {editorName
-                  ? `by ${editorName} · ${updatedRelative}`
-                  : updatedRelative}
-              </span>
-            )}
+            <span className="page-viewer__metadata-item">
+              Updated{' '}
+              {editorName
+                ? `by ${editorName} · ${updatedRelative}`
+                : updatedRelative}
+            </span>
           </div>
         )}
       </div>
