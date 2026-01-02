@@ -102,16 +102,16 @@ func (t *TreeService) migrateTreeToV1Schema() error {
 			return nil
 		}
 
-		info, _ := os.Stat(filePath)
-
 		// The default value is set to now
 		createdAt := time.Now().UTC()
 		updatedAt := time.Now().UTC()
 
-		// If we have file info, use its ModTime
-		if info != nil {
+		// Try to read file info; on error, log non-NotExist issues and keep defaults
+		if info, err := os.Stat(filePath); err == nil {
 			createdAt = info.ModTime().UTC()
 			updatedAt = info.ModTime().UTC()
+		} else if !os.IsNotExist(err) {
+			log.Printf("could not stat file for node %s at path %s: %v", node.ID, filePath, err)
 		}
 
 		node.Metadata = PageMetadata{
