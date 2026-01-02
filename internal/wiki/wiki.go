@@ -22,6 +22,7 @@ type Wiki struct {
 	tree          *tree.TreeService
 	slug          *tree.SlugService
 	auth          *auth.AuthService
+	userResolver  *auth.UserResolver
 	user          *auth.UserService
 	asset         *assets.AssetService
 	branding      *branding.BrandingService
@@ -33,6 +34,8 @@ type Wiki struct {
 }
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
+
+const SYSTEM_USER_ID = "system"
 
 func collectSubtreeIDs(node *tree.PageNode) []string {
 	var ids []string
@@ -70,6 +73,11 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	// Initialize the user service
 	userService := auth.NewUserService(store)
 	if err := userService.InitDefaultAdmin(options.AdminPassword); err != nil {
+		return nil, err
+	}
+
+	userResolver, err := auth.NewUserResolver(userService)
+	if err != nil {
 		return nil, err
 	}
 
@@ -143,6 +151,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		slug:          slugService,
 		user:          userService,
 		auth:          authService,
+		userResolver:  userResolver,
 		asset:         assetService,
 		branding:      brandingService,
 		storageDir:    options.StorageDir,
@@ -170,7 +179,7 @@ func (w *Wiki) EnsureWelcomePage() error {
 		return nil
 	}
 
-	p, err := w.CreatePage(nil, "Welcome to Leaf Wiki", "welcome-to-leaf-wiki")
+	p, err := w.CreatePage(SYSTEM_USER_ID, nil, "Welcome to Leaf Wiki", "welcome-to-leaf-wiki")
 	if err != nil {
 		return err
 	}
@@ -204,7 +213,7 @@ You can write, edit, and structure pages – all in a simple tree layout.
 - **Bold**
 ` + "- `Inline code` \n```\n\n" + "Enjoy writing!"
 
-	if _, err := w.UpdatePage(p.ID, p.Title, p.Slug, content); err != nil {
+	if _, err := w.UpdatePage(SYSTEM_USER_ID, p.ID, p.Title, p.Slug, content); err != nil {
 		return err
 	}
 
@@ -215,7 +224,7 @@ func (w *Wiki) GetTree() *tree.PageNode {
 	return w.tree.GetTree()
 }
 
-func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Page, error) {
+func (w *Wiki) CreatePage(userID string, parentID *string, title string, slug string) (*tree.Page, error) {
 	ve := errors.NewValidationErrors()
 
 	if title == "" {
@@ -239,7 +248,7 @@ func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Pa
 		}
 	}
 
-	id, err := w.tree.CreatePage(parentID, title, slug)
+	id, err := w.tree.CreatePage(userID, parentID, title, slug)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +267,7 @@ func (w *Wiki) CreatePage(parentID *string, title string, slug string) (*tree.Pa
 	return page, nil
 }
 
-func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, error) {
+func (w *Wiki) EnsurePath(userID string, targetPath string, targetTitle string) (*tree.Page, error) {
 	ve := errors.NewValidationErrors()
 
 	cleanTargetPath := strings.Trim(strings.TrimSpace(targetPath), "/")
@@ -299,7 +308,7 @@ func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, er
 	}
 
 	// Now we create the missing segments
-	result, err := w.tree.EnsurePagePath(cleanTargetPath, cleanTargetTitle)
+	result, err := w.tree.EnsurePagePath(userID, cleanTargetPath, cleanTargetTitle)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +334,7 @@ func (w *Wiki) EnsurePath(targetPath string, targetTitle string) (*tree.Page, er
 	return page, nil
 }
 
-func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
+func (w *Wiki) UpdatePage(userID string, id, title, slug, content string) (*tree.Page, error) {
 
 	// Validate the request
 	ve := errors.NewValidationErrors()
@@ -355,7 +364,7 @@ func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
 		}
 	}
 
-	if err = w.tree.UpdatePage(id, title, slug, content); err != nil {
+	if err = w.tree.UpdatePage(userID, id, title, slug, content); err != nil {
 		return nil, err
 	}
 
@@ -398,7 +407,7 @@ func (w *Wiki) UpdatePage(id, title, slug, content string) (*tree.Page, error) {
 	return after, nil
 }
 
-func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title string, slug string) (*tree.Page, error) {
+func (w *Wiki) CopyPage(userID string, currentPageID string, targetParentID *string, title string, slug string) (*tree.Page, error) {
 	// Validate the request
 	ve := errors.NewValidationErrors()
 	if title == "" {
@@ -414,19 +423,22 @@ func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title stri
 	// Find the current page
 	page, err := w.tree.GetPage(currentPageID)
 	if err != nil {
+		log.Printf("error: could not find page to copy: %v", err)
 		return nil, err
 	}
 
 	// Create a copy of the page
-	copyID, err := w.tree.CreatePage(targetParentID, title, slug)
+	copyID, err := w.tree.CreatePage(userID, targetParentID, title, slug)
 	if err != nil {
+		log.Printf("error: could not create page copy: %v", err)
 		return nil, err
 	}
-	cleanup := func() { _ = w.tree.DeletePage(*copyID, false) }
+	cleanup := func() { _ = w.tree.DeletePage(userID, *copyID, false) }
 
 	// Get the copied page
 	copy, err := w.tree.GetPage(*copyID)
 	if err != nil {
+		log.Printf("error: could not get copied page: %v", err)
 		cleanup()
 		return nil, err
 	}
@@ -434,6 +446,7 @@ func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title stri
 	// Copy assets!
 	if err := w.asset.CopyAllAssets(page.PageNode, copy.PageNode); err != nil {
 		cleanup()
+		log.Printf("error: could not copy assets: %v", err)
 		return nil, err
 	}
 
@@ -441,7 +454,8 @@ func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title stri
 	updatedContent := strings.ReplaceAll(page.Content, "/assets/"+page.ID+"/", "/assets/"+copy.ID+"/")
 
 	// Write the content to the copied page
-	if err := w.tree.UpdatePage(copy.ID, copy.Title, copy.Slug, updatedContent); err != nil {
+	if err := w.tree.UpdatePage(userID, copy.ID, copy.Title, copy.Slug, updatedContent); err != nil {
+		log.Printf("error: could not update copied page content: %v", err)
 		cleanup()
 		_ = w.asset.DeleteAllAssetsForPage(copy.PageNode)
 		return nil, err
@@ -456,13 +470,14 @@ func (w *Wiki) CopyPage(currentPageID string, targetParentID *string, title stri
 	return copy, nil
 }
 
-func (w *Wiki) DeletePage(id string, recursive bool) error {
+func (w *Wiki) DeletePage(userID string, id string, recursive bool) error {
 	if id == "root" || id == "" {
 		return fmt.Errorf("cannot delete root page")
 	}
 
 	page, err := w.tree.GetPage(id)
 	if err != nil {
+		log.Printf("error: could not find page to delete: %v", err)
 		return err
 	}
 
@@ -491,7 +506,8 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 			oldPrefix = page.CalculatePath()
 		}
 
-		if err := w.tree.DeletePage(id, recursive); err != nil {
+		if err := w.tree.DeletePage(userID, id, recursive); err != nil {
+			log.Printf("error: could not delete page: %v", err)
 			return err
 		}
 
@@ -518,7 +534,8 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 		return nil
 	}
 
-	if err := w.tree.DeletePage(id, recursive); err != nil {
+	if err := w.tree.DeletePage(userID, id, recursive); err != nil {
+		log.Printf("error: could not delete page: %v", err)
 		return err
 	}
 
@@ -544,7 +561,7 @@ func (w *Wiki) DeletePage(id string, recursive bool) error {
 	return nil
 }
 
-func (w *Wiki) MovePage(id, parentID string) error {
+func (w *Wiki) MovePage(userID, id, parentID string) error {
 	if id == "root" || id == "" {
 		return fmt.Errorf("cannot move root page")
 	}
@@ -570,7 +587,7 @@ func (w *Wiki) MovePage(id, parentID string) error {
 			oldPrefix = p.CalculatePath()
 		}
 	}
-	if err := w.tree.MovePage(id, parentID); err != nil {
+	if err := w.tree.MovePage(userID, id, parentID); err != nil {
 		return err
 	}
 
@@ -707,6 +724,11 @@ func (w *Wiki) CreateUser(username, email, password, role string) (*auth.PublicU
 		return nil, err
 	}
 
+	// Reload the user resolver cache
+	if err := w.userResolver.Reload(); err != nil {
+		log.Printf("warning: could not reload user resolver cache: %v", err)
+	}
+
 	return user.ToPublicUser(), nil
 }
 
@@ -734,6 +756,11 @@ func (w *Wiki) UpdateUser(id, username, email, password, role string) (*auth.Pub
 		return nil, err
 	}
 
+	// Reload the user resolver cache
+	if err := w.userResolver.Reload(); err != nil {
+		log.Printf("warning: could not reload user resolver cache: %v", err)
+	}
+
 	return user.ToPublicUser(), nil
 }
 
@@ -758,7 +785,17 @@ func (w *Wiki) ChangeOwnPassword(id, oldPassword, newPassword string) error {
 }
 
 func (w *Wiki) DeleteUser(id string) error {
-	return w.user.DeleteUser(id)
+	err := w.user.DeleteUser(id)
+	if err != nil {
+		return err
+	}
+
+	// Reload the user resolver cache
+	if err := w.userResolver.Reload(); err != nil {
+		log.Printf("warning: could not reload user resolver cache: %v", err)
+	}
+
+	return nil
 }
 
 func (w *Wiki) UpdatePassword(id, password string) error {
@@ -865,6 +902,10 @@ func (w *Wiki) GetAuthService() *auth.AuthService {
 
 func (w *Wiki) GetAssetService() *assets.AssetService {
 	return w.asset
+}
+
+func (w *Wiki) GetUserResolver() *auth.UserResolver {
+	return w.userResolver
 }
 
 func (w *Wiki) GetStorageDir() string {

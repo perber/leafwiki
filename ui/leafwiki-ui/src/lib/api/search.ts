@@ -17,7 +17,7 @@ export type SearchResultItem = {
 
 export type SearchResult = {
   count: number
-  items: SearchResultItem[]
+  items: SearchResultItem[] | null
   limit: number
   offset: number
 }

@@ -58,18 +58,18 @@ func setupTreeForLinksTest(t *testing.T) (*tree.TreeService, string, string) {
 	}
 
 	// create "docs" under root
-	docsIDPtr, err := ts.CreatePage(nil, "Docs", "docs")
+	docsIDPtr, err := ts.CreatePage("system", nil, "Docs", "docs")
 	if err != nil {
 		t.Fatalf("CreatePage docs failed: %v", err)
 	}
 	docsID := *docsIDPtr
 
 	// create "page1" and "page2" under docs
-	page1IDPtr, err := ts.CreatePage(&docsID, "Page 1", "page1")
+	page1IDPtr, err := ts.CreatePage("system", &docsID, "Page 1", "page1")
 	if err != nil {
 		t.Fatalf("CreatePage page1 failed: %v", err)
 	}
-	page2IDPtr, err := ts.CreatePage(&docsID, "Page 2", "page2")
+	page2IDPtr, err := ts.CreatePage("system", &docsID, "Page 2", "page2")
 	if err != nil {
 		t.Fatalf("CreatePage page2 failed: %v", err)
 	}
@@ -168,13 +168,13 @@ func setupLinkService(t *testing.T) (*LinkService, *tree.TreeService, *LinksStor
 func createSimpleLinkedPages(t *testing.T, ts *tree.TreeService) (pageAID, pageBID string) {
 	t.Helper()
 
-	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	aIDPtr, err := ts.CreatePage("system", nil, "Page A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage a failed: %v", err)
 	}
 	pageAID = *aIDPtr
 
-	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	bIDPtr, err := ts.CreatePage("system", nil, "Page B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage b failed: %v", err)
 	}
@@ -185,7 +185,7 @@ func createSimpleLinkedPages(t *testing.T, ts *tree.TreeService) (pageAID, pageB
 		t.Fatalf("GetPage a failed: %v", err)
 	}
 	contentA := "Link to B: [Go to B](/b)"
-	if err := ts.UpdatePage(aPage.ID, aPage.Title, aPage.Slug, contentA); err != nil {
+	if err := ts.UpdatePage("system", aPage.ID, aPage.Title, aPage.Slug, contentA); err != nil {
 		t.Fatalf("UpdatePage a failed: %v", err)
 	}
 
@@ -194,7 +194,7 @@ func createSimpleLinkedPages(t *testing.T, ts *tree.TreeService) (pageAID, pageB
 		t.Fatalf("GetPage b failed: %v", err)
 	}
 	contentB := "# Page B\nNo outgoing links."
-	if err := ts.UpdatePage(bPage.ID, bPage.Title, bPage.Slug, contentB); err != nil {
+	if err := ts.UpdatePage("system", bPage.ID, bPage.Title, bPage.Slug, contentB); err != nil {
 		t.Fatalf("UpdatePage b failed: %v", err)
 	}
 
@@ -242,7 +242,7 @@ func TestLinkService_IndexAllPages_ReplacesExistingLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage a failed: %v", err)
 	}
-	if err := ts.UpdatePage(aPage.ID, aPage.Title, aPage.Slug, "No more links."); err != nil {
+	if err := ts.UpdatePage("system", aPage.ID, aPage.Title, aPage.Slug, "No more links."); err != nil {
 		t.Fatalf("UpdatePage a failed: %v", err)
 	}
 
@@ -355,7 +355,7 @@ func TestLinkService_GetOutgoingLinksForPage_ReturnsOutgoingLinks(t *testing.T) 
 func TestLinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 
-	aIDPtr, err := ts.CreatePage(nil, "Lonely Page", "lonely")
+	aIDPtr, err := ts.CreatePage("system", nil, "Lonely Page", "lonely")
 	if err != nil {
 		t.Fatalf("CreatePage lonely failed: %v", err)
 	}
@@ -366,7 +366,7 @@ func TestLinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
 		t.Fatalf("GetPage lonely failed: %v", err)
 	}
 
-	if err := ts.UpdatePage(page.ID, page.Title, page.Slug, "Just some text, no links."); err != nil {
+	if err := ts.UpdatePage("system", page.ID, page.Title, page.Slug, "Just some text, no links."); err != nil {
 		t.Fatalf("UpdatePage lonely failed: %v", err)
 	}
 
@@ -434,7 +434,7 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 
-	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	aIDPtr, err := ts.CreatePage("system", nil, "Page A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage a failed: %v", err)
 	}
@@ -444,7 +444,7 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetPage a failed: %v", err)
 	}
-	if err := ts.UpdatePage(aPage.ID, aPage.Title, aPage.Slug, "Link to B: [Go](/b)"); err != nil {
+	if err := ts.UpdatePage("system", aPage.ID, aPage.Title, aPage.Slug, "Link to B: [Go](/b)"); err != nil {
 		t.Fatalf("UpdatePage a failed: %v", err)
 	}
 
@@ -469,7 +469,7 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 		t.Fatalf("expected empty ToPageID for broken link, got %q", out1.Outgoings[0].ToPageID)
 	}
 
-	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	bIDPtr, err := ts.CreatePage("system", nil, "Page B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage b failed: %v", err)
 	}
@@ -479,7 +479,7 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetPage b failed: %v", err)
 	}
-	if err := ts.UpdatePage(bPage.ID, bPage.Title, bPage.Slug, "# Page B"); err != nil {
+	if err := ts.UpdatePage("system", bPage.ID, bPage.Title, bPage.Slug, "# Page B"); err != nil {
 		t.Fatalf("UpdatePage b failed: %v", err)
 	}
 
@@ -519,7 +519,7 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 func TestLinkService_HealOnPageCreate_ResolvesBrokenLinksWithoutReindex(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 
-	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	aIDPtr, err := ts.CreatePage("system", nil, "Page A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
@@ -529,7 +529,7 @@ func TestLinkService_HealOnPageCreate_ResolvesBrokenLinksWithoutReindex(t *testi
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link to B: [Go](/b)"); err != nil {
+	if err := ts.UpdatePage("system", pageA.ID, pageA.Title, pageA.Slug, "Link to B: [Go](/b)"); err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
 
@@ -555,7 +555,7 @@ func TestLinkService_HealOnPageCreate_ResolvesBrokenLinksWithoutReindex(t *testi
 		t.Fatalf("expected empty ToPageID before heal, got %q", out1.Outgoings[0].ToPageID)
 	}
 
-	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	bIDPtr, err := ts.CreatePage("system", nil, "Page B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
@@ -604,19 +604,19 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 	svc, ts, store := setupLinkService(t)
 
 	// Create three pages: A, B, C
-	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	aIDPtr, err := ts.CreatePage("system", nil, "Page A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
 	pageAID := *aIDPtr
 
-	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	bIDPtr, err := ts.CreatePage("system", nil, "Page B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
 	pageBID := *bIDPtr
 
-	cIDPtr, err := ts.CreatePage(nil, "Page C", "c")
+	cIDPtr, err := ts.CreatePage("system", nil, "Page C", "c")
 	if err != nil {
 		t.Fatalf("CreatePage C failed: %v", err)
 	}
@@ -627,7 +627,7 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link: [Missing](/nonexistent)"); err != nil {
+	if err := ts.UpdatePage("system", pageA.ID, pageA.Title, pageA.Slug, "Link: [Missing](/nonexistent)"); err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
 
@@ -635,7 +635,7 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage B failed: %v", err)
 	}
-	if err := ts.UpdatePage(pageB.ID, pageB.Title, pageB.Slug, "Link: [Missing](/nonexistent)"); err != nil {
+	if err := ts.UpdatePage("system", pageB.ID, pageB.Title, pageB.Slug, "Link: [Missing](/nonexistent)"); err != nil {
 		t.Fatalf("UpdatePage B failed: %v", err)
 	}
 
@@ -644,7 +644,7 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage C failed: %v", err)
 	}
-	if err := ts.UpdatePage(pageC.ID, pageC.Title, pageC.Slug, "Link: [Other](/other-missing)"); err != nil {
+	if err := ts.UpdatePage("system", pageC.ID, pageC.Title, pageC.Slug, "Link: [Other](/other-missing)"); err != nil {
 		t.Fatalf("UpdatePage C failed: %v", err)
 	}
 
@@ -692,13 +692,13 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
 	svc, ts, store := setupLinkService(t)
 
-	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	aIDPtr, err := ts.CreatePage("system", nil, "Page A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
 	pageAID := *aIDPtr
 
-	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	bIDPtr, err := ts.CreatePage("system", nil, "Page B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
@@ -709,7 +709,7 @@ func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link: [Missing1](/missing1)"); err != nil {
+	if err := ts.UpdatePage("system", pageA.ID, pageA.Title, pageA.Slug, "Link: [Missing1](/missing1)"); err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
 
@@ -718,7 +718,7 @@ func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage B failed: %v", err)
 	}
-	if err := ts.UpdatePage(pageB.ID, pageB.Title, pageB.Slug, "Link: [Missing2](/missing2)"); err != nil {
+	if err := ts.UpdatePage("system", pageB.ID, pageB.Title, pageB.Slug, "Link: [Missing2](/missing2)"); err != nil {
 		t.Fatalf("UpdatePage B failed: %v", err)
 	}
 
@@ -756,13 +756,13 @@ func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
 func TestLinksStore_GetBrokenIncomingForPath_EmptyWhenNoBrokenLinks(t *testing.T) {
 	svc, ts, store := setupLinkService(t)
 
-	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	aIDPtr, err := ts.CreatePage("system", nil, "Page A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
 	pageAID := *aIDPtr
 
-	_, err = ts.CreatePage(nil, "Page B", "b")
+	_, err = ts.CreatePage("system", nil, "Page B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
@@ -772,7 +772,7 @@ func TestLinksStore_GetBrokenIncomingForPath_EmptyWhenNoBrokenLinks(t *testing.T
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link: [To B](/b)"); err != nil {
+	if err := ts.UpdatePage("system", pageA.ID, pageA.Title, pageA.Slug, "Link: [To B](/b)"); err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
 
@@ -805,17 +805,17 @@ func TestLinksStore_GetBrokenIncomingForPath_OrdersByFromTitle(t *testing.T) {
 	svc, ts, store := setupLinkService(t)
 
 	// Create three pages with titles that should be ordered alphabetically
-	zIDPtr, err := ts.CreatePage(nil, "Zebra Page", "z")
+	zIDPtr, err := ts.CreatePage("system", nil, "Zebra Page", "z")
 	if err != nil {
 		t.Fatalf("CreatePage Z failed: %v", err)
 	}
 
-	aIDPtr, err := ts.CreatePage(nil, "Alpha Page", "a")
+	aIDPtr, err := ts.CreatePage("system", nil, "Alpha Page", "a")
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
 
-	mIDPtr, err := ts.CreatePage(nil, "Middle Page", "m")
+	mIDPtr, err := ts.CreatePage("system", nil, "Middle Page", "m")
 	if err != nil {
 		t.Fatalf("CreatePage M failed: %v", err)
 	}
@@ -827,7 +827,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OrdersByFromTitle(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetPage(%s) failed: %v", id, err)
 		}
-		if err := ts.UpdatePage(page.ID, page.Title, page.Slug, "Link: [Missing](/missing)"); err != nil {
+		if err := ts.UpdatePage("system", page.ID, page.Title, page.Slug, "Link: [Missing](/missing)"); err != nil {
 			t.Fatalf("UpdatePage(%s) failed: %v", id, err)
 		}
 	}
@@ -859,7 +859,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *tes
 	svc, ts, store := setupLinkService(t)
 
 	// Create Page A that links to a non-existent page
-	aIDPtr, err := ts.CreatePage(nil, "Page A", "a")
+	aIDPtr, err := ts.CreatePage("system", nil, "Page A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
@@ -869,7 +869,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *tes
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	if err := ts.UpdatePage(pageA.ID, pageA.Title, pageA.Slug, "Link: [To B](/b)"); err != nil {
+	if err := ts.UpdatePage("system", pageA.ID, pageA.Title, pageA.Slug, "Link: [To B](/b)"); err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
 
@@ -888,7 +888,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *tes
 	}
 
 	// Now create Page B - this should heal the link
-	bIDPtr, err := ts.CreatePage(nil, "Page B", "b")
+	bIDPtr, err := ts.CreatePage("system", nil, "Page B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
@@ -898,7 +898,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *tes
 	if err != nil {
 		t.Fatalf("GetPage B failed: %v", err)
 	}
-	if err := ts.UpdatePage(pageB.ID, pageB.Title, pageB.Slug, "# Page B"); err != nil {
+	if err := ts.UpdatePage("system", pageB.ID, pageB.Title, pageB.Slug, "# Page B"); err != nil {
 		t.Fatalf("UpdatePage B failed: %v", err)
 	}
 

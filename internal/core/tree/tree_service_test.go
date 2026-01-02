@@ -89,7 +89,7 @@ func TestTreeService_CreatePage_RootLevel(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	_, err := service.CreatePage(nil, "Welcome", "welcome")
+	_, err := service.CreatePage("system", nil, "Welcome", "welcome")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestTreeService_CreatePage_Nested(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Zuerst einen Parent anlegen
-	_, err := service.CreatePage(nil, "Docs", "docs")
+	_, err := service.CreatePage("system", nil, "Docs", "docs")
 	if err != nil {
 		t.Fatalf("Failed to create parent page: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestTreeService_CreatePage_Nested(t *testing.T) {
 	parent := service.GetTree().Children[0]
 
 	// Jetzt Subpage erstellen
-	_, err = service.CreatePage(&parent.ID, "Getting Started", "getting-started")
+	_, err = service.CreatePage("system", &parent.ID, "Getting Started", "getting-started")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestTreeService_CreatePage_InvalidParent(t *testing.T) {
 	_ = service.LoadTree()
 
 	invalidID := "does-not-exist"
-	_, err := service.CreatePage(&invalidID, "Broken", "broken")
+	_, err := service.CreatePage("system", &invalidID, "Broken", "broken")
 	if err == nil {
 		t.Errorf("Expected error for invalid parent ID, got none")
 	}
@@ -164,7 +164,7 @@ func TestTreeService_UpdatePage_ContentAndSlug(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Seite anlegen
-	_, err := service.CreatePage(nil, "Docs", "docs")
+	_, err := service.CreatePage("system", nil, "Docs", "docs")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestTreeService_UpdatePage_ContentAndSlug(t *testing.T) {
 	// Inhalt + Slug ändern
 	newSlug := "documentation"
 	newContent := "# Updated Docs"
-	err = service.UpdatePage(page.ID, "Documentation", newSlug, newContent)
+	err = service.UpdatePage("system", page.ID, "Documentation", newSlug, newContent)
 	if err != nil {
 		t.Fatalf("UpdatePage failed: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestTreeService_UpdatePage_FileNotFound(t *testing.T) {
 	service.tree.Children = append(service.tree.Children, page)
 
 	// Versuch zu aktualisieren
-	err := service.UpdatePage(id, "Still Ghost", "still-ghost", "# Boo")
+	err := service.UpdatePage("system", id, "Still Ghost", "still-ghost", "# Boo")
 	if err == nil {
 		t.Error("Expected error when file does not exist")
 	}
@@ -221,7 +221,7 @@ func TestTreeService_UpdatePage_InvalidID(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	err := service.UpdatePage("unknown", "Nope", "nope", "# nope")
+	err := service.UpdatePage("system", "unknown", "Nope", "nope", "# nope")
 	if err == nil {
 		t.Error("Expected error for invalid ID, got none")
 	}
@@ -233,14 +233,14 @@ func TestTreeService_DeletePage_Success(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Seite erstellen
-	_, err := service.CreatePage(nil, "DeleteMe", "delete-me")
+	_, err := service.CreatePage("system", nil, "DeleteMe", "delete-me")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	page := service.GetTree().Children[0]
 
 	// Löschen
-	err = service.DeletePage(page.ID, false)
+	err = service.DeletePage("system", page.ID, false)
 	if err != nil {
 		t.Fatalf("DeletePage failed: %v", err)
 	}
@@ -263,19 +263,19 @@ func TestTreeService_DeletePage_HasChildrenWithoutRecursive(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Parent + Child
-	_, err := service.CreatePage(nil, "Parent", "parent")
+	_, err := service.CreatePage("system", nil, "Parent", "parent")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	parent := service.GetTree().Children[0]
 
-	_, err = service.CreatePage(&parent.ID, "Child", "child")
+	_, err = service.CreatePage("system", &parent.ID, "Child", "child")
 	if err != nil {
 		t.Fatalf("CreatePage (child) failed: %v", err)
 	}
 
 	// Versuch ohne Rekursion
-	err = service.DeletePage(parent.ID, false)
+	err = service.DeletePage("system", parent.ID, false)
 	if err == nil {
 		t.Error("Expected error when deleting parent with children without recursive flag")
 	}
@@ -286,7 +286,7 @@ func TestTreeService_DeletePage_InvalidID(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	err := service.DeletePage("nonexistent", false)
+	err := service.DeletePage("system", "nonexistent", false)
 	if err == nil {
 		t.Error("Expected error for unknown ID")
 	}
@@ -298,19 +298,19 @@ func TestTreeService_DeletePage_Recursive(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Parent → Child
-	_, err := service.CreatePage(nil, "Parent", "parent")
+	_, err := service.CreatePage("system", nil, "Parent", "parent")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	parent := service.GetTree().Children[0]
 
-	_, err = service.CreatePage(&parent.ID, "Child", "child")
+	_, err = service.CreatePage("system", &parent.ID, "Child", "child")
 	if err != nil {
 		t.Fatalf("CreatePage (child) failed: %v", err)
 	}
 
 	// Rekursiv löschen
-	err = service.DeletePage(parent.ID, true)
+	err = service.DeletePage("system", parent.ID, true)
 	if err != nil {
 		t.Fatalf("Expected recursive delete to succeed, got error: %v", err)
 	}
@@ -327,11 +327,11 @@ func TestTreeService_MovePage_FileToFolder(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Create root → a, root → b
-	_, err := service.CreatePage(nil, "A", "a")
+	_, err := service.CreatePage("system", nil, "A", "a")
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
-	_, err = service.CreatePage(nil, "B", "b")
+	_, err = service.CreatePage("system", nil, "B", "b")
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
@@ -339,7 +339,7 @@ func TestTreeService_MovePage_FileToFolder(t *testing.T) {
 	a := service.GetTree().Children[0]
 	b := service.GetTree().Children[1]
 
-	err = service.MovePage(a.ID, b.ID)
+	err = service.MovePage("system", a.ID, b.ID)
 	if err != nil {
 		t.Fatalf("MovePage failed: %v", err)
 	}
@@ -362,14 +362,14 @@ func TestTreeService_MovePage_NonexistentPage(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Create only one page
-	_, err := service.CreatePage(nil, "Target", "target")
+	_, err := service.CreatePage("system", nil, "Target", "target")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	target := service.GetTree().Children[0]
 
 	// Versuch mit ungültiger ID
-	err = service.MovePage("does-not-exist", target.ID)
+	err = service.MovePage("system", "does-not-exist", target.ID)
 	if err == nil {
 		t.Error("Expected error for non-existent source page")
 	}
@@ -380,13 +380,13 @@ func TestTreeService_MovePage_NonexistentTarget(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	_, err := service.CreatePage(nil, "Source", "source")
+	_, err := service.CreatePage("system", nil, "Source", "source")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	source := service.GetTree().Children[0]
 
-	err = service.MovePage(source.ID, "invalid-target-id")
+	err = service.MovePage("system", source.ID, "invalid-target-id")
 	if err == nil {
 		t.Error("Expected error for non-existent target")
 	}
@@ -397,13 +397,13 @@ func TestTreeService_MovePage_SelfAsParent(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	_, err := service.CreatePage(nil, "Loop", "loop")
+	_, err := service.CreatePage("system", nil, "Loop", "loop")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	node := service.GetTree().Children[0]
 
-	err = service.MovePage(node.ID, node.ID)
+	err = service.MovePage("system", node.ID, node.ID)
 	if err == nil {
 		t.Error("Expected error when moving page into itself (if you later implement such protection)")
 	}
@@ -415,19 +415,19 @@ func TestTreeService_FindPageByRoutePath_Success(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Tree: root → architecture → project-a → specs
-	_, err := service.CreatePage(nil, "Architecture", "architecture")
+	_, err := service.CreatePage("system", nil, "Architecture", "architecture")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	arch := service.GetTree().Children[0]
 
-	_, err = service.CreatePage(&arch.ID, "Project A", "project-a")
+	_, err = service.CreatePage("system", &arch.ID, "Project A", "project-a")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	projectA := arch.Children[0]
 
-	_, err = service.CreatePage(&projectA.ID, "Specs", "specs")
+	_, err = service.CreatePage("system", &projectA.ID, "Specs", "specs")
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -455,7 +455,7 @@ func TestTreeService_FindPageByRoutePath_NotFound(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	if _, err := service.CreatePage(nil, "Top", "top"); err != nil {
+	if _, err := service.CreatePage("system", nil, "Top", "top"); err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
@@ -469,11 +469,11 @@ func TestTreeService_FindPageByRoutePath_PartialMatch(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	if _, err := service.CreatePage(nil, "Docs", "docs"); err != nil {
+	if _, err := service.CreatePage("system", nil, "Docs", "docs"); err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
-	if _, err := service.CreatePage(nil, "API", "api"); err != nil {
+	if _, err := service.CreatePage("system", nil, "API", "api"); err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
@@ -567,11 +567,11 @@ func TestTreeService_LookupPath_Exists(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Create tree structure
-	_, _ = service.CreatePage(nil, "Home", "home")
+	_, _ = service.CreatePage("system", nil, "Home", "home")
 	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage(&home.ID, "About", "about")
+	_, _ = service.CreatePage("system", &home.ID, "About", "about")
 	about := home.Children[0]
-	_, _ = service.CreatePage(&about.ID, "Team", "team")
+	_, _ = service.CreatePage("system", &about.ID, "Team", "team")
 
 	lookup, err := service.LookupPagePath(service.GetTree().Children, "home/about/team")
 	if err != nil {
@@ -595,9 +595,9 @@ func TestTreeService_LookupPath_NotExists(t *testing.T) {
 	_ = service.LoadTree()
 
 	// Create tree structure
-	_, _ = service.CreatePage(nil, "Home", "home")
+	_, _ = service.CreatePage("system", nil, "Home", "home")
 	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage(&home.ID, "About", "about")
+	_, _ = service.CreatePage("system", &home.ID, "About", "about")
 
 	lookup, err := service.LookupPagePath(service.GetTree().Children, "home/about/contact")
 	if err != nil {
@@ -641,9 +641,9 @@ func TestTreeService_LookupPath_DeeperMissingPath(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	_, _ = service.CreatePage(nil, "Home", "home")
+	_, _ = service.CreatePage("system", nil, "Home", "home")
 	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage(&home.ID, "About", "about")
+	_, _ = service.CreatePage("system", &home.ID, "About", "about")
 
 	lookup, err := service.LookupPagePath(service.GetTree().Children, "home/about/team/members")
 	if err != nil {
@@ -672,7 +672,7 @@ func TestTreeService_LookupPath_OnlyOneSegment(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	_, _ = service.CreatePage(nil, "Home", "home")
+	_, _ = service.CreatePage("system", nil, "Home", "home")
 
 	lookup, err := service.LookupPagePath(service.GetTree().Children, "home")
 	if err != nil {
@@ -695,11 +695,11 @@ func TestTreeService_EnsurePagePath_Successful(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	_, _ = service.CreatePage(nil, "Home", "home")
+	_, _ = service.CreatePage("system", nil, "Home", "home")
 	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage(&home.ID, "About", "about")
+	_, _ = service.CreatePage("system", &home.ID, "About", "about")
 
-	result, err := service.EnsurePagePath("home/about/team", "Team")
+	result, err := service.EnsurePagePath("system", "home/about/team", "Team")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -723,13 +723,13 @@ func TestTreeService_EnsurePagePath_AlreadyExists(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	_, _ = service.CreatePage(nil, "Home", "home")
+	_, _ = service.CreatePage("system", nil, "Home", "home")
 	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage(&home.ID, "About", "about")
+	_, _ = service.CreatePage("system", &home.ID, "About", "about")
 	about := home.Children[0]
-	_, _ = service.CreatePage(&about.ID, "Team", "team")
+	_, _ = service.CreatePage("system", &about.ID, "Team", "team")
 
-	result, err := service.EnsurePagePath("home/about/team", "Team")
+	result, err := service.EnsurePagePath("system", "home/about/team", "Team")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -747,11 +747,11 @@ func TestTreeService_EnsurePagePath_PartialExistence(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	_, _ = service.CreatePage(nil, "Home", "home")
+	_, _ = service.CreatePage("system", nil, "Home", "home")
 	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage(&home.ID, "About", "about")
+	_, _ = service.CreatePage("system", &home.ID, "About", "about")
 
-	result, err := service.EnsurePagePath("home/about/team/members", "Members")
+	result, err := service.EnsurePagePath("system", "home/about/team/members", "Members")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -779,7 +779,7 @@ func TestTreeService_EnsurePagePath_EmptyPath(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	result, err := service.EnsurePagePath("", "Root")
+	result, err := service.EnsurePagePath("system", "", "Root")
 	if err == nil {
 		t.Fatalf("expected error for empty path, got nil")
 	}
@@ -794,7 +794,7 @@ func TestTreeService_EnsurePagePath_PathStartingWithSlash(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	result, err := service.EnsurePagePath("/leading/slash", "Invalid")
+	result, err := service.EnsurePagePath("system", "/leading/slash", "Invalid")
 	if err != nil {
 		t.Fatalf("expected error for invalid path, got nil")
 	}
