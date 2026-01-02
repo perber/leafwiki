@@ -1,9 +1,7 @@
 package api
 
-import "github.com/perber/wiki/internal/core/tree"
-
 type Page struct {
-	*tree.PageNode
+	*Node
 	Content string `json:"content"`
 	Path    string `json:"path"`
 }

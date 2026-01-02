@@ -1,4 +1,5 @@
 import Page404 from '@/components/Page404'
+import { formatRelativeTime } from '@/lib/formatDate'
 import {
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
@@ -15,6 +16,10 @@ import { useScrollToHeadline } from './useScrollToHeadline'
 import { useSetPageTitle } from './useSetPageTitle'
 import { useToolbarActions } from './useToolbarActions'
 import { useViewerStore } from './viewer'
+
+function displayUser(label?: { username: string }) {
+  return label?.username || null
+}
 
 export default function PageViewer() {
   const { pathname } = useLocation()
@@ -65,10 +70,26 @@ export default function PageViewer() {
     return null
   }
 
+  const editorName = displayUser(page?.metadata?.lastAuthor)
+
+  const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
+
+  const showUpdated = updatedRelative
+
   return (
     <div className="page-viewer">
-      <div>
+      <div className="page-viewer__header">
         <Breadcrumbs />
+        {page && showUpdated && (
+          <div className="page-viewer__metadata">
+            <span className="page-viewer__metadata-item">
+              Updated{' '}
+              {editorName
+                ? `by ${editorName} · ${updatedRelative}`
+                : updatedRelative}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* we keep the content also during loading to avoid flickering */}
