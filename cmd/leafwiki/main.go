@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/perber/wiki/internal/core/tools"
 	"github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/wiki"
 )
@@ -17,6 +18,7 @@ func printUsage() {
 
 	Usage:
 	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
+	leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
 	leafwiki reset-admin-password
 	leafwiki --help
 
@@ -31,7 +33,9 @@ func printUsage() {
 	--access-token-timeout  Access token timeout duration (e.g. 24h, 15m) (default: 15m)
 	--refresh-token-timeout Refresh token timeout duration (e.g. 168h, 7d) (default: 7d)
 	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
-	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.	  
+	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.	 
+	--disable-auth                Disable authentication completely (default: false) (WARNING: only use in trusted networks!)
+	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false) 
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -44,6 +48,8 @@ func printUsage() {
 	LEAFWIKI_INJECT_CODE_IN_HEADER
 	LEAFWIKI_ACCESS_TOKEN_TIMEOUT
 	LEAFWIKI_REFRESH_TOKEN_TIMEOUT
+	LEAFWIKI_DISABLE_AUTH
+	LEAFWIKI_HIDE_LINK_METADATA_SECTION
 	`)
 }
 
@@ -58,6 +64,7 @@ func main() {
 	publicAccessFlag := flag.Bool("public-access", false, "allow public access to the wiki with read access (default: false)")
 	allowInsecureFlag := flag.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)")
 	injectCodeInHeaderFlag := flag.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")")
+	disableAuthFlag := flag.Bool("disable-auth", false, "disable authentication completely (default: false) (WARNING: only use in trusted networks!)")
 	hideLinkMetadataSectionFlag := flag.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)")
 	accessTokenTimeoutFlag := flag.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)")
 	refreshTokenTimeoutFlag := flag.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)")
@@ -78,39 +85,14 @@ func main() {
 	hideLinkMetadataSection := resolveBool("hide-link-metadata-section", *hideLinkMetadataSectionFlag, visited, "LEAFWIKI_HIDE_LINK_METADATA_SECTION")
 	accessTokenTimeout := resolveDuration("access-token-timeout", *accessTokenTimeoutFlag, visited, "LEAFWIKI_ACCESS_TOKEN_TIMEOUT")
 	refreshTokenTimeout := resolveDuration("refresh-token-timeout", *refreshTokenTimeoutFlag, visited, "LEAFWIKI_REFRESH_TOKEN_TIMEOUT")
-
-	log.Printf("configuration: host=%q port=%q allowInsecure=%t dataDir=%q publicAccess=%t injectHeader=%t hideLinkMetadataSection=%t ",
-		host, port, allowInsecure, dataDir, publicAccess, injectCodeInHeader != "", hideLinkMetadataSection,
-	)
-
-	if allowInsecure {
-		log.Printf("WARNING: allow-insecure enabled. Auth cookies may be transmitted over plain HTTP (INSECURE).")
-	}
-
-	// Check if data directory exists
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			log.Fatalf("Failed to create data directory: %v", err)
-		}
-	}
+	// If disable-auth is set, override relevant settings
+	disableAuth := resolveBool("disable-auth", *disableAuthFlag, visited, "LEAFWIKI_DISABLE_AUTH")
 
 	args := flag.Args()
 	if len(args) > 0 {
 		switch args[0] {
 		case "reset-admin-password":
-			// Note: No JWT secret needed for this command
-			w, err := wiki.NewWiki(&wiki.WikiOptions{
-				StorageDir:          dataDir,
-				JWTSecret:           "",
-				AdminPassword:       adminPassword,
-				AccessTokenTimeout:  accessTokenTimeout,
-				RefreshTokenTimeout: refreshTokenTimeout,
-			})
-			if err != nil {
-				log.Fatalf("Failed to initialize Wiki: %v", err)
-			}
-			defer w.Close()
-			user, err := w.ResetAdminUserPassword()
+			user, err := tools.ResetAdminPassword(dataDir)
 			if err != nil {
 				log.Fatalf("Password reset failed: %v", err)
 			}
@@ -128,12 +110,30 @@ func main() {
 		}
 	}
 
-	if jwtSecret == "" {
-		log.Fatal("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
+	if disableAuth {
+		publicAccess = true
+		log.Printf("WARNING: Authentication disabled. Wiki is publicly accessible without authentication.")
 	}
 
-	if adminPassword == "" {
-		log.Fatalf("admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
+	if allowInsecure {
+		log.Printf("WARNING: allow-insecure enabled. Auth cookies may be transmitted over plain HTTP (INSECURE).")
+	}
+
+	// Check if data directory exists
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
+			log.Fatalf("Failed to create data directory: %v", err)
+		}
+	}
+
+	if !disableAuth {
+		if jwtSecret == "" {
+			log.Fatal("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
+		}
+
+		if adminPassword == "" {
+			log.Fatalf("admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
+		}
 	}
 
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
@@ -142,6 +142,7 @@ func main() {
 		JWTSecret:           jwtSecret,
 		AccessTokenTimeout:  accessTokenTimeout,
 		RefreshTokenTimeout: refreshTokenTimeout,
+		AuthDisabled:        disableAuth,
 	})
 	if err != nil {
 		log.Fatalf("Failed to initialize Wiki: %v", err)
@@ -155,6 +156,7 @@ func main() {
 		HideLinkMetadataSection: hideLinkMetadataSection,
 		AccessTokenTimeout:      accessTokenTimeout,
 		RefreshTokenTimeout:     refreshTokenTimeout,
+		AuthDisabled:            disableAuth,
 	})
 
 	// Start server - combine host and port

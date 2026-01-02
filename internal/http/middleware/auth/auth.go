@@ -8,8 +8,16 @@ import (
 	"github.com/perber/wiki/internal/wiki"
 )
 
-func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies) gin.HandlerFunc {
+func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies, authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+
+		if authDisabled {
+			if _, exists := c.Get("user"); exists {
+				c.Next()
+				return
+			}
+		}
+
 		token, err := authCookies.ReadAccess(c)
 		if err != nil || token == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid access token"})

@@ -33,6 +33,7 @@ type RouterOptions struct {
 	AccessTokenTimeout      time.Duration // Duration for access token validity
 	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
 	HideLinkMetadataSection bool          // Whether to hide the link metadata section in the frontend UI
+	AuthDisabled            bool          // Whether authentication is disabled
 }
 
 // NewRouter creates a new HTTP router for the wiki application.
@@ -61,7 +62,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
-			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection})
+			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection, "authDisabled": options.AuthDisabled})
 		})
 
 		// PUBLIC READ ACCESS (if enabled via flag or env):
@@ -81,7 +82,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	}
 
 	requiresAuthGroup := router.Group("/api")
-	requiresAuthGroup.Use(auth_middleware.RequireAuth(wikiInstance, authCookies), security.CSRFMiddleware(csrfCookie))
+	requiresAuthGroup.Use(auth_middleware.InjectPublicEditor(options.AuthDisabled), auth_middleware.RequireAuth(wikiInstance, authCookies, options.AuthDisabled), security.CSRFMiddleware(csrfCookie))
 	{
 		// If public access is disabled, we need to ensure that the tree and pages routes are protected
 		// and require authentication. If public access is enabled, these routes are already handled

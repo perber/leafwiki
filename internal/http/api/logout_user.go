@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -19,8 +20,8 @@ func LogoutUserHandler(w *wiki.Wiki, authCookies *auth_middleware.AuthCookies, c
 		refreshToken, _ := authCookies.ReadRefresh(c)
 		if refreshToken != "" {
 			// revoke the refresh token session
-			err := w.GetAuthService().RevokeRefreshToken(refreshToken)
-			if err != nil {
+			err := w.Logout(refreshToken)
+			if err != nil && !errors.Is(err, wiki.ErrAuthDisabled) {
 				log.Printf("[INFO] Unable to revoke the refresh token: %v", err)
 			}
 		}

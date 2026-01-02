@@ -434,30 +434,6 @@ func TestWiki_InitDefaultAdmin_UsesGivenPassword(t *testing.T) {
 	}
 }
 
-func TestWiki_ResetAdminUserPassword_ChangesPassword(t *testing.T) {
-	w := createWikiTestInstance(t)
-	defer w.Close()
-
-	original, err := w.GetUserService().GetUserByEmailOrUsernameAndPassword("admin", "admin")
-	if err != nil {
-		t.Fatalf("Admin not found: %v", err)
-	}
-
-	resetUser, err := w.ResetAdminUserPassword()
-	if err != nil {
-		t.Fatalf("Reset failed: %v", err)
-	}
-
-	if resetUser.Password == "" {
-		t.Fatal("Reset password is empty")
-	}
-
-	match, err := w.GetUserService().DoesIDAndPasswordMatch(original.ID, resetUser.Password)
-	if err != nil || !match {
-		t.Error("Reset password does not match")
-	}
-}
-
 func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
@@ -470,23 +446,6 @@ func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 	_, err = w.Login("admin", "wrong")
 	if err == nil {
 		t.Error("Expected login to fail with wrong password")
-	}
-}
-
-func TestWiki_ResetAdminPasswordWithoutJWTSecret(t *testing.T) {
-	w := createWikiTestInstance(t)
-	defer w.Close()
-
-	user, err := w.ResetAdminUserPassword()
-	if err != nil {
-		t.Fatalf("ResetAdminUserPassword failed: %v", err)
-	}
-
-	if user.Username != "admin" {
-		t.Errorf("Expected username to be 'admin', got %s", user.Username)
-	}
-	if user.Password == "" {
-		t.Error("Expected new password to be set, got empty string")
 	}
 }
 
