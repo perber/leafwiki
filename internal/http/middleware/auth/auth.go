@@ -79,17 +79,20 @@ func RequireSelfOrAdmin(authDisabled bool) gin.HandlerFunc {
 		// Check if user is trying to access their own resource
 		isSelf := user.ID == c.Param("id")
 
-		// Check if user is admin
-		isAdmin := user.HasRole(auth.RoleAdmin)
+		// Allow users to access their own resources
+		if isSelf {
+			c.Next()
+			return
+		}
 
-		// If auth is disabled, block admin operations
-		if authDisabled && !isSelf {
+		// For non-self access (admin operations), block if auth is disabled
+		if authDisabled {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Admin operations are not available when authentication is disabled"})
 			return
 		}
 
-		// Allow if user is accessing their own resource or is admin
-		if !isSelf && !isAdmin {
+		// Check if user has admin privileges for accessing other users
+		if !user.HasRole(auth.RoleAdmin) {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Admin privileges required"})
 			return
 		}
