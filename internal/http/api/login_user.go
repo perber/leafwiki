@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,12 @@ func LoginUserHandler(wikiInstance *wiki.Wiki, authCookies *auth_middleware.Auth
 		}
 
 		data, err := wikiInstance.Login(req.Identifier, req.Password)
+
+		if errors.Is(err, wiki.ErrAuthDisabled) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "authentication is disabled"})
+			return
+		}
+
 		if err != nil && err == auth.ErrUserInvalidCredentials {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 			return

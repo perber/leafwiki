@@ -1,3 +1,4 @@
+import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { API_BASE_URL } from '../config'
 
@@ -57,6 +58,8 @@ export async function login(identifier: string, password: string) {
 }
 
 export async function logout() {
+  const { authDisabled } = useConfigStore.getState()
+  if (authDisabled) return
   const headers = new Headers()
   const csrfToken = getCsrfTokenFromCookie()
   if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
@@ -78,6 +81,7 @@ export async function fetchWithAuth(
 ): Promise<unknown> {
   const store = useSessionStore.getState()
   const logout = store.logout
+  const authDisabled = useConfigStore.getState().authDisabled
 
   const headers = new Headers(options.headers || {})
   if (!(options.body instanceof FormData)) {
@@ -113,7 +117,7 @@ export async function fetchWithAuth(
 
   let res = await doFetch()
 
-  if (res.status === 401 && retry) {
+  if (res.status === 401 && retry && !authDisabled) {
     if (!isRefreshing) {
       isRefreshing = true
       refreshPromise = refreshAccessToken().finally(() => {
@@ -127,9 +131,11 @@ export async function fetchWithAuth(
       res = await doFetch()
     } catch {
       // Refresh token failed, log out the user
-      logout()
-      const { setUser } = useSessionStore.getState()
-      setUser(null)
+      if (!authDisabled) {
+        logout()
+        const { setUser } = useSessionStore.getState()
+        setUser(null)
+      }
       throw new Error('Unauthorized')
     }
   }

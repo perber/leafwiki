@@ -6,6 +6,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
+import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
 import { useNavigate } from 'react-router-dom'
@@ -16,6 +17,7 @@ export default function UserToolbar() {
   const logout = useSessionStore((s) => s.logout)
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
+  const authDisabled = useConfigStore((s) => s.authDisabled)
 
   if (!user) {
     // renders the login
@@ -29,6 +31,14 @@ export default function UserToolbar() {
         >
           Login
         </button>
+      </div>
+    )
+  }
+
+  if (authDisabled) {
+    return (
+      <div className="user-toolbar">
+        <span className="user-toolbar__not-logged-in">Public editor</span>
       </div>
     )
   }

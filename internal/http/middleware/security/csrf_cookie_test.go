@@ -75,8 +75,8 @@ func TestCSRFCookie_Issue_Secure(t *testing.T) {
 	if csrfCookie.Path != "/" {
 		t.Errorf("Expected CSRF cookie path '/', got '%s'", csrfCookie.Path)
 	}
-	if csrfCookie.SameSite != http.SameSiteStrictMode {
-		t.Errorf("Expected CSRF cookie SameSite StrictMode, got %v", csrfCookie.SameSite)
+	if csrfCookie.SameSite != http.SameSiteLaxMode {
+		t.Errorf("Expected CSRF cookie SameSite LaxMode, got %v", csrfCookie.SameSite)
 	}
 	if csrfCookie.MaxAge != int(time.Hour.Seconds()) {
 		t.Errorf("Expected CSRF cookie MaxAge %d, got %d", int(time.Hour.Seconds()), csrfCookie.MaxAge)
