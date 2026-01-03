@@ -24,7 +24,7 @@
             "program": "${workspaceFolder}/cmd/leafwiki/main.go",
             "args": [
                 "--allow-insecure=true",
-                "--disable-auth=true",
+                "--disable-auth=true"
             ],
         },
         {
