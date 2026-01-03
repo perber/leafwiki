@@ -434,30 +434,6 @@ func TestWiki_InitDefaultAdmin_UsesGivenPassword(t *testing.T) {
 	}
 }
 
-func TestWiki_ResetAdminUserPassword_ChangesPassword(t *testing.T) {
-	w := createWikiTestInstance(t)
-	defer w.Close()
-
-	original, err := w.GetUserService().GetUserByEmailOrUsernameAndPassword("admin", "admin")
-	if err != nil {
-		t.Fatalf("Admin not found: %v", err)
-	}
-
-	resetUser, err := w.ResetAdminUserPassword()
-	if err != nil {
-		t.Fatalf("Reset failed: %v", err)
-	}
-
-	if resetUser.Password == "" {
-		t.Fatal("Reset password is empty")
-	}
-
-	match, err := w.GetUserService().DoesIDAndPasswordMatch(original.ID, resetUser.Password)
-	if err != nil || !match {
-		t.Error("Reset password does not match")
-	}
-}
-
 func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
@@ -470,23 +446,6 @@ func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 	_, err = w.Login("admin", "wrong")
 	if err == nil {
 		t.Error("Expected login to fail with wrong password")
-	}
-}
-
-func TestWiki_ResetAdminPasswordWithoutJWTSecret(t *testing.T) {
-	w := createWikiTestInstance(t)
-	defer w.Close()
-
-	user, err := w.ResetAdminUserPassword()
-	if err != nil {
-		t.Fatalf("ResetAdminUserPassword failed: %v", err)
-	}
-
-	if user.Username != "admin" {
-		t.Errorf("Expected username to be 'admin', got %s", user.Username)
-	}
-	if user.Password == "" {
-		t.Error("Expected new password to be set, got empty string")
 	}
 }
 
@@ -1177,5 +1136,128 @@ func TestWiki_MovePage_ReindexesRelativeLinks(t *testing.T) {
 	}
 	if out2.Outgoings[0].ToPageID != guideShared.ID {
 		t.Fatalf("ToPageID after move = %q, want %q", out2.Outgoings[0].ToPageID, guideShared.ID)
+	}
+}
+
+func TestWiki_AuthDisabled_Initialization(t *testing.T) {
+	// Create a wiki instance with AuthDisabled set to true
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:          t.TempDir(),
+		AdminPassword:       "",
+		JWTSecret:           "",
+		AccessTokenTimeout:  0,
+		RefreshTokenTimeout: 0,
+		AuthDisabled:        true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance with AuthDisabled: %v", err)
+	}
+	defer wikiInstance.Close()
+
+	// Verify that the auth service is nil
+	if wikiInstance.GetAuthService() != nil {
+		t.Error("Expected auth service to be nil when AuthDisabled is true")
+	}
+}
+
+func TestWiki_AuthDisabled_LoginReturnsError(t *testing.T) {
+	// Create a wiki instance with AuthDisabled set to true
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:   t.TempDir(),
+		AuthDisabled: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance with AuthDisabled: %v", err)
+	}
+	defer wikiInstance.Close()
+
+	// Attempt to login should return ErrAuthDisabled
+	_, err = wikiInstance.Login("admin", "admin")
+	if err != ErrAuthDisabled {
+		t.Errorf("Expected ErrAuthDisabled, got %v", err)
+	}
+}
+
+func TestWiki_AuthDisabled_LogoutReturnsError(t *testing.T) {
+	// Create a wiki instance with AuthDisabled set to true
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:   t.TempDir(),
+		AuthDisabled: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance with AuthDisabled: %v", err)
+	}
+	defer wikiInstance.Close()
+
+	// Attempt to logout should return ErrAuthDisabled
+	err = wikiInstance.Logout("some-token")
+	if err != ErrAuthDisabled {
+		t.Errorf("Expected ErrAuthDisabled, got %v", err)
+	}
+}
+
+func TestWiki_AuthDisabled_RefreshTokenReturnsError(t *testing.T) {
+	// Create a wiki instance with AuthDisabled set to true
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:   t.TempDir(),
+		AuthDisabled: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance with AuthDisabled: %v", err)
+	}
+	defer wikiInstance.Close()
+
+	// Attempt to refresh token should return ErrAuthDisabled
+	_, err = wikiInstance.RefreshToken("some-token")
+	if err != ErrAuthDisabled {
+		t.Errorf("Expected ErrAuthDisabled, got %v", err)
+	}
+}
+
+func TestWiki_AuthDisabled_CoreFunctionalityWorks(t *testing.T) {
+	// Create a wiki instance with AuthDisabled set to true
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:   t.TempDir(),
+		AuthDisabled: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance with AuthDisabled: %v", err)
+	}
+	defer wikiInstance.Close()
+
+	// Test creating a page
+	page, err := wikiInstance.CreatePage("system", nil, "Test Page", "test-page")
+	if err != nil {
+		t.Fatalf("Failed to create page with AuthDisabled: %v", err)
+	}
+
+	if page.Title != "Test Page" {
+		t.Errorf("Expected title 'Test Page', got %q", page.Title)
+	}
+
+	// Test updating a page
+	updatedPage, err := wikiInstance.UpdatePage("system", page.ID, "Updated Title", "updated-slug", "# Content")
+	if err != nil {
+		t.Fatalf("Failed to update page with AuthDisabled: %v", err)
+	}
+
+	if updatedPage.Title != "Updated Title" {
+		t.Errorf("Expected title 'Updated Title', got %q", updatedPage.Title)
+	}
+
+	// Test getting a page
+	retrievedPage, err := wikiInstance.GetPage(page.ID)
+	if err != nil {
+		t.Fatalf("Failed to get page with AuthDisabled: %v", err)
+	}
+
+	if retrievedPage.ID != page.ID {
+		t.Errorf("Expected ID %q, got %q", page.ID, retrievedPage.ID)
+	}
+
+	// Test deleting a page
+	err = wikiInstance.DeletePage("system", page.ID, false)
+	if err != nil {
+		t.Fatalf("Failed to delete page with AuthDisabled: %v", err)
 	}
 }

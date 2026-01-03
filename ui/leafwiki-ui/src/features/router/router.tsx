@@ -7,11 +7,14 @@ import PageViewer from '../viewer/PageViewer'
 import AuthWrapper from './RouterAuthWrapper'
 import ReadOnlyWrapper from './RouterReadOnlyWrapper'
 
-export const createLeafWikiRouter = (isReadOnlyViewer: boolean) =>
+export const createLeafWikiRouter = (
+  isReadOnlyViewer: boolean,
+  authDisabled: boolean,
+) =>
   createBrowserRouter([
     {
       path: '/login',
-      element: <LoginForm />,
+      element: authDisabled ? <Navigate to="/" replace /> : <LoginForm />,
     },
     {
       path: '/',
@@ -27,13 +30,14 @@ export const createLeafWikiRouter = (isReadOnlyViewer: boolean) =>
     },
     {
       path: '/users',
-      element: isReadOnlyViewer ? (
-        <Navigate to="/" />
-      ) : (
-        <AuthWrapper>
-          <UserManagement />
-        </AuthWrapper>
-      ),
+      element:
+        isReadOnlyViewer || authDisabled ? (
+          <Navigate to="/" />
+        ) : (
+          <AuthWrapper>
+            <UserManagement />
+          </AuthWrapper>
+        ),
     },
     {
       path: '/e/*',

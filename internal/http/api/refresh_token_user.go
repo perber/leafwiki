@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,10 @@ func RefreshTokenUserHandler(wikiInstance *wiki.Wiki, authCookies *auth_middlewa
 
 		data, err := wikiInstance.RefreshToken(rt)
 		if err != nil {
+			if errors.Is(err, wiki.ErrAuthDisabled) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "authentication is disabled"})
+				return
+			}
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}

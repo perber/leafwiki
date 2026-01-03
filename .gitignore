@@ -37,6 +37,9 @@ dist/*
 # data dir
 data/
 
+# test database files
+*.db
+
 __debug*
 
 **/test-results/*

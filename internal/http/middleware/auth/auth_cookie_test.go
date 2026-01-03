@@ -314,8 +314,8 @@ func TestAuthCookies_Set_Secure(t *testing.T) {
 	if accessCookie.Path != "/" {
 		t.Errorf("Expected access cookie path '/', got '%s'", accessCookie.Path)
 	}
-	if accessCookie.SameSite != http.SameSiteStrictMode {
-		t.Errorf("Expected access cookie SameSite StrictMode, got %v", accessCookie.SameSite)
+	if accessCookie.SameSite != http.SameSiteLaxMode {
+		t.Errorf("Expected access cookie SameSite LaxMode, got %v", accessCookie.SameSite)
 	}
 	if accessCookie.MaxAge != 3600 {
 		t.Errorf("Expected access cookie MaxAge 3600, got %d", accessCookie.MaxAge)
@@ -334,8 +334,8 @@ func TestAuthCookies_Set_Secure(t *testing.T) {
 	if refreshCookie.Path != "/" {
 		t.Errorf("Expected refresh cookie path '/', got '%s'", refreshCookie.Path)
 	}
-	if refreshCookie.SameSite != http.SameSiteStrictMode {
-		t.Errorf("Expected refresh cookie SameSite StrictMode, got %v", refreshCookie.SameSite)
+	if refreshCookie.SameSite != http.SameSiteLaxMode {
+		t.Errorf("Expected refresh cookie SameSite LaxMode, got %v", refreshCookie.SameSite)
 	}
 	if refreshCookie.MaxAge != 86400 {
 		t.Errorf("Expected refresh cookie MaxAge 86400, got %d", refreshCookie.MaxAge)

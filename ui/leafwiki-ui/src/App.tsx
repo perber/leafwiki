@@ -12,8 +12,9 @@ import { useConfigStore } from './stores/config'
 function App() {
   const configHasLoaded = useConfigStore((s) => s.hasLoaded)
   const loadConfig = useConfigStore((s) => s.loadConfig)
+  const authDisabled = useConfigStore((s) => s.authDisabled)
   // bootstrap authentication on app start -> session store
-  useBootstrapAuth()
+  useBootstrapAuth(configHasLoaded && !authDisabled)
 
   const isLoggedIn = useSessionStore((s) => !!s.user)
   const isRefreshing = useSessionStore((s) => s.isRefreshing)
@@ -26,13 +27,13 @@ function App() {
   }, [loadConfig])
 
   const router = useMemo(
-    () => createLeafWikiRouter(isReadOnlyViewer),
-    [isReadOnlyViewer],
+    () => createLeafWikiRouter(isReadOnlyViewer, authDisabled),
+    [isReadOnlyViewer, authDisabled],
   )
 
   if (!configHasLoaded) return null // Config not loaded yet. Show nothing meanwhile or maybe a loading spinner
 
-  if (isRefreshing) {
+  if (isRefreshing && !authDisabled) {
     return null // avoid router flicker before bootstrapping finished
   }
 
