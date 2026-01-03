@@ -51,7 +51,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
 
 	authCookies := auth_middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
-	csrfCookie := security.NewCSRFCookie(options.AllowInsecure, options.AccessTokenTimeout)
+	csrfCookie := security.NewCSRFCookie(options.AllowInsecure, options.RefreshTokenTimeout)
 
 	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
 	refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
@@ -62,6 +62,10 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
+			if _, err := csrfCookie.Issue(c); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
+				return
+			}
 			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection, "authDisabled": options.AuthDisabled})
 		})
 

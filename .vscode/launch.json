@@ -10,7 +10,22 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/leafwiki/main.go",
-            "args": ["--jwt-secret=secretkey", "--admin-password=anewpassword", "--allow-insecure=true"],
+            "args": [
+                "--jwt-secret=secretkey",
+                "--admin-password=anewpassword",
+                "--allow-insecure=true"
+            ],
+        },
+        {
+            "name": "Launch leafwiki public edit",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/leafwiki/main.go",
+            "args": [
+                "--allow-insecure=true",
+                "--disable-auth=true",
+            ],
         },
         {
             "name": "Launch leafwiki with public pages",
@@ -18,7 +33,12 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/leafwiki/main.go",
-            "args": ["--jwt-secret=secretkey", "--public-access=true", "--allow-insecure=true", "--admin-password=anewpassword"],
+            "args": [
+                "--jwt-secret=secretkey",
+                "--public-access=true",
+                "--allow-insecure=true",
+                "--admin-password=anewpassword"
+            ],
         },
         // admin reset
         {
@@ -27,7 +47,9 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cmd/leafwiki/main.go",
-            "args": ["reset-admin-password"],
+            "args": [
+                "reset-admin-password"
+            ],
         }
     ]
 }
