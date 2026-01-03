@@ -1,6 +1,7 @@
 // register sidebar panel items
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
+import { ImagePreviewDialog } from '@/features/imagepreview/ImagePreviewDialog'
 import { AddPageDialog } from '@/features/page/AddPageDialog'
 import { CopyPageDialog } from '@/features/page/CopyPageDialog'
 import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
@@ -62,6 +63,7 @@ export const DIALOG_USER_FORM = 'user-form'
 export const DIALOG_CHANGE_USER_PASSWORD = 'change-user-password'
 export const DIALOG_DELETE_USER_CONFIRMATION = 'delete-user-confirmation'
 export const DIALOG_UNSAVED_CHANGES = 'unsaved-changes'
+export const DIALOG_IMAGE_PREVIEW = 'image-preview'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -209,6 +211,18 @@ dialogRegistry.register({
       <UnsavedChangesDialog
         key={DIALOG_UNSAVED_CHANGES}
         {...(props as React.ComponentProps<typeof UnsavedChangesDialog>)}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_IMAGE_PREVIEW,
+  render: (props) => {
+    return (
+      <ImagePreviewDialog
+        key={DIALOG_IMAGE_PREVIEW}
+        {...(props as React.ComponentProps<typeof ImagePreviewDialog>)}
       />
     )
   },
