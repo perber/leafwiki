@@ -59,6 +59,7 @@ type WikiOptions struct {
 	JWTSecret           string        // JWT secret for authentication
 	AccessTokenTimeout  time.Duration // Access token timeout duration
 	RefreshTokenTimeout time.Duration // Refresh token timeout duration
+	AuthDisabled        bool          // Whether authentication is disabled
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
@@ -70,8 +71,10 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 
 	// Initialize the user service
 	userService := auth.NewUserService(store)
-	if err := userService.InitDefaultAdmin(options.AdminPassword); err != nil {
-		return nil, err
+	if !options.AuthDisabled {
+		if err := userService.InitDefaultAdmin(options.AdminPassword); err != nil {
+			return nil, err
+		}
 	}
 
 	userResolver, err := auth.NewUserResolver(userService)
@@ -79,15 +82,17 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		return nil, err
 	}
 
-	// SessionStore
-	sessionStore, err := auth.NewSessionStore(options.StorageDir)
-	if err != nil {
-		return nil, err
+	var sessionStore *auth.SessionStore
+	var authService *auth.AuthService
+	if !options.AuthDisabled {
+		sessionStore, err = auth.NewSessionStore(options.StorageDir)
+		if err != nil {
+			return nil, err
+		}
+
+		// Initialize the auth service
+		authService = auth.NewAuthService(userService, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 	}
-
-	// Initialize the auth service
-	authService := auth.NewAuthService(userService, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
-
 	// Initialize the tree service
 	treeService := tree.NewTreeService(options.StorageDir)
 	if err := treeService.LoadTree(); err != nil {
@@ -680,10 +685,23 @@ func (w *Wiki) GetLinkStatusForPage(pageID string) (*links.LinkStatusResult, err
 }
 
 func (w *Wiki) Login(identifier, password string) (*auth.AuthToken, error) {
+	if w.auth == nil {
+		return nil, ErrAuthDisabled
+	}
 	return w.auth.Login(identifier, password)
 }
 
+func (w *Wiki) Logout(token string) error {
+	if w.auth == nil {
+		return ErrAuthDisabled
+	}
+	return w.auth.RevokeRefreshToken(token)
+}
+
 func (w *Wiki) RefreshToken(token string) (*auth.AuthToken, error) {
+	if w.auth == nil {
+		return nil, ErrAuthDisabled
+	}
 	return w.auth.RefreshToken(token)
 }
 
@@ -825,15 +843,6 @@ func (w *Wiki) GetUserByID(id string) (*auth.PublicUser, error) {
 	}
 
 	return user.ToPublicUser(), nil
-}
-
-func (w *Wiki) ResetAdminUserPassword() (*auth.User, error) {
-	adminUser, err := w.user.ResetAdminUserPassword()
-	if err != nil {
-		return nil, err
-	}
-
-	return adminUser, nil
 }
 
 func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string) (string, error) {

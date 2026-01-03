@@ -2,11 +2,15 @@ import { useSessionStore } from '@/stores/session'
 import { useEffect } from 'react'
 import { API_BASE_URL } from './config'
 
-export function useBootstrapAuth() {
+export function useBootstrapAuth(enabled = true) {
   const setUser = useSessionStore((s) => s.setUser)
   const setRefreshing = useSessionStore((s) => s.setRefreshing)
 
   useEffect(() => {
+    if (!enabled) {
+      setRefreshing(false)
+      return
+    }
     let cancelled = false
 
     ;(async () => {
@@ -37,5 +41,5 @@ export function useBootstrapAuth() {
     return () => {
       cancelled = true
     }
-  }, [setUser, setRefreshing])
+  }, [setUser, setRefreshing, enabled])
 }
