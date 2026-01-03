@@ -19,7 +19,7 @@ type CSRFCookie struct {
 func NewCSRFCookie(allowInsecure bool, ttl time.Duration) *CSRFCookie {
 	return &CSRFCookie{
 		AllowInsecure: allowInsecure,
-		SameSite:      http.SameSiteStrictMode,
+		SameSite:      http.SameSiteLaxMode,
 		TTL:           ttl,
 	}
 }
@@ -43,6 +43,11 @@ func (c *CSRFCookie) Issue(ctx *gin.Context) (string, error) {
 	secure, err := utils.RequireSecure(ctx, c.AllowInsecure)
 	if err != nil {
 		return "", err
+	}
+
+	if existing, err := ctx.Cookie(c.cookieName(secure)); err == nil && existing != "" {
+		ctx.Header("X-CSRF-Token", existing)
+		return existing, nil
 	}
 
 	token, err := c.generateToken()

@@ -18,7 +18,7 @@ type AuthCookies struct {
 func NewAuthCookies(allowInsecure bool, accessTTL, refreshTTL time.Duration) *AuthCookies {
 	return &AuthCookies{
 		AllowInsecure: allowInsecure,
-		SameSite:      http.SameSiteStrictMode,
+		SameSite:      http.SameSiteLaxMode,
 		AccessTTL:     accessTTL,
 		RefreshTTL:    refreshTTL,
 	}
