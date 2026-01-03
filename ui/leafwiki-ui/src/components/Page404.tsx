@@ -2,12 +2,14 @@ import { Button } from '@/components/ui/button'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
 import { useLocation } from 'react-router-dom'
 
 export default function Page404() {
   const user = useSessionStore((s) => s.user)
+  const authDisabled = useConfigStore((s) => s.authDisabled)
   const readOnlyMode = useIsReadOnly()
   const appMode = useAppMode()
   const { pathname } = useLocation()
@@ -19,7 +21,7 @@ export default function Page404() {
       <p className="page404__text">
         The page you are looking for does not exist.
       </p>
-      {user && !readOnlyMode && appMode === 'view' && (
+      {(user || authDisabled) && !readOnlyMode && appMode === 'view' && (
         <>
           <p className="page404__text">
             Create the page by clicking the button below.

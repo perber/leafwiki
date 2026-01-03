@@ -33,6 +33,7 @@ type RouterOptions struct {
 	AccessTokenTimeout      time.Duration // Duration for access token validity
 	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
 	HideLinkMetadataSection bool          // Whether to hide the link metadata section in the frontend UI
+	AuthDisabled            bool          // Whether authentication is disabled
 }
 
 // NewRouter creates a new HTTP router for the wiki application.
@@ -50,7 +51,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
 
 	authCookies := auth_middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
-	csrfCookie := security.NewCSRFCookie(options.AllowInsecure, options.AccessTokenTimeout)
+	csrfCookie := security.NewCSRFCookie(options.AllowInsecure, 3*24*time.Hour)
 
 	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
 	refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
@@ -61,7 +62,11 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
-			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection})
+			if _, err := csrfCookie.Issue(c); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
+				return
+			}
+			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection, "authDisabled": options.AuthDisabled})
 		})
 
 		// PUBLIC READ ACCESS (if enabled via flag or env):
@@ -81,7 +86,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	}
 
 	requiresAuthGroup := router.Group("/api")
-	requiresAuthGroup.Use(auth_middleware.RequireAuth(wikiInstance, authCookies), security.CSRFMiddleware(csrfCookie))
+	requiresAuthGroup.Use(auth_middleware.InjectPublicEditor(options.AuthDisabled), auth_middleware.RequireAuth(wikiInstance, authCookies, options.AuthDisabled), security.CSRFMiddleware(csrfCookie))
 	{
 		// If public access is disabled, we need to ensure that the tree and pages routes are protected
 		// and require authentication. If public access is enabled, these routes are already handled
@@ -112,13 +117,15 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.GET("/pages/slug-suggestion", auth_middleware.RequireEditorOrAdmin(), api.SuggestSlugHandler(wikiInstance))
 
 		// User
-		requiresAuthGroup.POST("/users", auth_middleware.RequireAdmin(), api.CreateUserHandler(wikiInstance))
-		requiresAuthGroup.GET("/users", auth_middleware.RequireAdmin(), api.GetUsersHandler(wikiInstance))
-		requiresAuthGroup.PUT("/users/:id", auth_middleware.RequireSelfOrAdmin(), api.UpdateUserHandler(wikiInstance))
-		requiresAuthGroup.DELETE("/users/:id", auth_middleware.RequireAdmin(), api.DeleteUserHandler(wikiInstance))
+		requiresAuthGroup.POST("/users", auth_middleware.RequireAdmin(options.AuthDisabled), api.CreateUserHandler(wikiInstance))
+		requiresAuthGroup.GET("/users", auth_middleware.RequireAdmin(options.AuthDisabled), api.GetUsersHandler(wikiInstance))
+		requiresAuthGroup.PUT("/users/:id", auth_middleware.RequireSelfOrAdmin(options.AuthDisabled), api.UpdateUserHandler(wikiInstance))
+		requiresAuthGroup.DELETE("/users/:id", auth_middleware.RequireAdmin(options.AuthDisabled), api.DeleteUserHandler(wikiInstance))
 
-		// Change Own Password
-		requiresAuthGroup.PUT("/users/me/password", api.ChangeOwnPasswordUserHandler(wikiInstance))
+		// Change Own Password (only meaningful when authentication is enabled)
+		if !options.AuthDisabled {
+			requiresAuthGroup.PUT("/users/me/password", api.ChangeOwnPasswordUserHandler(wikiInstance))
+		}
 
 		// Assets
 		requiresAuthGroup.POST("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.UploadAssetHandler(wikiInstance))

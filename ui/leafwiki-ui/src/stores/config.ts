@@ -4,6 +4,7 @@ import { create } from 'zustand'
 type ConfigStore = {
   publicAccess: boolean
   hideLinkMetadataSection: boolean
+  authDisabled: boolean
   loading: boolean
   hasLoaded: boolean
   loadConfig: () => Promise<void>
@@ -12,6 +13,7 @@ type ConfigStore = {
 export const useConfigStore = create<ConfigStore>((set) => ({
   publicAccess: false,
   hideLinkMetadataSection: false,
+  authDisabled: false,
   loading: false,
   hasLoaded: false,
 
@@ -22,6 +24,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
       set({
         publicAccess: config.publicAccess,
         hideLinkMetadataSection: config.hideLinkMetadataSection,
+        authDisabled: config.authDisabled,
         hasLoaded: true,
       })
     } catch (error) {

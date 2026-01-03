@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../config'
 export type Config = {
   publicAccess: boolean
   hideLinkMetadataSection: boolean
+  authDisabled: boolean
 }
 
 export async function getConfig(): Promise<Config> {
