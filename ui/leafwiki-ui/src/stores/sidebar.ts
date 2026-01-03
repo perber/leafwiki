@@ -27,7 +27,7 @@ export const useSidebarStore = create<SidebarStore>()(
       sidebarMode: SIDEBAR_TREE_PANEL_ID,
       setSidebarMode: (mode) => set({ sidebarMode: mode }),
 
-      sidebarVisible: false,
+      sidebarVisible: true,
       setSidebarVisible: (visible) => set({ sidebarVisible: visible }),
 
       sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
@@ -37,7 +37,7 @@ export const useSidebarStore = create<SidebarStore>()(
           Math.max(MIN_SIDEBAR_WIDTH, width),
         )
         set({ sidebarWidth: clamped })
-      },
+      }
     }),
     {
       name: 'leafwiki-sidebar', // localStorage key
@@ -45,7 +45,7 @@ export const useSidebarStore = create<SidebarStore>()(
         sidebarVisible: state.sidebarVisible,
         sidebarMode: state.sidebarMode,
         sidebarWidth: state.sidebarWidth,
-      }),
+      })
     },
   ),
 )

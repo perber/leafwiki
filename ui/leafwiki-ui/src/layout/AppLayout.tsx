@@ -17,7 +17,7 @@ import {
   useSidebarStore,
 } from '@/stores/sidebar'
 import { MenuIcon } from 'lucide-react'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 export const MOBILE_SIDEBAR_WIDTH = 320
@@ -25,6 +25,7 @@ export const MOBILE_SIDEBAR_WIDTH = 320
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const appMode = useAppMode()
   const [isEditor, setIsEditor] = useState(appMode === 'edit')
+
 
   // store resize handler in onMouseMove, onMouseUp in useRef
   const resizeHandlerRef = useRef<{
@@ -83,6 +84,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     resizeHandlerRef.current = { onMouseMove, onMouseUp }
     setResizing(true)
   }
+
+
+  useLayoutEffect(() => {
+    // on initial load, close sidebar on mobile
+    console.log("isMobile", isMobile)
+    if (isMobile) setSidebarVisible(false)
+  }, [isMobile, setSidebarVisible])
 
   useEffect(() => {
     if (!resizing || !resizeHandlerRef.current) return
