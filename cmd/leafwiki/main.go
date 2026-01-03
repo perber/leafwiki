@@ -35,7 +35,7 @@ func printUsage() {
 	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
 	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
 	--disable-auth                Disable authentication completely (default: false) (WARNING: only use in trusted networks!)
-	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false) 
+	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false)
 
 	Environment variables:
 	LEAFWIKI_HOST
