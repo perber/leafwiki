@@ -122,8 +122,10 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.PUT("/users/:id", auth_middleware.RequireSelfOrAdmin(options.AuthDisabled), api.UpdateUserHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/users/:id", auth_middleware.RequireAdmin(options.AuthDisabled), api.DeleteUserHandler(wikiInstance))
 
-		// Change Own Password
-		requiresAuthGroup.PUT("/users/me/password", api.ChangeOwnPasswordUserHandler(wikiInstance))
+		// Change Own Password (only meaningful when authentication is enabled)
+		if !options.AuthDisabled {
+			requiresAuthGroup.PUT("/users/me/password", api.ChangeOwnPasswordUserHandler(wikiInstance))
+		}
 
 		// Assets
 		requiresAuthGroup.POST("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.UploadAssetHandler(wikiInstance))
