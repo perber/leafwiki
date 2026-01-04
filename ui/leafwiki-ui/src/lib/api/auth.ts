@@ -158,7 +158,7 @@ declare global {
  * Ensures there is only ONE refresh in-flight across the whole runtime (even if module is duplicated).
  */
 export function ensureRefresh(): Promise<void> {
-  const authDisabled = useConfigStore.getState().authDisabled
+  const { authDisabled } = useConfigStore.getState()
   if (authDisabled) {
     return Promise.resolve()
   }
