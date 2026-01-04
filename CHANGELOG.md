@@ -3,6 +3,30 @@
 
 This document records notable changes to LeafWiki, organized by release.
 
+## ✅ v0.7.0 – Security, Authentication & UX Improvements
+
+### Security & Authentication
+- [x] Added session-based authentication backed by a local database
+- [x] Secure, HttpOnly cookies enabled by default
+- [x] CSRF protection for all state-changing requests
+- [x] Rate limiting for authentication-related endpoints
+- [x] Configurable access and refresh token timeouts
+- [x] Added `--allow-insecure` flag to explicitly disable secure cookies (HTTP only)
+- [x] Added `--disable-auth` flag to fully disable authentication (internal networks only)
+
+### Access Control
+- [x] Added **viewer role** for read-only access
+- [x] Allow editing pages without login when authentication is disabled
+
+### UI / UX Improvements
+- [x] Sidebar is open by default
+- [x] Improved image zoom behavior
+- [x] Editor no longer loses content when switching modes
+- [x] Hide login button when authentication is disabled
+
+### Metadata & Content
+- [x] Added metadata support for pages  (created at, updated at, author)
+
 ## ✅ v0.6.1
 
 - [x] Changed default server host binding from `0.0.0.0` to `127.0.0.1` for safer local defaults (configure `--host` to expose externally)
