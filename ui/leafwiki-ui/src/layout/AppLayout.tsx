@@ -85,8 +85,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   useLayoutEffect(() => {
-    // on initial load, close sidebar on mobile
-    console.log('isMobile', isMobile)
+    // Update sidebar visibility on mobile change
     if (isMobile) setSidebarVisible(false)
   }, [isMobile, setSidebarVisible])
 
