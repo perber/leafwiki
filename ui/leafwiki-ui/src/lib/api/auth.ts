@@ -71,16 +71,13 @@ export async function logout() {
   }).catch(() => {})
 }
 
-let isRefreshing = false // to prevent multiple simultaneous refreshes
-let refreshPromise: Promise<void> | null = null
-
 export async function fetchWithAuth(
   path: string,
   options: RequestInit = {},
   retry = true,
 ): Promise<unknown> {
   const store = useSessionStore.getState()
-  const logout = store.logout
+  const sessionLogout = store.logout
   const authDisabled = useConfigStore.getState().authDisabled
 
   const headers = new Headers(options.headers || {})
@@ -118,21 +115,13 @@ export async function fetchWithAuth(
   let res = await doFetch()
 
   if (res.status === 401 && retry && !authDisabled) {
-    if (!isRefreshing) {
-      isRefreshing = true
-      refreshPromise = refreshAccessToken().finally(() => {
-        isRefreshing = false
-        refreshPromise = null
-      })
-    }
-
     try {
-      await refreshPromise
+      await ensureRefresh()
       res = await doFetch()
     } catch {
       // Refresh token failed, log out the user
       if (!authDisabled) {
-        logout()
+        sessionLogout()
         const { setUser } = useSessionStore.getState()
         setUser(null)
       }
@@ -159,6 +148,22 @@ export async function fetchWithAuth(
   } catch {
     return null
   }
+}
+
+declare global {
+  var __leafwikiRefreshPromise: Promise<void> | null | undefined
+}
+
+/**
+ * Ensures there is only ONE refresh in-flight across the whole runtime (even if module is duplicated).
+ */
+export function ensureRefresh(): Promise<void> {
+  if (!globalThis.__leafwikiRefreshPromise) {
+    globalThis.__leafwikiRefreshPromise = refreshAccessToken().finally(() => {
+      globalThis.__leafwikiRefreshPromise = null
+    })
+  }
+  return globalThis.__leafwikiRefreshPromise
 }
 
 async function refreshAccessToken() {
