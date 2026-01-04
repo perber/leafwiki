@@ -104,7 +104,7 @@ For details on the current model and its constraints, see [Known limitations](#k
 - Full-text search across page titles and content
 - Image and asset support
 - Dark mode and mobile-friendly UI
-- Separation between admin and editor users
+- Separation between admin, editor, and viewer users
 - Keyboard shortcuts for common actions (like saving with Ctrl+S, ...)
 
 
@@ -264,9 +264,10 @@ These options control how the server runs after installation.
 | `--public-access`               | Allow public read-only access                                          | `false`       | –                 |
 | `--hide-link-metadata-section`  | Hide link metadata section                                             | `false`       | –                 |
 | `--inject-code-in-header`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS)| `""`          | v0.6.0            |
-| `--allow-insecure`              | ⚠️ disables Secure Cookies.                                            | `false`       | v0.7.0            |
+| `--allow-insecure`              | ⚠️ Disables Secure & HttpOnly cookies (required for HTTP)              | `false`       | v0.7.0            |
 | `--access-token-timeout`        | Access token timeout duration (e.g. 24h, 15m)                          | `15m`         | v0.7.0            |
 | `--refresh-token-timeout`       | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`          | v0.7.0            |
+| `--disable-auth`                | ⚠️ Disable  authentication & authorization (internal networks only!)   | `false`       | v0.7.0            |
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
 
@@ -285,14 +286,64 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_PUBLIC_ACCESS`               | Allow public read-only access                                           | `false`    | -               |
 | `LEAFWIKI_HIDE_LINK_METADATA_SECTION`  | Hide link metadata section                                              | `false`    | -               |
 | `LEAFWIKI_INJECT_CODE_IN_HEADER`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`       | v0.6.0          |
-| `LEAFWIKI_ALLOW_INSECURE`              | ⚠️ disables Secure Cookies.                                             | `false`    | v0.7.0          |
+| `LEAFWIKI_ALLOW_INSECURE`              | ⚠️ Disables Secure & HttpOnly cookies (required for HTTP)               | `false`    | v0.7.0          |
 | `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`        | Access token timeout duration (e.g. 24h, 15m)                           | `15m`      | v0.7.0          |
 | `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`       | Refresh token timeout duration (e.g. 168h, 7d)                          | `7d`       | v0.7.0          |
+| `LEAFWIKI_DISABLE_AUTH`                | ⚠️ Disable  authentication & authorization (internal networks only!)    | `false`    | v0.7.0          |
 
 
 These environment variables override the default values and are especially useful in containerized or production environments.
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
+
+### Security Overview - Since v0.7.0
+
+LeafWiki includes several built-in security mechanisms enabled by default:
+
+- **Secure, HttpOnly cookies** for session handling
+- **Session-based authentication** backed by a local database
+- **CSRF protection** for all state-changing requests
+- **Rate limiting** on authentication-related endpoints
+- **Role-based access** (admin, editor, viewer)
+
+These features are **enabled by default** and provide safe defaults for most deployments.
+
+⚠️ Disabling or weakening these protections (e.g. via `--disable-auth` or `--allow-insecure`)
+should only be done in **trusted, internal environments**.
+
+---
+
+### ⚠️ Security Warning: `--disable-auth`
+
+> **⚠️ WARNING – USE WITH EXTREME CAUTION**
+
+The `--disable-auth` flag **completely disables authentication and authorization** in LeafWiki.
+
+When enabled:
+- **Anyone with network access can edit, delete and modify all content**
+- **No login, no roles, no session checks are enforced**
+- **All security mechanisms are bypassed**
+
+**This flag MUST NOT be used on public or internet-facing deployments.**
+
+**Intended use cases only:**
+- Local development
+- Internal networks
+- Environments protected by VPN and/or firewall
+- Fully isolated test systems
+
+If you use this flag, **you are fully responsible for securing access at the network level**.
+
+**Safe example (local development only):**
+
+```bash
+./leafwiki --disable-auth --host=127.0.0.1
+```
+
+**For most setups, prefer:**
+- Authentication enabled (default)
+- `--public-access` for read-only public access
+- Viewer role for read-only access
 
 ## Migrating existing Markdown content (community tool)
 
