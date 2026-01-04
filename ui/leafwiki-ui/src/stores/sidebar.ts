@@ -37,7 +37,7 @@ export const useSidebarStore = create<SidebarStore>()(
           Math.max(MIN_SIDEBAR_WIDTH, width),
         )
         set({ sidebarWidth: clamped })
-      }
+      },
     }),
     {
       name: 'leafwiki-sidebar', // localStorage key
@@ -45,7 +45,7 @@ export const useSidebarStore = create<SidebarStore>()(
         sidebarVisible: state.sidebarVisible,
         sidebarMode: state.sidebarMode,
         sidebarWidth: state.sidebarWidth,
-      })
+      }),
     },
   ),
 )

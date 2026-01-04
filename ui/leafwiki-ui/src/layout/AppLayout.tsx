@@ -26,7 +26,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const appMode = useAppMode()
   const [isEditor, setIsEditor] = useState(appMode === 'edit')
 
-
   // store resize handler in onMouseMove, onMouseUp in useRef
   const resizeHandlerRef = useRef<{
     onMouseMove: (e: MouseEvent) => void
@@ -85,10 +84,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setResizing(true)
   }
 
-
   useLayoutEffect(() => {
     // on initial load, close sidebar on mobile
-    console.log("isMobile", isMobile)
+    console.log('isMobile', isMobile)
     if (isMobile) setSidebarVisible(false)
   }, [isMobile, setSidebarVisible])
 
