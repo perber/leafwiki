@@ -19,7 +19,7 @@ export default function UserToolbar() {
   const openDialog = useDialogsStore((state) => state.openDialog)
   const authDisabled = useConfigStore((s) => s.authDisabled)
 
-  if (!user) {
+  if (!user && !authDisabled) {
     // renders the login
     return (
       <div className="user-toolbar">
@@ -57,7 +57,7 @@ export default function UserToolbar() {
             data-testid="user-toolbar-avatar"
           >
             <AvatarFallback className="user-toolbar__avatar-fallback">
-              {user.username[0].toUpperCase()}
+              {user?.username[0].toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </DropdownMenuTrigger>
