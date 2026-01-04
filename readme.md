@@ -1,6 +1,6 @@
 # 🌿 LeafWiki
 
-**Self-hosted markdown knowledge base server — tree-structured, lightweight, single-binary.**  
+**Self-hosted Markdown knowledge base server — tree-structured, lightweight, single-binary.**  
 
 LeafWiki is a lightweight, self-hosted knowledge base server for documenting runbooks, internal docs, and technical knowledge — without the overhead of traditional wiki systems. 
 
