@@ -158,6 +158,11 @@ declare global {
  * Ensures there is only ONE refresh in-flight across the whole runtime (even if module is duplicated).
  */
 export function ensureRefresh(): Promise<void> {
+  const authDisabled = useConfigStore.getState().authDisabled
+  if (authDisabled) {
+    return Promise.resolve()
+  }
+  
   if (!globalThis.__leafwikiRefreshPromise) {
     globalThis.__leafwikiRefreshPromise = refreshAccessToken().finally(() => {
       globalThis.__leafwikiRefreshPromise = null
