@@ -563,11 +563,11 @@ func TestGetPageEndpoint(t *testing.T) {
 		t.Errorf("Expected id in response, got: %v", resp)
 	}
 
-	if resp["title"] != "Welcome to Leaf Wiki" {
+	if resp["title"] != "Welcome to LeafWiki" {
 		t.Errorf("Expected title in response, got: %v", resp)
 	}
 
-	if resp["slug"] != "welcome-to-leaf-wiki" {
+	if resp["slug"] != "welcome-to-leafwiki" {
 		t.Errorf("Expected slug in response, got: %v", resp)
 	}
 }
@@ -777,7 +777,7 @@ func TestSortPagesEndpoint(t *testing.T) {
 	}
 
 	// Get Welcome Page by path
-	welcomePage, err := w.FindByPath("welcome-to-leaf-wiki")
+	welcomePage, err := w.FindByPath("welcome-to-leafwiki")
 	if err != nil {
 		t.Fatalf("FindByPath failed: %v", err)
 	}

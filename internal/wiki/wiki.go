@@ -184,7 +184,7 @@ func (w *Wiki) EnsureWelcomePage() error {
 		return nil
 	}
 
-	p, err := w.CreatePage(SYSTEM_USER_ID, nil, "Welcome to Leaf Wiki", "welcome-to-leaf-wiki")
+	p, err := w.CreatePage(SYSTEM_USER_ID, nil, "Welcome to LeafWiki", "welcome-to-leafwiki")
 	if err != nil {
 		return err
 	}
@@ -192,25 +192,28 @@ func (w *Wiki) EnsureWelcomePage() error {
 	// Set the content of the welcome page
 	content := `# Welcome to LeafWiki!
 
-This is your personal, lightweight Markdown wiki.  
-You can write, edit, and structure pages – all in a simple tree layout.
+LeafWiki is a lightweight, self-hosted knowledge base server for documenting  
+runbooks, internal docs, and technical knowledge using plain Markdown files.  
+
+Content is stored directly on disk, organized in a clear tree structure, and served by a single Go binary.  
 
 ---
 
-## Features
+## What you can do here
 
-- **Live Markdown editor** with preview
-- **Tree-based navigation**
-- **Per-page assets** like images and files
-- **No database** – just clean files
-- **Single Go binary** – easy to run
+- Write and edit pages using plain Markdown
+- Organize content explicitly in a tree structure
+- Attach images and files per page
+- Keep full control over your data on your own server
+
+LeafWiki is designed for clarity, structure, and long-term maintainability — not for complex workflows or heavy collaboration features.
 
 ---
 
-## Tips
+## Getting started
 
-- Click the + button to create new pages or folders
-- Double-click an asset to insert it into the editor
+- Click the + button to create new pages
+- Press the Pencil icon to edit the page
 - Use Markdown for formatting, like:
 
 ` + "```" + `md
