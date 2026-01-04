@@ -7,7 +7,7 @@ export default class TreeView {
   constructor(private page: Page) {}
 
   async getRootAddButton() {
-    return this.page.locator('button[data-testid="tree-view-action-button-add"]');
+    return this.page.getByTestId('sidebar').getByTestId('tree-view-action-button-add').first();
   }
 
   async clickRootAddButton() {

@@ -27,7 +27,7 @@ export const useSidebarStore = create<SidebarStore>()(
       sidebarMode: SIDEBAR_TREE_PANEL_ID,
       setSidebarMode: (mode) => set({ sidebarMode: mode }),
 
-      sidebarVisible: false,
+      sidebarVisible: true,
       setSidebarVisible: (visible) => set({ sidebarVisible: visible }),
 
       sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
