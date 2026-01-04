@@ -5,11 +5,11 @@ import {
   indentWithTab,
 } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
-import { EditorState } from '@codemirror/state'
+import { Compartment, EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, keymap } from '@codemirror/view'
 import { githubLight } from '@fsegurai/codemirror-theme-github-light'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDesignModeStore } from '../designtoggle/designmode'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 
@@ -32,6 +32,7 @@ export default function MarkdownCodeEditor({
   const valueRef = useRef(initialValue)
 
   const designMode = useDesignModeStore((state) => state.mode)
+  const [themeCompartment] = useState(() => new Compartment())
 
   // Always use the latest onChange function
   useEffect(() => {
@@ -107,7 +108,7 @@ export default function MarkdownCodeEditor({
     const state = EditorState.create({
       doc: initialValue,
       extensions: [
-        designMode === 'light' ? githubLight : oneDark,
+        themeCompartment.of(designMode === 'light' ? githubLight : oneDark),
         markdown(),
         history(),
         keymap.of([
@@ -162,8 +163,20 @@ export default function MarkdownCodeEditor({
     return () => {
       view.destroy()
       viewRef.current = null
+      editorViewRef.current = null
     }
-  }, [initialValue, onCursorLineChange, editorViewRef, designMode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValue, onCursorLineChange, editorViewRef, themeCompartment])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: themeCompartment.reconfigure(
+        designMode === 'light' ? githubLight : oneDark,
+      ),
+    })
+  }, [designMode, themeCompartment])
 
   return <div ref={editorRef} className="markdown-code-editor" />
 }
