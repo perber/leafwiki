@@ -1,8 +1,10 @@
 # 🌿 LeafWiki
 
-**A self-hosted Dev Wiki built for developers — tree-based, fast, and powered by plain Markdown.**  
+**Self-hosted markdown knowledge base server — tree-structured, lightweight, single-binary.**  
 
-LeafWiki provides a personal, self-hosted documentation space — storing pages as plain Markdown files on your own infrastructure, without requiring an external database.
+LeafWiki is a lightweight, self-hosted knowledge base server for documenting runbooks, internal docs, and technical knowledge — without the overhead of traditional wiki systems. 
+
+Content is stored as Markdown files directly on disk, organized in a clear tree structure, and served by a single Go binary — with no separate database service to run.
 
 ---
 
@@ -36,22 +38,47 @@ The demo instance resets automatically every hour, so all changes are temporary.
 ## What LeafWiki is good for today
 
 LeafWiki focuses on personal and small-team documentation use cases today.  
-Team features and collaboration may evolve based on real-world needs.
+Team features and collaboration evolve cautiously, guided by real-world usage rather than speculative complexity.
 
 LeafWiki is currently well-suited for:
 - Personal technical notes, documentation and ideas
 - Project documentation maintained by one main contributor
 - Runbooks, operational knowledge and engineering guides for small teams
-- Structured content that benefit from explicit hierarchy and ordering
+- Structured content that benefits from explicit hierarchy and ordering
+
+---
+
+## Project Status
+
+LeafWiki is stable for everyday use as a personal or primary-owner wiki.  
+The core feature set — writing, structure, search, ... is actively maintained and production-ready.
+
+Collaboration is currently limited and follows a *last-write-wins* approach.  
+More advanced team-oriented capabilities are under development, with a focus on durability and predictable behavior.
+
+
+**Current priorities:**  
+- Versioning
+- Operations metadata (created/updated info)
+- Conflict handling for concurrent edits (optimistic locking)
+
+Development is iterative and guided by real-world use.  
+The platform will evolve cautiously toward team workflows while maintaining its principles of simplicity and low operational overhead.
+
+> **LeafWiki** is actively developed and open to collaboration 🌿 
+
+See the [CHANGELOG](CHANGELOG.md) for release details.
 
 ---
 
 ## Why Another Wiki?
 
+LeafWiki is a wiki-style knowledge base focused on structure and simplicity,
+rather than collaboration-heavy workflows.
+
 Many existing wiki tools feel heavier than the problem they solve.  
 They require databases, plugins, workflows or complex deployment setups.  
-
-That adds friction before writing has even started.  
+ 
 You have to pick structure, configure storage, and think about operations instead of capturing knowledge while the context is fresh.  
 
 LeafWiki was designed around a few simple questions:
@@ -108,7 +135,6 @@ For details on the current model and its constraints, see [Known limitations](#k
 - Keyboard shortcuts for common actions (like saving with Ctrl+S, ...)
 
 
-LeafWiki runs as a single Go binary, does not require an external database, and is designed to be self-hosted using Docker or as a standalone binary.
 LeafWiki supports public read-only access for documentation use cases, while keeping editing and structure management restricted to authenticated users.
 
 ## What LeafWiki is not
@@ -116,29 +142,6 @@ LeafWiki supports public read-only access for documentation use cases, while kee
 LeafWiki does not aim to be a large enterprise documentation system.
 
 It intentionally avoids complex workflows, real-time collaborative editing, and advanced permission models to maintain simplicity, predictability, and low operational overhead.
-
----
-
-## Project Status
-
-LeafWiki is stable for everyday use as a personal or primary-owner wiki.  
-The core feature set — writing, structure, search, ... is actively maintained and production-ready.
-
-Collaboration is currently limited and follows a *last-write-wins* approach.  
-More advanced team-oriented capabilities are under development, with a focus on durability and predictable behavior.
-
-
-**Current priorities:**  
-- Versioning
-- Operations metadata (created/updated info)
-- Conflict handling for concurrent edits (optimistic locking)
-
-Development is iterative and guided by real-world use.  
-The platform will evolve cautiously toward team workflows while maintaining its principles of simplicity and low operational overhead.
-
-> **LeafWiki** is actively developed and open to collaboration 🌿 
-
-See the [CHANGELOG](CHANGELOG.md) for release details.
 
 ---
 
