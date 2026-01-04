@@ -167,7 +167,7 @@ export function ensureRefresh(): Promise<void> {
   if (authDisabled) {
     return Promise.resolve()
   }
-  
+
   if (!globalThis.__leafwikiRefreshPromise) {
     globalThis.__leafwikiRefreshPromise = refreshAccessToken().finally(() => {
       globalThis.__leafwikiRefreshPromise = null
