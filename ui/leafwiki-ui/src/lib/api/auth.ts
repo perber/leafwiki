@@ -151,9 +151,14 @@ export async function fetchWithAuth(
 }
 
 declare global {
-  var __leafwikiRefreshPromise: Promise<void> | null | undefined
+  // Explicitly initialized below; runtime value is either a Promise or null
+  var __leafwikiRefreshPromise: Promise<void> | null
 }
 
+// Ensure the global is initialized to a known value at module load time.
+if (typeof globalThis.__leafwikiRefreshPromise === 'undefined') {
+  globalThis.__leafwikiRefreshPromise = null
+}
 /**
  * Ensures there is only ONE refresh in-flight across the whole runtime (even if module is duplicated).
  */
