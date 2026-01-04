@@ -30,7 +30,7 @@ EXPOSE 8080
 RUN mkdir -p /app/data && chmod 777 /app/data
 
 LABEL org.opencontainers.image.title="LeafWiki" \
-      org.opencontainers.image.description="Self-hosted markdown knowledge base server — tree-structured, lightweight, single-binary." \
+      org.opencontainers.image.description="Self-hosted Markdown knowledge base server — tree-structured, lightweight, single-binary." \
       org.opencontainers.image.url="https://demo.leafwiki.com" \
       org.opencontainers.image.source="https://github.com/perber/leafwiki" \
       org.opencontainers.image.licenses="MIT"
