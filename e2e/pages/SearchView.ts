@@ -10,6 +10,8 @@ export default class SearchView {
   async enterSearchQuery(query: string) {
     const searchInput = await this.getSearchInput();
     await searchInput.fill(query);
+    // wait for results to update
+    await this.page.waitForTimeout(500);
   }
 
   async clearSearch() {
