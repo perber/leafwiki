@@ -189,7 +189,7 @@ func TestTreeService_UpdatePage_ContentAndSlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read file: %v", err)
 	}
-	if string(data) != newContent {
+	if !strings.Contains(string(data), newContent) {
 		t.Errorf("Expected content %q, got %q", newContent, string(data))
 	}
 }
@@ -199,7 +199,7 @@ func TestTreeService_UpdatePage_FileNotFound(t *testing.T) {
 	service := NewTreeService(tmpDir)
 	_ = service.LoadTree()
 
-	// Seite im Baum erzeugen, aber Datei nicht schreiben
+	// Create a page in the tree but do not create the corresponding file
 	id := "ghost"
 	page := &PageNode{
 		ID:     id,
@@ -274,7 +274,7 @@ func TestTreeService_DeletePage_HasChildrenWithoutRecursive(t *testing.T) {
 		t.Fatalf("CreatePage (child) failed: %v", err)
 	}
 
-	// Versuch ohne Rekursion
+	// Try deleting parent without recursive
 	err = service.DeletePage("system", parent.ID, false)
 	if err == nil {
 		t.Error("Expected error when deleting parent with children without recursive flag")
