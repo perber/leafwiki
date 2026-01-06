@@ -154,7 +154,7 @@ func (t *TreeService) migrateToV1() error {
 }
 
 // migrateToV2 migrates the tree to the v2 schema
-// Adds frontmatter to all exisiting pages if missing
+// Adds frontmatter to all existing pages if missing
 func (t *TreeService) migrateToV2() error {
 	// Traverse all pages and add frontmatter if missing
 	var addFrontmatter func(node *PageNode) error
