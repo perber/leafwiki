@@ -11,4 +11,7 @@ var ErrMovePageCircularReference = errors.New("circular reference detected")
 var ErrPageCannotBeMovedToItself = errors.New("page cannot be moved to itself")
 var ErrInvalidSortOrder = errors.New("invalid sort order")
 var ErrFrontmatterParse = errors.New("frontmatter parse error")
+<<<<<<< HEAD
 var ErrFileNotFound = errors.New("file not found")
+=======
+>>>>>>> 8ffdc61 (feat: write frontmatter (#563))
