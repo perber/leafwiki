@@ -820,6 +820,7 @@ func TestTreeService_MigrateToV2_PagesWithoutFrontmatter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
+	page2 := page1.Children[0]
 
 	// Write content without frontmatter
 	page1Path := filepath.Join(tmpDir, "root", "page1.md")
@@ -875,8 +876,8 @@ func TestTreeService_MigrateToV2_PagesWithoutFrontmatter(t *testing.T) {
 	if !has2 {
 		t.Error("Expected page2 to have frontmatter after migration")
 	}
-	if fm2.LeafWikiID != page1.Children[0].ID {
-		t.Errorf("Expected page2 frontmatter ID to be %s, got %s", page1.Children[0].ID, fm2.LeafWikiID)
+	if fm2.LeafWikiID != page2.ID {
+		t.Errorf("Expected page2 frontmatter ID to be %s, got %s", page2.ID, fm2.LeafWikiID)
 	}
 	if !strings.Contains(body2, "# Page 2 Content") {
 		t.Error("Expected page2 body to be preserved")
