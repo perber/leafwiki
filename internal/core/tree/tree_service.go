@@ -209,18 +209,18 @@ func (t *TreeService) migrateToV2() error {
 		if changed {
 			newContent, err := BuildMarkdownWithFrontmatter(fm, body)
 			if err != nil {
-				t.log.Error("could not build markdown with frontmatter", "nodeID", node.ID, "err", err)
+				t.log.Error("could not build markdown with frontmatter", "nodeID", node.ID, "error", err)
 				return fmt.Errorf("could not build markdown with frontmatter for node %s: %w", node.ID, err)
 			}
 
 			filePath, err := t.store.getFilePath(node)
 			if err != nil {
-				t.log.Error("could not get file path", "nodeID", node.ID, "err", err)
+				t.log.Error("could not get file path", "nodeID", node.ID, "error", err)
 				return fmt.Errorf("could not get file path for node %s: %w", node.ID, err)
 			}
 
 			if err := writeFileAtomic(filePath, []byte(newContent), 0o644); err != nil {
-				t.log.Error("could not write updated page content", "nodeID", node.ID, "filePath", filePath, "err", err)
+				t.log.Error("could not write updated page content", "nodeID", node.ID, "filePath", filePath, "error", err)
 				return fmt.Errorf("could not write updated page content for node %s: %w", node.ID, err)
 			}
 
