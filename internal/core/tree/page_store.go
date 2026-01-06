@@ -375,5 +375,5 @@ func (f *PageStore) getFilePath(entry *PageNode) (string, error) {
 		return path.Join(entryPath, "index.md"), nil
 	}
 
-	return "", errors.New("file not found")
+	return "", ErrFileNotFound
 }

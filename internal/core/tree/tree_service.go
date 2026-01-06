@@ -162,7 +162,7 @@ func (t *TreeService) migrateToV2() error {
 		// Read the content of the page
 		content, err := t.store.ReadPageRaw(node)
 		if err != nil {
-			if errors.Is(err, os.ErrNotExist) || err.Error() == "file not found" {
+			if errors.Is(err, os.ErrNotExist) || errors.Is(err, ErrFileNotFound) {
 				t.log.Warn("Page file does not exist, skipping frontmatter addition", "nodeID", node.ID)
 				// Recurse into children
 				for _, child := range node.Children {
