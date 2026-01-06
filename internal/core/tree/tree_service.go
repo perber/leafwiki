@@ -1,8 +1,9 @@
 package tree
 
 import (
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"sort"
 	"strings"
@@ -19,6 +20,7 @@ type TreeService struct {
 	treeFilename string
 	tree         *PageNode
 	store        *PageStore
+	log          *slog.Logger
 
 	mu sync.RWMutex
 }
@@ -30,6 +32,7 @@ func NewTreeService(storageDir string) *TreeService {
 		treeFilename: "tree.json",
 		tree:         nil,
 		store:        NewPageStore(storageDir),
+		log:          slog.Default().With("component", "TreeService"),
 	}
 }
 
@@ -47,42 +50,56 @@ func (t *TreeService) LoadTree() error {
 	}
 
 	// Load the schema version
-	log.Printf("Checking schema version...")
+	t.log.Info("Checking schema version...")
 	schema, err := loadSchema(t.storageDir)
 	if err != nil {
-		log.Printf("Error loading schema: %v", err)
+		t.log.Error("Error loading schema", "error", err)
 		return err
 	}
 
 	if schema.Version < CurrentSchemaVersion {
-		log.Printf("Migrating schema from version %d to %d...", schema.Version, CurrentSchemaVersion)
+		t.log.Info("Migrating schema", "fromVersion", schema.Version, "toVersion", CurrentSchemaVersion)
 		if err := t.migrate(schema.Version); err != nil {
-			log.Printf("Error migrating schema: %v", err)
+			t.log.Error("Error migrating schema", "error", err)
 			return err
 		}
-
-		// migration was successful, update schema version
-		if err := saveSchema(t.storageDir, CurrentSchemaVersion); err != nil {
-			log.Printf("Error saving schema: %v", err)
-			return err
-		}
-
-		return t.saveTreeLocked()
 	}
 
 	return err
 }
 
 func (t *TreeService) migrate(fromVersion int) error {
-	if fromVersion < 1 {
-		if err := t.migrateTreeToV1Schema(); err != nil {
+
+	for v := fromVersion; v < CurrentSchemaVersion; v++ {
+		switch v {
+		case 0:
+			if err := t.migrateToV1(); err != nil {
+				t.log.Error("Error migrating to v1", "error", err)
+				return err
+			}
+		case 1:
+			if err := t.migrateToV2(); err != nil {
+				t.log.Error("Error migrating to v2", "error", err)
+				return err
+			}
+		}
+
+		// Save the tree after each migration step
+		if err := t.saveTreeLocked(); err != nil {
+			t.log.Error("Error saving tree after migration", "version", v+1, "error", err)
+			return err
+		}
+
+		// Update the schema version file
+		if err := saveSchema(t.storageDir, v+1); err != nil {
+			t.log.Error("Error saving schema", "version", v+1, "error", err)
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *TreeService) migrateTreeToV1Schema() error {
+func (t *TreeService) migrateToV1() error {
 	// Backfill metadata for all pages
 	var backfillMetadata func(node *PageNode) error
 	backfillMetadata = func(node *PageNode) error {
@@ -98,7 +115,7 @@ func (t *TreeService) migrateTreeToV1Schema() error {
 			// Log the error and continue
 			// We still want to backfill metadata for other nodes
 			// but we cannot do it for this node
-			log.Printf("could not get file path for node %s: %v", node.ID, err)
+			t.log.Error("Could not get file path for node", "nodeID", node.ID, "error", err)
 			return nil
 		}
 
@@ -111,7 +128,7 @@ func (t *TreeService) migrateTreeToV1Schema() error {
 			createdAt = info.ModTime().UTC()
 			updatedAt = info.ModTime().UTC()
 		} else if !os.IsNotExist(err) {
-			log.Printf("could not stat file for node %s at path %s: %v", node.ID, filePath, err)
+			t.log.Error("Could not stat file for node", "nodeID", node.ID, "filePath", filePath, "error", err)
 		}
 
 		node.Metadata = PageMetadata{
@@ -129,7 +146,111 @@ func (t *TreeService) migrateTreeToV1Schema() error {
 		return nil
 	}
 
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
 	return backfillMetadata(t.tree)
+}
+
+// migrateToV2 migrates the tree to the v2 schema
+// Adds frontmatter to all exisiting pages if missing
+func (t *TreeService) migrateToV2() error {
+	// Traverse all pages and add frontmatter if missing
+	var addFrontmatter func(node *PageNode) error
+	addFrontmatter = func(node *PageNode) error {
+		// Read the content of the page
+		content, err := t.store.ReadPageRaw(node)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				t.log.Warn("Page file does not exist, skipping frontmatter addition", "nodeID", node.ID)
+				// Recurse into children
+				for _, child := range node.Children {
+					if err := addFrontmatter(child); err != nil {
+						t.log.Error("Error adding frontmatter to child node", "nodeID", child.ID, "error", err)
+						return err
+					}
+				}
+				return nil
+			}
+			t.log.Error("Could not read page content for node", "nodeID", node.ID, "error", err)
+			return fmt.Errorf("could not read page content for node %s: %v", node.ID, err)
+		}
+
+		// Parse the frontmatter
+		fm, body, has, err := ParseFrontmatter(content)
+		if err != nil {
+			t.log.Error("Could not parse frontmatter for node", "nodeID", node.ID, "error", err)
+			return fmt.Errorf("could not parse frontmatter for node %s: %v", node.ID, err)
+		}
+
+		// Decide if we need to change anything
+		changed := false
+
+		// If there is no frontmatter, start with a new one
+		if !has {
+			fm = Frontmatter{}
+			changed = true
+		}
+
+		// Ensure required fields exist
+		if strings.TrimSpace(fm.LeafWikiID) == "" {
+			fm.LeafWikiID = node.ID
+			changed = true
+		}
+		// Optional but nice: keep title in sync *at least once*
+		// (you might choose to NOT overwrite existing title)
+		if strings.TrimSpace(fm.LeafWikiTitle) == "" {
+			fm.LeafWikiTitle = node.Title
+			changed = true
+		}
+
+		// Only write if changed
+		if changed {
+			newContent, err := BuildMarkdownWithFrontmatter(fm, body)
+			if err != nil {
+				t.log.Error("could not build markdown with frontmatter", "nodeID", node.ID, "err", err)
+				return fmt.Errorf("could not build markdown with frontmatter for node %s: %w", node.ID, err)
+			}
+
+			filePath, err := t.store.getFilePath(node)
+			if err != nil {
+				t.log.Error("could not get file path", "nodeID", node.ID, "err", err)
+				return fmt.Errorf("could not get file path for node %s: %w", node.ID, err)
+			}
+
+			if err := writeFileAtomic(filePath, []byte(newContent), 0o644); err != nil {
+				t.log.Error("could not write updated page content", "nodeID", node.ID, "filePath", filePath, "err", err)
+				return fmt.Errorf("could not write updated page content for node %s: %w", node.ID, err)
+			}
+
+			t.log.Info("frontmatter backfilled", "nodeID", node.ID, "path", filePath)
+		}
+
+		// Recurse into children
+		for _, child := range node.Children {
+			if err := addFrontmatter(child); err != nil {
+				t.log.Error("Error adding frontmatter to child node", "nodeID", child.ID, "error", err)
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
+	// start the recursion from the children of the root
+	for _, child := range t.tree.Children {
+		if err := addFrontmatter(child); err != nil {
+			t.log.Error("Error adding frontmatter to child node", "nodeID", child.ID, "error", err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 // SaveTree saves the tree to the storage directory
