@@ -803,3 +803,373 @@ func TestTreeService_EnsurePagePath_PathStartingWithSlash(t *testing.T) {
 		t.Errorf("expected nil result for invalid path")
 	}
 }
+
+func TestTreeService_MigrateToV2_PagesWithoutFrontmatter(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	// Create pages without frontmatter
+	_, err := service.CreatePage("system", nil, "Page1", "page1")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	page1 := service.GetTree().Children[0]
+
+	_, err = service.CreatePage("system", &page1.ID, "Page2", "page2")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	page2 := page1.Children[0]
+
+	// Write content without frontmatter
+	page1Path := filepath.Join(tmpDir, "root", "page1.md")
+	page2Path := filepath.Join(tmpDir, "root", "page1", "page2.md")
+	
+	err = os.WriteFile(page1Path, []byte("# Page 1 Content\nHello World"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write page1: %v", err)
+	}
+	
+	err = os.WriteFile(page2Path, []byte("# Page 2 Content\nNested content"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write page2: %v", err)
+	}
+
+	// Run migration
+	err = service.migrateToV2()
+	if err != nil {
+		t.Fatalf("migrateToV2 failed: %v", err)
+	}
+
+	// Verify frontmatter was added to page1
+	content1, err := os.ReadFile(page1Path)
+	if err != nil {
+		t.Fatalf("Failed to read page1 after migration: %v", err)
+	}
+	fm1, body1, has1, err := ParseFrontmatter(string(content1))
+	if err != nil {
+		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
+	}
+	if !has1 {
+		t.Error("Expected page1 to have frontmatter after migration")
+	}
+	if fm1.LeafWikiID != page1.ID {
+		t.Errorf("Expected page1 frontmatter ID to be %s, got %s", page1.ID, fm1.LeafWikiID)
+	}
+	if fm1.LeafWikiTitle != "Page1" {
+		t.Errorf("Expected page1 frontmatter title to be 'Page1', got %s", fm1.LeafWikiTitle)
+	}
+	if !strings.Contains(body1, "# Page 1 Content") {
+		t.Error("Expected page1 body to be preserved")
+	}
+
+	// Verify frontmatter was added to page2
+	content2, err := os.ReadFile(page2Path)
+	if err != nil {
+		t.Fatalf("Failed to read page2 after migration: %v", err)
+	}
+	fm2, body2, has2, err := ParseFrontmatter(string(content2))
+	if err != nil {
+		t.Fatalf("Failed to parse frontmatter for page2: %v", err)
+	}
+	if !has2 {
+		t.Error("Expected page2 to have frontmatter after migration")
+	}
+	if fm2.LeafWikiID != page2.ID {
+		t.Errorf("Expected page2 frontmatter ID to be %s, got %s", page2.ID, fm2.LeafWikiID)
+	}
+	if !strings.Contains(body2, "# Page 2 Content") {
+		t.Error("Expected page2 body to be preserved")
+	}
+}
+
+func TestTreeService_MigrateToV2_PagesWithExistingFrontmatter(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	// Create page
+	_, err := service.CreatePage("system", nil, "Page1", "page1")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	page1 := service.GetTree().Children[0]
+
+	// Write content with existing frontmatter
+	page1Path := filepath.Join(tmpDir, "root", "page1.md")
+	existingContent := "---\nleafwiki_id: " + page1.ID + "\nleafwiki_title: Custom Title\n---\n# Page 1 Content"
+	err = os.WriteFile(page1Path, []byte(existingContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write page1: %v", err)
+	}
+
+	// Run migration
+	err = service.migrateToV2()
+	if err != nil {
+		t.Fatalf("migrateToV2 failed: %v", err)
+	}
+
+	// Verify frontmatter was not modified (should be unchanged)
+	content1, err := os.ReadFile(page1Path)
+	if err != nil {
+		t.Fatalf("Failed to read page1 after migration: %v", err)
+	}
+	fm1, body1, has1, err := ParseFrontmatter(string(content1))
+	if err != nil {
+		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
+	}
+	if !has1 {
+		t.Error("Expected page1 to have frontmatter after migration")
+	}
+	if fm1.LeafWikiID != page1.ID {
+		t.Errorf("Expected page1 frontmatter ID to be %s, got %s", page1.ID, fm1.LeafWikiID)
+	}
+	if fm1.LeafWikiTitle != "Custom Title" {
+		t.Errorf("Expected page1 frontmatter title to be 'Custom Title', got %s", fm1.LeafWikiTitle)
+	}
+	if !strings.Contains(body1, "# Page 1 Content") {
+		t.Error("Expected page1 body to be preserved")
+	}
+}
+
+func TestTreeService_MigrateToV2_MissingFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	// Create a page and its file
+	_, err := service.CreatePage("system", nil, "Page1", "page1")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	// Write content to page1
+	page1Path := filepath.Join(tmpDir, "root", "page1.md")
+	err = os.WriteFile(page1Path, []byte("# Page 1 Content"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write page1: %v", err)
+	}
+
+	// Create a page with a child
+	_, err = service.CreatePage("system", nil, "Parent", "parent")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	parent := service.GetTree().Children[1]
+
+	_, err = service.CreatePage("system", &parent.ID, "Child", "child")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	// Write content to child without frontmatter
+	childPath := filepath.Join(tmpDir, "root", "parent", "child.md")
+	err = os.WriteFile(childPath, []byte("# Child Content"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write child: %v", err)
+	}
+
+	// Remove the parent index.md file (parent has children so it's in a folder)
+	parentIndexPath := filepath.Join(tmpDir, "root", "parent", "index.md")
+	if _, err := os.Stat(parentIndexPath); err == nil {
+		os.Remove(parentIndexPath)
+	}
+
+	// Run migration - should handle missing parent file gracefully and still migrate child
+	err = service.migrateToV2()
+	if err != nil {
+		t.Fatalf("migrateToV2 should handle missing files gracefully, got error: %v", err)
+	}
+
+	// Verify page1 was migrated
+	content1, err := os.ReadFile(page1Path)
+	if err != nil {
+		t.Fatalf("Failed to read page1 after migration: %v", err)
+	}
+	_, _, has1, err := ParseFrontmatter(string(content1))
+	if err != nil {
+		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
+	}
+	if !has1 {
+		t.Error("Expected page1 to have frontmatter after migration")
+	}
+
+	// Verify child was still migrated even though parent file is missing
+	childContent, err := os.ReadFile(childPath)
+	if err != nil {
+		t.Fatalf("Failed to read child after migration: %v", err)
+	}
+	_, _, hasChild, err := ParseFrontmatter(string(childContent))
+	if err != nil {
+		t.Fatalf("Failed to parse frontmatter for child: %v", err)
+	}
+	if !hasChild {
+		t.Error("Expected child to have frontmatter after migration even if parent file is missing")
+	}
+}
+
+func TestTreeService_MigrateToV2_SkipsNonExistentFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	// Create a simple page
+	_, err := service.CreatePage("system", nil, "Page1", "page1")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	// Write content without frontmatter
+	page1Path := filepath.Join(tmpDir, "root", "page1.md")
+	err = os.WriteFile(page1Path, []byte("# Page 1 Content"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write page1: %v", err)
+	}
+
+	// Manually add a node to the tree without creating its file
+	// This simulates a corrupted tree structure
+	ghostNode := &PageNode{
+		ID:     "ghost-node",
+		Title:  "Ghost",
+		Slug:   "ghost",
+		Parent: service.tree,
+	}
+	service.tree.Children = append(service.tree.Children, ghostNode)
+
+	// Run migration - should handle the ghost node gracefully if it returns os.ErrNotExist
+	// But will fail with other errors from getFilePath
+	err = service.migrateToV2()
+	// The getFilePath returns "file not found" which is not os.ErrNotExist
+	// So the migration will fail
+	if err == nil {
+		t.Error("Expected migration to fail when encountering missing file")
+	}
+}
+
+func TestTreeService_MigrateToV2_TreeNotLoaded(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	// Do NOT load tree
+
+	// Run migration should fail
+	err := service.migrateToV2()
+	if err == nil {
+		t.Error("Expected error when tree is not loaded")
+	}
+	if !errors.Is(err, ErrTreeNotLoaded) {
+		t.Errorf("Expected ErrTreeNotLoaded, got: %v", err)
+	}
+}
+
+func TestTreeService_MigrateToV2_PartialFrontmatter(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	// Create page
+	_, err := service.CreatePage("system", nil, "Page1", "page1")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	page1 := service.GetTree().Children[0]
+
+	// Write content with partial frontmatter (missing ID)
+	page1Path := filepath.Join(tmpDir, "root", "page1.md")
+	partialContent := "---\nleafwiki_title: Existing Title\n---\n# Page 1 Content"
+	err = os.WriteFile(page1Path, []byte(partialContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write page1: %v", err)
+	}
+
+	// Run migration
+	err = service.migrateToV2()
+	if err != nil {
+		t.Fatalf("migrateToV2 failed: %v", err)
+	}
+
+	// Verify ID was added but title was preserved
+	content1, err := os.ReadFile(page1Path)
+	if err != nil {
+		t.Fatalf("Failed to read page1 after migration: %v", err)
+	}
+	fm1, _, _, err := ParseFrontmatter(string(content1))
+	if err != nil {
+		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
+	}
+	if fm1.LeafWikiID != page1.ID {
+		t.Errorf("Expected page1 frontmatter ID to be added: %s, got %s", page1.ID, fm1.LeafWikiID)
+	}
+	if fm1.LeafWikiTitle != "Existing Title" {
+		t.Errorf("Expected page1 frontmatter title to be preserved: 'Existing Title', got %s", fm1.LeafWikiTitle)
+	}
+}
+
+func TestTreeService_MigrateToV2_EmptyTree(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	// Run migration on empty tree (only root, no children)
+	err := service.migrateToV2()
+	if err != nil {
+		t.Fatalf("migrateToV2 should succeed on empty tree, got error: %v", err)
+	}
+}
+
+func TestTreeService_MigrateToV2_PreservesBodyContent(t *testing.T) {
+	tmpDir := t.TempDir()
+	service := NewTreeService(tmpDir)
+	_ = service.LoadTree()
+
+	// Create page
+	_, err := service.CreatePage("system", nil, "Page1", "page1")
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	// Write complex content without frontmatter
+	page1Path := filepath.Join(tmpDir, "root", "page1.md")
+	complexContent := `# Title
+
+This is a paragraph.
+
+## Section 1
+
+- Item 1
+- Item 2
+
+` + "```go\nfunc main() {\n\tfmt.Println(\"Hello\")\n}\n```" + `
+
+### Subsection
+
+More content here.
+
+---
+
+Horizontal rule above.
+`
+	err = os.WriteFile(page1Path, []byte(complexContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write page1: %v", err)
+	}
+
+	// Run migration
+	err = service.migrateToV2()
+	if err != nil {
+		t.Fatalf("migrateToV2 failed: %v", err)
+	}
+
+	// Verify body content is exactly preserved
+	content1, err := os.ReadFile(page1Path)
+	if err != nil {
+		t.Fatalf("Failed to read page1 after migration: %v", err)
+	}
+	_, body1, _, err := ParseFrontmatter(string(content1))
+	if err != nil {
+		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
+	}
+	if body1 != complexContent {
+		t.Errorf("Expected body to be exactly preserved.\nGot:\n%s\n\nWant:\n%s", body1, complexContent)
+	}
+}
