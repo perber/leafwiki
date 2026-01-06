@@ -108,7 +108,12 @@ func (f *PageStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 		}
 		// Create an empty index.md file / Fallback!
 		indexPath := path.Join(parentPath, "index.md")
-		if err := shared.WriteFileAtomic(indexPath, []byte(""), 0o644); err != nil {
+		fm := Frontmatter{LeafWikiID: parentEntry.ID, LeafWikiTitle: parentEntry.Title}
+		content, err := BuildMarkdownWithFrontmatter(fm, "")
+		if err != nil {
+			return fmt.Errorf("could not build markdown with frontmatter: %v", err)
+		}
+		if err := shared.WriteFileAtomic(indexPath, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("could not create index file: %v", err)
 		}
 	}
@@ -121,11 +126,14 @@ func (f *PageStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 	}
 
 	// Create the file
-	content := []byte("# " + newEntry.Title + "\n")
-	if err := shared.WriteFileAtomic(newFilename, content, 0o644); err != nil {
+	fm := Frontmatter{LeafWikiID: newEntry.ID}
+	content, err := BuildMarkdownWithFrontmatter(fm, "# "+newEntry.Title+"\n")
+	if err != nil {
+		return fmt.Errorf("could not build markdown with frontmatter: %v", err)
+	}
+	if err := shared.WriteFileAtomic(newFilename, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("could not create file: %v", err)
 	}
-
 	return nil
 }
 
@@ -179,7 +187,12 @@ func (f *PageStore) UpdatePage(entry *PageNode, slug string, content string) err
 	mode := file.Mode()
 
 	// Update the file content
-	if err := shared.WriteFileAtomic(filePath, []byte(content), mode); err != nil {
+	fm := Frontmatter{LeafWikiID: entry.ID, LeafWikiTitle: entry.Title}
+	contentWithFM, err := BuildMarkdownWithFrontmatter(fm, content)
+	if err != nil {
+		return fmt.Errorf("could not build markdown with frontmatter: %v", err)
+	}
+	if err := shared.WriteFileAtomic(filePath, []byte(contentWithFM), mode); err != nil {
 		return fmt.Errorf("could not write to file atomically: %v", err)
 	}
 
@@ -269,18 +282,24 @@ func (f *PageStore) ReadPageContent(entry *PageNode) (string, error) {
 		return "", fmt.Errorf("file not found: %v", err)
 	}
 
-	// Read the file content
+	// Read the file
 	file, err := os.Open(filePath)
 	if err != nil {
 		return "", fmt.Errorf("could not open file: %v", err)
 	}
 	defer file.Close()
 
-	content, err := io.ReadAll(file)
+	raw, err := io.ReadAll(file)
 	if err != nil {
 		return "", fmt.Errorf("could not read file: %v", err)
 	}
-	return string(content), nil
+
+	_, content, _, err := ParseFrontmatter(string(raw))
+	if err != nil {
+		return string(raw), err
+	}
+
+	return content, nil
 }
 
 func (f *PageStore) getFilePath(entry *PageNode) (string, error) {
