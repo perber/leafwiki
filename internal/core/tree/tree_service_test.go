@@ -825,12 +825,12 @@ func TestTreeService_MigrateToV2_PagesWithoutFrontmatter(t *testing.T) {
 	// Write content without frontmatter
 	page1Path := filepath.Join(tmpDir, "root", "page1.md")
 	page2Path := filepath.Join(tmpDir, "root", "page1", "page2.md")
-	
+
 	err = os.WriteFile(page1Path, []byte("# Page 1 Content\nHello World"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write page1: %v", err)
 	}
-	
+
 	err = os.WriteFile(page2Path, []byte("# Page 2 Content\nNested content"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write page2: %v", err)
@@ -1020,6 +1020,7 @@ func TestTreeService_MigrateToV2_SkipsNonExistentFiles(t *testing.T) {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
+	page1 := service.GetTree().Children[0]
 	// Write content without frontmatter
 	page1Path := filepath.Join(tmpDir, "root", "page1.md")
 	err = os.WriteFile(page1Path, []byte("# Page 1 Content"), 0644)
@@ -1037,13 +1038,28 @@ func TestTreeService_MigrateToV2_SkipsNonExistentFiles(t *testing.T) {
 	}
 	service.tree.Children = append(service.tree.Children, ghostNode)
 
-	// Run migration - should handle the ghost node gracefully if it returns os.ErrNotExist
-	// But will fail with other errors from getFilePath
 	err = service.migrateToV2()
-	// The getFilePath returns "file not found" which is not os.ErrNotExist
-	// So the migration will fail
-	if err == nil {
-		t.Error("Expected migration to fail when encountering missing file")
+	if err != nil {
+		t.Fatalf("Expected migration to skip missing files gracefully, got error: %v", err)
+	}
+
+	// page1 should have frontmatter now
+	content1, err := os.ReadFile(page1Path)
+	if err != nil {
+		t.Fatalf("Failed to read page1 after migration: %v", err)
+	}
+	fm1, body1, has1, err := ParseFrontmatter(string(content1))
+	if err != nil {
+		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
+	}
+	if !has1 {
+		t.Fatal("Expected page1 to have frontmatter after migration")
+	}
+	if fm1.LeafWikiID != page1.ID {
+		t.Fatalf("Expected leafwiki_id %q, got %q", page1.ID, fm1.LeafWikiID)
+	}
+	if !strings.Contains(body1, "# Page 1 Content") {
+		t.Fatalf("Expected body to be preserved")
 	}
 }
 
