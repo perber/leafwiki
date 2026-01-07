@@ -266,6 +266,19 @@ func (f *PageStore) MovePage(entry *PageNode, parentEntry *PageNode) error {
 	return nil
 }
 
+// ReadPageRaw returns the raw content of a page including frontmatter
+func (f *PageStore) ReadPageRaw(entry *PageNode) (string, error) {
+	filePath, err := f.getFilePath(entry)
+	if err != nil {
+		return "", err
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // ReadPageContent returns the content of a page
 func (f *PageStore) ReadPageContent(entry *PageNode) (string, error) {
 	if entry == nil {
@@ -320,5 +333,5 @@ func (f *PageStore) getFilePath(entry *PageNode) (string, error) {
 		return path.Join(entryPath, "index.md"), nil
 	}
 
-	return "", errors.New("file not found")
+	return "", ErrFileNotFound
 }
