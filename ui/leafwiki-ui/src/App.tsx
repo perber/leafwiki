@@ -7,6 +7,7 @@ import { useEffect, useMemo } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './App.css'
+import { useBrandingStore } from './stores/branding'
 import { useConfigStore } from './stores/config'
 
 function App() {
@@ -26,7 +27,10 @@ function App() {
   useApplyDesignMode()
   useEffect(() => {
     loadConfig()
-  }, [loadConfig])
+    loadBranding()
+  }, [loadConfig, loadBranding])
+    // Load branding configuration
+    loadBranding()
 
   const router = useMemo(
     () => createLeafWikiRouter(isReadOnlyViewer, authDisabled),

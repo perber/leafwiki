@@ -1,3 +1,4 @@
+import { useBrandingStore } from '@/stores/branding'
 import { useUserStore } from '@/stores/users'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -9,6 +10,7 @@ import { useToolbarActions } from './useToolbarActions'
 export default function UserManagement() {
   const { users, loadUsers, reset } = useUserStore()
   const [loading, setLoading] = useState(true)
+  const siteName = useBrandingStore((s) => s.siteName)
 
   useToolbarActions()
 
@@ -29,7 +31,7 @@ export default function UserManagement() {
 
   return (
     <>
-      <title>User Management - LeafWiki</title>
+      <title>User Management - {siteName}</title>
       <div className="user-management">
         <h1 className="user-management__title">User Management</h1>
 
@@ -85,11 +87,10 @@ export default function UserManagement() {
                       </td>
                       <td className="user-management__table-cell">
                         <span
-                          className={`user-management__role-pill ${
-                            user.role === 'admin'
+                          className={`user-management__role-pill ${user.role === 'admin'
                               ? 'user-management__role-pill--admin'
                               : 'user-management__role-pill--default'
-                          }`}
+                            }`}
                         >
                           {user.role}
                         </span>

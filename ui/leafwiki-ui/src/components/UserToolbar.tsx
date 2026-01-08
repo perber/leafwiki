@@ -69,6 +69,12 @@ export default function UserToolbar() {
             >
               User Management
             </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => navigate('/settings/branding')}
+            >
+              Branding Settings
+            </DropdownMenuItem>
           </RoleGuard>
           <DropdownMenuItem
             className="cursor-pointer"

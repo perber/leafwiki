@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { login } from '@/lib/api/auth'
-import { useSessionStore } from '@/stores/session'
 import { useBrandingStore } from '@/stores/branding'
+import { useSessionStore } from '@/stores/session'
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ export default function LoginForm() {
 
   const navigate = useNavigate()
   const user = useSessionStore((s) => s.user)
+  const { siteName, logoImagePath } = useBrandingStore()
 
   // If already logged in, redirect to home
   if (user) {
@@ -38,10 +39,21 @@ export default function LoginForm() {
 
   return (
     <>
-      <title>Login - LeafWiki</title>
+      <title>Login - {siteName}</title>
       <div className="login">
         <form onSubmit={handleSubmit} className="login__form">
-          <h1 className="login__title">🌿 LeafWiki</h1>
+          <h1 className="login__title">
+            {logoImagePath ? (
+              <img
+                src={`/branding/${logoImagePath}`}
+                alt={siteName}
+                className="login__logo-image"
+              />
+            ) : (
+              <span>🌿</span>
+            )}{' '}
+            {siteName}
+          </h1>
 
           <div className="login__field">
             <Input
