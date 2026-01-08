@@ -13,6 +13,8 @@ function App() {
   const configHasLoaded = useConfigStore((s) => s.hasLoaded)
   const loadConfig = useConfigStore((s) => s.loadConfig)
   const authDisabled = useConfigStore((s) => s.authDisabled)
+  const loadBranding = useBrandingStore((s) => s.loadBranding)
+
   // bootstrap authentication on app start -> session store
   useBootstrapAuth(configHasLoaded && !authDisabled)
 
