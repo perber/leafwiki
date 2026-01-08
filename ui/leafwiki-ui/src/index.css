@@ -437,7 +437,7 @@
   }
 
   .user-toolbar__avatar>span {
-    @apply bg-avatar-bg text-avatar-foreground !important;
+    @apply bg-avatar-bg text-avatar-foreground;
   }
 
   .user-toolbar__avatar-fallback {
@@ -483,789 +483,827 @@
   }
 
   .asset-item__action-button {
-    @apply text-muted hover:text-brand !important;
+    @apply text-muted hover:text-brand;
+    color: hsl(var(--muted)) !important;
+
+    &:hover {
+      color: hsl(var(--brand)) !important;
+    }
   }
 
   .asset-item__action-button--save {
-    @apply text-brand hover:text-brand-dark !important;
+    @apply text-brand hover:text-brand-dark;
+    color: hsl(var(--brand)) !important;
+
+    &:hover {
+      color: hsl(var(--brand-dark)) !important;
+    }
   }
 
   .asset-item__action-button--cancel {
-    @apply text-error hover:text-error !important;
+    @apply text-error hover:text-error;
+    color: hsl(var(--error)) !important;
+
+    &:hover {
+      color: hsl(var(--error)) !important;
+    }
   }
 
   .asset-item__action-button--delete {
-    @apply text-muted hover:text-error !important;
-  }
-
-  /* AssetManager Component */
-  .asset-manager {
-    @apply text-interface-text space-y-3 text-sm;
-  }
-
-  .asset-manager__title {
-    @apply text-interface-text font-semibold;
-  }
-
-  .asset-manager__dropzone {
-    @apply border-surface-border text-interface-text bg-surface flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center transition;
-  }
-
-  .asset-manager__dropzone--dragging {
-    @apply border-brand bg-brand/5 text-brand;
-  }
-
-  .asset-manager__dropzone--hover {
-    @apply border-surface-border bg-surface-alt;
-  }
-
-  .asset-manager__dropzone-icon {
-    @apply mb-2;
-  }
-
-  .asset-manager__dropzone-text {
-    @apply text-interface-text text-xs;
-  }
-
-  .asset-manager__dropzone-uploading {
-    @apply text-brand text-xs;
-  }
-
-  .asset-manager__list-container {
-    @apply h-96;
-  }
-
-  .asset-manager__loading {
-    @apply text-muted text-xs;
-  }
-
-  .asset-manager__empty {
-    @apply text-muted text-xs italic;
-  }
-
-  .asset-manager__list {
-    @apply h-full space-y-2 overflow-y-auto;
-  }
-
-  .asset-manager__tip {
-    @apply text-muted mt-2 text-xs italic;
-  }
-
-  /** AssetManager Dialog **/
-  .asset-manager-dialog__content {
-    @apply max-w-4xl;
-  }
-
-  /* AssetPreviewTooltip */
-  .asset-preview-tooltip__content {
-    @apply border-surface-border bg-surface z-50 max-w-sm rounded border p-2 shadow-lg;
-  }
-
-  .asset-preview-tooltip__image {
-    @apply border-surface-border max-h-[300px] max-w-[300px] rounded border;
-  }
-
-  .asset-preview-tooltip__file {
-    @apply text-interface-text flex items-center gap-2 text-sm;
-  }
-
-  /* Login Form*/
-  .login {
-    @apply border-surface-border bg-surface text-interface-text h-screen w-96 border-r shadow-md;
-  }
-
-  .login__form {
-    @apply w-full p-4;
-  }
-
-  .login__title {
-    @apply text-interface-text mb-4 text-xl font-bold;
-  }
-
-  .login__logo-image {
-    @apply h-6 w-auto inline-block align-middle;
-  }
-
-<<<<<<< HEAD
-  .login__field {
-    @apply mb-4;
-  }
-
-=======
->>>>>>> 406e8dc (feat: add secure cookie + session DB based authentication with rate limiting (#486))
-  .login__submit {
-    @apply w-full;
-  }
-
-  .editor-title-bar {
-    @apply flex flex-1 flex-col items-center;
-  }
-
-  .editor-title-bar__button {
-    @apply text-interface-text relative flex items-center gap-1 text-base font-semibold hover:underline;
-  }
-
-  .editor-title-bar__title {
-    @apply inline-block max-w-[15vw] truncate sm:max-w-[40vw];
-  }
-
-  .editor-title-bar__icon {
-    @apply text-muted absolute top-1/2 -right-6 -translate-y-1/2 transition-transform duration-200 ease-in-out;
-  }
-
-  .editor-title-bar__button:hover .editor-title-bar__icon {
-    @apply text-interface-text;
-  }
-
-  .editor-title-bar__dirty-indicator {
-    @apply text-warning ml-2 text-xs;
-  }
-
-  .editor-title-bar__slug {
-    @apply bg-surface-alt text-interface-text mt-1 inline-block max-w-[15vw] truncate rounded px-2 py-0.5 font-mono text-xs sm:max-w-[40vw];
-  }
-
-  /** Markdown Code Editor **/
-  .markdown-code-editor {
-    @apply h-full w-full rounded shadow-xs;
-  }
-
-  /** markdown-editor **/
-  .markdown-editor {
-    @apply flex h-full w-full flex-col overflow-hidden;
-  }
-
-  /* Mobile layout */
-  .markdown-editor__mobile {
-    @apply flex h-full w-full flex-col;
-  }
-
-  .markdown-editor__tabs {
-    @apply border-surface-border text-interface-text mb-2 flex border-b text-sm;
-  }
-
-  .markdown-editor__tab-button {
-    @apply -mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5;
-  }
-
-  .markdown-editor__tab-button--active {
-    @apply border-brand text-brand font-semibold;
-  }
-
-  .markdown-editor__tab-button--inactive {
-    @apply text-interface-text hover:text-brand border-transparent;
-  }
-
-  /* Shared scroll pane */
-  .markdown-editor__pane-container {
-    @apply flex max-w-none flex-1 overflow-auto;
-  }
-
-  .markdown-editor__pane {
-    @apply w-full;
-  }
-
-  .markdown-editor__pane--hidden {
-    @apply hidden;
-  }
-
-  /* Desktop mode */
-  .markdown-editor__editor-pane {
-    @apply flex max-w-none flex-1 overflow-auto;
-  }
-
-  .markdown-editor__editor-pane--half {
-    @apply w-1/2;
-  }
-
-  .markdown-editor__editor-pane--full {
-    @apply w-full;
-  }
-
-  .markdown-editor__divider {
-    @apply bg-surface-border h-full w-1;
-  }
-
-  .markdown-editor__preview-container {
-    @apply w-1/2 max-w-none flex-1;
-  }
-
-  /* Preview styling */
-  .markdown-editor__preview {
-    @apply prose prose-base dark:prose-invert box-content h-full w-full overflow-auto leading-relaxed;
-  }
-
-  .markdown-editor__preview-inner {
-    @apply p-4;
-  }
-
-  /* Markdown Editor Toolbar */
-  .markdown-toolbar {
-    @apply border-markdown-toolbar-border bg-markdown-toolbar sticky top-0 z-10 flex min-h-12 flex-wrap items-center gap-1.5 border-b pr-2 pl-2 shadow-xs;
-  }
-
-  .markdown-toolbar__button {
-    @apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80 hover:bg-markdown-toolbar-border !important;
-  }
-
-  .markdown-toolbar__button--desktop-only {
-    @apply max-md:hidden;
-  }
-
-  .markdown-toolbar__separator {
-    @apply bg-surface-border/60 mx-1 h-5 w-px self-center;
-  }
-
-  .markdown-toolbar__separator--desktop-only {
-    @apply max-md:hidden;
-  }
-
-  .markdown-toolbar__icon {
-    @apply h-4 w-4;
-  }
-
-  /** PageEditor **/
-  .page-editor {
-    @apply h-full w-full overflow-hidden;
-  }
-
-  .page-editor__error {
-    @apply text-error p-6 text-sm;
-  }
-
-  .page-editor__not-found {
-    @apply p-6;
-  }
-
-  .toolbar-button__close-editor {
-    @apply rounded-full !important;
-  }
-
-  .toolbar-button__save-page {
-    @apply bg-success text-success-foreground hover:bg-success/80 rounded-full !important;
-  }
-
-  /* Shared page dialog styles */
-  .page-dialog__fields {
-    @apply space-y-4;
-  }
-
-  .dialog__path {
-    @apply text-muted font-mono text-xs;
-  }
-
-  /* Add / Copy / Create-by-path dialogs */
-
-  .create-page-by-path-dialog__alert {
-    @apply bg-error/10 text-error rounded-md p-4 text-sm;
-  }
-
-  .create-page-by-path-dialog__lookup-title {
-    @apply text-interface-text text-sm font-semibold;
-  }
-
-  .create-page-by-path-dialog__lookup-list {
-    @apply bg-surface-alt mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md p-1;
-  }
-
-  .create-page-by-path-dialog__lookup-item {
-    @apply text-interface-text mb-1 flex items-center gap-1 text-xs;
-  }
-
-  .create-page-by-path-dialog__lookup-item-icon--ok {
-    @apply text-success;
-  }
-
-  .create-page-by-path-dialog__lookup-item-icon--missing {
-    @apply text-error;
-  }
-
-  .create-page-by-path-dialog__lookup-item-slug {
-    @apply font-mono;
-  }
-
-  /* Delete dialog */
-
-  .delete-page-dialog__recursive {
-    @apply text-muted space-y-1 text-sm;
-  }
-
-  .delete-page-dialog__recursive-label {
-    @apply flex items-center gap-2;
-  }
-
-  /* Sort pages dialog */
-
-  .sort-pages-dialog__list {
-    @apply space-y-2;
-  }
-
-  .sort-pages-dialog__item {
-    @apply bg-surface flex items-center justify-between rounded-lg border px-3 py-2 transition hover:shadow-xs;
-  }
-
-  .sort-pages-dialog__item-title {
-    @apply text-interface-text truncate text-sm;
-  }
-
-  .sort-pages-dialog__item-actions {
-    @apply flex gap-1;
-  }
-
-  /** Search **/
-
-  .search {
-    @apply mt-2;
-  }
-
-  .search__input-wrapper {
-    @apply relative mb-4;
-  }
-
-  .search__input {
-    @apply border-surface-border bg-surface text-interface-text w-full rounded-md border px-2 py-1 pr-8 text-sm;
-  }
-
-  .search__clear-button {
-    @apply text-muted hover:text-interface-text absolute top-1/2 right-1 -translate-y-1/2 text-sm;
-  }
-
-  .search__body {
-    @apply mb-4;
-  }
-
-  .search__status {
-    @apply text-sm;
-  }
-
-  .search__status--loading,
-  .search__status--empty {
-    @apply text-muted;
-  }
-
-  .search__result-summary {
-    @apply text-interface-text mb-2 text-sm;
-  }
-
-  .search__results {
-    @apply space-y-4;
-  }
-
-  /* SearchResultCard */
-
-  .search-result-card {
-    @apply border-border bg-surface block rounded-sm border p-4 shadow-xs transition;
-  }
-
-  .search-result-card--active {
-    @apply border-border bg-surface-alt shadow-md;
-  }
-
-  .search-result-card--inactive {
-    @apply hover:bg-surface-alt hover:shadow-md;
-  }
-
-  .search-result-card__title {
-    @apply text-brand mb-1 text-base break-words whitespace-normal;
-  }
-
-  .search-result-card__excerpt {
-    @apply text-interface-text mb-2 text-sm break-words whitespace-normal;
-  }
-
-  .search-result-card__path {
-    @apply text-muted mt-2 text-xs;
-  }
-
-  .search-result-card b {
-    @apply text-brand-dark font-semibold;
-  }
-
-  /** backlink pane **/
-  .backlinks__pane {
-    @apply text-interface-text border-border mt-0 w-full border-t pt-2 pb-1 text-sm;
-  }
-
-  .backlinks__content {
-    @apply flex flex-col gap-2 sm:flex-row sm:gap-8;
-  }
-
-  .backlinks__content ul {
-    @apply m-0 list-none p-0;
-  }
-
-  .backlinks__item a {
-    @apply text-muted-foreground hover:text-brand px-0 py-0 text-xs no-underline !important;
-  }
-
-  .backlinks__item a:hover {
-    background: transparent !important;
-  }
-
-  .backlinks__item .backlinks__icon {
-    @apply inline;
-  }
-
-  .backlinks__icon {
-    @apply mr-1 scale-75 opacity-40;
-  }
-
-  /* Backlinks pane extensions */
-  .backlinks__group {
-    @apply w-full sm:w-1/2;
-  }
-
-  .backlinks__group-title {
-    @apply text-muted mb-1 text-xs font-normal tracking-normal normal-case;
-  }
-
-  .backlinks__subgroup-title {
-    @apply text-muted mt-3 mb-1 text-xs font-medium;
-  }
-
-  .backlinks__badge {
-    @apply bg-surface-alt border-surface-border text-interface-text rounded border px-2 py-0.5 text-[11px];
-  }
-
-  .backlinks__empty {
-    @apply text-muted text-xs italic;
-  }
-
-  .backlinks__item--broken a {
-    @apply text-error;
-  }
-
-  .backlinks__item--broken a:hover {
-    @apply hover:bg-error/10;
-  }
-
-  /* user management */
-  .user-management {
-    @apply mx-auto max-w-4xl p-6;
-  }
-
-  .user-management__title {
-    @apply text-interface-text mb-4 text-2xl font-bold;
-  }
-
-  .user-management__header-actions {
-    @apply flex justify-end;
-  }
-
-  .user-management__table-card {
-    @apply border-surface-border bg-surface mt-4 rounded-md border shadow-sm;
-  }
-
-  .user-management__table-scroll {
-    @apply overflow-x-auto;
-  }
-
-  .user-management__table {
-    @apply w-full text-sm;
-  }
-
-  .user-management__table-head {
-    @apply bg-surface-alt text-left;
-  }
-
-  .user-management__table-header-cell {
-    @apply text-interface-text p-3;
-  }
-
-  .user-management__table-body-message {
-    @apply text-muted p-4 text-center;
-  }
-
-  .user-management__table-row {
-    @apply border-surface-border border-t;
-  }
-
-  .user-management__table-cell {
-    @apply text-interface-text p-3;
-  }
-
-  .user-management__actions-cell {
-    @apply p-3;
-  }
-
-  .user-management__actions {
-    @apply flex gap-2;
-  }
-
-  .user-management__role-pill {
-    @apply rounded px-2 py-1 text-xs font-medium;
-  }
-
-  .user-management__role-pill--admin {
-    @apply bg-brand/10 text-brand;
-  }
-
-  .user-management__role-pill--default {
-    @apply bg-surface-alt text-interface-text;
-  }
-
-  .breadcrumbs-nav {
-    @apply text-muted mr-2 flex w-full flex-1 grow text-sm;
-  }
-
-  .breadcrumbs-nav__list {
-    @apply flex flex-wrap items-center gap-1;
-  }
-
-  .breadcrumbs-nav__item {
-    @apply flex items-center gap-1;
-  }
-
-  .breadcrumbs-nav__separator {
-    @apply text-muted;
-  }
-
-  .breadcrumbs-nav__current {
-    @apply text-page-text font-semibold;
-  }
-
-  .breadcrumbs-nav__link {
-    @apply text-page-text hover:underline;
-  }
-
-  /* readonly input */
-  input[readonly] {
-    @apply bg-surface-alt cursor-not-allowed;
-  }
-
-  .page-viewer {
-    @apply mx-auto w-full max-w-6xl px-8 pt-8 pb-0;
-    @apply flex min-h-full flex-col;
-  }
+    @apply text-muted hover:text-error;
+    color: hsl(var(--muted)) !important;
+
+    &:hover {
+      color: hsl(var(--error)) !important;
+    }
+  }
+}
+
+/* AssetManager Component */
+.asset-manager {
+  @apply text-interface-text space-y-3 text-sm;
+}
+
+.asset-manager__title {
+  @apply text-interface-text font-semibold;
+}
+
+.asset-manager__dropzone {
+  @apply border-surface-border text-interface-text bg-surface flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed p-4 text-center transition;
+}
+
+.asset-manager__dropzone--dragging {
+  @apply border-brand bg-brand/5 text-brand;
+}
+
+.asset-manager__dropzone--hover {
+  @apply border-surface-border bg-surface-alt;
+}
+
+.asset-manager__dropzone-icon {
+  @apply mb-2;
+}
+
+.asset-manager__dropzone-text {
+  @apply text-interface-text text-xs;
+}
+
+.asset-manager__dropzone-uploading {
+  @apply text-brand text-xs;
+}
+
+.asset-manager__list-container {
+  @apply h-96;
+}
+
+.asset-manager__loading {
+  @apply text-muted text-xs;
+}
+
+.asset-manager__empty {
+  @apply text-muted text-xs italic;
+}
+
+.asset-manager__list {
+  @apply h-full space-y-2 overflow-y-auto;
+}
+
+.asset-manager__tip {
+  @apply text-muted mt-2 text-xs italic;
+}
+
+/** AssetManager Dialog **/
+.asset-manager-dialog__content {
+  @apply max-w-4xl;
+}
+
+/* AssetPreviewTooltip */
+.asset-preview-tooltip__content {
+  @apply border-surface-border bg-surface z-50 max-w-sm rounded border p-2 shadow-lg;
+}
+
+.asset-preview-tooltip__image {
+  @apply border-surface-border max-h-[300px] max-w-[300px] rounded border;
+}
+
+.asset-preview-tooltip__file {
+  @apply text-interface-text flex items-center gap-2 text-sm;
+}
+
+/* Login Form*/
+.login {
+  @apply border-surface-border bg-surface text-interface-text h-screen w-96 border-r shadow-md;
+}
+
+.login__form {
+  @apply w-full p-4;
+}
+
+.login__title {
+  @apply text-interface-text mb-4 text-xl font-bold;
+}
+
+.login__logo-image {
+  @apply h-6 w-auto inline-block align-middle;
+}
+
+<<<<<<< HEAD <<<<<<< HEAD=======>>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding) .login__field {
+  @apply mb-4;
+}
+
+=======>>>>>>>406e8dc (feat: add secure cookie + session DB based authentication with rate limiting (#486)) .login__submit {
+  @apply w-full;
+}
+
+.editor-title-bar {
+  @apply flex flex-1 flex-col items-center;
+}
+
+.editor-title-bar__button {
+  @apply text-interface-text relative flex items-center gap-1 text-base font-semibold hover:underline;
+}
+
+.editor-title-bar__title {
+  @apply inline-block max-w-[15vw] truncate sm:max-w-[40vw];
+}
+
+.editor-title-bar__icon {
+  @apply text-muted absolute top-1/2 -right-6 -translate-y-1/2 transition-transform duration-200 ease-in-out;
+}
+
+.editor-title-bar__button:hover .editor-title-bar__icon {
+  @apply text-interface-text;
+}
+
+.editor-title-bar__dirty-indicator {
+  @apply text-warning ml-2 text-xs;
+}
+
+.editor-title-bar__slug {
+  @apply bg-surface-alt text-interface-text mt-1 inline-block max-w-[15vw] truncate rounded px-2 py-0.5 font-mono text-xs sm:max-w-[40vw];
+}
+
+/** Markdown Code Editor **/
+.markdown-code-editor {
+  @apply h-full w-full rounded shadow-xs;
+}
+
+/** markdown-editor **/
+.markdown-editor {
+  @apply flex h-full w-full flex-col overflow-hidden;
+}
+
+/* Mobile layout */
+.markdown-editor__mobile {
+  @apply flex h-full w-full flex-col;
+}
+
+.markdown-editor__tabs {
+  @apply border-surface-border text-interface-text mb-2 flex border-b text-sm;
+}
+
+.markdown-editor__tab-button {
+  @apply -mb-px flex flex-1 items-center justify-center gap-1 border-b-2 px-3 py-1.5;
+}
+
+.markdown-editor__tab-button--active {
+  @apply border-brand text-brand font-semibold;
+}
+
+.markdown-editor__tab-button--inactive {
+  @apply text-interface-text hover:text-brand border-transparent;
+}
+
+/* Shared scroll pane */
+.markdown-editor__pane-container {
+  @apply flex max-w-none flex-1 overflow-auto;
+}
+
+.markdown-editor__pane {
+  @apply w-full;
+}
+
+.markdown-editor__pane--hidden {
+  @apply hidden;
+}
+
+/* Desktop mode */
+.markdown-editor__editor-pane {
+  @apply flex max-w-none flex-1 overflow-auto;
+}
+
+.markdown-editor__editor-pane--half {
+  @apply w-1/2;
+}
+
+.markdown-editor__editor-pane--full {
+  @apply w-full;
+}
+
+.markdown-editor__divider {
+  @apply bg-surface-border h-full w-1;
+}
+
+.markdown-editor__preview-container {
+  @apply w-1/2 max-w-none flex-1;
+}
+
+/* Preview styling */
+.markdown-editor__preview {
+  @apply prose prose-base dark:prose-invert box-content h-full w-full overflow-auto leading-relaxed;
+}
+
+.markdown-editor__preview-inner {
+  @apply p-4;
+}
+
+/* Markdown Editor Toolbar */
+.markdown-toolbar {
+  @apply border-markdown-toolbar-border bg-markdown-toolbar sticky top-0 z-10 flex min-h-12 flex-wrap items-center gap-1.5 border-b pr-2 pl-2 shadow-xs;
+}
+
+.markdown-toolbar__button {
+  <<<<<<< HEAD @apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80 hover:bg-markdown-toolbar-border !important;
+  =======@apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80 hover:bg-markdown-toolbar-border;
+  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
+}
+
+.markdown-toolbar__button--desktop-only {
+  @apply max-md:hidden;
+}
+
+.markdown-toolbar__separator {
+  @apply bg-surface-border/60 mx-1 h-5 w-px self-center;
+}
+
+.markdown-toolbar__separator--desktop-only {
+  @apply max-md:hidden;
+}
+
+.markdown-toolbar__icon {
+  @apply h-4 w-4;
+}
+
+/** PageEditor **/
+.page-editor {
+  @apply h-full w-full overflow-hidden;
+}
+
+.page-editor__error {
+  @apply text-error p-6 text-sm;
+}
+
+.page-editor__not-found {
+  @apply p-6;
+}
+
+.toolbar-button__close-editor {
+  <<<<<<< HEAD @apply rounded-full !important;
+}
+
+.toolbar-button__save-page {
+  @apply bg-success text-success-foreground hover:bg-success/80 rounded-full !important;
+  =======@apply rounded-full;
+}
+
+.toolbar-button__save-page {
+  @apply bg-success text-success-foreground hover:bg-success/80 rounded-full;
+  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
+}
+
+/* Shared page dialog styles */
+.page-dialog__fields {
+  @apply space-y-4;
+}
+
+.dialog__path {
+  @apply text-muted font-mono text-xs;
+}
+
+/* Add / Copy / Create-by-path dialogs */
+
+.create-page-by-path-dialog__alert {
+  @apply bg-error/10 text-error rounded-md p-4 text-sm;
+}
+
+.create-page-by-path-dialog__lookup-title {
+  @apply text-interface-text text-sm font-semibold;
+}
+
+.create-page-by-path-dialog__lookup-list {
+  @apply bg-surface-alt mt-2 h-24 list-inside list-none space-y-4 overflow-auto rounded-md p-1;
+}
+
+.create-page-by-path-dialog__lookup-item {
+  @apply text-interface-text mb-1 flex items-center gap-1 text-xs;
+}
+
+.create-page-by-path-dialog__lookup-item-icon--ok {
+  @apply text-success;
+}
+
+.create-page-by-path-dialog__lookup-item-icon--missing {
+  @apply text-error;
+}
+
+.create-page-by-path-dialog__lookup-item-slug {
+  @apply font-mono;
+}
+
+/* Delete dialog */
+
+.delete-page-dialog__recursive {
+  @apply text-muted space-y-1 text-sm;
+}
+
+.delete-page-dialog__recursive-label {
+  @apply flex items-center gap-2;
+}
+
+/* Sort pages dialog */
+
+.sort-pages-dialog__list {
+  @apply space-y-2;
+}
+
+.sort-pages-dialog__item {
+  @apply bg-surface flex items-center justify-between rounded-lg border px-3 py-2 transition hover:shadow-xs;
+}
 
-  .page-viewer__body {
-    @apply flex min-h-0 flex-1 flex-col gap-8;
-  }
-
-  .page-viewer__error {
-    @apply text-error p-6;
-  }
-
-  .page-viewer__header {
-    /* on small screens it shouold be a column */
-    @apply flex flex-col md:flex-row;
-  }
-
-  .page-viewer__content {
-    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full flex-1 leading-relaxed;
-  }
-
-  .page-viewer__metadata {
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    margin-top: 0.25rem;
-    margin-bottom: 1rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    opacity: 0.8;
-  }
-
-  .page-viewer__metadata-item {
-    display: inline-flex;
-    align-items: center;
-    white-space: nowrap;
-  }
-
-  .page-viewer__metadata-item::before {
-    content: '•';
-    opacity: 0.4;
-    font-size: 0.6rem;
-    margin-right: 0.25rem;
-    margin-left: 0.25rem;
-  }
-
-  .page-viewer__metadata-item:first-child::before {
-    content: '';
-    margin: 0;
-  }
-
-  /* Markdown content tweaks */
-  .markdown-editor__preview-container img,
-  .page-viewer__content img {
-    height: auto;
-    max-width: 100%;
-  }
-
-  .table-wrapper {
-    @apply max-w-full overflow-auto;
-  }
-
-  .table-wrapper table {
-    @apply w-full border-collapse;
-  }
-
-  .table-wrapper tbody tr:nth-child(odd) {
-    @apply bg-surface-alt;
-  }
-
-  .table-wrapper th,
-  .table-wrapper td {
-    @apply border-border border px-4 py-2;
-  }
-
-  .table-wrapper thead {
-    @apply bg-table-header-bg;
-  }
-
-  .table-wrapper th:first-child,
-  .table-wrapper td:first-child {
-    @apply pl-4 !important;
-  }
-
-  .table-wrapper th:last-child,
-  .table-wrapper td:last-child {
-    @apply pr-4 !important;
-  }
-
-  .markdown-editor__preview-container ol ol,
-  .markdown-editor__preview-container ol ul,
-  .markdown-editor__preview-container ul ol,
-  .markdown-editor__preview-container ul ul,
-  .page-viewer__content ol ol,
-  .page-viewer__content ol ul,
-  .page-viewer__content ul ol,
-  .page-viewer__content ul ul {
-    @apply mt-0 mb-0;
-  }
-
-  .markdown-editor__preview-container li::marker,
-  .page-viewer__content li::marker {
-    @apply text-page-text;
-  }
-
-  .markdown-editor__preview-container ul li,
-  .page-viewer__content ul li {
-    @apply list-disc;
-  }
-
-  .tree-view {
-    @apply w-full;
-  }
-
-  .tree-view__toolbar {
-    @apply mb-2 flex;
-  }
-
-  .tree-view__status {
-    @apply text-sm;
-  }
+.sort-pages-dialog__item-title {
+  @apply text-interface-text truncate text-sm;
+}
 
-  .tree-view__status--loading {
-    @apply text-muted;
-  }
-
-  .tree-view__status--error {
-    @apply text-error;
-  }
-
-  .tree-view__action-icon {
-    @apply text-muted hover:text-interface-text cursor-pointer;
-  }
-
-  .tree-view__nodes {
-    @apply w-full;
-  }
-
-  .tree-node {
-    @apply text-interface-text relative flex cursor-pointer items-center transition-all;
-  }
-
-  .tree-node--active {
-    @apply text-brand;
-  }
-
-  .tree-node--inactive {
-    @apply hover:bg-tree-node-hover;
-  }
-
-  .tree-node__marker {
-    @apply bg-surface-border absolute top-0 bottom-0 w-0.5;
-  }
-
-  .tree-node__marker--active {
-    @apply bg-brand/60;
-  }
-
-  .tree-node__main {
-    @apply flex w-full flex-1 items-center gap-2 pl-4;
-  }
-
-  .tree-node__toggle {
-    @apply text-muted -ml-1 shrink-0 transition-transform;
-  }
-
-  .tree-node__toggle--open {
-    @apply rotate-180;
-  }
-
-  .tree-node__toggle--closed {
-    @apply rotate-90;
-  }
-
-  .tree-node__toggle-spacer {
-    @apply -ml-1 w-4;
-  }
-
-  .tree-node__tooltip-parent {
-    @apply w-full flex-1 overflow-hidden;
-  }
-
-  .tree-node__link {
-    @apply w-full py-1;
-  }
-
-  .tree-node__title {
-    @apply text-interface-text block truncate overflow-hidden text-sm text-ellipsis;
-  }
+.sort-pages-dialog__item-actions {
+  @apply flex gap-1;
+}
 
-  .tree-node__title--active {
-    @apply text-brand;
-  }
-
-  .tree-node__actions {
-    @apply bg-surface absolute right-0 flex items-center gap-1 rounded-md shadow-md;
-  }
+/** Search **/
+
+.search {
+  @apply mt-2;
+}
+
+.search__input-wrapper {
+  @apply relative mb-4;
+}
+
+.search__input {
+  @apply border-surface-border bg-surface text-interface-text w-full rounded-md border px-2 py-1 pr-8 text-sm;
+}
+
+.search__clear-button {
+  @apply text-muted hover:text-interface-text absolute top-1/2 right-1 -translate-y-1/2 text-sm;
+}
+
+.search__body {
+  @apply mb-4;
+}
+
+.search__status {
+  @apply text-sm;
+}
+
+.search__status--loading,
+.search__status--empty {
+  @apply text-muted;
+}
+
+.search__result-summary {
+  @apply text-interface-text mb-2 text-sm;
+}
+
+.search__results {
+  @apply space-y-4;
+}
+
+/* SearchResultCard */
 
-  .tree-node__actions--compact {
-    @apply px-1 py-2;
-  }
+.search-result-card {
+  @apply border-border bg-surface block rounded-sm border p-4 shadow-xs transition;
+}
 
-  .tree-node__action-icon {
-    @apply text-muted hover:text-interface-text cursor-pointer;
-  }
+.search-result-card--active {
+  @apply border-border bg-surface-alt shadow-md;
+}
 
-  .tree-node__children {
-    @apply ml-4 pl-2;
-  }
+.search-result-card--inactive {
+  @apply hover:bg-surface-alt hover:shadow-md;
+}
 
-  .tree-node__children--closed {
-    @apply hidden;
-  }
+.search-result-card__title {
+  @apply text-brand mb-1 text-base break-words whitespace-normal;
+}
 
-  .btn {
-    @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium;
-  }
+.search-result-card__excerpt {
+  @apply text-interface-text mb-2 text-sm break-words whitespace-normal;
+}
 
-  /* grüner Primary-Button */
-  .btn--primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm;
-  }
+.search-result-card__path {
+  @apply text-muted mt-2 text-xs;
+}
 
-  /* neutraler grauer Button */
-  .btn--secondary {
-    @apply bg-surface text-interface-text border-surface-border hover:bg-surface-alt border shadow-xs;
-  }
+.search-result-card b {
+  @apply text-brand-dark font-semibold;
+}
 
-  /* gefährlich (Delete) */
-  .btn--danger {
-    @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm;
-  }
+/** backlink pane **/
+.backlinks__pane {
+  @apply text-interface-text border-border mt-0 w-full border-t pt-2 pb-1 text-sm;
+}
+
+.backlinks__content {
+  @apply flex flex-col gap-2 sm:flex-row sm:gap-8;
+}
+
+.backlinks__content ul {
+  @apply m-0 list-none p-0;
+}
+
+.backlinks__item a {
+  <<<<<<< HEAD @apply text-muted-foreground hover:text-brand px-0 py-0 text-xs no-underline !important;
+  =======@apply text-muted-foreground hover:text-brand px-0 py-0 text-xs no-underline;
+  color: hsl(var(--muted-foreground)) !important;
+
+  &:hover {
+    color: hsl(var(--brand)) !important;
+  }
+
+  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
+}
+
+.backlinks__item a:hover {
+  background: transparent !important;
+}
+
+.backlinks__item .backlinks__icon {
+  @apply inline;
+}
+
+.backlinks__icon {
+  @apply mr-1 scale-75 opacity-40;
+}
+
+/* Backlinks pane extensions */
+.backlinks__group {
+  @apply w-full sm:w-1/2;
+}
+
+.backlinks__group-title {
+  @apply text-muted mb-1 text-xs font-normal tracking-normal normal-case;
+}
+
+.backlinks__subgroup-title {
+  @apply text-muted mt-3 mb-1 text-xs font-medium;
+}
+
+.backlinks__badge {
+  @apply bg-surface-alt border-surface-border text-interface-text rounded border px-2 py-0.5 text-[11px];
+}
+
+.backlinks__empty {
+  @apply text-muted text-xs italic;
+}
+
+.backlinks__item--broken a {
+  @apply text-error;
+}
+
+.backlinks__item--broken a:hover {
+  @apply hover:bg-error/10;
+}
+
+/* user management */
+.user-management {
+  @apply mx-auto max-w-4xl p-6;
+}
+
+.user-management__title {
+  @apply text-interface-text mb-4 text-2xl font-bold;
+}
+
+.user-management__header-actions {
+  @apply flex justify-end;
+}
+
+.user-management__table-card {
+  @apply border-surface-border bg-surface mt-4 rounded-md border shadow-sm;
+}
+
+.user-management__table-scroll {
+  @apply overflow-x-auto;
+}
+
+.user-management__table {
+  @apply w-full text-sm;
+}
+
+.user-management__table-head {
+  @apply bg-surface-alt text-left;
+}
+
+.user-management__table-header-cell {
+  @apply text-interface-text p-3;
+}
+
+.user-management__table-body-message {
+  @apply text-muted p-4 text-center;
+}
+
+.user-management__table-row {
+  @apply border-surface-border border-t;
+}
+
+.user-management__table-cell {
+  @apply text-interface-text p-3;
+}
+
+.user-management__actions-cell {
+  @apply p-3;
+}
+
+.user-management__actions {
+  @apply flex gap-2;
+}
+
+.user-management__role-pill {
+  @apply rounded px-2 py-1 text-xs font-medium;
+}
+
+.user-management__role-pill--admin {
+  @apply bg-brand/10 text-brand;
+}
+
+.user-management__role-pill--default {
+  @apply bg-surface-alt text-interface-text;
+}
+
+.breadcrumbs-nav {
+  @apply text-muted mr-2 flex w-full flex-1 grow text-sm;
+}
+
+.breadcrumbs-nav__list {
+  @apply flex flex-wrap items-center gap-1;
+}
+
+.breadcrumbs-nav__item {
+  @apply flex items-center gap-1;
+}
+
+.breadcrumbs-nav__separator {
+  @apply text-muted;
+}
+
+.breadcrumbs-nav__current {
+  @apply text-page-text font-semibold;
+}
+
+.breadcrumbs-nav__link {
+  @apply text-page-text hover:underline;
+}
+
+/* readonly input */
+input[readonly] {
+  @apply bg-surface-alt cursor-not-allowed;
+}
+
+.page-viewer {
+  @apply mx-auto w-full max-w-6xl px-8 pt-8 pb-0;
+  @apply flex min-h-full flex-col;
+}
+
+.page-viewer__body {
+  @apply flex min-h-0 flex-1 flex-col gap-8;
+}
+
+.page-viewer__error {
+  @apply text-error p-6;
+}
+
+.page-viewer__header {
+  /* on small screens it shouold be a column */
+  @apply flex flex-col md:flex-row;
+}
+
+.page-viewer__content {
+  @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full flex-1 leading-relaxed;
+}
+
+.page-viewer__metadata {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  opacity: 0.8;
+}
+
+.page-viewer__metadata-item {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.page-viewer__metadata-item::before {
+  content: '•';
+  opacity: 0.4;
+  font-size: 0.6rem;
+  margin-right: 0.25rem;
+  margin-left: 0.25rem;
+}
+
+.page-viewer__metadata-item:first-child::before {
+  content: '';
+  margin: 0;
+}
+
+/* Markdown content tweaks */
+.markdown-editor__preview-container img,
+.page-viewer__content img {
+  height: auto;
+  max-width: 100%;
+}
+
+.table-wrapper {
+  @apply max-w-full overflow-auto;
+}
+
+.table-wrapper table {
+  @apply w-full border-collapse;
+}
+
+.table-wrapper tbody tr:nth-child(odd) {
+  @apply bg-surface-alt;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+  @apply border-border border px-4 py-2;
+}
+
+.table-wrapper thead {
+  @apply bg-table-header-bg;
+}
+
+.table-wrapper th:first-child,
+.table-wrapper td:first-child {
+  <<<<<<< HEAD @apply pl-4 !important;
+  =======@apply pl-4;
+  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
+}
+
+.table-wrapper th:last-child,
+.table-wrapper td:last-child {
+  <<<<<<< HEAD @apply pr-4 !important;
+  =======@apply pr-4;
+  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
+}
+
+.markdown-editor__preview-container ol ol,
+.markdown-editor__preview-container ol ul,
+.markdown-editor__preview-container ul ol,
+.markdown-editor__preview-container ul ul,
+.page-viewer__content ol ol,
+.page-viewer__content ol ul,
+.page-viewer__content ul ol,
+.page-viewer__content ul ul {
+  @apply mt-0 mb-0;
+}
+
+.markdown-editor__preview-container li::marker,
+.page-viewer__content li::marker {
+  @apply text-page-text;
+}
+
+.markdown-editor__preview-container ul li,
+.page-viewer__content ul li {
+  @apply list-disc;
+}
+
+.tree-view {
+  @apply w-full;
+}
+
+.tree-view__toolbar {
+  @apply mb-2 flex;
+}
+
+.tree-view__status {
+  @apply text-sm;
+}
+
+.tree-view__status--loading {
+  @apply text-muted;
+}
+
+.tree-view__status--error {
+  @apply text-error;
+}
+
+.tree-view__action-icon {
+  @apply text-muted hover:text-interface-text cursor-pointer;
+}
+
+.tree-view__nodes {
+  @apply w-full;
+}
+
+.tree-node {
+  @apply text-interface-text relative flex cursor-pointer items-center transition-all;
+}
+
+.tree-node--active {
+  @apply text-brand;
+}
+
+.tree-node--inactive {
+  @apply hover:bg-tree-node-hover;
+}
+
+.tree-node__marker {
+  @apply bg-surface-border absolute top-0 bottom-0 w-0.5;
+}
+
+.tree-node__marker--active {
+  @apply bg-brand/60;
+}
+
+.tree-node__main {
+  @apply flex w-full flex-1 items-center gap-2 pl-4;
+}
+
+.tree-node__toggle {
+  @apply text-muted -ml-1 shrink-0 transition-transform;
+}
+
+.tree-node__toggle--open {
+  @apply rotate-180;
+}
+
+.tree-node__toggle--closed {
+  @apply rotate-90;
+}
+
+.tree-node__toggle-spacer {
+  @apply -ml-1 w-4;
+}
+
+.tree-node__tooltip-parent {
+  @apply w-full flex-1 overflow-hidden;
+}
+
+.tree-node__link {
+  @apply w-full py-1;
+}
+
+.tree-node__title {
+  @apply text-interface-text block truncate overflow-hidden text-sm text-ellipsis;
+}
+
+.tree-node__title--active {
+  @apply text-brand;
+}
+
+.tree-node__actions {
+  @apply bg-surface absolute right-0 flex items-center gap-1 rounded-md shadow-md;
+}
+
+.tree-node__actions--compact {
+  @apply px-1 py-2;
+}
+
+.tree-node__action-icon {
+  @apply text-muted hover:text-interface-text cursor-pointer;
+}
+
+.tree-node__children {
+  @apply ml-4 pl-2;
+}
+
+.tree-node__children--closed {
+  @apply hidden;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium;
+}
+
+/* grüner Primary-Button */
+.btn--primary {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm;
+}
+
+/* neutraler grauer Button */
+.btn--secondary {
+  @apply bg-surface text-interface-text border-surface-border hover:bg-surface-alt border shadow-xs;
+}
+
+/* gefährlich (Delete) */
+.btn--danger {
+  @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm;
+}
 }
 
 /* -------------------------------------------------------
@@ -1325,7 +1363,9 @@
   }
 
   code.hljs {
-    @apply pl-0 !important;
+    <<<<<<< HEAD @apply pl-0 !important;
+    =======@apply pl-0;
+    >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
   }
 }
 
