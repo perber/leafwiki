@@ -131,17 +131,17 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		}
 
 		// Assets
-
-		// Assets
 		requiresAuthGroup.POST("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.UploadAssetHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.ListAssetsHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id/assets/rename", auth_middleware.RequireEditorOrAdmin(), api.RenameAssetHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", auth_middleware.RequireEditorOrAdmin(), api.DeleteAssetHandler(wikiInstance))
 
 		// Branding (admin only)
-		requiresAuthGroup.PUT("/branding", auth_middleware.RequireAdmin(), api.UpdateBrandingHandler(wikiInstance))
-		requiresAuthGroup.POST("/branding/logo", auth_middleware.RequireAdmin(), api.UploadBrandingLogoHandler(wikiInstance))
-		requiresAuthGroup.POST("/branding/favicon", auth_middleware.RequireAdmin(), api.UploadBrandingFaviconHandler(wikiInstance))
+
+		// Branding (admin only)
+		requiresAuthGroup.PUT("/branding", auth_middleware.RequireAdmin(options.AuthDisabled), api.UpdateBrandingHandler(wikiInstance))
+		requiresAuthGroup.POST("/branding/logo", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingLogoHandler(wikiInstance))
+		requiresAuthGroup.POST("/branding/favicon", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingFaviconHandler(wikiInstance))
 	}
 
 	// Serve branding assets (logos, favicons)
