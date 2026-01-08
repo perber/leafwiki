@@ -6,6 +6,7 @@ import './App.css'
 import { createLeafWikiRouter } from './features/router/router'
 import { useIsReadOnly } from './lib/useIsReadOnly'
 import { useAuthStore } from './stores/auth'
+import { useBrandingStore } from './stores/branding'
 import { usePublicAccessStore } from './stores/publicAccess'
 import useApplyDesignMode from './useApplyDesignMode'
 
@@ -14,6 +15,8 @@ function App() {
   const setLoaded = usePublicAccessStore((s) => s.setLoaded)
   const setPublicAccess = usePublicAccessStore((s) => s.setPublicAccess)
 
+  const loadBranding = useBrandingStore((s) => s.loadBranding)
+
   const isLoggedIn = useAuthStore((s) => !!s.user)
   const isReadOnly = useIsReadOnly()
   const isReadOnlyViewer = isReadOnly && !isLoggedIn
@@ -21,6 +24,9 @@ function App() {
   useApplyDesignMode()
 
   useEffect(() => {
+    // Load branding configuration
+    loadBranding()
+
     getConfig()
       .then((config) => {
         if (!config) {
@@ -38,7 +44,7 @@ function App() {
       .finally(() => {
         setLoaded(true) // Mark public access as loaded
       })
-  }, [setPublicAccess, setLoaded])
+  }, [setPublicAccess, setLoaded, loadBranding])
 
   const router = useMemo(
     () => createLeafWikiRouter(isReadOnlyViewer),

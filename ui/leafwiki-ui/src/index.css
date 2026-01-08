@@ -259,6 +259,7 @@
    COMPONENTS LAYER — Sidebar, custom UI parts
 ------------------------------------------------------- */
 @layer components {
+
   /* Sidebar */
   .sidebar {
     @apply bg-surface flex h-full w-full flex-col overflow-hidden;
@@ -315,6 +316,14 @@
 
   .app-layout__logo-n-title h2 {
     @apply text-xl font-bold;
+  }
+
+  .app-layout__logo-image {
+    @apply h-6 w-auto inline-block align-middle;
+  }
+
+  .app-layout__logo-emoji {
+    @apply text-xl;
   }
 
   .app-layout__editor-title-bar-container {
@@ -427,8 +436,8 @@
     @apply h-5 w-5;
   }
 
-  .user-toolbar__avatar > span {
-    @apply bg-avatar-bg! text-avatar-foreground!;
+  .user-toolbar__avatar>span {
+    @apply bg-avatar-bg text-avatar-foreground!;
   }
 
   .user-toolbar__avatar-fallback {
@@ -474,19 +483,19 @@
   }
 
   .asset-item__action-button {
-    @apply text-muted! hover:text-brand!;
+    @apply text-muted hover:text-brand!;
   }
 
   .asset-item__action-button--save {
-    @apply text-brand! hover:text-brand-dark!;
+    @apply text-brand hover:text-brand-dark!;
   }
 
   .asset-item__action-button--cancel {
-    @apply text-error! hover:text-error!;
+    @apply text-error hover:text-error!;
   }
 
   .asset-item__action-button--delete {
-    @apply text-muted! hover:text-error!;
+    @apply text-muted hover:text-error!;
   }
 
   /* AssetManager Component */
@@ -571,6 +580,10 @@
 
   .login__title {
     @apply text-interface-text mb-4 text-xl font-bold;
+  }
+
+  .login__logo-image {
+    @apply h-6 w-auto inline-block align-middle;
   }
 
   .login__field {
@@ -730,7 +743,7 @@
   }
 
   .toolbar-button__save-page {
-    @apply bg-success! text-success-foreground! hover:bg-success/80! rounded-full!;
+    @apply bg-success text-success-foreground hover:bg-success/80 rounded-full!;
   }
 
   /* Shared page dialog styles */
@@ -887,7 +900,7 @@
   }
 
   .backlinks__item a {
-    @apply hover:bg-tree-node-hover hover:text-brand text-interface-text! inline-block rounded-md pt-2 pr-5 pb-2 pl-2 text-xs leading-snug;
+    @apply hover:bg-tree-node-hover hover:text-brand text-interface-text inline-block rounded-md pt-2 pr-5 pb-2 pl-2 text-xs leading-snug;
   }
 
   .backlinks__item .backlinks__icon {
@@ -1018,7 +1031,7 @@
 
   /* readonly input */
   input[readonly] {
-    @apply bg-surface-alt! cursor-not-allowed;
+    @apply bg-surface-alt cursor-not-allowed;
   }
 
   .page-viewer {
@@ -1225,6 +1238,7 @@
    UTILITIES LAYER — Markdown, tables, custom scrollbars
 ------------------------------------------------------- */
 @layer utilities {
+
   html,
   body {
     @apply bg-page-bg text-page-text font-sans;
@@ -1325,6 +1339,7 @@
 ------------------------------------------------------- */
 @layer print {
   @media print {
+
     html,
     body {
       background: #fff !important;
@@ -1350,6 +1365,7 @@
       padding: 0 !important;
       border: 0 !important;
     }
+
     .app-layout__content-wrapper {
       height: auto !important;
     }
@@ -1459,5 +1475,64 @@
     .app-layout__header-spacer {
       height: 0 !important;
     }
+  }
+}
+
+/* Branding Settings - appended */
+@layer components {
+  .branding-settings {
+    @apply mx-auto max-w-2xl p-6;
+  }
+
+  .branding-settings__title {
+    @apply text-interface-text mb-6 text-2xl font-bold;
+  }
+
+  .branding-settings__section {
+    @apply border-surface-border bg-surface mb-6 rounded-lg border p-6;
+  }
+
+  .branding-settings__section-title {
+    @apply text-interface-text mb-2 text-lg font-semibold;
+  }
+
+  .branding-settings__section-description {
+    @apply text-muted mb-4 text-sm;
+  }
+
+  .branding-settings__field {
+    @apply mb-4;
+  }
+
+  .branding-settings__preview {
+    @apply bg-surface-alt mb-4 flex items-center gap-3 rounded-md p-4;
+  }
+
+  .branding-settings__preview-label {
+    @apply text-muted text-sm;
+  }
+
+  .branding-settings__preview-emoji {
+    @apply text-3xl;
+  }
+
+  .branding-settings__preview-image {
+    @apply h-10 w-auto;
+  }
+
+  .branding-settings__preview-favicon {
+    @apply h-8 w-8;
+  }
+
+  .branding-settings__preview-placeholder {
+    @apply text-muted text-sm italic;
+  }
+
+  .branding-settings__hint {
+    @apply text-muted mt-1 text-xs;
+  }
+
+  .branding-settings__actions {
+    @apply flex justify-end gap-2;
   }
 }
