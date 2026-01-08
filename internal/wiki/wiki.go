@@ -10,6 +10,7 @@ import (
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/branding"
 	"github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
@@ -22,6 +23,7 @@ type Wiki struct {
 	auth          *auth.AuthService
 	user          *auth.UserService
 	asset         *assets.AssetService
+	branding      *branding.BrandingService
 	searchIndex   *search.SQLiteIndex
 	status        *search.IndexingStatus
 	storageDir    string
@@ -117,6 +119,12 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 		}
 	}
 
+	// Initialize the branding service
+	brandingService, err := branding.NewBrandingService(storageDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init branding service: %w", err)
+	}
+
 	// Initialize the wiki service
 	wiki := &Wiki{
 		tree:          treeService,
@@ -124,6 +132,7 @@ func NewWiki(storageDir string, adminPassword string, jwtSecret string, enableSe
 		user:          userService,
 		auth:          authService,
 		asset:         assetService,
+		branding:      brandingService,
 		storageDir:    storageDir,
 		searchIndex:   sqliteIndex,
 		status:        status,
@@ -869,4 +878,26 @@ func (w *Wiki) Close() error {
 	}
 
 	return w.searchIndex.Close()
+}
+
+// Branding methods
+
+func (w *Wiki) GetBranding() (*branding.BrandingConfig, error) {
+	return w.branding.GetBranding()
+}
+
+func (w *Wiki) UpdateBranding(siteName string) error {
+	return w.branding.UpdateBranding(siteName)
+}
+
+func (w *Wiki) UploadBrandingLogo(file multipart.File, filename string) (string, error) {
+	return w.branding.UploadLogo(file, filename)
+}
+
+func (w *Wiki) UploadBrandingFavicon(file multipart.File, filename string) (string, error) {
+	return w.branding.UploadFavicon(file, filename)
+}
+
+func (w *Wiki) GetBrandingService() *branding.BrandingService {
+	return w.branding
 }

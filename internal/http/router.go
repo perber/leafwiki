@@ -69,6 +69,9 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 			c.JSON(200, gin.H{"publicAccess": publicAccess})
 		})
 
+		// Branding (public, no auth required)
+		nonAuthApiGroup.GET("/branding", api.GetBrandingHandler(wikiInstance))
+
 		// PUBLIC READ ACCESS (if enabled via flag or env):
 		// These routes are accessible without authentication when publicAccess == true.
 		// Only safe, read-only operations are allowed here (GET tree/pages).
@@ -127,7 +130,15 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 		requiresAuthGroup.GET("/pages/:id/assets", api.ListAssetsHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id/assets/rename", api.RenameAssetHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", api.DeleteAssetHandler(wikiInstance))
+
+		// Branding (admin only)
+		requiresAuthGroup.PUT("/branding", middleware.RequireAdmin(wikiInstance), api.UpdateBrandingHandler(wikiInstance))
+		requiresAuthGroup.POST("/branding/logo", middleware.RequireAdmin(wikiInstance), api.UploadBrandingLogoHandler(wikiInstance))
+		requiresAuthGroup.POST("/branding/favicon", middleware.RequireAdmin(wikiInstance), api.UploadBrandingFaviconHandler(wikiInstance))
 	}
+
+	// Serve branding assets (logos, favicons)
+	router.StaticFS("/branding", gin.Dir(wikiInstance.GetBrandingService().GetBrandingAssetsDir(), true))
 
 	// If frontend embedding is enabled, serve it on all unknown routes
 	if EmbedFrontend == "true" {
@@ -145,18 +156,18 @@ func NewRouter(wikiInstance *wiki.Wiki, publicAccess bool, injectCodeInHeader st
 		router.StaticFS("/static", http.FS(staticFS))
 
 		router.GET("/favicon.svg", func(c *gin.Context) {
-			file, err := fsys.Open("favicon.svg")
-			if err != nil {
-				c.Status(http.StatusNotFound)
-				return
-			}
-			stat, err := file.Stat()
-			if err != nil {
-				c.Status(http.StatusInternalServerError)
+			// Get branding config to check for custom favicon
+			brandingConfig, err := wikiInstance.GetBranding()
+			if err == nil && brandingConfig.FaviconImagePath != "" {
+				// Serve custom favicon from branding assets
+				faviconPath := wikiInstance.GetBrandingService().GetBrandingAssetsDir() + "/" + brandingConfig.FaviconImagePath
+				c.File(faviconPath)
 				return
 			}
 
-			c.DataFromReader(http.StatusOK, stat.Size(), "image/svg+xml", file, nil)
+			// Serve default leaf favicon as SVG
+			svgContent := `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🌿</text></svg>`
+			c.Data(http.StatusOK, "image/svg+xml", []byte(svgContent))
 		})
 
 		router.NoRoute(func(c *gin.Context) {
