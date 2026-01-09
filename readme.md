@@ -155,7 +155,7 @@ The sections below show a recommended quick start and a few common installation 
 The easiest way to install LeafWiki is using the provided installation script:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh --arch amd64
+sudo /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh)"
 ```
 
 This installs LeafWiki as a system service on the target machine.
@@ -175,15 +175,21 @@ Make sure that this file is accessible only to authorized users.
 
 #### Installer script options
 
-The installation script supports a small set of flags that control how LeafWiki is installed on the target system.
-These options are only used during installation and do not affect the runtime behavior of LeafWiki.
+**Non-interactive mode**
 
-| Flag               | Description                                                 | Default       |
-|--------------------|-------------------------------------------------------------|---------------|
-| `--arch`           | Target architecture for the binary (e.g. `amd64`, `arm64`)  |       -       |
-| `--host`           | Host/IP address the server binds to                         | `127.0.0.1`   |
-| `--port`           | Port the server listens on                                  | `8080`        |
+The script supports non-interactive mode for automated deployments. Use the `--non-interactive` flag and provide configuration via an `.env` file:
 
+```bash
+./install.sh --non-interactive --env-file ./.env
+```
+
+An `.env.example` file is included showing all available environment variables. Copy and customize it as needed:
+
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+./install.sh --non-interactive --env-file ./.env
+```
 
 ### Docker
 
