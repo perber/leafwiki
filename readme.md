@@ -37,8 +37,6 @@ Mobile-friendly UI for reading (and editing) docs & runbooks on the go.
   <img src="./mobile-navigation.png" width="260" />
 </p>
 
-
-
 ---
 
 ## What LeafWiki is good for today
