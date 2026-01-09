@@ -110,8 +110,6 @@ LeafWiki is built around a small set of clear principles:
 - **Self-hosted by design**
   Designed to run on a single server with minimal operational overhead.
 
-Self-hosting is the primary and fully supported way to run LeafWiki.
-
 ---
 
 ### Data model
