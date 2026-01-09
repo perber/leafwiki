@@ -12,8 +12,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/wiki"
 )
+
+func pageNodeKind() *tree.NodeKind {
+	kind := tree.NodeKindPage
+	return &kind
+}
 
 func createWikiTestInstance(t *testing.T) *wiki.Wiki {
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
@@ -306,7 +312,7 @@ func TestDeletePageEndpoint(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Delete Me", "delete-me")
+	_, err := w.CreatePage("system", nil, "Delete Me", "delete-me", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -339,11 +345,11 @@ func TestDeletePageEndpoint_HasChildren(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	parent, err := w.CreatePage("system", nil, "Parent", "parent")
+	parent, err := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	_, err = w.CreatePage("system", &parent.ID, "Child", "child")
+	_, err = w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -360,11 +366,11 @@ func TestDeletePageEndpoint_Recursive(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	parent, err := w.CreatePage("system", nil, "Parent", "parent")
+	parent, err := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	_, err = w.CreatePage("system", &parent.ID, "Child", "child")
+	_, err = w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -384,7 +390,7 @@ func TestUpdatePageEndpoint(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Original Title", "original-title")
+	_, err := w.CreatePage("system", nil, "Original Title", "original-title", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -437,7 +443,7 @@ func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Create a page
-	created, err := w.CreatePage("system", nil, "Immutable Slug", "immutable-slug")
+	created, err := w.CreatePage("system", nil, "Immutable Slug", "immutable-slug", pageNodeKind())
 	if err != nil {
 		t.Fatalf("Failed to create page: %v", err)
 	}
@@ -471,13 +477,13 @@ func TestUpdatePage_PageAlreadyExists(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Original Title", "original-title")
+	_, err := w.CreatePage("system", nil, "Original Title", "original-title", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	page := w.GetTree().Children[0]
 
-	_, err = w.CreatePage("system", nil, "Conflict Title", "conflict-title")
+	_, err = w.CreatePage("system", nil, "Conflict Title", "conflict-title", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -540,7 +546,7 @@ func TestGetPageEndpoint(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Create a page
-	_, err := w.CreatePage("system", nil, "Welcome", "welcome")
+	_, err := w.CreatePage("system", nil, "Welcome", "welcome", pageNodeKind())
 	if err != nil {
 		t.Fatalf("Failed to create page: %v", err)
 	}
@@ -602,11 +608,11 @@ func TestMovePageEndpoint(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Create two pages a and b
-	_, err := w.CreatePage("system", nil, "Section A", "section-a")
+	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	_, err = w.CreatePage("system", nil, "Section B", "section-b")
+	_, err = w.CreatePage("system", nil, "Section B", "section-b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -668,7 +674,7 @@ func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Section A", "section-a")
+	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -689,13 +695,13 @@ func TestMovePageEndpoint_CircularReference(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Section A", "section-a")
+	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	a := w.GetTree().Children[0]
 
-	_, err = w.CreatePage("system", &a.ID, "Section B", "section-b")
+	_, err = w.CreatePage("system", &a.ID, "Section B", "section-b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -714,19 +720,19 @@ func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Section A", "section-a")
+	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 	a := w.GetTree().Children[0]
 
-	_, err = w.CreatePage("system", nil, "Section B", "section-b")
+	_, err = w.CreatePage("system", nil, "Section B", "section-b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
 
 	// Create Conflict Page in b
-	conflictPage, err := w.CreatePage("system", &a.ID, "Section B", "section-b")
+	conflictPage, err := w.CreatePage("system", &a.ID, "Section B", "section-b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -744,7 +750,7 @@ func TestMovePage_InTheSamePlace(t *testing.T) {
 	defer w.Close()
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Section A", "section-a")
+	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -763,15 +769,15 @@ func TestSortPagesEndpoint(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Create pages
-	page1, err := w.CreatePage("system", nil, "Page 1", "page-1")
+	page1, err := w.CreatePage("system", nil, "Page 1", "page-1", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	page2, err := w.CreatePage("system", nil, "Page 2", "page-2")
+	page2, err := w.CreatePage("system", nil, "Page 2", "page-2", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
-	page3, err := w.CreatePage("system", nil, "Page 3", "page-3")
+	page3, err := w.CreatePage("system", nil, "Page 3", "page-3", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -1342,7 +1348,7 @@ func TestAssetEndpoints(t *testing.T) {
 	}
 
 	// Step 1: Create page direkt über Wiki-API
-	page, err := w.CreatePage("system", nil, "Assets Page", "assets-page")
+	page, err := w.CreatePage("system", nil, "Assets Page", "assets-page", pageNodeKind())
 	if err != nil {
 		t.Fatalf("Failed to create page: %v", err)
 	}

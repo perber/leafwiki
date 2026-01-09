@@ -19,7 +19,7 @@ type TreeService struct {
 	storageDir   string
 	treeFilename string
 	tree         *PageNode
-	store        *PageStore
+	store        *NodeStore
 	log          *slog.Logger
 
 	mu sync.RWMutex
@@ -31,7 +31,7 @@ func NewTreeService(storageDir string) *TreeService {
 		storageDir:   storageDir,
 		treeFilename: "tree.json",
 		tree:         nil,
-		store:        NewPageStore(storageDir),
+		store:        NewNodeStore(storageDir),
 		log:          slog.Default().With("component", "TreeService"),
 	}
 }
@@ -110,25 +110,34 @@ func (t *TreeService) migrateToV1() error {
 
 		// Read creation and modification times from the filesystem
 		// and set them in the metadata
-		filePath, err := t.store.getFilePath(node)
+
+		r, err := t.store.resolveNode(node)
 		if err != nil {
-			// Log the error and continue
-			// We still want to backfill metadata for other nodes
-			// but we cannot do it for this node
-			t.log.Error("Could not get file path for node", "nodeID", node.ID, "error", err)
+			// Log and continue (same behavior as before)
+			t.log.Error("Could not resolve node for metadata backfill", "nodeID", node.ID, "error", err)
 			return nil
+		}
+
+		// Prefer the real on-disk object:
+		// - Page => <base>.md
+		// - Folder with content => <base>/index.md
+		// - Folder without content => use folder mtime
+		statPath := r.FilePath
+		if r.Kind == NodeKindSection && !r.HasContent {
+			statPath = r.DirPath
 		}
 
 		// The default value is set to now
 		createdAt := time.Now().UTC()
 		updatedAt := time.Now().UTC()
 
-		// Try to read file info; on error, log non-NotExist issues and keep defaults
-		if info, err := os.Stat(filePath); err == nil {
-			createdAt = info.ModTime().UTC()
-			updatedAt = info.ModTime().UTC()
-		} else if !os.IsNotExist(err) {
-			t.log.Error("Could not stat file for node", "nodeID", node.ID, "filePath", filePath, "error", err)
+		if statPath != "" {
+			if info, err := os.Stat(statPath); err == nil {
+				createdAt = info.ModTime().UTC()
+				updatedAt = info.ModTime().UTC()
+			} else if !os.IsNotExist(err) {
+				t.log.Error("Could not stat node for metadata", "nodeID", node.ID, "path", statPath, "error", err)
+			}
 		}
 
 		node.Metadata = PageMetadata{
@@ -155,7 +164,13 @@ func (t *TreeService) migrateToV1() error {
 
 // migrateToV2 migrates the tree to the v2 schema
 // Adds frontmatter to all existing pages if missing
+// Adds kind to all nodes
 func (t *TreeService) migrateToV2() error {
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+	t.backfillKindFromFSLocked()
+
 	// Traverse all pages and add frontmatter if missing
 	var addFrontmatter func(node *PageNode) error
 	addFrontmatter = func(node *PageNode) error {
@@ -174,14 +189,14 @@ func (t *TreeService) migrateToV2() error {
 				return nil
 			}
 			t.log.Error("Could not read page content for node", "nodeID", node.ID, "error", err)
-			return fmt.Errorf("could not read page content for node %s: %v", node.ID, err)
+			return fmt.Errorf("could not read page content for node %s: %w", node.ID, err)
 		}
 
 		// Parse the frontmatter
 		fm, body, has, err := ParseFrontmatter(content)
 		if err != nil {
 			t.log.Error("Could not parse frontmatter for node", "nodeID", node.ID, "error", err)
-			return fmt.Errorf("could not parse frontmatter for node %s: %v", node.ID, err)
+			return fmt.Errorf("could not parse frontmatter for node %s: %w", node.ID, err)
 		}
 
 		// Decide if we need to change anything
@@ -213,10 +228,9 @@ func (t *TreeService) migrateToV2() error {
 				return fmt.Errorf("could not build markdown with frontmatter for node %s: %w", node.ID, err)
 			}
 
-			filePath, err := t.store.getFilePath(node)
+			filePath, err := t.store.contentPathForNodeWrite(node)
 			if err != nil {
-				t.log.Error("could not get file path", "nodeID", node.ID, "error", err)
-				return fmt.Errorf("could not get file path for node %s: %w", node.ID, err)
+				return fmt.Errorf("could not determine content path for node %s: %w", node.ID, err)
 			}
 
 			if err := writeFileAtomic(filePath, []byte(newContent), 0o644); err != nil {
@@ -238,10 +252,6 @@ func (t *TreeService) migrateToV2() error {
 		return nil
 	}
 
-	if t.tree == nil {
-		return ErrTreeNotLoaded
-	}
-
 	// start the recursion from the children of the root
 	for _, child := range t.tree.Children {
 		if err := addFrontmatter(child); err != nil {
@@ -253,12 +263,65 @@ func (t *TreeService) migrateToV2() error {
 	return nil
 }
 
-// SaveTree saves the tree to the storage directory
-func (t *TreeService) SaveTree() error {
+func (t *TreeService) backfillKindFromFSLocked() {
+	if t.tree == nil {
+		return
+	}
+	t.tree.Kind = NodeKindSection
+
+	var walk func(n *PageNode)
+	walk = func(n *PageNode) {
+		if n == nil {
+			return
+		}
+
+		// Root skip
+		if n.ID != "root" {
+			// Nur backfillen, wenn Kind fehlt/unknown
+			if n.Kind != NodeKindPage && n.Kind != NodeKindSection {
+				r, err := t.store.resolveNode(n)
+				if err == nil {
+					n.Kind = r.Kind
+				} else {
+					// Fallback-Heuristik, wenn auf Disk nichts existiert
+					if n.HasChildren() {
+						n.Kind = NodeKindSection
+					} else {
+						n.Kind = NodeKindPage
+					}
+					t.log.Warn("could not resolve node on disk; kind backfilled by heuristic",
+						"nodeID", n.ID, "slug", n.Slug, "err", err, "kind", n.Kind)
+				}
+			}
+		}
+
+		for _, ch := range n.Children {
+			walk(ch)
+		}
+	}
+
+	for _, ch := range t.tree.Children {
+		walk(ch)
+	}
+}
+
+func (t *TreeService) withLockedTree(fn func() error) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	return t.saveTreeLocked()
+	return fn()
+}
+
+func (t *TreeService) withRLockedTree(fn func() error) error {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	return fn()
+}
+
+// SaveTree saves the tree to the storage directory
+func (t *TreeService) SaveTree() error {
+	return t.withLockedTree(t.saveTreeLocked)
 }
 
 func (t *TreeService) saveTreeLocked() error {
@@ -266,98 +329,74 @@ func (t *TreeService) saveTreeLocked() error {
 	return t.store.SaveTree(t.treeFilename, t.tree)
 }
 
-// Create Page adds a new page to the tree
-func (t *TreeService) CreatePage(userID string, parentID *string, title string, slug string) (*string, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
+// Create Node adds a new node to the tree
+func (t *TreeService) CreateNode(userID string, parentID *string, title string, slug string, nodeKind *NodeKind) (*string, error) {
+	var result *string
+	err := t.withLockedTree(func() error {
+		var err error
+		result, err = t.createNodeLocked(userID, parentID, title, slug, nodeKind)
+		return err
+	})
 
-	result, err := t.createPageLocked(userID, parentID, title, slug)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := t.saveTreeLocked(); err != nil {
-		return nil, fmt.Errorf("could not save tree: %v", err)
-	}
-
-	return result, nil
+	return result, err
 }
 
-// createPageLocked creates a new page under the given parent
+// createNodeLocked creates a new node under the given parent
 // Lock must be held by the caller
-func (t *TreeService) createPageLocked(userID string, parentID *string, title string, slug string) (*string, error) {
-
+func (t *TreeService) createNodeLocked(userID string, parentID *string, title string, slug string, kind *NodeKind) (*string, error) {
 	if t.tree == nil {
 		return nil, ErrTreeNotLoaded
 	}
 
-	if parentID == nil {
-		// The entry needs to be added to the root
-		root := t.tree
-		if root == nil {
+	// Decide which kind we create
+	k := NodeKindPage
+	if kind != nil {
+		k = *kind
+	}
+
+	// Resolve the parent
+	parent := t.tree
+	if parentID != nil && *parentID != "" && *parentID != "root" {
+		var err error
+		parent, err = t.findPageByIDLocked(t.tree.Children, *parentID)
+		if err != nil {
 			return nil, ErrParentNotFound
 		}
-
-		if root.ChildAlreadyExists(slug) {
-			return nil, ErrPageAlreadyExists
-		}
-
-		// Generate a unique ID for the new page
-		id, err := shared.GenerateUniqueID()
-		if err != nil {
-			return nil, fmt.Errorf("could not generate unique ID: %v", err)
-		}
-
-		now := time.Now().UTC()
-
-		entry := &PageNode{
-			ID:       id,
-			Title:    title,
-			Parent:   root,
-			Slug:     slug,
-			Position: len(root.Children), // Set the position to the end of the list
-			Children: []*PageNode{},
-			Metadata: PageMetadata{
-				CreatedAt:    now,
-				UpdatedAt:    now,
-				CreatorID:    userID,
-				LastAuthorID: userID,
-			},
-		}
-
-		if err := t.store.CreatePage(root, entry); err != nil {
-			return nil, fmt.Errorf("could not create page entry: %v", err)
-		}
-
-		root.Children = append(root.Children, entry)
-
-		// Store Tree after adding page
-		// (Saving the tree is now the caller's responsibility)
-		return &entry.ID, nil
 	}
 
-	// Find the parent page
-	parent, err := t.findPageByIDLocked(t.tree.Children, *parentID)
-	if err != nil {
-		return nil, ErrParentNotFound
-	}
-
+	// Check if a child with the same slug already exists
 	if parent.ChildAlreadyExists(slug) {
 		return nil, ErrPageAlreadyExists
+	}
+
+	// Check if the current parent is a section
+	// if not, we need to convert it to a section
+	if parent.Kind != NodeKindSection && parent.ID != "root" {
+		t.log.Info("converting parent to section", "parentID", parent.ID, "oldKind", parent.Kind, "newKind", NodeKindSection)
+		if err := t.store.ConvertNode(parent, NodeKindSection); err != nil {
+			return nil, fmt.Errorf("could not convert parent node: %w", err)
+		}
+		parent.Kind = NodeKindSection
+	}
+
+	if parent.Kind != NodeKindSection {
+		return nil, fmt.Errorf("cannot add child to non-section parent, got %q", parent.Kind)
 	}
 
 	// Generate a unique ID for the new page
 	id, err := shared.GenerateUniqueID()
 	if err != nil {
-		return nil, fmt.Errorf("could not generate unique ID: %v", err)
+		return nil, fmt.Errorf("could not generate unique ID: %w", err)
 	}
 
 	now := time.Now().UTC()
+
 	entry := &PageNode{
 		ID:       id,
-		Slug:     slug,
 		Title:    title,
 		Parent:   parent,
+		Slug:     slug,
+		Kind:     k,
 		Position: len(parent.Children), // Set the position to the end of the list
 		Children: []*PageNode{},
 		Metadata: PageMetadata{
@@ -368,23 +407,34 @@ func (t *TreeService) createPageLocked(userID string, parentID *string, title st
 		},
 	}
 
-	if err := t.store.CreatePage(parent, entry); err != nil {
-		return nil, fmt.Errorf("could not create page entry: %v", err)
+	// Create on disk depending on kind
+	switch k {
+	case NodeKindPage:
+		if err := t.store.CreatePage(parent, entry); err != nil {
+			return nil, fmt.Errorf("could not create page entry: %w", err)
+		}
+	case NodeKindSection:
+		if err := t.store.CreateSection(parent, entry); err != nil {
+			return nil, fmt.Errorf("could not create section entry: %w", err)
+		}
 	}
 
 	// Add the new page to the parent
 	parent.Children = append(parent.Children, entry)
-
 	return &entry.ID, nil
 }
 
 // FindPageByID finds a page in the tree by its ID
 // If the page is not found, it returns an error
 func (t *TreeService) FindPageByID(entry []*PageNode, id string) (*PageNode, error) {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+	var result *PageNode
+	err := t.withRLockedTree(func() error {
+		var err error
+		result, err = t.findPageByIDLocked(entry, id)
+		return err
+	})
 
-	return t.findPageByIDLocked(entry, id)
+	return result, err
 }
 
 // findPageByIDLocked finds a page in the tree by its ID
@@ -404,93 +454,142 @@ func (t *TreeService) findPageByIDLocked(entry []*PageNode, id string) (*PageNod
 	return nil, ErrPageNotFound
 }
 
-// DeletePage deletes a page from the tree
-func (t *TreeService) DeletePage(userID string, id string, recursive bool) error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	if t.tree == nil {
-		return ErrTreeNotLoaded
-	}
-
-	// Find the page to delete
-	page, err := t.findPageByIDLocked(t.tree.Children, id)
-	if err != nil {
-		return ErrPageNotFound
-	}
-
-	// Check if page has children
-	if page.HasChildren() && !recursive {
-		return ErrPageHasChildren
-	}
-
-	// Delete the page from the parent
-	parent := page.Parent
-	if parent == nil {
-		return ErrParentNotFound
-	}
-
-	// Delete the page from the filesystem
-	if err := t.store.DeletePage(page); err != nil {
-		return fmt.Errorf("could not delete page entry: %v", err)
-	}
-
-	// Remove the page from the parent
-	for i, e := range parent.Children {
-		if e.ID == id {
-			parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
-			break
+// DeleteNode deletes a node from the tree
+func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error {
+	err := t.withLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
 		}
-	}
 
-	t.reindexPositions(parent)
+		// Find the node to delete
+		node, err := t.findPageByIDLocked(t.tree.Children, id)
+		if err != nil {
+			return ErrPageNotFound
+		}
 
-	return t.saveTreeLocked()
+		// Check if node has children
+		if node.HasChildren() && !recursive {
+			return ErrPageHasChildren
+		}
+
+		// Delete the node from the parent
+		parent := node.Parent
+		if parent == nil {
+			return ErrParentNotFound
+		}
+
+		switch node.Kind {
+		case NodeKindSection:
+			if err := t.store.DeleteSection(node); err != nil {
+				return fmt.Errorf("could not delete section entry: %w", err)
+			}
+		case NodeKindPage:
+			if node.HasChildren() {
+				// This should not happen due to earlier check, but just in case
+				// Convert to section and delete recursively
+				t.log.Info("converting page to section for recursive delete", "pageID", node.ID)
+				if err := t.store.ConvertNode(node, NodeKindSection); err != nil {
+					return fmt.Errorf("could not convert page to section: %w", err)
+				}
+				node.Kind = NodeKindSection
+				if err := t.store.DeleteSection(node); err != nil {
+					return fmt.Errorf("could not delete section entry: %w", err)
+				}
+			} else {
+				if err := t.store.DeletePage(node); err != nil {
+					return fmt.Errorf("could not delete page entry: %w", err)
+				}
+			}
+		default:
+			return fmt.Errorf("unknown node kind: %v", node.Kind)
+		}
+
+		// Remove the page from the parent
+		for i, e := range parent.Children {
+			if e.ID == id {
+				parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
+				break
+			}
+		}
+
+		t.reindexPositions(parent)
+		return t.saveTreeLocked()
+	})
+	return err
 }
 
-// UpdatePage updates a page in the tree
-func (t *TreeService) UpdatePage(userID string, id string, title string, slug string, content string) error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
+// UpdateNode updates a node (page/section) in the tree and syncs disk state via NodeStore.
+func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, kind *NodeKind) error {
+	return t.withLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
 
-	if t.tree == nil {
-		return ErrTreeNotLoaded
-	}
+		// Find node
+		node, err := t.findPageByIDLocked(t.tree.Children, id)
+		if err != nil {
+			return ErrPageNotFound
+		}
 
-	// Find the page to update
-	page, err := t.findPageByIDLocked(t.tree.Children, id)
-	if err != nil {
-		return ErrPageNotFound
-	}
+		// Slug must be unique under same parent (when changed)
+		if slug != node.Slug && node.Parent != nil && node.Parent.ChildAlreadyExists(slug) {
+			return ErrPageAlreadyExists
+		}
 
-	// Check if the slug is unique when slug changes!
-	if slug != page.Slug && page.Parent.ChildAlreadyExists(slug) {
-		return ErrPageAlreadyExists
-	}
+		// Kind change?
+		if kind != nil && *kind != node.Kind {
+			// Section -> Page only allowed if no children
+			if node.Kind == NodeKindSection && *kind == NodeKindPage && node.HasChildren() {
+				return ErrPageHasChildren
+			}
 
-	// Update the entry in the filesystem!
-	if err := t.store.UpdatePage(page, slug, content); err != nil {
-		return fmt.Errorf("could not update page entry: %v", err)
-	}
+			t.log.Info("changing node kind", "nodeID", node.ID, "oldKind", node.Kind, "newKind", *kind)
+			if err := t.store.ConvertNode(node, *kind); err != nil {
+				return fmt.Errorf("could not convert node: %w", err)
+			}
+			node.Kind = *kind
+		}
 
-	// Update the page
-	page.Title = title
-	page.Slug = slug
-	// Update metadata
-	page.Metadata.UpdatedAt = time.Now().UTC()
-	page.Metadata.LastAuthorID = userID
-	// Save the tree
-	return t.saveTreeLocked()
+		// Content update?
+		if content != nil {
+			t.log.Info("updating node content", "nodeID", node.ID)
+			if err := t.store.UpsertContent(node, *content); err != nil {
+				return fmt.Errorf("could not upsert content: %w", err)
+			}
+		}
+
+		// Rename slug on disk (must happen while node still has old slug)
+		if slug != node.Slug {
+			t.log.Info("renaming node slug", "nodeID", node.ID, "oldSlug", node.Slug, "newSlug", slug)
+			if err := t.store.RenameNode(node, slug); err != nil {
+				return fmt.Errorf("could not rename node: %w", err)
+			}
+			node.Slug = slug
+		}
+
+		// Update title in tree
+		node.Title = title
+
+		// Update metadata
+		node.Metadata.UpdatedAt = time.Now().UTC()
+		node.Metadata.LastAuthorID = userID
+
+		// Keep frontmatter in sync *if file exists* (important when title changed but content == nil)
+		if err := t.store.SyncFrontmatterIfExists(node); err != nil {
+			return fmt.Errorf("could not sync frontmatter: %w", err)
+		}
+
+		// Save tree
+		return t.saveTreeLocked()
+	})
+
 }
 
 // GetTree returns the tree
 func (t *TreeService) GetTree() *PageNode {
-	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.mu.RLock()
+	defer t.mu.RUnlock()
 
-	if t.tree != nil {
-		t.sortTreeByPosition(t.tree)
-	}
 	return t.tree
 }
 
@@ -512,7 +611,7 @@ func (t *TreeService) GetPage(id string) (*Page, error) {
 	// Get the content of the page
 	content, err := t.store.ReadPageContent(page)
 	if err != nil {
-		return nil, fmt.Errorf("could not get page content: %v", err)
+		return nil, fmt.Errorf("could not get page content: %w", err)
 	}
 
 	return &Page{
@@ -537,7 +636,7 @@ func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (
 					// Get the content of the entry
 					content, err := t.store.ReadPageContent(e)
 					if err != nil {
-						return nil, fmt.Errorf("could not get page content: %v", err)
+						return nil, fmt.Errorf("could not get page content: %w", err)
 					}
 
 					return &Page{
@@ -648,7 +747,10 @@ func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLo
 	return lookup, nil
 }
 
-func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string) (*EnsurePathResult, error) {
+// EnsurePagePath ensures that a given path exists in the tree
+// It creates any missing segments as needed
+// Returns the final page node and a list of created nodes
+func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string, kind *NodeKind) (*EnsurePathResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -658,81 +760,78 @@ func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string
 
 	created := []*PageNode{}
 
-	// Lookup the path
 	lookup, err := t.LookupPagePathLocked(t.tree.Children, p)
 	if err != nil {
-		return nil, fmt.Errorf("could not lookup page path: %v", err)
+		return nil, fmt.Errorf("could not lookup page path: %w", err)
 	}
 
-	// If the path exists, return the existing page
+	// Path exists -> return existing
 	if lookup.Exists {
-		page, err := t.findPageByIDLocked(t.tree.Children, *lookup.Segments[len(lookup.Segments)-1].ID)
+		last := lookup.Segments[len(lookup.Segments)-1]
+		page, err := t.findPageByIDLocked(t.tree.Children, *last.ID)
 		if err != nil {
-			return nil, fmt.Errorf("could not find existing page by ID: %v", err)
+			return nil, fmt.Errorf("could not find existing page by ID: %w", err)
 		}
-		return &EnsurePathResult{
-			Exists: true,
-			Page:   page,
-		}, nil
+		return &EnsurePathResult{Exists: true, Page: page}, nil
 	}
 
-	// If the path does not exist, create it
-	var currentID *string
+	// Create missing segments
+	var currentID *string // nil means root
 	for i, segment := range lookup.Segments {
-
 		if segment.Exists {
-			// If the segment exists, use it
 			currentID = segment.ID
 			continue
 		}
 
-		// Create the segment
-		title := segment.Slug
+		// Title
+		segTitle := segment.Slug
 		if i == len(lookup.Segments)-1 {
-			// If this is the last segment, use the targetTitle
-			title = targetTitle
+			segTitle = targetTitle
 		}
 
-		// If the segment does not exist, create it
-		newPageID, err := t.createPageLocked(userID, currentID, title, segment.Slug)
+		// Kind: intermediate segments are sections, last segment uses provided kind (or page/section default)
+		kindToUse := NodeKindSection
+		if i == len(lookup.Segments)-1 && kind != nil {
+			kindToUse = *kind
+		}
+
+		newID, err := t.createNodeLocked(userID, currentID, segTitle, segment.Slug, &kindToUse)
 		if err != nil {
-			return nil, fmt.Errorf("could not create page: %v", err)
+			return nil, fmt.Errorf("could not create segment %q: %w", segment.Slug, err)
 		}
-		currentID = newPageID
-		// Append the newly created page node to the created slice
-		// It is a synthetic PageNode with only ID, Slug and Title set
-		created = append(created, &PageNode{ID: *currentID, Slug: segment.Slug, Title: title})
+		currentID = newID
 
-		// If this is the last segment, return the current page
-		if i == len(lookup.Segments)-1 {
-			page, err := t.findPageByIDLocked(t.tree.Children, *currentID)
-			if err != nil {
-				return nil, fmt.Errorf("could not find created page by ID: %v", err)
-			}
-
-			// Save the tree
-			if err := t.saveTreeLocked(); err != nil {
-				return nil, fmt.Errorf("could not save tree: %v", err)
-			}
-
-			return &EnsurePathResult{
-				Exists:  true,
-				Page:    page,
-				Created: created,
-			}, nil
-		}
+		created = append(created, &PageNode{
+			ID:    *newID,
+			Slug:  segment.Slug,
+			Title: segTitle,
+			Kind:  kindToUse,
+		})
 	}
 
-	// Save the tree
+	// Resolve final page
+	if currentID == nil {
+		return nil, fmt.Errorf("could not ensure page path")
+	}
+	page, err := t.findPageByIDLocked(t.tree.Children, *currentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not find created page by ID: %w", err)
+	}
+
+	// Save once
 	if err := t.saveTreeLocked(); err != nil {
-		return nil, fmt.Errorf("could not save tree: %v", err)
+		return nil, fmt.Errorf("could not save tree: %w", err)
 	}
 
-	return nil, fmt.Errorf("could not ensure page path")
+	return &EnsurePathResult{
+		Exists:  true,
+		Page:    page,
+		Created: created,
+	}, nil
 }
 
-// MovePage moves a page to another parent
-func (t *TreeService) MovePage(userID string, id string, parentID string) error {
+// MoveNode moves a node to another parent (root if parentID is empty/"root")
+func (t *TreeService) MoveNode(userID string, id string, parentID string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -740,52 +839,59 @@ func (t *TreeService) MovePage(userID string, id string, parentID string) error 
 		return ErrTreeNotLoaded
 	}
 
-	// Find the page to move
-	page, err := t.findPageByIDLocked(t.tree.Children, id)
+	// Find node to move
+	node, err := t.findPageByIDLocked(t.tree.Children, id)
 	if err != nil {
 		return ErrPageNotFound
 	}
 
-	// We think that the page is moved to the root
+	// Resolve destination parent (default root)
 	newParent := t.tree
-
-	// Check if a parentID is provided
 	if parentID != "" && parentID != "root" {
-		// Find the new parent
 		newParent, err = t.findPageByIDLocked(t.tree.Children, parentID)
 		if err != nil {
 			return fmt.Errorf("new parent not found: %w", ErrParentNotFound)
 		}
 	}
 
-	// Child with the same slug already exists
-	if newParent.ChildAlreadyExists(page.Slug) {
+	// Same slug collision under new parent
+	if newParent.ChildAlreadyExists(node.Slug) {
 		return fmt.Errorf("child with the same slug already exists: %w", ErrPageAlreadyExists)
 	}
 
-	// Check if the page is not moved to itself
-	if page.ID == newParent.ID {
+	// Can't move into itself
+	if node.ID == newParent.ID {
 		return fmt.Errorf("page cannot be moved to itself: %w", ErrPageCannotBeMovedToItself)
 	}
 
-	// Check if a circular reference is created
-	if page.IsChildOf(newParent.ID, true) {
+	// Circular reference guard: node cannot be moved under its own descendants
+	if node.IsChildOf(newParent.ID, true) {
 		return fmt.Errorf("circular reference detected: %w", ErrMovePageCircularReference)
 	}
 
-	// Move the page in the filesystem
-	if err := t.store.MovePage(page, newParent); err != nil {
-		return fmt.Errorf("could not move page entry: %w", err)
+	// If destination parent is a PAGE, auto-convert it to SECTION so it can host children
+	if newParent.ID != "root" && newParent.Kind == NodeKindPage {
+		if err := t.store.ConvertNode(newParent, NodeKindSection); err != nil {
+			return fmt.Errorf("could not auto-convert new parent page to section: %w", err)
+		}
+		newParent.Kind = NodeKindSection
 	}
 
-	// Move the page to the new parent
-	// Remove the page from the old parent
-	oldParent := page.Parent
+	// Defensive: after possible conversion, destination must be a section
+	if newParent.Kind != NodeKindSection {
+		return fmt.Errorf("destination parent must be a section, got %q", newParent.Kind)
+	}
+
+	// Move on disk (strict by node.Kind inside NodeStore)
+	if err := t.store.MoveNode(node, newParent); err != nil {
+		return fmt.Errorf("could not move node on disk: %w", err)
+	}
+
+	// Unlink from old parent in tree
+	oldParent := node.Parent
 	if oldParent == nil {
 		return fmt.Errorf("old parent not found: %w", ErrParentNotFound)
 	}
-
-	// Remove the page from the old parent
 	for i, e := range oldParent.Children {
 		if e.ID == id {
 			oldParent.Children = append(oldParent.Children[:i], oldParent.Children[i+1:]...)
@@ -793,20 +899,20 @@ func (t *TreeService) MovePage(userID string, id string, parentID string) error 
 		}
 	}
 
-	// Add the page to the new parent
-	page.Position = len(newParent.Children)
-	newParent.Children = append(newParent.Children, page)
-	page.Parent = newParent
+	// Link under new parent
+	node.Position = len(newParent.Children)
+	newParent.Children = append(newParent.Children, node)
+	node.Parent = newParent
 
-	// Update Metadata of the moved page
-	page.Metadata.UpdatedAt = time.Now().UTC()
-	page.Metadata.LastAuthorID = userID
+	// Update metadata
+	node.Metadata.UpdatedAt = time.Now().UTC()
+	node.Metadata.LastAuthorID = userID
 
-	// Reindex the positions of the old parent
+	// Reindex positions
 	t.reindexPositions(newParent)
 	t.reindexPositions(oldParent)
 
-	// Save the tree
+	// Persist tree
 	return t.saveTreeLocked()
 }
 
@@ -876,6 +982,39 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 	return t.saveTreeLocked()
 }
 
+// maybeCollapseSectionToPageLocked tries to collapse a section node into a page node
+// It is not used currently, but after testing the user flow we might want to integrate it
+// into UpdateNode or MoveNode operations
+// Lock must be held by the caller
+// func (t *TreeService) maybeCollapseSectionToPageLocked(node *PageNode) {
+// 	if node == nil || node.ID == "root" {
+// 		return
+// 	}
+// 	if node.Kind != NodeKindSection {
+// 		return
+// 	}
+// 	if node.HasChildren() {
+// 		return
+// 	}
+
+// 	// Only collapse if index.md exists
+// 	indexPath, err := t.store.contentPathForNodeRead(node)
+// 	if err != nil {
+// 		return
+// 	}
+// 	if _, err := os.Stat(indexPath); err != nil {
+// 		// no index.md => keep as section
+// 		return
+// 	}
+
+// 	// Try collapse (will refuse if folder has other files)
+// 	if err := t.store.ConvertNode(node, NodeKindPage); err != nil {
+// 		// not allowed (e.g. folder not empty) -> keep section
+// 		return
+// 	}
+// 	node.Kind = NodeKindPage
+// }
+
 func (t *TreeService) reindexPositions(parent *PageNode) {
 	sort.SliceStable(parent.Children, func(i, j int) bool {
 		return parent.Children[i].Position < parent.Children[j].Position
@@ -885,11 +1024,11 @@ func (t *TreeService) reindexPositions(parent *PageNode) {
 	}
 }
 
-func (t *TreeService) sortTreeByPosition(node *PageNode) {
-	sort.SliceStable(node.Children, func(i, j int) bool {
-		return node.Children[i].Position < node.Children[j].Position
-	})
-	for _, child := range node.Children {
-		t.sortTreeByPosition(child)
-	}
-}
+// func (t *TreeService) sortTreeByPosition(node *PageNode) {
+// 	sort.SliceStable(node.Children, func(i, j int) bool {
+// 		return node.Children[i].Position < node.Children[j].Position
+// 	})
+// 	for _, child := range node.Children {
+// 		t.sortTreeByPosition(child)
+// 	}
+// }

@@ -3,6 +3,7 @@ package wiki
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"mime/multipart"
 	"path"
 	"regexp"
@@ -29,6 +30,7 @@ type Wiki struct {
 	storageDir    string
 	searchWatcher *search.Watcher
 	links         *links.LinkService
+	log           *slog.Logger
 }
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
@@ -63,6 +65,9 @@ type WikiOptions struct {
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
+
+	logger := slog.Default().With("component", "Wiki")
+
 	// Initialize the user store
 	store, err := auth.NewUserStore(options.StorageDir)
 	if err != nil {
@@ -110,7 +115,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	}
 	linkService := links.NewLinkService(options.StorageDir, treeService, linksStore)
 	if err := linkService.IndexAllPages(); err != nil {
-		log.Printf("failed to index links of pages: %v", err)
+		logger.Warn("failed to index links on startup", "error", err)
 	}
 
 	sqliteIndex, err := search.NewSQLiteIndex(options.StorageDir)
@@ -126,18 +131,18 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	go func() {
 		err := search.BuildAndRunIndexer(treeService, sqliteIndex, path.Join(options.StorageDir, "root"), 4, status)
 		if err != nil {
-			log.Printf("indexing failed: %v", err)
+			logger.Warn("indexing failed", "error", err)
 		}
 	}()
 
 	// Start the file watcher for indexing
 	searchWatcher, err = search.NewWatcher(path.Join(options.StorageDir, "root"), treeService, sqliteIndex, status)
 	if err != nil {
-		log.Printf("failed to create file watcher: %v", err)
+		logger.Warn("failed to create file watcher", "error", err)
 	} else {
 		go func() {
 			if err := searchWatcher.Start(); err != nil {
-				log.Printf("failed to start file watcher: %v", err)
+				logger.Warn("failed to start file watcher", "error", err)
 			}
 		}()
 	}
@@ -155,6 +160,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		status:        status,
 		searchWatcher: searchWatcher,
 		links:         linkService,
+		log:           logger,
 	}
 
 	// Ensure the welcome page exists
@@ -166,16 +172,12 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 }
 
 func (w *Wiki) EnsureWelcomePage() error {
-	_, err := w.tree.GetPage("root")
-	if err == nil {
-		return nil
-	}
-
 	if len(w.tree.GetTree().Children) > 0 {
+		w.log.Info("Welcome page already exists, skipping creation")
 		return nil
 	}
-
-	p, err := w.CreatePage(SYSTEM_USER_ID, nil, "Welcome to LeafWiki", "welcome-to-leafwiki")
+	k := tree.NodeKindPage
+	p, err := w.CreatePage(SYSTEM_USER_ID, nil, "Welcome to LeafWiki", "welcome-to-leafwiki", &k)
 	if err != nil {
 		return err
 	}
@@ -212,7 +214,7 @@ LeafWiki is designed for clarity, structure, and long-term maintainability — n
 - **Bold**
 ` + "- `Inline code` \n```\n\n" + "Enjoy writing!"
 
-	if _, err := w.UpdatePage(SYSTEM_USER_ID, p.ID, p.Title, p.Slug, content); err != nil {
+	if _, err := w.UpdatePage(SYSTEM_USER_ID, p.ID, p.Title, p.Slug, &content, &k); err != nil {
 		return err
 	}
 
@@ -223,11 +225,15 @@ func (w *Wiki) GetTree() *tree.PageNode {
 	return w.tree.GetTree()
 }
 
-func (w *Wiki) CreatePage(userID string, parentID *string, title string, slug string) (*tree.Page, error) {
+func (w *Wiki) CreatePage(userID string, parentID *string, title string, slug string, kind *tree.NodeKind) (*tree.Page, error) {
 	ve := errors.NewValidationErrors()
 
 	if title == "" {
 		ve.Add("title", "Title must not be empty")
+	}
+
+	if kind == nil {
+		ve.Add("kind", "Kind must be specified")
 	}
 
 	if err := w.slug.IsValidSlug(slug); err != nil {
@@ -246,10 +252,20 @@ func (w *Wiki) CreatePage(userID string, parentID *string, title string, slug st
 			return nil, err
 		}
 	}
-
-	id, err := w.tree.CreatePage(userID, parentID, title, slug)
-	if err != nil {
-		return nil, err
+	var id *string
+	if *kind == tree.NodeKindPage {
+		var err error
+		id, err = w.tree.CreateNode(userID, parentID, title, slug, kind)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if *kind == tree.NodeKindSection {
+		var err error
+		id, err = w.tree.CreateNode(userID, parentID, title, slug, kind)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	page, err := w.tree.GetPage(*id)
@@ -266,7 +282,7 @@ func (w *Wiki) CreatePage(userID string, parentID *string, title string, slug st
 	return page, nil
 }
 
-func (w *Wiki) EnsurePath(userID string, targetPath string, targetTitle string) (*tree.Page, error) {
+func (w *Wiki) EnsurePath(userID string, targetPath string, targetTitle string, kind *tree.NodeKind) (*tree.Page, error) {
 	ve := errors.NewValidationErrors()
 
 	cleanTargetPath := strings.Trim(strings.TrimSpace(targetPath), "/")
@@ -307,7 +323,7 @@ func (w *Wiki) EnsurePath(userID string, targetPath string, targetTitle string) 
 	}
 
 	// Now we create the missing segments
-	result, err := w.tree.EnsurePagePath(userID, cleanTargetPath, cleanTargetTitle)
+	result, err := w.tree.EnsurePagePath(userID, cleanTargetPath, cleanTargetTitle, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +349,7 @@ func (w *Wiki) EnsurePath(userID string, targetPath string, targetTitle string) 
 	return page, nil
 }
 
-func (w *Wiki) UpdatePage(userID string, id, title, slug, content string) (*tree.Page, error) {
+func (w *Wiki) UpdatePage(userID string, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
 
 	// Validate the request
 	ve := errors.NewValidationErrors()
@@ -363,7 +379,7 @@ func (w *Wiki) UpdatePage(userID string, id, title, slug, content string) (*tree
 		}
 	}
 
-	if err = w.tree.UpdatePage(userID, id, title, slug, content); err != nil {
+	if err = w.tree.UpdateNode(userID, id, title, slug, content, kind); err != nil {
 		return nil, err
 	}
 
@@ -394,8 +410,10 @@ func (w *Wiki) UpdatePage(userID string, id, title, slug, content string) (*tree
 				}
 			}
 		} else {
-			if err := w.links.UpdateLinksForPage(after, content); err != nil {
-				log.Printf("warning: failed to update links for page %s: %v", after.ID, err)
+			if content != nil {
+				if err := w.links.UpdateLinksForPage(after, *content); err != nil {
+					log.Printf("warning: failed to update links for page %s: %v", after.ID, err)
+				}
 			}
 			if err := w.links.HealLinksForExactPath(after); err != nil {
 				log.Printf("warning: failed to heal links for page %s: %v", after.ID, err)
@@ -426,13 +444,15 @@ func (w *Wiki) CopyPage(userID string, currentPageID string, targetParentID *str
 		return nil, err
 	}
 
+	kind := tree.NodeKindPage
+
 	// Create a copy of the page
-	copyID, err := w.tree.CreatePage(userID, targetParentID, title, slug)
+	copyID, err := w.tree.CreateNode(userID, targetParentID, title, slug, &kind)
 	if err != nil {
 		log.Printf("error: could not create page copy: %v", err)
 		return nil, err
 	}
-	cleanup := func() { _ = w.tree.DeletePage(userID, *copyID, false) }
+	cleanup := func() { _ = w.tree.DeleteNode(userID, *copyID, false) }
 
 	// Get the copied page
 	copy, err := w.tree.GetPage(*copyID)
@@ -453,7 +473,7 @@ func (w *Wiki) CopyPage(userID string, currentPageID string, targetParentID *str
 	updatedContent := strings.ReplaceAll(page.Content, "/assets/"+page.ID+"/", "/assets/"+copy.ID+"/")
 
 	// Write the content to the copied page
-	if err := w.tree.UpdatePage(userID, copy.ID, copy.Title, copy.Slug, updatedContent); err != nil {
+	if err := w.tree.UpdateNode(userID, copy.ID, copy.Title, copy.Slug, &updatedContent, &kind); err != nil {
 		log.Printf("error: could not update copied page content: %v", err)
 		cleanup()
 		_ = w.asset.DeleteAllAssetsForPage(copy.PageNode)
@@ -505,7 +525,7 @@ func (w *Wiki) DeletePage(userID string, id string, recursive bool) error {
 			oldPrefix = page.CalculatePath()
 		}
 
-		if err := w.tree.DeletePage(userID, id, recursive); err != nil {
+		if err := w.tree.DeleteNode(userID, id, recursive); err != nil {
 			log.Printf("error: could not delete page: %v", err)
 			return err
 		}
@@ -533,7 +553,7 @@ func (w *Wiki) DeletePage(userID string, id string, recursive bool) error {
 		return nil
 	}
 
-	if err := w.tree.DeletePage(userID, id, recursive); err != nil {
+	if err := w.tree.DeleteNode(userID, id, recursive); err != nil {
 		log.Printf("error: could not delete page: %v", err)
 		return err
 	}
@@ -586,7 +606,7 @@ func (w *Wiki) MovePage(userID, id, parentID string) error {
 			oldPrefix = p.CalculatePath()
 		}
 	}
-	if err := w.tree.MovePage(userID, id, parentID); err != nil {
+	if err := w.tree.MoveNode(userID, id, parentID); err != nil {
 		return err
 	}
 
