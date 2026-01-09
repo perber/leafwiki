@@ -14,6 +14,8 @@ A public demo of LeafWiki is available here:
 
 🌐 **[demo.leafwiki.com](https://demo.leafwiki.com)**  
 
+Try: `Ctrl+E` to edit, `Ctrl+S` to save, `Ctrl+Shift+F` to open the search.  
+
 Login credentials are displayed on the demo site.  
 The demo instance resets automatically every hour, so all changes are temporary.
 
