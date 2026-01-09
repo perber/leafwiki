@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-EXEC_NAME=""
 INTERACTIVE=1
 ARCH=""
 PUBLIC_ACCESS="false"
@@ -9,8 +7,10 @@ DATA_DIR="$PWD/data"
 PORT="8080"
 HOST="127.0.0.1"
 VERSION=""
-JWT_PASSWORD=""
+JWT_SECRET=""
 ADMIN_PASSWORD=""
+ENV_FILE=".env"
+ENV_FILE_PATH="/etc/leafwiki/.env"
 
 # Usage function
 usage() {
@@ -31,15 +31,8 @@ usage() {
 }
 
 check_dependencies() {
-    # test wget is installed
-    if ! command -v wget &> /dev/null; then
-        echo "Error: wget is not installed. Please install wget and try again."
-        exit 1
-    fi
-
-    # test if systemctl is installed
-    if ! command -v systemctl &> /dev/null; then
-        echo "Error: systemctl is not installed. This script requires systemd to manage the LeafWiki service."
+    if ! command -v $1 &> /dev/null; then
+        echo "Error: ${1} is not installed. Please install ${1} and try again."
         exit 1
     fi
 }
@@ -47,6 +40,7 @@ check_dependencies() {
 validate_architecture(){
     if [[ "$ARCH" != "amd64" && "$ARCH" != "arm64" ]]; then
         echo "Error: Unsupported architecture '$ARCH'. Supported values are: amd64, arm64"
+        usage
         exit 1
     fi
 }
@@ -60,22 +54,13 @@ validate_port(){
 }
 
 validate_requirements_non_interactive(){
-    if [[ -z "$ARCH" ]]; then
-        echo "Error: ARCH environment variable is required in non-interactive mode (set it in the env file used with --env-file)."
+    local var_value="$1"
+    local var_name="$2"
+    if [[ -z "$var_value" ]]; then
+        echo "Error: $var_name environment variable is required in non-interactive mode (set it in the env file used with --env-file)."
         usage
         exit 1
     fi
-    if [[ -z "$JWT_PASSWORD" ]]; then
-        echo "Error: JWT_PASSWORD environment variable is required in non-interactive mode (set it in the env file used with --env-file)."
-        usage
-        exit 1
-    fi
-    if [[ -z "$ADMIN_PASSWORD" ]]; then
-        echo "Error: ADMIN_PASSWORD environment variable is required in non-interactive mode (set it in the env file used with --env-file)."
-        usage
-        exit 1
-    fi
-    validate_port
 }
 
 validate_version(){
@@ -97,15 +82,23 @@ get_version(){
 
 download_binary(){
     wget "https://github.com/perber/leafwiki/releases/download/v${VERSION}/leafwiki-v${VERSION}-linux-${ARCH}" || exit 1
-    chmod +x "./leafwiki-v${VERSION}-linux-${ARCH}"
-    EXEC_NAME="leafwiki-v${VERSION}-linux-${ARCH}"
+    cp leafwiki-v${VERSION}-linux-${ARCH} /usr/local/bin/leafwiki
+    rm leafwiki-v${VERSION}-linux-${ARCH}
+    chmod +x /usr/local/bin/leafwiki
 }
 
-check_dependencies
+check_dependencies "systemctl"
+check_dependencies "wget"
 
 # Check if --non-interactive flag is present
 if [[ "$*" == *"--non-interactive"*  ||  "$*" == *"-non-interactive"* ]]; then
     INTERACTIVE=0
+fi
+
+if [[ "$INTERACTIVE" -eq 0 && "$*" != *"--env-file"* && "$*" != *"-env-file"* ]]; then
+    echo "Error: In non-interactive mode, --env-file is required"
+    usage
+    exit 1
 fi
 
 if [[ "$INTERACTIVE" == 0 ]]; then
@@ -124,9 +117,10 @@ if [[ "$INTERACTIVE" == 0 ]]; then
                     echo "Error: Environment file '$2' does not exist or is not a regular file"
                     exit 1
                 fi
-                env_file="$2"
-                if [[ ! -r "$env_file" ]]; then
-                    echo "Error: Cannot read env file '$env_file'"
+                ENV_FILE_PATH="$(realpath "$2")"
+                ENV_FILE="$(basename "$2")"
+                if [[ ! -r "$ENV_FILE_PATH" ]]; then
+                    echo "Error: Cannot read env file '$ENV_FILE_PATH'"
                     exit 1
                 fi
                 # Source the environment file and parse each variable
@@ -148,7 +142,7 @@ if [[ "$INTERACTIVE" == 0 ]]; then
                     
                     # Export the variable
                     export "$key=$value"
-                done < "$env_file"
+                done < "$ENV_FILE_PATH"
                 shift 2
                 ;;
             *)
@@ -164,11 +158,16 @@ if [[ "$INTERACTIVE" == 0 ]]; then
     PORT="${LEAFWIKI_PORT:-$PORT}"
     HOST="${LEAFWIKI_HOST:-$HOST}"
     VERSION="${LEAFWIKI_VERSION:-$VERSION}"
-    JWT_PASSWORD="${LEAFWIKI_JWT_PASSWORD:-$JWT_PASSWORD}"
+    JWT_SECRET="${LEAFWIKI_JWT_SECRET:-$JWT_SECRET}"
     ADMIN_PASSWORD="${LEAFWIKI_ADMIN_PASSWORD:-$ADMIN_PASSWORD}"
+    ALLOW_INSECURE=${LEAFWIKI_ALLOW_INSECURE:-false}
+    DISABLE_AUTH=${LEAFWIKI_DISABLE_AUTH:-false}
 
     validate_architecture
-    validate_requirements_non_interactive
+    validate_requirements_non_interactive "$ARCH" "LEAFWIKI_ARCH"
+    validate_requirements_non_interactive "$JWT_SECRET" "LEAFWIKI_JWT_SECRET"
+    validate_requirements_non_interactive "$ADMIN_PASSWORD" "LEAFWIKI_ADMIN_PASSWORD"
+    validate_port
 
 else
     echo "___________________________________________________"
@@ -188,7 +187,7 @@ else
 
     read -rp "Which architecture do you want to use? (amd64/arm64): " ARCH
     echo
-    read -rsp "Which JWT password do you want to use: " JWT_PASSWORD
+    read -rsp "Which JWT secret do you want to use: " JWT_SECRET
     echo
     read -rsp "Which admin password do you want to use: " ADMIN_PASSWORD
     echo
@@ -211,6 +210,16 @@ else
     validate_port
     validate_architecture
 
+    mkdir -p "$(dirname "$ENV_FILE_PATH")"
+    
+    echo "LEAFWIKI_ARCH=\"$ARCH\"" > "$ENV_FILE_PATH"
+    echo "LEAFWIKI_PUBLIC_ACCESS=\"$PUBLIC_ACCESS\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_DATA_DIR=\"$DATA_DIR\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_PORT=\"$PORT\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_HOST=\"$HOST\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_JWT_SECRET=\"$JWT_SECRET\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_ADMIN_PASSWORD=\"$ADMIN_PASSWORD\"" >> "$ENV_FILE_PATH"
+
 fi
 
 get_version
@@ -226,7 +235,8 @@ After=network.target
 
 [Service]
 User=$RUN_USER
-ExecStart=$(realpath $PWD)/$EXEC_NAME --data-dir=$DATA_DIR --jwt-secret=\"$JWT_PASSWORD\" --public-access=$PUBLIC_ACCESS --admin-password=$ADMIN_PASSWORD --port=$PORT --host=$HOST
+EnvironmentFile=-${ENV_FILE_PATH:-$(realpath $PWD)/$ENV_FILE}
+ExecStart=/usr/local/bin/leafwiki
 Restart=on-failure
 
 [Install]
@@ -240,13 +250,13 @@ if [[ "$IS_ACTIVE" == "failed" ]]; then
     echo "Installation failed: "
     systemctl status leafwiki
 else
-    echo "======================================"
-    echo "== LeafWiki installation completed! =="
-    echo "==                                  =="
-    echo "== Host: $HOST                      =="
-    echo "== Port: $PORT                      =="
-    echo "== DataDirectory: $DATA_DIR         =="
-    echo "== Status : $IS_ACTIVE              =="
-    echo "==                                  =="
-    echo "======================================"
+    echo "======================================="
+    echo "== LeafWiki installation completed!  =="
+    echo "==                                   =="
+    printf "== %-33s ==\n" "Host: $HOST"
+    printf "== %-33s ==\n" "Port: $PORT"
+    printf "== %-33s ==\n" "DataDirectory: $DATA_DIR"
+    printf "== %-33s ==\n" "Status: $IS_ACTIVE"
+    echo "==                                   =="
+    echo "======================================="
 fi
