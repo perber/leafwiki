@@ -1,10 +1,10 @@
 # 🌿 LeafWiki
 
-**Self-hosted Markdown knowledge base server — tree-structured, lightweight, single-binary.**  
+**LeafWiki – A fast wiki for people who think in folders, not feeds**  
+Single Go binary. Markdown on disk. No external database service.
 
-LeafWiki is a lightweight, self-hosted knowledge base server for documenting runbooks, internal docs, and technical knowledge — without the overhead of traditional wiki systems. 
-
-Content is stored as Markdown files directly on disk, organized in a clear tree structure, and served by a single Go binary — with no separate database service to run.
+LeafWiki is a lightweight, self-hosted wiki for runbooks, internal docs, and technical notes — built for fast writing and explicit structure.
+It keeps your content as plain Markdown on disk and gives you fast navigation, search, and editing — without running additional services.
 
 ---
 
@@ -17,6 +17,8 @@ A public demo of LeafWiki is available here:
 Login credentials are displayed on the demo site.  
 The demo instance resets automatically every hour, so all changes are temporary.
 
+Self-hosting is the primary and fully supported way to run LeafWiki.
+
 ---
 
 ## Preview
@@ -27,21 +29,25 @@ The demo instance resets automatically every hour, so all changes are temporary.
 
 **Mobile View:**
 
+Mobile-friendly UI for reading (and editing) docs & runbooks on the go.
+
 <p align="center">
   <img src="./mobile-editor.png" width="260" />
   <img src="./mobile-pageview.png" width="260" />
   <img src="./mobile-navigation.png" width="260" />
 </p>
 
+
+
 ---
 
 ## What LeafWiki is good for today
 
 LeafWiki focuses on personal and small-team documentation use cases today.  
-Team features and collaboration evolve cautiously, guided by real-world usage rather than speculative complexity.
+Team features will evolve over time, guided by real-world usage.
 
 LeafWiki is currently well-suited for:
-- Personal technical notes, documentation and ideas
+- Personal technical notes and documentation
 - Project documentation maintained by one main contributor
 - Runbooks, operational knowledge and engineering guides for small teams
 - Structured content that benefits from explicit hierarchy and ordering
@@ -51,7 +57,7 @@ LeafWiki is currently well-suited for:
 ## Project Status
 
 LeafWiki is stable for everyday use as a personal or primary-owner wiki.  
-The core feature set — writing, structure, search, ... is actively maintained and production-ready.
+The core features — writing, navigation, and search — are actively maintained and production-ready.
 
 Collaboration is currently limited and follows a *last-write-wins* approach.  
 More advanced team-oriented capabilities are under development, with a focus on durability and predictable behavior.
@@ -62,7 +68,7 @@ More advanced team-oriented capabilities are under development, with a focus on 
 - Operations metadata (created/updated info)
 - Conflict handling for concurrent edits (optimistic locking)
 
-Development is iterative and guided by real-world use.  
+Priorities are shaped by real-world usage, and development is iterative.
 The platform will evolve cautiously toward team workflows while maintaining its principles of simplicity and low operational overhead.
 
 > **LeafWiki** is actively developed and open to collaboration 🌿 
@@ -73,27 +79,18 @@ See the [CHANGELOG](CHANGELOG.md) for release details.
 
 ## Why Another Wiki?
 
-LeafWiki is a wiki-style knowledge base focused on structure and simplicity,
-rather than collaboration-heavy workflows.
-
-Many existing wiki tools feel heavier than the problem they solve.  
-They require databases, plugins, workflows or complex deployment setups.  
- 
-You have to pick structure, configure storage, and think about operations instead of capturing knowledge while the context is fresh.  
+Most wiki tools become operational projects: databases, plugins, workflows, and setup decisions.
 
 LeafWiki was designed around a few simple questions:
 - Why require a complex database for Markdown content?
 - Why should self-hosting a wiki require significant setup effort?
 - Why can’t structure and navigation be handled explicitly while keeping files portable?
 
-The result is a lightweight wiki engine with:
-- Markdown files stored directly on disk
-- Explicit tree-based structure
-- A single Go binary or container deployment
+In practice, that means:
+- Markdown on disk
+- Explicit tree structure
+- Single-binary or container deployment
 - Minimal operational overhead
-
-
-LeafWiki intentionally prioritizes writing flow, simplicity and long-term maintainability over feature complexity.
 
 ---
 
@@ -108,10 +105,12 @@ LeafWiki is built around a small set of clear principles:
   LeafWiki uses SQLite internally and does not require running or managing a separate database service.
 
 - **Explicit structure management**  
-  Page hierarchy and ordering are managed explicitly, allowing pages to be reordered without relying on the filesystem layout alone.
+  Structure is stored as metadata (JSON/SQLite) while page content stays plain Markdown.
 
 - **Self-hosted by design**
-  LeafWiki is designed to run on a single server with minimal operational overhead.
+  Designed to run on a single server with minimal operational overhead.
+
+Self-hosting is the primary and fully supported way to run LeafWiki.
 
 ---
 
@@ -124,24 +123,25 @@ For details on the current model and its constraints, see [Known limitations](#k
 
 ## What LeafWiki supports
 
-- Built-in Markdown editor
-- Tree-based navigation for structured content
-- Public read-only access
-- Support for diagrams via Mermaid
+- **Fast writing flow (editor + shortcuts)**
+- **Explicit tree navigation**
+- **Public read-only docs with authenticated editing**
+- Built-in Markdown editor with live preview
 - Full-text search across page titles and content
+- Support for diagrams via Mermaid
 - Image and asset support
 - Dark mode and mobile-friendly UI
 - Separation between admin, editor, and viewer users
 - Keyboard shortcuts for common actions (like saving with Ctrl+S, ...)
 
 
-LeafWiki supports public read-only access for documentation use cases, while keeping editing and structure management restricted to authenticated users.
-
 ## What LeafWiki is not
 
-LeafWiki does not aim to be a large enterprise documentation system.
+- Not a Confluence replacement
+- Not real-time collaborative editing
+- Not a workflow/approval/document-control platform
 
-It intentionally avoids complex workflows, real-time collaborative editing, and advanced permission models to maintain simplicity, predictability, and low operational overhead.
+LeafWiki is designed to stay small, predictable, and easy to operate.
 
 ---
 
