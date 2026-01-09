@@ -65,7 +65,7 @@ More advanced team-oriented capabilities are under development, with a focus on 
 
 **Current priorities:**  
 - Versioning
-- Operations metadata (created/updated info)
+- Importing existing Markdown content
 - Conflict handling for concurrent edits (optimistic locking)
 
 Priorities are shaped by real-world usage, and development is iterative.
