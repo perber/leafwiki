@@ -77,7 +77,7 @@ func buildFuzzyQuery(q string) string {
 		return q
 	}
 
-	if strings.ContainsAny(q, "-_+#/.") {
+	if strings.ContainsAny(q, "-_/+#.") {
 		return `"` + q + `"`
 	}
 
