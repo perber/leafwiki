@@ -217,3 +217,211 @@ func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 		t.Errorf("expected higher rank for headingMatch (got %f, %f)", result.Items[0].Rank, result.Items[1].Rank)
 	}
 }
+
+func TestSQLiteIndex_Search_WithHyphenatedTerms(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer index.Close()
+
+	// Index pages with hyphenated terms
+	err = index.IndexPage(
+		"docs/testing",
+		"docs/testing.md",
+		"testing1",
+		"Testing Guide",
+		"This page describes test-case scenarios and test-driven development.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index testing page: %v", err)
+	}
+
+	err = index.IndexPage(
+		"docs/other",
+		"docs/other.md",
+		"other1",
+		"Other Page",
+		"This page has no hyphenated testing terms.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index other page: %v", err)
+	}
+
+	// Search for hyphenated term
+	result, err := index.Search("test-case", 0, 10)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	// Should find the page with "test-case"
+	if result.Count != 1 {
+		t.Errorf("expected 1 result for 'test-case', got %d", result.Count)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 result item, got %d", len(result.Items))
+	}
+
+	if result.Items[0].PageID != "testing1" {
+		t.Errorf("expected testing1 to be found, got %s", result.Items[0].PageID)
+	}
+}
+
+func TestSQLiteIndex_Search_WithDotsInFilenames(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer index.Close()
+
+	// Index pages with filenames containing dots
+	err = index.IndexPage(
+		"docs/files",
+		"docs/files.md",
+		"files1",
+		"File Documentation",
+		"You can download the config.yaml or script.sh files from the repository.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index files page: %v", err)
+	}
+
+	err = index.IndexPage(
+		"docs/setup",
+		"docs/setup.md",
+		"setup1",
+		"Setup Guide",
+		"This guide shows how to set up the application.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index setup page: %v", err)
+	}
+
+	// Search for filename with dot
+	result, err := index.Search("config.yaml", 0, 10)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	// Should find the page with "config.yaml"
+	if result.Count != 1 {
+		t.Errorf("expected 1 result for 'config.yaml', got %d", result.Count)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 result item, got %d", len(result.Items))
+	}
+
+	if result.Items[0].PageID != "files1" {
+		t.Errorf("expected files1 to be found, got %s", result.Items[0].PageID)
+	}
+}
+
+func TestSQLiteIndex_Search_WithPlusSignsInTerms(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer index.Close()
+
+	// Index pages with programming language mentions
+	err = index.IndexPage(
+		"docs/cpp",
+		"docs/cpp.md",
+		"cpp1",
+		"C++ Programming",
+		"This guide covers c++ development and best practices.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index cpp page: %v", err)
+	}
+
+	err = index.IndexPage(
+		"docs/python",
+		"docs/python.md",
+		"python1",
+		"Python Programming",
+		"This guide covers Python development.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index python page: %v", err)
+	}
+
+	// Search for term with plus signs
+	result, err := index.Search("c++", 0, 10)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	// Should find the page with "c++"
+	if result.Count != 1 {
+		t.Errorf("expected 1 result for 'c++', got %d", result.Count)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 result item, got %d", len(result.Items))
+	}
+
+	if result.Items[0].PageID != "cpp1" {
+		t.Errorf("expected cpp1 to be found, got %s", result.Items[0].PageID)
+	}
+}
+
+func TestSQLiteIndex_Search_WithSlashesInPaths(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer index.Close()
+
+	// Index pages with path references
+	err = index.IndexPage(
+		"docs/paths",
+		"docs/paths.md",
+		"paths1",
+		"Path Documentation",
+		"The configuration is located at /etc/config/app.conf and data at /var/data/files.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index paths page: %v", err)
+	}
+
+	err = index.IndexPage(
+		"docs/general",
+		"docs/general.md",
+		"general1",
+		"General Info",
+		"This is general information about the application.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index general page: %v", err)
+	}
+
+	// Search for path with slashes
+	result, err := index.Search("/etc/config/app.conf", 0, 10)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	// Should find the page with the path
+	if result.Count != 1 {
+		t.Errorf("expected 1 result for '/etc/config/app.conf', got %d", result.Count)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 result item, got %d", len(result.Items))
+	}
+
+	if result.Items[0].PageID != "paths1" {
+		t.Errorf("expected paths1 to be found, got %s", result.Items[0].PageID)
+	}
+}
