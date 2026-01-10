@@ -23,11 +23,16 @@ func createWikiTestInstance(t *testing.T) *Wiki {
 	return wikiInstance
 }
 
+func pageNodeKind() *tree.NodeKind {
+	kind := tree.NodeKindPage
+	return &kind
+}
+
 func TestWiki_CreatePage_Root(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
 
-	page, err := w.CreatePage("system", nil, "Home", "home")
+	page, err := w.CreatePage("system", nil, "Home", "home", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
 	}
@@ -40,9 +45,10 @@ func TestWiki_CreatePage_Root(t *testing.T) {
 func TestWiki_CreatePage_WithParent(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	rootPage, _ := w.CreatePage("system", nil, "Docs", "docs")
+	kind := tree.NodeKindPage
+	rootPage, _ := w.CreatePage("system", nil, "Docs", "docs", &kind)
 
-	page, err := w.CreatePage("system", &rootPage.ID, "API-Doc", "api-doc")
+	page, err := w.CreatePage("system", &rootPage.ID, "API-Doc", "api-doc", &kind)
 	if err != nil {
 		t.Fatalf("CreatePage with parent failed: %v", err)
 	}
@@ -55,7 +61,7 @@ func TestWiki_CreatePage_WithParent(t *testing.T) {
 func TestWiki_CreatePage_EmptyTitle(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	_, err := w.CreatePage("system", nil, "", "empty")
+	_, err := w.CreatePage("system", nil, "", "empty", pageNodeKind())
 	if err == nil {
 		t.Error("Expected error for empty title, got none")
 	}
@@ -64,7 +70,7 @@ func TestWiki_CreatePage_EmptyTitle(t *testing.T) {
 func TestWiki_CreatePage_ReservedSlug(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	_, err := w.CreatePage("system", nil, "Reserved", "e")
+	_, err := w.CreatePage("system", nil, "Reserved", "e", pageNodeKind())
 	if err == nil {
 		t.Error("Expected error for reserved slug, got none")
 	}
@@ -82,9 +88,9 @@ func TestWiki_CreatePage_ReservedSlug(t *testing.T) {
 func TestWiki_CreatePage_PageExists(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	_, _ = w.CreatePage("system", nil, "Duplicate", "duplicate")
+	_, _ = w.CreatePage("system", nil, "Duplicate", "duplicate", pageNodeKind())
 
-	_, err := w.CreatePage("system", nil, "Duplicate", "duplicate")
+	_, err := w.CreatePage("system", nil, "Duplicate", "duplicate", pageNodeKind())
 	if err == nil {
 		t.Error("Expected error for duplicate page, got none")
 	}
@@ -94,7 +100,7 @@ func TestWiki_CreatePage_InvalidParent(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
 	invalidID := "not-real"
-	_, err := w.CreatePage("system", &invalidID, "Broken", "broken")
+	_, err := w.CreatePage("system", &invalidID, "Broken", "broken", pageNodeKind())
 	if err == nil {
 		t.Error("Expected error with invalid parent ID, got none")
 	}
@@ -103,7 +109,7 @@ func TestWiki_CreatePage_InvalidParent(t *testing.T) {
 func TestWiki_GetPage_ValidID(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	page, _ := w.CreatePage("system", nil, "ReadMe", "readme")
+	page, _ := w.CreatePage("system", nil, "ReadMe", "readme", pageNodeKind())
 
 	found, err := w.GetPage(page.ID)
 	if err != nil {
@@ -127,8 +133,8 @@ func TestWiki_GetPage_InvalidID(t *testing.T) {
 func TestWiki_MovePage_Valid(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	parent, _ := w.CreatePage("system", nil, "Projects", "projects")
-	child, _ := w.CreatePage("system", nil, "Old", "old")
+	parent, _ := w.CreatePage("system", nil, "Projects", "projects", pageNodeKind())
+	child, _ := w.CreatePage("system", nil, "Old", "old", pageNodeKind())
 
 	err := w.MovePage("system", child.ID, parent.ID)
 	if err != nil {
@@ -139,8 +145,7 @@ func TestWiki_MovePage_Valid(t *testing.T) {
 func TestWiki_DeletePage_Simple(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	page, _ := w.CreatePage("system", nil, "Trash", "trash")
-
+	page, _ := w.CreatePage("system", nil, "Trash", "trash", pageNodeKind())
 	err := w.DeletePage("system", page.ID, false)
 	if err != nil {
 		t.Fatalf("DeletePage failed: %v", err)
@@ -150,8 +155,8 @@ func TestWiki_DeletePage_Simple(t *testing.T) {
 func TestWiki_DeletePage_WithChildren(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	parent, _ := w.CreatePage("system", nil, "Parent", "parent")
-	_, _ = w.CreatePage("system", &parent.ID, "Child", "child")
+	parent, _ := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
+	_, _ = w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
 
 	err := w.DeletePage("system", parent.ID, false)
 	if err == nil {
@@ -162,8 +167,8 @@ func TestWiki_DeletePage_WithChildren(t *testing.T) {
 func TestWiki_DeletePage_Recursive(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	parent, _ := w.CreatePage("system", nil, "Parent", "parent")
-	_, _ = w.CreatePage("system", &parent.ID, "Child", "child")
+	parent, _ := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
+	_, _ = w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
 
 	err := w.DeletePage("system", parent.ID, true)
 	if err != nil {
@@ -205,9 +210,9 @@ func TestWiki_UpdatePage(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
 
-	page, _ := w.CreatePage("system", nil, "Draft", "draft")
-
-	page, err := w.UpdatePage("system", page.ID, "Final", "final", "# Updated")
+	page, _ := w.CreatePage("system", nil, "Draft", "draft", pageNodeKind())
+	var updatedstr string = "# Updated"
+	page, err := w.UpdatePage("system", page.ID, "Final", "final", &updatedstr, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage failed: %v", err)
 	}
@@ -234,7 +239,7 @@ func TestWiki_SuggestSlug_Conflict(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
 	root := w.GetTree()
-	_, err := w.CreatePage("system", nil, "My Page", "my-page")
+	_, err := w.CreatePage("system", nil, "My Page", "my-page", pageNodeKind())
 
 	if err != nil {
 		t.Fatalf("CreatePage failed: %v", err)
@@ -254,14 +259,14 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	defer w.Close()
 
 	// create a deep hierarchy of pages (Architecture -> Backend)
-	_, err := w.CreatePage("system", nil, "Architecture", "architecture")
+	_, err := w.CreatePage("system", nil, "Architecture", "architecture", pageNodeKind())
 	if err != nil {
 		t.Fatalf("Failed to create 'Architecture': %v", err)
 	}
 	root := w.GetTree()
 	arch := root.Children[0]
 
-	_, err = w.CreatePage("system", &arch.ID, "Backend", "backend")
+	_, err = w.CreatePage("system", &arch.ID, "Backend", "backend", pageNodeKind())
 	if err != nil {
 		t.Fatalf("Failed to create 'Backend': %v", err)
 	}
@@ -278,7 +283,7 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 	}
 
 	// Create a second one with the same name → it must be numbered
-	_, err = w.CreatePage("system", &backend.ID, "Data Layer", "data-layer")
+	_, err = w.CreatePage("system", &backend.ID, "Data Layer", "data-layer", pageNodeKind())
 	if err != nil {
 		t.Fatalf("Failed to create 'Data Layer': %v", err)
 	}
@@ -296,7 +301,7 @@ func TestWiki_SuggestSlug_DeepHierarchy(t *testing.T) {
 func TestWiki_FindByPath_Valid(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	_, _ = w.CreatePage("system", nil, "Company", "company")
+	_, _ = w.CreatePage("system", nil, "Company", "company", pageNodeKind())
 
 	found, err := w.FindByPath("company")
 	if err != nil {
@@ -319,9 +324,9 @@ func TestWiki_FindByPath_Invalid(t *testing.T) {
 func TestWiki_SortPages(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	parent, _ := w.CreatePage("system", nil, "Parent", "parent")
-	child1, _ := w.CreatePage("system", &parent.ID, "Child1", "child1")
-	child2, _ := w.CreatePage("system", &parent.ID, "Child2", "child2")
+	parent, _ := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
+	child1, _ := w.CreatePage("system", &parent.ID, "Child1", "child1", pageNodeKind())
+	child2, _ := w.CreatePage("system", &parent.ID, "Child2", "child2", pageNodeKind())
 
 	err := w.SortPages(parent.ID, []string{child2.ID, child1.ID})
 	if err != nil {
@@ -338,7 +343,7 @@ func TestWiki_SortPages(t *testing.T) {
 func TestWiki_CopyPages(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	original, _ := w.CreatePage("system", nil, "Original", "original")
+	original, _ := w.CreatePage("system", nil, "Original", "original", pageNodeKind())
 
 	copied, err := w.CopyPage("system", original.ID, nil, "Copy of Original", "copy-of-original")
 	if err != nil {
@@ -359,8 +364,8 @@ func TestWiki_CopyPages(t *testing.T) {
 func TestWiki_CopyPages_WithParent(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	parent, _ := w.CreatePage("system", nil, "Parent", "parent")
-	original, _ := w.CreatePage("system", nil, "Original", "original")
+	parent, _ := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
+	original, _ := w.CreatePage("system", nil, "Original", "original", pageNodeKind())
 
 	copied, err := w.CopyPage("system", original.ID, &parent.ID, "Copy of Original", "copy-of-original")
 	if err != nil {
@@ -384,7 +389,7 @@ func TestWiki_CopyPages_NonExistentSource(t *testing.T) {
 func TestWiki_CopyPages_WithAssets(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
-	original, _ := w.CreatePage("system", nil, "Original", "original")
+	original, _ := w.CreatePage("system", nil, "Original", "original", pageNodeKind())
 
 	originalNode := tree.PageNode{
 		ID:    original.ID,
@@ -454,12 +459,13 @@ func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
 	defer w.Close()
 
 	// 1) Create page A with links to /x and /x/y (both non-existing)
-	pageA, err := w.CreatePage("system", nil, "Page A", "a")
+	pageA, err := w.CreatePage("system", nil, "Page A", "a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
 
-	_, err = w.UpdatePage("system", pageA.ID, pageA.Title, pageA.Slug, "Links: [X](/x) and [XY](/x/y)")
+	var contentA string = "Links: [X](/x) and [XY](/x/y)"
+	_, err = w.UpdatePage("system", pageA.ID, pageA.Title, pageA.Slug, &contentA, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
@@ -489,7 +495,7 @@ func TestWiki_EnsurePath_HealsLinksForAllCreatedSegments(t *testing.T) {
 	}
 
 	// 3) EnsurePath creates /x and /x/y and triggers Heal for all newly created segments
-	_, err = w.EnsurePath("system", "/x/y", "X Y")
+	_, err = w.EnsurePath("system", "/x/y", "X Y", pageNodeKind())
 	if err != nil {
 		t.Fatalf("EnsurePath failed: %v", err)
 	}
@@ -548,21 +554,25 @@ func TestWiki_DeletePage_NonRecursive_MarksIncomingBroken(t *testing.T) {
 	defer w.Close()
 
 	// Create A with link to /b
-	a, err := w.CreatePage("system", nil, "Page A", "a")
+	a, err := w.CreatePage("system", nil, "Page A", "a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, "Link to B: [Go](/b)")
+
+	var contentA string = "Link to B: [Go](/b)"
+	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, &contentA, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
 
 	// Create B
-	b, err := w.CreatePage("system", nil, "Page B", "b")
+	b, err := w.CreatePage("system", nil, "Page B", "b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, "# Page B")
+
+	var contentB string = "# Page B"
+	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, &contentB, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage B failed: %v", err)
 	}
@@ -612,37 +622,40 @@ func TestWiki_DeletePage_Recursive_RemovesOutgoingForSubtree_AndBreaksIncomingBy
 	defer w.Close()
 
 	// Create /docs
-	docs, err := w.CreatePage("system", nil, "Docs", "docs")
+	docs, err := w.CreatePage("system", nil, "Docs", "docs", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage docs failed: %v", err)
 	}
 
 	// Create /docs/a and /docs/b
-	a, err := w.CreatePage("system", &docs.ID, "A", "a")
+	a, err := w.CreatePage("system", &docs.ID, "A", "a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage a failed: %v", err)
 	}
-	b, err := w.CreatePage("system", &docs.ID, "B", "b")
+	b, err := w.CreatePage("system", &docs.ID, "B", "b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage b failed: %v", err)
 	}
 
 	// A links to B inside subtree
-	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, "Link to B: [B](/docs/b)")
+	var contentA string = "Link to B: [B](/docs/b)"
+	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, &contentA, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage a failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, "# B")
+	var contentB string = "# B"
+	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, &contentB, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage b failed: %v", err)
 	}
 
 	// Create survivor /c with incoming link into subtree
-	c, err := w.CreatePage("system", nil, "C", "c")
+	c, err := w.CreatePage("system", nil, "C", "c", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage c failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", c.ID, c.Title, c.Slug, "Incoming link: [B](/docs/b)")
+	var contentC string = "Incoming link: [B](/docs/b)"
+	_, err = w.UpdatePage("system", c.ID, c.Title, c.Slug, &contentC, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage c failed: %v", err)
 	}
@@ -700,21 +713,23 @@ func TestWiki_RenamePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 	defer w.Close()
 
 	// Create A with links to /b (exists) and /b2 (does not exist yet)
-	a, err := w.CreatePage("system", nil, "A", "a")
+	a, err := w.CreatePage("system", nil, "A", "a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, "Links: [B](/b) and [B2](/b2)")
+	var contentA string = "Links: [B](/b) and [B2](/b2)"
+	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, &contentA, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
 
 	// Create B at /b
-	b, err := w.CreatePage("system", nil, "B", "b")
+	b, err := w.CreatePage("system", nil, "B", "b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, "# B")
+	var contentB string = "# B"
+	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, &contentB, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage B failed: %v", err)
 	}
@@ -751,7 +766,8 @@ func TestWiki_RenamePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 	}
 
 	// Rename B: /b -> /b2
-	_, err = w.UpdatePage("system", b.ID, b.Title, "b2", "# B (renamed)")
+	var contentB2 string = "# B (renamed)"
+	_, err = w.UpdatePage("system", b.ID, b.Title, "b2", &contentB2, pageNodeKind())
 	if err != nil {
 		t.Fatalf("Rename B failed: %v", err)
 	}
@@ -798,25 +814,27 @@ func TestWiki_RenameSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 	defer w.Close()
 
 	// Create subtree: /docs/b
-	docs, err := w.CreatePage("system", nil, "Docs", "docs")
+	docs, err := w.CreatePage("system", nil, "Docs", "docs", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage docs failed: %v", err)
 	}
-	b, err := w.CreatePage("system", &docs.ID, "B", "b")
+	b, err := w.CreatePage("system", &docs.ID, "B", "b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage /docs/b failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, "# B")
+	var contentB string = "# B"
+	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, &contentB, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage B failed: %v", err)
 	}
 
 	// Create A that links to old and future new subtree paths
-	a, err := w.CreatePage("system", nil, "A", "a")
+	a, err := w.CreatePage("system", nil, "A", "a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, "Links: [Old](/docs/b) and [New](/docs2/b)")
+	var contentA string = "Links: [Old](/docs/b) and [New](/docs2/b)"
+	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, &contentA, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
@@ -835,7 +853,9 @@ func TestWiki_RenameSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 	}
 
 	// Rename /docs -> /docs2
-	_, err = w.UpdatePage("system", docs.ID, docs.Title, "docs2", "# Docs")
+	var contentDocs2 string = "# Docs"
+	nodeSection := tree.NodeKindSection
+	_, err = w.UpdatePage("system", docs.ID, docs.Title, "docs2", &contentDocs2, &nodeSection)
 	if err != nil {
 		t.Fatalf("Rename docs failed: %v", err)
 	}
@@ -882,27 +902,29 @@ func TestWiki_MovePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 	defer w.Close()
 
 	// Create A that links to /b (old path) and /projects/b (future path)
-	a, err := w.CreatePage("system", nil, "A", "a")
+	a, err := w.CreatePage("system", nil, "A", "a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, "Links: [B](/b) and [B2](/projects/b)")
+	var contentA string = "Links: [B](/b) and [B2](/projects/b)"
+	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, &contentA, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
 
 	// Create B at /b
-	b, err := w.CreatePage("system", nil, "B", "b")
+	b, err := w.CreatePage("system", nil, "B", "b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage B failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, "# B")
+	var contentB string = "# B"
+	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, &contentB, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage B failed: %v", err)
 	}
 
 	// Create parent /projects (target)
-	projects, err := w.CreatePage("system", nil, "Projects", "projects")
+	projects, err := w.CreatePage("system", nil, "Projects", "projects", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage projects failed: %v", err)
 	}
@@ -980,31 +1002,33 @@ func TestWiki_MoveSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 	defer w.Close()
 
 	// Create subtree /docs/b
-	docs, err := w.CreatePage("system", nil, "Docs", "docs")
+	docs, err := w.CreatePage("system", nil, "Docs", "docs", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage docs failed: %v", err)
 	}
-	b, err := w.CreatePage("system", &docs.ID, "B", "b")
+	b, err := w.CreatePage("system", &docs.ID, "B", "b", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage /docs/b failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, "# B")
+	var contentB string = "# B"
+	_, err = w.UpdatePage("system", b.ID, b.Title, b.Slug, &contentB, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage B failed: %v", err)
 	}
 
 	// Create target parent /archive
-	archive, err := w.CreatePage("system", nil, "Archive", "archive")
+	archive, err := w.CreatePage("system", nil, "Archive", "archive", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage archive failed: %v", err)
 	}
 
 	// Create A that links to old and future new subtree paths
-	a, err := w.CreatePage("system", nil, "A", "a")
+	a, err := w.CreatePage("system", nil, "A", "a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage A failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, "Links: [Old](/docs/b) and [New](/archive/docs/b)")
+	var contentA string = "Links: [Old](/docs/b) and [New](/archive/docs/b)"
+	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, &contentA, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage A failed: %v", err)
 	}
@@ -1053,41 +1077,44 @@ func TestWiki_MovePage_ReindexesRelativeLinks(t *testing.T) {
 	defer w.Close()
 
 	// Create /docs with /docs/shared and /docs/a
-	docs, err := w.CreatePage("system", nil, "Docs", "docs")
+	docs, err := w.CreatePage("system", nil, "Docs", "docs", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage docs failed: %v", err)
 	}
 
-	docsShared, err := w.CreatePage("system", &docs.ID, "Shared", "shared")
+	docsShared, err := w.CreatePage("system", &docs.ID, "Shared", "shared", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage /docs/shared failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", docsShared.ID, docsShared.Title, docsShared.Slug, "# Docs Shared")
+	var contentDocsShared string = "# Docs Shared"
+	_, err = w.UpdatePage("system", docsShared.ID, docsShared.Title, docsShared.Slug, &contentDocsShared, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage /docs/shared failed: %v", err)
 	}
 
-	a, err := w.CreatePage("system", &docs.ID, "A", "a")
+	a, err := w.CreatePage("system", &docs.ID, "A", "a", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage /docs/a failed: %v", err)
 	}
 	// Important: relative link
-	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, "Relative: [S](../shared)")
+	var contentA string = "Relative: [S](../shared)"
+	_, err = w.UpdatePage("system", a.ID, a.Title, a.Slug, &contentA, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage /docs/a failed: %v", err)
 	}
 
 	// Create /guide with /guide/shared (different page!)
-	guide, err := w.CreatePage("system", nil, "Guide", "guide")
+	guide, err := w.CreatePage("system", nil, "Guide", "guide", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage guide failed: %v", err)
 	}
 
-	guideShared, err := w.CreatePage("system", &guide.ID, "Shared", "shared")
+	guideShared, err := w.CreatePage("system", &guide.ID, "Shared", "shared", pageNodeKind())
 	if err != nil {
 		t.Fatalf("CreatePage /guide/shared failed: %v", err)
 	}
-	_, err = w.UpdatePage("system", guideShared.ID, guideShared.Title, guideShared.Slug, "# Guide Shared")
+	var contentGuideShared string = "# Guide Shared"
+	_, err = w.UpdatePage("system", guideShared.ID, guideShared.Title, guideShared.Slug, &contentGuideShared, pageNodeKind())
 	if err != nil {
 		t.Fatalf("UpdatePage /guide/shared failed: %v", err)
 	}
@@ -1226,7 +1253,7 @@ func TestWiki_AuthDisabled_CoreFunctionalityWorks(t *testing.T) {
 	defer wikiInstance.Close()
 
 	// Test creating a page
-	page, err := wikiInstance.CreatePage("system", nil, "Test Page", "test-page")
+	page, err := wikiInstance.CreatePage("system", nil, "Test Page", "test-page", pageNodeKind())
 	if err != nil {
 		t.Fatalf("Failed to create page with AuthDisabled: %v", err)
 	}
@@ -1236,7 +1263,8 @@ func TestWiki_AuthDisabled_CoreFunctionalityWorks(t *testing.T) {
 	}
 
 	// Test updating a page
-	updatedPage, err := wikiInstance.UpdatePage("system", page.ID, "Updated Title", "updated-slug", "# Content")
+	var updatedContent string = "# Content"
+	updatedPage, err := wikiInstance.UpdatePage("system", page.ID, "Updated Title", "updated-slug", &updatedContent, pageNodeKind())
 	if err != nil {
 		t.Fatalf("Failed to update page with AuthDisabled: %v", err)
 	}

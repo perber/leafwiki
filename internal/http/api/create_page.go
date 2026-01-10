@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/tree"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
@@ -27,7 +28,8 @@ func CreatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		page, err := w.CreatePage(user.ID, req.ParentID, req.Title, req.Slug)
+		kind := tree.NodeKindPage
+		page, err := w.CreatePage(user.ID, req.ParentID, req.Title, req.Slug, &kind)
 		if err != nil {
 			respondWithError(c, err)
 			return
