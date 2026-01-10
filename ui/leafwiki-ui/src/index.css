@@ -607,11 +607,11 @@
   @apply h-6 w-auto inline-block align-middle;
 }
 
-<<<<<<< HEAD <<<<<<< HEAD=======>>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding) .login__field {
+.login__field {
   @apply mb-4;
 }
 
-=======>>>>>>>406e8dc (feat: add secure cookie + session DB based authentication with rate limiting (#486)) .login__submit {
+.login__submit {
   @apply w-full;
 }
 
@@ -723,9 +723,7 @@
 }
 
 .markdown-toolbar__button {
-  <<<<<<< HEAD @apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80 hover:bg-markdown-toolbar-border !important;
-  =======@apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80 hover:bg-markdown-toolbar-border;
-  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
+  @apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80 hover:bg-markdown-toolbar-border;
 }
 
 .markdown-toolbar__button--desktop-only {
@@ -758,17 +756,11 @@
 }
 
 .toolbar-button__close-editor {
-  <<<<<<< HEAD @apply rounded-full !important;
-}
-
-.toolbar-button__save-page {
-  @apply bg-success text-success-foreground hover:bg-success/80 rounded-full !important;
-  =======@apply rounded-full;
+  @apply rounded-full;
 }
 
 .toolbar-button__save-page {
   @apply bg-success text-success-foreground hover:bg-success/80 rounded-full;
-  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
 }
 
 /* Shared page dialog styles */
@@ -921,15 +913,12 @@
 }
 
 .backlinks__item a {
-  <<<<<<< HEAD @apply text-muted-foreground hover:text-brand px-0 py-0 text-xs no-underline !important;
-  =======@apply text-muted-foreground hover:text-brand px-0 py-0 text-xs no-underline;
+  @apply text-muted-foreground hover:text-brand px-0 py-0 text-xs no-underline;
   color: hsl(var(--muted-foreground)) !important;
 
   &:hover {
     color: hsl(var(--brand)) !important;
   }
-
-  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
 }
 
 .backlinks__item a:hover {
@@ -1149,16 +1138,12 @@ input[readonly] {
 
 .table-wrapper th:first-child,
 .table-wrapper td:first-child {
-  <<<<<<< HEAD @apply pl-4 !important;
-  =======@apply pl-4;
-  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
+  @apply pl-4;
 }
 
 .table-wrapper th:last-child,
 .table-wrapper td:last-child {
-  <<<<<<< HEAD @apply pr-4 !important;
-  =======@apply pr-4;
-  >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
+  @apply pr-4;
 }
 
 .markdown-editor__preview-container ol ol,
@@ -1304,7 +1289,7 @@ input[readonly] {
 .btn--danger {
   @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm;
 }
-}
+
 
 /* -------------------------------------------------------
    UTILITIES LAYER — Markdown, tables, custom scrollbars
@@ -1363,9 +1348,7 @@ input[readonly] {
   }
 
   code.hljs {
-    <<<<<<< HEAD @apply pl-0 !important;
-    =======@apply pl-0;
-    >>>>>>>bb8538b (feat: add frontend branding settings page and dynamic branding)
+    @apply pl-0;
   }
 }
 
