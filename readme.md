@@ -19,8 +19,6 @@ Try: `Ctrl+E` to edit, `Ctrl+S` to save, `Ctrl+Shift+F` to open the search.
 Login credentials are displayed on the demo site.  
 The demo instance resets automatically every hour, so all changes are temporary.
 
-Self-hosting is the primary and fully supported way to run LeafWiki.
-
 ---
 
 ## Preview
