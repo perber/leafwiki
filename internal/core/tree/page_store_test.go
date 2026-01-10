@@ -41,7 +41,7 @@ func TestPageStore_CreatePage(t *testing.T) {
 		t.Fatalf("Failed to read file: %v", err)
 	}
 
-	expected := "# Hello World\n"
+	expected := "---\nleafwiki_id: page-1\n---\n# Hello World\n"
 	if string(content) != expected {
 		t.Errorf("Unexpected file content. Got: %q, Expected: %q", string(content), expected)
 	}
@@ -253,8 +253,10 @@ func TestPageStore_UpdatePage_ContentOnly(t *testing.T) {
 		t.Fatalf("Could not read updated file: %v", err)
 	}
 
-	if string(data) != newContent {
-		t.Errorf("Expected content %q, got %q", newContent, string(data))
+	expectedNewContent := "---\nleafwiki_id: p1\nleafwiki_title: My Page\n---\n# New Content"
+
+	if string(data) != expectedNewContent {
+		t.Errorf("Expected content %q, got %q", expectedNewContent, string(data))
 	}
 }
 
