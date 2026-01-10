@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"log"
+	"log/slog"
 	"path"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ type SQLiteIndex struct {
 	storageDir string
 	filename   string
 	db         *sql.DB
+	logger     *slog.Logger
 }
 
 func extractHeadings(markdown string) string {
@@ -75,6 +77,11 @@ func buildFuzzyQuery(q string) string {
 		return q
 	}
 
+	if strings.ContainsAny(q, "-_+#/.") {
+		return `"` + q + `"`
+	}
+
+	// Append wildcard to each term
 	terms := strings.Fields(q)
 	for i, t := range terms {
 		// Skip if already has wildcard
@@ -91,6 +98,7 @@ func NewSQLiteIndex(storageDir string) (*SQLiteIndex, error) {
 	s := &SQLiteIndex{
 		storageDir: storageDir,
 		filename:   "search.db",
+		logger:     slog.Default().With("component", "SQLiteIndex"),
 	}
 
 	// Ensure the schema is created
@@ -126,7 +134,8 @@ func (s *SQLiteIndex) ensureSchema() error {
 				pageID,
 				title,
 				headings,
-				content
+				content,
+				tokenize = "unicode61 tokenchars '-_/+#.'"
 			);
         `)
 		return err
