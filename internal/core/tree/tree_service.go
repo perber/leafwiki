@@ -519,7 +519,7 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error
 }
 
 // UpdateNode updates a node (page/section) in the tree and syncs disk state via NodeStore.
-func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, kind *NodeKind) error {
+func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string) error {
 	return t.withLockedTree(func() error {
 		if t.tree == nil {
 			return ErrTreeNotLoaded
@@ -537,18 +537,20 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		}
 
 		// Kind change?
-		if kind != nil && *kind != node.Kind {
-			// Section -> Page only allowed if no children
-			if node.Kind == NodeKindSection && *kind == NodeKindPage && node.HasChildren() {
-				return ErrPageHasChildren
-			}
+		// This operation is currently disabled to avoid complexity with content migration.
+		// We need to check if we need it later.
+		// if kind != nil && *kind != node.Kind {
+		// 	// Section -> Page only allowed if no children
+		// 	if node.Kind == NodeKindSection && *kind == NodeKindPage && node.HasChildren() {
+		// 		return ErrPageHasChildren
+		// 	}
 
-			t.log.Info("changing node kind", "nodeID", node.ID, "oldKind", node.Kind, "newKind", *kind)
-			if err := t.store.ConvertNode(node, *kind); err != nil {
-				return fmt.Errorf("could not convert node: %w", err)
-			}
-			node.Kind = *kind
-		}
+		// 	t.log.Info("changing node kind", "nodeID", node.ID, "oldKind", node.Kind, "newKind", *kind)
+		// 	if err := t.store.ConvertNode(node, *kind); err != nil {
+		// 		return fmt.Errorf("could not convert node: %w", err)
+		// 	}
+		// 	node.Kind = *kind
+		// }
 
 		// Content update?
 		if content != nil {

@@ -198,7 +198,7 @@ func TestTreeService_UpdateNode_TitleOnly_SyncsFrontmatterIfFileExists(t *testin
 	mustStat(t, p)
 
 	// Update title only: content=nil, slug unchanged
-	if err := svc.UpdateNode("system", *id, "Documentation", "docs", nil, ptrKind(NodeKindPage)); err != nil {
+	if err := svc.UpdateNode("system", *id, "Documentation", "docs", nil); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -230,7 +230,7 @@ func TestTreeService_UpdateNode_SlugRename_RenamesOnDisk(t *testing.T) {
 	mustStat(t, oldPath)
 
 	newSlug := "documentation"
-	if err := svc.UpdateNode("system", *id, "Docs", newSlug, nil, ptrKind(NodeKindPage)); err != nil {
+	if err := svc.UpdateNode("system", *id, "Docs", newSlug, nil); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -239,6 +239,8 @@ func TestTreeService_UpdateNode_SlugRename_RenamesOnDisk(t *testing.T) {
 	mustNotExist(t, oldPath)
 }
 
+/*
+Disable this test for now as we are not enforcing to pass the kinds yet.
 func TestTreeService_UpdateNode_SectionToPage_DisallowedWithChildren(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
@@ -253,7 +255,7 @@ func TestTreeService_UpdateNode_SectionToPage_DisallowedWithChildren(t *testing.
 	}
 
 	// Now parent is section with children, attempt to convert back to page
-	err = svc.UpdateNode("system", *parentID, "Docs", "docs", nil, ptrKind(NodeKindPage))
+	err = svc.UpdateNode("system", *parentID, "Docs", "docs", nil)
 	if err == nil {
 		t.Fatalf("expected error converting section->page with children")
 	}
@@ -261,6 +263,7 @@ func TestTreeService_UpdateNode_SectionToPage_DisallowedWithChildren(t *testing.
 		t.Fatalf("expected ErrPageHasChildren, got: %v", err)
 	}
 }
+*/
 
 func TestTreeService_DeleteNode_NonRecursiveErrorsWhenHasChildren(t *testing.T) {
 	svc, _ := newLoadedService(t)
@@ -577,7 +580,7 @@ func TestTreeService_FindPageByRoutePath_ReturnsContent(t *testing.T) {
 	// Update specs content
 	specsNode := svc.GetTree().Children[0].Children[0].Children[0]
 	body := "# Specs\nHello"
-	if err := svc.UpdateNode("system", specsNode.ID, "Specs", "specs", &body, ptrKind(NodeKindPage)); err != nil {
+	if err := svc.UpdateNode("system", specsNode.ID, "Specs", "specs", &body); err != nil {
 		t.Fatalf("UpdateNode content failed: %v", err)
 	}
 

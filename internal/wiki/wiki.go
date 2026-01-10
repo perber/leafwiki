@@ -379,7 +379,7 @@ func (w *Wiki) UpdatePage(userID string, id, title, slug string, content *string
 		}
 	}
 
-	if err = w.tree.UpdateNode(userID, id, title, slug, content, kind); err != nil {
+	if err = w.tree.UpdateNode(userID, id, title, slug, content); err != nil {
 		return nil, err
 	}
 
@@ -473,7 +473,7 @@ func (w *Wiki) CopyPage(userID string, currentPageID string, targetParentID *str
 	updatedContent := strings.ReplaceAll(page.Content, "/assets/"+page.ID+"/", "/assets/"+copy.ID+"/")
 
 	// Write the content to the copied page
-	if err := w.tree.UpdateNode(userID, copy.ID, copy.Title, copy.Slug, &updatedContent, &kind); err != nil {
+	if err := w.tree.UpdateNode(userID, copy.ID, copy.Title, copy.Slug, &updatedContent); err != nil {
 		log.Printf("error: could not update copied page content: %v", err)
 		cleanup()
 		_ = w.asset.DeleteAllAssetsForPage(copy.PageNode)
