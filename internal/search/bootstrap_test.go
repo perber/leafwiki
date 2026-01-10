@@ -19,9 +19,10 @@ func TestBuildAndRunIndexer_BasicIndexing(t *testing.T) {
 		t.Fatalf("failed to load tree: %v", err)
 	}
 
-	_, err := treeSvc.CreatePage("system", nil, "Docs", "docs")
+	var pageNodeKind tree.NodeKind = "page"
+	_, err := treeSvc.CreateNode("system", nil, "Docs", "docs", &pageNodeKind)
 	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
+		t.Fatalf("CreateNode failed: %v", err)
 	}
 
 	mdPath := filepath.Join(tmp, "root", "docs.md")

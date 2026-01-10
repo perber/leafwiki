@@ -10,6 +10,13 @@ type PageMetadata struct {
 	LastAuthorID string    `json:"lastAuthorId"`
 }
 
+type NodeKind string
+
+const (
+	NodeKindPage    NodeKind = "page"
+	NodeKindSection NodeKind = "section"
+)
+
 // PageNode represents a single node in the tree
 // It has an ID, a parent, a path, and children
 // The ID is a unique identifier for the entry
@@ -21,6 +28,7 @@ type PageNode struct {
 	Position int         `json:"position"` // Position is the position of the entry
 	Parent   *PageNode   `json:"-"`
 
+	Kind     NodeKind     `json:"kind"`     // Kind is the kind of the node (page or folder)
 	Metadata PageMetadata `json:"metadata"` // Metadata holds metadata about the page
 }
 

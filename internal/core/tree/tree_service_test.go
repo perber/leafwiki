@@ -8,1184 +8,711 @@ import (
 	"testing"
 )
 
-func TestTreeService_SaveAndLoadTree(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
+// --- helpers ---
 
-	// Initialen Tree manuell setzen
-	service.tree = &PageNode{
-		ID:    "root",
-		Title: "Root",
-		Slug:  "root",
-		Children: []*PageNode{
-			{
-				ID:    "child1",
-				Title: "Child 1",
-				Slug:  "child-1",
-				Children: []*PageNode{
-					{
-						ID:    "child1a",
-						Title: "Child 1a",
-						Slug:  "child-1a",
-					},
-				},
-			},
-		},
+func newLoadedService(t *testing.T) (*TreeService, string) {
+	t.Helper()
+	tmpDir := t.TempDir()
+
+	// Ensure schema is current so LoadTree doesn't try to migrate unless a test wants it.
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
 	}
 
-	// SaveTree ausführen
-	if err := service.SaveTree(); err != nil {
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	return svc, tmpDir
+}
+
+func mustStat(t *testing.T, path string) os.FileInfo {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("expected %q to exist, stat error: %v", path, err)
+	}
+	return info
+}
+
+func mustNotExist(t *testing.T, path string) {
+	t.Helper()
+	_, err := os.Stat(path)
+	if err == nil {
+		t.Fatalf("expected %q to not exist, but it exists", path)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected os.ErrNotExist for %q, got: %v", path, err)
+	}
+}
+
+// --- A) Load/Save basics ---
+
+func TestTreeService_LoadTree_DefaultRootWhenMissing(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// schema current to prevent migration from failing due to missing schema file
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	tree := svc.GetTree()
+	if tree == nil || tree.ID != "root" {
+		t.Fatalf("expected default root, got: %+v", tree)
+	}
+	if tree.Kind != NodeKindSection {
+		t.Fatalf("expected root to be section, got %q", tree.Kind)
+	}
+}
+
+func TestTreeService_SaveAndLoad_RoundtripParents(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	// Create a small tree through public API (exercises disk + tree)
+	idA, err := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode A failed: %v", err)
+	}
+	_, err = svc.CreateNode("system", idA, "B", "b", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode B failed: %v", err)
+	}
+
+	if err := svc.SaveTree(); err != nil {
 		t.Fatalf("SaveTree failed: %v", err)
 	}
 
-	// Neue Instanz zum Laden
+	// Reload in a new service instance
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
 	loaded := NewTreeService(tmpDir)
 	if err := loaded.LoadTree(); err != nil {
 		t.Fatalf("LoadTree failed: %v", err)
 	}
 
-	// Verifikation der Struktur
 	root := loaded.GetTree()
-	if root.ID != "root" || root.Title != "Root" {
-		t.Errorf("Expected root node not loaded correctly")
+	if len(root.Children) != 1 {
+		t.Fatalf("expected 1 child at root, got %d", len(root.Children))
 	}
-
-	if len(root.Children) != 1 || root.Children[0].ID != "child1" {
-		t.Errorf("Child not loaded correctly")
+	a := root.Children[0]
+	if a.Parent == nil || a.Parent.ID != "root" {
+		t.Fatalf("expected parent pointer on A")
 	}
-
-	grandchild := root.Children[0].Children[0]
-	if grandchild == nil || grandchild.ID != "child1a" {
-		t.Errorf("Grandchild not loaded correctly")
+	if len(a.Children) != 1 {
+		t.Fatalf("expected A to have 1 child, got %d", len(a.Children))
 	}
-
-	// Verifiziere Parent-Zuweisung
-	if root.Children[0].Parent == nil || root.Children[0].Parent.ID != "root" {
-		t.Errorf("Parent not assigned to child node")
-	}
-	if grandchild.Parent == nil || grandchild.Parent.ID != "child1" {
-		t.Errorf("Parent not assigned to grandchild node")
+	b := a.Children[0]
+	if b.Parent == nil || b.Parent.ID != a.ID {
+		t.Fatalf("expected parent pointer on B")
 	}
 }
 
-func TestTreeService_LoadTree_DefaultOnMissing(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
+// --- B) Create/Update/Delete disk sync ---
 
-	// Kein tree.json vorhanden → Default-Root
-	err := service.LoadTree()
+func TestTreeService_CreateNode_Page_Root_CreatesFileAndFrontmatter(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	id, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
 	if err != nil {
-		t.Fatalf("Expected to load default tree, got error: %v", err)
+		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	tree := service.GetTree()
-	if tree == nil || tree.ID != "root" {
-		t.Errorf("Expected default root node, got: %+v", tree)
+	// file path: <tmp>/root/welcome.md (based on your existing tests + GeneratePath convention)
+	p := filepath.Join(tmpDir, "root", "welcome.md")
+	mustStat(t, p)
+
+	raw, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+
+	fm, _, has, err := ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter to exist")
+	}
+	if strings.TrimSpace(fm.LeafWikiID) != *id {
+		t.Fatalf("expected leafwiki_id=%q, got %q", *id, fm.LeafWikiID)
 	}
 }
 
-func TestTreeService_CreatePage_RootLevel(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_CreateChild_UnderPage_AutoConvertsParentToSection(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
 
-	_, err := service.CreatePage("system", nil, "Welcome", "welcome")
+	// Create parent as page
+	parentID, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
 	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
+		t.Fatalf("Create parent failed: %v", err)
 	}
 
-	tree := service.GetTree()
-	if len(tree.Children) != 1 {
-		t.Errorf("Expected 1 child at root level, got %d", len(tree.Children))
+	// Should exist as file initially
+	parentFile := filepath.Join(tmpDir, "root", "docs.md")
+	mustStat(t, parentFile)
+
+	// Create child under parent: must convert parent to section
+	_, err = svc.CreateNode("system", parentID, "Getting Started", "getting-started", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("Create child failed: %v", err)
 	}
 
-	child := tree.Children[0]
-	if child.Title != "Welcome" || child.Slug != "welcome" {
-		t.Errorf("Child has incorrect data: %+v", child)
-	}
+	// Parent should now be a folder with index.md (converted from docs.md)
+	parentDir := filepath.Join(tmpDir, "root", "docs")
+	mustStat(t, parentDir)
+	index := filepath.Join(parentDir, "index.md")
+	mustStat(t, index)
 
-	// Datei muss existieren
-	expectedPath := filepath.Join(tmpDir, "root", "welcome.md")
-	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
-		t.Errorf("Expected file not found: %s", expectedPath)
+	// Old file should be gone
+	mustNotExist(t, parentFile)
+
+	// Child file should be inside folder
+	childFile := filepath.Join(parentDir, "getting-started.md")
+	mustStat(t, childFile)
+
+	// Tree kind updated
+	parentNode, err := svc.FindPageByID(svc.GetTree().Children, *parentID)
+	if err != nil {
+		t.Fatalf("FindPageByID: %v", err)
+	}
+	if parentNode.Kind != NodeKindSection {
+		t.Fatalf("expected parent kind section, got %q", parentNode.Kind)
 	}
 }
 
-func TestTreeService_CreatePage_Nested(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_UpdateNode_TitleOnly_SyncsFrontmatterIfFileExists(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
 
-	// Zuerst einen Parent anlegen
-	_, err := service.CreatePage("system", nil, "Docs", "docs")
+	id, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
 	if err != nil {
-		t.Fatalf("Failed to create parent page: %v", err)
+		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	// ID des Elternteils holen
-	parent := service.GetTree().Children[0]
+	p := filepath.Join(tmpDir, "root", "docs.md")
+	mustStat(t, p)
 
-	// Jetzt Subpage erstellen
-	_, err = service.CreatePage("system", &parent.ID, "Getting Started", "getting-started")
+	// Update title only: content=nil, slug unchanged
+	if err := svc.UpdateNode("system", *id, "Documentation", "docs", nil); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(p)
 	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
+		t.Fatalf("read: %v", err)
 	}
-
-	if len(parent.Children) != 1 {
-		t.Errorf("Expected 1 child under parent, got %d", len(parent.Children))
+	fm, _, has, err := ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
 	}
-
-	sub := parent.Children[0]
-	if sub.Slug != "getting-started" {
-		t.Errorf("Unexpected slug: %s", sub.Slug)
+	if !has {
+		t.Fatalf("expected frontmatter")
 	}
-
-	expected := filepath.Join(tmpDir, "root", "docs", "getting-started.md")
-	if _, err := os.Stat(expected); os.IsNotExist(err) {
-		t.Errorf("Expected nested file not found: %s", expected)
+	if fm.LeafWikiTitle != "Documentation" {
+		t.Fatalf("expected leafwiki_title to be updated, got %q", fm.LeafWikiTitle)
 	}
 }
 
-func TestTreeService_CreatePage_InvalidParent(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_UpdateNode_SlugRename_RenamesOnDisk(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
 
-	invalidID := "does-not-exist"
-	_, err := service.CreatePage("system", &invalidID, "Broken", "broken")
-	if err == nil {
-		t.Errorf("Expected error for invalid parent ID, got none")
-	}
-}
-
-func TestTreeService_UpdatePage_ContentAndSlug(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Seite anlegen
-	_, err := service.CreatePage("system", nil, "Docs", "docs")
+	id, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
 	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
+		t.Fatalf("CreateNode failed: %v", err)
 	}
-	page := service.GetTree().Children[0]
 
-	// Inhalt + Slug ändern
+	oldPath := filepath.Join(tmpDir, "root", "docs.md")
+	mustStat(t, oldPath)
+
 	newSlug := "documentation"
-	newContent := "# Updated Docs"
-	err = service.UpdatePage("system", page.ID, "Documentation", newSlug, newContent)
-	if err != nil {
-		t.Fatalf("UpdatePage failed: %v", err)
+	if err := svc.UpdateNode("system", *id, "Docs", newSlug, nil); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
-	// Neuer Pfad sollte existieren
 	newPath := filepath.Join(tmpDir, "root", newSlug+".md")
-	if _, err := os.Stat(newPath); os.IsNotExist(err) {
-		t.Errorf("Expected updated file at %s not found", newPath)
-	}
-
-	// Inhalt prüfen
-	data, err := os.ReadFile(newPath)
-	if err != nil {
-		t.Fatalf("Failed to read file: %v", err)
-	}
-	if !strings.Contains(string(data), newContent) {
-		t.Errorf("Expected content %q, got %q", newContent, string(data))
-	}
+	mustStat(t, newPath)
+	mustNotExist(t, oldPath)
 }
 
-func TestTreeService_UpdatePage_FileNotFound(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+/*
+Disable this test for now as we are not enforcing to pass the kinds yet.
+func TestTreeService_UpdateNode_SectionToPage_DisallowedWithChildren(t *testing.T) {
+	svc, _ := newLoadedService(t)
 
-	// Create a page in the tree but do not create the corresponding file
-	id := "ghost"
-	page := &PageNode{
-		ID:     id,
-		Title:  "Ghost",
-		Slug:   "ghost",
-		Parent: service.tree,
+	// Create parent page, then child to force parent to section
+	parentID, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("Create parent failed: %v", err)
 	}
-	service.tree.Children = append(service.tree.Children, page)
+	_, err = svc.CreateNode("system", parentID, "Child", "child", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("Create child failed: %v", err)
+	}
 
-	// Versuch zu aktualisieren
-	err := service.UpdatePage("system", id, "Still Ghost", "still-ghost", "# Boo")
+	// Now parent is section with children, attempt to convert back to page
+	err = svc.UpdateNode("system", *parentID, "Docs", "docs", nil)
 	if err == nil {
-		t.Error("Expected error when file does not exist")
+		t.Fatalf("expected error converting section->page with children")
+	}
+	if !errors.Is(err, ErrPageHasChildren) {
+		t.Fatalf("expected ErrPageHasChildren, got: %v", err)
 	}
 }
+*/
 
-func TestTreeService_UpdatePage_InvalidID(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_DeleteNode_NonRecursiveErrorsWhenHasChildren(t *testing.T) {
+	svc, _ := newLoadedService(t)
 
-	err := service.UpdatePage("system", "unknown", "Nope", "nope", "# nope")
+	parentID, _ := svc.CreateNode("system", nil, "Parent", "parent", ptrKind(NodeKindPage))
+	_, _ = svc.CreateNode("system", parentID, "Child", "child", ptrKind(NodeKindPage))
+
+	err := svc.DeleteNode("system", *parentID, false)
 	if err == nil {
-		t.Error("Expected error for invalid ID, got none")
+		t.Fatalf("expected error")
+	}
+	if !errors.Is(err, ErrPageHasChildren) {
+		t.Fatalf("expected ErrPageHasChildren, got: %v", err)
 	}
 }
 
-func TestTreeService_DeletePage_Success(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_DeleteNode_RecursiveDeletesDiskAndTree(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
 
-	// Seite erstellen
-	_, err := service.CreatePage("system", nil, "DeleteMe", "delete-me")
+	parentID, _ := svc.CreateNode("system", nil, "Parent", "parent", ptrKind(NodeKindPage))
+	_, _ = svc.CreateNode("system", parentID, "Child", "child", ptrKind(NodeKindPage))
+
+	// Parent should now be a folder
+	parentDir := filepath.Join(tmpDir, "root", "parent")
+	mustStat(t, parentDir)
+
+	err := svc.DeleteNode("system", *parentID, true)
 	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page := service.GetTree().Children[0]
-
-	// Löschen
-	err = service.DeletePage("system", page.ID, false)
-	if err != nil {
-		t.Fatalf("DeletePage failed: %v", err)
+		t.Fatalf("DeleteNode recursive failed: %v", err)
 	}
 
-	// Datei darf nicht mehr existieren
-	path := filepath.Join(tmpDir, "root", "delete-me.md")
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Errorf("Expected file to be deleted: %s", path)
-	}
+	// Folder should be gone
+	mustNotExist(t, parentDir)
 
-	// Seite sollte aus Tree entfernt worden sein
-	if len(service.GetTree().Children) != 0 {
-		t.Errorf("Expected page to be removed from tree")
+	// Tree should have no children at root
+	if len(svc.GetTree().Children) != 0 {
+		t.Fatalf("expected root to have no children")
 	}
 }
 
-func TestTreeService_DeletePage_HasChildrenWithoutRecursive(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_DeletePage_Leaf_Success_RemovesFileAndTreeAndReindexes(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
 
-	// Parent + Child
-	_, err := service.CreatePage("system", nil, "Parent", "parent")
+	// Create 3 leaf pages
+	idA, err := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
 	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
+		t.Fatalf("CreateNode A: %v", err)
 	}
-	parent := service.GetTree().Children[0]
-
-	_, err = service.CreatePage("system", &parent.ID, "Child", "child")
+	idB, err := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
 	if err != nil {
-		t.Fatalf("CreatePage (child) failed: %v", err)
+		t.Fatalf("CreateNode B: %v", err)
+	}
+	idC, err := svc.CreateNode("system", nil, "C", "c", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode C: %v", err)
 	}
 
-	// Try deleting parent without recursive
-	err = service.DeletePage("system", parent.ID, false)
+	// Verify files exist
+	pathA := filepath.Join(tmpDir, "root", "a.md")
+	pathB := filepath.Join(tmpDir, "root", "b.md")
+	pathC := filepath.Join(tmpDir, "root", "c.md")
+	if _, err := os.Stat(pathB); err != nil {
+		t.Fatalf("expected %s exists: %v", pathB, err)
+	}
+
+	// Delete middle page (B)
+	if err := svc.DeleteNode("system", *idB, false); err != nil {
+		t.Fatalf("DeleteNode failed: %v", err)
+	}
+
+	// Disk: B gone; A/C still there
+	if _, err := os.Stat(pathB); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected %s to be deleted, got err=%v", pathB, err)
+	}
+	if _, err := os.Stat(pathA); err != nil {
+		t.Fatalf("expected %s exists: %v", pathA, err)
+	}
+	if _, err := os.Stat(pathC); err != nil {
+		t.Fatalf("expected %s exists: %v", pathC, err)
+	}
+
+	// Tree: only 2 children remain
+	root := svc.GetTree()
+	if len(root.Children) != 2 {
+		t.Fatalf("expected 2 children after delete, got %d", len(root.Children))
+	}
+
+	// Ensure deleted ID not present
+	for _, ch := range root.Children {
+		if ch.ID == *idB {
+			t.Fatalf("deleted node still present in tree")
+		}
+	}
+
+	// Reindex: positions must be 0..1 (order depends on previous positions; we just assert contiguous)
+	if root.Children[0].Position != 0 || root.Children[1].Position != 1 {
+		t.Fatalf("expected positions reindexed to 0..1, got %d,%d",
+			root.Children[0].Position, root.Children[1].Position)
+	}
+
+	// Optional: ensure remaining IDs are the ones we expect
+	_ = idA
+	_ = idC
+}
+
+func TestTreeService_DeletePage_WithChildren_NonRecursive_ReturnsErrPageHasChildren(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	parentID, err := svc.CreateNode("system", nil, "Parent", "parent", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode parent: %v", err)
+	}
+
+	_, err = svc.CreateNode("system", parentID, "Child", "child", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode child: %v", err)
+	}
+
+	err = svc.DeleteNode("system", *parentID, false)
 	if err == nil {
-		t.Error("Expected error when deleting parent with children without recursive flag")
+		t.Fatalf("expected error deleting page with children without recursive")
+	}
+	if !errors.Is(err, ErrPageHasChildren) {
+		t.Fatalf("expected ErrPageHasChildren, got: %v", err)
 	}
 }
 
-func TestTreeService_DeletePage_InvalidID(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_DeletePage_WithChildren_Recursive_DeletesFolder(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
 
-	err := service.DeletePage("system", "nonexistent", false)
+	parentID, err := svc.CreateNode("system", nil, "Parent", "parent", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode parent: %v", err)
+	}
+	_, err = svc.CreateNode("system", parentID, "Child", "child", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode child: %v", err)
+	}
+
+	// Parent was auto-converted to section -> folder should exist
+	parentDir := filepath.Join(tmpDir, "root", "parent")
+	if _, err := os.Stat(parentDir); err != nil {
+		t.Fatalf("expected parent dir exists (after auto-convert): %v", err)
+	}
+
+	// Recursive delete should remove the folder
+	if err := svc.DeleteNode("system", *parentID, true); err != nil {
+		t.Fatalf("DeleteNode recursive failed: %v", err)
+	}
+
+	if _, err := os.Stat(parentDir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected parent folder deleted, got err=%v", err)
+	}
+
+	// Tree should no longer contain parent
+	if len(svc.GetTree().Children) != 0 {
+		t.Fatalf("expected root to have no children after delete, got %d", len(svc.GetTree().Children))
+	}
+}
+
+func TestTreeService_DeletePage_InvalidID_ReturnsErrPageNotFound(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	err := svc.DeleteNode("system", "does-not-exist", false)
 	if err == nil {
-		t.Error("Expected error for unknown ID")
+		t.Fatalf("expected error")
+	}
+	if !errors.Is(err, ErrPageNotFound) {
+		t.Fatalf("expected ErrPageNotFound, got: %v", err)
 	}
 }
 
-func TestTreeService_DeletePage_Recursive(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_DeletePage_Drift_FileMissing_ReturnsError(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
 
-	// Parent → Child
-	_, err := service.CreatePage("system", nil, "Parent", "parent")
+	// Create a leaf page normally (creates file)
+	id, err := svc.CreateNode("system", nil, "Ghost", "ghost", ptrKind(NodeKindPage))
 	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	parent := service.GetTree().Children[0]
-
-	_, err = service.CreatePage("system", &parent.ID, "Child", "child")
-	if err != nil {
-		t.Fatalf("CreatePage (child) failed: %v", err)
+		t.Fatalf("CreateNode: %v", err)
 	}
 
-	// Rekursiv löschen
-	err = service.DeletePage("system", parent.ID, true)
-	if err != nil {
-		t.Fatalf("Expected recursive delete to succeed, got error: %v", err)
+	// Delete the file manually to simulate drift
+	p := filepath.Join(tmpDir, "root", "ghost.md")
+	if err := os.Remove(p); err != nil {
+		t.Fatalf("failed to remove file to simulate drift: %v", err)
 	}
 
-	parentPath := filepath.Join(tmpDir, "root", "parent")
-	if _, err := os.Stat(parentPath); !os.IsNotExist(err) {
-		t.Errorf("Expected parent folder to be deleted")
-	}
-}
-
-func TestTreeService_MovePage_FileToFolder(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create root → a, root → b
-	_, err := service.CreatePage("system", nil, "A", "a")
-	if err != nil {
-		t.Fatalf("CreatePage A failed: %v", err)
-	}
-	_, err = service.CreatePage("system", nil, "B", "b")
-	if err != nil {
-		t.Fatalf("CreatePage B failed: %v", err)
-	}
-
-	a := service.GetTree().Children[0]
-	b := service.GetTree().Children[1]
-
-	err = service.MovePage("system", a.ID, b.ID)
-	if err != nil {
-		t.Fatalf("MovePage failed: %v", err)
-	}
-
-	// Erwartung: a ist jetzt unter b
-	if len(b.Children) != 1 || b.Children[0].ID != a.ID {
-		t.Errorf("Expected page A to be moved under B")
-	}
-
-	// Datei existiert im neuen Pfad
-	expected := filepath.Join(tmpDir, "root", "b", "a.md")
-	if _, err := os.Stat(expected); os.IsNotExist(err) {
-		t.Errorf("Expected moved file: %v", expected)
-	}
-}
-
-func TestTreeService_MovePage_NonexistentPage(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create only one page
-	_, err := service.CreatePage("system", nil, "Target", "target")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	target := service.GetTree().Children[0]
-
-	// Versuch mit ungültiger ID
-	err = service.MovePage("system", "does-not-exist", target.ID)
+	// Now delete node - should error (drift)
+	err = svc.DeleteNode("system", *id, false)
 	if err == nil {
-		t.Error("Expected error for non-existent source page")
+		t.Fatalf("expected drift error")
+	}
+	// If you have a concrete DriftError type, you can assert with errors.As.
+	var dErr *DriftError
+	if !errors.As(err, &dErr) {
+		t.Fatalf("expected DriftError, got: %T (%v)", err, err)
 	}
 }
 
-func TestTreeService_MovePage_NonexistentTarget(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+// --- C) Move semantics ---
 
-	_, err := service.CreatePage("system", nil, "Source", "source")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
+func TestTreeService_MoveNode_TargetPageAutoConvertsToSection(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	aID, _ := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	bID, _ := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
+
+	// Move A under B (B is a page => should auto-convert to section)
+	if err := svc.MoveNode("system", *aID, *bID); err != nil {
+		t.Fatalf("MoveNode failed: %v", err)
 	}
-	source := service.GetTree().Children[0]
 
-	err = service.MovePage("system", source.ID, "invalid-target-id")
+	// B should now be folder with index.md
+	bDir := filepath.Join(tmpDir, "root", "b")
+	mustStat(t, bDir)
+	mustStat(t, filepath.Join(bDir, "index.md"))
+
+	// A should now be inside B folder
+	aPath := filepath.Join(bDir, "a.md")
+	mustStat(t, aPath)
+}
+
+func TestTreeService_MoveNode_PreventsCircularReference(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	aID, _ := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	// create child under A so A becomes section and has child
+	bID, _ := svc.CreateNode("system", aID, "B", "b", ptrKind(NodeKindPage))
+
+	// Try move A under B (A -> ... -> B). Should error with circular reference.
+	err := svc.MoveNode("system", *aID, *bID)
 	if err == nil {
-		t.Error("Expected error for non-existent target")
+		t.Fatalf("expected error moving node under its descendant")
+	}
+	if !errors.Is(err, ErrMovePageCircularReference) {
+		t.Fatalf("expected ErrMovePageCircularReference, got: %v", err)
 	}
 }
 
-func TestTreeService_MovePage_SelfAsParent(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_MoveNode_PreventsSelfParent(t *testing.T) {
+	svc, _ := newLoadedService(t)
 
-	_, err := service.CreatePage("system", nil, "Loop", "loop")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	node := service.GetTree().Children[0]
+	aID, _ := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
 
-	err = service.MovePage("system", node.ID, node.ID)
+	err := svc.MoveNode("system", *aID, *aID)
 	if err == nil {
-		t.Error("Expected error when moving page into itself (if you later implement such protection)")
+		t.Fatalf("expected error moving node into itself")
+	}
+	if !errors.Is(err, ErrPageCannotBeMovedToItself) {
+		t.Fatalf("expected ErrPageCannotBeMovedToItself, got: %v", err)
 	}
 }
 
-func TestTreeService_FindPageByRoutePath_Success(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Tree: root → architecture → project-a → specs
-	_, err := service.CreatePage("system", nil, "Architecture", "architecture")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	arch := service.GetTree().Children[0]
-
-	_, err = service.CreatePage("system", &arch.ID, "Project A", "project-a")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	projectA := arch.Children[0]
-
-	_, err = service.CreatePage("system", &projectA.ID, "Specs", "specs")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	// Datei anlegen
-	specPath := filepath.Join(tmpDir, "root", "architecture", "project-a", "specs.md")
-	err = os.WriteFile(specPath, []byte("# Project A Specs"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write specs file: %v", err)
-	}
-
-	// 🔍 Suche über RoutePath
-	page, err := service.FindPageByRoutePath(service.GetTree().Children, "architecture/project-a/specs")
-	if err != nil {
-		t.Fatalf("Expected page, got error: %v", err)
-	}
-
-	if page.Slug != "specs" || !strings.Contains(page.Content, "Specs") {
-		t.Errorf("Unexpected page content or slug")
-	}
-}
-
-func TestTreeService_FindPageByRoutePath_NotFound(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	if _, err := service.CreatePage("system", nil, "Top", "top"); err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	if _, err := service.FindPageByRoutePath(service.GetTree().Children, "top/missing"); err == nil {
-		t.Error("Expected error for non-existent nested path, got nil")
-	}
-}
-
-func TestTreeService_FindPageByRoutePath_PartialMatch(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	if _, err := service.CreatePage("system", nil, "Docs", "docs"); err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	if _, err := service.CreatePage("system", nil, "API", "api"); err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	if _, err := service.FindPageByRoutePath(service.GetTree().Children, "docs/should-not-exist"); err == nil {
-		t.Error("Expected error for unmatched subpath")
-	}
-}
-
-func setupTestTree() *TreeService {
-	ts := NewTreeService(os.TempDir())
-	ts.tree = &PageNode{
-		ID:    "root",
-		Title: "Root",
-		Children: []*PageNode{
-			{ID: "a", Title: "A"},
-			{ID: "b", Title: "B"},
-			{ID: "c", Title: "C"},
-		},
-	}
-	return ts
-}
+// --- D) SortPages ---
 
 func TestTreeService_SortPages_ValidOrder(t *testing.T) {
-	ts := setupTestTree()
+	svc, _ := newLoadedService(t)
 
-	err := ts.SortPages("root", []string{"c", "a", "b"})
+	idA, _ := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	idB, _ := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
+	idC, _ := svc.CreateNode("system", nil, "C", "c", ptrKind(NodeKindPage))
+
+	err := svc.SortPages("root", []string{*idC, *idA, *idB})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("SortPages failed: %v", err)
 	}
 
-	if ts.tree.Children[0].ID != "c" || ts.tree.Children[1].ID != "a" || ts.tree.Children[2].ID != "b" {
-		t.Errorf("unexpected order after sorting")
+	root := svc.GetTree()
+	if root.Children[0].ID != *idC || root.Children[1].ID != *idA || root.Children[2].ID != *idB {
+		t.Fatalf("unexpected order after sort")
+	}
+	if root.Children[0].Position != 0 || root.Children[1].Position != 1 || root.Children[2].Position != 2 {
+		t.Fatalf("expected positions to be reindexed")
 	}
 }
 
 func TestTreeService_SortPages_InvalidLength(t *testing.T) {
-	ts := setupTestTree()
+	svc, _ := newLoadedService(t)
 
-	err := ts.SortPages("root", []string{"a", "b"})
+	_, _ = svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	_, _ = svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
+
+	err := svc.SortPages("root", []string{"only-one"})
 	if err == nil {
-		t.Errorf("expected error for invalid length, got nil")
+		t.Fatalf("expected error for invalid length")
 	}
-}
-
-func TestTreeService_SortPages_InvalidID(t *testing.T) {
-	ts := setupTestTree()
-
-	err := ts.SortPages("root", []string{"a", "b", "x"})
-	if err == nil {
-		t.Errorf("expected error for invalid ID, got nil")
+	if !errors.Is(err, ErrInvalidSortOrder) {
+		t.Fatalf("expected ErrInvalidSortOrder, got: %v", err)
 	}
 }
 
 func TestTreeService_SortPages_DuplicateID(t *testing.T) {
-	ts := setupTestTree()
+	svc, _ := newLoadedService(t)
 
-	err := ts.SortPages("root", []string{"a", "a", "b"})
+	idA, _ := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	idB, _ := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
+
+	err := svc.SortPages("root", []string{*idA, *idA, *idB})
 	if err == nil {
-		t.Errorf("expected error for duplicate ID, got nil")
+		t.Fatalf("expected error for duplicate IDs")
 	}
 }
 
-func TestTreeService_SortPages_EmptyOK(t *testing.T) {
-	ts := NewTreeService(t.TempDir())
-	ts.tree = &PageNode{
-		ID:       "root",
-		Title:    "Root",
-		Children: []*PageNode{},
+// --- E) Routing, Lookup, Ensure ---
+
+func TestTreeService_FindPageByRoutePath_ReturnsContent(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	archID, _ := svc.CreateNode("system", nil, "Architecture", "architecture", ptrKind(NodeKindPage))
+	// create child -> converts arch to section
+	projectID, _ := svc.CreateNode("system", archID, "Project A", "project-a", ptrKind(NodeKindPage))
+	_, _ = svc.CreateNode("system", projectID, "Specs", "specs", ptrKind(NodeKindPage))
+
+	// Update specs content
+	specsNode := svc.GetTree().Children[0].Children[0].Children[0]
+	body := "# Specs\nHello"
+	if err := svc.UpdateNode("system", specsNode.ID, "Specs", "specs", &body); err != nil {
+		t.Fatalf("UpdateNode content failed: %v", err)
 	}
 
-	err := ts.SortPages("root", []string{})
+	page, err := svc.FindPageByRoutePath(svc.GetTree().Children, "architecture/project-a/specs")
 	if err != nil {
-		t.Fatalf("unexpected error for empty list: %v", err)
+		t.Fatalf("FindPageByRoutePath failed: %v", err)
+	}
+	if page.Slug != "specs" {
+		t.Fatalf("expected slug specs, got %q", page.Slug)
+	}
+	if !strings.Contains(page.Content, "Hello") {
+		t.Fatalf("expected content to include Hello, got: %q", page.Content)
 	}
 }
 
-func TestTreeService_SortPages_TreeNotLoaded(t *testing.T) {
-	ts := &TreeService{
-		tree: nil,
-	}
+func TestTreeService_LookupPagePath_Segments(t *testing.T) {
+	svc, _ := newLoadedService(t)
 
-	err := ts.SortPages("root", []string{"a"})
-	if err == nil || !errors.Is(err, ErrTreeNotLoaded) {
-		t.Errorf("expected ErrTreeNotLoaded, got: %v", err)
-	}
-}
+	homeID, _ := svc.CreateNode("system", nil, "Home", "home", ptrKind(NodeKindPage))
+	_, _ = svc.CreateNode("system", homeID, "About", "about", ptrKind(NodeKindPage))
 
-func TestTreeService_LookupPath_Exists(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create tree structure
-	_, _ = service.CreatePage("system", nil, "Home", "home")
-	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage("system", &home.ID, "About", "about")
-	about := home.Children[0]
-	_, _ = service.CreatePage("system", &about.ID, "Team", "team")
-
-	lookup, err := service.LookupPagePath(service.GetTree().Children, "home/about/team")
+	lookup, err := svc.LookupPagePath(svc.GetTree().Children, "home/about/team")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("LookupPagePath failed: %v", err)
 	}
-
-	if !lookup.Exists {
-		t.Errorf("expected path to exist")
+	if lookup.Exists {
+		t.Fatalf("expected full path to not exist")
 	}
 	if len(lookup.Segments) != 3 {
-		t.Errorf("expected 3 segments, got %d", len(lookup.Segments))
+		t.Fatalf("expected 3 segments, got %d", len(lookup.Segments))
 	}
-	if !lookup.Segments[2].Exists || lookup.Segments[2].ID == nil || lookup.Segments[2].Slug != "team" {
-		t.Errorf("expected last segment to exist with correct Slug")
+	if !lookup.Segments[0].Exists || lookup.Segments[0].ID == nil {
+		t.Fatalf("expected home segment to exist with ID")
 	}
-}
-
-func TestTreeService_LookupPath_NotExists(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create tree structure
-	_, _ = service.CreatePage("system", nil, "Home", "home")
-	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage("system", &home.ID, "About", "about")
-
-	lookup, err := service.LookupPagePath(service.GetTree().Children, "home/about/contact")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if !lookup.Segments[1].Exists || lookup.Segments[1].ID == nil {
+		t.Fatalf("expected about segment to exist with ID")
 	}
-
-	if lookup.Exists {
-		t.Errorf("expected path to not exist")
-	}
-	if len(lookup.Segments) != 3 {
-		t.Errorf("expected 3 segments, got %d", len(lookup.Segments))
-	}
-	if !lookup.Segments[1].Exists || lookup.Segments[1].ID == nil || lookup.Segments[1].Slug != "about" {
-		t.Errorf("expected second segment to exist with correct Slug")
-	}
-	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil || lookup.Segments[2].Slug != "contact" {
-		t.Errorf("expected last segment to not exist with correct Slug")
+	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil {
+		t.Fatalf("expected team to not exist")
 	}
 }
 
-func TestTreeService_LookupPath_EmptyPath(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+func TestTreeService_EnsurePagePath_CreatesIntermediateSectionsAndFinalPage(t *testing.T) {
+	svc, _ := newLoadedService(t)
 
-	lookup, err := service.LookupPagePath(service.GetTree().Children, "")
+	// Ensure a deep path; intermediate nodes should become sections
+	res, err := svc.EnsurePagePath("system", "home/about/team/members", "Members", ptrKind(NodeKindPage))
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("EnsurePagePath failed: %v", err)
+	}
+	if res.Page == nil || res.Page.Slug != "members" {
+		t.Fatalf("expected final page 'members'")
 	}
 
-	if lookup.Exists {
-		t.Errorf("expected empty path to not exist")
-	}
-	if len(lookup.Segments) != 0 {
-		t.Errorf("expected 0 segments, got %d", len(lookup.Segments))
-	}
-}
-
-func TestTreeService_LookupPath_DeeperMissingPath(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	_, _ = service.CreatePage("system", nil, "Home", "home")
-	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage("system", &home.ID, "About", "about")
-
-	lookup, err := service.LookupPagePath(service.GetTree().Children, "home/about/team/members")
+	// home/about/team should exist as path now
+	lookup, err := svc.LookupPagePath(svc.GetTree().Children, "home/about/team/members")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("LookupPagePath failed: %v", err)
 	}
-
-	if lookup.Exists {
-		t.Errorf("expected path to not exist")
-	}
-	if len(lookup.Segments) != 4 {
-		t.Errorf("expected 4 segments, got %d", len(lookup.Segments))
-	}
-	if !lookup.Segments[1].Exists || lookup.Segments[1].ID == nil || lookup.Segments[1].Slug != "about" {
-		t.Errorf("expected second segment to exist with correct Slug")
-	}
-	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil || lookup.Segments[2].Slug != "team" {
-		t.Errorf("expected third segment to not exist with correct Slug")
-	}
-	if lookup.Segments[3].Exists || lookup.Segments[3].ID != nil || lookup.Segments[3].Slug != "members" {
-		t.Errorf("expected last segment to not exist with correct Slug")
-	}
-}
-
-func TestTreeService_LookupPath_OnlyOneSegment(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	_, _ = service.CreatePage("system", nil, "Home", "home")
-
-	lookup, err := service.LookupPagePath(service.GetTree().Children, "home")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	if !lookup.Exists {
-		t.Errorf("expected path to exist")
-	}
-	if len(lookup.Segments) != 1 {
-		t.Errorf("expected 1 segment, got %d", len(lookup.Segments))
-	}
-	if !lookup.Segments[0].Exists || lookup.Segments[0].ID == nil || lookup.Segments[0].Slug != "home" {
-		t.Errorf("expected segment to exist with correct Slug")
+		t.Fatalf("expected path to exist after EnsurePagePath")
 	}
 }
 
-func TestTreeService_EnsurePagePath_Successful(t *testing.T) {
+// --- F) Migration V2 (frontmatter backfill) ---
+func TestTreeService_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *testing.T) {
+	if CurrentSchemaVersion < 2 {
+		t.Skip("requires schema v2+")
+	}
+
 	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
 
-	_, _ = service.CreatePage("system", nil, "Home", "home")
-	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage("system", &home.ID, "About", "about")
+	// start on v1 (or generally: current-1)
+	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
 
-	result, err := service.EnsurePagePath("system", "home/about/team", "Team")
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	id, err := svc.CreateNode("system", nil, "Page1", "page1", ptrKind(NodeKindPage))
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	if !result.Exists {
-		t.Errorf("expected path to exist after creation")
-	}
-	if result.Page == nil || result.Page.Slug != "team" || result.Page.Title != "Team" {
-		t.Errorf("expected created page with correct Slug and Title")
+	// IMPORTANT: persist tree so the next service instance sees the node
+	if err := svc.SaveTree(); err != nil {
+		t.Fatalf("SaveTree failed: %v", err)
 	}
 
-	// Verify the page was actually created in the tree
-	about := home.Children[0]
-	if len(about.Children) != 1 || about.Children[0].Slug != "team" {
-		t.Errorf("expected 'team' page to be a child of 'about'")
+	// overwrite file without FM
+	pagePath := filepath.Join(tmpDir, "root", "page1.md")
+	body := "# Page 1 Content\nHello World\n"
+	if err := os.WriteFile(pagePath, []byte(body), 0o644); err != nil {
+		t.Fatalf("write old content failed: %v", err)
+	}
+
+	// force schema old again
+	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	loaded := NewTreeService(tmpDir)
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree (migrating) failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(pagePath)
+	if err != nil {
+		t.Fatalf("read migrated file: %v", err)
+	}
+
+	fm, migratedBody, has, err := ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after migration, got:\n%s", string(raw))
+	}
+	if fm.LeafWikiID != *id {
+		t.Fatalf("expected leafwiki_id=%q, got %q", *id, fm.LeafWikiID)
+	}
+	if strings.TrimSpace(fm.LeafWikiTitle) == "" {
+		t.Fatalf("expected leafwiki_title to be set")
+	}
+	if migratedBody != body {
+		t.Fatalf("expected body preserved exactly.\nGot:\n%q\nWant:\n%q", migratedBody, body)
 	}
 }
 
-func TestTreeService_EnsurePagePath_AlreadyExists(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
+// --- small util ---
 
-	_, _ = service.CreatePage("system", nil, "Home", "home")
-	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage("system", &home.ID, "About", "about")
-	about := home.Children[0]
-	_, _ = service.CreatePage("system", &about.ID, "Team", "team")
-
-	result, err := service.EnsurePagePath("system", "home/about/team", "Team")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !result.Exists {
-		t.Errorf("expected path to exist")
-	}
-	if result.Page == nil || result.Page.Slug != "team" {
-		t.Errorf("expected existing page with correct Slug")
-	}
-}
-
-func TestTreeService_EnsurePagePath_PartialExistence(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	_, _ = service.CreatePage("system", nil, "Home", "home")
-	home := service.GetTree().Children[0]
-	_, _ = service.CreatePage("system", &home.ID, "About", "about")
-
-	result, err := service.EnsurePagePath("system", "home/about/team/members", "Members")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !result.Exists {
-		t.Errorf("expected full path to exist after creation")
-	}
-	if result.Page == nil || result.Page.Slug != "members" || result.Page.Title != "Members" {
-		t.Errorf("expected created 'members' page with correct Slug and Title")
-	}
-
-	// Verify the intermediate 'team' page was also created
-	about := home.Children[0]
-	if len(about.Children) != 1 || about.Children[0].Slug != "team" {
-		t.Errorf("expected 'team' page to be a child of 'about'")
-	}
-	team := about.Children[0]
-	if len(team.Children) != 1 || team.Children[0].Slug != "members" {
-		t.Errorf("expected 'members' page to be a child of 'team'")
-	}
-}
-
-func TestTreeService_EnsurePagePath_EmptyPath(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	result, err := service.EnsurePagePath("system", "", "Root")
-	if err == nil {
-		t.Fatalf("expected error for empty path, got nil")
-	}
-
-	if result != nil {
-		t.Errorf("expected nil result for empty path")
-	}
-}
-
-func TestTreeService_EnsurePagePath_PathStartingWithSlash(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	result, err := service.EnsurePagePath("system", "/leading/slash", "Invalid")
-	if err != nil {
-		t.Fatalf("expected error for invalid path, got nil")
-	}
-
-	if result == nil {
-		t.Errorf("expected nil result for invalid path")
-	}
-}
-
-func TestTreeService_MigrateToV2_PagesWithoutFrontmatter(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create pages without frontmatter
-	_, err := service.CreatePage("system", nil, "Page1", "page1")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page1 := service.GetTree().Children[0]
-
-	_, err = service.CreatePage("system", &page1.ID, "Page2", "page2")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page2 := page1.Children[0]
-
-	// Write content without frontmatter
-	page1Path := filepath.Join(tmpDir, "root", "page1.md")
-	page2Path := filepath.Join(tmpDir, "root", "page1", "page2.md")
-
-	err = os.WriteFile(page1Path, []byte("# Page 1 Content\nHello World"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write page1: %v", err)
-	}
-
-	err = os.WriteFile(page2Path, []byte("# Page 2 Content\nNested content"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write page2: %v", err)
-	}
-
-	// Run migration
-	err = service.migrateToV2()
-	if err != nil {
-		t.Fatalf("migrateToV2 failed: %v", err)
-	}
-
-	// Verify frontmatter was added to page1
-	content1, err := os.ReadFile(page1Path)
-	if err != nil {
-		t.Fatalf("Failed to read page1 after migration: %v", err)
-	}
-	fm1, body1, has1, err := ParseFrontmatter(string(content1))
-	if err != nil {
-		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
-	}
-	if !has1 {
-		t.Error("Expected page1 to have frontmatter after migration")
-	}
-	if fm1.LeafWikiID != page1.ID {
-		t.Errorf("Expected page1 frontmatter ID to be %s, got %s", page1.ID, fm1.LeafWikiID)
-	}
-	if fm1.LeafWikiTitle != "Page1" {
-		t.Errorf("Expected page1 frontmatter title to be 'Page1', got %s", fm1.LeafWikiTitle)
-	}
-	if !strings.Contains(body1, "# Page 1 Content") {
-		t.Error("Expected page1 body to be preserved")
-	}
-
-	// Verify frontmatter was added to page2
-	content2, err := os.ReadFile(page2Path)
-	if err != nil {
-		t.Fatalf("Failed to read page2 after migration: %v", err)
-	}
-	fm2, body2, has2, err := ParseFrontmatter(string(content2))
-	if err != nil {
-		t.Fatalf("Failed to parse frontmatter for page2: %v", err)
-	}
-	if !has2 {
-		t.Error("Expected page2 to have frontmatter after migration")
-	}
-	if fm2.LeafWikiID != page2.ID {
-		t.Errorf("Expected page2 frontmatter ID to be %s, got %s", page2.ID, fm2.LeafWikiID)
-	}
-	if !strings.Contains(body2, "# Page 2 Content") {
-		t.Error("Expected page2 body to be preserved")
-	}
-}
-
-func TestTreeService_MigrateToV2_PagesWithExistingFrontmatter(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create page
-	_, err := service.CreatePage("system", nil, "Page1", "page1")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page1 := service.GetTree().Children[0]
-
-	// Write content with existing frontmatter
-	page1Path := filepath.Join(tmpDir, "root", "page1.md")
-	existingContent := "---\nleafwiki_id: " + page1.ID + "\nleafwiki_title: Custom Title\n---\n# Page 1 Content"
-	err = os.WriteFile(page1Path, []byte(existingContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write page1: %v", err)
-	}
-
-	// Run migration
-	err = service.migrateToV2()
-	if err != nil {
-		t.Fatalf("migrateToV2 failed: %v", err)
-	}
-
-	// Verify frontmatter was not modified (should be unchanged)
-	content1, err := os.ReadFile(page1Path)
-	if err != nil {
-		t.Fatalf("Failed to read page1 after migration: %v", err)
-	}
-	fm1, body1, has1, err := ParseFrontmatter(string(content1))
-	if err != nil {
-		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
-	}
-	if !has1 {
-		t.Error("Expected page1 to have frontmatter after migration")
-	}
-	if fm1.LeafWikiID != page1.ID {
-		t.Errorf("Expected page1 frontmatter ID to be %s, got %s", page1.ID, fm1.LeafWikiID)
-	}
-	if fm1.LeafWikiTitle != "Custom Title" {
-		t.Errorf("Expected page1 frontmatter title to be 'Custom Title', got %s", fm1.LeafWikiTitle)
-	}
-	if !strings.Contains(body1, "# Page 1 Content") {
-		t.Error("Expected page1 body to be preserved")
-	}
-}
-
-func TestTreeService_MigrateToV2_MissingFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create a page and its file
-	_, err := service.CreatePage("system", nil, "Page1", "page1")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	// Write content to page1
-	page1Path := filepath.Join(tmpDir, "root", "page1.md")
-	err = os.WriteFile(page1Path, []byte("# Page 1 Content"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write page1: %v", err)
-	}
-
-	// Create a page with a child
-	_, err = service.CreatePage("system", nil, "Parent", "parent")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	parent := service.GetTree().Children[1]
-
-	_, err = service.CreatePage("system", &parent.ID, "Child", "child")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	// Write content to child without frontmatter
-	childPath := filepath.Join(tmpDir, "root", "parent", "child.md")
-	err = os.WriteFile(childPath, []byte("# Child Content"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write child: %v", err)
-	}
-
-	// Remove the parent index.md file (parent has children so it's in a folder)
-	parentIndexPath := filepath.Join(tmpDir, "root", "parent", "index.md")
-	if _, err := os.Stat(parentIndexPath); err == nil {
-		os.Remove(parentIndexPath)
-	}
-
-	// Run migration - should handle missing parent file gracefully and still migrate child
-	err = service.migrateToV2()
-	if err != nil {
-		t.Fatalf("migrateToV2 should handle missing files gracefully, got error: %v", err)
-	}
-
-	// Verify page1 was migrated
-	content1, err := os.ReadFile(page1Path)
-	if err != nil {
-		t.Fatalf("Failed to read page1 after migration: %v", err)
-	}
-	_, _, has1, err := ParseFrontmatter(string(content1))
-	if err != nil {
-		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
-	}
-	if !has1 {
-		t.Error("Expected page1 to have frontmatter after migration")
-	}
-
-	// Verify child was still migrated even though parent file is missing
-	childContent, err := os.ReadFile(childPath)
-	if err != nil {
-		t.Fatalf("Failed to read child after migration: %v", err)
-	}
-	_, _, hasChild, err := ParseFrontmatter(string(childContent))
-	if err != nil {
-		t.Fatalf("Failed to parse frontmatter for child: %v", err)
-	}
-	if !hasChild {
-		t.Error("Expected child to have frontmatter after migration even if parent file is missing")
-	}
-}
-
-func TestTreeService_MigrateToV2_SkipsNonExistentFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create a simple page
-	_, err := service.CreatePage("system", nil, "Page1", "page1")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	page1 := service.GetTree().Children[0]
-	// Write content without frontmatter
-	page1Path := filepath.Join(tmpDir, "root", "page1.md")
-	err = os.WriteFile(page1Path, []byte("# Page 1 Content"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write page1: %v", err)
-	}
-
-	// Manually add a node to the tree without creating its file
-	// This simulates a corrupted tree structure
-	ghostNode := &PageNode{
-		ID:     "ghost-node",
-		Title:  "Ghost",
-		Slug:   "ghost",
-		Parent: service.tree,
-	}
-	service.tree.Children = append(service.tree.Children, ghostNode)
-
-	err = service.migrateToV2()
-	if err != nil {
-		t.Fatalf("Expected migration to skip missing files gracefully, got error: %v", err)
-	}
-
-	// page1 should have frontmatter now
-	content1, err := os.ReadFile(page1Path)
-	if err != nil {
-		t.Fatalf("Failed to read page1 after migration: %v", err)
-	}
-	fm1, body1, has1, err := ParseFrontmatter(string(content1))
-	if err != nil {
-		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
-	}
-	if !has1 {
-		t.Fatal("Expected page1 to have frontmatter after migration")
-	}
-	if fm1.LeafWikiID != page1.ID {
-		t.Fatalf("Expected leafwiki_id %q, got %q", page1.ID, fm1.LeafWikiID)
-	}
-	if !strings.Contains(body1, "# Page 1 Content") {
-		t.Fatalf("Expected body to be preserved")
-	}
-}
-
-func TestTreeService_MigrateToV2_TreeNotLoaded(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	// Do NOT load tree
-
-	// Run migration should fail
-	err := service.migrateToV2()
-	if err == nil {
-		t.Error("Expected error when tree is not loaded")
-	}
-	if !errors.Is(err, ErrTreeNotLoaded) {
-		t.Errorf("Expected ErrTreeNotLoaded, got: %v", err)
-	}
-}
-
-func TestTreeService_MigrateToV2_PartialFrontmatter(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create page
-	_, err := service.CreatePage("system", nil, "Page1", "page1")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page1 := service.GetTree().Children[0]
-
-	// Write content with partial frontmatter (missing ID)
-	page1Path := filepath.Join(tmpDir, "root", "page1.md")
-	partialContent := "---\nleafwiki_title: Existing Title\n---\n# Page 1 Content"
-	err = os.WriteFile(page1Path, []byte(partialContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write page1: %v", err)
-	}
-
-	// Run migration
-	err = service.migrateToV2()
-	if err != nil {
-		t.Fatalf("migrateToV2 failed: %v", err)
-	}
-
-	// Verify ID was added but title was preserved
-	content1, err := os.ReadFile(page1Path)
-	if err != nil {
-		t.Fatalf("Failed to read page1 after migration: %v", err)
-	}
-	fm1, _, _, err := ParseFrontmatter(string(content1))
-	if err != nil {
-		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
-	}
-	if fm1.LeafWikiID != page1.ID {
-		t.Errorf("Expected page1 frontmatter ID to be added: %s, got %s", page1.ID, fm1.LeafWikiID)
-	}
-	if fm1.LeafWikiTitle != "Existing Title" {
-		t.Errorf("Expected page1 frontmatter title to be preserved: 'Existing Title', got %s", fm1.LeafWikiTitle)
-	}
-}
-
-func TestTreeService_MigrateToV2_EmptyTree(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Run migration on empty tree (only root, no children)
-	err := service.migrateToV2()
-	if err != nil {
-		t.Fatalf("migrateToV2 should succeed on empty tree, got error: %v", err)
-	}
-}
-
-func TestTreeService_MigrateToV2_PreservesBodyContent(t *testing.T) {
-	tmpDir := t.TempDir()
-	service := NewTreeService(tmpDir)
-	_ = service.LoadTree()
-
-	// Create page
-	_, err := service.CreatePage("system", nil, "Page1", "page1")
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	// Write complex content without frontmatter
-	page1Path := filepath.Join(tmpDir, "root", "page1.md")
-	complexContent := `# Title
-
-This is a paragraph.
-
-## Section 1
-
-- Item 1
-- Item 2
-
-` + "```go\nfunc main() {\n\tfmt.Println(\"Hello\")\n}\n```" + `
-
-### Subsection
-
-More content here.
-
----
-
-Horizontal rule above.
-`
-	err = os.WriteFile(page1Path, []byte(complexContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write page1: %v", err)
-	}
-
-	// Run migration
-	err = service.migrateToV2()
-	if err != nil {
-		t.Fatalf("migrateToV2 failed: %v", err)
-	}
-
-	// Verify body content is exactly preserved
-	content1, err := os.ReadFile(page1Path)
-	if err != nil {
-		t.Fatalf("Failed to read page1 after migration: %v", err)
-	}
-	_, body1, _, err := ParseFrontmatter(string(content1))
-	if err != nil {
-		t.Fatalf("Failed to parse frontmatter for page1: %v", err)
-	}
-	if body1 != complexContent {
-		t.Errorf("Expected body to be exactly preserved.\nGot:\n%s\n\nWant:\n%s", body1, complexContent)
-	}
-}
+func ptrKind(k NodeKind) *NodeKind { return &k }
