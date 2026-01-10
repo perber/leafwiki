@@ -80,7 +80,7 @@ func TestSQLiteIndex_Search(t *testing.T) {
 	}
 
 	// Perform search
-	result, err := index.Search("content:search", 0, 10)
+	result, err := index.Search("content:search*", 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
