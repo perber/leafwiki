@@ -137,8 +137,6 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", auth_middleware.RequireEditorOrAdmin(), api.DeleteAssetHandler(wikiInstance))
 
 		// Branding (admin only)
-
-		// Branding (admin only)
 		requiresAuthGroup.PUT("/branding", auth_middleware.RequireAdmin(options.AuthDisabled), api.UpdateBrandingHandler(wikiInstance))
 		requiresAuthGroup.POST("/branding/logo", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingLogoHandler(wikiInstance))
 		requiresAuthGroup.POST("/branding/favicon", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingFaviconHandler(wikiInstance))
