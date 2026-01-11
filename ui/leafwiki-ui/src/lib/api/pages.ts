@@ -1,5 +1,8 @@
 import { fetchWithAuth } from './auth'
 
+export const NODE_KIND_PAGE = 'page'
+export const NODE_KIND_SECTION = 'section'
+
 export type PageMetadata = {
   createdAt: string
   updatedAt: string
@@ -22,7 +25,7 @@ export type PageNode = {
   path: string
   parentId?: string | null
   children: PageNode[] | null
-
+  kind: 'page' | 'section'
   metadata?: PageMetadata // optional metadata, because older API responses may not have it
 }
 
@@ -32,6 +35,7 @@ export interface Page {
   path: string
   title: string
   content: string
+  kind: 'page' | 'section'
   metadata?: PageMetadata // optional metadata, because older API responses may not have it
 }
 
@@ -71,17 +75,19 @@ export async function createPage({
   title,
   slug,
   parentId,
+  kind,
 }: {
   title: string
   slug: string
   parentId: string | null
+  kind: 'page' | 'section'
 }) {
   if (parentId === '') parentId = null
 
   return await fetchWithAuth(`/api/pages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, slug, parentId }),
+    body: JSON.stringify({ title, slug, parentId, kind }),
   })
 }
 
