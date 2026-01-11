@@ -15,7 +15,10 @@ type AddPageDialogProps = {
   nodeKind?: 'page' | 'section'
 }
 
-export function AddPageDialog({ parentId, nodeKind = NODE_KIND_PAGE }: AddPageDialogProps) {
+export function AddPageDialog({
+  parentId,
+  nodeKind = NODE_KIND_PAGE,
+}: AddPageDialogProps) {
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [loading, setLoading] = useState(false)
@@ -53,7 +56,10 @@ export function AddPageDialog({ parentId, nodeKind = NODE_KIND_PAGE }: AddPageDi
   }, [])
 
   const handleCreate = useCallback(
-    async (redirect: boolean = true, nodeKind?: 'page' | 'section'): Promise<boolean> => {
+    async (
+      redirect: boolean = true,
+      nodeKind?: 'page' | 'section',
+    ): Promise<boolean> => {
       if (!nodeKind) nodeKind = NODE_KIND_PAGE // Default to 'page' if not provided
       if (!title) return false // Should not happen due to button disabling
 
@@ -108,7 +114,6 @@ export function AddPageDialog({ parentId, nodeKind = NODE_KIND_PAGE }: AddPageDi
 
   const buttons = useMemo(() => {
     const b: BaseDialogConfirmButton[] = [
-
       {
         label: 'Create',
         actionType: 'no-redirect',
@@ -119,31 +124,32 @@ export function AddPageDialog({ parentId, nodeKind = NODE_KIND_PAGE }: AddPageDi
       },
     ]
     if (nodeKind === NODE_KIND_PAGE) {
-      b.push(
-        {
-          label: 'Create & Edit Page',
-          actionType: 'confirm',
-          autoFocus: false,
-          loading,
-          disabled: isCreateButtonDisabled,
-          variant: 'default',
-        })
+      b.push({
+        label: 'Create & Edit Page',
+        actionType: 'confirm',
+        autoFocus: false,
+        loading,
+        disabled: isCreateButtonDisabled,
+        variant: 'default',
+      })
     }
     return b
-  }, [
-    isCreateButtonDisabled,
-    loading,
-    nodeKind,
-  ])
+  }, [isCreateButtonDisabled, loading, nodeKind])
 
   return (
     <BaseDialog
-      dialogTitle={nodeKind === 'page' ? "Create a new page" : "Create a new section"}
-      dialogDescription={nodeKind === 'page' ? "Enter the title of the new page" : "Enter the title of the new section"}
+      dialogTitle={
+        nodeKind === 'page' ? 'Create a new page' : 'Create a new section'
+      }
+      dialogDescription={
+        nodeKind === 'page'
+          ? 'Enter the title of the new page'
+          : 'Enter the title of the new section'
+      }
       dialogType={DIALOG_ADD_PAGE}
       onClose={handleCancel}
       onConfirm={async (actionType: string): Promise<boolean> => {
-        return await handleCreate(actionType !== 'no-redirect')
+        return await handleCreate(actionType !== 'no-redirect', nodeKind)
       }}
       testidPrefix="add-page-dialog"
       cancelButton={{

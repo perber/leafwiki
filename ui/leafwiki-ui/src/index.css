@@ -1225,11 +1225,11 @@
   }
 
   .tree-node__actions {
-    @apply bg-surface absolute right-0 flex items-center gap-1 rounded-md shadow-md;
+    @apply flex gap-1;
   }
 
   .tree-node__actions--compact {
-    @apply px-1 py-2;
+    @apply pl-1;
   }
 
   .tree-node__action-icon {

@@ -1,7 +1,7 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 
 type TreeViewActionButtonProps = {
-  onClick: () => void
+  onClick?: () => void
   actionName: string
   icon: React.ReactNode
   tooltip: string
@@ -18,7 +18,10 @@ export function TreeViewActionButton({
       <TooltipWrapper label={tooltip} side="top" align="start">
         <button
           type="button"
-          onClick={() => onClick()}
+          onClick={(e) => {
+            onClick?.()
+            e.stopPropagation()
+          }}
           className="btn-treeview"
           aria-label={tooltip}
           data-testid={`tree-view-action-button-${actionName}`}

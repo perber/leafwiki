@@ -58,20 +58,30 @@ export default function TreeView() {
         <div className="tree-view__toolbar">
           <TreeViewActionButton
             actionName="add"
-            icon={<FilePlus size={18} className="tree-view__action-icon" />}
+            icon={<FilePlus className="tree-view__action-icon" size={18} />}
             tooltip="Create new page"
-            onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: '', nodeKind: NODE_KIND_PAGE })}
+            onClick={() =>
+              openDialog(DIALOG_ADD_PAGE, {
+                parentId: '',
+                nodeKind: NODE_KIND_PAGE,
+              })
+            }
           />
           <TreeViewActionButton
             actionName="add-section"
-            icon={<FolderPlus size={20} className="tree-view__action-icon" />}
+            icon={<FolderPlus className="tree-view__action-icon" size={18} />}
             tooltip="Create new section"
-            onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: '', nodeKind: NODE_KIND_SECTION })}
+            onClick={() =>
+              openDialog(DIALOG_ADD_PAGE, {
+                parentId: '',
+                nodeKind: NODE_KIND_SECTION,
+              })
+            }
           />
           {tree && (
             <TreeViewActionButton
               actionName="sort"
-              icon={<List size={20} className="tree-view__action-icon" />}
+              icon={<List className="tree-view__action-icon" size={18} />}
               tooltip="Sort pages"
               onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: tree })}
             />

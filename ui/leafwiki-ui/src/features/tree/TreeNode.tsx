@@ -1,11 +1,7 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
-import { PageNode } from '@/lib/api/pages'
-import {
-  DIALOG_ADD_PAGE,
-  DIALOG_MOVE_PAGE,
-  DIALOG_SORT_PAGES,
-} from '@/lib/registries'
+import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
+import { DIALOG_ADD_PAGE } from '@/lib/registries'
 import { buildEditUrl, buildViewUrl } from '@/lib/urlUtil'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -13,9 +9,10 @@ import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
-import { ChevronUp, List, Move, Plus } from 'lucide-react'
+import { ChevronUp, FilePlus } from 'lucide-react'
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import MoreActionsMenu from './MoreActionsMenu'
 
 type Props = {
   node: PageNode
@@ -92,7 +89,7 @@ export const TreeNode = React.memo(function TreeNode({
         />
 
         <div className="tree-node__main">
-          {hasChildren && (
+          {node.kind === NODE_KIND_SECTION && (
             <ChevronUp
               data-testid={`tree-node-toggle-icon-${node.id}`}
               size={16}
@@ -100,40 +97,28 @@ export const TreeNode = React.memo(function TreeNode({
                 'tree-node__toggle--open': open,
                 'tree-node__toggle--closed': !open,
               })}
-              onClick={() => hasChildren && toggleNode(node.id)}
+              onClick={() => node.kind === NODE_KIND_SECTION && toggleNode(node.id)}
             />
           )}
           {
             // add empty space to align with nodes that have children
-            !hasChildren && <div className="tree-node__toggle-spacer" />
+            node.kind !== NODE_KIND_SECTION && <div className="tree-node__toggle-spacer" />
           }
           {linkText}
-        </div>
-
-        {(hovered || isMobile) && !readOnlyMode && (
-          <div className={clsx('tree-node__actions', treeActionButtonStyle)}>
-            <TreeViewActionButton
-              actionName="add"
-              icon={<Plus size={18} className="tree-node__action-icon" />}
-              tooltip="Create new page"
-              onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: node.id })}
-            />
-            <TreeViewActionButton
-              actionName="move"
-              icon={<Move size={16} className="tree-node__action-icon" />}
-              tooltip="Move page to new parent"
-              onClick={() => openDialog(DIALOG_MOVE_PAGE, { pageId: node.id })}
-            />
-            {hasChildren && (
+          {(hovered || isMobile) && !readOnlyMode && (
+            <div className={clsx('tree-node__actions', treeActionButtonStyle)}>
               <TreeViewActionButton
-                actionName="sort"
-                icon={<List size={16} className="tree-node__action-icon" />}
-                tooltip="Sort pages"
-                onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: node })}
+                actionName="add"
+                icon={<FilePlus size={18} className="tree-node__action-icon" />}
+                tooltip="Create new page"
+                onClick={() =>
+                  openDialog(DIALOG_ADD_PAGE, { parentId: node.id })
+                }
               />
-            )}
-          </div>
-        )}
+              <MoreActionsMenu node={node} />
+            </div>
+          )}
+        </div>
       </div>
 
       <div
