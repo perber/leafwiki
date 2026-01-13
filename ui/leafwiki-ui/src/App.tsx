@@ -29,8 +29,8 @@ function App() {
     loadConfig()
     loadBranding()
   }, [loadConfig, loadBranding])
-    // Load branding configuration
-    loadBranding()
+  // Load branding configuration
+  loadBranding()
 
   const router = useMemo(
     () => createLeafWikiRouter(isReadOnlyViewer, authDisabled),

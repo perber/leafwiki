@@ -73,4 +73,3 @@ export const createLeafWikiRouter = (
       ),
     },
   ] satisfies RouteObject[])
-

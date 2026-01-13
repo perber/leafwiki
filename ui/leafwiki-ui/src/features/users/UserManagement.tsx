@@ -87,10 +87,11 @@ export default function UserManagement() {
                       </td>
                       <td className="user-management__table-cell">
                         <span
-                          className={`user-management__role-pill ${user.role === 'admin'
+                          className={`user-management__role-pill ${
+                            user.role === 'admin'
                               ? 'user-management__role-pill--admin'
                               : 'user-management__role-pill--default'
-                            }`}
+                          }`}
                         >
                           {user.role}
                         </span>
