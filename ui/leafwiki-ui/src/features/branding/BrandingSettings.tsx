@@ -39,7 +39,7 @@ export default function BrandingSettings() {
         siteName: localSiteName,
       })
       toast.success('Branding settings saved')
-    } catch (err) {
+    } catch {
       toast.error('Failed to save branding settings')
     } finally {
       setSaving(false)
@@ -53,7 +53,7 @@ export default function BrandingSettings() {
     try {
       await uploadLogo(file)
       toast.success('Logo uploaded successfully')
-    } catch (err) {
+    } catch {
       toast.error('Failed to upload logo')
     }
   }
@@ -67,7 +67,7 @@ export default function BrandingSettings() {
     try {
       await uploadFavicon(file)
       toast.success('Favicon uploaded successfully')
-    } catch (err) {
+    } catch {
       toast.error('Failed to upload favicon')
     }
   }
@@ -123,7 +123,7 @@ export default function BrandingSettings() {
               type="file"
               ref={logoInputRef}
               onChange={handleLogoUpload}
-              accept=".png,.svg,.jpg,.jpeg,.webp"
+              accept=".png,.jpg,.jpeg,.webp"
               className="hidden"
             />
             <Button
@@ -135,7 +135,7 @@ export default function BrandingSettings() {
               Upload Image
             </Button>
             <p className="branding-settings__hint">
-              Accepts PNG, SVG, JPG, JPEG, WebP
+              Accepts PNG, JPG, JPEG, WebP
             </p>
           </div>
         </div>
@@ -169,7 +169,7 @@ export default function BrandingSettings() {
               type="file"
               ref={faviconInputRef}
               onChange={handleFaviconUpload}
-              accept=".png,.svg,.ico,.webp"
+              accept=".png,.gif,.ico"
               className="hidden"
             />
             <Button
@@ -181,7 +181,7 @@ export default function BrandingSettings() {
               Upload Favicon
             </Button>
             <p className="branding-settings__hint">
-              Accepts PNG, SVG, ICO, WebP
+              Accepts PNG, GIF, ICO
             </p>
           </div>
         </div>

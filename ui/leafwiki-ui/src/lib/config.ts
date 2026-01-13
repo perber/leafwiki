@@ -12,5 +12,4 @@ export const IMAGE_EXTENSIONS = [
   'gif',
   'webp',
   'bmp',
-  'svg',
 ]
