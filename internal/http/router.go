@@ -128,6 +128,13 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		// Change Own Password (only meaningful when authentication is enabled)
 		if !options.AuthDisabled {
 			requiresAuthGroup.PUT("/users/me/password", api.ChangeOwnPasswordUserHandler(wikiInstance))
+			// Branding (admin only)
+			// Only allowed when authentication is enabled
+			requiresAuthGroup.PUT("/branding", auth_middleware.RequireAdmin(options.AuthDisabled), api.UpdateBrandingHandler(wikiInstance))
+			requiresAuthGroup.POST("/branding/logo", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingLogoHandler(wikiInstance))
+			requiresAuthGroup.POST("/branding/favicon", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingFaviconHandler(wikiInstance))
+			requiresAuthGroup.DELETE("/branding/logo", auth_middleware.RequireAdmin(options.AuthDisabled), api.DeleteBrandingLogoHandler(wikiInstance))
+			requiresAuthGroup.DELETE("/branding/favicon", auth_middleware.RequireAdmin(options.AuthDisabled), api.DeleteBrandingFaviconHandler(wikiInstance))
 		}
 
 		// Assets
@@ -135,11 +142,6 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.GET("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.ListAssetsHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id/assets/rename", auth_middleware.RequireEditorOrAdmin(), api.RenameAssetHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", auth_middleware.RequireEditorOrAdmin(), api.DeleteAssetHandler(wikiInstance))
-
-		// Branding (admin only)
-		requiresAuthGroup.PUT("/branding", auth_middleware.RequireAdmin(options.AuthDisabled), api.UpdateBrandingHandler(wikiInstance))
-		requiresAuthGroup.POST("/branding/logo", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingLogoHandler(wikiInstance))
-		requiresAuthGroup.POST("/branding/favicon", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingFaviconHandler(wikiInstance))
 	}
 
 	// Serve branding assets (logos, favicons)
@@ -163,9 +165,9 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		router.GET("/favicon.svg", func(c *gin.Context) {
 			// Get branding config to check for custom favicon
 			brandingConfig, err := wikiInstance.GetBranding()
-			if err == nil && brandingConfig.FaviconImagePath != "" {
+			if err == nil && brandingConfig.FaviconFile != "" {
 				// Serve custom favicon from branding assets
-				faviconPath := wikiInstance.GetBrandingService().GetBrandingAssetsDir() + "/" + brandingConfig.FaviconImagePath
+				faviconPath := wikiInstance.GetBrandingService().GetBrandingAssetsDir() + "/" + brandingConfig.FaviconFile
 				c.File(faviconPath)
 				return
 			}
@@ -179,7 +181,8 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			if c.Request.Method == http.MethodGet &&
 				!strings.HasPrefix(c.Request.URL.Path, "/api") &&
 				!strings.HasPrefix(c.Request.URL.Path, "/assets") &&
-				!strings.HasPrefix(c.Request.URL.Path, "/static") {
+				!strings.HasPrefix(c.Request.URL.Path, "/static") &&
+				!strings.HasPrefix(c.Request.URL.Path, "/branding") {
 
 				c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 				data, err := fs.ReadFile(fsys, "index.html")
@@ -187,6 +190,14 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 					c.Status(http.StatusNotFound)
 					return
 				}
+
+				// get site name from branding config
+				var siteName string = "LeafWiki"
+				if branding, err := wikiInstance.GetBranding(); err == nil {
+					siteName = branding.SiteName
+				}
+
+				data = []byte(strings.ReplaceAll(string(data), "{{__SITE_NAME__}}", siteName)) // inject site name into title tag
 
 				if options.InjectCodeInHeader != "" {
 					html := string(data)

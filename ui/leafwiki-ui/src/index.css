@@ -317,6 +317,14 @@
     @apply text-xl font-bold;
   }
 
+  .app-layout__logo-image {
+    @apply inline-block h-6 w-auto align-middle;
+  }
+
+  .app-layout__logo-emoji {
+    @apply text-xl;
+  }
+
   .app-layout__editor-title-bar-container {
     @apply flex min-h-full flex-1 items-center justify-center;
   }

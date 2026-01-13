@@ -3,8 +3,12 @@ import { create } from 'zustand'
 
 type BrandingStore = {
   siteName: string
-  logoImagePath: string
-  faviconImagePath: string
+  logoFile: string
+  faviconFile: string
+  logoExts: string[]
+  maxLogoSize: number
+  faviconExts: string[]
+  maxFaviconSize: number
   isLoaded: boolean
   isLoading: boolean
   error: string | null
@@ -13,12 +17,18 @@ type BrandingStore = {
   updateBranding: (config: Partial<brandingAPI.BrandingConfig>) => Promise<void>
   uploadLogo: (file: File) => Promise<void>
   uploadFavicon: (file: File) => Promise<void>
+  deleteLogo: () => Promise<void>
+  deleteFavicon: () => Promise<void>
 }
 
 export const useBrandingStore = create<BrandingStore>((set) => ({
   siteName: 'LeafWiki',
-  logoImagePath: '',
-  faviconImagePath: '',
+  logoFile: '',
+  faviconFile: '',
+  logoExts: [],
+  maxLogoSize: 0,
+  faviconExts: [],
+  maxFaviconSize: 0,
   isLoaded: false,
   isLoading: false,
   error: null,
@@ -29,8 +39,12 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       const config = await brandingAPI.getBranding()
       set({
         siteName: config.siteName,
-        logoImagePath: config.logoImagePath,
-        faviconImagePath: config.faviconImagePath,
+        logoFile: config.logoFile,
+        logoExts: config.brandingConstraints.logoExts,
+        maxLogoSize: config.brandingConstraints.maxLogoSize,
+        faviconFile: config.faviconFile,
+        faviconExts: config.brandingConstraints.faviconExts,
+        maxFaviconSize: config.brandingConstraints.maxFaviconSize,
         isLoaded: true,
         isLoading: false,
       })
@@ -48,8 +62,8 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       const updated = await brandingAPI.updateBranding(config)
       set({
         siteName: updated.siteName,
-        logoImagePath: updated.logoImagePath,
-        faviconImagePath: updated.faviconImagePath,
+        logoFile: updated.logoFile,
+        faviconFile: updated.faviconFile,
         isLoading: false,
       })
     } catch (err) {
@@ -66,15 +80,15 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     try {
       const result = await brandingAPI.uploadBrandingLogo(file)
       set({
-        logoImagePath: result.branding.logoImagePath,
-        isLoading: false,
+        logoFile: result.branding.logoFile,
       })
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : 'Failed to upload logo',
-        isLoading: false,
       })
       throw err
+    } finally {
+      set({ isLoading: false })
     }
   },
 
@@ -83,17 +97,53 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     try {
       const result = await brandingAPI.uploadBrandingFavicon(file)
       set({
-        faviconImagePath: result.branding.faviconImagePath,
-        isLoading: false,
+        faviconFile: result.branding.faviconFile,
       })
       // Refresh favicon in browser
       refreshFavicon()
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : 'Failed to upload favicon',
-        isLoading: false,
       })
       throw err
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  deleteLogo: async () => {
+    set({ isLoading: true, error: null })
+    try {
+      await brandingAPI.deleteBrandingLogo()
+      set({
+        logoFile: '',
+      })
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Failed to delete logo',
+      })
+      throw err
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  deleteFavicon: async () => {
+    set({ isLoading: true, error: null })
+    try {
+      await brandingAPI.deleteBrandingFavicon()
+      set({
+        faviconFile: '',
+      })
+      // Refresh favicon in browser
+      refreshFavicon()
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Failed to delete favicon',
+      })
+      throw err
+    } finally {
+      set({ isLoading: false })
     }
   },
 }))

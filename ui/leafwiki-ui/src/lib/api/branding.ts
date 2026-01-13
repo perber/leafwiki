@@ -3,8 +3,14 @@ import { fetchWithAuth } from './auth'
 
 export type BrandingConfig = {
   siteName: string
-  logoImagePath: string
-  faviconImagePath: string
+  logoFile: string
+  faviconFile: string
+  brandingConstraints: {
+    logoExts: string[]
+    maxLogoSize: number
+    faviconExts: string[]
+    maxFaviconSize: number
+  }
 }
 
 export async function getBranding(): Promise<BrandingConfig> {
@@ -48,4 +54,16 @@ export async function uploadBrandingFavicon(
     body: formData,
     headers: {}, // Let browser set Content-Type for FormData
   })) as { path: string; branding: BrandingConfig }
+}
+
+export async function deleteBrandingLogo(): Promise<BrandingConfig> {
+  return (await fetchWithAuth('/api/branding/logo', {
+    method: 'DELETE',
+  })) as BrandingConfig
+}
+
+export async function deleteBrandingFavicon(): Promise<BrandingConfig> {
+  return (await fetchWithAuth('/api/branding/favicon', {
+    method: 'DELETE',
+  })) as BrandingConfig
 }

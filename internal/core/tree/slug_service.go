@@ -11,14 +11,16 @@ import (
 )
 
 var reservedSlugs = map[string]bool{
-	"e":      true,
-	"edit":   true,
-	"api":    true,
-	"assets": true,
-	"index":  true,
-	"users":  true,
-	"user":   true,
-	"login":  true,
+	"e":        true,
+	"edit":     true,
+	"api":      true,
+	"assets":   true,
+	"branding": true,
+	"index":    true,
+	"users":    true,
+	"user":     true,
+	"login":    true,
+	"settings": true,
 }
 
 type SlugService struct {

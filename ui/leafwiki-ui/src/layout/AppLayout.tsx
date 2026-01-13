@@ -44,7 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useAutoCloseSidebarOnMobile()
 
-  const { siteName, logoImagePath } = useBrandingStore()
+  const { siteName, logoFile } = useBrandingStore()
 
   const sidebarContainerRef = useRef<HTMLDivElement | null>(null)
   const liveSidebarWidthRef = useRef(sidebarWidth)
@@ -167,9 +167,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="app-layout__logo-n-title">
             <h2>
               <Link to="/">
-                {logoImagePath ? (
+                {logoFile ? (
                   <img
-                    src={`/branding/${logoImagePath}`}
+                    src={`/branding/${logoFile}`}
                     alt={siteName}
                     className="app-layout__logo-image"
                   />

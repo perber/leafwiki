@@ -2,21 +2,36 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useBrandingStore } from '@/stores/branding'
-import { ImageIcon, Loader2, SaveIcon, UploadIcon } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import {
+  ImageIcon,
+  Loader2,
+  SaveIcon,
+  TrashIcon,
+  UploadIcon,
+} from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { useSetTitle } from '../viewer/setTitle'
 
 export default function BrandingSettings() {
   const {
     siteName,
-    logoImagePath,
-    faviconImagePath,
+    logoFile,
+    faviconFile,
     isLoading,
+    logoExts,
+    maxLogoSize,
+    faviconExts,
+    maxFaviconSize,
     loadBranding,
     updateBranding,
     uploadLogo,
     uploadFavicon,
+    deleteLogo,
+    deleteFavicon,
   } = useBrandingStore()
+
+  useSetTitle({ title: 'Branding Settings' })
 
   const [localSiteName, setLocalSiteName] = useState(siteName)
   const [saving, setSaving] = useState(false)
@@ -24,13 +39,31 @@ export default function BrandingSettings() {
   const logoInputRef = useRef<HTMLInputElement>(null)
   const faviconInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     loadBranding()
   }, [loadBranding])
 
   useEffect(() => {
     setLocalSiteName(siteName)
   }, [siteName])
+
+  const handleLogoDelete = async () => {
+    try {
+      await deleteLogo()
+      toast.success('Logo deleted successfully')
+    } catch {
+      toast.error('Failed to delete logo')
+    }
+  }
+
+  const handleFaviconDelete = async () => {
+    try {
+      await deleteFavicon()
+      toast.success('Favicon deleted successfully')
+    } catch {
+      toast.error('Failed to delete favicon')
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -74,10 +107,8 @@ export default function BrandingSettings() {
 
   return (
     <>
-      <title>Branding Settings - {siteName}</title>
       <div className="branding-settings">
         <h1 className="branding-settings__title">Branding Settings</h1>
-
         <div className="branding-settings__section">
           <h2 className="branding-settings__section-title">Site Name</h2>
           <p className="branding-settings__section-description">
@@ -104,12 +135,22 @@ export default function BrandingSettings() {
             <span className="branding-settings__preview-label">
               Current Logo:
             </span>
-            {logoImagePath ? (
-              <img
-                src={`/branding/${logoImagePath}`}
-                alt="Logo"
-                className="branding-settings__preview-image"
-              />
+            {logoFile ? (
+              <>
+                <img
+                  src={`/branding/${logoFile}`}
+                  alt="Logo"
+                  className="branding-settings__preview-image"
+                />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleLogoDelete}
+                  disabled={isLoading}
+                >
+                  <TrashIcon />
+                </Button>
+              </>
             ) : (
               <span className="branding-settings__preview-placeholder">
                 No logo uploaded
@@ -118,12 +159,12 @@ export default function BrandingSettings() {
           </div>
 
           <div className="branding-settings__field">
-            <Label>Upload Logo</Label>
+            <Label>Upload Logo</Label>{' '}
             <input
               type="file"
               ref={logoInputRef}
               onChange={handleLogoUpload}
-              accept=".png,.jpg,.jpeg,.webp"
+              accept={logoExts.map((ext) => `${ext}`).join(',')}
               className="hidden"
             />
             <Button
@@ -135,7 +176,8 @@ export default function BrandingSettings() {
               Upload Image
             </Button>
             <p className="branding-settings__hint">
-              Accepts PNG, JPG, JPEG, WebP
+              Accepts {logoExts.map((ext) => ext.toUpperCase()).join(', ')}, max
+              size {(maxLogoSize / (1024 * 1024)).toFixed(1)} MB
             </p>
           </div>
         </div>
@@ -150,12 +192,23 @@ export default function BrandingSettings() {
             <span className="branding-settings__preview-label">
               Current Favicon:
             </span>
-            {faviconImagePath ? (
-              <img
-                src={`/branding/${faviconImagePath}`}
-                alt="Favicon"
-                className="branding-settings__preview-favicon"
-              />
+            {faviconFile ? (
+              <>
+                {' '}
+                <img
+                  src={`/branding/${faviconFile}`}
+                  alt="Favicon"
+                  className="branding-settings__preview-favicon"
+                />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleFaviconDelete}
+                  disabled={isLoading}
+                >
+                  <TrashIcon />
+                </Button>
+              </>
             ) : (
               <span className="branding-settings__preview-placeholder">
                 Using default favicon
@@ -169,7 +222,7 @@ export default function BrandingSettings() {
               type="file"
               ref={faviconInputRef}
               onChange={handleFaviconUpload}
-              accept=".png,.gif,.ico"
+              accept={faviconExts.map((ext) => `${ext}`).join(',')}
               className="hidden"
             />
             <Button
@@ -181,7 +234,8 @@ export default function BrandingSettings() {
               Upload Favicon
             </Button>
             <p className="branding-settings__hint">
-              Accepts PNG, GIF, ICO
+              Accepts {faviconExts.map((ext) => ext.toUpperCase()).join(', ')},
+              max size {(maxFaviconSize / (1024 * 1024)).toFixed(1)} MB
             </p>
           </div>
         </div>

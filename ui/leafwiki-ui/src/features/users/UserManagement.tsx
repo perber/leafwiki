@@ -1,7 +1,7 @@
-import { useBrandingStore } from '@/stores/branding'
 import { useUserStore } from '@/stores/users'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { useSetTitle } from '../viewer/setTitle'
 import { ChangePasswordButton } from './ChangePasswordButton'
 import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
@@ -10,8 +10,7 @@ import { useToolbarActions } from './useToolbarActions'
 export default function UserManagement() {
   const { users, loadUsers, reset } = useUserStore()
   const [loading, setLoading] = useState(true)
-  const siteName = useBrandingStore((s) => s.siteName)
-
+  useSetTitle({ title: 'User Management' })
   useToolbarActions()
 
   useEffect(() => {
@@ -31,7 +30,6 @@ export default function UserManagement() {
 
   return (
     <>
-      <title>User Management - {siteName}</title>
       <div className="user-management">
         <h1 className="user-management__title">User Management</h1>
 

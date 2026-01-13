@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
-	"github.com/perber/wiki/internal/core/branding"
 	"github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
@@ -947,8 +947,15 @@ func (w *Wiki) Close() error {
 
 // Branding methods
 
-func (w *Wiki) GetBranding() (*branding.BrandingConfig, error) {
+func (w *Wiki) GetBranding() (*branding.BrandingConfigResponse, error) {
 	return w.branding.GetBranding()
+}
+
+func (w *Wiki) GetBrandingConstraints() (*branding.BrandingConstraintsResponse, error) {
+	if b, err := w.branding.GetBranding(); err == nil {
+		return &b.BrandingConstraints, nil
+	}
+	return nil, fmt.Errorf("failed to get branding constraints")
 }
 
 func (w *Wiki) UpdateBranding(siteName string) error {
@@ -959,8 +966,16 @@ func (w *Wiki) UploadBrandingLogo(file multipart.File, filename string) (string,
 	return w.branding.UploadLogo(file, filename)
 }
 
+func (w *Wiki) DeleteBrandingLogo() error {
+	return w.branding.DeleteLogo()
+}
+
 func (w *Wiki) UploadBrandingFavicon(file multipart.File, filename string) (string, error) {
 	return w.branding.UploadFavicon(file, filename)
+}
+
+func (w *Wiki) DeleteBrandingFavicon() error {
+	return w.branding.DeleteFavicon()
 }
 
 func (w *Wiki) GetBrandingService() *branding.BrandingService {

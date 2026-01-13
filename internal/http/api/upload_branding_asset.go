@@ -9,10 +9,14 @@ import (
 
 func UploadBrandingLogoHandler(w *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		const maxUploadSize = 10 << 20 // 10 MB
-		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
+		constraints, err := w.GetBrandingConstraints()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load branding config"})
+			return
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, constraints.MaxLogoSize)
 
-		if err := c.Request.ParseMultipartForm(maxUploadSize); err != nil {
+		if err := c.Request.ParseMultipartForm(constraints.MaxLogoSize); err != nil {
 			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
 			return
 		}
@@ -43,10 +47,14 @@ func UploadBrandingLogoHandler(w *wiki.Wiki) gin.HandlerFunc {
 
 func UploadBrandingFaviconHandler(w *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		const maxUploadSize = 5 << 20 // 5 MB
-		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
+		constraints, err := w.GetBrandingConstraints()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load branding config"})
+			return
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, constraints.MaxFaviconSize)
 
-		if err := c.Request.ParseMultipartForm(maxUploadSize); err != nil {
+		if err := c.Request.ParseMultipartForm(constraints.MaxFaviconSize); err != nil {
 			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
 			return
 		}
@@ -72,5 +80,43 @@ func UploadBrandingFaviconHandler(w *wiki.Wiki) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"path": path, "branding": branding})
+	}
+}
+
+func DeleteBrandingFaviconHandler(w *wiki.Wiki) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := w.DeleteBrandingFavicon()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete favicon"})
+			return
+		}
+
+		// Return updated branding config
+		branding, err := w.GetBranding()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load branding config"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"branding": branding})
+	}
+}
+
+func DeleteBrandingLogoHandler(w *wiki.Wiki) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := w.DeleteBrandingLogo()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete logo"})
+			return
+		}
+
+		// Return updated branding config
+		branding, err := w.GetBranding()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load branding config"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"branding": branding})
 	}
 }
