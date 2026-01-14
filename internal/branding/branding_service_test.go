@@ -340,6 +340,18 @@ func TestBrandingService_UpdateBranding_EmptySiteName_ReturnsError(t *testing.T)
 	}
 }
 
+func TestBrandingService_UpdateBranding_WhitespaceOnlySiteName_ReturnsError(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+
+	err := svc.UpdateBranding("   ")
+	if err == nil {
+		t.Fatalf("expected error for whitespace-only site name, got nil")
+	}
+	if !strings.Contains(err.Error(), "site name cannot be empty") {
+		t.Fatalf("expected 'site name cannot be empty' error, got: %v", err)
+	}
+}
+
 func TestBrandingService_UploadLogo_InvalidExtension_ReturnsError(t *testing.T) {
 	svc, _ := newTestBrandingService(t)
 

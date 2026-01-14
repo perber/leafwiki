@@ -50,7 +50,7 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	
-	if siteName == "" {
+	if strings.TrimSpace(siteName) == "" {
 		return fmt.Errorf("site name cannot be empty")
 	}
 	
