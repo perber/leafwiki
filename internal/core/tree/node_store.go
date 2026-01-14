@@ -10,55 +10,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/perber/wiki/internal/core/shared"
 )
 
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
-}
-
-// writeFileAtomic writes data to filename atomically by writing to a temp file
-// in the same directory and then renaming it over the target.
-func writeFileAtomic(filename string, data []byte, perm os.FileMode) error {
-	dir := filepath.Dir(filename)
-
-	tmpFile, err := os.CreateTemp(dir, ".tmp-*")
-	if err != nil {
-		return fmt.Errorf("create temp file: %w", err)
-	}
-
-	tmpName := tmpFile.Name()
-	// Ensure the temp file is removed in case of an error
-	defer func() {
-		_ = os.Remove(tmpName)
-	}()
-
-	if perm != 0 {
-		if err := tmpFile.Chmod(perm); err != nil {
-			tmpFile.Close()
-			return fmt.Errorf("chmod temp file: %w", err)
-		}
-	}
-
-	if _, err := tmpFile.Write(data); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("write temp file: %w", err)
-	}
-
-	if err := tmpFile.Sync(); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("sync temp file: %w", err)
-	}
-
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("close temp file: %w", err)
-	}
-
-	if err := atomicReplace(tmpName, filename); err != nil {
-		return fmt.Errorf("replace temp file: %w", err)
-	}
-
-	return nil
 }
 
 func atomicReplace(src, dst string) error {
@@ -152,7 +110,7 @@ func (f *NodeStore) SaveTree(filename string, tree *PageNode) error {
 		return fmt.Errorf("could not marshal tree: %w", err)
 	}
 
-	if err := writeFileAtomic(fullPath, data, 0o644); err != nil {
+	if err := shared.WriteFileAtomic(fullPath, data, 0o644); err != nil {
 		return fmt.Errorf("could not atomically write tree file: %w", err)
 	}
 
@@ -207,7 +165,7 @@ func (f *NodeStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 		return fmt.Errorf("could not build markdown with frontmatter: %w", err)
 	}
 
-	if err := writeFileAtomic(destFile, []byte(md), 0o644); err != nil {
+	if err := shared.WriteFileAtomic(destFile, []byte(md), 0o644); err != nil {
 		return fmt.Errorf("could not create file: %w", err)
 	}
 
@@ -287,7 +245,7 @@ func (f *NodeStore) UpsertContent(entry *PageNode, content string) error {
 	if err != nil {
 		return fmt.Errorf("could not build markdown with frontmatter: %w", err)
 	}
-	if err := writeFileAtomic(filePath, []byte(contentWithFM), mode); err != nil {
+	if err := shared.WriteFileAtomic(filePath, []byte(contentWithFM), mode); err != nil {
 		return fmt.Errorf("could not write to file atomically: %w", err)
 	}
 
@@ -630,7 +588,7 @@ func (f *NodeStore) SyncFrontmatterIfExists(entry *PageNode) error {
 		mode = st.Mode()
 	}
 
-	if err := writeFileAtomic(filePath, []byte(out), mode); err != nil {
+	if err := shared.WriteFileAtomic(filePath, []byte(out), mode); err != nil {
 		return fmt.Errorf("write file atomically: %w", err)
 	}
 	return nil
@@ -818,7 +776,7 @@ func (f *NodeStore) ConvertNode(entry *PageNode, target NodeKind) error {
 			if err != nil {
 				return err
 			}
-			if err := writeFileAtomic(filePath, []byte(md), 0o644); err != nil {
+			if err := shared.WriteFileAtomic(filePath, []byte(md), 0o644); err != nil {
 				return fmt.Errorf("could not write page file: %w", err)
 			}
 		}
