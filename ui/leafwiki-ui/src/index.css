@@ -581,9 +581,9 @@
     @apply text-interface-text mb-4 text-xl font-bold;
   }
 
-.login__logo-image {
-  @apply h-6 w-auto inline-block align-middle;
-}
+  .login__logo-image {
+    @apply inline-block h-6 w-auto align-middle;
+  }
 
   .login__field {
     @apply mb-4;
