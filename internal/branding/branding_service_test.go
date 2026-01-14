@@ -352,6 +352,24 @@ func TestBrandingService_UpdateBranding_WhitespaceOnlySiteName_ReturnsError(t *t
 	}
 }
 
+func TestBrandingService_UpdateBranding_TrimsWhitespace(t *testing.T) {
+	svc, dir := newTestBrandingService(t)
+
+	if err := svc.UpdateBranding("  My Wiki  "); err != nil {
+		t.Fatalf("UpdateBranding() error: %v", err)
+	}
+
+	// Verify that whitespace was trimmed
+	store := NewBrandingStore(dir)
+	cfg, err := store.Load()
+	if err != nil {
+		t.Fatalf("store.Load() error: %v", err)
+	}
+	if cfg.SiteName != "My Wiki" {
+		t.Fatalf("expected SiteName %q (trimmed), got %q", "My Wiki", cfg.SiteName)
+	}
+}
+
 func TestBrandingService_UploadLogo_InvalidExtension_ReturnsError(t *testing.T) {
 	svc, _ := newTestBrandingService(t)
 
