@@ -78,7 +78,13 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 }
 
 // containsControlCharacters checks if a string contains control characters
-// that could break UI layout or cause display issues
+// that could break UI layout or cause display issues.
+// Blocks all control characters (unicode.IsControl) except common whitespace:
+// - \t (tab, U+0009)
+// - \n (newline, U+000A)
+// - \r (carriage return, U+000D)
+// These exceptions allow for normal text formatting while preventing
+// null bytes, vertical tabs, form feeds, and other problematic characters.
 func containsControlCharacters(s string) bool {
 	for _, r := range s {
 		// Disallow control characters except for common whitespace
