@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/perber/wiki/internal/core/shared/errors"
 )
 
 // helper: create a service with temp storage dir
@@ -328,45 +330,140 @@ func TestBrandingService_UpdateBranding_PersistsToDisk(t *testing.T) {
 	}
 }
 
-func TestBrandingService_UpdateBranding_EmptySiteName_ReturnsError(t *testing.T) {
-	svc, _ := newTestBrandingService(t)
-
-	err := svc.UpdateBranding("")
-	if err == nil {
-		t.Fatalf("expected error for empty site name, got nil")
-	}
-	if !strings.Contains(err.Error(), "site name cannot be empty") {
-		t.Fatalf("expected 'site name cannot be empty' error, got: %v", err)
-	}
-}
-
-func TestBrandingService_UpdateBranding_WhitespaceOnlySiteName_ReturnsError(t *testing.T) {
-	svc, _ := newTestBrandingService(t)
-
-	err := svc.UpdateBranding("   ")
-	if err == nil {
-		t.Fatalf("expected error for whitespace-only site name, got nil")
-	}
-	if !strings.Contains(err.Error(), "site name cannot be empty") {
-		t.Fatalf("expected 'site name cannot be empty' error, got: %v", err)
-	}
-}
-
-func TestBrandingService_UpdateBranding_TrimsWhitespace(t *testing.T) {
+func TestBrandingService_UpdateBranding_TrimsSiteName(t *testing.T) {
 	svc, dir := newTestBrandingService(t)
 
-	if err := svc.UpdateBranding("  My Wiki  "); err != nil {
+	if err := svc.UpdateBranding("  Trimmed Wiki  "); err != nil {
 		t.Fatalf("UpdateBranding() error: %v", err)
 	}
 
-	// Verify that whitespace was trimmed
 	store := NewBrandingStore(dir)
 	cfg, err := store.Load()
 	if err != nil {
 		t.Fatalf("store.Load() error: %v", err)
 	}
-	if cfg.SiteName != "My Wiki" {
-		t.Fatalf("expected SiteName %q (trimmed), got %q", "My Wiki", cfg.SiteName)
+	if cfg.SiteName != "Trimmed Wiki" {
+		t.Fatalf("expected SiteName %q, got %q", "Trimmed Wiki", cfg.SiteName)
+	}
+}
+
+func TestBrandingService_UpdateBranding_EmptySiteName_ReturnsValidationError(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+
+	err := svc.UpdateBranding("")
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	ve, ok := err.(*errors.ValidationErrors)
+	if !ok {
+		t.Fatalf("expected ValidationErrors, got %T", err)
+	}
+	if len(ve.Errors) != 1 || ve.Errors[0].Field != "siteName" {
+		t.Fatalf("expected validation error for siteName, got %v", ve.Errors)
+	}
+}
+
+func TestBrandingService_UpdateBranding_WhitespaceOnlySiteName_ReturnsValidationError(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+
+	err := svc.UpdateBranding("   ")
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	ve, ok := err.(*errors.ValidationErrors)
+	if !ok {
+		t.Fatalf("expected ValidationErrors, got %T", err)
+	}
+	if len(ve.Errors) != 1 || ve.Errors[0].Field != "siteName" {
+		t.Fatalf("expected validation error for siteName, got %v", ve.Errors)
+	}
+}
+
+func TestBrandingService_UpdateBranding_TooLongSiteName_ReturnsValidationError(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+
+	// Create a site name that exceeds the max length (default is 100)
+	longName := strings.Repeat("a", 101)
+
+	err := svc.UpdateBranding(longName)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	ve, ok := err.(*errors.ValidationErrors)
+	if !ok {
+		t.Fatalf("expected ValidationErrors, got %T", err)
+	}
+	if len(ve.Errors) != 1 || ve.Errors[0].Field != "siteName" {
+		t.Fatalf("expected validation error for siteName, got %v", ve.Errors)
+	}
+	if !strings.Contains(ve.Errors[0].Message, "must not exceed") {
+		t.Fatalf("expected length validation error message, got %q", ve.Errors[0].Message)
+	}
+}
+
+func TestBrandingService_UpdateBranding_MaxLengthSiteName_Success(t *testing.T) {
+	svc, dir := newTestBrandingService(t)
+
+	// Create a site name exactly at max length (default is 100)
+	exactName := strings.Repeat("a", 100)
+
+	if err := svc.UpdateBranding(exactName); err != nil {
+		t.Fatalf("UpdateBranding() error: %v", err)
+	}
+
+	store := NewBrandingStore(dir)
+	cfg, err := store.Load()
+	if err != nil {
+		t.Fatalf("store.Load() error: %v", err)
+	}
+	if cfg.SiteName != exactName {
+		t.Fatalf("expected SiteName with length %d, got length %d", len(exactName), len(cfg.SiteName))
+	}
+}
+
+func TestBrandingService_UpdateBranding_ControlCharacters_ReturnsValidationError(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+
+	// Test with null character (control character)
+	nameWithControl := "My\x00Wiki"
+
+	err := svc.UpdateBranding(nameWithControl)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	ve, ok := err.(*errors.ValidationErrors)
+	if !ok {
+		t.Fatalf("expected ValidationErrors, got %T", err)
+	}
+	if len(ve.Errors) != 1 || ve.Errors[0].Field != "siteName" {
+		t.Fatalf("expected validation error for siteName, got %v", ve.Errors)
+	}
+	if !strings.Contains(ve.Errors[0].Message, "control characters") {
+		t.Fatalf("expected control characters validation error message, got %q", ve.Errors[0].Message)
+	}
+}
+
+func TestBrandingService_UpdateBranding_ValidSpecialCharacters_Success(t *testing.T) {
+	svc, dir := newTestBrandingService(t)
+
+	// Test with common special characters that should be allowed
+	validName := "My Wiki - The Best! (2024) & More"
+
+	if err := svc.UpdateBranding(validName); err != nil {
+		t.Fatalf("UpdateBranding() error: %v", err)
+	}
+
+	store := NewBrandingStore(dir)
+	cfg, err := store.Load()
+	if err != nil {
+		t.Fatalf("store.Load() error: %v", err)
+	}
+	if cfg.SiteName != validName {
+		t.Fatalf("expected SiteName %q, got %q", validName, cfg.SiteName)
 	}
 }
 
