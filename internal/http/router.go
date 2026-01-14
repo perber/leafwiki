@@ -234,7 +234,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			brandingConfig, err := wikiInstance.GetBranding()
 			if err == nil && brandingConfig.FaviconFile != "" {
 				// Serve custom favicon from branding assets
-				faviconPath := wikiInstance.GetBrandingService().GetBrandingAssetsDir() + "/" + brandingConfig.FaviconFile
+				faviconPath := filepath.Join(wikiInstance.GetBrandingService().GetBrandingAssetsDir(), brandingConfig.FaviconFile)
 				c.File(faviconPath)
 				return
 			}

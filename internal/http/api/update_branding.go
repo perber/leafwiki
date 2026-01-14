@@ -18,7 +18,7 @@ func UpdateBrandingHandler(wikiInstance *wiki.Wiki) gin.HandlerFunc {
 		}
 
 		if err := wikiInstance.UpdateBranding(req.SiteName); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			respondWithError(c, err)
 			return
 		}
 
