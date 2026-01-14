@@ -49,9 +49,12 @@ func (s *BrandingService) GetBranding() (*BrandingConfigResponse, error) {
 func (s *BrandingService) UpdateBranding(siteName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if siteName != "" {
-		s.brandingConfig.SiteName = siteName
+	
+	if siteName == "" {
+		return fmt.Errorf("site name cannot be empty")
 	}
+	
+	s.brandingConfig.SiteName = siteName
 
 	if err := s.store.Save(s.brandingConfig); err != nil {
 		return err
