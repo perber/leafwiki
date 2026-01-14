@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/perber/wiki/internal/core/shared"
+	"github.com/perber/wiki/internal/core/shared/errors"
 )
 
 // BrandingService provides branding operations
@@ -49,15 +51,42 @@ func (s *BrandingService) GetBranding() (*BrandingConfigResponse, error) {
 func (s *BrandingService) UpdateBranding(siteName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if siteName != "" {
-		s.brandingConfig.SiteName = siteName
+
+	// Validate site name
+	ve := errors.NewValidationErrors()
+	trimmedSiteName := strings.TrimSpace(siteName)
+
+	if trimmedSiteName == "" {
+		ve.Add("siteName", "Site name must not be empty")
+	} else if len(trimmedSiteName) > s.brandingConfig.BrandingConstraints.MaxSiteNameLength {
+		ve.Add("siteName", fmt.Sprintf("Site name must not exceed %d characters", s.brandingConfig.BrandingConstraints.MaxSiteNameLength))
+	} else if containsControlCharacters(trimmedSiteName) {
+		ve.Add("siteName", "Site name contains invalid control characters")
 	}
+
+	if ve.HasErrors() {
+		return ve
+	}
+
+	s.brandingConfig.SiteName = trimmedSiteName
 
 	if err := s.store.Save(s.brandingConfig); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// containsControlCharacters checks if a string contains control characters
+// that could break UI layout or cause display issues
+func containsControlCharacters(s string) bool {
+	for _, r := range s {
+		// Disallow control characters except for common whitespace
+		if unicode.IsControl(r) && r != '\t' && r != '\n' && r != '\r' {
+			return true
+		}
+	}
+	return false
 }
 
 // UploadLogo saves a custom logo image
