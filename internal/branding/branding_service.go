@@ -67,8 +67,6 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 	if ve.HasErrors() {
 		return ve
 	}
-	
-	s.brandingConfig.SiteName = trimmedName
 
 	s.brandingConfig.SiteName = trimmedSiteName
 
