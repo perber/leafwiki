@@ -233,7 +233,7 @@ func (t *TreeService) migrateToV2() error {
 				return fmt.Errorf("could not determine content path for node %s: %w", node.ID, err)
 			}
 
-			if err := writeFileAtomic(filePath, []byte(newContent), 0o644); err != nil {
+			if err := shared.WriteFileAtomic(filePath, []byte(newContent), 0o644); err != nil {
 				t.log.Error("could not write updated page content", "nodeID", node.ID, "filePath", filePath, "error", err)
 				return fmt.Errorf("could not write updated page content for node %s: %w", node.ID, err)
 			}
