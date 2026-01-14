@@ -7,7 +7,11 @@ import (
 )
 
 func removeOtherMatches(glob string, keepPath string) {
-	matches, _ := filepath.Glob(glob)
+	matches, err := filepath.Glob(glob)
+	if err != nil {
+		log.Printf("Failed to glob pattern %s: %v", glob, err)
+		return
+	}
 	for _, p := range matches {
 		if p == keepPath {
 			continue
