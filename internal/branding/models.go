@@ -50,18 +50,20 @@ func (bc *BrandingConfig) AllowedFaviconExts() []string {
 
 // BrandingConstraints holds the constraints for branding assets
 type BrandingConstraints struct {
-	LogoExts       map[string]bool `json:"logoExts"`
-	FaviconExts    map[string]bool `json:"faviconExts"`
-	MaxLogoSize    int64           `json:"maxLogoSize"`
-	MaxFaviconSize int64           `json:"maxFaviconSize"`
+	LogoExts          map[string]bool `json:"logoExts"`
+	FaviconExts       map[string]bool `json:"faviconExts"`
+	MaxLogoSize       int64           `json:"maxLogoSize"`
+	MaxFaviconSize    int64           `json:"maxFaviconSize"`
+	MaxSiteNameLength int             `json:"maxSiteNameLength"`
 }
 
 func (bc BrandingConstraints) ToResponse() BrandingConstraintsResponse {
 	return BrandingConstraintsResponse{
-		LogoExts:       bc.getSortedLogoExts(),
-		FaviconExts:    bc.getSortedFaviconExts(),
-		MaxLogoSize:    bc.MaxLogoSize,
-		MaxFaviconSize: bc.MaxFaviconSize,
+		LogoExts:          bc.getSortedLogoExts(),
+		FaviconExts:       bc.getSortedFaviconExts(),
+		MaxLogoSize:       bc.MaxLogoSize,
+		MaxFaviconSize:    bc.MaxFaviconSize,
+		MaxSiteNameLength: bc.MaxSiteNameLength,
 	}
 }
 
@@ -96,10 +98,11 @@ type BrandingConfigResponse struct {
 }
 
 type BrandingConstraintsResponse struct {
-	LogoExts       []string `json:"logoExts"`
-	FaviconExts    []string `json:"faviconExts"`
-	MaxLogoSize    int64    `json:"maxLogoSize"`
-	MaxFaviconSize int64    `json:"maxFaviconSize"`
+	LogoExts          []string `json:"logoExts"`
+	FaviconExts       []string `json:"faviconExts"`
+	MaxLogoSize       int64    `json:"maxLogoSize"`
+	MaxFaviconSize    int64    `json:"maxFaviconSize"`
+	MaxSiteNameLength int      `json:"maxSiteNameLength"`
 }
 
 // DefaultBrandingConfig returns the default branding configuration
@@ -109,10 +112,11 @@ func DefaultBrandingConfig() *BrandingConfig {
 		LogoFile:    "",
 		FaviconFile: "",
 		BrandingConstraints: BrandingConstraints{
-			LogoExts:       map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".webp": true},
-			FaviconExts:    map[string]bool{".png": true, ".gif": true, ".ico": true, ".webp": true},
-			MaxLogoSize:    1 * 1024 * 1024, // 1 MB
-			MaxFaviconSize: 1 * 1024 * 1024, // 1 MB
+			LogoExts:          map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".webp": true},
+			FaviconExts:       map[string]bool{".png": true, ".gif": true, ".ico": true, ".webp": true},
+			MaxLogoSize:       1 * 1024 * 1024, // 1 MB
+			MaxFaviconSize:    1 * 1024 * 1024, // 1 MB
+			MaxSiteNameLength: 100,
 		},
 	}
 }
