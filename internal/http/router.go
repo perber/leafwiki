@@ -150,8 +150,12 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	router.GET("/branding/:filename", func(c *gin.Context) {
 		filename := c.Param("filename")
 		
-		// Sanitize filename to prevent directory traversal
-		if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		// Sanitize filename to prevent directory traversal and malicious input
+		// Only allow simple filenames (no path separators, no null bytes, no ..)
+		if strings.Contains(filename, "..") || 
+			strings.Contains(filename, "/") || 
+			strings.Contains(filename, "\\") || 
+			strings.Contains(filename, "\x00") {
 			c.Status(http.StatusForbidden)
 			return
 		}
@@ -159,6 +163,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		// Get allowed extensions from branding constraints
 		constraints, err := wikiInstance.GetBrandingConstraints()
 		if err != nil {
+			log.Printf("Failed to get branding constraints: %v", err)
 			c.Status(http.StatusInternalServerError)
 			return
 		}
@@ -179,20 +184,32 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			return
 		}
 		
-		// Construct and validate file path
-		filePath := filepath.Join(wikiInstance.GetBrandingService().GetBrandingAssetsDir(), filename)
+		// Construct file path
+		brandingDir := wikiInstance.GetBrandingService().GetBrandingAssetsDir()
+		filePath := filepath.Join(brandingDir, filename)
+		
+		// Clean the path and verify it's within the branding directory
+		cleanPath := filepath.Clean(filePath)
+		cleanBrandingDir := filepath.Clean(brandingDir)
+		
+		// Ensure the resolved path is still within the branding directory
+		if !strings.HasPrefix(cleanPath, cleanBrandingDir + string(filepath.Separator)) && cleanPath != cleanBrandingDir {
+			c.Status(http.StatusForbidden)
+			return
+		}
 		
 		// Check if file exists
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
 			c.Status(http.StatusNotFound)
 			return
 		} else if err != nil {
+			log.Printf("Error checking file existence: %v", err)
 			c.Status(http.StatusInternalServerError)
 			return
 		}
 		
 		// Serve the file
-		c.File(filePath)
+		c.File(cleanPath)
 	})
 
 	// If frontend embedding is enabled, serve it on all unknown routes
