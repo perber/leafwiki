@@ -11,6 +11,7 @@ import { Toolbar } from '@/features/toolbar/Toolbar'
 import { useAppMode } from '@/lib/useAppMode'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useBrandingStore } from '@/stores/branding'
 import {
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
@@ -42,6 +43,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
 
   useAutoCloseSidebarOnMobile()
+
+  const { siteName, logoFile } = useBrandingStore()
 
   const sidebarContainerRef = useRef<HTMLDivElement | null>(null)
   const liveSidebarWidthRef = useRef(sidebarWidth)
@@ -161,11 +164,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <MenuIcon className="app-layout__sidebar-toggle-button-icon" />
             </Button>
           </div>
-          {/* Left side: Logo and Title */}
           <div className="app-layout__logo-n-title">
             <h2>
               <Link to="/">
-                🌿 <span className="max-md:hidden">LeafWiki</span>
+                {logoFile ? (
+                  <img
+                    src={`/branding/${logoFile}`}
+                    alt={siteName}
+                    className="app-layout__logo-image"
+                  />
+                ) : (
+                  <span className="app-layout__logo-emoji">🌿</span>
+                )}{' '}
+                <span className="max-md:hidden">{siteName}</span>
               </Link>
             </h2>
           </div>

@@ -317,6 +317,14 @@
     @apply text-xl font-bold;
   }
 
+  .app-layout__logo-image {
+    @apply inline-block h-6 w-auto align-middle;
+  }
+
+  .app-layout__logo-emoji {
+    @apply text-xl;
+  }
+
   .app-layout__editor-title-bar-container {
     @apply flex min-h-full flex-1 items-center justify-center;
   }
@@ -571,6 +579,10 @@
 
   .login__title {
     @apply text-interface-text mb-4 text-xl font-bold;
+  }
+
+  .login__logo-image {
+    @apply inline-block h-6 w-auto align-middle;
   }
 
   .login__field {
@@ -1249,6 +1261,62 @@
   /* gefährlich (Delete) */
   .btn--danger {
     @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm;
+  }
+
+  .branding-settings {
+    @apply mx-auto max-w-2xl p-6;
+  }
+
+  .branding-settings__title {
+    @apply text-interface-text mb-6 text-2xl font-bold;
+  }
+
+  .branding-settings__section {
+    @apply border-surface-border bg-surface mb-6 rounded-lg border p-6;
+  }
+
+  .branding-settings__section-title {
+    @apply text-interface-text mb-2 text-lg font-semibold;
+  }
+
+  .branding-settings__section-description {
+    @apply text-muted mb-4 text-sm;
+  }
+
+  .branding-settings__field {
+    @apply mb-4;
+  }
+
+  .branding-settings__preview {
+    @apply bg-surface-alt mb-4 flex items-center gap-3 rounded-md p-4;
+  }
+
+  .branding-settings__preview-label {
+    @apply text-muted text-sm;
+  }
+
+  .branding-settings__preview-emoji {
+    @apply text-3xl;
+  }
+
+  .branding-settings__preview-image {
+    @apply h-10 w-auto;
+  }
+
+  .branding-settings__preview-favicon {
+    @apply h-8 w-8;
+  }
+
+  .branding-settings__preview-placeholder {
+    @apply text-muted text-sm italic;
+  }
+
+  .branding-settings__hint {
+    @apply text-muted mt-1 text-xs;
+  }
+
+  .branding-settings__actions {
+    @apply flex justify-end gap-2;
   }
 }
 

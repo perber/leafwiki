@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom'
 import LoginForm from '../auth/LoginForm'
+import BrandingSettings from '../branding/BrandingSettings'
 import PageEditor from '../editor/PageEditor'
 import RootRedirect from '../page/RootRedirect'
 import UserManagement from '../users/UserManagement'
@@ -38,6 +39,16 @@ export const createLeafWikiRouter = (
             <UserManagement />
           </AuthWrapper>
         ),
+    },
+    {
+      path: '/settings/branding',
+      element: isReadOnlyViewer ? (
+        <Navigate to="/" />
+      ) : (
+        <AuthWrapper>
+          <BrandingSettings />
+        </AuthWrapper>
+      ),
     },
     {
       path: '/e/*',

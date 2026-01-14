@@ -1,4 +1,5 @@
 import { Page } from '@/lib/api/pages'
+import { useBrandingStore } from '@/stores/branding'
 import { useEffect } from 'react'
 
 export interface UseSetPageTitleOptions {
@@ -7,7 +8,9 @@ export interface UseSetPageTitleOptions {
 
 // Hook to set the document title based on the page title
 export function useSetPageTitle({ page }: UseSetPageTitleOptions) {
+  const siteName = useBrandingStore((s) => s.siteName)
+
   useEffect(() => {
-    document.title = page?.title ? `${page?.title} - LeafWiki` : 'LeafWiki'
-  }, [page?.title])
+    document.title = page?.title ? `${page?.title} - ${siteName}` : siteName
+  }, [page?.title, siteName])
 }

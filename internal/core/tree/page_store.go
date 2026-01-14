@@ -8,51 +8,9 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/perber/wiki/internal/core/shared"
 )
-
-// writeFileAtomic writes data to filename atomically by writing to a temp file
-// in the same directory and then renaming it over the target.
-func writeFileAtomic(filename string, data []byte, perm os.FileMode) error {
-	dir := path.Dir(filename)
-
-	tmpFile, err := os.CreateTemp(dir, ".tmp-*")
-	if err != nil {
-		return fmt.Errorf("create temp file: %w", err)
-	}
-
-	tmpName := tmpFile.Name()
-	// Ensure the temp file is removed in case of an error
-	defer func() {
-		_ = os.Remove(tmpName)
-	}()
-
-	if perm != 0 {
-		if err := tmpFile.Chmod(perm); err != nil {
-			tmpFile.Close()
-			return fmt.Errorf("chmod temp file: %w", err)
-		}
-	}
-
-	if _, err := tmpFile.Write(data); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("write temp file: %w", err)
-	}
-
-	if err := tmpFile.Sync(); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("sync temp file: %w", err)
-	}
-
-	if err := tmpFile.Close(); err != nil {
-		return fmt.Errorf("close temp file: %w", err)
-	}
-
-	if err := os.Rename(tmpName, filename); err != nil {
-		return fmt.Errorf("rename temp file: %w", err)
-	}
-
-	return nil
-}
 
 type PageStore struct {
 	storageDir string
@@ -120,7 +78,7 @@ func (f *PageStore) SaveTree(filename string, tree *PageNode) error {
 		return fmt.Errorf("could not marshal tree: %v", err)
 	}
 
-	if err := writeFileAtomic(fullPath, data, 0o644); err != nil {
+	if err := shared.WriteFileAtomic(fullPath, data, 0o644); err != nil {
 		return fmt.Errorf("could not atomically write tree file: %v", err)
 	}
 
@@ -150,7 +108,7 @@ func (f *PageStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 		}
 		// Create an empty index.md file / Fallback!
 		indexPath := path.Join(parentPath, "index.md")
-		if err := writeFileAtomic(indexPath, []byte(""), 0o644); err != nil {
+		if err := shared.WriteFileAtomic(indexPath, []byte(""), 0o644); err != nil {
 			return fmt.Errorf("could not create index file: %v", err)
 		}
 	}
@@ -164,7 +122,7 @@ func (f *PageStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 
 	// Create the file
 	content := []byte("# " + newEntry.Title + "\n")
-	if err := writeFileAtomic(newFilename, content, 0o644); err != nil {
+	if err := shared.WriteFileAtomic(newFilename, content, 0o644); err != nil {
 		return fmt.Errorf("could not create file: %v", err)
 	}
 
@@ -221,7 +179,7 @@ func (f *PageStore) UpdatePage(entry *PageNode, slug string, content string) err
 	mode := file.Mode()
 
 	// Update the file content
-	if err := writeFileAtomic(filePath, []byte(content), mode); err != nil {
+	if err := shared.WriteFileAtomic(filePath, []byte(content), mode); err != nil {
 		return fmt.Errorf("could not write to file atomically: %v", err)
 	}
 
