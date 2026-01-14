@@ -12,6 +12,7 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useSetTitle } from '../viewer/setTitle'
+import { useToolbarActions } from './useToolbarActions'
 
 export default function BrandingSettings() {
   const {
@@ -31,6 +32,8 @@ export default function BrandingSettings() {
     deleteFavicon,
   } = useBrandingStore()
 
+  // reset toolbar actions on mount
+  useToolbarActions()
   useSetTitle({ title: 'Branding Settings' })
 
   const [localSiteName, setLocalSiteName] = useState(siteName)
