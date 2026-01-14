@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -144,8 +145,55 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", auth_middleware.RequireEditorOrAdmin(), api.DeleteAssetHandler(wikiInstance))
 	}
 
-	// Serve branding assets (logos, favicons)
-	router.StaticFS("/branding", gin.Dir(wikiInstance.GetBrandingService().GetBrandingAssetsDir(), true))
+	// Serve branding assets (logos, favicons) with extension validation
+	router.GET("/branding/:filename", func(c *gin.Context) {
+		filename := c.Param("filename")
+		
+		// Get allowed extensions from branding constraints
+		constraints, err := wikiInstance.GetBrandingConstraints()
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		
+		// Validate file extension against whitelist
+		ext := strings.ToLower(filepath.Ext(filename))
+		isAllowed := false
+		
+		// Check if extension is in allowed logo extensions
+		for _, allowedExt := range constraints.LogoExts {
+			if ext == allowedExt {
+				isAllowed = true
+				break
+			}
+		}
+		
+		// If not a logo extension, check favicon extensions
+		if !isAllowed {
+			for _, allowedExt := range constraints.FaviconExts {
+				if ext == allowedExt {
+					isAllowed = true
+					break
+				}
+			}
+		}
+		
+		if !isAllowed {
+			c.Status(http.StatusForbidden)
+			return
+		}
+		
+		// Sanitize filename to prevent directory traversal
+		cleanFilename := filepath.Base(filename)
+		if cleanFilename != filename || strings.Contains(filename, "..") {
+			c.Status(http.StatusForbidden)
+			return
+		}
+		
+		// Serve the file
+		filePath := filepath.Join(wikiInstance.GetBrandingService().GetBrandingAssetsDir(), cleanFilename)
+		c.File(filePath)
+	})
 
 	// If frontend embedding is enabled, serve it on all unknown routes
 	if EmbedFrontend == "true" {
