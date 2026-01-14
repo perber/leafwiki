@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -149,6 +150,12 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	router.GET("/branding/:filename", func(c *gin.Context) {
 		filename := c.Param("filename")
 		
+		// Sanitize filename to prevent directory traversal
+		if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+			c.Status(http.StatusForbidden)
+			return
+		}
+		
 		// Get allowed extensions from branding constraints
 		constraints, err := wikiInstance.GetBrandingConstraints()
 		if err != nil {
@@ -156,42 +163,35 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			return
 		}
 		
+		// Build a combined set of allowed extensions for O(1) lookup
+		allowedExts := make(map[string]bool)
+		for _, ext := range constraints.LogoExts {
+			allowedExts[ext] = true
+		}
+		for _, ext := range constraints.FaviconExts {
+			allowedExts[ext] = true
+		}
+		
 		// Validate file extension against whitelist
 		ext := strings.ToLower(filepath.Ext(filename))
-		isAllowed := false
-		
-		// Check if extension is in allowed logo extensions
-		for _, allowedExt := range constraints.LogoExts {
-			if ext == allowedExt {
-				isAllowed = true
-				break
-			}
-		}
-		
-		// If not a logo extension, check favicon extensions
-		if !isAllowed {
-			for _, allowedExt := range constraints.FaviconExts {
-				if ext == allowedExt {
-					isAllowed = true
-					break
-				}
-			}
-		}
-		
-		if !isAllowed {
+		if !allowedExts[ext] {
 			c.Status(http.StatusForbidden)
 			return
 		}
 		
-		// Sanitize filename to prevent directory traversal
-		cleanFilename := filepath.Base(filename)
-		if cleanFilename != filename || strings.Contains(filename, "..") {
-			c.Status(http.StatusForbidden)
+		// Construct and validate file path
+		filePath := filepath.Join(wikiInstance.GetBrandingService().GetBrandingAssetsDir(), filename)
+		
+		// Check if file exists
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			c.Status(http.StatusNotFound)
+			return
+		} else if err != nil {
+			c.Status(http.StatusInternalServerError)
 			return
 		}
 		
 		// Serve the file
-		filePath := filepath.Join(wikiInstance.GetBrandingService().GetBrandingAssetsDir(), cleanFilename)
 		c.File(filePath)
 	})
 
