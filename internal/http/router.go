@@ -195,7 +195,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		// Ensure the resolved path is still within the branding directory
 		// Use filepath.Rel to check the relative path doesn't escape the directory
 		rel, err := filepath.Rel(cleanBrandingDir, cleanPath)
-		if err != nil || strings.HasPrefix(rel, "..") || strings.HasPrefix(rel, string(filepath.Separator)) {
+		if err != nil || strings.HasPrefix(rel, "..") {
 			c.Status(http.StatusForbidden)
 			return
 		}
