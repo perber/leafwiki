@@ -3,7 +3,7 @@ import { useBootstrapAuth } from '@/lib/bootstrapAuth'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useSessionStore } from '@/stores/session'
 import useApplyDesignMode from '@/useApplyDesignMode'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import './App.css'
@@ -27,10 +27,12 @@ function App() {
   useApplyDesignMode()
   useEffect(() => {
     loadConfig()
+  }, [loadConfig])
+
+  useLayoutEffect(() => {
+    // Load branding configuration
     loadBranding()
-  }, [loadConfig, loadBranding])
-  // Load branding configuration
-  loadBranding()
+  }, [loadBranding])
 
   const router = useMemo(
     () => createLeafWikiRouter(isReadOnlyViewer, authDisabled),

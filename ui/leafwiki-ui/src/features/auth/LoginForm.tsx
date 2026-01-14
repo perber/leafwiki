@@ -14,7 +14,7 @@ export default function LoginForm() {
 
   const navigate = useNavigate()
   const user = useSessionStore((s) => s.user)
-  const { siteName, logoImagePath } = useBrandingStore()
+  const { siteName, logoFile } = useBrandingStore()
 
   // If already logged in, redirect to home
   if (user) {
@@ -43,9 +43,9 @@ export default function LoginForm() {
       <div className="login">
         <form onSubmit={handleSubmit} className="login__form">
           <h1 className="login__title">
-            {logoImagePath ? (
+            {logoFile ? (
               <img
-                src={`/branding/${logoImagePath}`}
+                src={`/branding/${logoFile}`}
                 alt={siteName}
                 className="login__logo-image"
               />
