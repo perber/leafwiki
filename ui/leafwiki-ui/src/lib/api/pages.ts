@@ -154,6 +154,14 @@ export async function sortPages(parentId: string, orderedIDs: string[]) {
   })
 }
 
+export async function convertPage(id: string, targetKind: 'page' | 'section') {
+  return await fetchWithAuth(`/api/pages/convert/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetKind }),
+  })
+}
+
 export type PathLookupResult = {
   path: string
   exists: boolean

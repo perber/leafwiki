@@ -5,7 +5,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { NODE_KIND_PAGE, NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
+import { convertPage, NODE_KIND_PAGE, NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import {
   DIALOG_ADD_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
@@ -13,7 +13,10 @@ import {
   DIALOG_SORT_PAGES,
 } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useTreeStore } from '@/stores/tree'
 import { FilePlus, FolderPlus, List, MoreVertical, Move, Trash } from 'lucide-react'
+import { useCallback } from 'react'
+import { toast } from 'sonner'
 import { TreeViewActionButton } from './TreeViewActionButton'
 
 export type MoreActionsProps = {
@@ -23,7 +26,18 @@ export type MoreActionsProps = {
 export default function MoreActionsMenu({ node }: MoreActionsProps) {
   const { id: nodeId, kind: nodeKind, children } = node
   const openDialog = useDialogsStore((state) => state.openDialog)
+  const reloadTree = useTreeStore((state) => state.reloadTree)
   const hasChildren = children && children.length > 0
+
+  const handleConvertPage = useCallback(() => {
+    convertPage(nodeId, nodeKind === NODE_KIND_PAGE ? NODE_KIND_SECTION : NODE_KIND_PAGE).then(() => {
+      toast.success('Page converted successfully')
+      reloadTree()
+    }).catch(() => {
+      toast.error('Failed to convert page')
+    })
+  }, [nodeId, nodeKind, reloadTree])
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger aria-label="More actions">
@@ -74,7 +88,7 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
           {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_SECTION && !hasChildren && (
-          <DropdownMenuItem className="cursor-pointer">
+          <DropdownMenuItem className="cursor-pointer" onClick={handleConvertPage}>
             {' '}
             Convert to page
           </DropdownMenuItem>

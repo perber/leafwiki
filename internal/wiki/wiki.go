@@ -656,6 +656,19 @@ func (w *Wiki) MovePage(userID, id, parentID string) error {
 	return nil
 }
 
+func (w *Wiki) ConvertPage(userID, id string, targetKind tree.NodeKind) error {
+	if id == "root" || id == "" {
+		return fmt.Errorf("cannot convert root page")
+	}
+
+	err := w.tree.ConvertNode(userID, id, targetKind)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (w *Wiki) SortPages(parentID string, orderedIDs []string) error {
 	return w.tree.SortPages(parentID, orderedIDs)
 }
