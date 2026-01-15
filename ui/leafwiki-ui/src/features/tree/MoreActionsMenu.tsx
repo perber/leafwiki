@@ -14,8 +14,9 @@ import {
 } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { FilePlus, FolderPlus, List, MoreVertical, Move, Trash } from 'lucide-react'
+import { FilePlus, FolderPlus, List, MoreVertical, Move, Repeat2, Trash } from 'lucide-react'
 import { useCallback } from 'react'
+import { useLocation } from 'react-router'
 import { toast } from 'sonner'
 import { TreeViewActionButton } from './TreeViewActionButton'
 
@@ -28,6 +29,7 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
   const openDialog = useDialogsStore((state) => state.openDialog)
   const reloadTree = useTreeStore((state) => state.reloadTree)
   const hasChildren = children && children.length > 0
+  const location = useLocation()
 
   const handleConvertPage = useCallback(() => {
     convertPage(nodeId, nodeKind === NODE_KIND_PAGE ? NODE_KIND_SECTION : NODE_KIND_PAGE).then(() => {
@@ -37,6 +39,19 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
       toast.error('Failed to convert page')
     })
   }, [nodeId, nodeKind, reloadTree])
+
+  const redirectUrlAfterDelete = useCallback(() => {
+    if (location.pathname.startsWith("/" + node.path)) {
+      if (node.parentId) {
+        return node.path.substring(0, node.path.lastIndexOf('/'))
+      } else {
+        return '/'
+      }
+    }
+
+    // remove leading slash
+    return location.pathname.startsWith("/") ? location.pathname.substring(1) : location.pathname
+  }, [location.pathname, node.path, node.parentId])
 
   return (
     <DropdownMenu>
@@ -88,7 +103,7 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
           {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_SECTION && !hasChildren && (
-          <DropdownMenuItem className="cursor-pointer" onClick={handleConvertPage}>
+          <DropdownMenuItem className="cursor-pointer" onClick={handleConvertPage}><Repeat2 size={18} className="tree-node__action-icon" />
             {' '}
             Convert to page
           </DropdownMenuItem>
@@ -97,6 +112,7 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
         <DropdownMenuItem className="cursor-pointer text-error" onClick={() => {
           openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
             pageId: node?.id,
+            redirectUrl: redirectUrlAfterDelete(),
           })
         }}><Trash size={18} className="tree-node__action-icon text-error" /> Delete{' '}
           {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
