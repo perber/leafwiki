@@ -14,9 +14,9 @@ import {
 } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { FilePlus, FolderPlus, List, MoreVertical, Move, Repeat2, Trash } from 'lucide-react'
+import { FilePlus, FolderPlus, List, MoreVertical, Move, Pencil, Repeat2, Trash } from 'lucide-react'
 import { useCallback } from 'react'
-import { useLocation } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { TreeViewActionButton } from './TreeViewActionButton'
 
@@ -29,6 +29,7 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
   const openDialog = useDialogsStore((state) => state.openDialog)
   const reloadTree = useTreeStore((state) => state.reloadTree)
   const hasChildren = children && children.length > 0
+  const navigate = useNavigate()
   const location = useLocation()
 
   const handleConvertPage = useCallback(() => {
@@ -87,6 +88,12 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
           Section
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem className="cursor-pointer" onClick={() => {
+          navigate(`/e/${node.path}`)
+        }}>
+          <Pencil size={18} className="tree-node__action-icon" /> Edit{' '}
+          {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
+        </DropdownMenuItem>
         {nodeKind === NODE_KIND_SECTION && hasChildren && (
           <DropdownMenuItem
             className="cursor-pointer"
