@@ -84,8 +84,6 @@ export async function createPage({
 }) {
   if (parentId === '') parentId = null
 
-  console.log('Creating page with kind:', kind)
-
   return await fetchWithAuth(`/api/pages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
