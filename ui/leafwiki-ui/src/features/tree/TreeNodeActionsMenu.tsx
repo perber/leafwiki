@@ -130,7 +130,9 @@ export default function TreeNodeActionsMenu({
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_SECTION && hasChildren && (
           <DropdownMenuItem
+          
             className="cursor-pointer"
+            data-testid="tree-view-action-button-sort"
             onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: node })}
           >
             <List size={18} className="tree-node__action-icon" /> Sort Section
@@ -138,6 +140,7 @@ export default function TreeNodeActionsMenu({
         )}
         <DropdownMenuItem
           className="cursor-pointer"
+          data-testid="tree-view-action-button-move"
           onClick={() => openDialog(DIALOG_MOVE_PAGE, { pageId: node.id })}
         >
           <Move size={18} className="tree-node__action-icon" /> Move{' '}
@@ -155,6 +158,7 @@ export default function TreeNodeActionsMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-error cursor-pointer"
+          data-testid="tree-view-action-button-delete"
           onClick={() => {
             openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
               pageId: node?.id,
