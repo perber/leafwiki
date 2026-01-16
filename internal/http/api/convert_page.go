@@ -32,7 +32,15 @@ func ConvertPageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		err := w.ConvertPage(user.ID, id, tree.NodeKind(req.TargetKind))
+		// Validate TargetKind before converting to tree.NodeKind
+		if req.TargetKind != "page" && req.TargetKind != "section" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid targetKind"})
+			return
+		}
+
+		kind := tree.NodeKind(req.TargetKind)
+
+		err := w.ConvertPage(user.ID, id, kind)
 		if err != nil {
 			respondWithError(c, err)
 			return
