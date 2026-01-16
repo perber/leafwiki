@@ -10,7 +10,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { ChevronUp, FilePlus } from 'lucide-react'
-import React, { useState } from 'react'
+import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import MoreActionsMenu from './MoreActionsMenu'
 
@@ -26,7 +26,6 @@ export const TreeNode = React.memo(function TreeNode({
   const { isNodeOpen, toggleNode } = useTreeStore()
   const appMode = useAppMode()
   const hasChildren = node.children && node.children.length > 0
-  const [hovered, setHovered] = useState(false)
   const { pathname } = useLocation()
 
   const currentPath =
@@ -78,8 +77,6 @@ export const TreeNode = React.memo(function TreeNode({
         })}
         data-testid={`tree-node-${node.id}`}
         style={{ paddingLeft: indent }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
       >
         <div
           className={clsx('tree-node__marker', {
@@ -109,7 +106,7 @@ export const TreeNode = React.memo(function TreeNode({
             )
           }
           {linkText}
-          {(hovered || isMobile) && !readOnlyMode && (
+          {!readOnlyMode && (
             <div className={clsx('tree-node__actions', treeActionButtonStyle)}>
               <TreeViewActionButton
                 actionName="add"
