@@ -116,7 +116,7 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
           }}
         >
           <Pencil size={18} className="tree-node__action-icon" /> Edit{' '}
-          {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
+          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_SECTION && hasChildren && (
           <DropdownMenuItem
@@ -131,7 +131,7 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
           onClick={() => openDialog(DIALOG_MOVE_PAGE, { pageId: node.id })}
         >
           <Move size={18} className="tree-node__action-icon" /> Move{' '}
-          {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
+          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_SECTION && !hasChildren && (
           <DropdownMenuItem
@@ -139,7 +139,7 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
             onClick={handleConvertPage}
           >
             <Repeat2 size={18} className="tree-node__action-icon" /> Convert to
-            page
+            Page
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
@@ -153,7 +153,7 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
           }}
         >
           <Trash size={18} className="tree-node__action-icon text-error" />{' '}
-          Delete {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
+          Delete {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
