@@ -86,7 +86,13 @@ export default class TreeView {
     await nodeRow.scrollIntoViewIfNeeded();
     await nodeRow.hover(); // oder mouse.move, s.u.
 
-    const sortButton = nodeRow.locator('button[data-testid="tree-view-action-button-sort"]');
+    // open more actions menu
+    const moreActionsButton = nodeRow.locator(
+      'button[data-testid="tree-view-action-button-open-more-actions"]',
+    );
+    await moreActionsButton.click({ force: true });
+
+    const sortButton = this.page.locator('div[data-testid="tree-view-action-button-sort"]');
     await sortButton.click({ force: true });
 
     const sortPageDialog = new SortPageDialog(this.page);
@@ -111,7 +117,12 @@ export default class TreeView {
     await nodeRow.scrollIntoViewIfNeeded();
     await nodeRow.hover(); // oder mouse.move, s.u.
 
-    const moveButton = nodeRow.locator('button[data-testid="tree-view-action-button-move"]');
+    const moreActionsButton = nodeRow.locator(
+      'button[data-testid="tree-view-action-button-open-more-actions"]',
+    );
+    await moreActionsButton.click({ force: true });
+
+    const moveButton = this.page.locator('div[data-testid="tree-view-action-button-move"]');
     await moveButton.click({ force: true });
 
     const movePageDialog = new MovePageDialog(this.page);

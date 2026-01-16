@@ -13,6 +13,7 @@ type createPageRequest struct {
 	ParentID *string `json:"parentId"` // optional
 	Title    string  `json:"title" binding:"required"`
 	Slug     string  `json:"slug" binding:"required"`
+	Kind     *string `json:"kind"` // optional
 }
 
 func CreatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
@@ -29,6 +30,9 @@ func CreatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 		}
 
 		kind := tree.NodeKindPage
+		if req.Kind != nil {
+			kind = tree.NodeKind(*req.Kind)
+		}
 		page, err := w.CreatePage(user.ID, req.ParentID, req.Title, req.Slug, &kind)
 		if err != nil {
 			respondWithError(c, err)
