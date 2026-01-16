@@ -1,5 +1,5 @@
-// Dialogs store
-// is used to manage the state of dialogs in the application
+// Tree node actions menus store
+// used to manage the open state of tree node action menus in the application
 
 import { create } from 'zustand'
 
