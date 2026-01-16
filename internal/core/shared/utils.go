@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path"
+	"runtime"
 
 	"github.com/teris-io/shortid"
 )
@@ -34,6 +35,17 @@ func GenerateRandomPassword(length int) (string, error) {
 		password[i] = charset[n.Int64()]
 	}
 	return string(password), nil
+}
+
+func atomicReplace(src, dst string) error {
+	// On Windows, os.Rename fails if dst already exists.
+	// On Unix, Rename is atomic and replaces dst.
+	if runtime.GOOS == "windows" {
+		if err := os.Remove(dst); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove existing file: %w", err)
+		}
+	}
+	return os.Rename(src, dst)
 }
 
 // WriteFileAtomic writes data to filename atomically by writing to a temp file
@@ -73,7 +85,7 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf("close temp file: %w", err)
 	}
 
-	if err := os.Rename(tmpName, filename); err != nil {
+	if err := atomicReplace(tmpName, filename); err != nil {
 		return fmt.Errorf("rename temp file: %w", err)
 	}
 
