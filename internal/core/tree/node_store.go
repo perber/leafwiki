@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/perber/wiki/internal/core/shared"
@@ -17,17 +16,6 @@ import (
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
-}
-
-func atomicReplace(src, dst string) error {
-	// On Windows, os.Rename fails if dst already exists.
-	// On Unix, Rename is atomic and replaces dst.
-	if runtime.GOOS == "windows" {
-		if err := os.Remove(dst); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove existing file: %w", err)
-		}
-	}
-	return os.Rename(src, dst)
 }
 
 type ResolvedNode struct {

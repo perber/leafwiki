@@ -130,7 +130,6 @@ export default function TreeNodeActionsMenu({
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_SECTION && hasChildren && (
           <DropdownMenuItem
-          
             className="cursor-pointer"
             data-testid="tree-view-action-button-sort"
             onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: node })}
