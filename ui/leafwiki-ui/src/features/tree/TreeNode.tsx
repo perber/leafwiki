@@ -12,7 +12,7 @@ import clsx from 'clsx'
 import { ChevronUp, FilePlus } from 'lucide-react'
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import MoreActionsMenu from './MoreActionsMenu'
+import TreeNodeActionsMenu from './TreeNodeActionsMenu'
 
 type Props = {
   node: PageNode
@@ -116,7 +116,7 @@ export const TreeNode = React.memo(function TreeNode({
                   openDialog(DIALOG_ADD_PAGE, { parentId: node.id })
                 }
               />
-              <MoreActionsMenu node={node} />
+              <TreeNodeActionsMenu node={node} />
             </div>
           )}
         </div>

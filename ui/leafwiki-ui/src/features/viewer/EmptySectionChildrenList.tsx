@@ -8,7 +8,7 @@ import { useTreeStore } from '@/stores/tree'
 import { FilePlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-type ChildListProps = {
+type EmptySectionChildrenListProps = {
   page: Page
 }
 
@@ -16,7 +16,9 @@ function displayUser(label?: { username: string }) {
   return label?.username || null
 }
 
-export default function ChildList({ page }: ChildListProps) {
+export default function EmptySectionChildrenList({
+  page,
+}: EmptySectionChildrenListProps) {
   const getPageById = useTreeStore((s) => s.getPageById)
   const node = getPageById(page.id)
   const openDialog = useDialogsStore((s) => s.openDialog)
@@ -45,7 +47,10 @@ export default function ChildList({ page }: ChildListProps) {
   return (
     <>
       {hasChildren && (
-        <div className="child-list__section">
+        <nav
+          aria-label={`Subpages of ${page.title}`}
+          className="child-list__section"
+        >
           <h2 className="child-list__section-title">
             Pages and Sections in '{page.title}'
           </h2>
@@ -83,11 +88,14 @@ export default function ChildList({ page }: ChildListProps) {
               Add Page
             </Button>
           )}
-        </div>
+        </nav>
       )}
       {/* No children - Add Button and allow users to create a new page */}
       {!hasChildren && (
-        <div className="child-list__section">
+        <nav
+          aria-label={`Subpages of ${page.title}`}
+          className="child-list__section"
+        >
           <div className="mb-2 flex items-center justify-between">
             <h2 className="child-list__section-title grow">
               No Pages and Sections in '{page.title}'
@@ -103,7 +111,7 @@ export default function ChildList({ page }: ChildListProps) {
               Add Page
             </Button>
           )}
-        </div>
+        </nav>
       )}
     </>
   )

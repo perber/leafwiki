@@ -12,7 +12,7 @@ import { BacklinkInfo } from '../links/LinkInfo'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import Breadcrumbs from './Breadcrumbs'
-import ChildList from './ChildList'
+import EmptySectionChildrenList from './EmptySectionChildrenList'
 import { useScrollToHeadline } from './useScrollToHeadline'
 import { useSetPageTitle } from './useSetPageTitle'
 import { useToolbarActions } from './useToolbarActions'
@@ -98,7 +98,7 @@ export default function PageViewer() {
         <div className="page-viewer__body">
           <article className="page-viewer__content">
             <MarkdownPreview content={page.content} path={page.path} />
-            <ChildList page={page} />
+            <EmptySectionChildrenList page={page} />
           </article>
           <BacklinkInfo />
         </div>

@@ -33,18 +33,25 @@ import { useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { TreeViewActionButton } from './TreeViewActionButton'
+import { useTreeNodeActionsMenusStore } from './treeNodeActionsMenus'
 
-export type MoreActionsProps = {
+export type TreeNodeActionsMenuProps = {
   node: PageNode
 }
 
-export default function MoreActionsMenu({ node }: MoreActionsProps) {
+export default function TreeNodeActionsMenu({
+  node,
+}: TreeNodeActionsMenuProps) {
   const { id: nodeId, kind: nodeKind, children } = node
   const openDialog = useDialogsStore((state) => state.openDialog)
   const reloadTree = useTreeStore((state) => state.reloadTree)
   const hasChildren = children && children.length > 0
   const navigate = useNavigate()
   const location = useLocation()
+  const setOpenMenuNodeId = useTreeNodeActionsMenusStore(
+    (s) => s.setOpenMenuNodeId,
+  )
+  const open = useTreeNodeActionsMenusStore((s) => s.openMenuNodeId === node.id)
 
   const handleConvertPage = useCallback(() => {
     convertPage(
@@ -76,7 +83,10 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
   }, [location.pathname, node.path, node.parentId])
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      open={open}
+      onOpenChange={(nextOpen) => setOpenMenuNodeId(nextOpen ? node.id : null)}
+    >
       <DropdownMenuTrigger aria-label="More actions">
         <TreeViewActionButton
           actionName="open-more-actions"
