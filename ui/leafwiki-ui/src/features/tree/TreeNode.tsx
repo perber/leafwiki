@@ -97,12 +97,16 @@ export const TreeNode = React.memo(function TreeNode({
                 'tree-node__toggle--open': open,
                 'tree-node__toggle--closed': !open,
               })}
-              onClick={() => node.kind === NODE_KIND_SECTION && toggleNode(node.id)}
+              onClick={() =>
+                node.kind === NODE_KIND_SECTION && toggleNode(node.id)
+              }
             />
           )}
           {
             // add empty space to align with nodes that have children
-            node.kind !== NODE_KIND_SECTION && <div className="tree-node__toggle-spacer" />
+            node.kind !== NODE_KIND_SECTION && (
+              <div className="tree-node__toggle-spacer" />
+            )
           }
           {linkText}
           {(hovered || isMobile) && !readOnlyMode && (

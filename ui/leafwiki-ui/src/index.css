@@ -1318,6 +1318,22 @@
   .branding-settings__actions {
     @apply flex justify-end gap-2;
   }
+
+  .child-list__section {
+    @apply border-surface-border bg-surface mb-2 rounded-lg border px-4 py-2;
+  }
+
+  .child-list__section-title {
+    @apply text-interface-text mt-0 mb-4 text-lg font-semibold;
+  }
+
+  .child-list__section li {
+    @apply text-sm;
+  }
+
+  .child-list__section li a {
+    @apply text-interface-text! hover:underline!;
+  }
 }
 
 /* -------------------------------------------------------

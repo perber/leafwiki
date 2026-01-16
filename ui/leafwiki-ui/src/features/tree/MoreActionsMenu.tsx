@@ -5,7 +5,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { convertPage, NODE_KIND_PAGE, NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
+import {
+  convertPage,
+  NODE_KIND_PAGE,
+  NODE_KIND_SECTION,
+  PageNode,
+} from '@/lib/api/pages'
 import {
   DIALOG_ADD_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
@@ -14,7 +19,16 @@ import {
 } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { FilePlus, FolderPlus, List, MoreVertical, Move, Pencil, Repeat2, Trash } from 'lucide-react'
+import {
+  FilePlus,
+  FolderPlus,
+  List,
+  MoreVertical,
+  Move,
+  Pencil,
+  Repeat2,
+  Trash,
+} from 'lucide-react'
 import { useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -33,16 +47,21 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
   const location = useLocation()
 
   const handleConvertPage = useCallback(() => {
-    convertPage(nodeId, nodeKind === NODE_KIND_PAGE ? NODE_KIND_SECTION : NODE_KIND_PAGE).then(() => {
-      toast.success('Page converted successfully')
-      reloadTree()
-    }).catch(() => {
-      toast.error('Failed to convert page')
-    })
+    convertPage(
+      nodeId,
+      nodeKind === NODE_KIND_PAGE ? NODE_KIND_SECTION : NODE_KIND_PAGE,
+    )
+      .then(() => {
+        toast.success('Page converted successfully')
+        reloadTree()
+      })
+      .catch(() => {
+        toast.error('Failed to convert page')
+      })
   }, [nodeId, nodeKind, reloadTree])
 
   const redirectUrlAfterDelete = useCallback(() => {
-    if (location.pathname.startsWith("/" + node.path)) {
+    if (location.pathname.startsWith('/' + node.path)) {
       if (node.parentId) {
         return node.path.substring(0, node.path.lastIndexOf('/'))
       } else {
@@ -51,7 +70,9 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
     }
 
     // remove leading slash
-    return location.pathname.startsWith("/") ? location.pathname.substring(1) : location.pathname
+    return location.pathname.startsWith('/')
+      ? location.pathname.substring(1)
+      : location.pathname
   }, [location.pathname, node.path, node.parentId])
 
   return (
@@ -88,9 +109,12 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
           Section
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="cursor-pointer" onClick={() => {
-          navigate(`/e/${node.path}`)
-        }}>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onClick={() => {
+            navigate(`/e/${node.path}`)
+          }}
+        >
           <Pencil size={18} className="tree-node__action-icon" /> Edit{' '}
           {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
         </DropdownMenuItem>
@@ -110,19 +134,26 @@ export default function MoreActionsMenu({ node }: MoreActionsProps) {
           {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_SECTION && !hasChildren && (
-          <DropdownMenuItem className="cursor-pointer" onClick={handleConvertPage}><Repeat2 size={18} className="tree-node__action-icon" />
-            {' '}
-            Convert to page
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={handleConvertPage}
+          >
+            <Repeat2 size={18} className="tree-node__action-icon" /> Convert to
+            page
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="cursor-pointer text-error" onClick={() => {
-          openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
-            pageId: node?.id,
-            redirectUrl: redirectUrlAfterDelete(),
-          })
-        }}><Trash size={18} className="tree-node__action-icon text-error" /> Delete{' '}
-          {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
+        <DropdownMenuItem
+          className="text-error cursor-pointer"
+          onClick={() => {
+            openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
+              pageId: node?.id,
+              redirectUrl: redirectUrlAfterDelete(),
+            })
+          }}
+        >
+          <Trash size={18} className="tree-node__action-icon text-error" />{' '}
+          Delete {nodeKind === NODE_KIND_PAGE ? 'page' : 'section'}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
