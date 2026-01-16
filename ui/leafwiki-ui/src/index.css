@@ -1225,11 +1225,26 @@
   }
 
   .tree-node__actions {
-    @apply bg-surface absolute right-0 flex items-center gap-1 rounded-md shadow-md;
+    @apply flex gap-1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+
+  .tree-node:hover .tree-node__actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  @media (hover: none) {
+    .tree-node__actions {
+      opacity: 1;
+      pointer-events: auto;
+    }
   }
 
   .tree-node__actions--compact {
-    @apply px-1 py-2;
+    @apply pl-1;
   }
 
   .tree-node__action-icon {
@@ -1317,6 +1332,22 @@
 
   .branding-settings__actions {
     @apply flex justify-end gap-2;
+  }
+
+  .child-list__section {
+    @apply border-surface-border bg-surface mb-2 rounded-lg border px-4 py-2;
+  }
+
+  .child-list__section-title {
+    @apply text-interface-text mt-0 mb-4 text-lg font-semibold;
+  }
+
+  .child-list__section li {
+    @apply text-sm;
+  }
+
+  .child-list__section li a {
+    @apply text-interface-text! hover:underline!;
   }
 }
 
@@ -1449,6 +1480,7 @@
       padding: 0 !important;
       border: 0 !important;
     }
+
     .app-layout__content-wrapper {
       height: auto !important;
     }

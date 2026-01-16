@@ -113,6 +113,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		// Pages
 		requiresAuthGroup.POST("/pages", auth_middleware.RequireEditorOrAdmin(), api.CreatePageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/ensure", auth_middleware.RequireEditorOrAdmin(), api.EnsurePageHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/convert/:id", auth_middleware.RequireEditorOrAdmin(), api.ConvertPageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/copy/:id", auth_middleware.RequireEditorOrAdmin(), api.CopyPageHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.UpdatePageHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.DeletePageHandler(wikiInstance))
@@ -149,17 +150,17 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	// Serve branding assets (logos, favicons) with extension validation
 	router.GET("/branding/:filename", func(c *gin.Context) {
 		filename := c.Param("filename")
-		
+
 		// Sanitize filename to prevent directory traversal and malicious input
 		// Only allow simple filenames (no path separators, no null bytes, no ..)
-		if strings.Contains(filename, "..") || 
-			strings.Contains(filename, "/") || 
-			strings.Contains(filename, "\\") || 
+		if strings.Contains(filename, "..") ||
+			strings.Contains(filename, "/") ||
+			strings.Contains(filename, "\\") ||
 			strings.Contains(filename, "\x00") {
 			c.Status(http.StatusForbidden)
 			return
 		}
-		
+
 		// Get allowed extensions from branding constraints
 		constraints, err := wikiInstance.GetBrandingConstraints()
 		if err != nil {
@@ -167,7 +168,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		
+
 		// Build a combined set of allowed extensions for O(1) lookup
 		allowedExts := make(map[string]bool)
 		for _, ext := range constraints.LogoExts {
@@ -176,22 +177,22 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		for _, ext := range constraints.FaviconExts {
 			allowedExts[ext] = true
 		}
-		
+
 		// Validate file extension against whitelist
 		ext := strings.ToLower(filepath.Ext(filename))
 		if !allowedExts[ext] {
 			c.Status(http.StatusForbidden)
 			return
 		}
-		
+
 		// Construct file path
 		brandingDir := wikiInstance.GetBrandingService().GetBrandingAssetsDir()
 		filePath := filepath.Join(brandingDir, filename)
-		
+
 		// Clean the path and verify it's within the branding directory
 		cleanPath := filepath.Clean(filePath)
 		cleanBrandingDir := filepath.Clean(brandingDir)
-		
+
 		// Ensure the resolved path is still within the branding directory
 		// Use filepath.Rel to check the relative path doesn't escape the directory
 		rel, err := filepath.Rel(cleanBrandingDir, cleanPath)
@@ -199,7 +200,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusForbidden)
 			return
 		}
-		
+
 		// Check if file exists
 		if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
 			c.Status(http.StatusNotFound)
@@ -209,7 +210,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		
+
 		// Serve the file
 		c.File(cleanPath)
 	})

@@ -587,6 +587,49 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 
 }
 
+func (t *TreeService) ConvertNode(userID string, id string, kind NodeKind) error {
+	return t.withLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+
+		// Find node
+		node, err := t.findPageByIDLocked(t.tree.Children, id)
+		if err != nil {
+			return ErrPageNotFound
+		}
+
+		if node.Kind == kind {
+			// No change
+			return nil
+		}
+
+		// Section -> Page only allowed if no children
+		if node.Kind == NodeKindSection && kind == NodeKindPage && node.HasChildren() {
+			return ErrPageHasChildren
+		}
+
+		t.log.Info("changing node kind", "nodeID", node.ID, "oldKind", node.Kind, "newKind", kind)
+
+		if err := t.store.ConvertNode(node, kind); err != nil {
+			return fmt.Errorf("could not convert node: %w", err)
+		}
+		node.Kind = kind
+
+		// Update metadata
+		node.Metadata.UpdatedAt = time.Now().UTC()
+		node.Metadata.LastAuthorID = userID
+
+		// Keep frontmatter in sync *if file exists* (important when kind changed but content == nil)
+		if err := t.store.SyncFrontmatterIfExists(node); err != nil {
+			return fmt.Errorf("could not sync frontmatter: %w", err)
+		}
+
+		// Save tree
+		return t.saveTreeLocked()
+	})
+}
+
 // GetTree returns the tree
 func (t *TreeService) GetTree() *PageNode {
 	t.mu.RLock()

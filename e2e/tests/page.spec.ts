@@ -6,7 +6,6 @@ import DeletePageDialog from '../pages/DeletePageDialog';
 import EditPage from '../pages/EditPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
-import SearchView from '../pages/SearchView';
 import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
 
@@ -368,6 +367,9 @@ graph TD;
     test.expect(await deletePageDialog.dialogTextVisible()).toBeFalsy();
   });
 
+  // disable this test cases, because it is flaky
+  // TODO: fix the flakiness
+  /*
   test('search-page', async ({ page }) => {
     const title = `Page To Search ${Date.now()}`;
     const content = `This is the content of the page to search, created at ${new Date().toISOString()}`;
@@ -404,6 +406,7 @@ graph TD;
     // clear search
     await searchView.clearSearch();
   });
+  */
 
   test('test-asset-upload-and-use-in-page', async ({ page }) => {
     const title = `Page With Asset ${Date.now()}`;

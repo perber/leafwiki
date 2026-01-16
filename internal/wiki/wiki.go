@@ -194,10 +194,11 @@ func (w *Wiki) EnsureWelcomePage() error {
 	// Set the content of the welcome page
 	content := `# Welcome to LeafWiki!
 
-LeafWiki is a lightweight, self-hosted knowledge base server for documenting  
-runbooks, internal docs, and technical knowledge using plain Markdown files.  
+LeafWiki – A fast wiki for people who think in folders, not feeds.  
+Single Go binary. Markdown on disk. No external database service.  
 
-Content is stored directly on disk, organized in a clear tree structure, and served by a single Go binary.  
+LeafWiki is a lightweight, self-hosted wiki for runbooks, internal docs, and technical notes — built for fast writing and explicit structure. It keeps your content as plain Markdown on disk and gives you fast navigation, search, and editing — without running additional services.
+
 
 ---
 
@@ -243,6 +244,10 @@ func (w *Wiki) CreatePage(userID string, parentID *string, title string, slug st
 
 	if kind == nil {
 		ve.Add("kind", "Kind must be specified")
+	}
+
+	if kind != nil && *kind != tree.NodeKindPage && *kind != tree.NodeKindSection {
+		ve.Add("kind", "Kind must be either 'page' or 'section'")
 	}
 
 	if err := w.slug.IsValidSlug(slug); err != nil {
@@ -646,6 +651,19 @@ func (w *Wiki) MovePage(userID, id, parentID string) error {
 				log.Printf("warning: failed to heal links for page %s: %v", pid, err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (w *Wiki) ConvertPage(userID, id string, targetKind tree.NodeKind) error {
+	if id == "root" || id == "" {
+		return fmt.Errorf("cannot convert root page")
+	}
+
+	err := w.tree.ConvertNode(userID, id, targetKind)
+	if err != nil {
+		return err
 	}
 
 	return nil
