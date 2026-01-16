@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { NODE_KIND_SECTION, Page } from '@/lib/api/pages'
 import { formatRelativeTime } from '@/lib/formatDate'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
+import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { FilePlus } from 'lucide-react'
@@ -20,6 +21,7 @@ export default function ChildList({ page }: ChildListProps) {
   const node = getPageById(page.id)
   const openDialog = useDialogsStore((s) => s.openDialog)
   const tree = useTreeStore((s) => s.tree)
+  const isReadOnly = useIsReadOnly()
 
   if (!tree) {
     return null
@@ -39,9 +41,7 @@ export default function ChildList({ page }: ChildListProps) {
   }
 
   const hasChildren = node.children && node.children.length > 0
-
   const editorName = displayUser(page?.metadata?.lastAuthor)
-
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
 
   return (
@@ -71,14 +71,16 @@ export default function ChildList({ page }: ChildListProps) {
               )
             })}
           </ul>
-          <Button
-            onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: page.id })}
-            variant="default"
-            size="sm"
-          >
-            <FilePlus size={16} />
-            Add Page
-          </Button>
+          {!isReadOnly && (
+            <Button
+              onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: page.id })}
+              variant="default"
+              size="sm"
+            >
+              <FilePlus size={16} />
+              Add Page
+            </Button>
+          )}
         </div>
       )}
       {/* No children - Add Button and allow users to create a new page */}
@@ -89,14 +91,16 @@ export default function ChildList({ page }: ChildListProps) {
               No Pages and Sections in '{page.title}'
             </h2>
           </div>
-          <Button
-            onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: page.id })}
-            variant="default"
-            size="sm"
-          >
-            <FilePlus size={16} />
-            Add Page
-          </Button>
+          {!isReadOnly && (
+            <Button
+              onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: page.id })}
+              variant="default"
+              size="sm"
+            >
+              <FilePlus size={16} />
+              Add Page
+            </Button>
+          )}
         </div>
       )}
     </>
