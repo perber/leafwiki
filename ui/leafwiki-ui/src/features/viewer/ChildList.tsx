@@ -41,8 +41,6 @@ export default function ChildList({ page }: ChildListProps) {
   }
 
   const hasChildren = node.children && node.children.length > 0
-  const editorName = displayUser(page?.metadata?.lastAuthor)
-  const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
 
   return (
     <>
@@ -54,6 +52,10 @@ export default function ChildList({ page }: ChildListProps) {
           <ul>
             {node.children?.map((n) => {
               if (!n) return null
+
+              const editorName = displayUser(n?.metadata?.lastAuthor)
+              const updatedRelative = formatRelativeTime(n?.metadata?.updatedAt)
+
               return (
                 <li key={n.id}>
                   <Link to={`/${n.path}`}>{n.title}</Link>{' '}
