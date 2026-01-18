@@ -123,6 +123,7 @@ For details on the current model and its constraints, see [Known limitations](#k
 - **Explicit tree navigation**
 - **Public read-only docs with authenticated editing**
 - Built-in Markdown editor with live preview
+- Brand customization (logo, favicon & site name)
 - Full-text search across page titles and content
 - Support for diagrams via Mermaid
 - Image and asset support
