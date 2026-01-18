@@ -3,6 +3,15 @@
 
 This document records notable changes to LeafWiki, organized by release.
 
+## ✅ v0.7.2 – Branding Settings, Installer Improvements & Search Tokenizer Update
+
+### Features & Improvements
+- [x] Add branding settings page to customize logo, favicon & app name - Thanks to @Tak-MK for the suggestion & @berkulutus for the initial implementation!
+- [x] Improve installer with `--non-interactive` mode for automated setups - Thanks @Hugo-Galley for the implementation!
+- [x] Search tokenizer updated to better support filenames and programming language names like C++
+- [x] Regular dependency updates
+
+
 ## ✅ v0.7.0 – Security, Authentication & UX Improvements
 
 ### Security & Authentication
