@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/microcosm-cc/bluemonday"
+	"github.com/perber/wiki/internal/core/tree"
 	"github.com/russross/blackfriday/v2"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
@@ -158,7 +159,12 @@ func (s *SQLiteIndex) Close() error {
 	return nil
 }
 
-func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, title string, content string) error {
+func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, title string, raw string) error {
+	_, content, _, err := tree.ParseFrontmatter(raw)
+	if err != nil {
+		return err
+	}
+
 	// Headings extracted from the Markdown
 	headings := extractHeadings(content)
 
