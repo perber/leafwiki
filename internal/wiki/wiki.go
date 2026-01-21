@@ -235,6 +235,10 @@ func (w *Wiki) GetTree() *tree.PageNode {
 	return w.tree.GetTree()
 }
 
+func (w *Wiki) TreeHash() string {
+	return w.tree.TreeHash()
+}
+
 func (w *Wiki) CreatePage(userID string, parentID *string, title string, slug string, kind *tree.NodeKind) (*tree.Page, error) {
 	ve := errors.NewValidationErrors()
 
@@ -1018,4 +1022,8 @@ func (w *Wiki) DeleteBrandingFavicon() error {
 
 func (w *Wiki) GetBrandingService() *branding.BrandingService {
 	return w.branding
+}
+
+func (w *Wiki) GetSlugService() *tree.SlugService {
+	return w.slug
 }

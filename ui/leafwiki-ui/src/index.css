@@ -935,71 +935,6 @@
     @apply hover:bg-error/10;
   }
 
-  /* user management */
-  .user-management {
-    @apply mx-auto max-w-4xl p-6;
-  }
-
-  .user-management__title {
-    @apply text-interface-text mb-4 text-2xl font-bold;
-  }
-
-  .user-management__header-actions {
-    @apply flex justify-end;
-  }
-
-  .user-management__table-card {
-    @apply border-surface-border bg-surface mt-4 rounded-md border shadow-sm;
-  }
-
-  .user-management__table-scroll {
-    @apply overflow-x-auto;
-  }
-
-  .user-management__table {
-    @apply w-full text-sm;
-  }
-
-  .user-management__table-head {
-    @apply bg-surface-alt text-left;
-  }
-
-  .user-management__table-header-cell {
-    @apply text-interface-text p-3;
-  }
-
-  .user-management__table-body-message {
-    @apply text-muted p-4 text-center;
-  }
-
-  .user-management__table-row {
-    @apply border-surface-border border-t;
-  }
-
-  .user-management__table-cell {
-    @apply text-interface-text p-3;
-  }
-
-  .user-management__actions-cell {
-    @apply p-3;
-  }
-
-  .user-management__actions {
-    @apply flex gap-2;
-  }
-
-  .user-management__role-pill {
-    @apply rounded px-2 py-1 text-xs font-medium;
-  }
-
-  .user-management__role-pill--admin {
-    @apply bg-brand/10 text-brand;
-  }
-
-  .user-management__role-pill--default {
-    @apply bg-surface-alt text-interface-text;
-  }
-
   .breadcrumbs-nav {
     @apply text-muted mr-2 flex w-full flex-1 grow text-sm;
   }
@@ -1030,8 +965,7 @@
   }
 
   .page-viewer {
-    @apply mx-auto w-full max-w-6xl px-8 pt-8 pb-0;
-    @apply flex min-h-full flex-col;
+    @apply mx-auto flex min-h-full w-full max-w-6xl flex-col px-8 pt-8 pb-0;
   }
 
   .page-viewer__body {
@@ -1278,60 +1212,128 @@
     @apply bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm;
   }
 
-  .branding-settings {
-    @apply mx-auto max-w-2xl p-6;
+  .settings {
+    @apply mx-auto w-full max-w-6xl px-8 pt-8 pb-4;
   }
 
-  .branding-settings__title {
+  .settings__title {
     @apply text-interface-text mb-6 text-2xl font-bold;
   }
 
-  .branding-settings__section {
+  .settings__section {
     @apply border-surface-border bg-surface mb-6 rounded-lg border p-6;
   }
 
-  .branding-settings__section-title {
+  .settings__section-title {
     @apply text-interface-text mb-2 text-lg font-semibold;
   }
 
-  .branding-settings__section-description {
+  .settings__section-description {
     @apply text-muted mb-4 text-sm;
   }
 
-  .branding-settings__field {
+  .settings__field {
     @apply mb-4;
   }
 
-  .branding-settings__preview {
+  .settings__preview {
     @apply bg-surface-alt mb-4 flex items-center gap-3 rounded-md p-4;
   }
 
-  .branding-settings__preview-label {
+  .settings__preview-label {
     @apply text-muted text-sm;
   }
 
-  .branding-settings__preview-emoji {
+  .settings__preview-emoji {
     @apply text-3xl;
   }
 
-  .branding-settings__preview-image {
+  .settings__preview-image {
     @apply h-10 w-auto;
   }
 
-  .branding-settings__preview-favicon {
+  .settings__preview-favicon {
     @apply h-8 w-8;
   }
 
-  .branding-settings__preview-placeholder {
+  .settings__preview-placeholder {
     @apply text-muted text-sm italic;
   }
 
-  .branding-settings__hint {
+  .settings__hint {
     @apply text-muted mt-1 text-xs;
   }
 
-  .branding-settings__actions {
+  .settings__actions {
     @apply flex justify-end gap-2;
+  }
+
+  .settings__header-actions {
+    @apply flex justify-end;
+  }
+
+  .settings__table-card {
+    @apply border-surface-border bg-surface mt-4 rounded-md border shadow-sm;
+  }
+
+  .settings__table-scroll {
+    @apply overflow-x-auto;
+  }
+
+  .settings__table {
+    @apply w-full text-sm;
+  }
+
+  .importer .settings__table {
+    @apply text-xs;
+  }
+
+  .settings__table-head {
+    @apply bg-surface-alt text-left;
+  }
+
+  .settings__table-header-cell {
+    @apply text-interface-text p-3;
+  }
+
+  .settings__table-body-message {
+    @apply text-muted p-4 text-center;
+  }
+
+  .settings__table-row {
+    @apply border-surface-border border-t;
+  }
+
+  .settings__table-cell {
+    @apply text-interface-text p-3;
+  }
+
+  .settings__actions-cell {
+    @apply p-3;
+  }
+
+  .settings__role-pill, .settings__pill {
+    @apply rounded px-2 py-1 text-xs font-medium;
+  }
+
+  .settings__pill-success {
+    @apply bg-success/10;
+  }
+
+  .settings__pill-warning {
+    @apply bg-warning/10;
+  }
+
+  .settings__pill-error {
+    @apply bg-error/10 text-error;
+  }
+
+  .settings__role-pill--admin {
+    @apply bg-brand/10 text-brand;
+  }
+
+  .settings__role-pill--default {
+    @apply bg-surface-alt text-interface-text;
   }
 
   .child-list__section {

@@ -82,6 +82,31 @@ func hasSlugConflict(parent *PageNode, currentID string, slug string) bool {
 	return false
 }
 
+func (s *SlugService) NormalizePath(path string, validate bool) (string, error) {
+	segments := make([]string, 0)
+
+	for _, segment := range strings.Split(path, string("/")) {
+
+		if segment == "" {
+			continue
+		}
+
+		if validate {
+			// normalize first and then validate
+			// the validation will ensure that the segment is a proper slug
+			seg := normalizeSlug(segment)
+			if err := s.IsValidSlug(seg); err != nil {
+				return "", fmt.Errorf("segment '%s' is not a valid slug: %v", segment, err)
+			}
+			segment = seg
+		} else {
+			segment = normalizeSlug(segment)
+		}
+		segments = append(segments, segment)
+	}
+	return strings.Join(segments, string("/")), nil
+}
+
 func (s *SlugService) NormalizeFilename(filename string) string {
 	ext := filepath.Ext(filename)
 	base := filename[:len(filename)-len(ext)]

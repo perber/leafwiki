@@ -324,6 +324,15 @@ func (t *TreeService) SaveTree() error {
 	return t.withLockedTree(t.saveTreeLocked)
 }
 
+func (t *TreeService) TreeHash() string {
+	var hash string
+	_ = t.withRLockedTree(func() error {
+		hash = t.tree.Hash()
+		return nil
+	})
+	return hash
+}
+
 func (t *TreeService) saveTreeLocked() error {
 	// Save the tree to the storage directory
 	return t.store.SaveTree(t.treeFilename, t.tree)
@@ -764,6 +773,8 @@ func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLo
 				// Segment exists
 				lookup.Segments[i].Exists = true
 				lookup.Segments[i].ID = &e.ID
+				lookup.Segments[i].Kind = &e.Kind
+				lookup.Segments[i].Title = &e.Title
 
 				// Move to the next entry
 				entry = e.Children

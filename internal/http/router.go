@@ -14,6 +14,7 @@ import (
 	"github.com/perber/wiki/internal/http/api"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
+	"github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -38,6 +39,16 @@ type RouterOptions struct {
 	AuthDisabled            bool          // Whether authentication is disabled
 }
 
+// wireImporterService sets up and returns an ImporterService instance
+// Parameters:
+//   - w: the wiki instance to use for importing
+func wireImporterService(w *wiki.Wiki) *importer.ImporterService {
+	slugger := w.GetSlugService()
+	planner := importer.NewPlanner(w, slugger)
+	store := importer.NewPlanStore()
+	return importer.NewImporterService(planner, store)
+}
+
 // NewRouter creates a new HTTP router for the wiki application.
 // Parameters:
 //   - wikiInstance: the wiki instance to serve
@@ -48,6 +59,8 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	} else {
 		gin.SetMode(gin.DebugMode)
 	}
+
+	importerService := wireImporterService(wikiInstance)
 
 	router := gin.Default()
 	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
@@ -145,6 +158,12 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.GET("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.ListAssetsHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id/assets/rename", auth_middleware.RequireEditorOrAdmin(), api.RenameAssetHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", auth_middleware.RequireEditorOrAdmin(), api.DeleteAssetHandler(wikiInstance))
+
+		// Importer
+		requiresAuthGroup.POST("/import/plan", auth_middleware.RequireEditorOrAdmin(), api.CreateImportPlanHandler(importerService))
+		requiresAuthGroup.GET("/import/plan", auth_middleware.RequireEditorOrAdmin(), api.GetImportPlanHandler(importerService))
+		requiresAuthGroup.POST("/import/execute", auth_middleware.RequireEditorOrAdmin(), api.ExecuteImportHandler(importerService, wikiInstance))
+		requiresAuthGroup.DELETE("/import/plan", auth_middleware.RequireEditorOrAdmin(), api.ClearImportPlanHandler(importerService))
 	}
 
 	// Serve branding assets (logos, favicons) with extension validation

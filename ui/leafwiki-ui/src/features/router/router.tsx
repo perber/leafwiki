@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom'
 import LoginForm from '../auth/LoginForm'
 import BrandingSettings from '../branding/BrandingSettings'
 import PageEditor from '../editor/PageEditor'
+import Importer from '../importer/Importer'
 import RootRedirect from '../page/RootRedirect'
 import UserManagement from '../users/UserManagement'
 import PageViewer from '../viewer/PageViewer'
@@ -47,6 +48,16 @@ export const createLeafWikiRouter = (
       ) : (
         <AuthWrapper>
           <BrandingSettings />
+        </AuthWrapper>
+      ),
+    },
+    {
+      path: '/settings/importer',
+      element: isReadOnlyViewer ? (
+        <Navigate to="/" />
+      ) : (
+        <AuthWrapper>
+          <Importer />
         </AuthWrapper>
       ),
     },
