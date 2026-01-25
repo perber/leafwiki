@@ -100,7 +100,16 @@ func (t *TreeService) migrate(fromVersion int) error {
 }
 
 func (t *TreeService) migrateToV1() error {
-	// Backfill metadata for all pages
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
+	return t.backfillMetadataLocked()
+}
+
+// backfillMetadataLocked backfills metadata for all nodes in the tree from filesystem
+// Assumes the tree is already locked by the caller
+func (t *TreeService) backfillMetadataLocked() error {
 	var backfillMetadata func(node *PageNode) error
 	backfillMetadata = func(node *PageNode) error {
 		// If CreatedAt is already set, assume metadata was backfilled and skip
@@ -167,10 +176,6 @@ func (t *TreeService) ReconstructTreeFromFS() error {
 }
 
 func (t *TreeService) reconstructTreeFromFSLocked() error {
-	if t.tree == nil {
-		return ErrTreeNotLoaded
-	}
-
 	// Reconstruct the tree from the filesystem
 	// This is a more complex operation and may involve reading the filesystem structure
 	newTree, err := t.store.ReconstructTreeFromFS()
@@ -179,6 +184,12 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 		return err
 	}
 	t.tree = newTree
+
+	// Backfill metadata for all nodes
+	if err := t.backfillMetadataLocked(); err != nil {
+		t.log.Error("Error backfilling metadata after reconstruction", "error", err)
+		return err
+	}
 
 	// Save the tree
 	if err := t.saveTreeLocked(); err != nil {
