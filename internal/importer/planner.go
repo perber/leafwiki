@@ -52,7 +52,7 @@ type PlanResult struct {
 	ID       string     `json:"id"`
 	TreeHash string     `json:"tree_hash"` // hash of the state of the wiki tree before import
 	Items    []PlanItem `json:"items"`
-	Errors   []error    `json:"errors"`
+	Errors   []string   `json:"errors"`
 }
 
 // Planner is responsible for creating an import plan
@@ -81,14 +81,14 @@ func (p *Planner) CreatePlan(entries []ImportMDFile, options PlanOptions) (*Plan
 	result := &PlanResult{
 		ID:       id,
 		Items:    []PlanItem{},
-		Errors:   []error{},
+		Errors:   []string{},
 		TreeHash: p.wiki.TreeHash(),
 	}
 	for _, entry := range entries {
 		resEntry, err := p.analyzeEntry(entry, options)
 		if err != nil {
 			p.log.Warn("could not import resource", "source_path", entry.SourcePath, "error", err)
-			result.Errors = append(result.Errors, err)
+			result.Errors = append(result.Errors, err.Error())
 			continue
 		}
 

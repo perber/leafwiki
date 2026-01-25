@@ -1,7 +1,6 @@
 package importer
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -401,7 +400,7 @@ func TestPlanner_analyzeEntry_InvalidSourceDirSegment_ReturnsError(t *testing.T)
 		t.Fatalf("Errors len = %d (want 1)", len(res.Errors))
 	}
 	// optional: grobe Assertion, dass es ein Validate-Fehler ist
-	if res.Errors[0] == nil || !errors.Is(res.Errors[0], res.Errors[0]) {
+	if res.Errors[0] == "" {
 		t.Fatalf("unexpected error: %v", res.Errors[0])
 	}
 }
