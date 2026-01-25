@@ -59,33 +59,31 @@ func (x *ZipExtractor) ExtractToTemp(zipPath string) (*ZipWorkspace, error) {
 			return fail(fmt.Errorf("mkdir: %w", err))
 		}
 
-		rc, err := f.Open()
-		if err != nil {
-			return fail(fmt.Errorf("open zip entry: %w", err))
-		}
-		defer rc.Close()
-
-		out, err := os.OpenFile(destPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-		if err != nil {
-			rc.Close()
-			return fail(fmt.Errorf("create file: %w", err))
-		}
-
-		if _, err := io.Copy(out, rc); err != nil {
-			if err := out.Close(); err != nil {
-				x.log.Error("close failed", "error", err)
+		// Extract single file in inner scope to ensure deterministic cleanup per iteration
+		if err := func() error {
+			rc, err := f.Open()
+			if err != nil {
+				return fmt.Errorf("open zip entry: %w", err)
 			}
-			if err := rc.Close(); err != nil {
-				x.log.Error("close failed", "error", err)
-			}
-			return fail(fmt.Errorf("write file: %w", err))
-		}
+			defer rc.Close()
 
-		if err := out.Close(); err != nil {
-			x.log.Error("close failed", "error", err)
-		}
-		if err := rc.Close(); err != nil {
-			x.log.Error("close failed", "error", err)
+			out, err := os.OpenFile(destPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+			if err != nil {
+				return fmt.Errorf("create file: %w", err)
+			}
+			defer func() {
+				if err := out.Close(); err != nil {
+					x.log.Error("close failed", "error", err)
+				}
+			}()
+
+			if _, err := io.Copy(out, rc); err != nil {
+				return fmt.Errorf("write file: %w", err)
+			}
+
+			return nil
+		}(); err != nil {
+			return fail(err)
 		}
 	}
 
