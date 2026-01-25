@@ -100,7 +100,16 @@ func (t *TreeService) migrate(fromVersion int) error {
 }
 
 func (t *TreeService) migrateToV1() error {
-	// Backfill metadata for all pages
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
+	return t.backfillMetadataLocked()
+}
+
+// backfillMetadataLocked backfills CreatedAt and UpdatedAt timestamps for all nodes from filesystem
+// The caller must ensure that t.tree is not nil and must hold the appropriate lock before calling this method
+func (t *TreeService) backfillMetadataLocked() error {
 	var backfillMetadata func(node *PageNode) error
 	backfillMetadata = func(node *PageNode) error {
 		// If CreatedAt is already set, assume metadata was backfilled and skip
@@ -155,10 +164,6 @@ func (t *TreeService) migrateToV1() error {
 		return nil
 	}
 
-	if t.tree == nil {
-		return ErrTreeNotLoaded
-	}
-
 	return backfillMetadata(t.tree)
 }
 
@@ -167,10 +172,6 @@ func (t *TreeService) ReconstructTreeFromFS() error {
 }
 
 func (t *TreeService) reconstructTreeFromFSLocked() error {
-	if t.tree == nil {
-		return ErrTreeNotLoaded
-	}
-
 	// Reconstruct the tree from the filesystem
 	// This is a more complex operation and may involve reading the filesystem structure
 	newTree, err := t.store.ReconstructTreeFromFS()
@@ -178,11 +179,30 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 		t.log.Error("Error reconstructing tree from filesystem", "error", err)
 		return err
 	}
+	
+	// Defensive check to protect against unexpected nil returns from ReconstructTreeFromFS
+	if newTree == nil {
+		return fmt.Errorf("internal error: ReconstructTreeFromFS returned nil tree")
+	}
+	
+	// Save the old tree in case we need to revert
+	// Note: oldTree may be nil if this is the first reconstruction (which is expected)
+	oldTree := t.tree
 	t.tree = newTree
+
+	// Backfill metadata for all nodes
+	if err := t.backfillMetadataLocked(); err != nil {
+		t.log.Error("Error backfilling metadata after reconstruction", "error", err)
+		// Revert tree assignment on failure (may set back to nil, which is fine)
+		t.tree = oldTree
+		return err
+	}
 
 	// Save the tree
 	if err := t.saveTreeLocked(); err != nil {
 		t.log.Error("Error saving tree after reconstruction", "error", err)
+		// Revert tree assignment on failure (may set back to nil, which is fine)
+		t.tree = oldTree
 		return err
 	}
 
