@@ -47,7 +47,7 @@ func TestImporterService_createImportPlanFromFolder_StoresPlan(t *testing.T) {
 	w := &fakeWiki{treeHash: "h1", lookups: map[string]*tree.PathLookup{}}
 	is := newServiceWithFakeWiki(t, w)
 
-	plan, err := is.createImportPlanFromFolder(tmp)
+	plan, err := is.createImportPlanFromFolder(tmp, "")
 	if err != nil {
 		t.Fatalf("createImportPlanFromFolder err: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestImporterService_createImportPlanFromFolder_CleansUpOldWorkspace(t *test
 		CreatedAt:     time.Now(),
 	})
 
-	_, err := is.createImportPlanFromFolder(newWS)
+	_, err := is.createImportPlanFromFolder(newWS, "")
 	if err != nil {
 		t.Fatalf("createImportPlanFromFolder err: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestImporterService_ClearCurrentPlan(t *testing.T) {
 	w := &fakeWiki{treeHash: "h1", lookups: map[string]*tree.PathLookup{}}
 	is := newServiceWithFakeWiki(t, w)
 
-	_, err := is.createImportPlanFromFolder(tmp)
+	_, err := is.createImportPlanFromFolder(tmp, "")
 	if err != nil {
 		t.Fatalf("createImportPlanFromFolder err: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestImporterService_ExecuteCurrentPlan_HappyPath_UsesExecutorAndStripsFront
 	w := &fakeWiki{treeHash: "h1", lookups: map[string]*tree.PathLookup{}}
 	is := newServiceWithFakeWiki(t, w)
 
-	plan, err := is.createImportPlanFromFolder(ws)
+	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
 		t.Fatalf("createImportPlanFromFolder err: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestImporterService_ExecuteCurrentPlan_ExecutorStalePlanPropagatesError(t *
 	w := &fakeWiki{treeHash: "h1", lookups: map[string]*tree.PathLookup{}}
 	is := newServiceWithFakeWiki(t, w)
 
-	plan, err := is.createImportPlanFromFolder(ws)
+	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
 		t.Fatalf("createImportPlanFromFolder err: %v", err)
 	}
@@ -239,5 +239,36 @@ func TestFindMarkdownEntries_FindsMdRecursively_AndNormalizesSlashes(t *testing.
 	}
 	if set["b.txt"] {
 		t.Fatalf("should not include b.txt")
+	}
+}
+
+func TestImporterService_createImportPlanFromFolder_UsesTargetBasePath(t *testing.T) {
+	tmp := t.TempDir()
+	mustWrite(t, tmp, "a.md", "# A\nbody")
+
+	w := &fakeWiki{treeHash: "h1", lookups: map[string]*tree.PathLookup{}}
+	is := newServiceWithFakeWiki(t, w)
+
+	plan, err := is.createImportPlanFromFolder(tmp, "docs/imports")
+	if err != nil {
+		t.Fatalf("createImportPlanFromFolder err: %v", err)
+	}
+	if plan == nil || len(plan.Items) != 1 {
+		t.Fatalf("unexpected plan: %#v", plan)
+	}
+
+	// Verify the plan item has the correct target path with the base path
+	item := plan.Items[0]
+	if item.TargetPath != "docs/imports/a" {
+		t.Fatalf("expected TargetPath 'docs/imports/a', got %q", item.TargetPath)
+	}
+
+	// Verify the stored plan options has the correct target base path
+	sp, err := is.planStore.Get()
+	if err != nil {
+		t.Fatalf("Get plan err: %v", err)
+	}
+	if sp.PlanOptions.TargetBasePath != "docs/imports" {
+		t.Fatalf("expected TargetBasePath 'docs/imports', got %q", sp.PlanOptions.TargetBasePath)
 	}
 }

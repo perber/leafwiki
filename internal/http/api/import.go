@@ -30,7 +30,10 @@ func CreateImportPlanHandler(svc *importer.ImporterService) gin.HandlerFunc {
 		}
 		defer file.Close()
 
-		plan, err := svc.CreateImportPlanFromZipUpload(file)
+		// optional: targetBasePath from form (defaults to empty string = root)
+		targetBasePath := c.PostForm("targetBasePath")
+
+		plan, err := svc.CreateImportPlanFromZipUpload(file, targetBasePath)
 		if err != nil {
 			respondWithError(c, err)
 			return
