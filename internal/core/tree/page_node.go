@@ -159,7 +159,7 @@ func writeInt64(w io.Writer, v int64) {
 }
 
 func writeTime(w io.Writer, t time.Time) {
-	// stabil: UnixNano in UTC (Zero => 0)
+	// stable: UnixNano in UTC (Zero => 0)
 	if t.IsZero() {
 		writeInt64(w, 0)
 		return
