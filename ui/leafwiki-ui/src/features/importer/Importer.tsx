@@ -157,7 +157,7 @@ export default function Importer() {
                         </tr>
                       </thead>
                       <tbody>
-                        {importPlan.items.map((item, index) => (
+                        {importPlan.items.map((item) => (
                           <tr key={`${item.source_path}::${item.target_path}`}>
                             <td className="settings__table-cell">
                               {item.source_path}
@@ -258,7 +258,7 @@ export default function Importer() {
                     </tr>
                   </thead>
                   <tbody>
-                    {importResult.items.map((item, index) => (
+                    {importResult.items.map((item) => (
                       <tr key={`${item.source_path}::${item.target_path}`}>
                         <td className="settings__table-cell">
                           {item.source_path}
