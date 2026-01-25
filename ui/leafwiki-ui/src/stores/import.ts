@@ -7,6 +7,7 @@ type ImportStore = {
   creatingImportPlan: boolean
   executingImportPlan: boolean
   importPlan: importAPI.ImportPlan | null
+  importResult: importAPI.ImportResult | null
   createImportPlan: (sourcePath: File) => Promise<void>
   loadImportPlan: () => Promise<void>
   executeImportPlan: () => Promise<void>
@@ -16,8 +17,9 @@ export const useImportStore = create<ImportStore>((set, get) => ({
   importPlan: null,
   creatingImportPlan: false,
   executingImportPlan: false,
+  importResult: null,
   createImportPlan: async (sourcePath: File) => {
-    set({ creatingImportPlan: true })
+    set({ creatingImportPlan: true, importPlan: null, importResult: null })
     try {
       const importPlan = await importAPI.createImportPlanFromZip(sourcePath)
       toast.success('Import plan created successfully')
@@ -29,6 +31,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
     }
   },
   loadImportPlan: async () => {
+    set({ creatingImportPlan: true, importPlan: null, importResult: null })
     try {
       const importPlan = await importAPI.getImportPlan()
       set({ importPlan })
@@ -46,10 +49,10 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       return
     }
     try {
-      set({ executingImportPlan: true })
-      await importAPI.executeImportPlan()
+      set({ executingImportPlan: true, importResult: null })
+      const importResult = await importAPI.executeImportPlan()
       toast.success('Import completed successfully')
-      set({ importPlan: null })
+      set({ importPlan: null, importResult })
     } catch (err) {
       if ('error' in (err as { error: string })) {
         toast.error(

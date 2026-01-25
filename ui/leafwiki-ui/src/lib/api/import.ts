@@ -1,52 +1,5 @@
 import { fetchWithAuth } from './auth'
 
-/**
- * 
- *{
-    "id": "q9cEcXSDR",
-    "tree_hash": "028bc386f9f8f94b66d240430a4b4fe90e26879d67041444ed854b4f289b100f",
-    "items": [
-        {
-            "source_path": "features/index.md",
-            "target_path": "features",
-            "title": "Features",
-            "desired_slug": "features",
-            "kind": "section",
-            "exists": false,
-            "existing_id": null,
-            "action": "create",
-            "conflicts": null,
-            "notes": null
-        },
-        {
-            "source_path": "features/mermaind.md",
-            "target_path": "features/mermaind",
-            "title": "Mermaid",
-            "desired_slug": "mermaind",
-            "kind": "page",
-            "exists": false,
-            "existing_id": null,
-            "action": "create",
-            "conflicts": null,
-            "notes": null
-        },
-        {
-            "source_path": "home.md",
-            "target_path": "home",
-            "title": "Home",
-            "desired_slug": "home",
-            "kind": "page",
-            "exists": false,
-            "existing_id": null,
-            "action": "create",
-            "conflicts": null,
-            "notes": null
-        }
-    ],
-    "errors": []
-}
- */
-
 export type ImportPlan = {
   id: string
   tree_hash: string
@@ -67,6 +20,20 @@ export type ImportPlanItem = {
   notes: string[] | null
 }
 
+export type ImportResult = {
+  imported_count: number
+  updated_count: number
+  skipped_count: number
+  items: {
+    source_path: string
+    target_path: string
+    action: 'created' | 'updated' | 'skipped' | 'conflicted'
+    error?: string
+  }[]
+  tree_hash: string
+  tree_hash_before: string
+}
+
 export async function createImportPlanFromZip(file: File): Promise<ImportPlan> {
   const formData = new FormData()
   formData.append('file', file)
@@ -84,8 +51,8 @@ export async function getImportPlan(): Promise<ImportPlan> {
   })) as Promise<ImportPlan>
 }
 
-export async function executeImportPlan(): Promise<void> {
-  await fetchWithAuth('/api/import/execute', {
+export async function executeImportPlan(): Promise<ImportResult> {
+  return (await fetchWithAuth('/api/import/execute', {
     method: 'POST',
-  })
+  })) as Promise<ImportResult>
 }

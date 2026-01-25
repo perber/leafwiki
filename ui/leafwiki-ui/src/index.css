@@ -1312,7 +1312,8 @@
     @apply p-3;
   }
 
-  .settings__role-pill, .settings__pill {
+  .settings__role-pill,
+  .settings__pill {
     @apply rounded px-2 py-1 text-xs font-medium;
   }
 
