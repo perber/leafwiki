@@ -75,6 +75,12 @@ export default function UserToolbar() {
             >
               Branding Settings
             </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => navigate('/settings/importer')}
+            >
+              Import
+            </DropdownMenuItem>
           </RoleGuard>
           <DropdownMenuItem
             className="cursor-pointer"
