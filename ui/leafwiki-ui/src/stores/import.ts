@@ -54,10 +54,12 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       toast.success('Import completed successfully')
       set({ importPlan: null, importResult })
     } catch (err) {
-      if ('error' in (err as { error: string })) {
+      if (typeof err === 'object' && err !== null && 'error' in err) {
         toast.error(
           'Failed to execute import plan: ' + (err as { error: string }).error,
         )
+      } else if (err instanceof Error) {
+        toast.error('Failed to execute import plan: ' + err.message)
       } else {
         toast.error('Failed to execute import plan: unknown error')
       }
