@@ -130,7 +130,6 @@ export default function Importer() {
             </div>
           </div>
         )}
-        ️
         {importPlan && importPlan.items.length > 0 && (
           <>
             <div className="settings__section">
