@@ -164,10 +164,6 @@ func (t *TreeService) backfillMetadataLocked() error {
 		return nil
 	}
 
-	if t.tree == nil {
-		return ErrTreeNotLoaded
-	}
-
 	return backfillMetadata(t.tree)
 }
 
