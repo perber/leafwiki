@@ -2,9 +2,11 @@ package tree
 
 // PathLookup helpers for LookupPath()
 type PathSegment struct {
-	Slug   string  `json:"slug"`
-	Exists bool    `json:"exists"`
-	ID     *string `json:"id,omitempty"`
+	Slug   string    `json:"slug"`
+	Exists bool      `json:"exists"`
+	Kind   *NodeKind `json:"kind,omitempty"`
+	Title  *string   `json:"title,omitempty"`
+	ID     *string   `json:"id,omitempty"`
 }
 
 type PathLookup struct {
