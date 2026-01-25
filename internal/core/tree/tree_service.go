@@ -107,7 +107,7 @@ func (t *TreeService) migrateToV1() error {
 	return t.backfillMetadataLocked()
 }
 
-// backfillMetadataLocked backfills metadata for all nodes in the tree from filesystem
+// backfillMetadataLocked backfills CreatedAt and UpdatedAt timestamps for all nodes from filesystem
 // The caller must ensure that t.tree is not nil before calling this method
 func (t *TreeService) backfillMetadataLocked() error {
 	var backfillMetadata func(node *PageNode) error
@@ -182,17 +182,18 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 	
 	// Defensive check - should not happen as ReconstructTreeFromFS always returns a root node
 	if newTree == nil {
-		return fmt.Errorf("reconstructed tree is nil")
+		return fmt.Errorf("internal error: ReconstructTreeFromFS returned nil tree")
 	}
 	
 	// Save the old tree in case we need to revert
+	// Note: oldTree may be nil if this is the first reconstruction (which is expected)
 	oldTree := t.tree
 	t.tree = newTree
 
 	// Backfill metadata for all nodes
 	if err := t.backfillMetadataLocked(); err != nil {
 		t.log.Error("Error backfilling metadata after reconstruction", "error", err)
-		// Revert tree assignment on failure
+		// Revert tree assignment on failure (may set back to nil, which is fine)
 		t.tree = oldTree
 		return err
 	}
@@ -200,7 +201,7 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 	// Save the tree
 	if err := t.saveTreeLocked(); err != nil {
 		t.log.Error("Error saving tree after reconstruction", "error", err)
-		// Revert tree assignment on failure
+		// Revert tree assignment on failure (may set back to nil, which is fine)
 		t.tree = oldTree
 		return err
 	}
