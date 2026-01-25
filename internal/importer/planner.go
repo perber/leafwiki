@@ -195,12 +195,17 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 }
 
 func (p *Planner) extractTitleFromMDFile(mdFilePath string) (string, error) {
+	// Helper to get filename-based fallback
+	filenameFallback := func() string {
+		base := path.Base(mdFilePath)
+		return strings.TrimSuffix(base, path.Ext(base))
+	}
+
 	// Read the file content
 	content, err := os.ReadFile(mdFilePath)
 	if err != nil {
 		// If we can't read the file, return filename as fallback but keep the error
-		base := path.Base(mdFilePath)
-		return strings.TrimSuffix(base, path.Ext(base)), err
+		return filenameFallback(), err
 	}
 
 	stripSingleAndDoubleQuotes := func(s string, err error) (string, error) {
@@ -225,8 +230,7 @@ func (p *Planner) extractTitleFromMDFile(mdFilePath string) (string, error) {
 	}
 
 	// strip extension from filename
-	base := path.Base(mdFilePath)
-	return stripSingleAndDoubleQuotes(strings.TrimSuffix(base, path.Ext(base)), nil)
+	return stripSingleAndDoubleQuotes(filenameFallback(), nil)
 }
 
 func (p *Planner) extractTitleFromFrontMatter(content []byte) (string, error) {
