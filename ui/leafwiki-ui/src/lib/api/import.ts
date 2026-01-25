@@ -15,7 +15,7 @@ export type ImportPlanItem = {
   kind: 'page' | 'section'
   exists: boolean
   existing_id: string | null
-  action: 'create' | 'update' | 'skip' | 'conflict'
+  action: 'create' | 'update' | 'skip'
   conflicts: string[] | null
   notes: string[] | null
 }
