@@ -20,7 +20,7 @@ func printUsage() {
 	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
 	leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
 	leafwiki reset-admin-password
-	leafwiki reconstruct-tree [--data-dir <DIR>]
+	leafwiki [--data-dir <DIR>] reconstruct-tree
 	leafwiki --help
 
 	Options:
