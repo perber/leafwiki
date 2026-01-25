@@ -162,6 +162,33 @@ func (t *TreeService) migrateToV1() error {
 	return backfillMetadata(t.tree)
 }
 
+func (t *TreeService) ReconstructTreeFromFS() error {
+	return t.withLockedTree(t.reconstructTreeFromFSLocked)
+}
+
+func (t *TreeService) reconstructTreeFromFSLocked() error {
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
+	// Reconstruct the tree from the filesystem
+	// This is a more complex operation and may involve reading the filesystem structure
+	newTree, err := t.store.ReconstructTreeFromFS()
+	if err != nil {
+		t.log.Error("Error reconstructing tree from filesystem", "error", err)
+		return err
+	}
+	t.tree = newTree
+
+	// Save the tree
+	if err := t.saveTreeLocked(); err != nil {
+		t.log.Error("Error saving tree after reconstruction", "error", err)
+		return err
+	}
+
+	return nil
+}
+
 // migrateToV2 migrates the tree to the v2 schema
 // Adds frontmatter to all existing pages if missing
 // Adds kind to all nodes

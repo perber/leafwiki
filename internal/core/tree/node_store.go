@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/perber/wiki/internal/core/shared"
@@ -77,6 +78,129 @@ func (f *NodeStore) LoadTree(filename string) (*PageNode, error) {
 	f.assignParentToChildren(tree)
 
 	return tree, nil
+}
+
+func (f *NodeStore) ReconstructTreeFromFS() (*PageNode, error) {
+	root := &PageNode{
+		ID:       "root",
+		Slug:     "root",
+		Title:    "root",
+		Parent:   nil,
+		Position: 0,
+		Children: []*PageNode{},
+		Kind:     NodeKindSection,
+	}
+
+	err := f.reconstructTreeRecursive(f.storageDir, root)
+	if err != nil {
+		return nil, fmt.Errorf("reconstruct tree from fs: %w", err)
+	}
+
+	return root, nil
+}
+func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNode) error {
+	entries, err := os.ReadDir(currentPath)
+	if err != nil {
+		return fmt.Errorf("read dir %s: %w", currentPath, err)
+	}
+
+	// stable ordering
+	sort.Slice(entries, func(i, j int) bool {
+		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
+	})
+
+	for _, entry := range entries {
+		name := entry.Name()
+
+		// optional: skip hidden stuff
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+
+		// defaults
+		title := name
+		id, err := shared.GenerateUniqueID()
+		if err != nil {
+			return fmt.Errorf("generate unique ID: %w", err)
+		}
+
+		if entry.IsDir() {
+			indexPath := filepath.Join(currentPath, name, "index.md")
+			if fileExists(indexPath) {
+				content, err := os.ReadFile(indexPath)
+				if err != nil {
+					return fmt.Errorf("read index.md %s: %w", indexPath, err)
+				}
+				fm, _, _, err := ParseFrontmatter(string(content))
+				if err != nil {
+					return fmt.Errorf("parse frontmatter in %s: %w", indexPath, err)
+				}
+				if strings.TrimSpace(fm.LeafWikiID) != "" {
+					id = strings.TrimSpace(fm.LeafWikiID)
+				}
+				if strings.TrimSpace(fm.LeafWikiTitle) != "" {
+					title = strings.TrimSpace(fm.LeafWikiTitle)
+				}
+			}
+
+			child := &PageNode{
+				ID:       id,
+				Slug:     name,
+				Title:    title,
+				Parent:   parent,
+				Position: len(parent.Children),
+				Children: []*PageNode{},
+				Kind:     NodeKindSection,
+			}
+			parent.Children = append(parent.Children, child)
+
+			if err := f.reconstructTreeRecursive(filepath.Join(currentPath, name), child); err != nil {
+				return err
+			}
+			continue
+		}
+
+		// file
+		if !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		// skip index.md (handled by section case)
+		if name == "index.md" {
+			continue
+		}
+
+		slug := strings.TrimSuffix(name, ".md")
+		filePath := filepath.Join(currentPath, name)
+
+		// sensible defaults for pages
+		title = slug
+
+		content, err := os.ReadFile(filePath)
+		if err == nil {
+			fm, _, _, err := ParseFrontmatter(string(content))
+			if err == nil {
+				if strings.TrimSpace(fm.LeafWikiID) != "" {
+					id = strings.TrimSpace(fm.LeafWikiID)
+				}
+				if strings.TrimSpace(fm.LeafWikiTitle) != "" {
+					title = strings.TrimSpace(fm.LeafWikiTitle)
+				}
+			}
+		}
+
+		child := &PageNode{
+			ID:       id,
+			Slug:     slug,
+			Title:    title,
+			Parent:   parent,
+			Position: len(parent.Children),
+			Children: nil,
+			Kind:     NodeKindPage,
+		}
+		parent.Children = append(parent.Children, child)
+	}
+
+	return nil
 }
 
 func (f *NodeStore) assignParentToChildren(parent *PageNode) {

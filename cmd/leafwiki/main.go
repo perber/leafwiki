@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"strings"
@@ -21,6 +20,7 @@ func printUsage() {
 	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
 	leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
 	leafwiki reset-admin-password
+	leafwiki reconstruct-tree [--data-dir <DIR>]
 	leafwiki --help
 
 	Options:
@@ -56,7 +56,7 @@ func printUsage() {
 
 func setupLogger() {
 	level := slog.LevelInfo
-	if os.Getenv("LOG_LEVEL") == "debug" {
+	if os.Getenv("LEAFWIKI_LOG_LEVEL") == "debug" {
 		level = slog.LevelDebug
 	}
 
@@ -66,6 +66,11 @@ func setupLogger() {
 	})
 
 	slog.SetDefault(slog.New(handler))
+}
+
+func fail(msg string, args ...any) {
+	slog.Default().Error(msg, args...)
+	os.Exit(1)
 }
 
 func main() {
@@ -110,11 +115,17 @@ func main() {
 		case "reset-admin-password":
 			user, err := tools.ResetAdminPassword(dataDir)
 			if err != nil {
-				log.Fatalf("Password reset failed: %v", err)
+				fail("Password reset failed", "error", err)
 			}
 
 			fmt.Println("Admin password reset successfully.")
 			fmt.Printf("New password for user %s: %s\n", user.Username, user.Password)
+			return
+		case "reconstruct-tree":
+			if err := tools.ReconstructTreeFromFS(dataDir); err != nil {
+				fail("Tree reconstruction failed", "error", err)
+			}
+			fmt.Println("Tree reconstructed successfully from filesystem.")
 			return
 		case "--help", "-h", "help":
 			printUsage()
@@ -128,27 +139,27 @@ func main() {
 
 	if disableAuth {
 		publicAccess = true
-		log.Printf("WARNING: Authentication disabled. Wiki is publicly accessible without authentication.")
+		slog.Default().Warn("Authentication disabled. Wiki is publicly accessible without authentication.")
 	}
 
 	if allowInsecure {
-		log.Printf("WARNING: allow-insecure enabled. Auth cookies may be transmitted over plain HTTP (INSECURE).")
+		slog.Default().Warn("allow-insecure enabled. Auth cookies may be transmitted over plain HTTP (INSECURE).")
 	}
 
 	// Check if data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			log.Fatalf("Failed to create data directory: %v", err)
+			fail("Failed to create data directory", "error", err)
 		}
 	}
 
 	if !disableAuth {
 		if jwtSecret == "" {
-			log.Fatal("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
+			fail("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
 		}
 
 		if adminPassword == "" {
-			log.Fatalf("admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
+			fail("admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
 		}
 	}
 
@@ -161,7 +172,7 @@ func main() {
 		AuthDisabled:        disableAuth,
 	})
 	if err != nil {
-		log.Fatalf("Failed to initialize Wiki: %v", err)
+		fail("Failed to initialize Wiki", "error", err)
 	}
 	defer w.Close()
 
@@ -180,7 +191,7 @@ func main() {
 
 	// Start server
 	if err := router.Run(listenAddr); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		fail("Failed to start server", "error", err)
 	}
 }
 
@@ -208,7 +219,7 @@ func resolveBool(flagName string, flagVal bool, visited map[string]bool, envVar 
 			return b
 		}
 		// If env var is set but invalid, fail fast (helps operators)
-		log.Fatalf("Invalid value for %s: %q (expected true/false/1/0/yes/no)", envVar, env)
+		fail("Invalid value for %s: %q (expected true/false/1/0/yes/no)", envVar, env)
 	}
 	return flagVal // default from flag
 }
@@ -222,7 +233,7 @@ func resolveDuration(flagName string, flagVal time.Duration, visited map[string]
 			return d
 		}
 		// If env var is set but invalid, fail fast (helps operators)
-		log.Fatalf("Invalid value for %s: %q (expected duration like 24h, 15m)", envVar, env)
+		fail("Invalid value for %s: %q (expected duration like 24h, 15m)", envVar, env)
 	}
 	return flagVal // default from flag
 }
