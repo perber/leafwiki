@@ -3,6 +3,23 @@ import { toast } from 'sonner'
 import { create } from 'zustand'
 import { useTreeStore } from './tree'
 
+// Helper to normalize error messages from various error types
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message
+  }
+  if (typeof err === 'object' && err !== null) {
+    const errObj = err as Record<string, unknown>
+    if (typeof errObj.error === 'string') {
+      return errObj.error
+    }
+    if (typeof errObj.message === 'string') {
+      return errObj.message
+    }
+  }
+  return String(err)
+}
+
 type ImportStore = {
   creatingImportPlan: boolean
   executingImportPlan: boolean
@@ -25,7 +42,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       toast.success('Import plan created successfully')
       set({ importPlan })
     } catch (err) {
-      toast.error('Failed to create import plan: ' + (err as Error).message)
+      toast.error('Failed to create import plan: ' + getErrorMessage(err))
     } finally {
       set({ creatingImportPlan: false })
     }
@@ -36,7 +53,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       const importPlan = await importAPI.getImportPlan()
       set({ importPlan })
     } catch (err) {
-      toast.error('Failed to load import plan: ' + (err as Error).message)
+      toast.error('Failed to load import plan: ' + getErrorMessage(err))
       return
     } finally {
       set({ creatingImportPlan: false })
@@ -54,13 +71,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       toast.success('Import completed successfully')
       set({ importPlan: null, importResult })
     } catch (err) {
-      if ('error' in (err as { error: string })) {
-        toast.error(
-          'Failed to execute import plan: ' + (err as { error: string }).error,
-        )
-      } else {
-        toast.error('Failed to execute import plan: unknown error')
-      }
+      toast.error('Failed to execute import plan: ' + getErrorMessage(err))
     } finally {
       set({ executingImportPlan: false })
       // reload tree
