@@ -91,8 +91,22 @@ func (f *NodeStore) ReconstructTreeFromFS() (*PageNode, error) {
 		Kind:     NodeKindSection,
 	}
 
-	err := f.reconstructTreeRecursive(f.storageDir, root)
+	rootDir := filepath.Join(f.storageDir, "root")
+
+	info, err := os.Stat(rootDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// No on-disk content yet; return an empty root tree.
+			return root, nil
+		}
+		return nil, fmt.Errorf("stat root dir %s: %w", rootDir, err)
+	}
+
+	if !info.IsDir() {
+		return nil, fmt.Errorf("root path %s is not a directory", rootDir)
+	}
+
+	if err := f.reconstructTreeRecursive(rootDir, root); err != nil {
 		return nil, fmt.Errorf("reconstruct tree from fs: %w", err)
 	}
 
