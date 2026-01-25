@@ -13,8 +13,19 @@ type ImportStore = {
   executeImportPlan: () => Promise<void>
 }
 
-// Helper to extract error message from various error shapes
+/**
+ * Helper to extract error message from various error shapes.
+ * Handles:
+ * - string errors
+ * - objects with `error` property (e.g., from fetchWithAuth)
+ * - objects with `message` property (e.g., standard Error objects)
+ * @param err - The error to extract a message from
+ * @returns A string error message, or 'unknown error' if no message can be extracted
+ */
 function getErrorMessage(err: unknown): string {
+  if (typeof err === 'string') {
+    return err
+  }
   if (typeof err === 'object' && err !== null) {
     if ('error' in err && typeof err.error === 'string') {
       return err.error
