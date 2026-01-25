@@ -18,7 +18,11 @@ func TestZipExtractor_ValidateExtractedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExtractToTemp failed: %v", err)
 	}
-	defer ws.Cleanup()
+	defer func() {
+		if err := ws.Cleanup(); err != nil {
+			t.Fatalf("Cleanup failed: %v", err)
+		}
+	}()
 
 	// Check if expected files exist
 	expectedFiles := []string{

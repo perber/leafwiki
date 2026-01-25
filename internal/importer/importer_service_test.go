@@ -223,11 +223,6 @@ func TestFindMarkdownEntries_FindsMdRecursively_AndNormalizesSlashes(t *testing.
 		}
 	}
 
-	// only .md files (case-insensitive)
-	if !set["a.md"] || !set["sub/c.MD"] && !set["sub/c.md"] {
-		// depending on Rel and actual filename case, filepath.ToSlash keeps case from disk;
-		// but we wrote "c.MD". The SourcePath will be "sub/c.MD".
-	}
 	if !set["a.md"] {
 		t.Fatalf("missing a.md, got %#v", set)
 	}

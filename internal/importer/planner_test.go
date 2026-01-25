@@ -358,12 +358,16 @@ func TestPlanner_extractTitleFromMDFile_FilenameFallback(t *testing.T) {
 func TestPlanner_CreatePlan_TitleExtractionError_AddsNote(t *testing.T) {
 	tmp := t.TempDir()
 	abs := writeFile(t, tmp, "unreadable.md", "# Title")
-	
+
 	// Make file unreadable to trigger extraction error
 	if err := os.Chmod(abs, 0o000); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
-	defer os.Chmod(abs, 0o644) // restore for cleanup
+	defer func() {
+		if err := os.Chmod(abs, 0o644); err != nil { // restore for cleanup
+			t.Fatalf("chmod restore: %v", err)
+		}
+	}()
 
 	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
 	p := newPlannerWithFake(wiki)
