@@ -28,7 +28,7 @@ func NewImporterService(planner *Planner, planStore *PlanStore) *ImporterService
 }
 
 // CreateImportPlanFromFolder creates an import plan from a folder path
-func (is *ImporterService) createImportPlanFromFolder(folderPath string) (*PlanResult, error) {
+func (is *ImporterService) createImportPlanFromFolder(folderPath string, targetBasePath string) (*PlanResult, error) {
 	// single-plan semantics: cleanup old plan workspace if present
 	if old, err := is.planStore.Get(); err == nil && old != nil {
 		err = os.RemoveAll(old.WorkspaceRoot)
@@ -46,6 +46,7 @@ func (is *ImporterService) createImportPlanFromFolder(folderPath string) (*PlanR
 
 	opts := PlanOptions{
 		SourceBasePath: folderPath,
+		TargetBasePath: targetBasePath,
 	}
 
 	plan, err := is.planner.CreatePlan(entries, opts)
@@ -169,13 +170,14 @@ func FindMarkdownEntries(sourceBasePath string) ([]ImportMDFile, error) {
 // CreateImportPlanFromZipUpload creates an import plan from an uploaded zip file
 func (is *ImporterService) CreateImportPlanFromZipUpload(
 	r io.Reader,
+	targetBasePath string,
 ) (*PlanResult, error) {
 	ws, err := is.extractZipReaderToTemp(r)
 	if err != nil {
 		return nil, fmt.Errorf("extract zip to temp: %w", err)
 	}
 
-	plan, err := is.createImportPlanFromFolder(ws.Root)
+	plan, err := is.createImportPlanFromFolder(ws.Root, targetBasePath)
 	if err != nil {
 		if err := ws.Cleanup(); err != nil {
 			is.logger.Error("cleanup failed", "error", err)
