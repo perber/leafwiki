@@ -42,17 +42,17 @@ export async function createImportPlanFromZip(file: File): Promise<ImportPlan> {
     method: 'POST',
     body: formData,
     headers: {}, // Let browser set Content-Type for FormData
-  })) as Promise<ImportPlan>
+  })) as ImportPlan
 }
 
 export async function getImportPlan(): Promise<ImportPlan> {
   return (await fetchWithAuth('/api/import/plan', {
     method: 'GET',
-  })) as Promise<ImportPlan>
+  })) as ImportPlan
 }
 
 export async function executeImportPlan(): Promise<ImportResult> {
   return (await fetchWithAuth('/api/import/execute', {
     method: 'POST',
-  })) as Promise<ImportResult>
+  })) as ImportResult
 }
