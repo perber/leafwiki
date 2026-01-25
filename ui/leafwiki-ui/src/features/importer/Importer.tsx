@@ -259,7 +259,7 @@ export default function Importer() {
                   </thead>
                   <tbody>
                     {importResult.items.map((item, index) => (
-                      <tr key={index}>
+                      <tr key={`${item.source_path}::${item.target_path}`}>
                         <td className="settings__table-cell">
                           {item.source_path}
                         </td>
