@@ -16,6 +16,15 @@ func CreateImportPlanHandler(svc *importer.ImporterService) gin.HandlerFunc {
 			return
 		}
 
+		const maxUploadSize = 500 << 20 // 500 MiB (~524 MB)
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
+
+		// Parse form
+		if err := c.Request.ParseMultipartForm(maxUploadSize); err != nil {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "upload exceeds maximum size limit of 500 MiB"})
+			return
+		}
+
 		// multipart: file
 		fh, err := c.FormFile("file")
 		if err != nil {
