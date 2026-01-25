@@ -179,17 +179,24 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 		t.log.Error("Error reconstructing tree from filesystem", "error", err)
 		return err
 	}
+	
+	// Save the old tree in case we need to revert
+	oldTree := t.tree
 	t.tree = newTree
 
 	// Backfill metadata for all nodes
 	if err := t.backfillMetadataLocked(); err != nil {
 		t.log.Error("Error backfilling metadata after reconstruction", "error", err)
+		// Revert tree assignment on failure
+		t.tree = oldTree
 		return err
 	}
 
 	// Save the tree
 	if err := t.saveTreeLocked(); err != nil {
 		t.log.Error("Error saving tree after reconstruction", "error", err)
+		// Revert tree assignment on failure
+		t.tree = oldTree
 		return err
 	}
 
