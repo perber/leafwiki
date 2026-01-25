@@ -1,10 +1,10 @@
 package tree
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"io"
 	"sort"
 	"time"
 )
@@ -85,39 +85,38 @@ func (p *PageNode) Hash() string {
 
 func (p *PageNode) hashSum(includeMetadata bool) [32]byte {
 	h := sha256.New()
-	var buf bytes.Buffer
 
 	// depth-first, deterministic
-	p.writeHashPayload(&buf, includeMetadata)
-	_, _ = h.Write(buf.Bytes())
+	// Write directly to hash to avoid buffering entire tree in memory
+	p.writeHashPayload(h, includeMetadata)
 
 	var out [32]byte
 	copy(out[:], h.Sum(nil))
 	return out
 }
 
-func (p *PageNode) writeHashPayload(buf *bytes.Buffer, includeMetadata bool) {
+func (p *PageNode) writeHashPayload(w io.Writer, includeMetadata bool) {
 	// Node fields (parent excluded)
-	writeString(buf, "id")
-	writeString(buf, p.ID)
-	writeString(buf, "title")
-	writeString(buf, p.Title)
-	writeString(buf, "slug")
-	writeString(buf, p.Slug)
-	writeString(buf, "kind")
-	writeString(buf, string(p.Kind))
-	writeString(buf, "position")
-	writeInt64(buf, int64(p.Position))
+	writeString(w, "id")
+	writeString(w, p.ID)
+	writeString(w, "title")
+	writeString(w, p.Title)
+	writeString(w, "slug")
+	writeString(w, p.Slug)
+	writeString(w, "kind")
+	writeString(w, string(p.Kind))
+	writeString(w, "position")
+	writeInt64(w, int64(p.Position))
 
 	if includeMetadata {
-		writeString(buf, "meta.createdAt")
-		writeTime(buf, p.Metadata.CreatedAt)
-		writeString(buf, "meta.updatedAt")
-		writeTime(buf, p.Metadata.UpdatedAt)
-		writeString(buf, "meta.creatorId")
-		writeString(buf, p.Metadata.CreatorID)
-		writeString(buf, "meta.lastAuthorId")
-		writeString(buf, p.Metadata.LastAuthorID)
+		writeString(w, "meta.createdAt")
+		writeTime(w, p.Metadata.CreatedAt)
+		writeString(w, "meta.updatedAt")
+		writeTime(w, p.Metadata.UpdatedAt)
+		writeString(w, "meta.creatorId")
+		writeString(w, p.Metadata.CreatorID)
+		writeString(w, "meta.lastAuthorId")
+		writeString(w, p.Metadata.LastAuthorID)
 	}
 
 	// Children: enforce stable order (Position, then ID as tie-breaker)
@@ -134,36 +133,36 @@ func (p *PageNode) writeHashPayload(buf *bytes.Buffer, includeMetadata bool) {
 		return children[i].ID < children[j].ID
 	})
 
-	writeString(buf, "children.count")
-	writeInt64(buf, int64(len(children)))
+	writeString(w, "children.count")
+	writeInt64(w, int64(len(children)))
 
 	for _, ch := range children {
 		if ch == nil {
-			writeString(buf, "child.nil")
+			writeString(w, "child.nil")
 			continue
 		}
 		// Separator for safety
-		writeString(buf, "child.begin")
-		ch.writeHashPayload(buf, includeMetadata)
-		writeString(buf, "child.end")
+		writeString(w, "child.begin")
+		ch.writeHashPayload(w, includeMetadata)
+		writeString(w, "child.end")
 	}
 }
 
-func writeString(buf *bytes.Buffer, s string) {
+func writeString(w io.Writer, s string) {
 	// length-prefixed string (uint32 len + bytes)
-	_ = binary.Write(buf, binary.BigEndian, uint32(len(s)))
-	_, _ = buf.WriteString(s)
+	_ = binary.Write(w, binary.BigEndian, uint32(len(s)))
+	_, _ = io.WriteString(w, s)
 }
 
-func writeInt64(buf *bytes.Buffer, v int64) {
-	_ = binary.Write(buf, binary.BigEndian, v)
+func writeInt64(w io.Writer, v int64) {
+	_ = binary.Write(w, binary.BigEndian, v)
 }
 
-func writeTime(buf *bytes.Buffer, t time.Time) {
+func writeTime(w io.Writer, t time.Time) {
 	// stabil: UnixNano in UTC (Zero => 0)
 	if t.IsZero() {
-		writeInt64(buf, 0)
+		writeInt64(w, 0)
 		return
 	}
-	writeInt64(buf, t.UTC().UnixNano())
+	writeInt64(w, t.UTC().UnixNano())
 }
