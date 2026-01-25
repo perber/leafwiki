@@ -3,6 +3,7 @@ package importer
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
@@ -351,6 +352,46 @@ func TestPlanner_extractTitleFromMDFile_FilenameFallback(t *testing.T) {
 	}
 	if title != "some-file" {
 		t.Fatalf("title = %q", title)
+	}
+}
+
+func TestPlanner_CreatePlan_TitleExtractionError_AddsNote(t *testing.T) {
+	tmp := t.TempDir()
+	abs := writeFile(t, tmp, "unreadable.md", "# Title")
+	
+	// Make file unreadable to trigger extraction error
+	if err := os.Chmod(abs, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	defer os.Chmod(abs, 0o644) // restore for cleanup
+
+	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
+	p := newPlannerWithFake(wiki)
+
+	res, err := p.CreatePlan([]ImportMDFile{{SourcePath: "unreadable.md"}}, PlanOptions{
+		SourceBasePath: tmp,
+		TargetBasePath: "docs",
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan err: %v", err)
+	}
+	if len(res.Errors) != 0 {
+		t.Fatalf("Errors = %#v", res.Errors)
+	}
+	if len(res.Items) != 1 {
+		t.Fatalf("Items len = %d (want 1)", len(res.Items))
+	}
+
+	it := res.Items[0]
+	if len(it.Notes) != 1 {
+		t.Fatalf("Notes len = %d (want 1)", len(it.Notes))
+	}
+	if !strings.Contains(it.Notes[0], "Failed to extract title") {
+		t.Fatalf("Note = %q (should contain 'Failed to extract title')", it.Notes[0])
+	}
+	// Title should still be set (fallback to filename)
+	if it.Title != "unreadable" {
+		t.Fatalf("Title = %q (want unreadable)", it.Title)
 	}
 }
 
