@@ -3,6 +3,23 @@ import { toast } from 'sonner'
 import { create } from 'zustand'
 import { useTreeStore } from './tree'
 
+// Helper to normalize error messages from various error types
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message
+  }
+  if (typeof err === 'object' && err !== null) {
+    const errObj = err as Record<string, unknown>
+    if (typeof errObj.error === 'string') {
+      return errObj.error
+    }
+    if (typeof errObj.message === 'string') {
+      return errObj.message
+    }
+  }
+  return String(err)
+}
+
 type ImportStore = {
   creatingImportPlan: boolean
   executingImportPlan: boolean
