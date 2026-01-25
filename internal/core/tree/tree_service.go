@@ -108,7 +108,7 @@ func (t *TreeService) migrateToV1() error {
 }
 
 // backfillMetadataLocked backfills metadata for all nodes in the tree from filesystem
-// Assumes the tree is already locked by the caller
+// Assumes the tree is already locked by the caller and that t.tree is not nil
 func (t *TreeService) backfillMetadataLocked() error {
 	var backfillMetadata func(node *PageNode) error
 	backfillMetadata = func(node *PageNode) error {
