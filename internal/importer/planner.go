@@ -149,7 +149,11 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 		return nil, err
 	}
 
-	title, _ := p.extractTitleFromMDFile(sourcePath)
+	title, titleErr := p.extractTitleFromMDFile(sourcePath)
+	var notes []string
+	if titleErr != nil {
+		notes = append(notes, fmt.Sprintf("Failed to extract title from file: %v", titleErr))
+	}
 
 	if !result.Exists {
 
@@ -168,6 +172,7 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 			Kind:        kind,
 			Exists:      false,
 			Action:      PlanActionCreate,
+			Notes:       notes,
 		}, nil
 	}
 
@@ -185,6 +190,7 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 		ExistingID:  last.ID,
 		Kind:        kind,
 		Action:      PlanActionSkip,
+		Notes:       notes,
 	}, nil
 }
 
@@ -192,7 +198,9 @@ func (p *Planner) extractTitleFromMDFile(mdFilePath string) (string, error) {
 	// Read the file content
 	content, err := os.ReadFile(mdFilePath)
 	if err != nil {
-		return "", err
+		// If we can't read the file, return filename as fallback but keep the error
+		base := path.Base(mdFilePath)
+		return strings.TrimSuffix(base, path.Ext(base)), err
 	}
 
 	stripSingleAndDoubleQuotes := func(s string, err error) (string, error) {
