@@ -118,9 +118,14 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		return fmt.Errorf("read dir %s: %w", currentPath, err)
 	}
 
-	// stable ordering
-	sort.Slice(entries, func(i, j int) bool {
-		return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
+	// stable, deterministic ordering (case-insensitive, with case-sensitive tie-breaker)
+	sort.SliceStable(entries, func(i, j int) bool {
+		li := strings.ToLower(entries[i].Name())
+		lj := strings.ToLower(entries[j].Name())
+		if li == lj {
+			return entries[i].Name() < entries[j].Name()
+		}
+		return li < lj
 	})
 
 	for _, entry := range entries {
