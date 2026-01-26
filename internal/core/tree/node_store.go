@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/perber/wiki/internal/core/frontmatter"
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 )
 
@@ -147,20 +147,17 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		if entry.IsDir() {
 			indexPath := filepath.Join(currentPath, name, "index.md")
 			if fileExists(indexPath) {
-				content, err := os.ReadFile(indexPath)
+				mdFile, err := markdown.LoadMarkdownFile(indexPath)
 				if err != nil {
-					return fmt.Errorf("read index.md %s: %w", indexPath, err)
+					f.log.Error("could not load index.md", "path", indexPath, "error", err)
+					continue
 				}
-				fm, _, _, err := frontmatter.ParseFrontmatter(string(content))
+				title, err = mdFile.GetTitle()
 				if err != nil {
-					return fmt.Errorf("parse frontmatter in %s: %w", indexPath, err)
+					f.log.Error("could not extract title from index.md", "path", indexPath, "error", err)
+					continue
 				}
-				if strings.TrimSpace(fm.LeafWikiID) != "" {
-					id = strings.TrimSpace(fm.LeafWikiID)
-				}
-				if strings.TrimSpace(fm.LeafWikiTitle) != "" {
-					title = strings.TrimSpace(fm.LeafWikiTitle)
-				}
+				id = mdFile.GetFrontmatter().LeafWikiID
 			}
 
 			child := &PageNode{
@@ -192,20 +189,18 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		slug := strings.TrimSuffix(name, ".md")
 		filePath := filepath.Join(currentPath, name)
 
-		// sensible defaults for pages
-		title = slug
-
-		content, err := os.ReadFile(filePath)
-		if err == nil {
-			fm, _, _, err := frontmatter.ParseFrontmatter(string(content))
-			if err == nil {
-				if strings.TrimSpace(fm.LeafWikiID) != "" {
-					id = strings.TrimSpace(fm.LeafWikiID)
-				}
-				if strings.TrimSpace(fm.LeafWikiTitle) != "" {
-					title = strings.TrimSpace(fm.LeafWikiTitle)
-				}
-			}
+		mdFile, err := markdown.LoadMarkdownFile(filePath)
+		if err != nil {
+			f.log.Error("could not load markdown file", "path", filePath, "error", err)
+			continue
+		}
+		title, err = mdFile.GetTitle()
+		if err != nil {
+			f.log.Error("could not extract title from file", "path", filePath, "error", err)
+			continue
+		}
+		if mdFile.GetFrontmatter().LeafWikiID != "" {
+			id = mdFile.GetFrontmatter().LeafWikiID
 		}
 
 		child := &PageNode{
@@ -291,8 +286,8 @@ func (f *NodeStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 	}
 
 	// Build and write file
-	fm := frontmatter.Frontmatter{LeafWikiID: newEntry.ID}
-	md, err := frontmatter.BuildMarkdownWithFrontmatter(fm, "# "+newEntry.Title+"\n")
+	fm := markdown.Frontmatter{LeafWikiID: newEntry.ID}
+	md, err := markdown.BuildMarkdownWithFrontmatter(fm, "# "+newEntry.Title+"\n")
 	if err != nil {
 		return fmt.Errorf("could not build markdown with frontmatter: %w", err)
 	}
@@ -372,8 +367,8 @@ func (f *NodeStore) UpsertContent(entry *PageNode, content string) error {
 	}
 
 	// Update the file content
-	fm := frontmatter.Frontmatter{LeafWikiID: strings.TrimSpace(entry.ID), LeafWikiTitle: strings.TrimSpace(entry.Title)}
-	contentWithFM, err := frontmatter.BuildMarkdownWithFrontmatter(fm, content)
+	fm := markdown.Frontmatter{LeafWikiID: strings.TrimSpace(entry.ID), LeafWikiTitle: strings.TrimSpace(entry.Title)}
+	contentWithFM, err := markdown.BuildMarkdownWithFrontmatter(fm, content)
 	if err != nil {
 		return fmt.Errorf("could not build markdown with frontmatter: %w", err)
 	}
@@ -663,7 +658,7 @@ func (f *NodeStore) ReadPageContent(entry *PageNode) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, content, _, err := frontmatter.ParseFrontmatter(string(raw))
+	_, content, _, err := markdown.ParseFrontmatter(string(raw))
 	if err != nil {
 		return string(raw), err
 	}
@@ -698,19 +693,19 @@ func (f *NodeStore) SyncFrontmatterIfExists(entry *PageNode) error {
 		return fmt.Errorf("read content file: %w", err)
 	}
 
-	fm, body, has, err := frontmatter.ParseFrontmatter(string(raw))
+	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
 	if err != nil {
 		return fmt.Errorf("parse frontmatter: %w", err)
 	}
 	if !has {
-		fm = frontmatter.Frontmatter{}
+		fm = markdown.Frontmatter{}
 	}
 
 	// Tree-SoT invariants
 	fm.LeafWikiID = strings.TrimSpace(entry.ID)
 	fm.LeafWikiTitle = strings.TrimSpace(entry.Title)
 
-	out, err := frontmatter.BuildMarkdownWithFrontmatter(fm, body)
+	out, err := markdown.BuildMarkdownWithFrontmatter(fm, body)
 	if err != nil {
 		return fmt.Errorf("build markdown: %w", err)
 	}
@@ -903,8 +898,8 @@ func (f *NodeStore) ConvertNode(entry *PageNode, target NodeKind) error {
 				return fmt.Errorf("could not move index to page: %w", err)
 			}
 		} else {
-			fm := frontmatter.Frontmatter{LeafWikiID: entry.ID, LeafWikiTitle: entry.Title}
-			md, err := frontmatter.BuildMarkdownWithFrontmatter(fm, "")
+			fm := markdown.Frontmatter{LeafWikiID: entry.ID, LeafWikiTitle: entry.Title}
+			md, err := markdown.BuildMarkdownWithFrontmatter(fm, "")
 			if err != nil {
 				return err
 			}

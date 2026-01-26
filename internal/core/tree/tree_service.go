@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/perber/wiki/internal/core/frontmatter"
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 )
 
@@ -168,48 +168,6 @@ func (t *TreeService) backfillMetadataLocked() error {
 	return backfillMetadata(t.tree)
 }
 
-func (t *TreeService) ReconstructTreeFromFS() error {
-	return t.withLockedTree(t.reconstructTreeFromFSLocked)
-}
-
-func (t *TreeService) reconstructTreeFromFSLocked() error {
-	// Reconstruct the tree from the filesystem
-	// This is a more complex operation and may involve reading the filesystem structure
-	newTree, err := t.store.ReconstructTreeFromFS()
-	if err != nil {
-		t.log.Error("Error reconstructing tree from filesystem", "error", err)
-		return err
-	}
-
-	// Defensive check to protect against unexpected nil returns from ReconstructTreeFromFS
-	if newTree == nil {
-		return fmt.Errorf("internal error: ReconstructTreeFromFS returned nil tree")
-	}
-
-	// Save the old tree in case we need to revert
-	// Note: oldTree may be nil if this is the first reconstruction (which is expected)
-	oldTree := t.tree
-	t.tree = newTree
-
-	// Backfill metadata for all nodes
-	if err := t.backfillMetadataLocked(); err != nil {
-		t.log.Error("Error backfilling metadata after reconstruction", "error", err)
-		// Revert tree assignment on failure (may set back to nil, which is fine)
-		t.tree = oldTree
-		return err
-	}
-
-	// Save the tree
-	if err := t.saveTreeLocked(); err != nil {
-		t.log.Error("Error saving tree after reconstruction", "error", err)
-		// Revert tree assignment on failure (may set back to nil, which is fine)
-		t.tree = oldTree
-		return err
-	}
-
-	return nil
-}
-
 // migrateToV2 migrates the tree to the v2 schema
 // Adds frontmatter to all existing pages if missing
 // Adds kind to all nodes
@@ -241,7 +199,7 @@ func (t *TreeService) migrateToV2() error {
 		}
 
 		// Parse the frontmatter
-		fm, body, has, err := frontmatter.ParseFrontmatter(content)
+		fm, body, has, err := markdown.ParseFrontmatter(content)
 		if err != nil {
 			t.log.Error("Could not parse frontmatter for node", "nodeID", node.ID, "error", err)
 			return fmt.Errorf("could not parse frontmatter for node %s: %w", node.ID, err)
@@ -252,7 +210,7 @@ func (t *TreeService) migrateToV2() error {
 
 		// If there is no frontmatter, start with a new one
 		if !has {
-			fm = frontmatter.Frontmatter{}
+			fm = markdown.Frontmatter{}
 			changed = true
 		}
 
@@ -270,7 +228,7 @@ func (t *TreeService) migrateToV2() error {
 
 		// Only write if changed
 		if changed {
-			newContent, err := frontmatter.BuildMarkdownWithFrontmatter(fm, body)
+			newContent, err := markdown.BuildMarkdownWithFrontmatter(fm, body)
 			if err != nil {
 				t.log.Error("could not build markdown with frontmatter", "nodeID", node.ID, "error", err)
 				return fmt.Errorf("could not build markdown with frontmatter for node %s: %w", node.ID, err)
@@ -372,6 +330,12 @@ func (t *TreeService) SaveTree() error {
 	return t.withLockedTree(t.saveTreeLocked)
 }
 
+// saveTreeLocked saves the tree to the storage directory
+func (t *TreeService) saveTreeLocked() error {
+	return t.store.SaveTree(t.treeFilename, t.tree)
+}
+
+// TreeHash returns the current hash of the tree
 func (t *TreeService) TreeHash() string {
 	var hash string
 	_ = t.withRLockedTree(func() error {
@@ -381,9 +345,47 @@ func (t *TreeService) TreeHash() string {
 	return hash
 }
 
-func (t *TreeService) saveTreeLocked() error {
-	// Save the tree to the storage directory
-	return t.store.SaveTree(t.treeFilename, t.tree)
+// ReconstructTreeFromFS reconstructs the tree from the filesystem
+func (t *TreeService) ReconstructTreeFromFS() error {
+	return t.withLockedTree(t.reconstructTreeFromFSLocked)
+}
+
+func (t *TreeService) reconstructTreeFromFSLocked() error {
+	// Reconstruct the tree from the filesystem
+	// This is a more complex operation and may involve reading the filesystem structure
+	newTree, err := t.store.ReconstructTreeFromFS()
+	if err != nil {
+		t.log.Error("Error reconstructing tree from filesystem", "error", err)
+		return err
+	}
+
+	// Defensive check to protect against unexpected nil returns from ReconstructTreeFromFS
+	if newTree == nil {
+		return fmt.Errorf("internal error: ReconstructTreeFromFS returned nil tree")
+	}
+
+	// Save the old tree in case we need to revert
+	// Note: oldTree may be nil if this is the first reconstruction (which is expected)
+	oldTree := t.tree
+	t.tree = newTree
+
+	// Backfill metadata for all nodes
+	if err := t.backfillMetadataLocked(); err != nil {
+		t.log.Error("Error backfilling metadata after reconstruction", "error", err)
+		// Revert tree assignment on failure (may set back to nil, which is fine)
+		t.tree = oldTree
+		return err
+	}
+
+	// Save the tree
+	if err := t.saveTreeLocked(); err != nil {
+		t.log.Error("Error saving tree after reconstruction", "error", err)
+		// Revert tree assignment on failure (may set back to nil, which is fine)
+		t.tree = oldTree
+		return err
+	}
+
+	return nil
 }
 
 // Create Node adds a new node to the tree

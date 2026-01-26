@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perber/wiki/internal/core/frontmatter"
+	"github.com/perber/wiki/internal/core/markdown"
 )
 
 func mustWriteFile(t *testing.T, path string, data string, perm os.FileMode) {
@@ -168,7 +168,7 @@ func TestNodeStore_CreatePage_CreatesMarkdownWithFrontmatter(t *testing.T) {
 		t.Fatalf("read created page: %v", err)
 	}
 
-	fm, body, has, err := frontmatter.ParseFrontmatter(string(raw))
+	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestNodeStore_UpsertContent_Page_CreatesOrUpdates_PreservesMode(t *testing.
 	}
 
 	raw, _ := os.ReadFile(path)
-	fm, body, has, err := frontmatter.ParseFrontmatter(string(raw))
+	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
@@ -441,7 +441,7 @@ func TestNodeStore_SyncFrontmatterIfExists_Page_UpdatesOrAddsFM(t *testing.T) {
 	}
 
 	raw := string(mustRead(t, path))
-	fm, body, has, err := frontmatter.ParseFrontmatter(raw)
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
@@ -462,7 +462,7 @@ func TestNodeStore_SyncFrontmatterIfExists_Page_UpdatesOrAddsFM(t *testing.T) {
 		t.Fatalf("SyncFrontmatterIfExists(update): %v", err)
 	}
 	raw2 := string(mustRead(t, path))
-	fm2, body2, has2, err := frontmatter.ParseFrontmatter(raw2)
+	fm2, body2, has2, err := markdown.ParseFrontmatter(raw2)
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
@@ -616,7 +616,7 @@ func TestNodeStore_ConvertNode_SectionToPage_NoIndex_CreatesEmptyPageWithFM(t *t
 
 	pageFile := filepath.Join(tmp, "root", "docs.md")
 	raw := string(mustRead(t, pageFile))
-	fm, _, has, err := frontmatter.ParseFrontmatter(raw)
+	fm, _, has, err := markdown.ParseFrontmatter(raw)
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}

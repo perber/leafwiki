@@ -1,4 +1,4 @@
-package frontmatter
+package markdown
 
 import "errors"
 

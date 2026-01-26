@@ -3,10 +3,9 @@ package importer
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 
-	"github.com/perber/wiki/internal/core/frontmatter"
+	"github.com/perber/wiki/internal/core/markdown"
 )
 
 type ExecutionResult struct {
@@ -94,18 +93,17 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 				continue
 			}
 			sourceAbs := filepath.Join(e.planOptions.SourceBasePath, filepath.FromSlash(item.SourcePath))
-			content, err := os.ReadFile(sourceAbs)
+			mdFile, err := markdown.LoadMarkdownFile(sourceAbs)
 			if err != nil {
 				errMsg := err.Error()
 				execItem.Action = ExecutionActionSkipped
 				execItem.Error = &errMsg
 				result.SkippedCount++
 				result.Items = append(result.Items, execItem)
-				e.logger.Error("Failed to read source file", "source_path", sourceAbs, "error", err)
+				e.logger.Error("Failed to load source file", "source_path", sourceAbs, "error", err)
 				continue
 			}
-			// Strip frontmatter if any
-			_, body, _ := frontmatter.SplitFrontmatter(string(content))
+			body := mdFile.GetContent()
 			if _, err := e.wiki.UpdatePage(userID, page.ID, page.Title, page.Slug, &body, &page.Kind); err != nil {
 				errMsg := err.Error()
 				execItem.Action = ExecutionActionSkipped

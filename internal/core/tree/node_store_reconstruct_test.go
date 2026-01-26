@@ -56,28 +56,28 @@ func TestNodeStore_ReconstructTreeFromFS_BuildsSectionsAndPages_SkipsIndexMdAsPa
 	// <tmp>/docs/index.md (section content)
 	// <tmp>/docs/intro.md (page)
 	// <tmp>/readme.md (page at root)
-	mustMkdir(t, filepath.Join(tmp, "docs"))
+	mustMkdir(t, filepath.Join(tmp, "root", "docs"))
 
 	secIndex := `---
 leafwiki_id: sec-docs
 leafwiki_title: Documentation
 ---
 # Section`
-	mustWriteFile(t, filepath.Join(tmp, "docs", "index.md"), secIndex, 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "docs", "index.md"), secIndex, 0o644)
 
 	pageIntro := `---
 leafwiki_id: page-intro
 leafwiki_title: Introduction
 ---
 # Intro`
-	mustWriteFile(t, filepath.Join(tmp, "docs", "intro.md"), pageIntro, 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "docs", "intro.md"), pageIntro, 0o644)
 
 	rootPage := `---
 leafwiki_id: page-readme
 leafwiki_title: Readme
 ---
 # Readme`
-	mustWriteFile(t, filepath.Join(tmp, "readme.md"), rootPage, 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "readme.md"), rootPage, 0o644)
 
 	tree, err := store.ReconstructTreeFromFS()
 	if err != nil {
@@ -141,7 +141,7 @@ func TestNodeStore_ReconstructTreeFromFS_SectionWithoutIndex_UsesDirNameAsTitle(
 	store := NewNodeStore(tmp)
 
 	// FS: <tmp>/emptysec/ (no index.md)
-	mustMkdir(t, filepath.Join(tmp, "emptysec"))
+	mustMkdir(t, filepath.Join(tmp, "root", "emptysec"))
 
 	tree, err := store.ReconstructTreeFromFS()
 	if err != nil {
@@ -161,12 +161,12 @@ func TestNodeStore_ReconstructTreeFromFS_SectionWithoutIndex_UsesDirNameAsTitle(
 	}
 }
 
-func TestNodeStore_ReconstructTreeFromFS_PageWithoutFrontmatter_FallsBackToSlugTitle(t *testing.T) {
+func TestNodeStore_ReconstructTreeFromFS_PageWithoutFrontmatter_FallsBackToHeadlineTitle(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
 	// FS: <tmp>/plain.md (no fm)
-	mustWriteFile(t, filepath.Join(tmp, "plain.md"), "# hello\n", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "plain.md"), "# hello\n", 0o644)
 
 	tree, err := store.ReconstructTreeFromFS()
 	if err != nil {
@@ -178,9 +178,8 @@ func TestNodeStore_ReconstructTreeFromFS_PageWithoutFrontmatter_FallsBackToSlugT
 		t.Fatalf("expected page, got %q", p.Kind)
 	}
 
-	// With your current logic: ParseFrontmatter will fail/has=false => keep generated id,
-	// title fallback should be slug (plain)
-	if p.Title != "plain" {
+	// title fallback should be headline
+	if p.Title != "hello" {
 		t.Fatalf("expected title fallback to slug 'plain', got %q", p.Title)
 	}
 	if strings.TrimSpace(p.ID) == "" {
@@ -194,9 +193,9 @@ func TestNodeStore_ReconstructTreeFromFS_PositionsAreContiguous(t *testing.T) {
 	store := NewNodeStore(tmp)
 
 	// Create several files/dirs
-	mustWriteFile(t, filepath.Join(tmp, "b.md"), "# b", 0o644)
-	mustWriteFile(t, filepath.Join(tmp, "a.md"), "# a", 0o644)
-	mustMkdir(t, filepath.Join(tmp, "zsec"))
+	mustWriteFile(t, filepath.Join(tmp, "root", "b.md"), "# b", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "a.md"), "# a", 0o644)
+	mustMkdir(t, filepath.Join(tmp, "root", "zsec"))
 
 	tree, err := store.ReconstructTreeFromFS()
 	if err != nil {
