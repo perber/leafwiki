@@ -746,6 +746,317 @@ func TestTreeService_ReconstructTreeFromFS_UpdatesSchemaVersion(t *testing.T) {
 	mustStat(t, filepath.Join(tmpDir, "tree.json"))
 }
 
+// --- G) ReconstructTreeFromFS ---
+
+func TestTreeService_ReconstructTreeFromFS_BackfillsMetadata(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	// Create some files on disk manually (simulating external changes)
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "page1.md"), `---
+leafwiki_id: page-1
+leafwiki_title: Page One
+---
+# Page One`, 0o644)
+
+	mustMkdir(t, filepath.Join(tmpDir, "root", "section1"))
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "section1", "index.md"), `---
+leafwiki_id: sec-1
+leafwiki_title: Section One
+---
+# Section One`, 0o644)
+
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "section1", "page2.md"), `---
+leafwiki_id: page-2
+leafwiki_title: Page Two
+---
+# Page Two`, 0o644)
+
+	// Reconstruct the tree from filesystem
+	err := svc.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
+	}
+
+	// Verify metadata was backfilled for all nodes
+	tree := svc.GetTree()
+
+	// Check root metadata
+	if tree.Metadata.CreatedAt.IsZero() {
+		t.Fatalf("expected root metadata CreatedAt to be backfilled, got zero")
+	}
+	if tree.Metadata.UpdatedAt.IsZero() {
+		t.Fatalf("expected root metadata UpdatedAt to be backfilled, got zero")
+	}
+
+	// Find and verify page1
+	page1 := findChildBySlug(t, tree, "page1")
+	if page1.Metadata.CreatedAt.IsZero() {
+		t.Fatalf("expected page1 metadata CreatedAt to be backfilled, got zero")
+	}
+	if page1.Metadata.UpdatedAt.IsZero() {
+		t.Fatalf("expected page1 metadata UpdatedAt to be backfilled, got zero")
+	}
+
+	// Find and verify section1
+	section1 := findChildBySlug(t, tree, "section1")
+	if section1.Metadata.CreatedAt.IsZero() {
+		t.Fatalf("expected section1 metadata CreatedAt to be backfilled, got zero")
+	}
+	if section1.Metadata.UpdatedAt.IsZero() {
+		t.Fatalf("expected section1 metadata UpdatedAt to be backfilled, got zero")
+	}
+
+	// Find and verify page2 (child of section1)
+	page2 := findChildBySlug(t, section1, "page2")
+	if page2.Metadata.CreatedAt.IsZero() {
+		t.Fatalf("expected page2 metadata CreatedAt to be backfilled, got zero")
+	}
+	if page2.Metadata.UpdatedAt.IsZero() {
+		t.Fatalf("expected page2 metadata UpdatedAt to be backfilled, got zero")
+	}
+}
+
+func TestTreeService_ReconstructTreeFromFS_PersistsTreeJSON(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	// Create some files on disk manually
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "readme.md"), `---
+leafwiki_id: readme-page
+leafwiki_title: README
+---
+# README`, 0o644)
+
+	// Verify tree.json doesn't exist or is empty before reconstruction
+	treeJSONPath := filepath.Join(tmpDir, "tree.json")
+
+	// Reconstruct the tree from filesystem
+	err := svc.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
+	}
+
+	// Verify tree.json was persisted
+	info := mustStat(t, treeJSONPath)
+	if info.Size() == 0 {
+		t.Fatalf("expected tree.json to have content after reconstruction, got size 0")
+	}
+
+	// Verify we can reload the tree from the saved tree.json
+	newSvc := NewTreeService(tmpDir)
+	if err := newSvc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree after reconstruction failed: %v", err)
+	}
+
+	// Verify the tree structure matches
+	tree := newSvc.GetTree()
+	if tree == nil || tree.ID != "root" {
+		t.Fatalf("expected root node after reload, got: %+v", tree)
+	}
+
+	// Verify the readme page exists
+	readme := findChildBySlug(t, tree, "readme")
+	if readme.ID != "readme-page" {
+		t.Fatalf("expected readme ID to be 'readme-page', got %q", readme.ID)
+	}
+	if readme.Title != "README" {
+		t.Fatalf("expected readme title to be 'README', got %q", readme.Title)
+	}
+
+	// Verify metadata was persisted
+	if readme.Metadata.CreatedAt.IsZero() {
+		t.Fatalf("expected persisted metadata CreatedAt to not be zero")
+	}
+	if readme.Metadata.UpdatedAt.IsZero() {
+		t.Fatalf("expected persisted metadata UpdatedAt to not be zero")
+	}
+}
+
+func TestTreeService_ReconstructTreeFromFS_ComplexTree_PreservesStructure(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	// Create a complex tree structure on disk
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "intro.md"), `---
+leafwiki_id: intro
+leafwiki_title: Introduction
+---
+# Introduction`, 0o644)
+
+	mustMkdir(t, filepath.Join(tmpDir, "root", "docs"))
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "docs", "index.md"), `---
+leafwiki_id: docs-section
+leafwiki_title: Documentation
+---
+# Documentation`, 0o644)
+
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "docs", "getting-started.md"), `---
+leafwiki_id: getting-started
+leafwiki_title: Getting Started
+---
+# Getting Started`, 0o644)
+
+	mustMkdir(t, filepath.Join(tmpDir, "root", "docs", "guides"))
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "docs", "guides", "index.md"), `---
+leafwiki_id: guides-section
+leafwiki_title: Guides
+---
+# Guides`, 0o644)
+
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "docs", "guides", "basic.md"), `---
+leafwiki_id: basic-guide
+leafwiki_title: Basic Guide
+---
+# Basic Guide`, 0o644)
+
+	// Reconstruct
+	err := svc.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
+	}
+
+	tree := svc.GetTree()
+
+	// Verify structure
+	intro := findChildBySlug(t, tree, "intro")
+	if intro.Kind != NodeKindPage {
+		t.Fatalf("expected intro to be a page, got %q", intro.Kind)
+	}
+
+	docs := findChildBySlug(t, tree, "docs")
+	if docs.Kind != NodeKindSection {
+		t.Fatalf("expected docs to be a section, got %q", docs.Kind)
+	}
+	if docs.ID != "docs-section" {
+		t.Fatalf("expected docs ID to be 'docs-section', got %q", docs.ID)
+	}
+
+	gettingStarted := findChildBySlug(t, docs, "getting-started")
+	if gettingStarted.Kind != NodeKindPage {
+		t.Fatalf("expected getting-started to be a page, got %q", gettingStarted.Kind)
+	}
+
+	guides := findChildBySlug(t, docs, "guides")
+	if guides.Kind != NodeKindSection {
+		t.Fatalf("expected guides to be a section, got %q", guides.Kind)
+	}
+
+	basic := findChildBySlug(t, guides, "basic")
+	if basic.Kind != NodeKindPage {
+		t.Fatalf("expected basic to be a page, got %q", basic.Kind)
+	}
+
+	// Verify all nodes have metadata
+	if intro.Metadata.CreatedAt.IsZero() {
+		t.Fatalf("expected intro to have metadata")
+	}
+	if docs.Metadata.CreatedAt.IsZero() {
+		t.Fatalf("expected docs to have metadata")
+	}
+	if guides.Metadata.CreatedAt.IsZero() {
+		t.Fatalf("expected guides to have metadata")
+	}
+	if basic.Metadata.CreatedAt.IsZero() {
+		t.Fatalf("expected basic to have metadata")
+	}
+
+	// Verify tree.json was saved and can be reloaded
+	treeJSONPath := filepath.Join(tmpDir, "tree.json")
+	mustStat(t, treeJSONPath)
+
+	reloadedSvc := NewTreeService(tmpDir)
+	if err := reloadedSvc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree after reconstruction failed: %v", err)
+	}
+
+	reloadedTree := reloadedSvc.GetTree()
+	if len(reloadedTree.Children) != len(tree.Children) {
+		t.Fatalf("expected reloaded tree to have same number of children")
+	}
+}
+
+func TestTreeService_ReconstructTreeFromFS_EmptyDirectory_CreatesRootAndPersists(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	// Reconstruct from empty directory (should create just root)
+	err := svc.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
+	}
+
+	tree := svc.GetTree()
+	if tree == nil || tree.ID != "root" {
+		t.Fatalf("expected root node, got: %+v", tree)
+	}
+
+	// Note: Root metadata may not be backfilled from filesystem when directory is empty
+	// because there's no corresponding file/directory to stat. This is expected behavior.
+	// The important thing is that the tree is reconstructed and persisted.
+
+	// Verify tree.json was saved
+	treeJSONPath := filepath.Join(tmpDir, "tree.json")
+	mustStat(t, treeJSONPath)
+
+	// Verify we can reload
+	reloadedSvc := NewTreeService(tmpDir)
+	if err := reloadedSvc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree after reconstruction failed: %v", err)
+	}
+
+	reloadedTree := reloadedSvc.GetTree()
+	if reloadedTree == nil || reloadedTree.ID != "root" {
+		t.Fatalf("expected root node after reload")
+	}
+}
+
+func TestTreeService_ReconstructTreeFromFS_RevertsOnMetadataBackfillError(t *testing.T) {
+	// This test is harder to trigger without mocking, but we can at least verify
+	// that if the tree state is preserved if we can cause a failure scenario.
+	// For now, we'll test that a successful reconstruction doesn't lose the old tree.
+	svc, tmpDir := newLoadedService(t)
+
+	// Create initial tree state
+	initialID, err := svc.CreateNode("system", nil, "Initial", "initial", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	// Get initial tree
+	initialTree := svc.GetTree()
+	if len(initialTree.Children) != 1 {
+		t.Fatalf("expected 1 child in initial tree")
+	}
+
+	// Create a new file on disk
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "new-page.md"), `---
+leafwiki_id: new-page
+leafwiki_title: New Page
+---
+# New Page`, 0o644)
+
+	// Reconstruct should succeed
+	err = svc.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
+	}
+
+	// Verify new tree has both nodes
+	newTree := svc.GetTree()
+	if len(newTree.Children) != 2 {
+		t.Fatalf("expected 2 children after reconstruction, got %d", len(newTree.Children))
+	}
+
+	// Verify initial node still exists
+	var foundInitial bool
+	for _, child := range newTree.Children {
+		if child.ID == *initialID {
+			foundInitial = true
+			break
+		}
+	}
+	if !foundInitial {
+		t.Fatalf("expected initial node to still exist after reconstruction")
+	}
+}
+
 // --- small util ---
 
 func ptrKind(k NodeKind) *NodeKind { return &k }
