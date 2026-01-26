@@ -5,6 +5,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/perber/wiki/internal/core/shared"
 )
 
 type MarkdownFile struct {
@@ -56,7 +58,13 @@ func (mf *MarkdownFile) WriteToFile() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(mf.path, []byte(fmContent), 0644)
+
+	mode := os.FileMode(0o644)
+	if st, err := os.Stat(mf.path); err == nil {
+		mode = st.Mode()
+	}
+
+	return shared.WriteFileAtomic(mf.path, []byte(fmContent), mode)
 }
 
 func (mf *MarkdownFile) GetTitle() (string, error) {
