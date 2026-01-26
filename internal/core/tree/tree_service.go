@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/perber/wiki/internal/core/frontmatter"
 	"github.com/perber/wiki/internal/core/shared"
 )
 
@@ -179,12 +180,12 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 		t.log.Error("Error reconstructing tree from filesystem", "error", err)
 		return err
 	}
-	
+
 	// Defensive check to protect against unexpected nil returns from ReconstructTreeFromFS
 	if newTree == nil {
 		return fmt.Errorf("internal error: ReconstructTreeFromFS returned nil tree")
 	}
-	
+
 	// Save the old tree in case we need to revert
 	// Note: oldTree may be nil if this is the first reconstruction (which is expected)
 	oldTree := t.tree
@@ -240,7 +241,7 @@ func (t *TreeService) migrateToV2() error {
 		}
 
 		// Parse the frontmatter
-		fm, body, has, err := ParseFrontmatter(content)
+		fm, body, has, err := frontmatter.ParseFrontmatter(content)
 		if err != nil {
 			t.log.Error("Could not parse frontmatter for node", "nodeID", node.ID, "error", err)
 			return fmt.Errorf("could not parse frontmatter for node %s: %w", node.ID, err)
@@ -251,7 +252,7 @@ func (t *TreeService) migrateToV2() error {
 
 		// If there is no frontmatter, start with a new one
 		if !has {
-			fm = Frontmatter{}
+			fm = frontmatter.Frontmatter{}
 			changed = true
 		}
 
@@ -269,7 +270,7 @@ func (t *TreeService) migrateToV2() error {
 
 		// Only write if changed
 		if changed {
-			newContent, err := BuildMarkdownWithFrontmatter(fm, body)
+			newContent, err := frontmatter.BuildMarkdownWithFrontmatter(fm, body)
 			if err != nil {
 				t.log.Error("could not build markdown with frontmatter", "nodeID", node.ID, "error", err)
 				return fmt.Errorf("could not build markdown with frontmatter for node %s: %w", node.ID, err)

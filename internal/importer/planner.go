@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/perber/wiki/internal/core/frontmatter"
 	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/tree"
 )
@@ -234,7 +235,7 @@ func (p *Planner) extractTitleFromMDFile(mdFilePath string) (string, error) {
 }
 
 func (p *Planner) extractTitleFromFrontMatter(content []byte) (string, error) {
-	frontMatter, _, has := tree.SplitFrontmatter(string(content))
+	frontMatter, _, has := frontmatter.SplitFrontmatter(string(content))
 	if !has {
 		return "", errors.New("no frontmatter found")
 	}

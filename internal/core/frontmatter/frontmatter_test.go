@@ -1,4 +1,4 @@
-package tree
+package frontmatter
 
 import (
 	"errors"

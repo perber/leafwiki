@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/core/frontmatter"
 )
 
 type ExecutionResult struct {
@@ -105,7 +105,7 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 				continue
 			}
 			// Strip frontmatter if any
-			_, body, _ := tree.SplitFrontmatter(string(content))
+			_, body, _ := frontmatter.SplitFrontmatter(string(content))
 			if _, err := e.wiki.UpdatePage(userID, page.ID, page.Title, page.Slug, &body, &page.Kind); err != nil {
 				errMsg := err.Error()
 				execItem.Action = ExecutionActionSkipped

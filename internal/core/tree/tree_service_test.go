@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/perber/wiki/internal/core/frontmatter"
 )
 
 // --- helpers ---
@@ -132,7 +134,7 @@ func TestTreeService_CreateNode_Page_Root_CreatesFileAndFrontmatter(t *testing.T
 		t.Fatalf("read file: %v", err)
 	}
 
-	fm, _, has, err := ParseFrontmatter(string(raw))
+	fm, _, has, err := frontmatter.ParseFrontmatter(string(raw))
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
@@ -206,7 +208,7 @@ func TestTreeService_UpdateNode_TitleOnly_SyncsFrontmatterIfFileExists(t *testin
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	fm, _, has, err := ParseFrontmatter(string(raw))
+	fm, _, has, err := frontmatter.ParseFrontmatter(string(raw))
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
@@ -695,7 +697,7 @@ func TestTreeService_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *te
 		t.Fatalf("read migrated file: %v", err)
 	}
 
-	fm, migratedBody, has, err := ParseFrontmatter(string(raw))
+	fm, migratedBody, has, err := frontmatter.ParseFrontmatter(string(raw))
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
