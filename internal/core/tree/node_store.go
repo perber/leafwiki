@@ -40,7 +40,9 @@ func isValidSlug(slug string) bool {
 		return false
 	}
 
-	// Check reserved slugs (case-insensitive comparison)
+	// Check reserved slugs with case-insensitive comparison
+	// (we normalize to lowercase here because the input may have uppercase,
+	// which will be rejected by the regex check below)
 	if reservedSlugs[strings.ToLower(slug)] {
 		return false
 	}
