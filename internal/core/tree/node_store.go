@@ -159,6 +159,12 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 					}
 					if mdFile.GetFrontmatter().LeafWikiID != "" {
 						id = mdFile.GetFrontmatter().LeafWikiID
+					} else {
+						// Generated ID needs to be written back
+						mdFile.SetFrontmatterID(id)
+						if err := mdFile.WriteToFile(); err != nil {
+							f.log.Error("could not write leafwiki_id back to index.md", "path", indexPath, "error", err)
+						}
 					}
 				}
 			}
@@ -204,6 +210,12 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		}
 		if mdFile.GetFrontmatter().LeafWikiID != "" {
 			id = mdFile.GetFrontmatter().LeafWikiID
+		} else {
+			// Generated ID needs to be written back
+			mdFile.SetFrontmatterID(id)
+			if err := mdFile.WriteToFile(); err != nil {
+				f.log.Error("could not write leafwiki_id back to file", "path", filePath, "error", err)
+			}
 		}
 
 		child := &PageNode{

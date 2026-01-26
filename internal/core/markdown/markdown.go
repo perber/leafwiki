@@ -99,3 +99,7 @@ func (mf *MarkdownFile) GetPath() string {
 func (mf *MarkdownFile) GetFrontmatter() Frontmatter {
 	return mf.fm
 }
+
+func (mf *MarkdownFile) SetFrontmatterID(id string) {
+	mf.fm.LeafWikiID = id
+}
