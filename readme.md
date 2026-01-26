@@ -392,6 +392,73 @@ python3 tools/generate-tree.py --root data/root --output data/tree.json
 
 ---
 
+## Reconstruct Tree from Filesystem
+
+LeafWiki includes a built-in `reconstruct-tree` command that rebuilds the navigation tree (`tree.json`) by scanning the actual Markdown files and folders on disk.
+
+**Usage:**
+
+```bash
+leafwiki reconstruct-tree [--data-dir <DIR>]
+```
+
+Or if you installed LeafWiki as a binary:
+
+```bash
+./leafwiki reconstruct-tree [--data-dir <DIR>]
+```
+
+**What it does:**
+
+The command:
+- Scans the `data/root` directory recursively
+- Extracts page titles from Markdown files (from H1 headings or frontmatter)
+- Preserves `leafwiki_id` values from frontmatter when present
+- Generates new IDs for pages without frontmatter IDs
+- Rebuilds the complete navigation tree structure
+- Saves the new `tree.json` and updates `schema.json`
+
+**Use cases:**
+
+1. **Recovery from corrupted tree.json**  
+   If your `tree.json` becomes corrupted or deleted, this command reconstructs it from your existing Markdown files.
+
+2. **Manual filesystem changes**  
+   If you've added, moved, or renamed Markdown files directly on disk (outside LeafWiki's UI), run this command to sync the navigation tree.
+
+3. **Migration and import**  
+   When importing existing Markdown content into LeafWiki, use this command to automatically generate the navigation structure.
+
+4. **Tree structure reset**  
+   If the tree structure becomes inconsistent with the filesystem, this provides a clean rebuild based on actual file layout.
+
+**Important notes:**
+
+- ⚠️ This command **replaces the entire tree structure**. Any custom ordering or metadata in `tree.json` will be lost.
+- The command creates a **deterministic, alphabetically-sorted** tree based on file and folder names.
+- Page content (Markdown files) is never modified—only the navigation structure is rebuilt.
+- Frontmatter `leafwiki_id` values are preserved when present, maintaining page identity and internal links.
+- For folders (sections), the command looks for `index.md` to extract the section title.
+- Files and folders starting with `.` (hidden) are automatically skipped.
+
+**Example:**
+
+```bash
+# Default data directory (./data)
+leafwiki reconstruct-tree
+
+# Custom data directory
+leafwiki --data-dir /path/to/data reconstruct-tree
+```
+
+**Before running this command:**
+
+- Ensure your data directory exists and contains a `root` folder with your Markdown content
+- Consider backing up your current `tree.json` if you need to preserve custom ordering
+- The server does not need to be running—this is a standalone command
+
+---
+
 ## Quick Start (Dev)
 
 ```
