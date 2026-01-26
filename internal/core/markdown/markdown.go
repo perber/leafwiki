@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,7 +15,7 @@ type MarkdownFile struct {
 }
 
 func LoadMarkdownFile(filePath string) (*MarkdownFile, error) {
-	if !strings.HasSuffix(filePath, ".md") {
+	if !strings.EqualFold(filepath.Ext(filePath), ".md") {
 		return nil, errors.New("file is not a markdown file")
 	}
 
