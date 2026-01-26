@@ -30,12 +30,14 @@ type ResolvedNode struct {
 type NodeStore struct {
 	storageDir string
 	log        *slog.Logger
+	slugger    *SlugService
 }
 
 func NewNodeStore(storageDir string) *NodeStore {
 	return &NodeStore{
 		storageDir: storageDir,
 		log:        slog.Default().With("component", "NodeStore"),
+		slugger:    NewSlugService(),
 	}
 }
 
@@ -153,6 +155,13 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		}
 
 		if entry.IsDir() {
+			// Normalize and validate the directory name as a slug
+			normalizedSlug := normalizeSlug(name)
+			if err := f.slugger.IsValidSlug(normalizedSlug); err != nil {
+				f.log.Error("skipping directory with invalid slug", "directory", name, "normalized", normalizedSlug, "error", err)
+				continue
+			}
+
 			indexPath := filepath.Join(currentPath, name, "index.md")
 			if fileExists(indexPath) {
 				mdFile, err := markdown.LoadMarkdownFile(indexPath)
@@ -176,7 +185,7 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 
 			child := &PageNode{
 				ID:       id,
-				Slug:     name,
+				Slug:     normalizedSlug,
 				Title:    title,
 				Parent:   parent,
 				Position: len(parent.Children),
@@ -200,7 +209,14 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 			continue
 		}
 
-		slug := strings.TrimSuffix(name, ".md")
+		// Normalize and validate the filename (without .md) as a slug
+		baseFilename := strings.TrimSuffix(name, ".md")
+		normalizedSlug := normalizeSlug(baseFilename)
+		if err := f.slugger.IsValidSlug(normalizedSlug); err != nil {
+			f.log.Error("skipping file with invalid slug", "file", name, "normalized", normalizedSlug, "error", err)
+			continue
+		}
+
 		filePath := filepath.Join(currentPath, name)
 
 		mdFile, err := markdown.LoadMarkdownFile(filePath)
@@ -222,7 +238,7 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 
 		child := &PageNode{
 			ID:       id,
-			Slug:     slug,
+			Slug:     normalizedSlug,
 			Title:    title,
 			Parent:   parent,
 			Position: len(parent.Children),
