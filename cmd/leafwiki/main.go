@@ -127,6 +127,16 @@ func main() {
 			fmt.Printf("New password for user %s: %s\n", user.Username, user.Password)
 			return
 		case "reconstruct-tree":
+			// Ensure data directory exists before reconstruction
+			if _, err := os.Stat(dataDir); err != nil {
+				if os.IsNotExist(err) {
+					if err := os.MkdirAll(dataDir, 0755); err != nil {
+						fail("Failed to create data directory", "error", err)
+					}
+				} else {
+					fail("Failed to access data directory", "error", err)
+				}
+			}
 			if err := tools.ReconstructTreeFromFS(dataDir); err != nil {
 				fail("Tree reconstruction failed", "error", err)
 			}
