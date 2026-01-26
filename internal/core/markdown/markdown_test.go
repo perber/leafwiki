@@ -73,3 +73,20 @@ func TestPlanner_extractTitleFromMDFile_FilenameFallback(t *testing.T) {
 		t.Fatalf("title = %q", title)
 	}
 }
+
+func TestLoadMarkdownFile_UppercaseExtension(t *testing.T) {
+	tmp := t.TempDir()
+	abs := test_utils.WriteFile(t, tmp, "README.MD", "# Uppercase Extension\n\nThis file has .MD extension")
+
+	mdFile, err := LoadMarkdownFile(abs)
+	if err != nil {
+		t.Fatalf("expected no error for .MD extension, got: %v", err)
+	}
+	title, err := mdFile.GetTitle()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if title != "Uppercase Extension" {
+		t.Fatalf("title = %q, want %q", title, "Uppercase Extension")
+	}
+}
