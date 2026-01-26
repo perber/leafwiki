@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,6 +29,26 @@ var EmbedFrontend = "false"
 
 // Environment is a flag to set the environment
 var Environment = "development"
+
+// Slog Wrapper for Gin (Info level)
+type slogWriter struct {
+	logger *slog.Logger
+}
+
+func (sw *slogWriter) Write(p []byte) (n int, err error) {
+	sw.logger.Info(strings.TrimSpace(string(p)))
+	return len(p), nil
+}
+
+// Slog Wrapper for Gin Errors (Error level)
+type slogErrorWriter struct {
+	logger *slog.Logger
+}
+
+func (sew *slogErrorWriter) Write(p []byte) (n int, err error) {
+	sew.logger.Error(strings.TrimSpace(string(p)))
+	return len(p), nil
+}
 
 type RouterOptions struct {
 	PublicAccess            bool          // Whether the wiki allows public read access
@@ -59,6 +80,10 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	} else {
 		gin.SetMode(gin.DebugMode)
 	}
+
+	// Set Gin to use slog for logging
+	gin.DefaultWriter = &slogWriter{logger: slog.Default().With("component", "gin")}
+	gin.DefaultErrorWriter = &slogErrorWriter{logger: slog.Default().With("component", "gin")}
 
 	importerService := wireImporterService(wikiInstance)
 

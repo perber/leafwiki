@@ -1,8 +1,9 @@
-package tree
+package markdown
 
 import (
 	"bytes"
 	"errors"
+	"os"
 	"strings"
 
 	yaml "gopkg.in/yaml.v3"
@@ -13,7 +14,43 @@ type Frontmatter struct {
 	LeafWikiTitle string `yaml:"leafwiki_title,omitempty" json:"title,omitempty"`
 }
 
-func SplitFrontmatter(md string) (yamlPart string, body string, has bool) {
+func (fm *Frontmatter) LoadFrontMatterFromContent(yamlPart string) (has bool, err error) {
+	if err := yaml.Unmarshal([]byte(yamlPart), fm); err != nil {
+		return true, errors.Join(ErrFrontmatterParse, err)
+	}
+
+	/** Check for title also in frontmatter **/
+	type titleOnlyStruct struct {
+		Title string `yaml:"title,omitempty"`
+	}
+	var tos titleOnlyStruct
+	if err := yaml.Unmarshal([]byte(yamlPart), &tos); err == nil {
+		if tos.Title != "" {
+			fm.LeafWikiTitle = tos.Title
+		}
+	}
+
+	fm.LeafWikiID = fm.stripSingleAndDoubleQuotes(fm.LeafWikiID)
+	fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(fm.LeafWikiTitle)
+
+	return true, nil
+}
+
+func (fm *Frontmatter) stripSingleAndDoubleQuotes(s string) string {
+	s = strings.Trim(s, `"`)
+	s = strings.Trim(s, `'`)
+	return s
+}
+
+func (fm *Frontmatter) LoadFrontMatterFromFile(mdFilePath string) (has bool, err error) {
+	content, err := os.ReadFile(mdFilePath)
+	if err != nil {
+		return false, err
+	}
+	return fm.LoadFrontMatterFromContent(string(content))
+}
+
+func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 	// BOM-safe + normalize newlines
 	s := strings.TrimPrefix(md, "\ufeff")
 	s = strings.ReplaceAll(s, "\r\n", "\n")
@@ -114,7 +151,7 @@ func SplitFrontmatter(md string) (yamlPart string, body string, has bool) {
 }
 
 func ParseFrontmatter(md string) (fm Frontmatter, body string, has bool, err error) {
-	yamlPart, body, has := SplitFrontmatter(md)
+	yamlPart, body, has := splitFrontmatter(md)
 	if !has {
 		return Frontmatter{}, md, false, nil
 	}
@@ -122,6 +159,9 @@ func ParseFrontmatter(md string) (fm Frontmatter, body string, has bool, err err
 	if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
 		return Frontmatter{}, md, true, errors.Join(ErrFrontmatterParse, err)
 	}
+
+	fm.LeafWikiID = fm.stripSingleAndDoubleQuotes(fm.LeafWikiID)
+	fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(fm.LeafWikiTitle)
 	return fm, body, true, nil
 }
 
