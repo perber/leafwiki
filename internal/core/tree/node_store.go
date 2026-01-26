@@ -39,7 +39,7 @@ func NewNodeStore(storageDir string) *NodeStore {
 	}
 }
 
-// writeIDToMarkdownFile writes a leafwiki_id to a markdown file's frontmatter
+// writeIDToMarkdownFile writes a leafwiki_id to a markdown file's frontmatter and logs errors if the write fails
 func (f *NodeStore) writeIDToMarkdownFile(mdFile *markdown.MarkdownFile, id string) {
 	mdFile.SetFrontmatterID(id)
 	if err := mdFile.WriteToFile(); err != nil {

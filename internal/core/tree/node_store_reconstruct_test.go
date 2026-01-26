@@ -237,10 +237,10 @@ func TestNodeStore_ReconstructTreeFromFS_WritesIDsBackToFiles(t *testing.T) {
 	section := findChildBySlug(t, tree, "section")
 
 	// Verify that IDs were generated
-	if strings.TrimSpace(page.ID) == "" {
+	if page.ID == "" {
 		t.Fatalf("expected page to have generated ID, got empty")
 	}
-	if strings.TrimSpace(section.ID) == "" {
+	if section.ID == "" {
 		t.Fatalf("expected section to have generated ID, got empty")
 	}
 
