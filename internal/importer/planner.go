@@ -158,11 +158,8 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 
 	title := path.Base(wikiPath) // fallback to last segment of wiki path
 	if md != nil {
-		var titleErr error
-		title, titleErr = md.GetTitle()
-		if titleErr != nil {
-			notes = append(notes, fmt.Sprintf("Failed to extract title from file: %v", titleErr))
-			title = "unknown" // ensure title is set
+		if extractedTitle, _ := md.GetTitle(); extractedTitle != "" {
+			title = extractedTitle
 		}
 	}
 
