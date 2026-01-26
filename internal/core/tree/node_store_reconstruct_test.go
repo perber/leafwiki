@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/perber/wiki/internal/core/markdown"
 )
 
 func findChildBySlug(t *testing.T, parent *PageNode, slug string) *PageNode {
@@ -212,6 +214,68 @@ func TestNodeStore_ReconstructTreeFromFS_PositionsAreContiguous(t *testing.T) {
 		if seen[i] != i {
 			t.Fatalf("expected contiguous positions 0..%d, got %v (slugs=%v)", len(seen)-1, seen, slugs(tree.Children))
 		}
+	}
+}
+
+
+func TestNodeStore_ReconstructTreeFromFS_WritesIDsBackToFiles(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	// Create files without leafwiki_id in frontmatter
+	mustWriteFile(t, filepath.Join(tmp, "root", "no-id.md"), "# No ID", 0o644)
+	mustMkdir(t, filepath.Join(tmp, "root", "section"))
+	mustWriteFile(t, filepath.Join(tmp, "root", "section", "index.md"), "# Section No ID", 0o644)
+
+	// Run reconstruction
+	tree, err := store.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
+	}
+
+	// Get the page and section nodes
+	page := findChildBySlug(t, tree, "no-id")
+	section := findChildBySlug(t, tree, "section")
+
+	// Verify that IDs were generated
+	if page.ID == "" {
+		t.Fatalf("expected page to have generated ID, got empty")
+	}
+	if section.ID == "" {
+		t.Fatalf("expected section to have generated ID, got empty")
+	}
+
+	// Now reload the files and check that IDs were written back
+	pageMd, err := markdown.LoadMarkdownFile(filepath.Join(tmp, "root", "no-id.md"))
+	if err != nil {
+		t.Fatalf("failed to reload page: %v", err)
+	}
+	if pageMd.GetFrontmatter().LeafWikiID != page.ID {
+		t.Fatalf("expected page frontmatter ID=%q, got %q", page.ID, pageMd.GetFrontmatter().LeafWikiID)
+	}
+
+	sectionMd, err := markdown.LoadMarkdownFile(filepath.Join(tmp, "root", "section", "index.md"))
+	if err != nil {
+		t.Fatalf("failed to reload section index: %v", err)
+	}
+	if sectionMd.GetFrontmatter().LeafWikiID != section.ID {
+		t.Fatalf("expected section frontmatter ID=%q, got %q", section.ID, sectionMd.GetFrontmatter().LeafWikiID)
+	}
+
+	// Run reconstruction again and verify IDs are stable (deterministic)
+	tree2, err := store.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("second ReconstructTreeFromFS: %v", err)
+	}
+
+	page2 := findChildBySlug(t, tree2, "no-id")
+	section2 := findChildBySlug(t, tree2, "section")
+
+	if page2.ID != page.ID {
+		t.Fatalf("expected deterministic page ID on second run: first=%q, second=%q", page.ID, page2.ID)
+	}
+	if section2.ID != section.ID {
+		t.Fatalf("expected deterministic section ID on second run: first=%q, second=%q", section.ID, section2.ID)
 	}
 }
 

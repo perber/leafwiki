@@ -41,6 +41,14 @@ func NewNodeStore(storageDir string) *NodeStore {
 	}
 }
 
+// writeIDToMarkdownFile writes a leafwiki_id to a markdown file's frontmatter and logs errors if the write fails
+func (f *NodeStore) writeIDToMarkdownFile(mdFile *markdown.MarkdownFile, id string) {
+	mdFile.SetFrontmatterID(id)
+	if err := mdFile.WriteToFile(); err != nil {
+		f.log.Error("could not write leafwiki_id back to file", "path", mdFile.GetPath(), "error", err)
+	}
+}
+
 func (f *NodeStore) LoadTree(filename string) (*PageNode, error) {
 	fullPath := filepath.Join(f.storageDir, filename)
 
@@ -168,6 +176,9 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 					}
 					if mdFile.GetFrontmatter().LeafWikiID != "" {
 						id = mdFile.GetFrontmatter().LeafWikiID
+					} else {
+						// Generated ID needs to be written back
+						f.writeIDToMarkdownFile(mdFile, id)
 					}
 				}
 			}
@@ -220,6 +231,9 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		}
 		if mdFile.GetFrontmatter().LeafWikiID != "" {
 			id = mdFile.GetFrontmatter().LeafWikiID
+		} else {
+			// Generated ID needs to be written back
+			f.writeIDToMarkdownFile(mdFile, id)
 		}
 
 		child := &PageNode{
