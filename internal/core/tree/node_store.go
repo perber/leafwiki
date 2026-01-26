@@ -150,15 +150,16 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 				mdFile, err := markdown.LoadMarkdownFile(indexPath)
 				if err != nil {
 					f.log.Error("could not load index.md", "path", indexPath, "error", err)
-					continue
-				}
-				title, err = mdFile.GetTitle()
-				if err != nil {
-					f.log.Error("could not extract title from index.md", "path", indexPath, "error", err)
-					continue
-				}
-				if mdFile.GetFrontmatter().LeafWikiID != "" {
-					id = mdFile.GetFrontmatter().LeafWikiID
+					// fall back to default title and generated ID, but still add the section and recurse
+				} else {
+					title, err = mdFile.GetTitle()
+					if err != nil {
+						f.log.Error("could not extract title from index.md", "path", indexPath, "error", err)
+						// keep default title; still add the section and recurse
+					}
+					if mdFile.GetFrontmatter().LeafWikiID != "" {
+						id = mdFile.GetFrontmatter().LeafWikiID
+					}
 				}
 			}
 
