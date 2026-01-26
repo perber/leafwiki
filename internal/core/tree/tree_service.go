@@ -385,6 +385,13 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 		return err
 	}
 
+	// Update the schema version to prevent unnecessary migrations on next startup
+	if err := saveSchema(t.storageDir, CurrentSchemaVersion); err != nil {
+		t.log.Error("Error saving schema after reconstruction", "error", err)
+		// Note: We don't revert the tree here since it was already saved successfully
+		return err
+	}
+
 	return nil
 }
 

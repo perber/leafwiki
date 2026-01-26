@@ -715,6 +715,37 @@ func TestTreeService_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *te
 	}
 }
 
+// TestTreeService_ReconstructTreeFromFS_UpdatesSchemaVersion verifies that
+// ReconstructTreeFromFS writes the current schema version to prevent unnecessary migrations
+func TestTreeService_ReconstructTreeFromFS_UpdatesSchemaVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a minimal file structure for reconstruction
+	mustMkdir(t, filepath.Join(tmpDir, "root"))
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "test.md"), "# Test Page", 0o644)
+
+	// Create service WITHOUT schema.json (simulating an old/missing schema)
+	svc := NewTreeService(tmpDir)
+
+	// Reconstruct the tree (no prior tree loaded)
+	if err := svc.ReconstructTreeFromFS(); err != nil {
+		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
+	}
+
+	// Verify schema.json was created with current version
+	schema, err := loadSchema(tmpDir)
+	if err != nil {
+		t.Fatalf("loadSchema failed: %v", err)
+	}
+
+	if schema.Version != CurrentSchemaVersion {
+		t.Errorf("expected schema version %d after reconstruction, got %d", CurrentSchemaVersion, schema.Version)
+	}
+
+	// Verify tree.json was also created
+	mustStat(t, filepath.Join(tmpDir, "tree.json"))
+}
+
 // --- small util ---
 
 func ptrKind(k NodeKind) *NodeKind { return &k }
