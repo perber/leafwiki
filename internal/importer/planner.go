@@ -165,7 +165,7 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 			title = "root"
 		}
 	}
-	
+
 	if md != nil {
 		var titleErr error
 		title, titleErr = md.GetTitle()
