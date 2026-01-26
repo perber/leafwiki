@@ -112,7 +112,7 @@ leafwiki_title: Readme
 	}
 	// page title/id from frontmatter
 	if intro.ID != "page-intro" {
-		t.Fatalf("expected intro.ID=page-intro, got %q (BUG: your current code sets ID=\"\")", intro.ID)
+		t.Fatalf("expected intro.ID=page-intro, got %q", intro.ID)
 	}
 	if intro.Title != "Introduction" {
 		t.Fatalf("expected intro.Title=Introduction, got %q", intro.Title)
