@@ -16,6 +16,14 @@ import (
 	"github.com/perber/wiki/internal/core/shared"
 )
 
+var (
+	// slugPattern is the regex pattern for valid slugs
+	slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	
+	// invalidSlugMessage is the warning message for invalid slugs
+	invalidSlugMessage = "must contain only lowercase letters, numbers, and hyphens, and cannot be a reserved slug"
+)
+
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
@@ -39,12 +47,7 @@ func isValidSlug(slug string) bool {
 
 	// Check format: only lowercase letters, numbers, and hyphens
 	// This regex enforces lowercase and ensures no leading/trailing hyphens
-	matched, err := regexp.MatchString(`^[a-z0-9]+(-[a-z0-9]+)*$`, slug)
-	if err != nil || !matched {
-		return false
-	}
-
-	return true
+	return slugPattern.MatchString(slug)
 }
 
 type ResolvedNode struct {
@@ -174,7 +177,7 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		if entry.IsDir() {
 			// Validate that the directory name is a valid slug
 			if !isValidSlug(name) {
-				f.log.Warn("skipping directory with invalid slug", "path", filepath.Join(currentPath, name), "name", name, "reason", "directory name must contain only lowercase letters, numbers, and hyphens, and cannot be a reserved slug")
+				f.log.Warn("skipping directory with invalid slug", "path", filepath.Join(currentPath, name), "name", name, "reason", invalidSlugMessage)
 				continue
 			}
 
@@ -226,7 +229,7 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		
 		// Validate that the file name (without .md) is a valid slug
 		if !isValidSlug(slug) {
-			f.log.Warn("skipping markdown file with invalid slug", "path", filepath.Join(currentPath, name), "slug", slug, "reason", "file name must contain only lowercase letters, numbers, and hyphens, and cannot be a reserved slug")
+			f.log.Warn("skipping markdown file with invalid slug", "path", filepath.Join(currentPath, name), "slug", slug, "reason", invalidSlugMessage)
 			continue
 		}
 		
