@@ -59,6 +59,10 @@ func setupLogger() {
 	level := slog.LevelInfo
 	if os.Getenv("LEAFWIKI_LOG_LEVEL") == "debug" {
 		level = slog.LevelDebug
+	} else if (os.Getenv("LEAFWIKI_LOG_LEVEL")) == "error" {
+		level = slog.LevelError
+	} else if (os.Getenv("LEAFWIKI_LOG_LEVEL")) == "warn" {
+		level = slog.LevelWarn
 	}
 
 	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
