@@ -201,16 +201,17 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		}
 
 		// file
-		if !strings.HasSuffix(name, ".md") {
-			continue
-		}
-		// skip index.md (handled by section case)
-		if name == "index.md" {
+		ext := filepath.Ext(name)
+		if !strings.EqualFold(ext, ".md") {
 			continue
 		}
 
 		// Normalize and validate the filename (without .md) as a slug
-		baseFilename := strings.TrimSuffix(name, ".md")
+		baseFilename := strings.TrimSuffix(name, ext)
+		// skip index.md (handled by section case)
+		if strings.EqualFold(baseFilename, "index") {
+			continue
+		}
 		normalizedSlug := normalizeSlug(baseFilename)
 		if err := f.slugger.IsValidSlug(normalizedSlug); err != nil {
 			f.log.Error("skipping file with invalid slug", "file", name, "normalized", normalizedSlug, "error", err)
