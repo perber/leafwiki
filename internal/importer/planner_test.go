@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 type fakeWiki struct {
@@ -79,25 +80,13 @@ func (f *fakeWiki) UpdatePage(userID string, id, title, slug string, content *st
 	}}, nil
 }
 
-func writeFile(t *testing.T, base, rel, content string) string {
-	t.Helper()
-	abs := filepath.Join(base, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.WriteFile(abs, []byte(content), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	return abs
-}
-
 func newPlannerWithFake(w *fakeWiki) *Planner {
 	return NewPlanner(w, tree.NewSlugService())
 }
 
 func TestPlanner_CreatePlan_CreateNewPage_NonIndex(t *testing.T) {
 	tmp := t.TempDir()
-	writeFile(t, tmp, "My Page.md", "# Hello\n\nbody")
+	test_utils.WriteFile(t, tmp, "My Page.md", "# Hello\n\nbody")
 
 	wiki := &fakeWiki{
 		treeHash: "h1",
@@ -142,7 +131,7 @@ func TestPlanner_CreatePlan_CreateNewPage_NonIndex(t *testing.T) {
 
 func TestPlanner_CreatePlan_CreateNewSection_IndexMd(t *testing.T) {
 	tmp := t.TempDir()
-	writeFile(t, tmp, "Guides/index.md", "---\ntitle: Guides\n---\n\n# Ignored")
+	test_utils.WriteFile(t, tmp, "Guides/index.md", "---\ntitle: Guides\n---\n\n# Ignored")
 
 	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
 	p := newPlannerWithFake(wiki)
@@ -175,7 +164,7 @@ func TestPlanner_CreatePlan_CreateNewSection_IndexMd(t *testing.T) {
 
 func TestPlanner_CreatePlan_SkipExisting_UsesLookupLastSegment(t *testing.T) {
 	tmp := t.TempDir()
-	writeFile(t, tmp, "a.md", "# A")
+	test_utils.WriteFile(t, tmp, "a.md", "# A")
 
 	existingID := "id123"
 	existingKind := tree.NodeKindPage
@@ -268,7 +257,7 @@ func TestPlanner_CreatePlan_Error_SourceIsDirectory_IsCollected(t *testing.T) {
 
 func TestPlanner_CreatePlan_Error_ExistingZeroSegments_IsCollected(t *testing.T) {
 	tmp := t.TempDir()
-	writeFile(t, tmp, "x.md", "# X")
+	test_utils.WriteFile(t, tmp, "x.md", "# X")
 
 	wiki := &fakeWiki{
 		treeHash: "h",
@@ -295,69 +284,9 @@ func TestPlanner_CreatePlan_Error_ExistingZeroSegments_IsCollected(t *testing.T)
 
 // ---- Title extraction -------------------------------------------------------
 
-func TestPlanner_extractTitleFromMDFile_FrontmatterTitleWins(t *testing.T) {
-	tmp := t.TempDir()
-	abs := writeFile(t, tmp, "t.md", "---\ntitle: FM Title\n---\n\n# Heading")
-
-	p := newPlannerWithFake(&fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}})
-
-	title, err := p.extractTitleFromMDFile(abs)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if title != "FM Title" {
-		t.Fatalf("title = %q", title)
-	}
-}
-
-func TestPlanner_extractTitleFromMDFile_LeafwikiTitle(t *testing.T) {
-	tmp := t.TempDir()
-	abs := writeFile(t, tmp, "t.md", "---\nleafwiki_title: Leaf\n---\n\n# Heading")
-
-	p := newPlannerWithFake(&fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}})
-
-	title, err := p.extractTitleFromMDFile(abs)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if title != "Leaf" {
-		t.Fatalf("title = %q", title)
-	}
-}
-
-func TestPlanner_extractTitleFromMDFile_FirstHeadingFallback(t *testing.T) {
-	tmp := t.TempDir()
-	abs := writeFile(t, tmp, "t.md", "no fm\n\n# Heading Only\nx")
-
-	p := newPlannerWithFake(&fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}})
-
-	title, err := p.extractTitleFromMDFile(abs)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if title != "Heading Only" {
-		t.Fatalf("title = %q", title)
-	}
-}
-
-func TestPlanner_extractTitleFromMDFile_FilenameFallback(t *testing.T) {
-	tmp := t.TempDir()
-	abs := writeFile(t, tmp, "some-file.md", "no title")
-
-	p := newPlannerWithFake(&fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}})
-
-	title, err := p.extractTitleFromMDFile(abs)
-	if err != nil {
-		t.Fatalf("err: %v", err)
-	}
-	if title != "some-file" {
-		t.Fatalf("title = %q", title)
-	}
-}
-
 func TestPlanner_CreatePlan_TitleExtractionError_AddsNote(t *testing.T) {
 	tmp := t.TempDir()
-	abs := writeFile(t, tmp, "unreadable.md", "# Title")
+	abs := test_utils.WriteFile(t, tmp, "unreadable.md", "# Title")
 
 	// Make file unreadable to trigger extraction error
 	if err := os.Chmod(abs, 0o000); err != nil {
@@ -390,8 +319,8 @@ func TestPlanner_CreatePlan_TitleExtractionError_AddsNote(t *testing.T) {
 	if len(it.Notes) != 1 {
 		t.Fatalf("Notes len = %d (want 1)", len(it.Notes))
 	}
-	if !strings.Contains(it.Notes[0], "Failed to extract title") {
-		t.Fatalf("Note = %q (should contain 'Failed to extract title')", it.Notes[0])
+	if !strings.Contains(it.Notes[0], "Failed to load markdown file for title extraction") {
+		t.Fatalf("Note = %q (should contain 'Failed to load markdown file for title extraction')", it.Notes[0])
 	}
 	// Title should still be set (fallback to filename)
 	if it.Title != "unreadable" {
@@ -402,7 +331,7 @@ func TestPlanner_CreatePlan_TitleExtractionError_AddsNote(t *testing.T) {
 func TestPlanner_analyzeEntry_NormalizesSourceDirSegments(t *testing.T) {
 	// "My Guides/Intro.md" -> "my-guides/intro" (SlugService.NormalizePath + NormalizeFilename)
 	tmp := t.TempDir()
-	writeFile(t, tmp, "My Guides/Intro.md", "# Intro")
+	test_utils.WriteFile(t, tmp, "My Guides/Intro.md", "# Intro")
 
 	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
 	p := newPlannerWithFake(wiki)
@@ -426,7 +355,7 @@ func TestPlanner_analyzeEntry_InvalidSourceDirSegment_ReturnsError(t *testing.T)
 	// NormalizePath(validate=true) nutzt IsValidSlug() nach slug.Make().
 	// Ein Segment wie "!!!" sluggt zu "" => invalid.
 	tmp := t.TempDir()
-	writeFile(t, tmp, "!!!/a.md", "# A")
+	test_utils.WriteFile(t, tmp, "!!!/a.md", "# A")
 
 	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
 	p := newPlannerWithFake(wiki)
@@ -447,5 +376,59 @@ func TestPlanner_analyzeEntry_InvalidSourceDirSegment_ReturnsError(t *testing.T)
 	// optional: grobe Assertion, dass es ein Validate-Fehler ist
 	if res.Errors[0] == "" {
 		t.Fatalf("unexpected error: %v", res.Errors[0])
+	}
+}
+
+func TestPlanner_CreatePlan_RootIndexMd_EmptyWikiPath_UsesFallbackTitle(t *testing.T) {
+	// Test case for root-level index.md with empty TargetBasePath and markdown loading failure
+	// When wikiPath is empty, path.Base("") returns ".", which is not meaningful.
+	// The fix should use filename without extension as fallback.
+	tmp := t.TempDir()
+	abs := test_utils.WriteFile(t, tmp, "index.md", "# Title")
+
+	// Make file unreadable to trigger markdown loading failure
+	if err := os.Chmod(abs, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	defer func() {
+		if err := os.Chmod(abs, 0o644); err != nil { // restore for cleanup
+			t.Fatalf("chmod restore: %v", err)
+		}
+	}()
+
+	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
+	p := newPlannerWithFake(wiki)
+
+	res, err := p.CreatePlan([]ImportMDFile{{SourcePath: "index.md"}}, PlanOptions{
+		SourceBasePath: tmp,
+		TargetBasePath: "", // empty target base path
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan err: %v", err)
+	}
+	if len(res.Errors) != 0 {
+		t.Fatalf("Errors = %#v", res.Errors)
+	}
+	if len(res.Items) != 1 {
+		t.Fatalf("Items len = %d (want 1)", len(res.Items))
+	}
+
+	it := res.Items[0]
+	if it.TargetPath != "" {
+		t.Fatalf("TargetPath = %q (want empty)", it.TargetPath)
+	}
+	if it.Kind != tree.NodeKindSection {
+		t.Fatalf("Kind = %v (want Section)", it.Kind)
+	}
+	// The title should fallback to "index" (filename without .md), not "." from path.Base("")
+	if it.Title != "index" {
+		t.Fatalf("Title = %q (want index as fallback when wikiPath is empty and markdown fails)", it.Title)
+	}
+	// Should have a note about failed markdown loading
+	if len(it.Notes) == 0 {
+		t.Fatalf("Expected notes about failed markdown loading")
+	}
+	if !strings.Contains(it.Notes[0], "Failed to load markdown file for title extraction") {
+		t.Fatalf("Note = %q (should contain 'Failed to load markdown file for title extraction')", it.Notes[0])
 	}
 }
