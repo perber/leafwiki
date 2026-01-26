@@ -149,15 +149,20 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 			if fileExists(indexPath) {
 				mdFile, err := markdown.LoadMarkdownFile(indexPath)
 				if err != nil {
+					// Log the error but still create the section using fallback title/ID.
 					f.log.Error("could not load index.md", "path", indexPath, "error", err)
-					continue
+				} else {
+					mdTitle, err := mdFile.GetTitle()
+					if err != nil {
+						// Log the error but keep the default title (directory name).
+						f.log.Error("could not extract title from index.md", "path", indexPath, "error", err)
+					} else {
+						title = mdTitle
+					}
+					if fmID := mdFile.GetFrontmatter().LeafWikiID; fmID != "" {
+						id = fmID
+					}
 				}
-				title, err = mdFile.GetTitle()
-				if err != nil {
-					f.log.Error("could not extract title from index.md", "path", indexPath, "error", err)
-					continue
-				}
-				id = mdFile.GetFrontmatter().LeafWikiID
 			}
 
 			child := &PageNode{
