@@ -156,7 +156,16 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 		notes = append(notes, fmt.Sprintf("Failed to load markdown file for title extraction: %v", err))
 	}
 
+	// Determine fallback title
 	title := path.Base(wikiPath) // fallback to last segment of wiki path
+	if wikiPath == "" {
+		// For root-level index.md or empty paths, use filename without extension
+		title = strings.TrimSuffix(filenameLower, path.Ext(filenameLower))
+		if title == "" {
+			title = "root"
+		}
+	}
+	
 	if md != nil {
 		var titleErr error
 		title, titleErr = md.GetTitle()
