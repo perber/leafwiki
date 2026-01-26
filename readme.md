@@ -399,13 +399,13 @@ LeafWiki includes a built-in `reconstruct-tree` command that rebuilds the naviga
 **Usage:**
 
 ```bash
-leafwiki reconstruct-tree [--data-dir <DIR>]
+leafwiki [--data-dir <DIR>] reconstruct-tree
 ```
 
 Or if you installed LeafWiki as a binary:
 
 ```bash
-./leafwiki reconstruct-tree [--data-dir <DIR>]
+./leafwiki [--data-dir <DIR>] reconstruct-tree
 ```
 
 **What it does:**
