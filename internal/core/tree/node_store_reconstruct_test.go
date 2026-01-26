@@ -214,3 +214,71 @@ func TestNodeStore_ReconstructTreeFromFS_PositionsAreContiguous(t *testing.T) {
 		}
 	}
 }
+
+func TestNodeStore_ReconstructTreeFromFS_SkipsInvalidSlugs(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	// Create directories and files with invalid slugs
+	// Invalid directory names
+	mustMkdir(t, filepath.Join(tmp, "root", "Invalid-Dir")) // uppercase
+	mustWriteFile(t, filepath.Join(tmp, "root", "Invalid-Dir", "index.md"), "# Invalid Dir", 0o644)
+	mustMkdir(t, filepath.Join(tmp, "root", "dir_with_underscores")) // underscores
+	mustWriteFile(t, filepath.Join(tmp, "root", "dir_with_underscores", "index.md"), "# Dir With Underscores", 0o644)
+	mustMkdir(t, filepath.Join(tmp, "root", "dir with spaces")) // spaces
+	mustWriteFile(t, filepath.Join(tmp, "root", "dir with spaces", "index.md"), "# Dir With Spaces", 0o644)
+	mustMkdir(t, filepath.Join(tmp, "root", "api")) // reserved slug
+	mustWriteFile(t, filepath.Join(tmp, "root", "api", "index.md"), "# API", 0o644)
+	
+	// Invalid file names
+	mustWriteFile(t, filepath.Join(tmp, "root", "Invalid-File.md"), "# Invalid File", 0o644) // uppercase
+	mustWriteFile(t, filepath.Join(tmp, "root", "file_with_underscores.md"), "# File With Underscores", 0o644) // underscores
+	mustWriteFile(t, filepath.Join(tmp, "root", "file with spaces.md"), "# File With Spaces", 0o644) // spaces
+	mustWriteFile(t, filepath.Join(tmp, "root", "edit.md"), "# Edit", 0o644) // reserved slug
+	
+	// Valid slugs for comparison
+	mustMkdir(t, filepath.Join(tmp, "root", "valid-dir"))
+	mustWriteFile(t, filepath.Join(tmp, "root", "valid-dir", "index.md"), "# Valid Dir", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "valid-file.md"), "# Valid File", 0o644)
+
+	tree, err := store.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
+	}
+
+	// Should only have the valid directory and file
+	if len(tree.Children) != 2 {
+		t.Fatalf("expected 2 children (valid-dir and valid-file), got %d: %v", len(tree.Children), slugs(tree.Children))
+	}
+
+	// Verify valid-dir exists
+	validDir := findChildBySlug(t, tree, "valid-dir")
+	if validDir.Kind != NodeKindSection {
+		t.Fatalf("expected valid-dir to be section, got %q", validDir.Kind)
+	}
+	if validDir.Title != "Valid Dir" {
+		t.Fatalf("expected valid-dir title 'Valid Dir', got %q", validDir.Title)
+	}
+
+	// Verify valid-file exists
+	validFile := findChildBySlug(t, tree, "valid-file")
+	if validFile.Kind != NodeKindPage {
+		t.Fatalf("expected valid-file to be page, got %q", validFile.Kind)
+	}
+	if validFile.Title != "Valid File" {
+		t.Fatalf("expected valid-file title 'Valid File', got %q", validFile.Title)
+	}
+
+	// Verify invalid slugs are not present
+	invalidSlugs := []string{
+		"Invalid-Dir", "dir_with_underscores", "dir with spaces", "api",
+		"Invalid-File", "file_with_underscores", "file with spaces", "edit",
+	}
+	for _, invalidSlug := range invalidSlugs {
+		for _, child := range tree.Children {
+			if child.Slug == invalidSlug {
+				t.Fatalf("found invalid slug %q in tree, should have been skipped", invalidSlug)
+			}
+		}
+	}
+}

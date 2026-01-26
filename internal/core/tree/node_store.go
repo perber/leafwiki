@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -18,6 +19,49 @@ import (
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+// isValidSlug checks if a slug is valid according to the slug validation rules.
+// Valid slugs must:
+// - Not be empty
+// - Contain only lowercase letters, numbers, and hyphens
+// - Not start or end with a hyphen
+// - Not be a reserved slug
+func isValidSlug(slug string) bool {
+	if slug == "" {
+		return false
+	}
+
+	// Check reserved slugs (case-insensitive comparison)
+	reservedSlugs := map[string]bool{
+		"e":        true,
+		"edit":     true,
+		"api":      true,
+		"assets":   true,
+		"branding": true,
+		"index":    true,
+		"users":    true,
+		"user":     true,
+		"login":    true,
+		"settings": true,
+	}
+	if reservedSlugs[strings.ToLower(slug)] {
+		return false
+	}
+
+	// Check format: only lowercase letters, numbers, and hyphens
+	// This regex enforces lowercase, so uppercase letters will fail
+	matched, err := regexp.MatchString(`^[a-z0-9]+(-[a-z0-9]+)*$`, slug)
+	if err != nil || !matched {
+		return false
+	}
+
+	// Check not starting or ending with hyphen (already covered by regex, but explicit check for clarity)
+	if strings.HasPrefix(slug, "-") || strings.HasSuffix(slug, "-") {
+		return false
+	}
+
+	return true
 }
 
 type ResolvedNode struct {
@@ -145,6 +189,12 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		}
 
 		if entry.IsDir() {
+			// Validate that the directory name is a valid slug
+			if !isValidSlug(name) {
+				f.log.Warn("skipping directory with invalid slug", "path", filepath.Join(currentPath, name), "name", name, "reason", "directory name must contain only lowercase letters, numbers, and hyphens, and cannot be a reserved slug")
+				continue
+			}
+
 			indexPath := filepath.Join(currentPath, name, "index.md")
 			if fileExists(indexPath) {
 				mdFile, err := markdown.LoadMarkdownFile(indexPath)
@@ -190,6 +240,13 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		}
 
 		slug := strings.TrimSuffix(name, ".md")
+		
+		// Validate that the file name (without .md) is a valid slug
+		if !isValidSlug(slug) {
+			f.log.Warn("skipping markdown file with invalid slug", "path", filepath.Join(currentPath, name), "slug", slug, "reason", "file name must contain only lowercase letters, numbers, and hyphens, and cannot be a reserved slug")
+			continue
+		}
+		
 		filePath := filepath.Join(currentPath, name)
 
 		mdFile, err := markdown.LoadMarkdownFile(filePath)
