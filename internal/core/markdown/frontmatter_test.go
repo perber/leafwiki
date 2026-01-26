@@ -1,4 +1,4 @@
-package tree
+package markdown
 
 import (
 	"errors"
@@ -94,7 +94,7 @@ func TestSplitFrontmatter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fm, body, has := SplitFrontmatter(tt.input)
+			fm, body, has := splitFrontmatter(tt.input)
 
 			if has != tt.wantHas {
 				t.Fatalf("has = %v, want %v", has, tt.wantHas)

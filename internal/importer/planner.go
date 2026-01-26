@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/tree"
 )
@@ -149,14 +150,32 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 		return nil, err
 	}
 
-	title, titleErr := p.extractTitleFromMDFile(sourcePath)
 	var notes []string
-	if titleErr != nil {
-		notes = append(notes, fmt.Sprintf("Failed to extract title from file: %v", titleErr))
+	md, err := markdown.LoadMarkdownFile(sourcePath)
+	if err != nil {
+		notes = append(notes, fmt.Sprintf("Failed to load markdown file for title extraction: %v", err))
+	}
+
+	// Determine fallback title
+	title := path.Base(wikiPath) // fallback to last segment of wiki path
+	if wikiPath == "" {
+		// For root-level index.md or empty paths, use filename without extension
+		title = strings.TrimSuffix(filenameLower, path.Ext(filenameLower))
+		if title == "" {
+			title = "root"
+		}
+	}
+
+	if md != nil {
+		var titleErr error
+		title, titleErr = md.GetTitle()
+		if titleErr != nil {
+			notes = append(notes, fmt.Sprintf("Failed to extract title from file: %v", titleErr))
+			title = "unknown" // ensure title is set
+		}
 	}
 
 	if !result.Exists {
-
 		// slug = last segment
 		slug := ""
 		if wikiPath != "" {
@@ -192,74 +211,4 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 		Action:      PlanActionSkip,
 		Notes:       notes,
 	}, nil
-}
-
-func (p *Planner) extractTitleFromMDFile(mdFilePath string) (string, error) {
-	// Helper to get filename-based fallback
-	filenameFallback := func() string {
-		base := path.Base(mdFilePath)
-		return strings.TrimSuffix(base, path.Ext(base))
-	}
-
-	// Read the file content
-	content, err := os.ReadFile(mdFilePath)
-	if err != nil {
-		// If we can't read the file, return filename as fallback but keep the error
-		return filenameFallback(), err
-	}
-
-	stripSingleAndDoubleQuotes := func(s string, err error) (string, error) {
-		if err != nil {
-			return "", err
-		}
-		s = strings.Trim(s, `"`)
-		s = strings.Trim(s, `'`)
-		return s, nil
-	}
-
-	// Try to extract title from frontmatter
-	title, err := stripSingleAndDoubleQuotes(p.extractTitleFromFrontMatter(content))
-	if err == nil && title != "" {
-		return title, nil
-	}
-
-	// Try to extract title from first heading
-	title, err = stripSingleAndDoubleQuotes(p.extractTitleFromFirstHeading(content))
-	if err == nil && title != "" {
-		return title, nil
-	}
-
-	// strip extension from filename
-	return stripSingleAndDoubleQuotes(filenameFallback(), nil)
-}
-
-func (p *Planner) extractTitleFromFrontMatter(content []byte) (string, error) {
-	frontMatter, _, has := tree.SplitFrontmatter(string(content))
-	if !has {
-		return "", errors.New("no frontmatter found")
-	}
-
-	// Look for title or leafwiki_title in the frontmatter
-	lines := strings.Split(frontMatter, "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "title:") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "title:")), nil
-		}
-		if strings.HasPrefix(line, "leafwiki_title:") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "leafwiki_title:")), nil
-		}
-	}
-	return "", errors.New("no title found in frontmatter")
-}
-
-func (p *Planner) extractTitleFromFirstHeading(content []byte) (string, error) {
-	// Simple first heading extraction
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "# ") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "# ")), nil
-		}
-	}
-	return "", errors.New("no heading found")
 }
