@@ -61,7 +61,7 @@ func (mf *MarkdownFile) WriteToFile() error {
 
 	mode := os.FileMode(0o644)
 	if st, err := os.Stat(mf.path); err == nil {
-		mode = st.Mode().Perm()
+		mode = st.Mode()
 	}
 
 	return shared.WriteFileAtomic(mf.path, []byte(fmContent), mode)
