@@ -214,3 +214,45 @@ func TestNodeStore_ReconstructTreeFromFS_PositionsAreContiguous(t *testing.T) {
 		}
 	}
 }
+
+func TestNodeStore_ReconstructTreeFromFS_SkipsInvalidSlugs(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	// Create files and directories with invalid slug names
+	// Uppercase letters should be normalized
+	mustWriteFile(t, filepath.Join(tmp, "root", "Valid Page.md"), "# Valid", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "UPPERCASE.md"), "# Upper", 0o644)
+	mustMkdir(t, filepath.Join(tmp, "root", "Valid Section"))
+	mustWriteFile(t, filepath.Join(tmp, "root", "Valid Section", "index.md"), "# Section", 0o644)
+
+	// Create a valid file to ensure the test still works
+	mustWriteFile(t, filepath.Join(tmp, "root", "valid.md"), "# Valid", 0o644)
+
+	tree, err := store.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
+	}
+
+	// The valid file should be present with normalized slug
+	valid := findChildBySlug(t, tree, "valid")
+	if valid == nil {
+		t.Fatalf("expected valid page to be present")
+	}
+
+	// Files with spaces and uppercase should be normalized
+	validPage := findChildBySlug(t, tree, "valid-page")
+	if validPage == nil {
+		t.Fatalf("expected 'Valid Page.md' to be normalized to 'valid-page'")
+	}
+
+	uppercase := findChildBySlug(t, tree, "uppercase")
+	if uppercase == nil {
+		t.Fatalf("expected 'UPPERCASE.md' to be normalized to 'uppercase'")
+	}
+
+	validSection := findChildBySlug(t, tree, "valid-section")
+	if validSection == nil {
+		t.Fatalf("expected 'Valid Section' directory to be normalized to 'valid-section'")
+	}
+}
