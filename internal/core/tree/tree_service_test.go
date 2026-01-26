@@ -978,7 +978,7 @@ func TestTreeService_ReconstructTreeFromFS_EmptyDirectory_CreatesRootAndPersists
 
 func TestTreeService_ReconstructTreeFromFS_RevertsOnMetadataBackfillError(t *testing.T) {
 	// This test is harder to trigger without mocking, but we can at least verify
-	// that if the tree state is preserved if we can cause a failure scenario.
+	// that the tree state is preserved if we can cause a failure scenario.
 	// For now, we'll test that a successful reconstruction doesn't lose the old tree.
 	svc, tmpDir := newLoadedService(t)
 
