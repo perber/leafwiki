@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"github.com/perber/wiki/internal/http/api"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
+	"github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -28,6 +30,26 @@ var EmbedFrontend = "false"
 // Environment is a flag to set the environment
 var Environment = "development"
 
+// Slog Wrapper for Gin (Info level)
+type slogWriter struct {
+	logger *slog.Logger
+}
+
+func (sw *slogWriter) Write(p []byte) (n int, err error) {
+	sw.logger.Info(strings.TrimSpace(string(p)))
+	return len(p), nil
+}
+
+// Slog Wrapper for Gin Errors (Error level)
+type slogErrorWriter struct {
+	logger *slog.Logger
+}
+
+func (sew *slogErrorWriter) Write(p []byte) (n int, err error) {
+	sew.logger.Error(strings.TrimSpace(string(p)))
+	return len(p), nil
+}
+
 type RouterOptions struct {
 	PublicAccess            bool          // Whether the wiki allows public read access
 	InjectCodeInHeader      string        // Raw HTML/JS code to inject into the <head> tag
@@ -36,6 +58,16 @@ type RouterOptions struct {
 	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
 	HideLinkMetadataSection bool          // Whether to hide the link metadata section in the frontend UI
 	AuthDisabled            bool          // Whether authentication is disabled
+}
+
+// wireImporterService sets up and returns an ImporterService instance
+// Parameters:
+//   - w: the wiki instance to use for importing
+func wireImporterService(w *wiki.Wiki) *importer.ImporterService {
+	slugger := w.GetSlugService()
+	planner := importer.NewPlanner(w, slugger)
+	store := importer.NewPlanStore()
+	return importer.NewImporterService(planner, store)
 }
 
 // NewRouter creates a new HTTP router for the wiki application.
@@ -48,6 +80,12 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	} else {
 		gin.SetMode(gin.DebugMode)
 	}
+
+	// Set Gin to use slog for logging
+	gin.DefaultWriter = &slogWriter{logger: slog.Default().With("component", "gin")}
+	gin.DefaultErrorWriter = &slogErrorWriter{logger: slog.Default().With("component", "gin")}
+
+	importerService := wireImporterService(wikiInstance)
 
 	router := gin.Default()
 	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
@@ -113,6 +151,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		// Pages
 		requiresAuthGroup.POST("/pages", auth_middleware.RequireEditorOrAdmin(), api.CreatePageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/ensure", auth_middleware.RequireEditorOrAdmin(), api.EnsurePageHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/convert/:id", auth_middleware.RequireEditorOrAdmin(), api.ConvertPageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/copy/:id", auth_middleware.RequireEditorOrAdmin(), api.CopyPageHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.UpdatePageHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.DeletePageHandler(wikiInstance))
@@ -144,22 +183,28 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.GET("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.ListAssetsHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id/assets/rename", auth_middleware.RequireEditorOrAdmin(), api.RenameAssetHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", auth_middleware.RequireEditorOrAdmin(), api.DeleteAssetHandler(wikiInstance))
+
+		// Importer
+		requiresAuthGroup.POST("/import/plan", auth_middleware.RequireEditorOrAdmin(), api.CreateImportPlanHandler(importerService))
+		requiresAuthGroup.GET("/import/plan", auth_middleware.RequireEditorOrAdmin(), api.GetImportPlanHandler(importerService))
+		requiresAuthGroup.POST("/import/execute", auth_middleware.RequireEditorOrAdmin(), api.ExecuteImportHandler(importerService, wikiInstance))
+		requiresAuthGroup.DELETE("/import/plan", auth_middleware.RequireEditorOrAdmin(), api.ClearImportPlanHandler(importerService))
 	}
 
 	// Serve branding assets (logos, favicons) with extension validation
 	router.GET("/branding/:filename", func(c *gin.Context) {
 		filename := c.Param("filename")
-		
+
 		// Sanitize filename to prevent directory traversal and malicious input
 		// Only allow simple filenames (no path separators, no null bytes, no ..)
-		if strings.Contains(filename, "..") || 
-			strings.Contains(filename, "/") || 
-			strings.Contains(filename, "\\") || 
+		if strings.Contains(filename, "..") ||
+			strings.Contains(filename, "/") ||
+			strings.Contains(filename, "\\") ||
 			strings.Contains(filename, "\x00") {
 			c.Status(http.StatusForbidden)
 			return
 		}
-		
+
 		// Get allowed extensions from branding constraints
 		constraints, err := wikiInstance.GetBrandingConstraints()
 		if err != nil {
@@ -167,7 +212,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		
+
 		// Build a combined set of allowed extensions for O(1) lookup
 		allowedExts := make(map[string]bool)
 		for _, ext := range constraints.LogoExts {
@@ -176,22 +221,22 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		for _, ext := range constraints.FaviconExts {
 			allowedExts[ext] = true
 		}
-		
+
 		// Validate file extension against whitelist
 		ext := strings.ToLower(filepath.Ext(filename))
 		if !allowedExts[ext] {
 			c.Status(http.StatusForbidden)
 			return
 		}
-		
+
 		// Construct file path
 		brandingDir := wikiInstance.GetBrandingService().GetBrandingAssetsDir()
 		filePath := filepath.Join(brandingDir, filename)
-		
+
 		// Clean the path and verify it's within the branding directory
 		cleanPath := filepath.Clean(filePath)
 		cleanBrandingDir := filepath.Clean(brandingDir)
-		
+
 		// Ensure the resolved path is still within the branding directory
 		// Use filepath.Rel to check the relative path doesn't escape the directory
 		rel, err := filepath.Rel(cleanBrandingDir, cleanPath)
@@ -199,7 +244,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusForbidden)
 			return
 		}
-		
+
 		// Check if file exists
 		if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
 			c.Status(http.StatusNotFound)
@@ -209,7 +254,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		
+
 		// Serve the file
 		c.File(cleanPath)
 	})

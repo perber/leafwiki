@@ -83,6 +83,7 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 		Slug:     node.Slug,
 		Path:     path,
 		Position: node.Position,
+		Kind:     node.Kind,
 		Metadata: NodeMetadata{
 			CreatedAt:    node.Metadata.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:    node.Metadata.UpdatedAt.Format(time.RFC3339),

@@ -74,3 +74,32 @@ func TestGenerateUniqueSlug_SpecialCharacters(t *testing.T) {
 		t.Errorf("Expected 'aepfel-and-baume', got '%s'", result)
 	}
 }
+
+func TestNormalizePath(t *testing.T) {
+	s := NewSlugService()
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"folder/subfolder/page.md", "folder/subfolder/page-md"},
+		{"My Folder/Another Folder/Page Title.md", "my-folder/another-folder/page-title-md"},
+		{"Äpfel & Bäume/Über uns.md", "apfel-and-baume/uber-uns-md"},
+		{"folder//subfolder///page.md", "folder/subfolder/page-md"},
+		{"/leading/slash/page.md", "leading/slash/page-md"},
+		{"only-file.md", "only-file-md"},
+	}
+
+	for _, test := range tests {
+
+		result, err := s.NormalizePath(test.input, true)
+		if err != nil {
+			t.Errorf("Unexpected error for input %v: %v", test.input, err)
+			continue
+		}
+
+		if result != test.expected {
+			t.Errorf("For input %v, expected %v but got %v", test.input, test.expected, result)
+		}
+	}
+}

@@ -30,45 +30,35 @@ export default function UserManagement() {
 
   return (
     <>
-      <div className="user-management">
-        <h1 className="user-management__title">User Management</h1>
+      <div className="settings">
+        <h1 className="settings__title">User Management</h1>
 
-        <div className="user-management__header-actions">
+        <div className="settings__header-actions">
           <CreateEditUserButton />
         </div>
 
-        <div className="user-management__table-card">
-          <div className="user-management__table-scroll">
-            <table className="user-management__table">
-              <thead className="user-management__table-head">
+        <div className="settings__table-card">
+          <div className="settings__table-scroll">
+            <table className="settings__table">
+              <thead className="settings__table-head">
                 <tr>
-                  <th className="user-management__table-header-cell">
-                    Username
-                  </th>
-                  <th className="user-management__table-header-cell">Email</th>
-                  <th className="user-management__table-header-cell">Role</th>
-                  <th className="user-management__table-header-cell">
-                    Actions
-                  </th>
+                  <th className="settings__table-header-cell">Username</th>
+                  <th className="settings__table-header-cell">Email</th>
+                  <th className="settings__table-header-cell">Role</th>
+                  <th className="settings__table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && (
                   <tr>
-                    <td
-                      colSpan={4}
-                      className="user-management__table-body-message"
-                    >
+                    <td colSpan={4} className="settings__table-body-message">
                       Loading users...
                     </td>
                   </tr>
                 )}
                 {!loading && users.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={4}
-                      className="user-management__table-body-message"
-                    >
+                    <td colSpan={4} className="settings__table-body-message">
                       No users found.
                     </td>
                   </tr>
@@ -76,26 +66,22 @@ export default function UserManagement() {
                 {!loading &&
                   users.length > 0 &&
                   users.map((user) => (
-                    <tr key={user.id} className="user-management__table-row">
-                      <td className="user-management__table-cell">
-                        {user.username}
-                      </td>
-                      <td className="user-management__table-cell">
-                        {user.email}
-                      </td>
-                      <td className="user-management__table-cell">
+                    <tr key={user.id} className="settings__table-row">
+                      <td className="settings__table-cell">{user.username}</td>
+                      <td className="settings__table-cell">{user.email}</td>
+                      <td className="settings__table-cell">
                         <span
-                          className={`user-management__role-pill ${
+                          className={`settings__role-pill ${
                             user.role === 'admin'
-                              ? 'user-management__role-pill--admin'
-                              : 'user-management__role-pill--default'
+                              ? 'settings__role-pill--admin'
+                              : 'settings__role-pill--default'
                           }`}
                         >
                           {user.role}
                         </span>
                       </td>
-                      <td className="user-management__actions-cell">
-                        <div className="user-management__actions">
+                      <td className="settings__actions-cell">
+                        <div className="settings__actions">
                           <CreateEditUserButton user={user} />
                           <ChangePasswordButton user={user} />
                           <DeleteUserButton user={user} />

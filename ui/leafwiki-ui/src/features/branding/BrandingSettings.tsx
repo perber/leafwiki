@@ -110,14 +110,14 @@ export default function BrandingSettings() {
 
   return (
     <>
-      <div className="branding-settings">
-        <h1 className="branding-settings__title">Branding Settings</h1>
-        <div className="branding-settings__section">
-          <h2 className="branding-settings__section-title">Site Name</h2>
-          <p className="branding-settings__section-description">
+      <div className="settings">
+        <h1 className="settings__title">Branding Settings</h1>
+        <div className="settings__section">
+          <h2 className="settings__section-title">Site Name</h2>
+          <p className="settings__section-description">
             The name displayed in the header, page titles, and login screen.
           </p>
-          <div className="branding-settings__field">
+          <div className="settings__field">
             <Label htmlFor="siteName">Site Name</Label>
             <Input
               id="siteName"
@@ -128,22 +128,20 @@ export default function BrandingSettings() {
           </div>
         </div>
 
-        <div className="branding-settings__section">
-          <h2 className="branding-settings__section-title">Logo</h2>
-          <p className="branding-settings__section-description">
+        <div className="settings__section">
+          <h2 className="settings__section-title">Logo</h2>
+          <p className="settings__section-description">
             The logo displayed in the header next to the site name.
           </p>
 
-          <div className="branding-settings__preview">
-            <span className="branding-settings__preview-label">
-              Current Logo:
-            </span>
+          <div className="settings__preview">
+            <span className="settings__preview-label">Current Logo:</span>
             {logoFile ? (
               <>
                 <img
                   src={`/branding/${logoFile}`}
                   alt="Logo"
-                  className="branding-settings__preview-image"
+                  className="settings__preview-image"
                 />
                 <Button
                   variant="destructive"
@@ -155,13 +153,13 @@ export default function BrandingSettings() {
                 </Button>
               </>
             ) : (
-              <span className="branding-settings__preview-placeholder">
+              <span className="settings__preview-placeholder">
                 No logo uploaded
               </span>
             )}
           </div>
 
-          <div className="branding-settings__field">
+          <div className="settings__field">
             <Label>Upload Logo</Label>{' '}
             <input
               type="file"
@@ -178,30 +176,28 @@ export default function BrandingSettings() {
               <UploadIcon className="mr-2 h-4 w-4" />
               Upload Image
             </Button>
-            <p className="branding-settings__hint">
+            <p className="settings__hint">
               Accepts {logoExts.map((ext) => ext.toUpperCase()).join(', ')}, max
               size {(maxLogoSize / (1024 * 1024)).toFixed(1)} MB
             </p>
           </div>
         </div>
 
-        <div className="branding-settings__section">
-          <h2 className="branding-settings__section-title">Favicon</h2>
-          <p className="branding-settings__section-description">
+        <div className="settings__section">
+          <h2 className="settings__section-title">Favicon</h2>
+          <p className="settings__section-description">
             The icon displayed in the browser tab.
           </p>
 
-          <div className="branding-settings__preview">
-            <span className="branding-settings__preview-label">
-              Current Favicon:
-            </span>
+          <div className="settings__preview">
+            <span className="settings__preview-label">Current Favicon:</span>
             {faviconFile ? (
               <>
                 {' '}
                 <img
                   src={`/branding/${faviconFile}`}
                   alt="Favicon"
-                  className="branding-settings__preview-favicon"
+                  className="settings__preview-favicon"
                 />
                 <Button
                   variant="destructive"
@@ -213,13 +209,13 @@ export default function BrandingSettings() {
                 </Button>
               </>
             ) : (
-              <span className="branding-settings__preview-placeholder">
+              <span className="settings__preview-placeholder">
                 Using default favicon
               </span>
             )}
           </div>
 
-          <div className="branding-settings__field">
+          <div className="settings__field">
             <Label>Upload Favicon</Label>
             <input
               type="file"
@@ -236,14 +232,14 @@ export default function BrandingSettings() {
               <ImageIcon className="mr-2 h-4 w-4" />
               Upload Favicon
             </Button>
-            <p className="branding-settings__hint">
+            <p className="settings__hint">
               Accepts {faviconExts.map((ext) => ext.toUpperCase()).join(', ')},
               max size {(maxFaviconSize / (1024 * 1024)).toFixed(1)} MB
             </p>
           </div>
         </div>
 
-        <div className="branding-settings__actions">
+        <div className="settings__actions">
           <Button onClick={handleSave} disabled={saving || isLoading}>
             {saving ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/tree"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
@@ -26,7 +27,8 @@ func EnsurePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		result, err := w.EnsurePath(user.ID, req.Path, req.TargetTitle)
+		kind := tree.NodeKindPage
+		result, err := w.EnsurePath(user.ID, req.Path, req.TargetTitle, &kind)
 		if err != nil {
 			respondWithError(c, err)
 			return

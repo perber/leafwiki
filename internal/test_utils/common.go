@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"mime/multipart"
+	"os"
+	"path/filepath"
+	"testing"
 )
 
 // CreateMultipartFile simulates a real file upload using multipart encoding
@@ -33,4 +36,16 @@ func CreateMultipartFile(filename string, content []byte) (multipart.File, strin
 
 	f, err := files[0].Open()
 	return f, files[0].Filename, err
+}
+
+func WriteFile(t *testing.T, base, rel, content string) string {
+	t.Helper()
+	abs := filepath.Join(base, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(abs, []byte(content), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	return abs
 }
