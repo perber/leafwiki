@@ -224,7 +224,7 @@ func resolveBool(flagName string, flagVal bool, visited map[string]bool, envVar 
 			return b
 		}
 		// If env var is set but invalid, fail fast (helps operators)
-		fail("Invalid value for %s: %q (expected true/false/1/0/yes/no)", envVar, env)
+		fail("Invalid environment variable value", "variable", envVar, "value", env, "expected", "true/false/1/0/yes/no")
 	}
 	return flagVal // default from flag
 }
@@ -238,7 +238,7 @@ func resolveDuration(flagName string, flagVal time.Duration, visited map[string]
 			return d
 		}
 		// If env var is set but invalid, fail fast (helps operators)
-		fail("Invalid value for %s: %q (expected duration like 24h, 15m)", envVar, env)
+		fail("Invalid environment variable value", "variable", envVar, "value", env, "expected", "duration like 24h, 15m")
 	}
 	return flagVal // default from flag
 }
