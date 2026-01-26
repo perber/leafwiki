@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/microcosm-cc/bluemonday"
-	"github.com/perber/wiki/internal/core/frontmatter"
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/russross/blackfriday/v2"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
@@ -160,7 +160,7 @@ func (s *SQLiteIndex) Close() error {
 }
 
 func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, title string, raw string) error {
-	_, content, _, err := frontmatter.ParseFrontmatter(raw)
+	_, content, _, err := markdown.ParseFrontmatter(raw)
 	if err != nil {
 		return err
 	}
