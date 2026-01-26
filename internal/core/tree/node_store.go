@@ -33,31 +33,14 @@ func isValidSlug(slug string) bool {
 	}
 
 	// Check reserved slugs (case-insensitive comparison)
-	reservedSlugs := map[string]bool{
-		"e":        true,
-		"edit":     true,
-		"api":      true,
-		"assets":   true,
-		"branding": true,
-		"index":    true,
-		"users":    true,
-		"user":     true,
-		"login":    true,
-		"settings": true,
-	}
 	if reservedSlugs[strings.ToLower(slug)] {
 		return false
 	}
 
 	// Check format: only lowercase letters, numbers, and hyphens
-	// This regex enforces lowercase, so uppercase letters will fail
+	// This regex enforces lowercase and ensures no leading/trailing hyphens
 	matched, err := regexp.MatchString(`^[a-z0-9]+(-[a-z0-9]+)*$`, slug)
 	if err != nil || !matched {
-		return false
-	}
-
-	// Check not starting or ending with hyphen (already covered by regex, but explicit check for clarity)
-	if strings.HasPrefix(slug, "-") || strings.HasSuffix(slug, "-") {
 		return false
 	}
 
