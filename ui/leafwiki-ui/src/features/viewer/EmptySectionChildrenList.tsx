@@ -89,7 +89,10 @@ export default function EmptySectionChildrenList({
             <div className="mb-2 flex w-full justify-end">
               <Button
                 onClick={() =>
-                  openDialog(DIALOG_ADD_PAGE, { parentId: page.id })
+                  openDialog(DIALOG_ADD_PAGE, {
+                    parentId: page.id,
+                    nodeKind: NODE_KIND_PAGE,
+                  })
                 }
                 variant="default"
                 size="sm"
