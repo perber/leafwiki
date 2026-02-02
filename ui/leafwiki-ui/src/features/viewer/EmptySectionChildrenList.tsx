@@ -1,11 +1,11 @@
 import { Button } from '@/components/ui/button'
-import { NODE_KIND_SECTION, Page } from '@/lib/api/pages'
+import { NODE_KIND_PAGE, NODE_KIND_SECTION, Page } from '@/lib/api/pages'
 import { formatRelativeTime } from '@/lib/formatDate'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { FilePlus } from 'lucide-react'
+import { FilePlus, FolderPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 type EmptySectionChildrenListProps = {
@@ -51,9 +51,16 @@ export default function EmptySectionChildrenList({
           aria-label={`Subpages of ${page.title}`}
           className="child-list__section"
         >
-          <h2 className="child-list__section-title">
-            Pages and Sections in '{page.title}'
+          <h2 className="child-list__section-title mb-1">
+            Overview of the section '{page.title}'
           </h2>
+          <p className="text-muted mb-4 text-sm">
+            This page is the default overview of the section and lists its pages
+            and sections.
+            <br />
+            When editing this page, you can define a custom start page for the
+            section.
+          </p>
           <ul>
             {node.children?.map((n) => {
               if (!n) return null
@@ -79,14 +86,18 @@ export default function EmptySectionChildrenList({
             })}
           </ul>
           {!isReadOnly && (
-            <Button
-              onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: page.id })}
-              variant="default"
-              size="sm"
-            >
-              <FilePlus size={16} />
-              Add Page
-            </Button>
+            <div className="mb-2 flex w-full justify-end">
+              <Button
+                onClick={() =>
+                  openDialog(DIALOG_ADD_PAGE, { parentId: page.id })
+                }
+                variant="default"
+                size="sm"
+              >
+                <FilePlus size={16} />
+                Add Page
+              </Button>
+            </div>
           )}
         </nav>
       )}
@@ -96,20 +107,45 @@ export default function EmptySectionChildrenList({
           aria-label={`Subpages of ${page.title}`}
           className="child-list__section"
         >
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="child-list__section-title grow">
-              No Pages and Sections in '{page.title}'
+          <div>
+            <h2 className="child-list__section-title mb-1 grow">
+              This section is empty.
             </h2>
+            <p className="text-muted text-sm">
+              The section <b>{page.title}</b> does not contain any pages or
+              sections yet. Start by adding a new page or create a new section.
+            </p>
           </div>
           {!isReadOnly && (
-            <Button
-              onClick={() => openDialog(DIALOG_ADD_PAGE, { parentId: page.id })}
-              variant="default"
-              size="sm"
-            >
-              <FilePlus size={16} />
-              Add Page
-            </Button>
+            <div className="mb-2 flex w-full justify-end">
+              <Button
+                onClick={() =>
+                  openDialog(DIALOG_ADD_PAGE, {
+                    parentId: page.id,
+                    nodeKind: NODE_KIND_PAGE,
+                  })
+                }
+                variant="default"
+                size="sm"
+              >
+                <FilePlus size={16} />
+                Add Page
+              </Button>
+              <Button
+                onClick={() =>
+                  openDialog(DIALOG_ADD_PAGE, {
+                    parentId: page.id,
+                    nodeKind: NODE_KIND_SECTION,
+                  })
+                }
+                variant="default"
+                size="sm"
+                className="ml-2"
+              >
+                <FolderPlus size={16} />
+                Add Section
+              </Button>
+            </div>
           )}
         </nav>
       )}
