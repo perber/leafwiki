@@ -50,13 +50,26 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	}
 
 	router := gin.Default()
-	router.StaticFS("/assets", gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), true))
-
 	authCookies := auth_middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 	csrfCookie := security.NewCSRFCookie(options.AllowInsecure, 3*24*time.Hour)
 
 	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
 	refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
+
+	assetsFS := gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), false) // false = kein directory listing
+
+	if options.PublicAccess || options.AuthDisabled {
+		// public read access oder public mode -> assets öffentlich
+		router.StaticFS("/assets", assetsFS)
+	} else {
+		// private -> assets nur mit auth
+		assetsGroup := router.Group("/assets")
+		assetsGroup.Use(
+			auth_middleware.InjectPublicEditor(options.AuthDisabled),
+			auth_middleware.RequireAuth(wikiInstance, authCookies, options.AuthDisabled),
+		)
+		assetsGroup.StaticFS("/", assetsFS)
+	}
 
 	nonAuthApiGroup := router.Group("/api")
 	{
@@ -149,17 +162,17 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	// Serve branding assets (logos, favicons) with extension validation
 	router.GET("/branding/:filename", func(c *gin.Context) {
 		filename := c.Param("filename")
-		
+
 		// Sanitize filename to prevent directory traversal and malicious input
 		// Only allow simple filenames (no path separators, no null bytes, no ..)
-		if strings.Contains(filename, "..") || 
-			strings.Contains(filename, "/") || 
-			strings.Contains(filename, "\\") || 
+		if strings.Contains(filename, "..") ||
+			strings.Contains(filename, "/") ||
+			strings.Contains(filename, "\\") ||
 			strings.Contains(filename, "\x00") {
 			c.Status(http.StatusForbidden)
 			return
 		}
-		
+
 		// Get allowed extensions from branding constraints
 		constraints, err := wikiInstance.GetBrandingConstraints()
 		if err != nil {
@@ -167,7 +180,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		
+
 		// Build a combined set of allowed extensions for O(1) lookup
 		allowedExts := make(map[string]bool)
 		for _, ext := range constraints.LogoExts {
@@ -176,22 +189,22 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		for _, ext := range constraints.FaviconExts {
 			allowedExts[ext] = true
 		}
-		
+
 		// Validate file extension against whitelist
 		ext := strings.ToLower(filepath.Ext(filename))
 		if !allowedExts[ext] {
 			c.Status(http.StatusForbidden)
 			return
 		}
-		
+
 		// Construct file path
 		brandingDir := wikiInstance.GetBrandingService().GetBrandingAssetsDir()
 		filePath := filepath.Join(brandingDir, filename)
-		
+
 		// Clean the path and verify it's within the branding directory
 		cleanPath := filepath.Clean(filePath)
 		cleanBrandingDir := filepath.Clean(brandingDir)
-		
+
 		// Ensure the resolved path is still within the branding directory
 		// Use filepath.Rel to check the relative path doesn't escape the directory
 		rel, err := filepath.Rel(cleanBrandingDir, cleanPath)
@@ -199,7 +212,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusForbidden)
 			return
 		}
-		
+
 		// Check if file exists
 		if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
 			c.Status(http.StatusNotFound)
@@ -209,7 +222,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		
+
 		// Serve the file
 		c.File(cleanPath)
 	})
