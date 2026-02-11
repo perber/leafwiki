@@ -56,13 +56,13 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
 	refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
 
-	assetsFS := gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), false) // false = kein directory listing
+	assetsFS := gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), false) // false = no directory listing
 
 	if options.PublicAccess || options.AuthDisabled {
-		// public read access oder public mode -> assets öffentlich
+		// public read access or auth disabled -> assets are publicly accessible
 		router.StaticFS("/assets", assetsFS)
 	} else {
-		// private -> assets nur mit auth
+		// private mode -> assets only accessible with authentication
 		assetsGroup := router.Group("/assets")
 		assetsGroup.Use(
 			auth_middleware.InjectPublicEditor(options.AuthDisabled),
