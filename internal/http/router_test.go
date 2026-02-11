@@ -1454,6 +1454,99 @@ func TestIndexingStatusEndpoint(t *testing.T) {
 	}
 }
 
+// uploadTestAsset is a helper function that creates a page, uploads an asset, and returns the asset URL and auth cookies.
+// If needsAuth is true, it will obtain authentication cookies; otherwise it will get CSRF token only (for AuthDisabled mode).
+func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content string, needsAuth bool) (assetURL string, cookies []*http.Cookie) {
+	// Create a page
+	page, err := w.CreatePage("system", nil, "Test Page", "test-page")
+	if err != nil {
+		t.Fatalf("Failed to create page: %v", err)
+	}
+
+	// Prepare the file upload
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "test.txt")
+	if err != nil {
+		t.Fatalf("Failed to create form file: %v", err)
+	}
+	if _, err := part.Write([]byte(content)); err != nil {
+		t.Fatalf("Failed to write file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Failed to close multipart writer: %v", err)
+	}
+
+	var csrfToken string
+	
+	if needsAuth {
+		// Login to get auth cookies
+		loginBody := `{"identifier": "admin", "password": "admin"}`
+		loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+		loginReq.Header.Set("Content-Type", "application/json")
+		loginRec := httptest.NewRecorder()
+		router.ServeHTTP(loginRec, loginReq)
+		
+		if loginRec.Code != http.StatusOK {
+			t.Fatalf("Expected 200 OK on login, got %d", loginRec.Code)
+		}
+		
+		cookies = loginRec.Result().Cookies()
+		csrfToken = loginRec.Header().Get("X-CSRF-Token")
+		if csrfToken == "" {
+			for _, c := range cookies {
+				if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+					csrfToken = c.Value
+					break
+				}
+			}
+		}
+	} else {
+		// Get CSRF token only (for AuthDisabled mode)
+		configReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+		configRec := httptest.NewRecorder()
+		router.ServeHTTP(configRec, configReq)
+		
+		cookies = configRec.Result().Cookies()
+		csrfToken = configRec.Header().Get("X-CSRF-Token")
+		if csrfToken == "" {
+			for _, c := range cookies {
+				if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+					csrfToken = c.Value
+					break
+				}
+			}
+		}
+	}
+
+	// Upload the asset
+	uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	for _, cookie := range cookies {
+		uploadReq.AddCookie(cookie)
+	}
+	uploadReq.Header.Set("X-CSRF-Token", csrfToken)
+	
+	uploadRec := httptest.NewRecorder()
+	router.ServeHTTP(uploadRec, uploadReq)
+	
+	if uploadRec.Code != http.StatusCreated {
+		t.Fatalf("Expected 201 Created on upload, got %d - %s", uploadRec.Code, uploadRec.Body.String())
+	}
+	
+	var uploadResp map[string]string
+	if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
+		t.Fatalf("Invalid upload JSON: %v", err)
+	}
+	
+	assetURL = uploadResp["file"]
+	if assetURL == "" {
+		t.Fatal("Expected file URL in upload response")
+	}
+
+	return assetURL, cookies
+}
+
 // TestAssetAccessControl tests the access control for static asset routes
 func TestAssetAccessControl(t *testing.T) {
 	t.Run("PrivateMode_UnauthenticatedAccess_Returns401", func(t *testing.T) {
@@ -1471,75 +1564,10 @@ func TestAssetAccessControl(t *testing.T) {
 			AuthDisabled:            false,
 		})
 
-		// Step 1: Create a page and upload an asset as admin
-		page, err := w.CreatePage("system", nil, "Test Page", "test-page")
-		if err != nil {
-			t.Fatalf("Failed to create page: %v", err)
-		}
+		// Upload an asset (with auth)
+		assetURL, _ := uploadTestAsset(t, router, w, "test content", true)
 
-		// Upload an asset
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		part, err := writer.CreateFormFile("file", "test.txt")
-		if err != nil {
-			t.Fatalf("Failed to create form file: %v", err)
-		}
-		if _, err := part.Write([]byte("test content")); err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
-		if err := writer.Close(); err != nil {
-			t.Fatalf("Failed to close multipart writer: %v", err)
-		}
-
-		// Login and upload
-		uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
-		uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
-		
-		// Get auth cookies
-		loginBody := `{"identifier": "admin", "password": "admin"}`
-		loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
-		loginReq.Header.Set("Content-Type", "application/json")
-		loginRec := httptest.NewRecorder()
-		router.ServeHTTP(loginRec, loginReq)
-		
-		if loginRec.Code != http.StatusOK {
-			t.Fatalf("Expected 200 OK on login, got %d", loginRec.Code)
-		}
-		
-		cookies := loginRec.Result().Cookies()
-		csrfToken := loginRec.Header().Get("X-CSRF-Token")
-		if csrfToken == "" {
-			for _, c := range cookies {
-				if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
-					csrfToken = c.Value
-					break
-				}
-			}
-		}
-		
-		for _, cookie := range cookies {
-			uploadReq.AddCookie(cookie)
-		}
-		uploadReq.Header.Set("X-CSRF-Token", csrfToken)
-		
-		uploadRec := httptest.NewRecorder()
-		router.ServeHTTP(uploadRec, uploadReq)
-		
-		if uploadRec.Code != http.StatusCreated {
-			t.Fatalf("Expected 201 Created on upload, got %d - %s", uploadRec.Code, uploadRec.Body.String())
-		}
-		
-		var uploadResp map[string]string
-		if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
-			t.Fatalf("Invalid upload JSON: %v", err)
-		}
-		
-		assetURL := uploadResp["file"]
-		if assetURL == "" {
-			t.Fatal("Expected file URL in upload response")
-		}
-
-		// Step 2: Try to access the asset without authentication
+		// Try to access the asset without authentication
 		assetReq := httptest.NewRequest(http.MethodGet, assetURL, nil)
 		assetRec := httptest.NewRecorder()
 		router.ServeHTTP(assetRec, assetReq)
@@ -1565,75 +1593,10 @@ func TestAssetAccessControl(t *testing.T) {
 			AuthDisabled:            false,
 		})
 
-		// Step 1: Create a page and upload an asset as admin
-		page, err := w.CreatePage("system", nil, "Test Page", "test-page")
-		if err != nil {
-			t.Fatalf("Failed to create page: %v", err)
-		}
+		// Upload an asset (with auth) and get cookies
+		assetURL, cookies := uploadTestAsset(t, router, w, "test content", true)
 
-		// Upload an asset
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		part, err := writer.CreateFormFile("file", "test.txt")
-		if err != nil {
-			t.Fatalf("Failed to create form file: %v", err)
-		}
-		if _, err := part.Write([]byte("test content")); err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
-		if err := writer.Close(); err != nil {
-			t.Fatalf("Failed to close multipart writer: %v", err)
-		}
-
-		// Login and upload
-		uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
-		uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
-		
-		// Get auth cookies
-		loginBody := `{"identifier": "admin", "password": "admin"}`
-		loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
-		loginReq.Header.Set("Content-Type", "application/json")
-		loginRec := httptest.NewRecorder()
-		router.ServeHTTP(loginRec, loginReq)
-		
-		if loginRec.Code != http.StatusOK {
-			t.Fatalf("Expected 200 OK on login, got %d", loginRec.Code)
-		}
-		
-		cookies := loginRec.Result().Cookies()
-		csrfToken := loginRec.Header().Get("X-CSRF-Token")
-		if csrfToken == "" {
-			for _, c := range cookies {
-				if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
-					csrfToken = c.Value
-					break
-				}
-			}
-		}
-		
-		for _, cookie := range cookies {
-			uploadReq.AddCookie(cookie)
-		}
-		uploadReq.Header.Set("X-CSRF-Token", csrfToken)
-		
-		uploadRec := httptest.NewRecorder()
-		router.ServeHTTP(uploadRec, uploadReq)
-		
-		if uploadRec.Code != http.StatusCreated {
-			t.Fatalf("Expected 201 Created on upload, got %d - %s", uploadRec.Code, uploadRec.Body.String())
-		}
-		
-		var uploadResp map[string]string
-		if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
-			t.Fatalf("Invalid upload JSON: %v", err)
-		}
-		
-		assetURL := uploadResp["file"]
-		if assetURL == "" {
-			t.Fatal("Expected file URL in upload response")
-		}
-
-		// Step 2: Access the asset with authentication
+		// Access the asset with authentication
 		assetReq := httptest.NewRequest(http.MethodGet, assetURL, nil)
 		for _, cookie := range cookies {
 			assetReq.AddCookie(cookie)
@@ -1668,75 +1631,10 @@ func TestAssetAccessControl(t *testing.T) {
 			AuthDisabled:            false,
 		})
 
-		// Step 1: Create a page and upload an asset as admin
-		page, err := w.CreatePage("system", nil, "Test Page", "test-page")
-		if err != nil {
-			t.Fatalf("Failed to create page: %v", err)
-		}
+		// Upload an asset (with auth)
+		assetURL, _ := uploadTestAsset(t, router, w, "test content public", true)
 
-		// Upload an asset
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		part, err := writer.CreateFormFile("file", "test.txt")
-		if err != nil {
-			t.Fatalf("Failed to create form file: %v", err)
-		}
-		if _, err := part.Write([]byte("test content public")); err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
-		if err := writer.Close(); err != nil {
-			t.Fatalf("Failed to close multipart writer: %v", err)
-		}
-
-		// Login and upload
-		uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
-		uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
-		
-		// Get auth cookies
-		loginBody := `{"identifier": "admin", "password": "admin"}`
-		loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
-		loginReq.Header.Set("Content-Type", "application/json")
-		loginRec := httptest.NewRecorder()
-		router.ServeHTTP(loginRec, loginReq)
-		
-		if loginRec.Code != http.StatusOK {
-			t.Fatalf("Expected 200 OK on login, got %d", loginRec.Code)
-		}
-		
-		cookies := loginRec.Result().Cookies()
-		csrfToken := loginRec.Header().Get("X-CSRF-Token")
-		if csrfToken == "" {
-			for _, c := range cookies {
-				if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
-					csrfToken = c.Value
-					break
-				}
-			}
-		}
-		
-		for _, cookie := range cookies {
-			uploadReq.AddCookie(cookie)
-		}
-		uploadReq.Header.Set("X-CSRF-Token", csrfToken)
-		
-		uploadRec := httptest.NewRecorder()
-		router.ServeHTTP(uploadRec, uploadReq)
-		
-		if uploadRec.Code != http.StatusCreated {
-			t.Fatalf("Expected 201 Created on upload, got %d - %s", uploadRec.Code, uploadRec.Body.String())
-		}
-		
-		var uploadResp map[string]string
-		if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
-			t.Fatalf("Invalid upload JSON: %v", err)
-		}
-		
-		assetURL := uploadResp["file"]
-		if assetURL == "" {
-			t.Fatal("Expected file URL in upload response")
-		}
-
-		// Step 2: Try to access the asset without authentication
+		// Try to access the asset without authentication
 		assetReq := httptest.NewRequest(http.MethodGet, assetURL, nil)
 		assetRec := httptest.NewRecorder()
 		router.ServeHTTP(assetRec, assetReq)
@@ -1768,67 +1666,10 @@ func TestAssetAccessControl(t *testing.T) {
 			AuthDisabled:            true,
 		})
 
-		// Step 1: Create a page and upload an asset
-		page, err := w.CreatePage("system", nil, "Test Page", "test-page")
-		if err != nil {
-			t.Fatalf("Failed to create page: %v", err)
-		}
+		// Upload an asset (no auth needed, but CSRF token still required)
+		assetURL, _ := uploadTestAsset(t, router, w, "test content no auth", false)
 
-		// Get CSRF token first (still needed for POST requests even when auth is disabled)
-		configReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-		configRec := httptest.NewRecorder()
-		router.ServeHTTP(configRec, configReq)
-		
-		cookies := configRec.Result().Cookies()
-		csrfToken := configRec.Header().Get("X-CSRF-Token")
-		if csrfToken == "" {
-			for _, c := range cookies {
-				if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
-					csrfToken = c.Value
-					break
-				}
-			}
-		}
-
-		// Upload an asset (no auth needed when AuthDisabled=true, but CSRF still required)
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		part, err := writer.CreateFormFile("file", "test.txt")
-		if err != nil {
-			t.Fatalf("Failed to create form file: %v", err)
-		}
-		if _, err := part.Write([]byte("test content no auth")); err != nil {
-			t.Fatalf("Failed to write file: %v", err)
-		}
-		if err := writer.Close(); err != nil {
-			t.Fatalf("Failed to close multipart writer: %v", err)
-		}
-
-		uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
-		uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
-		for _, cookie := range cookies {
-			uploadReq.AddCookie(cookie)
-		}
-		uploadReq.Header.Set("X-CSRF-Token", csrfToken)
-		
-		uploadRec := httptest.NewRecorder()
-		router.ServeHTTP(uploadRec, uploadReq)
-		
-		if uploadRec.Code != http.StatusCreated {
-			t.Fatalf("Expected 201 Created on upload, got %d - %s", uploadRec.Code, uploadRec.Body.String())
-		}
-		
-		var uploadResp map[string]string
-		if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
-			t.Fatalf("Invalid upload JSON: %v", err)
-		}
-		
-		assetURL := uploadResp["file"]
-		if assetURL == "" {
-			t.Fatal("Expected file URL in upload response")
-		}
-
-		// Step 2: Try to access the asset without authentication
+		// Try to access the asset without authentication
 		assetReq := httptest.NewRequest(http.MethodGet, assetURL, nil)
 		assetRec := httptest.NewRecorder()
 		router.ServeHTTP(assetRec, assetReq)
