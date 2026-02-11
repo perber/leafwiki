@@ -11,7 +11,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569
 	github.com/yuin/goldmark v1.7.16
-	golang.org/x/crypto v0.47.0
+	golang.org/x/crypto v0.48.0
 	modernc.org/sqlite v1.44.3
 )
 
@@ -46,9 +46,9 @@ require (
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	golang.org/x/arch v0.20.0 // indirect
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
-	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
