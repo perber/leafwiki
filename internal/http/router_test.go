@@ -1464,7 +1464,7 @@ func TestIndexingStatusEndpoint(t *testing.T) {
 // If needsAuth is true, it will obtain authentication cookies; otherwise it will get CSRF token only (for AuthDisabled mode).
 func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content string, needsAuth bool) (assetURL string, cookies []*http.Cookie) {
 	// Create a page
-	page, err := w.CreatePage("system", nil, "Test Page", "test-page")
+	page, err := w.CreatePage("system", nil, "Test Page", "test-page", pageNodeKind())
 	if err != nil {
 		t.Fatalf("Failed to create page: %v", err)
 	}
@@ -1484,7 +1484,7 @@ func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content str
 	}
 
 	var csrfToken string
-	
+
 	if needsAuth {
 		// Login to get auth cookies
 		loginBody := `{"identifier": "admin", "password": "admin"}`
@@ -1492,11 +1492,11 @@ func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content str
 		loginReq.Header.Set("Content-Type", "application/json")
 		loginRec := httptest.NewRecorder()
 		router.ServeHTTP(loginRec, loginReq)
-		
+
 		if loginRec.Code != http.StatusOK {
 			t.Fatalf("Expected 200 OK on login, got %d", loginRec.Code)
 		}
-		
+
 		cookies = loginRec.Result().Cookies()
 		csrfToken = loginRec.Header().Get("X-CSRF-Token")
 		if csrfToken == "" {
@@ -1512,7 +1512,7 @@ func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content str
 		configReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 		configRec := httptest.NewRecorder()
 		router.ServeHTTP(configRec, configReq)
-		
+
 		cookies = configRec.Result().Cookies()
 		csrfToken = configRec.Header().Get("X-CSRF-Token")
 		if csrfToken == "" {
@@ -1532,19 +1532,19 @@ func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content str
 		uploadReq.AddCookie(cookie)
 	}
 	uploadReq.Header.Set("X-CSRF-Token", csrfToken)
-	
+
 	uploadRec := httptest.NewRecorder()
 	router.ServeHTTP(uploadRec, uploadReq)
-	
+
 	if uploadRec.Code != http.StatusCreated {
 		t.Fatalf("Expected 201 Created on upload, got %d - %s", uploadRec.Code, uploadRec.Body.String())
 	}
-	
+
 	var uploadResp map[string]string
 	if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
 		t.Fatalf("Invalid upload JSON: %v", err)
 	}
-	
+
 	assetURL = uploadResp["file"]
 	if assetURL == "" {
 		t.Fatal("Expected file URL in upload response")
@@ -1558,7 +1558,7 @@ func TestAssetAccessControl(t *testing.T) {
 	t.Run("PrivateMode_UnauthenticatedAccess_Returns401", func(t *testing.T) {
 		w := createWikiTestInstance(t)
 		defer w.Close()
-		
+
 		// Create router with PublicAccess=false and AuthDisabled=false
 		router := NewRouter(w, RouterOptions{
 			PublicAccess:            false,
@@ -1587,7 +1587,7 @@ func TestAssetAccessControl(t *testing.T) {
 	t.Run("PrivateMode_AuthenticatedAccess_Returns200", func(t *testing.T) {
 		w := createWikiTestInstance(t)
 		defer w.Close()
-		
+
 		// Create router with PublicAccess=false and AuthDisabled=false
 		router := NewRouter(w, RouterOptions{
 			PublicAccess:            false,
@@ -1614,7 +1614,7 @@ func TestAssetAccessControl(t *testing.T) {
 		if assetRec.Code != http.StatusOK {
 			t.Errorf("Expected 200 OK when accessing asset with auth in private mode, got %d", assetRec.Code)
 		}
-		
+
 		// Verify content
 		content := assetRec.Body.String()
 		if content != "test content" {
@@ -1625,7 +1625,7 @@ func TestAssetAccessControl(t *testing.T) {
 	t.Run("PublicAccessMode_UnauthenticatedAccess_Returns200", func(t *testing.T) {
 		w := createWikiTestInstance(t)
 		defer w.Close()
-		
+
 		// Create router with PublicAccess=true
 		router := NewRouter(w, RouterOptions{
 			PublicAccess:            true,
@@ -1649,7 +1649,7 @@ func TestAssetAccessControl(t *testing.T) {
 		if assetRec.Code != http.StatusOK {
 			t.Errorf("Expected 200 OK when accessing asset without auth in public mode, got %d", assetRec.Code)
 		}
-		
+
 		// Verify content
 		content := assetRec.Body.String()
 		if content != "test content public" {
@@ -1660,7 +1660,7 @@ func TestAssetAccessControl(t *testing.T) {
 	t.Run("AuthDisabledMode_UnauthenticatedAccess_Returns200", func(t *testing.T) {
 		w := createWikiTestInstance(t)
 		defer w.Close()
-		
+
 		// Create router with AuthDisabled=true
 		router := NewRouter(w, RouterOptions{
 			PublicAccess:            false,
@@ -1684,7 +1684,7 @@ func TestAssetAccessControl(t *testing.T) {
 		if assetRec.Code != http.StatusOK {
 			t.Errorf("Expected 200 OK when accessing asset without auth when AuthDisabled=true, got %d", assetRec.Code)
 		}
-		
+
 		// Verify content
 		content := assetRec.Body.String()
 		if content != "test content no auth" {
