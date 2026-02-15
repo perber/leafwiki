@@ -9,6 +9,8 @@ type TreeStore = {
   error: string | null
   reloadTree: () => Promise<void>
   toggleNode: (id: string) => void
+  openNode: (id: string) => void
+  closeNode: (id: string) => void
   isNodeOpen: (id: string) => boolean
   getPageById: (id: string) => PageNode | null
   getPageByPath: (path: string) => PageNode | null
@@ -39,6 +41,18 @@ export const useTreeStore = create<TreeStore>()(
           return
         }
 
+        set({ openNodeIds: Array.from(current) })
+      },
+
+      openNode: (id: string) => {
+        const current = new Set(get().openNodeIds)
+        current.add(id)
+        set({ openNodeIds: Array.from(current) })
+      },
+
+      closeNode: (id: string) => {
+        const current = new Set(get().openNodeIds)
+        current.delete(id)
         set({ openNodeIds: Array.from(current) })
       },
 

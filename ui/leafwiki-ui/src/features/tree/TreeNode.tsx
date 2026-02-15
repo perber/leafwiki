@@ -68,7 +68,6 @@ export const TreeNode = React.memo(function TreeNode({
           ) {
             return
           }
-          toggleNode(node.id)
         }}
       >
         <span
