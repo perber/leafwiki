@@ -346,50 +346,6 @@ If you use this flag, **you are fully responsible for securing access at the net
 - `--public-access` for read-only public access
 - Viewer role for read-only access
 
-## Migrating existing Markdown content (community tool)
-
-If you already have an existing folder of Markdown files, you can bootstrap a LeafWiki navigation tree using a small community-contributed helper script.
-
-
-> **Community Tool**  
-> Useful for **initial migration** from existing Markdown structures into LeafWiki.  
-> Optional, provided “as is”. Contributions are welcome
-
-The script:
-- Scans a Markdown directory (default: `data/root`)
-- Normalizes folder/file names to LeafWiki conventions (lowercase, hyphens)
-- Ensures every folder has an `index.md`
-- Generates a `data/tree.json` so LeafWiki can navigate the structure
-
-Location: `tools/generate-tree.py`
-
-### preview changes (dry-run mode)
-You can preview the changes without modifying any files using the `--preview` flag:
-
-```bash
-python3 tools/generate-tree.py --root data/root --preview
-```
-
-This will:
-- show proposed renames, skipped files and added index.md files
-- print a preview of the generated tree
-- perform no changes.
-
-### Generate tree.json and normalize Markdown structure
-To actually apply the changes and generate `tree.json`, run:
-
-```bash
-python3 tools/generate-tree.py --root data/root --output data/tree.json
-```
-
-**Notes:**
-- It will rename files/folders to enforce LeafWiki naming conventions (lowercase, hyphens)
-- It will create blank `index.md` files in folders that lack them.
-- This is intended as a one-time import step
-- For ongoing structure management, use LeafWiki's UI.
-
-> Contributed in [#523](https://github.com/perber/leafwiki/issues/523) - thanks to @nicgord
-
 ---
 
 ## Reconstruct Tree from Filesystem
@@ -456,6 +412,17 @@ leafwiki --data-dir /path/to/data reconstruct-tree
 - Ensure your data directory exists and contains a `root` folder with your Markdown content
 - Consider backing up your current `tree.json` if you need to preserve custom ordering
 - The server does not need to be running—this is a standalone command
+
+---
+
+## Import Feature 
+
+LeafWiki includes a built-in Markdown Importer that allows you to import existing Markdown files and folders into the wiki structure.
+The importer is available as admin in the UI and can be used to quickly bring existing documentation into LeafWiki.
+
+At the moment the importer does not support all features of the wiki (e.g. metadata, backlinks, assets, ...) but it provides a fast way to get started with existing Markdown content.
+
+Please open an issue if you have specific feature requests or feedback for the importer.
 
 ---
 
