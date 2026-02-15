@@ -6,6 +6,7 @@ import {
 } from '@/lib/registries'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BacklinkInfo } from '../links/LinkInfo'
@@ -26,6 +27,7 @@ export default function PageViewer() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
+  const openNode = useTreeStore((state) => state.openNode)
   const loading = useProgressbarStore((s) => s.loading)
   const error = useViewerStore((s) => s.error)
   const page = useViewerStore((s) => s.page)
@@ -60,6 +62,12 @@ export default function PageViewer() {
     const path = pathname.slice(1) // remove leading /
     loadPageData?.(path)
   }, [pathname, loadPageData])
+
+  // Open node
+  useEffect(() => {
+    if (!page?.id) return
+    openNode(page.id)
+  }, [openNode, page?.id])
 
   const renderError = () => {
     if (!loading && !page) {

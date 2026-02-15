@@ -54,22 +54,6 @@ export const TreeNode = React.memo(function TreeNode({
         to={`/${node.path}`}
         className="tree-node__link"
         data-testid={`tree-node-link-${node.id}`}
-        onClick={(e) => {
-          // Only toggle sections on click
-          if (node.kind !== NODE_KIND_SECTION) return
-
-          // Prevent toggling when using modifier keys or middle mouse button
-          if (
-            e.metaKey ||
-            e.ctrlKey ||
-            e.shiftKey ||
-            e.altKey ||
-            e.button === 1
-          ) {
-            return
-          }
-          toggleNode(node.id)
-        }}
       >
         <span
           className={clsx('tree-node__title', {

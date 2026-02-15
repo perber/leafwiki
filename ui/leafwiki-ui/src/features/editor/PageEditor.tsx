@@ -23,6 +23,7 @@ export default function PageEditor() {
   const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
   const page = usePageEditorStore((s) => s.page)
+  const openNode = useTreeStore((s) => s.openNode)
   const dirty = usePageEditorStore((s) => {
     const { page, title, slug, content } = s
     if (!page) return false
@@ -44,6 +45,12 @@ export default function PageEditor() {
     if (!path) return
     loadPageData(path)
   }, [path, loadPageData])
+
+  // Open node
+  useEffect(() => {
+    if (!initialPage?.id) return
+    openNode(initialPage.id)
+  }, [openNode, initialPage?.id])
 
   // callbacks to save / close
   const handleSave = useCallback(() => {
