@@ -3,6 +3,16 @@
 
 This document records notable changes to LeafWiki, organized by release.
 
+## ✅ v0.8.0 – Sections & Importer
+
+### Features & Improvements
+- [x] A new section type to organize pages into collapsible sections in the Tree View
+- [x] Markdown Importer to import existing markdown files and folders into the wiki structure
+- [x] Added reconstruct from disk functionality to rebuild the wiki structure from the markdown files on disk (useful for recovery and importer)
+- [x] Added more options to the Tree View context menu (e.g. create section, ...)
+- [x] Regular dependency updates
+
+
 ## ✅ v0.7.2 – Branding Settings, Installer Improvements & Search Tokenizer Update
 
 ### Features & Improvements
