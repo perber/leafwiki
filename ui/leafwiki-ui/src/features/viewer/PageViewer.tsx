@@ -65,7 +65,7 @@ export default function PageViewer() {
 
   // Open node
   useEffect(() => {
-    if (!page) return
+    if (!page?.id) return
     openNode(page.id)
   }, [openNode, page?.id])
 

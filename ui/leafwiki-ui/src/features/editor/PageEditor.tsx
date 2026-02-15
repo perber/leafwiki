@@ -48,9 +48,9 @@ export default function PageEditor() {
 
   // Open node
   useEffect(() => {
-    if (!page) return
-    openNode(page.id)
-  }, [openNode, page?.id])
+    if (!initialPage?.id) return
+    openNode(initialPage.id)
+  }, [openNode, initialPage?.id])
 
   // callbacks to save / close
   const handleSave = useCallback(() => {
