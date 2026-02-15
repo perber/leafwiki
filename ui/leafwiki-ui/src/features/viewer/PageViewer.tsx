@@ -67,7 +67,7 @@ export default function PageViewer() {
   useEffect(() => {
     if (!page) return
     openNode(page.id)
-  }, [openNode, page])
+  }, [openNode, page?.id])
 
   const renderError = () => {
     if (!loading && !page) {
