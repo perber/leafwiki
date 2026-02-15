@@ -50,7 +50,7 @@ export default function PageEditor() {
   useEffect(() => {
     if (!page) return
     openNode(page.id)
-  }, [openNode, page])
+  }, [openNode, page?.id])
 
   // callbacks to save / close
   const handleSave = useCallback(() => {
