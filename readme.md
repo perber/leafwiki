@@ -218,6 +218,28 @@ The data directory inside the container will be `/app/data`..
 
 ---
 
+### Docker Compose
+
+You can also run LeafWiki using Docker Compose:
+
+```yaml
+services:
+  leafwiki:
+    image: ghcr.io/perber/leafwiki:latest
+    container_name: leafwiki
+    user: 1000:1000  # Run as non-root (specify your {UID}:{GID})
+    ports:
+      - "8080:8080"
+    environment:
+      - LEAFWIKI_JWT_SECRET=yourSecret
+      - LEAFWIKI_ADMIN_PASSWORD=yourPassword 
+    volumes: 
+      - ~/leafwiki-data:/app/data
+    restart: unless-stopped
+```
+
+Make sure the mounted data directory (`~/leafwiki-data`) is writable by the user specified in the `user` field.
+
 ### Manual installation
 
 Download the latest release binary from GitHub, make it executable, and start the server:
