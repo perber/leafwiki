@@ -260,6 +260,12 @@ You can change the data directory with the `--data-dir` flag.
 
 The JWT secret is required for authentication and should be kept secure.
 
+### Deploy on Railway
+Leafwiki can be deployed in one click on Railway, all the necessary config is already taken care of. 
+Make sure to change `LEAFWIKI_ADMIN_PASSWORD` when deploying as the default value otherwise will be `admin`
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/leafwiki?referralCode=iz4oG7&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
 
 ## Authentication and admin user
 
