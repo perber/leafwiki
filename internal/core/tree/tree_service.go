@@ -731,7 +731,7 @@ func (t *TreeService) GetPage(id string) (*Page, error) {
 	}, nil
 }
 
-// FindPageByPath finds a page in the tree by its path
+// FindPageByRoutePath finds a page in the tree by its path
 func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (*Page, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()

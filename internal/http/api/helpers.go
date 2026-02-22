@@ -50,6 +50,14 @@ func ToAPIPage(p *tree.Page, userResolver *auth.UserResolver) *Page {
 	}
 }
 
+func ToAPIPageWithDepth(p *tree.Page, userResolver *auth.UserResolver, depth int) *Page {
+	return &Page{
+		Node:    ToAPINodeWithDepth(p.PageNode, "", userResolver, depth),
+		Content: p.Content,
+		Path:    buildPathFromNode(p.PageNode),
+	}
+}
+
 func buildPathFromNode(node *tree.PageNode) string {
 	var parts []string
 	current := node
@@ -97,6 +105,45 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 	for _, child := range node.Children {
 		apiNode.Children = append(apiNode.Children, ToAPINode(child, path, userResolver))
 	}
+
+	return apiNode
+}
+
+// pruneNodeDepth limits the depth of the node tree to the specified depth.
+// depth == 0  -> keep the current node, drop all its children
+// depth > 0   -> recurse into children with depth-1
+// depth < 0   -> unlimited depth, no pruning
+func pruneNodeDepth(n *Node, depth int) {
+	if n == nil {
+		return
+	}
+
+	if depth == 0 {
+		n.Children = nil
+		return
+	}
+
+	if depth < 0 {
+		// Unlimited depth: no pruning.
+		return
+	}
+
+	for _, child := range n.Children {
+		pruneNodeDepth(child, depth-1)
+	}
+}
+
+func ToAPINodeWithDepth(node *tree.PageNode, parentPath string, userResolver *auth.UserResolver, depth int) *Node {
+	// Build the full node tree using the existing ToAPINode implementation.
+	apiNode := ToAPINode(node, parentPath, userResolver)
+
+	// Negative depth means unlimited depth: return the full tree.
+	if depth < 0 {
+		return apiNode
+	}
+
+	// Prune the tree to the requested depth.
+	pruneNodeDepth(apiNode, depth)
 
 	return apiNode
 }
