@@ -11,23 +11,24 @@ import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { ChevronUp, FilePlus } from 'lucide-react'
 import React from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import TreeNodeActionsMenu from './TreeNodeActionsMenu'
 
 type Props = {
   node: PageNode
   level?: number
+  pathname?: string
 }
 
 export const TreeNode = React.memo(function TreeNode({
   node,
   level = 0,
+  pathname = '',
 }: Props) {
-  const isNodeOpen = useTreeStore((state) => state.isNodeOpen)
-  const toggleNode = useTreeStore((state) => state.toggleNode)
+  const open = useTreeStore((s) => !!s.openNodeIdSet?.[node.id])
+  const toggleNode = useTreeStore((s) => s.toggleNode)
   const appMode = useAppMode()
   const hasChildren = node.children && node.children.length > 0
-  const { pathname } = useLocation()
 
   const currentPath =
     appMode === 'edit'
@@ -35,7 +36,6 @@ export const TreeNode = React.memo(function TreeNode({
       : buildViewUrl(node.path.startsWith('/') ? node.path : `/${node.path}`)
 
   const isActive = currentPath === pathname
-  const open = isNodeOpen(node.id)
   const openDialog = useDialogsStore((state) => state.openDialog)
 
   const isMobile = useIsMobile()
@@ -130,7 +130,12 @@ export const TreeNode = React.memo(function TreeNode({
       >
         {hasChildren &&
           node.children?.map((child) => (
-            <TreeNode key={child.id} node={child} level={level + 1} />
+            <TreeNode
+              key={child.id}
+              node={child}
+              level={level + 1}
+              pathname={pathname}
+            />
           ))}
       </div>
     </>
