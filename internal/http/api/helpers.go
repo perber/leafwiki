@@ -50,6 +50,14 @@ func ToAPIPage(p *tree.Page, userResolver *auth.UserResolver) *Page {
 	}
 }
 
+func ToAPIPageWithDepth(p *tree.Page, userResolver *auth.UserResolver, depth int) *Page {
+	return &Page{
+		Node:    ToAPINodeWithDepth(p.PageNode, "", userResolver, depth),
+		Content: p.Content,
+		Path:    buildPathFromNode(p.PageNode),
+	}
+}
+
 func buildPathFromNode(node *tree.PageNode) string {
 	var parts []string
 	current := node
@@ -96,6 +104,51 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 
 	for _, child := range node.Children {
 		apiNode.Children = append(apiNode.Children, ToAPINode(child, path, userResolver))
+	}
+
+	return apiNode
+}
+
+func ToAPINodeWithDepth(node *tree.PageNode, parentPath string, userResolver *auth.UserResolver, depth int) *Node {
+	path := node.Slug
+
+	if node.Slug == "root" {
+		path = ""
+	}
+
+	if node.Slug != "root" && parentPath != "" {
+		path = parentPath + "/" + node.Slug
+	}
+
+	var creator, lastAuthor *auth.UserLabel
+	if userResolver != nil {
+		creator, _ = userResolver.ResolveUserLabel(node.Metadata.CreatorID)
+		lastAuthor, _ = userResolver.ResolveUserLabel(node.Metadata.LastAuthorID)
+	}
+
+	apiNode := &Node{
+		ID:       node.ID,
+		Title:    node.Title,
+		Slug:     node.Slug,
+		Path:     path,
+		Position: node.Position,
+		Kind:     node.Kind,
+		Metadata: NodeMetadata{
+			CreatedAt:    node.Metadata.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:    node.Metadata.UpdatedAt.Format(time.RFC3339),
+			CreatorID:    node.Metadata.CreatorID,
+			LastAuthorID: node.Metadata.LastAuthorID,
+			Creator:      creator,
+			LastAuthor:   lastAuthor,
+		},
+	}
+
+	if depth <= 0 {
+		return apiNode
+	}
+
+	for _, child := range node.Children {
+		apiNode.Children = append(apiNode.Children, ToAPINodeWithDepth(child, path, userResolver, depth-1))
 	}
 
 	return apiNode

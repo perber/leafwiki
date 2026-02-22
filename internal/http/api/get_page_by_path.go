@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -21,6 +22,11 @@ func GetPageByPathHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, ToAPIPage(page, w.GetUserResolver()))
+		depth := 0
+		if page.Kind == tree.NodeKindSection {
+			depth = 1
+		}
+
+		c.JSON(http.StatusOK, ToAPIPageWithDepth(page, w.GetUserResolver(), depth))
 	}
 }
