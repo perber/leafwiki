@@ -1593,5 +1593,13 @@
     .app-layout__header-spacer {
       height: 0 !important;
     }
+
+    .page-viewer__header {
+      display: none !important;
+    }
+
+    .backlinks__pane {
+      display: none !important;
+    }
   }
 }
