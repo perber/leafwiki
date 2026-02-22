@@ -23,7 +23,8 @@ export const TreeNode = React.memo(function TreeNode({
   node,
   level = 0,
 }: Props) {
-  const { isNodeOpen, toggleNode } = useTreeStore()
+  const isNodeOpen = useTreeStore((state) => state.isNodeOpen)
+  const toggleNode = useTreeStore((state) => state.toggleNode)
   const appMode = useAppMode()
   const hasChildren = node.children && node.children.length > 0
   const { pathname } = useLocation()
