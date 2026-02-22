@@ -602,6 +602,109 @@ func TestGetPageEndpoint_MissingID(t *testing.T) {
 	}
 }
 
+func TestGetPageByPathEndpoint_MissingPath(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path", nil)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected status 400, got %d", rec.Code)
+	}
+}
+
+func TestGetPageByPathEndpoint_NotFound(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path?path=does-not-exist", nil)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404, got %d", rec.Code)
+	}
+}
+
+func TestGetPageByPathEndpoint_PageReturnsNoChildren(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	// Create a standalone page (no children – adding children auto-converts it to a section)
+	_, err := w.CreatePage("system", nil, "My Page", "my-page", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path?path=my-page", nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	// Page kind (depth=0): the node must be returned with children absent or null
+	if resp["kind"] != "page" {
+		t.Errorf("Expected kind 'page', got: %v", resp["kind"])
+	}
+	if children, ok := resp["children"]; ok && children != nil {
+		t.Errorf("Expected no children for page kind (depth=0), got: %v", children)
+	}
+}
+
+func TestGetPageByPathEndpoint_SectionReturnsDirectChildrenOnly(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer w.Close()
+	router := createRouterTestInstance(w, t)
+
+	sectionKind := tree.NodeKindSection
+
+	// Create a section with a child page that itself has a grandchild
+	section, err := w.CreatePage("system", nil, "My Section", "my-section", &sectionKind)
+	if err != nil {
+		t.Fatalf("CreatePage (section) failed: %v", err)
+	}
+	child, err := w.CreatePage("system", &section.ID, "Child Page", "child-page", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage (child) failed: %v", err)
+	}
+	_, err = w.CreatePage("system", &child.ID, "Grandchild Page", "grandchild-page", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage (grandchild) failed: %v", err)
+	}
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path?path=my-section", nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	// Section kind (depth=1): direct children must be present
+	children, ok := resp["children"].([]interface{})
+	if !ok || len(children) == 0 {
+		t.Fatalf("Expected direct children for section kind (depth=1), got: %v", resp["children"])
+	}
+
+	// Grandchildren must be absent or null (depth=1 means children's children are not included)
+	firstChild, ok := children[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected child to be an object, got: %v", children[0])
+	}
+	if grandchildren, ok := firstChild["children"]; ok && grandchildren != nil {
+		t.Errorf("Expected no grandchildren for section kind (depth=1), got: %v", grandchildren)
+	}
+}
+
 func TestMovePageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer w.Close()
