@@ -109,47 +109,41 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 	return apiNode
 }
 
+// pruneNodeDepth limits the depth of the node tree to the specified depth.
+// depth == 0  -> keep the current node, drop all its children
+// depth > 0   -> recurse into children with depth-1
+// depth < 0   -> unlimited depth, no pruning
+func pruneNodeDepth(n *Node, depth int) {
+	if n == nil {
+		return
+	}
+
+	if depth == 0 {
+		n.Children = nil
+		return
+	}
+
+	if depth < 0 {
+		// Unlimited depth: no pruning.
+		return
+	}
+
+	for _, child := range n.Children {
+		pruneNodeDepth(child, depth-1)
+	}
+}
+
 func ToAPINodeWithDepth(node *tree.PageNode, parentPath string, userResolver *auth.UserResolver, depth int) *Node {
-	path := node.Slug
+	// Build the full node tree using the existing ToAPINode implementation.
+	apiNode := ToAPINode(node, parentPath, userResolver)
 
-	if node.Slug == "root" {
-		path = ""
-	}
-
-	if node.Slug != "root" && parentPath != "" {
-		path = parentPath + "/" + node.Slug
-	}
-
-	var creator, lastAuthor *auth.UserLabel
-	if userResolver != nil {
-		creator, _ = userResolver.ResolveUserLabel(node.Metadata.CreatorID)
-		lastAuthor, _ = userResolver.ResolveUserLabel(node.Metadata.LastAuthorID)
-	}
-
-	apiNode := &Node{
-		ID:       node.ID,
-		Title:    node.Title,
-		Slug:     node.Slug,
-		Path:     path,
-		Position: node.Position,
-		Kind:     node.Kind,
-		Metadata: NodeMetadata{
-			CreatedAt:    node.Metadata.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:    node.Metadata.UpdatedAt.Format(time.RFC3339),
-			CreatorID:    node.Metadata.CreatorID,
-			LastAuthorID: node.Metadata.LastAuthorID,
-			Creator:      creator,
-			LastAuthor:   lastAuthor,
-		},
-	}
-
-	if depth <= 0 {
+	// Negative depth means unlimited depth: return the full tree.
+	if depth < 0 {
 		return apiNode
 	}
 
-	for _, child := range node.Children {
-		apiNode.Children = append(apiNode.Children, ToAPINodeWithDepth(child, path, userResolver, depth-1))
-	}
+	// Prune the tree to the requested depth.
+	pruneNodeDepth(apiNode, depth)
 
 	return apiNode
 }
