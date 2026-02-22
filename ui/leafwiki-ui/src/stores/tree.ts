@@ -1,7 +1,33 @@
 import { fetchTree, PageNode } from '@/lib/api/pages'
-import { assignParentIds } from '@/lib/treeUtils'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+
+function buildIndexes(root: PageNode) {
+  const byPath: Record<string, PageNode> = {}
+  const byId: Record<string, PageNode> = {}
+
+  const walk = (n: PageNode) => {
+    byId[n.id] = n
+    byPath[n.path] = n
+    for (const ch of n.children || []) walk(ch)
+  }
+
+  walk(root)
+  return { byPath, byId }
+}
+
+function assignParentIds(node: PageNode, parentId: string | null = null) {
+  node.parentId = parentId
+  for (const child of node.children || []) {
+    assignParentIds(child, node.id)
+  }
+}
+
+function toSetRecord(ids: string[]): Record<string, true> {
+  const rec: Record<string, true> = {}
+  for (const id of ids) rec[id] = true
+  return rec
+}
 
 type TreeStore = {
   tree: PageNode | null
@@ -15,8 +41,12 @@ type TreeStore = {
   getPageById: (id: string) => PageNode | null
   getPageByPath: (path: string) => PageNode | null
   getPathById: (id: string) => string | null
+  getAncestors: (id: string) => string[]
+  openAncestorsForPath: (path: string) => void
   openNodeIds: string[]
-  prevOpenNodeIds: string[] | null
+  openNodeIdSet: Record<string, true>
+  byPath: Record<string, PageNode>
+  byId: Record<string, PageNode>
 }
 export const useTreeStore = create<TreeStore>()(
   persist(
@@ -24,89 +54,64 @@ export const useTreeStore = create<TreeStore>()(
       tree: null,
       loading: false,
       error: null,
-      prevOpenNodeIds: null,
       openNodeIds: [],
+      openNodeIdSet: {},
+      byPath: {},
+      byId: {},
 
       toggleNode: (id: string) => {
         const current = new Set(get().openNodeIds)
 
-        if (current.has(id)) {
-          current.delete(id)
-        } else {
-          current.add(id)
-        }
+        if (current.has(id)) current.delete(id)
+        else current.add(id)
 
-        if (current.size === 0) {
-          set({ openNodeIds: [] })
-          return
-        }
-
-        set({ openNodeIds: Array.from(current) })
+        const ids = Array.from(current)
+        set({ openNodeIds: ids, openNodeIdSet: toSetRecord(ids) })
       },
 
       openNode: (id: string) => {
         const current = new Set(get().openNodeIds)
         current.add(id)
-        set({ openNodeIds: Array.from(current) })
+        const ids = Array.from(current)
+        set({ openNodeIds: ids, openNodeIdSet: toSetRecord(ids) })
       },
 
       closeNode: (id: string) => {
         const current = new Set(get().openNodeIds)
         current.delete(id)
-        set({ openNodeIds: Array.from(current) })
+        const ids = Array.from(current)
+        set({ openNodeIds: ids, openNodeIdSet: toSetRecord(ids) })
       },
 
-      isNodeOpen: (id: string) => {
-        return get().openNodeIds.includes(id)
-      },
+      isNodeOpen: (id: string) => !!get().openNodeIdSet?.[id],
 
-      getPathById: (id: string) => {
-        const findNodeById = (node: PageNode): PageNode | null => {
-          if (node.id === id) return node
-          for (const child of node.children || []) {
-            const found = findNodeById(child)
-            if (found) return found
-          }
-          return null
+      getPageByPath: (path: string) => get().byPath?.[path] ?? null,
+      getPageById: (id: string) => get().byId?.[id] ?? null,
+      getPathById: (id: string) => get().byId?.[id]?.path ?? null,
+
+      getAncestors: (id: string) => {
+        const byId = get().byId
+        const out: string[] = []
+        let cur = byId?.[id]
+        while (cur?.parentId) {
+          out.unshift(cur.parentId)
+          cur = byId[cur.parentId]
         }
-
-        const tree = get().tree
-        if (!tree) return null
-
-        const node = findNodeById(tree)
-        return node?.path ?? null
+        return out
       },
 
-      getPageByPath: (path: string) => {
-        const findNodeByPath = (node: PageNode): PageNode | null => {
-          if (node.path === path) return node
-          for (const child of node.children || []) {
-            const found = findNodeByPath(child)
-            if (found) return found
-          }
-          return null
-        }
+      openAncestorsForPath: (path: string) => {
+        const node = get().getPageByPath(path)
+        if (!node) return
 
-        const tree = get().tree
-        if (!tree) return null
+        const ancestors = get().getAncestors(node.id)
+        if (ancestors.length === 0) return
 
-        return findNodeByPath(tree)
-      },
+        const merged = new Set(get().openNodeIds)
+        for (const id of ancestors) merged.add(id)
 
-      getPageById: (id: string) => {
-        const findNodeById = (node: PageNode): PageNode | null => {
-          if (node.id === id) return node
-          for (const child of node.children || []) {
-            const found = findNodeById(child)
-            if (found) return found
-          }
-          return null
-        }
-
-        const tree = get().tree
-        if (!tree) return null
-
-        return findNodeById(tree)
+        const ids = Array.from(merged)
+        set({ openNodeIds: ids, openNodeIdSet: toSetRecord(ids) })
       },
 
       reloadTree: async () => {
@@ -115,7 +120,9 @@ export const useTreeStore = create<TreeStore>()(
         try {
           const tree = await fetchTree()
           assignParentIds(tree)
-          set({ tree })
+          const { byPath, byId } = buildIndexes(tree)
+          const persistedOpen = get().openNodeIds
+          set({ tree, byPath, byId, openNodeIdSet: toSetRecord(persistedOpen) })
           // FIXME: a better error handling is required here
         } catch (err: unknown) {
           if (err instanceof Error) {
