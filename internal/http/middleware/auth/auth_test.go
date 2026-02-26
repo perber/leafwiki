@@ -31,7 +31,7 @@ func TestRequireAuth_WithAuthDisabled_UserExists(t *testing.T) {
 	w := createTestWiki(t)
 	defer w.Close()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 
@@ -88,7 +88,7 @@ func TestRequireAuth_WithAuthDisabled_NoUser(t *testing.T) {
 	w := createTestWiki(t)
 	defer w.Close()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 
@@ -120,7 +120,7 @@ func TestRequireAuth_WithAuthEnabled_ValidToken(t *testing.T) {
 	wikiInstance := createTestWiki(t)
 	defer wikiInstance.Close()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	// Login to get a valid token
 	authToken, err := wikiInstance.GetAuthService().Login("admin", "admin")
@@ -177,7 +177,7 @@ func TestRequireAuth_WithAuthEnabled_MissingToken(t *testing.T) {
 	wikiInstance := createTestWiki(t)
 	defer wikiInstance.Close()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 
@@ -209,7 +209,7 @@ func TestRequireAuth_WithAuthEnabled_InvalidToken(t *testing.T) {
 	wikiInstance := createTestWiki(t)
 	defer wikiInstance.Close()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 
@@ -245,7 +245,7 @@ func TestRequireAuth_WithAuthEnabled_UserSetInContext(t *testing.T) {
 	wikiInstance := createTestWiki(t)
 	defer wikiInstance.Close()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	// Login to get a valid token
 	authToken, err := wikiInstance.GetAuthService().Login("admin", "admin")
@@ -292,7 +292,7 @@ func TestRequireAuth_NextNotCalledOnFailure(t *testing.T) {
 	wikiInstance := createTestWiki(t)
 	defer wikiInstance.Close()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 
@@ -386,7 +386,7 @@ func TestRequireAuth_ComprehensiveScenarios(t *testing.T) {
 			wikiInstance := createTestWiki(t)
 			defer wikiInstance.Close()
 
-			authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+			authCookies := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 			router := gin.New()
 

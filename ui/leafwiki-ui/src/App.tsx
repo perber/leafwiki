@@ -1,4 +1,5 @@
 import { createLeafWikiRouter } from '@/features/router/router'
+import { BASE_PATH } from '@/lib/config'
 import { useBootstrapAuth } from '@/lib/bootstrapAuth'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useSessionStore } from '@/stores/session'
@@ -35,7 +36,12 @@ function App() {
   }, [loadBranding])
 
   const router = useMemo(
-    () => createLeafWikiRouter(isReadOnlyViewer, authDisabled),
+    () =>
+      createLeafWikiRouter(
+        isReadOnlyViewer,
+        authDisabled,
+        BASE_PATH || undefined,
+      ),
     [isReadOnlyViewer, authDisabled],
   )
 

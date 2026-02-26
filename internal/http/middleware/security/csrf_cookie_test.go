@@ -12,7 +12,7 @@ import (
 )
 
 func TestCSRFCookie_CookieName_Secure(t *testing.T) {
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	name := csrf.cookieName(true)
 	if name != "__Host-leafwiki_csrf" {
@@ -21,7 +21,7 @@ func TestCSRFCookie_CookieName_Secure(t *testing.T) {
 }
 
 func TestCSRFCookie_CookieName_Insecure(t *testing.T) {
-	csrf := NewCSRFCookie(true, time.Hour)
+	csrf := NewCSRFCookie(true, time.Hour, "/")
 
 	name := csrf.cookieName(false)
 	if name != "leafwiki_csrf" {
@@ -31,7 +31,7 @@ func TestCSRFCookie_CookieName_Insecure(t *testing.T) {
 
 func TestCSRFCookie_Issue_Secure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -94,7 +94,7 @@ func TestCSRFCookie_Issue_Secure(t *testing.T) {
 
 func TestCSRFCookie_Issue_Insecure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	csrf := NewCSRFCookie(true, time.Hour)
+	csrf := NewCSRFCookie(true, time.Hour, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -134,7 +134,7 @@ func TestCSRFCookie_Issue_Insecure(t *testing.T) {
 
 func TestCSRFCookie_Issue_ErrorWhenHTTPSRequired(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -163,7 +163,7 @@ func TestCSRFCookie_Issue_ErrorWhenHTTPSRequired(t *testing.T) {
 
 func TestCSRFCookie_Read_Secure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -192,7 +192,7 @@ func TestCSRFCookie_Read_Secure(t *testing.T) {
 
 func TestCSRFCookie_Read_Insecure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	csrf := NewCSRFCookie(true, time.Hour)
+	csrf := NewCSRFCookie(true, time.Hour, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -220,7 +220,7 @@ func TestCSRFCookie_Read_Insecure(t *testing.T) {
 
 func TestCSRFCookie_Read_MissingCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -245,7 +245,7 @@ func TestCSRFCookie_Read_MissingCookie(t *testing.T) {
 
 func TestCSRFCookie_Clear_Secure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -286,7 +286,7 @@ func TestCSRFCookie_Clear_Secure(t *testing.T) {
 
 func TestCSRFCookie_Clear_Insecure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	csrf := NewCSRFCookie(true, time.Hour)
+	csrf := NewCSRFCookie(true, time.Hour, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {

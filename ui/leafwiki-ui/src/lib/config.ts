@@ -1,5 +1,10 @@
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(
-  /\/$/,
+export const BASE_PATH = (
+  document.querySelector('meta[name="base-path"]')?.getAttribute('content') ||
+  ''
+).replace(/\/+$/, '')
+
+export const API_BASE_URL = (import.meta.env.VITE_API_URL || BASE_PATH).replace(
+  /\/+$/,
   '',
 )
 
