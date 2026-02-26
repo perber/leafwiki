@@ -58,6 +58,7 @@ type RouterOptions struct {
 	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
 	HideLinkMetadataSection bool          // Whether to hide the link metadata section in the frontend UI
 	AuthDisabled            bool          // Whether authentication is disabled
+	BasePath                string        // URL prefix when served behind a reverse proxy (e.g. "/wiki")
 }
 
 // wireImporterService sets up and returns an ImporterService instance
@@ -88,20 +89,28 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	importerService := wireImporterService(wikiInstance)
 
 	router := gin.Default()
-	authCookies := auth_middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
-	csrfCookie := security.NewCSRFCookie(options.AllowInsecure, 3*24*time.Hour)
+
+	cookiePath := "/"
+	if options.BasePath != "" {
+		cookiePath = options.BasePath
+	}
+
+	authCookies := auth_middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout, cookiePath)
+	csrfCookie := security.NewCSRFCookie(options.AllowInsecure, 3*24*time.Hour, cookiePath)
 
 	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
 	refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
+
+	base := router.Group(options.BasePath)
 
 	assetsFS := gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), false) // false = no directory listing
 
 	if options.PublicAccess || options.AuthDisabled {
 		// public read access or auth disabled -> assets are publicly accessible
-		router.StaticFS("/assets", assetsFS)
+		base.StaticFS("/assets", assetsFS)
 	} else {
 		// private mode -> assets only accessible with authentication
-		assetsGroup := router.Group("/assets")
+		assetsGroup := base.Group("/assets")
 		assetsGroup.Use(
 			auth_middleware.InjectPublicEditor(options.AuthDisabled),
 			auth_middleware.RequireAuth(wikiInstance, authCookies, options.AuthDisabled),
@@ -109,7 +118,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		assetsGroup.StaticFS("/", assetsFS)
 	}
 
-	nonAuthApiGroup := router.Group("/api")
+	nonAuthApiGroup := base.Group("/api")
 	{
 		// Auth
 		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies, csrfCookie))
@@ -119,7 +128,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
 				return
 			}
-			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection, "authDisabled": options.AuthDisabled})
+			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection, "authDisabled": options.AuthDisabled, "basePath": options.BasePath})
 		})
 
 		// Branding (public, no auth required)
@@ -141,7 +150,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		}
 	}
 
-	requiresAuthGroup := router.Group("/api")
+	requiresAuthGroup := base.Group("/api")
 	requiresAuthGroup.Use(auth_middleware.InjectPublicEditor(options.AuthDisabled), auth_middleware.RequireAuth(wikiInstance, authCookies, options.AuthDisabled), security.CSRFMiddleware(csrfCookie))
 	{
 		// If public access is disabled, we need to ensure that the tree and pages routes are protected
@@ -205,7 +214,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	}
 
 	// Serve branding assets (logos, favicons) with extension validation
-	router.GET("/branding/:filename", func(c *gin.Context) {
+	base.GET("/branding/:filename", func(c *gin.Context) {
 		filename := c.Param("filename")
 
 		// Sanitize filename to prevent directory traversal and malicious input
@@ -285,9 +294,9 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		}
 
 		// Serve the embedded frontend files js, css, ...
-		router.StaticFS("/static", http.FS(staticFS))
+		base.StaticFS("/static", http.FS(staticFS))
 
-		router.GET("/favicon.svg", func(c *gin.Context) {
+		base.GET("/favicon.svg", func(c *gin.Context) {
 			// Get branding config to check for custom favicon
 			brandingConfig, err := wikiInstance.GetBranding()
 			if err == nil && brandingConfig.FaviconFile != "" {
@@ -303,11 +312,20 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		})
 
 		router.NoRoute(func(c *gin.Context) {
+			// Strip basePath prefix to check known route prefixes
+			path := c.Request.URL.Path
+			if options.BasePath != "" {
+				path = strings.TrimPrefix(path, options.BasePath)
+				if path == "" {
+					path = "/"
+				}
+			}
+
 			if c.Request.Method == http.MethodGet &&
-				!strings.HasPrefix(c.Request.URL.Path, "/api") &&
-				!strings.HasPrefix(c.Request.URL.Path, "/assets") &&
-				!strings.HasPrefix(c.Request.URL.Path, "/static") &&
-				!strings.HasPrefix(c.Request.URL.Path, "/branding") {
+				!strings.HasPrefix(path, "/api") &&
+				!strings.HasPrefix(path, "/assets") &&
+				!strings.HasPrefix(path, "/static") &&
+				!strings.HasPrefix(path, "/branding") {
 
 				c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 				data, err := fs.ReadFile(fsys, "index.html")
@@ -322,19 +340,27 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 					siteName = branding.SiteName
 				}
 
-				data = []byte(strings.ReplaceAll(string(data), "{{__SITE_NAME__}}", siteName)) // inject site name into title tag
+				html := string(data)
+				html = strings.ReplaceAll(html, "{{__SITE_NAME__}}", siteName)
+				html = strings.ReplaceAll(html, "{{__BASE_PATH__}}", options.BasePath)
+
+				// Rewrite absolute asset paths in the built HTML so the browser
+				// fetches them under the base path (e.g. /wiki/static/...).
+				if options.BasePath != "" {
+					html = strings.ReplaceAll(html, `"/static/`, `"`+options.BasePath+`/static/`)
+					html = strings.ReplaceAll(html, `"/favicon.svg"`, `"`+options.BasePath+`/favicon.svg"`)
+				}
 
 				if options.InjectCodeInHeader != "" {
-					html := string(data)
 					// replaces the closing </head> tag with the injected code
 					newHtml := strings.Replace(html, "</head>", "  "+options.InjectCodeInHeader+"\n  </head>", 1)
 					if newHtml == html {
 						log.Printf("Warning: could not inject code into header, </head> tag not found")
 					}
-					data = []byte(newHtml)
+					html = newHtml
 				}
 
-				c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 			} else {
 				c.String(http.StatusNotFound, "Page not found")
 			}

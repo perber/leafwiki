@@ -12,6 +12,7 @@ import ReadOnlyWrapper from './RouterReadOnlyWrapper'
 export const createLeafWikiRouter = (
   isReadOnlyViewer: boolean,
   authDisabled: boolean,
+  basename?: string,
 ) =>
   createBrowserRouter([
     {
@@ -83,4 +84,4 @@ export const createLeafWikiRouter = (
         </AuthWrapper>
       ),
     },
-  ] satisfies RouteObject[])
+  ] satisfies RouteObject[], { basename: basename || '/' })

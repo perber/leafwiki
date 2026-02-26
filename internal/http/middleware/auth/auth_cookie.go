@@ -13,14 +13,19 @@ type AuthCookies struct {
 	SameSite      http.SameSite
 	AccessTTL     time.Duration
 	RefreshTTL    time.Duration
+	CookiePath    string
 }
 
-func NewAuthCookies(allowInsecure bool, accessTTL, refreshTTL time.Duration) *AuthCookies {
+func NewAuthCookies(allowInsecure bool, accessTTL, refreshTTL time.Duration, cookiePath string) *AuthCookies {
+	if cookiePath == "" {
+		cookiePath = "/"
+	}
 	return &AuthCookies{
 		AllowInsecure: allowInsecure,
 		SameSite:      http.SameSiteLaxMode,
 		AccessTTL:     accessTTL,
 		RefreshTTL:    refreshTTL,
+		CookiePath:    cookiePath,
 	}
 }
 
@@ -42,7 +47,7 @@ func (a *AuthCookies) Set(c *gin.Context, accessToken, refreshToken string) erro
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     accessName,
 		Value:    accessToken,
-		Path:     "/",
+		Path:     a.CookiePath,
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: a.SameSite,
@@ -52,7 +57,7 @@ func (a *AuthCookies) Set(c *gin.Context, accessToken, refreshToken string) erro
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     refreshName,
 		Value:    refreshToken,
-		Path:     "/",
+		Path:     a.CookiePath,
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: a.SameSite,
@@ -70,11 +75,11 @@ func (a *AuthCookies) Clear(c *gin.Context) error {
 
 	accessName, refreshName := a.cookieNames(secure)
 
-	expire := func(name, path string) {
+	expire := func(name string) {
 		http.SetCookie(c.Writer, &http.Cookie{
 			Name:     name,
 			Value:    "",
-			Path:     path,
+			Path:     a.CookiePath,
 			HttpOnly: true,
 			Secure:   secure,
 			SameSite: a.SameSite,
@@ -82,8 +87,8 @@ func (a *AuthCookies) Clear(c *gin.Context) error {
 		})
 	}
 
-	expire(accessName, "/")
-	expire(refreshName, "/")
+	expire(accessName)
+	expire(refreshName)
 	return nil
 }
 

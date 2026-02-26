@@ -15,7 +15,7 @@ import (
 func TestCSRFMiddleware_AllowsSafeMethodsWithoutToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.Use(CSRFMiddleware(csrf))
@@ -36,7 +36,7 @@ func TestCSRFMiddleware_AllowsSafeMethodsWithoutToken(t *testing.T) {
 func TestCSRFMiddleware_BlocksPostWithoutCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.Use(CSRFMiddleware(csrf))
@@ -64,7 +64,7 @@ func TestCSRFMiddleware_BlocksPostWithoutCookie(t *testing.T) {
 func TestCSRFMiddleware_BlocksPostWithCookieButNoHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.Use(CSRFMiddleware(csrf))
@@ -97,7 +97,7 @@ func TestCSRFMiddleware_BlocksPostWithCookieButNoHeader(t *testing.T) {
 func TestCSRFMiddleware_BlocksPostWithMismatchingTokens(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.Use(CSRFMiddleware(csrf))
@@ -131,7 +131,7 @@ func TestCSRFMiddleware_BlocksPostWithMismatchingTokens(t *testing.T) {
 func TestCSRFMiddleware_AllowsPostWithMatchingTokens(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	csrf := NewCSRFCookie(false, time.Hour)
+	csrf := NewCSRFCookie(false, time.Hour, "/")
 
 	router := gin.New()
 	router.Use(CSRFMiddleware(csrf))

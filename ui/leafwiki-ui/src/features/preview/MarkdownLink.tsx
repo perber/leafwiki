@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { BASE_PATH } from '@/lib/config'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { buildViewUrl } from '@/lib/urlUtil'
 import { useAppMode } from '@/lib/useAppMode'
@@ -81,9 +82,12 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
   if (isInternal) {
     // check if it is a asset link
     if (href.startsWith('assets/') || href.startsWith('/assets/')) {
+      const assetHref = href.startsWith('/assets/')
+        ? BASE_PATH + href
+        : BASE_PATH + '/assets/' + href.slice('assets/'.length)
       return (
         <a
-          href={href}
+          href={assetHref}
           {...props}
           target="_blank"
           rel="noopener noreferrer"
@@ -102,8 +106,12 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
       normalizedHref = normalizeWikiPath(href)
     } else {
       // Relative link (e.g. "../stoff/change", "child-page", "./foo")
+      let locationPath = window.location.pathname
+      if (BASE_PATH && locationPath.startsWith(BASE_PATH)) {
+        locationPath = locationPath.slice(BASE_PATH.length) || '/'
+      }
       const currentPath = normalizeWikiPath(
-        props.path ?? buildViewUrl(window.location.pathname),
+        props.path ?? buildViewUrl(locationPath),
       )
 
       normalizedHref = resolvePath(currentPath, href)

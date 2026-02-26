@@ -227,7 +227,7 @@ func Test_RequireSecure_ErrorWhenHTTPSRequired(t *testing.T) {
 }
 
 func TestAuthCookies_CookieNames_Secure(t *testing.T) {
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(false, time.Hour, time.Hour*24, "/")
 
 	accessName, refreshName := auth.cookieNames(true)
 
@@ -241,7 +241,7 @@ func TestAuthCookies_CookieNames_Secure(t *testing.T) {
 }
 
 func TestAuthCookies_CookieNames_Insecure(t *testing.T) {
-	auth := NewAuthCookies(true, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	accessName, refreshName := auth.cookieNames(false)
 
@@ -256,7 +256,7 @@ func TestAuthCookies_CookieNames_Insecure(t *testing.T) {
 
 func TestAuthCookies_Set_Secure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(false, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -344,7 +344,7 @@ func TestAuthCookies_Set_Secure(t *testing.T) {
 
 func TestAuthCookies_Set_Insecure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(true, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -407,7 +407,7 @@ func TestAuthCookies_Set_Insecure(t *testing.T) {
 
 func TestAuthCookies_Set_ErrorWhenHTTPSRequired(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(false, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -431,7 +431,7 @@ func TestAuthCookies_Set_ErrorWhenHTTPSRequired(t *testing.T) {
 
 func TestAuthCookies_Clear_Secure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(false, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -494,7 +494,7 @@ func TestAuthCookies_Clear_Secure(t *testing.T) {
 
 func TestAuthCookies_Clear_Insecure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(true, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -534,7 +534,7 @@ func TestAuthCookies_Clear_Insecure(t *testing.T) {
 
 func TestAuthCookies_ReadAccess_Secure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(false, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -563,7 +563,7 @@ func TestAuthCookies_ReadAccess_Secure(t *testing.T) {
 
 func TestAuthCookies_ReadAccess_Insecure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(true, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -591,7 +591,7 @@ func TestAuthCookies_ReadAccess_Insecure(t *testing.T) {
 
 func TestAuthCookies_ReadAccess_MissingCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(false, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -616,7 +616,7 @@ func TestAuthCookies_ReadAccess_MissingCookie(t *testing.T) {
 
 func TestAuthCookies_ReadRefresh_Secure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(false, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -645,7 +645,7 @@ func TestAuthCookies_ReadRefresh_Secure(t *testing.T) {
 
 func TestAuthCookies_ReadRefresh_Insecure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(true, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(true, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -673,7 +673,7 @@ func TestAuthCookies_ReadRefresh_Insecure(t *testing.T) {
 
 func TestAuthCookies_ReadRefresh_MissingCookie(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	auth := NewAuthCookies(false, time.Hour, time.Hour*24)
+	auth := NewAuthCookies(false, time.Hour, time.Hour*24, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
@@ -701,7 +701,7 @@ func TestAuthCookies_CustomTTL(t *testing.T) {
 
 	accessTTL := 30 * time.Minute
 	refreshTTL := 7 * 24 * time.Hour
-	auth := NewAuthCookies(false, accessTTL, refreshTTL)
+	auth := NewAuthCookies(false, accessTTL, refreshTTL, "/")
 
 	router := gin.New()
 	router.GET("/test", func(c *gin.Context) {
