@@ -36,7 +36,12 @@ function App() {
   }, [loadBranding])
 
   const router = useMemo(
-    () => createLeafWikiRouter(isReadOnlyViewer, authDisabled, BASE_PATH || undefined),
+    () =>
+      createLeafWikiRouter(
+        isReadOnlyViewer,
+        authDisabled,
+        BASE_PATH || undefined,
+      ),
     [isReadOnlyViewer, authDisabled],
   )
 

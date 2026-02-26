@@ -14,74 +14,77 @@ export const createLeafWikiRouter = (
   authDisabled: boolean,
   basename?: string,
 ) =>
-  createBrowserRouter([
-    {
-      path: '/login',
-      element: authDisabled ? <Navigate to="/" replace /> : <LoginForm />,
-    },
-    {
-      path: '/',
-      element: isReadOnlyViewer ? (
-        <ReadOnlyWrapper>
-          <RootRedirect />
-        </ReadOnlyWrapper>
-      ) : (
-        <AuthWrapper>
-          <RootRedirect />
-        </AuthWrapper>
-      ),
-    },
-    {
-      path: '/users',
-      element:
-        isReadOnlyViewer || authDisabled ? (
+  createBrowserRouter(
+    [
+      {
+        path: '/login',
+        element: authDisabled ? <Navigate to="/" replace /> : <LoginForm />,
+      },
+      {
+        path: '/',
+        element: isReadOnlyViewer ? (
+          <ReadOnlyWrapper>
+            <RootRedirect />
+          </ReadOnlyWrapper>
+        ) : (
+          <AuthWrapper>
+            <RootRedirect />
+          </AuthWrapper>
+        ),
+      },
+      {
+        path: '/users',
+        element:
+          isReadOnlyViewer || authDisabled ? (
+            <Navigate to="/" />
+          ) : (
+            <AuthWrapper>
+              <UserManagement />
+            </AuthWrapper>
+          ),
+      },
+      {
+        path: '/settings/branding',
+        element: isReadOnlyViewer ? (
           <Navigate to="/" />
         ) : (
           <AuthWrapper>
-            <UserManagement />
+            <BrandingSettings />
           </AuthWrapper>
         ),
-    },
-    {
-      path: '/settings/branding',
-      element: isReadOnlyViewer ? (
-        <Navigate to="/" />
-      ) : (
-        <AuthWrapper>
-          <BrandingSettings />
-        </AuthWrapper>
-      ),
-    },
-    {
-      path: '/settings/importer',
-      element: isReadOnlyViewer ? (
-        <Navigate to="/" />
-      ) : (
-        <AuthWrapper>
-          <Importer />
-        </AuthWrapper>
-      ),
-    },
-    {
-      path: '/e/*',
-      element: isReadOnlyViewer ? (
-        <Navigate to="/" />
-      ) : (
-        <AuthWrapper>
-          <PageEditor />
-        </AuthWrapper>
-      ),
-    },
-    {
-      path: '*',
-      element: isReadOnlyViewer ? (
-        <ReadOnlyWrapper>
-          <PageViewer />
-        </ReadOnlyWrapper>
-      ) : (
-        <AuthWrapper>
-          <PageViewer />
-        </AuthWrapper>
-      ),
-    },
-  ] satisfies RouteObject[], { basename: basename || '/' })
+      },
+      {
+        path: '/settings/importer',
+        element: isReadOnlyViewer ? (
+          <Navigate to="/" />
+        ) : (
+          <AuthWrapper>
+            <Importer />
+          </AuthWrapper>
+        ),
+      },
+      {
+        path: '/e/*',
+        element: isReadOnlyViewer ? (
+          <Navigate to="/" />
+        ) : (
+          <AuthWrapper>
+            <PageEditor />
+          </AuthWrapper>
+        ),
+      },
+      {
+        path: '*',
+        element: isReadOnlyViewer ? (
+          <ReadOnlyWrapper>
+            <PageViewer />
+          </ReadOnlyWrapper>
+        ) : (
+          <AuthWrapper>
+            <PageViewer />
+          </AuthWrapper>
+        ),
+      },
+    ] satisfies RouteObject[],
+    { basename: basename || '/' },
+  )
