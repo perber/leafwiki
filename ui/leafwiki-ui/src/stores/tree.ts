@@ -26,7 +26,9 @@ function collectExpandableNodeIds(root: PageNode | null): string[] {
     for (const ch of children) walk(ch)
   }
 
-  walk(root)
+  for (const ch of root.children || []) {
+    walk(ch)
+  }
   return out
 }
 
