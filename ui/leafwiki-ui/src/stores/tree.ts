@@ -16,6 +16,20 @@ function buildIndexes(root: PageNode) {
   return { byPath, byId }
 }
 
+function collectExpandableNodeIds(root: PageNode | null): string[] {
+  if (!root) return []
+  const out: string[] = []
+
+  const walk = (n: PageNode) => {
+    const children = n.children || []
+    if (children.length > 0) out.push(n.id)
+    for (const ch of children) walk(ch)
+  }
+
+  walk(root)
+  return out
+}
+
 function assignParentIds(node: PageNode, parentId: string | null = null) {
   node.parentId = parentId
   for (const child of node.children || []) {
@@ -33,6 +47,8 @@ type TreeStore = {
   tree: PageNode | null
   loading: boolean
   error: string | null
+  expandAll: () => void
+  collapseAll: () => void
   reloadTree: () => Promise<void>
   toggleNode: (id: string) => void
   openNode: (id: string) => void
@@ -58,7 +74,15 @@ export const useTreeStore = create<TreeStore>()(
       openNodeIdSet: {},
       byPath: {},
       byId: {},
+      expandAll: () => {
+        const tree = get().tree
+        const ids = collectExpandableNodeIds(tree)
+        set({ openNodeIds: ids, openNodeIdSet: toSetRecord(ids) })
+      },
 
+      collapseAll: () => {
+        set({ openNodeIds: [], openNodeIdSet: {} })
+      },
       toggleNode: (id: string) => {
         const current = new Set(get().openNodeIds)
 

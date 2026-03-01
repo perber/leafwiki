@@ -4,7 +4,13 @@ import { DIALOG_ADD_PAGE, DIALOG_SORT_PAGES } from '@/lib/registries'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { FilePlus, FolderPlus, List } from 'lucide-react'
+import {
+  ChevronsDown,
+  ChevronsUp,
+  FilePlus,
+  FolderPlus,
+  List,
+} from 'lucide-react'
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { TreeNode } from './TreeNode'
@@ -16,6 +22,8 @@ export default function TreeView() {
   const { pathname } = useLocation()
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const openAncestorsForPath = useTreeStore((s) => s.openAncestorsForPath)
+  const expandAll = useTreeStore((s) => s.expandAll)
+  const collapseAll = useTreeStore((s) => s.collapseAll)
 
   const currentPath = pathname.replace(/^\/(e\/)?/, '') // z.B. docs/setup/intro
 
@@ -70,6 +78,18 @@ export default function TreeView() {
                 nodeKind: NODE_KIND_SECTION,
               })
             }
+          />
+          <TreeViewActionButton
+            actionName="expand-all"
+            icon={<ChevronsDown className="tree-view__action-icon" size={18} />}
+            tooltip="Expand all"
+            onClick={expandAll}
+          />
+          <TreeViewActionButton
+            actionName="collapse-all"
+            icon={<ChevronsUp className="tree-view__action-icon" size={18} />}
+            tooltip="Collapse all"
+            onClick={collapseAll}
           />
           {tree && (
             <TreeViewActionButton
