@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
-import { BASE_PATH } from '@/lib/config'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
-import { buildViewUrl } from '@/lib/urlUtil'
+import { buildViewUrl, stripBasePath, withBasePath } from '@/lib/urlUtil'
 import { useAppMode } from '@/lib/useAppMode'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
@@ -82,9 +81,11 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
   if (isInternal) {
     // check if it is a asset link
     if (href.startsWith('assets/') || href.startsWith('/assets/')) {
-      const assetHref = href.startsWith('/assets/')
-        ? BASE_PATH + href
-        : BASE_PATH + '/assets/' + href.slice('assets/'.length)
+      const path = href.startsWith('/assets/')
+        ? href
+        : '/assets/' + href.slice('assets/'.length)
+
+      const assetHref = withBasePath(path)
       return (
         <a
           href={assetHref}
@@ -107,9 +108,14 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
     } else {
       // Relative link (e.g. "../stoff/change", "child-page", "./foo")
       let locationPath = window.location.pathname
-      if (BASE_PATH && locationPath.startsWith(BASE_PATH)) {
-        locationPath = locationPath.slice(BASE_PATH.length) || '/'
+
+      // nutzt deinen util-strip (mit Boundary-Check)
+      const stripped = stripBasePath(locationPath)
+      if (stripped !== null) {
+        locationPath = stripped
       }
+
+      // danach wie gehabt
       const currentPath = normalizeWikiPath(
         props.path ?? buildViewUrl(locationPath),
       )

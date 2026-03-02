@@ -1,5 +1,13 @@
 import { BASE_PATH } from './config'
 
+export function normalizeBasePath(base: string | undefined | null): string {
+  if (!base || base === '/') return ''
+  base = base.startsWith('/') ? base : `/${base}`
+  return base.replace(/\/+$/, '') // trailing slashes entfernen
+}
+
+const BASE = normalizeBasePath(BASE_PATH)
+
 function ensureLeadingSlash(pathname: string): string {
   if (!pathname) {
     return '/'
@@ -7,46 +15,38 @@ function ensureLeadingSlash(pathname: string): string {
   return pathname.startsWith('/') ? pathname : `/${pathname}`
 }
 
-function stripBasePath(pathname: string): string {
-  // Normalize input first to simplify comparisons
+export function withBasePath(p: string): string {
+  if (!BASE) return p
+  return BASE + (p.startsWith('/') ? p : `/${p}`)
+}
+
+export function stripBasePath(pathname: string): string | null {
   pathname = ensureLeadingSlash(pathname)
-  if (!BASE_PATH) {
-    return pathname
-  }
-  // Only strip when pathname is exactly the base path
-  if (pathname === BASE_PATH) {
-    return '/'
-  }
-  // Or when it starts with the base path followed by a path separator
-  const baseWithSlash = `${BASE_PATH}/`
-  if (pathname.startsWith(baseWithSlash)) {
-    const stripped = pathname.slice(BASE_PATH.length)
+  if (!BASE) return pathname
+  if (pathname === BASE) return '/'
+  if (pathname.startsWith(BASE + '/')) {
+    const stripped = pathname.slice(BASE.length)
     return ensureLeadingSlash(stripped)
   }
-
-  return pathname
+  return null
 }
 
 export function buildEditUrl(pathname: string): string {
-  pathname = stripBasePath(pathname)
-
-  if (pathname.startsWith('/e/')) {
-    return pathname
+  let p = stripBasePath(pathname)
+  if (p === null) return `/e${ensureLeadingSlash(pathname)}`
+  if (p.startsWith('/e/')) return p
+  if (p.startsWith('/')) {
+    p = p.slice(1)
   }
 
-  if (pathname.startsWith('/')) {
-    pathname = pathname.slice(1)
-  }
-
-  return `/e/${pathname}`
+  return `/e/${p}`
 }
 
 export function buildViewUrl(pathname: string): string {
-  pathname = stripBasePath(pathname)
+  const stripped = stripBasePath(pathname)
+  if (stripped === null) return pathname
+  pathname = stripped
 
-  if (pathname.startsWith('/e/')) {
-    return pathname.slice(3)
-  }
-
+  if (pathname.startsWith('/e/')) return pathname.slice(3)
   return pathname
 }
