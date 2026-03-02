@@ -3,7 +3,7 @@ import { BASE_PATH } from './config'
 export function normalizeBasePath(base: string | undefined | null): string {
   if (!base || base === '/') return ''
   base = base.startsWith('/') ? base : `/${base}`
-  return base.replace(/\/+$/, '') // trailing slashes entfernen
+  return base.replace(/\/+$/, '') // remove trailing slashes
 }
 
 const BASE = normalizeBasePath(BASE_PATH)
