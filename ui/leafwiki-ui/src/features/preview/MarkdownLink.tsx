@@ -109,13 +109,13 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
       // Relative link (e.g. "../stoff/change", "child-page", "./foo")
       let locationPath = window.location.pathname
 
-      // nutzt deinen util-strip (mit Boundary-Check)
+      // Use stripBasePath utility (with boundary check)
       const stripped = stripBasePath(locationPath)
       if (stripped !== null) {
         locationPath = stripped
       }
 
-      // danach wie gehabt
+      // Then proceed as before
       const currentPath = normalizeWikiPath(
         props.path ?? buildViewUrl(locationPath),
       )
