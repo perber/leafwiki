@@ -1,12 +1,23 @@
-export const BASE_PATH = (
-  document.querySelector('meta[name="base-path"]')?.getAttribute('content') ||
-  ''
-).replace(/\/+$/, '')
+function readBasePathFromMeta(): string {
+  const raw =
+    document
+      .querySelector('meta[name="base-path"]')
+      ?.getAttribute('content')
+      ?.trim() ?? ''
 
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || BASE_PATH).replace(
-  /\/+$/,
-  '',
-)
+  if (!raw || raw.includes('{{')) {
+    return ''
+  }
+
+  const withSlash = raw.startsWith('/') ? raw : `/${raw}`
+  return withSlash.replace(/\/+$/, '')
+}
+
+export const BASE_PATH = readBasePathFromMeta()
+
+export const API_BASE_URL = (
+  import.meta.env.VITE_API_URL || (BASE_PATH ? `${BASE_PATH}/api` : '/api')
+).replace(/\/+$/, '')
 
 export const MAX_UPLOAD_SIZE_MB = 50
 export const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024

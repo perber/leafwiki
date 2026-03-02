@@ -86,5 +86,5 @@ export const createLeafWikiRouter = (
         ),
       },
     ] satisfies RouteObject[],
-    { basename: basename || '/' },
+    { basename: basename || undefined },
   )
