@@ -14,18 +14,13 @@ type CSRFCookie struct {
 	AllowInsecure bool
 	SameSite      http.SameSite
 	TTL           time.Duration
-	CookiePath    string
 }
 
-func NewCSRFCookie(allowInsecure bool, ttl time.Duration, cookiePath string) *CSRFCookie {
-	if cookiePath == "" {
-		cookiePath = "/"
-	}
+func NewCSRFCookie(allowInsecure bool, ttl time.Duration) *CSRFCookie {
 	return &CSRFCookie{
 		AllowInsecure: allowInsecure,
 		SameSite:      http.SameSiteLaxMode,
 		TTL:           ttl,
-		CookiePath:    cookiePath,
 	}
 }
 
@@ -63,7 +58,7 @@ func (c *CSRFCookie) Issue(ctx *gin.Context) (string, error) {
 	http.SetCookie(ctx.Writer, &http.Cookie{
 		Name:     c.cookieName(secure),
 		Value:    token,
-		Path:     c.CookiePath,
+		Path:     "/",
 		HttpOnly: false, // JS should read this cookie
 		Secure:   secure,
 		SameSite: c.SameSite,
@@ -95,7 +90,7 @@ func (c *CSRFCookie) Clear(ctx *gin.Context) error {
 	http.SetCookie(ctx.Writer, &http.Cookie{
 		Name:     c.cookieName(secure),
 		Value:    "",
-		Path:     c.CookiePath,
+		Path:     "/",
 		HttpOnly: false,
 		Secure:   secure,
 		SameSite: c.SameSite,
