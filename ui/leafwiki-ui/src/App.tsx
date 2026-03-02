@@ -1,6 +1,6 @@
 import { createLeafWikiRouter } from '@/features/router/router'
-import { BASE_PATH } from '@/lib/config'
 import { useBootstrapAuth } from '@/lib/bootstrapAuth'
+import { BASE_PATH } from '@/lib/config'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useSessionStore } from '@/stores/session'
 import useApplyDesignMode from '@/useApplyDesignMode'

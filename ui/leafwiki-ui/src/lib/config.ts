@@ -15,9 +15,13 @@ function readBasePathFromMeta(): string {
 
 export const BASE_PATH = readBasePathFromMeta()
 
+console.log(BASE_PATH ? `Using base path: "${BASE_PATH}"` : 'No base path configured')
+
 export const API_BASE_URL = (
-  import.meta.env.VITE_API_URL || (BASE_PATH ? `${BASE_PATH}/api` : '/api')
+  (BASE_PATH ? `${BASE_PATH}` : '')
 ).replace(/\/+$/, '')
+
+console.log(`Using API base URL: "${API_BASE_URL}"`)
 
 export const MAX_UPLOAD_SIZE_MB = 50
 export const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
