@@ -96,6 +96,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
 	refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
 
+	// The BasePath is always looking like "/wiki" or "" (no trailing slash).
 	base := router.Group(options.BasePath)
 
 	assetsFS := gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), false) // false = no directory listing
@@ -310,7 +311,18 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			// Strip basePath prefix to check known route prefixes
 			path := c.Request.URL.Path
 			if options.BasePath != "" {
+
+				// Ensure the pagePath is present
+				// If the pagePath does not match exactly render 404
+				if path != options.BasePath && !strings.HasPrefix(path, options.BasePath+"/") {
+					c.String(http.StatusNotFound, "Page not found")
+					return
+				}
+
+				// Strip the base path prefix to get the actual path for route checking
 				path = strings.TrimPrefix(path, options.BasePath)
+				// If the path is empty after stripping, set it to "/"
+				// This can happen when the request is exactly on the base path (e.g. "/wiki"), in which case we want to serve the frontend's index.html
 				if path == "" {
 					path = "/"
 				}
