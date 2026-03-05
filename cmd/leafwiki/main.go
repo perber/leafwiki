@@ -37,6 +37,7 @@ func printUsage() {
 	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
 	--disable-auth                Disable authentication completely (default: false) (WARNING: only use in trusted networks!)
 	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false)
+	--base-path                   URL prefix when served behind a reverse proxy (e.g. /wiki) (default: "")
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -52,6 +53,7 @@ func printUsage() {
 	LEAFWIKI_REFRESH_TOKEN_TIMEOUT
 	LEAFWIKI_DISABLE_AUTH
 	LEAFWIKI_HIDE_LINK_METADATA_SECTION
+	LEAFWIKI_BASE_PATH
 	`)
 }
 
@@ -94,6 +96,7 @@ func main() {
 	hideLinkMetadataSectionFlag := flag.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)")
 	accessTokenTimeoutFlag := flag.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)")
 	refreshTokenTimeoutFlag := flag.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)")
+	basePathFlag := flag.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)")
 	flag.Parse()
 
 	// Track which flags were explicitly set on CLI
@@ -113,6 +116,7 @@ func main() {
 	refreshTokenTimeout := resolveDuration("refresh-token-timeout", *refreshTokenTimeoutFlag, visited, "LEAFWIKI_REFRESH_TOKEN_TIMEOUT")
 	// If disable-auth is set, later logic will override publicAccess accordingly
 	disableAuth := resolveBool("disable-auth", *disableAuthFlag, visited, "LEAFWIKI_DISABLE_AUTH")
+	basePath := normalizeBasePath(resolveString("base-path", *basePathFlag, visited, "LEAFWIKI_BASE_PATH", ""))
 
 	args := flag.Args()
 	if len(args) > 0 {
@@ -199,6 +203,7 @@ func main() {
 		AccessTokenTimeout:      accessTokenTimeout,
 		RefreshTokenTimeout:     refreshTokenTimeout,
 		AuthDisabled:            disableAuth,
+		BasePath:                basePath,
 	})
 
 	// Start server - combine host and port
@@ -271,4 +276,15 @@ func parseDuration(s string) (time.Duration, bool) {
 		return 0, false
 	}
 	return d, true
+}
+
+// normalizeBasePath normalizes the base path to the form "/mypath" (no trailing slash).
+// Accepts "mypath", "/mypath", "/mypath/", etc. Returns "" for root.
+func normalizeBasePath(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.Trim(s, "/")
+	if s == "" {
+		return ""
+	}
+	return "/" + s
 }
