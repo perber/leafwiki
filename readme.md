@@ -232,7 +232,8 @@ services:
       - "8080:8080"
     environment:
       - LEAFWIKI_JWT_SECRET=yourSecret
-      - LEAFWIKI_ADMIN_PASSWORD=yourPassword 
+      - LEAFWIKI_ADMIN_PASSWORD=yourPassword
+      - LEAFWIKI_ALLOW_INSECURE=true  # WARNING: Enables HTTP by disabling Secure/HttpOnly cookies; for HTTPS deployments, omit this variable. HTTPS is the preferred method.
     volumes: 
       - ~/leafwiki-data:/app/data
     restart: unless-stopped
