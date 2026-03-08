@@ -233,7 +233,7 @@ services:
     environment:
       - LEAFWIKI_JWT_SECRET=yourSecret
       - LEAFWIKI_ADMIN_PASSWORD=yourPassword
-      - LEAFWIKI_ALLOW_INSECURE=true  # Allow insecure is required to run leafwiki with http. (When using https you can skip the env variable. Running in https is the prefered method.
+      - LEAFWIKI_ALLOW_INSECURE=true  # WARNING: Enables HTTP by disabling Secure/HttpOnly cookies; for HTTPS deployments, omit this variable. HTTPS is the preferred method.
     volumes: 
       - ~/leafwiki-data:/app/data
     restart: unless-stopped
