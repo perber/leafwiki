@@ -1,5 +1,22 @@
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(
-  /\/$/,
+function readBasePathFromMeta(): string {
+  const raw =
+    document
+      .querySelector('meta[name="base-path"]')
+      ?.getAttribute('content')
+      ?.trim() ?? ''
+
+  if (!raw || raw.includes('{{')) {
+    return ''
+  }
+
+  const withSlash = raw.startsWith('/') ? raw : `/${raw}`
+  return withSlash.replace(/\/+$/, '')
+}
+
+export const BASE_PATH = readBasePathFromMeta()
+
+export const API_BASE_URL = (BASE_PATH ? `${BASE_PATH}` : '').replace(
+  /\/+$/,
   '',
 )
 

@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { DIALOG_IMAGE_PREVIEW } from '@/lib/registries'
+import { withBasePath } from '@/lib/urlUtil'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useEffect, useState } from 'react'
 
@@ -28,7 +29,8 @@ export function MarkdownImage({ src = '', style, alt, ...rest }: Props) {
     const checkVersion = async () => {
       try {
         const v = Date.now()
-        const url = new URL(src, location.origin)
+        const prefixedSrc = withBasePath(src)
+        const url = new URL(prefixedSrc, location.origin)
         url.searchParams.set('v', v.toString())
         setVersionedSrc(url.toString())
       } catch {

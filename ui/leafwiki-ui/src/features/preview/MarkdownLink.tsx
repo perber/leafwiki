@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
-import { buildViewUrl } from '@/lib/urlUtil'
+import { buildViewUrl, stripBasePath, withBasePath } from '@/lib/urlUtil'
 import { useAppMode } from '@/lib/useAppMode'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
@@ -81,9 +81,14 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
   if (isInternal) {
     // check if it is a asset link
     if (href.startsWith('assets/') || href.startsWith('/assets/')) {
+      const path = href.startsWith('/assets/')
+        ? href
+        : '/assets/' + href.slice('assets/'.length)
+
+      const assetHref = withBasePath(path)
       return (
         <a
-          href={href}
+          href={assetHref}
           {...props}
           target="_blank"
           rel="noopener noreferrer"
@@ -102,8 +107,17 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
       normalizedHref = normalizeWikiPath(href)
     } else {
       // Relative link (e.g. "../stoff/change", "child-page", "./foo")
+      let locationPath = window.location.pathname
+
+      // Use stripBasePath utility (with boundary check)
+      const stripped = stripBasePath(locationPath)
+      if (stripped !== null) {
+        locationPath = stripped
+      }
+
+      // Then proceed as before
       const currentPath = normalizeWikiPath(
-        props.path ?? buildViewUrl(window.location.pathname),
+        props.path ?? buildViewUrl(locationPath),
       )
 
       normalizedHref = resolvePath(currentPath, href)
