@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -59,7 +60,7 @@ func authenticatedRequest(t *testing.T, router http.Handler, method, url string,
 	}
 
 	loginRes := loginRec.Result()
-	defer loginRes.Body.Close()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
 
 	cookies := loginRes.Cookies()
 	if len(cookies) == 0 {
@@ -116,7 +117,7 @@ func authenticatedRequestAs(t *testing.T, router http.Handler, username, passwor
 	}
 
 	loginRes := loginRec.Result()
-	defer loginRes.Body.Close()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
 
 	cookies := loginRes.Cookies()
 	if len(cookies) == 0 {
@@ -159,7 +160,7 @@ func authenticatedRequestAs(t *testing.T, router http.Handler, username, passwor
 
 func TestCreatePageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	title := "Getting Started"
@@ -193,7 +194,7 @@ func TestCreatePageEndpoint(t *testing.T) {
 
 func TestCreatePageEndpoint_MissingTitle(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"title": ""}`
@@ -206,7 +207,7 @@ func TestCreatePageEndpoint_MissingTitle(t *testing.T) {
 
 func TestCreatePageEndpoint_InvalidJSON(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `this is not valid json`
@@ -219,7 +220,7 @@ func TestCreatePageEndpoint_InvalidJSON(t *testing.T) {
 
 func TestCreatePageEndpoint_PageAlreadyExists(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"title": "Page Exists", "slug": "page-exists"}`
@@ -238,7 +239,7 @@ func TestCreatePageEndpoint_PageAlreadyExists(t *testing.T) {
 
 func TestGetTreeEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/tree", nil)
@@ -272,7 +273,7 @@ func TestGetTreeEndpoint(t *testing.T) {
 
 func TestSuggestSlugEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/slug-suggestion?title=NewPage", nil)
@@ -297,7 +298,7 @@ func TestSuggestSlugEndpoint(t *testing.T) {
 
 func TestSuggestSlugEndpoint_MissingTitle(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/slug-suggestion", nil)
@@ -309,7 +310,7 @@ func TestSuggestSlugEndpoint_MissingTitle(t *testing.T) {
 
 func TestDeletePageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	_, err := w.CreatePage("system", nil, "Delete Me", "delete-me", pageNodeKind())
@@ -330,7 +331,7 @@ func TestDeletePageEndpoint(t *testing.T) {
 
 func TestDeletePageEndpoint_NotFound(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/not-found-id", nil)
@@ -342,7 +343,7 @@ func TestDeletePageEndpoint_NotFound(t *testing.T) {
 
 func TestDeletePageEndpoint_HasChildren(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	parent, err := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
@@ -363,7 +364,7 @@ func TestDeletePageEndpoint_HasChildren(t *testing.T) {
 
 func TestDeletePageEndpoint_Recursive(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	parent, err := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
@@ -387,7 +388,7 @@ func TestDeletePageEndpoint_Recursive(t *testing.T) {
 
 func TestUpdatePageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	_, err := w.CreatePage("system", nil, "Original Title", "original-title", pageNodeKind())
@@ -427,7 +428,7 @@ func TestUpdatePageEndpoint(t *testing.T) {
 
 func TestUpdatePage_NotFound(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"title": "Updated", "slug": "updated", "content": "New content"}`
@@ -439,7 +440,7 @@ func TestUpdatePage_NotFound(t *testing.T) {
 
 func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create a page
@@ -474,7 +475,7 @@ func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
 
 func TestUpdatePage_PageAlreadyExists(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	_, err := w.CreatePage("system", nil, "Original Title", "original-title", pageNodeKind())
@@ -504,7 +505,7 @@ func TestUpdatePage_PageAlreadyExists(t *testing.T) {
 
 func TestUpdatePage_InvalidJSON(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `this is not valid json`
@@ -517,7 +518,7 @@ func TestUpdatePage_InvalidJSON(t *testing.T) {
 
 func TestUpdatePage_MissingTitle(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"slug": "updated", "content": "New content"}`
@@ -529,7 +530,7 @@ func TestUpdatePage_MissingTitle(t *testing.T) {
 
 func TestUpdatePage_MissingSlug(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"title": "Updated", "content": "New content"}`
@@ -542,7 +543,7 @@ func TestUpdatePage_MissingSlug(t *testing.T) {
 
 func TestGetPageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create a page
@@ -580,7 +581,7 @@ func TestGetPageEndpoint(t *testing.T) {
 
 func TestGetPageEndpoint_NotFound(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/not-found-id", nil)
@@ -592,7 +593,7 @@ func TestGetPageEndpoint_NotFound(t *testing.T) {
 
 func TestGetPageEndpoint_MissingID(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/", nil)
@@ -604,7 +605,7 @@ func TestGetPageEndpoint_MissingID(t *testing.T) {
 
 func TestGetPageByPathEndpoint_MissingPath(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path", nil)
@@ -616,7 +617,7 @@ func TestGetPageByPathEndpoint_MissingPath(t *testing.T) {
 
 func TestGetPageByPathEndpoint_NotFound(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path?path=does-not-exist", nil)
@@ -628,7 +629,7 @@ func TestGetPageByPathEndpoint_NotFound(t *testing.T) {
 
 func TestGetPageByPathEndpoint_PageReturnsNoChildren(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create a standalone page (no children – adding children auto-converts it to a section)
@@ -659,7 +660,7 @@ func TestGetPageByPathEndpoint_PageReturnsNoChildren(t *testing.T) {
 
 func TestGetPageByPathEndpoint_SectionReturnsDirectChildrenOnly(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	sectionKind := tree.NodeKindSection
@@ -707,7 +708,7 @@ func TestGetPageByPathEndpoint_SectionReturnsDirectChildrenOnly(t *testing.T) {
 
 func TestMovePageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create two pages a and b
@@ -738,7 +739,7 @@ func TestMovePageEndpoint(t *testing.T) {
 
 func TestMovePageEndpoint_NotFound(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/not-found-id/move", strings.NewReader(`{"parentId":"root"}`))
@@ -750,7 +751,7 @@ func TestMovePageEndpoint_NotFound(t *testing.T) {
 
 func TestMovePageEndpoint_InvalidJSON(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/invalid-id/move", strings.NewReader(`this is not valid json`))
@@ -762,7 +763,7 @@ func TestMovePageEndpoint_InvalidJSON(t *testing.T) {
 
 func TestMovePageEndpoint_MissingParentID(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-parent/move", strings.NewReader(`{"parentId":""}`))
@@ -774,7 +775,7 @@ func TestMovePageEndpoint_MissingParentID(t *testing.T) {
 
 func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
@@ -795,7 +796,7 @@ func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 
 func TestMovePageEndpoint_CircularReference(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
@@ -820,7 +821,7 @@ func TestMovePageEndpoint_CircularReference(t *testing.T) {
 
 func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
@@ -850,7 +851,7 @@ func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 
 func TestMovePage_InTheSamePlace(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
@@ -868,7 +869,7 @@ func TestMovePage_InTheSamePlace(t *testing.T) {
 
 func TestSortPagesEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create pages
@@ -936,7 +937,7 @@ func TestSortPagesEndpoint(t *testing.T) {
 
 func TestAuthLoginEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"identifier": "admin", "password": "admin"}`
@@ -951,7 +952,7 @@ func TestAuthLoginEndpoint(t *testing.T) {
 	}
 
 	res := rec.Result()
-	defer res.Body.Close()
+	defer test_utils.WrapCloseWithErrorCheck(res.Body.Close, t)
 
 	// Prüfen, ob Cookies gesetzt wurden
 	cookies := res.Cookies()
@@ -962,7 +963,7 @@ func TestAuthLoginEndpoint(t *testing.T) {
 
 func TestAuthLogin_InvalidCredentials(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"identifier": "admin", "password": "wrong"}`
@@ -979,7 +980,7 @@ func TestAuthLogin_InvalidCredentials(t *testing.T) {
 
 func TestAuthRefreshToken(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// 1) Login
@@ -994,7 +995,7 @@ func TestAuthRefreshToken(t *testing.T) {
 	}
 
 	loginRes := loginRec.Result()
-	defer loginRes.Body.Close()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
 	cookies := loginRes.Cookies()
 
 	if len(cookies) == 0 {
@@ -1030,7 +1031,7 @@ func TestAuthRefreshToken(t *testing.T) {
 
 	// optional: check if new cookies are set
 	refreshRes := rec.Result()
-	defer refreshRes.Body.Close()
+	defer test_utils.WrapCloseWithErrorCheck(refreshRes.Body.Close, t)
 	newCookies := refreshRes.Cookies()
 	if len(newCookies) == 0 {
 		t.Fatalf("Expected new auth cookies on refresh")
@@ -1039,7 +1040,7 @@ func TestAuthRefreshToken(t *testing.T) {
 
 func TestCreateUserEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"username": "john", "email": "john@example.com", "password": "secret123", "role": "editor"}`
@@ -1052,7 +1053,7 @@ func TestCreateUserEndpoint(t *testing.T) {
 
 func TestCreateUser_DuplicateEmailOrUsername(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create initial user
@@ -1076,7 +1077,7 @@ func TestCreateUser_DuplicateEmailOrUsername(t *testing.T) {
 
 func TestCreateUser_InvalidRole(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"username": "sam", "email": "sam@example.com", "password": "secret1234", "role": "undefined"}`
@@ -1089,7 +1090,7 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 
 func TestCreateUser_WithViewerRole(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	body := `{"username": "vieweruser", "email": "viewer@example.com", "password": "secret1234", "role": "viewer"}`
@@ -1102,7 +1103,7 @@ func TestCreateUser_WithViewerRole(t *testing.T) {
 
 func TestUpdateUser_RoleToViewer(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create user
@@ -1127,7 +1128,7 @@ func TestUpdateUser_RoleToViewer(t *testing.T) {
 
 func TestViewer_CannotCreatePage(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create a viewer user
@@ -1145,7 +1146,7 @@ func TestViewer_CannotCreatePage(t *testing.T) {
 
 func TestViewer_CannotUploadAsset(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create a viewer user
@@ -1169,7 +1170,7 @@ func TestViewer_CannotUploadAsset(t *testing.T) {
 
 func TestViewer_CannotUpdatePage(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create a viewer user
@@ -1194,7 +1195,7 @@ func TestViewer_CannotUpdatePage(t *testing.T) {
 
 func TestViewer_CannotDeletePage(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create a viewer user
@@ -1218,7 +1219,7 @@ func TestViewer_CannotDeletePage(t *testing.T) {
 
 func TestGetUsersEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/users", nil)
@@ -1238,7 +1239,7 @@ func TestGetUsersEndpoint(t *testing.T) {
 
 func TestUpdateUserEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create user
@@ -1264,7 +1265,7 @@ func TestUpdateUserEndpoint(t *testing.T) {
 
 func TestDeleteUserEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create user
@@ -1282,7 +1283,7 @@ func TestDeleteUserEndpoint(t *testing.T) {
 
 func TestDeleteAdminUser_ShouldFail(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Get default admin
@@ -1310,7 +1311,7 @@ func TestDeleteAdminUser_ShouldFail(t *testing.T) {
 
 func TestRequireAdminMiddleware(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Default Admin create user should succeed
@@ -1324,7 +1325,7 @@ func TestRequireAdminMiddleware(t *testing.T) {
 
 func TestRequireAdminMiddleware_BlockedWhenAuthDisabled(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	// Create router with auth disabled
 	router := NewRouter(w, RouterOptions{
@@ -1369,7 +1370,7 @@ func TestRequireAdminMiddleware_BlockedWhenAuthDisabled(t *testing.T) {
 
 func TestRequireAuthMiddleware_Unauthorized(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Request ohne Token
@@ -1386,7 +1387,7 @@ func TestRequireAuthMiddleware_Unauthorized(t *testing.T) {
 
 func TestRequireAuthMiddleware_InvalidToken(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(`{"title": "Bad", "slug": "bad"}`))
@@ -1403,7 +1404,7 @@ func TestRequireAuthMiddleware_InvalidToken(t *testing.T) {
 
 func TestAssetEndpoints(t *testing.T) {
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Step 0: Login als Admin und Cookies holen
@@ -1419,7 +1420,7 @@ func TestAssetEndpoints(t *testing.T) {
 	}
 
 	loginRes := loginRec.Result()
-	defer loginRes.Body.Close()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
 
 	cookies := loginRes.Cookies()
 	if len(cookies) == 0 {
@@ -1544,7 +1545,7 @@ func TestAssetEndpoints(t *testing.T) {
 func TestIndexingStatusEndpoint(t *testing.T) {
 	// Lets call /api/search/status
 	w := createWikiTestInstance(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Default Admin holen
@@ -1660,7 +1661,7 @@ func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content str
 func TestAssetAccessControl(t *testing.T) {
 	t.Run("PrivateMode_UnauthenticatedAccess_Returns401", func(t *testing.T) {
 		w := createWikiTestInstance(t)
-		defer w.Close()
+		defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 		// Create router with PublicAccess=false and AuthDisabled=false
 		router := NewRouter(w, RouterOptions{
@@ -1689,7 +1690,7 @@ func TestAssetAccessControl(t *testing.T) {
 
 	t.Run("PrivateMode_AuthenticatedAccess_Returns200", func(t *testing.T) {
 		w := createWikiTestInstance(t)
-		defer w.Close()
+		defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 		// Create router with PublicAccess=false and AuthDisabled=false
 		router := NewRouter(w, RouterOptions{
@@ -1727,7 +1728,7 @@ func TestAssetAccessControl(t *testing.T) {
 
 	t.Run("PublicAccessMode_UnauthenticatedAccess_Returns200", func(t *testing.T) {
 		w := createWikiTestInstance(t)
-		defer w.Close()
+		defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 		// Create router with PublicAccess=true
 		router := NewRouter(w, RouterOptions{
@@ -1762,7 +1763,7 @@ func TestAssetAccessControl(t *testing.T) {
 
 	t.Run("AuthDisabledMode_UnauthenticatedAccess_Returns200", func(t *testing.T) {
 		w := createWikiTestInstance(t)
-		defer w.Close()
+		defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 		// Create router with AuthDisabled=true
 		router := NewRouter(w, RouterOptions{

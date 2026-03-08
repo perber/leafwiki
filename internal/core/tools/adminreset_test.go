@@ -19,7 +19,7 @@ func TestResetAdminPassword(t *testing.T) {
 	userService := auth.NewUserService(store)
 	_, err = userService.CreateUser("admin", "admin@example.com", "oldpassword", "admin")
 	if err != nil {
-		store.Close()
+		_ = store.Close()
 		t.Fatalf("Failed to create admin user: %v", err)
 	}
 
@@ -48,7 +48,11 @@ func TestResetAdminPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create user store: %v", err)
 	}
-	defer store2.Close()
+	defer func() {
+		if err := store2.Close(); err != nil {
+			t.Fatalf("Failed to close user store: %v", err)
+		}
+	}()
 
 	userService2 := auth.NewUserService(store2)
 	_, err = userService2.GetUserByEmailOrUsernameAndPassword("admin", adminUser.Password)
@@ -84,7 +88,11 @@ func TestResetAdminPassword_NoAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create user store: %v", err)
 	}
-	defer store.Close()
+	defer func() {
+		if err := store.Close(); err != nil {
+			t.Fatalf("Failed to close user store: %v", err)
+		}
+	}()
 
 	userService := auth.NewUserService(store)
 	_, err = userService.GetUserByEmailOrUsernameAndPassword("admin", adminUser.Password)

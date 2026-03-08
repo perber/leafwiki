@@ -110,12 +110,17 @@ func RequireEditorOrAdmin() gin.HandlerFunc {
 		}
 
 		user, ok := userValue.(*auth.User)
-		if !ok || !(user.HasRole(auth.RoleAdmin) || user.HasRole(auth.RoleEditor)) {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Editor or Admin role required"})
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
 			return
 		}
 
-		c.Next()
+		if user.HasRole(auth.RoleAdmin) || user.HasRole(auth.RoleEditor) {
+			c.Next()
+			return
+		}
+
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Editor or Admin role required"})
 	}
 }
 

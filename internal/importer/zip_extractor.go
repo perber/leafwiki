@@ -25,7 +25,11 @@ func (x *ZipExtractor) ExtractToTemp(zipPath string) (*ZipWorkspace, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open zip: %w", err)
 	}
-	defer r.Close()
+	defer func() {
+		if err := r.Close(); err != nil {
+			x.log.Error("close failed", "error", err)
+		}
+	}()
 
 	root, err := os.MkdirTemp("", "import-*")
 	if err != nil {
@@ -65,7 +69,11 @@ func (x *ZipExtractor) ExtractToTemp(zipPath string) (*ZipWorkspace, error) {
 			if err != nil {
 				return fmt.Errorf("open zip entry: %w", err)
 			}
-			defer rc.Close()
+			defer func() {
+				if err := rc.Close(); err != nil {
+					x.log.Error("close failed", "error", err)
+				}
+			}()
 
 			out, err := os.OpenFile(destPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 			if err != nil {

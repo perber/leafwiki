@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"path"
 	"sync"
 
@@ -167,7 +168,11 @@ func (s *LinksStore) AddLinks(fromPageID string, fromTitle string, toLinks []Tar
 		}
 		return errors.Join(base, err)
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			slog.Default().Error("could not close statement", "error", err)
+		}
+	}()
 
 	for _, link := range toLinks {
 		brokenInt := 0
@@ -197,7 +202,11 @@ func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Default().Error("could not close rows", "error", err)
+		}
+	}()
 
 	var backlinks []Backlink
 	for rows.Next() {
@@ -232,7 +241,11 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Default().Error("could not close rows", "error", err)
+		}
+	}()
 
 	var outgoings []Outgoing
 	for rows.Next() {
@@ -273,7 +286,11 @@ func (s *LinksStore) GetBrokenIncomingForPath(toPath string) ([]Backlink, error)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Default().Error("could not close rows", "error", err)
+		}
+	}()
 
 	var backlinks []Backlink
 	for rows.Next() {

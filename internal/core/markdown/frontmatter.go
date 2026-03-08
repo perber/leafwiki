@@ -5,9 +5,15 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"unicode"
 
 	yaml "gopkg.in/yaml.v3"
 )
+
+func invalidYAMLKeyRune(r rune) bool {
+	//nolint:staticcheck
+	return !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-')
+}
 
 type Frontmatter struct {
 	LeafWikiID    string `yaml:"leafwiki_id,omitempty" json:"id,omitempty"`
@@ -57,7 +63,7 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 	s = strings.ReplaceAll(s, "\r", "\n")
 
 	// Must start with '---' on the very first line
-	if !(s == "---" || strings.HasPrefix(s, "---\n")) {
+	if s != "---" && !strings.HasPrefix(s, "---\n") {
 		return "", md, false
 	}
 
@@ -107,12 +113,7 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 		if trim != "" && !strings.HasPrefix(trim, "#") {
 			if idx := strings.IndexByte(trim, ':'); idx > 0 {
 				key := strings.TrimSpace(trim[:idx])
-				if key != "" && strings.IndexFunc(key, func(r rune) bool {
-					return !(r >= 'a' && r <= 'z' ||
-						r >= 'A' && r <= 'Z' ||
-						r >= '0' && r <= '9' ||
-						r == '_' || r == '-')
-				}) == -1 {
+				if key != "" && strings.IndexFunc(key, invalidYAMLKeyRune) == -1 {
 					looksLikeYAML = true
 				}
 			}

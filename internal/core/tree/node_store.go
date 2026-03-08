@@ -69,7 +69,11 @@ func (f *NodeStore) LoadTree(filename string) (*PageNode, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open tree file %s: %w", fullPath, err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			f.log.Error("could not close tree file", "file", fullPath, "error", err)
+		}
+	}()
 	data, err := io.ReadAll(file)
 
 	if err != nil {

@@ -1,6 +1,10 @@
 package auth
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/perber/wiki/internal/test_utils"
+)
 
 func setupTestUserStore(t *testing.T) *UserStore {
 	t.Helper()
@@ -15,7 +19,7 @@ func setupTestUserStore(t *testing.T) *UserStore {
 
 func TestUserStore_CreateUser(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user := &User{
 		ID:       "1",
@@ -55,7 +59,7 @@ func TestUserStore_CreateUser(t *testing.T) {
 
 func TestUserStore_CreateUser_EmailAlreadyExists(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 	user1 := &User{
 		ID:       "1",
 		Username: "testuser1",
@@ -89,7 +93,7 @@ func TestUserStore_CreateUser_EmailAlreadyExists(t *testing.T) {
 
 func TestUserStore_CreateUser_UsernameAlreadyExists(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 	user1 := &User{
 		ID:       "1",
 		Username: "testuser1",
@@ -120,7 +124,7 @@ func TestUserStore_CreateUser_UsernameAlreadyExists(t *testing.T) {
 
 func TestUserStore_GetUserByID_NotExisting(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 	user := &User{
 		ID:       "1",
 		Username: "testuser",
@@ -154,7 +158,7 @@ func TestUserStore_GetUserByID_NotExisting(t *testing.T) {
 
 func TestUserStore_UpdateUser(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 	user := &User{
 		ID:       "1",
 		Username: "testuser",
@@ -205,7 +209,7 @@ func TestUserStore_UpdateUser(t *testing.T) {
 
 func TestUserStore_UpdateUser_EMailAlreadyExists(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",
@@ -253,7 +257,7 @@ func TestUserStore_UpdateUser_EMailAlreadyExists(t *testing.T) {
 
 func TestUserStore_UpdateUser_UsernameAlreadyExists(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",
@@ -301,7 +305,7 @@ func TestUserStore_UpdateUser_UsernameAlreadyExists(t *testing.T) {
 
 func TestUserStore_DeleteUser(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 	user := &User{
 		ID:       "1",
 		Username: "testuser",
@@ -351,7 +355,7 @@ func TestUserStore_DeleteUser(t *testing.T) {
 }
 func TestUserStore_DeleteUser_NotExisting(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	// Attempt to delete a non-existing user
 	err := store.DeleteUser("non-existing-id")
@@ -365,7 +369,7 @@ func TestUserStore_DeleteUser_NotExisting(t *testing.T) {
 
 func TestUserStore_GetAllUsers(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",
@@ -425,7 +429,7 @@ func TestUserStore_GetAllUsers(t *testing.T) {
 }
 func TestUserStore_GetUserCount(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",
@@ -466,7 +470,7 @@ func TestUserStore_GetUserCount(t *testing.T) {
 
 func TestUserStore_GetUserByUsernameAndPassword(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",
@@ -540,7 +544,7 @@ func TestUserStore_GetUserByUsernameAndPassword(t *testing.T) {
 
 func TestUserStore_GetUserByEmailAndPassword(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",
@@ -608,7 +612,7 @@ func TestUserStore_GetUserByEmailAndPassword(t *testing.T) {
 
 func TestUserStore_GetUserByUsernameOrEmailAndPassword(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",
@@ -695,7 +699,7 @@ func TestUserStore_GetUserByUsernameOrEmailAndPassword(t *testing.T) {
 
 func TestUserStore_GetUserByEmail(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",
@@ -746,7 +750,7 @@ func TestUserStore_GetUserByEmail(t *testing.T) {
 
 func TestUserStore_GetUserByUsername(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",
@@ -797,7 +801,7 @@ func TestUserStore_GetUserByUsername(t *testing.T) {
 
 func TestUserStoreUpdatePassword(t *testing.T) {
 	store := setupTestUserStore(t)
-	defer store.Close()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	user1 := &User{
 		ID:       "1",

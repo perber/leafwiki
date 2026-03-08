@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -25,7 +26,11 @@ func UploadAssetHandler(w *wiki.Wiki) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				slog.Default().Error("could not close file", "error", err)
+			}
+		}()
 
 		url, err := w.UploadAsset(pageID, file, header.Filename)
 		if err != nil {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"log"
+	"log/slog"
 	"path"
 	"strings"
 	"sync"
@@ -258,7 +259,11 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				slog.Default().Error("could not close rows", "error", err)
+			}
+		}()
 
 		var results []SearchResultItem
 		for rows.Next() {
