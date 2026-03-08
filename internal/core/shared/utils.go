@@ -67,25 +67,28 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 
 	if perm != 0 {
 		if err := tmpFile.Chmod(perm); err != nil {
-			if err := tmpFile.Close(); err != nil {
-				return fmt.Errorf("close temp file: %w", err)
+			chmodErr := fmt.Errorf("chmod temp file: %w", err)
+			if closeErr := tmpFile.Close(); closeErr != nil {
+				slog.Default().Error("failed to close temp file", "operation", "chmod", "error", closeErr)
 			}
-			return fmt.Errorf("chmod temp file: %w", err)
+			return chmodErr
 		}
 	}
 
 	if _, err := tmpFile.Write(data); err != nil {
-		if err := tmpFile.Close(); err != nil {
-			return fmt.Errorf("close temp file: %w", err)
+		writeErr := fmt.Errorf("write temp file: %w", err)
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			slog.Default().Error("failed to close temp file", "operation", "write", "error", closeErr)
 		}
-		return fmt.Errorf("write temp file: %w", err)
+		return writeErr
 	}
 
 	if err := tmpFile.Sync(); err != nil {
-		if err := tmpFile.Close(); err != nil {
-			return fmt.Errorf("close temp file: %w", err)
+		syncErr := fmt.Errorf("sync temp file: %w", err)
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			slog.Default().Error("failed to close temp file", "operation", "sync", "error", closeErr)
 		}
-		return fmt.Errorf("sync temp file: %w", err)
+		return syncErr
 	}
 
 	if err := tmpFile.Close(); err != nil {
