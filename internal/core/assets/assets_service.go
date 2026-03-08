@@ -3,6 +3,7 @@ package assets
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"os"
 	"path"
@@ -14,6 +15,7 @@ import (
 type AssetService struct {
 	assetsDir string
 	slugger   *tree.SlugService
+	log       *slog.Logger
 
 	mu sync.RWMutex
 }
@@ -32,6 +34,7 @@ func NewAssetService(storageDir string, slugger *tree.SlugService) *AssetService
 	return &AssetService{
 		assetsDir: assetsDir,
 		slugger:   slugger,
+		log:       slog.Default().With("component", "AssetService"),
 	}
 }
 
@@ -92,7 +95,12 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 	if err != nil {
 		return "", fmt.Errorf("could not create file: %w", err)
 	}
-	defer out.Close()
+	defer func() {
+		err := out.Close()
+		if err != nil {
+			s.log.Warn("failed to close file", "file", fullPath, "error", err)
+		}
+	}()
 
 	if _, err := io.Copy(out, file); err != nil {
 		return "", fmt.Errorf("could not write file: %w", err)
@@ -251,13 +259,23 @@ func (s *AssetService) copySingleAsset(sourceAssetPath string, targetAssetPath s
 	if err != nil {
 		return fmt.Errorf("could not open source asset file: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() {
+		err := sourceFile.Close()
+		if err != nil {
+			s.log.Warn("failed to close source file", "file", sourceFilePath, "error", err)
+		}
+	}()
 
 	targetFile, err := os.Create(targetFilePath)
 	if err != nil {
 		return fmt.Errorf("could not create target asset file: %w", err)
 	}
-	defer targetFile.Close()
+	defer func() {
+		err := targetFile.Close()
+		if err != nil {
+			s.log.Warn("failed to close target file", "file", targetFilePath, "error", err)
+		}
+	}()
 
 	if _, err := io.Copy(targetFile, sourceFile); err != nil {
 		return fmt.Errorf("could not copy asset file: %w", err)

@@ -216,7 +216,12 @@ func TestBrandingService_UploadThenDeleteLogo_EndToEnd(t *testing.T) {
 	if _, err := tmp.Seek(0, 0); err != nil {
 		t.Fatalf("Seek() error: %v", err)
 	}
-	defer tmp.Close()
+	defer func() {
+		err := tmp.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	got, err := svc.UploadLogo(tmp, "mylogo.png")
 	if err != nil {
@@ -261,7 +266,12 @@ func TestBrandingService_UploadThenDeleteFavicon_EndToEnd(t *testing.T) {
 	if _, err := tmp.Seek(0, 0); err != nil {
 		t.Fatalf("Seek() error: %v", err)
 	}
-	defer tmp.Close()
+	defer func() {
+		err := tmp.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	got, err := svc.UploadFavicon(tmp, "favicon.ico")
 	if err != nil {
@@ -477,7 +487,12 @@ func TestBrandingService_UploadLogo_InvalidExtension_ReturnsError(t *testing.T) 
 	if err != nil {
 		t.Fatalf("CreateTemp() error: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	_, err = svc.UploadLogo(f, "logo.exe")
 	if err == nil {
@@ -495,7 +510,12 @@ func TestBrandingService_UploadFavicon_InvalidExtension_ReturnsError(t *testing.
 	if err != nil {
 		t.Fatalf("CreateTemp() error: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	_, err = svc.UploadFavicon(f, "favicon.jpg") // jpg should be invalid for favicon in defaults
 	if err == nil {
@@ -521,7 +541,12 @@ func TestBrandingService_UploadLogo_WritesFileAndUpdatesConfig(t *testing.T) {
 	if _, err := tmp.Seek(0, 0); err != nil {
 		t.Fatalf("Seek() error: %v", err)
 	}
-	defer tmp.Close()
+	defer func() {
+		err := tmp.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	rel, err := svc.UploadLogo(tmp, "mylogo.png")
 	if err != nil {
@@ -563,7 +588,12 @@ func TestBrandingService_UploadFavicon_WritesFileAndUpdatesConfig(t *testing.T) 
 	if _, err := tmp.Seek(0, 0); err != nil {
 		t.Fatalf("Seek() error: %v", err)
 	}
-	defer tmp.Close()
+	defer func() {
+		err := tmp.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	rel, err := svc.UploadFavicon(tmp, "favicon.ico")
 	if err != nil {
@@ -613,7 +643,12 @@ func TestBrandingService_UploadLogo_RemovesOldLogoVariants(t *testing.T) {
 	if _, err := tmp.Seek(0, 0); err != nil {
 		t.Fatalf("Seek() error: %v", err)
 	}
-	defer tmp.Close()
+	defer func() {
+		err := tmp.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	if _, err := svc.UploadLogo(tmp, "logo.png"); err != nil {
 		t.Fatalf("UploadLogo() error: %v", err)
@@ -656,7 +691,12 @@ func TestBrandingService_UploadFavicon_RemovesOldFaviconVariants(t *testing.T) {
 	if _, err := tmp.Seek(0, 0); err != nil {
 		t.Fatalf("Seek() error: %v", err)
 	}
-	defer tmp.Close()
+	defer func() {
+		err := tmp.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	if _, err := svc.UploadFavicon(tmp, "favicon.ico"); err != nil {
 		t.Fatalf("UploadFavicon() error: %v", err)
@@ -692,7 +732,12 @@ func TestBrandingService_UploadLogo_TooLarge_ReturnsErrorAndDoesNotUpdateConfig(
 	if _, err := tmp.Seek(0, 0); err != nil {
 		t.Fatalf("Seek() error: %v", err)
 	}
-	defer tmp.Close()
+	defer func() {
+		err := tmp.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	_, err = svc.UploadLogo(tmp, "logo.png")
 	if err == nil {
@@ -726,7 +771,12 @@ func TestBrandingService_UploadFavicon_TooLarge_ReturnsErrorAndDoesNotUpdateConf
 	if _, err := tmp.Seek(0, 0); err != nil {
 		t.Fatalf("Seek() error: %v", err)
 	}
-	defer tmp.Close()
+	defer func() {
+		err := tmp.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	_, err = svc.UploadFavicon(tmp, "favicon.ico")
 	if err == nil {

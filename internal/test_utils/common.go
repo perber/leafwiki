@@ -49,3 +49,10 @@ func WriteFile(t *testing.T, base, rel, content string) string {
 	}
 	return abs
 }
+
+func WrapCloseWithErrorCheck(closer func() error, t *testing.T) {
+	err := closer()
+	if err != nil {
+		t.Fatalf("failed to close resource: %v", err)
+	}
+}

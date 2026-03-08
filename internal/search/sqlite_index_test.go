@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/perber/wiki/internal/test_utils"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
@@ -15,7 +16,7 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create SQLiteIndex: %v", err)
 	}
-	defer index.Close()
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
 
 	// Testdata
 	path := "docs/test.md"
@@ -66,7 +67,7 @@ func TestSQLiteIndex_Search(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create SQLiteIndex: %v", err)
 	}
-	defer index.Close()
+	defer WrapCloseWithErrorCheck(index.Close, t)
 
 	// Index two pages
 	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", "This content is about SQLite search.")
@@ -106,7 +107,7 @@ func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create SQLiteIndex: %v", err)
 	}
-	defer index.Close()
+	defer WrapCloseWithErrorCheck(index.Close, t)
 
 	// page with match in title
 	err = index.IndexPage(
@@ -170,7 +171,7 @@ func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create SQLiteIndex: %v", err)
 	}
-	defer index.Close()
+	defer WrapCloseWithErrorCheck(index.Close, t)
 
 	// page with match in heading (Markdown heading)
 	err = index.IndexPage(
