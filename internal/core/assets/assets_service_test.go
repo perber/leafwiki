@@ -1,6 +1,7 @@
 package assets
 
 import (
+	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,12 +108,11 @@ func TestSlugCollision(t *testing.T) {
 		if err != nil {
 			t.Fatalf("test_utils.CreateMultipartFile failed: %v", err)
 		}
-		defer func() {
-			err := file.Close()
-			if err != nil {
+		defer func(f multipart.File) {
+			if err := f.Close(); err != nil {
 				t.Fatalf("Close() error: %v", err)
 			}
-		}()
+		}(file)
 
 		_, err = service.SaveAssetForPage(page, file, name)
 		if err != nil {
