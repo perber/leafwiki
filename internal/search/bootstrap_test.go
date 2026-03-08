@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/test_utils"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
@@ -35,7 +36,7 @@ func TestBuildAndRunIndexer_BasicIndexing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to init SQLiteIndex: %v", err)
 	}
-	defer index.Close()
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
 
 	status := NewIndexingStatus()
 

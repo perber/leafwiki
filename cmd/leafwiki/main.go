@@ -193,7 +193,11 @@ func main() {
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			slog.Default().Error("Failed to close Wiki", "error", err)
+		}
+	}()
 
 	router := http.NewRouter(w, http.RouterOptions{
 		PublicAccess:            publicAccess,

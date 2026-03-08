@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -29,7 +30,7 @@ func TestRequireAuth_WithAuthDisabled_UserExists(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	w := createTestWiki(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
 
@@ -86,7 +87,7 @@ func TestRequireAuth_WithAuthDisabled_NoUser(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	w := createTestWiki(t)
-	defer w.Close()
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
 
@@ -118,7 +119,7 @@ func TestRequireAuth_WithAuthEnabled_ValidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	wikiInstance := createTestWiki(t)
-	defer wikiInstance.Close()
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
 
 	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
 
@@ -175,7 +176,7 @@ func TestRequireAuth_WithAuthEnabled_MissingToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	wikiInstance := createTestWiki(t)
-	defer wikiInstance.Close()
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
 
 	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
 
@@ -207,7 +208,7 @@ func TestRequireAuth_WithAuthEnabled_InvalidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	wikiInstance := createTestWiki(t)
-	defer wikiInstance.Close()
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
 
 	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
 
@@ -243,7 +244,7 @@ func TestRequireAuth_WithAuthEnabled_UserSetInContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	wikiInstance := createTestWiki(t)
-	defer wikiInstance.Close()
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
 
 	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
 
@@ -290,7 +291,7 @@ func TestRequireAuth_NextNotCalledOnFailure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	wikiInstance := createTestWiki(t)
-	defer wikiInstance.Close()
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
 
 	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
 
@@ -384,7 +385,7 @@ func TestRequireAuth_ComprehensiveScenarios(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			wikiInstance := createTestWiki(t)
-			defer wikiInstance.Close()
+			defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
 
 			authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
 

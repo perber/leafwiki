@@ -287,9 +287,10 @@ func TestAuthCookies_Set_Secure(t *testing.T) {
 	// Find access token cookie
 	var accessCookie, refreshCookie *http.Cookie
 	for _, cookie := range cookies {
-		if cookie.Name == "__Host-leafwiki_at" {
+		switch cookie.Name {
+		case "__Host-leafwiki_at":
 			accessCookie = cookie
-		} else if cookie.Name == "__Host-leafwiki_rt" {
+		case "__Host-leafwiki_rt":
 			refreshCookie = cookie
 		}
 	}
@@ -374,9 +375,10 @@ func TestAuthCookies_Set_Insecure(t *testing.T) {
 	// Find access token cookie
 	var accessCookie, refreshCookie *http.Cookie
 	for _, cookie := range cookies {
-		if cookie.Name == "leafwiki_at" {
+		switch cookie.Name {
+		case "leafwiki_at":
 			accessCookie = cookie
-		} else if cookie.Name == "leafwiki_rt" {
+		case "leafwiki_rt":
 			refreshCookie = cookie
 		}
 	}
@@ -462,9 +464,10 @@ func TestAuthCookies_Clear_Secure(t *testing.T) {
 	// Find cookies
 	var accessCookie, refreshCookie *http.Cookie
 	for _, cookie := range cookies {
-		if cookie.Name == "__Host-leafwiki_at" {
+		switch cookie.Name {
+		case "__Host-leafwiki_at":
 			accessCookie = cookie
-		} else if cookie.Name == "__Host-leafwiki_rt" {
+		case "__Host-leafwiki_rt":
 			refreshCookie = cookie
 		}
 	}
@@ -725,12 +728,14 @@ func TestAuthCookies_CustomTTL(t *testing.T) {
 
 	cookies := w.Result().Cookies()
 	for _, cookie := range cookies {
-		if cookie.Name == "__Host-leafwiki_at" {
+		switch cookie.Name {
+		case "__Host-leafwiki_at":
 			expectedMaxAge := int(accessTTL.Seconds())
 			if cookie.MaxAge != expectedMaxAge {
 				t.Errorf("Expected access cookie MaxAge %d, got %d", expectedMaxAge, cookie.MaxAge)
 			}
-		} else if cookie.Name == "__Host-leafwiki_rt" {
+
+		case "__Host-leafwiki_rt":
 			expectedMaxAge := int(refreshTTL.Seconds())
 			if cookie.MaxAge != expectedMaxAge {
 				t.Errorf("Expected refresh cookie MaxAge %d, got %d", expectedMaxAge, cookie.MaxAge)

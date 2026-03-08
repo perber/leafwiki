@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// Hilfsfunktion: Testdatenstruktur anlegen
 func createTestFiles(t *testing.T, root string, files map[string]string) {
 	for relPath, content := range files {
 		fullPath := filepath.Join(root, relPath)

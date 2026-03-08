@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/big"
 	"mime/multipart"
 	"os"
@@ -66,19 +67,28 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 
 	if perm != 0 {
 		if err := tmpFile.Chmod(perm); err != nil {
-			tmpFile.Close()
-			return fmt.Errorf("chmod temp file: %w", err)
+			chmodErr := fmt.Errorf("chmod temp file: %w", err)
+			if closeErr := tmpFile.Close(); closeErr != nil {
+				slog.Default().Error("failed to close temp file", "operation", "chmod", "error", closeErr)
+			}
+			return chmodErr
 		}
 	}
 
 	if _, err := tmpFile.Write(data); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("write temp file: %w", err)
+		writeErr := fmt.Errorf("write temp file: %w", err)
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			slog.Default().Error("failed to close temp file", "operation", "write", "error", closeErr)
+		}
+		return writeErr
 	}
 
 	if err := tmpFile.Sync(); err != nil {
-		tmpFile.Close()
-		return fmt.Errorf("sync temp file: %w", err)
+		syncErr := fmt.Errorf("sync temp file: %w", err)
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			slog.Default().Error("failed to close temp file", "operation", "sync", "error", closeErr)
+		}
+		return syncErr
 	}
 
 	if err := tmpFile.Close(); err != nil {
@@ -115,7 +125,10 @@ func WriteStreamAtomic(targetPath string, src multipart.File, maxBytes int64) er
 	// Ensure cleanup on failure
 	ok := false
 	defer func() {
-		out.Close()
+		if err := out.Close(); err != nil {
+			slog.Default().Error("Failed to close temp file", "file", tmp, "error", err)
+			return
+		}
 		if !ok {
 			_ = os.Remove(tmp)
 		}

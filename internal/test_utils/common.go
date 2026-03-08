@@ -21,7 +21,9 @@ func CreateMultipartFile(filename string, content []byte) (multipart.File, strin
 	if _, err := part.Write(content); err != nil {
 		return nil, "", err
 	}
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return nil, "", err
+	}
 
 	reader := multipart.NewReader(body, writer.Boundary())
 	form, err := reader.ReadForm(10 << 20)
@@ -48,4 +50,12 @@ func WriteFile(t *testing.T, base, rel, content string) string {
 		t.Fatalf("write: %v", err)
 	}
 	return abs
+}
+
+func WrapCloseWithErrorCheck(closer func() error, t *testing.T) {
+	t.Helper()
+	err := closer()
+	if err != nil {
+		t.Fatalf("failed to close resource: %v", err)
+	}
 }

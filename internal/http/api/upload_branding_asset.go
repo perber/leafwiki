@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -26,7 +27,11 @@ func UploadBrandingLogoHandler(w *wiki.Wiki) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				slog.Default().Error("could not close file", "error", err)
+			}
+		}()
 
 		path, err := w.UploadBrandingLogo(file, header.Filename)
 		if err != nil {
@@ -64,7 +69,11 @@ func UploadBrandingFaviconHandler(w *wiki.Wiki) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				slog.Default().Error("could not close file", "error", err)
+			}
+		}()
 
 		path, err := w.UploadBrandingFavicon(file, header.Filename)
 		if err != nil {

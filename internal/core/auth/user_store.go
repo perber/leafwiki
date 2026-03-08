@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"log/slog"
 	"path"
 	"strings"
 
@@ -259,7 +260,11 @@ func (f *UserStore) GetAllUsers() ([]*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Default().Error("could not close rows", "error", err)
+		}
+	}()
 
 	var users []*User
 	for rows.Next() {

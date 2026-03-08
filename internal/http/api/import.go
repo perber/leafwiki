@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +38,11 @@ func CreateImportPlanHandler(svc *importer.ImporterService) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to open uploaded file"})
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				slog.Default().Error("could not close uploaded file", "error", err)
+			}
+		}()
 
 		// optional: targetBasePath from form (defaults to empty string = root)
 		targetBasePath := c.PostForm("targetBasePath")

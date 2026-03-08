@@ -1,6 +1,7 @@
 package assets
 
 import (
+	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,7 +28,12 @@ func TestSaveAndListAsset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	url, err := service.SaveAssetForPage(page, file, name)
 	if err != nil {
@@ -65,7 +71,12 @@ func TestDeletePageAndEnsureAllAssetsAreDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	_, err = service.SaveAssetForPage(page, file, name)
 	if err != nil {
@@ -97,7 +108,11 @@ func TestSlugCollision(t *testing.T) {
 		if err != nil {
 			t.Fatalf("test_utils.CreateMultipartFile failed: %v", err)
 		}
-		defer file.Close()
+		defer func(f multipart.File) {
+			if err := f.Close(); err != nil {
+				t.Fatalf("Close() error: %v", err)
+			}
+		}(file)
 
 		_, err = service.SaveAssetForPage(page, file, name)
 		if err != nil {
@@ -132,7 +147,12 @@ func TestAssetRename(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create test file: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		err := file.Close()
+		if err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
 
 	if _, err := service.SaveAssetForPage(page, file, name); err != nil {
 		t.Fatalf("SaveAsset failed: %v", err)

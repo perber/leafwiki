@@ -247,7 +247,7 @@ func TestLinkService_IndexAllPages_ReplacesExistingLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage a failed: %v", err)
 	}
-	var noLinks string = "No more links."
+	var noLinks = "No more links."
 	if err := ts.UpdateNode("system", aPage.ID, aPage.Title, aPage.Slug, &noLinks); err != nil {
 		t.Fatalf("UpdatePage a failed: %v", err)
 	}
@@ -372,7 +372,7 @@ func TestLinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
 		t.Fatalf("GetPage lonely failed: %v", err)
 	}
 
-	var noLinks string = "Just some text, no links."
+	var noLinks = "Just some text, no links."
 	if err := ts.UpdateNode("system", page.ID, page.Title, page.Slug, &noLinks); err != nil {
 		t.Fatalf("UpdateNode lonely failed: %v", err)
 	}
@@ -451,7 +451,7 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetPage a failed: %v", err)
 	}
-	var linkToB string = "Link to B: [Go](/b)"
+	var linkToB = "Link to B: [Go](/b)"
 	if err := ts.UpdateNode("system", aPage.ID, aPage.Title, aPage.Slug, &linkToB); err != nil {
 		t.Fatalf("UpdateNode a failed: %v", err)
 	}
@@ -487,7 +487,7 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetPage b failed: %v", err)
 	}
-	var pageBContent string = "# Page B"
+	var pageBContent = "# Page B"
 	if err := ts.UpdateNode("system", bPage.ID, bPage.Title, bPage.Slug, &pageBContent); err != nil {
 		t.Fatalf("UpdateNode b failed: %v", err)
 	}
@@ -538,7 +538,7 @@ func TestLinkService_HealOnPageCreate_ResolvesBrokenLinksWithoutReindex(t *testi
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	var linkToB string = "Link to B: [Go](/b)"
+	var linkToB = "Link to B: [Go](/b)"
 	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToB); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
@@ -637,7 +637,7 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	var linkToMissing string = "Link: [Missing](/nonexistent)"
+	var linkToMissing = "Link: [Missing](/nonexistent)"
 	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToMissing); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
@@ -655,7 +655,7 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage C failed: %v", err)
 	}
-	var linkToOther string = "Link: [Other](/other-missing)"
+	var linkToOther = "Link: [Other](/other-missing)"
 	if err := ts.UpdateNode("system", pageC.ID, pageC.Title, pageC.Slug, &linkToOther); err != nil {
 		t.Fatalf("UpdateNode C failed: %v", err)
 	}
@@ -721,7 +721,7 @@ func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	var linkToMissing1 string = "Link: [Missing1](/missing1)"
+	var linkToMissing1 = "Link: [Missing1](/missing1)"
 	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToMissing1); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
@@ -731,7 +731,7 @@ func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage B failed: %v", err)
 	}
-	var linkToMissing2 string = "Link: [Missing2](/missing2)"
+	var linkToMissing2 = "Link: [Missing2](/missing2)"
 	if err := ts.UpdateNode("system", pageB.ID, pageB.Title, pageB.Slug, &linkToMissing2); err != nil {
 		t.Fatalf("UpdateNode B failed: %v", err)
 	}
@@ -786,7 +786,7 @@ func TestLinksStore_GetBrokenIncomingForPath_EmptyWhenNoBrokenLinks(t *testing.T
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	var linkToB string = "Link: [To B](/b)"
+	var linkToB = "Link: [To B](/b)"
 	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToB); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
@@ -842,7 +842,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OrdersByFromTitle(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetPage(%s) failed: %v", id, err)
 		}
-		var linkToMissing string = "Link: [Missing](/missing)"
+		var linkToMissing = "Link: [Missing](/missing)"
 		if err := ts.UpdateNode("system", page.ID, page.Title, page.Slug, &linkToMissing); err != nil {
 			t.Fatalf("UpdateNode(%s) failed: %v", id, err)
 		}
@@ -885,7 +885,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *tes
 	if err != nil {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
-	var linkToB string = "Link: [To B](/b)"
+	var linkToB = "Link: [To B](/b)"
 	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToB); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
@@ -915,7 +915,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *tes
 	if err != nil {
 		t.Fatalf("GetPage B failed: %v", err)
 	}
-	var contentB string = "# Page B"
+	var contentB = "# Page B"
 	if err := ts.UpdateNode("system", pageB.ID, pageB.Title, pageB.Slug, &contentB); err != nil {
 		t.Fatalf("UpdateNode B failed: %v", err)
 	}

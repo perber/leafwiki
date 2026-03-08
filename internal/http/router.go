@@ -342,7 +342,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 				}
 
 				// get site name from branding config
-				var siteName string = "LeafWiki"
+				var siteName = "LeafWiki"
 				if branding, err := wikiInstance.GetBranding(); err == nil {
 					siteName = branding.SiteName
 				}
