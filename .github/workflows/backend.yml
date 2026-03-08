@@ -17,13 +17,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.23.4'
+          go-version: '1.25.0'
 
       - name: Install dependencies
         run: go mod download
 
       - name: Lint with golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           args: --timeout=5m
@@ -37,7 +37,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.23.4'
+          go-version: '1.25.0'
 
       - name: Install dependencies
         run: go mod download
