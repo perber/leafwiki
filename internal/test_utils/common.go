@@ -53,6 +53,7 @@ func WriteFile(t *testing.T, base, rel, content string) string {
 }
 
 func WrapCloseWithErrorCheck(closer func() error, t *testing.T) {
+	t.Helper()
 	err := closer()
 	if err != nil {
 		t.Fatalf("failed to close resource: %v", err)
