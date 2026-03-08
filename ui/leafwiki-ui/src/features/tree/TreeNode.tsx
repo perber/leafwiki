@@ -1,4 +1,3 @@
-import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
@@ -45,12 +44,7 @@ export const TreeNode = React.memo(function TreeNode({
   const markerOffset = 8 // Distance from left for the vertical line
 
   const linkText = (
-    <TooltipWrapper
-      label={node.title}
-      side="bottom"
-      align="center"
-      parentClassName="tree-node__tooltip-parent"
-    >
+    <div className={clsx('flex', 'tree-node__tooltip-parent')}>
       <Link
         to={`/${node.path}`}
         className="tree-node__link"
@@ -64,7 +58,7 @@ export const TreeNode = React.memo(function TreeNode({
           {node.title || 'Untitled Page'}
         </span>
       </Link>
-    </TooltipWrapper>
+    </div>
   )
 
   const treeActionButtonStyle = isMobile ? '' : 'tree-node__actions--compact'
