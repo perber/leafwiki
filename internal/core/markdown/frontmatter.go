@@ -18,6 +18,34 @@ func invalidYAMLKeyRune(r rune) bool {
 type Frontmatter struct {
 	LeafWikiID    string `yaml:"leafwiki_id,omitempty" json:"id,omitempty"`
 	LeafWikiTitle string `yaml:"leafwiki_title,omitempty" json:"title,omitempty"`
+	CreatedAt     string `yaml:"created_at,omitempty" json:"created_at,omitempty"`
+	CreatorID     string `yaml:"creator_id,omitempty" json:"creator_id,omitempty"`
+	UpdatedAt     string `yaml:"updated_at,omitempty" json:"updated_at,omitempty"`
+	LastAuthorID  string `yaml:"last_author_id,omitempty" json:"last_author_id,omitempty"`
+}
+
+func (fm *Frontmatter) stripSingleAndDoubleQuotes(s string) string {
+	s = strings.Trim(s, `"`)
+	s = strings.Trim(s, `'`)
+	return s
+}
+
+func (fm *Frontmatter) Normalize() {
+	fm.LeafWikiID = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(fm.LeafWikiID))
+	fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(fm.LeafWikiTitle))
+	fm.CreatedAt = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(fm.CreatedAt))
+	fm.CreatorID = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(fm.CreatorID))
+	fm.UpdatedAt = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(fm.UpdatedAt))
+	fm.LastAuthorID = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(fm.LastAuthorID))
+}
+
+func (fm Frontmatter) IsZero() bool {
+	return fm.LeafWikiID == "" &&
+		fm.LeafWikiTitle == "" &&
+		fm.CreatedAt == "" &&
+		fm.CreatorID == "" &&
+		fm.UpdatedAt == "" &&
+		fm.LastAuthorID == ""
 }
 
 func (fm *Frontmatter) LoadFrontMatterFromContent(yamlPart string) (has bool, err error) {
@@ -25,27 +53,18 @@ func (fm *Frontmatter) LoadFrontMatterFromContent(yamlPart string) (has bool, er
 		return true, errors.Join(ErrFrontmatterParse, err)
 	}
 
-	/** Check for title also in frontmatter **/
 	type titleOnlyStruct struct {
 		Title string `yaml:"title,omitempty"`
 	}
 	var tos titleOnlyStruct
 	if err := yaml.Unmarshal([]byte(yamlPart), &tos); err == nil {
-		if tos.Title != "" {
+		if tos.Title != "" && fm.LeafWikiTitle == "" {
 			fm.LeafWikiTitle = tos.Title
 		}
 	}
 
-	fm.LeafWikiID = fm.stripSingleAndDoubleQuotes(fm.LeafWikiID)
-	fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(fm.LeafWikiTitle)
-
+	fm.Normalize()
 	return true, nil
-}
-
-func (fm *Frontmatter) stripSingleAndDoubleQuotes(s string) string {
-	s = strings.Trim(s, `"`)
-	s = strings.Trim(s, `'`)
-	return s
 }
 
 func (fm *Frontmatter) LoadFrontMatterFromFile(mdFilePath string) (has bool, err error) {
@@ -57,43 +76,34 @@ func (fm *Frontmatter) LoadFrontMatterFromFile(mdFilePath string) (has bool, err
 }
 
 func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
-	// BOM-safe + normalize newlines
 	s := strings.TrimPrefix(md, "\ufeff")
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.ReplaceAll(s, "\r", "\n")
 
-	// Must start with '---' on the very first line
 	if s != "---" && !strings.HasPrefix(s, "---\n") {
 		return "", md, false
 	}
 
-	// Find end of first line
 	firstNL := strings.IndexByte(s, '\n')
 	if firstNL == -1 {
-		// it's exactly "---" (or a single-line file)
 		return "", md, false
 	}
 	if strings.TrimSpace(s[:firstNL]) != "---" {
 		return "", md, false
 	}
 
-	// Find closing delimiter on its own line: "\n---\n" or "\n---" at EOF
-	// We'll scan line-by-line using indices.
 	pos := firstNL + 1
 	yamlStart := pos
 
 	endDelimLineStart := -1
 	endDelimLineEnd := -1
-
 	looksLikeYAML := false
 
 	for pos <= len(s) {
-		// find end of current line
 		nextNL := strings.IndexByte(s[pos:], '\n')
 		var line string
 		var lineEnd int
 		if nextNL == -1 {
-			// last line
 			lineEnd = len(s)
 			line = s[pos:lineEnd]
 		} else {
@@ -108,8 +118,6 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 			break
 		}
 
-		// Heuristic: at least one "key:" line => treat as YAML frontmatter
-		// Skip blanks/comments
 		if trim != "" && !strings.HasPrefix(trim, "#") {
 			if idx := strings.IndexByte(trim, ':'); idx > 0 {
 				key := strings.TrimSpace(trim[:idx])
@@ -119,7 +127,6 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 			}
 		}
 
-		// advance to next line
 		if nextNL == -1 {
 			pos = len(s) + 1
 		} else {
@@ -127,21 +134,16 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 		}
 	}
 
-	// No closing delimiter found => treat as no frontmatter
 	if endDelimLineStart == -1 {
 		return "", md, false
 	}
-
-	// If it doesn't look like YAML, treat as plain markdown (separator use-case)
 	if !looksLikeYAML {
 		return "", md, false
 	}
 
-	// YAML is between yamlStart and the start of the closing delimiter line
 	yamlPart = s[yamlStart:endDelimLineStart]
-	yamlPart = strings.TrimSuffix(yamlPart, "\n") // nice-to-have
+	yamlPart = strings.TrimSuffix(yamlPart, "\n")
 
-	// Body starts after the closing delimiter line (+ its trailing newline if present)
 	bodyStart := endDelimLineEnd
 	if bodyStart < len(s) && s[bodyStart:bodyStart+1] == "\n" {
 		bodyStart++
@@ -161,14 +163,24 @@ func ParseFrontmatter(md string) (fm Frontmatter, body string, has bool, err err
 		return Frontmatter{}, md, true, errors.Join(ErrFrontmatterParse, err)
 	}
 
-	fm.LeafWikiID = fm.stripSingleAndDoubleQuotes(fm.LeafWikiID)
-	fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(fm.LeafWikiTitle)
+	type titleOnlyStruct struct {
+		Title string `yaml:"title,omitempty"`
+	}
+	var tos titleOnlyStruct
+	if err := yaml.Unmarshal([]byte(yamlPart), &tos); err == nil {
+		if tos.Title != "" && fm.LeafWikiTitle == "" {
+			fm.LeafWikiTitle = tos.Title
+		}
+	}
+
+	fm.Normalize()
 	return fm, body, true, nil
 }
 
 func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
-	// Avoid emitting empty frontmatter like "{}"
-	if strings.TrimSpace(fm.LeafWikiID) == "" {
+	fm.Normalize()
+
+	if fm.IsZero() {
 		return body, nil
 	}
 
@@ -179,7 +191,7 @@ func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
 
 	var out bytes.Buffer
 	out.WriteString("---\n")
-	out.Write(b) // yaml.v3 usually ends with \n, which is fine
+	out.Write(b)
 	out.WriteString("---\n")
 	out.WriteString(body)
 	return out.String(), nil

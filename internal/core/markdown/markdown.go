@@ -110,5 +110,20 @@ func (mf *MarkdownFile) GetFrontmatter() Frontmatter {
 }
 
 func (mf *MarkdownFile) SetFrontmatterID(id string) {
-	mf.fm.LeafWikiID = id
+	mf.fm.LeafWikiID = strings.TrimSpace(id)
+}
+
+func (mf *MarkdownFile) SetFrontmatterTitle(title string) {
+	mf.fm.LeafWikiTitle = strings.TrimSpace(title)
+}
+
+func (mf *MarkdownFile) SetFrontmatterMetadata(createdAt, creatorID, updatedAt, lastAuthorID string) {
+	mf.fm.CreatedAt = strings.TrimSpace(createdAt)
+	mf.fm.CreatorID = strings.TrimSpace(creatorID)
+	mf.fm.UpdatedAt = strings.TrimSpace(updatedAt)
+	mf.fm.LastAuthorID = strings.TrimSpace(lastAuthorID)
+}
+
+func (mf *MarkdownFile) SetContent(content string) {
+	mf.content = content
 }
