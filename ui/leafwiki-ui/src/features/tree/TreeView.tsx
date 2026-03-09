@@ -55,30 +55,34 @@ export default function TreeView() {
 
   return (
     <div className="tree-view">
-      {!readOnlyMode && (
-        <div className="tree-view__toolbar">
-          <TreeViewActionButton
-            actionName="add"
-            icon={<FilePlus className="tree-view__action-icon" size={18} />}
-            tooltip="Create new page"
-            onClick={() =>
-              openDialog(DIALOG_ADD_PAGE, {
-                parentId: '',
-                nodeKind: NODE_KIND_PAGE,
-              })
-            }
-          />
-          <TreeViewActionButton
-            actionName="add-section"
-            icon={<FolderPlus className="tree-view__action-icon" size={18} />}
-            tooltip="Create new section"
-            onClick={() =>
-              openDialog(DIALOG_ADD_PAGE, {
-                parentId: '',
-                nodeKind: NODE_KIND_SECTION,
-              })
-            }
-          />
+      <div className="tree-view__toolbar">
+        {!readOnlyMode && (
+          <>
+            <TreeViewActionButton
+              actionName="add"
+              icon={<FilePlus className="tree-view__action-icon" size={18} />}
+              tooltip="Create new page"
+              onClick={() =>
+                openDialog(DIALOG_ADD_PAGE, {
+                  parentId: '',
+                  nodeKind: NODE_KIND_PAGE,
+                })
+              }
+            />
+            <TreeViewActionButton
+              actionName="add-section"
+              icon={<FolderPlus className="tree-view__action-icon" size={18} />}
+              tooltip="Create new section"
+              onClick={() =>
+                openDialog(DIALOG_ADD_PAGE, {
+                  parentId: '',
+                  nodeKind: NODE_KIND_SECTION,
+                })
+              }
+            />
+          </>
+        )}
+        <>
           <TreeViewActionButton
             actionName="expand-all"
             icon={<ChevronsDown className="tree-view__action-icon" size={18} />}
@@ -91,16 +95,16 @@ export default function TreeView() {
             tooltip="Collapse all"
             onClick={collapseAll}
           />
-          {tree && (
-            <TreeViewActionButton
-              actionName="sort"
-              icon={<List className="tree-view__action-icon" size={18} />}
-              tooltip="Sort pages"
-              onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: tree })}
-            />
-          )}
-        </div>
-      )}
+        </>
+        {!readOnlyMode && tree && (
+          <TreeViewActionButton
+            actionName="sort"
+            icon={<List className="tree-view__action-icon" size={18} />}
+            tooltip="Sort pages"
+            onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: tree })}
+          />
+        )}
+      </div>
       <div className="tree-view__nodes">
         {tree?.children?.map((node) => (
           <TreeNode key={node.id} node={node} pathname={pathname} />
