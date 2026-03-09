@@ -1095,39 +1095,6 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 	return t.saveTreeLocked()
 }
 
-// maybeCollapseSectionToPageLocked tries to collapse a section node into a page node
-// It is not used currently, but after testing the user flow we might want to integrate it
-// into UpdateNode or MoveNode operations
-// Lock must be held by the caller
-// func (t *TreeService) maybeCollapseSectionToPageLocked(node *PageNode) {
-// 	if node == nil || node.ID == "root" {
-// 		return
-// 	}
-// 	if node.Kind != NodeKindSection {
-// 		return
-// 	}
-// 	if node.HasChildren() {
-// 		return
-// 	}
-
-// 	// Only collapse if index.md exists
-// 	indexPath, err := t.store.contentPathForNodeRead(node)
-// 	if err != nil {
-// 		return
-// 	}
-// 	if _, err := os.Stat(indexPath); err != nil {
-// 		// no index.md => keep as section
-// 		return
-// 	}
-
-// 	// Try collapse (will refuse if folder has other files)
-// 	if err := t.store.ConvertNode(node, NodeKindPage); err != nil {
-// 		// not allowed (e.g. folder not empty) -> keep section
-// 		return
-// 	}
-// 	node.Kind = NodeKindPage
-// }
-
 func (t *TreeService) reindexPositions(parent *PageNode) {
 	sort.SliceStable(parent.Children, func(i, j int) bool {
 		return parent.Children[i].Position < parent.Children[j].Position
@@ -1136,12 +1103,3 @@ func (t *TreeService) reindexPositions(parent *PageNode) {
 		child.Position = i
 	}
 }
-
-// func (t *TreeService) sortTreeByPosition(node *PageNode) {
-// 	sort.SliceStable(node.Children, func(i, j int) bool {
-// 		return node.Children[i].Position < node.Children[j].Position
-// 	})
-// 	for _, child := range node.Children {
-// 		t.sortTreeByPosition(child)
-// 	}
-// }
