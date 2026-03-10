@@ -79,11 +79,10 @@ The frontend dev server usually runs at:
 
 http://localhost:5173
 
----
-
 Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` directory.
-If you change the e2e tests, please also run npm run format in the `e2e` directory.
+If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
 
+---
 # Pull request guidelines
 
 To keep reviews efficient, please follow these guidelines:
