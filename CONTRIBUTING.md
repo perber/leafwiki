@@ -9,7 +9,7 @@ Whether you're fixing a typo, reporting a bug, improving documentation, or contr
 
 ---
 
-# Ways to contribute
+## Ways to contribute
 
 There are many ways to help improve LeafWiki:
 
@@ -23,7 +23,7 @@ If you're unsure whether something is worth contributing — **open an issue and
 
 ---
 
-# Project principles
+## Project principles
 
 LeafWiki intentionally follows a small set of design principles.
 
@@ -37,7 +37,7 @@ Contributions should respect these ideas:
 
 ---
 
-# Before submitting code
+## Before submitting code
 
 For **anything larger than a small fix**, please open an issue first.
 
@@ -51,7 +51,7 @@ Small improvements, documentation updates, and obvious bug fixes can usually be 
 
 ---
 
-# Development setup
+## Development setup
 
 Clone the repository:
 
@@ -83,7 +83,7 @@ Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` dire
 If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
 
 ---
-# Pull request guidelines
+## Pull request guidelines
 
 To keep reviews efficient, please follow these guidelines:
 
@@ -97,7 +97,7 @@ PRs that combine multiple unrelated changes may be asked to split.
 
 ---
 
-# Commit style
+## Commit style
 
 LeafWiki uses **Conventional Commits**.
 
@@ -127,7 +127,7 @@ Common commit types:
 
 ---
 
-# Feature proposals
+## Feature proposals
 
 If you'd like to propose a feature, please include:
 
@@ -139,7 +139,7 @@ Good feature requests focus on **practical real-world usage**.
 
 ---
 
-# Documentation contributions
+## Documentation contributions
 
 Documentation improvements are always welcome.
 
@@ -152,7 +152,7 @@ Examples include:
 
 ---
 
-# Code style
+## Code style
 
 Please follow the existing project style.
 
@@ -164,7 +164,7 @@ General guidelines:
 
 ---
 
-# Review process
+## Review process
 
 All contributions are reviewed before merging.
 
@@ -178,7 +178,7 @@ This helps keep the project consistent and maintainable.
 
 ---
 
-# Questions or discussions
+## Questions or discussions
 
 If you're unsure about something, feel free to open an issue or discussion.
 
