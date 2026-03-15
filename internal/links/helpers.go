@@ -172,7 +172,7 @@ func toBacklinkResultItem(tree *tree.TreeService, backlink Backlink) BacklinkRes
 		return BacklinkResultItem{}
 	}
 
-	page, err := tree.FindPageByID(root.Children, backlink.FromPageID)
+	page, err := tree.FindPageByID(backlink.FromPageID)
 	if err != nil {
 		return BacklinkResultItem{}
 	}
@@ -215,7 +215,7 @@ func toOutgoingResultItem(tree *tree.TreeService, outgoing Outgoing) OutgoingRes
 		return item
 	}
 
-	toPage, err := tree.FindPageByID(root.Children, outgoing.ToPageID)
+	toPage, err := tree.FindPageByID(outgoing.ToPageID)
 	if err != nil || toPage == nil {
 		return item
 	}

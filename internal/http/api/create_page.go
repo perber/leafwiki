@@ -33,7 +33,7 @@ func CreatePageHandler(w *wiki.Wiki) gin.HandlerFunc {
 		if req.Kind != nil {
 			kind = tree.NodeKind(*req.Kind)
 		}
-		page, err := w.CreatePage(user.ID, req.ParentID, req.Title, req.Slug, &kind)
+		page, err := w.CreateNode(user.ID, req.ParentID, req.Title, req.Slug, &kind)
 		if err != nil {
 			respondWithError(c, err)
 			return

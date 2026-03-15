@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"io"
-	"sort"
 	"time"
 )
 
@@ -24,19 +23,41 @@ const (
 	NodeKindSection NodeKind = "section"
 )
 
-// PageNode represents a single node in the tree
-// It has an ID, a parent, a path, and children
-// The ID is a unique identifier for the entry
-type PageNode struct {
-	ID       string      `json:"id"`       // Unique identifier for the entry
-	Title    string      `json:"title"`    // Title is the name of the entry
-	Slug     string      `json:"slug"`     // Slug is the path of the entry
-	Children []*PageNode `json:"children"` // Children are the children of the entry
-	Position int         `json:"position"` // Position is the position of the entry
-	Parent   *PageNode   `json:"-"`
+type NodeIssueCode string
 
-	Kind     NodeKind     `json:"kind"`     // Kind is the kind of the node (page or folder)
+const (
+	NodeIssueMissingIndexMD NodeIssueCode = "missing_index_md"
+	NodeIssueMissingID      NodeIssueCode = "missing_leafwiki_id"
+	NodeIssueDuplicateID    NodeIssueCode = "duplicate_leafwiki_id"
+	NodeIssueInvalidOrder   NodeIssueCode = "invalid_order_json"
+)
+
+type NodeIssue struct {
+	Code    NodeIssueCode `json:"code"`
+	Message string        `json:"message"`
+}
+
+// This is an in-memory projection reconstructed from the filesystem.
+// Parent/Children/Kind are derived, not persisted truth.
+type PageNode struct {
+	ID       string       `json:"id"`       // Unique identifier for the entry
+	Title    string       `json:"title"`    // Title is the name of the entry
+	Slug     string       `json:"slug"`     // Slug is the path of the entry
 	Metadata PageMetadata `json:"metadata"` // Metadata holds metadata about the page
+
+	// Derived fields (not persisted)
+	Parent   *PageNode   `json:"-"`
+	Children []*PageNode `json:"children,omitempty"`
+	Kind     NodeKind    `json:"kind"`
+
+	// Visible repair/drift markers for app/browser
+	RepairNeeded bool        `json:"repairNeeded"`
+	Issues       []NodeIssue `json:"issues,omitempty"`
+}
+
+func (p *PageNode) Hash() string {
+	sum := p.hashSum(true) // includeMetadata = true
+	return hex.EncodeToString(sum[:])
 }
 
 func (p *PageNode) HasChildren() bool {
@@ -52,12 +73,12 @@ func (p *PageNode) ChildAlreadyExists(slug string) bool {
 	return false
 }
 
-func (p *PageNode) IsChildOf(childID string, recursive bool) bool {
+func (p *PageNode) HasDescendant(childID string, recursive bool) bool {
 	for _, child := range p.Children {
 		if child.ID == childID {
 			return true
 		}
-		if recursive && child.IsChildOf(childID, recursive) {
+		if recursive && child.HasDescendant(childID, recursive) {
 			return true
 		}
 	}
@@ -74,13 +95,6 @@ func (p *PageNode) CalculatePath() string {
 		return p.Slug
 	}
 	return p.Parent.CalculatePath() + "/" + p.Slug
-}
-
-// Hash returns a deterministic hash of the node and all descendants.
-// Parent is intentionally ignored to avoid cycles.
-func (p *PageNode) Hash() string {
-	sum := p.hashSum(true) // includeMetadata = true
-	return hex.EncodeToString(sum[:])
 }
 
 func (p *PageNode) hashSum(includeMetadata bool) [32]byte {
@@ -105,8 +119,12 @@ func (p *PageNode) writeHashPayload(w io.Writer, includeMetadata bool) {
 	writeString(w, p.Slug)
 	writeString(w, "kind")
 	writeString(w, string(p.Kind))
-	writeString(w, "position")
-	writeInt64(w, int64(p.Position))
+
+	if p.RepairNeeded {
+		writeInt64(w, 1)
+	} else {
+		writeInt64(w, 0)
+	}
 
 	if includeMetadata {
 		writeString(w, "meta.createdAt")
@@ -119,24 +137,9 @@ func (p *PageNode) writeHashPayload(w io.Writer, includeMetadata bool) {
 		writeString(w, p.Metadata.LastAuthorID)
 	}
 
-	// Children: enforce stable order (Position, then ID as tie-breaker)
-	children := make([]*PageNode, 0, len(p.Children))
-	children = append(children, p.Children...)
-
-	sort.SliceStable(children, func(i, j int) bool {
-		if children[i] == nil || children[j] == nil {
-			return children[j] != nil // nils last
-		}
-		if children[i].Position != children[j].Position {
-			return children[i].Position < children[j].Position
-		}
-		return children[i].ID < children[j].ID
-	})
-
 	writeString(w, "children.count")
-	writeInt64(w, int64(len(children)))
-
-	for _, ch := range children {
+	writeInt64(w, int64(len(p.Children)))
+	for _, ch := range p.Children {
 		if ch == nil {
 			writeString(w, "child.nil")
 			continue

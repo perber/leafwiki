@@ -67,18 +67,7 @@ func buildPathFromNode(node *tree.PageNode) string {
 	}
 	return strings.Join(parts, "/")
 }
-
-func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserResolver) *Node {
-	path := node.Slug
-
-	if node.Slug == "root" {
-		path = ""
-	}
-
-	if node.Slug != "root" && parentPath != "" {
-		path = parentPath + "/" + node.Slug
-	}
-
+func toAPINodeWithDerivedPosition(node *tree.PageNode, userResolver *auth.UserResolver, position int) *Node {
 	var creator, lastAuthor *auth.UserLabel
 	if userResolver != nil {
 		creator, _ = userResolver.ResolveUserLabel(node.Metadata.CreatorID)
@@ -86,12 +75,14 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 	}
 
 	apiNode := &Node{
-		ID:       node.ID,
-		Title:    node.Title,
-		Slug:     node.Slug,
-		Path:     path,
-		Position: node.Position,
-		Kind:     node.Kind,
+		ID:           node.ID,
+		Title:        node.Title,
+		Slug:         node.Slug,
+		Path:         strings.Trim(node.CalculatePath(), "/"),
+		Position:     position,
+		Kind:         node.Kind,
+		RepairNeeded: node.RepairNeeded,
+		Issues:       node.Issues,
 		Metadata: NodeMetadata{
 			CreatedAt:    node.Metadata.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:    node.Metadata.UpdatedAt.Format(time.RFC3339),
@@ -102,11 +93,16 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 		},
 	}
 
-	for _, child := range node.Children {
-		apiNode.Children = append(apiNode.Children, ToAPINode(child, path, userResolver))
+	for i, child := range node.Children {
+		apiNode.Children = append(apiNode.Children, toAPINodeWithDerivedPosition(child, userResolver, i))
 	}
 
 	return apiNode
+}
+
+func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserResolver) *Node {
+	_ = parentPath
+	return toAPINodeWithDerivedPosition(node, userResolver, 0)
 }
 
 // pruneNodeDepth limits the depth of the node tree to the specified depth.

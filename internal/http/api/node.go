@@ -16,10 +16,14 @@ type NodeMetadata struct {
 }
 
 type Node struct {
-	ID       string        `json:"id"`
-	Title    string        `json:"title"`
-	Slug     string        `json:"slug"`
-	Path     string        `json:"path"`
+	ID           string           `json:"id"`
+	Title        string           `json:"title"`
+	Slug         string           `json:"slug"`
+	Path         string           `json:"path"`
+	RepairNeeded bool             `json:"repairNeeded,omitempty"`
+	Issues       []tree.NodeIssue `json:"issues,omitempty"`
+	// Position is derived from the current sibling order in the read model.
+	// It is not canonical persisted state.
 	Position int           `json:"position"`
 	Kind     tree.NodeKind `json:"kind"`
 	Children []*Node       `json:"children"`

@@ -4,33 +4,34 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 )
+
+const legacyTreeFilename = "tree.json"
+const migratedLegacyTreeFilename = "tree.json.migrated.bak"
+const fsMigrationMarker = ".leafwiki_fs_migrated"
 
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
 }
 
-type ResolvedNode struct {
-	Kind       NodeKind
-	DirPath    string
-	FilePath   string
-	HasContent bool
-}
-
 type NodeStore struct {
 	storageDir string
 	log        *slog.Logger
 	slugger    *SlugService
+}
+
+type sectionOrderFile struct {
+	Children []string `json:"children"`
 }
 
 func NewNodeStore(storageDir string) *NodeStore {
@@ -41,58 +42,69 @@ func NewNodeStore(storageDir string) *NodeStore {
 	}
 }
 
-// writeIDToMarkdownFile writes a leafwiki_id to a markdown file's frontmatter and logs errors if the write fails
-func (f *NodeStore) writeIDToMarkdownFile(mdFile *markdown.MarkdownFile, id string) {
-	mdFile.SetFrontmatterID(id)
-	if err := mdFile.WriteToFile(); err != nil {
-		f.log.Error("could not write leafwiki_id back to file", "path", mdFile.GetPath(), "error", err)
-	}
+func (f *NodeStore) migratedLegacyTreePath() string {
+	return filepath.Join(f.storageDir, migratedLegacyTreeFilename)
 }
 
-func (f *NodeStore) LoadTree(filename string) (*PageNode, error) {
-	fullPath := filepath.Join(f.storageDir, filename)
+func (f *NodeStore) legacyTreePath() string {
+	return filepath.Join(f.storageDir, legacyTreeFilename)
+}
 
-	// check if file exists
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		return &PageNode{
-			ID:       "root",
-			Slug:     "root",
-			Title:    "root",
-			Parent:   nil,
-			Position: 0,
-			Children: []*PageNode{},
-			Kind:     NodeKindSection,
-		}, nil
+func (f *NodeStore) migrationMarkerPath() string {
+	return filepath.Join(f.storageDir, fsMigrationMarker)
+}
+
+func (f *NodeStore) HasLegacyTreeJSON() bool {
+	return fileExists(f.legacyTreePath())
+}
+
+func (f *NodeStore) HasFSMigrationMarker() bool {
+	return fileExists(f.migrationMarkerPath())
+}
+
+func (f *NodeStore) WriteFSMigrationMarker() error {
+	return os.WriteFile(f.migrationMarkerPath(), []byte("ok\n"), 0o644)
+}
+
+func (f *NodeStore) ArchiveLegacyTreeJSON() error {
+	src := f.legacyTreePath()
+	dst := f.migratedLegacyTreePath()
+
+	if !fileExists(src) {
+		return nil
+	}
+	if fileExists(dst) {
+		return fmt.Errorf("cannot archive legacy tree.json: destination already exists: %s", dst)
+	}
+	if err := os.Rename(src, dst); err != nil {
+		return fmt.Errorf("archive legacy tree.json: %w", err)
 	}
 
-	file, err := os.Open(fullPath)
+	return nil
+}
+
+func (f *NodeStore) LoadLegacyTree() (*legacyPageNode, error) {
+	path := f.legacyTreePath()
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("open tree file %s: %w", fullPath, err)
+		return nil, err
 	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			f.log.Error("could not close tree file", "file", fullPath, "error", err)
-		}
-	}()
-	data, err := io.ReadAll(file)
 
+	var root legacyPageNode
+	if err := json.Unmarshal(raw, &root); err != nil {
+		return nil, fmt.Errorf("unmarshal legacy tree.json: %w", err)
+	}
+
+	return &root, nil
+}
+
+func (f *NodeStore) RootDirHasContent() bool {
+	rootDir := filepath.Join(f.storageDir, "root")
+	entries, err := os.ReadDir(rootDir)
 	if err != nil {
-		return nil, fmt.Errorf("read tree file %s: %w", fullPath, err)
+		return false
 	}
-
-	tree := &PageNode{}
-	if err := json.Unmarshal(data, tree); err != nil {
-		return nil, fmt.Errorf("unmarshal tree data %s: %w", fullPath, err)
-	}
-
-	if tree.ID == "root" && tree.Kind == "" {
-		tree.Kind = NodeKindSection
-	}
-
-	// assigns parent to children
-	f.assignParentToChildren(tree)
-
-	return tree, nil
+	return len(entries) > 0
 }
 
 func (f *NodeStore) ReconstructTreeFromFS() (*PageNode, error) {
@@ -101,7 +113,6 @@ func (f *NodeStore) ReconstructTreeFromFS() (*PageNode, error) {
 		Slug:     "root",
 		Title:    "root",
 		Parent:   nil,
-		Position: 0,
 		Children: []*PageNode{},
 		Kind:     NodeKindSection,
 	}
@@ -125,8 +136,11 @@ func (f *NodeStore) ReconstructTreeFromFS() (*PageNode, error) {
 		return nil, fmt.Errorf("reconstruct tree from fs: %w", err)
 	}
 
+	f.markDuplicateIDs(root)
+
 	return root, nil
 }
+
 func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNode) error {
 	entries, err := os.ReadDir(currentPath)
 	if err != nil {
@@ -143,23 +157,24 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		return li < lj
 	})
 
+	var children []*PageNode
 	for _, entry := range entries {
 		name := entry.Name()
 
-		// optional: skip hidden stuff
+		// ignore hidden files and folders (those starting with .)
 		if strings.HasPrefix(name, ".") {
 			continue
 		}
 
-		// defaults
-		title := name
-		id, err := shared.GenerateUniqueID()
-		if err != nil {
-			return fmt.Errorf("generate unique ID: %w", err)
+		if strings.EqualFold(name, "order.json") {
+			continue
 		}
 
+		title := name
+		id := ""
+		repairNeeded := false
+		var issues []NodeIssue
 		if entry.IsDir() {
-			// Normalize and validate the directory name as a slug
 			normalizedSlug := normalizeSlug(name)
 			if err := f.slugger.IsValidSlug(normalizedSlug); err != nil {
 				f.log.Error("skipping directory with invalid slug", "directory", name, "normalized", normalizedSlug, "error", err)
@@ -171,32 +186,48 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 				mdFile, err := markdown.LoadMarkdownFile(indexPath)
 				if err != nil {
 					f.log.Error("could not load index.md", "path", indexPath, "error", err)
-					// fall back to default title and generated ID, but still add the section and recurse
+					repairNeeded = true
+					issues = append(issues, NodeIssue{
+						Code:    NodeIssueMissingIndexMD,
+						Message: "index.md exists but could not be parsed",
+					})
 				} else {
 					title, err = mdFile.GetTitle()
 					if err != nil {
 						f.log.Error("could not extract title from index.md", "path", indexPath, "error", err)
-						// keep default title; still add the section and recurse
 					}
 					if mdFile.GetFrontmatter().LeafWikiID != "" {
 						id = mdFile.GetFrontmatter().LeafWikiID
-					} else {
-						// Generated ID needs to be written back
-						f.writeIDToMarkdownFile(mdFile, id)
 					}
 				}
+			} else {
+				repairNeeded = true
+				issues = append(issues, NodeIssue{
+					Code:    NodeIssueMissingIndexMD,
+					Message: "section has no index.md",
+				})
+			}
+
+			if strings.TrimSpace(id) == "" {
+				id = syntheticNodeID(filepath.Join(currentPath, name))
+				repairNeeded = true
+				issues = append(issues, NodeIssue{
+					Code:    NodeIssueMissingID,
+					Message: "section is missing leafwiki_id in index.md frontmatter",
+				})
 			}
 
 			child := &PageNode{
-				ID:       id,
-				Slug:     normalizedSlug,
-				Title:    title,
-				Parent:   parent,
-				Position: len(parent.Children),
-				Children: []*PageNode{},
-				Kind:     NodeKindSection,
+				ID:           id,
+				Slug:         normalizedSlug,
+				Title:        title,
+				Parent:       parent,
+				Children:     []*PageNode{},
+				Kind:         NodeKindSection,
+				RepairNeeded: repairNeeded,
+				Issues:       issues,
 			}
-			parent.Children = append(parent.Children, child)
+			children = append(children, child)
 
 			if err := f.reconstructTreeRecursive(filepath.Join(currentPath, name), child); err != nil {
 				return err
@@ -210,9 +241,7 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 			continue
 		}
 
-		// Normalize and validate the filename (without .md) as a slug
 		baseFilename := strings.TrimSuffix(name, ext)
-		// skip index.md (handled by section case)
 		if strings.EqualFold(baseFilename, "index") {
 			continue
 		}
@@ -237,49 +266,485 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		if mdFile.GetFrontmatter().LeafWikiID != "" {
 			id = mdFile.GetFrontmatter().LeafWikiID
 		} else {
-			// Generated ID needs to be written back
-			f.writeIDToMarkdownFile(mdFile, id)
+			id = syntheticNodeID(filePath)
+			repairNeeded = true
+			issues = append(issues, NodeIssue{
+				Code:    NodeIssueMissingID,
+				Message: "page is missing leafwiki_id in frontmatter",
+			})
 		}
 
 		child := &PageNode{
-			ID:       id,
-			Slug:     normalizedSlug,
-			Title:    title,
-			Parent:   parent,
-			Position: len(parent.Children),
-			Children: nil,
-			Kind:     NodeKindPage,
+			ID:           id,
+			Slug:         normalizedSlug,
+			Title:        title,
+			Parent:       parent,
+			Children:     nil,
+			Kind:         NodeKindPage,
+			RepairNeeded: repairNeeded,
+			Issues:       issues,
 		}
-		parent.Children = append(parent.Children, child)
+		children = append(children, child)
 	}
 
+	parent.Children = f.sortChildrenForParent(currentPath, children, parent)
 	return nil
 }
 
-func (f *NodeStore) assignParentToChildren(parent *PageNode) {
-	for _, child := range parent.Children {
-		child.Parent = parent
-		f.assignParentToChildren(child)
+func (f *NodeStore) MigrateLegacyTreeJSONToFS() error {
+	if !f.HasLegacyTreeJSON() {
+		return nil
 	}
-}
-
-func (f *NodeStore) SaveTree(filename string, tree *PageNode) error {
-	if tree == nil {
-		return errors.New("a tree is required")
+	if f.HasFSMigrationMarker() {
+		return nil
+	}
+	if f.RootDirHasContent() {
+		return fmt.Errorf("refusing legacy migration: root/ already contains content")
 	}
 
-	fullPath := filepath.Join(f.storageDir, filename)
-
-	data, err := json.Marshal(tree)
+	legacyRoot, err := f.LoadLegacyTree()
 	if err != nil {
-		return fmt.Errorf("could not marshal tree: %w", err)
+		return fmt.Errorf("load legacy tree: %w", err)
+	}
+	if legacyRoot == nil {
+		return fmt.Errorf("legacy tree.json is nil")
 	}
 
-	if err := shared.WriteFileAtomic(fullPath, data, 0o644); err != nil {
-		return fmt.Errorf("could not atomically write tree file: %w", err)
+	rootDir := filepath.Join(f.storageDir, "root")
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		return fmt.Errorf("ensure root dir: %w", err)
+	}
+
+	for _, child := range legacyRoot.Children {
+		if err := f.migrateLegacyNode(rootDir, child); err != nil {
+			return err
+		}
+	}
+
+	if err := f.writeLegacyOrderFile(rootDir, legacyRoot.Children); err != nil {
+		return err
+	}
+
+	if err := f.ArchiveLegacyTreeJSON(); err != nil {
+		return fmt.Errorf("archive legacy tree.json after migration: %w", err)
+	}
+
+	if err := f.WriteFSMigrationMarker(); err != nil {
+		return fmt.Errorf("write migration marker: %w", err)
 	}
 
 	return nil
+}
+
+func (f *NodeStore) migrateLegacyNode(parentDir string, n *legacyPageNode) error {
+	if n == nil {
+		return nil
+	}
+
+	slug := strings.TrimSpace(n.Slug)
+	if slug == "" {
+		return fmt.Errorf("legacy node %q has empty slug", n.ID)
+	}
+
+	switch n.Kind {
+	case NodeKindSection:
+		dirPath := filepath.Join(parentDir, slug)
+		if err := os.MkdirAll(dirPath, 0o755); err != nil {
+			return fmt.Errorf("create section dir %s: %w", dirPath, err)
+		}
+
+		indexPath := filepath.Join(dirPath, "index.md")
+		if err := f.writeLegacyNodeMarkdown(indexPath, n); err != nil {
+			return err
+		}
+
+		for _, child := range n.sortedChildren() {
+			if err := f.migrateLegacyNode(dirPath, child); err != nil {
+				return err
+			}
+		}
+
+		if err := f.writeLegacyOrderFile(dirPath, n.Children); err != nil {
+			return err
+		}
+		return nil
+
+	case NodeKindPage:
+		if len(n.Children) > 0 {
+			// Legacy invalid shape: page with children.
+			// Migrate safely as section to preserve subtree.
+			dirPath := filepath.Join(parentDir, slug)
+			if err := os.MkdirAll(dirPath, 0o755); err != nil {
+				return fmt.Errorf("create promoted section dir %s: %w", dirPath, err)
+			}
+
+			indexPath := filepath.Join(dirPath, "index.md")
+			if err := f.writeLegacyNodeMarkdown(indexPath, n); err != nil {
+				return err
+			}
+
+			for _, child := range n.sortedChildren() {
+				if err := f.migrateLegacyNode(dirPath, child); err != nil {
+					return err
+				}
+			}
+
+			if err := f.writeLegacyOrderFile(dirPath, n.Children); err != nil {
+				return err
+			}
+			return nil
+		}
+
+		filePath := filepath.Join(parentDir, slug+".md")
+		return f.writeLegacyNodeMarkdown(filePath, n)
+
+	default:
+		return fmt.Errorf("legacy node %q has unknown kind %q", n.ID, n.Kind)
+	}
+}
+
+func (n *legacyPageNode) sortedChildren() []*legacyPageNode {
+	out := append([]*legacyPageNode(nil), n.Children...)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Position != out[j].Position {
+			return out[i].Position < out[j].Position
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
+}
+
+func (f *NodeStore) writeLegacyOrderFile(sectionDir string, children []*legacyPageNode) error {
+	if len(children) == 0 {
+		return nil
+	}
+
+	sorted := append([]*legacyPageNode(nil), children...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].Position != sorted[j].Position {
+			return sorted[i].Position < sorted[j].Position
+		}
+		return sorted[i].ID < sorted[j].ID
+	})
+
+	ids := make([]string, 0, len(sorted))
+	for _, ch := range sorted {
+		if ch == nil || strings.TrimSpace(ch.ID) == "" {
+			continue
+		}
+		ids = append(ids, ch.ID)
+	}
+
+	data, err := json.MarshalIndent(sectionOrderFile{Children: ids}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return shared.WriteFileAtomic(filepath.Join(sectionDir, "order.json"), data, 0o644)
+}
+
+func (f *NodeStore) writeLegacyNodeMarkdown(path string, n *legacyPageNode) error {
+	body := "# " + strings.TrimSpace(n.Title) + "\n"
+	fm := markdown.Frontmatter{
+		LeafWikiID:    strings.TrimSpace(n.ID),
+		LeafWikiTitle: strings.TrimSpace(n.Title),
+	}
+	if !n.Metadata.CreatedAt.IsZero() {
+		fm.CreatedAt = n.Metadata.CreatedAt.UTC().Format(time.RFC3339)
+	}
+	if !n.Metadata.UpdatedAt.IsZero() {
+		fm.UpdatedAt = n.Metadata.UpdatedAt.UTC().Format(time.RFC3339)
+	}
+	fm.CreatorID = strings.TrimSpace(n.Metadata.CreatorID)
+	fm.LastAuthorID = strings.TrimSpace(n.Metadata.LastAuthorID)
+
+	mf := markdown.NewMarkdownFile(path, body, fm)
+	if err := mf.WriteToFile(); err != nil {
+		return fmt.Errorf("write migrated markdown %s: %w", path, err)
+	}
+	return nil
+}
+
+func (f *NodeStore) orderFilePathForSection(section *PageNode) (string, error) {
+	if section == nil {
+		return "", errors.New("section is nil")
+	}
+	if section.Kind != NodeKindSection {
+		return "", fmt.Errorf("node %s is not a section", section.ID)
+	}
+	dir, err := f.dirPathForNode(section)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "order.json"), nil
+}
+
+func (f *NodeStore) readChildOrder(parentDir string) ([]string, error) {
+	path := filepath.Join(parentDir, "order.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var file sectionOrderFile
+	if err := json.Unmarshal(raw, &file); err != nil {
+		return nil, err
+	}
+	return file.Children, nil
+}
+func (f *NodeStore) WriteChildOrder(parent *PageNode, orderedIDs []string) error {
+	if parent == nil {
+		return errors.New("parent is nil")
+	}
+	if parent.Kind != NodeKindSection {
+		return fmt.Errorf("parent %s is not a section", parent.ID)
+	}
+
+	valid := make(map[string]bool, len(parent.Children))
+	for _, child := range parent.Children {
+		valid[child.ID] = true
+	}
+
+	seen := make(map[string]bool, len(orderedIDs))
+	out := make([]string, 0, len(orderedIDs))
+	for _, id := range orderedIDs {
+		if !valid[id] {
+			return fmt.Errorf("order contains non-child id %q", id)
+		}
+		if seen[id] {
+			return fmt.Errorf("order contains duplicate id %q", id)
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+
+	path, err := f.orderFilePathForSection(parent)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(sectionOrderFile{Children: out}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return shared.WriteFileAtomic(path, data, 0o644)
+}
+
+func (f *NodeStore) AppendChildOrder(parent *PageNode, childID string) error {
+	ids, err := f.normalizedOrderedChildren(parent)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if id == childID {
+			return nil
+		}
+	}
+	ids = append(ids, childID)
+	return f.WriteChildOrder(parent, ids)
+}
+
+func (f *NodeStore) RemoveChildOrder(parent *PageNode, childID string) error {
+	ids, err := f.normalizedOrderedChildren(parent)
+	if err != nil {
+		return err
+	}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id != childID {
+			out = append(out, id)
+		}
+	}
+	return f.WriteChildOrder(parent, out)
+}
+
+func (f *NodeStore) markDuplicateIDs(root *PageNode) {
+	seen := map[string]*PageNode{}
+	var walk func(*PageNode)
+	walk = func(n *PageNode) {
+		if n == nil {
+			return
+		}
+		if n.ID != "" && n.ID != "root" {
+			if prev, ok := seen[n.ID]; ok {
+				n.RepairNeeded = true
+				n.Issues = append(n.Issues, NodeIssue{
+					Code:    NodeIssueDuplicateID,
+					Message: fmt.Sprintf("duplicate leafwiki_id also used by %q", prev.CalculatePath()),
+				})
+				prev.RepairNeeded = true
+				prev.Issues = append(prev.Issues, NodeIssue{
+					Code:    NodeIssueDuplicateID,
+					Message: fmt.Sprintf("duplicate leafwiki_id also used by %q", n.CalculatePath()),
+				})
+			} else {
+				seen[n.ID] = n
+			}
+		}
+		for _, ch := range n.Children {
+			walk(ch)
+		}
+	}
+	walk(root)
+}
+
+func (f *NodeStore) currentOrderedChildren(parent *PageNode) ([]string, error) {
+	if parent == nil {
+		return nil, errors.New("parent is nil")
+	}
+	if parent.Kind != NodeKindSection {
+		return nil, fmt.Errorf("parent %s is not a section", parent.ID)
+	}
+	dir, err := f.dirPathForNode(parent)
+	if err != nil {
+		return nil, err
+	}
+	return f.readChildOrder(dir)
+}
+
+func (f *NodeStore) sortChildrenForParent(parentDir string, children []*PageNode, parent *PageNode) []*PageNode {
+	orderIDs, err := f.readChildOrder(parentDir)
+	if err != nil {
+		parent.RepairNeeded = true
+		parent.Issues = append(parent.Issues, NodeIssue{
+			Code:    NodeIssueInvalidOrder,
+			Message: "order.json could not be parsed; falling back to deterministic order",
+		})
+		orderIDs = nil
+	}
+
+	byID := make(map[string]*PageNode, len(children))
+	for _, child := range children {
+		byID[child.ID] = child
+	}
+
+	var ordered []*PageNode
+	seen := make(map[string]bool, len(children))
+	unknownIDs := false
+
+	for _, id := range orderIDs {
+		if child, ok := byID[id]; ok {
+			if !seen[id] {
+				ordered = append(ordered, child)
+				seen[id] = true
+			}
+		} else {
+			unknownIDs = true
+		}
+	}
+
+	if unknownIDs {
+		parent.RepairNeeded = true
+		parent.Issues = append(parent.Issues, NodeIssue{
+			Code:    NodeIssueInvalidOrder,
+			Message: "order.json references unknown child ids",
+		})
+	}
+
+	var tail []*PageNode
+	for _, child := range children {
+		if !seen[child.ID] {
+			tail = append(tail, child)
+		}
+	}
+
+	sort.SliceStable(tail, func(i, j int) bool {
+		si := strings.ToLower(tail[i].Slug)
+		sj := strings.ToLower(tail[j].Slug)
+		if si == sj {
+			return tail[i].Slug < tail[j].Slug
+		}
+		return si < sj
+	})
+
+	return append(ordered, tail...)
+}
+
+func (f *NodeStore) normalizedOrderedChildren(parent *PageNode) ([]string, error) {
+	raw, err := f.currentOrderedChildren(parent)
+	if err != nil {
+		return nil, err
+	}
+
+	valid := make(map[string]bool, len(parent.Children))
+	for _, child := range parent.Children {
+		valid[child.ID] = true
+	}
+
+	seen := make(map[string]bool, len(raw))
+	out := make([]string, 0, len(raw))
+	for _, id := range raw {
+		if !valid[id] || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out, nil
+}
+
+// WriteNodeFrontmatter explicitly persists node metadata to the canonical content file.
+// For sections, this may create index.md if missing.
+// For pages, a missing file is treated as drift.
+func (f *NodeStore) WriteNodeFrontmatter(entry *PageNode) error {
+	if entry == nil {
+		return &InvalidOpError{Op: "WriteNodeFrontmatter", Reason: "an entry is required"}
+	}
+	if entry.ID == "root" {
+		return nil
+	}
+
+	filePath, err := f.contentPathForNodeWrite(entry)
+	if err != nil {
+		return err
+	}
+
+	var mdFile *markdown.MarkdownFile
+
+	if _, err := os.Stat(filePath); err == nil {
+		mdFile, err = markdown.LoadMarkdownFile(filePath)
+		if err != nil {
+			return fmt.Errorf("could not load markdown file %s: %w", filePath, err)
+		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		if entry.Kind == NodeKindPage {
+			return &DriftError{
+				NodeID: entry.ID,
+				Kind:   entry.Kind,
+				Path:   filePath,
+				Reason: "expected page file missing",
+			}
+		}
+		mdFile = markdown.NewMarkdownFile(filePath, "", markdown.Frontmatter{})
+	} else {
+		return fmt.Errorf("could not stat markdown file %s: %w", filePath, err)
+	}
+
+	mdFile.SetFrontmatterID(entry.ID)
+	mdFile.SetFrontmatterTitle(entry.Title)
+	mdFile.SetFrontmatterMetadata(
+		formatRFC3339(entry.Metadata.CreatedAt),
+		entry.Metadata.CreatorID,
+		formatRFC3339(entry.Metadata.UpdatedAt),
+		entry.Metadata.LastAuthorID,
+	)
+
+	if err := mdFile.WriteToFile(); err != nil {
+		return fmt.Errorf("could not write markdown file %s: %w", filePath, err)
+	}
+
+	return nil
+}
+
+// syntheticNodeID is only a temporary projection fallback for nodes missing leafwiki_id.
+// It must not be treated as stable identity across renames or moves.
+func syntheticNodeID(path string) string {
+	return "missing-id:" + strings.ReplaceAll(path, string(filepath.Separator), "/")
 }
 
 // CreatePage creates a new page file under the given parent entry
@@ -324,13 +789,16 @@ func (f *NodeStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 	}
 
 	// Build and write file
-	fm := markdown.Frontmatter{LeafWikiID: newEntry.ID}
-	md, err := markdown.BuildMarkdownWithFrontmatter(fm, "# "+newEntry.Title+"\n")
-	if err != nil {
-		return fmt.Errorf("could not build markdown with frontmatter: %w", err)
-	}
-
-	if err := shared.WriteFileAtomic(destFile, []byte(md), 0o644); err != nil {
+	mf := markdown.NewMarkdownFile(destFile, "# "+newEntry.Title+"\n", markdown.Frontmatter{})
+	mf.SetFrontmatterID(newEntry.ID)
+	mf.SetFrontmatterTitle(newEntry.Title)
+	mf.SetFrontmatterMetadata(
+		formatRFC3339(newEntry.Metadata.CreatedAt),
+		newEntry.Metadata.CreatorID,
+		formatRFC3339(newEntry.Metadata.UpdatedAt),
+		newEntry.Metadata.LastAuthorID,
+	)
+	if err := mf.WriteToFile(); err != nil {
 		return fmt.Errorf("could not create file: %w", err)
 	}
 
@@ -348,8 +816,6 @@ func (f *NodeStore) CreateSection(parentEntry *PageNode, newEntry *PageNode) err
 	if newEntry.ID == "root" {
 		return &InvalidOpError{Op: "CreateSection", Reason: "cannot create root"}
 	}
-
-	// Sections can only be created under sections (Option A)
 	if parentEntry.Kind != NodeKindSection {
 		return &InvalidOpError{Op: "CreateSection", Reason: "parent entry must be a section"}
 	}
@@ -357,30 +823,40 @@ func (f *NodeStore) CreateSection(parentEntry *PageNode, newEntry *PageNode) err
 		return &InvalidOpError{Op: "CreateSection", Reason: "new entry must be a section"}
 	}
 
-	// Parent directory from tree path
 	parentDir, err := f.dirPathForNode(parentEntry)
 	if err != nil {
 		return err
 	}
 
-	// Ensure parent directory exists (idempotent)
 	if err := os.MkdirAll(parentDir, 0o755); err != nil {
 		return fmt.Errorf("could not ensure parent directory exists: %w", err)
 	}
 
-	// Destination base paths
 	destBase := filepath.Join(parentDir, newEntry.Slug)
 	destFile := destBase + ".md"
 	destDir := destBase
 
-	// Reject if either a file OR a directory with same slug exists
 	if fileExists(destFile) || fileExists(destDir) {
 		return &PageAlreadyExistsError{Path: destBase}
 	}
 
-	// Create the folder for the section (no index.md by default)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("could not create section folder: %w", err)
+	}
+
+	indexPath := filepath.Join(destDir, "index.md")
+	mf := markdown.NewMarkdownFile(indexPath, "# "+newEntry.Title+"\n", markdown.Frontmatter{})
+	mf.SetFrontmatterID(newEntry.ID)
+	mf.SetFrontmatterTitle(newEntry.Title)
+	mf.SetFrontmatterMetadata(
+		formatRFC3339(newEntry.Metadata.CreatedAt),
+		newEntry.Metadata.CreatorID,
+		formatRFC3339(newEntry.Metadata.UpdatedAt),
+		newEntry.Metadata.LastAuthorID,
+	)
+
+	if err := mf.WriteToFile(); err != nil {
+		return fmt.Errorf("could not create section index.md: %w", err)
 	}
 
 	return nil
@@ -389,32 +865,39 @@ func (f *NodeStore) CreateSection(parentEntry *PageNode, newEntry *PageNode) err
 // UpsertContent updates the content of a page file on disk
 // It creates the file if it does not exist also for sections (index.md)
 func (f *NodeStore) UpsertContent(entry *PageNode, content string) error {
+
 	if entry == nil {
 		return &InvalidOpError{Op: "UpsertContent", Reason: "an entry is required"}
 	}
 
-	// Determine expected write path
 	filePath, err := f.contentPathForNodeWrite(entry)
 	if err != nil {
 		return err
 	}
 
-	mode := os.FileMode(0o644)
-	if st, err := os.Stat(filePath); err == nil {
-		mode = st.Mode()
+	var mf *markdown.MarkdownFile
+	if _, err := os.Stat(filePath); err == nil {
+		mf, err = markdown.LoadMarkdownFile(filePath)
+		if err != nil {
+			return err
+		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		mf = markdown.NewMarkdownFile(filePath, "", markdown.Frontmatter{})
+	} else {
+		return err
 	}
 
-	// Update the file content
-	fm := markdown.Frontmatter{LeafWikiID: strings.TrimSpace(entry.ID), LeafWikiTitle: strings.TrimSpace(entry.Title)}
-	contentWithFM, err := markdown.BuildMarkdownWithFrontmatter(fm, content)
-	if err != nil {
-		return fmt.Errorf("could not build markdown with frontmatter: %w", err)
-	}
-	if err := shared.WriteFileAtomic(filePath, []byte(contentWithFM), mode); err != nil {
-		return fmt.Errorf("could not write to file atomically: %w", err)
-	}
+	mf.SetFrontmatterID(entry.ID)
+	mf.SetFrontmatterTitle(entry.Title)
+	mf.SetFrontmatterMetadata(
+		formatRFC3339(entry.Metadata.CreatedAt),
+		entry.Metadata.CreatorID,
+		formatRFC3339(entry.Metadata.UpdatedAt),
+		entry.Metadata.LastAuthorID,
+	)
+	mf.SetContent(content)
 
-	return nil
+	return mf.WriteToFile()
 }
 
 // MoveNode moves a page to a other node
@@ -703,62 +1186,6 @@ func (f *NodeStore) ReadPageContent(entry *PageNode) (string, error) {
 	return content, nil
 }
 
-// SyncFrontmatterIfExists updates the frontmatter of a page file on disk if it exists
-func (f *NodeStore) SyncFrontmatterIfExists(entry *PageNode) error {
-	if entry == nil {
-		return &InvalidOpError{Op: "SyncFrontmatterIfExists", Reason: "an entry is required"}
-	}
-
-	// keine side effects: write-path NICHT verwenden (würde mkdir + bei Section implizit index.md Pfad liefern)
-	// aber read-path reicht, weil wir nur syncen, wenn Datei existiert
-	filePath, err := f.contentPathForNodeRead(entry)
-	if err != nil {
-		return err
-	}
-
-	// Datei existiert?
-	if !fileExists(filePath) {
-		// Page: muss existieren
-		if entry.Kind == NodeKindPage || entry.Kind == "" {
-			return &DriftError{NodeID: entry.ID, Kind: entry.Kind, Path: filePath, Reason: "expected page file missing"}
-		}
-		// Section: kein index.md -> NICHT erzeugen
-		return nil
-	}
-
-	raw, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("read content file: %w", err)
-	}
-
-	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
-	if err != nil {
-		return fmt.Errorf("parse frontmatter: %w", err)
-	}
-	if !has {
-		fm = markdown.Frontmatter{}
-	}
-
-	// Tree-SoT invariants
-	fm.LeafWikiID = strings.TrimSpace(entry.ID)
-	fm.LeafWikiTitle = strings.TrimSpace(entry.Title)
-
-	out, err := markdown.BuildMarkdownWithFrontmatter(fm, body)
-	if err != nil {
-		return fmt.Errorf("build markdown: %w", err)
-	}
-
-	mode := os.FileMode(0o644)
-	if st, err := os.Stat(filePath); err == nil {
-		mode = st.Mode()
-	}
-
-	if err := shared.WriteFileAtomic(filePath, []byte(out), mode); err != nil {
-		return fmt.Errorf("write file atomically: %w", err)
-	}
-	return nil
-}
-
 func (f *NodeStore) dirPathForNode(entry *PageNode) (string, error) {
 	if entry == nil {
 		return "", &InvalidOpError{Op: "dirPathForNode", Reason: "an entry is required"}
@@ -817,52 +1244,9 @@ func (f *NodeStore) contentPathForNodeWrite(entry *PageNode) (string, error) {
 	}
 }
 
-// resolveNode inspects the filesystem to determine if the given PageNode
-// corresponds to a file or folder, returning a ResolvedNode with details.
-// This function is only used for migration. Other parts of the system should rely on contentPathForNodeRead or contentPathForNodeWrite.
-// If this function is used outside of migration, it may lead to inconsistencies between the tree and the actual filesystem state.
-func (f *NodeStore) resolveNode(entry *PageNode) (*ResolvedNode, error) {
-	basePath, err := f.dirPathForNode(entry)
-	if err != nil {
-		return nil, err
-	}
-
-	// 1) File?
-	if _, err := os.Stat(basePath + ".md"); err == nil {
-		f.log.Debug("resolved as file node", "filePath", basePath+".md")
-		return &ResolvedNode{
-			Kind:       NodeKindPage,
-			FilePath:   basePath + ".md",
-			HasContent: true,
-		}, nil
-	}
-
-	// 2) Folder?
-	if info, err := os.Stat(basePath); err == nil && info.IsDir() {
-		index := filepath.Join(basePath, "index.md")
-		if _, err := os.Stat(index); err == nil {
-			f.log.Debug("resolved as section node with content", "dirPath", basePath, "filePath", index)
-			return &ResolvedNode{
-				Kind:       NodeKindSection,
-				DirPath:    basePath,
-				FilePath:   index,
-				HasContent: true,
-			}, nil
-		}
-		f.log.Debug("resolved as section node without content", "dirPath", basePath)
-		return &ResolvedNode{
-			Kind:       NodeKindSection,
-			DirPath:    basePath,
-			FilePath:   "", // no index.md present
-			HasContent: false,
-		}, nil
-	}
-
-	return nil, &NotFoundError{Resource: "node", Path: basePath, ID: entry.ID}
-}
-
-// ConvertNode converts the on-disk representation between page <-> folder.
-// NOTE: TreeService must ensure folder->page is allowed (no children).
+// ConvertNode converts on-disk representation between page-file and section-folder.
+// This is transitional infrastructure, not a canonical "kind metadata update".
+// Kind is derived from the resulting filesystem shape.
 func (f *NodeStore) ConvertNode(entry *PageNode, target NodeKind) error {
 	if entry == nil {
 		return &InvalidOpError{Op: "ConvertNode", Reason: "an entry is required"}

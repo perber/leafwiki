@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 )
 
 func GeneratePathFromPageNode(entry *PageNode) string {
@@ -76,4 +77,11 @@ func FoldPageFolderIfEmpty(storageDir string, pagePath string) error {
 	}
 
 	return nil
+}
+
+func formatRFC3339(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
 }
