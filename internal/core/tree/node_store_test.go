@@ -28,126 +28,126 @@ func mustMkdir(t *testing.T, path string) {
 	}
 }
 
-func TestNodeStore_LoadTree_MissingFile_ReturnsDefaultRoot(t *testing.T) {
-	tmp := t.TempDir()
-	store := NewNodeStore(tmp)
-
-	tree, err := store.LoadTree("missing.json")
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("LoadTree: %v", err)
+		t.Fatalf("read %s: %v", path, err)
 	}
-	if tree == nil {
-		t.Fatalf("expected tree, got nil")
-	}
-	if tree.ID != "root" || tree.Slug != "root" || tree.Title != "root" {
-		t.Fatalf("unexpected default root: %#v", tree)
-	}
-	if tree.Kind != NodeKindSection {
-		t.Fatalf("expected root kind %q, got %q", NodeKindSection, tree.Kind)
-	}
-	if tree.Parent != nil {
-		t.Fatalf("expected root parent nil")
-	}
-	if len(tree.Children) != 0 {
-		t.Fatalf("expected no children")
-	}
+	return b
 }
 
-func TestNodeStore_SaveTree_ThenLoadTree_AssignsParents(t *testing.T) {
-	tmp := t.TempDir()
-	store := NewNodeStore(tmp)
-
-	tree := &PageNode{
+func newRoot() *PageNode {
+	return &PageNode{
 		ID:    "root",
 		Slug:  "root",
 		Title: "root",
 		Kind:  NodeKindSection,
-		Children: []*PageNode{
-			{
-				ID:    "s1",
-				Slug:  "sec",
-				Title: "Section",
-				Kind:  NodeKindSection,
-				Children: []*PageNode{
-					{
-						ID:    "p1",
-						Slug:  "page",
-						Title: "Page",
-						Kind:  NodeKindPage,
-					},
-				},
-			},
-		},
-	}
-
-	if err := store.SaveTree("tree.json", tree); err != nil {
-		t.Fatalf("SaveTree: %v", err)
-	}
-
-	loaded, err := store.LoadTree("tree.json")
-	if err != nil {
-		t.Fatalf("LoadTree: %v", err)
-	}
-
-	sec := loaded.Children[0]
-	p := sec.Children[0]
-
-	if sec.Parent == nil || sec.Parent.ID != "root" {
-		t.Fatalf("expected section parent root, got %#v", sec.Parent)
-	}
-	if p.Parent == nil || p.Parent.ID != "s1" {
-		t.Fatalf("expected page parent s1, got %#v", p.Parent)
 	}
 }
 
-func TestNodeStore_SaveTree_NilTree_Error(t *testing.T) {
-	tmp := t.TempDir()
-	store := NewNodeStore(tmp)
-
-	if err := store.SaveTree("tree.json", nil); err == nil {
-		t.Fatalf("expected error, got nil")
+func newSection(id, slug, title string, parent *PageNode) *PageNode {
+	return &PageNode{
+		ID:     id,
+		Slug:   slug,
+		Title:  title,
+		Kind:   NodeKindSection,
+		Parent: parent,
 	}
 }
 
-func TestNodeStore_CreateSection_CreatesFolder_NoIndexByDefault(t *testing.T) {
+func newPage(id, slug, title string, parent *PageNode) *PageNode {
+	return &PageNode{
+		ID:     id,
+		Slug:   slug,
+		Title:  title,
+		Kind:   NodeKindPage,
+		Parent: parent,
+	}
+}
+
+func TestNodeStore_CreateSection_CreatesFolderAndIndex(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	sec := &PageNode{ID: "sec1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	root := newRoot()
+	sec := newSection("sec1", "docs", "Docs", root)
 
 	if err := store.CreateSection(root, sec); err != nil {
 		t.Fatalf("CreateSection: %v", err)
 	}
 
-	// expected folder: <tmp>/root/docs
 	dir := filepath.Join(tmp, "root", "docs")
 	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
 		t.Fatalf("expected section folder at %s", dir)
 	}
 
-	// no index.md by default
 	index := filepath.Join(dir, "index.md")
-	if _, err := os.Stat(index); err == nil {
-		t.Fatalf("did not expect index.md to exist by default: %s", index)
+	raw, err := os.ReadFile(index)
+	if err != nil {
+		t.Fatalf("expected index.md to exist: %v", err)
+	}
+
+	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter in index.md")
+	}
+	if fm.LeafWikiID != "sec1" {
+		t.Fatalf("expected leafwiki_id sec1, got %q", fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "Docs" {
+		t.Fatalf("expected leafwiki_title Docs, got %q", fm.LeafWikiTitle)
+	}
+	if !strings.Contains(body, "# Docs") {
+		t.Fatalf("expected H1 title in body, got %q", body)
 	}
 }
 
-func TestNodeStore_CreateSection_KindGuards(t *testing.T) {
+func TestNodeStore_CreateSection_Guards(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	rootPageWrong := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindPage}
-	sec := &PageNode{ID: "sec1", Slug: "docs", Title: "Docs", Kind: NodeKindSection}
-
-	if err := store.CreateSection(rootPageWrong, sec); err == nil {
-		t.Fatalf("expected error when parent is not a section")
+	tests := []struct {
+		name   string
+		parent *PageNode
+		entry  *PageNode
+	}{
+		{
+			name:   "parent must be section",
+			parent: &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindPage},
+			entry:  &PageNode{ID: "sec1", Slug: "docs", Title: "Docs", Kind: NodeKindSection},
+		},
+		{
+			name:   "entry must be section",
+			parent: newRoot(),
+			entry:  &PageNode{ID: "p1", Slug: "x", Title: "X", Kind: NodeKindPage},
+		},
+		{
+			name:   "entry must not be nil",
+			parent: newRoot(),
+			entry:  nil,
+		},
+		{
+			name:   "parent must not be nil",
+			parent: nil,
+			entry:  &PageNode{ID: "sec1", Slug: "docs", Title: "Docs", Kind: NodeKindSection},
+		},
+		{
+			name:   "entry must not be root",
+			parent: newRoot(),
+			entry:  &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection},
+		},
 	}
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	pageWrong := &PageNode{ID: "x", Slug: "x", Title: "X", Kind: NodeKindPage}
-	if err := store.CreateSection(root, pageWrong); err == nil {
-		t.Fatalf("expected error when new entry is not a section")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := store.CreateSection(tc.parent, tc.entry); err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+		})
 	}
 }
 
@@ -155,15 +155,15 @@ func TestNodeStore_CreatePage_CreatesMarkdownWithFrontmatter(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	page := &PageNode{ID: "p1", Slug: "hello", Title: "Hello World", Kind: NodeKindPage, Parent: root}
+	root := newRoot()
+	page := newPage("p1", "hello", "Hello World", root)
 
 	if err := store.CreatePage(root, page); err != nil {
 		t.Fatalf("CreatePage: %v", err)
 	}
 
-	p := filepath.Join(tmp, "root", "hello.md")
-	raw, err := os.ReadFile(p)
+	path := filepath.Join(tmp, "root", "hello.md")
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read created page: %v", err)
 	}
@@ -178,41 +178,83 @@ func TestNodeStore_CreatePage_CreatesMarkdownWithFrontmatter(t *testing.T) {
 	if strings.TrimSpace(fm.LeafWikiID) != "p1" {
 		t.Fatalf("expected leafwiki_id p1, got %q", fm.LeafWikiID)
 	}
-	// CreatePage setzt nur ID im FM, Title kommt in den Body als H1
+	if fm.LeafWikiTitle != "Hello World" {
+		t.Fatalf("expected leafwiki_title Hello World, got %q", fm.LeafWikiTitle)
+	}
 	if !strings.Contains(body, "# Hello World") {
 		t.Fatalf("expected H1 title in body, got: %q", body)
 	}
 }
 
-func TestNodeStore_CreatePage_RejectsCollision_FileOrDir(t *testing.T) {
+func TestNodeStore_CreatePage_GuardsAndCollisions(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
+	root := newRoot()
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-
-	// collision as file
-	mustWriteFile(t, filepath.Join(tmp, "root", "dup.md"), "x", 0o644)
-	page := &PageNode{ID: "p1", Slug: "dup", Title: "Dup", Kind: NodeKindPage, Parent: root}
-	if err := store.CreatePage(root, page); err == nil {
-		t.Fatalf("expected PageAlreadyExistsError for existing file")
+	tests := []struct {
+		name  string
+		setup func(t *testing.T)
+		entry *PageNode
+	}{
+		{
+			name:  "entry must not be nil",
+			entry: nil,
+		},
+		{
+			name:  "entry must be page",
+			entry: newSection("s1", "docs", "Docs", root),
+		},
+		{
+			name: "slug collides with file",
+			setup: func(t *testing.T) {
+				mustWriteFile(t, filepath.Join(tmp, "root", "dup.md"), "x", 0o644)
+			},
+			entry: newPage("p1", "dup", "Dup", root),
+		},
+		{
+			name: "slug collides with dir",
+			setup: func(t *testing.T) {
+				mustMkdir(t, filepath.Join(tmp, "root", "dupdir"))
+			},
+			entry: newPage("p2", "dupdir", "DupDir", root),
+		},
 	}
 
-	// collision as dir
-	mustMkdir(t, filepath.Join(tmp, "root", "dupdir"))
-	page2 := &PageNode{ID: "p2", Slug: "dupdir", Title: "DupDir", Kind: NodeKindPage, Parent: root}
-	if err := store.CreatePage(root, page2); err == nil {
-		t.Fatalf("expected PageAlreadyExistsError for existing dir")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.setup != nil {
+				tc.setup(t)
+			}
+			if err := store.CreatePage(root, tc.entry); err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+		})
 	}
+
+	t.Run("parent must be section", func(t *testing.T) {
+		parent := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindPage}
+		entry := newPage("p3", "page", "Page", parent)
+
+		if err := store.CreatePage(parent, entry); err == nil {
+			t.Fatalf("expected error, got nil")
+		}
+	})
+
+	t.Run("parent must not be nil", func(t *testing.T) {
+		entry := &PageNode{ID: "p4", Slug: "page", Title: "Page", Kind: NodeKindPage}
+		if err := store.CreatePage(nil, entry); err == nil {
+			t.Fatalf("expected error, got nil")
+		}
+	})
 }
 
 func TestNodeStore_UpsertContent_Page_CreatesOrUpdates_PreservesMode(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	page := &PageNode{ID: "p1", Slug: "p", Title: "My Page", Kind: NodeKindPage, Parent: root}
+	root := newRoot()
+	page := newPage("p1", "p", "My Page", root)
 
-	// create with custom mode
 	path := filepath.Join(tmp, "root", "p.md")
 	mustWriteFile(t, path, "# old", 0o600)
 
@@ -224,26 +266,23 @@ func TestNodeStore_UpsertContent_Page_CreatesOrUpdates_PreservesMode(t *testing.
 	if err != nil {
 		t.Fatalf("stat: %v", err)
 	}
-	// permissions should stay (best-effort; Windows behaves differently sometimes)
-	if runtime.GOOS != "windows" {
-		if st.Mode().Perm() != 0o600 {
-			t.Fatalf("expected perm 0600, got %o", st.Mode().Perm())
-		}
+	if runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 {
+		t.Fatalf("expected perm 0600, got %o", st.Mode().Perm())
 	}
 
-	raw, _ := os.ReadFile(path)
-	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
+	raw := string(mustRead(t, path))
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
 	if !has {
-		t.Fatalf("expected FM to exist")
+		t.Fatalf("expected frontmatter")
 	}
 	if fm.LeafWikiID != "p1" {
 		t.Fatalf("expected id p1, got %q", fm.LeafWikiID)
 	}
 	if fm.LeafWikiTitle != "My Page" {
-		t.Fatalf("expected title 'My Page', got %q", fm.LeafWikiTitle)
+		t.Fatalf("expected title My Page, got %q", fm.LeafWikiTitle)
 	}
 	if strings.TrimSpace(body) != "# new" {
 		t.Fatalf("expected body '# new', got %q", body)
@@ -254,8 +293,8 @@ func TestNodeStore_UpsertContent_Section_WritesIndexAndCreatesDir(t *testing.T) 
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	sec := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	root := newRoot()
+	sec := newSection("s1", "docs", "Docs", root)
 
 	if err := store.UpsertContent(sec, "# docs"); err != nil {
 		t.Fatalf("UpsertContent: %v", err)
@@ -271,12 +310,11 @@ func TestNodeStore_MoveNode_Page_MovesFileStrict(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	secA := &PageNode{ID: "a", Slug: "a", Title: "A", Kind: NodeKindSection, Parent: root}
-	secB := &PageNode{ID: "b", Slug: "b", Title: "B", Kind: NodeKindSection, Parent: root}
-	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: secA}
+	root := newRoot()
+	secA := newSection("a", "a", "A", root)
+	secB := newSection("b", "b", "B", root)
+	page := newPage("p1", "p", "P", secA)
 
-	// create source file at old location (tree-based path)
 	src := filepath.Join(tmp, "root", "a", "p.md")
 	mustWriteFile(t, src, "# hi", 0o644)
 
@@ -297,17 +335,46 @@ func TestNodeStore_MoveNode_DriftWhenMissingSource(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	sec := &PageNode{ID: "s", Slug: "s", Title: "S", Kind: NodeKindSection, Parent: root}
-	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: sec}
+	root := newRoot()
+	sec := newSection("s", "s", "S", root)
+	page := newPage("p1", "p", "P", sec)
 
 	err := store.MoveNode(page, root)
 	if err == nil {
 		t.Fatalf("expected DriftError, got nil")
 	}
+
 	var de *DriftError
 	if !errors.As(err, &de) {
 		t.Fatalf("expected DriftError, got %T: %v", err, err)
+	}
+}
+
+func TestNodeStore_MoveNode_Guards(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := newRoot()
+	pageParent := &PageNode{ID: "p", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: root}
+	page := newPage("p1", "child", "Child", root)
+
+	tests := []struct {
+		name   string
+		entry  *PageNode
+		parent *PageNode
+	}{
+		{name: "entry required", entry: nil, parent: root},
+		{name: "parent required", entry: page, parent: nil},
+		{name: "cannot move root", entry: newRoot(), parent: root},
+		{name: "parent must be section", entry: page, parent: pageParent},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := store.MoveNode(tc.entry, tc.parent); err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+		})
 	}
 }
 
@@ -315,8 +382,8 @@ func TestNodeStore_DeletePage_RemovesFile_OrDriftIfMissing(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: root}
+	root := newRoot()
+	page := newPage("p1", "p", "P", root)
 
 	path := filepath.Join(tmp, "root", "p.md")
 	mustWriteFile(t, path, "# x", 0o644)
@@ -328,10 +395,33 @@ func TestNodeStore_DeletePage_RemovesFile_OrDriftIfMissing(t *testing.T) {
 		t.Fatalf("expected file deleted")
 	}
 
-	// delete again -> drift
 	err := store.DeletePage(page)
 	if err == nil {
 		t.Fatalf("expected DriftError")
+	}
+}
+
+func TestNodeStore_DeletePage_Guards(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := newRoot()
+
+	tests := []struct {
+		name  string
+		entry *PageNode
+	}{
+		{name: "entry required", entry: nil},
+		{name: "cannot delete root", entry: newRoot()},
+		{name: "entry must be page", entry: newSection("s1", "docs", "Docs", root)},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := store.DeletePage(tc.entry); err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+		})
 	}
 }
 
@@ -339,8 +429,8 @@ func TestNodeStore_DeleteSection_RemovesFolderRecursive_OrDriftIfMissing(t *test
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	sec := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	root := newRoot()
+	sec := newSection("s1", "docs", "Docs", root)
 
 	dir := filepath.Join(tmp, "root", "docs")
 	mustMkdir(t, dir)
@@ -360,35 +450,86 @@ func TestNodeStore_DeleteSection_RemovesFolderRecursive_OrDriftIfMissing(t *test
 	}
 }
 
+func TestNodeStore_DeleteSection_Guards(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := newRoot()
+
+	tests := []struct {
+		name  string
+		entry *PageNode
+	}{
+		{name: "entry required", entry: nil},
+		{name: "cannot delete root", entry: newRoot()},
+		{name: "entry must be section", entry: newPage("p1", "p", "P", root)},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := store.DeleteSection(tc.entry); err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+		})
+	}
+}
+
 func TestNodeStore_RenameNode_PageAndSection(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	root := newRoot()
 
-	// page rename
-	page := &PageNode{ID: "p1", Slug: "old", Title: "P", Kind: NodeKindPage, Parent: root}
-	oldFile := filepath.Join(tmp, "root", "old.md")
-	mustWriteFile(t, oldFile, "# x", 0o644)
+	t.Run("page", func(t *testing.T) {
+		page := newPage("p1", "old", "P", root)
+		oldFile := filepath.Join(tmp, "root", "old.md")
+		mustWriteFile(t, oldFile, "# x", 0o644)
 
-	if err := store.RenameNode(page, "new"); err != nil {
-		t.Fatalf("RenameNode(page): %v", err)
+		if err := store.RenameNode(page, "new"); err != nil {
+			t.Fatalf("RenameNode(page): %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(tmp, "root", "new.md")); err != nil {
+			t.Fatalf("expected new page file")
+		}
+	})
+
+	t.Run("section", func(t *testing.T) {
+		sec := newSection("s1", "docs", "Docs", root)
+		secDir := filepath.Join(tmp, "root", "docs")
+		mustMkdir(t, secDir)
+		mustWriteFile(t, filepath.Join(secDir, "index.md"), "# y", 0o644)
+
+		if err := store.RenameNode(sec, "docs2"); err != nil {
+			t.Fatalf("RenameNode(section): %v", err)
+		}
+		if st, err := os.Stat(filepath.Join(tmp, "root", "docs2")); err != nil || !st.IsDir() {
+			t.Fatalf("expected renamed section dir")
+		}
+	})
+}
+
+func TestNodeStore_RenameNode_Guards(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := newRoot()
+
+	tests := []struct {
+		name    string
+		entry   *PageNode
+		newSlug string
+	}{
+		{name: "entry required", entry: nil, newSlug: "x"},
+		{name: "new slug required", entry: newPage("p1", "old", "P", root), newSlug: ""},
+		{name: "cannot rename root", entry: newRoot(), newSlug: "x"},
 	}
-	if _, err := os.Stat(filepath.Join(tmp, "root", "new.md")); err != nil {
-		t.Fatalf("expected new page file")
-	}
 
-	// section rename
-	sec := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
-	secDir := filepath.Join(tmp, "root", "docs")
-	mustMkdir(t, secDir)
-	mustWriteFile(t, filepath.Join(secDir, "index.md"), "# y", 0o644)
-
-	if err := store.RenameNode(sec, "docs2"); err != nil {
-		t.Fatalf("RenameNode(section): %v", err)
-	}
-	if st, err := os.Stat(filepath.Join(tmp, "root", "docs2")); err != nil || !st.IsDir() {
-		t.Fatalf("expected renamed section dir")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := store.RenameNode(tc.entry, tc.newSlug); err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+		})
 	}
 }
 
@@ -396,10 +537,9 @@ func TestNodeStore_ReadPageRaw_Section_NoIndex_ReturnsEmptyNil(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	sec := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	root := newRoot()
+	sec := newSection("s1", "docs", "Docs", root)
 
-	// folder exists, but no index.md
 	mustMkdir(t, filepath.Join(tmp, "root", "docs"))
 
 	raw, err := store.ReadPageRaw(sec)
@@ -415,8 +555,8 @@ func TestNodeStore_ReadPageRaw_Page_Missing_IsDrift(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: root}
+	root := newRoot()
+	page := newPage("p1", "p", "P", root)
 
 	_, err := store.ReadPageRaw(page)
 	if err == nil {
@@ -424,118 +564,96 @@ func TestNodeStore_ReadPageRaw_Page_Missing_IsDrift(t *testing.T) {
 	}
 }
 
-func TestNodeStore_SyncFrontmatterIfExists_Page_UpdatesOrAddsFM(t *testing.T) {
+func TestNodeStore_WriteNodeFrontmatter_PageAndSection(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	page := &PageNode{ID: "p1", Slug: "p", Title: "Title A", Kind: NodeKindPage, Parent: root}
+	root := newRoot()
 
-	path := filepath.Join(tmp, "root", "p.md")
+	t.Run("page", func(t *testing.T) {
+		page := newPage("p1", "p", "Title A", root)
+		path := filepath.Join(tmp, "root", "p.md")
+		mustWriteFile(t, path, "# Body\nHello", 0o644)
 
-	// file without FM
-	mustWriteFile(t, path, "# Body\nHello", 0o644)
+		if err := store.WriteNodeFrontmatter(page); err != nil {
+			t.Fatalf("WriteNodeFrontmatter(page): %v", err)
+		}
 
-	if err := store.SyncFrontmatterIfExists(page); err != nil {
-		t.Fatalf("SyncFrontmatterIfExists: %v", err)
-	}
+		raw := string(mustRead(t, path))
+		fm, body, has, err := markdown.ParseFrontmatter(raw)
+		if err != nil {
+			t.Fatalf("ParseFrontmatter: %v", err)
+		}
+		if !has {
+			t.Fatalf("expected frontmatter")
+		}
+		if fm.LeafWikiID != "p1" || fm.LeafWikiTitle != "Title A" {
+			t.Fatalf("unexpected frontmatter: %#v", fm)
+		}
+		if strings.TrimSpace(body) != "# Body\nHello" {
+			t.Fatalf("body changed unexpectedly: %q", body)
+		}
+	})
 
-	raw := string(mustRead(t, path))
-	fm, body, has, err := markdown.ParseFrontmatter(raw)
-	if err != nil {
-		t.Fatalf("ParseFrontmatter: %v", err)
-	}
-	if !has {
-		t.Fatalf("expected fm after sync")
-	}
-	if fm.LeafWikiID != "p1" || fm.LeafWikiTitle != "Title A" {
-		t.Fatalf("unexpected fm: %#v", fm)
-	}
-	if strings.TrimSpace(body) != "# Body\nHello" {
-		t.Fatalf("body changed unexpectedly: %q", body)
-	}
+	t.Run("section creates index when missing", func(t *testing.T) {
+		sec := newSection("s1", "docs", "Docs", root)
 
-	// update title and id
-	page.Title = "Title B"
-	page.ID = "p1b"
-	if err := store.SyncFrontmatterIfExists(page); err != nil {
-		t.Fatalf("SyncFrontmatterIfExists(update): %v", err)
-	}
-	raw2 := string(mustRead(t, path))
-	fm2, body2, has2, err := markdown.ParseFrontmatter(raw2)
-	if err != nil {
-		t.Fatalf("ParseFrontmatter: %v", err)
-	}
-	if !has2 || fm2.LeafWikiID != "p1b" || fm2.LeafWikiTitle != "Title B" {
-		t.Fatalf("expected updated fm, got %#v", fm2)
-	}
-	if strings.TrimSpace(body2) != "# Body\nHello" {
-		t.Fatalf("body changed unexpectedly on update: %q", body2)
-	}
+		if err := store.WriteNodeFrontmatter(sec); err != nil {
+			t.Fatalf("WriteNodeFrontmatter(section): %v", err)
+		}
+
+		index := filepath.Join(tmp, "root", "docs", "index.md")
+		raw := string(mustRead(t, index))
+		fm, _, has, err := markdown.ParseFrontmatter(raw)
+		if err != nil {
+			t.Fatalf("ParseFrontmatter: %v", err)
+		}
+		if !has {
+			t.Fatalf("expected frontmatter")
+		}
+		if fm.LeafWikiID != "s1" || fm.LeafWikiTitle != "Docs" {
+			t.Fatalf("unexpected frontmatter: %#v", fm)
+		}
+	})
 }
 
-func TestNodeStore_SyncFrontmatterIfExists_Section_NoIndex_NoSideEffects(t *testing.T) {
+func TestNodeStore_WriteNodeFrontmatter_GuardsAndDrift(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	sec := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	root := newRoot()
+	page := newPage("p1", "p", "P", root)
 
-	// Do NOT create folder: sync must not mkdir via write-path; should return nil.
-	if err := store.SyncFrontmatterIfExists(sec); err != nil {
-		t.Fatalf("SyncFrontmatterIfExists(section): %v", err)
-	}
-	// Ensure no folder created implicitly
-	if _, err := os.Stat(filepath.Join(tmp, "root", "docs")); err == nil {
-		t.Fatalf("expected no side effects (folder created), but folder exists")
-	}
-}
+	t.Run("entry required", func(t *testing.T) {
+		if err := store.WriteNodeFrontmatter(nil); err == nil {
+			t.Fatalf("expected error, got nil")
+		}
+	})
 
-func TestNodeStore_resolveNode_FileVsFolder(t *testing.T) {
-	tmp := t.TempDir()
-	store := NewNodeStore(tmp)
+	t.Run("root is noop", func(t *testing.T) {
+		if err := store.WriteNodeFrontmatter(newRoot()); err != nil {
+			t.Fatalf("expected nil, got %v", err)
+		}
+	})
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-
-	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: root}
-	mustWriteFile(t, filepath.Join(tmp, "root", "p.md"), "# x", 0o644)
-
-	r1, err := store.resolveNode(page)
-	if err != nil {
-		t.Fatalf("resolveNode(page): %v", err)
-	}
-	if r1.Kind != NodeKindPage || !r1.HasContent || !strings.HasSuffix(r1.FilePath, "p.md") {
-		t.Fatalf("unexpected resolved: %#v", r1)
-	}
-
-	sec := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
-	secDir := filepath.Join(tmp, "root", "docs")
-	mustMkdir(t, secDir)
-
-	r2, err := store.resolveNode(sec)
-	if err != nil {
-		t.Fatalf("resolveNode(sec without index): %v", err)
-	}
-	if r2.Kind != NodeKindSection || r2.HasContent {
-		t.Fatalf("expected section without content: %#v", r2)
-	}
-
-	mustWriteFile(t, filepath.Join(secDir, "index.md"), "# idx", 0o644)
-	r3, err := store.resolveNode(sec)
-	if err != nil {
-		t.Fatalf("resolveNode(sec with index): %v", err)
-	}
-	if r3.Kind != NodeKindSection || !r3.HasContent || !strings.HasSuffix(r3.FilePath, "index.md") {
-		t.Fatalf("unexpected resolved: %#v", r3)
-	}
+	t.Run("page missing file is drift", func(t *testing.T) {
+		err := store.WriteNodeFrontmatter(page)
+		if err == nil {
+			t.Fatalf("expected DriftError")
+		}
+		var de *DriftError
+		if !errors.As(err, &de) {
+			t.Fatalf("expected DriftError, got %T: %v", err, err)
+		}
+	})
 }
 
 func TestNodeStore_ConvertNode_PageToSection_MovesToIndex(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	entry := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: root}
+	root := newRoot()
+	entry := newPage("p1", "p", "P", root)
 
 	file := filepath.Join(tmp, "root", "p.md")
 	mustWriteFile(t, file, "# hi", 0o644)
@@ -553,86 +671,99 @@ func TestNodeStore_ConvertNode_PageToSection_MovesToIndex(t *testing.T) {
 	}
 }
 
-func TestNodeStore_ConvertNode_SectionToPage_RejectsNonEmptyFolder(t *testing.T) {
+func TestNodeStore_ConvertNode_SectionToPage(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	entry := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	root := newRoot()
 
-	dir := filepath.Join(tmp, "root", "docs")
-	mustMkdir(t, dir)
-	mustWriteFile(t, filepath.Join(dir, "index.md"), "# idx", 0o644)
-	mustWriteFile(t, filepath.Join(dir, "other.txt"), "nope", 0o644)
+	t.Run("rejects non-empty folder", func(t *testing.T) {
+		entry := newSection("s1", "docs", "Docs", root)
 
-	err := store.ConvertNode(entry, NodeKindPage)
-	if err == nil {
-		t.Fatalf("expected ConvertNotAllowedError")
-	}
-	var cna *ConvertNotAllowedError
-	if !errors.As(err, &cna) {
-		t.Fatalf("expected ConvertNotAllowedError, got %T: %v", err, err)
-	}
+		dir := filepath.Join(tmp, "root", "docs")
+		mustMkdir(t, dir)
+		mustWriteFile(t, filepath.Join(dir, "index.md"), "# idx", 0o644)
+		mustWriteFile(t, filepath.Join(dir, "other.txt"), "nope", 0o644)
+
+		err := store.ConvertNode(entry, NodeKindPage)
+		if err == nil {
+			t.Fatalf("expected ConvertNotAllowedError")
+		}
+		var cna *ConvertNotAllowedError
+		if !errors.As(err, &cna) {
+			t.Fatalf("expected ConvertNotAllowedError, got %T: %v", err, err)
+		}
+	})
+
+	t.Run("with index moves and removes folder", func(t *testing.T) {
+		tmp2 := t.TempDir()
+		store2 := NewNodeStore(tmp2)
+		root2 := newRoot()
+		entry := newSection("s1", "docs", "Docs", root2)
+
+		dir := filepath.Join(tmp2, "root", "docs")
+		mustMkdir(t, dir)
+		mustWriteFile(t, filepath.Join(dir, "index.md"), "# idx", 0o644)
+
+		if err := store2.ConvertNode(entry, NodeKindPage); err != nil {
+			t.Fatalf("ConvertNode(section->page): %v", err)
+		}
+
+		pageFile := filepath.Join(tmp2, "root", "docs.md")
+		if _, err := os.Stat(pageFile); err != nil {
+			t.Fatalf("expected page file: %v", err)
+		}
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Fatalf("expected folder removed")
+		}
+	})
+
+	t.Run("no index creates empty page with frontmatter", func(t *testing.T) {
+		tmp2 := t.TempDir()
+		store2 := NewNodeStore(tmp2)
+		root2 := newRoot()
+		entry := newSection("s1", "docs", "Docs", root2)
+
+		dir := filepath.Join(tmp2, "root", "docs")
+		mustMkdir(t, dir)
+
+		if err := store2.ConvertNode(entry, NodeKindPage); err != nil {
+			t.Fatalf("ConvertNode(section->page no index): %v", err)
+		}
+
+		pageFile := filepath.Join(tmp2, "root", "docs.md")
+		raw := string(mustRead(t, pageFile))
+		fm, _, has, err := markdown.ParseFrontmatter(raw)
+		if err != nil {
+			t.Fatalf("ParseFrontmatter: %v", err)
+		}
+		if !has || fm.LeafWikiID != "s1" || fm.LeafWikiTitle != "Docs" {
+			t.Fatalf("unexpected fm: %#v", fm)
+		}
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Fatalf("expected folder removed")
+		}
+	})
 }
 
-func TestNodeStore_ConvertNode_SectionToPage_WithIndex_MovesAndRemovesFolder(t *testing.T) {
+func TestNodeStore_ConvertNode_Guards(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	entry := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
-
-	dir := filepath.Join(tmp, "root", "docs")
-	mustMkdir(t, dir)
-	mustWriteFile(t, filepath.Join(dir, "index.md"), "# idx", 0o644)
-
-	if err := store.ConvertNode(entry, NodeKindPage); err != nil {
-		t.Fatalf("ConvertNode(section->page): %v", err)
+	tests := []struct {
+		name   string
+		entry  *PageNode
+		target NodeKind
+	}{
+		{name: "entry required", entry: nil, target: NodeKindPage},
+		{name: "unknown target kind", entry: newRoot(), target: NodeKind("weird")},
 	}
 
-	pageFile := filepath.Join(tmp, "root", "docs.md")
-	if _, err := os.Stat(pageFile); err != nil {
-		t.Fatalf("expected page file: %v", err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := store.ConvertNode(tc.entry, tc.target); err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+		})
 	}
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Fatalf("expected folder removed")
-	}
-}
-
-func TestNodeStore_ConvertNode_SectionToPage_NoIndex_CreatesEmptyPageWithFM(t *testing.T) {
-	tmp := t.TempDir()
-	store := NewNodeStore(tmp)
-
-	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	entry := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
-
-	dir := filepath.Join(tmp, "root", "docs")
-	mustMkdir(t, dir)
-	// empty folder, no index.md
-
-	if err := store.ConvertNode(entry, NodeKindPage); err != nil {
-		t.Fatalf("ConvertNode(section->page no index): %v", err)
-	}
-
-	pageFile := filepath.Join(tmp, "root", "docs.md")
-	raw := string(mustRead(t, pageFile))
-	fm, _, has, err := markdown.ParseFrontmatter(raw)
-	if err != nil {
-		t.Fatalf("ParseFrontmatter: %v", err)
-	}
-	if !has || fm.LeafWikiID != "s1" || fm.LeafWikiTitle != "Docs" {
-		t.Fatalf("unexpected fm: %#v", fm)
-	}
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Fatalf("expected folder removed")
-	}
-}
-
-func mustRead(t *testing.T, path string) []byte {
-	t.Helper()
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
-	}
-	return b
 }
