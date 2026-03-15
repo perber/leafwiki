@@ -104,7 +104,7 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 				continue
 			}
 			body := mdFile.GetContent()
-			if _, err := e.wiki.UpdatePage(userID, page.ID, page.Title, page.Slug, &body, &page.Kind); err != nil {
+			if _, err := e.wiki.UpdatePage(userID, page.ID, page.Title, page.Slug, &body, nil); err != nil {
 				errMsg := err.Error()
 				execItem.Action = ExecutionActionSkipped
 				execItem.Error = &errMsg
