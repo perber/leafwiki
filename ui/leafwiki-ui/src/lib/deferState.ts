@@ -1,3 +1,3 @@
 export function deferStateUpdate(fn: () => void) {
-  queueMicrotask(fn)
+  Promise.resolve().then(fn)
 }
