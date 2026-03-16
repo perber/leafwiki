@@ -1,9 +1,9 @@
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { deferStateUpdate } from '@/lib/deferState'
@@ -15,8 +15,8 @@ import { File, FolderTree } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-    buildQuickSwitcherItems,
-    searchQuickSwitcherItems,
+  buildQuickSwitcherItems,
+  searchQuickSwitcherItems,
 } from './pageQuickSwitcher'
 
 export function PageQuickSwitcherDialog() {
@@ -78,7 +78,7 @@ export function PageQuickSwitcherDialog() {
         if (!open) queueMicrotask(() => closeDialog())
       }}
     >
-      <DialogContent className="gap-0 p-0 sm:max-w-2xl max-h-[85dvh] overflow-hidden">
+      <DialogContent className="max-h-[85dvh] gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="border-b px-4 pt-4 pb-3">
           <DialogTitle>Go to page</DialogTitle>
           <DialogDescription>
@@ -86,7 +86,7 @@ export function PageQuickSwitcherDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-4 py-3 border-b">
+        <div className="border-b px-4 py-3">
           <Input
             ref={inputRef}
             defaultValue=""
