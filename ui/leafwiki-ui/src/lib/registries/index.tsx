@@ -2,6 +2,7 @@
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
 import { ImagePreviewDialog } from '@/features/imagepreview/ImagePreviewDialog'
+import { PageQuickSwitcherDialog } from '@/features/page-switcher/PageQuickSwitcherDialog'
 import { AddPageDialog } from '@/features/page/AddPageDialog'
 import { CopyPageDialog } from '@/features/page/CopyPageDialog'
 import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
@@ -64,6 +65,7 @@ export const DIALOG_CHANGE_USER_PASSWORD = 'change-user-password'
 export const DIALOG_DELETE_USER_CONFIRMATION = 'delete-user-confirmation'
 export const DIALOG_UNSAVED_CHANGES = 'unsaved-changes'
 export const DIALOG_IMAGE_PREVIEW = 'image-preview'
+export const DIALOG_PAGE_QUICK_SWITCHER = 'page-quick-switcher'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -225,5 +227,12 @@ dialogRegistry.register({
         {...(props as React.ComponentProps<typeof ImagePreviewDialog>)}
       />
     )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_PAGE_QUICK_SWITCHER,
+  render: () => {
+    return <PageQuickSwitcherDialog key={DIALOG_PAGE_QUICK_SWITCHER} />
   },
 })

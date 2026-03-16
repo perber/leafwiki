@@ -22,7 +22,11 @@ export function HotKeyHandler() {
 
       // Open print Dialog!
       // It is a hotfix, because for some reason the layout is looking different when the browser is opening the printdialog!
-      const isPrint = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p'
+      const isPrint =
+        (e.ctrlKey || e.metaKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        e.key.toLowerCase() === 'p'
       if (isPrint) {
         window.print()
         e.preventDefault()
