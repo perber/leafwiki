@@ -48,8 +48,7 @@ export function buildQuickSwitcherItems(
   return items
 }
 
-function scoreItem(item: QuickSwitcherItem, rawQuery: string) {
-  const query = normalize(rawQuery)
+function scoreItem(item: QuickSwitcherItem, query: string) {
   if (!query) return 0
 
   const title = normalize(item.title)
