@@ -1,14 +1,13 @@
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { deferStateUpdate } from '@/lib/deferState'
 import { DIALOG_PAGE_QUICK_SWITCHER } from '@/lib/registries'
-import { useIsMobile } from '@/lib/useIsMobile'
 import { cn } from '@/lib/utils'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
@@ -16,13 +15,12 @@ import { File, FolderTree } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  buildQuickSwitcherItems,
-  searchQuickSwitcherItems,
+    buildQuickSwitcherItems,
+    searchQuickSwitcherItems,
 } from './pageQuickSwitcher'
 
 export function PageQuickSwitcherDialog() {
   const navigate = useNavigate()
-  const isMobile = useIsMobile()
   const closeDialog = useDialogsStore((state) => state.closeDialog)
   const isOpen = useDialogsStore(
     (state) => state.dialogType === DIALOG_PAGE_QUICK_SWITCHER,
@@ -80,13 +78,7 @@ export function PageQuickSwitcherDialog() {
         if (!open) queueMicrotask(() => closeDialog())
       }}
     >
-      <DialogContent
-        className={cn(
-          'gap-3 p-0 sm:max-w-2xl',
-          isMobile &&
-            'top-2 left-2 h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none translate-x-0 translate-y-0 rounded-lg',
-        )}
-      >
+      <DialogContent className="gap-0 p-0 sm:max-w-2xl max-h-[85dvh] overflow-hidden">
         <DialogHeader className="border-b px-4 pt-4 pb-3">
           <DialogTitle>Go to page</DialogTitle>
           <DialogDescription>
@@ -94,7 +86,7 @@ export function PageQuickSwitcherDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-4">
+        <div className="px-4 py-3 border-b">
           <Input
             ref={inputRef}
             defaultValue=""
@@ -134,7 +126,7 @@ export function PageQuickSwitcherDialog() {
           />
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto px-2 pb-2 max-md:max-h-none">
+        <div className="max-h-[70dvh] overflow-y-auto px-2 pb-2">
           {results.length === 0 ? (
             <div className="text-muted-foreground px-2 py-6 text-sm">
               No matching page found.
