@@ -29,7 +29,9 @@ export async function refreshAfterPageRefactor({
   await useTreeStore.getState().reloadTree()
 
   const currentViewerPage = useViewerStore.getState().page
-  const normalizedCurrentPath = normalizeRoutePath(currentViewerPage?.path || '')
+  const normalizedCurrentPath = normalizeRoutePath(
+    currentViewerPage?.path || '',
+  )
   const normalizedRoutePath = normalizeRoutePath(currentPath)
   const isViewingMovedPage =
     normalizedCurrentPath === preview.oldPath ||

@@ -15,9 +15,7 @@ export function PageRefactorDialog({
 }: PageRefactorDialogProps) {
   const previewWarnings = preview.warnings ?? []
   const defaultRewriteLinks = preview.counts.matchedLinks > 0
-  const [rewriteLinks, setRewriteLinks] = useState(
-    defaultRewriteLinks,
-  )
+  const [rewriteLinks, setRewriteLinks] = useState(defaultRewriteLinks)
   const resolvedRef = useRef(false)
 
   const resolveOnce = (value: boolean | null) => {

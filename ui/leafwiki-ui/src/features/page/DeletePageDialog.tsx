@@ -46,9 +46,7 @@ export function DeletePageDialog({
       } catch (err) {
         if (cancelled) return
         const message =
-          err instanceof Error
-            ? err.message
-            : 'Failed to load page references'
+          err instanceof Error ? err.message : 'Failed to load page references'
         setBacklinksError(message)
         setBacklinks([])
       } finally {
@@ -166,18 +164,18 @@ export function DeletePageDialog({
           </p>
         )}
 
-      {hasChildren && (
-        <div className="delete-page-dialog__recursive">
-          <label className="delete-page-dialog__recursive-label">
-            <Checkbox
-              data-testid="delete-page-dialog-recursive-delete-checkbox"
-              checked={deleteRecursive}
-              onCheckedChange={(val) => setDeleteRecursive(!!val)}
-            />
-            Also delete all subpages
-          </label>
-        </div>
-      )}
+        {hasChildren && (
+          <div className="delete-page-dialog__recursive">
+            <label className="delete-page-dialog__recursive-label">
+              <Checkbox
+                data-testid="delete-page-dialog-recursive-delete-checkbox"
+                checked={deleteRecursive}
+                onCheckedChange={(val) => setDeleteRecursive(!!val)}
+              />
+              Also delete all subpages
+            </label>
+          </div>
+        )}
       </div>
     </BaseDialog>
   )

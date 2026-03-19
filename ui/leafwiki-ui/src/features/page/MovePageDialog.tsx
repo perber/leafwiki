@@ -1,5 +1,9 @@
 import BaseDialog from '@/components/BaseDialog'
-import { applyPageRefactor, PageNode, previewPageRefactor } from '@/lib/api/pages'
+import {
+  applyPageRefactor,
+  PageNode,
+  previewPageRefactor,
+} from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_MOVE_PAGE } from '@/lib/registries'
 import { useTreeStore } from '@/stores/tree'
