@@ -66,6 +66,12 @@ export function PageQuickSwitcherDialog() {
 
   useEffect(() => {
     resultRefs.current = resultRefs.current.slice(0, results.length)
+    setActiveIndex((prev) => {
+      if (results.length === 0) {
+        return 0
+      }
+      return Math.min(prev, results.length - 1)
+    })
   }, [results])
 
   useEffect(() => {
