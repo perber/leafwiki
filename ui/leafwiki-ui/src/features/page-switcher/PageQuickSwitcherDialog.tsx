@@ -111,8 +111,14 @@ export function PageQuickSwitcherDialog() {
             defaultValue=""
             placeholder="Type a page title…"
             aria-label="Search pages"
-            aria-activedescendant={results[activeIndex]?.id}
-            aria-controls="page-quick-switcher-results"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-activedescendant={
+              results.length > 0 ? results[activeIndex]?.id : undefined
+            }
+            aria-controls={
+              results.length > 0 ? 'page-quick-switcher-results' : undefined
+            }
             aria-expanded={results.length > 0}
             aria-autocomplete="list"
             onChange={(e) => {
