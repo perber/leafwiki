@@ -279,6 +279,39 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 	return outgoings, nil
 }
 
+func (s *LinksStore) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorLinkMatch, error) {
+	rows, err := s.db.Query(`
+		SELECT from_page_id, from_title, to_path, broken
+		FROM links
+		WHERE to_path = ? OR to_path LIKE ?
+		ORDER BY from_title, to_path
+	`, oldPrefix, oldPrefix+"/%")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Default().Error("could not close rows", "error", err)
+		}
+	}()
+
+	var matches []RefactorLinkMatch
+	for rows.Next() {
+		var match RefactorLinkMatch
+		var brokenInt int
+		if err := rows.Scan(&match.FromPageID, &match.FromTitle, &match.ToPath, &brokenInt); err != nil {
+			return nil, err
+		}
+		match.Broken = brokenInt == 1
+		matches = append(matches, match)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return matches, nil
+}
+
 func (s *LinksStore) GetBrokenIncomingForPath(toPath string) ([]Backlink, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -334,11 +367,17 @@ func (s *LinksStore) HealLinksForPath(toPath string, pageID string) error {
 }
 
 func (s *LinksStore) Clear() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	_, err := s.db.Exec(`DELETE FROM links`)
 	return err
 }
 
 func (s *LinksStore) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.db != nil {
 		err := s.db.Close()
 		if err != nil {
