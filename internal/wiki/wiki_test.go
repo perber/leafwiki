@@ -175,6 +175,224 @@ func TestWiki_MovePage_Valid(t *testing.T) {
 	}
 }
 
+func TestWiki_PreviewPageRefactor_RenameListsAffectedPages(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	target, _ := w.CreatePage("system", nil, "Target", "target", pageNodeKind())
+	ref, _ := w.CreatePage("system", nil, "Ref", "ref", pageNodeKind())
+	content := "[Target](/target)"
+	if _, err := w.UpdatePage("system", ref.ID, ref.Title, ref.Slug, &content, pageNodeKind()); err != nil {
+		t.Fatalf("UpdatePage failed: %v", err)
+	}
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
+	}
+
+	preview, err := w.PreviewPageRefactor(target.ID, PageRefactorPreviewRequest{
+		Kind:  PageRefactorKindRename,
+		Title: target.Title,
+		Slug:  "target-renamed",
+	})
+	if err != nil {
+		t.Fatalf("PreviewPageRefactor failed: %v", err)
+	}
+
+	if preview.OldPath != "/target" {
+		t.Fatalf("OldPath = %q, want %q", preview.OldPath, "/target")
+	}
+	if preview.NewPath != "/target-renamed" {
+		t.Fatalf("NewPath = %q, want %q", preview.NewPath, "/target-renamed")
+	}
+	if preview.Counts.AffectedPages != 1 {
+		t.Fatalf("AffectedPages = %d, want 1", preview.Counts.AffectedPages)
+	}
+	if len(preview.AffectedPages) != 1 {
+		t.Fatalf("expected 1 affected page, got %d", len(preview.AffectedPages))
+	}
+	if preview.AffectedPages[0].FromPageID != ref.ID {
+		t.Fatalf("FromPageID = %q, want %q", preview.AffectedPages[0].FromPageID, ref.ID)
+	}
+}
+
+func TestWiki_ApplyPageRefactor_RenameRewritesIncomingLinks(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	target, _ := w.CreatePage("system", nil, "Target", "target", pageNodeKind())
+	ref, _ := w.CreatePage("system", nil, "Ref", "ref", pageNodeKind())
+	content := "[Target](/target)"
+	if _, err := w.UpdatePage("system", ref.ID, ref.Title, ref.Slug, &content, pageNodeKind()); err != nil {
+		t.Fatalf("UpdatePage failed: %v", err)
+	}
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
+	}
+
+	updated, err := w.ApplyPageRefactor("system", target.ID, ApplyPageRefactorRequest{
+		PageRefactorPreviewRequest: PageRefactorPreviewRequest{
+			Kind:    PageRefactorKindRename,
+			Title:   "Target Renamed",
+			Slug:    "target-renamed",
+			Content: &target.Content,
+		},
+		RewriteLinks: true,
+	})
+	if err != nil {
+		t.Fatalf("ApplyPageRefactor failed: %v", err)
+	}
+
+	if updated.CalculatePath() != "/target-renamed" {
+		t.Fatalf("updated path mismatch: %q", updated.CalculatePath())
+	}
+
+	refPage, err := w.GetPage(ref.ID)
+	if err != nil {
+		t.Fatalf("GetPage(ref) failed: %v", err)
+	}
+	if refPage.Content != "[Target](/target-renamed)" {
+		t.Fatalf("ref content = %q, want %q", refPage.Content, "[Target](/target-renamed)")
+	}
+
+	outgoing, err := w.GetOutgoingLinks(ref.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks failed: %v", err)
+	}
+	if outgoing.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d", outgoing.Count)
+	}
+	if outgoing.Outgoings[0].ToPath != "/target-renamed" {
+		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "/target-renamed")
+	}
+	if outgoing.Outgoings[0].Broken {
+		t.Fatalf("expected rewritten link to be healed")
+	}
+}
+
+func TestWiki_PreviewPageRefactor_UsesEmptyWarningArrays(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	page, _ := w.CreatePage("system", nil, "Target", "target", pageNodeKind())
+
+	preview, err := w.PreviewPageRefactor(page.ID, PageRefactorPreviewRequest{
+		Kind:  PageRefactorKindRename,
+		Title: page.Title,
+		Slug:  "target-renamed",
+	})
+	if err != nil {
+		t.Fatalf("PreviewPageRefactor failed: %v", err)
+	}
+
+	if preview.Warnings == nil {
+		t.Fatalf("expected preview warnings to be an empty slice, got nil")
+	}
+	if len(preview.Warnings) != 0 {
+		t.Fatalf("expected no preview warnings, got %d", len(preview.Warnings))
+	}
+	for i, affected := range preview.AffectedPages {
+		if affected.Warnings == nil {
+			t.Fatalf("affected page %d warnings should be empty slice, got nil", i)
+		}
+		if affected.MatchedPaths == nil {
+			t.Fatalf("affected page %d matched paths should be empty slice, got nil", i)
+		}
+	}
+}
+
+func TestWiki_PreviewPageRefactor_Move_ExcludesMovedSubtreeFromOptionalAffectedPages(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	docs, _ := w.CreatePage("system", nil, "Docs", "docs", pageNodeKind())
+	pageA, _ := w.CreatePage("system", &docs.ID, "Page A", "page-a", pageNodeKind())
+	pageB, _ := w.CreatePage("system", &docs.ID, "Page B", "page-b", pageNodeKind())
+	archive, _ := w.CreatePage("system", nil, "Archive", "archive", pageNodeKind())
+
+	contentA := "[To B](../page-b)"
+	if _, err := w.UpdatePage("system", pageA.ID, pageA.Title, pageA.Slug, &contentA, pageNodeKind()); err != nil {
+		t.Fatalf("UpdatePage(pageA) failed: %v", err)
+	}
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
+	}
+
+	preview, err := w.PreviewPageRefactor(pageA.ID, PageRefactorPreviewRequest{
+		Kind:        PageRefactorKindMove,
+		NewParentID: &archive.ID,
+	})
+	if err != nil {
+		t.Fatalf("PreviewPageRefactor failed: %v", err)
+	}
+
+	if preview.Counts.AffectedPages != 0 {
+		t.Fatalf("expected no optional affected pages, got %d", preview.Counts.AffectedPages)
+	}
+	if len(preview.AffectedPages) != 0 {
+		t.Fatalf("expected no affected pages, got %d", len(preview.AffectedPages))
+	}
+
+	_ = pageB
+}
+
+func TestWiki_ApplyPageRefactor_Move_RewritesRelativeOutgoingLinksInMovedPage(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	docs, _ := w.CreatePage("system", nil, "Docs", "docs", pageNodeKind())
+	pageA, _ := w.CreatePage("system", &docs.ID, "Page A", "page-a", pageNodeKind())
+	pageB, _ := w.CreatePage("system", &docs.ID, "Page B", "page-b", pageNodeKind())
+	archive, _ := w.CreatePage("system", nil, "Archive", "archive", pageNodeKind())
+
+	contentA := "[To B](../page-b)"
+	if _, err := w.UpdatePage("system", pageA.ID, pageA.Title, pageA.Slug, &contentA, pageNodeKind()); err != nil {
+		t.Fatalf("UpdatePage(pageA) failed: %v", err)
+	}
+	if err := w.ReindexLinks(); err != nil {
+		t.Fatalf("ReindexLinks failed: %v", err)
+	}
+
+	updated, err := w.ApplyPageRefactor("system", pageA.ID, ApplyPageRefactorRequest{
+		PageRefactorPreviewRequest: PageRefactorPreviewRequest{
+			Kind:        PageRefactorKindMove,
+			NewParentID: &archive.ID,
+		},
+		RewriteLinks: false,
+	})
+	if err != nil {
+		t.Fatalf("ApplyPageRefactor(move) failed: %v", err)
+	}
+
+	if updated.CalculatePath() != "/archive/page-a" {
+		t.Fatalf("updated path = %q, want %q", updated.CalculatePath(), "/archive/page-a")
+	}
+
+	movedPage, err := w.GetPage(pageA.ID)
+	if err != nil {
+		t.Fatalf("GetPage(pageA) failed: %v", err)
+	}
+	if movedPage.Content != "[To B](../../docs/page-b)" {
+		t.Fatalf("moved page content = %q, want %q", movedPage.Content, "[To B](../../docs/page-b)")
+	}
+
+	outgoing, err := w.GetOutgoingLinks(pageA.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(pageA) failed: %v", err)
+	}
+	if outgoing.Count != 1 {
+		t.Fatalf("expected 1 outgoing link, got %d", outgoing.Count)
+	}
+	if outgoing.Outgoings[0].ToPageID != pageB.ID {
+		t.Fatalf("ToPageID = %q, want %q", outgoing.Outgoings[0].ToPageID, pageB.ID)
+	}
+	if outgoing.Outgoings[0].ToPath != "/docs/page-b" {
+		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "/docs/page-b")
+	}
+	if outgoing.Outgoings[0].Broken {
+		t.Fatalf("expected outgoing link to remain valid after move refactor")
+	}
+}
+
 func TestWiki_DeletePage_Simple(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
