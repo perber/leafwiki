@@ -33,6 +33,7 @@ export function PageQuickSwitcherDialog() {
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const resultRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const items = useMemo(() => buildQuickSwitcherItems(tree), [tree])
   const results = useMemo(
@@ -63,6 +64,18 @@ export function PageQuickSwitcherDialog() {
     })
   }, [query])
 
+  useEffect(() => {
+    resultRefs.current = resultRefs.current.slice(0, results.length)
+  }, [results])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    resultRefs.current[activeIndex]?.scrollIntoView({
+      block: 'nearest',
+    })
+  }, [activeIndex, isOpen, results])
+
   const openResult = (path: string) => {
     queueMicrotask(() => {
       openAncestorsForPath(path)
@@ -92,6 +105,10 @@ export function PageQuickSwitcherDialog() {
             defaultValue=""
             placeholder="Type a page title…"
             aria-label="Search pages"
+            aria-activedescendant={results[activeIndex]?.id}
+            aria-controls="page-quick-switcher-results"
+            aria-expanded={results.length > 0}
+            aria-autocomplete="list"
             onChange={(e) => {
               const nextValue = e.target.value
               deferStateUpdate(() => {
@@ -126,13 +143,18 @@ export function PageQuickSwitcherDialog() {
           />
         </div>
 
-        <div className="max-h-[70dvh] overflow-y-auto px-2 pb-2">
+        <div className="custom-scrollbar max-h-[70dvh] overflow-y-auto px-2 pb-2">
           {results.length === 0 ? (
             <div className="text-muted-foreground px-2 py-6 text-sm">
               No matching page found.
             </div>
           ) : (
-            <ul className="space-y-1">
+            <ul
+              id="page-quick-switcher-results"
+              role="listbox"
+              aria-label="Matching pages"
+              className="space-y-1"
+            >
               {results.map((item, index) => {
                 const active = index === activeIndex
                 const Icon = item.kind === 'section' ? FolderTree : File
@@ -140,7 +162,14 @@ export function PageQuickSwitcherDialog() {
                 return (
                   <li key={item.id}>
                     <button
+                      id={item.id}
+                      ref={(element) => {
+                        resultRefs.current[index] = element
+                      }}
                       type="button"
+                      role="option"
+                      aria-selected={active}
+                      tabIndex={-1}
                       className={cn(
                         'flex w-full items-start gap-3 rounded-md px-3 py-2 text-left',
                         active
