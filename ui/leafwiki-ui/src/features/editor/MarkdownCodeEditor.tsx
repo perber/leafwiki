@@ -1,3 +1,4 @@
+import { autocompletion } from '@codemirror/autocomplete'
 import {
   defaultKeymap,
   history,
@@ -12,6 +13,10 @@ import { githubLight } from '@fsegurai/codemirror-theme-github-light'
 import { useEffect, useRef, useState } from 'react'
 import { useDesignModeStore } from '../designtoggle/designmode'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
+import {
+  InternalLinkCompletion,
+  internalLinkCompletionSource,
+} from './internalLinkCompletion'
 
 type MarkdownCodeEditorProps = {
   initialValue: string
@@ -110,6 +115,23 @@ export default function MarkdownCodeEditor({
       extensions: [
         themeCompartment.of(designMode === 'light' ? githubLight : oneDark),
         markdown(),
+        autocompletion({
+          override: [internalLinkCompletionSource],
+          icons: false,
+          optionClass: () => 'cm-internal-link-option',
+          addToOptions: [
+            {
+              render: (completion) => {
+                const option = completion as InternalLinkCompletion
+                const path = document.createElement('div')
+                path.className = 'cm-internal-link-option__path'
+                path.textContent = `/${option.path}`
+                return path
+              },
+              position: 79,
+            },
+          ],
+        }),
         history(),
         keymap.of([
           ...customShortcuts,

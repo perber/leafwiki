@@ -14,10 +14,7 @@ import { useTreeStore } from '@/stores/tree'
 import { File, FolderTree } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  buildQuickSwitcherItems,
-  searchQuickSwitcherItems,
-} from './pageQuickSwitcher'
+import { searchQuickSwitcherItems } from './pageQuickSwitcher'
 
 export function PageQuickSwitcherDialog() {
   const navigate = useNavigate()
@@ -25,7 +22,7 @@ export function PageQuickSwitcherDialog() {
   const isOpen = useDialogsStore(
     (state) => state.dialogType === DIALOG_PAGE_QUICK_SWITCHER,
   )
-  const tree = useTreeStore((state) => state.tree)
+  const items = useTreeStore((state) => state.flatPages)
   const openAncestorsForPath = useTreeStore(
     (state) => state.openAncestorsForPath,
   )
@@ -35,7 +32,6 @@ export function PageQuickSwitcherDialog() {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const resultRefs = useRef<(HTMLButtonElement | null)[]>([])
 
-  const items = useMemo(() => buildQuickSwitcherItems(tree), [tree])
   const results = useMemo(
     () => searchQuickSwitcherItems(items, query, 20),
     [items, query],

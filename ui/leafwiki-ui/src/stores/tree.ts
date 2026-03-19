@@ -1,4 +1,5 @@
 import { fetchTree, PageNode } from '@/lib/api/pages'
+import { FlatPageSearchItem, buildFlatPageSearchItems } from '@/lib/pageSearch'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
@@ -65,6 +66,7 @@ type TreeStore = {
   openNodeIdSet: Record<string, true>
   byPath: Record<string, PageNode>
   byId: Record<string, PageNode>
+  flatPages: FlatPageSearchItem[]
 }
 export const useTreeStore = create<TreeStore>()(
   persist(
@@ -76,6 +78,7 @@ export const useTreeStore = create<TreeStore>()(
       openNodeIdSet: {},
       byPath: {},
       byId: {},
+      flatPages: [],
       expandAll: () => {
         const tree = get().tree
         const ids = collectExpandableNodeIds(tree)
@@ -147,8 +150,15 @@ export const useTreeStore = create<TreeStore>()(
           const tree = await fetchTree()
           assignParentIds(tree)
           const { byPath, byId } = buildIndexes(tree)
+          const flatPages = buildFlatPageSearchItems(tree)
           const persistedOpen = get().openNodeIds
-          set({ tree, byPath, byId, openNodeIdSet: toSetRecord(persistedOpen) })
+          set({
+            tree,
+            byPath,
+            byId,
+            flatPages,
+            openNodeIdSet: toSetRecord(persistedOpen),
+          })
           // FIXME: a better error handling is required here
         } catch (err: unknown) {
           if (err instanceof Error) {
