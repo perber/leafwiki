@@ -9,13 +9,15 @@ interface ViewerState {
   error: string | null
   page: Page | null
   setError: (error: string | null) => void
-  loadPageData?: (path: string) => Promise<void>
+  clear: () => void
+  loadPageData: (path: string) => Promise<void>
 }
 
 export const useViewerStore = create<ViewerState>((set) => ({
   error: null,
   page: null,
   setError: (error) => set({ error }),
+  clear: () => set({ error: null, page: null }),
   loadPageData: async (path: string) => {
     useProgressbarStore.getState().setLoading(true)
     set({ error: null })

@@ -46,6 +46,26 @@ With both: [Both](/docs/page5?foo=bar#section)
 	}
 }
 
+func TestExtractLinksFromMarkdown_IgnoresAssetDestinations(t *testing.T) {
+	md := `
+Asset absolute: [File](/assets/abc/manual.pdf)
+Asset relative: [Image](assets/abc/picture.png)
+Internal: [Page](/docs/page1)
+`
+
+	links := extractLinksFromMarkdown(md)
+
+	want := []string{"/docs/page1"}
+	if len(links) != len(want) {
+		t.Fatalf("expected %d links, got %d: %#v", len(want), len(links), links)
+	}
+	for i, w := range want {
+		if links[i] != w {
+			t.Fatalf("link[%d] = %q, want %q", i, links[i], w)
+		}
+	}
+}
+
 // helper to create a small tree structure:
 // root
 //
@@ -148,6 +168,24 @@ func TestResolveTargetLinks_ReturnsBrokenTargetsForNonExisting(t *testing.T) {
 	}
 	if targets[1].TargetPagePath != "/docs/unknown" {
 		t.Errorf("targets[1].TargetPagePath = %q, want %q", targets[1].TargetPagePath, "/docs/unknown")
+	}
+}
+
+func TestResolveTargetLinks_IgnoresAssetDestinations(t *testing.T) {
+	ts, page1ID, _ := setupTreeForLinksTest(t)
+
+	page1, err := ts.GetPage(page1ID)
+	if err != nil {
+		t.Fatalf("GetPage(page1) failed: %v", err)
+	}
+
+	targets := resolveTargetLinks(ts, page1.CalculatePath(), []string{
+		"/assets/abc/manual.pdf",
+		"assets/abc/picture.png",
+	})
+
+	if len(targets) != 0 {
+		t.Fatalf("expected asset links to be ignored, got %#v", targets)
 	}
 }
 
@@ -392,6 +430,62 @@ func TestLinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
 
 	if result.Count != 0 {
 		t.Fatalf("expected 0 outgoing links, got %d: %#v", result.Count, result.Outgoings)
+	}
+}
+
+func TestLinkService_IndexAllPages_IgnoresAssetLinksInOutgoingAndBrokenSets(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	aIDPtr, err := ts.CreateNode("system", nil, "Page A", "a", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode a failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	bIDPtr, err := ts.CreateNode("system", nil, "Page B", "b", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode b failed: %v", err)
+	}
+	pageBID := *bIDPtr
+
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage a failed: %v", err)
+	}
+	contentA := "Asset: [Manual](/assets/abc/manual.pdf)\nPage: [Go](/b)"
+	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &contentA); err != nil {
+		t.Fatalf("UpdateNode a failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	outgoing, err := svc.GetOutgoingLinksForPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage failed: %v", err)
+	}
+	if outgoing.Count != 1 {
+		t.Fatalf("expected only wiki links in outgoings, got %d: %#v", outgoing.Count, outgoing.Outgoings)
+	}
+	if outgoing.Outgoings[0].ToPath != "/b" {
+		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "/b")
+	}
+
+	status, err := svc.GetLinkStatusForPage(pageAID, "/a")
+	if err != nil {
+		t.Fatalf("GetLinkStatusForPage failed: %v", err)
+	}
+	if status.Counts.Outgoings != 1 || status.Counts.BrokenOutgoings != 0 {
+		t.Fatalf("unexpected link status counts: %#v", status.Counts)
+	}
+
+	backlinks, err := svc.GetBacklinksForPage(pageBID)
+	if err != nil {
+		t.Fatalf("GetBacklinksForPage failed: %v", err)
+	}
+	if backlinks.Count != 1 {
+		t.Fatalf("expected only page backlink to remain, got %d: %#v", backlinks.Count, backlinks.Backlinks)
 	}
 }
 

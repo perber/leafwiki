@@ -76,6 +76,10 @@ func (b *LinkService) GetOutgoingLinksForPage(pageID string) (*OutgoingResult, e
 	return toOutgoingLinkResult(b.treeService, outgoingLinks), err
 }
 
+func (b *LinkService) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorLinkMatch, error) {
+	return b.store.GetRefactorMatchesForPrefix(oldPrefix)
+}
+
 func (b *LinkService) GetLinkStatusForPage(pageID string, pagePath string) (*LinkStatusResult, error) {
 	pagePath = normalizeWikiPath(pagePath)
 
