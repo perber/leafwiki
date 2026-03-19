@@ -283,7 +283,11 @@ func (s *LinksStore) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorLi
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Default().Error("could not close rows", "error", err)
+		}
+	}()
 
 	var matches []RefactorLinkMatch
 	for rows.Next() {
@@ -357,11 +361,17 @@ func (s *LinksStore) HealLinksForPath(toPath string, pageID string) error {
 }
 
 func (s *LinksStore) Clear() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	_, err := s.db.Exec(`DELETE FROM links`)
 	return err
 }
 
 func (s *LinksStore) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.db != nil {
 		err := s.db.Close()
 		if err != nil {

@@ -256,7 +256,6 @@ func parseInlineLinkOccurrence(content string, start int) (inlineLinkOccurrence,
 		for i < len(content) {
 			if content[i] == '>' {
 				destEnd = i
-				i++
 				break
 			}
 			if content[i] == '\\' {
