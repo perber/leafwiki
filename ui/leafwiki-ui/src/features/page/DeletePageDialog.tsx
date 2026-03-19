@@ -1,11 +1,13 @@
 import BaseDialog from '@/components/BaseDialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { fetchLinkStatus, type Backlink } from '@/lib/api/links'
 import { deletePage, NODE_KIND_PAGE } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_DELETE_PAGE_CONFIRMATION } from '@/lib/registries'
 import { useTreeStore } from '@/stores/tree'
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { AlertTriangle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 export type DeletePageDialogProps = {
@@ -23,7 +25,41 @@ export function DeletePageDialog({
 
   const [loading, setLoading] = useState(false)
   const [deleteRecursive, setDeleteRecursive] = useState(false)
+  const [backlinksLoading, setBacklinksLoading] = useState(false)
+  const [backlinksError, setBacklinksError] = useState<string | null>(null)
+  const [backlinks, setBacklinks] = useState<Backlink[]>([])
   const [, setFieldErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadBacklinks = async () => {
+      setBacklinksLoading(true)
+      setBacklinksError(null)
+
+      try {
+        const status = await fetchLinkStatus(pageId)
+        if (cancelled) return
+        setBacklinks(status.backlinks ?? [])
+      } catch (err) {
+        if (cancelled) return
+        const message =
+          err instanceof Error ? err.message : 'Failed to load page references'
+        setBacklinksError(message)
+        setBacklinks([])
+      } finally {
+        if (!cancelled) {
+          setBacklinksLoading(false)
+        }
+      }
+    }
+
+    void loadBacklinks()
+
+    return () => {
+      cancelled = true
+    }
+  }, [pageId])
 
   if (!page) return null
   const hasChildren = (page.children?.length ?? 0) > 0
@@ -75,18 +111,72 @@ export function DeletePageDialog({
         },
       ]}
     >
-      {hasChildren && (
-        <div className="delete-page-dialog__recursive">
-          <label className="delete-page-dialog__recursive-label">
-            <Checkbox
-              data-testid="delete-page-dialog-recursive-delete-checkbox"
-              checked={deleteRecursive}
-              onCheckedChange={(val) => setDeleteRecursive(!!val)}
-            />{' '}
-            {'Also delete all descendant pages and sections'}
-          </label>
-        </div>
-      )}
+      <div className="space-y-3">
+        {backlinksLoading ? (
+          <p
+            className="text-muted-foreground text-sm"
+            data-testid="delete-page-dialog-backlinks-loading"
+          >
+            Checking which pages reference this page...
+          </p>
+        ) : backlinksError ? (
+          <div
+            className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+            data-testid="delete-page-dialog-backlinks-error"
+          >
+            Could not load page references. Deleting will still work, but link
+            impact could not be shown.
+          </div>
+        ) : backlinks.length > 0 ? (
+          <div
+            className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
+            data-testid="delete-page-dialog-backlinks-warning"
+          >
+            <div className="flex items-start gap-2 font-medium">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                This page is referenced by {backlinks.length} page
+                {backlinks.length === 1 ? '' : 's'}.
+              </span>
+            </div>
+            <p className="mt-2 text-sm">
+              Deleting this page will leave those links broken.
+            </p>
+            <ul
+              className="mt-3 max-h-40 space-y-1 overflow-auto pr-1 text-sm"
+              data-testid="delete-page-dialog-backlinks-list"
+            >
+              {backlinks.map((backlink) => (
+                <li key={backlink.from_page_id}>
+                  <Link className="underline" to={backlink.from_path}>
+                    {backlink.from_title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p
+            className="text-muted-foreground text-sm"
+            data-testid="delete-page-dialog-no-backlinks"
+          >
+            No pages currently reference this page.
+          </p>
+        )}
+
+        {hasChildren && (
+          <div className="delete-page-dialog__recursive">
+            <label className="delete-page-dialog__recursive-label">
+              <Checkbox
+                data-testid="delete-page-dialog-recursive-delete-checkbox"
+                checked={deleteRecursive}
+                onCheckedChange={(val) => setDeleteRecursive(!!val)}
+              />
+              Also delete all subpages
+            </label>
+          </div>
+        )}
+      </div>
     </BaseDialog>
   )
 }

@@ -195,6 +195,8 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.POST("/pages/ensure", auth_middleware.RequireEditorOrAdmin(), api.EnsurePageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/convert/:id", auth_middleware.RequireEditorOrAdmin(), api.ConvertPageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/copy/:id", auth_middleware.RequireEditorOrAdmin(), api.CopyPageHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/:id/refactor/preview", auth_middleware.RequireEditorOrAdmin(), api.PreviewPageRefactorHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/:id/refactor/apply", auth_middleware.RequireEditorOrAdmin(), api.ApplyPageRefactorHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.UpdatePageHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.DeletePageHandler(wikiInstance))
 

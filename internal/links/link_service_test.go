@@ -88,7 +88,6 @@ Internal: [Page](/docs/page1)
 		}
 	}
 }
-
 // helper to create a small tree structure:
 // root
 //
