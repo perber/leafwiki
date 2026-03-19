@@ -40,6 +40,8 @@ export function PageQuickSwitcherDialog() {
     () => searchQuickSwitcherItems(items, query, 20),
     [items, query],
   )
+  const clampedActiveIndex =
+    results.length === 0 ? 0 : Math.min(activeIndex, results.length - 1)
 
   useEffect(() => {
     if (!isOpen) {
@@ -66,21 +68,15 @@ export function PageQuickSwitcherDialog() {
 
   useEffect(() => {
     resultRefs.current = resultRefs.current.slice(0, results.length)
-    setActiveIndex((prev) => {
-      if (results.length === 0) {
-        return 0
-      }
-      return Math.min(prev, results.length - 1)
-    })
   }, [results])
 
   useEffect(() => {
     if (!isOpen) return
 
-    resultRefs.current[activeIndex]?.scrollIntoView({
+    resultRefs.current[clampedActiveIndex]?.scrollIntoView({
       block: 'nearest',
     })
-  }, [activeIndex, isOpen, results])
+  }, [clampedActiveIndex, isOpen, results])
 
   const openResult = (path: string) => {
     queueMicrotask(() => {
@@ -114,7 +110,7 @@ export function PageQuickSwitcherDialog() {
             role="combobox"
             aria-haspopup="listbox"
             aria-activedescendant={
-              results.length > 0 ? results[activeIndex]?.id : undefined
+              results.length > 0 ? results[clampedActiveIndex]?.id : undefined
             }
             aria-controls={
               results.length > 0 ? 'page-quick-switcher-results' : undefined
@@ -145,7 +141,7 @@ export function PageQuickSwitcherDialog() {
               }
 
               if (e.key === 'Enter') {
-                const activeItem = results[activeIndex]
+                const activeItem = results[clampedActiveIndex]
                 if (!activeItem) return
 
                 e.preventDefault()
@@ -168,7 +164,7 @@ export function PageQuickSwitcherDialog() {
               className="space-y-1"
             >
               {results.map((item, index) => {
-                const active = index === activeIndex
+                const active = index === clampedActiveIndex
                 const Icon = item.kind === 'section' ? FolderTree : File
 
                 return (
