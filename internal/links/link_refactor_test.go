@@ -54,3 +54,29 @@ func TestMarkdownRefactorEngine_Rewrite_UsesMovedSourcePathForRelativeLinks(t *t
 		t.Fatalf("expected relative link to be recalculated against moved source path, got %q", result.Content)
 	}
 }
+
+func TestMarkdownRefactorEngine_Rewrite_IgnoresAssetLinks(t *testing.T) {
+	content := `
+[AssetAbs](/assets/abc/manual.pdf)
+[AssetRel](assets/abc/manual.pdf)
+[Wiki](/docs/b)
+`
+
+	result := NewMarkdownRefactorEngine().Rewrite(content, "/docs/a", []RewriteRule{{
+		OldPath: "/docs/b",
+		NewPath: "/guides/b",
+	}})
+
+	if result.Count() != 1 {
+		t.Fatalf("expected only wiki link rewrite, got %d", result.Count())
+	}
+	if !strings.Contains(result.Content, "[AssetAbs](/assets/abc/manual.pdf)") {
+		t.Fatalf("absolute asset link should remain unchanged, got:\n%s", result.Content)
+	}
+	if !strings.Contains(result.Content, "[AssetRel](assets/abc/manual.pdf)") {
+		t.Fatalf("relative asset link should remain unchanged, got:\n%s", result.Content)
+	}
+	if !strings.Contains(result.Content, "[Wiki](/guides/b)") {
+		t.Fatalf("wiki link should be rewritten, got:\n%s", result.Content)
+	}
+}

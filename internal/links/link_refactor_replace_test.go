@@ -75,3 +75,26 @@ func TestMarkdownRefactorEngine_RewriteRelativeLinksForPathChange_UsesFolderSema
 		t.Fatalf("unexpected content: %q", result.Content)
 	}
 }
+
+func TestMarkdownRefactorEngine_RewriteRelativeLinksForPathChange_IgnoresRelativeAssetLinks(t *testing.T) {
+	content := `[Asset](assets/abc/manual.pdf)`
+
+	result := NewMarkdownRefactorEngine().RewriteRelativeLinksForPathChange(
+		content,
+		"/docs/a",
+		"/guides/a",
+		[]RewriteRule{
+			{
+				OldPath: "/docs/a",
+				NewPath: "/guides/a",
+			},
+		},
+	)
+
+	if result.Count() != 0 {
+		t.Fatalf("expected no rewrite for asset link, got %d", result.Count())
+	}
+	if result.Content != content {
+		t.Fatalf("asset link should remain unchanged, got %q", result.Content)
+	}
+}

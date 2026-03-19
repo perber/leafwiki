@@ -396,7 +396,7 @@ func normalizeCandidateDestination(destination string) string {
 
 func rewriteLinkDestination(currentPath string, destination string, rules []RewriteRule) (string, bool, *RewriteWarning) {
 	baseDest, suffix := splitLinkDestination(destination)
-	if baseDest == "" || isExternalLinkDestination(baseDest) {
+	if baseDest == "" || isExternalLinkDestination(baseDest) || isAssetLinkDestination(baseDest) {
 		return destination, false, nil
 	}
 
@@ -434,7 +434,7 @@ func rewriteLinkDestination(currentPath string, destination string, rules []Rewr
 
 func rewriteRelativeLinkForPathChange(oldCurrentPath string, newCurrentPath string, destination string, rules []RewriteRule) (string, bool, *RewriteWarning) {
 	baseDest, suffix := splitLinkDestination(destination)
-	if baseDest == "" || strings.HasPrefix(baseDest, "/") || isExternalLinkDestination(baseDest) {
+	if baseDest == "" || strings.HasPrefix(baseDest, "/") || isExternalLinkDestination(baseDest) || isAssetLinkDestination(baseDest) {
 		return destination, false, nil
 	}
 
