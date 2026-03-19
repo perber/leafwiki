@@ -33,12 +33,15 @@ export function PageQuickSwitcherDialog() {
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const resultRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const items = useMemo(() => buildQuickSwitcherItems(tree), [tree])
   const results = useMemo(
     () => searchQuickSwitcherItems(items, query, 20),
     [items, query],
   )
+  const clampedActiveIndex =
+    results.length === 0 ? 0 : Math.min(activeIndex, results.length - 1)
 
   useEffect(() => {
     if (!isOpen) {
@@ -62,6 +65,18 @@ export function PageQuickSwitcherDialog() {
       setActiveIndex(0)
     })
   }, [query])
+
+  useEffect(() => {
+    resultRefs.current = resultRefs.current.slice(0, results.length)
+  }, [results])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    resultRefs.current[clampedActiveIndex]?.scrollIntoView({
+      block: 'nearest',
+    })
+  }, [clampedActiveIndex, isOpen, results])
 
   const openResult = (path: string) => {
     queueMicrotask(() => {
@@ -92,6 +107,16 @@ export function PageQuickSwitcherDialog() {
             defaultValue=""
             placeholder="Type a page title…"
             aria-label="Search pages"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-activedescendant={
+              results.length > 0 ? results[clampedActiveIndex]?.id : undefined
+            }
+            aria-controls={
+              results.length > 0 ? 'page-quick-switcher-results' : undefined
+            }
+            aria-expanded={results.length > 0}
+            aria-autocomplete="list"
             onChange={(e) => {
               const nextValue = e.target.value
               deferStateUpdate(() => {
@@ -116,7 +141,7 @@ export function PageQuickSwitcherDialog() {
               }
 
               if (e.key === 'Enter') {
-                const activeItem = results[activeIndex]
+                const activeItem = results[clampedActiveIndex]
                 if (!activeItem) return
 
                 e.preventDefault()
@@ -126,21 +151,33 @@ export function PageQuickSwitcherDialog() {
           />
         </div>
 
-        <div className="max-h-[70dvh] overflow-y-auto px-2 pb-2">
+        <div className="custom-scrollbar max-h-[70dvh] overflow-y-auto px-2 pb-2">
           {results.length === 0 ? (
             <div className="text-muted-foreground px-2 py-6 text-sm">
               No matching page found.
             </div>
           ) : (
-            <ul className="space-y-1">
+            <ul
+              id="page-quick-switcher-results"
+              role="listbox"
+              aria-label="Matching pages"
+              className="space-y-1"
+            >
               {results.map((item, index) => {
-                const active = index === activeIndex
+                const active = index === clampedActiveIndex
                 const Icon = item.kind === 'section' ? FolderTree : File
 
                 return (
                   <li key={item.id}>
                     <button
+                      id={item.id}
+                      ref={(element) => {
+                        resultRefs.current[index] = element
+                      }}
                       type="button"
+                      role="option"
+                      aria-selected={active}
+                      tabIndex={-1}
                       className={cn(
                         'flex w-full items-start gap-3 rounded-md px-3 py-2 text-left',
                         active
