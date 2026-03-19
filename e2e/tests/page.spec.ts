@@ -1,10 +1,11 @@
-import test from '@playwright/test';
+import test, { expect } from '@playwright/test';
 import AddPageDialog from '../pages/AddPageDialog';
 import CopyPageDialog from '../pages/CopyPageDialog';
 import CreatePageByPathDialog from '../pages/CreatePageByPathDialog';
 import DeletePageDialog from '../pages/DeletePageDialog';
 import EditPage from '../pages/EditPage';
 import LoginPage from '../pages/LoginPage';
+import MovePageDialog from '../pages/MovePageDialog';
 import NotFoundPage from '../pages/NotFoundPage';
 import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
@@ -244,10 +245,11 @@ graph TD;
 
   // test move
   test('move-page-subpage-to-root-level', async ({ page }) => {
-    const parentTitle = `Move Parent Page ${Date.now()}`;
-    const childTitle = `Child Page of ${parentTitle}`;
+    const stamp = Date.now();
+    const parentTitle = `move-parent-${stamp}`;
+    const siblingTitle = `move-sibling-${stamp}`;
+    const childTitle = `move-child-${stamp}`;
 
-    // Create parent page
     const treeView = new TreeView(page);
     const curNodeCount = await treeView.getNumberOfTreeNodes();
     await treeView.clickRootAddButton();
@@ -257,19 +259,89 @@ graph TD;
     await addPageDialog.submitWithoutRedirect();
 
     await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
-    // Create child page
+    await treeView.createSubPageOfParent(parentTitle, siblingTitle);
     await treeView.createSubPageOfParent(parentTitle, childTitle);
-    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
 
-    // Move child page to root level
-    await treeView.movePageToTopLevel(parentTitle, childTitle);
-    // Verify the move
+    await treeView.expandNodeByTitle(parentTitle);
+    await treeView.clickPageByTitle(childTitle);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent(`[${siblingTitle}](../${siblingTitle})`);
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await treeView.openMoveDialogForPage(parentTitle, childTitle);
+
+    const movePageDialog = new MovePageDialog(page);
+    await movePageDialog.selectNewParentAsTopLevel();
+    await movePageDialog.clickMoveButton();
+    await movePageDialog.expectRefactorDialogHidden();
+    await page.waitForTimeout(5000);
+
     const nodeRow = page
       .locator('div[data-testid^="tree-node-"]')
       .filter({ hasText: childTitle })
       .first();
 
     test.expect(await nodeRow.count()).toBe(1);
+
+    await treeView.clickPageByTitle(childTitle);
+    await page.locator('article').getByRole('link', { name: siblingTitle }).click();
+    await page.waitForURL(new RegExp(`/${parentTitle}/${siblingTitle}$`));
+    await expect(page.locator('article > h1')).toHaveText(siblingTitle);
+  });
+
+  test('move-page-updates-incoming-links-via-refactor-dialog', async ({ page }) => {
+    const stamp = Date.now();
+    const parentTitle = `incoming-parent-${stamp}`;
+    const targetTitle = `incoming-target-${stamp}`;
+    const referrerTitle = `incoming-referrer-${stamp}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(parentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await treeView.createSubPageOfParent(parentTitle, targetTitle);
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
+
+    await treeView.clickRootAddButton();
+    await addPageDialog.fillTitle(referrerTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 3);
+
+    await treeView.clickPageByTitle(referrerTitle);
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent(`[${targetTitle}](/${parentTitle}/${targetTitle})`);
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await treeView.openMoveDialogForPage(parentTitle, targetTitle);
+
+    const movePageDialog = new MovePageDialog(page);
+    await movePageDialog.selectNewParentAsTopLevel();
+    await movePageDialog.clickMoveButton();
+    await movePageDialog.expectRefactorDialogVisible();
+    await movePageDialog.expectAffectedPagesCount(1);
+    await movePageDialog.expectAffectedPageTitle(referrerTitle);
+    await movePageDialog.confirmRefactorDialog();
+    await page.waitForTimeout(5000);
+
+    await treeView.clickPageByTitle(targetTitle);
+    await treeView.clickPageByTitle(referrerTitle);
+    await page.locator('article').getByRole('link', { name: targetTitle }).click();
+    await page.waitForURL(new RegExp(`/${targetTitle}$`));
+    await expect(page.locator('article > h1')).toHaveText(targetTitle);
   });
 
   test('copy-page', async ({ page }) => {
@@ -322,13 +394,55 @@ graph TD;
 
     const deletePageDialog = new DeletePageDialog(page);
     test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.expectNoBacklinksVisible();
     await deletePageDialog.abortDeletion();
     await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
 
     await viewPage.clickDeletePageButton();
     test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.expectNoBacklinksVisible();
     await deletePageDialog.confirmDeletion();
     await treeView.expectNumberOfTreeNodes(curNodeCount);
+  });
+
+  test('delete-page-shows-backlink-warning', async ({ page }) => {
+    const stamp = Date.now();
+    const targetTitle = `delete-target-${stamp}`;
+    const referrerTitle = `delete-referrer-${stamp}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(targetTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+
+    await treeView.clickRootAddButton();
+    await addPageDialog.fillTitle(referrerTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
+
+    await treeView.clickPageByTitle(referrerTitle);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent(`[${targetTitle}](/${targetTitle})`);
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await treeView.clickPageByTitle(targetTitle);
+    await viewPage.clickDeletePageButton();
+
+    const deletePageDialog = new DeletePageDialog(page);
+    test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.expectBacklinksWarningVisible();
+    await deletePageDialog.expectBacklinkTitle(referrerTitle);
+    await deletePageDialog.abortDeletion();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
   });
 
   test('nested-delete-operation', async ({ page }) => {

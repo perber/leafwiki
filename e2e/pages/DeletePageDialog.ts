@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 export default class DeletePageDialog {
   constructor(private page: Page) {}
@@ -36,5 +36,17 @@ export default class DeletePageDialog {
     await deleteButton.click();
     // We will be redirected to another page, so wait a bit
     await this.page.waitForTimeout(1000);
+  }
+
+  async expectBacklinksWarningVisible() {
+    await expect(this.page.getByTestId('delete-page-dialog-backlinks-warning')).toBeVisible();
+  }
+
+  async expectNoBacklinksVisible() {
+    await expect(this.page.getByTestId('delete-page-dialog-no-backlinks')).toBeVisible();
+  }
+
+  async expectBacklinkTitle(title: string) {
+    await expect(this.page.getByTestId('delete-page-dialog-backlinks-list')).toContainText(title);
   }
 }
