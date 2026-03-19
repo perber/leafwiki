@@ -42,6 +42,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const sidebarWidth = useSidebarStore((s) => s.sidebarWidth)
   const setSidebarWidth = useSidebarStore((s) => s.setSidebarWidth)
   const isMobile = useIsMobile()
+  const isPrintCycleRef = useRef(false)
+  const sidebarVisibleBeforePrintRef = useRef<boolean | null>(null)
 
   useAutoCloseSidebarOnMobile()
 
@@ -90,8 +92,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useLayoutEffect(() => {
     // Update sidebar visibility on mobile change
-    if (isMobile) setSidebarVisible(false)
+    if (isMobile && !isPrintCycleRef.current) setSidebarVisible(false)
   }, [isMobile, setSidebarVisible])
+
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      isPrintCycleRef.current = true
+      sidebarVisibleBeforePrintRef.current = sidebarVisible
+    }
+
+    const handleAfterPrint = () => {
+      const sidebarVisibleBeforePrint = sidebarVisibleBeforePrintRef.current
+
+      if (sidebarVisibleBeforePrint !== null) {
+        setSidebarVisible(sidebarVisibleBeforePrint)
+      }
+
+      sidebarVisibleBeforePrintRef.current = null
+
+      requestAnimationFrame(() => {
+        isPrintCycleRef.current = false
+      })
+    }
+
+    window.addEventListener('beforeprint', handleBeforePrint)
+    window.addEventListener('afterprint', handleAfterPrint)
+
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint)
+      window.removeEventListener('afterprint', handleAfterPrint)
+    }
+  }, [setSidebarVisible, sidebarVisible])
 
   useEffect(() => {
     if (!resizing || !resizeHandlerRef.current) return
