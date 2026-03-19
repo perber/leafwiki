@@ -16,10 +16,7 @@ export default class TreeView {
     const pageLink = this.page.locator('a[data-testid^="tree-node-link-"]', {
       hasText: title,
     });
-    return this.page
-      .locator('div[data-testid^="tree-node-"]')
-      .filter({ has: pageLink })
-      .first();
+    return this.page.locator('div[data-testid^="tree-node-"]').filter({ has: pageLink }).first();
   }
 
   async getRootAddButton() {
@@ -41,9 +38,11 @@ export default class TreeView {
   }
 
   async findPageByTitle(title: string) {
-    return this.page.locator('a[data-testid^="tree-node-link-"]', {
-      hasText: title,
-    }).first();
+    return this.page
+      .locator('a[data-testid^="tree-node-link-"]', {
+        hasText: title,
+      })
+      .first();
   }
 
   async clickPageByTitle(title: string) {

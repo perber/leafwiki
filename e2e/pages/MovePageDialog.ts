@@ -47,7 +47,9 @@ export default class MovePageDialog {
 
   async expectAffectedPageTitle(title: string) {
     await expect(
-      this.page.locator('[data-testid="page-refactor-dialog-affected-page"]').filter({ hasText: title }),
+      this.page
+        .locator('[data-testid="page-refactor-dialog-affected-page"]')
+        .filter({ hasText: title }),
     ).toHaveCount(1);
   }
 }

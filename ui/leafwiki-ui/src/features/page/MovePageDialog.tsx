@@ -7,14 +7,13 @@ import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PageSelect } from './PageSelect'
+import { refreshAfterPageRefactor } from './pageMutationRefresh'
 import { confirmPageRefactor } from './pageRefactorDialog'
 
 export function MovePageDialog({ pageId }: { pageId: string }) {
-  const { tree, reloadTree } = useTreeStore()
+  const { tree } = useTreeStore()
   const [loading, setLoading] = useState(false)
   const [, setFieldErrors] = useState<Record<string, string>>({})
-  const getPathById = useTreeStore((s) => s.getPathById)
-  const pagePath = getPathById(pageId) || ''
   // get opened route from react router
   const currentPath = useLocation().pathname
   const navigate = useNavigate()
@@ -58,17 +57,11 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
         parentId: newParentId,
         rewriteLinks,
       })
-      if (`${currentPath}` === `/${pagePath}`) {
-        await reloadTree()
-        const newPath = getPathById(pageId) || ''
-        if (newPath) {
-          navigate(`/${newPath}`)
-        } else {
-          navigate('/')
-        }
-      } else {
-        await reloadTree()
-      }
+      await refreshAfterPageRefactor({
+        preview,
+        currentPath,
+        navigate,
+      })
 
       toast.success('Page moved successfully')
       return true // Close the dialog

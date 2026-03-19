@@ -290,7 +290,7 @@ graph TD;
 
     await treeView.clickPageByTitle(childTitle);
     await page.locator('article').getByRole('link', { name: siblingTitle }).click();
-    await page.waitForURL(new RegExp(`/${parentTitle}/${siblingTitle}$`));
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${parentTitle}/${siblingTitle}`);
     await expect(page.locator('article > h1')).toHaveText(siblingTitle);
   });
 
@@ -337,10 +337,8 @@ graph TD;
     await movePageDialog.confirmRefactorDialog();
     await page.waitForTimeout(5000);
 
-    await treeView.clickPageByTitle(targetTitle);
-    await treeView.clickPageByTitle(referrerTitle);
     await page.locator('article').getByRole('link', { name: targetTitle }).click();
-    await page.waitForURL(new RegExp(`/${targetTitle}$`));
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${targetTitle}`);
     await expect(page.locator('article > h1')).toHaveText(targetTitle);
   });
 
