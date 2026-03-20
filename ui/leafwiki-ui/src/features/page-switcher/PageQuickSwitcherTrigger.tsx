@@ -6,7 +6,9 @@ import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { FileSearch } from 'lucide-react'
 import { useEffect } from 'react'
 
-const isMacOS = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+const isMacOS =
+  typeof navigator !== 'undefined' &&
+  /Mac|iPhone|iPad|iPod/.test(navigator.platform)
 const quickSwitcherHotkeyLabel = isMacOS ? 'Cmd+Option+P' : 'Ctrl+Alt+P'
 
 export function PageQuickSwitcherTrigger() {
