@@ -1,6 +1,7 @@
 // Hotkeys store
 // is used to manage global hotkeys in the application
 
+import { normalizeHotkeyCombo } from '@/lib/hotkeys'
 import { create } from 'zustand'
 
 export type HotKeyDefinition = {
@@ -20,29 +21,38 @@ type HotKeysStore = {
 export const useHotKeysStore = create<HotKeysStore>((set, get) => ({
   registeredHotkeys: {},
   registerHotkey: (hotKeyDefinition: HotKeyDefinition) => {
+    const normalizedKeyCombo = normalizeHotkeyCombo(hotKeyDefinition.keyCombo)
+
     set((state) => {
-      const existingHotkeys =
-        state.registeredHotkeys[hotKeyDefinition.keyCombo] || []
+      const existingHotkeys = state.registeredHotkeys[normalizedKeyCombo] || []
       return {
         registeredHotkeys: {
           ...state.registeredHotkeys,
-          [hotKeyDefinition.keyCombo]: [...existingHotkeys, hotKeyDefinition],
+          [normalizedKeyCombo]: [
+            ...existingHotkeys,
+            {
+              ...hotKeyDefinition,
+              keyCombo: normalizedKeyCombo,
+            },
+          ],
         },
       }
     })
   },
   unregisterHotkey: (keyCombo: string) => {
+    const normalizedKeyCombo = normalizeHotkeyCombo(keyCombo)
+
     set((state) => {
-      const existingHotkeys = state.registeredHotkeys[keyCombo] || []
+      const existingHotkeys = state.registeredHotkeys[normalizedKeyCombo] || []
       if (existingHotkeys.length === 0) {
         return state // No hotkey to unregister
       }
       const updatedHotkeys = existingHotkeys.slice(0, -1) // Remove the last registered hotkey
       const newRegisteredHotkeys = { ...state.registeredHotkeys }
       if (updatedHotkeys.length === 0) {
-        delete newRegisteredHotkeys[keyCombo] // Remove the key if no hotkeys left
+        delete newRegisteredHotkeys[normalizedKeyCombo] // Remove the key if no hotkeys left
       } else {
-        newRegisteredHotkeys[keyCombo] = updatedHotkeys
+        newRegisteredHotkeys[normalizedKeyCombo] = updatedHotkeys
       }
       return {
         registeredHotkeys: newRegisteredHotkeys,

@@ -1,6 +1,7 @@
 // The HotKeyHandler is responsible for handling hotkey events globally in the application.
 // It registers event listeners for keydown events and calls the actions defined in the hotkey map.
 
+import { getHotkeyComboFromEvent } from '@/lib/hotkeys'
 import { useAppMode } from '@/lib/useAppMode'
 import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
@@ -18,8 +19,6 @@ export function HotKeyHandler() {
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      const keyCombo = []
-
       // Open print Dialog!
       // It is a hotfix, because for some reason the layout is looking different when the browser is opening the printdialog!
       const isPrint =
@@ -34,15 +33,7 @@ export function HotKeyHandler() {
         return
       }
 
-      // Construct key combo string like 'Mod+Shift+K'
-      // 'Mod' represents 'Ctrl' on Windows/Linux and 'Meta' on Mac
-      if (e.ctrlKey || e.metaKey) keyCombo.push('Mod')
-
-      if (e.shiftKey) keyCombo.push('Shift')
-      if (e.altKey) keyCombo.push('Alt')
-
-      keyCombo.push(e.key)
-      const comboString = keyCombo.join('+')
+      const comboString = getHotkeyComboFromEvent(e)
 
       // Always allow Escape
       if (comboString !== 'Escape') {
