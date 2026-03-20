@@ -6,6 +6,9 @@ import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { FileSearch } from 'lucide-react'
 import { useEffect } from 'react'
 
+const isMacOS = /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+const quickSwitcherHotkeyLabel = isMacOS ? 'Cmd+Option+P' : 'Ctrl+Alt+P'
+
 export function PageQuickSwitcherTrigger() {
   const appMode = useAppMode()
   const openDialog = useDialogsStore((state) => state.openDialog)
@@ -35,13 +38,13 @@ export function PageQuickSwitcherTrigger() {
       size="sm"
       onClick={() => openDialog(DIALOG_PAGE_QUICK_SWITCHER)}
       aria-label="Go to page"
-      title="Go to page (Ctrl+Alt+P)"
+      title={`Go to page (${quickSwitcherHotkeyLabel})`}
       className="max-md:px-2"
     >
       <FileSearch size={16} />
       <span className="max-md:hidden">Go to page</span>
       <span className="text-muted-foreground ml-1 hidden text-xs md:inline">
-        Ctrl+Alt+P
+        {quickSwitcherHotkeyLabel}
       </span>
     </Button>
   )
