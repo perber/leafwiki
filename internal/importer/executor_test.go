@@ -21,6 +21,9 @@ type fakeExecWiki struct {
 	updateFn func(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error)
 
 	lastUpdatedContent *string
+	ensureTargets      []string
+	ensureKinds        []tree.NodeKind
+	updateTitles       []string
 }
 
 func (f *fakeExecWiki) TreeHash() string { return f.hash }
@@ -31,6 +34,10 @@ func (f *fakeExecWiki) LookupPagePath(path string) (*tree.PathLookup, error) {
 
 func (f *fakeExecWiki) EnsurePath(userID string, targetPath string, title string, kind *tree.NodeKind) (*tree.Page, error) {
 	f.ensureCalls++
+	f.ensureTargets = append(f.ensureTargets, targetPath)
+	if kind != nil {
+		f.ensureKinds = append(f.ensureKinds, *kind)
+	}
 	if f.ensureFn != nil {
 		return f.ensureFn(userID, targetPath, title, kind)
 	}
@@ -40,6 +47,7 @@ func (f *fakeExecWiki) EnsurePath(userID string, targetPath string, title string
 func (f *fakeExecWiki) UpdatePage(userID string, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
 	f.updateCalls++
 	f.lastUpdatedContent = content
+	f.updateTitles = append(f.updateTitles, title)
 	if f.updateFn != nil {
 		return f.updateFn(userID, id, title, slug, content, kind)
 	}
@@ -202,5 +210,46 @@ func TestExecutor_UnknownAction_SkipsItem(t *testing.T) {
 	}
 	if res.Items[0].Error == nil || *res.Items[0].Error != "unknown action" {
 		t.Fatalf("Error=%#v", res.Items[0].Error)
+	}
+}
+
+func TestExecutor_Create_FolderIndexAndSiblingPage_ImportsSectionThenNestedPage(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Ordner/index.md", `---
+title: Ordner
+---
+
+# Ordner`)
+	writeTmp(t, tmp, "Ordner/Ordner.md", "# Unterseite")
+
+	w := &fakeExecWiki{hash: "h1"}
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Ordner/index.md", TargetPath: "ordner", Title: "Ordner", Kind: tree.NodeKindSection, Action: PlanActionCreate},
+			{SourcePath: "Ordner/Ordner.md", TargetPath: "ordner/ordner", Title: "Unterseite", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, w, slog.Default())
+	res, err := ex.Execute("user1")
+	if err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+	if res.ImportedCount != 2 || res.SkippedCount != 0 {
+		t.Fatalf("counts imported=%d skipped=%d", res.ImportedCount, res.SkippedCount)
+	}
+	if w.ensureCalls != 2 || w.updateCalls != 2 {
+		t.Fatalf("calls ensure=%d update=%d", w.ensureCalls, w.updateCalls)
+	}
+	if len(w.ensureTargets) != 2 || w.ensureTargets[0] != "ordner" || w.ensureTargets[1] != "ordner/ordner" {
+		t.Fatalf("unexpected ensure targets: %#v", w.ensureTargets)
+	}
+	if len(w.ensureKinds) != 2 || w.ensureKinds[0] != tree.NodeKindSection || w.ensureKinds[1] != tree.NodeKindPage {
+		t.Fatalf("unexpected ensure kinds: %#v", w.ensureKinds)
+	}
+	if len(w.updateTitles) != 2 || w.updateTitles[0] != "Ordner" || w.updateTitles[1] != "Unterseite" {
+		t.Fatalf("unexpected update titles: %#v", w.updateTitles)
 	}
 }

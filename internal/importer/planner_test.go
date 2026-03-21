@@ -432,3 +432,100 @@ func TestPlanner_CreatePlan_RootIndexMd_EmptyWikiPath_UsesFallbackTitle(t *testi
 		t.Fatalf("Note = %q (should contain 'Failed to load markdown file for title extraction')", it.Notes[0])
 	}
 }
+
+func TestPlanner_CreatePlan_FolderIndexAndSiblingPage_MapToSectionAndNestedPage(t *testing.T) {
+	tmp := t.TempDir()
+	test_utils.WriteFile(t, tmp, "Ordner/index.md", `---
+title: Ordner
+---
+
+# Ordner`)
+	test_utils.WriteFile(t, tmp, "Ordner/Ordner.md", "# Unterseite")
+
+	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
+	p := newPlannerWithFake(wiki)
+
+	res, err := p.CreatePlan([]ImportMDFile{
+		{SourcePath: "Ordner/index.md"},
+		{SourcePath: "Ordner/Ordner.md"},
+	}, PlanOptions{
+		SourceBasePath: tmp,
+		TargetBasePath: "",
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan err: %v", err)
+	}
+	if len(res.Errors) != 0 {
+		t.Fatalf("Errors = %#v", res.Errors)
+	}
+	if len(res.Items) != 2 {
+		t.Fatalf("Items len = %d (want 2)", len(res.Items))
+	}
+
+	section := res.Items[0]
+	page := res.Items[1]
+
+	if section.SourcePath != "Ordner/index.md" || section.Kind != tree.NodeKindSection || section.TargetPath != "ordner" {
+		t.Fatalf("unexpected section item: %#v", section)
+	}
+	if page.SourcePath != "Ordner/Ordner.md" || page.Kind != tree.NodeKindPage || page.TargetPath != "ordner/ordner" {
+		t.Fatalf("unexpected nested page item: %#v", page)
+	}
+}
+
+func TestPlanner_CreatePlan_FolderMarkdownWithoutIndex_RemainsNestedPage(t *testing.T) {
+	tmp := t.TempDir()
+	test_utils.WriteFile(t, tmp, "Ordner/Ordner.md", "# Unterseite")
+
+	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
+	p := newPlannerWithFake(wiki)
+
+	res, err := p.CreatePlan([]ImportMDFile{{SourcePath: "Ordner/Ordner.md"}}, PlanOptions{
+		SourceBasePath: tmp,
+		TargetBasePath: "wiki",
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan err: %v", err)
+	}
+	if len(res.Errors) != 0 {
+		t.Fatalf("Errors = %#v", res.Errors)
+	}
+	if len(res.Items) != 1 {
+		t.Fatalf("Items len = %d (want 1)", len(res.Items))
+	}
+
+	it := res.Items[0]
+	if it.Kind != tree.NodeKindPage {
+		t.Fatalf("Kind = %v (want Page)", it.Kind)
+	}
+	if it.TargetPath != "wiki/ordner/ordner" {
+		t.Fatalf("TargetPath = %q (want wiki/ordner/ordner)", it.TargetPath)
+	}
+}
+
+func TestPlanner_CreatePlan_CreateNewSection_IndexUppercaseMD(t *testing.T) {
+	tmp := t.TempDir()
+	test_utils.WriteFile(t, tmp, "Guides/index.MD", `---
+title: Guides
+---
+
+# Ignored`)
+
+	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
+	p := newPlannerWithFake(wiki)
+
+	res, err := p.CreatePlan([]ImportMDFile{{SourcePath: "Guides/index.MD"}}, PlanOptions{
+		SourceBasePath: tmp,
+		TargetBasePath: "docs",
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan err: %v", err)
+	}
+	it := res.Items[0]
+	if it.Kind != tree.NodeKindSection {
+		t.Fatalf("Kind = %v", it.Kind)
+	}
+	if it.TargetPath != "docs/guides" {
+		t.Fatalf("TargetPath = %q (want docs/guides)", it.TargetPath)
+	}
+}

@@ -88,6 +88,11 @@ func (t *TreeService) migrate(fromVersion int) error {
 				t.log.Error("Error migrating to v3", "error", err)
 				return err
 			}
+		case 3:
+			if err := t.migrateToV4(); err != nil {
+				t.log.Error("Error migrating to v4", "error", err)
+				return err
+			}
 		}
 
 		// Save the tree after each migration step
@@ -210,6 +215,31 @@ func (t *TreeService) migrateToV3() error {
 	}
 
 	return backfillMetadataFrontmatter(t.tree)
+}
+
+func (t *TreeService) migrateToV4() error {
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
+	var materializeSectionIndexes func(node *PageNode) error
+	materializeSectionIndexes = func(node *PageNode) error {
+		if node != nil && node.ID != "root" && node.Kind == NodeKindSection {
+			if _, err := t.store.ensureSectionIndex(node); err != nil {
+				return fmt.Errorf("could not materialize section index for node %s: %w", node.ID, err)
+			}
+		}
+
+		for _, child := range node.Children {
+			if err := materializeSectionIndexes(child); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return materializeSectionIndexes(t.tree)
 }
 
 // migrateToV2 migrates the tree to the v2 schema

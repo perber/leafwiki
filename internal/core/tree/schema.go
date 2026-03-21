@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-const CurrentSchemaVersion = 3
+const CurrentSchemaVersion = 4
 
 type SchemaInfo struct {
 	Version int `json:"version"`

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -150,6 +151,44 @@ func TestTreeService_CreateNode_Page_Root_CreatesFileAndFrontmatter(t *testing.T
 	}
 	if fm.LeafWikiCreatorID != "system" || fm.LeafWikiLastAuthorID != "system" {
 		t.Fatalf("expected creator metadata to be set, got %#v", fm)
+	}
+}
+
+func TestTreeService_CreateNode_Section_CreatesIndexWithFrontmatter(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	id, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	index := filepath.Join(tmpDir, "root", "docs", "index.md")
+	raw, err := os.ReadFile(index)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+
+	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter to exist")
+	}
+	if strings.TrimSpace(fm.LeafWikiID) != *id {
+		t.Fatalf("expected leafwiki_id=%q, got %q", *id, fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "Docs" {
+		t.Fatalf("expected leafwiki_title Docs, got %q", fm.LeafWikiTitle)
+	}
+	if fm.LeafWikiCreatedAt == "" || fm.LeafWikiUpdatedAt == "" {
+		t.Fatalf("expected leafwiki timestamps to be set, got %#v", fm)
+	}
+	if fm.LeafWikiCreatorID != "system" || fm.LeafWikiLastAuthorID != "system" {
+		t.Fatalf("expected creator metadata to be set, got %#v", fm)
+	}
+	if strings.TrimSpace(body) != "" {
+		t.Fatalf("expected empty section body, got %q", body)
 	}
 }
 
@@ -578,6 +617,85 @@ func TestTreeService_SortPages_DuplicateID(t *testing.T) {
 
 // --- E) Routing, Lookup, Ensure ---
 
+func TestTreeService_GetPage_SectionWithoutIndex_DoesNotMaterializeIndex(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	id, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	indexPath := filepath.Join(tmpDir, "root", "docs", "index.md")
+	if err := os.Remove(indexPath); err != nil {
+		t.Fatalf("remove index.md: %v", err)
+	}
+
+	page, err := svc.GetPage(*id)
+	if err != nil {
+		t.Fatalf("GetPage failed: %v", err)
+	}
+	if page.ID != *id {
+		t.Fatalf("expected page ID %q, got %q", *id, page.ID)
+	}
+	if page.Content != "" {
+		t.Fatalf("expected empty content for section without index, got %q", page.Content)
+	}
+	if _, err := os.Stat(indexPath); err == nil {
+		t.Fatalf("expected GetPage to avoid materializing index.md")
+	}
+}
+
+func TestTreeService_ConvertNode_PageToSection_MaterializesIndexWithNodeMetadata(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	id, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	if err != nil {
+		t.Fatalf("FindPageByID failed: %v", err)
+	}
+	node.Metadata.CreatedAt = time.Date(2026, time.March, 22, 10, 15, 30, 0, time.UTC)
+	node.Metadata.UpdatedAt = time.Date(2026, time.March, 22, 11, 16, 31, 0, time.UTC)
+	node.Metadata.CreatorID = "alice"
+	node.Metadata.LastAuthorID = "bob"
+
+	if err := svc.ConvertNode("carol", *id, NodeKindSection); err != nil {
+		t.Fatalf("ConvertNode failed: %v", err)
+	}
+
+	indexPath := filepath.Join(tmpDir, "root", "docs", "index.md")
+	raw, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("read converted index: %v", err)
+	}
+
+	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after conversion")
+	}
+	if fm.LeafWikiID != *id || fm.LeafWikiTitle != "Docs" {
+		t.Fatalf("unexpected converted frontmatter: %#v", fm)
+	}
+	if fm.LeafWikiCreatedAt != "2026-03-22T10:15:30Z" {
+		t.Fatalf("expected created_at to be preserved after conversion, got %#v", fm)
+	}
+	if fm.LeafWikiUpdatedAt == "" {
+		t.Fatalf("expected updated_at after conversion, got %#v", fm)
+	}
+	if fm.LeafWikiCreatorID != "alice" || fm.LeafWikiLastAuthorID != "carol" {
+		t.Fatalf("expected metadata to be carried over and updated for actor, got %#v", fm)
+	}
+	if !strings.Contains(body, "# Docs") {
+		t.Fatalf("expected converted body to be preserved, got %q", body)
+	}
+}
+
 func TestTreeService_FindPageByRoutePath_ReturnsContent(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
@@ -655,6 +773,81 @@ func TestTreeService_EnsurePagePath_CreatesIntermediateSectionsAndFinalPage(t *t
 }
 
 // --- F) Migration V3 (metadata frontmatter backfill) ---
+func TestTreeService_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *testing.T) {
+	if CurrentSchemaVersion < 4 {
+		t.Skip("requires schema v4+")
+	}
+
+	tmpDir := t.TempDir()
+
+	if err := saveSchema(tmpDir, 3); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	id, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	if err != nil {
+		t.Fatalf("FindPageByID failed: %v", err)
+	}
+	node.Metadata = PageMetadata{
+		CreatedAt:    time.Date(2026, time.March, 22, 10, 15, 30, 0, time.UTC),
+		UpdatedAt:    time.Date(2026, time.March, 22, 11, 16, 31, 0, time.UTC),
+		CreatorID:    "alice",
+		LastAuthorID: "bob",
+	}
+
+	if err := svc.SaveTree(); err != nil {
+		t.Fatalf("SaveTree failed: %v", err)
+	}
+
+	indexPath := filepath.Join(tmpDir, "root", "docs", "index.md")
+	if err := os.Remove(indexPath); err != nil {
+		t.Fatalf("remove section index failed: %v", err)
+	}
+
+	if err := saveSchema(tmpDir, 3); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	loaded := NewTreeService(tmpDir)
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree (migrating) failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("read migrated section index: %v", err)
+	}
+	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after migration")
+	}
+	if fm.LeafWikiID != *id || fm.LeafWikiTitle != "Docs" {
+		t.Fatalf("expected section frontmatter to be materialized, got %#v", fm)
+	}
+	if fm.LeafWikiCreatedAt != "2026-03-22T10:15:30Z" || fm.LeafWikiUpdatedAt != "2026-03-22T11:16:31Z" {
+		t.Fatalf("expected timestamps to be materialized, got %#v", fm)
+	}
+	if fm.LeafWikiCreatorID != "alice" || fm.LeafWikiLastAuthorID != "bob" {
+		t.Fatalf("expected author metadata to be materialized, got %#v", fm)
+	}
+	if strings.TrimSpace(body) != "" {
+		t.Fatalf("expected empty section body after migration, got %q", body)
+	}
+}
+
 func TestTreeService_LoadTree_MigratesToV3_BackfillsMetadataFrontmatter(t *testing.T) {
 	if CurrentSchemaVersion < 3 {
 		t.Skip("requires schema v3+")
@@ -1449,3 +1642,68 @@ leafwiki_title: New Page
 // --- small util ---
 
 func ptrKind(k NodeKind) *NodeKind { return &k }
+
+func TestTreeService_LoadTree_MigratesToV4_ReturnsErrorWhenSectionIndexCannotBeWritten(t *testing.T) {
+	if CurrentSchemaVersion < 4 {
+		t.Skip("requires schema v4+")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("permission-based migration failure test is not reliable on Windows")
+	}
+
+	tmpDir := t.TempDir()
+
+	if err := saveSchema(tmpDir, 3); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	id, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	if err != nil {
+		t.Fatalf("FindPageByID failed: %v", err)
+	}
+	node.Metadata = PageMetadata{
+		CreatedAt:    time.Date(2026, time.March, 22, 10, 15, 30, 0, time.UTC),
+		UpdatedAt:    time.Date(2026, time.March, 22, 11, 16, 31, 0, time.UTC),
+		CreatorID:    "alice",
+		LastAuthorID: "bob",
+	}
+
+	if err := svc.SaveTree(); err != nil {
+		t.Fatalf("SaveTree failed: %v", err)
+	}
+
+	sectionDir := filepath.Join(tmpDir, "root", "docs")
+	indexPath := filepath.Join(sectionDir, "index.md")
+	if err := os.Remove(indexPath); err != nil {
+		t.Fatalf("remove section index failed: %v", err)
+	}
+	if err := os.Chmod(sectionDir, 0o555); err != nil {
+		t.Fatalf("chmod section dir failed: %v", err)
+	}
+	defer func() {
+		_ = os.Chmod(sectionDir, 0o755)
+	}()
+
+	if err := saveSchema(tmpDir, 3); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	loaded := NewTreeService(tmpDir)
+	err = loaded.LoadTree()
+	if err == nil {
+		t.Fatalf("expected migration error when section index cannot be written")
+	}
+	if !strings.Contains(err.Error(), "materialize section index") {
+		t.Fatalf("expected migration error to mention section index materialization, got: %v", err)
+	}
+}

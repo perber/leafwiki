@@ -69,6 +69,35 @@ func (f *NodeStore) syncManagedFrontmatter(mdFile *markdown.MarkdownFile, entry 
 	)
 }
 
+func (f *NodeStore) ensureSectionIndex(entry *PageNode) (string, error) {
+	if entry == nil {
+		return "", &InvalidOpError{Op: "ensureSectionIndex", Reason: "an entry is required"}
+	}
+	if entry.Kind != NodeKindSection {
+		return "", &InvalidOpError{Op: "ensureSectionIndex", Reason: "entry must be a section"}
+	}
+
+	filePath, err := f.contentPathForNodeWrite(entry)
+	if err != nil {
+		return "", err
+	}
+
+	mdFile := markdown.NewMarkdownFile(filePath, "", markdown.Frontmatter{})
+	if fileExists(filePath) {
+		mdFile, err = markdown.LoadMarkdownFile(filePath)
+		if err != nil {
+			return "", fmt.Errorf("could not load markdown file: %w", err)
+		}
+	}
+
+	f.syncManagedFrontmatter(mdFile, entry)
+	if err := mdFile.WriteToFile(); err != nil {
+		return "", fmt.Errorf("could not write markdown file: %w", err)
+	}
+
+	return filePath, nil
+}
+
 func fallbackMetadataString(value string) string {
 	if strings.TrimSpace(value) == "" {
 		return reconstructSystemUserID
@@ -264,6 +293,12 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 			}
 			parent.Children = append(parent.Children, child)
 
+			if !fileExists(indexPath) {
+				if _, err := f.ensureSectionIndex(child); err != nil {
+					return fmt.Errorf("materialize missing section index for %s: %w", indexPath, err)
+				}
+			}
+
 			if err := f.reconstructTreeRecursive(filepath.Join(currentPath, name), child, reconstructNow); err != nil {
 				return err
 			}
@@ -442,9 +477,13 @@ func (f *NodeStore) CreateSection(parentEntry *PageNode, newEntry *PageNode) err
 		return &PageAlreadyExistsError{Path: destBase}
 	}
 
-	// Create the folder for the section (no index.md by default)
+	// Create the folder for the section and materialize its metadata container.
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("could not create section folder: %w", err)
+	}
+
+	if _, err := f.ensureSectionIndex(newEntry); err != nil {
+		return err
 	}
 
 	return nil
@@ -935,11 +974,19 @@ func (f *NodeStore) ConvertNode(entry *PageNode, target NodeKind) error {
 			if err := os.Rename(filePath, indexPath); err != nil {
 				return fmt.Errorf("could not move page into folder: %w", err)
 			}
+			entry.Kind = NodeKindSection
+			if _, err := f.ensureSectionIndex(entry); err != nil {
+				return err
+			}
 			return nil
 		}
-		// already folder (or missing) -> ensure dir exists
+		// already folder (or missing) -> ensure dir exists and materialize index.md
 		if err := os.MkdirAll(folderPath, 0o755); err != nil {
 			return fmt.Errorf("could not ensure folder exists: %w", err)
+		}
+		entry.Kind = NodeKindSection
+		if _, err := f.ensureSectionIndex(entry); err != nil {
+			return err
 		}
 		return nil
 
