@@ -1,4 +1,8 @@
-import { autocompletion } from '@codemirror/autocomplete'
+import {
+  autocompletion,
+  closeCompletion,
+  completionStatus,
+} from '@codemirror/autocomplete'
 import {
   defaultKeymap,
   history,
@@ -66,6 +70,17 @@ export default function MarkdownCodeEditor({
     })
 
     const customShortcuts = [
+      {
+        key: 'Escape',
+        run: (view: EditorView) => {
+          if (completionStatus(view.state) === null) {
+            return false
+          }
+
+          return closeCompletion(view)
+        },
+        stopPropagation: true,
+      },
       {
         key: 'Mod-b',
         run: () => {
