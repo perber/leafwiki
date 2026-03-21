@@ -158,7 +158,7 @@ export default function TreeNodeActionsMenu({
           onClick={() => {
             if (isCurrentlyEditedPage) {
               toast.warning(
-                'This page is currently being edited. Please close the editor before deleting it.',
+                `This ${nodeKind === NODE_KIND_PAGE ? 'page' : 'section'} is currently being edited. Please close the editor before deleting it.`,
               )
               return
             }
