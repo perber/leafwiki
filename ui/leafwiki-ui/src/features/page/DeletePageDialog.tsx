@@ -10,12 +10,12 @@ import { toast } from 'sonner'
 
 export type DeletePageDialogProps = {
   pageId: string
-  redirectUrl: string
+  redirectTo: string
 }
 
 export function DeletePageDialog({
   pageId,
-  redirectUrl,
+  redirectTo,
 }: DeletePageDialogProps) {
   const navigate = useNavigate()
   const reloadTree = useTreeStore((s) => s.reloadTree)
@@ -35,7 +35,7 @@ export function DeletePageDialog({
     try {
       await deletePage(pageId, deleteRecursive)
       toast.success(`${itemLabelCapitalized} deleted successfully`)
-      navigate(`/${redirectUrl}`)
+      navigate(redirectTo)
       await reloadTree()
       return true
     } catch (err) {

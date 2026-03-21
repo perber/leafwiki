@@ -11,6 +11,7 @@ import {
   NODE_KIND_SECTION,
   PageNode,
 } from '@/lib/api/pages'
+import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import {
   DIALOG_ADD_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
@@ -68,19 +69,8 @@ export default function TreeNodeActionsMenu({
   }, [nodeId, nodeKind, reloadTree])
 
   const redirectUrlAfterDelete = useCallback(() => {
-    if (location.pathname.startsWith('/' + node.path)) {
-      if (node.parentId) {
-        return node.path.substring(0, node.path.lastIndexOf('/'))
-      } else {
-        return '/'
-      }
-    }
-
-    // remove leading slash
-    return location.pathname.startsWith('/')
-      ? location.pathname.substring(1)
-      : location.pathname
-  }, [location.pathname, node.path, node.parentId])
+    return getDeleteRedirectRoutePath(location.pathname, node.path)
+  }, [location.pathname, node.path])
 
   return (
     <DropdownMenu
@@ -161,7 +151,7 @@ export default function TreeNodeActionsMenu({
           onClick={() => {
             openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
               pageId: node?.id,
-              redirectUrl: redirectUrlAfterDelete(),
+              redirectTo: redirectUrlAfterDelete(),
             })
           }}
         >

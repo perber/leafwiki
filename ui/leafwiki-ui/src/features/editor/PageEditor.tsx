@@ -1,5 +1,5 @@
 import Page404 from '@/components/Page404'
-import { buildBrowserEditUrl } from '@/lib/urlUtil'
+import { buildBrowserEditUrl } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'

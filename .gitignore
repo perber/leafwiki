@@ -48,3 +48,6 @@ __debug*
 local
 
 ui.zip
+# local embedded frontend output for fast E2E runs
+internal/http/dist/*
+!internal/http/dist/.gitkeep

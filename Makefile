@@ -79,6 +79,10 @@ run-e2e:
 	@echo "🚀 Starting end-to-end tests..."
 	@./e2e/run.sh
 
+run-e2e-local:
+	@echo "⚡ Starting end-to-end tests (local fast path)..."
+	@E2E_RUN_MODE=local ./e2e/run.sh
+
 help:
 	@echo "Available commands:"
 	@echo "  make build      – Build binary for current system"
@@ -86,8 +90,9 @@ help:
 	@echo "  make clean      – Clean all generated files"
 	@echo "  make test       – Run all Go tests"
 	@echo "  make run-e2e    – Run end-to-end tests (using Docker)"
+	@echo "  make run-e2e-local – Run end-to-end tests via local fast path"
 	@echo "  make run        – Run development server"
 	@echo "  make docker-build-publish    – Build and push multi-arch Docker image"
 	@echo "  make changelog – Generate changelog"
 
-.PHONY: all build run clean test fmt lint help docker-build-publish changelog run-e2e
+.PHONY: all build run clean test fmt lint help docker-build-publish changelog run-e2e run-e2e-local

@@ -1,4 +1,5 @@
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
+import { getParentWikiRoutePath } from '@/lib/wikiPath'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -29,7 +30,7 @@ export function EditorTitleBar() {
     if (!page) return
 
     const parentId = () => {
-      const parentPath = page.path.split('/').slice(0, -1).join('/')
+      const parentPath = getParentWikiRoutePath(page.path)
       const p = getPageByPath(parentPath)
       if (!p) return ''
       return p.id

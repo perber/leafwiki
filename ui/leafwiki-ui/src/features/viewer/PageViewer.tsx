@@ -5,6 +5,7 @@ import {
   DIALOG_DELETE_PAGE_CONFIRMATION,
 } from '@/lib/registries'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
+import { getParentWikiRoutePath, toWikiLookupPath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect } from 'react'
@@ -42,10 +43,9 @@ export default function PageViewer() {
       navigate(`/e/${page?.path || ''}`)
     }, [page?.path, navigate]),
     deletePage: useCallback(() => {
-      const redirectUrl = page?.path.split('/').slice(0, -1).join('/')
       openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
         pageId: page?.id,
-        redirectUrl,
+        redirectTo: getParentWikiRoutePath(page?.path || '/'),
       })
     }, [page, openDialog]),
     copyPage: useCallback(() => {
@@ -60,7 +60,7 @@ export default function PageViewer() {
   useSetPageTitle({ page })
 
   useEffect(() => {
-    const path = pathname.slice(1)
+    const path = toWikiLookupPath(pathname)
     loadPageData?.(path)
   }, [pathname, loadPageData])
 
