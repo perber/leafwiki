@@ -23,7 +23,7 @@ The demo instance resets automatically every hour, so all changes are temporary.
 
 ## Preview
 
-![LeafWiki](./preview.png)
+![LeafWiki](./assets/preview.png)
 
 ---
 
@@ -32,9 +32,9 @@ The demo instance resets automatically every hour, so all changes are temporary.
 Mobile-friendly UI for reading (and editing) docs & runbooks on the go.
 
 <p align="center">
-  <img src="./mobile-editor.png" width="260" />
-  <img src="./mobile-pageview.png" width="260" />
-  <img src="./mobile-navigation.png" width="260" />
+  <img src="./assets/mobile-editor.png" width="260" />
+  <img src="./assets/mobile-pageview.png" width="260" />
+  <img src="./assets/mobile-navigation.png" width="260" />
 </p>
 
 ---
