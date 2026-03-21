@@ -82,8 +82,7 @@ export function DeletePageDialog({
               data-testid="delete-page-dialog-recursive-delete-checkbox"
               checked={deleteRecursive}
               onCheckedChange={(val) => setDeleteRecursive(!!val)}
-            />
-            {' '}
+            />{' '}
             {'Also delete all descendant pages and sections'}
           </label>
         </div>

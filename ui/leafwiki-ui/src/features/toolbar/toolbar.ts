@@ -22,6 +22,6 @@ export interface ToolbarState {
 
 export const useToolbarStore = create<ToolbarState>((set, get) => ({
   buttons: [],
-  setButtons: (buttons: ToolbarButton[]) => set({ buttons }),
+  setButtons: (buttons) => set({ buttons }),
   getButtons: () => get().buttons,
 }))

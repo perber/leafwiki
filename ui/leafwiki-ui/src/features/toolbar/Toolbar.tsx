@@ -9,6 +9,7 @@ export function Toolbar() {
       {buttons.map((button) => (
         <ToolbarButton
           key={button.id}
+          testId={`${button.id}-button`}
           hotkey={button.hotkey}
           label={button.label}
           onClick={button.action}
