@@ -83,6 +83,7 @@ export function EditPageMetadataDialog({
           autoFocus: true,
         },
       ]}
+      testidPrefix="edit-page-metadata-dialog"
     >
       <div className="page-dialog__fields">
         <FormInput
@@ -92,6 +93,7 @@ export function EditPageMetadataDialog({
           onChange={handleTitleChange}
           placeholder={`${itemLabelCapitalized} title`}
           error={fieldErrors.title}
+          testid="edit-page-metadata-dialog-title-input"
         />
 
         <SlugInputWithSuggestion
@@ -105,10 +107,14 @@ export function EditPageMetadataDialog({
           onSlugLoadingChange={setSlugLoading}
           onLastSlugTitleChange={setLastSlugTitle}
           error={fieldErrors.slug}
+          testid="edit-page-metadata-dialog-slug-input"
         />
       </div>
 
-      <span className="dialog__path">
+      <span
+        className="dialog__path"
+        data-testid="edit-page-metadata-dialog-path-display"
+      >
         Path: {parentPath !== '' && `${parentPath}/`}
         {slug && `${slug}`}
       </span>

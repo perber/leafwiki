@@ -8,7 +8,7 @@ app_url="${E2E_BASE_URL:-http://localhost:8085}"
 app_port="${E2E_PORT:-8085}"
 run_mode="${E2E_RUN_MODE:-docker}"
 server_pid=""
-server_log="$current_dir/local-server.log"
+server_log=""
 local_data_dir=""
 
 build_frontend_for_local_e2e() {
@@ -66,7 +66,7 @@ start_local() {
   build_frontend_for_local_e2e
 
   local_data_dir="$(mktemp -d /tmp/leafwiki-e2e-data.XXXXXX)"
-  : > "$server_log"
+  server_log="$(mktemp /tmp/leafwiki-e2e-server.XXXXXX.log)"
 
   (
     cd "$repo_root"
@@ -91,9 +91,12 @@ stop_local() {
     kill "$server_pid" >/dev/null 2>&1 || true
     wait "$server_pid" >/dev/null 2>&1 || true
   fi
-
   if [ -n "$local_data_dir" ] && [ -d "$local_data_dir" ]; then
     rm -rf "$local_data_dir"
+  fi
+
+  if [ -n "$server_log" ] && [ -f "$server_log" ]; then
+    rm -f "$server_log"
   fi
 }
 

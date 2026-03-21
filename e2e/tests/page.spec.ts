@@ -4,6 +4,7 @@ import CopyPageDialog from '../pages/CopyPageDialog';
 import CreatePageByPathDialog from '../pages/CreatePageByPathDialog';
 import DeletePageDialog from '../pages/DeletePageDialog';
 import EditPage from '../pages/EditPage';
+import EditPageMetadataDialog from '../pages/EditPageMetadataDialog';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import TreeView from '../pages/TreeView';
@@ -509,6 +510,42 @@ graph TD;
 
     test.expect(await viewPage.getTitle()).toBe(currentTitle);
     await page.waitForURL(new RegExp('/' + currentTitle + '$'));
+  });
+
+  test('edit-metadata-on-nested-page-keeps-parent-path', async ({ page }) => {
+    const suffix = Date.now();
+    const parentTitle = 'meta-parent-' + suffix;
+    const childTitle = 'meta-child-' + suffix;
+    const renamedChildTitle = 'meta-child-renamed-' + suffix;
+    const expectedPath = parentTitle + '/' + renamedChildTitle;
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(parentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.createSubPageOfParent(parentTitle, childTitle);
+    await treeView.expandNodeByTitle(parentTitle);
+    await treeView.clickPageByTitle(childTitle);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openMetadataDialog();
+
+    const metadataDialog = new EditPageMetadataDialog(page);
+    await metadataDialog.fillTitle(renamedChildTitle);
+    await metadataDialog.expectSlug(renamedChildTitle);
+    await metadataDialog.expectPath(expectedPath);
+    await metadataDialog.submit();
+
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await page.waitForURL(new RegExp('/' + expectedPath + '$'));
   });
 
   test('test-asset-upload-and-use-in-page', async ({ page }) => {

@@ -4,7 +4,6 @@ export default class EditPage {
   constructor(private page: Page) {}
 
   async writeContent(content: string) {
-    // Code mirror editor
     const editor = this.page.locator('.cm-editor');
     await editor.click();
     await this.page.keyboard.type(content);
@@ -13,7 +12,7 @@ export default class EditPage {
   async savePage() {
     const saveButton = this.page.locator('button[data-testid="save-page-button"]');
     await saveButton.click();
-    await this.page.waitForTimeout(500); // wait for save to complete
+    await this.page.waitForTimeout(500);
   }
 
   async closeEditor() {
@@ -26,16 +25,20 @@ export default class EditPage {
     await assetManagerButton.click();
   }
 
+  async openMetadataDialog() {
+    const metadataButton = this.page.locator('button[data-testid="edit-page-metadata-button"]');
+    await metadataButton.click();
+  }
+
   async uploadAsset(filePath: string) {
     const dropzone = this.page.locator('div[data-testid="asset-upload-dropzone"]');
 
     const [fileChooser] = await Promise.all([
       this.page.waitForEvent('filechooser'),
-      dropzone.click(), // trigger the picker
+      dropzone.click(),
     ]);
 
     await fileChooser.setFiles(filePath);
-    // wait until the asset appears in the list
     await this.page.locator('li[data-testid="asset-item"]').first().waitFor({ state: 'visible' });
   }
 
