@@ -110,12 +110,24 @@ func TestNodeStore_SaveTree_NilTree_Error(t *testing.T) {
 	}
 }
 
-func TestNodeStore_CreateSection_CreatesFolder_NoIndexByDefault(t *testing.T) {
+func TestNodeStore_CreateSection_CreatesFolderAndIndexWithFrontmatter(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
 	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	sec := &PageNode{ID: "sec1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	sec := &PageNode{
+		ID:     "sec1",
+		Slug:   "docs",
+		Title:  "Docs",
+		Kind:   NodeKindSection,
+		Parent: root,
+		Metadata: PageMetadata{
+			CreatedAt:    time.Date(2026, time.March, 22, 10, 15, 30, 0, time.UTC),
+			UpdatedAt:    time.Date(2026, time.March, 22, 11, 16, 31, 0, time.UTC),
+			CreatorID:    "alice",
+			LastAuthorID: "bob",
+		},
+	}
 
 	if err := store.CreateSection(root, sec); err != nil {
 		t.Fatalf("CreateSection: %v", err)
@@ -127,10 +139,26 @@ func TestNodeStore_CreateSection_CreatesFolder_NoIndexByDefault(t *testing.T) {
 		t.Fatalf("expected section folder at %s", dir)
 	}
 
-	// no index.md by default
 	index := filepath.Join(dir, "index.md")
-	if _, err := os.Stat(index); err == nil {
-		t.Fatalf("did not expect index.md to exist by default: %s", index)
+	raw := string(mustRead(t, index))
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter in section index")
+	}
+	if fm.LeafWikiID != "sec1" || fm.LeafWikiTitle != "Docs" {
+		t.Fatalf("unexpected section frontmatter: %#v", fm)
+	}
+	if fm.LeafWikiCreatedAt != "2026-03-22T10:15:30Z" || fm.LeafWikiUpdatedAt != "2026-03-22T11:16:31Z" {
+		t.Fatalf("unexpected section timestamp metadata: %#v", fm)
+	}
+	if fm.LeafWikiCreatorID != "alice" || fm.LeafWikiLastAuthorID != "bob" {
+		t.Fatalf("unexpected section author metadata: %#v", fm)
+	}
+	if strings.TrimSpace(body) != "" {
+		t.Fatalf("expected empty section body, got %q", body)
 	}
 }
 
@@ -477,7 +505,6 @@ func TestNodeStore_ReadPageRaw_Section_NoIndex_ReturnsEmptyNil(t *testing.T) {
 	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
 	sec := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
 
-	// folder exists, but no index.md
 	mustMkdir(t, filepath.Join(tmp, "root", "docs"))
 
 	raw, err := store.ReadPageRaw(sec)
@@ -486,6 +513,10 @@ func TestNodeStore_ReadPageRaw_Section_NoIndex_ReturnsEmptyNil(t *testing.T) {
 	}
 	if raw != "" {
 		t.Fatalf("expected empty raw for section without index, got %q", raw)
+	}
+
+	if _, err := os.Stat(filepath.Join(tmp, "root", "docs", "index.md")); err == nil {
+		t.Fatalf("expected no index.md side effect on read")
 	}
 }
 
@@ -754,6 +785,65 @@ func TestNodeStore_ConvertNode_PageToSection_MovesToIndex(t *testing.T) {
 	}
 	if _, err := os.Stat(file); !os.IsNotExist(err) {
 		t.Fatalf("expected old file removed")
+	}
+}
+
+func TestNodeStore_ConvertNode_PageToSection_PreservesExistingMetadataAndBody(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{
+		ID:     "p1",
+		Slug:   "p",
+		Title:  "Section Title",
+		Kind:   NodeKindPage,
+		Parent: root,
+		Metadata: PageMetadata{
+			CreatedAt:    time.Date(2026, time.March, 22, 10, 15, 30, 0, time.UTC),
+			UpdatedAt:    time.Date(2026, time.March, 22, 11, 16, 31, 0, time.UTC),
+			CreatorID:    "alice",
+			LastAuthorID: "bob",
+		},
+	}
+
+	file := filepath.Join(tmp, "root", "p.md")
+	mustWriteFile(t, file, `---
+custom_key: keep-me
+leafwiki_id: legacy-id
+leafwiki_title: Legacy Title
+---
+# hi
+`, 0o644)
+
+	if err := store.ConvertNode(entry, NodeKindSection); err != nil {
+		t.Fatalf("ConvertNode(page->section): %v", err)
+	}
+
+	index := filepath.Join(tmp, "root", "p", "index.md")
+	raw := string(mustRead(t, index))
+	if !strings.Contains(raw, "custom_key: keep-me") {
+		t.Fatalf("expected custom frontmatter to be preserved, got %q", raw)
+	}
+
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after conversion")
+	}
+	if fm.LeafWikiID != "p1" || fm.LeafWikiTitle != "Section Title" {
+		t.Fatalf("expected managed frontmatter from tree metadata, got %#v", fm)
+	}
+	if fm.LeafWikiCreatedAt != "2026-03-22T10:15:30Z" || fm.LeafWikiUpdatedAt != "2026-03-22T11:16:31Z" {
+		t.Fatalf("expected timestamps from tree metadata, got %#v", fm)
+	}
+	if fm.LeafWikiCreatorID != "alice" || fm.LeafWikiLastAuthorID != "bob" {
+		t.Fatalf("expected author metadata from tree metadata, got %#v", fm)
+	}
+	if strings.TrimSpace(body) != "# hi" {
+		t.Fatalf("expected body to be preserved, got %q", body)
 	}
 }
 

@@ -140,11 +140,10 @@ leafwiki_title: Readme
 	}
 }
 
-func TestNodeStore_ReconstructTreeFromFS_SectionWithoutIndex_UsesDirNameAsTitle(t *testing.T) {
+func TestNodeStore_ReconstructTreeFromFS_SectionWithoutIndex_UsesDirNameAsTitleAndMaterializesIndex(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	// FS: <tmp>/emptysec/ (no index.md)
 	mustMkdir(t, filepath.Join(tmp, "root", "emptysec"))
 
 	tree, err := store.ReconstructTreeFromFS()
@@ -156,12 +155,30 @@ func TestNodeStore_ReconstructTreeFromFS_SectionWithoutIndex_UsesDirNameAsTitle(
 	if sec.Kind != NodeKindSection {
 		t.Fatalf("expected section, got %q", sec.Kind)
 	}
-	// title defaults to folder name (per your code)
 	if sec.Title != "emptysec" {
 		t.Fatalf("expected title=emptysec, got %q", sec.Title)
 	}
 	if strings.TrimSpace(sec.ID) == "" {
 		t.Fatalf("expected some generated id, got empty")
+	}
+
+	indexPath := filepath.Join(tmp, "root", "emptysec", "index.md")
+	raw, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("expected reconstruct to materialize missing index.md: %v", err)
+	}
+	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter in materialized index")
+	}
+	if fm.LeafWikiID != sec.ID || fm.LeafWikiTitle != sec.Title {
+		t.Fatalf("unexpected frontmatter in materialized index: %#v", fm)
+	}
+	if strings.TrimSpace(body) != "" {
+		t.Fatalf("expected empty body in materialized index, got %q", body)
 	}
 }
 

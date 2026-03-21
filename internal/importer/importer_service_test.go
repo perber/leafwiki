@@ -267,3 +267,28 @@ func TestImporterService_createImportPlanFromFolder_UsesTargetBasePath(t *testin
 		t.Fatalf("expected TargetBasePath 'docs/imports', got %q", sp.PlanOptions.TargetBasePath)
 	}
 }
+
+func TestFindMarkdownEntries_FindsMixedCaseMdExtensions(t *testing.T) {
+	base := t.TempDir()
+	mustWrite(t, base, "a.MD", "x")
+	mustWrite(t, base, "b.mD", "x")
+	mustWrite(t, base, "c.Md", "x")
+	mustWrite(t, base, "d.txt", "x")
+
+	got, err := FindMarkdownEntries(base)
+	if err != nil {
+		t.Fatalf("FindMarkdownEntries err: %v", err)
+	}
+
+	set := map[string]bool{}
+	for _, e := range got {
+		set[e.SourcePath] = true
+	}
+
+	if !set["a.MD"] || !set["b.mD"] || !set["c.Md"] {
+		t.Fatalf("expected mixed-case markdown files to be included, got %#v", set)
+	}
+	if set["d.txt"] {
+		t.Fatalf("should not include non-markdown files")
+	}
+}
