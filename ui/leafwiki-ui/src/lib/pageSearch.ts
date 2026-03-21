@@ -66,7 +66,10 @@ function scoreItem(
   if (title === query) return 1000
   if (path === query) return 980
   if (title.startsWith(query)) return 900
-  if (options.pathStartsWithScore && path.startsWith(query)) {
+  if (
+    typeof options.pathStartsWithScore === 'number' &&
+    path.startsWith(query)
+  ) {
     return options.pathStartsWithScore
   }
   if (breadcrumb.startsWith(query)) return 700
@@ -94,10 +97,7 @@ export function searchFlatPageSearchItems(
   const normalizedQuery = normalize(query)
 
   if (!normalizedQuery) {
-    return items
-      .slice()
-      .sort((a, b) => a.title.localeCompare(b.title))
-      .slice(0, limit)
+    return items.slice(0, limit)
   }
 
   return items

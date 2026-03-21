@@ -69,7 +69,12 @@ export function internalLinkCompletionSource(
   const items = useTreeStore.getState().flatPages
   if (items.length === 0) return null
 
-  const matches = searchFlatPageSearchItems(items, range.query, MAX_RESULTS, {
+  const query =
+    range.query.startsWith('/') && range.query.length > 1
+      ? range.query.slice(1)
+      : range.query
+
+  const matches = searchFlatPageSearchItems(items, query, MAX_RESULTS, {
     pathStartsWithScore: 820,
   })
   if (matches.length === 0) return null
