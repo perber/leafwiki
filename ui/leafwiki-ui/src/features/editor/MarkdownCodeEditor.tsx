@@ -25,6 +25,9 @@ type MarkdownCodeEditorProps = {
   editorViewRef: React.RefObject<EditorView | null>
 }
 
+// CodeMirror uses 80 for the built-in detail slot, so render the path just before it.
+const COMPLETION_PATH_POSITION_BEFORE_DETAIL = 79
+
 export default function MarkdownCodeEditor({
   initialValue,
   editorViewRef,
@@ -128,7 +131,7 @@ export default function MarkdownCodeEditor({
                 path.textContent = `/${option.path}`
                 return path
               },
-              position: 79,
+              position: COMPLETION_PATH_POSITION_BEFORE_DETAIL,
             },
           ],
         }),

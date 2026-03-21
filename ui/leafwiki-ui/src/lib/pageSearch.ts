@@ -115,17 +115,19 @@ function scoreItem(
   const breadcrumb = item.normalizedBreadcrumb
 
   if (title === query) return 1000
-  if (path === query) return 980
   if (title.startsWith(query)) return 900
-  if (
-    typeof options.pathStartsWithScore === 'number' &&
-    path.startsWith(query)
-  ) {
-    return options.pathStartsWithScore
+  if (title.includes(query)) return 800
+
+  if (path === query) return 700
+  if (path.startsWith(query)) {
+    if (typeof options.pathStartsWithScore === 'number') {
+      return Math.min(options.pathStartsWithScore, 750)
+    }
+
+    return 680
   }
-  if (breadcrumb.startsWith(query)) return 700
-  if (title.includes(query)) return 600
-  if (path.includes(query)) return 500
+  if (breadcrumb.startsWith(query)) return 500
+  if (path.includes(query)) return 450
   if (breadcrumb.includes(query)) return 400
 
   const queryParts = query.split(/\s+/).filter(Boolean)
@@ -133,7 +135,7 @@ function scoreItem(
     queryParts.length > 1 &&
     queryParts.every((part) => item.searchText.includes(part))
   ) {
-    return 380
+    return 350
   }
 
   return -1

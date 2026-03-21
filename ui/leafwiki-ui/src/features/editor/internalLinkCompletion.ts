@@ -55,7 +55,6 @@ function buildCompletionOptions(
     info: item.breadcrumb,
     type: 'text',
     apply: `/${item.path}`,
-    section: item.kind === 'section' ? 'Sections' : 'Pages',
     path: item.path,
   }))
 }
@@ -83,7 +82,6 @@ export function internalLinkCompletionSource(
     from: range.from,
     to: range.to,
     options: buildCompletionOptions(matches),
-    validFor: /^[^)\s]*$/,
     filter: false,
   }
 }
