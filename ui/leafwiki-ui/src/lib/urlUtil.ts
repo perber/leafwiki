@@ -42,6 +42,15 @@ export function buildEditUrl(pathname: string): string {
   return `/e/${p}`
 }
 
+export function buildBrowserEditUrl(pathname: string): string {
+  const normalized = ensureLeadingSlash(pathname)
+  if (normalized.startsWith('/e/')) {
+    // Already an edit path; just apply the base path without re-wrapping.
+    return withBasePath(normalized)
+  }
+  return withBasePath(buildEditUrl(pathname))
+}
+
 export function buildViewUrl(pathname: string): string {
   const stripped = stripBasePath(pathname)
   if (stripped === null) return pathname

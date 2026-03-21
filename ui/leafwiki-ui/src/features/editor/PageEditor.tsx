@@ -1,5 +1,5 @@
 import Page404 from '@/components/Page404'
-import { buildEditUrl } from '@/lib/urlUtil'
+import { buildBrowserEditUrl } from '@/lib/urlUtil'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -58,7 +58,11 @@ export default function PageEditor() {
       .then(async (page) => {
         // update URL the new path after save without reloading
         if (page) {
-          window.history.replaceState(null, '', buildEditUrl(`/${page?.path}`))
+          window.history.replaceState(
+            null,
+            '',
+            buildBrowserEditUrl(`/${page?.path}`),
+          )
           toast.success('Page saved successfully')
         }
       })
