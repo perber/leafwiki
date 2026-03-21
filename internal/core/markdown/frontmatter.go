@@ -3,7 +3,8 @@ package markdown
 import (
 	"bytes"
 	"errors"
-	"os"
+	"fmt"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -16,44 +17,63 @@ func invalidYAMLKeyRune(r rune) bool {
 }
 
 type Frontmatter struct {
-	LeafWikiID    string `yaml:"leafwiki_id,omitempty" json:"id,omitempty"`
-	LeafWikiTitle string `yaml:"leafwiki_title,omitempty" json:"title,omitempty"`
+	LeafWikiID    string                 `yaml:"leafwiki_id,omitempty" json:"id,omitempty"`
+	LeafWikiTitle string                 `yaml:"leafwiki_title,omitempty" json:"title,omitempty"`
+	ExtraFields   map[string]interface{} `yaml:"-" json:"-"`
 }
 
-func (fm *Frontmatter) LoadFrontMatterFromContent(yamlPart string) (has bool, err error) {
-	if err := yaml.Unmarshal([]byte(yamlPart), fm); err != nil {
-		return true, errors.Join(ErrFrontmatterParse, err)
+func parseFrontmatterYAML(yamlPart string) (Frontmatter, error) {
+	var raw map[string]interface{}
+	if err := yaml.Unmarshal([]byte(yamlPart), &raw); err != nil {
+		return Frontmatter{}, errors.Join(ErrFrontmatterParse, err)
+	}
+	if raw == nil {
+		raw = map[string]interface{}{}
 	}
 
-	/** Check for title also in frontmatter **/
-	type titleOnlyStruct struct {
-		Title string `yaml:"title,omitempty"`
+	fm := Frontmatter{ExtraFields: map[string]interface{}{}}
+
+	if value, ok := raw["leafwiki_id"]; ok {
+		fm.LeafWikiID = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(valueToString(value)))
 	}
-	var tos titleOnlyStruct
-	if err := yaml.Unmarshal([]byte(yamlPart), &tos); err == nil {
-		if tos.Title != "" {
-			fm.LeafWikiTitle = tos.Title
+
+	if value, ok := raw["leafwiki_title"]; ok {
+		fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(valueToString(value))
+	} else if value, ok := raw["title"]; ok {
+		fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(valueToString(value))
+	}
+
+	for key, value := range raw {
+		switch key {
+		case "leafwiki_id", "leafwiki_title":
+			continue
+		default:
+			fm.ExtraFields[key] = value
 		}
 	}
 
-	fm.LeafWikiID = fm.stripSingleAndDoubleQuotes(fm.LeafWikiID)
-	fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(fm.LeafWikiTitle)
+	if len(fm.ExtraFields) == 0 {
+		fm.ExtraFields = nil
+	}
 
-	return true, nil
+	return fm, nil
+}
+
+func valueToString(value interface{}) string {
+	switch typed := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return typed
+	default:
+		return fmt.Sprint(typed)
+	}
 }
 
 func (fm *Frontmatter) stripSingleAndDoubleQuotes(s string) string {
 	s = strings.Trim(s, `"`)
 	s = strings.Trim(s, `'`)
 	return s
-}
-
-func (fm *Frontmatter) LoadFrontMatterFromFile(mdFilePath string) (has bool, err error) {
-	content, err := os.ReadFile(mdFilePath)
-	if err != nil {
-		return false, err
-	}
-	return fm.LoadFrontMatterFromContent(string(content))
 }
 
 func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
@@ -78,7 +98,6 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 	}
 
 	// Find closing delimiter on its own line: "\n---\n" or "\n---" at EOF
-	// We'll scan line-by-line using indices.
 	pos := firstNL + 1
 	yamlStart := pos
 
@@ -88,12 +107,10 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 	looksLikeYAML := false
 
 	for pos <= len(s) {
-		// find end of current line
 		nextNL := strings.IndexByte(s[pos:], '\n')
 		var line string
 		var lineEnd int
 		if nextNL == -1 {
-			// last line
 			lineEnd = len(s)
 			line = s[pos:lineEnd]
 		} else {
@@ -108,8 +125,6 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 			break
 		}
 
-		// Heuristic: at least one "key:" line => treat as YAML frontmatter
-		// Skip blanks/comments
 		if trim != "" && !strings.HasPrefix(trim, "#") {
 			if idx := strings.IndexByte(trim, ':'); idx > 0 {
 				key := strings.TrimSpace(trim[:idx])
@@ -119,7 +134,6 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 			}
 		}
 
-		// advance to next line
 		if nextNL == -1 {
 			pos = len(s) + 1
 		} else {
@@ -127,21 +141,17 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 		}
 	}
 
-	// No closing delimiter found => treat as no frontmatter
 	if endDelimLineStart == -1 {
 		return "", md, false
 	}
 
-	// If it doesn't look like YAML, treat as plain markdown (separator use-case)
 	if !looksLikeYAML {
 		return "", md, false
 	}
 
-	// YAML is between yamlStart and the start of the closing delimiter line
 	yamlPart = s[yamlStart:endDelimLineStart]
-	yamlPart = strings.TrimSuffix(yamlPart, "\n") // nice-to-have
+	yamlPart = strings.TrimSuffix(yamlPart, "\n")
 
-	// Body starts after the closing delimiter line (+ its trailing newline if present)
 	bodyStart := endDelimLineEnd
 	if bodyStart < len(s) && s[bodyStart:bodyStart+1] == "\n" {
 		bodyStart++
@@ -151,35 +161,75 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 	return yamlPart, body, true
 }
 
+// ParseFrontmatter splits already loaded markdown into frontmatter and body.
+// Use this on raw content that is already in memory when you only need parsing,
+// not path-based title fallback or write-back via MarkdownFile.
 func ParseFrontmatter(md string) (fm Frontmatter, body string, has bool, err error) {
 	yamlPart, body, has := splitFrontmatter(md)
 	if !has {
 		return Frontmatter{}, md, false, nil
 	}
 
-	if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
-		return Frontmatter{}, md, true, errors.Join(ErrFrontmatterParse, err)
+	fm, err = parseFrontmatterYAML(yamlPart)
+	if err != nil {
+		return Frontmatter{}, md, true, err
 	}
-
-	fm.LeafWikiID = fm.stripSingleAndDoubleQuotes(fm.LeafWikiID)
-	fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(fm.LeafWikiTitle)
 	return fm, body, true, nil
 }
 
+func toYAMLNode(value interface{}) (*yaml.Node, error) {
+	var node yaml.Node
+	if err := node.Encode(value); err != nil {
+		return nil, err
+	}
+	return &node, nil
+}
+
+// BuildMarkdownWithFrontmatter rebuilds markdown from parsed frontmatter data
+// and a markdown body. It preserves additional frontmatter keys and emits them
+// in deterministic order to keep rewrites stable.
 func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
-	// Avoid emitting empty frontmatter like "{}"
 	if strings.TrimSpace(fm.LeafWikiID) == "" {
 		return body, nil
 	}
 
-	b, err := yaml.Marshal(fm)
+	mapping := &yaml.Node{Kind: yaml.MappingNode}
+
+	extraKeys := make([]string, 0, len(fm.ExtraFields))
+	for key := range fm.ExtraFields {
+		extraKeys = append(extraKeys, key)
+	}
+	sort.Strings(extraKeys)
+	for _, key := range extraKeys {
+		valueNode, err := toYAMLNode(fm.ExtraFields[key])
+		if err != nil {
+			return "", err
+		}
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+			valueNode,
+		)
+	}
+
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_id"},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiID)},
+	)
+	if strings.TrimSpace(fm.LeafWikiTitle) != "" {
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_title"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiTitle)},
+		)
+	}
+
+	b, err := yaml.Marshal(mapping)
 	if err != nil {
 		return "", err
 	}
 
 	var out bytes.Buffer
 	out.WriteString("---\n")
-	out.Write(b) // yaml.v3 usually ends with \n, which is fine
+	out.Write(b)
 	out.WriteString("---\n")
 	out.WriteString(body)
 	return out.String(), nil

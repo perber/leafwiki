@@ -178,9 +178,40 @@ func TestNodeStore_CreatePage_CreatesMarkdownWithFrontmatter(t *testing.T) {
 	if strings.TrimSpace(fm.LeafWikiID) != "p1" {
 		t.Fatalf("expected leafwiki_id p1, got %q", fm.LeafWikiID)
 	}
-	// CreatePage setzt nur ID im FM, Title kommt in den Body als H1
+	if fm.LeafWikiTitle != "Hello World" {
+		t.Fatalf("expected leafwiki_title 'Hello World', got %q", fm.LeafWikiTitle)
+	}
 	if !strings.Contains(body, "# Hello World") {
 		t.Fatalf("expected H1 title in body, got: %q", body)
+	}
+}
+
+
+
+func TestNodeStore_CreatePage_SetsLeafWikiTitleInitially(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "hello", Title: "Hello World", Kind: NodeKindPage, Parent: root}
+
+	if err := store.CreatePage(root, page); err != nil {
+		t.Fatalf("CreatePage: %v", err)
+	}
+
+	raw := string(mustRead(t, filepath.Join(tmp, "root", "hello.md")))
+	fm, _, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter")
+	}
+	if fm.LeafWikiID != "p1" {
+		t.Fatalf("expected leafwiki_id p1, got %q", fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "Hello World" {
+		t.Fatalf("expected CreatePage to set leafwiki_title, got %q", fm.LeafWikiTitle)
 	}
 }
 
@@ -233,6 +264,56 @@ func TestNodeStore_UpsertContent_Page_CreatesOrUpdates_PreservesMode(t *testing.
 
 	raw, _ := os.ReadFile(path)
 	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected FM to exist")
+	}
+	if fm.LeafWikiID != "p1" {
+		t.Fatalf("expected id p1, got %q", fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "My Page" {
+		t.Fatalf("expected title 'My Page', got %q", fm.LeafWikiTitle)
+	}
+	if strings.TrimSpace(body) != "# new" {
+		t.Fatalf("expected body '# new', got %q", body)
+	}
+}
+
+
+
+func TestNodeStore_UpsertContent_PreservesExistingCustomFrontmatter(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "My Page", Kind: NodeKindPage, Parent: root}
+
+	path := filepath.Join(tmp, "root", "p.md")
+	mustWriteFile(t, path, `---
+custom_key: keep-me
+tags:
+  - alpha
+leafwiki_id: old-id
+leafwiki_title: Old Title
+---
+# old
+`, 0o644)
+
+	if err := store.UpsertContent(page, "# new"); err != nil {
+		t.Fatalf("UpsertContent: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	if !strings.Contains(raw, "custom_key: keep-me") {
+		t.Fatalf("expected custom frontmatter to be preserved, got: %q", raw)
+	}
+	if !strings.Contains(raw, "- alpha") {
+		t.Fatalf("expected custom list frontmatter to be preserved, got: %q", raw)
+	}
+
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
 	if err != nil {
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
@@ -424,6 +505,61 @@ func TestNodeStore_ReadPageRaw_Page_Missing_IsDrift(t *testing.T) {
 	}
 }
 
+
+
+func TestNodeStore_ReadPageContent_StripsFrontmatterAndPreservesBody(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: root}
+
+	path := filepath.Join(tmp, "root", "p.md")
+	mustWriteFile(t, path, `---
+custom_key: keep-me
+leafwiki_id: p1
+leafwiki_title: Existing Title
+---
+# Body
+Hello
+`, 0o644)
+
+	content, err := store.ReadPageContent(page)
+	if err != nil {
+		t.Fatalf("ReadPageContent: %v", err)
+	}
+	if content != `# Body
+Hello
+` {
+		t.Fatalf("expected body without frontmatter, got %q", content)
+	}
+}
+
+func TestNodeStore_ReadPageContent_InvalidFrontmatterReturnsRaw(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: root}
+
+	path := filepath.Join(tmp, "root", "p.md")
+	raw := `---
+leafwiki_id: [broken
+---
+# Body
+Hello
+`
+	mustWriteFile(t, path, raw, 0o644)
+
+	content, err := store.ReadPageContent(page)
+	if err == nil {
+		t.Fatalf("expected parse error for invalid frontmatter")
+	}
+	if content != raw {
+		t.Fatalf("expected raw content fallback on parse error, got %q", content)
+	}
+}
+
 func TestNodeStore_SyncFrontmatterIfExists_Page_UpdatesOrAddsFM(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
@@ -471,6 +607,55 @@ func TestNodeStore_SyncFrontmatterIfExists_Page_UpdatesOrAddsFM(t *testing.T) {
 	}
 	if strings.TrimSpace(body2) != "# Body\nHello" {
 		t.Fatalf("body changed unexpectedly on update: %q", body2)
+	}
+}
+
+
+
+func TestNodeStore_SyncFrontmatterIfExists_PreservesExistingCustomFrontmatter(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "Title A", Kind: NodeKindPage, Parent: root}
+
+	path := filepath.Join(tmp, "root", "p.md")
+	mustWriteFile(t, path, `---
+custom_key: keep-me
+aliases:
+  - one
+leafwiki_id: old-id
+leafwiki_title: Old Title
+---
+# Body
+Hello
+`, 0o644)
+
+	if err := store.SyncFrontmatterIfExists(page); err != nil {
+		t.Fatalf("SyncFrontmatterIfExists: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	if !strings.Contains(raw, "custom_key: keep-me") {
+		t.Fatalf("expected custom frontmatter to be preserved, got: %q", raw)
+	}
+	if !strings.Contains(raw, "- one") {
+		t.Fatalf("expected custom list frontmatter to be preserved, got: %q", raw)
+	}
+
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected FM to exist")
+	}
+	if fm.LeafWikiID != "p1" || fm.LeafWikiTitle != "Title A" {
+		t.Fatalf("unexpected fm: %#v", fm)
+	}
+	if strings.TrimSpace(body) != `# Body
+Hello` {
+		t.Fatalf("body changed unexpectedly: %q", body)
 	}
 }
 

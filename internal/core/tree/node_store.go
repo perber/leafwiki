@@ -43,7 +43,7 @@ func NewNodeStore(storageDir string) *NodeStore {
 
 // writeIDToMarkdownFile writes a leafwiki_id to a markdown file's frontmatter and logs errors if the write fails
 func (f *NodeStore) writeIDToMarkdownFile(mdFile *markdown.MarkdownFile, id string) {
-	mdFile.SetFrontmatterID(id)
+	mdFile.SetLeafWikiFrontmatter(id, mdFile.GetFrontmatter().LeafWikiTitle)
 	if err := mdFile.WriteToFile(); err != nil {
 		f.log.Error("could not write leafwiki_id back to file", "path", mdFile.GetPath(), "error", err)
 	}
@@ -323,14 +323,9 @@ func (f *NodeStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 		return &PageAlreadyExistsError{Path: destBase}
 	}
 
-	// Build and write file
-	fm := markdown.Frontmatter{LeafWikiID: newEntry.ID}
-	md, err := markdown.BuildMarkdownWithFrontmatter(fm, "# "+newEntry.Title+"\n")
-	if err != nil {
-		return fmt.Errorf("could not build markdown with frontmatter: %w", err)
-	}
-
-	if err := shared.WriteFileAtomic(destFile, []byte(md), 0o644); err != nil {
+	mdFile := markdown.NewMarkdownFile(destFile, "# "+newEntry.Title+"\n", markdown.Frontmatter{})
+	mdFile.SetLeafWikiFrontmatter(newEntry.ID, newEntry.Title)
+	if err := mdFile.WriteToFile(); err != nil {
 		return fmt.Errorf("could not create file: %w", err)
 	}
 
@@ -393,25 +388,23 @@ func (f *NodeStore) UpsertContent(entry *PageNode, content string) error {
 		return &InvalidOpError{Op: "UpsertContent", Reason: "an entry is required"}
 	}
 
-	// Determine expected write path
 	filePath, err := f.contentPathForNodeWrite(entry)
 	if err != nil {
 		return err
 	}
 
-	mode := os.FileMode(0o644)
-	if st, err := os.Stat(filePath); err == nil {
-		mode = st.Mode()
+	mdFile := markdown.NewMarkdownFile(filePath, "", markdown.Frontmatter{})
+	if fileExists(filePath) {
+		mdFile, err = markdown.LoadMarkdownFile(filePath)
+		if err != nil {
+			return fmt.Errorf("could not load markdown file: %w", err)
+		}
 	}
 
-	// Update the file content
-	fm := markdown.Frontmatter{LeafWikiID: strings.TrimSpace(entry.ID), LeafWikiTitle: strings.TrimSpace(entry.Title)}
-	contentWithFM, err := markdown.BuildMarkdownWithFrontmatter(fm, content)
-	if err != nil {
-		return fmt.Errorf("could not build markdown with frontmatter: %w", err)
-	}
-	if err := shared.WriteFileAtomic(filePath, []byte(contentWithFM), mode); err != nil {
-		return fmt.Errorf("could not write to file atomically: %w", err)
+	mdFile.SetContent(content)
+	mdFile.SetLeafWikiFrontmatter(strings.TrimSpace(entry.ID), strings.TrimSpace(entry.Title))
+	if err := mdFile.WriteToFile(); err != nil {
+		return fmt.Errorf("could not write markdown file: %w", err)
 	}
 
 	return nil
@@ -696,11 +689,18 @@ func (f *NodeStore) ReadPageContent(entry *PageNode) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, content, _, err := markdown.ParseFrontmatter(string(raw))
+
+	filePath, err := f.contentPathForNodeRead(entry)
 	if err != nil {
-		return string(raw), err
+		return "", err
 	}
-	return content, nil
+
+	mdFile, err := markdown.NewMarkdownFileFromRaw(filePath, raw)
+	if err != nil {
+		return raw, err
+	}
+
+	return mdFile.GetContent(), nil
 }
 
 // SyncFrontmatterIfExists updates the frontmatter of a page file on disk if it exists
@@ -726,35 +726,14 @@ func (f *NodeStore) SyncFrontmatterIfExists(entry *PageNode) error {
 		return nil
 	}
 
-	raw, err := os.ReadFile(filePath)
+	mdFile, err := markdown.LoadMarkdownFile(filePath)
 	if err != nil {
-		return fmt.Errorf("read content file: %w", err)
+		return fmt.Errorf("load markdown file: %w", err)
 	}
 
-	fm, body, has, err := markdown.ParseFrontmatter(string(raw))
-	if err != nil {
-		return fmt.Errorf("parse frontmatter: %w", err)
-	}
-	if !has {
-		fm = markdown.Frontmatter{}
-	}
-
-	// Tree-SoT invariants
-	fm.LeafWikiID = strings.TrimSpace(entry.ID)
-	fm.LeafWikiTitle = strings.TrimSpace(entry.Title)
-
-	out, err := markdown.BuildMarkdownWithFrontmatter(fm, body)
-	if err != nil {
-		return fmt.Errorf("build markdown: %w", err)
-	}
-
-	mode := os.FileMode(0o644)
-	if st, err := os.Stat(filePath); err == nil {
-		mode = st.Mode()
-	}
-
-	if err := shared.WriteFileAtomic(filePath, []byte(out), mode); err != nil {
-		return fmt.Errorf("write file atomically: %w", err)
+	mdFile.SetLeafWikiFrontmatter(strings.TrimSpace(entry.ID), strings.TrimSpace(entry.Title))
+	if err := mdFile.WriteToFile(); err != nil {
+		return fmt.Errorf("write markdown file: %w", err)
 	}
 	return nil
 }
@@ -936,12 +915,9 @@ func (f *NodeStore) ConvertNode(entry *PageNode, target NodeKind) error {
 				return fmt.Errorf("could not move index to page: %w", err)
 			}
 		} else {
-			fm := markdown.Frontmatter{LeafWikiID: entry.ID, LeafWikiTitle: entry.Title}
-			md, err := markdown.BuildMarkdownWithFrontmatter(fm, "")
-			if err != nil {
-				return err
-			}
-			if err := shared.WriteFileAtomic(filePath, []byte(md), 0o644); err != nil {
+			mdFile := markdown.NewMarkdownFile(filePath, "", markdown.Frontmatter{})
+			mdFile.SetLeafWikiFrontmatter(entry.ID, entry.Title)
+			if err := mdFile.WriteToFile(); err != nil {
 				return fmt.Errorf("could not write page file: %w", err)
 			}
 		}

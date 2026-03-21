@@ -198,48 +198,35 @@ func (t *TreeService) migrateToV2() error {
 			return fmt.Errorf("could not read page content for node %s: %w", node.ID, err)
 		}
 
-		// Parse the frontmatter
-		fm, body, has, err := markdown.ParseFrontmatter(content)
+		filePath, err := t.store.contentPathForNodeWrite(node)
 		if err != nil {
-			t.log.Error("Could not parse frontmatter for node", "nodeID", node.ID, "error", err)
-			return fmt.Errorf("could not parse frontmatter for node %s: %w", node.ID, err)
+			return fmt.Errorf("could not determine content path for node %s: %w", node.ID, err)
 		}
 
-		// Decide if we need to change anything
+		mdFile := markdown.NewMarkdownFile(filePath, content, markdown.Frontmatter{})
+		if raw := strings.TrimSpace(content); raw != "" {
+			mdFile, err = markdown.NewMarkdownFileFromRaw(filePath, content)
+			if err != nil {
+				t.log.Error("Could not parse markdown content for node", "nodeID", node.ID, "error", err)
+				return fmt.Errorf("could not parse markdown content for node %s: %w", node.ID, err)
+			}
+		}
+
+		fm := mdFile.GetFrontmatter()
 		changed := false
 
-		// If there is no frontmatter, start with a new one
-		if !has {
-			fm = markdown.Frontmatter{}
-			changed = true
-		}
-
-		// Ensure required fields exist
 		if strings.TrimSpace(fm.LeafWikiID) == "" {
 			fm.LeafWikiID = node.ID
 			changed = true
 		}
-		// Optional but nice: keep title in sync *at least once*
-		// (you might choose to NOT overwrite existing title)
 		if strings.TrimSpace(fm.LeafWikiTitle) == "" {
 			fm.LeafWikiTitle = node.Title
 			changed = true
 		}
 
-		// Only write if changed
 		if changed {
-			newContent, err := markdown.BuildMarkdownWithFrontmatter(fm, body)
-			if err != nil {
-				t.log.Error("could not build markdown with frontmatter", "nodeID", node.ID, "error", err)
-				return fmt.Errorf("could not build markdown with frontmatter for node %s: %w", node.ID, err)
-			}
-
-			filePath, err := t.store.contentPathForNodeWrite(node)
-			if err != nil {
-				return fmt.Errorf("could not determine content path for node %s: %w", node.ID, err)
-			}
-
-			if err := shared.WriteFileAtomic(filePath, []byte(newContent), 0o644); err != nil {
+			mdFile.SetLeafWikiFrontmatter(fm.LeafWikiID, fm.LeafWikiTitle)
+			if err := mdFile.WriteToFile(); err != nil {
 				t.log.Error("could not write updated page content", "nodeID", node.ID, "filePath", filePath, "error", err)
 				return fmt.Errorf("could not write updated page content for node %s: %w", node.ID, err)
 			}
