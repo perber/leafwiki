@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -354,15 +355,19 @@ leafwiki_last_author_id: bob
 	}
 }
 
-func TestNodeStore_ReconstructTreeFromFS_MissingMetadataFallsBackToNowAndSystem(t *testing.T) {
+func TestNodeStore_ReconstructTreeFromFS_MissingMetadataFallsBackToMtimeAndSystem(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	mustWriteFile(t, filepath.Join(tmp, "root", "page.md"), `# Page One`, 0o644)
+	pagePath := filepath.Join(tmp, "root", "page.md")
+	mustWriteFile(t, pagePath, `# Page One`, 0o644)
 
-	before := time.Now().UTC().Add(-time.Second)
+	wantTime := time.Date(2026, time.March, 21, 12, 34, 56, 0, time.UTC)
+	if err := os.Chtimes(pagePath, wantTime, wantTime); err != nil {
+		t.Fatalf("Chtimes: %v", err)
+	}
+
 	tree, err := store.ReconstructTreeFromFS()
-	after := time.Now().UTC().Add(time.Second)
 	if err != nil {
 		t.Fatalf("ReconstructTreeFromFS: %v", err)
 	}
@@ -371,17 +376,17 @@ func TestNodeStore_ReconstructTreeFromFS_MissingMetadataFallsBackToNowAndSystem(
 	if strings.TrimSpace(page.ID) == "" {
 		t.Fatalf("expected generated ID")
 	}
-	if page.Metadata.CreatedAt.Before(before) || page.Metadata.CreatedAt.After(after) {
-		t.Fatalf("expected created_at fallback near now, got %v", page.Metadata.CreatedAt)
+	if got := page.Metadata.CreatedAt.UTC().Format(time.RFC3339); got != wantTime.Format(time.RFC3339) {
+		t.Fatalf("expected created_at fallback from mtime, got %q", got)
 	}
-	if page.Metadata.UpdatedAt.Before(before) || page.Metadata.UpdatedAt.After(after) {
-		t.Fatalf("expected updated_at fallback near now, got %v", page.Metadata.UpdatedAt)
+	if got := page.Metadata.UpdatedAt.UTC().Format(time.RFC3339); got != wantTime.Format(time.RFC3339) {
+		t.Fatalf("expected updated_at fallback from mtime, got %q", got)
 	}
 	if page.Metadata.CreatorID != reconstructSystemUserID || page.Metadata.LastAuthorID != reconstructSystemUserID {
 		t.Fatalf("expected system user fallback, got %#v", page.Metadata)
 	}
 
-	mdFile, err := markdown.LoadMarkdownFile(filepath.Join(tmp, "root", "page.md"))
+	mdFile, err := markdown.LoadMarkdownFile(pagePath)
 	if err != nil {
 		t.Fatalf("LoadMarkdownFile: %v", err)
 	}
@@ -394,11 +399,12 @@ func TestNodeStore_ReconstructTreeFromFS_MissingMetadataFallsBackToNowAndSystem(
 	}
 }
 
-func TestNodeStore_ReconstructTreeFromFS_InvalidMetadataTimestampFallsBackToNow(t *testing.T) {
+func TestNodeStore_ReconstructTreeFromFS_InvalidMetadataTimestampFallsBackToMtime(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	mustWriteFile(t, filepath.Join(tmp, "root", "page.md"), `---
+	pagePath := filepath.Join(tmp, "root", "page.md")
+	mustWriteFile(t, pagePath, `---
 leafwiki_id: page-1
 leafwiki_title: Page One
 leafwiki_created_at: not-a-timestamp
@@ -408,16 +414,19 @@ leafwiki_last_author_id: bob
 ---
 # Page One`, 0o644)
 
-	before := time.Now().UTC().Add(-time.Second)
+	wantTime := time.Date(2026, time.March, 21, 12, 34, 56, 0, time.UTC)
+	if err := os.Chtimes(pagePath, wantTime, wantTime); err != nil {
+		t.Fatalf("Chtimes: %v", err)
+	}
+
 	tree, err := store.ReconstructTreeFromFS()
-	after := time.Now().UTC().Add(time.Second)
 	if err != nil {
 		t.Fatalf("ReconstructTreeFromFS: %v", err)
 	}
 
 	page := findChildBySlug(t, tree, "page")
-	if page.Metadata.CreatedAt.Before(before) || page.Metadata.CreatedAt.After(after) {
-		t.Fatalf("expected invalid created_at to fall back near now, got %v", page.Metadata.CreatedAt)
+	if got := page.Metadata.CreatedAt.UTC().Format(time.RFC3339); got != wantTime.Format(time.RFC3339) {
+		t.Fatalf("expected invalid created_at to fall back to mtime, got %q", got)
 	}
 	if got := page.Metadata.UpdatedAt.UTC().Format(time.RFC3339); got != "2026-03-21T11:16:31Z" {
 		t.Fatalf("expected valid updated_at to be preserved, got %q", got)

@@ -1228,13 +1228,17 @@ leafwiki_last_author_id: bob
 func TestTreeService_ReconstructTreeFromFS_PersistsTreeJSON_MetadataFallbacksWhenMissing(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
-	mustWriteFile(t, filepath.Join(tmpDir, "root", "readme.md"), `# README`, 0o644)
+	readmePath := filepath.Join(tmpDir, "root", "readme.md")
+	mustWriteFile(t, readmePath, `# README`, 0o644)
 
-	before := time.Now().UTC().Add(-time.Second)
+	wantTime := time.Date(2026, time.March, 21, 12, 34, 56, 0, time.UTC)
+	if err := os.Chtimes(readmePath, wantTime, wantTime); err != nil {
+		t.Fatalf("Chtimes: %v", err)
+	}
+
 	if err := svc.ReconstructTreeFromFS(); err != nil {
 		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
 	}
-	after := time.Now().UTC().Add(time.Second)
 
 	newSvc := NewTreeService(tmpDir)
 	if err := newSvc.LoadTree(); err != nil {
@@ -1245,11 +1249,11 @@ func TestTreeService_ReconstructTreeFromFS_PersistsTreeJSON_MetadataFallbacksWhe
 	if strings.TrimSpace(readme.ID) == "" {
 		t.Fatalf("expected generated ID to persist")
 	}
-	if readme.Metadata.CreatedAt.Before(before) || readme.Metadata.CreatedAt.After(after) {
-		t.Fatalf("expected persisted created_at fallback near now, got %v", readme.Metadata.CreatedAt)
+	if got := readme.Metadata.CreatedAt.UTC().Format(time.RFC3339); got != wantTime.Format(time.RFC3339) {
+		t.Fatalf("expected persisted created_at fallback from mtime, got %q", got)
 	}
-	if readme.Metadata.UpdatedAt.Before(before) || readme.Metadata.UpdatedAt.After(after) {
-		t.Fatalf("expected persisted updated_at fallback near now, got %v", readme.Metadata.UpdatedAt)
+	if got := readme.Metadata.UpdatedAt.UTC().Format(time.RFC3339); got != wantTime.Format(time.RFC3339) {
+		t.Fatalf("expected persisted updated_at fallback from mtime, got %q", got)
 	}
 	if readme.Metadata.CreatorID != reconstructSystemUserID || readme.Metadata.LastAuthorID != reconstructSystemUserID {
 		t.Fatalf("expected persisted system-user metadata fallback, got %#v", readme.Metadata)
