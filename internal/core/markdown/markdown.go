@@ -26,7 +26,11 @@ func LoadMarkdownFile(filePath string) (*MarkdownFile, error) {
 		return nil, err
 	}
 
-	fm, content, has, err := ParseFrontmatter(string(raw))
+	return NewMarkdownFileFromRaw(filePath, string(raw))
+}
+
+func NewMarkdownFileFromRaw(filePath string, raw string) (*MarkdownFile, error) {
+	fm, content, has, err := ParseFrontmatter(raw)
 	if err != nil {
 		return nil, err
 	}

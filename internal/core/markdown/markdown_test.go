@@ -144,3 +144,41 @@ func TestLoadMarkdownFile_UppercaseExtension(t *testing.T) {
 		t.Fatalf("title = %q, want %q", title, "Uppercase Extension")
 	}
 }
+
+func TestNewMarkdownFileFromRaw_PreservesCustomFrontmatter(t *testing.T) {
+	mdFile, err := NewMarkdownFileFromRaw("/tmp/test.md", `---
+custom_key: keep-me
+leafwiki_id: p1
+leafwiki_title: Existing Title
+---
+# Body
+Hello
+`)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	if mdFile.GetFrontmatter().LeafWikiID != "p1" {
+		t.Fatalf("expected id p1, got %q", mdFile.GetFrontmatter().LeafWikiID)
+	}
+	if mdFile.GetFrontmatter().LeafWikiTitle != "Existing Title" {
+		t.Fatalf("expected title 'Existing Title', got %q", mdFile.GetFrontmatter().LeafWikiTitle)
+	}
+	if got := mdFile.GetContent(); got != "# Body\nHello\n" {
+		t.Fatalf("unexpected content: %q", got)
+	}
+	if got := mdFile.GetFrontmatter().ExtraFields["custom_key"]; got != "keep-me" {
+		t.Fatalf("expected custom_key to be preserved, got %#v", got)
+	}
+}
+
+func TestNewMarkdownFileFromRaw_InvalidFrontmatter(t *testing.T) {
+	_, err := NewMarkdownFileFromRaw("/tmp/test.md", `---
+leafwiki_id: [broken
+---
+# Body
+`)
+	if err == nil {
+		t.Fatalf("expected parse error")
+	}
+}

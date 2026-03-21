@@ -695,7 +695,7 @@ func (f *NodeStore) ReadPageContent(entry *PageNode) (string, error) {
 		return "", err
 	}
 
-	mdFile, err := markdown.LoadMarkdownFile(filePath)
+	mdFile, err := markdown.NewMarkdownFileFromRaw(filePath, raw)
 	if err != nil {
 		return raw, err
 	}
