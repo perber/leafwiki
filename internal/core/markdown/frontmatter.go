@@ -161,6 +161,9 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 	return yamlPart, body, true
 }
 
+// ParseFrontmatter splits already loaded markdown into frontmatter and body.
+// Use this on raw content that is already in memory when you only need parsing,
+// not path-based title fallback or write-back via MarkdownFile.
 func ParseFrontmatter(md string) (fm Frontmatter, body string, has bool, err error) {
 	yamlPart, body, has := splitFrontmatter(md)
 	if !has {
@@ -182,6 +185,9 @@ func toYAMLNode(value interface{}) (*yaml.Node, error) {
 	return &node, nil
 }
 
+// BuildMarkdownWithFrontmatter rebuilds markdown from parsed frontmatter data
+// and a markdown body. It preserves additional frontmatter keys and emits them
+// in deterministic order to keep rewrites stable.
 func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
 	if strings.TrimSpace(fm.LeafWikiID) == "" {
 		return body, nil
