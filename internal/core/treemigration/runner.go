@@ -65,37 +65,18 @@ type Dependencies struct {
 }
 
 func Run(fromVersion int, deps Dependencies) error {
-	if deps.Root == nil {
-		return errors.New("tree not loaded")
+	if err := validateDependencies(fromVersion, deps); err != nil {
+		return err
 	}
 
 	for version := fromVersion; version < deps.CurrentSchemaVersion; version++ {
-		var err error
-
-		switch version {
-		case 0:
-			err = migrateToV1(deps)
-			if err != nil {
-				deps.Log.Error("Error migrating to v1", "error", err)
-			}
-		case 1:
-			err = migrateToV2(deps)
-			if err != nil {
-				deps.Log.Error("Error migrating to v2", "error", err)
-			}
-		case 2:
-			err = migrateToV3(deps)
-			if err != nil {
-				deps.Log.Error("Error migrating to v3", "error", err)
-			}
-		case 3:
-			err = migrateToV4(deps)
-			if err != nil {
-				deps.Log.Error("Error migrating to v4", "error", err)
-			}
+		migration, err := migrationForVersion(version)
+		if err != nil {
+			return err
 		}
 
-		if err != nil {
+		if err := migration(deps); err != nil {
+			deps.Log.Error("Error migrating schema version", "fromVersion", version, "toVersion", version+1, "error", err)
 			return err
 		}
 
@@ -111,6 +92,53 @@ func Run(fromVersion int, deps Dependencies) error {
 	}
 
 	return nil
+}
+
+func validateDependencies(fromVersion int, deps Dependencies) error {
+	if fromVersion < 0 {
+		return fmt.Errorf("invalid schema version: %d", fromVersion)
+	}
+	if deps.Root == nil {
+		return errors.New("tree not loaded")
+	}
+	if deps.Store == nil {
+		return errors.New("migration store is required")
+	}
+	if deps.Log == nil {
+		return errors.New("migration logger is required")
+	}
+	if deps.SaveTree == nil {
+		return errors.New("save tree callback is required")
+	}
+	if deps.SaveSchema == nil {
+		return errors.New("save schema callback is required")
+	}
+	if deps.CurrentSchemaVersion < fromVersion {
+		return fmt.Errorf("current schema version %d is older than stored version %d", deps.CurrentSchemaVersion, fromVersion)
+	}
+
+	for version := fromVersion; version < deps.CurrentSchemaVersion; version++ {
+		if _, err := migrationForVersion(version); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func migrationForVersion(version int) (func(Dependencies) error, error) {
+	switch version {
+	case 0:
+		return migrateToV1, nil
+	case 1:
+		return migrateToV2, nil
+	case 2:
+		return migrateToV3, nil
+	case 3:
+		return migrateToV4, nil
+	default:
+		return nil, fmt.Errorf("unsupported schema migration version: %d", version)
+	}
 }
 
 func migrateToV1(deps Dependencies) error {
