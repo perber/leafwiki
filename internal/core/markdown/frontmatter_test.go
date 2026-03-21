@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestSplitFrontmatter(t *testing.T) {
@@ -173,6 +174,20 @@ func TestParseFrontmatter(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:  "valid frontmatter with leafwiki metadata",
+			input: "---\nleafwiki_id: abc123\nleafwiki_created_at: 2026-03-21T10:15:30Z\nleafwiki_updated_at: 2026-03-21T11:16:31Z\nleafwiki_creator_id: alice\nleafwiki_last_author_id: bob\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiID:           "abc123",
+				LeafWikiCreatedAt:    "2026-03-21T10:15:30Z",
+				LeafWikiUpdatedAt:    "2026-03-21T11:16:31Z",
+				LeafWikiCreatorID:    "alice",
+				LeafWikiLastAuthorID: "bob",
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
 			name:  "unknown fields are preserved",
 			input: "---\nkey: value\n---\nBody",
 			wantFM: Frontmatter{
@@ -311,6 +326,19 @@ func TestBuildMarkdownWithFrontmatter(t *testing.T) {
 			},
 			body: "# Title\nContent",
 			want: "---\nleafwiki_id: abc123\nleafwiki_title: My Title\n---\n# Title\nContent",
+		},
+		{
+			name: "frontmatter with metadata fields",
+			fm: Frontmatter{
+				LeafWikiID:           "abc123",
+				LeafWikiTitle:        "My Title",
+				LeafWikiCreatedAt:    "2026-03-21T10:15:30Z",
+				LeafWikiUpdatedAt:    "2026-03-21T11:16:31Z",
+				LeafWikiCreatorID:    "alice",
+				LeafWikiLastAuthorID: "bob",
+			},
+			body: "Content",
+			want: "---\nleafwiki_id: abc123\nleafwiki_title: My Title\nleafwiki_created_at: \"2026-03-21T10:15:30Z\"\nleafwiki_updated_at: \"2026-03-21T11:16:31Z\"\nleafwiki_creator_id: alice\nleafwiki_last_author_id: bob\n---\nContent",
 		},
 		{
 			name: "frontmatter preserves unknown fields",
@@ -477,5 +505,38 @@ leafwiki_title: My Title
 Content`
 	if got != want {
 		t.Fatalf("BuildMarkdownWithFrontmatter() =\n%q\nwant:\n%q", got, want)
+	}
+}
+
+func TestFrontmatter_MetadataRoundtripRFC3339(t *testing.T) {
+	createdAt := time.Date(2026, time.March, 21, 10, 15, 30, 0, time.UTC).Format(time.RFC3339)
+	updatedAt := time.Date(2026, time.March, 21, 11, 16, 31, 0, time.UTC).Format(time.RFC3339)
+
+	input := Frontmatter{
+		LeafWikiID:           "abc123",
+		LeafWikiTitle:        "My Title",
+		LeafWikiCreatedAt:    createdAt,
+		LeafWikiUpdatedAt:    updatedAt,
+		LeafWikiCreatorID:    "alice",
+		LeafWikiLastAuthorID: "bob",
+	}
+
+	raw, err := BuildMarkdownWithFrontmatter(input, "Body")
+	if err != nil {
+		t.Fatalf("BuildMarkdownWithFrontmatter() error = %v", err)
+	}
+
+	fm, body, has, err := ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter() error = %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter")
+	}
+	if body != "Body" {
+		t.Fatalf("unexpected body %q", body)
+	}
+	if !reflect.DeepEqual(fm, input) {
+		t.Fatalf("frontmatter changed: got %+v want %+v", fm, input)
 	}
 }

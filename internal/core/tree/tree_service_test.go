@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/perber/wiki/internal/core/markdown"
 )
@@ -143,6 +144,12 @@ func TestTreeService_CreateNode_Page_Root_CreatesFileAndFrontmatter(t *testing.T
 	}
 	if strings.TrimSpace(fm.LeafWikiID) != *id {
 		t.Fatalf("expected leafwiki_id=%q, got %q", *id, fm.LeafWikiID)
+	}
+	if fm.LeafWikiCreatedAt == "" || fm.LeafWikiUpdatedAt == "" {
+		t.Fatalf("expected leafwiki timestamps to be set, got %#v", fm)
+	}
+	if fm.LeafWikiCreatorID != "system" || fm.LeafWikiLastAuthorID != "system" {
+		t.Fatalf("expected creator metadata to be set, got %#v", fm)
 	}
 }
 
@@ -647,6 +654,82 @@ func TestTreeService_EnsurePagePath_CreatesIntermediateSectionsAndFinalPage(t *t
 	}
 }
 
+// --- F) Migration V3 (metadata frontmatter backfill) ---
+func TestTreeService_LoadTree_MigratesToV3_BackfillsMetadataFrontmatter(t *testing.T) {
+	if CurrentSchemaVersion < 3 {
+		t.Skip("requires schema v3+")
+	}
+
+	tmpDir := t.TempDir()
+
+	if err := saveSchema(tmpDir, 2); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	id, err := svc.CreateNode("system", nil, "Page1", "page1", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	if err != nil {
+		t.Fatalf("FindPageByID failed: %v", err)
+	}
+	node.Metadata = PageMetadata{
+		CreatedAt:    time.Date(2026, time.March, 21, 10, 15, 30, 0, time.UTC),
+		UpdatedAt:    time.Date(2026, time.March, 21, 11, 16, 31, 0, time.UTC),
+		CreatorID:    "alice",
+		LastAuthorID: "bob",
+	}
+
+	if err := svc.SaveTree(); err != nil {
+		t.Fatalf("SaveTree failed: %v", err)
+	}
+
+	pagePath := filepath.Join(tmpDir, "root", "page1.md")
+	legacyContent := "---\nleafwiki_id: " + *id + "\nleafwiki_title: Page1\n---\n# Page 1 Content\nHello World\n"
+	if err := os.WriteFile(pagePath, []byte(legacyContent), 0o644); err != nil {
+		t.Fatalf("write legacy content failed: %v", err)
+	}
+
+	if err := saveSchema(tmpDir, 2); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	loaded := NewTreeService(tmpDir)
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree (migrating) failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(pagePath)
+	if err != nil {
+		t.Fatalf("read migrated file: %v", err)
+	}
+
+	fm, migratedBody, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after migration")
+	}
+	if fm.LeafWikiCreatedAt != "2026-03-21T10:15:30Z" || fm.LeafWikiUpdatedAt != "2026-03-21T11:16:31Z" {
+		t.Fatalf("expected metadata timestamps to be backfilled, got %#v", fm)
+	}
+	if fm.LeafWikiCreatorID != "alice" || fm.LeafWikiLastAuthorID != "bob" {
+		t.Fatalf("expected metadata authors to be backfilled, got %#v", fm)
+	}
+	wantBody := "# Page 1 Content\nHello World\n"
+	if migratedBody != wantBody {
+		t.Fatalf("expected body preserved exactly.\nGot:\n%q\nWant:\n%q", migratedBody, wantBody)
+	}
+}
+
 // --- F) Migration V2 (frontmatter backfill) ---
 func TestTreeService_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *testing.T) {
 	if CurrentSchemaVersion < 2 {
@@ -656,7 +739,7 @@ func TestTreeService_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *te
 	tmpDir := t.TempDir()
 
 	// start on v1 (or generally: current-1)
-	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+	if err := saveSchema(tmpDir, 1); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -683,7 +766,7 @@ func TestTreeService_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *te
 	}
 
 	// force schema old again
-	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+	if err := saveSchema(tmpDir, 1); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -715,7 +798,6 @@ func TestTreeService_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *te
 	}
 }
 
-
 func TestTreeService_LoadTree_MigratesToV2_PreservesExistingCustomFrontmatter(t *testing.T) {
 	if CurrentSchemaVersion < 2 {
 		t.Skip("requires schema v2+")
@@ -723,7 +805,7 @@ func TestTreeService_LoadTree_MigratesToV2_PreservesExistingCustomFrontmatter(t 
 
 	tmpDir := t.TempDir()
 
-	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+	if err := saveSchema(tmpDir, 1); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -754,7 +836,7 @@ Hello World
 		t.Fatalf("write legacy content failed: %v", err)
 	}
 
-	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+	if err := saveSchema(tmpDir, 1); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -800,7 +882,6 @@ Hello World
 	}
 }
 
-
 func TestTreeService_LoadTree_MigratesToV2_PreservesExistingLeafWikiTitle(t *testing.T) {
 	if CurrentSchemaVersion < 2 {
 		t.Skip("requires schema v2+")
@@ -808,7 +889,7 @@ func TestTreeService_LoadTree_MigratesToV2_PreservesExistingLeafWikiTitle(t *tes
 
 	tmpDir := t.TempDir()
 
-	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+	if err := saveSchema(tmpDir, 1); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -837,7 +918,7 @@ Hello World
 		t.Fatalf("write legacy content failed: %v", err)
 	}
 
-	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+	if err := saveSchema(tmpDir, 1); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -879,7 +960,7 @@ func TestTreeService_LoadTree_MigratesToV2_PreservesTitleAlias(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+	if err := saveSchema(tmpDir, 1); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -909,7 +990,7 @@ Hello World
 		t.Fatalf("write legacy content failed: %v", err)
 	}
 
-	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+	if err := saveSchema(tmpDir, 1); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -1107,6 +1188,71 @@ leafwiki_title: README
 	}
 	if readme.Metadata.UpdatedAt.IsZero() {
 		t.Fatalf("expected persisted metadata UpdatedAt to not be zero")
+	}
+}
+
+func TestTreeService_ReconstructTreeFromFS_PersistsTreeJSON_MetadataFromFrontmatter(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "readme.md"), `---
+leafwiki_id: readme-page
+leafwiki_title: README
+leafwiki_created_at: 2026-03-21T10:15:30Z
+leafwiki_updated_at: 2026-03-21T11:16:31Z
+leafwiki_creator_id: alice
+leafwiki_last_author_id: bob
+---
+# README`, 0o644)
+
+	if err := svc.ReconstructTreeFromFS(); err != nil {
+		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
+	}
+
+	newSvc := NewTreeService(tmpDir)
+	if err := newSvc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree after reconstruction failed: %v", err)
+	}
+
+	readme := findChildBySlug(t, newSvc.GetTree(), "readme")
+	if got := readme.Metadata.CreatedAt.UTC().Format(time.RFC3339); got != "2026-03-21T10:15:30Z" {
+		t.Fatalf("expected persisted created_at from frontmatter, got %q", got)
+	}
+	if got := readme.Metadata.UpdatedAt.UTC().Format(time.RFC3339); got != "2026-03-21T11:16:31Z" {
+		t.Fatalf("expected persisted updated_at from frontmatter, got %q", got)
+	}
+	if readme.Metadata.CreatorID != "alice" || readme.Metadata.LastAuthorID != "bob" {
+		t.Fatalf("expected persisted author metadata from frontmatter, got %#v", readme.Metadata)
+	}
+}
+
+func TestTreeService_ReconstructTreeFromFS_PersistsTreeJSON_MetadataFallbacksWhenMissing(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "readme.md"), `# README`, 0o644)
+
+	before := time.Now().UTC().Add(-time.Second)
+	if err := svc.ReconstructTreeFromFS(); err != nil {
+		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
+	}
+	after := time.Now().UTC().Add(time.Second)
+
+	newSvc := NewTreeService(tmpDir)
+	if err := newSvc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree after reconstruction failed: %v", err)
+	}
+
+	readme := findChildBySlug(t, newSvc.GetTree(), "readme")
+	if strings.TrimSpace(readme.ID) == "" {
+		t.Fatalf("expected generated ID to persist")
+	}
+	if readme.Metadata.CreatedAt.Before(before) || readme.Metadata.CreatedAt.After(after) {
+		t.Fatalf("expected persisted created_at fallback near now, got %v", readme.Metadata.CreatedAt)
+	}
+	if readme.Metadata.UpdatedAt.Before(before) || readme.Metadata.UpdatedAt.After(after) {
+		t.Fatalf("expected persisted updated_at fallback near now, got %v", readme.Metadata.UpdatedAt)
+	}
+	if readme.Metadata.CreatorID != reconstructSystemUserID || readme.Metadata.LastAuthorID != reconstructSystemUserID {
+		t.Fatalf("expected persisted system-user metadata fallback, got %#v", readme.Metadata)
 	}
 }
 

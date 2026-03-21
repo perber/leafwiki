@@ -83,6 +83,11 @@ func (t *TreeService) migrate(fromVersion int) error {
 				t.log.Error("Error migrating to v2", "error", err)
 				return err
 			}
+		case 2:
+			if err := t.migrateToV3(); err != nil {
+				t.log.Error("Error migrating to v3", "error", err)
+				return err
+			}
 		}
 
 		// Save the tree after each migration step
@@ -166,6 +171,45 @@ func (t *TreeService) backfillMetadataLocked() error {
 	}
 
 	return backfillMetadata(t.tree)
+}
+
+func (t *TreeService) migrateToV3() error {
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
+	var backfillMetadataFrontmatter func(node *PageNode) error
+	backfillMetadataFrontmatter = func(node *PageNode) error {
+		filePath, err := t.store.contentPathForNodeRead(node)
+		if err != nil {
+			return fmt.Errorf("could not determine content path for node %s: %w", node.ID, err)
+		}
+		if fileExists(filePath) {
+			mdFile, err := markdown.LoadMarkdownFile(filePath)
+			if err != nil {
+				return fmt.Errorf("could not load markdown file for node %s: %w", node.ID, err)
+			}
+			mdFile.SetLeafWikiMetadata(
+				formatMetadataTime(node.Metadata.CreatedAt),
+				formatMetadataTime(node.Metadata.UpdatedAt),
+				strings.TrimSpace(node.Metadata.CreatorID),
+				strings.TrimSpace(node.Metadata.LastAuthorID),
+			)
+			if err := mdFile.WriteToFile(); err != nil {
+				return fmt.Errorf("could not write migrated metadata for node %s: %w", node.ID, err)
+			}
+		}
+
+		for _, child := range node.Children {
+			if err := backfillMetadataFrontmatter(child); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return backfillMetadataFrontmatter(t.tree)
 }
 
 // migrateToV2 migrates the tree to the v2 schema
@@ -356,13 +400,7 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 	oldTree := t.tree
 	t.tree = newTree
 
-	// Backfill metadata for all nodes
-	if err := t.backfillMetadataLocked(); err != nil {
-		t.log.Error("Error backfilling metadata after reconstruction", "error", err)
-		// Revert tree assignment on failure (may set back to nil, which is fine)
-		t.tree = oldTree
-		return err
-	}
+	// Reconstructed nodes already carry metadata from frontmatter or safe defaults.
 
 	// Save the tree
 	if err := t.saveTreeLocked(); err != nil {

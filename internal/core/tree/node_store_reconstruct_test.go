@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/perber/wiki/internal/core/markdown"
 )
@@ -217,7 +218,6 @@ func TestNodeStore_ReconstructTreeFromFS_PositionsAreContiguous(t *testing.T) {
 	}
 }
 
-
 func TestNodeStore_ReconstructTreeFromFS_WritesIDsBackToFiles(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
@@ -318,5 +318,111 @@ func TestNodeStore_ReconstructTreeFromFS_SkipsInvalidSlugs(t *testing.T) {
 	validSection := findChildBySlug(t, tree, "valid-section")
 	if validSection == nil {
 		t.Fatalf("expected 'Valid Section' directory to be normalized to 'valid-section'")
+	}
+}
+func TestNodeStore_ReconstructTreeFromFS_ReadsMetadataFromFrontmatter(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", "page.md"), `---
+leafwiki_id: page-1
+leafwiki_title: Page One
+leafwiki_created_at: 2026-03-21T10:15:30Z
+leafwiki_updated_at: 2026-03-21T11:16:31Z
+leafwiki_creator_id: alice
+leafwiki_last_author_id: bob
+---
+# Page One`, 0o644)
+
+	tree, err := store.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
+	}
+
+	page := findChildBySlug(t, tree, "page")
+	if page.ID != "page-1" {
+		t.Fatalf("expected page ID from frontmatter, got %q", page.ID)
+	}
+	if got := page.Metadata.CreatedAt.UTC().Format(time.RFC3339); got != "2026-03-21T10:15:30Z" {
+		t.Fatalf("expected created_at from frontmatter, got %q", got)
+	}
+	if got := page.Metadata.UpdatedAt.UTC().Format(time.RFC3339); got != "2026-03-21T11:16:31Z" {
+		t.Fatalf("expected updated_at from frontmatter, got %q", got)
+	}
+	if page.Metadata.CreatorID != "alice" || page.Metadata.LastAuthorID != "bob" {
+		t.Fatalf("expected author metadata from frontmatter, got %#v", page.Metadata)
+	}
+}
+
+func TestNodeStore_ReconstructTreeFromFS_MissingMetadataFallsBackToNowAndSystem(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", "page.md"), `# Page One`, 0o644)
+
+	before := time.Now().UTC().Add(-time.Second)
+	tree, err := store.ReconstructTreeFromFS()
+	after := time.Now().UTC().Add(time.Second)
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
+	}
+
+	page := findChildBySlug(t, tree, "page")
+	if strings.TrimSpace(page.ID) == "" {
+		t.Fatalf("expected generated ID")
+	}
+	if page.Metadata.CreatedAt.Before(before) || page.Metadata.CreatedAt.After(after) {
+		t.Fatalf("expected created_at fallback near now, got %v", page.Metadata.CreatedAt)
+	}
+	if page.Metadata.UpdatedAt.Before(before) || page.Metadata.UpdatedAt.After(after) {
+		t.Fatalf("expected updated_at fallback near now, got %v", page.Metadata.UpdatedAt)
+	}
+	if page.Metadata.CreatorID != reconstructSystemUserID || page.Metadata.LastAuthorID != reconstructSystemUserID {
+		t.Fatalf("expected system user fallback, got %#v", page.Metadata)
+	}
+
+	mdFile, err := markdown.LoadMarkdownFile(filepath.Join(tmp, "root", "page.md"))
+	if err != nil {
+		t.Fatalf("LoadMarkdownFile: %v", err)
+	}
+	fm := mdFile.GetFrontmatter()
+	if fm.LeafWikiID != page.ID {
+		t.Fatalf("expected generated ID to be written back, got %q want %q", fm.LeafWikiID, page.ID)
+	}
+	if fm.LeafWikiCreatedAt != "" || fm.LeafWikiUpdatedAt != "" || fm.LeafWikiCreatorID != "" || fm.LeafWikiLastAuthorID != "" {
+		t.Fatalf("expected reconstruct fallback metadata to stay out of frontmatter during read-only reconstruct, got %#v", fm)
+	}
+}
+
+func TestNodeStore_ReconstructTreeFromFS_InvalidMetadataTimestampFallsBackToNow(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", "page.md"), `---
+leafwiki_id: page-1
+leafwiki_title: Page One
+leafwiki_created_at: not-a-timestamp
+leafwiki_updated_at: 2026-03-21T11:16:31Z
+leafwiki_creator_id: alice
+leafwiki_last_author_id: bob
+---
+# Page One`, 0o644)
+
+	before := time.Now().UTC().Add(-time.Second)
+	tree, err := store.ReconstructTreeFromFS()
+	after := time.Now().UTC().Add(time.Second)
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
+	}
+
+	page := findChildBySlug(t, tree, "page")
+	if page.Metadata.CreatedAt.Before(before) || page.Metadata.CreatedAt.After(after) {
+		t.Fatalf("expected invalid created_at to fall back near now, got %v", page.Metadata.CreatedAt)
+	}
+	if got := page.Metadata.UpdatedAt.UTC().Format(time.RFC3339); got != "2026-03-21T11:16:31Z" {
+		t.Fatalf("expected valid updated_at to be preserved, got %q", got)
+	}
+	if page.Metadata.CreatorID != "alice" || page.Metadata.LastAuthorID != "bob" {
+		t.Fatalf("expected author metadata to be preserved, got %#v", page.Metadata)
 	}
 }
