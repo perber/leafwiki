@@ -84,5 +84,6 @@ export function internalLinkCompletionSource(
     to: range.to,
     options: buildCompletionOptions(matches),
     validFor: /^[^)\s]*$/,
+    filter: false,
   }
 }
