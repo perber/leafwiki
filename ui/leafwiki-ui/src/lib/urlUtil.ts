@@ -42,6 +42,10 @@ export function buildEditUrl(pathname: string): string {
   return `/e/${p}`
 }
 
+export function buildBrowserEditUrl(pathname: string): string {
+  return withBasePath(buildEditUrl(pathname))
+}
+
 export function buildViewUrl(pathname: string): string {
   const stripped = stripBasePath(pathname)
   if (stripped === null) return pathname
