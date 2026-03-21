@@ -11,13 +11,14 @@ import {
   NODE_KIND_SECTION,
   PageNode,
 } from '@/lib/api/pages'
-import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import {
   DIALOG_ADD_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
   DIALOG_MOVE_PAGE,
   DIALOG_SORT_PAGES,
 } from '@/lib/registries'
+import { useAppMode } from '@/lib/useAppMode'
+import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import {
@@ -33,6 +34,7 @@ import {
 import { useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { usePageEditorStore } from '../editor/pageEditor'
 import { TreeViewActionButton } from './TreeViewActionButton'
 import { useTreeNodeActionsMenusStore } from './treeNodeActionsMenus'
 
@@ -44,6 +46,8 @@ export default function TreeNodeActionsMenu({
   node,
 }: TreeNodeActionsMenuProps) {
   const { id: nodeId, kind: nodeKind, children } = node
+  const appMode = useAppMode()
+  const currentEditorPageId = usePageEditorStore((state) => state.page?.id)
   const openDialog = useDialogsStore((state) => state.openDialog)
   const reloadTree = useTreeStore((state) => state.reloadTree)
   const hasChildren = children && children.length > 0
@@ -71,6 +75,9 @@ export default function TreeNodeActionsMenu({
   const redirectUrlAfterDelete = useCallback(() => {
     return getDeleteRedirectRoutePath(location.pathname, node.path)
   }, [location.pathname, node.path])
+
+  const isCurrentlyEditedNode =
+    appMode === 'edit' && currentEditorPageId === node.id
 
   return (
     <DropdownMenu
@@ -149,6 +156,13 @@ export default function TreeNodeActionsMenu({
           className="text-error cursor-pointer"
           data-testid="tree-view-action-button-delete"
           onClick={() => {
+            if (isCurrentlyEditedNode) {
+              toast.warning(
+                `This ${nodeKind === NODE_KIND_PAGE ? 'page' : 'section'} is currently being edited. Please close the editor before deleting it.`,
+              )
+              return
+            }
+
             openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
               pageId: node?.id,
               redirectTo: redirectUrlAfterDelete(),

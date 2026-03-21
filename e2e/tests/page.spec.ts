@@ -512,6 +512,45 @@ graph TD;
     await page.waitForURL(new RegExp('/' + currentTitle + '$'));
   });
 
+  test('cannot-delete-current-page-while-editing-it', async ({ page }) => {
+    const title = 'Editing Delete Guard ' + Date.now();
+    const warningText =
+      'This page is currently being edited. Please close the editor before deleting it.';
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.clickPageByTitle(title);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const nodeRow = page
+      .locator('div[data-testid^="tree-node-"]')
+      .filter({ hasText: title })
+      .first();
+
+    await nodeRow.scrollIntoViewIfNeeded();
+    await nodeRow.hover();
+
+    const moreActionsButton = nodeRow.locator(
+      'button[data-testid="tree-view-action-button-open-more-actions"]',
+    );
+    await moreActionsButton.click({ force: true });
+
+    const deleteButton = page.locator('div[data-testid="tree-view-action-button-delete"]');
+    await deleteButton.click({ force: true });
+
+    const deletePageDialog = new DeletePageDialog(page);
+    test.expect(await deletePageDialog.dialogTextVisible()).toBeFalsy();
+    await page.getByText(warningText).waitFor({ state: 'visible' });
+    test.expect(await page.locator('.cm-editor').isVisible()).toBeTruthy();
+  });
+
   test('edit-metadata-on-nested-page-keeps-parent-path', async ({ page }) => {
     const suffix = Date.now();
     const parentTitle = 'meta-parent-' + suffix;
