@@ -1,4 +1,5 @@
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
+import { getParentWikiRoutePath, toWikiLookupPath } from '@/lib/wikiPath'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -29,7 +30,7 @@ export function EditorTitleBar() {
     if (!page) return
 
     const parentId = () => {
-      const parentPath = page.path.split('/').slice(0, -1).join('/')
+      const parentPath = toWikiLookupPath(getParentWikiRoutePath(page.path))
       const p = getPageByPath(parentPath)
       if (!p) return ''
       return p.id
@@ -58,7 +59,11 @@ export function EditorTitleBar() {
 
   return (
     <div className="editor-title-bar">
-      <button onClick={onEditClicked} className="editor-title-bar__button">
+      <button
+        onClick={onEditClicked}
+        className="editor-title-bar__button"
+        data-testid="edit-page-metadata-button"
+      >
         <TooltipWrapper label={title} side="top" align="start">
           {title && <span className="editor-title-bar__title">{title}</span>}
           <Pencil size={16} className="editor-title-bar__icon" />

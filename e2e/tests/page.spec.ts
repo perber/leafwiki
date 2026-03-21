@@ -4,6 +4,7 @@ import CopyPageDialog from '../pages/CopyPageDialog';
 import CreatePageByPathDialog from '../pages/CreatePageByPathDialog';
 import DeletePageDialog from '../pages/DeletePageDialog';
 import EditPage from '../pages/EditPage';
+import EditPageMetadataDialog from '../pages/EditPageMetadataDialog';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import TreeView from '../pages/TreeView';
@@ -407,6 +408,145 @@ graph TD;
     await searchView.clearSearch();
   });
   */
+
+  test('markdown-relative-link-navigates-to-sibling-page', async ({ page }) => {
+    const suffix = Date.now();
+    const parentTitle = 'markdown-link-parent-' + suffix;
+    const sourceTitle = 'source-' + suffix;
+    const targetTitle = 'target-' + suffix;
+    const linkLabel = 'Go to sibling target';
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(parentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.createSubPageOfParent(parentTitle, sourceTitle);
+    await treeView.createSubPageOfParent(parentTitle, targetTitle);
+    await treeView.expandNodeByTitle(parentTitle);
+    await treeView.clickPageByTitle(sourceTitle);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent('[' + linkLabel + '](../' + targetTitle + ')');
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await page.getByRole('link', { name: linkLabel }).click();
+    await page.waitForURL(new RegExp('/' + parentTitle + '/' + targetTitle + '$'));
+
+    await test.expect(page.locator('article>h1')).toHaveText(targetTitle);
+  });
+
+  test('delete-current-subpage-redirects-to-parent-page', async ({ page }) => {
+    const suffix = Date.now();
+    const parentTitle = 'delete-parent-' + suffix;
+    const childTitle = 'delete-child-' + suffix;
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(parentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.createSubPageOfParent(parentTitle, childTitle);
+    await treeView.expandNodeByTitle(parentTitle);
+    await treeView.clickPageByTitle(childTitle);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickDeletePageButton();
+
+    const deletePageDialog = new DeletePageDialog(page);
+    await deletePageDialog.confirmDeletion();
+    await page.waitForURL(new RegExp('/' + parentTitle + '$'));
+
+    test.expect(await viewPage.getTitle()).toBe(parentTitle);
+  });
+
+  test('delete-unrelated-page-keeps-current-page-open', async ({ page }) => {
+    const suffix = Date.now();
+    const currentTitle = 'current-page-' + suffix;
+    const otherTitle = 'other-page-' + suffix;
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(currentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.clickRootAddButton();
+    await addPageDialog.fillTitle(otherTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.clickPageByTitle(currentTitle);
+
+    const viewPage = new ViewPage(page);
+    test.expect(await viewPage.getTitle()).toBe(currentTitle);
+
+    const nodeRow = page
+      .locator('div[data-testid^="tree-node-"]')
+      .filter({ hasText: otherTitle })
+      .first();
+
+    await nodeRow.scrollIntoViewIfNeeded();
+    await nodeRow.hover();
+
+    const moreActionsButton = nodeRow.locator(
+      'button[data-testid="tree-view-action-button-open-more-actions"]',
+    );
+    await moreActionsButton.click({ force: true });
+
+    const deleteButton = page.locator('div[data-testid="tree-view-action-button-delete"]');
+    await deleteButton.click({ force: true });
+
+    const deletePageDialog = new DeletePageDialog(page);
+    await deletePageDialog.confirmDeletion();
+
+    test.expect(await viewPage.getTitle()).toBe(currentTitle);
+    await page.waitForURL(new RegExp('/' + currentTitle + '$'));
+  });
+
+  test('edit-metadata-on-nested-page-keeps-parent-path', async ({ page }) => {
+    const suffix = Date.now();
+    const parentTitle = 'meta-parent-' + suffix;
+    const childTitle = 'meta-child-' + suffix;
+    const renamedChildTitle = 'meta-child-renamed-' + suffix;
+    const expectedPath = parentTitle + '/' + renamedChildTitle;
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(parentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.createSubPageOfParent(parentTitle, childTitle);
+    await treeView.expandNodeByTitle(parentTitle);
+    await treeView.clickPageByTitle(childTitle);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openMetadataDialog();
+
+    const metadataDialog = new EditPageMetadataDialog(page);
+    await metadataDialog.fillTitle(renamedChildTitle);
+    await metadataDialog.expectSlug(renamedChildTitle);
+    await metadataDialog.expectPath(expectedPath);
+    await metadataDialog.submit();
+
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await page.waitForURL(new RegExp('/' + expectedPath + '$'));
+  });
 
   test('test-asset-upload-and-use-in-page', async ({ page }) => {
     const title = `Page With Asset ${Date.now()}`;

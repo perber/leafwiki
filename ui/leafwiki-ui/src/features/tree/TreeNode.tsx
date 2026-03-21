@@ -1,7 +1,7 @@
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
-import { buildEditUrl, buildViewUrl } from '@/lib/urlUtil'
+import { buildEditUrl, buildViewUrl } from '@/lib/routePath'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
