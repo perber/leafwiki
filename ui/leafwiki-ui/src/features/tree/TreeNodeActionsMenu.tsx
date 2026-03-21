@@ -11,14 +11,14 @@ import {
   NODE_KIND_SECTION,
   PageNode,
 } from '@/lib/api/pages'
-import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
-import { useAppMode } from '@/lib/useAppMode'
 import {
   DIALOG_ADD_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
   DIALOG_MOVE_PAGE,
   DIALOG_SORT_PAGES,
 } from '@/lib/registries'
+import { useAppMode } from '@/lib/useAppMode'
+import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import {
@@ -156,7 +156,7 @@ export default function TreeNodeActionsMenu({
           className="text-error cursor-pointer"
           data-testid="tree-view-action-button-delete"
           onClick={() => {
-            if (isCurrentlyEditedPage) {
+            if (isCurrentlyEditedNode) {
               toast.warning(
                 `This ${nodeKind === NODE_KIND_PAGE ? 'page' : 'section'} is currently being edited. Please close the editor before deleting it.`,
               )
