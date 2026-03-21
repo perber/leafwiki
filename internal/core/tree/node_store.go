@@ -76,6 +76,17 @@ func fallbackMetadataString(value string) string {
 	return strings.TrimSpace(value)
 }
 
+func (f *NodeStore) metadataFallbackTime(filePath string, fallback time.Time) time.Time {
+	info, err := os.Stat(filePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			f.log.Warn("could not stat path for reconstruct metadata fallback, using runtime fallback", "path", filePath, "fallback", fallback.UTC().Format(time.RFC3339), "error", err)
+		}
+		return fallback.UTC()
+	}
+	return info.ModTime().UTC()
+}
+
 func (f *NodeStore) parseMetadataTime(value string, fallback time.Time, field string, filePath string) time.Time {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
@@ -90,9 +101,10 @@ func (f *NodeStore) parseMetadataTime(value string, fallback time.Time, field st
 }
 
 func (f *NodeStore) metadataFromFrontmatter(fm markdown.Frontmatter, fallbackNow time.Time, filePath string) PageMetadata {
+	fallbackTime := f.metadataFallbackTime(filePath, fallbackNow)
 	return PageMetadata{
-		CreatedAt:    f.parseMetadataTime(fm.LeafWikiCreatedAt, fallbackNow, "leafwiki_created_at", filePath),
-		UpdatedAt:    f.parseMetadataTime(fm.LeafWikiUpdatedAt, fallbackNow, "leafwiki_updated_at", filePath),
+		CreatedAt:    f.parseMetadataTime(fm.LeafWikiCreatedAt, fallbackTime, "leafwiki_created_at", filePath),
+		UpdatedAt:    f.parseMetadataTime(fm.LeafWikiUpdatedAt, fallbackTime, "leafwiki_updated_at", filePath),
 		CreatorID:    fallbackMetadataString(fm.LeafWikiCreatorID),
 		LastAuthorID: fallbackMetadataString(fm.LeafWikiLastAuthorID),
 	}
