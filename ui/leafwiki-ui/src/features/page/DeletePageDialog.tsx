@@ -83,7 +83,8 @@ export function DeletePageDialog({
               checked={deleteRecursive}
               onCheckedChange={(val) => setDeleteRecursive(!!val)}
             />
-            {`Also delete all sub${itemLabel === 'page' ? 'pages' : 'sections'}`}
+            {' '}
+            {'Also delete all descendant pages and sections'}
           </label>
         </div>
       )}
