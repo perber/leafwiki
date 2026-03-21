@@ -30,6 +30,7 @@ build_frontend_for_local_e2e() {
   rm -rf "$repo_root/internal/http/dist"
   mkdir -p "$repo_root/internal/http/dist"
   cp -R "$repo_root/ui/leafwiki-ui/dist/." "$repo_root/internal/http/dist/"
+  touch "$repo_root/internal/http/dist/.gitkeep"
 }
 
 start_docker() {
