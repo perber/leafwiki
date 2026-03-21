@@ -34,6 +34,7 @@ export default function PageViewer() {
   const loadPageData = useViewerStore((s) => s.loadPageData)
 
   const actions = {
+    pageKind: page?.kind,
     printPage: useCallback(() => {
       window.print()
     }, []),
@@ -59,11 +60,10 @@ export default function PageViewer() {
   useSetPageTitle({ page })
 
   useEffect(() => {
-    const path = pathname.slice(1) // remove leading /
+    const path = pathname.slice(1)
     loadPageData?.(path)
   }, [pathname, loadPageData])
 
-  // Open node
   useEffect(() => {
     if (!page?.id) return
     openNode(page.id)
@@ -80,9 +80,7 @@ export default function PageViewer() {
   }
 
   const editorName = displayUser(page?.metadata?.lastAuthor)
-
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
-
   const showUpdated = updatedRelative
 
   return (
@@ -101,7 +99,6 @@ export default function PageViewer() {
         )}
       </div>
 
-      {/* we keep the content also during loading to avoid flickering */}
       {page && !error && (
         <div className="page-viewer__body">
           <article className="page-viewer__content">

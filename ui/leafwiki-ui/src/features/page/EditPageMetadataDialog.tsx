@@ -1,3 +1,4 @@
+import { NODE_KIND_PAGE, type Page } from '@/lib/api/pages'
 import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
@@ -8,6 +9,7 @@ import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 type EditPageMetadataDialogProps = {
   parentId: string
   currentId?: string
+  itemKind?: Page['kind']
   title: string
   slug: string
   onChange: (title: string, slug: string) => void
@@ -16,11 +18,14 @@ type EditPageMetadataDialogProps = {
 export function EditPageMetadataDialog({
   parentId,
   currentId,
+  itemKind = NODE_KIND_PAGE,
   title: propTitle,
   slug: propSlug,
   onChange,
 }: EditPageMetadataDialogProps) {
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
+  const itemLabel = itemKind === NODE_KIND_PAGE ? 'page' : 'section'
+  const itemLabelCapitalized = itemKind === NODE_KIND_PAGE ? 'Page' : 'Section'
 
   const [title, setTitle] = useState(propTitle)
   const [slug, setSlug] = useState(propSlug)
@@ -55,8 +60,8 @@ export function EditPageMetadataDialog({
   return (
     <BaseDialog
       dialogType={DIALOG_EDIT_PAGE_METADATA}
-      dialogTitle="Edit page metadata"
-      dialogDescription="Change metadata of the page"
+      dialogTitle={`Edit ${itemLabel} metadata`}
+      dialogDescription={`Change metadata of the ${itemLabel}`}
       onClose={() => {
         resetForm()
         return true
@@ -85,7 +90,7 @@ export function EditPageMetadataDialog({
           label="Title"
           value={title}
           onChange={handleTitleChange}
-          placeholder="Page title"
+          placeholder={`${itemLabelCapitalized} title`}
           error={fieldErrors.title}
         />
 

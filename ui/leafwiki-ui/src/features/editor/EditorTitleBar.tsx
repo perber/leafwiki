@@ -38,6 +38,7 @@ export function EditorTitleBar() {
     openDialog(DIALOG_EDIT_PAGE_METADATA, {
       title: title,
       currentId: page.id,
+      itemKind: page.kind,
       slug: slug,
       parentId: parentId(),
       onChange: (title: string, slug: string) => {
