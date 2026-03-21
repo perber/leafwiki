@@ -205,10 +205,10 @@ func (t *TreeService) migrateToV2() error {
 
 		mdFile := markdown.NewMarkdownFile(filePath, content, markdown.Frontmatter{})
 		if raw := strings.TrimSpace(content); raw != "" {
-			mdFile, err = markdown.LoadMarkdownFile(filePath)
+			mdFile, err = markdown.NewMarkdownFileFromRaw(filePath, content)
 			if err != nil {
-				t.log.Error("Could not load markdown file for node", "nodeID", node.ID, "error", err)
-				return fmt.Errorf("could not load markdown file for node %s: %w", node.ID, err)
+				t.log.Error("Could not parse markdown content for node", "nodeID", node.ID, "error", err)
+				return fmt.Errorf("could not parse markdown content for node %s: %w", node.ID, err)
 			}
 		}
 

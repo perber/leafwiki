@@ -3,6 +3,8 @@ package markdown
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -59,10 +61,12 @@ func parseFrontmatterYAML(yamlPart string) (Frontmatter, error) {
 
 func valueToString(value interface{}) string {
 	switch typed := value.(type) {
+	case nil:
+		return ""
 	case string:
 		return typed
 	default:
-		return ""
+		return fmt.Sprint(typed)
 	}
 }
 
@@ -170,21 +174,49 @@ func ParseFrontmatter(md string) (fm Frontmatter, body string, has bool, err err
 	return fm, body, true, nil
 }
 
+func toYAMLNode(value interface{}) (*yaml.Node, error) {
+	var node yaml.Node
+	if err := node.Encode(value); err != nil {
+		return nil, err
+	}
+	return &node, nil
+}
+
 func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
 	if strings.TrimSpace(fm.LeafWikiID) == "" {
 		return body, nil
 	}
 
-	payload := map[string]interface{}{}
-	for key, value := range fm.ExtraFields {
-		payload[key] = value
+	mapping := &yaml.Node{Kind: yaml.MappingNode}
+
+	extraKeys := make([]string, 0, len(fm.ExtraFields))
+	for key := range fm.ExtraFields {
+		extraKeys = append(extraKeys, key)
 	}
-	payload["leafwiki_id"] = strings.TrimSpace(fm.LeafWikiID)
-	if strings.TrimSpace(fm.LeafWikiTitle) != "" {
-		payload["leafwiki_title"] = strings.TrimSpace(fm.LeafWikiTitle)
+	sort.Strings(extraKeys)
+	for _, key := range extraKeys {
+		valueNode, err := toYAMLNode(fm.ExtraFields[key])
+		if err != nil {
+			return "", err
+		}
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+			valueNode,
+		)
 	}
 
-	b, err := yaml.Marshal(payload)
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_id"},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiID)},
+	)
+	if strings.TrimSpace(fm.LeafWikiTitle) != "" {
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_title"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiTitle)},
+		)
+	}
+
+	b, err := yaml.Marshal(mapping)
 	if err != nil {
 		return "", err
 	}

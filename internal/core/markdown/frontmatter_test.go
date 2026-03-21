@@ -429,3 +429,53 @@ func TestParseFrontmatterAndBuildRoundtrip(t *testing.T) {
 		})
 	}
 }
+
+func TestParseFrontmatter_ScalarLeafWikiValuesArePreserved(t *testing.T) {
+	fm, body, has, err := ParseFrontmatter(`---
+leafwiki_id: 123
+leafwiki_title: true
+---
+Body`)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter() error = %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter")
+	}
+	if fm.LeafWikiID != "123" {
+		t.Fatalf("expected numeric id to be preserved, got %q", fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "true" {
+		t.Fatalf("expected bool title to be preserved, got %q", fm.LeafWikiTitle)
+	}
+	if body != "Body" {
+		t.Fatalf("unexpected body %q", body)
+	}
+}
+
+func TestBuildMarkdownWithFrontmatter_SortsExtraFieldsDeterministically(t *testing.T) {
+	fm := Frontmatter{
+		LeafWikiID:    "abc123",
+		LeafWikiTitle: "My Title",
+		ExtraFields: map[string]interface{}{
+			"z_key": "last",
+			"a_key": "first",
+		},
+	}
+
+	got, err := BuildMarkdownWithFrontmatter(fm, "Content")
+	if err != nil {
+		t.Fatalf("BuildMarkdownWithFrontmatter() error = %v", err)
+	}
+
+	want := `---
+a_key: first
+z_key: last
+leafwiki_id: abc123
+leafwiki_title: My Title
+---
+Content`
+	if got != want {
+		t.Fatalf("BuildMarkdownWithFrontmatter() =\n%q\nwant:\n%q", got, want)
+	}
+}
