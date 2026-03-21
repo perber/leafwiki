@@ -3,6 +3,8 @@
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
+import type { EditorView } from '@codemirror/view'
+import { completionStatus } from '@codemirror/autocomplete'
 import { Save, X } from 'lucide-react'
 import { useEffect } from 'react'
 import { useToolbarStore } from '../toolbar/toolbar'
@@ -11,12 +13,14 @@ import { usePageEditorStore } from './pageEditor'
 export interface ToolbarActionsOptions {
   savePage: () => void
   closePage: () => void
+  getEditorView?: () => EditorView | null
 }
 
 // Hook to set up toolbar actions based on app mode and read-only status
 export function useToolbarActions({
   savePage,
   closePage,
+  getEditorView,
 }: ToolbarActionsOptions) {
   const setButtons = useToolbarStore((state) => state.setButtons)
   const appMode = useAppMode()
@@ -78,7 +82,14 @@ export function useToolbarActions({
       keyCombo: 'Escape',
       enabled: true,
       mode: ['edit'],
-      action: closePage,
+      action: () => {
+        const view = getEditorView?.()
+        if (view && completionStatus(view.state) !== null) {
+          return
+        }
+
+        closePage()
+      },
     }
 
     registerHotkey(saveHotKey)
@@ -94,6 +105,7 @@ export function useToolbarActions({
     setButtons,
     savePage,
     closePage,
+    getEditorView,
     registerHotkey,
     unregisterHotkey,
     dirty,

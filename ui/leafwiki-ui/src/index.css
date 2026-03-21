@@ -255,6 +255,59 @@
   }
 }
 
+.cm-tooltip-autocomplete {
+  border: 1px solid hsl(var(--surface-border)) !important;
+  background: hsl(var(--surface)) !important;
+  color: hsl(var(--interface-text)) !important;
+  border-radius: var(--radius-md) !important;
+  font-family: var(--font-sans) !important;
+  box-shadow:
+    0 18px 45px -24px rgb(15 23 42 / 0.45),
+    0 10px 18px -16px rgb(15 23 42 / 0.35) !important;
+  overflow: hidden !important;
+}
+
+.cm-tooltip-autocomplete > ul {
+  padding: 0.35rem !important;
+}
+
+.cm-tooltip-autocomplete ul li {
+  border-radius: calc(var(--radius-sm) + 1px) !important;
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected] {
+  background: hsl(var(--surface-alt)) !important;
+  color: hsl(var(--interface-text)) !important;
+}
+
+.cm-tooltip-autocomplete ul li .cm-completionLabel {
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+}
+
+.cm-internal-link-option {
+  align-items: flex-start;
+}
+
+.cm-internal-link-option .cm-completionIcon {
+  margin-top: 0.2rem;
+}
+
+.cm-internal-link-option__path {
+  grid-column: 2 / 4;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-top: 0.1rem;
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected] .cm-internal-link-option__path {
+  color: color-mix(in srgb, hsl(var(--interface-text)) 68%, transparent);
+}
+
 /* -------------------------------------------------------
    COMPONENTS LAYER — Sidebar, custom UI parts
 ------------------------------------------------------- */

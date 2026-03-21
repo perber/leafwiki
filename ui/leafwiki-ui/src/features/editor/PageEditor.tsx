@@ -79,6 +79,7 @@ export default function PageEditor() {
   useToolbarActions({
     savePage: () => handleSave(),
     closePage: handleClose,
+    getEditorView: () => editorRef.current?.editorViewRef.current ?? null,
   })
 
   // content changes in the editor are synced to the store

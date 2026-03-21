@@ -1,4 +1,9 @@
 import {
+  autocompletion,
+  closeCompletion,
+  completionStatus,
+} from '@codemirror/autocomplete'
+import {
   defaultKeymap,
   history,
   historyKeymap,
@@ -12,6 +17,10 @@ import { githubLight } from '@fsegurai/codemirror-theme-github-light'
 import { useEffect, useRef, useState } from 'react'
 import { useDesignModeStore } from '../designtoggle/designmode'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
+import {
+  InternalLinkCompletion,
+  internalLinkCompletionSource,
+} from './internalLinkCompletion'
 
 type MarkdownCodeEditorProps = {
   initialValue: string
@@ -19,6 +28,9 @@ type MarkdownCodeEditorProps = {
   onCursorLineChange?: (line: number) => void
   editorViewRef: React.RefObject<EditorView | null>
 }
+
+// CodeMirror uses 80 for the built-in detail slot, so render the path just before it.
+const COMPLETION_PATH_POSITION_BEFORE_DETAIL = 79
 
 export default function MarkdownCodeEditor({
   initialValue,
@@ -58,6 +70,17 @@ export default function MarkdownCodeEditor({
     })
 
     const customShortcuts = [
+      {
+        key: 'Escape',
+        run: (view: EditorView) => {
+          if (completionStatus(view.state) === null) {
+            return false
+          }
+
+          return closeCompletion(view)
+        },
+        stopPropagation: true,
+      },
       {
         key: 'Mod-b',
         run: () => {
@@ -110,6 +133,23 @@ export default function MarkdownCodeEditor({
       extensions: [
         themeCompartment.of(designMode === 'light' ? githubLight : oneDark),
         markdown(),
+        autocompletion({
+          override: [internalLinkCompletionSource],
+          icons: false,
+          optionClass: () => 'cm-internal-link-option',
+          addToOptions: [
+            {
+              render: (completion) => {
+                const option = completion as InternalLinkCompletion
+                const path = document.createElement('div')
+                path.className = 'cm-internal-link-option__path'
+                path.textContent = `/${option.path}`
+                return path
+              },
+              position: COMPLETION_PATH_POSITION_BEFORE_DETAIL,
+            },
+          ],
+        }),
         history(),
         keymap.of([
           ...customShortcuts,
