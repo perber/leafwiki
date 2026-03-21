@@ -1,6 +1,6 @@
 import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
-import { copyPage, Page, PageNode } from '@/lib/api/pages'
+import { copyPage, NODE_KIND_PAGE, Page, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_COPY_PAGE } from '@/lib/registries'
 import { buildEditUrl } from '@/lib/urlUtil'
@@ -12,7 +12,6 @@ import { PageSelect } from './PageSelect'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
 export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
-  // Dialog state from zustand store
   const [targetParentID, setTargetParentID] = useState<string>('root')
   const [title, setTitle] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
@@ -23,6 +22,9 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const parentPath = useTreeStore((s) => s.getPathById(targetParentID) || '')
   const navigate = useNavigate()
+  const itemLabel = sourcePage.kind === NODE_KIND_PAGE ? 'page' : 'section'
+  const itemLabelCapitalized =
+    sourcePage.kind === NODE_KIND_PAGE ? 'Page' : 'Section'
 
   const { tree, reloadTree } = useTreeStore()
 
@@ -79,34 +81,34 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
   }
 
   const handleCopy = async (redirect: boolean): Promise<boolean> => {
-    if (!title) return false // Should not happen due to button disabling
+    if (!title) return false
 
     if (!slug) {
       toast.error('Slug could not be generated. Please enter it manually.')
-      return false // Should not happen due to button disabling
+      return false
     }
 
     if (!slugTouched && (slugLoading || title !== lastSlugTitle)) {
       toast.warning('Please wait until the slug is fully generated.')
-      return false // Should not happen due to button disabling
+      return false
     }
 
     setLoading(true)
     setFieldErrors({})
     try {
       await copyPage(sourcePage.id, targetParentID, title, slug)
-      toast.success('Page copied')
+      toast.success(`${itemLabelCapitalized} copied`)
       await reloadTree()
       if (redirect) {
         const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
         navigate(buildEditUrl(fullPath))
       }
       resetForm()
-      return true // Close the dialog
+      return true
     } catch (err: unknown) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, 'Error copying page')
-      return false // Keep the dialog open
+      handleFieldErrors(err, setFieldErrors, `Error copying ${itemLabel}`)
+      return false
     } finally {
       setLoading(false)
     }
@@ -124,8 +126,8 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
 
   return (
     <BaseDialog
-      dialogTitle="Copy Page"
-      dialogDescription="Create a copy of this page"
+      dialogTitle={`Copy ${itemLabelCapitalized}`}
+      dialogDescription={`Create a copy of this ${itemLabel}`}
       dialogType={DIALOG_COPY_PAGE}
       onClose={handleCancel}
       onConfirm={async (): Promise<boolean> => {
@@ -140,7 +142,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
       }}
       buttons={[
         {
-          label: loading ? 'Copying...' : 'Copy & Edit Page',
+          label: loading ? 'Copying...' : `Copy & Edit ${itemLabelCapitalized}`,
           actionType: 'confirm',
           autoFocus: true,
           loading,
@@ -157,7 +159,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
         onChange={(val) => {
           handleTitleChange(val)
         }}
-        placeholder="Page title"
+        placeholder={`${itemLabelCapitalized} title`}
         error={fieldErrors.title}
       />
       <SlugInputWithSuggestion

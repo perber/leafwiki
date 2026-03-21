@@ -29,6 +29,8 @@ export function AddPageDialog({
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
   const navigate = useNavigate()
+  const itemLabel = nodeKind === NODE_KIND_PAGE ? 'page' : 'section'
+  const itemLabelCapitalized = nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'
 
   const isCreateButtonDisabled =
     !title ||
@@ -60,35 +62,35 @@ export function AddPageDialog({
       redirect: boolean = true,
       nodeKind?: 'page' | 'section',
     ): Promise<boolean> => {
-      if (!nodeKind) nodeKind = NODE_KIND_PAGE // Default to 'page' if not provided
-      if (!title) return false // Should not happen due to button disabling
+      if (!nodeKind) nodeKind = NODE_KIND_PAGE
+      if (!title) return false
 
       if (!slug) {
         toast.error('Slug could not be generated. Please enter it manually.')
-        return false // Should not happen due to button disabling
+        return false
       }
 
       if (!slugTouched && (slugLoading || title !== lastSlugTitle)) {
         toast.warning('Please wait until the slug is fully generated.')
-        return false // Should not happen due to button disabling
+        return false
       }
 
       setLoading(true)
       setFieldErrors({})
       try {
         await createPage({ title, slug, parentId, kind: nodeKind })
-        toast.success('Page created')
+        toast.success(`${itemLabelCapitalized} created`)
         await reloadTree()
         if (redirect) {
           const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
           navigate(buildEditUrl(fullPath))
         }
         resetForm()
-        return true // Close the dialog
+        return true
       } catch (err: unknown) {
         console.warn(err)
-        handleFieldErrors(err, setFieldErrors, 'Error creating page')
-        return false // Keep the dialog open
+        handleFieldErrors(err, setFieldErrors, `Error creating ${itemLabel}`)
+        return false
       } finally {
         setLoading(false)
       }
@@ -104,6 +106,8 @@ export function AddPageDialog({
       parentPath,
       navigate,
       resetForm,
+      itemLabel,
+      itemLabelCapitalized,
     ],
   )
 
@@ -125,7 +129,7 @@ export function AddPageDialog({
     ]
     if (nodeKind === NODE_KIND_PAGE) {
       b.push({
-        label: 'Create & Edit Page',
+        label: `Create & Edit ${itemLabelCapitalized}`,
         actionType: 'confirm',
         autoFocus: false,
         loading,
@@ -134,7 +138,7 @@ export function AddPageDialog({
       })
     }
     return b
-  }, [isCreateButtonDisabled, loading, nodeKind])
+  }, [isCreateButtonDisabled, loading, nodeKind, itemLabelCapitalized])
 
   return (
     <BaseDialog
@@ -170,7 +174,7 @@ export function AddPageDialog({
             setFieldErrors((prev) => ({ ...prev, title: '' }))
           }}
           testid="add-page-title-input"
-          placeholder="Page title"
+          placeholder={`${itemLabelCapitalized} title`}
           error={fieldErrors.title}
         />
         <SlugInputWithSuggestion

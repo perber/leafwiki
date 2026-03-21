@@ -4,9 +4,10 @@ export default class DeletePageDialog {
   constructor(private page: Page) {}
 
   async dialogTextVisible() {
-    // Are you sure you want to delete this page? This action cannot be undone.
     return this.page
-      .locator('text=Are you sure you want to delete this page? This action cannot be undone.')
+      .getByText(
+        /Are you sure you want to delete this (page|section)\? This action cannot be undone\./,
+      )
       .isVisible();
   }
 

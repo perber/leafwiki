@@ -3,6 +3,7 @@ import { TooltipWrapper } from '../../components/TooltipWrapper'
 import { Button } from '../../components/ui/button'
 
 export type ToolbarButtonProps = {
+  testId?: string
   label: string
   hotkey: string
   variant?: 'outline' | 'ghost' | 'link' | 'destructive' | 'default'
@@ -13,6 +14,7 @@ export type ToolbarButtonProps = {
 }
 
 export function ToolbarButton({
+  testId,
   label,
   hotkey,
   onClick,
@@ -31,7 +33,9 @@ export function ToolbarButton({
         size="icon"
         disabled={disabled}
         aria-label={label}
-        data-testid={`${label.toLowerCase().replace(/ /g, '-')}-button`}
+        data-testid={
+          testId ?? `${label.toLowerCase().replace(/ /g, '-')}-button`
+        }
         onClick={onClick}
       >
         {icon}

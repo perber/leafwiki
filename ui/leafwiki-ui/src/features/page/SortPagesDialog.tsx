@@ -1,7 +1,7 @@
 // components/page/SortPagesDialog.tsx
 import BaseDialog from '@/components/BaseDialog'
 import { Button } from '@/components/ui/button'
-import { PageNode, sortPages } from '@/lib/api/pages'
+import { NODE_KIND_PAGE, PageNode, sortPages } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_SORT_PAGES } from '@/lib/registries'
 import { useTreeStore } from '@/stores/tree'
@@ -10,14 +10,12 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 export function SortPagesDialog({ parent }: { parent: PageNode }) {
-  // State to manage the order of the pages
+  const itemLabel = parent.kind === NODE_KIND_PAGE ? 'page' : 'section'
+  const itemLabelCapitalized =
+    parent.kind === NODE_KIND_PAGE ? 'Page' : 'Section'
   const [order, setOrder] = useState(parent.children?.map((c) => c.id) || [])
-
-  // Loading state
   const [loading, setLoading] = useState(false)
   const [, setFieldErrors] = useState<Record<string, string>>({})
-
-  // Reload tree state from zustand store
   const reloadTree = useTreeStore((s) => s.reloadTree)
 
   useEffect(() => {
@@ -43,12 +41,16 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
     try {
       await sortPages(parent.id, order)
       await reloadTree()
-      toast.success('Pages sorted successfully')
-      return true // Close the dialog
+      toast.success(`${itemLabelCapitalized} children sorted successfully`)
+      return true
     } catch (err) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, 'Error moving page')
-      return false // Keep the dialog open
+      handleFieldErrors(
+        err,
+        setFieldErrors,
+        `Error sorting ${itemLabel} children`,
+      )
+      return false
     } finally {
       setLoading(false)
     }
@@ -58,8 +60,8 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
     <BaseDialog
       dialogType={DIALOG_SORT_PAGES}
       testidPrefix="sort-pages-dialog"
-      dialogTitle="Sort Pages"
-      dialogDescription="Sort the pages by clicking the arrows. The order will be saved after you click 'Save'."
+      dialogTitle={`Sort ${itemLabelCapitalized} Children`}
+      dialogDescription={`Sort the ${itemLabel} children by clicking the arrows. The order will be saved after you click 'Save'.`}
       onClose={() => true}
       onConfirm={async (type) => {
         if (type === 'confirm') {

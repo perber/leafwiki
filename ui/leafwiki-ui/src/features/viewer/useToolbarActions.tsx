@@ -1,5 +1,6 @@
 // Hook to provide toolbar actions for the page viewer
 
+import { NODE_KIND_PAGE, type Page } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
@@ -8,14 +9,15 @@ import { useEffect } from 'react'
 import { useToolbarStore } from '../toolbar/toolbar'
 
 export interface ToolbarActionsOptions {
+  pageKind?: Page['kind']
   printPage: () => void
   editPage: () => void
   deletePage: () => void
   copyPage: () => void
 }
 
-// Hook to set up toolbar actions based on app mode and read-only status
 export function useToolbarActions({
+  pageKind = NODE_KIND_PAGE,
   printPage,
   editPage,
   deletePage,
@@ -26,6 +28,7 @@ export function useToolbarActions({
   const readOnlyMode = useIsReadOnly()
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
+  const itemLabel = pageKind === NODE_KIND_PAGE ? 'Page' : 'Section'
 
   useEffect(() => {
     if (readOnlyMode || appMode !== 'view') {
@@ -36,7 +39,7 @@ export function useToolbarActions({
     setButtons([
       {
         id: 'delete-page',
-        label: 'Delete Page',
+        label: `Delete ${itemLabel}`,
         hotkey: 'Ctrl+Delete',
         icon: <Trash2 size={18} />,
         variant: 'outline',
@@ -45,7 +48,7 @@ export function useToolbarActions({
       },
       {
         id: 'copy-page',
-        label: 'Copy Page',
+        label: `Copy ${itemLabel}`,
         hotkey: 'Ctrl+Shift+S',
         icon: <Copy size={18} />,
         variant: 'outline',
@@ -53,21 +56,20 @@ export function useToolbarActions({
       },
       {
         id: 'print-page',
-        label: 'Print Page',
+        label: `Print ${itemLabel}`,
         hotkey: 'Ctrl+P',
         icon: <Printer size={18} />,
         action: printPage,
       },
       {
         id: 'edit-page',
-        label: 'Edit Page',
+        label: `Edit ${itemLabel}`,
         hotkey: 'Ctrl+E',
         icon: <Pencil size={18} />,
         action: editPage,
       },
     ])
 
-    // Register hotkeys
     const copyHotkey: HotKeyDefinition = {
       keyCombo: 'Mod+Shift+S',
       enabled: true,
@@ -108,5 +110,6 @@ export function useToolbarActions({
     printPage,
     registerHotkey,
     unregisterHotkey,
+    itemLabel,
   ])
 }

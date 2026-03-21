@@ -1,5 +1,5 @@
 import BaseDialog from '@/components/BaseDialog'
-import { movePage, PageNode } from '@/lib/api/pages'
+import { movePage, NODE_KIND_PAGE, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_MOVE_PAGE } from '@/lib/registries'
 import { useTreeStore } from '@/stores/tree'
@@ -13,8 +13,8 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
   const [loading, setLoading] = useState(false)
   const [, setFieldErrors] = useState<Record<string, string>>({})
   const getPathById = useTreeStore((s) => s.getPathById)
+  const page = useTreeStore((s) => s.getPageById(pageId))
   const pagePath = getPathById(pageId) || ''
-  // get opened route from react router
   const currentPath = useLocation().pathname
   const navigate = useNavigate()
 
@@ -35,11 +35,14 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
   const [newParentId, setNewParentId] = useState<string>(parentId || '')
 
   if (!tree) return null
-
   if (!parentId) return null
+  if (!page) return null
+
+  const itemLabel = page.kind === NODE_KIND_PAGE ? 'page' : 'section'
+  const itemLabelCapitalized = page.kind === NODE_KIND_PAGE ? 'Page' : 'Section'
 
   const handleMove = async (): Promise<boolean> => {
-    if (!newParentId || newParentId === parentId) return false // No change
+    if (!newParentId || newParentId === parentId) return false
 
     setLoading(true)
     try {
@@ -56,12 +59,12 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
         await reloadTree()
       }
 
-      toast.success('Page moved successfully')
-      return true // Close the dialog
+      toast.success(`${itemLabelCapitalized} moved successfully`)
+      return true
     } catch (err: unknown) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, 'Error moving page')
-      return false // Keep the dialog open
+      handleFieldErrors(err, setFieldErrors, `Error moving ${itemLabel}`)
+      return false
     } finally {
       setLoading(false)
     }
@@ -71,8 +74,8 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
     <BaseDialog
       dialogType={DIALOG_MOVE_PAGE}
       testidPrefix="move-page-dialog"
-      dialogTitle="Move Page"
-      dialogDescription="Select a new parent for this page"
+      dialogTitle={`Move ${itemLabelCapitalized}`}
+      dialogDescription={`Select a new parent for this ${itemLabel}`}
       onClose={() => true}
       onConfirm={async (type) => {
         if (type === 'confirm') {
