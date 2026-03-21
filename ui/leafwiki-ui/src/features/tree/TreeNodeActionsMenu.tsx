@@ -76,7 +76,7 @@ export default function TreeNodeActionsMenu({
     return getDeleteRedirectRoutePath(location.pathname, node.path)
   }, [location.pathname, node.path])
 
-  const isCurrentlyEditedPage =
+  const isCurrentlyEditedNode =
     appMode === 'edit' && currentEditorPageId === node.id
 
   return (
