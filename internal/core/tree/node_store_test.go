@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/perber/wiki/internal/core/markdown"
 )
@@ -186,8 +187,6 @@ func TestNodeStore_CreatePage_CreatesMarkdownWithFrontmatter(t *testing.T) {
 	}
 }
 
-
-
 func TestNodeStore_CreatePage_SetsLeafWikiTitleInitially(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
@@ -280,8 +279,6 @@ func TestNodeStore_UpsertContent_Page_CreatesOrUpdates_PreservesMode(t *testing.
 		t.Fatalf("expected body '# new', got %q", body)
 	}
 }
-
-
 
 func TestNodeStore_UpsertContent_PreservesExistingCustomFrontmatter(t *testing.T) {
 	tmp := t.TempDir()
@@ -505,8 +502,6 @@ func TestNodeStore_ReadPageRaw_Page_Missing_IsDrift(t *testing.T) {
 	}
 }
 
-
-
 func TestNodeStore_ReadPageContent_StripsFrontmatterAndPreservesBody(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
@@ -565,7 +560,19 @@ func TestNodeStore_SyncFrontmatterIfExists_Page_UpdatesOrAddsFM(t *testing.T) {
 	store := NewNodeStore(tmp)
 
 	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
-	page := &PageNode{ID: "p1", Slug: "p", Title: "Title A", Kind: NodeKindPage, Parent: root}
+	page := &PageNode{
+		ID:     "p1",
+		Slug:   "p",
+		Title:  "Title A",
+		Kind:   NodeKindPage,
+		Parent: root,
+		Metadata: PageMetadata{
+			CreatedAt:    time.Date(2026, time.March, 21, 10, 15, 30, 0, time.UTC),
+			UpdatedAt:    time.Date(2026, time.March, 21, 11, 16, 31, 0, time.UTC),
+			CreatorID:    "alice",
+			LastAuthorID: "bob",
+		},
+	}
 
 	path := filepath.Join(tmp, "root", "p.md")
 
@@ -587,6 +594,12 @@ func TestNodeStore_SyncFrontmatterIfExists_Page_UpdatesOrAddsFM(t *testing.T) {
 	if fm.LeafWikiID != "p1" || fm.LeafWikiTitle != "Title A" {
 		t.Fatalf("unexpected fm: %#v", fm)
 	}
+	if fm.LeafWikiCreatedAt != "2026-03-21T10:15:30Z" || fm.LeafWikiUpdatedAt != "2026-03-21T11:16:31Z" {
+		t.Fatalf("unexpected timestamp metadata: %#v", fm)
+	}
+	if fm.LeafWikiCreatorID != "alice" || fm.LeafWikiLastAuthorID != "bob" {
+		t.Fatalf("unexpected author metadata: %#v", fm)
+	}
 	if strings.TrimSpace(body) != "# Body\nHello" {
 		t.Fatalf("body changed unexpectedly: %q", body)
 	}
@@ -594,6 +607,8 @@ func TestNodeStore_SyncFrontmatterIfExists_Page_UpdatesOrAddsFM(t *testing.T) {
 	// update title and id
 	page.Title = "Title B"
 	page.ID = "p1b"
+	page.Metadata.UpdatedAt = time.Date(2026, time.March, 21, 12, 17, 32, 0, time.UTC)
+	page.Metadata.LastAuthorID = "carol"
 	if err := store.SyncFrontmatterIfExists(page); err != nil {
 		t.Fatalf("SyncFrontmatterIfExists(update): %v", err)
 	}
@@ -605,12 +620,16 @@ func TestNodeStore_SyncFrontmatterIfExists_Page_UpdatesOrAddsFM(t *testing.T) {
 	if !has2 || fm2.LeafWikiID != "p1b" || fm2.LeafWikiTitle != "Title B" {
 		t.Fatalf("expected updated fm, got %#v", fm2)
 	}
+	if fm2.LeafWikiCreatedAt != "2026-03-21T10:15:30Z" || fm2.LeafWikiUpdatedAt != "2026-03-21T12:17:32Z" {
+		t.Fatalf("expected updated timestamps in fm, got %#v", fm2)
+	}
+	if fm2.LeafWikiCreatorID != "alice" || fm2.LeafWikiLastAuthorID != "carol" {
+		t.Fatalf("expected updated author metadata in fm, got %#v", fm2)
+	}
 	if strings.TrimSpace(body2) != "# Body\nHello" {
 		t.Fatalf("body changed unexpectedly on update: %q", body2)
 	}
 }
-
-
 
 func TestNodeStore_SyncFrontmatterIfExists_PreservesExistingCustomFrontmatter(t *testing.T) {
 	tmp := t.TempDir()

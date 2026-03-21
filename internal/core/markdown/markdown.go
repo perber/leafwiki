@@ -135,3 +135,10 @@ func (mf *MarkdownFile) SetLeafWikiFrontmatter(id string, title string) {
 	mf.setFrontmatterID(id)
 	mf.setFrontmatterTitle(title)
 }
+
+func (mf *MarkdownFile) SetLeafWikiMetadata(createdAt string, updatedAt string, creatorID string, lastAuthorID string) {
+	mf.fm.LeafWikiCreatedAt = strings.TrimSpace(createdAt)
+	mf.fm.LeafWikiUpdatedAt = strings.TrimSpace(updatedAt)
+	mf.fm.LeafWikiCreatorID = strings.TrimSpace(creatorID)
+	mf.fm.LeafWikiLastAuthorID = strings.TrimSpace(lastAuthorID)
+}

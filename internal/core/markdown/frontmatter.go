@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	yaml "gopkg.in/yaml.v3"
@@ -17,9 +18,13 @@ func invalidYAMLKeyRune(r rune) bool {
 }
 
 type Frontmatter struct {
-	LeafWikiID    string                 `yaml:"leafwiki_id,omitempty" json:"id,omitempty"`
-	LeafWikiTitle string                 `yaml:"leafwiki_title,omitempty" json:"title,omitempty"`
-	ExtraFields   map[string]interface{} `yaml:"-" json:"-"`
+	LeafWikiID           string                 `yaml:"leafwiki_id,omitempty" json:"id,omitempty"`
+	LeafWikiTitle        string                 `yaml:"leafwiki_title,omitempty" json:"title,omitempty"`
+	LeafWikiCreatedAt    string                 `yaml:"leafwiki_created_at,omitempty" json:"createdAt,omitempty"`
+	LeafWikiUpdatedAt    string                 `yaml:"leafwiki_updated_at,omitempty" json:"updatedAt,omitempty"`
+	LeafWikiCreatorID    string                 `yaml:"leafwiki_creator_id,omitempty" json:"creatorId,omitempty"`
+	LeafWikiLastAuthorID string                 `yaml:"leafwiki_last_author_id,omitempty" json:"lastAuthorId,omitempty"`
+	ExtraFields          map[string]interface{} `yaml:"-" json:"-"`
 }
 
 func parseFrontmatterYAML(yamlPart string) (Frontmatter, error) {
@@ -42,10 +47,22 @@ func parseFrontmatterYAML(yamlPart string) (Frontmatter, error) {
 	} else if value, ok := raw["title"]; ok {
 		fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(valueToString(value))
 	}
+	if value, ok := raw["leafwiki_created_at"]; ok {
+		fm.LeafWikiCreatedAt = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(valueToString(value)))
+	}
+	if value, ok := raw["leafwiki_updated_at"]; ok {
+		fm.LeafWikiUpdatedAt = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(valueToString(value)))
+	}
+	if value, ok := raw["leafwiki_creator_id"]; ok {
+		fm.LeafWikiCreatorID = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(valueToString(value)))
+	}
+	if value, ok := raw["leafwiki_last_author_id"]; ok {
+		fm.LeafWikiLastAuthorID = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(valueToString(value)))
+	}
 
 	for key, value := range raw {
 		switch key {
-		case "leafwiki_id", "leafwiki_title":
+		case "leafwiki_id", "leafwiki_title", "leafwiki_created_at", "leafwiki_updated_at", "leafwiki_creator_id", "leafwiki_last_author_id":
 			continue
 		default:
 			fm.ExtraFields[key] = value
@@ -65,6 +82,8 @@ func valueToString(value interface{}) string {
 		return ""
 	case string:
 		return typed
+	case time.Time:
+		return typed.UTC().Format(time.RFC3339)
 	default:
 		return fmt.Sprint(typed)
 	}
@@ -219,6 +238,30 @@ func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
 		mapping.Content = append(mapping.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_title"},
 			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiTitle)},
+		)
+	}
+	if strings.TrimSpace(fm.LeafWikiCreatedAt) != "" {
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_created_at"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiCreatedAt)},
+		)
+	}
+	if strings.TrimSpace(fm.LeafWikiUpdatedAt) != "" {
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_updated_at"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiUpdatedAt)},
+		)
+	}
+	if strings.TrimSpace(fm.LeafWikiCreatorID) != "" {
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_creator_id"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiCreatorID)},
+		)
+	}
+	if strings.TrimSpace(fm.LeafWikiLastAuthorID) != "" {
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_last_author_id"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiLastAuthorID)},
 		)
 	}
 
