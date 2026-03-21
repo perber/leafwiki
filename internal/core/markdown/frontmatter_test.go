@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -148,6 +149,19 @@ func TestParseFrontmatter(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:  "title alias is mapped and preserved",
+			input: "---\ntitle: My Title\n---\n# Title\nContent",
+			wantFM: Frontmatter{
+				LeafWikiTitle: "My Title",
+				ExtraFields: map[string]interface{}{
+					"title": "My Title",
+				},
+			},
+			wantBody: "# Title\nContent",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
 			name:  "valid frontmatter with both ID and title",
 			input: "---\nleafwiki_id: abc123\nleafwiki_title: My Title\n---\n# Title\nContent",
 			wantFM: Frontmatter{
@@ -159,9 +173,13 @@ func TestParseFrontmatter(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:     "empty YAML frontmatter",
-			input:    "---\nkey: value\n---\nBody",
-			wantFM:   Frontmatter{},
+			name:  "unknown fields are preserved",
+			input: "---\nkey: value\n---\nBody",
+			wantFM: Frontmatter{
+				ExtraFields: map[string]interface{}{
+					"key": "value",
+				},
+			},
 			wantBody: "Body",
 			wantHas:  true,
 			wantErr:  false,
@@ -185,10 +203,13 @@ func TestParseFrontmatter(t *testing.T) {
 			wantErrType: ErrFrontmatterParse,
 		},
 		{
-			name:  "frontmatter with extra fields (ignored)",
+			name:  "frontmatter with extra fields",
 			input: "---\nleafwiki_id: abc123\nextra_field: ignored\n---\nBody",
 			wantFM: Frontmatter{
 				LeafWikiID: "abc123",
+				ExtraFields: map[string]interface{}{
+					"extra_field": "ignored",
+				},
 			},
 			wantBody: "Body",
 			wantHas:  true,
@@ -198,7 +219,7 @@ func TestParseFrontmatter(t *testing.T) {
 			name:  "frontmatter with whitespace in values",
 			input: "---\nleafwiki_id: \"  abc123  \"\nleafwiki_title: \"  My Title  \"\n---\nBody",
 			wantFM: Frontmatter{
-				LeafWikiID:    "  abc123  ",
+				LeafWikiID:    "abc123",
 				LeafWikiTitle: "  My Title  ",
 			},
 			wantBody: "Body",
@@ -225,7 +246,7 @@ func TestParseFrontmatter(t *testing.T) {
 				t.Fatalf("has = %v, want %v", has, tt.wantHas)
 			}
 
-			if fm != tt.wantFM {
+			if !reflect.DeepEqual(fm, tt.wantFM) {
 				t.Fatalf("frontmatter = %+v, want %+v", fm, tt.wantFM)
 			}
 
@@ -292,6 +313,18 @@ func TestBuildMarkdownWithFrontmatter(t *testing.T) {
 			want: "---\nleafwiki_id: abc123\nleafwiki_title: My Title\n---\n# Title\nContent",
 		},
 		{
+			name: "frontmatter preserves unknown fields",
+			fm: Frontmatter{
+				LeafWikiID:    "abc123",
+				LeafWikiTitle: "My Title",
+				ExtraFields: map[string]interface{}{
+					"custom_key": "keep-me",
+				},
+			},
+			body: "Content",
+			want: "---\ncustom_key: keep-me\nleafwiki_id: abc123\nleafwiki_title: My Title\n---\nContent",
+		},
+		{
 			name: "empty body",
 			fm: Frontmatter{
 				LeafWikiID: "abc123",
@@ -354,11 +387,15 @@ func TestParseFrontmatterAndBuildRoundtrip(t *testing.T) {
 			input:    "---\nleafwiki_id: abc123\nleafwiki_title: My Title\n---\n# Title\nContent",
 			wantBody: "# Title\nContent",
 		},
+		{
+			name:     "with unknown fields",
+			input:    "---\nleafwiki_id: abc123\ncustom_key: keep-me\n---\n# Title\nContent",
+			wantBody: "# Title\nContent",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Parse the original markdown
 			fm, body, has, err := ParseFrontmatter(tt.input)
 			if err != nil {
 				t.Fatalf("ParseFrontmatter() error = %v", err)
@@ -368,29 +405,24 @@ func TestParseFrontmatterAndBuildRoundtrip(t *testing.T) {
 				t.Fatalf("body after parse = %q, want %q", body, tt.wantBody)
 			}
 
-			// Rebuild markdown with frontmatter
 			rebuilt, err := BuildMarkdownWithFrontmatter(fm, body)
 			if err != nil {
 				t.Fatalf("BuildMarkdownWithFrontmatter() error = %v", err)
 			}
 
-			// Parse again to verify
 			fm2, body2, has2, err := ParseFrontmatter(rebuilt)
 			if err != nil {
 				t.Fatalf("ParseFrontmatter() second parse error = %v", err)
 			}
 
-			// Check that has flag is consistent
 			if has != has2 {
 				t.Fatalf("has flag changed: first=%v, second=%v", has, has2)
 			}
 
-			// Check frontmatter is preserved
-			if fm != fm2 {
+			if !reflect.DeepEqual(fm, fm2) {
 				t.Fatalf("frontmatter changed: first=%+v, second=%+v", fm, fm2)
 			}
 
-			// Check body is preserved
 			if body != body2 {
 				t.Fatalf("body changed: first=%q, second=%q", body, body2)
 			}

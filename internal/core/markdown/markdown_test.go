@@ -1,6 +1,8 @@
 package markdown
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/test_utils"
@@ -71,6 +73,58 @@ func TestPlanner_extractTitleFromMDFile_FilenameFallback(t *testing.T) {
 	}
 	if title != "some-file" {
 		t.Fatalf("title = %q", title)
+	}
+}
+
+func TestMarkdownFile_WriteToFile_PreservesCustomFrontmatter(t *testing.T) {
+	tmp := t.TempDir()
+	abs := test_utils.WriteFile(t, tmp, "t.md", `---
+custom_key: keep-me
+aliases:
+  - one
+leafwiki_id: old-id
+leafwiki_title: Old Title
+---
+
+# Heading`)
+
+	mdFile, err := LoadMarkdownFile(abs)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	mdFile.setFrontmatterID("new-id")
+	if err := mdFile.WriteToFile(); err != nil {
+		t.Fatalf("WriteToFile err: %v", err)
+	}
+
+	rawBytes, err := os.ReadFile(abs)
+	if err != nil {
+		t.Fatalf("ReadFile err: %v", err)
+	}
+	raw := string(rawBytes)
+	if !strings.Contains(raw, "custom_key: keep-me") {
+		t.Fatalf("expected custom frontmatter to be preserved, got: %q", raw)
+	}
+	if !strings.Contains(raw, "- one") {
+		t.Fatalf("expected custom list frontmatter to be preserved, got: %q", raw)
+	}
+
+	fm, body, has, err := ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter err: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after write")
+	}
+	if fm.LeafWikiID != "new-id" {
+		t.Fatalf("expected id 'new-id', got %q", fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "Old Title" {
+		t.Fatalf("expected title 'Old Title', got %q", fm.LeafWikiTitle)
+	}
+	if body != "\n# Heading" {
+		t.Fatalf("unexpected body: %q", body)
 	}
 }
 

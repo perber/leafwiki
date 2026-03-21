@@ -26,16 +26,11 @@ func LoadMarkdownFile(filePath string) (*MarkdownFile, error) {
 		return nil, err
 	}
 
-	yamlPart, content, has := splitFrontmatter(string(raw))
-
-	var fm Frontmatter
-
-	if has {
-		_, err = fm.LoadFrontMatterFromContent(string(yamlPart))
-		if err != nil {
-			return nil, err
-		}
-	} else {
+	fm, content, has, err := ParseFrontmatter(string(raw))
+	if err != nil {
+		return nil, err
+	}
+	if !has {
 		fm = Frontmatter{}
 	}
 
@@ -55,7 +50,7 @@ func NewMarkdownFile(filePath string, content string, fm Frontmatter) *MarkdownF
 }
 
 func (mf *MarkdownFile) WriteToFile() error {
-	fmContent, err := BuildMarkdownWithFrontmatter(mf.fm, string(mf.content))
+	fmContent, err := BuildMarkdownWithFrontmatter(mf.fm, mf.content)
 	if err != nil {
 		return err
 	}
@@ -69,25 +64,22 @@ func (mf *MarkdownFile) WriteToFile() error {
 }
 
 func (mf *MarkdownFile) GetTitle() (string, error) {
-	// 1. Frontmatter title
 	if mf.fm.LeafWikiTitle != "" {
 		return strings.TrimSpace(mf.fm.LeafWikiTitle), nil
 	}
 
-	// 2. First heading
 	title, err := mf.extractTitleFromFirstHeading()
 	if err == nil && title != "" {
 		return title, nil
 	}
 
-	// 3. Filename fallback
 	base := path.Base(mf.path)
 	name := strings.TrimSuffix(base, path.Ext(base))
 	return name, nil
 }
 
 func (mf *MarkdownFile) extractTitleFromFirstHeading() (string, error) {
-	lines := strings.Split(string(mf.content), "\n")
+	lines := strings.Split(mf.content, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "# ") {
@@ -98,7 +90,11 @@ func (mf *MarkdownFile) extractTitleFromFirstHeading() (string, error) {
 }
 
 func (mf *MarkdownFile) GetContent() string {
-	return string(mf.content)
+	return mf.content
+}
+
+func (mf *MarkdownFile) SetContent(content string) {
+	mf.content = content
 }
 
 func (mf *MarkdownFile) GetPath() string {
@@ -109,6 +105,15 @@ func (mf *MarkdownFile) GetFrontmatter() Frontmatter {
 	return mf.fm
 }
 
-func (mf *MarkdownFile) SetFrontmatterID(id string) {
+func (mf *MarkdownFile) setFrontmatterID(id string) {
 	mf.fm.LeafWikiID = id
+}
+
+func (mf *MarkdownFile) setFrontmatterTitle(title string) {
+	mf.fm.LeafWikiTitle = title
+}
+
+func (mf *MarkdownFile) SetLeafWikiFrontmatter(id string, title string) {
+	mf.setFrontmatterID(id)
+	mf.setFrontmatterTitle(title)
 }

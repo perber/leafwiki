@@ -715,6 +715,245 @@ func TestTreeService_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *te
 	}
 }
 
+
+func TestTreeService_LoadTree_MigratesToV2_PreservesExistingCustomFrontmatter(t *testing.T) {
+	if CurrentSchemaVersion < 2 {
+		t.Skip("requires schema v2+")
+	}
+
+	tmpDir := t.TempDir()
+
+	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	id, err := svc.CreateNode("system", nil, "Page1", "page1", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	if err := svc.SaveTree(); err != nil {
+		t.Fatalf("SaveTree failed: %v", err)
+	}
+
+	pagePath := filepath.Join(tmpDir, "root", "page1.md")
+	legacyContent := `---
+custom_key: keep-me
+tags:
+  - alpha
+---
+# Page 1 Content
+Hello World
+`
+	if err := os.WriteFile(pagePath, []byte(legacyContent), 0o644); err != nil {
+		t.Fatalf("write legacy content failed: %v", err)
+	}
+
+	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	loaded := NewTreeService(tmpDir)
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree (migrating) failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(pagePath)
+	if err != nil {
+		t.Fatalf("read migrated file: %v", err)
+	}
+
+	migrated := string(raw)
+	if !strings.Contains(migrated, "custom_key: keep-me") {
+		t.Fatalf(`expected custom frontmatter to be preserved, got:
+%s`, migrated)
+	}
+	if !strings.Contains(migrated, "- alpha") {
+		t.Fatalf(`expected list frontmatter to be preserved, got:
+%s`, migrated)
+	}
+
+	fm, migratedBody, has, err := markdown.ParseFrontmatter(migrated)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf(`expected frontmatter after migration, got:
+%s`, migrated)
+	}
+	if fm.LeafWikiID != *id {
+		t.Fatalf("expected leafwiki_id=%q, got %q", *id, fm.LeafWikiID)
+	}
+	if strings.TrimSpace(fm.LeafWikiTitle) == "" {
+		t.Fatalf("expected leafwiki_title to be set")
+	}
+	wantBody := `# Page 1 Content
+Hello World
+`
+	if migratedBody != wantBody {
+		t.Fatalf("expected body preserved exactly.\nGot:\n%q\nWant:\n%q", migratedBody, wantBody)
+	}
+}
+
+
+func TestTreeService_LoadTree_MigratesToV2_PreservesExistingLeafWikiTitle(t *testing.T) {
+	if CurrentSchemaVersion < 2 {
+		t.Skip("requires schema v2+")
+	}
+
+	tmpDir := t.TempDir()
+
+	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	id, err := svc.CreateNode("system", nil, "Tree Title", "page1", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	if err := svc.SaveTree(); err != nil {
+		t.Fatalf("SaveTree failed: %v", err)
+	}
+
+	pagePath := filepath.Join(tmpDir, "root", "page1.md")
+	legacyContent := `---
+leafwiki_title: Existing Title
+---
+# Page 1 Content
+Hello World
+`
+	if err := os.WriteFile(pagePath, []byte(legacyContent), 0o644); err != nil {
+		t.Fatalf("write legacy content failed: %v", err)
+	}
+
+	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	loaded := NewTreeService(tmpDir)
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree (migrating) failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(pagePath)
+	if err != nil {
+		t.Fatalf("read migrated file: %v", err)
+	}
+
+	fm, migratedBody, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after migration")
+	}
+	if fm.LeafWikiID != *id {
+		t.Fatalf("expected leafwiki_id=%q, got %q", *id, fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "Existing Title" {
+		t.Fatalf("expected existing leafwiki_title to be preserved, got %q", fm.LeafWikiTitle)
+	}
+	wantBody := `# Page 1 Content
+Hello World
+`
+	if migratedBody != wantBody {
+		t.Fatalf("expected body preserved exactly.\nGot:\n%q\nWant:\n%q", migratedBody, wantBody)
+	}
+}
+
+func TestTreeService_LoadTree_MigratesToV2_PreservesTitleAlias(t *testing.T) {
+	if CurrentSchemaVersion < 2 {
+		t.Skip("requires schema v2+")
+	}
+
+	tmpDir := t.TempDir()
+
+	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	id, err := svc.CreateNode("system", nil, "Tree Title", "page1", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	if err := svc.SaveTree(); err != nil {
+		t.Fatalf("SaveTree failed: %v", err)
+	}
+
+	pagePath := filepath.Join(tmpDir, "root", "page1.md")
+	legacyContent := `---
+title: Alias Title
+custom_key: keep-me
+---
+# Page 1 Content
+Hello World
+`
+	if err := os.WriteFile(pagePath, []byte(legacyContent), 0o644); err != nil {
+		t.Fatalf("write legacy content failed: %v", err)
+	}
+
+	if err := saveSchema(tmpDir, CurrentSchemaVersion-1); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	loaded := NewTreeService(tmpDir)
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree (migrating) failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(pagePath)
+	if err != nil {
+		t.Fatalf("read migrated file: %v", err)
+	}
+
+	migrated := string(raw)
+	if !strings.Contains(migrated, "title: Alias Title") {
+		t.Fatalf(`expected title alias to be preserved, got:
+%s`, migrated)
+	}
+	if !strings.Contains(migrated, "custom_key: keep-me") {
+		t.Fatalf(`expected custom frontmatter to be preserved, got:
+%s`, migrated)
+	}
+
+	fm, migratedBody, has, err := markdown.ParseFrontmatter(migrated)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after migration")
+	}
+	if fm.LeafWikiID != *id {
+		t.Fatalf("expected leafwiki_id=%q, got %q", *id, fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "Alias Title" {
+		t.Fatalf("expected title alias to remain effective, got %q", fm.LeafWikiTitle)
+	}
+	wantBody := `# Page 1 Content
+Hello World
+`
+	if migratedBody != wantBody {
+		t.Fatalf("expected body preserved exactly.\nGot:\n%q\nWant:\n%q", migratedBody, wantBody)
+	}
+}
+
 // TestTreeService_ReconstructTreeFromFS_UpdatesSchemaVersion verifies that
 // ReconstructTreeFromFS writes the current schema version to prevent unnecessary migrations
 func TestTreeService_ReconstructTreeFromFS_UpdatesSchemaVersion(t *testing.T) {
