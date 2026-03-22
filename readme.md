@@ -1,10 +1,11 @@
 # 🌿 LeafWiki
 
-**LeafWiki – A fast wiki for people who think in folders, not feeds**  
-Single Go binary. Markdown on disk. No external database service.
+**LeafWiki is the self-hosted documentation app for people who think in structure, not sprawl.**  
+Fast editing. Explicit tree navigation. Markdown stored on disk. Single Go binary.
 
-LeafWiki is a lightweight, self-hosted wiki for runbooks, internal docs, and technical notes — built for fast writing and explicit structure.
-It keeps your content as plain Markdown on disk and gives you fast navigation, search, and editing — without running additional services.
+LeafWiki is a lightweight wiki for runbooks, internal docs, and technical notes. It gives you a focused app for writing, browsing, searching, and organizing knowledge, while keeping your content portable as plain Markdown files on disk.
+
+If you want something lighter than a large wiki platform, but more structured than scattered notes and folders, LeafWiki sits in that gap.
 
 ---
 
@@ -41,8 +42,8 @@ Mobile-friendly UI for reading (and editing) docs & runbooks on the go.
 
 ## What LeafWiki is good for today
 
-LeafWiki focuses on personal and small-team documentation use cases today.  
-Team features will evolve over time, guided by real-world usage.
+LeafWiki focuses on personal and small-team documentation use cases today.
+It is designed for teams that want a focused documentation app with clear structure, fast editing, and full control over their data without taking on the weight of a larger platform.
 
 LeafWiki is currently well-suited for:
 - Personal technical notes and documentation
@@ -77,16 +78,19 @@ See the [CHANGELOG](CHANGELOG.md) for release details.
 
 ## Why Another Wiki?
 
-Most wiki tools become operational projects: databases, plugins, workflows, and setup decisions.
+Most wiki tools become projects of their own: databases to manage, plugins to maintain, workflows to configure, and too many setup decisions for a system that should just help you write, navigate, and find information.
 
-LeafWiki was designed around a few simple questions:
-- Why require a complex database for Markdown content?
-- Why should self-hosting a wiki require significant setup effort?
-- Why can’t structure and navigation be handled explicitly while keeping files portable?
+LeafWiki takes a narrower view:
+- Provide a focused documentation app instead of a sprawling platform
+- Make structure explicit instead of inferred
+- Keep content portable as plain Markdown on disk
+- Stay easy to self-host and easy to understand
+- Avoid turning documentation into platform maintenance
 
 In practice, that means:
-- Markdown on disk
+- A dedicated app for writing, reading, and organizing docs
 - Explicit tree structure
+- Markdown stored on disk
 - Single-binary or container deployment
 - Minimal operational overhead
 
@@ -96,8 +100,8 @@ In practice, that means:
 
 LeafWiki is built around a small set of clear principles:
 
-- **Plain Markdown storage**  
-  All content is stored as Markdown files on disk. This avoids vendor lock-in and keeps your data portable and transparent.
+- **App-first, file-backed**  
+  LeafWiki is built as a documentation app with its own navigation, editing, and search experience while keeping content stored as plain Markdown files on disk.
 
 - **No external database required**  
   LeafWiki uses SQLite internally and does not require running or managing a separate database service.
@@ -120,26 +124,26 @@ For details on the current model and its constraints, see [Known limitations](#k
 
 ## What LeafWiki supports
 
-- **Fast writing flow (editor + shortcuts)**
-- **Explicit tree navigation**
+- **Fast writing flow with editor shortcuts**
+- **Explicit tree navigation instead of flat note lists**
 - **Public read-only docs with authenticated editing**
 - Built-in Markdown editor with live preview
-- Brand customization (logo, favicon & site name)
 - Full-text search across page titles and content
-- Support for diagrams via Mermaid
 - Image and asset support
-- Dark mode and mobile-friendly UI
+- Support for diagrams via Mermaid
+- Brand customization such as logo, favicon, and site name
 - Separation between admin, editor, and viewer users
-- Keyboard shortcuts for common actions (like saving with Ctrl+S, ...)
+- Dark mode and mobile-friendly UI
+- Keyboard shortcuts for common actions such as save and search
 
 
 ## What LeafWiki is not
 
 - Not a Confluence replacement
 - Not real-time collaborative editing
-- Not a workflow/approval/document-control platform
+- Not a workflow, approval, or document-control platform
 
-LeafWiki is designed to stay small, predictable, and easy to operate.
+LeafWiki is designed to stay focused, predictable, and easy to operate.
 
 ---
 
