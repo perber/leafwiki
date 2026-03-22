@@ -101,6 +101,11 @@ func (t *TreeService) LoadTree() error {
 	}
 
 	t.tree = reconstructed
+
+	if err := os.Remove(legacyTreePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.log.Warn("Could not remove migrated legacy tree snapshot", "path", legacyTreePath, "error", err)
+	}
+
 	return nil
 }
 
@@ -859,6 +864,14 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 			}
 			return fmt.Errorf("could not persist destination child order: %w", err)
 		}
+	}
+
+	if err := t.store.SyncFrontmatterIfExists(node); err != nil {
+		rollbackErr := t.rollbackMovedNodeLocked(node, oldParent, newParent, previousOldChildren, previousOldPositions, previousNewChildren, previousNewPositions, previousPosition, previousMetadata, newParentWasConverted)
+		if rollbackErr != nil {
+			return errors.Join(fmt.Errorf("could not sync moved node frontmatter: %w", err), fmt.Errorf("rollback moved node: %w", rollbackErr))
+		}
+		return fmt.Errorf("could not sync moved node frontmatter: %w", err)
 	}
 
 	return nil

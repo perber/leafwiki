@@ -238,7 +238,7 @@ func TestTreeMigration_LoadTree_MigratesToV5_BackfillsChildOrderFiles(t *testing
 	}
 
 	tmpDir := t.TempDir()
-	writeSchema(t, tmpDir, 4)
+	writeSchema(t, tmpDir, tree.CurrentSchemaVersion)
 
 	svc := tree.NewTreeService(tmpDir)
 	if err := svc.LoadTree(); err != nil {
@@ -386,7 +386,7 @@ func TestTreeMigration_LoadTree_MigratesToV5_ReturnsErrorWhenOrderFileCannotBeWr
 	}
 
 	tmpDir := t.TempDir()
-	writeSchema(t, tmpDir, 4)
+	writeSchema(t, tmpDir, tree.CurrentSchemaVersion)
 
 	svc := tree.NewTreeService(tmpDir)
 	if err := svc.LoadTree(); err != nil {
@@ -405,12 +405,9 @@ func TestTreeMigration_LoadTree_MigratesToV5_ReturnsErrorWhenOrderFileCannotBeWr
 	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("remove root order file failed: %v", err)
 	}
-	if err := os.Chmod(filepath.Join(tmpDir, "root"), 0o555); err != nil {
-		t.Fatalf("chmod root dir failed: %v", err)
+	if err := os.Mkdir(filepath.Join(tmpDir, "root", ".order.json"), 0o755); err != nil {
+		t.Fatalf("mkdir root order path failed: %v", err)
 	}
-	defer func() {
-		_ = os.Chmod(filepath.Join(tmpDir, "root"), 0o755)
-	}()
 	writeSchema(t, tmpDir, 4)
 
 	loaded := tree.NewTreeService(tmpDir)
