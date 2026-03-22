@@ -1125,7 +1125,7 @@ func (f *NodeStore) ConvertNode(entry *PageNode, target NodeKind) error {
 		// allow only:
 		// - empty folder
 		// - folder with only index.md
-		// - internal child-order metadata alongside index.md
+		// - internal child-order metadata file (alone or alongside index.md)
 		allowed := true
 		for _, e := range entries {
 			name := e.Name()
