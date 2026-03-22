@@ -25,6 +25,7 @@ func (testStore) ContentPathForRead(Node) (string, error)  { return "", nil }
 func (testStore) ContentPathForWrite(Node) (string, error) { return "", nil }
 func (testStore) EnsureSectionIndex(Node) (string, error)  { return "", nil }
 func (testStore) ReadPageRaw(Node) (string, error)         { return "", nil }
+func (testStore) SaveChildOrder(Node) error                { return nil }
 
 type testLogger struct{}
 
@@ -37,7 +38,7 @@ func validDependencies() Dependencies {
 		Root:                 testNode{},
 		Store:                testStore{},
 		Log:                  testLogger{},
-		CurrentSchemaVersion: 4,
+		CurrentSchemaVersion: 5,
 		SaveTree:             func() error { return nil },
 		SaveSchema:           func(int) error { return nil },
 	}
@@ -83,13 +84,13 @@ func TestRun_RejectsMissingRequiredDependencies(t *testing.T) {
 
 func TestRun_RejectsUnsupportedMigrationVersion(t *testing.T) {
 	deps := validDependencies()
-	deps.CurrentSchemaVersion = 5
+	deps.CurrentSchemaVersion = 6
 
 	err := Run(4, deps)
 	if err == nil {
 		t.Fatalf("expected error for unsupported migration version")
 	}
-	if !strings.Contains(err.Error(), "unsupported schema migration version: 4") {
+	if !strings.Contains(err.Error(), "unsupported schema migration version: 5") {
 		t.Fatalf("expected unsupported migration version error, got: %v", err)
 	}
 }

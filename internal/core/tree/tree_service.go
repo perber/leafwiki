@@ -151,7 +151,10 @@ func (t *TreeService) CreateNode(userID string, parentID *string, title string, 
 	err := t.withLockedTree(func() error {
 		var err error
 		result, err = t.createNodeLocked(userID, parentID, title, slug, nodeKind)
-		return err
+		if err != nil {
+			return err
+		}
+		return t.saveTreeLocked()
 	})
 
 	return result, err
@@ -237,6 +240,9 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 
 	// Add the new page to the parent
 	parent.Children = append(parent.Children, entry)
+	if err := t.store.SaveChildOrder(parent); err != nil {
+		return nil, fmt.Errorf("could not persist child order: %w", err)
+	}
 	return &entry.ID, nil
 }
 
@@ -329,6 +335,9 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error
 		}
 
 		t.reindexPositions(parent)
+		if err := t.store.SaveChildOrder(parent); err != nil {
+			return fmt.Errorf("could not persist child order: %w", err)
+		}
 		return t.saveTreeLocked()
 	})
 	return err
@@ -775,6 +784,15 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 	t.reindexPositions(newParent)
 	t.reindexPositions(oldParent)
 
+	if err := t.store.SaveChildOrder(oldParent); err != nil {
+		return fmt.Errorf("could not persist source child order: %w", err)
+	}
+	if newParent != oldParent {
+		if err := t.store.SaveChildOrder(newParent); err != nil {
+			return fmt.Errorf("could not persist destination child order: %w", err)
+		}
+	}
+
 	// Persist tree
 	return t.saveTreeLocked()
 }
@@ -840,6 +858,10 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 
 	// Reindex the positions
 	t.reindexPositions(parent)
+
+	if err := t.store.SaveChildOrder(parent); err != nil {
+		return fmt.Errorf("could not persist child order: %w", err)
+	}
 
 	// Save the tree
 	return t.saveTreeLocked()

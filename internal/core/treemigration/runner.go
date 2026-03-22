@@ -46,6 +46,7 @@ type Store interface {
 	ContentPathForWrite(node Node) (string, error)
 	EnsureSectionIndex(node Node) (string, error)
 	ReadPageRaw(node Node) (string, error)
+	SaveChildOrder(node Node) error
 }
 
 type Logger interface {
@@ -136,6 +137,8 @@ func migrationForVersion(version int) (func(Dependencies) error, error) {
 		return migrateToV3, nil
 	case 3:
 		return migrateToV4, nil
+	case 4:
+		return migrateToV5, nil
 	default:
 		return nil, fmt.Errorf("unsupported schema migration version: %d", version)
 	}
@@ -188,6 +191,31 @@ func backfillMetadata(deps Dependencies, node Node) error {
 
 	for _, child := range node.Children() {
 		if err := backfillMetadata(deps, child); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func migrateToV5(deps Dependencies) error {
+	return backfillChildOrder(deps, deps.Root)
+}
+
+func backfillChildOrder(deps Dependencies, node Node) error {
+	if node == nil {
+		return nil
+	}
+
+	children := node.Children()
+	if len(children) > 0 {
+		if err := deps.Store.SaveChildOrder(node); err != nil {
+			return fmt.Errorf("persist child order for node %s: %w", node.ID(), err)
+		}
+	}
+
+	for _, child := range children {
+		if err := backfillChildOrder(deps, child); err != nil {
 			return err
 		}
 	}

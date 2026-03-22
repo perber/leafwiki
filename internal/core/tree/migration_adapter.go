@@ -127,6 +127,14 @@ func (a *migrationStoreAdapter) EnsureSectionIndex(node treemigration.Node) (str
 	return a.store.ensureSectionIndex(entry)
 }
 
+func (a *migrationStoreAdapter) SaveChildOrder(node treemigration.Node) error {
+	entry, err := unwrapMigrationNode(node)
+	if err != nil {
+		return err
+	}
+	return a.store.SaveChildOrder(entry)
+}
+
 func (a *migrationStoreAdapter) ReadPageRaw(node treemigration.Node) (string, error) {
 	entry, err := unwrapMigrationNode(node)
 	if err != nil {
