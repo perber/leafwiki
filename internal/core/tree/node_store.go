@@ -1125,10 +1125,11 @@ func (f *NodeStore) ConvertNode(entry *PageNode, target NodeKind) error {
 		// allow only:
 		// - empty folder
 		// - folder with only index.md
+		// - internal child-order metadata alongside index.md
 		allowed := true
 		for _, e := range entries {
 			name := e.Name()
-			if name == "index.md" {
+			if name == "index.md" || name == orderFilename {
 				continue
 			}
 			allowed = false
@@ -1149,6 +1150,10 @@ func (f *NodeStore) ConvertNode(entry *PageNode, target NodeKind) error {
 			if err := mdFile.WriteToFile(); err != nil {
 				return fmt.Errorf("could not write page file: %w", err)
 			}
+		}
+
+		if err := os.Remove(filepath.Join(folderPath, orderFilename)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("could not remove child order file: %w", err)
 		}
 
 		// remove folder (must be empty now)
