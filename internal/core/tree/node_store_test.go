@@ -101,12 +101,46 @@ func TestNodeStore_SaveTree_ThenLoadTree_AssignsParents(t *testing.T) {
 	}
 }
 
-func TestNodeStore_SaveTree_NilTree_Error(t *testing.T) {
+func TestNodeStore_SaveChildOrder_Root_WritesOrderFile(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	if err := store.SaveTree("tree.json", nil); err == nil {
-		t.Fatalf("expected error, got nil")
+	root := &PageNode{
+		ID:    "root",
+		Slug:  "root",
+		Title: "root",
+		Kind:  NodeKindSection,
+		Children: []*PageNode{
+			{ID: "a"},
+			{ID: "b"},
+		},
+	}
+
+	if err := store.SaveChildOrder(root); err != nil {
+		t.Fatalf("SaveChildOrder root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, "root", ".order.json")); err != nil {
+		t.Fatalf("expected root order file: %v", err)
+	}
+}
+
+func TestNodeStore_SaveChildOrder_Page_ReturnsErrorWithoutCreatingDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "page1", Slug: "docs", Title: "Docs", Kind: NodeKindPage, Parent: root}
+
+	err := store.SaveChildOrder(page)
+	if err == nil {
+		t.Fatalf("expected SaveChildOrder to reject page nodes")
+	}
+	var opErr *InvalidOpError
+	if !errors.As(err, &opErr) {
+		t.Fatalf("expected InvalidOpError, got %T (%v)", err, err)
+	}
+	if _, err := os.Stat(filepath.Join(tmp, "root", "docs")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected no stray page directory, got err=%v", err)
 	}
 }
 

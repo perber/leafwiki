@@ -429,6 +429,9 @@ func (f *NodeStore) SaveChildOrder(parent *PageNode) error {
 	if parent == nil {
 		return &InvalidOpError{Op: "SaveChildOrder", Reason: "a parent entry is required"}
 	}
+	if parent.ID != "root" && parent.Kind != NodeKindSection {
+		return &InvalidOpError{Op: "SaveChildOrder", Reason: "parent entry must be root or a section"}
+	}
 
 	dirPath, err := f.dirPathForNode(parent)
 	if err != nil {

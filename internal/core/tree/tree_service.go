@@ -167,7 +167,7 @@ func (t *TreeService) CreateNode(userID string, parentID *string, title string, 
 
 		if err := t.saveTreeLocked(); err != nil {
 			rollbackErr := t.rollbackCreatedNodeLocked(created.parent, created.entry, created.parentWasConverted)
-			if rollbackErr == nil && created.parent != nil {
+			if rollbackErr == nil && created.parent != nil && created.parent.Kind == NodeKindSection {
 				rollbackErr = t.store.SaveChildOrder(created.parent)
 			}
 			result = nil

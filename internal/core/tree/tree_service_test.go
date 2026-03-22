@@ -191,6 +191,7 @@ func TestTreeService_CreateChild_RollsBackParentAutoConvertWhenTreeSaveFails(t *
 		t.Fatalf("expected parent children rolled back, got %d", len(parent.Children))
 	}
 	mustStat(t, filepath.Join(tmpDir, "root", "docs.md"))
+	mustNotExist(t, filepath.Join(tmpDir, "root", "docs"))
 	mustNotExist(t, filepath.Join(tmpDir, "root", "docs", "index.md"))
 	mustNotExist(t, filepath.Join(tmpDir, "root", "docs", "child.md"))
 }
