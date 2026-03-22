@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -19,6 +20,17 @@ func mustWriteFile(t *testing.T, path string, data string, perm os.FileMode) {
 	}
 	if err := os.WriteFile(path, []byte(data), perm); err != nil {
 		t.Fatalf("write file: %v", err)
+	}
+}
+
+func writeLegacyTreeJSON(t *testing.T, storageDir string, tree *PageNode) {
+	t.Helper()
+	raw, err := json.Marshal(tree)
+	if err != nil {
+		t.Fatalf("marshal legacy tree: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storageDir, "tree.json"), raw, 0o644); err != nil {
+		t.Fatalf("write legacy tree: %v", err)
 	}
 }
 
@@ -81,9 +93,7 @@ func TestNodeStore_SaveTree_ThenLoadTree_AssignsParents(t *testing.T) {
 		},
 	}
 
-	if err := store.SaveTree("tree.json", tree); err != nil {
-		t.Fatalf("SaveTree: %v", err)
-	}
+	writeLegacyTreeJSON(t, tmp, tree)
 
 	loaded, err := store.LoadTree("tree.json")
 	if err != nil {

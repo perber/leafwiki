@@ -162,7 +162,7 @@ func (t *TreeService) migrationDependencies() treemigration.Dependencies {
 		Store:                &migrationStoreAdapter{store: t.store},
 		Log:                  t.log,
 		CurrentSchemaVersion: CurrentSchemaVersion,
-		SaveTree:             t.saveTreeLocked,
+		SaveTree:             func() error { return nil },
 		SaveSchema: func(version int) error {
 			return saveSchema(t.storageDir, version)
 		},

@@ -2,7 +2,6 @@ package tree
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,6 +18,18 @@ import (
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+func ensureUniqueReconstructedID(seenIDs map[string]string, id string, path string) error {
+	trimmedID := strings.TrimSpace(id)
+	if trimmedID == "" {
+		return fmt.Errorf("reconstruct tree from fs: empty leafwiki_id at %s", path)
+	}
+	if existingPath, exists := seenIDs[trimmedID]; exists {
+		return fmt.Errorf("duplicate leafwiki_id %q in %s and %s", trimmedID, existingPath, path)
+	}
+	seenIDs[trimmedID] = path
+	return nil
 }
 
 type ResolvedNode struct {
@@ -51,9 +62,21 @@ func NewNodeStore(storageDir string) *NodeStore {
 
 // writeIDToMarkdownFile writes a leafwiki_id to a markdown file's frontmatter and logs errors if the write fails
 func (f *NodeStore) writeIDToMarkdownFile(mdFile *markdown.MarkdownFile, id string) {
+	var originalModTime time.Time
+	if info, err := os.Stat(mdFile.GetPath()); err == nil {
+		originalModTime = info.ModTime()
+	}
+
 	mdFile.SetLeafWikiFrontmatter(id, mdFile.GetFrontmatter().LeafWikiTitle)
 	if err := mdFile.WriteToFile(); err != nil {
 		f.log.Error("could not write leafwiki_id back to file", "path", mdFile.GetPath(), "error", err)
+		return
+	}
+
+	if !originalModTime.IsZero() {
+		if err := os.Chtimes(mdFile.GetPath(), originalModTime, originalModTime); err != nil {
+			f.log.Warn("could not restore file mtime after writing leafwiki_id", "path", mdFile.GetPath(), "error", err)
+		}
 	}
 }
 
@@ -203,6 +226,7 @@ func (f *NodeStore) ReconstructTreeFromFS() (*PageNode, error) {
 		Kind:     NodeKindSection,
 		Metadata: f.metadataFromFrontmatter(markdown.Frontmatter{}, reconstructNow, rootDir),
 	}
+	seenIDs := map[string]string{"root": rootDir}
 
 	info, err := os.Stat(rootDir)
 	if err != nil {
@@ -217,13 +241,13 @@ func (f *NodeStore) ReconstructTreeFromFS() (*PageNode, error) {
 		return nil, fmt.Errorf("root path %s is not a directory", rootDir)
 	}
 
-	if err := f.reconstructTreeRecursive(rootDir, root, reconstructNow); err != nil {
+	if err := f.reconstructTreeRecursive(rootDir, root, reconstructNow, seenIDs); err != nil {
 		return nil, fmt.Errorf("reconstruct tree from fs: %w", err)
 	}
 
 	return root, nil
 }
-func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNode, reconstructNow time.Time) error {
+func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNode, reconstructNow time.Time, seenIDs map[string]string) error {
 	entries, err := os.ReadDir(currentPath)
 	if err != nil {
 		return fmt.Errorf("read dir %s: %w", currentPath, err)
@@ -296,6 +320,9 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 				Kind:     NodeKindSection,
 				Metadata: metadata,
 			}
+			if err := ensureUniqueReconstructedID(seenIDs, child.ID, indexPath); err != nil {
+				return err
+			}
 			parent.Children = append(parent.Children, child)
 
 			if !fileExists(indexPath) {
@@ -304,7 +331,7 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 				}
 			}
 
-			if err := f.reconstructTreeRecursive(filepath.Join(currentPath, name), child, reconstructNow); err != nil {
+			if err := f.reconstructTreeRecursive(filepath.Join(currentPath, name), child, reconstructNow, seenIDs); err != nil {
 				return err
 			}
 			continue
@@ -358,6 +385,9 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 			Children: nil,
 			Kind:     NodeKindPage,
 			Metadata: metadata,
+		}
+		if err := ensureUniqueReconstructedID(seenIDs, child.ID, filePath); err != nil {
+			return err
 		}
 		parent.Children = append(parent.Children, child)
 	}
@@ -467,25 +497,6 @@ func (f *NodeStore) assignParentToChildren(parent *PageNode) {
 		child.Parent = parent
 		f.assignParentToChildren(child)
 	}
-}
-
-func (f *NodeStore) SaveTree(filename string, tree *PageNode) error {
-	if tree == nil {
-		return errors.New("a tree is required")
-	}
-
-	fullPath := filepath.Join(f.storageDir, filename)
-
-	data, err := json.Marshal(tree)
-	if err != nil {
-		return fmt.Errorf("could not marshal tree: %w", err)
-	}
-
-	if err := shared.WriteFileAtomic(fullPath, data, 0o644); err != nil {
-		return fmt.Errorf("could not atomically write tree file: %w", err)
-	}
-
-	return nil
 }
 
 // CreatePage creates a new page file under the given parent entry

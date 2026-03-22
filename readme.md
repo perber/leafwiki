@@ -103,7 +103,7 @@ LeafWiki is built around a small set of clear principles:
   LeafWiki uses SQLite internally and does not require running or managing a separate database service.
 
 - **Explicit structure management**  
-  Structure is stored as metadata (JSON/SQLite) while page content stays plain Markdown.
+  Structure is derived from the filesystem layout and persisted metadata files while page content stays plain Markdown.
 
 - **Self-hosted by design**
   Designed to run on a single server with minimal operational overhead.
@@ -112,7 +112,8 @@ LeafWiki is built around a small set of clear principles:
 
 ### Data model
 
-LeafWiki stores page content as Markdown files and uses a combination of JSON and SQLite for navigation, metadata, and search.
+LeafWiki stores page content as Markdown files on disk.
+Navigation is reconstructed from the filesystem layout, child ordering is stored in `.order.json`, and search uses SQLite.
 For details on the current model and its constraints, see [Known limitations](#known-limitations).
 
 ---
@@ -288,11 +289,11 @@ These options control how the server runs after installation.
 | `--public-access`               | Allow public read-only access                                          | `false`       | –                 |
 | `--hide-link-metadata-section`  | Hide link metadata section                                             | `false`       | –                 |
 | `--inject-code-in-header`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS)| `""`          | v0.6.0            |
-| `--allow-insecure`              | ⚠️ Disables Secure & HttpOnly cookies (required for HTTP)              | `false`       | v0.7.0            |
+| `--allow-insecure`              | ⚠️ Allows insecure HTTP usage for auth cookies (required for plain HTTP) | `false`       | v0.7.0            |
 | `--access-token-timeout`        | Access token timeout duration (e.g. 24h, 15m)                          | `15m`         | v0.7.0            |
 | `--refresh-token-timeout`       | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`          | v0.7.0            |
-| `--disable-auth`                | ⚠️ Disable  authentication & authorization (internal networks only!)   | `false`       | v0.7.0            |
-| `--base-path`                | URL prefix when served behind a reverse proxy (e.g. /wiki)    | `""`       | v0.8.2            |
+| `--disable-auth`                | ⚠️ Disable authentication & authorization (internal networks only!)    | `false`       | v0.7.0            |
+| `--base-path`                   | URL prefix when served behind a reverse proxy (e.g. /wiki)              | `""`        | v0.8.2            |
 
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
@@ -312,10 +313,10 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_PUBLIC_ACCESS`               | Allow public read-only access                                           | `false`    | -               |
 | `LEAFWIKI_HIDE_LINK_METADATA_SECTION`  | Hide link metadata section                                              | `false`    | -               |
 | `LEAFWIKI_INJECT_CODE_IN_HEADER`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`       | v0.6.0          |
-| `LEAFWIKI_ALLOW_INSECURE`              | ⚠️ Disables Secure & HttpOnly cookies (required for HTTP)               | `false`    | v0.7.0          |
+| `LEAFWIKI_ALLOW_INSECURE`              | ⚠️ Allows insecure HTTP usage for auth cookies (required for plain HTTP) | `false`    | v0.7.0          |
 | `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`        | Access token timeout duration (e.g. 24h, 15m)                           | `15m`      | v0.7.0          |
 | `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`       | Refresh token timeout duration (e.g. 168h, 7d)                          | `7d`       | v0.7.0          |
-| `LEAFWIKI_DISABLE_AUTH`                | ⚠️ Disable  authentication & authorization (internal networks only!)    | `false`    | v0.7.0          |
+| `LEAFWIKI_DISABLE_AUTH`                | ⚠️ Disable authentication & authorization (internal networks only!)     | `false`    | v0.7.0          |
 | `LEAFWIKI_BASE_PATH`                   | URL prefix when served behind a reverse proxy (e.g. /wiki)              | `""`       | v0.8.2          |
 
 
@@ -374,73 +375,6 @@ If you use this flag, **you are fully responsible for securing access at the net
 
 ---
 
-## Reconstruct Tree from Filesystem
-
-LeafWiki includes a built-in `reconstruct-tree` command that rebuilds the navigation tree (`tree.json`) by scanning the actual Markdown files and folders on disk.
-
-**Usage:**
-
-```bash
-leafwiki [--data-dir <DIR>] reconstruct-tree
-```
-
-Or if you installed LeafWiki as a binary:
-
-```bash
-./leafwiki [--data-dir <DIR>] reconstruct-tree
-```
-
-**What it does:**
-
-The command:
-- Scans the `data/root` directory recursively
-- Extracts page titles from Markdown files (from H1 headings or frontmatter)
-- Preserves `leafwiki_id` values from frontmatter when present
-- Generates new IDs for pages without frontmatter IDs
-- Rebuilds the complete navigation tree structure
-- Saves the new `tree.json` and updates `schema.json`
-
-**Use cases:**
-
-1. **Recovery from corrupted tree.json**  
-   If your `tree.json` becomes corrupted or deleted, this command reconstructs it from your existing Markdown files.
-
-2. **Manual filesystem changes**  
-   If you've added, moved, or renamed Markdown files directly on disk (outside LeafWiki's UI), run this command to sync the navigation tree.
-
-3. **Migration and import**  
-   When importing existing Markdown content into LeafWiki, use this command to automatically generate the navigation structure.
-
-4. **Tree structure reset**  
-   If the tree structure becomes inconsistent with the filesystem, this provides a clean rebuild based on actual file layout.
-
-**Important notes:**
-
-- ⚠️ This command **replaces the entire tree structure**. Any custom ordering or metadata in `tree.json` will be lost.
-- The command creates a **deterministic, alphabetically-sorted** tree based on file and folder names.
-- Page content (Markdown files) is never modified—only the navigation structure is rebuilt.
-- Frontmatter `leafwiki_id` values are preserved when present, maintaining page identity and internal links.
-- For folders (sections), the command looks for `index.md` to extract the section title.
-- Files and folders starting with `.` (hidden) are automatically skipped.
-
-**Example:**
-
-```bash
-# Default data directory (./data)
-leafwiki reconstruct-tree
-
-# Custom data directory
-leafwiki --data-dir /path/to/data reconstruct-tree
-```
-
-**Before running this command:**
-
-- Ensure your data directory exists and contains a `root` folder with your Markdown content
-- Consider backing up your current `tree.json` if you need to preserve custom ordering
-- The server does not need to be running—this is a standalone command
-
----
-
 ## Import Feature 
 
 LeafWiki includes a built-in Markdown Importer that allows you to import existing Markdown files and folders into the wiki structure.
@@ -470,7 +404,7 @@ npm run dev   # Starts Vite dev server on http://localhost:5173
 
 cd ../../cmd/leafwiki
 
-go run main.go --jwt-secret=yoursecret --public-access=true --allow-insecure=true --admin-password=yourpassword
+go run main.go --jwt-secret=yoursecret --allow-insecure=true --admin-password=yourpassword
 
 # Note: The backend binds to 127.0.0.1 by default for security.
 # If you need to access it from a different machine or network interface
@@ -514,7 +448,7 @@ As a result, the following limitations apply today:
   Edits follow a last-write-wins model. Best suited for single maintainers or low-concurrency use.
 
 - **Metadata not fully embedded in Markdown**  
-  Page content is plain Markdown, but structure, metadata, user accounts, and search indexes are stored in SQLite.
+  Page content is plain Markdown, but ordering metadata, user accounts, and search indexes are stored outside the page body.
 
 - **Minimal access control**  
   No role-based permissions or fine-grained restrictions at this time.

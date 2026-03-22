@@ -18,45 +18,67 @@ import (
 // TreeService is our main component for handling tree operations
 // We use this service to create pages, delete pages, update pages, etc.
 type TreeService struct {
-	storageDir   string
-	treeFilename string
-	tree         *PageNode
-	store        *NodeStore
-	log          *slog.Logger
+	storageDir string
+	tree       *PageNode
+	store      *NodeStore
+	log        *slog.Logger
 
 	mu sync.RWMutex
 }
 
 // NewTreeService creates a new TreeService
+const legacyTreeFilename = "tree.json"
+
 func NewTreeService(storageDir string) *TreeService {
 	return &TreeService{
-		storageDir:   storageDir,
-		treeFilename: "tree.json",
-		tree:         nil,
-		store:        NewNodeStore(storageDir),
-		log:          slog.Default().With("component", "TreeService"),
+		storageDir: storageDir,
+		tree:       nil,
+		store:      NewNodeStore(storageDir),
+		log:        slog.Default().With("component", "TreeService"),
 	}
 }
 
-// LoadTree loads the tree from the storage directory
-// If the tree does not exist, it creates a new tree
+// LoadTree reconstructs the in-memory tree from the filesystem.
+// Legacy tree.json data is only used as a migration source for older schema versions.
 func (t *TreeService) LoadTree() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	// Load the tree from the storage directory
-	var err error
-	t.tree, err = t.store.LoadTree(t.treeFilename)
-	if err != nil {
-		return err
-	}
-
-	// Load the schema version
 	t.log.Info("Checking schema version...")
 	schema, err := loadSchema(t.storageDir)
 	if err != nil {
 		t.log.Error("Error loading schema", "error", err)
 		return err
+	}
+
+	legacyTreePath := filepath.Join(t.storageDir, legacyTreeFilename)
+	if schema.Version < CurrentSchemaVersion {
+		if info, statErr := os.Stat(legacyTreePath); statErr == nil && !info.IsDir() {
+			legacyTree, legacyErr := t.store.LoadTree(legacyTreeFilename)
+			if legacyErr != nil {
+				t.log.Warn("Could not load legacy tree, falling back to filesystem reconstruction", "path", legacyTreePath, "error", legacyErr)
+				t.tree, err = t.store.ReconstructTreeFromFS()
+				if err != nil {
+					return err
+				}
+			} else {
+				t.tree = legacyTree
+			}
+		} else {
+			t.tree, err = t.store.ReconstructTreeFromFS()
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		t.tree, err = t.store.ReconstructTreeFromFS()
+		if err != nil {
+			return err
+		}
+	}
+
+	if t.tree == nil {
+		return fmt.Errorf("internal error: tree reconstruction returned nil tree")
 	}
 
 	if schema.Version < CurrentSchemaVersion {
@@ -67,7 +89,16 @@ func (t *TreeService) LoadTree() error {
 		}
 	}
 
-	return err
+	reconstructed, err := t.store.ReconstructTreeFromFS()
+	if err != nil {
+		return err
+	}
+	if reconstructed == nil {
+		return fmt.Errorf("internal error: tree reconstruction returned nil tree")
+	}
+
+	t.tree = reconstructed
+	return nil
 }
 
 func (t *TreeService) withLockedTree(fn func() error) error {
@@ -82,16 +113,6 @@ func (t *TreeService) withRLockedTree(fn func() error) error {
 	defer t.mu.RUnlock()
 
 	return fn()
-}
-
-// SaveTree saves the tree to the storage directory
-func (t *TreeService) SaveTree() error {
-	return t.withLockedTree(t.saveTreeLocked)
-}
-
-// saveTreeLocked saves the tree to the storage directory
-func (t *TreeService) saveTreeLocked() error {
-	return t.store.SaveTree(t.treeFilename, t.tree)
 }
 
 // TreeHash returns the current hash of the tree
@@ -130,18 +151,9 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 
 	// Reconstructed nodes already carry metadata from frontmatter or safe defaults.
 
-	// Save the tree
-	if err := t.saveTreeLocked(); err != nil {
-		t.log.Error("Error saving tree after reconstruction", "error", err)
-		// Revert tree assignment on failure (may set back to nil, which is fine)
-		t.tree = oldTree
-		return err
-	}
-
-	// Update the schema version to prevent unnecessary migrations on next startup
 	if err := saveSchema(t.storageDir, CurrentSchemaVersion); err != nil {
 		t.log.Error("Error saving schema after reconstruction", "error", err)
-		// Note: We don't revert the tree here since it was already saved successfully
+		t.tree = oldTree
 		return err
 	}
 
@@ -165,17 +177,6 @@ func (t *TreeService) CreateNode(userID string, parentID *string, title string, 
 		}
 		result = &created.id
 
-		if err := t.saveTreeLocked(); err != nil {
-			rollbackErr := t.rollbackCreatedNodeLocked(created.parent, created.entry, created.parentWasConverted)
-			if rollbackErr == nil && created.parent != nil && created.parent.Kind == NodeKindSection {
-				rollbackErr = t.store.SaveChildOrder(created.parent)
-			}
-			result = nil
-			if rollbackErr != nil {
-				return errors.Join(fmt.Errorf("could not save tree: %w", err), fmt.Errorf("rollback created node after tree save failure: %w", rollbackErr))
-			}
-			return fmt.Errorf("could not save tree: %w", err)
-		}
 		return nil
 	})
 
@@ -412,7 +413,7 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error
 		if err := t.store.SaveChildOrder(parent); err != nil {
 			return fmt.Errorf("could not persist child order: %w", err)
 		}
-		return t.saveTreeLocked()
+		return nil
 	})
 	return err
 }
@@ -465,7 +466,7 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		}
 
 		// Save tree
-		return t.saveTreeLocked()
+		return nil
 	})
 
 }
@@ -509,7 +510,7 @@ func (t *TreeService) ConvertNode(userID string, id string, kind NodeKind) error
 		}
 
 		// Save tree
-		return t.saveTreeLocked()
+		return nil
 	})
 }
 
@@ -749,10 +750,6 @@ func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string
 	}
 
 	// Save once
-	if err := t.saveTreeLocked(); err != nil {
-		return nil, fmt.Errorf("could not save tree: %w", err)
-	}
-
 	return &EnsurePathResult{
 		Exists:  true,
 		Page:    page,
@@ -851,8 +848,7 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 		}
 	}
 
-	// Persist tree
-	return t.saveTreeLocked()
+	return nil
 }
 
 func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
@@ -933,8 +929,7 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 		return fmt.Errorf("could not persist child order: %w", err)
 	}
 
-	// Save the tree
-	return t.saveTreeLocked()
+	return nil
 }
 
 func (t *TreeService) reindexPositions(parent *PageNode) {

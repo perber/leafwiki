@@ -30,6 +30,17 @@ func writeSchema(t *testing.T, dir string, version int) {
 
 func ptrKind(kind tree.NodeKind) *tree.NodeKind { return &kind }
 
+func persistLegacyTreeSnapshot(t *testing.T, storageDir string, root *tree.PageNode) {
+	t.Helper()
+	raw, err := json.Marshal(root)
+	if err != nil {
+		t.Fatalf("marshal legacy tree snapshot failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storageDir, "tree.json"), raw, 0o644); err != nil {
+		t.Fatalf("write legacy tree snapshot failed: %v", err)
+	}
+}
+
 func TestTreeMigration_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *testing.T) {
 	if tree.CurrentSchemaVersion < 2 {
 		t.Skip("requires schema v2+")
@@ -47,9 +58,7 @@ func TestTreeMigration_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *
 	if err != nil {
 		t.Fatalf("CreateNode failed: %v", err)
 	}
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	pagePath := filepath.Join(tmpDir, "root", "page1.md")
 	body := "# Page 1 Content\nHello World\n"
@@ -103,9 +112,7 @@ func TestTreeMigration_LoadTree_MigratesToV2_PreservesExistingCustomFrontmatter(
 	if err != nil {
 		t.Fatalf("CreateNode failed: %v", err)
 	}
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	pagePath := filepath.Join(tmpDir, "root", "page1.md")
 	legacyContent := `---
@@ -187,9 +194,7 @@ func TestTreeMigration_LoadTree_MigratesToV3_BackfillsMetadataFrontmatter(t *tes
 		LastAuthorID: "bob",
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	pagePath := filepath.Join(tmpDir, "root", "page1.md")
 	legacyContent := "---\nleafwiki_id: " + *id + "\nleafwiki_title: Page1\n---\n# Page 1 Content\nHello World\n"
@@ -266,9 +271,7 @@ func TestTreeMigration_LoadTree_MigratesToV5_BackfillsChildOrderFiles(t *testing
 		t.Fatalf("remove docs order file: %v", err)
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 	writeSchema(t, tmpDir, 4)
 
 	loaded := tree.NewTreeService(tmpDir)
@@ -336,9 +339,7 @@ func TestTreeMigration_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *
 		LastAuthorID: "bob",
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	indexPath := filepath.Join(tmpDir, "root", "docs", "index.md")
 	if err := os.Remove(indexPath); err != nil {
@@ -454,9 +455,7 @@ func TestTreeMigration_LoadTree_MigratesToV4_ReturnsErrorWhenSectionIndexCannotB
 		LastAuthorID: "bob",
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	sectionDir := filepath.Join(tmpDir, "root", "docs")
 	indexPath := filepath.Join(sectionDir, "index.md")
