@@ -424,6 +424,7 @@ go run main.go --jwt-secret=yoursecret --allow-insecure=true --admin-password=yo
 | Action                     | Shortcut                                   |
 |----------------------------|--------------------------------------------|
 | Switch to Edit Mode        | `Ctrl + E` (or `Cmd + E`)                  |
+| Go to Page                | `Ctrl + Alt + P` (or `Cmd + Option + P`)   |
 | Switch to Search Pane      | `Ctrl + Shift + F` (or `Cmd + Shift + F`)  |
 | Switch to Navigation Pane  | `Ctrl + Shift + E` (or `Cmd + Shift + E`)  |
 | Save Page                  | `Ctrl + S` (or `Cmd + S`)                  |
