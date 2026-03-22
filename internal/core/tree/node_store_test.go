@@ -532,6 +532,110 @@ func TestNodeStore_RenameNode_PageAndSection(t *testing.T) {
 	}
 }
 
+func TestNodeStore_RenameNode_RejectsEmptySlugAndRoot(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "old", Title: "P", Kind: NodeKindPage, Parent: root}
+
+	if err := store.RenameNode(page, "   "); err == nil {
+		t.Fatalf("expected empty slug to be rejected")
+	}
+	if err := store.RenameNode(root, "new-root"); err == nil {
+		t.Fatalf("expected root rename to be rejected")
+	}
+}
+
+func TestNodeStore_RenameNode_ReturnsNilWhenSlugUnchanged(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "same", Title: "P", Kind: NodeKindPage, Parent: root}
+	file := filepath.Join(tmp, "root", "same.md")
+	mustWriteFile(t, file, "# x", 0o644)
+
+	if err := store.RenameNode(page, "same"); err != nil {
+		t.Fatalf("expected unchanged slug rename to be a no-op, got %v", err)
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("expected original file to remain: %v", err)
+	}
+}
+
+func TestNodeStore_RenameNode_RejectsDestinationCollision(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "old", Title: "P", Kind: NodeKindPage, Parent: root}
+	mustWriteFile(t, filepath.Join(tmp, "root", "old.md"), "# x", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "new.md"), "# y", 0o644)
+
+	err := store.RenameNode(page, "new")
+	if err == nil {
+		t.Fatalf("expected PageAlreadyExistsError")
+	}
+	var existsErr *PageAlreadyExistsError
+	if !errors.As(err, &existsErr) {
+		t.Fatalf("expected PageAlreadyExistsError, got %T: %v", err, err)
+	}
+}
+
+func TestNodeStore_RenameNode_Page_DriftWhenSourceIsFolder(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "old", Title: "P", Kind: NodeKindPage, Parent: root}
+	mustMkdir(t, filepath.Join(tmp, "root", "old.md"))
+
+	err := store.RenameNode(page, "new")
+	if err == nil {
+		t.Fatalf("expected DriftError")
+	}
+	var de *DriftError
+	if !errors.As(err, &de) {
+		t.Fatalf("expected DriftError, got %T: %v", err, err)
+	}
+}
+
+func TestNodeStore_RenameNode_Section_DriftWhenSourceIsFile(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	sec := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	mustWriteFile(t, filepath.Join(tmp, "root", "docs"), "not a dir", 0o644)
+
+	err := store.RenameNode(sec, "docs2")
+	if err == nil {
+		t.Fatalf("expected DriftError")
+	}
+	var de *DriftError
+	if !errors.As(err, &de) {
+		t.Fatalf("expected DriftError, got %T: %v", err, err)
+	}
+}
+
+func TestNodeStore_RenameNode_RejectsUnknownKind(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "x1", Slug: "weird", Title: "Weird", Kind: NodeKind("mystery"), Parent: root}
+
+	err := store.RenameNode(entry, "other")
+	if err == nil {
+		t.Fatalf("expected InvalidOpError")
+	}
+	var opErr *InvalidOpError
+	if !errors.As(err, &opErr) {
+		t.Fatalf("expected InvalidOpError, got %T: %v", err, err)
+	}
+}
+
 func TestNodeStore_ReadPageRaw_Section_NoIndex_ReturnsEmptyNil(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
@@ -953,6 +1057,149 @@ func TestNodeStore_ConvertNode_SectionToPage_NoIndex_CreatesEmptyPageWithFM(t *t
 	}
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Fatalf("expected folder removed")
+	}
+}
+
+func TestNodeStore_MoveNode_Section_MovesFolderStrict(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	secA := &PageNode{ID: "a", Slug: "a", Title: "A", Kind: NodeKindSection, Parent: root}
+	secB := &PageNode{ID: "b", Slug: "b", Title: "B", Kind: NodeKindSection, Parent: root}
+	entry := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: secA}
+
+	srcDir := filepath.Join(tmp, "root", "a", "docs")
+	mustMkdir(t, srcDir)
+	mustWriteFile(t, filepath.Join(srcDir, "index.md"), "# hi", 0o644)
+
+	if err := store.MoveNode(entry, secB); err != nil {
+		t.Fatalf("MoveNode(section): %v", err)
+	}
+
+	dstDir := filepath.Join(tmp, "root", "b", "docs")
+	if st, err := os.Stat(dstDir); err != nil || !st.IsDir() {
+		t.Fatalf("expected moved section dir, err=%v", err)
+	}
+	if _, err := os.Stat(srcDir); !os.IsNotExist(err) {
+		t.Fatalf("expected old section dir removed")
+	}
+}
+
+func TestNodeStore_MoveNode_Page_DriftWhenSourceIsFolder(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	sec := &PageNode{ID: "s", Slug: "s", Title: "S", Kind: NodeKindSection, Parent: root}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: sec}
+
+	mustMkdir(t, filepath.Join(tmp, "root", "s", "p.md"))
+
+	err := store.MoveNode(page, root)
+	if err == nil {
+		t.Fatalf("expected DriftError")
+	}
+	var de *DriftError
+	if !errors.As(err, &de) {
+		t.Fatalf("expected DriftError, got %T: %v", err, err)
+	}
+}
+
+func TestNodeStore_MoveNode_Section_DriftWhenSourceIsFile(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	sec := &PageNode{ID: "s", Slug: "s", Title: "S", Kind: NodeKindSection, Parent: root}
+	entry := &PageNode{ID: "p1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: sec}
+
+	mustWriteFile(t, filepath.Join(tmp, "root", "s", "docs"), "not a dir", 0o644)
+
+	err := store.MoveNode(entry, root)
+	if err == nil {
+		t.Fatalf("expected DriftError")
+	}
+	var de *DriftError
+	if !errors.As(err, &de) {
+		t.Fatalf("expected DriftError, got %T: %v", err, err)
+	}
+}
+
+func TestNodeStore_MoveNode_RejectsDestinationCollision(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	secA := &PageNode{ID: "a", Slug: "a", Title: "A", Kind: NodeKindSection, Parent: root}
+	secB := &PageNode{ID: "b", Slug: "b", Title: "B", Kind: NodeKindSection, Parent: root}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: secA}
+
+	src := filepath.Join(tmp, "root", "a", "p.md")
+	dst := filepath.Join(tmp, "root", "b", "p.md")
+	mustWriteFile(t, src, "# hi", 0o644)
+	mustWriteFile(t, dst, "# existing", 0o644)
+
+	err := store.MoveNode(page, secB)
+	if err == nil {
+		t.Fatalf("expected PageAlreadyExistsError")
+	}
+	var existsErr *PageAlreadyExistsError
+	if !errors.As(err, &existsErr) {
+		t.Fatalf("expected PageAlreadyExistsError, got %T: %v", err, err)
+	}
+}
+
+func TestNodeStore_ConvertNode_PageToSection_CreatesIndexWhenPageMissing(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: root}
+
+	if err := store.ConvertNode(entry, NodeKindSection); err != nil {
+		t.Fatalf("ConvertNode(page->section missing page): %v", err)
+	}
+
+	index := filepath.Join(tmp, "root", "p", "index.md")
+	if _, err := os.Stat(index); err != nil {
+		t.Fatalf("expected materialized section index: %v", err)
+	}
+}
+
+func TestNodeStore_ConvertNode_RejectsUnknownTarget(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: root}
+
+	err := store.ConvertNode(entry, NodeKind("weird"))
+	if err == nil {
+		t.Fatalf("expected InvalidOpError")
+	}
+	var opErr *InvalidOpError
+	if !errors.As(err, &opErr) {
+		t.Fatalf("expected InvalidOpError, got %T: %v", err, err)
+	}
+}
+
+func TestNodeStore_ConvertNode_SectionToPage_DriftWhenPathIsFile(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+
+	mustWriteFile(t, filepath.Join(tmp, "root", "docs"), "not a dir", 0o644)
+
+	err := store.ConvertNode(entry, NodeKindPage)
+	if err == nil {
+		t.Fatalf("expected DriftError")
+	}
+	var de *DriftError
+	if !errors.As(err, &de) {
+		t.Fatalf("expected DriftError, got %T: %v", err, err)
 	}
 }
 

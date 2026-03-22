@@ -133,6 +133,66 @@ func TestTreeService_SaveAndLoad_RoundtripParents(t *testing.T) {
 	}
 }
 
+func TestTreeService_TreeHash_IsStableAcrossRepeatedCalls(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	h1 := svc.TreeHash()
+	h2 := svc.TreeHash()
+	if h1 == "" {
+		t.Fatalf("expected non-empty hash")
+	}
+	if h1 != h2 {
+		t.Fatalf("expected stable hash across repeated calls, got %q and %q", h1, h2)
+	}
+	if want := svc.GetTree().Hash(); h1 != want {
+		t.Fatalf("expected TreeHash to match underlying tree hash, got %q want %q", h1, want)
+	}
+}
+
+func TestTreeService_TreeHash_ChangesWhenTreeChanges(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	before := svc.TreeHash()
+	pageID, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+	afterCreate := svc.TreeHash()
+	if before == afterCreate {
+		t.Fatalf("expected hash to change after create")
+	}
+
+	if err := svc.UpdateNode("system", *pageID, "Welcome 2", "welcome", nil); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+	afterUpdate := svc.TreeHash()
+	if afterCreate == afterUpdate {
+		t.Fatalf("expected hash to change after update")
+	}
+}
+
+func TestTreeService_TreeHash_ChangesWhenOrderChanges(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	firstID, err := svc.CreateNode("system", nil, "One", "one", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode first failed: %v", err)
+	}
+	secondID, err := svc.CreateNode("system", nil, "Two", "two", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode second failed: %v", err)
+	}
+
+	before := svc.TreeHash()
+	if err := svc.SortPages("", []string{*secondID, *firstID}); err != nil {
+		t.Fatalf("SortPages failed: %v", err)
+	}
+	after := svc.TreeHash()
+	if before == after {
+		t.Fatalf("expected hash to change after sort")
+	}
+}
+
 // --- B) Create/Update/Delete disk sync ---
 
 func TestTreeService_CreateNode_PersistsTreeJSON(t *testing.T) {
