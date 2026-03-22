@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -48,6 +49,21 @@ func mustNotExist(t *testing.T, path string) {
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected os.ErrNotExist for %q, got: %v", path, err)
 	}
+}
+
+func readOrderIDs(t *testing.T, dir string) []string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(dir, ".order.json"))
+	if err != nil {
+		t.Fatalf("read order file: %v", err)
+	}
+	var persisted struct {
+		OrderedIDs []string `json:"ordered_ids"`
+	}
+	if err := json.Unmarshal(raw, &persisted); err != nil {
+		t.Fatalf("unmarshal order file: %v", err)
+	}
+	return persisted.OrderedIDs
 }
 
 // --- A) Load/Save basics ---
@@ -117,7 +133,193 @@ func TestTreeService_SaveAndLoad_RoundtripParents(t *testing.T) {
 	}
 }
 
+func TestTreeService_TreeHash_IsStableAcrossRepeatedCalls(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	h1 := svc.TreeHash()
+	h2 := svc.TreeHash()
+	if h1 == "" {
+		t.Fatalf("expected non-empty hash")
+	}
+	if h1 != h2 {
+		t.Fatalf("expected stable hash across repeated calls, got %q and %q", h1, h2)
+	}
+	if want := svc.GetTree().Hash(); h1 != want {
+		t.Fatalf("expected TreeHash to match underlying tree hash, got %q want %q", h1, want)
+	}
+}
+
+func TestTreeService_TreeHash_ChangesWhenTreeChanges(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	before := svc.TreeHash()
+	pageID, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+	afterCreate := svc.TreeHash()
+	if before == afterCreate {
+		t.Fatalf("expected hash to change after create")
+	}
+
+	if err := svc.UpdateNode("system", *pageID, "Welcome 2", "welcome", nil); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+	afterUpdate := svc.TreeHash()
+	if afterCreate == afterUpdate {
+		t.Fatalf("expected hash to change after update")
+	}
+}
+
+func TestTreeService_TreeHash_ChangesWhenOrderChanges(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	firstID, err := svc.CreateNode("system", nil, "One", "one", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode first failed: %v", err)
+	}
+	secondID, err := svc.CreateNode("system", nil, "Two", "two", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode second failed: %v", err)
+	}
+
+	before := svc.TreeHash()
+	if err := svc.SortPages("", []string{*secondID, *firstID}); err != nil {
+		t.Fatalf("SortPages failed: %v", err)
+	}
+	after := svc.TreeHash()
+	if before == after {
+		t.Fatalf("expected hash to change after sort")
+	}
+}
+
 // --- B) Create/Update/Delete disk sync ---
+
+func TestTreeService_CreateNode_PersistsTreeJSON(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	id, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	reloaded := NewTreeService(tmpDir)
+	if err := reloaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	root := reloaded.GetTree()
+	if len(root.Children) != 1 {
+		t.Fatalf("expected 1 child after reload, got %d", len(root.Children))
+	}
+	if root.Children[0].ID != *id {
+		t.Fatalf("expected persisted child ID %q, got %q", *id, root.Children[0].ID)
+	}
+}
+
+func TestTreeService_CreateChild_RollsBackParentAutoConvertWhenTreeSaveFails(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	parentID, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode parent failed: %v", err)
+	}
+	mustStat(t, filepath.Join(tmpDir, "root", "docs.md"))
+
+	if err := os.Remove(filepath.Join(tmpDir, "tree.json")); err != nil {
+		t.Fatalf("remove tree.json file: %v", err)
+	}
+	mustMkdir(t, filepath.Join(tmpDir, "tree.json"))
+
+	childID, err := svc.CreateNode("system", parentID, "Child", "child", ptrKind(NodeKindPage))
+	if err == nil {
+		t.Fatalf("expected CreateNode child to fail when tree.json save fails")
+	}
+	if childID != nil {
+		t.Fatalf("expected returned child id to be nil on failure, got %q", *childID)
+	}
+
+	root := svc.GetTree()
+	if len(root.Children) != 1 {
+		t.Fatalf("expected only original parent after rollback, got %d root children", len(root.Children))
+	}
+	parent := root.Children[0]
+	if parent.Kind != NodeKindPage {
+		t.Fatalf("expected parent kind rolled back to page, got %q", parent.Kind)
+	}
+	if len(parent.Children) != 0 {
+		t.Fatalf("expected parent children rolled back, got %d", len(parent.Children))
+	}
+	mustStat(t, filepath.Join(tmpDir, "root", "docs.md"))
+	mustNotExist(t, filepath.Join(tmpDir, "root", "docs"))
+	mustNotExist(t, filepath.Join(tmpDir, "root", "docs", "index.md"))
+	mustNotExist(t, filepath.Join(tmpDir, "root", "docs", "child.md"))
+}
+
+func TestTreeService_CreateNode_RollsBackWhenTreeSaveFails(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	mustMkdir(t, filepath.Join(tmpDir, "tree.json"))
+
+	id, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
+	if err == nil {
+		t.Fatalf("expected CreateNode to fail when tree.json save fails")
+	}
+	if !strings.Contains(err.Error(), "save tree") {
+		t.Fatalf("expected CreateNode error to mention tree save, got: %v", err)
+	}
+	if id != nil {
+		t.Fatalf("expected returned id to be nil on failure, got %q", *id)
+	}
+	if len(svc.GetTree().Children) != 0 {
+		t.Fatalf("expected in-memory tree rollback, got %d root children", len(svc.GetTree().Children))
+	}
+	mustNotExist(t, filepath.Join(tmpDir, "root", "welcome.md"))
+	got := readOrderIDs(t, filepath.Join(tmpDir, "root"))
+	if len(got) != 0 {
+		t.Fatalf("expected root order rollback, got %v", got)
+	}
+	if err := os.Remove(filepath.Join(tmpDir, "tree.json")); err != nil {
+		t.Fatalf("remove tree.json dir: %v", err)
+	}
+	reloaded := NewTreeService(tmpDir)
+	if err := reloaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if len(reloaded.GetTree().Children) != 0 {
+		t.Fatalf("expected no persisted children after rollback, got %d", len(reloaded.GetTree().Children))
+	}
+}
+
+func TestTreeService_CreateNode_RollsBackWhenOrderWriteFails(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	mustMkdir(t, filepath.Join(tmpDir, "root", ".order.json"))
+
+	id, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
+	if err == nil {
+		t.Fatalf("expected CreateNode to fail when order file write fails")
+	}
+	if !strings.Contains(err.Error(), "persist child order") {
+		t.Fatalf("expected CreateNode error to mention child order persistence, got: %v", err)
+	}
+	if id != nil {
+		t.Fatalf("expected returned id to be nil on failure, got %q", *id)
+	}
+
+	if len(svc.GetTree().Children) != 0 {
+		t.Fatalf("expected in-memory tree rollback, got %d root children", len(svc.GetTree().Children))
+	}
+	mustNotExist(t, filepath.Join(tmpDir, "root", "welcome.md"))
+
+	reloaded := NewTreeService(tmpDir)
+	if err := reloaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if len(reloaded.GetTree().Children) != 0 {
+		t.Fatalf("expected no persisted children after rollback, got %d", len(reloaded.GetTree().Children))
+	}
+}
 
 func TestTreeService_CreateNode_Page_Root_CreatesFileAndFrontmatter(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
@@ -151,6 +353,25 @@ func TestTreeService_CreateNode_Page_Root_CreatesFileAndFrontmatter(t *testing.T
 	}
 	if fm.LeafWikiCreatorID != "system" || fm.LeafWikiLastAuthorID != "system" {
 		t.Fatalf("expected creator metadata to be set, got %#v", fm)
+	}
+}
+
+func TestTreeService_CreateNode_PersistsRootOrderFile(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	idA, err := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode A failed: %v", err)
+	}
+	idB, err := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode B failed: %v", err)
+	}
+
+	got := readOrderIDs(t, filepath.Join(tmpDir, "root"))
+	want := []string{*idA, *idB}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected persisted order after create: got %v want %v", got, want)
 	}
 }
 
@@ -417,6 +638,33 @@ func TestTreeService_DeletePage_Leaf_Success_RemovesFileAndTreeAndReindexes(t *t
 	_ = idC
 }
 
+func TestTreeService_DeleteNode_UpdatesRootOrderFile(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	idA, err := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode A: %v", err)
+	}
+	idB, err := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode B: %v", err)
+	}
+	idC, err := svc.CreateNode("system", nil, "C", "c", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode C: %v", err)
+	}
+
+	if err := svc.DeleteNode("system", *idB, false); err != nil {
+		t.Fatalf("DeleteNode failed: %v", err)
+	}
+
+	got := readOrderIDs(t, filepath.Join(tmpDir, "root"))
+	want := []string{*idA, *idC}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected persisted order after delete: got %v want %v", got, want)
+	}
+}
+
 func TestTreeService_DeletePage_WithChildren_NonRecursive_ReturnsErrPageHasChildren(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
@@ -534,6 +782,80 @@ func TestTreeService_MoveNode_TargetPageAutoConvertsToSection(t *testing.T) {
 	mustStat(t, aPath)
 }
 
+func TestTreeService_MoveNode_UpdatesSourceAndDestinationOrderFiles(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	destID, err := svc.CreateNode("system", nil, "Dest", "dest", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode dest: %v", err)
+	}
+	moveID, err := svc.CreateNode("system", nil, "Move", "move", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode move: %v", err)
+	}
+	stayID, err := svc.CreateNode("system", nil, "Stay", "stay", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode stay: %v", err)
+	}
+	nestedID, err := svc.CreateNode("system", destID, "Nested", "nested", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode nested: %v", err)
+	}
+
+	if err := svc.MoveNode("system", *moveID, *destID); err != nil {
+		t.Fatalf("MoveNode failed: %v", err)
+	}
+
+	rootOrder := readOrderIDs(t, filepath.Join(tmpDir, "root"))
+	wantRoot := []string{*destID, *stayID}
+	if strings.Join(rootOrder, ",") != strings.Join(wantRoot, ",") {
+		t.Fatalf("unexpected root order after move: got %v want %v", rootOrder, wantRoot)
+	}
+
+	destOrder := readOrderIDs(t, filepath.Join(tmpDir, "root", "dest"))
+	wantDest := []string{*nestedID, *moveID}
+	if strings.Join(destOrder, ",") != strings.Join(wantDest, ",") {
+		t.Fatalf("unexpected destination order after move: got %v want %v", destOrder, wantDest)
+	}
+}
+
+func TestTreeService_MoveNode_IgnoresOrderPersistenceErrorsAfterMove(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	destID, err := svc.CreateNode("system", nil, "Dest", "dest", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode dest: %v", err)
+	}
+	moveID, err := svc.CreateNode("system", nil, "Move", "move", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode move: %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil {
+		t.Fatalf("remove root order file: %v", err)
+	}
+	mustMkdir(t, filepath.Join(tmpDir, "root", ".order.json"))
+	if err := os.Remove(filepath.Join(tmpDir, "root", "dest", ".order.json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("remove dest order file: %v", err)
+	}
+	mustMkdir(t, filepath.Join(tmpDir, "root", "dest", ".order.json"))
+
+	if err := svc.MoveNode("system", *moveID, *destID); err != nil {
+		t.Fatalf("MoveNode should succeed despite order persistence failure: %v", err)
+	}
+
+	destDir := filepath.Join(tmpDir, "root", "dest")
+	mustStat(t, filepath.Join(destDir, "move.md"))
+	root := svc.GetTree()
+	if len(root.Children) != 1 || root.Children[0].ID != *destID {
+		t.Fatalf("expected moved node removed from root, got %#v", root.Children)
+	}
+	dest := findChildBySlug(t, root, "dest")
+	if len(dest.Children) != 1 || dest.Children[0].ID != *moveID {
+		t.Fatalf("expected moved node under destination after best-effort order persistence")
+	}
+}
+
 func TestTreeService_MoveNode_PreventsCircularReference(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
@@ -585,6 +907,97 @@ func TestTreeService_SortPages_ValidOrder(t *testing.T) {
 	}
 	if root.Children[0].Position != 0 || root.Children[1].Position != 1 || root.Children[2].Position != 2 {
 		t.Fatalf("expected positions to be reindexed")
+	}
+}
+
+func TestTreeService_SortPages_PersistsOrderFileWithoutChangingMetadata(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	idA, err := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode A: %v", err)
+	}
+	idB, err := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode B: %v", err)
+	}
+	idC, err := svc.CreateNode("system", nil, "C", "c", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode C: %v", err)
+	}
+
+	root := svc.GetTree()
+	before := map[string]PageMetadata{}
+	for _, child := range root.Children {
+		before[child.ID] = child.Metadata
+	}
+
+	if err := svc.SortPages("root", []string{*idC, *idA, *idB}); err != nil {
+		t.Fatalf("SortPages failed: %v", err)
+	}
+
+	orderPath := filepath.Join(tmpDir, "root", ".order.json")
+	raw, err := os.ReadFile(orderPath)
+	if err != nil {
+		t.Fatalf("read order file: %v", err)
+	}
+	var persisted struct {
+		OrderedIDs []string `json:"ordered_ids"`
+	}
+	if err := json.Unmarshal(raw, &persisted); err != nil {
+		t.Fatalf("unmarshal order file: %v", err)
+	}
+	wantIDs := []string{*idC, *idA, *idB}
+	if strings.Join(persisted.OrderedIDs, ",") != strings.Join(wantIDs, ",") {
+		t.Fatalf("unexpected persisted order: got %v want %v", persisted.OrderedIDs, wantIDs)
+	}
+
+	for _, child := range svc.GetTree().Children {
+		if got := child.Metadata; got != before[child.ID] {
+			t.Fatalf("metadata changed during reorder for %q: before=%+v after=%+v", child.ID, before[child.ID], got)
+		}
+	}
+}
+
+func TestTreeService_SortPages_RollsBackWhenOrderPersistenceFails(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	idA, err := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode A: %v", err)
+	}
+	idB, err := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode B: %v", err)
+	}
+	idC, err := svc.CreateNode("system", nil, "C", "c", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode C: %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil {
+		t.Fatalf("remove root order file: %v", err)
+	}
+	mustMkdir(t, filepath.Join(tmpDir, "root", ".order.json"))
+
+	err = svc.SortPages("root", []string{*idC, *idA, *idB})
+	if err == nil {
+		t.Fatalf("expected SortPages to fail when order persistence fails")
+	}
+	if !strings.Contains(err.Error(), "persist child order") {
+		t.Fatalf("expected SortPages error to mention child order persistence, got: %v", err)
+	}
+
+	root := svc.GetTree()
+	want := []string{*idA, *idB, *idC}
+	got := []string{root.Children[0].ID, root.Children[1].ID, root.Children[2].ID}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("expected in-memory order rollback, got %v want %v", got, want)
+	}
+	for i, child := range root.Children {
+		if child.Position != i {
+			t.Fatalf("expected child %q position rollback to %d, got %d", child.ID, i, child.Position)
+		}
 	}
 }
 
@@ -750,6 +1163,38 @@ func TestTreeService_LookupPagePath_Segments(t *testing.T) {
 	}
 }
 
+func TestTreeService_EnsurePagePath_PersistsOrderFilesForCreatedPath(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	res, err := svc.EnsurePagePath("system", "home/about/team/members", "Members", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("EnsurePagePath failed: %v", err)
+	}
+	if res.Page == nil || res.Page.Slug != "members" {
+		t.Fatalf("expected final page 'members'")
+	}
+
+	rootOrder := readOrderIDs(t, filepath.Join(tmpDir, "root"))
+	if len(rootOrder) != 1 || rootOrder[0] != res.Created[0].ID {
+		t.Fatalf("unexpected root order after EnsurePagePath: %v", rootOrder)
+	}
+
+	homeOrder := readOrderIDs(t, filepath.Join(tmpDir, "root", "home"))
+	if len(homeOrder) != 1 || homeOrder[0] != res.Created[1].ID {
+		t.Fatalf("unexpected home order after EnsurePagePath: %v", homeOrder)
+	}
+
+	aboutOrder := readOrderIDs(t, filepath.Join(tmpDir, "root", "home", "about"))
+	if len(aboutOrder) != 1 || aboutOrder[0] != res.Created[2].ID {
+		t.Fatalf("unexpected about order after EnsurePagePath: %v", aboutOrder)
+	}
+
+	teamOrder := readOrderIDs(t, filepath.Join(tmpDir, "root", "home", "about", "team"))
+	if len(teamOrder) != 1 || teamOrder[0] != res.Created[3].ID {
+		t.Fatalf("unexpected team order after EnsurePagePath: %v", teamOrder)
+	}
+}
+
 func TestTreeService_EnsurePagePath_CreatesIntermediateSectionsAndFinalPage(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
@@ -773,6 +1218,82 @@ func TestTreeService_EnsurePagePath_CreatesIntermediateSectionsAndFinalPage(t *t
 }
 
 // --- F) Migration V3 (metadata frontmatter backfill) ---
+func TestTreeService_LoadTree_MigratesToV5_BackfillsChildOrderFiles(t *testing.T) {
+	if CurrentSchemaVersion < 5 {
+		t.Skip("requires schema v5+")
+	}
+
+	tmpDir := t.TempDir()
+
+	if err := saveSchema(tmpDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	docsID, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode docs failed: %v", err)
+	}
+	alphaID, err := svc.CreateNode("system", nil, "Alpha", "alpha", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode alpha failed: %v", err)
+	}
+	betaID, err := svc.CreateNode("system", docsID, "Beta", "beta", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode beta failed: %v", err)
+	}
+
+	root := svc.GetTree()
+	root.Children = []*PageNode{root.Children[1], root.Children[0]}
+	for i, child := range root.Children {
+		child.Position = i
+	}
+
+	docsNode, err := svc.FindPageByID(root.Children, *docsID)
+	if err != nil {
+		t.Fatalf("FindPageByID docs failed: %v", err)
+	}
+	if len(docsNode.Children) != 1 || docsNode.Children[0].ID != *betaID {
+		t.Fatalf("expected docs child beta before migration")
+	}
+
+	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("remove root order file: %v", err)
+	}
+	if err := os.Remove(filepath.Join(tmpDir, "root", "docs", ".order.json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("remove docs order file: %v", err)
+	}
+
+	if err := svc.SaveTree(); err != nil {
+		t.Fatalf("SaveTree failed: %v", err)
+	}
+
+	if err := saveSchema(tmpDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	loaded := NewTreeService(tmpDir)
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree (migrating) failed: %v", err)
+	}
+
+	rootOrder := readOrderIDs(t, filepath.Join(tmpDir, "root"))
+	wantRoot := []string{*alphaID, *docsID}
+	if strings.Join(rootOrder, ",") != strings.Join(wantRoot, ",") {
+		t.Fatalf("unexpected root order after migration: got %v want %v", rootOrder, wantRoot)
+	}
+
+	docsOrder := readOrderIDs(t, filepath.Join(tmpDir, "root", "docs"))
+	wantDocs := []string{*betaID}
+	if strings.Join(docsOrder, ",") != strings.Join(wantDocs, ",") {
+		t.Fatalf("unexpected docs order after migration: got %v want %v", docsOrder, wantDocs)
+	}
+}
+
 func TestTreeService_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *testing.T) {
 	if CurrentSchemaVersion < 4 {
 		t.Skip("requires schema v4+")
@@ -1642,6 +2163,58 @@ leafwiki_title: New Page
 // --- small util ---
 
 func ptrKind(k NodeKind) *NodeKind { return &k }
+
+func TestTreeService_LoadTree_MigratesToV5_ReturnsErrorWhenOrderFileCannotBeWritten(t *testing.T) {
+	if CurrentSchemaVersion < 5 {
+		t.Skip("requires schema v5+")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("permission-based migration failure test is not reliable on Windows")
+	}
+
+	tmpDir := t.TempDir()
+
+	if err := saveSchema(tmpDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	_, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+	_, err = svc.CreateNode("system", nil, "Alpha", "alpha", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode alpha failed: %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("remove root order file failed: %v", err)
+	}
+	if err := os.Chmod(filepath.Join(tmpDir, "root"), 0o555); err != nil {
+		t.Fatalf("chmod root dir failed: %v", err)
+	}
+	defer func() {
+		_ = os.Chmod(filepath.Join(tmpDir, "root"), 0o755)
+	}()
+
+	if err := saveSchema(tmpDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	loaded := NewTreeService(tmpDir)
+	err = loaded.LoadTree()
+	if err == nil {
+		t.Fatalf("expected migration error when order file cannot be written")
+	}
+	if !strings.Contains(err.Error(), "persist child order") {
+		t.Fatalf("expected migration error to mention child order persistence, got: %v", err)
+	}
+}
 
 func TestTreeService_LoadTree_MigratesToV4_ReturnsErrorWhenSectionIndexCannotBeWritten(t *testing.T) {
 	if CurrentSchemaVersion < 4 {

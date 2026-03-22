@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
@@ -233,6 +234,68 @@ func TestNodeStore_ReconstructTreeFromFS_PositionsAreContiguous(t *testing.T) {
 		if seen[i] != i {
 			t.Fatalf("expected contiguous positions 0..%d, got %v (slugs=%v)", len(seen)-1, seen, slugs(tree.Children))
 		}
+	}
+}
+
+func TestNodeStore_ReconstructTreeFromFS_OrderFileOverridesDefaultOrder(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", "a.md"), "---\nleafwiki_id: id-a\n---\n# A", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "b.md"), "---\nleafwiki_id: id-b\n---\n# B", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "c.md"), "---\nleafwiki_id: id-c\n---\n# C", 0o644)
+
+	orderRaw, err := json.Marshal(map[string][]string{
+		"ordered_ids": {"id-c", "id-a"},
+	})
+	if err != nil {
+		t.Fatalf("marshal order file: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(tmp, "root", ".order.json"), string(orderRaw), 0o644)
+
+	tree, err := store.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
+	}
+
+	got := slugs(tree.Children)
+	want := []string{"c", "a", "b"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected child order: got %v want %v", got, want)
+	}
+
+	for i, child := range tree.Children {
+		if child.Position != i {
+			t.Fatalf("expected child %q position %d, got %d", child.Slug, i, child.Position)
+		}
+	}
+}
+
+func TestNodeStore_ReconstructTreeFromFS_OrderFileIgnoresUnknownIDsAndKeepsRemainingStable(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", "a.md"), "---\nleafwiki_id: id-a\n---\n# A", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "b.md"), "---\nleafwiki_id: id-b\n---\n# B", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "c.md"), "---\nleafwiki_id: id-c\n---\n# C", 0o644)
+
+	orderRaw, err := json.Marshal(map[string][]string{
+		"ordered_ids": {"missing-id", "id-b"},
+	})
+	if err != nil {
+		t.Fatalf("marshal order file: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(tmp, "root", ".order.json"), string(orderRaw), 0o644)
+
+	tree, err := store.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
+	}
+
+	got := slugs(tree.Children)
+	want := []string{"b", "a", "c"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected child order: got %v want %v", got, want)
 	}
 }
 

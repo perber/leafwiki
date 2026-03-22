@@ -35,6 +35,11 @@ type NodeStore struct {
 }
 
 const reconstructSystemUserID = "system"
+const orderFilename = ".order.json"
+
+type childOrderFile struct {
+	OrderedIDs []string `json:"ordered_ids"`
+}
 
 func NewNodeStore(storageDir string) *NodeStore {
 	return &NodeStore{
@@ -355,6 +360,103 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 			Metadata: metadata,
 		}
 		parent.Children = append(parent.Children, child)
+	}
+
+	f.applyChildOrder(parent, currentPath)
+
+	return nil
+}
+
+func (f *NodeStore) applyChildOrder(parent *PageNode, dirPath string) {
+	if parent == nil || len(parent.Children) < 2 {
+		return
+	}
+
+	order, err := f.readChildOrder(dirPath)
+	if err != nil {
+		f.log.Warn("could not read child order file, keeping default order", "path", filepath.Join(dirPath, orderFilename), "error", err)
+		return
+	}
+	if len(order.OrderedIDs) == 0 {
+		return
+	}
+
+	positions := make(map[string]int, len(order.OrderedIDs))
+	for i, id := range order.OrderedIDs {
+		if _, exists := positions[id]; exists {
+			continue
+		}
+		positions[id] = i
+	}
+
+	sort.SliceStable(parent.Children, func(i, j int) bool {
+		pi, okI := positions[parent.Children[i].ID]
+		pj, okJ := positions[parent.Children[j].ID]
+		switch {
+		case okI && okJ:
+			return pi < pj
+		case okI:
+			return true
+		case okJ:
+			return false
+		default:
+			return parent.Children[i].Position < parent.Children[j].Position
+		}
+	})
+
+	for i, child := range parent.Children {
+		child.Position = i
+	}
+}
+
+func (f *NodeStore) readChildOrder(dirPath string) (*childOrderFile, error) {
+	raw, err := os.ReadFile(filepath.Join(dirPath, orderFilename))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &childOrderFile{}, nil
+		}
+		return nil, err
+	}
+
+	var order childOrderFile
+	if err := json.Unmarshal(raw, &order); err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
+func (f *NodeStore) SaveChildOrder(parent *PageNode) error {
+	if parent == nil {
+		return &InvalidOpError{Op: "SaveChildOrder", Reason: "a parent entry is required"}
+	}
+	if parent.ID != "root" && parent.Kind != NodeKindSection {
+		return &InvalidOpError{Op: "SaveChildOrder", Reason: "parent entry must be root or a section"}
+	}
+
+	dirPath, err := f.dirPathForNode(parent)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dirPath, 0o755); err != nil {
+		return fmt.Errorf("could not ensure parent directory exists: %w", err)
+	}
+
+	orderedIDs := make([]string, 0, len(parent.Children))
+	for _, child := range parent.Children {
+		if child == nil {
+			continue
+		}
+		orderedIDs = append(orderedIDs, child.ID)
+	}
+
+	data, err := json.MarshalIndent(childOrderFile{OrderedIDs: orderedIDs}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("could not marshal child order: %w", err)
+	}
+	data = append(data, byte('\n'))
+
+	if err := shared.WriteFileAtomic(filepath.Join(dirPath, orderFilename), data, 0o644); err != nil {
+		return fmt.Errorf("could not atomically write child order file: %w", err)
 	}
 
 	return nil

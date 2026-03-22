@@ -227,6 +227,86 @@ func TestTreeMigration_LoadTree_MigratesToV3_BackfillsMetadataFrontmatter(t *tes
 	}
 }
 
+func TestTreeMigration_LoadTree_MigratesToV5_BackfillsChildOrderFiles(t *testing.T) {
+	if tree.CurrentSchemaVersion < 5 {
+		t.Skip("requires schema v5+")
+	}
+
+	tmpDir := t.TempDir()
+	writeSchema(t, tmpDir, 4)
+
+	svc := tree.NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	docsID, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(tree.NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode docs failed: %v", err)
+	}
+	alphaID, err := svc.CreateNode("system", nil, "Alpha", "alpha", ptrKind(tree.NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode alpha failed: %v", err)
+	}
+	betaID, err := svc.CreateNode("system", docsID, "Beta", "beta", ptrKind(tree.NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode beta failed: %v", err)
+	}
+
+	root := svc.GetTree()
+	root.Children = []*tree.PageNode{root.Children[1], root.Children[0]}
+	for i, child := range root.Children {
+		child.Position = i
+	}
+
+	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("remove root order file: %v", err)
+	}
+	if err := os.Remove(filepath.Join(tmpDir, "root", "docs", ".order.json")); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("remove docs order file: %v", err)
+	}
+
+	if err := svc.SaveTree(); err != nil {
+		t.Fatalf("SaveTree failed: %v", err)
+	}
+	writeSchema(t, tmpDir, 4)
+
+	loaded := tree.NewTreeService(tmpDir)
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree (migrating) failed: %v", err)
+	}
+
+	var rootOrder struct {
+		OrderedIDs []string `json:"ordered_ids"`
+	}
+	rawRootOrder, err := os.ReadFile(filepath.Join(tmpDir, "root", ".order.json"))
+	if err != nil {
+		t.Fatalf("read root order file: %v", err)
+	}
+	if err := json.Unmarshal(rawRootOrder, &rootOrder); err != nil {
+		t.Fatalf("unmarshal root order file: %v", err)
+	}
+	wantRoot := []string{*alphaID, *docsID}
+	if strings.Join(rootOrder.OrderedIDs, ",") != strings.Join(wantRoot, ",") {
+		t.Fatalf("unexpected root order after migration: got %v want %v", rootOrder.OrderedIDs, wantRoot)
+	}
+
+	var docsOrder struct {
+		OrderedIDs []string `json:"ordered_ids"`
+	}
+	rawDocsOrder, err := os.ReadFile(filepath.Join(tmpDir, "root", "docs", ".order.json"))
+	if err != nil {
+		t.Fatalf("read docs order file: %v", err)
+	}
+	if err := json.Unmarshal(rawDocsOrder, &docsOrder); err != nil {
+		t.Fatalf("unmarshal docs order file: %v", err)
+	}
+	wantDocs := []string{*betaID}
+	if strings.Join(docsOrder.OrderedIDs, ",") != strings.Join(wantDocs, ",") {
+		t.Fatalf("unexpected docs order after migration: got %v want %v", docsOrder.OrderedIDs, wantDocs)
+	}
+}
+
 func TestTreeMigration_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *testing.T) {
 	if tree.CurrentSchemaVersion < 4 {
 		t.Skip("requires schema v4+")
@@ -293,6 +373,52 @@ func TestTreeMigration_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *
 	}
 	if strings.TrimSpace(body) != "" {
 		t.Fatalf("expected empty section body after migration, got %q", body)
+	}
+}
+
+func TestTreeMigration_LoadTree_MigratesToV5_ReturnsErrorWhenOrderFileCannotBeWritten(t *testing.T) {
+	if tree.CurrentSchemaVersion < 5 {
+		t.Skip("requires schema v5+")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("permission-based migration failure test is not reliable on Windows")
+	}
+
+	tmpDir := t.TempDir()
+	writeSchema(t, tmpDir, 4)
+
+	svc := tree.NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	_, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(tree.NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+	_, err = svc.CreateNode("system", nil, "Alpha", "alpha", ptrKind(tree.NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode alpha failed: %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("remove root order file failed: %v", err)
+	}
+	if err := os.Chmod(filepath.Join(tmpDir, "root"), 0o555); err != nil {
+		t.Fatalf("chmod root dir failed: %v", err)
+	}
+	defer func() {
+		_ = os.Chmod(filepath.Join(tmpDir, "root"), 0o755)
+	}()
+	writeSchema(t, tmpDir, 4)
+
+	loaded := tree.NewTreeService(tmpDir)
+	err = loaded.LoadTree()
+	if err == nil {
+		t.Fatalf("expected migration error when order file cannot be written")
+	}
+	if !strings.Contains(err.Error(), "persist child order") {
+		t.Fatalf("expected migration error to mention child order persistence, got: %v", err)
 	}
 }
 
