@@ -1,8 +1,11 @@
 package tree
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -145,16 +148,35 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 	return nil
 }
 
+type createNodeResult struct {
+	id                 string
+	entry              *PageNode
+	parent             *PageNode
+	parentWasConverted bool
+}
+
 // Create Node adds a new node to the tree
 func (t *TreeService) CreateNode(userID string, parentID *string, title string, slug string, nodeKind *NodeKind) (*string, error) {
 	var result *string
 	err := t.withLockedTree(func() error {
-		var err error
-		result, err = t.createNodeLocked(userID, parentID, title, slug, nodeKind)
+		created, err := t.createNodeLocked(userID, parentID, title, slug, nodeKind)
 		if err != nil {
 			return err
 		}
-		return t.saveTreeLocked()
+		result = &created.id
+
+		if err := t.saveTreeLocked(); err != nil {
+			rollbackErr := t.rollbackCreatedNodeLocked(created.parent, created.entry, created.parentWasConverted)
+			if rollbackErr == nil && created.parent != nil {
+				rollbackErr = t.store.SaveChildOrder(created.parent)
+			}
+			result = nil
+			if rollbackErr != nil {
+				return errors.Join(fmt.Errorf("could not save tree: %w", err), fmt.Errorf("rollback created node after tree save failure: %w", rollbackErr))
+			}
+			return fmt.Errorf("could not save tree: %w", err)
+		}
+		return nil
 	})
 
 	return result, err
@@ -162,7 +184,7 @@ func (t *TreeService) CreateNode(userID string, parentID *string, title string, 
 
 // createNodeLocked creates a new node under the given parent
 // Lock must be held by the caller
-func (t *TreeService) createNodeLocked(userID string, parentID *string, title string, slug string, kind *NodeKind) (*string, error) {
+func (t *TreeService) createNodeLocked(userID string, parentID *string, title string, slug string, kind *NodeKind) (*createNodeResult, error) {
 	if t.tree == nil {
 		return nil, ErrTreeNotLoaded
 	}
@@ -188,6 +210,8 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 		return nil, ErrPageAlreadyExists
 	}
 
+	parentWasConverted := false
+
 	// Check if the current parent is a section
 	// if not, we need to convert it to a section
 	if parent.Kind != NodeKindSection && parent.ID != "root" {
@@ -196,6 +220,7 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 			return nil, fmt.Errorf("could not convert parent node: %w", err)
 		}
 		parent.Kind = NodeKindSection
+		parentWasConverted = true
 	}
 
 	if parent.Kind != NodeKindSection {
@@ -241,9 +266,58 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 	// Add the new page to the parent
 	parent.Children = append(parent.Children, entry)
 	if err := t.store.SaveChildOrder(parent); err != nil {
+		rollbackErr := t.rollbackCreatedNodeLocked(parent, entry, parentWasConverted)
+		if rollbackErr != nil {
+			return nil, errors.Join(fmt.Errorf("could not persist child order: %w", err), fmt.Errorf("rollback created node: %w", rollbackErr))
+		}
 		return nil, fmt.Errorf("could not persist child order: %w", err)
 	}
-	return &entry.ID, nil
+	return &createNodeResult{
+		id:                 entry.ID,
+		entry:              entry,
+		parent:             parent,
+		parentWasConverted: parentWasConverted,
+	}, nil
+}
+
+func (t *TreeService) rollbackCreatedNodeLocked(parent *PageNode, entry *PageNode, parentWasConverted bool) error {
+	if parent == nil || entry == nil {
+		return nil
+	}
+
+	for i, child := range parent.Children {
+		if child == entry {
+			parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
+			break
+		}
+	}
+
+	switch entry.Kind {
+	case NodeKindSection:
+		if err := t.store.DeleteSection(entry); err != nil {
+			return err
+		}
+	case NodeKindPage:
+		if err := t.store.DeletePage(entry); err != nil {
+			return err
+		}
+	}
+
+	if parentWasConverted && parent != nil && len(parent.Children) == 0 {
+		orderPath, err := t.store.dirPathForNode(parent)
+		if err != nil {
+			return err
+		}
+		if err := os.Remove(filepath.Join(orderPath, orderFilename)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove parent order file before fold-back: %w", err)
+		}
+		if err := t.store.ConvertNode(parent, NodeKindPage); err != nil {
+			return err
+		}
+		parent.Kind = NodeKindPage
+	}
+
+	return nil
 }
 
 // FindPageByID finds a page in the tree by its ID
@@ -360,22 +434,6 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		if slug != node.Slug && node.Parent != nil && node.Parent.ChildAlreadyExists(slug) {
 			return ErrPageAlreadyExists
 		}
-
-		// Kind change?
-		// This operation is currently disabled to avoid complexity with content migration.
-		// We need to check if we need it later.
-		// if kind != nil && *kind != node.Kind {
-		// 	// Section -> Page only allowed if no children
-		// 	if node.Kind == NodeKindSection && *kind == NodeKindPage && node.HasChildren() {
-		// 		return ErrPageHasChildren
-		// 	}
-
-		// 	t.log.Info("changing node kind", "nodeID", node.ID, "oldKind", node.Kind, "newKind", *kind)
-		// 	if err := t.store.ConvertNode(node, *kind); err != nil {
-		// 		return fmt.Errorf("could not convert node: %w", err)
-		// 	}
-		// 	node.Kind = *kind
-		// }
 
 		// Content update?
 		if content != nil {
@@ -667,14 +725,14 @@ func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string
 			kindToUse = *kind
 		}
 
-		newID, err := t.createNodeLocked(userID, currentID, segTitle, segment.Slug, &kindToUse)
+		createdNode, err := t.createNodeLocked(userID, currentID, segTitle, segment.Slug, &kindToUse)
 		if err != nil {
 			return nil, fmt.Errorf("could not create segment %q: %w", segment.Slug, err)
 		}
-		currentID = newID
+		currentID = &createdNode.id
 
 		created = append(created, &PageNode{
-			ID:    *newID,
+			ID:    createdNode.id,
 			Slug:  segment.Slug,
 			Title: segTitle,
 			Kind:  kindToUse,
@@ -785,11 +843,11 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 	t.reindexPositions(oldParent)
 
 	if err := t.store.SaveChildOrder(oldParent); err != nil {
-		return fmt.Errorf("could not persist source child order: %w", err)
+		t.log.Warn("could not persist source child order after move; continuing with moved tree", "parentID", oldParent.ID, "error", err)
 	}
 	if newParent != oldParent {
 		if err := t.store.SaveChildOrder(newParent); err != nil {
-			return fmt.Errorf("could not persist destination child order: %w", err)
+			t.log.Warn("could not persist destination child order after move; continuing with moved tree", "parentID", newParent.ID, "error", err)
 		}
 	}
 
@@ -840,6 +898,12 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 		seen[id] = true
 	}
 
+	previousChildren := append([]*PageNode(nil), parent.Children...)
+	previousPositions := make(map[string]int, len(parent.Children))
+	for _, child := range parent.Children {
+		previousPositions[child.ID] = child.Position
+	}
+
 	// Create a map to store the position of each page
 	positions := make(map[string]int)
 	for i, id := range orderedIDs {
@@ -860,45 +924,18 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 	t.reindexPositions(parent)
 
 	if err := t.store.SaveChildOrder(parent); err != nil {
+		parent.Children = previousChildren
+		for _, child := range parent.Children {
+			if pos, ok := previousPositions[child.ID]; ok {
+				child.Position = pos
+			}
+		}
 		return fmt.Errorf("could not persist child order: %w", err)
 	}
 
 	// Save the tree
 	return t.saveTreeLocked()
 }
-
-// maybeCollapseSectionToPageLocked tries to collapse a section node into a page node
-// It is not used currently, but after testing the user flow we might want to integrate it
-// into UpdateNode or MoveNode operations
-// Lock must be held by the caller
-// func (t *TreeService) maybeCollapseSectionToPageLocked(node *PageNode) {
-// 	if node == nil || node.ID == "root" {
-// 		return
-// 	}
-// 	if node.Kind != NodeKindSection {
-// 		return
-// 	}
-// 	if node.HasChildren() {
-// 		return
-// 	}
-
-// 	// Only collapse if index.md exists
-// 	indexPath, err := t.store.contentPathForNodeRead(node)
-// 	if err != nil {
-// 		return
-// 	}
-// 	if _, err := os.Stat(indexPath); err != nil {
-// 		// no index.md => keep as section
-// 		return
-// 	}
-
-// 	// Try collapse (will refuse if folder has other files)
-// 	if err := t.store.ConvertNode(node, NodeKindPage); err != nil {
-// 		// not allowed (e.g. folder not empty) -> keep section
-// 		return
-// 	}
-// 	node.Kind = NodeKindPage
-// }
 
 func (t *TreeService) reindexPositions(parent *PageNode) {
 	sort.SliceStable(parent.Children, func(i, j int) bool {
@@ -908,12 +945,3 @@ func (t *TreeService) reindexPositions(parent *PageNode) {
 		child.Position = i
 	}
 }
-
-// func (t *TreeService) sortTreeByPosition(node *PageNode) {
-// 	sort.SliceStable(node.Children, func(i, j int) bool {
-// 		return node.Children[i].Position < node.Children[j].Position
-// 	})
-// 	for _, child := range node.Children {
-// 		t.sortTreeByPosition(child)
-// 	}
-// }

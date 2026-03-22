@@ -157,6 +157,109 @@ func TestTreeService_CreateNode_PersistsTreeJSON(t *testing.T) {
 	}
 }
 
+func TestTreeService_CreateChild_RollsBackParentAutoConvertWhenTreeSaveFails(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	parentID, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode parent failed: %v", err)
+	}
+	mustStat(t, filepath.Join(tmpDir, "root", "docs.md"))
+
+	if err := os.Remove(filepath.Join(tmpDir, "tree.json")); err != nil {
+		t.Fatalf("remove tree.json file: %v", err)
+	}
+	mustMkdir(t, filepath.Join(tmpDir, "tree.json"))
+
+	childID, err := svc.CreateNode("system", parentID, "Child", "child", ptrKind(NodeKindPage))
+	if err == nil {
+		t.Fatalf("expected CreateNode child to fail when tree.json save fails")
+	}
+	if childID != nil {
+		t.Fatalf("expected returned child id to be nil on failure, got %q", *childID)
+	}
+
+	root := svc.GetTree()
+	if len(root.Children) != 1 {
+		t.Fatalf("expected only original parent after rollback, got %d root children", len(root.Children))
+	}
+	parent := root.Children[0]
+	if parent.Kind != NodeKindPage {
+		t.Fatalf("expected parent kind rolled back to page, got %q", parent.Kind)
+	}
+	if len(parent.Children) != 0 {
+		t.Fatalf("expected parent children rolled back, got %d", len(parent.Children))
+	}
+	mustStat(t, filepath.Join(tmpDir, "root", "docs.md"))
+	mustNotExist(t, filepath.Join(tmpDir, "root", "docs", "index.md"))
+	mustNotExist(t, filepath.Join(tmpDir, "root", "docs", "child.md"))
+}
+
+func TestTreeService_CreateNode_RollsBackWhenTreeSaveFails(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	mustMkdir(t, filepath.Join(tmpDir, "tree.json"))
+
+	id, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
+	if err == nil {
+		t.Fatalf("expected CreateNode to fail when tree.json save fails")
+	}
+	if !strings.Contains(err.Error(), "save tree") {
+		t.Fatalf("expected CreateNode error to mention tree save, got: %v", err)
+	}
+	if id != nil {
+		t.Fatalf("expected returned id to be nil on failure, got %q", *id)
+	}
+	if len(svc.GetTree().Children) != 0 {
+		t.Fatalf("expected in-memory tree rollback, got %d root children", len(svc.GetTree().Children))
+	}
+	mustNotExist(t, filepath.Join(tmpDir, "root", "welcome.md"))
+	got := readOrderIDs(t, filepath.Join(tmpDir, "root"))
+	if len(got) != 0 {
+		t.Fatalf("expected root order rollback, got %v", got)
+	}
+	if err := os.Remove(filepath.Join(tmpDir, "tree.json")); err != nil {
+		t.Fatalf("remove tree.json dir: %v", err)
+	}
+	reloaded := NewTreeService(tmpDir)
+	if err := reloaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if len(reloaded.GetTree().Children) != 0 {
+		t.Fatalf("expected no persisted children after rollback, got %d", len(reloaded.GetTree().Children))
+	}
+}
+
+func TestTreeService_CreateNode_RollsBackWhenOrderWriteFails(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	mustMkdir(t, filepath.Join(tmpDir, "root", ".order.json"))
+
+	id, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
+	if err == nil {
+		t.Fatalf("expected CreateNode to fail when order file write fails")
+	}
+	if !strings.Contains(err.Error(), "persist child order") {
+		t.Fatalf("expected CreateNode error to mention child order persistence, got: %v", err)
+	}
+	if id != nil {
+		t.Fatalf("expected returned id to be nil on failure, got %q", *id)
+	}
+
+	if len(svc.GetTree().Children) != 0 {
+		t.Fatalf("expected in-memory tree rollback, got %d root children", len(svc.GetTree().Children))
+	}
+	mustNotExist(t, filepath.Join(tmpDir, "root", "welcome.md"))
+
+	reloaded := NewTreeService(tmpDir)
+	if err := reloaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if len(reloaded.GetTree().Children) != 0 {
+		t.Fatalf("expected no persisted children after rollback, got %d", len(reloaded.GetTree().Children))
+	}
+}
+
 func TestTreeService_CreateNode_Page_Root_CreatesFileAndFrontmatter(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
@@ -655,6 +758,43 @@ func TestTreeService_MoveNode_UpdatesSourceAndDestinationOrderFiles(t *testing.T
 	}
 }
 
+func TestTreeService_MoveNode_IgnoresOrderPersistenceErrorsAfterMove(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	destID, err := svc.CreateNode("system", nil, "Dest", "dest", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode dest: %v", err)
+	}
+	moveID, err := svc.CreateNode("system", nil, "Move", "move", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode move: %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil {
+		t.Fatalf("remove root order file: %v", err)
+	}
+	mustMkdir(t, filepath.Join(tmpDir, "root", ".order.json"))
+	if err := os.Remove(filepath.Join(tmpDir, "root", "dest", ".order.json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("remove dest order file: %v", err)
+	}
+	mustMkdir(t, filepath.Join(tmpDir, "root", "dest", ".order.json"))
+
+	if err := svc.MoveNode("system", *moveID, *destID); err != nil {
+		t.Fatalf("MoveNode should succeed despite order persistence failure: %v", err)
+	}
+
+	destDir := filepath.Join(tmpDir, "root", "dest")
+	mustStat(t, filepath.Join(destDir, "move.md"))
+	root := svc.GetTree()
+	if len(root.Children) != 1 || root.Children[0].ID != *destID {
+		t.Fatalf("expected moved node removed from root, got %#v", root.Children)
+	}
+	dest := findChildBySlug(t, root, "dest")
+	if len(dest.Children) != 1 || dest.Children[0].ID != *moveID {
+		t.Fatalf("expected moved node under destination after best-effort order persistence")
+	}
+}
+
 func TestTreeService_MoveNode_PreventsCircularReference(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
@@ -754,6 +894,48 @@ func TestTreeService_SortPages_PersistsOrderFileWithoutChangingMetadata(t *testi
 	for _, child := range svc.GetTree().Children {
 		if got := child.Metadata; got != before[child.ID] {
 			t.Fatalf("metadata changed during reorder for %q: before=%+v after=%+v", child.ID, before[child.ID], got)
+		}
+	}
+}
+
+func TestTreeService_SortPages_RollsBackWhenOrderPersistenceFails(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	idA, err := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode A: %v", err)
+	}
+	idB, err := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode B: %v", err)
+	}
+	idC, err := svc.CreateNode("system", nil, "C", "c", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode C: %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil {
+		t.Fatalf("remove root order file: %v", err)
+	}
+	mustMkdir(t, filepath.Join(tmpDir, "root", ".order.json"))
+
+	err = svc.SortPages("root", []string{*idC, *idA, *idB})
+	if err == nil {
+		t.Fatalf("expected SortPages to fail when order persistence fails")
+	}
+	if !strings.Contains(err.Error(), "persist child order") {
+		t.Fatalf("expected SortPages error to mention child order persistence, got: %v", err)
+	}
+
+	root := svc.GetTree()
+	want := []string{*idA, *idB, *idC}
+	got := []string{root.Children[0].ID, root.Children[1].ID, root.Children[2].ID}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("expected in-memory order rollback, got %v want %v", got, want)
+	}
+	for i, child := range root.Children {
+		if child.Position != i {
+			t.Fatalf("expected child %q position rollback to %d, got %d", child.ID, i, child.Position)
 		}
 	}
 }
