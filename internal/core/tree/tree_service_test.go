@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/perber/wiki/internal/core/markdown"
+	"github.com/perber/wiki/internal/core/treemigration"
 )
 
 // --- helpers ---
@@ -48,6 +49,17 @@ func mustNotExist(t *testing.T, path string) {
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected os.ErrNotExist for %q, got: %v", path, err)
+	}
+}
+
+func persistLegacyTreeSnapshot(t *testing.T, storageDir string, tree *PageNode) {
+	t.Helper()
+	raw, err := json.Marshal(tree)
+	if err != nil {
+		t.Fatalf("marshal legacy tree snapshot failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storageDir, legacyTreeFilename), raw, 0o644); err != nil {
+		t.Fatalf("write legacy tree snapshot failed: %v", err)
 	}
 }
 
@@ -90,6 +102,89 @@ func TestTreeService_LoadTree_DefaultRootWhenMissing(t *testing.T) {
 	}
 }
 
+func TestTreeService_LoadTree_MigratesLegacyTreeOrderIntoOrderFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "a.md"), `---
+leafwiki_id: id-a
+leafwiki_title: A
+---
+# A`, 0o644)
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "b.md"), `---
+leafwiki_id: id-b
+leafwiki_title: B
+---
+# B`, 0o644)
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "c.md"), `---
+leafwiki_id: id-c
+leafwiki_title: C
+---
+# C`, 0o644)
+
+	legacyTree := &PageNode{
+		ID:       "root",
+		Slug:     "root",
+		Title:    "root",
+		Kind:     NodeKindSection,
+		Children: []*PageNode{{ID: "id-c", Slug: "c", Title: "C", Kind: NodeKindPage, Position: 0}, {ID: "id-a", Slug: "a", Title: "A", Kind: NodeKindPage, Position: 1}, {ID: "id-b", Slug: "b", Title: "B", Kind: NodeKindPage, Position: 2}},
+	}
+	persistLegacyTreeSnapshot(t, tmpDir, legacyTree)
+	if err := saveSchema(tmpDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	root := svc.GetTree()
+	if got, want := slugs(root.Children), []string{"c", "a", "b"}; strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected child order after legacy migration: got %v want %v", got, want)
+	}
+	if got, want := readOrderIDs(t, filepath.Join(tmpDir, "root")), []string{"id-c", "id-a", "id-b"}; strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected persisted order after legacy migration: got %v want %v", got, want)
+	}
+	mustNotExist(t, filepath.Join(tmpDir, legacyTreeFilename))
+}
+
+func TestTreeService_LoadTree_RemovesLegacyTreeSnapshotAfterSuccessfulMigration(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "a.md"), `---
+leafwiki_id: id-a
+leafwiki_title: A
+---
+# A`, 0o644)
+	mustWriteFile(t, filepath.Join(tmpDir, "root", "b.md"), `---
+leafwiki_id: id-b
+leafwiki_title: B
+---
+# B`, 0o644)
+
+	legacyTree := &PageNode{
+		ID:    "root",
+		Slug:  "root",
+		Title: "root",
+		Kind:  NodeKindSection,
+		Children: []*PageNode{
+			{ID: "id-b", Slug: "b", Title: "B", Kind: NodeKindPage, Position: 0},
+			{ID: "id-a", Slug: "a", Title: "A", Kind: NodeKindPage, Position: 1},
+		},
+	}
+	persistLegacyTreeSnapshot(t, tmpDir, legacyTree)
+	if err := saveSchema(tmpDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	mustNotExist(t, filepath.Join(tmpDir, legacyTreeFilename))
+}
+
 func TestTreeService_SaveAndLoad_RoundtripParents(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
@@ -101,10 +196,6 @@ func TestTreeService_SaveAndLoad_RoundtripParents(t *testing.T) {
 	_, err = svc.CreateNode("system", idA, "B", "b", ptrKind(NodeKindPage))
 	if err != nil {
 		t.Fatalf("CreateNode B failed: %v", err)
-	}
-
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
 	}
 
 	// Reload in a new service instance
@@ -195,7 +286,7 @@ func TestTreeService_TreeHash_ChangesWhenOrderChanges(t *testing.T) {
 
 // --- B) Create/Update/Delete disk sync ---
 
-func TestTreeService_CreateNode_PersistsTreeJSON(t *testing.T) {
+func TestTreeService_CreateNode_ReloadsFromFilesystem(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
 	id, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
@@ -226,14 +317,14 @@ func TestTreeService_CreateChild_RollsBackParentAutoConvertWhenTreeSaveFails(t *
 	}
 	mustStat(t, filepath.Join(tmpDir, "root", "docs.md"))
 
-	if err := os.Remove(filepath.Join(tmpDir, "tree.json")); err != nil {
-		t.Fatalf("remove tree.json file: %v", err)
-	}
-	mustMkdir(t, filepath.Join(tmpDir, "tree.json"))
+	mustMkdir(t, filepath.Join(tmpDir, "root", "docs", ".order.json"))
 
 	childID, err := svc.CreateNode("system", parentID, "Child", "child", ptrKind(NodeKindPage))
 	if err == nil {
-		t.Fatalf("expected CreateNode child to fail when tree.json save fails")
+		t.Fatalf("expected CreateNode child to fail when child order save fails")
+	}
+	if !strings.Contains(err.Error(), "persist child order") {
+		t.Fatalf("expected CreateNode error to mention child order persistence, got: %v", err)
 	}
 	if childID != nil {
 		t.Fatalf("expected returned child id to be nil on failure, got %q", *childID)
@@ -259,14 +350,14 @@ func TestTreeService_CreateChild_RollsBackParentAutoConvertWhenTreeSaveFails(t *
 func TestTreeService_CreateNode_RollsBackWhenTreeSaveFails(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
-	mustMkdir(t, filepath.Join(tmpDir, "tree.json"))
+	mustMkdir(t, filepath.Join(tmpDir, "root", ".order.json"))
 
 	id, err := svc.CreateNode("system", nil, "Welcome", "welcome", ptrKind(NodeKindPage))
 	if err == nil {
-		t.Fatalf("expected CreateNode to fail when tree.json save fails")
+		t.Fatalf("expected CreateNode to fail when order file write fails")
 	}
-	if !strings.Contains(err.Error(), "save tree") {
-		t.Fatalf("expected CreateNode error to mention tree save, got: %v", err)
+	if !strings.Contains(err.Error(), "persist child order") {
+		t.Fatalf("expected CreateNode error to mention child order persistence, got: %v", err)
 	}
 	if id != nil {
 		t.Fatalf("expected returned id to be nil on failure, got %q", *id)
@@ -275,12 +366,10 @@ func TestTreeService_CreateNode_RollsBackWhenTreeSaveFails(t *testing.T) {
 		t.Fatalf("expected in-memory tree rollback, got %d root children", len(svc.GetTree().Children))
 	}
 	mustNotExist(t, filepath.Join(tmpDir, "root", "welcome.md"))
-	got := readOrderIDs(t, filepath.Join(tmpDir, "root"))
-	if len(got) != 0 {
-		t.Fatalf("expected root order rollback, got %v", got)
-	}
-	if err := os.Remove(filepath.Join(tmpDir, "tree.json")); err != nil {
-		t.Fatalf("remove tree.json dir: %v", err)
+	if info, err := os.Stat(filepath.Join(tmpDir, "root", ".order.json")); err != nil {
+		t.Fatalf("stat root order path: %v", err)
+	} else if !info.IsDir() {
+		t.Fatalf("expected failure trigger to remain a directory")
 	}
 	reloaded := NewTreeService(tmpDir)
 	if err := reloaded.LoadTree(); err != nil {
@@ -819,7 +908,67 @@ func TestTreeService_MoveNode_UpdatesSourceAndDestinationOrderFiles(t *testing.T
 	}
 }
 
-func TestTreeService_MoveNode_IgnoresOrderPersistenceErrorsAfterMove(t *testing.T) {
+func TestTreeService_MoveNode_PersistsMovedNodeMetadataToFrontmatter(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	destID, err := svc.CreateNode("system", nil, "Dest", "dest", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode dest: %v", err)
+	}
+	moveID, err := svc.CreateNode("system", nil, "Move", "move", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode move: %v", err)
+	}
+
+	node, err := svc.FindPageByID(svc.GetTree().Children, *moveID)
+	if err != nil {
+		t.Fatalf("FindPageByID failed: %v", err)
+	}
+	beforeUpdatedAt := node.Metadata.UpdatedAt
+
+	if err := svc.MoveNode("alice", *moveID, *destID); err != nil {
+		t.Fatalf("MoveNode failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(tmpDir, "root", "dest", "move.md"))
+	if err != nil {
+		t.Fatalf("read moved page: %v", err)
+	}
+	fm, _, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatal("expected frontmatter on moved page")
+	}
+	if fm.LeafWikiLastAuthorID != "alice" {
+		t.Fatalf("expected moved page last author to persist, got %#v", fm)
+	}
+	if fm.LeafWikiUpdatedAt == "" {
+		t.Fatalf("expected moved page updated timestamp to persist, got %#v", fm)
+	}
+
+	reloaded := NewTreeService(tmpDir)
+	if err := reloaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree after move failed: %v", err)
+	}
+	reloadedNode, err := reloaded.FindPageByID(reloaded.GetTree().Children, *moveID)
+	if err != nil {
+		t.Fatalf("FindPageByID after reload failed: %v", err)
+	}
+	if reloadedNode.Metadata.LastAuthorID != "alice" {
+		t.Fatalf("expected persisted last author after reload, got %#v", reloadedNode.Metadata)
+	}
+	persistedUpdatedAt, err := time.Parse(time.RFC3339, fm.LeafWikiUpdatedAt)
+	if err != nil {
+		t.Fatalf("parse persisted updated_at failed: %v", err)
+	}
+	if !reloadedNode.Metadata.UpdatedAt.Equal(persistedUpdatedAt) {
+		t.Fatalf("expected reloaded metadata to match persisted frontmatter, fm=%s reloaded=%s (before=%s)", persistedUpdatedAt, reloadedNode.Metadata.UpdatedAt, beforeUpdatedAt)
+	}
+}
+
+func TestTreeService_MoveNode_ReturnsErrorAndRollsBackWhenOrderPersistenceFails(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
 	destID, err := svc.CreateNode("system", nil, "Dest", "dest", ptrKind(NodeKindSection))
@@ -840,19 +989,29 @@ func TestTreeService_MoveNode_IgnoresOrderPersistenceErrorsAfterMove(t *testing.
 	}
 	mustMkdir(t, filepath.Join(tmpDir, "root", "dest", ".order.json"))
 
-	if err := svc.MoveNode("system", *moveID, *destID); err != nil {
-		t.Fatalf("MoveNode should succeed despite order persistence failure: %v", err)
+	err = svc.MoveNode("system", *moveID, *destID)
+	if err == nil {
+		t.Fatal("expected MoveNode to fail when child order persistence fails")
+	}
+	if !strings.Contains(err.Error(), "could not persist source child order") {
+		t.Fatalf("unexpected MoveNode error: %v", err)
 	}
 
-	destDir := filepath.Join(tmpDir, "root", "dest")
-	mustStat(t, filepath.Join(destDir, "move.md"))
+	mustStat(t, filepath.Join(tmpDir, "root", "move.md"))
+	if _, statErr := os.Stat(filepath.Join(tmpDir, "root", "dest", "move.md")); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("expected moved file to be rolled back from destination, stat err = %v", statErr)
+	}
+
 	root := svc.GetTree()
-	if len(root.Children) != 1 || root.Children[0].ID != *destID {
-		t.Fatalf("expected moved node removed from root, got %#v", root.Children)
+	if len(root.Children) != 2 {
+		t.Fatalf("expected rollback to restore root children, got %#v", root.Children)
+	}
+	if root.Children[0].ID != *destID || root.Children[1].ID != *moveID {
+		t.Fatalf("unexpected root children after rollback: got [%s %s]", root.Children[0].ID, root.Children[1].ID)
 	}
 	dest := findChildBySlug(t, root, "dest")
-	if len(dest.Children) != 1 || dest.Children[0].ID != *moveID {
-		t.Fatalf("expected moved node under destination after best-effort order persistence")
+	if len(dest.Children) != 0 {
+		t.Fatalf("expected destination children to be rolled back, got %#v", dest.Children)
 	}
 }
 
@@ -1225,7 +1384,7 @@ func TestTreeService_LoadTree_MigratesToV5_BackfillsChildOrderFiles(t *testing.T
 
 	tmpDir := t.TempDir()
 
-	if err := saveSchema(tmpDir, 4); err != nil {
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -1268,9 +1427,7 @@ func TestTreeService_LoadTree_MigratesToV5_BackfillsChildOrderFiles(t *testing.T
 		t.Fatalf("remove docs order file: %v", err)
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	if err := saveSchema(tmpDir, 4); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
@@ -1326,9 +1483,7 @@ func TestTreeService_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *te
 		LastAuthorID: "bob",
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	indexPath := filepath.Join(tmpDir, "root", "docs", "index.md")
 	if err := os.Remove(indexPath); err != nil {
@@ -1369,6 +1524,92 @@ func TestTreeService_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *te
 	}
 }
 
+func TestTreeService_LoadTree_ResumesInterruptedMigrationWithPersistedLegacySnapshot(t *testing.T) {
+	if CurrentSchemaVersion < 3 {
+		t.Skip("requires schema v3+")
+	}
+
+	tmpDir := t.TempDir()
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	id, err := svc.CreateNode("system", nil, "Page1", "page1", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	if err != nil {
+		t.Fatalf("FindPageByID failed: %v", err)
+	}
+	svc.GetTree().Metadata = PageMetadata{}
+	node.Metadata = PageMetadata{}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
+
+	pagePath := filepath.Join(tmpDir, "root", "page1.md")
+	legacyBody := "# Page 1 Content\nHello World\n"
+	if err := os.WriteFile(pagePath, []byte(legacyBody), 0o644); err != nil {
+		t.Fatalf("write legacy content failed: %v", err)
+	}
+	originalModTime := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	if err := os.Chtimes(pagePath, originalModTime, originalModTime); err != nil {
+		t.Fatalf("Chtimes failed: %v", err)
+	}
+	if err := saveSchema(tmpDir, 0); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	interrupted := NewTreeService(tmpDir)
+	legacyTree, err := interrupted.store.LoadTree(legacyTreeFilename)
+	if err != nil {
+		t.Fatalf("LoadTree legacy snapshot failed: %v", err)
+	}
+	interrupted.tree = legacyTree
+
+	deps := interrupted.migrationDependencies()
+	stopErr := errors.New("stop after v2")
+	deps.SaveSchema = func(version int) error {
+		if err := saveSchema(tmpDir, version); err != nil {
+			return err
+		}
+		if version == 2 {
+			return stopErr
+		}
+		return nil
+	}
+
+	err = treemigration.Run(0, deps)
+	if !errors.Is(err, stopErr) {
+		t.Fatalf("expected interrupted migration error, got %v", err)
+	}
+
+	reloaded := NewTreeService(tmpDir)
+	if err := reloaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree after interrupted migration failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(pagePath)
+	if err != nil {
+		t.Fatalf("read resumed migration file: %v", err)
+	}
+	fm, _, has, err := markdown.ParseFrontmatter(string(raw))
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after resumed migration")
+	}
+	if fm.LeafWikiCreatedAt != originalModTime.Format(time.RFC3339) || fm.LeafWikiUpdatedAt != originalModTime.Format(time.RFC3339) {
+		t.Fatalf("expected resumed migration to preserve v1 metadata via persisted legacy snapshot, got %#v", fm)
+	}
+}
+
 func TestTreeService_LoadTree_MigratesToV3_BackfillsMetadataFrontmatter(t *testing.T) {
 	if CurrentSchemaVersion < 3 {
 		t.Skip("requires schema v3+")
@@ -1401,9 +1642,7 @@ func TestTreeService_LoadTree_MigratesToV3_BackfillsMetadataFrontmatter(t *testi
 		LastAuthorID: "bob",
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	pagePath := filepath.Join(tmpDir, "root", "page1.md")
 	legacyContent := "---\nleafwiki_id: " + *id + "\nleafwiki_title: Page1\n---\n# Page 1 Content\nHello World\n"
@@ -1468,9 +1707,7 @@ func TestTreeService_LoadTree_MigratesToV2_AddsFrontmatterAndPreservesBody(t *te
 	}
 
 	// IMPORTANT: persist tree so the next service instance sees the node
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	// overwrite file without FM
 	pagePath := filepath.Join(tmpDir, "root", "page1.md")
@@ -1533,9 +1770,7 @@ func TestTreeService_LoadTree_MigratesToV2_PreservesExistingCustomFrontmatter(t 
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	pagePath := filepath.Join(tmpDir, "root", "page1.md")
 	legacyContent := `---
@@ -1617,9 +1852,7 @@ func TestTreeService_LoadTree_MigratesToV2_PreservesExistingLeafWikiTitle(t *tes
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	pagePath := filepath.Join(tmpDir, "root", "page1.md")
 	legacyContent := `---
@@ -1688,9 +1921,7 @@ func TestTreeService_LoadTree_MigratesToV2_PreservesTitleAlias(t *testing.T) {
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	pagePath := filepath.Join(tmpDir, "root", "page1.md")
 	legacyContent := `---
@@ -1776,8 +2007,8 @@ func TestTreeService_ReconstructTreeFromFS_UpdatesSchemaVersion(t *testing.T) {
 		t.Errorf("expected schema version %d after reconstruction, got %d", CurrentSchemaVersion, schema.Version)
 	}
 
-	// Verify tree.json was also created
-	mustStat(t, filepath.Join(tmpDir, "tree.json"))
+	// Startup reconstruction should no longer create a tree.json snapshot.
+	mustNotExist(t, filepath.Join(tmpDir, "tree.json"))
 }
 
 // --- G) ReconstructTreeFromFS ---
@@ -1850,7 +2081,7 @@ leafwiki_title: Page Two
 	}
 }
 
-func TestTreeService_ReconstructTreeFromFS_PersistsTreeJSON(t *testing.T) {
+func TestTreeService_ReconstructTreeFromFS_ReloadsFromFilesystem(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
 	// Create some files on disk manually
@@ -1860,22 +2091,13 @@ leafwiki_title: README
 ---
 # README`, 0o644)
 
-	// Verify tree.json doesn't exist or is empty before reconstruction
-	treeJSONPath := filepath.Join(tmpDir, "tree.json")
-
 	// Reconstruct the tree from filesystem
 	err := svc.ReconstructTreeFromFS()
 	if err != nil {
 		t.Fatalf("ReconstructTreeFromFS failed: %v", err)
 	}
 
-	// Verify tree.json was persisted
-	info := mustStat(t, treeJSONPath)
-	if info.Size() == 0 {
-		t.Fatalf("expected tree.json to have content after reconstruction, got size 0")
-	}
-
-	// Verify we can reload the tree from the saved tree.json
+	// Verify we can reload the tree directly from the filesystem.
 	newSvc := NewTreeService(tmpDir)
 	if err := newSvc.LoadTree(); err != nil {
 		t.Fatalf("LoadTree after reconstruction failed: %v", err)
@@ -1905,7 +2127,7 @@ leafwiki_title: README
 	}
 }
 
-func TestTreeService_ReconstructTreeFromFS_PersistsTreeJSON_MetadataFromFrontmatter(t *testing.T) {
+func TestTreeService_ReconstructTreeFromFS_ReloadsMetadataFromFrontmatter(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
 	mustWriteFile(t, filepath.Join(tmpDir, "root", "readme.md"), `---
@@ -1939,7 +2161,7 @@ leafwiki_last_author_id: bob
 	}
 }
 
-func TestTreeService_ReconstructTreeFromFS_PersistsTreeJSON_MetadataFallbacksWhenMissing(t *testing.T) {
+func TestTreeService_ReconstructTreeFromFS_ReloadsMetadataFallbacksWhenMissing(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
 	readmePath := filepath.Join(tmpDir, "root", "readme.md")
@@ -2061,9 +2283,7 @@ leafwiki_title: Basic Guide
 		t.Fatalf("expected basic to have metadata")
 	}
 
-	// Verify tree.json was saved and can be reloaded
-	treeJSONPath := filepath.Join(tmpDir, "tree.json")
-	mustStat(t, treeJSONPath)
+	mustNotExist(t, filepath.Join(tmpDir, "tree.json"))
 
 	reloadedSvc := NewTreeService(tmpDir)
 	if err := reloadedSvc.LoadTree(); err != nil {
@@ -2094,9 +2314,7 @@ func TestTreeService_ReconstructTreeFromFS_EmptyDirectory_CreatesRootAndPersists
 	// because there's no corresponding file/directory to stat. This is expected behavior.
 	// The important thing is that the tree is reconstructed and persisted.
 
-	// Verify tree.json was saved
-	treeJSONPath := filepath.Join(tmpDir, "tree.json")
-	mustStat(t, treeJSONPath)
+	mustNotExist(t, filepath.Join(tmpDir, "tree.json"))
 
 	// Verify we can reload
 	reloadedSvc := NewTreeService(tmpDir)
@@ -2174,7 +2392,7 @@ func TestTreeService_LoadTree_MigratesToV5_ReturnsErrorWhenOrderFileCannotBeWrit
 
 	tmpDir := t.TempDir()
 
-	if err := saveSchema(tmpDir, 4); err != nil {
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
 	}
 
@@ -2195,12 +2413,7 @@ func TestTreeService_LoadTree_MigratesToV5_ReturnsErrorWhenOrderFileCannotBeWrit
 	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil && !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("remove root order file failed: %v", err)
 	}
-	if err := os.Chmod(filepath.Join(tmpDir, "root"), 0o555); err != nil {
-		t.Fatalf("chmod root dir failed: %v", err)
-	}
-	defer func() {
-		_ = os.Chmod(filepath.Join(tmpDir, "root"), 0o755)
-	}()
+	mustMkdir(t, filepath.Join(tmpDir, "root", ".order.json"))
 
 	if err := saveSchema(tmpDir, 4); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
@@ -2251,9 +2464,7 @@ func TestTreeService_LoadTree_MigratesToV4_ReturnsErrorWhenSectionIndexCannotBeW
 		LastAuthorID: "bob",
 	}
 
-	if err := svc.SaveTree(); err != nil {
-		t.Fatalf("SaveTree failed: %v", err)
-	}
+	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
 
 	sectionDir := filepath.Join(tmpDir, "root", "docs")
 	indexPath := filepath.Join(sectionDir, "index.md")

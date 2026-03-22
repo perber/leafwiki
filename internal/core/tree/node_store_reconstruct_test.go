@@ -299,6 +299,33 @@ func TestNodeStore_ReconstructTreeFromFS_OrderFileIgnoresUnknownIDsAndKeepsRemai
 	}
 }
 
+func TestNodeStore_ReconstructTreeFromFS_ReturnsErrorOnDuplicateLeafWikiIDs(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", "a.md"), `---
+leafwiki_id: dup-id
+leafwiki_title: A
+---
+# A`, 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "b.md"), `---
+leafwiki_id: dup-id
+leafwiki_title: B
+---
+# B`, 0o644)
+
+	_, err := store.ReconstructTreeFromFS()
+	if err == nil {
+		t.Fatalf("expected duplicate ID error")
+	}
+	if !strings.Contains(err.Error(), "duplicate leafwiki_id") {
+		t.Fatalf("expected duplicate ID error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "dup-id") {
+		t.Fatalf("expected duplicate ID to be mentioned, got: %v", err)
+	}
+}
+
 func TestNodeStore_ReconstructTreeFromFS_WritesIDsBackToFiles(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
