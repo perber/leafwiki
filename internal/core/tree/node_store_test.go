@@ -1070,6 +1070,39 @@ func TestNodeStore_ConvertNode_SectionToPage_NoIndex_CreatesEmptyPageWithFM(t *t
 	}
 }
 
+func TestNodeStore_ConvertNode_SectionToPage_WithOrderMetadata_PreservesIndexContent(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "s1", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+
+	dir := filepath.Join(tmp, "root", "docs")
+	mustMkdir(t, dir)
+	indexPath := filepath.Join(dir, "index.md")
+	mustWriteFile(t, indexPath, `---
+leafwiki_id: existing
+leafwiki_title: Existing
+custom: keep
+---
+# idx
+`, 0o644)
+	mustWriteFile(t, filepath.Join(dir, orderFilename), `{"ordered_ids":[]}`, 0o644)
+
+	if err := store.ConvertNode(entry, NodeKindPage); err != nil {
+		t.Fatalf("ConvertNode(section->page with order metadata): %v", err)
+	}
+
+	pageFile := filepath.Join(tmp, "root", "docs.md")
+	raw := string(mustRead(t, pageFile))
+	if !strings.Contains(raw, "custom: keep") || !strings.Contains(raw, "# idx") {
+		t.Fatalf("expected converted page to keep index content, got: %s", raw)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("expected folder removed")
+	}
+}
+
 func TestNodeStore_MoveNode_Section_MovesFolderStrict(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
