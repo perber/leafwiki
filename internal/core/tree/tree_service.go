@@ -51,24 +51,29 @@ func (t *TreeService) LoadTree() error {
 		return err
 	}
 
+	if schema.Version == CurrentSchemaVersion {
+		reconstructed, err := t.store.ReconstructTreeFromFS()
+		if err != nil {
+			return err
+		}
+		if reconstructed == nil {
+			return fmt.Errorf("internal error: tree reconstruction returned nil tree")
+		}
+		t.tree = reconstructed
+		return nil
+	}
+
 	legacyTreePath := filepath.Join(t.storageDir, legacyTreeFilename)
-	if schema.Version < CurrentSchemaVersion {
-		if info, statErr := os.Stat(legacyTreePath); statErr == nil && !info.IsDir() {
-			legacyTree, legacyErr := t.store.LoadTree(legacyTreeFilename)
-			if legacyErr != nil {
-				t.log.Warn("Could not load legacy tree, falling back to filesystem reconstruction", "path", legacyTreePath, "error", legacyErr)
-				t.tree, err = t.store.ReconstructTreeFromFS()
-				if err != nil {
-					return err
-				}
-			} else {
-				t.tree = legacyTree
-			}
-		} else {
+	if info, statErr := os.Stat(legacyTreePath); statErr == nil && !info.IsDir() {
+		legacyTree, legacyErr := t.store.LoadTree(legacyTreeFilename)
+		if legacyErr != nil {
+			t.log.Warn("Could not load legacy tree, falling back to filesystem reconstruction", "path", legacyTreePath, "error", legacyErr)
 			t.tree, err = t.store.ReconstructTreeFromFS()
 			if err != nil {
 				return err
 			}
+		} else {
+			t.tree = legacyTree
 		}
 	} else {
 		t.tree, err = t.store.ReconstructTreeFromFS()
@@ -81,12 +86,10 @@ func (t *TreeService) LoadTree() error {
 		return fmt.Errorf("internal error: tree reconstruction returned nil tree")
 	}
 
-	if schema.Version < CurrentSchemaVersion {
-		t.log.Info("Migrating schema", "fromVersion", schema.Version, "toVersion", CurrentSchemaVersion)
-		if err := treemigration.Run(schema.Version, t.migrationDependencies()); err != nil {
-			t.log.Error("Error migrating schema", "error", err)
-			return err
-		}
+	t.log.Info("Migrating schema", "fromVersion", schema.Version, "toVersion", CurrentSchemaVersion)
+	if err := treemigration.Run(schema.Version, t.migrationDependencies()); err != nil {
+		t.log.Error("Error migrating schema", "error", err)
+		return err
 	}
 
 	reconstructed, err := t.store.ReconstructTreeFromFS()
@@ -772,6 +775,11 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 		return ErrPageNotFound
 	}
 
+	oldParent := node.Parent
+	if oldParent == nil {
+		return fmt.Errorf("old parent not found: %w", ErrParentNotFound)
+	}
+
 	// Resolve destination parent (default root)
 	newParent := t.tree
 	if parentID != "" && parentID != "root" {
@@ -796,29 +804,30 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 		return fmt.Errorf("circular reference detected: %w", ErrMovePageCircularReference)
 	}
 
-	// If destination parent is a PAGE, auto-convert it to SECTION so it can host children
+	newParentWasConverted := false
 	if newParent.ID != "root" && newParent.Kind == NodeKindPage {
 		if err := t.store.ConvertNode(newParent, NodeKindSection); err != nil {
 			return fmt.Errorf("could not auto-convert new parent page to section: %w", err)
 		}
 		newParent.Kind = NodeKindSection
+		newParentWasConverted = true
 	}
 
-	// Defensive: after possible conversion, destination must be a section
 	if newParent.Kind != NodeKindSection {
 		return fmt.Errorf("destination parent must be a section, got %q", newParent.Kind)
 	}
 
-	// Move on disk (strict by node.Kind inside NodeStore)
+	previousOldChildren := append([]*PageNode(nil), oldParent.Children...)
+	previousOldPositions := snapshotChildPositions(oldParent.Children)
+	previousNewChildren := append([]*PageNode(nil), newParent.Children...)
+	previousNewPositions := snapshotChildPositions(newParent.Children)
+	previousPosition := node.Position
+	previousMetadata := node.Metadata
+
 	if err := t.store.MoveNode(node, newParent); err != nil {
 		return fmt.Errorf("could not move node on disk: %w", err)
 	}
 
-	// Unlink from old parent in tree
-	oldParent := node.Parent
-	if oldParent == nil {
-		return fmt.Errorf("old parent not found: %w", ErrParentNotFound)
-	}
 	for i, e := range oldParent.Children {
 		if e.ID == id {
 			oldParent.Children = append(oldParent.Children[:i], oldParent.Children[i+1:]...)
@@ -826,29 +835,104 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 		}
 	}
 
-	// Link under new parent
 	node.Position = len(newParent.Children)
 	newParent.Children = append(newParent.Children, node)
 	node.Parent = newParent
-
-	// Update metadata
 	node.Metadata.UpdatedAt = time.Now().UTC()
 	node.Metadata.LastAuthorID = userID
 
-	// Reindex positions
 	t.reindexPositions(newParent)
 	t.reindexPositions(oldParent)
 
 	if err := t.store.SaveChildOrder(oldParent); err != nil {
-		t.log.Warn("could not persist source child order after move; continuing with moved tree", "parentID", oldParent.ID, "error", err)
+		rollbackErr := t.rollbackMovedNodeLocked(node, oldParent, newParent, previousOldChildren, previousOldPositions, previousNewChildren, previousNewPositions, previousPosition, previousMetadata, newParentWasConverted)
+		if rollbackErr != nil {
+			return errors.Join(fmt.Errorf("could not persist source child order: %w", err), fmt.Errorf("rollback moved node: %w", rollbackErr))
+		}
+		return fmt.Errorf("could not persist source child order: %w", err)
 	}
 	if newParent != oldParent {
 		if err := t.store.SaveChildOrder(newParent); err != nil {
-			t.log.Warn("could not persist destination child order after move; continuing with moved tree", "parentID", newParent.ID, "error", err)
+			rollbackErr := t.rollbackMovedNodeLocked(node, oldParent, newParent, previousOldChildren, previousOldPositions, previousNewChildren, previousNewPositions, previousPosition, previousMetadata, newParentWasConverted)
+			if rollbackErr != nil {
+				return errors.Join(fmt.Errorf("could not persist destination child order: %w", err), fmt.Errorf("rollback moved node: %w", rollbackErr))
+			}
+			return fmt.Errorf("could not persist destination child order: %w", err)
 		}
 	}
 
 	return nil
+}
+
+func snapshotChildPositions(children []*PageNode) map[string]int {
+	positions := make(map[string]int, len(children))
+	for _, child := range children {
+		if child == nil {
+			continue
+		}
+		positions[child.ID] = child.Position
+	}
+	return positions
+}
+
+func restoreChildSnapshot(parent *PageNode, children []*PageNode, positions map[string]int) {
+	if parent == nil {
+		return
+	}
+
+	parent.Children = append([]*PageNode(nil), children...)
+	for _, child := range parent.Children {
+		if child == nil {
+			continue
+		}
+		child.Parent = parent
+		if pos, ok := positions[child.ID]; ok {
+			child.Position = pos
+		}
+	}
+}
+
+func (t *TreeService) rollbackMovedNodeLocked(node *PageNode, oldParent *PageNode, newParent *PageNode, previousOldChildren []*PageNode, previousOldPositions map[string]int, previousNewChildren []*PageNode, previousNewPositions map[string]int, previousPosition int, previousMetadata PageMetadata, newParentWasConverted bool) error {
+	var rollbackErr error
+
+	if moveErr := t.store.MoveNode(node, oldParent); moveErr != nil {
+		rollbackErr = errors.Join(rollbackErr, fmt.Errorf("move node back on disk: %w", moveErr))
+	}
+
+	restoreChildSnapshot(oldParent, previousOldChildren, previousOldPositions)
+	if newParent != oldParent {
+		restoreChildSnapshot(newParent, previousNewChildren, previousNewPositions)
+	}
+	node.Parent = oldParent
+	node.Position = previousPosition
+	node.Metadata = previousMetadata
+
+	if newParentWasConverted && newParent != nil && newParent.ID != "root" && len(newParent.Children) == 0 {
+		newParentDir, dirErr := t.store.dirPathForNode(newParent)
+		if dirErr != nil {
+			rollbackErr = errors.Join(rollbackErr, fmt.Errorf("resolve converted parent dir: %w", dirErr))
+		} else {
+			if removeErr := os.RemoveAll(filepath.Join(newParentDir, orderFilename)); removeErr != nil {
+				rollbackErr = errors.Join(rollbackErr, fmt.Errorf("remove child order before parent rollback: %w", removeErr))
+			}
+		}
+		if convertErr := t.store.ConvertNode(newParent, NodeKindPage); convertErr != nil {
+			rollbackErr = errors.Join(rollbackErr, fmt.Errorf("convert destination parent back to page: %w", convertErr))
+		} else {
+			newParent.Kind = NodeKindPage
+		}
+	}
+
+	if err := t.store.SaveChildOrder(oldParent); err != nil {
+		rollbackErr = errors.Join(rollbackErr, fmt.Errorf("restore source child order: %w", err))
+	}
+	if newParent != oldParent && newParent.Kind == NodeKindSection {
+		if err := t.store.SaveChildOrder(newParent); err != nil {
+			rollbackErr = errors.Join(rollbackErr, fmt.Errorf("restore destination child order: %w", err))
+		}
+	}
+
+	return rollbackErr
 }
 
 func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {

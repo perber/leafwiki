@@ -870,7 +870,7 @@ func TestTreeService_MoveNode_UpdatesSourceAndDestinationOrderFiles(t *testing.T
 	}
 }
 
-func TestTreeService_MoveNode_IgnoresOrderPersistenceErrorsAfterMove(t *testing.T) {
+func TestTreeService_MoveNode_ReturnsErrorAndRollsBackWhenOrderPersistenceFails(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
 	destID, err := svc.CreateNode("system", nil, "Dest", "dest", ptrKind(NodeKindSection))
@@ -891,19 +891,29 @@ func TestTreeService_MoveNode_IgnoresOrderPersistenceErrorsAfterMove(t *testing.
 	}
 	mustMkdir(t, filepath.Join(tmpDir, "root", "dest", ".order.json"))
 
-	if err := svc.MoveNode("system", *moveID, *destID); err != nil {
-		t.Fatalf("MoveNode should succeed despite order persistence failure: %v", err)
+	err = svc.MoveNode("system", *moveID, *destID)
+	if err == nil {
+		t.Fatal("expected MoveNode to fail when child order persistence fails")
+	}
+	if !strings.Contains(err.Error(), "could not persist source child order") {
+		t.Fatalf("unexpected MoveNode error: %v", err)
 	}
 
-	destDir := filepath.Join(tmpDir, "root", "dest")
-	mustStat(t, filepath.Join(destDir, "move.md"))
+	mustStat(t, filepath.Join(tmpDir, "root", "move.md"))
+	if _, statErr := os.Stat(filepath.Join(tmpDir, "root", "dest", "move.md")); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("expected moved file to be rolled back from destination, stat err = %v", statErr)
+	}
+
 	root := svc.GetTree()
-	if len(root.Children) != 1 || root.Children[0].ID != *destID {
-		t.Fatalf("expected moved node removed from root, got %#v", root.Children)
+	if len(root.Children) != 2 {
+		t.Fatalf("expected rollback to restore root children, got %#v", root.Children)
+	}
+	if root.Children[0].ID != *destID || root.Children[1].ID != *moveID {
+		t.Fatalf("unexpected root children after rollback: got [%s %s]", root.Children[0].ID, root.Children[1].ID)
 	}
 	dest := findChildBySlug(t, root, "dest")
-	if len(dest.Children) != 1 || dest.Children[0].ID != *moveID {
-		t.Fatalf("expected moved node under destination after best-effort order persistence")
+	if len(dest.Children) != 0 {
+		t.Fatalf("expected destination children to be rolled back, got %#v", dest.Children)
 	}
 }
 
