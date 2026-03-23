@@ -1,10 +1,7 @@
 import BaseDialog from '@/components/BaseDialog'
 import { NODE_KIND_PAGE, PageNode } from '@/lib/api/pages'
 
-import {
-  applyPageRefactor,
-  previewPageRefactor
-} from '@/lib/api/pages'
+import { applyPageRefactor, previewPageRefactor } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_MOVE_PAGE } from '@/lib/registries'
 import { useTreeStore } from '@/stores/tree'
@@ -60,7 +57,6 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
       if (rewriteLinks === null) {
         return false
       }
-
 
       await applyPageRefactor(pageId, {
         kind: 'move',
