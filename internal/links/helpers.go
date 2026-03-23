@@ -36,7 +36,8 @@ func extractLinksFromMarkdown(content string) []string {
 		if link, ok := n.(*ast.Link); ok && entering {
 			// ignore external links
 			dest := string(link.Destination)
-			if strings.HasPrefix(dest, "http://") || strings.HasPrefix(dest, "https://") || strings.HasPrefix(dest, "mailto:") || strings.HasPrefix(dest, "#") {
+			lower := strings.ToLower(dest)
+			if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "mailto:") || strings.HasPrefix(lower, "#") {
 				return ast.WalkContinue, nil
 			}
 			// strip hash fragments
