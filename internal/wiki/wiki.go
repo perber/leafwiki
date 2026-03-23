@@ -13,6 +13,7 @@ import (
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
@@ -31,6 +32,7 @@ type Wiki struct {
 	status        *search.IndexingStatus
 	storageDir    string
 	searchWatcher *search.Watcher
+	revision      *revision.Service
 	links         *links.LinkService
 	log           *slog.Logger
 }
@@ -181,6 +183,9 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	if err := wiki.EnsureWelcomePage(); err != nil {
 		return nil, err
 	}
+
+	// Revision service intentionally starts AFTER welcome page bootstrap.
+	wiki.revision = revision.NewService(options.StorageDir, treeService, logger)
 
 	return wiki, nil
 }
@@ -444,6 +449,10 @@ func (w *Wiki) UpdatePage(userID string, id, title, slug string, content *string
 		}
 	}
 
+	if content != nil {
+		w.recordContentRevision(id, userID, "")
+	}
+
 	return after, nil
 }
 
@@ -509,6 +518,8 @@ func (w *Wiki) CopyPage(userID string, currentPageID string, targetParentID *str
 		}
 	}
 
+	w.recordAssetRevision(copy.ID, userID, "page copied")
+
 	return copy, nil
 }
 
@@ -534,6 +545,19 @@ func (w *Wiki) DeletePage(userID string, id string, recursive bool) error {
 				subtreeIDs = collectSubtreeIDs(node)
 				oldPrefix = node.CalculatePath() // IMPORTANT: before delete
 			}
+		}
+	}
+
+	// Record delete revisions BEFORE live delete.
+	if w.revision != nil {
+		idsToRecord := []string{id}
+		if recursive {
+			if len(subtreeIDs) > 0 {
+				idsToRecord = subtreeIDs
+			}
+		}
+		if err := w.recordDeleteRevisions(idsToRecord, userID, ""); err != nil {
+			return err
 		}
 	}
 
@@ -909,7 +933,13 @@ func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string, 
 	if err != nil {
 		return "", err
 	}
-	return w.asset.SaveAssetForPage(page, file, filename, maxBytes)
+	assetPath, err := w.asset.SaveAssetForPage(page, file, filename, maxBytes)
+	if err != nil {
+		return "", err
+	}
+	// fix: no userID in current method signature, so we fall back to system.
+	w.recordAssetRevision(pageID, SYSTEM_USER_ID, "")
+	return assetPath, nil
 }
 
 func (w *Wiki) ListAssets(pageID string) ([]string, error) {
@@ -933,7 +963,14 @@ func (w *Wiki) DeleteAsset(pageID string, filename string) error {
 	if err != nil {
 		return err
 	}
-	return w.asset.DeleteAsset(page, filename)
+	if err := w.asset.DeleteAsset(page, filename); err != nil {
+		return err
+	}
+
+	// fix: no userID in current method signature, so we fall back to system.
+	w.recordAssetRevision(pageID, SYSTEM_USER_ID, "")
+
+	return nil
 }
 
 func (w *Wiki) GetIndexingStatus() *search.IndexingStatus {
@@ -1031,4 +1068,62 @@ func (w *Wiki) GetBrandingService() *branding.BrandingService {
 
 func (w *Wiki) GetSlugService() *tree.SlugService {
 	return w.slug
+}
+
+func (w *Wiki) ListRevisions(pageID string) ([]*revision.Revision, error) {
+	if w.revision == nil {
+		return []*revision.Revision{}, nil
+	}
+	return w.revision.ListRevisions(pageID)
+}
+
+func (w *Wiki) GetLatestRevision(pageID string) (*revision.Revision, error) {
+	if w.revision == nil {
+		return nil, nil
+	}
+	return w.revision.GetLatestRevision(pageID)
+}
+
+func (w *Wiki) GetTrashEntry(pageID string) (*revision.TrashEntry, error) {
+	if w.revision == nil {
+		return nil, nil
+	}
+	return w.revision.GetTrashEntry(pageID)
+}
+
+func (w *Wiki) ListTrash() ([]*revision.TrashEntry, error) {
+	if w.revision == nil {
+		return []*revision.TrashEntry{}, nil
+	}
+	return w.revision.ListTrash()
+}
+
+func (w *Wiki) recordContentRevision(pageID, userID, summary string) {
+	if w.revision == nil {
+		return
+	}
+	if _, _, err := w.revision.RecordContentUpdate(pageID, userID, summary); err != nil {
+		w.log.Warn("failed to record content revision", "pageID", pageID, "error", err)
+	}
+}
+
+func (w *Wiki) recordAssetRevision(pageID, userID, summary string) {
+	if w.revision == nil {
+		return
+	}
+	if _, _, err := w.revision.RecordAssetChange(pageID, userID, summary); err != nil {
+		w.log.Warn("failed to record asset revision", "pageID", pageID, "error", err)
+	}
+}
+
+func (w *Wiki) recordDeleteRevisions(pageIDs []string, userID, summary string) error {
+	if w.revision == nil {
+		return nil
+	}
+	for _, pageID := range pageIDs {
+		if _, _, err := w.revision.RecordDelete(pageID, userID, summary); err != nil {
+			return err
+		}
+	}
+	return nil
 }
