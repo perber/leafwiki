@@ -66,6 +66,29 @@ Internal: [Page](/docs/page1)
 	}
 }
 
+func TestExtractLinksFromMarkdown_IgnoresMixedCaseExternalSchemes(t *testing.T) {
+	md := `
+Uppercase HTTPS: [A](HTTPS://example.com)
+Uppercase HTTP: [B](HTTP://example.com)
+Uppercase MAILTO: [C](MAILTO:foo@bar.com)
+Mixed case Https: [D](Https://example.com)
+Mixed case Mailto: [E](Mailto:foo@bar.com)
+Internal: [Page](/docs/page1)
+`
+
+	links := extractLinksFromMarkdown(md)
+
+	want := []string{"/docs/page1"}
+	if len(links) != len(want) {
+		t.Fatalf("expected %d links, got %d: %#v", len(want), len(links), links)
+	}
+	for i, w := range want {
+		if links[i] != w {
+			t.Fatalf("link[%d] = %q, want %q", i, links[i], w)
+		}
+	}
+}
+
 // helper to create a small tree structure:
 // root
 //
