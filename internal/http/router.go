@@ -180,6 +180,14 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.PUT("/pages/:id/sort", auth_middleware.RequireEditorOrAdmin(), api.SortPagesHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/slug-suggestion", auth_middleware.RequireEditorOrAdmin(), api.SuggestSlugHandler(wikiInstance))
 
+		// Revisions
+		requiresAuthGroup.GET("/pages/:id/revisions", api.ListPageRevisionsHandler(wikiInstance))
+		requiresAuthGroup.GET("/pages/:id/revisions/latest", api.GetLatestPageRevisionHandler(wikiInstance))
+
+		// Trash
+		requiresAuthGroup.GET("/trash", auth_middleware.RequireEditorOrAdmin(), api.ListTrashHandler(wikiInstance))
+		requiresAuthGroup.GET("/trash/:id", auth_middleware.RequireEditorOrAdmin(), api.GetTrashEntryHandler(wikiInstance))
+
 		// User
 		requiresAuthGroup.POST("/users", auth_middleware.RequireAdmin(options.AuthDisabled), api.CreateUserHandler(wikiInstance))
 		requiresAuthGroup.GET("/users", auth_middleware.RequireAdmin(options.AuthDisabled), api.GetUsersHandler(wikiInstance))
