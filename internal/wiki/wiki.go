@@ -449,6 +449,17 @@ func (w *Wiki) UpdatePage(userID string, id, title, slug string, content *string
 		}
 	}
 
+	if renameOrPathChange {
+		for _, pid := range subtreeIDs {
+			if content != nil && pid == id {
+				continue
+			}
+			w.recordStructureRevision(pid, userID, "")
+		}
+	} else if content == nil && before.Title != after.Title {
+		w.recordStructureRevision(id, userID, "")
+	}
+
 	if content != nil {
 		w.recordContentRevision(id, userID, "")
 	}
@@ -686,6 +697,10 @@ func (w *Wiki) MovePage(userID, id, parentID string) error {
 		}
 	}
 
+	for _, pid := range subtreeIDs {
+		w.recordStructureRevision(pid, userID, "")
+	}
+
 	return nil
 }
 
@@ -699,6 +714,7 @@ func (w *Wiki) ConvertPage(userID, id string, targetKind tree.NodeKind) error {
 		return err
 	}
 
+	w.recordStructureRevision(id, userID, "")
 	return nil
 }
 
@@ -955,7 +971,13 @@ func (w *Wiki) RenameAsset(pageID string, oldFilename, newFilename string) (stri
 	if err != nil {
 		return "", err
 	}
-	return w.asset.RenameAsset(page, oldFilename, newFilename)
+	newPath, err := w.asset.RenameAsset(page, oldFilename, newFilename)
+	if err != nil {
+		return "", err
+	}
+
+	w.recordAssetRevision(pageID, SYSTEM_USER_ID, "")
+	return newPath, nil
 }
 
 func (w *Wiki) DeleteAsset(pageID string, filename string) error {
@@ -1077,11 +1099,32 @@ func (w *Wiki) ListRevisions(pageID string) ([]*revision.Revision, error) {
 	return w.revision.ListRevisions(pageID)
 }
 
+func (w *Wiki) ListRevisionsPage(pageID, cursor string, limit int) ([]*revision.Revision, string, error) {
+	if w.revision == nil {
+		return []*revision.Revision{}, "", nil
+	}
+	return w.revision.ListRevisionsPage(pageID, cursor, limit)
+}
+
 func (w *Wiki) GetLatestRevision(pageID string) (*revision.Revision, error) {
 	if w.revision == nil {
 		return nil, nil
 	}
 	return w.revision.GetLatestRevision(pageID)
+}
+
+func (w *Wiki) GetRevisionSnapshot(pageID, revisionID string) (*revision.RevisionSnapshot, error) {
+	if w.revision == nil {
+		return nil, nil
+	}
+	return w.revision.GetRevisionSnapshot(pageID, revisionID)
+}
+
+func (w *Wiki) CompareRevisionSnapshots(pageID, baseRevisionID, targetRevisionID string) (*revision.RevisionComparison, error) {
+	if w.revision == nil {
+		return nil, nil
+	}
+	return w.revision.CompareRevisionSnapshots(pageID, baseRevisionID, targetRevisionID)
 }
 
 func (w *Wiki) GetTrashEntry(pageID string) (*revision.TrashEntry, error) {
@@ -1098,12 +1141,53 @@ func (w *Wiki) ListTrash() ([]*revision.TrashEntry, error) {
 	return w.revision.ListTrash()
 }
 
+func (w *Wiki) CheckRevisionIntegrity(pageID string) ([]revision.RevisionIntegrityIssue, error) {
+	if w.revision == nil {
+		return []revision.RevisionIntegrityIssue{}, nil
+	}
+	return w.revision.CheckRevisionIntegrity(pageID)
+}
+
+func (w *Wiki) RestorePage(userID, pageID string, targetParentID *string) (*tree.Page, error) {
+	if w.revision == nil {
+		return nil, fmt.Errorf("revision service not available")
+	}
+	if err := w.revision.RestorePage(pageID, userID, targetParentID); err != nil {
+		return nil, err
+	}
+
+	page, err := w.tree.GetPage(pageID)
+	if err != nil {
+		return nil, err
+	}
+
+	if w.links != nil {
+		if err := w.links.UpdateLinksForPage(page, page.Content); err != nil {
+			w.log.Warn("failed to update links for restored page", "pageID", page.ID, "error", err)
+		}
+		if err := w.links.HealLinksForExactPath(page); err != nil {
+			w.log.Warn("failed to heal links for restored page", "pageID", page.ID, "error", err)
+		}
+	}
+
+	return page, nil
+}
+
 func (w *Wiki) recordContentRevision(pageID, userID, summary string) {
 	if w.revision == nil {
 		return
 	}
 	if _, _, err := w.revision.RecordContentUpdate(pageID, userID, summary); err != nil {
 		w.log.Warn("failed to record content revision", "pageID", pageID, "error", err)
+	}
+}
+
+func (w *Wiki) recordStructureRevision(pageID, userID, summary string) {
+	if w.revision == nil {
+		return
+	}
+	if _, _, err := w.revision.RecordStructureChange(pageID, userID, summary); err != nil {
+		w.log.Warn("failed to record structure revision", "pageID", pageID, "error", err)
 	}
 }
 
