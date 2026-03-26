@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/perber/wiki/internal/core/revision"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
 type RevisionErrorResponse struct {
@@ -32,7 +32,7 @@ func respondWithRevisionStatusError(c *gin.Context, status int, code, message, t
 }
 
 func respondWithRevisionError(c *gin.Context, err error) {
-	if localized, ok := revision.AsLocalizedError(err); ok {
+	if localized, ok := sharederrors.AsLocalizedError(err); ok {
 		respondWithRevisionStatusError(c, revisionErrorStatus(localized.Code), localized.Code, localized.Message, localized.Template, localized.Args...)
 		return
 	}
