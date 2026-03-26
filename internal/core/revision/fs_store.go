@@ -19,6 +19,10 @@ type FSStore struct {
 	storageDir string
 }
 
+type revisionIndex map[string]string
+
+const revisionIndexFileName = "_index.json"
+
 func NewFSStore(storageDir string) *FSStore {
 	return &FSStore{storageDir: storageDir}
 }
@@ -154,63 +158,180 @@ func (s *FSStore) SaveRevision(rev *Revision) error {
 	if err := writeJSONAtomic(dst, rev); err != nil {
 		return fmt.Errorf("write revision: %w", err)
 	}
+	index, err := s.loadRevisionIndex(rev.PageID)
+	if err != nil {
+		return err
+	}
+	index[strings.TrimSpace(rev.ID)] = filepath.Base(dst)
+	if err := s.saveRevisionIndex(rev.PageID, index); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (s *FSStore) ListRevisions(pageID string) ([]*Revision, error) {
+	revisions, _, err := s.ListRevisionsPage(pageID, "", 0)
+	if err != nil {
+		return nil, err
+	}
+	return revisions, nil
+}
+
+func (s *FSStore) ListRevisionsPage(pageID, cursor string, limit int) ([]*Revision, string, error) {
+	names, err := s.revisionFileNames(pageID)
+	if err != nil {
+		return nil, "", err
+	}
+	if len(names) == 0 {
+		return []*Revision{}, "", nil
+	}
+
+	start := 0
+	cursor = strings.TrimSpace(cursor)
+	if cursor != "" {
+		start = len(names)
+		for i, name := range names {
+			if name == cursor {
+				start = i + 1
+				break
+			}
+		}
+		if start >= len(names) {
+			return []*Revision{}, "", nil
+		}
+	}
+
+	end := len(names)
+	if limit > 0 && start+limit < end {
+		end = start + limit
+	}
+
+	dir := s.revisionsPageDir(pageID)
+	revisions := make([]*Revision, 0, end-start)
+	for _, name := range names[start:end] {
+		var rev Revision
+		if err := readJSON(filepath.Join(dir, name), &rev); err != nil {
+			return nil, "", fmt.Errorf("read revision %s: %w", name, err)
+		}
+		revisions = append(revisions, &rev)
+	}
+
+	nextCursor := ""
+	if end < len(names) {
+		nextCursor = names[end-1]
+	}
+	return revisions, nextCursor, nil
+}
+
+func (s *FSStore) GetLatestRevision(pageID string) (*Revision, error) {
+	names, err := s.revisionFileNames(pageID)
+	if err != nil {
+		return nil, err
+	}
+	if len(names) == 0 {
+		return nil, nil
+	}
+	var rev Revision
+	if err := readJSON(filepath.Join(s.revisionsPageDir(pageID), names[0]), &rev); err != nil {
+		return nil, fmt.Errorf("read latest revision %s: %w", names[0], err)
+	}
+	return &rev, nil
+}
+
+func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
+	revisionID = strings.TrimSpace(revisionID)
+	if revisionID == "" {
+		return nil, os.ErrNotExist
+	}
+
+	index, err := s.loadRevisionIndex(pageID)
+	if err != nil {
+		return nil, err
+	}
+	if name := strings.TrimSpace(index[revisionID]); name != "" {
+		var rev Revision
+		if err := readJSON(filepath.Join(s.revisionsPageDir(pageID), name), &rev); err != nil {
+			return nil, fmt.Errorf("read revision %s: %w", name, err)
+		}
+		return &rev, nil
+	}
+
+	names, err := s.revisionFileNames(pageID)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range names {
+		if strings.HasSuffix(name, "_"+revisionID+".json") {
+			var rev Revision
+			if err := readJSON(filepath.Join(s.revisionsPageDir(pageID), name), &rev); err != nil {
+				return nil, fmt.Errorf("read revision %s: %w", name, err)
+			}
+			index[revisionID] = name
+			_ = s.saveRevisionIndex(pageID, index)
+			return &rev, nil
+		}
+	}
+	return nil, os.ErrNotExist
+}
+
+func (s *FSStore) revisionFileNames(pageID string) ([]string, error) {
 	dir := s.revisionsPageDir(pageID)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []*Revision{}, nil
+			return []string{}, nil
 		}
 		return nil, fmt.Errorf("read revisions dir: %w", err)
 	}
 
 	names := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".json") {
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".json") || entry.Name() == revisionIndexFileName {
 			continue
 		}
 		names = append(names, entry.Name())
 	}
-
 	sort.Sort(sort.Reverse(sort.StringSlice(names)))
-
-	revisions := make([]*Revision, 0, len(names))
-	for _, name := range names {
-		var rev Revision
-		if err := readJSON(filepath.Join(dir, name), &rev); err != nil {
-			return nil, fmt.Errorf("read revision %s: %w", name, err)
-		}
-		revisions = append(revisions, &rev)
-	}
-
-	return revisions, nil
+	return names, nil
 }
 
-func (s *FSStore) GetLatestRevision(pageID string) (*Revision, error) {
-	revisions, err := s.ListRevisions(pageID)
+func (s *FSStore) ReadContentBlob(hash string) ([]byte, error) {
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return []byte{}, nil
+	}
+
+	raw, err := os.ReadFile(s.contentBlobPath(hash))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read content blob: %w", err)
 	}
-	if len(revisions) == 0 {
-		return nil, nil
-	}
-	return revisions[0], nil
+	return raw, nil
 }
 
-func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
-	revisions, err := s.ListRevisions(pageID)
+func (s *FSStore) LoadAssetManifest(hash string) ([]AssetRef, error) {
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return []AssetRef{}, nil
+	}
+
+	var manifest assetManifest
+	if err := readJSON(s.assetManifestPath(hash), &manifest); err != nil {
+		return nil, fmt.Errorf("read asset manifest: %w", err)
+	}
+	return cloneAndSortAssetRefs(manifest.Items), nil
+}
+
+func (s *FSStore) ReadAssetBlob(hash string) ([]byte, error) {
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return nil, fmt.Errorf("asset hash is required")
+	}
+
+	raw, err := os.ReadFile(s.assetBlobPath(hash))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read asset blob: %w", err)
 	}
-	for _, rev := range revisions {
-		if rev.ID == revisionID {
-			return rev, nil
-		}
-	}
-	return nil, os.ErrNotExist
+	return raw, nil
 }
 
 func (s *FSStore) SaveTrashEntry(entry *TrashEntry) error {
@@ -252,7 +373,7 @@ func (s *FSStore) ListTrash() ([]*TrashEntry, error) {
 
 	trash := make([]*TrashEntry, 0, len(entries))
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".json") {
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".json") || entry.Name() == revisionIndexFileName {
 			continue
 		}
 
@@ -368,4 +489,37 @@ func cloneAndSortAssetRefs(items []AssetRef) []AssetRef {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func (s *FSStore) revisionIndexPath(pageID string) string {
+	return filepath.Join(s.revisionsPageDir(pageID), revisionIndexFileName)
+}
+
+func (s *FSStore) loadRevisionIndex(pageID string) (revisionIndex, error) {
+	path := s.revisionIndexPath(pageID)
+	var index revisionIndex
+	if err := readJSON(path, &index); err != nil {
+		if os.IsNotExist(err) {
+			return revisionIndex{}, nil
+		}
+		return nil, fmt.Errorf("read revision index: %w", err)
+	}
+	if index == nil {
+		return revisionIndex{}, nil
+	}
+	return index, nil
+}
+
+func (s *FSStore) saveRevisionIndex(pageID string, index revisionIndex) error {
+	if index == nil {
+		index = revisionIndex{}
+	}
+	path := s.revisionIndexPath(pageID)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("ensure revision dir: %w", err)
+	}
+	if err := writeJSONAtomic(path, index); err != nil {
+		return fmt.Errorf("write revision index: %w", err)
+	}
+	return nil
 }
