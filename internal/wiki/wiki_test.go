@@ -1,9 +1,12 @@
 package wiki
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/perber/wiki/internal/core/revision"
 	verrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
@@ -1538,5 +1541,196 @@ func TestWiki_AuthDisabled_CoreFunctionalityWorks(t *testing.T) {
 	err = wikiInstance.DeletePage("system", page.ID, false)
 	if err != nil {
 		t.Fatalf("Failed to delete page with AuthDisabled: %v", err)
+	}
+}
+
+func TestWiki_RestorePageWithNewParentPreservesIDAndAssets(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	sectionKind := tree.NodeKindSection
+	parent, err := w.CreatePage("system", nil, "Docs", "docs", &sectionKind)
+	if err != nil {
+		t.Fatalf("CreatePage(parent) failed: %v", err)
+	}
+
+	child, err := w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage(child) failed: %v", err)
+	}
+
+	content := "restored content"
+	child, err = w.UpdatePage("system", child.ID, child.Title, child.Slug, &content, pageNodeKind())
+	if err != nil {
+		t.Fatalf("UpdatePage failed: %v", err)
+	}
+
+	assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), child.ID)
+	if err := os.MkdirAll(assetDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(assetDir) failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(assetDir, "note.txt"), []byte("asset payload"), 0o644); err != nil {
+		t.Fatalf("WriteFile(asset) failed: %v", err)
+	}
+	w.recordAssetRevision(child.ID, "system", "")
+
+	if err := w.DeletePage("system", parent.ID, true); err != nil {
+		t.Fatalf("DeletePage failed: %v", err)
+	}
+
+	rootParent := "root"
+	restored, err := w.RestorePage("system", child.ID, &rootParent)
+	if err != nil {
+		t.Fatalf("RestorePage failed: %v", err)
+	}
+
+	if restored.ID != child.ID {
+		t.Fatalf("restored ID = %q, want %q", restored.ID, child.ID)
+	}
+	if restored.CalculatePath() != "/child" {
+		t.Fatalf("restored path = %q, want %q", restored.CalculatePath(), "/child")
+	}
+	if restored.Content != content {
+		t.Fatalf("restored content = %q, want %q", restored.Content, content)
+	}
+
+	assetBytes, err := os.ReadFile(filepath.Join(w.GetAssetService().GetAssetsDir(), child.ID, "note.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile(restored asset) failed: %v", err)
+	}
+	if string(assetBytes) != "asset payload" {
+		t.Fatalf("restored asset = %q", string(assetBytes))
+	}
+
+	if _, err := w.GetTrashEntry(child.ID); err == nil {
+		t.Fatalf("expected trash entry to be deleted after restore")
+	}
+
+	latest, err := w.GetLatestRevision(child.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision failed: %v", err)
+	}
+	if latest == nil || latest.Type != revision.RevisionTypeRestore {
+		t.Fatalf("latest revision type = %#v", latest)
+	}
+}
+
+func TestWiki_RestorePageRequiresTargetWhenOriginalParentMissing(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	sectionKind := tree.NodeKindSection
+	parent, _ := w.CreatePage("system", nil, "Docs", "docs", &sectionKind)
+	child, _ := w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
+
+	if err := w.DeletePage("system", parent.ID, true); err != nil {
+		t.Fatalf("DeletePage failed: %v", err)
+	}
+
+	_, err := w.RestorePage("system", child.ID, nil)
+	if err == nil {
+		t.Fatalf("expected restore to fail without target parent")
+	}
+
+	localized, ok := revision.AsLocalizedError(err)
+	if !ok {
+		t.Fatalf("expected localized revision error, got %T", err)
+	}
+	if localized.Code != "revision_restore_parent_required" {
+		t.Fatalf("error code = %q", localized.Code)
+	}
+}
+
+func TestWiki_MovePageRecordsStructureRevision(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	dest, err := w.CreatePage("system", nil, "Dest", "dest", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage(dest) failed: %v", err)
+	}
+	page, err := w.CreatePage("system", nil, "Move Me", "move-me", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage(page) failed: %v", err)
+	}
+
+	if err := w.MovePage("system", page.ID, dest.ID); err != nil {
+		t.Fatalf("MovePage failed: %v", err)
+	}
+
+	latest, err := w.GetLatestRevision(page.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision failed: %v", err)
+	}
+	if latest == nil || latest.Type != revision.RevisionTypeStructureUpdate {
+		t.Fatalf("latest revision = %#v", latest)
+	}
+	if latest.ParentID != dest.ID {
+		t.Fatalf("latest parent id = %q, want %q", latest.ParentID, dest.ID)
+	}
+}
+
+func TestWiki_RenameAssetRecordsAssetRevision(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	page, err := w.CreatePage("system", nil, "Asset Page", "asset-page", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), page.ID)
+	if err := os.MkdirAll(assetDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(assetDir) failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(assetDir, "old.txt"), []byte("payload"), 0o644); err != nil {
+		t.Fatalf("WriteFile(asset) failed: %v", err)
+	}
+
+	if _, err := w.RenameAsset(page.ID, "old.txt", "new.txt"); err != nil {
+		t.Fatalf("RenameAsset failed: %v", err)
+	}
+
+	latest, err := w.GetLatestRevision(page.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision failed: %v", err)
+	}
+	if latest == nil || latest.Type != revision.RevisionTypeAssetUpdate {
+		t.Fatalf("latest revision = %#v", latest)
+	}
+}
+
+func TestWiki_CheckRevisionIntegrityPassthrough(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	page, err := w.CreatePage("system", nil, "Page", "page", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	content := "hello"
+	page, err = w.UpdatePage("system", page.ID, page.Title, page.Slug, &content, pageNodeKind())
+	if err != nil {
+		t.Fatalf("UpdatePage failed: %v", err)
+	}
+
+	rev, err := w.GetLatestRevision(page.ID)
+	if err != nil || rev == nil {
+		t.Fatalf("GetLatestRevision failed: %#v %v", rev, err)
+	}
+	contentBlobPath := filepath.Join(w.GetStorageDir(), ".leafwiki", "blobs", "content", "sha256", rev.ContentHash[:2], rev.ContentHash)
+	if err := os.Remove(contentBlobPath); err != nil {
+		t.Fatalf("Remove content blob failed: %v", err)
+	}
+
+	issues, err := w.CheckRevisionIntegrity(page.ID)
+	if err != nil {
+		t.Fatalf("CheckRevisionIntegrity failed: %v", err)
+	}
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 integrity issue, got %#v", issues)
+	}
+	if issues[0].Code != "missing_content_blob" {
+		t.Fatalf("unexpected integrity issue: %#v", issues[0])
 	}
 }

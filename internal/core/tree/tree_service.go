@@ -183,11 +183,15 @@ type createNodeResult struct {
 	parentWasConverted bool
 }
 
+type createNodeOptions struct {
+	existingID string
+}
+
 // Create Node adds a new node to the tree
 func (t *TreeService) CreateNode(userID string, parentID *string, title string, slug string, nodeKind *NodeKind) (*string, error) {
 	var result *string
 	err := t.withLockedTree(func() error {
-		created, err := t.createNodeLocked(userID, parentID, title, slug, nodeKind)
+		created, err := t.createNodeLocked(userID, parentID, title, slug, nodeKind, createNodeOptions{})
 		if err != nil {
 			return err
 		}
@@ -199,9 +203,37 @@ func (t *TreeService) CreateNode(userID string, parentID *string, title string, 
 	return result, err
 }
 
-// createNodeLocked creates a new node under the given parent
-// Lock must be held by the caller
-func (t *TreeService) createNodeLocked(userID string, parentID *string, title string, slug string, kind *NodeKind) (*createNodeResult, error) {
+func (t *TreeService) RestoreNode(userID, id string, parentID *string, title, slug string, nodeKind NodeKind, content string, metadata PageMetadata) (*Page, error) {
+	var restored *Page
+	err := t.withLockedTree(func() error {
+		kind := nodeKind
+		created, err := t.createNodeLocked(userID, parentID, title, slug, &kind, createNodeOptions{existingID: id})
+		if err != nil {
+			return err
+		}
+
+		if err := t.store.UpsertContent(created.entry, content); err != nil {
+			return fmt.Errorf("could not restore content: %w", err)
+		}
+
+		created.entry.Metadata = metadata
+		created.entry.Metadata.UpdatedAt = metadata.UpdatedAt.UTC()
+		created.entry.Metadata.CreatedAt = metadata.CreatedAt.UTC()
+		created.entry.Metadata.CreatorID = strings.TrimSpace(metadata.CreatorID)
+		created.entry.Metadata.LastAuthorID = strings.TrimSpace(metadata.LastAuthorID)
+		if err := t.store.SyncFrontmatterIfExists(created.entry); err != nil {
+			return fmt.Errorf("could not sync restored frontmatter: %w", err)
+		}
+
+		restored = &Page{PageNode: created.entry, Content: content}
+		return nil
+	})
+	return restored, err
+}
+
+// createNodeLocked creates a new node under the given parent.
+// Lock must be held by the caller.
+func (t *TreeService) createNodeLocked(userID string, parentID *string, title string, slug string, kind *NodeKind, opts createNodeOptions) (*createNodeResult, error) {
 	if t.tree == nil {
 		return nil, ErrTreeNotLoaded
 	}
@@ -243,10 +275,17 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 		return nil, fmt.Errorf("cannot add child to non-section parent, got %q", parent.Kind)
 	}
 
-	// Generate a unique ID for the new page
-	id, err := shared.GenerateUniqueID()
-	if err != nil {
-		return nil, fmt.Errorf("could not generate unique ID: %w", err)
+	id := strings.TrimSpace(opts.existingID)
+	if id == "" {
+		var err error
+		id, err = shared.GenerateUniqueID()
+		if err != nil {
+			return nil, fmt.Errorf("could not generate unique ID: %w", err)
+		}
+	} else if _, err := t.findPageByIDLocked(t.tree.Children, id); err == nil {
+		return nil, fmt.Errorf("page id already exists: %s", id)
+	} else if !errors.Is(err, ErrPageNotFound) {
+		return nil, err
 	}
 
 	now := time.Now().UTC()
@@ -871,7 +910,7 @@ func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string
 			kindToUse = *kind
 		}
 
-		createdNode, err := t.createNodeLocked(userID, currentID, segTitle, segment.Slug, &kindToUse)
+		createdNode, err := t.createNodeLocked(userID, currentID, segTitle, segment.Slug, &kindToUse, createNodeOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("could not create segment %q: %w", segment.Slug, err)
 		}

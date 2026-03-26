@@ -207,10 +207,13 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		// Revisions
 		requiresAuthGroup.GET("/pages/:id/revisions", api.ListPageRevisionsHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/:id/revisions/latest", api.GetLatestPageRevisionHandler(wikiInstance))
+		requiresAuthGroup.GET("/pages/:id/revisions/compare", api.ComparePageRevisionsHandler(wikiInstance))
+		requiresAuthGroup.GET("/pages/:id/revisions/:revisionId", api.GetPageRevisionHandler(wikiInstance))
 
 		// Trash
 		requiresAuthGroup.GET("/trash", auth_middleware.RequireEditorOrAdmin(), api.ListTrashHandler(wikiInstance))
 		requiresAuthGroup.GET("/trash/:id", auth_middleware.RequireEditorOrAdmin(), api.GetTrashEntryHandler(wikiInstance))
+		requiresAuthGroup.POST("/trash/:id/restore", auth_middleware.RequireEditorOrAdmin(), api.RestorePageHandler(wikiInstance))
 
 		// User
 		requiresAuthGroup.POST("/users", auth_middleware.RequireAdmin(options.AuthDisabled), api.CreateUserHandler(wikiInstance))
