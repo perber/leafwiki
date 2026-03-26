@@ -4,7 +4,7 @@ import { NODE_KIND_PAGE, type Page } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
-import { Copy, Pencil, Printer, Trash2 } from 'lucide-react'
+import { Copy, History, Pencil, Printer, Trash2 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useToolbarStore } from '../toolbar/toolbar'
 
@@ -14,6 +14,7 @@ export interface ToolbarActionsOptions {
   editPage: () => void
   deletePage: () => void
   copyPage: () => void
+  showHistory: () => void
 }
 
 export function useToolbarActions({
@@ -22,6 +23,7 @@ export function useToolbarActions({
   editPage,
   deletePage,
   copyPage,
+  showHistory,
 }: ToolbarActionsOptions) {
   const setButtons = useToolbarStore((state) => state.setButtons)
   const appMode = useAppMode()
@@ -50,6 +52,14 @@ export function useToolbarActions({
         hotkey: 'Ctrl+P',
         icon: <Printer size={18} />,
         action: printPage,
+      },
+      {
+        id: 'page-history',
+        label: `${itemLabel} History`,
+        hotkey: '',
+        icon: <History size={18} />,
+        variant: 'outline',
+        action: showHistory,
       },
       {
         id: 'copy-page',
@@ -116,6 +126,7 @@ export function useToolbarActions({
     setButtons,
     deletePage,
     copyPage,
+    showHistory,
     editPage,
     printPage,
     registerHotkey,

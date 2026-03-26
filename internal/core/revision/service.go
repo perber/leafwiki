@@ -787,7 +787,7 @@ func (s *Service) resolveRestoreParentID(pageID, storedParentID, pagePath string
 		return nil, nil
 	}
 
-	parent, err := s.pages.FindPageByRoutePath(s.pages.GetTree().Children, parentPath)
+	parent, err := s.pages.FindPageByRoutePath(parentPath)
 	if err != nil {
 		return nil, sharederrors.NewLocalizedError(
 			"revision_restore_parent_required",
