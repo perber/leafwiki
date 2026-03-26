@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -173,7 +174,7 @@ func TestRestorePageFailedPaths(t *testing.T) {
 	}
 
 	err = service.RestorePage(pageID, "tester", nil)
-	localized, ok := AsLocalizedError(err)
+	localized, ok := sharederrors.AsLocalizedError(err)
 	if !ok || localized.Code != "revision_restore_invalid_revision" {
 		t.Fatalf("expected invalid revision error, got %#v (%v)", localized, err)
 	}
@@ -204,7 +205,7 @@ func TestRestorePageFailedPaths(t *testing.T) {
 	}
 
 	err = service2.RestorePage(pageID2, "tester", nil)
-	localized, ok = AsLocalizedError(err)
+	localized, ok = sharederrors.AsLocalizedError(err)
 	if !ok || localized.Code != "revision_restore_parent_required" {
 		t.Fatalf("expected parent required error, got %#v (%v), trash=%#v", localized, err, trash)
 	}
@@ -227,7 +228,7 @@ func TestRestorePageFailedPaths(t *testing.T) {
 		t.Fatalf("SaveRevision override failed: %v", err)
 	}
 	err = service3.RestorePage(pageID3, "tester", nil)
-	localized, ok = AsLocalizedError(err)
+	localized, ok = sharederrors.AsLocalizedError(err)
 	if !ok || localized.Code != "revision_restore_invalid_kind" {
 		t.Fatalf("expected invalid kind error, got %#v (%v)", localized, err)
 	}
@@ -235,18 +236,18 @@ func TestRestorePageFailedPaths(t *testing.T) {
 
 func TestLocalizedErrorHelpers(t *testing.T) {
 	cause := errors.New("boom")
-	err := newLocalizedError("code", "message", "template %s", cause, "arg")
+	err := sharederrors.NewLocalizedError("code", "message", "template %s", cause, "arg")
 	if err.Error() == "" {
 		t.Fatalf("expected non-empty error string")
 	}
 	if !errors.Is(err, cause) {
 		t.Fatalf("expected wrapped cause")
 	}
-	localized, ok := AsLocalizedError(err)
+	localized, ok := sharederrors.AsLocalizedError(err)
 	if !ok || localized.Code != "code" || localized.Args[0] != "arg" {
 		t.Fatalf("localized = %#v", localized)
 	}
-	if _, ok := AsLocalizedError(errors.New("plain")); ok {
+	if _, ok := sharederrors.AsLocalizedError(errors.New("plain")); ok {
 		t.Fatalf("plain error should not unwrap to LocalizedError")
 	}
 }
@@ -347,17 +348,17 @@ func TestRestoreAndMappingHelpers(t *testing.T) {
 	}
 
 	mapped := service.mapRestoreTreeError("page", "slug", resolved, tree.ErrParentNotFound)
-	localized, ok := AsLocalizedError(mapped)
+	localized, ok := sharederrors.AsLocalizedError(mapped)
 	if !ok || localized.Code != "revision_restore_parent_not_found" {
 		t.Fatalf("mapped parent error = %#v", mapped)
 	}
 	mapped = service.mapRestoreTreeError("page", "slug", resolved, tree.ErrPageAlreadyExists)
-	localized, ok = AsLocalizedError(mapped)
+	localized, ok = sharederrors.AsLocalizedError(mapped)
 	if !ok || localized.Code != "revision_restore_slug_conflict" {
 		t.Fatalf("mapped slug error = %#v", mapped)
 	}
 	mapped = service.mapRestoreTreeError("page", "slug", resolved, errors.New("boom"))
-	localized, ok = AsLocalizedError(mapped)
+	localized, ok = sharederrors.AsLocalizedError(mapped)
 	if !ok || localized.Code != "revision_restore_failed" {
 		t.Fatalf("mapped generic error = %#v", mapped)
 	}
@@ -441,7 +442,7 @@ func TestRestorePageMissingSnapshotData(t *testing.T) {
 		t.Fatalf("Remove content blob failed: %v", err)
 	}
 	err = service.RestorePage(pageID, "tester", nil)
-	localized, ok := AsLocalizedError(err)
+	localized, ok := sharederrors.AsLocalizedError(err)
 	if !ok || localized.Code != "revision_restore_content_missing" {
 		t.Fatalf("expected content missing error, got %#v (%v)", localized, err)
 	}
@@ -467,7 +468,7 @@ func TestRestorePageMissingSnapshotData(t *testing.T) {
 		t.Fatalf("Remove asset manifest failed: %v", err)
 	}
 	err = service2.RestorePage(pageID2, "tester", nil)
-	localized, ok = AsLocalizedError(err)
+	localized, ok = sharederrors.AsLocalizedError(err)
 	if !ok || localized.Code != "revision_restore_assets_missing" {
 		t.Fatalf("expected assets missing error, got %#v (%v)", localized, err)
 	}
@@ -477,7 +478,7 @@ func TestRestorePageAdditionalFailuresAndHelpers(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)
 	if err := service.RestorePage("   ", "tester", nil); err == nil {
 		t.Fatalf("expected empty page id to fail")
-	} else if localized, ok := AsLocalizedError(err); !ok || localized.Code != "revision_restore_invalid_page_id" {
+	} else if localized, ok := sharederrors.AsLocalizedError(err); !ok || localized.Code != "revision_restore_invalid_page_id" {
 		t.Fatalf("expected invalid page id error, got %#v (%v)", localized, err)
 	}
 
@@ -502,7 +503,7 @@ func TestRestorePageAdditionalFailuresAndHelpers(t *testing.T) {
 	}
 
 	err = service.RestorePage(pageID, "tester", nil)
-	if localized, ok := AsLocalizedError(err); !ok || localized.Code != "revision_restore_revision_not_found" {
+	if localized, ok := sharederrors.AsLocalizedError(err); !ok || localized.Code != "revision_restore_revision_not_found" {
 		t.Fatalf("expected revision not found error, got %#v (%v)", localized, err)
 	}
 
@@ -513,7 +514,7 @@ func TestRestorePageAdditionalFailuresAndHelpers(t *testing.T) {
 
 	badParent := "missing-parent"
 	err = service.RestorePage(pageID, "tester", &badParent)
-	if localized, ok := AsLocalizedError(err); !ok || localized.Code != "revision_restore_parent_not_found" {
+	if localized, ok := sharederrors.AsLocalizedError(err); !ok || localized.Code != "revision_restore_parent_not_found" {
 		t.Fatalf("expected parent not found error, got %#v (%v)", localized, err)
 	}
 
@@ -817,7 +818,7 @@ func TestRestorePageRollbackKeepsTrashOnAssetFailure(t *testing.T) {
 	}
 
 	err = service.RestorePage(pageID, "tester", nil)
-	localized, ok := AsLocalizedError(err)
+	localized, ok := sharederrors.AsLocalizedError(err)
 	if !ok || localized.Code != "revision_restore_failed" {
 		t.Fatalf("expected restore failure, got %#v (%v)", localized, err)
 	}
@@ -911,7 +912,7 @@ func TestRestorePageIsIdempotentAfterDeleteTrashFailure(t *testing.T) {
 	}
 
 	err = service.RestorePage(pageID, "tester", nil)
-	localized, ok := AsLocalizedError(err)
+	localized, ok := sharederrors.AsLocalizedError(err)
 	if !ok || localized.Code != "revision_restore_failed" {
 		t.Fatalf("expected restore failure on first commit attempt, got %#v (%v)", localized, err)
 	}

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
 func TestFSStoreRevisionReadPaths(t *testing.T) {
@@ -326,7 +328,7 @@ func TestFSStoreJSONHelpersAndLocalizedNil(t *testing.T) {
 		t.Fatalf("expected invalid json to fail")
 	}
 
-	var localized *LocalizedError
+	var localized *sharederrors.LocalizedError
 	if localized.Error() != "" {
 		t.Fatalf("nil localized error string should be empty")
 	}

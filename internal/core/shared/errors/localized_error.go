@@ -1,7 +1,7 @@
-package revision
+package errors
 
 import (
-	"errors"
+	stderrors "errors"
 	"fmt"
 )
 
@@ -30,7 +30,7 @@ func (e *LocalizedError) Unwrap() error {
 	return e.Cause
 }
 
-func newLocalizedError(code, message, template string, cause error, args ...string) *LocalizedError {
+func NewLocalizedError(code, message, template string, cause error, args ...string) *LocalizedError {
 	return &LocalizedError{
 		Code:     code,
 		Message:  message,
@@ -42,7 +42,7 @@ func newLocalizedError(code, message, template string, cause error, args ...stri
 
 func AsLocalizedError(err error) (*LocalizedError, bool) {
 	var localized *LocalizedError
-	if !errors.As(err, &localized) {
+	if !stderrors.As(err, &localized) {
 		return nil, false
 	}
 	return localized, true
