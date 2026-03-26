@@ -282,10 +282,8 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 		if err != nil {
 			return nil, fmt.Errorf("could not generate unique ID: %w", err)
 		}
-	} else if _, err := t.findPageByIDLocked(t.tree.Children, id); err == nil {
+	} else if existing := t.getNodeByIDLocked(id); existing != nil {
 		return nil, fmt.Errorf("page id already exists: %s", id)
-	} else if !errors.Is(err, ErrPageNotFound) {
-		return nil, err
 	}
 
 	now := time.Now().UTC()

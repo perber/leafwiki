@@ -3,6 +3,7 @@ import { formatRelativeTime } from '@/lib/formatDate'
 import {
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
+  DIALOG_PAGE_HISTORY,
 } from '@/lib/registries'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { getParentWikiRoutePath, toWikiLookupPath } from '@/lib/wikiPath'
@@ -51,6 +52,10 @@ export default function PageViewer() {
     copyPage: useCallback(() => {
       if (!page) return
       openDialog(DIALOG_COPY_PAGE, { sourcePage: page })
+    }, [page, openDialog]),
+    showHistory: useCallback(() => {
+      if (!page) return
+      openDialog(DIALOG_PAGE_HISTORY, { pageId: page.id, pageTitle: page.title })
     }, [page, openDialog]),
   }
 

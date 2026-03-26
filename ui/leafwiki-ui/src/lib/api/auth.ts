@@ -1,6 +1,7 @@
 import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { API_BASE_URL } from '../config'
+import { ApiLocalizedError, isApiLocalizedErrorResponse } from './errors'
 
 export type AuthResponse = {
   message: string
@@ -22,11 +23,9 @@ export class ApiError extends Error {
   }
 }
 
-// Helper to get CSRF token from cookie
 function getCsrfTokenFromCookie(): string | null {
   if (typeof document === 'undefined') return null
 
-  // first try the __Host variant, then the "normal" one
   const hostMatch =
     document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
     document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/)
@@ -103,7 +102,6 @@ export async function fetchWithAuth(
     }
   }
 
-  // Save the original body
   let originalBody = options.body
   if (
     options.body &&
@@ -129,7 +127,6 @@ export async function fetchWithAuth(
       await ensureRefresh()
       res = await doFetch()
     } catch {
-      // Refresh token failed, log out the user
       if (!authDisabled) {
         sessionLogout()
         const { setUser } = useSessionStore.getState()
@@ -140,7 +137,7 @@ export async function fetchWithAuth(
   }
 
   if (!res.ok) {
-    let errorBody: { error?: string; message?: string } | null = null
+    let errorBody: unknown = null
     try {
       errorBody = await res.json()
     } catch {
@@ -148,11 +145,38 @@ export async function fetchWithAuth(
       throw new ApiError(text || 'Request failed', res.status)
     }
 
-    if (errorBody?.error === 'validation_error') throw errorBody
-    if (errorBody?.error) {
-      throw new ApiError(errorBody.error, res.status)
+    if (
+      errorBody &&
+      typeof errorBody === 'object' &&
+      (errorBody as { error?: unknown }).error === 'validation_error'
+    ) {
+      throw errorBody
     }
-    throw new ApiError(errorBody?.message || 'Request failed', res.status)
+
+    if (isApiLocalizedErrorResponse(errorBody)) {
+      throw new ApiLocalizedError(errorBody.error)
+    }
+
+    if (
+      errorBody &&
+      typeof errorBody === 'object' &&
+      typeof (errorBody as { error?: unknown }).error === 'string'
+    ) {
+      throw new ApiError((errorBody as { error: string }).error, res.status)
+    }
+
+    if (
+      errorBody &&
+      typeof errorBody === 'object' &&
+      typeof (errorBody as { message?: unknown }).message === 'string'
+    ) {
+      throw new ApiError(
+        (errorBody as { message: string }).message,
+        res.status,
+      )
+    }
+
+    throw new ApiError('Request failed', res.status)
   }
 
   try {
@@ -163,17 +187,13 @@ export async function fetchWithAuth(
 }
 
 declare global {
-  // Explicitly initialized below; runtime value is either a Promise or null
   var __leafwikiRefreshPromise: Promise<void> | null
 }
 
-// Ensure the global is initialized to a known value at module load time.
 if (typeof globalThis.__leafwikiRefreshPromise === 'undefined') {
   globalThis.__leafwikiRefreshPromise = null
 }
-/**
- * Ensures there is only ONE refresh in-flight across the whole runtime (even if module is duplicated).
- */
+
 export function ensureRefresh(): Promise<void> {
   const { authDisabled } = useConfigStore.getState()
   if (authDisabled) {
@@ -197,7 +217,6 @@ async function refreshAccessToken() {
   })
 
   if (!res.ok) {
-    // No logout here, handled in fetchWithAuth
     throw new Error('Refresh failed')
   }
 
