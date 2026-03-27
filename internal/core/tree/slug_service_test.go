@@ -103,3 +103,11 @@ func TestNormalizePath(t *testing.T) {
 		}
 	}
 }
+
+func TestIsValidSlug_AllowsUppercase(t *testing.T) {
+	s := NewSlugService()
+
+	if err := s.IsValidSlug("ABCD-efg"); err != nil {
+		t.Fatalf("expected uppercase slug to be valid, got %v", err)
+	}
+}

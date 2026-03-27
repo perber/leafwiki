@@ -85,6 +85,25 @@ func TestWiki_CreatePage_ReservedSlug(t *testing.T) {
 	}
 }
 
+func TestWiki_UpdatePage_AllowsUppercaseSlug(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	page, err := w.CreatePage("system", nil, "Original", "original", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	content := "# Updated"
+	updated, err := w.UpdatePage("system", page.ID, "Original", "ABCD-efg", &content, pageNodeKind())
+	if err != nil {
+		t.Fatalf("expected uppercase slug update to succeed, got %v", err)
+	}
+	if updated.Slug != "ABCD-efg" {
+		t.Fatalf("expected slug to be preserved, got %q", updated.Slug)
+	}
+}
+
 func TestWiki_CreatePage_PageExists(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
