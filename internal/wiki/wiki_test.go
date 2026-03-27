@@ -104,6 +104,20 @@ func TestWiki_UpdatePage_AllowsUppercaseSlug(t *testing.T) {
 	}
 }
 
+func TestWiki_CreatePage_RejectsCaseInsensitiveSlugConflict(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	if _, err := w.CreatePage("system", nil, "Upper", "ABCD-efg", pageNodeKind()); err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	_, err := w.CreatePage("system", nil, "Lower", "abcd-efg", pageNodeKind())
+	if err == nil {
+		t.Fatal("expected conflict for case-insensitive duplicate slug")
+	}
+}
+
 func TestWiki_CreatePage_PageExists(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

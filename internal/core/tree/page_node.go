@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"io"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -45,7 +46,7 @@ func (p *PageNode) HasChildren() bool {
 
 func (p *PageNode) ChildAlreadyExists(slug string) bool {
 	for _, child := range p.Children {
-		if child.Slug == slug {
+		if strings.EqualFold(child.Slug, slug) {
 			return true
 		}
 	}

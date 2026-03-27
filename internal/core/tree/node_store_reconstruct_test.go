@@ -326,6 +326,25 @@ leafwiki_title: B
 	}
 }
 
+func TestNodeStore_ReconstructTreeFromFS_ReturnsErrorOnCaseInsensitiveDuplicateSlugs(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", "abc.md"), "# lower", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "ABC.md"), "# upper", 0o644)
+
+	_, err := store.ReconstructTreeFromFS()
+	if err == nil {
+		t.Fatalf("expected duplicate slug error")
+	}
+	if !strings.Contains(err.Error(), "duplicate slug") {
+		t.Fatalf("expected duplicate slug error, got: %v", err)
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "abc") {
+		t.Fatalf("expected conflicting slug to be mentioned, got: %v", err)
+	}
+}
+
 func TestNodeStore_ReconstructTreeFromFS_WritesIDsBackToFiles(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
@@ -406,15 +425,9 @@ func TestNodeStore_ReconstructTreeFromFS_SkipsInvalidSlugs(t *testing.T) {
 	}
 
 	// The valid file should be present with normalized slug
-	valid := findChildBySlug(t, tree, "valid")
-	if valid == nil {
-		t.Fatalf("expected valid page to be present")
-	}
+	findChildBySlug(t, tree, "valid")
 
-	uppercase := findChildBySlug(t, tree, "UPPERCASE")
-	if uppercase == nil {
-		t.Fatalf("expected uppercase slug to be reconstructed unchanged")
-	}
+	findChildBySlug(t, tree, "UPPERCASE")
 
 	if len(tree.Children) != 2 {
 		t.Fatalf("expected only invalid names with spaces to be skipped, got %v", slugs(tree.Children))
@@ -432,10 +445,7 @@ func TestNodeStore_ReconstructTreeFromFS_PreservesMixedCaseSlugNames(t *testing.
 		t.Fatalf("ReconstructTreeFromFS: %v", err)
 	}
 
-	child := findChildBySlug(t, tree, "ABCD-efg")
-	if child == nil {
-		t.Fatalf("expected mixed-case slug file to be reconstructed unchanged")
-	}
+	findChildBySlug(t, tree, "ABCD-efg")
 }
 func TestNodeStore_ReconstructTreeFromFS_ReadsMetadataFromFrontmatter(t *testing.T) {
 	tmp := t.TempDir()

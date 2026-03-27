@@ -85,7 +85,7 @@ func normalizeSlug(title string) string {
 // Checks if the given slug already exists among parent's children
 func hasSlugConflict(parent *PageNode, currentID string, slug string) bool {
 	for _, child := range parent.Children {
-		if child.Slug == slug && child.ID != currentID {
+		if strings.EqualFold(child.Slug, slug) && child.ID != currentID {
 			return true
 		}
 	}
