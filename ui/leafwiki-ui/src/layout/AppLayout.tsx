@@ -232,6 +232,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           id="sidebar-container"
           className={
             'app-layout__sidebar-container ' +
+            (appMode === 'history'
+              ? 'app-layout__sidebar-container--flush '
+              : '') +
             (resizing ? '' : ' transition-[width] duration-200')
           }
           style={{
