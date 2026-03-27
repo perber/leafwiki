@@ -652,7 +652,7 @@ func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLo
 
 		// Check if the segment exists in the current entry
 		for _, e := range entry {
-			if e.Slug == part {
+			if strings.EqualFold(e.Slug, part) {
 				// Segment exists
 				lookup.Segments[i].Exists = true
 				lookup.Segments[i].ID = &e.ID

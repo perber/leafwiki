@@ -32,6 +32,18 @@ func ensureUniqueReconstructedID(seenIDs map[string]string, id string, path stri
 	return nil
 }
 
+func ensureUniqueReconstructedSlug(seenSlugs map[string]string, slug string, path string) error {
+	key := strings.ToLower(strings.TrimSpace(slug))
+	if key == "" {
+		return fmt.Errorf("reconstruct tree from fs: empty slug at %s", path)
+	}
+	if existingPath, exists := seenSlugs[key]; exists {
+		return fmt.Errorf("duplicate slug %q (case-insensitive) in %s and %s", slug, existingPath, path)
+	}
+	seenSlugs[key] = path
+	return nil
+}
+
 type ResolvedNode struct {
 	Kind       NodeKind
 	DirPath    string
@@ -252,6 +264,7 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 	if err != nil {
 		return fmt.Errorf("read dir %s: %w", currentPath, err)
 	}
+	seenSlugs := map[string]string{}
 
 	// stable, deterministic ordering (case-insensitive, with case-sensitive tie-breaker)
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -280,10 +293,8 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		}
 
 		if entry.IsDir() {
-			// Normalize and validate the directory name as a slug
-			normalizedSlug := normalizeSlug(name)
-			if err := f.slugger.IsValidSlug(normalizedSlug); err != nil {
-				f.log.Error("skipping directory with invalid slug", "directory", name, "normalized", normalizedSlug, "error", err)
+			if err := f.slugger.IsValidSlug(name); err != nil {
+				f.log.Error("skipping directory with invalid slug", "directory", name, "error", err)
 				continue
 			}
 
@@ -312,13 +323,16 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 
 			child := &PageNode{
 				ID:       id,
-				Slug:     normalizedSlug,
+				Slug:     name,
 				Title:    title,
 				Parent:   parent,
 				Position: len(parent.Children),
 				Children: []*PageNode{},
 				Kind:     NodeKindSection,
 				Metadata: metadata,
+			}
+			if err := ensureUniqueReconstructedSlug(seenSlugs, child.Slug, filepath.Join(currentPath, name)); err != nil {
+				return err
 			}
 			if err := ensureUniqueReconstructedID(seenIDs, child.ID, indexPath); err != nil {
 				return err
@@ -343,15 +357,13 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 			continue
 		}
 
-		// Normalize and validate the filename (without .md) as a slug
 		baseFilename := strings.TrimSuffix(name, ext)
 		// skip index.md (handled by section case)
 		if strings.EqualFold(baseFilename, "index") {
 			continue
 		}
-		normalizedSlug := normalizeSlug(baseFilename)
-		if err := f.slugger.IsValidSlug(normalizedSlug); err != nil {
-			f.log.Error("skipping file with invalid slug", "file", name, "normalized", normalizedSlug, "error", err)
+		if err := f.slugger.IsValidSlug(baseFilename); err != nil {
+			f.log.Error("skipping file with invalid slug", "file", name, "error", err)
 			continue
 		}
 
@@ -378,13 +390,16 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 
 		child := &PageNode{
 			ID:       id,
-			Slug:     normalizedSlug,
+			Slug:     baseFilename,
 			Title:    title,
 			Parent:   parent,
 			Position: len(parent.Children),
 			Children: nil,
 			Kind:     NodeKindPage,
 			Metadata: metadata,
+		}
+		if err := ensureUniqueReconstructedSlug(seenSlugs, child.Slug, filePath); err != nil {
+			return err
 		}
 		if err := ensureUniqueReconstructedID(seenIDs, child.ID, filePath); err != nil {
 			return err

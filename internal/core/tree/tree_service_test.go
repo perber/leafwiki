@@ -445,6 +445,18 @@ func TestTreeService_CreateNode_Page_Root_CreatesFileAndFrontmatter(t *testing.T
 	}
 }
 
+func TestTreeService_CreateNode_RejectsCaseInsensitiveSlugConflict(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	if _, err := svc.CreateNode("system", nil, "Alpha", "Alpha", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode alpha failed: %v", err)
+	}
+
+	if _, err := svc.CreateNode("system", nil, "Alpha Lower", "alpha", ptrKind(NodeKindPage)); !errors.Is(err, ErrPageAlreadyExists) {
+		t.Fatalf("expected ErrPageAlreadyExists for case-insensitive conflict, got %v", err)
+	}
+}
+
 func TestTreeService_CreateNode_PersistsRootOrderFile(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
@@ -595,6 +607,32 @@ func TestTreeService_UpdateNode_SlugRename_RenamesOnDisk(t *testing.T) {
 	newPath := filepath.Join(tmpDir, "root", newSlug+".md")
 	mustStat(t, newPath)
 	mustNotExist(t, oldPath)
+}
+
+func TestTreeService_UpdateNode_RejectsCaseInsensitiveSlugConflict(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	firstID, err := svc.CreateNode("system", nil, "Alpha", "Alpha", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode first failed: %v", err)
+	}
+	secondID, err := svc.CreateNode("system", nil, "Beta", "Beta", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode second failed: %v", err)
+	}
+
+	err = svc.UpdateNode("system", *secondID, "Beta", "alpha", nil)
+	if !errors.Is(err, ErrPageAlreadyExists) {
+		t.Fatalf("expected ErrPageAlreadyExists, got %v", err)
+	}
+
+	page, err := svc.GetPage(*firstID)
+	if err != nil {
+		t.Fatalf("GetPage first failed: %v", err)
+	}
+	if page.Slug != "Alpha" {
+		t.Fatalf("expected original slug to remain unchanged, got %q", page.Slug)
+	}
 }
 
 /*
@@ -1046,6 +1084,27 @@ func TestTreeService_MoveNode_PreventsSelfParent(t *testing.T) {
 	}
 }
 
+func TestTreeService_MoveNode_RejectsCaseInsensitiveSlugConflict(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	parentID, err := svc.CreateNode("system", nil, "Parent", "parent", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode parent failed: %v", err)
+	}
+	moveID, err := svc.CreateNode("system", nil, "Move", "Alpha", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode move failed: %v", err)
+	}
+	if _, err := svc.CreateNode("system", parentID, "Existing", "alpha", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode existing failed: %v", err)
+	}
+
+	err = svc.MoveNode("system", *moveID, *parentID)
+	if !errors.Is(err, ErrPageAlreadyExists) {
+		t.Fatalf("expected ErrPageAlreadyExists, got %v", err)
+	}
+}
+
 // --- D) SortPages ---
 
 func TestTreeService_SortPages_ValidOrder(t *testing.T) {
@@ -1319,6 +1378,26 @@ func TestTreeService_LookupPagePath_Segments(t *testing.T) {
 	}
 	if lookup.Segments[2].Exists || lookup.Segments[2].ID != nil {
 		t.Fatalf("expected team to not exist")
+	}
+}
+
+func TestTreeService_LookupPagePath_IsCaseInsensitive(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	homeID, err := svc.CreateNode("system", nil, "Home", "Home", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode home failed: %v", err)
+	}
+	if _, err := svc.CreateNode("system", homeID, "About", "About", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode about failed: %v", err)
+	}
+
+	lookup, err := svc.LookupPagePath(svc.GetTree().Children, "home/about")
+	if err != nil {
+		t.Fatalf("LookupPagePath failed: %v", err)
+	}
+	if !lookup.Exists {
+		t.Fatalf("expected case-insensitive path lookup to resolve existing path")
 	}
 }
 

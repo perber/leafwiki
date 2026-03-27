@@ -30,7 +30,11 @@ func NewSlugService() *SlugService {
 	return &SlugService{}
 }
 
-// GenerateUniqueSlug returns a slug that doesn't conflict with siblings of the given parent
+// GenerateUniqueSlug generates a unique slug for a page under the given parent
+// It normalizes the desired slug and checks for conflicts with siblings and reserved slugs.
+// If there is a conflict, it appends a number to the slug until it finds a unique one.
+// currentID is used to exclude the current page when checking for conflicts (useful for updates)
+// For example, if desired is "about" and there is already an "about" page, it will try "about-1", "about-2", etc.
 func (s *SlugService) GenerateUniqueSlug(parent *PageNode, currentID, desired string) string {
 	slug := normalizeSlug(desired)
 	original := slug
@@ -44,20 +48,26 @@ func (s *SlugService) GenerateUniqueSlug(parent *PageNode, currentID, desired st
 	return slug
 }
 
+// IsValidSlug checks if the slug is valid according to our rules
+// Rules:
+// - Must not be empty
+// - Must not be a reserved slug (case-insensitive)
+// - Must contain only letters, numbers and hyphens
+// - Must not start or end with a hyphen
 func (s *SlugService) IsValidSlug(slug string) error {
 	if slug == "" {
 		return errors.New("slug must not be empty")
 	}
 
-	slug = strings.ToLower(slug)
-
-	if reservedSlugs[slug] {
+	// Check for reserved slugs (case-insensitive)
+	lowerSlug := strings.ToLower(slug)
+	if reservedSlugs[lowerSlug] {
 		return fmt.Errorf("slug '%s' is reserved", slug)
 	}
 
-	matched, err := regexp.MatchString(`^[a-z0-9]+(-[a-z0-9]+)*$`, slug)
+	matched, err := regexp.MatchString(`^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$`, slug)
 	if err != nil || !matched {
-		return errors.New("slug must contain only lowercase letters, numbers and hyphens")
+		return errors.New("slug must contain only letters, numbers and hyphens")
 	}
 
 	if strings.HasPrefix(slug, "-") || strings.HasSuffix(slug, "-") {
@@ -75,7 +85,7 @@ func normalizeSlug(title string) string {
 // Checks if the given slug already exists among parent's children
 func hasSlugConflict(parent *PageNode, currentID string, slug string) bool {
 	for _, child := range parent.Children {
-		if child.Slug == slug && child.ID != currentID {
+		if strings.EqualFold(child.Slug, slug) && child.ID != currentID {
 			return true
 		}
 	}
