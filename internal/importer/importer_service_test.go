@@ -9,7 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/wiki"
 )
 
 // --- Helpers ----------------------------------------------------------------
@@ -137,9 +140,9 @@ func TestImporterService_ExecuteCurrentPlan_NoPlan(t *testing.T) {
 	}
 }
 
-func TestImporterService_ExecuteCurrentPlan_HappyPath_UsesExecutorAndStripsFrontmatter(t *testing.T) {
+func TestImporterService_ExecuteCurrentPlan_HappyPath_PreservesNonInternalFrontmatter(t *testing.T) {
 	ws := t.TempDir()
-	mustWrite(t, ws, "a.md", "---\ntitle: X\n---\n\n# Heading\nBody")
+	mustWrite(t, ws, "a.md", "---\naliases:\n  - x\ncustom_key: keep-me\nleafwiki_id: source-id\nleafwiki_title: Source Title\ntitle: X\n---\n\n# Heading\nBody")
 
 	w := &fakeWiki{treeHash: "h1", lookups: map[string]*tree.PathLookup{}}
 	is := newServiceWithFakeWiki(t, w)
@@ -170,11 +173,103 @@ func TestImporterService_ExecuteCurrentPlan_HappyPath_UsesExecutorAndStripsFront
 	if w.lastUpdatedContent == nil {
 		t.Fatalf("expected UpdatePage content")
 	}
-	if strings.Contains(*w.lastUpdatedContent, "title: X") || strings.Contains(*w.lastUpdatedContent, "---") {
-		t.Fatalf("frontmatter not stripped; got: %q", *w.lastUpdatedContent)
+	fm, body, has, err := markdown.ParseFrontmatter(*w.lastUpdatedContent)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter err: %v", err)
 	}
-	if !strings.Contains(*w.lastUpdatedContent, "# Heading") {
-		t.Fatalf("expected body to include heading; got: %q", *w.lastUpdatedContent)
+	if !has {
+		t.Fatalf("expected preserved frontmatter, got: %q", *w.lastUpdatedContent)
+	}
+	if body != "\n# Heading\nBody" {
+		t.Fatalf("unexpected body: %q", body)
+	}
+	if got := fm.ExtraFields["custom_key"]; got != "keep-me" {
+		t.Fatalf("expected custom_key to be preserved, got %#v", got)
+	}
+	if got := fm.ExtraFields["title"]; got != "X" {
+		t.Fatalf("expected title extra field to be preserved, got %#v", got)
+	}
+	aliases, ok := fm.ExtraFields["aliases"].([]interface{})
+	if !ok || len(aliases) != 1 || aliases[0] != "x" {
+		t.Fatalf("expected aliases to be preserved, got %#v", fm.ExtraFields["aliases"])
+	}
+	if strings.Contains(*w.lastUpdatedContent, "leafwiki_id: source-id") {
+		t.Fatalf("expected source leafwiki_id to be dropped, got: %q", *w.lastUpdatedContent)
+	}
+	if strings.Contains(*w.lastUpdatedContent, "leafwiki_title: Source Title") {
+		t.Fatalf("expected source leafwiki_title to be dropped, got: %q", *w.lastUpdatedContent)
+	}
+}
+
+func TestImporterService_ExecuteCurrentPlan_WritesPreservedFrontmatterToDisk(t *testing.T) {
+	ws := t.TempDir()
+	mustWrite(t, ws, "Imported.md", "---\naliases:\n  - alpha\ncustom_key: keep-me\nleafwiki_id: source-id\ntitle: Imported Title\n---\n\n# Imported Title\nBody")
+
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:          t.TempDir(),
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("NewWiki err: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	planner := NewPlanner(w, tree.NewSlugService())
+	is := NewImporterService(planner, NewPlanStore())
+
+	plan, err := is.createImportPlanFromFolder(ws, "")
+	if err != nil {
+		t.Fatalf("createImportPlanFromFolder err: %v", err)
+	}
+	if len(plan.Items) != 1 {
+		t.Fatalf("expected one plan item, got %#v", plan.Items)
+	}
+
+	res, err := is.ExecuteCurrentPlan("system")
+	if err != nil {
+		t.Fatalf("ExecuteCurrentPlan err: %v", err)
+	}
+	if res.ImportedCount != 1 || res.SkippedCount != 0 {
+		t.Fatalf("unexpected result: imported=%d skipped=%d", res.ImportedCount, res.SkippedCount)
+	}
+
+	rawBytes, err := os.ReadFile(filepath.Join(w.GetStorageDir(), "root", "imported.md"))
+	if err != nil {
+		t.Fatalf("ReadFile err: %v", err)
+	}
+	raw := string(rawBytes)
+
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter err: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter in written file, got: %q", raw)
+	}
+	if body != "\n# Imported Title\nBody" {
+		t.Fatalf("unexpected body: %q", body)
+	}
+	if got := fm.ExtraFields["custom_key"]; got != "keep-me" {
+		t.Fatalf("expected custom_key to be preserved, got %#v", got)
+	}
+	if got := fm.ExtraFields["title"]; got != "Imported Title" {
+		t.Fatalf("expected title to be preserved, got %#v", got)
+	}
+	aliases, ok := fm.ExtraFields["aliases"].([]interface{})
+	if !ok || len(aliases) != 1 || aliases[0] != "alpha" {
+		t.Fatalf("expected aliases to be preserved, got %#v", fm.ExtraFields["aliases"])
+	}
+	if strings.Contains(raw, "leafwiki_id: source-id") {
+		t.Fatalf("expected source leafwiki_id to be dropped, got: %q", raw)
+	}
+	if fm.LeafWikiID == "" {
+		t.Fatalf("expected written file to contain generated leafwiki_id")
+	}
+	if fm.LeafWikiTitle != "Imported Title" {
+		t.Fatalf("expected written file to contain effective leafwiki_title, got %q", fm.LeafWikiTitle)
 	}
 }
 

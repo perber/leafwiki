@@ -115,6 +115,22 @@ func (mf *MarkdownFile) SetContent(content string) {
 	mf.content = content
 }
 
+func (mf *MarkdownFile) SetRawContentPreservingManagedFrontmatter(raw string) error {
+	incomingFM, body, has, err := ParseFrontmatter(raw)
+	if err != nil {
+		return err
+	}
+
+	if !has {
+		mf.content = raw
+		return nil
+	}
+
+	mf.content = body
+	mf.fm.ExtraFields = incomingFM.ExtraFields
+	return nil
+}
+
 func (mf *MarkdownFile) GetPath() string {
 	return mf.path
 }

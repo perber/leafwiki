@@ -508,6 +508,25 @@ Content`
 	}
 }
 
+func TestBuildMarkdownWithExtraFrontmatter_SortsExtraFieldsDeterministically(t *testing.T) {
+	got, err := BuildMarkdownWithExtraFrontmatter(map[string]interface{}{
+		"z_key": "last",
+		"a_key": "first",
+	}, "Content")
+	if err != nil {
+		t.Fatalf("BuildMarkdownWithExtraFrontmatter() error = %v", err)
+	}
+
+	want := `---
+a_key: first
+z_key: last
+---
+Content`
+	if got != want {
+		t.Fatalf("BuildMarkdownWithExtraFrontmatter() =\n%q\nwant:\n%q", got, want)
+	}
+}
+
 func TestFrontmatter_MetadataRoundtripRFC3339(t *testing.T) {
 	createdAt := time.Date(2026, time.March, 21, 10, 15, 30, 0, time.UTC).Format(time.RFC3339)
 	updatedAt := time.Date(2026, time.March, 21, 11, 16, 31, 0, time.UTC).Format(time.RFC3339)

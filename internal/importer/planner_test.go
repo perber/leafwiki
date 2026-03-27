@@ -162,6 +162,29 @@ func TestPlanner_CreatePlan_CreateNewSection_IndexMd(t *testing.T) {
 	}
 }
 
+func TestPlanner_CreatePlan_PrefersLeafWikiTitleOverTitle(t *testing.T) {
+	tmp := t.TempDir()
+	test_utils.WriteFile(t, tmp, "Guide.md", "---\nleafwiki_title: Preferred Title\ntitle: Fallback Title\n---\n\n# Heading")
+
+	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
+	p := newPlannerWithFake(wiki)
+
+	res, err := p.CreatePlan([]ImportMDFile{{SourcePath: "Guide.md"}}, PlanOptions{
+		SourceBasePath: tmp,
+		TargetBasePath: "",
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan err: %v", err)
+	}
+	if len(res.Items) != 1 {
+		t.Fatalf("Items len = %d", len(res.Items))
+	}
+
+	if got := res.Items[0].Title; got != "Preferred Title" {
+		t.Fatalf("Title = %q (want Preferred Title)", got)
+	}
+}
+
 func TestPlanner_CreatePlan_SkipExisting_UsesLookupLastSegment(t *testing.T) {
 	tmp := t.TempDir()
 	test_utils.WriteFile(t, tmp, "a.md", "# A")

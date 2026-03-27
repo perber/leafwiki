@@ -49,6 +49,10 @@ func NewExecutor(plan *PlanResult, planOptions *PlanOptions, wiki ImporterWiki, 
 	}
 }
 
+func buildImportedContent(mdFile *markdown.MarkdownFile) (string, error) {
+	return markdown.BuildMarkdownWithExtraFrontmatter(mdFile.GetFrontmatter().ExtraFields, mdFile.GetContent())
+}
+
 // Execute runs the import based on the provided plan
 func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 	beforeExecution := e.wiki.TreeHash()
@@ -103,8 +107,17 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 				e.logger.Error("Failed to load source file", "source_path", sourceAbs, "error", err)
 				continue
 			}
-			body := mdFile.GetContent()
-			if _, err := e.wiki.UpdatePage(userID, page.ID, page.Title, page.Slug, &body, &page.Kind); err != nil {
+			importedContent, err := buildImportedContent(mdFile)
+			if err != nil {
+				errMsg := err.Error()
+				execItem.Action = ExecutionActionSkipped
+				execItem.Error = &errMsg
+				result.SkippedCount++
+				result.Items = append(result.Items, execItem)
+				e.logger.Error("Failed to prepare imported content", "source_path", sourceAbs, "error", err)
+				continue
+			}
+			if _, err := e.wiki.UpdatePage(userID, page.ID, page.Title, page.Slug, &importedContent, &page.Kind); err != nil {
 				errMsg := err.Error()
 				execItem.Action = ExecutionActionSkipped
 				execItem.Error = &errMsg

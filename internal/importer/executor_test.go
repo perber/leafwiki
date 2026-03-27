@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -82,9 +83,9 @@ func TestExecutor_StalePlan(t *testing.T) {
 	}
 }
 
-func TestExecutor_Create_HappyPath_StripsFrontmatter(t *testing.T) {
+func TestExecutor_Create_HappyPath_PreservesNonInternalFrontmatter(t *testing.T) {
 	tmp := t.TempDir()
-	writeTmp(t, tmp, "a.md", "---\ntitle: X\n---\n\n# Heading\nBody")
+	writeTmp(t, tmp, "a.md", "---\naliases:\n  - x\ncustom_key: keep-me\nleafwiki_id: source-id\nleafwiki_title: Source Title\ntitle: X\n---\n\n# Heading\nBody")
 
 	w := &fakeExecWiki{hash: "h1"}
 	plan := &PlanResult{
@@ -115,11 +116,31 @@ func TestExecutor_Create_HappyPath_StripsFrontmatter(t *testing.T) {
 	if w.lastUpdatedContent == nil {
 		t.Fatalf("expected content to be passed to UpdatePage")
 	}
-	if strings.Contains(*w.lastUpdatedContent, "title: X") || strings.Contains(*w.lastUpdatedContent, "---") {
-		t.Fatalf("frontmatter was not stripped, got: %q", *w.lastUpdatedContent)
+	fm, body, has, err := markdown.ParseFrontmatter(*w.lastUpdatedContent)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter err: %v", err)
 	}
-	if !strings.Contains(*w.lastUpdatedContent, "# Heading") {
-		t.Fatalf("expected body content, got: %q", *w.lastUpdatedContent)
+	if !has {
+		t.Fatalf("expected preserved frontmatter, got: %q", *w.lastUpdatedContent)
+	}
+	if body != "\n# Heading\nBody" {
+		t.Fatalf("unexpected body: %q", body)
+	}
+	if got := fm.ExtraFields["custom_key"]; got != "keep-me" {
+		t.Fatalf("expected custom_key to be preserved, got %#v", got)
+	}
+	if got := fm.ExtraFields["title"]; got != "X" {
+		t.Fatalf("expected title extra field to be preserved, got %#v", got)
+	}
+	aliases, ok := fm.ExtraFields["aliases"].([]interface{})
+	if !ok || len(aliases) != 1 || aliases[0] != "x" {
+		t.Fatalf("expected aliases to be preserved, got %#v", fm.ExtraFields["aliases"])
+	}
+	if strings.Contains(*w.lastUpdatedContent, "leafwiki_id: source-id") {
+		t.Fatalf("expected source leafwiki_id to be dropped, got: %q", *w.lastUpdatedContent)
+	}
+	if strings.Contains(*w.lastUpdatedContent, "leafwiki_title: Source Title") {
+		t.Fatalf("expected source leafwiki_title to be dropped, got: %q", *w.lastUpdatedContent)
 	}
 
 	if res.TreeHashBefore != "h1" {
@@ -127,6 +148,47 @@ func TestExecutor_Create_HappyPath_StripsFrontmatter(t *testing.T) {
 	}
 	if res.TreeHash == "h1" {
 		t.Fatalf("expected TreeHash to change (fake changes it), got %q", res.TreeHash)
+	}
+}
+
+func TestExecutor_Create_HappyPath_PreservesDistinctExtraFieldValues(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "a.md", "---\nalpha: first\nbeta: second\nnested:\n  key: value\n---\n\nBody")
+
+	w := &fakeExecWiki{hash: "h1"}
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "a.md", TargetPath: "docs/a", Title: "A", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	if w.lastUpdatedContent == nil {
+		t.Fatalf("expected content to be passed to UpdatePage")
+	}
+
+	fm, _, has, err := markdown.ParseFrontmatter(*w.lastUpdatedContent)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter err: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter, got %q", *w.lastUpdatedContent)
+	}
+	if got := fm.ExtraFields["alpha"]; got != "first" {
+		t.Fatalf("expected alpha=first, got %#v", got)
+	}
+	if got := fm.ExtraFields["beta"]; got != "second" {
+		t.Fatalf("expected beta=second, got %#v", got)
+	}
+	nested, ok := fm.ExtraFields["nested"].(map[string]interface{})
+	if !ok || nested["key"] != "value" {
+		t.Fatalf("expected nested map to be preserved, got %#v", fm.ExtraFields["nested"])
 	}
 }
 

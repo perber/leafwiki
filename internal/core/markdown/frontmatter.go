@@ -204,30 +204,70 @@ func toYAMLNode(value interface{}) (*yaml.Node, error) {
 	return &node, nil
 }
 
-// BuildMarkdownWithFrontmatter rebuilds markdown from parsed frontmatter data
-// and a markdown body. It preserves additional frontmatter keys and emits them
-// in deterministic order to keep rewrites stable.
-func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
-	if strings.TrimSpace(fm.LeafWikiID) == "" {
-		return body, nil
-	}
-
+func buildExtraFieldsMapping(extraFields map[string]interface{}) (*yaml.Node, error) {
 	mapping := &yaml.Node{Kind: yaml.MappingNode}
 
-	extraKeys := make([]string, 0, len(fm.ExtraFields))
-	for key := range fm.ExtraFields {
+	extraKeys := make([]string, 0, len(extraFields))
+	for key := range extraFields {
 		extraKeys = append(extraKeys, key)
 	}
 	sort.Strings(extraKeys)
 	for _, key := range extraKeys {
-		valueNode, err := toYAMLNode(fm.ExtraFields[key])
+		valueNode, err := toYAMLNode(extraFields[key])
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		mapping.Content = append(mapping.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
 			valueNode,
 		)
+	}
+
+	return mapping, nil
+}
+
+func buildMarkdownFromMapping(mapping *yaml.Node, body string) (string, error) {
+	if mapping == nil || len(mapping.Content) == 0 {
+		return body, nil
+	}
+
+	b, err := yaml.Marshal(mapping)
+	if err != nil {
+		return "", err
+	}
+
+	var out bytes.Buffer
+	out.WriteString("---\n")
+	out.Write(b)
+	out.WriteString("---\n")
+	out.WriteString(body)
+	return out.String(), nil
+}
+
+func BuildMarkdownWithExtraFrontmatter(extraFields map[string]interface{}, body string) (string, error) {
+	if len(extraFields) == 0 {
+		return body, nil
+	}
+
+	mapping, err := buildExtraFieldsMapping(extraFields)
+	if err != nil {
+		return "", err
+	}
+
+	return buildMarkdownFromMapping(mapping, body)
+}
+
+// BuildMarkdownWithFrontmatter rebuilds markdown from parsed frontmatter data
+// and a markdown body. It preserves additional frontmatter keys and emits them
+// in deterministic order to keep rewrites stable.
+func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
+	if strings.TrimSpace(fm.LeafWikiID) == "" {
+		return BuildMarkdownWithExtraFrontmatter(fm.ExtraFields, body)
+	}
+
+	mapping, err := buildExtraFieldsMapping(fm.ExtraFields)
+	if err != nil {
+		return "", err
 	}
 
 	mapping.Content = append(mapping.Content,
@@ -265,15 +305,5 @@ func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
 		)
 	}
 
-	b, err := yaml.Marshal(mapping)
-	if err != nil {
-		return "", err
-	}
-
-	var out bytes.Buffer
-	out.WriteString("---\n")
-	out.Write(b)
-	out.WriteString("---\n")
-	out.WriteString(body)
-	return out.String(), nil
+	return buildMarkdownFromMapping(mapping, body)
 }
