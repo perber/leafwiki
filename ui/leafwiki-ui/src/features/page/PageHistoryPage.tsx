@@ -1,5 +1,4 @@
 import Page404 from '@/components/Page404'
-import { formatRelativeTime } from '@/lib/formatDate'
 import { buildViewUrl } from '@/lib/routePath'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { type HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
@@ -9,15 +8,10 @@ import { X } from 'lucide-react'
 import { useToolbarStore } from '../toolbar/toolbar'
 import { toWikiLookupPath } from '@/lib/wikiPath'
 import { useLocation, useNavigate } from 'react-router-dom'
-import Breadcrumbs from '../viewer/Breadcrumbs'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import { useSetPageTitle } from '../viewer/useSetPageTitle'
 import { useViewerStore } from '../viewer/viewer'
 import { PageHistoryContent } from './PageHistoryContent'
-
-function displayUser(label?: { username: string }) {
-  return label?.username || null
-}
 
 export default function PageHistoryPage() {
   const { pathname } = useLocation()
@@ -86,27 +80,8 @@ export default function PageHistoryPage() {
     return null
   }
 
-  const editorName = displayUser(page?.metadata?.lastAuthor)
-  const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
-
   return (
     <div className="page-viewer page-history-page">
-      <div className="page-viewer__header">
-        <div className="page-history-page__header-main">
-          <Breadcrumbs />
-          {page && (
-            <div className="page-viewer__metadata">
-              <span className="page-viewer__metadata-item">
-                History
-                {updatedRelative
-                  ? ` · Updated ${editorName ? `by ${editorName} · ${updatedRelative}` : updatedRelative}`
-                  : ''}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {page && !error ? (
         <div className="page-viewer__body page-history-page__body">
           <article className="page-history-page__content">
