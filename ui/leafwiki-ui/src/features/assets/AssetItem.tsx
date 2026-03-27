@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { deleteAsset, renameAsset } from '@/lib/api/assets'
 import { IMAGE_EXTENSIONS } from '@/lib/config'
+import { withBasePath } from '@/lib/routePath'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { Check, FileText, Pencil, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -30,7 +31,13 @@ export function AssetItem({
   onFilenameChange,
   onAssetVersionChange,
 }: Props) {
-  const assetUrl = filename
+  const markdownAssetUrl = filename
+  const assetPath = filename.startsWith('/assets/')
+    ? filename
+    : filename.startsWith('assets/')
+      ? `/${filename}`
+      : `/assets/${filename}`
+  const assetUrl = withBasePath(assetPath)
   const ext = filename.split('.').pop()?.toLowerCase()
   const isImage = imageExtensions.includes(ext ?? '')
   const baseName = filename.split('/').pop() ?? filename
@@ -87,8 +94,8 @@ export function AssetItem({
     if (isEditing) return
 
     const markdown = isImage
-      ? `![${newName}](${assetUrl})\n`
-      : `[${baseName}](${assetUrl})\n`
+      ? `![${newName}](${markdownAssetUrl})\n`
+      : `[${baseName}](${markdownAssetUrl})\n`
 
     onInsert(markdown)
   }
