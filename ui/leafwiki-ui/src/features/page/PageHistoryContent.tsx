@@ -305,11 +305,29 @@ export function PageHistoryContent({
 
   return (
     <div className="page-history" data-testid={`${testidPrefix}-content`}>
-      <div className="page-history__intro">
-        <p className="page-history__description">
-          Browse previous revisions and preview historical content for{' '}
-          {pageTitle}.
-        </p>
+      <div className="page-history__toolbar">
+        <div className="page-history__toolbar-title-group">
+          <div className="page-history__toolbar-label">History</div>
+          <div className="page-history__toolbar-title">{pageTitle}</div>
+        </div>
+        <div className="page-history__mode-switch">
+          <Button
+            variant={mode === 'preview' ? 'default' : 'outline'}
+            onClick={() => setMode('preview')}
+            disabled={!selectedRevisionId}
+            data-testid={`${testidPrefix}-preview-mode`}
+          >
+            Preview
+          </Button>
+          <Button
+            variant={mode === 'compare' ? 'default' : 'outline'}
+            onClick={() => setMode('compare')}
+            disabled={!selectedRevisionId || !latestRevisionId}
+            data-testid={`${testidPrefix}-compare-mode`}
+          >
+            Compare to current
+          </Button>
+        </div>
       </div>
 
       <div className="page-history__layout">
@@ -320,7 +338,7 @@ export function PageHistoryContent({
               Revisions
             </div>
           </div>
-          <div className="page-history__revision-list">
+          <div className="page-history__revision-list custom-scrollbar">
             {listLoading ? (
               <div className="page-history__loading-state">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -395,27 +413,9 @@ export function PageHistoryContent({
                 </div>
               ) : null}
             </div>
-            <div className="page-history__mode-switch">
-              <Button
-                variant={mode === 'preview' ? 'default' : 'outline'}
-                onClick={() => setMode('preview')}
-                disabled={!selectedRevisionId}
-                data-testid={`${testidPrefix}-preview-mode`}
-              >
-                Preview
-              </Button>
-              <Button
-                variant={mode === 'compare' ? 'default' : 'outline'}
-                onClick={() => setMode('compare')}
-                disabled={!selectedRevisionId || !latestRevisionId}
-                data-testid={`${testidPrefix}-compare-mode`}
-              >
-                Compare to current
-              </Button>
-            </div>
           </div>
 
-          <div className="page-history__detail-content">
+          <div className="page-history__detail-content custom-scrollbar">
             {mode === 'preview' ? (
               previewLoading ? (
                 <div className="page-history__loading-state">
