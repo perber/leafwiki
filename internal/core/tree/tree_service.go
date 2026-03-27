@@ -351,7 +351,7 @@ func (t *TreeService) rollbackCreatedNodeLocked(parent *PageNode, entry *PageNod
 		}
 	}
 
-	if parentWasConverted && parent != nil && len(parent.Children) == 0 {
+	if parentWasConverted && len(parent.Children) == 0 {
 		orderPath, err := t.store.dirPathForNode(parent)
 		if err != nil {
 			return err
