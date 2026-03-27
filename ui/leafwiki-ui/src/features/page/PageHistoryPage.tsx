@@ -12,6 +12,7 @@ import { useProgressbarStore } from '../progressbar/progressbar'
 import { useSetPageTitle } from '../viewer/useSetPageTitle'
 import { useViewerStore } from '../viewer/viewer'
 import { PageHistoryContent } from './PageHistoryContent'
+import { usePageHistory } from './pageHistory'
 
 export default function PageHistoryPage() {
   const { pathname } = useLocation()
@@ -24,6 +25,8 @@ export default function PageHistoryPage() {
   const error = useViewerStore((s) => s.error)
   const page = useViewerStore((s) => s.page)
   const loadPageData = useViewerStore((s) => s.loadPageData)
+
+  usePageHistory(page?.id ?? null)
 
   const closeHistory = useCallback(() => {
     navigate(buildViewUrl(page?.path || pathname))
