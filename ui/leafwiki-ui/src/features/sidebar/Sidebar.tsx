@@ -50,7 +50,7 @@ export default function Sidebar() {
             keyCombo: hotkey,
             enabled: true,
             action: actions.get(item.id)!,
-            mode: ['view', 'edit'],
+            mode: ['view', 'edit', 'history'],
           }
         })
         .filter(Boolean) as {

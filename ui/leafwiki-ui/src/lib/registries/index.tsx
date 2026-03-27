@@ -8,7 +8,6 @@ import { CopyPageDialog } from '@/features/page/CopyPageDialog'
 import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
 import { DeletePageDialog } from '@/features/page/DeletePageDialog'
 import { EditPageMetadataDialog } from '@/features/page/EditPageMetadataDialog'
-import { PageHistoryDialog } from '@/features/page/PageHistoryDialog'
 import { MovePageDialog } from '@/features/page/MovePageDialog'
 import { PageRefactorDialog } from '@/features/page/PageRefactorDialog'
 import { SortPagesDialog } from '@/features/page/SortPagesDialog'
@@ -59,7 +58,6 @@ export const DIALOG_MOVE_PAGE = 'move-page'
 export const DIALOG_CREATE_PAGE_BY_PATH = 'create-page-by-path'
 export const DIALOG_COPY_PAGE = 'copy-page'
 export const DIALOG_EDIT_PAGE_METADATA = 'edit-page-metadata'
-export const DIALOG_PAGE_HISTORY = 'page-history'
 export const DIALOG_ASSET_MANAGER = 'asset-manager'
 export const DIALOG_DELETE_PAGE_CONFIRMATION = 'delete-page-confirmation'
 export const DIALOG_CHANGE_OWN_PASSWORD = 'change-own-password'
@@ -126,18 +124,6 @@ dialogRegistry.register({
       <CopyPageDialog
         key={DIALOG_COPY_PAGE}
         {...(props as React.ComponentProps<typeof CopyPageDialog>)}
-      />
-    )
-  },
-})
-
-dialogRegistry.register({
-  type: DIALOG_PAGE_HISTORY,
-  render: (props) => {
-    return (
-      <PageHistoryDialog
-        key={DIALOG_PAGE_HISTORY}
-        {...(props as React.ComponentProps<typeof PageHistoryDialog>)}
       />
     )
   },

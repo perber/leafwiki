@@ -9,6 +9,12 @@ export type ApiLocalizedErrorResponse = {
   error: ApiLocalizedErrorDetail
 }
 
+export type ApiUiError = {
+  message: string
+  detail?: string
+  code?: string
+}
+
 export class ApiLocalizedError extends Error {
   code: string
   template: string
@@ -44,6 +50,46 @@ export function asApiLocalizedError(err: unknown): ApiLocalizedError | null {
     return err
   }
   return null
+}
+
+export function formatLocalizedErrorTemplate(
+  template: string,
+  args: string[] = [],
+): string {
+  if (!template) return ''
+
+  let argIndex = 0
+  const formatted = template.replace(/%s/g, () => {
+    const nextArg = args[argIndex]
+    argIndex += 1
+    return nextArg ?? '%s'
+  })
+
+  if (argIndex >= args.length) {
+    return formatted
+  }
+
+  return `${formatted} (${args.slice(argIndex).join(', ')})`
+}
+
+export function mapApiError(err: unknown, fallback: string): ApiUiError {
+  const localized = asApiLocalizedError(err)
+  if (localized) {
+    const detail = formatLocalizedErrorTemplate(
+      localized.template,
+      localized.args,
+    )
+
+    return {
+      message: localized.message || fallback,
+      detail: detail && detail !== localized.message ? detail : undefined,
+      code: localized.code,
+    }
+  }
+
+  return {
+    message: getErrorMessage(err, fallback),
+  }
 }
 
 export function getErrorMessage(err: unknown, fallback: string): string {

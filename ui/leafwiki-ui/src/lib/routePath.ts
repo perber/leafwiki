@@ -65,6 +65,24 @@ export function buildEditUrl(pathname: string): string {
 }
 
 /**
+ * Builds the internal history route for a wiki page path.
+ *
+ * Input may already be a browser pathname or a wiki path. The result is always
+ * a router path without the configured browser base path.
+ */
+export function buildHistoryUrl(pathname: string): string {
+  let p = stripBasePath(pathname)
+  if (p === null) return `/history${ensureLeadingSlash(pathname)}`
+  if (p === '/history' || p === '/history/') return '/history/'
+  if (p.startsWith('/history/')) return p
+  if (p.startsWith('/')) {
+    p = p.slice(1)
+  }
+
+  return `/history/${p}`
+}
+
+/**
  * Builds the browser URL for the editor, including the configured base path.
  */
 export function buildBrowserEditUrl(pathname: string): string {
@@ -83,9 +101,10 @@ export function buildBrowserEditUrl(pathname: string): string {
  */
 export function buildViewUrl(pathname: string): string {
   const stripped = stripBasePath(pathname)
-  if (stripped === null) return pathname
-  pathname = stripped
+  pathname = stripped ?? ensureLeadingSlash(pathname)
 
   if (pathname.startsWith('/e/')) return pathname.slice(3)
+  if (pathname === '/history' || pathname === '/history/') return '/'
+  if (pathname.startsWith('/history/')) return pathname.slice('/history'.length)
   return pathname
 }

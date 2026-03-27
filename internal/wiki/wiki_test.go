@@ -89,6 +89,16 @@ func TestWiki_CreatePage_ReservedSlug(t *testing.T) {
 	}
 }
 
+func TestWiki_CreatePage_ReservedHistorySlug(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	_, err := w.CreatePage("system", nil, "Reserved", "history", pageNodeKind())
+	if err == nil {
+		t.Fatal("Expected error for reserved history slug, got none")
+	}
+}
+
 func TestWiki_UpdatePage_AllowsUppercaseSlug(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

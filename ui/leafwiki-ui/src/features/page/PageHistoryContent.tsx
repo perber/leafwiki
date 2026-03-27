@@ -1,6 +1,5 @@
-import BaseDialog from '@/components/BaseDialog'
 import { Button } from '@/components/ui/button'
-import { asApiLocalizedError, getErrorMessage } from '@/lib/api/errors'
+import { mapApiError, type ApiUiError } from '@/lib/api/errors'
 import {
   compareRevisions,
   getLatestRevision,
@@ -12,22 +11,15 @@ import {
   type RevisionSnapshot,
 } from '@/lib/api/revisions'
 import { formatRelativeTime } from '@/lib/formatDate'
-import { DIALOG_PAGE_HISTORY } from '@/lib/registries'
-import { useDialogsStore } from '@/stores/dialogs'
 import { History, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
-export type PageHistoryDialogProps = {
-  pageId: string
-  pageTitle: string
-}
-
 type HistoryMode = 'preview' | 'compare'
 
-type LocalizedUiError = {
-  message: string
-  code?: string
-  template?: string
+export type PageHistoryContentProps = {
+  pageId: string
+  pageTitle: string
+  testidPrefix?: string
 }
 
 function revisionTypeLabel(type: string) {
@@ -64,31 +56,12 @@ function displayAuthor(revision: Revision) {
   return revision.author?.username || revision.authorId || 'Unknown'
 }
 
-function toUiError(err: unknown, fallback: string): LocalizedUiError {
-  const localized = asApiLocalizedError(err)
-  if (localized) {
-    return {
-      message: localized.message,
-      code: localized.code,
-      template: localized.template,
-    }
-  }
-
-  return {
-    message: getErrorMessage(err, fallback),
-  }
-}
-
-function ErrorNotice({ error }: { error: LocalizedUiError }) {
+function ErrorNotice({ error }: { error: ApiUiError }) {
   return (
-    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-      <div>{error.message}</div>
-      {error.code || error.template ? (
-        <div className="mt-1 text-xs text-red-600/90">
-          {error.code ? `Code: ${error.code}` : null}
-          {error.code && error.template ? ' · ' : null}
-          {error.template ? `Template: ${error.template}` : null}
-        </div>
+    <div className="page-history__error-notice">
+      <div className="page-history__error-title">{error.message}</div>
+      {error.detail ? (
+        <div className="page-history__error-detail">{error.detail}</div>
       ) : null}
     </div>
   )
@@ -102,45 +75,52 @@ function SnapshotPanel({
   snapshot: RevisionSnapshot
 }) {
   return (
-    <div className="space-y-4 rounded-md border p-4">
-      <div>
-        <div className="text-sm font-medium">{title}</div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          {revisionTypeLabel(snapshot.revision.type)} by {displayAuthor(snapshot.revision)}
+    <div className="page-history__snapshot">
+      <div className="page-history__snapshot-header">
+        <div className="page-history__snapshot-title">{title}</div>
+        <div className="page-history__snapshot-meta">
+          {revisionTypeLabel(snapshot.revision.type)} by{' '}
+          {displayAuthor(snapshot.revision)}
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-md bg-slate-50 p-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Path</div>
-          <div className="mt-1 text-sm">{snapshot.revision.path}</div>
+      <div className="page-history__snapshot-grid">
+        <div className="page-history__snapshot-field">
+          <div className="page-history__snapshot-label">Path</div>
+          <div className="page-history__snapshot-value">
+            {snapshot.revision.path}
+          </div>
         </div>
-        <div className="rounded-md bg-slate-50 p-3">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Timestamp</div>
-          <div className="mt-1 text-sm">{snapshot.revision.createdAt}</div>
+        <div className="page-history__snapshot-field">
+          <div className="page-history__snapshot-label">Timestamp</div>
+          <div className="page-history__snapshot-value">
+            {snapshot.revision.createdAt}
+          </div>
         </div>
       </div>
 
       <div>
-        <div className="mb-2 text-sm font-medium">Content</div>
-        <pre className="max-h-[28vh] overflow-auto rounded-md border bg-slate-50 p-4 text-sm whitespace-pre-wrap break-words">
+        <div className="page-history__section-title">Content</div>
+        <pre className="page-history__snapshot-content">
           {snapshot.content || '(empty)'}
         </pre>
       </div>
 
       <div>
-        <div className="mb-2 text-sm font-medium">Assets</div>
+        <div className="page-history__section-title">Assets</div>
         {snapshot.assets.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No assets stored for this revision.</div>
+          <div className="page-history__empty-message">
+            No assets stored for this revision.
+          </div>
         ) : (
-          <div className="space-y-2">
+          <div className="page-history__asset-list">
             {snapshot.assets.map((asset) => (
               <div
                 key={`${asset.name}-${asset.sha256}`}
-                className="rounded-md border px-3 py-2 text-sm"
+                className="page-history__asset-item"
               >
-                <div className="font-medium">{asset.name}</div>
-                <div className="text-xs text-muted-foreground">
+                <div className="page-history__asset-name">{asset.name}</div>
+                <div className="page-history__asset-meta">
                   {asset.mimeType || 'unknown'} · {asset.sizeBytes} bytes
                 </div>
               </div>
@@ -152,10 +132,15 @@ function SnapshotPanel({
   )
 }
 
-export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps) {
-  const open = useDialogsStore((s) => s.dialogType === DIALOG_PAGE_HISTORY)
+export function PageHistoryContent({
+  pageId,
+  pageTitle,
+  testidPrefix = 'page-history',
+}: PageHistoryContentProps) {
   const [revisions, setRevisions] = useState<Revision[]>([])
-  const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null)
+  const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(
+    null,
+  )
   const [latestRevisionId, setLatestRevisionId] = useState<string | null>(null)
   const [snapshot, setSnapshot] = useState<RevisionSnapshot | null>(null)
   const [comparison, setComparison] = useState<RevisionComparison | null>(null)
@@ -163,13 +148,13 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
   const [listLoading, setListLoading] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [compareLoading, setCompareLoading] = useState(false)
-  const [listError, setListError] = useState<LocalizedUiError | null>(null)
-  const [previewError, setPreviewError] = useState<LocalizedUiError | null>(null)
+  const [listError, setListError] = useState<ApiUiError | null>(null)
+  const [previewError, setPreviewError] = useState<ApiUiError | null>(null)
   const [nextCursor, setNextCursor] = useState('')
   const [loadingMore, setLoadingMore] = useState(false)
 
   useEffect(() => {
-    if (!open || !pageId) return
+    if (!pageId) return
 
     let cancelled = false
 
@@ -197,7 +182,7 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
         }
       } catch (err) {
         if (cancelled) return
-        setListError(toUiError(err, 'Failed to load page history'))
+        setListError(mapApiError(err, 'Failed to load page history'))
         setRevisions([])
         setNextCursor('')
         setLatestRevisionId(null)
@@ -213,10 +198,10 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
     return () => {
       cancelled = true
     }
-  }, [open, pageId])
+  }, [pageId])
 
   useEffect(() => {
-    if (!open || !pageId || !selectedRevisionId || mode !== 'preview') return
+    if (!pageId || !selectedRevisionId || mode !== 'preview') return
 
     let cancelled = false
 
@@ -230,7 +215,7 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
       } catch (err) {
         if (cancelled) return
         setSnapshot(null)
-        setPreviewError(toUiError(err, 'Failed to load revision preview'))
+        setPreviewError(mapApiError(err, 'Failed to load revision preview'))
       } finally {
         if (!cancelled) {
           setPreviewLoading(false)
@@ -243,11 +228,10 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
     return () => {
       cancelled = true
     }
-  }, [mode, open, pageId, selectedRevisionId])
+  }, [mode, pageId, selectedRevisionId])
 
   useEffect(() => {
     if (
-      !open ||
       !pageId ||
       !selectedRevisionId ||
       !latestRevisionId ||
@@ -262,13 +246,17 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
       setCompareLoading(true)
       setPreviewError(null)
       try {
-        const data = await compareRevisions(pageId, selectedRevisionId, latestRevisionId)
+        const data = await compareRevisions(
+          pageId,
+          selectedRevisionId,
+          latestRevisionId,
+        )
         if (cancelled) return
         setComparison(data)
       } catch (err) {
         if (cancelled) return
         setComparison(null)
-        setPreviewError(toUiError(err, 'Failed to compare revisions'))
+        setPreviewError(mapApiError(err, 'Failed to compare revisions'))
       } finally {
         if (!cancelled) {
           setCompareLoading(false)
@@ -281,7 +269,7 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
     return () => {
       cancelled = true
     }
-  }, [latestRevisionId, mode, open, pageId, selectedRevisionId])
+  }, [latestRevisionId, mode, pageId, selectedRevisionId])
 
   const selectedRevision = useMemo(
     () => revisions.find((item) => item.id === selectedRevisionId) ?? null,
@@ -289,7 +277,9 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
   )
 
   const isComparingCurrent =
-    mode === 'compare' && !!selectedRevisionId && selectedRevisionId === latestRevisionId
+    mode === 'compare' &&
+    !!selectedRevisionId &&
+    selectedRevisionId === latestRevisionId
 
   const loadMore = async () => {
     if (!nextCursor || loadingMore) return
@@ -300,7 +290,7 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
       setRevisions((current) => [...current, ...data.revisions])
       setNextCursor(data.nextCursor)
     } catch (err) {
-      setListError(toUiError(err, 'Failed to load more revisions'))
+      setListError(mapApiError(err, 'Failed to load more revisions'))
     } finally {
       setLoadingMore(false)
     }
@@ -314,68 +304,64 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
   }
 
   return (
-    <BaseDialog
-      dialogType={DIALOG_PAGE_HISTORY}
-      dialogTitle={`History for ${pageTitle}`}
-      dialogDescription="Browse previous revisions and preview historical content for this page."
-      onClose={() => true}
-      onConfirm={async () => true}
-      defaultAction="cancel"
-      testidPrefix="page-history-dialog"
-      contentClassName="max-w-7xl"
-      cancelButton={{
-        label: 'Close',
-        variant: 'outline',
-        autoFocus: true,
-      }}
-    >
-      <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
-        <div className="rounded-md border">
-          <div className="border-b px-4 py-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
+    <div className="page-history" data-testid={`${testidPrefix}-content`}>
+      <div className="page-history__intro">
+        <p className="page-history__description">
+          Browse previous revisions and preview historical content for{' '}
+          {pageTitle}.
+        </p>
+      </div>
+
+      <div className="page-history__layout">
+        <div className="page-history__panel">
+          <div className="page-history__panel-header">
+            <div className="page-history__panel-title">
               <History className="h-4 w-4" />
               Revisions
             </div>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto p-2">
+          <div className="page-history__revision-list">
             {listLoading ? (
-              <div className="flex items-center gap-2 px-2 py-6 text-sm text-muted-foreground">
+              <div className="page-history__loading-state">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading history...
               </div>
             ) : listError ? (
               <ErrorNotice error={listError} />
             ) : revisions.length === 0 ? (
-              <div className="px-2 py-6 text-sm text-muted-foreground">
+              <div className="page-history__empty-message page-history__empty-message--padded">
                 No revisions available yet.
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="page-history__revision-items">
                 {revisions.map((revision) => {
                   const selected = revision.id === selectedRevisionId
                   return (
                     <button
                       key={revision.id}
                       type="button"
-                      className={`w-full rounded-md border px-3 py-3 text-left transition ${
-                        selected
-                          ? 'border-blue-300 bg-blue-50'
-                          : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
+                      className={`page-history__revision-button ${
+                        selected ? 'page-history__revision-button--active' : ''
                       }`}
                       onClick={() => handleSelectRevision(revision.id)}
-                      data-testid={`page-history-dialog-revision-${revision.id}`}
+                      data-testid={`${testidPrefix}-revision-${revision.id}`}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium">{revisionTypeLabel(revision.type)}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatRelativeTime(revision.createdAt) || revision.createdAt}
+                      <div className="page-history__revision-row">
+                        <span className="page-history__revision-type">
+                          {revisionTypeLabel(revision.type)}
+                        </span>
+                        <span className="page-history__revision-time">
+                          {formatRelativeTime(revision.createdAt) ||
+                            revision.createdAt}
                         </span>
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
+                      <div className="page-history__revision-author">
                         {displayAuthor(revision)}
                       </div>
                       {revision.summary ? (
-                        <div className="mt-2 text-sm text-foreground/90">{revision.summary}</div>
+                        <div className="page-history__revision-summary">
+                          {revision.summary}
+                        </div>
                       ) : null}
                     </button>
                   )
@@ -386,7 +372,7 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
                     className="w-full"
                     onClick={loadMore}
                     disabled={loadingMore}
-                    data-testid="page-history-dialog-load-more"
+                    data-testid={`${testidPrefix}-load-more`}
                   >
                     {loadingMore ? 'Loading...' : 'Load more'}
                   </Button>
@@ -396,24 +382,25 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
           </div>
         </div>
 
-        <div className="min-h-[60vh] rounded-md border">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
+        <div className="page-history__panel page-history__panel--detail">
+          <div className="page-history__panel-header page-history__panel-header--detail">
             <div>
-              <div className="text-sm font-medium">
+              <div className="page-history__panel-heading">
                 {mode === 'preview' ? 'Revision Preview' : 'Compare to Current'}
               </div>
               {selectedRevision ? (
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {revisionTypeLabel(selectedRevision.type)} by {displayAuthor(selectedRevision)}
+                <div className="page-history__panel-subtitle">
+                  {revisionTypeLabel(selectedRevision.type)} by{' '}
+                  {displayAuthor(selectedRevision)}
                 </div>
               ) : null}
             </div>
-            <div className="flex gap-2">
+            <div className="page-history__mode-switch">
               <Button
                 variant={mode === 'preview' ? 'default' : 'outline'}
                 onClick={() => setMode('preview')}
                 disabled={!selectedRevisionId}
-                data-testid="page-history-dialog-preview-mode"
+                data-testid={`${testidPrefix}-preview-mode`}
               >
                 Preview
               </Button>
@@ -421,17 +408,17 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
                 variant={mode === 'compare' ? 'default' : 'outline'}
                 onClick={() => setMode('compare')}
                 disabled={!selectedRevisionId || !latestRevisionId}
-                data-testid="page-history-dialog-compare-mode"
+                data-testid={`${testidPrefix}-compare-mode`}
               >
                 Compare to current
               </Button>
             </div>
           </div>
 
-          <div className="max-h-[60vh] space-y-4 overflow-y-auto p-4">
+          <div className="page-history__detail-content">
             {mode === 'preview' ? (
               previewLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="page-history__loading-state">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading preview...
                 </div>
@@ -440,20 +427,20 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
               ) : snapshot ? (
                 <SnapshotPanel title="Selected revision" snapshot={snapshot} />
               ) : (
-                <div className="text-sm text-muted-foreground">
+                <div className="page-history__empty-message">
                   Select a revision to preview it.
                 </div>
               )
             ) : compareLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="page-history__loading-state">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Comparing with current version...
               </div>
             ) : previewError ? (
               <ErrorNotice error={previewError} />
             ) : comparison ? (
-              <div className="space-y-4">
-                <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm">
+              <div className="page-history__comparison">
+                <div className="page-history__comparison-notice">
                   {isComparingCurrent
                     ? 'You selected the current revision. There are no content or asset changes to compare.'
                     : comparison.contentChanged
@@ -462,20 +449,25 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
                 </div>
 
                 <div>
-                  <div className="mb-2 text-sm font-medium">Asset changes</div>
+                  <div className="page-history__section-title">
+                    Asset changes
+                  </div>
                   {comparison.assetChanges.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">
-                      No asset changes between the selected revision and the current version.
+                    <div className="page-history__empty-message">
+                      No asset changes between the selected revision and the
+                      current version.
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="page-history__asset-list">
                       {comparison.assetChanges.map((change) => (
                         <div
                           key={`${change.name}-${change.status}`}
-                          className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                          className="page-history__asset-change"
                         >
-                          <span className="font-medium">{change.name}</span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="page-history__asset-name">
+                            {change.name}
+                          </span>
+                          <span className="page-history__asset-meta">
                             {assetChangeLabel(change.status)}
                           </span>
                         </div>
@@ -484,19 +476,25 @@ export function PageHistoryDialog({ pageId, pageTitle }: PageHistoryDialogProps)
                   )}
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <SnapshotPanel title="Selected revision" snapshot={comparison.base} />
-                  <SnapshotPanel title="Current version" snapshot={comparison.target} />
+                <div className="page-history__comparison-grid">
+                  <SnapshotPanel
+                    title="Selected revision"
+                    snapshot={comparison.base}
+                  />
+                  <SnapshotPanel
+                    title="Current version"
+                    snapshot={comparison.target}
+                  />
                 </div>
               </div>
             ) : (
-              <div className="text-sm text-muted-foreground">
+              <div className="page-history__empty-message">
                 Select a revision to compare it with the current version.
               </div>
             )}
           </div>
         </div>
       </div>
-    </BaseDialog>
+    </div>
   )
 }

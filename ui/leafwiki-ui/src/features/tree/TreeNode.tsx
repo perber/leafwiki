@@ -1,7 +1,7 @@
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
-import { buildEditUrl, buildViewUrl } from '@/lib/routePath'
+import { buildEditUrl, buildHistoryUrl, buildViewUrl } from '@/lib/routePath'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
@@ -32,7 +32,9 @@ export const TreeNode = React.memo(function TreeNode({
   const currentPath =
     appMode === 'edit'
       ? buildEditUrl(node.path)
-      : buildViewUrl(node.path.startsWith('/') ? node.path : `/${node.path}`)
+      : appMode === 'history'
+        ? buildHistoryUrl(node.path)
+        : buildViewUrl(node.path.startsWith('/') ? node.path : `/${node.path}`)
 
   const isActive = currentPath === pathname
   const openDialog = useDialogsStore((state) => state.openDialog)

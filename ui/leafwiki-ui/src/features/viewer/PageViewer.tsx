@@ -3,8 +3,8 @@ import { formatRelativeTime } from '@/lib/formatDate'
 import {
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
-  DIALOG_PAGE_HISTORY,
 } from '@/lib/registries'
+import { buildHistoryUrl } from '@/lib/routePath'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { getParentWikiRoutePath, toWikiLookupPath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -55,8 +55,8 @@ export default function PageViewer() {
     }, [page, openDialog]),
     showHistory: useCallback(() => {
       if (!page) return
-      openDialog(DIALOG_PAGE_HISTORY, { pageId: page.id, pageTitle: page.title })
-    }, [page, openDialog]),
+      navigate(buildHistoryUrl(page.path))
+    }, [page, navigate]),
   }
 
   useScrollRestoration(pathname, loading)
