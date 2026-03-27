@@ -637,7 +637,9 @@ func (f *NodeStore) UpsertContent(entry *PageNode, content string) error {
 		}
 	}
 
-	mdFile.SetContent(content)
+	if err := mdFile.SetRawContentPreservingManagedFrontmatter(content); err != nil {
+		return fmt.Errorf("could not parse markdown content: %w", err)
+	}
 	f.syncManagedFrontmatter(mdFile, entry)
 	if err := mdFile.WriteToFile(); err != nil {
 		return fmt.Errorf("could not write markdown file: %w", err)

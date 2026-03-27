@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -82,9 +83,9 @@ func TestExecutor_StalePlan(t *testing.T) {
 	}
 }
 
-func TestExecutor_Create_HappyPath_StripsFrontmatter(t *testing.T) {
+func TestExecutor_Create_HappyPath_PreservesNonInternalFrontmatter(t *testing.T) {
 	tmp := t.TempDir()
-	writeTmp(t, tmp, "a.md", "---\ntitle: X\n---\n\n# Heading\nBody")
+	writeTmp(t, tmp, "a.md", "---\naliases:\n  - x\ncustom_key: keep-me\nleafwiki_id: source-id\nleafwiki_title: Source Title\ntitle: X\n---\n\n# Heading\nBody")
 
 	w := &fakeExecWiki{hash: "h1"}
 	plan := &PlanResult{
@@ -115,11 +116,31 @@ func TestExecutor_Create_HappyPath_StripsFrontmatter(t *testing.T) {
 	if w.lastUpdatedContent == nil {
 		t.Fatalf("expected content to be passed to UpdatePage")
 	}
-	if strings.Contains(*w.lastUpdatedContent, "title: X") || strings.Contains(*w.lastUpdatedContent, "---") {
-		t.Fatalf("frontmatter was not stripped, got: %q", *w.lastUpdatedContent)
+	fm, body, has, err := markdown.ParseFrontmatter(*w.lastUpdatedContent)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter err: %v", err)
 	}
-	if !strings.Contains(*w.lastUpdatedContent, "# Heading") {
-		t.Fatalf("expected body content, got: %q", *w.lastUpdatedContent)
+	if !has {
+		t.Fatalf("expected preserved frontmatter, got: %q", *w.lastUpdatedContent)
+	}
+	if body != "\n# Heading\nBody" {
+		t.Fatalf("unexpected body: %q", body)
+	}
+	if got := fm.ExtraFields["custom_key"]; got != "keep-me" {
+		t.Fatalf("expected custom_key to be preserved, got %#v", got)
+	}
+	if got := fm.ExtraFields["title"]; got != "X" {
+		t.Fatalf("expected title extra field to be preserved, got %#v", got)
+	}
+	aliases, ok := fm.ExtraFields["aliases"].([]interface{})
+	if !ok || len(aliases) != 1 || aliases[0] != "x" {
+		t.Fatalf("expected aliases to be preserved, got %#v", fm.ExtraFields["aliases"])
+	}
+	if strings.Contains(*w.lastUpdatedContent, "leafwiki_id: source-id") {
+		t.Fatalf("expected source leafwiki_id to be dropped, got: %q", *w.lastUpdatedContent)
+	}
+	if strings.Contains(*w.lastUpdatedContent, "leafwiki_title: Source Title") {
+		t.Fatalf("expected source leafwiki_title to be dropped, got: %q", *w.lastUpdatedContent)
 	}
 
 	if res.TreeHashBefore != "h1" {

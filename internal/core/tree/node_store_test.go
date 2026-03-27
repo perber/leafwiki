@@ -400,6 +400,58 @@ leafwiki_title: Old Title
 	}
 }
 
+func TestNodeStore_UpsertContent_RawFrontmatter_MergesExtrasIntoWrittenFrontmatter(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "My Page", Kind: NodeKindPage, Parent: root}
+
+	if err := store.CreatePage(root, page); err != nil {
+		t.Fatalf("CreatePage: %v", err)
+	}
+
+	rawContent := "---\naliases:\n  - alpha\ncustom_key: keep-me\nleafwiki_id: source-id\nleafwiki_title: Source Title\ntitle: Imported Title\n---\n\n# Imported Title\nBody"
+	if err := store.UpsertContent(page, rawContent); err != nil {
+		t.Fatalf("UpsertContent: %v", err)
+	}
+
+	path := filepath.Join(tmp, "root", "p.md")
+	raw := string(mustRead(t, path))
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter in written file")
+	}
+	if body != "\n# Imported Title\nBody" {
+		t.Fatalf("unexpected body: %q", body)
+	}
+	if got := fm.ExtraFields["custom_key"]; got != "keep-me" {
+		t.Fatalf("expected custom_key to be preserved, got %#v", got)
+	}
+	if got := fm.ExtraFields["title"]; got != "Imported Title" {
+		t.Fatalf("expected title to be preserved, got %#v", got)
+	}
+	aliases, ok := fm.ExtraFields["aliases"].([]interface{})
+	if !ok || len(aliases) != 1 || aliases[0] != "alpha" {
+		t.Fatalf("expected aliases to be preserved, got %#v", fm.ExtraFields["aliases"])
+	}
+	if strings.Contains(raw, "leafwiki_id: source-id") {
+		t.Fatalf("expected source leafwiki_id to be dropped, got: %q", raw)
+	}
+	if strings.Contains(raw, "leafwiki_title: Source Title") {
+		t.Fatalf("expected source leafwiki_title to be dropped, got: %q", raw)
+	}
+	if fm.LeafWikiID != "p1" {
+		t.Fatalf("expected managed leafwiki_id, got %q", fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "My Page" {
+		t.Fatalf("expected managed leafwiki_title, got %q", fm.LeafWikiTitle)
+	}
+}
+
 func TestNodeStore_UpsertContent_Section_WritesIndexAndCreatesDir(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
