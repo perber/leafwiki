@@ -151,6 +151,47 @@ func TestExecutor_Create_HappyPath_PreservesNonInternalFrontmatter(t *testing.T)
 	}
 }
 
+func TestExecutor_Create_HappyPath_PreservesDistinctExtraFieldValues(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "a.md", "---\nalpha: first\nbeta: second\nnested:\n  key: value\n---\n\nBody")
+
+	w := &fakeExecWiki{hash: "h1"}
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "a.md", TargetPath: "docs/a", Title: "A", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	if w.lastUpdatedContent == nil {
+		t.Fatalf("expected content to be passed to UpdatePage")
+	}
+
+	fm, _, has, err := markdown.ParseFrontmatter(*w.lastUpdatedContent)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter err: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter, got %q", *w.lastUpdatedContent)
+	}
+	if got := fm.ExtraFields["alpha"]; got != "first" {
+		t.Fatalf("expected alpha=first, got %#v", got)
+	}
+	if got := fm.ExtraFields["beta"]; got != "second" {
+		t.Fatalf("expected beta=second, got %#v", got)
+	}
+	nested, ok := fm.ExtraFields["nested"].(map[string]interface{})
+	if !ok || nested["key"] != "value" {
+		t.Fatalf("expected nested map to be preserved, got %#v", fm.ExtraFields["nested"])
+	}
+}
+
 func TestExecutor_Skip_DoesNotCallWiki(t *testing.T) {
 	tmp := t.TempDir()
 	w := &fakeExecWiki{hash: "h1"}

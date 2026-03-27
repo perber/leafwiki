@@ -1,14 +1,11 @@
 package importer
 
 import (
-	"bytes"
 	"fmt"
 	"log/slog"
 	"path/filepath"
-	"sort"
 
 	"github.com/perber/wiki/internal/core/markdown"
-	yaml "gopkg.in/yaml.v3"
 )
 
 type ExecutionResult struct {
@@ -53,41 +50,7 @@ func NewExecutor(plan *PlanResult, planOptions *PlanOptions, wiki ImporterWiki, 
 }
 
 func buildImportedContent(mdFile *markdown.MarkdownFile) (string, error) {
-	body := mdFile.GetContent()
-	extraFields := mdFile.GetFrontmatter().ExtraFields
-	if len(extraFields) == 0 {
-		return body, nil
-	}
-
-	mapping := &yaml.Node{Kind: yaml.MappingNode}
-	keys := make([]string, 0, len(extraFields))
-	for key := range extraFields {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		var valueNode yaml.Node
-		if err := valueNode.Encode(extraFields[key]); err != nil {
-			return "", err
-		}
-		mapping.Content = append(mapping.Content,
-			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
-			&valueNode,
-		)
-	}
-
-	rawFM, err := yaml.Marshal(mapping)
-	if err != nil {
-		return "", err
-	}
-
-	var out bytes.Buffer
-	out.WriteString("---\n")
-	out.Write(rawFM)
-	out.WriteString("---\n")
-	out.WriteString(body)
-	return out.String(), nil
+	return markdown.BuildMarkdownWithExtraFrontmatter(mdFile.GetFrontmatter().ExtraFields, mdFile.GetContent())
 }
 
 // Execute runs the import based on the provided plan
