@@ -20,6 +20,7 @@ var reservedSlugs = map[string]bool{
 	"users":    true,
 	"user":     true,
 	"login":    true,
+	"history":  true,
 	"settings": true,
 }
 
