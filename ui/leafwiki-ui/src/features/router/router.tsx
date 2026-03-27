@@ -3,6 +3,7 @@ import LoginForm from '../auth/LoginForm'
 import BrandingSettings from '../branding/BrandingSettings'
 import PageEditor from '../editor/PageEditor'
 import Importer from '../importer/Importer'
+import PageHistoryPage from '../page/PageHistoryPage'
 import RootRedirect from '../page/RootRedirect'
 import UserManagement from '../users/UserManagement'
 import PageViewer from '../viewer/PageViewer'
@@ -70,6 +71,18 @@ export const createLeafWikiRouter = (
         ) : (
           <AuthWrapper>
             <PageEditor />
+          </AuthWrapper>
+        ),
+      },
+      {
+        path: '/history/*',
+        element: isReadOnlyViewer ? (
+          <ReadOnlyWrapper>
+            <PageHistoryPage />
+          </ReadOnlyWrapper>
+        ) : (
+          <AuthWrapper>
+            <PageHistoryPage />
           </AuthWrapper>
         ),
       },

@@ -108,6 +108,11 @@ export default class ViewPage {
     await copyMenuItem.click();
   }
 
+  async clickPageHistoryButton() {
+    const historyButton = this.page.locator('button[data-testid="page-history-button"]');
+    await historyButton.click();
+  }
+
   async clickEditPageButton() {
     const editButton = this.page.locator('button[data-testid="edit-page-button"]');
     await editButton.click();

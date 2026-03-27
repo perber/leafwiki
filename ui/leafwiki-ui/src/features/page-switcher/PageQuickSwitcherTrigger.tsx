@@ -21,7 +21,7 @@ export function PageQuickSwitcherTrigger() {
     const hotkey: HotKeyDefinition = {
       keyCombo: 'Mod+Alt+KeyP',
       enabled: true,
-      mode: ['view'],
+      mode: ['view', 'history'],
       action: () => openDialog(DIALOG_PAGE_QUICK_SWITCHER),
     }
 
@@ -29,7 +29,7 @@ export function PageQuickSwitcherTrigger() {
     return () => unregisterHotkey(hotkey.keyCombo)
   }, [openDialog, registerHotkey, unregisterHotkey])
 
-  if (appMode !== 'view') {
+  if (appMode !== 'view' && appMode !== 'history') {
     return null
   }
 

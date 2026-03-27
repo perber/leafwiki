@@ -1618,6 +1618,33 @@ Paragraph outside the list.
     await page.waitForURL(new RegExp('/' + expectedPath + '$'));
   });
 
+  test('page-history-opens-for-nested-page', async ({ page }) => {
+    const suffix = Date.now();
+    const parentTitle = 'history-parent-' + suffix;
+    const childTitle = 'history-child-' + suffix;
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(parentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.createSubPageOfParent(parentTitle, childTitle);
+    await treeView.expandNodeByTitle(parentTitle);
+    await treeView.clickPageByTitle(childTitle);
+
+    const viewPage = new ViewPage(page);
+    await expect(page.locator('article > h1')).toHaveText(childTitle);
+
+    await viewPage.clickPageHistoryButton();
+
+    await page.waitForURL(new RegExp('/history/' + parentTitle + '/' + childTitle + '$'));
+    await expect(page.getByTestId('page-history-page-content')).toBeVisible();
+    await expect(page.getByTestId('history-title-bar')).toContainText(childTitle);
+    await expect(page.getByText('Error: Page not found')).toHaveCount(0);
+  });
+
   test('test-asset-upload-and-use-in-page', async ({ page }) => {
     const title = `Page With Asset ${Date.now()}`;
     // const assetFileName = 'test-image.png';

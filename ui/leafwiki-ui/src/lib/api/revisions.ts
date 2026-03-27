@@ -71,7 +71,9 @@ export async function listRevisions(
 }
 
 export async function getLatestRevision(pageId: string): Promise<Revision> {
-  return (await fetchWithAuth(`/api/pages/${pageId}/revisions/latest`)) as Revision
+  return (await fetchWithAuth(
+    `/api/pages/${pageId}/revisions/latest`,
+  )) as Revision
 }
 
 export async function getRevisionSnapshot(
