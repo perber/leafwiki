@@ -1,20 +1,13 @@
 import { Button } from '@/components/ui/button'
-import { mapApiError, type ApiUiError } from '@/lib/api/errors'
+import { type ApiUiError } from '@/lib/api/errors'
 import {
-  compareRevisions,
-  getLatestRevision,
-  getRevisionSnapshot,
-  listRevisions,
   type Revision,
   type RevisionAssetChange,
-  type RevisionComparison,
   type RevisionSnapshot,
 } from '@/lib/api/revisions'
-import { formatRelativeTime } from '@/lib/formatDate'
-import { History, Loader2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-
-type HistoryMode = 'preview' | 'compare'
+import { Loader2 } from 'lucide-react'
+import { useMemo } from 'react'
+import { usePageHistoryStore } from './pageHistory'
 
 export type PageHistoryContentProps = {
   pageId: string
@@ -133,143 +126,25 @@ function SnapshotPanel({
 }
 
 export function PageHistoryContent({
-  pageId,
   pageTitle,
   testidPrefix = 'page-history',
 }: PageHistoryContentProps) {
-  const [revisions, setRevisions] = useState<Revision[]>([])
-  const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(
-    null,
+  const revisions = usePageHistoryStore((state) => state.revisions)
+  const selectedRevisionId = usePageHistoryStore(
+    (state) => state.selectedRevisionId,
   )
-  const [latestRevisionId, setLatestRevisionId] = useState<string | null>(null)
-  const [snapshot, setSnapshot] = useState<RevisionSnapshot | null>(null)
-  const [comparison, setComparison] = useState<RevisionComparison | null>(null)
-  const [mode, setMode] = useState<HistoryMode>('preview')
-  const [listLoading, setListLoading] = useState(false)
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [compareLoading, setCompareLoading] = useState(false)
-  const [listError, setListError] = useState<ApiUiError | null>(null)
-  const [previewError, setPreviewError] = useState<ApiUiError | null>(null)
-  const [nextCursor, setNextCursor] = useState('')
-  const [loadingMore, setLoadingMore] = useState(false)
-
-  useEffect(() => {
-    if (!pageId) return
-
-    let cancelled = false
-
-    const load = async () => {
-      setListLoading(true)
-      setListError(null)
-      setPreviewError(null)
-      setSnapshot(null)
-      setComparison(null)
-      setSelectedRevisionId(null)
-      setLatestRevisionId(null)
-      setMode('preview')
-      try {
-        const [historyData, latestRevision] = await Promise.all([
-          listRevisions(pageId),
-          getLatestRevision(pageId),
-        ])
-        if (cancelled) return
-        setRevisions(historyData.revisions)
-        setNextCursor(historyData.nextCursor)
-        setLatestRevisionId(latestRevision.id)
-        const firstRevision = historyData.revisions[0]
-        if (firstRevision) {
-          setSelectedRevisionId(firstRevision.id)
-        }
-      } catch (err) {
-        if (cancelled) return
-        setListError(mapApiError(err, 'Failed to load page history'))
-        setRevisions([])
-        setNextCursor('')
-        setLatestRevisionId(null)
-      } finally {
-        if (!cancelled) {
-          setListLoading(false)
-        }
-      }
-    }
-
-    void load()
-
-    return () => {
-      cancelled = true
-    }
-  }, [pageId])
-
-  useEffect(() => {
-    if (!pageId || !selectedRevisionId || mode !== 'preview') return
-
-    let cancelled = false
-
-    const loadSnapshot = async () => {
-      setPreviewLoading(true)
-      setPreviewError(null)
-      try {
-        const data = await getRevisionSnapshot(pageId, selectedRevisionId)
-        if (cancelled) return
-        setSnapshot(data)
-      } catch (err) {
-        if (cancelled) return
-        setSnapshot(null)
-        setPreviewError(mapApiError(err, 'Failed to load revision preview'))
-      } finally {
-        if (!cancelled) {
-          setPreviewLoading(false)
-        }
-      }
-    }
-
-    void loadSnapshot()
-
-    return () => {
-      cancelled = true
-    }
-  }, [mode, pageId, selectedRevisionId])
-
-  useEffect(() => {
-    if (
-      !pageId ||
-      !selectedRevisionId ||
-      !latestRevisionId ||
-      mode !== 'compare'
-    ) {
-      return
-    }
-
-    let cancelled = false
-
-    const loadComparison = async () => {
-      setCompareLoading(true)
-      setPreviewError(null)
-      try {
-        const data = await compareRevisions(
-          pageId,
-          selectedRevisionId,
-          latestRevisionId,
-        )
-        if (cancelled) return
-        setComparison(data)
-      } catch (err) {
-        if (cancelled) return
-        setComparison(null)
-        setPreviewError(mapApiError(err, 'Failed to compare revisions'))
-      } finally {
-        if (!cancelled) {
-          setCompareLoading(false)
-        }
-      }
-    }
-
-    void loadComparison()
-
-    return () => {
-      cancelled = true
-    }
-  }, [latestRevisionId, mode, pageId, selectedRevisionId])
+  const latestRevisionId = usePageHistoryStore(
+    (state) => state.latestRevisionId,
+  )
+  const snapshot = usePageHistoryStore((state) => state.snapshot)
+  const comparison = usePageHistoryStore((state) => state.comparison)
+  const mode = usePageHistoryStore((state) => state.mode)
+  const listLoading = usePageHistoryStore((state) => state.listLoading)
+  const previewLoading = usePageHistoryStore((state) => state.previewLoading)
+  const compareLoading = usePageHistoryStore((state) => state.compareLoading)
+  const listError = usePageHistoryStore((state) => state.listError)
+  const previewError = usePageHistoryStore((state) => state.previewError)
+  const setMode = usePageHistoryStore((state) => state.setMode)
 
   const selectedRevision = useMemo(
     () => revisions.find((item) => item.id === selectedRevisionId) ?? null,
@@ -280,28 +155,6 @@ export function PageHistoryContent({
     mode === 'compare' &&
     !!selectedRevisionId &&
     selectedRevisionId === latestRevisionId
-
-  const loadMore = async () => {
-    if (!nextCursor || loadingMore) return
-    setLoadingMore(true)
-    setListError(null)
-    try {
-      const data = await listRevisions(pageId, nextCursor)
-      setRevisions((current) => [...current, ...data.revisions])
-      setNextCursor(data.nextCursor)
-    } catch (err) {
-      setListError(mapApiError(err, 'Failed to load more revisions'))
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
-  const handleSelectRevision = (revisionId: string) => {
-    setSelectedRevisionId(revisionId)
-    setPreviewError(null)
-    setSnapshot(null)
-    setComparison(null)
-  }
 
   return (
     <div className="page-history" data-testid={`${testidPrefix}-content`}>
@@ -330,76 +183,7 @@ export function PageHistoryContent({
         </div>
       </div>
 
-      <div className="page-history__layout">
-        <div className="page-history__panel">
-          <div className="page-history__panel-header">
-            <div className="page-history__panel-title">
-              <History className="h-4 w-4" />
-              Revisions
-            </div>
-          </div>
-          <div className="page-history__revision-list custom-scrollbar">
-            {listLoading ? (
-              <div className="page-history__loading-state">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading history...
-              </div>
-            ) : listError ? (
-              <ErrorNotice error={listError} />
-            ) : revisions.length === 0 ? (
-              <div className="page-history__empty-message page-history__empty-message--padded">
-                No revisions available yet.
-              </div>
-            ) : (
-              <div className="page-history__revision-items">
-                {revisions.map((revision) => {
-                  const selected = revision.id === selectedRevisionId
-                  return (
-                    <button
-                      key={revision.id}
-                      type="button"
-                      className={`page-history__revision-button ${
-                        selected ? 'page-history__revision-button--active' : ''
-                      }`}
-                      onClick={() => handleSelectRevision(revision.id)}
-                      data-testid={`${testidPrefix}-revision-${revision.id}`}
-                    >
-                      <div className="page-history__revision-row">
-                        <span className="page-history__revision-type">
-                          {revisionTypeLabel(revision.type)}
-                        </span>
-                        <span className="page-history__revision-time">
-                          {formatRelativeTime(revision.createdAt) ||
-                            revision.createdAt}
-                        </span>
-                      </div>
-                      <div className="page-history__revision-author">
-                        {displayAuthor(revision)}
-                      </div>
-                      {revision.summary ? (
-                        <div className="page-history__revision-summary">
-                          {revision.summary}
-                        </div>
-                      ) : null}
-                    </button>
-                  )
-                })}
-                {nextCursor ? (
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                    data-testid={`${testidPrefix}-load-more`}
-                  >
-                    {loadingMore ? 'Loading...' : 'Load more'}
-                  </Button>
-                ) : null}
-              </div>
-            )}
-          </div>
-        </div>
-
+      <div className="page-history__workspace">
         <div className="page-history__panel page-history__panel--detail">
           <div className="page-history__panel-header page-history__panel-header--detail">
             <div>
@@ -416,7 +200,18 @@ export function PageHistoryContent({
           </div>
 
           <div className="page-history__detail-content custom-scrollbar">
-            {mode === 'preview' ? (
+            {listLoading ? (
+              <div className="page-history__loading-state">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading history...
+              </div>
+            ) : listError ? (
+              <ErrorNotice error={listError} />
+            ) : revisions.length === 0 ? (
+              <div className="page-history__empty-message page-history__empty-message--padded">
+                No revisions available yet.
+              </div>
+            ) : mode === 'preview' ? (
               previewLoading ? (
                 <div className="page-history__loading-state">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -427,7 +222,7 @@ export function PageHistoryContent({
               ) : snapshot ? (
                 <SnapshotPanel title="Selected revision" snapshot={snapshot} />
               ) : (
-                <div className="page-history__empty-message">
+                <div className="page-history__empty-message page-history__empty-message--padded">
                   Select a revision to preview it.
                 </div>
               )
@@ -448,7 +243,7 @@ export function PageHistoryContent({
                       : 'Content is unchanged between the selected revision and the current version.'}
                 </div>
 
-                <div>
+                <div className="page-history__comparison-section">
                   <div className="page-history__section-title">
                     Asset changes
                   </div>
@@ -488,7 +283,7 @@ export function PageHistoryContent({
                 </div>
               </div>
             ) : (
-              <div className="page-history__empty-message">
+              <div className="page-history__empty-message page-history__empty-message--padded">
                 Select a revision to compare it with the current version.
               </div>
             )}

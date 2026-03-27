@@ -1,12 +1,14 @@
 // PanelItemRegistry
 // This file is used to register panel items for the sidebar or other panels.
 
+import type { AppMode } from '@/lib/useAppMode'
 import { JSX } from 'react'
 
 export interface PanelItem {
   id: string
   label: string
   hotkey?: string
+  modes?: AppMode[]
   icon: () => JSX.Element
   render: (props: unknown) => JSX.Element
 }
