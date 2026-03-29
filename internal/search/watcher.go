@@ -171,7 +171,7 @@ func reindexFile(fullPath, dataDir string, treeService *tree.TreeService, index 
 		return
 	}
 
-	err = index.IndexPage(page.CalculatePath(), rel, page.ID, page.Title, string(content))
+	err = index.IndexPage(page.CalculatePath(), rel, page.ID, page.Title, page.Kind, string(content))
 	if err != nil {
 		status.Fail()
 		log.Printf("[watcher] index error: %v", err)

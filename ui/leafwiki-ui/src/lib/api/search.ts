@@ -11,6 +11,7 @@ export type SearchResultItem = {
   page_id: string
   path: string
   title: string
+  kind: 'page' | 'section'
   excerpt: string
   rank: number
 }

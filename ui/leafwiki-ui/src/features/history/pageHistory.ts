@@ -11,7 +11,7 @@ import {
 import { useEffect } from 'react'
 import { create } from 'zustand'
 
-export type HistoryMode = 'preview' | 'compare'
+export type HistoryTab = 'changes' | 'preview' | 'raw' | 'assets'
 
 type PageHistoryState = {
   pageId: string
@@ -20,7 +20,7 @@ type PageHistoryState = {
   latestRevisionId: string | null
   snapshot: RevisionSnapshot | null
   comparison: RevisionComparison | null
-  mode: HistoryMode
+  activeTab: HistoryTab
   listLoading: boolean
   previewLoading: boolean
   compareLoading: boolean
@@ -34,7 +34,7 @@ type PageHistoryStore = PageHistoryState & {
   update: (patch: Partial<PageHistoryState>) => void
   reset: () => void
   selectRevision: (revisionId: string) => void
-  setMode: (mode: HistoryMode) => void
+  setActiveTab: (tab: HistoryTab) => void
 }
 
 const initialState: PageHistoryState = {
@@ -44,7 +44,7 @@ const initialState: PageHistoryState = {
   latestRevisionId: null,
   snapshot: null,
   comparison: null,
-  mode: 'preview',
+  activeTab: 'changes',
   listLoading: false,
   previewLoading: false,
   compareLoading: false,
@@ -65,7 +65,7 @@ export const usePageHistoryStore = create<PageHistoryStore>((set) => ({
       snapshot: null,
       comparison: null,
     }),
-  setMode: (mode) => set({ mode }),
+  setActiveTab: (activeTab) => set({ activeTab }),
 }))
 
 export function usePageHistory(pageId: string | null) {
@@ -77,7 +77,7 @@ export function usePageHistory(pageId: string | null) {
   const latestRevisionId = usePageHistoryStore(
     (state) => state.latestRevisionId,
   )
-  const mode = usePageHistoryStore((state) => state.mode)
+  const activeTab = usePageHistoryStore((state) => state.activeTab)
 
   useEffect(() => {
     if (!pageId) {
@@ -95,7 +95,7 @@ export function usePageHistory(pageId: string | null) {
         latestRevisionId: null,
         snapshot: null,
         comparison: null,
-        mode: 'preview',
+        activeTab: 'changes',
         listLoading: true,
         previewLoading: false,
         compareLoading: false,
@@ -143,7 +143,13 @@ export function usePageHistory(pageId: string | null) {
   }, [pageId, reset, update])
 
   useEffect(() => {
-    if (!pageId || !selectedRevisionId || mode !== 'preview') return
+    if (
+      !pageId ||
+      !selectedRevisionId ||
+      (activeTab !== 'preview' && activeTab !== 'raw')
+    ) {
+      return
+    }
 
     let cancelled = false
 
@@ -175,14 +181,14 @@ export function usePageHistory(pageId: string | null) {
     return () => {
       cancelled = true
     }
-  }, [mode, pageId, selectedRevisionId, update])
+  }, [activeTab, pageId, selectedRevisionId, update])
 
   useEffect(() => {
     if (
       !pageId ||
       !selectedRevisionId ||
       !latestRevisionId ||
-      mode !== 'compare'
+      (activeTab !== 'changes' && activeTab !== 'assets')
     ) {
       return
     }
@@ -221,7 +227,7 @@ export function usePageHistory(pageId: string | null) {
     return () => {
       cancelled = true
     }
-  }, [latestRevisionId, mode, pageId, selectedRevisionId, update])
+  }, [activeTab, latestRevisionId, pageId, selectedRevisionId, update])
 }
 
 export async function loadMorePageHistory() {

@@ -11,8 +11,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import { useSetPageTitle } from '../viewer/useSetPageTitle'
 import { useViewerStore } from '../viewer/viewer'
-import { PageHistoryContent } from './PageHistoryContent'
-import { usePageHistory } from './pageHistory'
+import { PageHistoryContent } from '@/features/history/PageHistoryContent'
+import { usePageHistory } from '@/features/history/pageHistory'
 
 export default function PageHistoryPage() {
   const { pathname } = useLocation()

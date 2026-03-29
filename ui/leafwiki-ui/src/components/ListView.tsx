@@ -1,8 +1,10 @@
-import { type ReactNode } from 'react'
+import { type ElementType, type ReactNode } from 'react'
 
 type ListViewProps = {
   header?: ReactNode
+  footer?: ReactNode
   children: ReactNode
+  as?: ElementType
   className?: string
   contentClassName?: string
   testId?: string
@@ -19,24 +21,28 @@ type ListViewItemProps = {
 type ListViewStatusProps = {
   children: ReactNode
   error?: boolean
+  className?: string
 }
 
 export function ListView({
   header,
+  footer,
   children,
+  as: Component = 'aside',
   className = '',
   contentClassName = '',
   testId,
 }: ListViewProps) {
   return (
-    <aside className={`list-view ${className}`.trim()} data-testid={testId}>
+    <Component className={`list-view ${className}`.trim()} data-testid={testId}>
       {header ? <div className="list-view__header">{header}</div> : null}
       <div
         className={`list-view__content custom-scrollbar ${contentClassName}`.trim()}
       >
         {children}
       </div>
-    </aside>
+      {footer ? <div className="list-view__footer">{footer}</div> : null}
+    </Component>
   )
 }
 
@@ -70,10 +76,11 @@ export function ListViewItem({
 export function ListViewStatus({
   children,
   error = false,
+  className = '',
 }: ListViewStatusProps) {
   return (
     <div
-      className={`list-view__status ${error ? 'list-view__status--error' : ''}`.trim()}
+      className={`list-view__status ${error ? 'list-view__status--error' : ''} ${className}`.trim()}
     >
       {children}
     </div>

@@ -5,13 +5,18 @@ import { Link, useLocation } from 'react-router-dom'
 type SearchResultCardProps = {
   item: SearchResultItem
   isSelected?: boolean
+  onMouseEnter?: () => void
+  onFocus?: () => void
 }
 
 const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
-  function SearchResultCard({ item, isSelected = false }, ref) {
+  function SearchResultCard(
+    { item, isSelected = false, onMouseEnter, onFocus },
+    ref,
+  ) {
     const location = useLocation()
     const isRouteActive = location.pathname === `${item.path}`
-    const isActive = isRouteActive || isSelected
+    const kindLabel = item.kind === 'section' ? 'Section' : 'Page'
 
     return (
       <Link
@@ -19,11 +24,13 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
         to={`${item.path}`}
         data-testid={`search-result-card-${item.page_id}`}
         aria-current={isRouteActive ? 'page' : undefined}
-        className={`search-result-card ${
-          isActive
-            ? 'search-result-card--active'
-            : 'search-result-card--inactive'
-        }`}
+        onMouseEnter={onMouseEnter}
+        onFocus={onFocus}
+        className={`list-view__item search-result-card ${
+          isSelected
+            ? 'list-view__item--active search-result-card--selected'
+            : ''
+        } ${isRouteActive ? 'search-result-card--route-active' : ''}`.trim()}
       >
         <div
           className="search-result-card__title"
@@ -34,6 +41,9 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
           className="search-result-card__excerpt"
           dangerouslySetInnerHTML={{ __html: item.excerpt }}
         />
+        <div className="search-result-card__meta">
+          <span className="search-result-card__badge">{kindLabel}</span>
+        </div>
         <div className="search-result-card__path">
           {item.path.split('/').join(' / ')}
         </div>
