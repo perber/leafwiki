@@ -1407,7 +1407,19 @@
   }
 
   .page-history__diff-content {
-    @apply text-interface-text block overflow-x-auto px-2.5 py-1.5 break-words whitespace-pre-wrap;
+    @apply text-interface-text block overflow-x-auto bg-transparent! px-2.5 py-1.5 break-words whitespace-pre-wrap;
+  }
+
+  .page-history__diff-line--context .page-history__diff-content {
+    @apply bg-surface!;
+  }
+
+  .page-history__diff-line--added .page-history__diff-content {
+    @apply bg-success/10! text-interface-text;
+  }
+
+  .page-history__diff-line--removed .page-history__diff-content {
+    @apply bg-error/10! text-interface-text;
   }
 
   .page-history__preview-panel {

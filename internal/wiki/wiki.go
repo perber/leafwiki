@@ -1178,6 +1178,31 @@ func (w *Wiki) RestorePage(userID, pageID string, targetParentID *string) (*tree
 	return page, nil
 }
 
+func (w *Wiki) RestoreRevision(userID, pageID, revisionID string) (*tree.Page, error) {
+	if w.revision == nil {
+		return nil, fmt.Errorf("revision service not available")
+	}
+	if err := w.revision.RestoreRevision(pageID, revisionID, userID); err != nil {
+		return nil, err
+	}
+
+	page, err := w.tree.GetPage(pageID)
+	if err != nil {
+		return nil, err
+	}
+
+	if w.links != nil {
+		if err := w.links.UpdateLinksForPage(page, page.Content); err != nil {
+			w.log.Warn("failed to update links for restored revision", "pageID", page.ID, "revisionID", revisionID, "error", err)
+		}
+		if err := w.links.HealLinksForExactPath(page); err != nil {
+			w.log.Warn("failed to heal links for restored revision", "pageID", page.ID, "revisionID", revisionID, "error", err)
+		}
+	}
+
+	return page, nil
+}
+
 func (w *Wiki) recordContentRevision(pageID, userID, summary string) {
 	if w.revision == nil {
 		return

@@ -1654,6 +1654,87 @@ func TestWiki_RestorePageRequiresTargetWhenOriginalParentMissing(t *testing.T) {
 	}
 }
 
+func TestWiki_RestoreRevisionRestoresAssetsAndStructure(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	sectionKind := tree.NodeKindSection
+	docs, err := w.CreatePage("system", nil, "Docs", "docs", &sectionKind)
+	if err != nil {
+		t.Fatalf("CreatePage(docs) failed: %v", err)
+	}
+	archive, err := w.CreatePage("system", nil, "Archive", "archive", &sectionKind)
+	if err != nil {
+		t.Fatalf("CreatePage(archive) failed: %v", err)
+	}
+	page, err := w.CreatePage("system", &docs.ID, "Original", "original", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage(page) failed: %v", err)
+	}
+
+	originalContent := "first version"
+	page, err = w.UpdatePage("system", page.ID, "Original", "original", &originalContent, pageNodeKind())
+	if err != nil {
+		t.Fatalf("UpdatePage(original) failed: %v", err)
+	}
+
+	assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), page.ID)
+	if err := os.MkdirAll(assetDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(assetDir) failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(assetDir, "old.txt"), []byte("old-asset"), 0o644); err != nil {
+		t.Fatalf("WriteFile(old asset) failed: %v", err)
+	}
+	w.recordAssetRevision(page.ID, "system", "")
+
+	originalRevision, err := w.GetLatestRevision(page.ID)
+	if err != nil || originalRevision == nil {
+		t.Fatalf("GetLatestRevision(original) failed: %#v %v", originalRevision, err)
+	}
+
+	changedContent := "second version"
+	page, err = w.UpdatePage("system", page.ID, "Changed", "changed", &changedContent, pageNodeKind())
+	if err != nil {
+		t.Fatalf("UpdatePage(changed) failed: %v", err)
+	}
+	if err := w.MovePage("system", page.ID, archive.ID); err != nil {
+		t.Fatalf("MovePage failed: %v", err)
+	}
+	if err := os.Remove(filepath.Join(assetDir, "old.txt")); err != nil {
+		t.Fatalf("Remove(old asset) failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(assetDir, "new.txt"), []byte("new-asset"), 0o644); err != nil {
+		t.Fatalf("WriteFile(new asset) failed: %v", err)
+	}
+	w.recordAssetRevision(page.ID, "system", "")
+
+	restored, err := w.RestoreRevision("system", page.ID, originalRevision.ID)
+	if err != nil {
+		t.Fatalf("RestoreRevision failed: %v", err)
+	}
+
+	if restored.Title != "Changed" || restored.Slug != "changed" {
+		t.Fatalf("restored identity = (%q,%q)", restored.Title, restored.Slug)
+	}
+	if restored.CalculatePath() != "/archive/changed" {
+		t.Fatalf("restored path = %q", restored.CalculatePath())
+	}
+	if restored.Content != originalContent {
+		t.Fatalf("restored content = %q", restored.Content)
+	}
+
+	oldAsset, err := os.ReadFile(filepath.Join(assetDir, "old.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile(old asset) failed: %v", err)
+	}
+	if string(oldAsset) != "old-asset" {
+		t.Fatalf("old asset = %q", string(oldAsset))
+	}
+	if _, err := os.Stat(filepath.Join(assetDir, "new.txt")); !os.IsNotExist(err) {
+		t.Fatalf("expected new asset to be removed, got %v", err)
+	}
+}
+
 func TestWiki_MovePageRecordsStructureRevision(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

@@ -642,6 +642,170 @@ func (s *Service) RestorePage(pageID, authorID string, targetParentID *string) e
 	return s.finalizeRestoreCommit(pageID, authorID)
 }
 
+func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
+	pageID = strings.TrimSpace(pageID)
+	revisionID = strings.TrimSpace(revisionID)
+	if pageID == "" {
+		return sharederrors.NewLocalizedError(
+			"revision_restore_invalid_page_id",
+			"Failed to restore page",
+			"failed to restore page %s",
+			nil,
+			pageID,
+		)
+	}
+	if revisionID == "" {
+		return sharederrors.NewLocalizedError(
+			"revision_restore_invalid_revision",
+			"Restore revision is invalid",
+			"restore revision %s for page %s is invalid",
+			nil,
+			revisionID,
+			pageID,
+		)
+	}
+
+	if _, err := s.pages.GetPage(pageID); err != nil {
+		if errors.Is(err, tree.ErrPageNotFound) {
+			return sharederrors.NewLocalizedError(
+				"revision_restore_page_not_found",
+				"Page not found",
+				"page %s not found",
+				err,
+				pageID,
+			)
+		}
+		return sharederrors.NewLocalizedError(
+			"revision_restore_failed",
+			"Failed to restore page",
+			"failed to restore page %s",
+			err,
+			pageID,
+		)
+	}
+
+	rev, err := s.store.GetRevision(pageID, revisionID)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return sharederrors.NewLocalizedError(
+				"revision_restore_revision_not_found",
+				"Restore revision not found",
+				"restore revision %s for page %s not found",
+				err,
+				revisionID,
+				pageID,
+			)
+		}
+		return sharederrors.NewLocalizedError(
+			"revision_restore_failed",
+			"Failed to restore page",
+			"failed to restore page %s",
+			err,
+			pageID,
+		)
+	}
+
+	content, err := s.store.ReadContentBlob(rev.ContentHash)
+	if err != nil {
+		return sharederrors.NewLocalizedError(
+			"revision_restore_content_missing",
+			"Restore content is unavailable",
+			"restore content for page %s is unavailable",
+			err,
+			pageID,
+		)
+	}
+
+	assets, err := s.store.LoadAssetManifest(rev.AssetManifestHash)
+	if err != nil {
+		return sharederrors.NewLocalizedError(
+			"revision_restore_assets_missing",
+			"Restore assets are unavailable",
+			"restore assets for page %s are unavailable",
+			err,
+			pageID,
+		)
+	}
+
+	page, err := s.pages.GetPage(pageID)
+	if err != nil {
+		if errors.Is(err, tree.ErrPageNotFound) {
+			return sharederrors.NewLocalizedError(
+				"revision_restore_page_not_found",
+				"Page not found",
+				"page %s not found",
+				err,
+				pageID,
+			)
+		}
+		return sharederrors.NewLocalizedError(
+			"revision_restore_failed",
+			"Failed to restore page",
+			"failed to restore page %s",
+			err,
+			pageID,
+		)
+	}
+
+	beforeState, err := s.capturePageState(pageID, true)
+	if err != nil {
+		return sharederrors.NewLocalizedError(
+			"revision_restore_failed",
+			"Failed to restore page",
+			"failed to restore page %s",
+			err,
+			pageID,
+		)
+	}
+
+	restoredContent := string(content)
+	if err := s.pages.UpdateNode(authorID, pageID, page.Title, page.Slug, &restoredContent); err != nil {
+		return sharederrors.NewLocalizedError(
+			"revision_restore_failed",
+			"Failed to restore page",
+			"failed to restore page %s",
+			err,
+			pageID,
+		)
+	}
+
+	if err := s.restoreAssets(pageID, assets); err != nil {
+		restoreRollbackContent := beforeState.Content
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, page.Title, page.Slug, &restoreRollbackContent); rollbackErr != nil {
+			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
+		}
+		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
+			s.log.Warn("failed to rollback restored assets", "pageID", pageID, "error", rollbackErr)
+		}
+		return sharederrors.NewLocalizedError(
+			"revision_restore_failed",
+			"Failed to restore page",
+			"failed to restore page %s",
+			err,
+			pageID,
+		)
+	}
+
+	if err := s.recordRestoreRevision(pageID, authorID); err != nil {
+		restoreRollbackContent := beforeState.Content
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, page.Title, page.Slug, &restoreRollbackContent); rollbackErr != nil {
+			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
+		}
+		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
+			s.log.Warn("failed to rollback restored assets", "pageID", pageID, "error", rollbackErr)
+		}
+		return sharederrors.NewLocalizedError(
+			"revision_restore_failed",
+			"Failed to restore page",
+			"failed to restore page %s",
+			err,
+			pageID,
+		)
+	}
+
+	return nil
+}
+
 func (s *Service) capturePageState(pageID string, withAssets bool) (*RevisionState, error) {
 	page, err := s.pages.GetPage(pageID)
 	if err != nil {
@@ -918,6 +1082,14 @@ func (s *Service) mapRestoreTreeError(pageID, slug string, parentID *string, err
 			err,
 			slug,
 		)
+	case errors.Is(err, tree.ErrPageHasChildren), errors.Is(err, tree.ErrMovePageCircularReference), errors.Is(err, tree.ErrPageCannotBeMovedToItself):
+		return sharederrors.NewLocalizedError(
+			"revision_restore_structure_conflict",
+			"Restore target conflicts with the current page structure",
+			"restore target for page %s conflicts with the current page structure",
+			err,
+			pageID,
+		)
 	default:
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
@@ -977,6 +1149,17 @@ func (s *Service) restoreAssets(pageID string, refs []AssetRef) error {
 	}
 
 	return nil
+}
+
+func normalizeParentID(parentID *string) string {
+	if parentID == nil {
+		return ""
+	}
+	trimmed := strings.TrimSpace(*parentID)
+	if trimmed == "" || trimmed == "root" {
+		return ""
+	}
+	return trimmed
 }
 
 func (s *Service) recordRestoreRevision(pageID, authorID string) error {

@@ -318,6 +318,34 @@ func GetLatestPageRevisionHandler(w *wiki.Wiki) gin.HandlerFunc {
 	}
 }
 
+func RestorePageRevisionHandler(w *wiki.Wiki) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		pageID := strings.TrimSpace(c.Param("id"))
+		revisionID := strings.TrimSpace(c.Param("revisionId"))
+		if pageID == "" {
+			respondWithRevisionStatusError(c, http.StatusBadRequest, "revision_restore_invalid_page_id", "Failed to restore page", "failed to restore page %s", pageID)
+			return
+		}
+		if revisionID == "" {
+			respondWithRevisionStatusError(c, http.StatusBadRequest, "revision_restore_invalid_revision", "Restore revision is invalid", "restore revision %s for page %s is invalid", revisionID, pageID)
+			return
+		}
+
+		user := auth_middleware.MustGetUser(c)
+		if user == nil {
+			return
+		}
+
+		page, err := w.RestoreRevision(user.ID, pageID, revisionID)
+		if err != nil {
+			respondWithRevisionError(c, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, ToAPIPage(page, w.GetUserResolver()))
+	}
+}
+
 func ListTrashHandler(w *wiki.Wiki) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		trash, err := w.ListTrash()
