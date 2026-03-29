@@ -99,6 +99,12 @@ export async function compareRevisions(
   )) as RevisionComparison
 }
 
+export async function restoreRevision(pageId: string, revisionId: string) {
+  return await fetchWithAuth(`/api/pages/${pageId}/revisions/${revisionId}/restore`, {
+    method: 'POST',
+  })
+}
+
 function encodeAssetName(name: string): string {
   return name
     .split('/')

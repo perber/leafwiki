@@ -1,16 +1,28 @@
 import { Button } from '@/components/ui/button'
-import { type ApiUiError } from '@/lib/api/errors'
+import { mapApiError, type ApiUiError } from '@/lib/api/errors'
+import { type Page } from '@/lib/api/pages'
 import {
   buildRevisionAssetUrl,
+  restoreRevision,
   type Revision,
   type RevisionAssetChange,
   type RevisionComparison,
   type RevisionSnapshot,
 } from '@/lib/api/revisions'
 import { formatRelativeTime } from '@/lib/formatDate'
-import { type ReactNode, useMemo } from 'react'
+import { buildHistoryUrl } from '@/lib/routePath'
+import { useTreeStore } from '@/stores/tree'
+import { type ReactNode, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
+import { useLinkStatusStore } from '../links/linkstatus_store'
 import MarkdownPreview from '../preview/MarkdownPreview'
-import { type HistoryTab, usePageHistoryStore } from './pageHistory'
+import { useViewerStore } from '../viewer/viewer'
+import {
+  type HistoryTab,
+  reloadPageHistory,
+  usePageHistoryStore,
+} from './pageHistory'
 
 export type PageHistoryContentProps = {
   pageId: string
@@ -30,20 +42,20 @@ type DiffSummary = {
   removedLines: number
 }
 
-function revisionTypeLabel(type: string) {
+function revisionTriggerLabel(type: string) {
   switch (type) {
     case 'content_update':
-      return 'Content'
+      return 'Saved after content update'
     case 'asset_update':
-      return 'Assets'
+      return 'Saved after asset update'
     case 'structure_update':
-      return 'Structure'
+      return 'Saved after structure update'
     case 'restore':
-      return 'Restore'
+      return 'Saved after restore'
     case 'delete':
-      return 'Delete'
+      return 'Saved before delete'
     default:
-      return type
+      return `Saved as ${type}`
   }
 }
 
@@ -308,10 +320,6 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
             value={String(comparison.assetChanges.length)}
             emphasized={comparison.assetChanges.length > 0}
           />
-          <SummaryStat
-            label="Revision type"
-            value={revisionTypeLabel(comparison.base.revision.type)}
-          />
         </div>
       </section>
 
@@ -428,9 +436,11 @@ function AssetsPanel({ comparison }: { comparison: RevisionComparison }) {
 }
 
 export function PageHistoryContent({
+  pageId,
   pageTitle,
   testidPrefix = 'page-history',
 }: PageHistoryContentProps) {
+  const navigate = useNavigate()
   const revisions = usePageHistoryStore((state) => state.revisions)
   const selectedRevisionId = usePageHistoryStore(
     (state) => state.selectedRevisionId,
@@ -442,8 +452,12 @@ export function PageHistoryContent({
   const previewLoading = usePageHistoryStore((state) => state.previewLoading)
   const compareLoading = usePageHistoryStore((state) => state.compareLoading)
   const listError = usePageHistoryStore((state) => state.listError)
+  const latestRevisionId = usePageHistoryStore(
+    (state) => state.latestRevisionId,
+  )
   const previewError = usePageHistoryStore((state) => state.previewError)
   const setActiveTab = usePageHistoryStore((state) => state.setActiveTab)
+  const [restoreLoading, setRestoreLoading] = useState(false)
 
   const selectedRevision = useMemo(
     () => revisions.find((item) => item.id === selectedRevisionId) ?? null,
@@ -455,7 +469,7 @@ export function PageHistoryContent({
 
     const result = [
       selectedRevision.path,
-      revisionTypeLabel(selectedRevision.type),
+      revisionTriggerLabel(selectedRevision.type),
     ]
 
     if (comparison) {
@@ -486,7 +500,9 @@ export function PageHistoryContent({
           <div className="page-history__header-copy">
             <div className="page-history__header-title">{pageTitle}</div>
             <div className="page-history__header-subtitle">
-              Revisions will appear here after this page is changed.
+              {latestRevisionId
+                ? 'Only the current revision exists right now.'
+                : 'Revisions will appear here after this page is changed.'}
             </div>
           </div>
         </div>
@@ -495,8 +511,16 @@ export function PageHistoryContent({
           <div className="page-history__panel page-history__panel--detail">
             <div className="page-history__detail-content custom-scrollbar">
               <EmptyState
-                title="No revisions yet"
-                message="This page does not have any saved revision history yet."
+                title={
+                  latestRevisionId
+                    ? 'No previous revisions yet'
+                    : 'No revisions yet'
+                }
+                message={
+                  latestRevisionId
+                    ? 'The current page state is saved, but there is no older revision to compare yet.'
+                    : 'This page does not have any saved revision history yet.'
+                }
               />
             </div>
           </div>
@@ -578,6 +602,38 @@ export function PageHistoryContent({
     )
   }
 
+  const handleRestore = async () => {
+    if (!selectedRevision || restoreLoading) {
+      return
+    }
+
+    setRestoreLoading(true)
+    try {
+      const restoredPage = (await restoreRevision(
+        pageId,
+        selectedRevision.id,
+      )) as Page
+
+      await useTreeStore.getState().reloadTree()
+      await useViewerStore.getState().loadPageData(restoredPage.path)
+
+      const viewerPageID = useViewerStore.getState().page?.id
+      if (viewerPageID) {
+        await useLinkStatusStore.getState().fetchLinkStatusForPage(viewerPageID)
+      } else {
+        useLinkStatusStore.getState().clear()
+      }
+
+      await reloadPageHistory(pageId)
+      navigate(buildHistoryUrl(restoredPage.path), { replace: true })
+      toast.success('Revision restored')
+    } catch (err) {
+      toast.error(mapApiError(err, 'Failed to restore revision').message)
+    } finally {
+      setRestoreLoading(false)
+    }
+  }
+
   return (
     <div className="page-history" data-testid={`${testidPrefix}-content`}>
       <div className="page-history__header">
@@ -602,10 +658,11 @@ export function PageHistoryContent({
         <div className="page-history__actions">
           <Button
             variant="default"
-            disabled
+            disabled={!selectedRevision || restoreLoading}
+            onClick={() => void handleRestore()}
             data-testid={`${testidPrefix}-restore`}
           >
-            Restore
+            {restoreLoading ? 'Restoring...' : 'Restore'}
           </Button>
         </div>
       </div>

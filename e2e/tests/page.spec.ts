@@ -1017,9 +1017,59 @@ graph TD;
     viewPage = new ViewPage(page);
     await viewPage.openCurrentPageHistory();
     await viewPage.switchToRevisionsTab();
-    await viewPage.openRevisionAt(1);
+    await viewPage.openRevisionAt(0);
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
     await viewPage.switchToHistoryPreviewTab();
     await viewPage.expectHistoryPreviewImageLoaded();
+  });
+
+  test('history-main-content-stays-visible-when-switching-sidebar-tabs', async ({ page }) => {
+    const title = `History Sidebar Stability ${Date.now()}`;
+    const firstRevisionContent = `First revision ${Date.now()}`;
+    const secondRevisionContent = `Second revision ${Date.now()}`;
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.clickPageByTitle(title);
+
+    let viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent(firstRevisionContent);
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+    await editPage.writeContent(`\n${secondRevisionContent}`);
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await viewPage.openCurrentPageHistory();
+    await viewPage.switchToRevisionsTab();
+    await viewPage.openRevisionAt(0);
+    await viewPage.switchToHistoryPreviewTab();
+
+    const historyContent = page.getByTestId('page-history-page-content');
+    await expect(historyContent).toContainText(firstRevisionContent);
+    await expect(historyContent).not.toContainText('No revision to display');
+
+    const historyPathBeforeSwitch = new URL(page.url()).pathname;
+
+    await viewPage.switchToExplorerTab();
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe(historyPathBeforeSwitch);
+    await expect(historyContent).toContainText(firstRevisionContent);
+    await expect(historyContent).not.toContainText('No revision to display');
+
+    await viewPage.switchToRevisionsTab();
+    await expect(historyContent).toContainText(firstRevisionContent);
+    await expect(historyContent).not.toContainText('No revision to display');
   });
 });

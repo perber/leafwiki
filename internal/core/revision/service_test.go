@@ -881,6 +881,89 @@ func TestRestorePagePreservesMetadataAndIdentity(t *testing.T) {
 	}
 }
 
+func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
+	service, treeService, storageDir := newRevisionTestService(t)
+
+	sectionKind := tree.NodeKindSection
+	docsID, err := treeService.CreateNode("tester", nil, "Docs", "docs", &sectionKind)
+	if err != nil {
+		t.Fatalf("CreateNode(docs) failed: %v", err)
+	}
+	archiveID, err := treeService.CreateNode("tester", nil, "Archive", "archive", &sectionKind)
+	if err != nil {
+		t.Fatalf("CreateNode(archive) failed: %v", err)
+	}
+
+	pageKind := tree.NodeKindPage
+	pageIDPtr, err := treeService.CreateNode("tester", docsID, "Original", "original", &pageKind)
+	if err != nil {
+		t.Fatalf("CreateNode(page) failed: %v", err)
+	}
+	pageID := *pageIDPtr
+
+	originalContent := "first version"
+	if err := treeService.UpdateNode("tester", pageID, "Original", "original", &originalContent); err != nil {
+		t.Fatalf("UpdateNode(original) failed: %v", err)
+	}
+	writeLiveAsset(t, storageDir, pageID, "old.txt", "old-asset")
+	originalRev, created, err := service.RecordAssetChange(pageID, "tester", "original state")
+	if err != nil {
+		t.Fatalf("RecordAssetChange(original) failed: %v", err)
+	}
+	if !created || originalRev == nil {
+		t.Fatalf("expected original revision to be created")
+	}
+
+	changedContent := "second version"
+	if err := treeService.UpdateNode("tester", pageID, "Changed", "changed", &changedContent); err != nil {
+		t.Fatalf("UpdateNode(changed) failed: %v", err)
+	}
+	if err := treeService.MoveNode("tester", pageID, *archiveID); err != nil {
+		t.Fatalf("MoveNode failed: %v", err)
+	}
+	if err := os.Remove(filepath.Join(storageDir, "assets", pageID, "old.txt")); err != nil {
+		t.Fatalf("Remove(old asset) failed: %v", err)
+	}
+	writeLiveAsset(t, storageDir, pageID, "new.txt", "new-asset")
+
+	if err := service.RestoreRevision(pageID, originalRev.ID, "tester"); err != nil {
+		t.Fatalf("RestoreRevision failed: %v", err)
+	}
+
+	page, err := treeService.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage failed: %v", err)
+	}
+	if page.Title != "Changed" || page.Slug != "changed" {
+		t.Fatalf("restored page identity = (%q,%q)", page.Title, page.Slug)
+	}
+	if page.Content != originalContent {
+		t.Fatalf("restored content = %q, want %q", page.Content, originalContent)
+	}
+	if got := page.CalculatePath(); got != "/archive/changed" {
+		t.Fatalf("restored path = %q", got)
+	}
+
+	oldAsset, err := os.ReadFile(filepath.Join(storageDir, "assets", pageID, "old.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile(old asset) failed: %v", err)
+	}
+	if string(oldAsset) != "old-asset" {
+		t.Fatalf("old asset = %q", string(oldAsset))
+	}
+	if _, err := os.Stat(filepath.Join(storageDir, "assets", pageID, "new.txt")); !os.IsNotExist(err) {
+		t.Fatalf("expected new asset to be removed, got %v", err)
+	}
+
+	latest, err := service.GetLatestRevision(pageID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision failed: %v", err)
+	}
+	if latest == nil || latest.Type != RevisionTypeRestore {
+		t.Fatalf("latest revision = %#v", latest)
+	}
+}
+
 type failingDeleteOnceStore struct {
 	called int
 	err    error

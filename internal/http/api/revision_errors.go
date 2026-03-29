@@ -47,7 +47,7 @@ func respondWithRevisionError(c *gin.Context, err error) {
 
 func revisionErrorStatus(code string) int {
 	switch code {
-	case "revision_restore_trash_not_found", "revision_restore_revision_not_found":
+	case "revision_restore_trash_not_found", "revision_restore_revision_not_found", "revision_restore_page_not_found":
 		return http.StatusNotFound
 	case "revision_preview_content_unavailable", "revision_preview_assets_unavailable":
 		return http.StatusInternalServerError
@@ -57,7 +57,7 @@ func revisionErrorStatus(code string) int {
 		return http.StatusBadRequest
 	case "revision_preview_asset_blob_unavailable":
 		return http.StatusInternalServerError
-	case "revision_restore_slug_conflict":
+	case "revision_restore_slug_conflict", "revision_restore_structure_conflict":
 		return http.StatusConflict
 	case "revision_restore_invalid_page_id", "revision_restore_invalid_revision", "revision_restore_invalid_kind", "revision_restore_parent_required":
 		return http.StatusBadRequest

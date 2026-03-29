@@ -184,4 +184,14 @@ export default class ViewPage {
     // wait for search input to be visible
     await this.page.locator('input[data-testid="search-input"]').waitFor({ state: 'visible' });
   }
+
+  async switchToExplorerTab() {
+    const explorerTabButton = this.page.locator(
+      'button[data-testid="sidebar-tree-tab-button"]',
+    );
+    await explorerTabButton.click();
+    await this.page.locator('a[data-testid^="tree-node-link-"]').first().waitFor({
+      state: 'visible',
+    });
+  }
 }

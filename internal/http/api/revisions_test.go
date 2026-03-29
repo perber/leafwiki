@@ -211,6 +211,102 @@ func TestGetPageRevisionHandlerReturnsSnapshot(t *testing.T) {
 	}
 }
 
+func TestRestorePageRevisionHandlerRestoresLivePage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	w := createRevisionTestWiki(t)
+	t.Cleanup(func() { _ = w.Close() })
+
+	sectionKind := tree.NodeKindSection
+	docs, err := w.CreatePage("editor", nil, "Docs", "docs", &sectionKind)
+	if err != nil {
+		t.Fatalf("CreatePage(docs) failed: %v", err)
+	}
+	archive, err := w.CreatePage("editor", nil, "Archive", "archive", &sectionKind)
+	if err != nil {
+		t.Fatalf("CreatePage(archive) failed: %v", err)
+	}
+	pageKind := tree.NodeKindPage
+	page, err := w.CreatePage("editor", &docs.ID, "Original", "original", &pageKind)
+	if err != nil {
+		t.Fatalf("CreatePage(page) failed: %v", err)
+	}
+
+	content := "historical content"
+	page, err = w.UpdatePage("editor", page.ID, "Original", "original", &content, &pageKind)
+	if err != nil {
+		t.Fatalf("UpdatePage(original) failed: %v", err)
+	}
+
+	oldAssetFile, err := os.CreateTemp(t.TempDir(), "restore-old-asset-*.txt")
+	if err != nil {
+		t.Fatalf("CreateTemp(old asset) failed: %v", err)
+	}
+	defer func() { _ = oldAssetFile.Close() }()
+	if _, err := oldAssetFile.WriteString("old-asset"); err != nil {
+		t.Fatalf("WriteString(old asset) failed: %v", err)
+	}
+	if _, err := oldAssetFile.Seek(0, io.SeekStart); err != nil {
+		t.Fatalf("Seek(old asset) failed: %v", err)
+	}
+	if _, err := w.UploadAsset("editor", page.ID, oldAssetFile, "old.txt"); err != nil {
+		t.Fatalf("UploadAsset(old) failed: %v", err)
+	}
+
+	rev, err := w.GetLatestRevision(page.ID)
+	if err != nil || rev == nil {
+		t.Fatalf("GetLatestRevision failed: %#v %v", rev, err)
+	}
+
+	changedContent := "current content"
+	page, err = w.UpdatePage("editor", page.ID, "Changed", "changed", &changedContent, &pageKind)
+	if err != nil {
+		t.Fatalf("UpdatePage(changed) failed: %v", err)
+	}
+	if err := w.MovePage("editor", page.ID, archive.ID); err != nil {
+		t.Fatalf("MovePage failed: %v", err)
+	}
+
+	assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), page.ID)
+	if err := os.Remove(filepath.Join(assetDir, "old.txt")); err != nil {
+		t.Fatalf("Remove(old asset) failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(assetDir, "new.txt"), []byte("new-asset"), 0o644); err != nil {
+		t.Fatalf("WriteFile(new asset) failed: %v", err)
+	}
+
+	router := gin.New()
+	router.POST("/pages/:id/revisions/:revisionId/restore", func(c *gin.Context) {
+		c.Set("user", &coreauth.User{ID: "editor", Role: coreauth.RoleEditor})
+		RestorePageRevisionHandler(w)(c)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/pages/"+page.ID+"/revisions/"+rev.ID+"/restore", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d body=%s", resp.Code, http.StatusOK, resp.Body.String())
+	}
+
+	var body Page
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body.Path != "archive/changed" {
+		t.Fatalf("path = %q", body.Path)
+	}
+	if body.Content != content {
+		t.Fatalf("content = %q, want %q", body.Content, content)
+	}
+	if _, err := os.Stat(filepath.Join(assetDir, "old.txt")); err != nil {
+		t.Fatalf("expected old asset to exist: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(assetDir, "new.txt")); !os.IsNotExist(err) {
+		t.Fatalf("expected new asset to be removed, got %v", err)
+	}
+}
+
 func TestGetPageRevisionHandlerReturnsStructuredArtifactError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

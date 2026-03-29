@@ -120,6 +120,9 @@ export function HistorySidebar({ active = false }: HistorySidebarProps) {
   )
   const listLoading = usePageHistoryStore((state) => state.listLoading)
   const listError = usePageHistoryStore((state) => state.listError)
+  const latestRevisionId = usePageHistoryStore(
+    (state) => state.latestRevisionId,
+  )
   const nextCursor = usePageHistoryStore((state) => state.nextCursor)
   const loadingMore = usePageHistoryStore((state) => state.loadingMore)
   const selectRevision = usePageHistoryStore((state) => state.selectRevision)
@@ -148,7 +151,9 @@ export function HistorySidebar({ active = false }: HistorySidebarProps) {
         <ListViewStatus error>{listError.message}</ListViewStatus>
       ) : revisions.length === 0 ? (
         <ListViewStatus>
-          No revisions yet. They will appear here after the page changes.
+          {latestRevisionId
+            ? 'No previous revisions yet. Older page versions will appear here after more changes.'
+            : 'No revisions yet. They will appear here after the page changes.'}
         </ListViewStatus>
       ) : (
         <ListViewList>

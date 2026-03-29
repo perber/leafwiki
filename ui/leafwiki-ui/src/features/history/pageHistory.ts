@@ -59,6 +59,64 @@ const initialState: PageHistoryState = {
   loadingMore: false,
 }
 
+async function loadPageHistoryState(pageId: string, update: (patch: Partial<PageHistoryState>) => void) {
+  update({
+    pageId,
+    revisions: [],
+    selectedRevisionId: null,
+    latestRevisionId: null,
+    isRevisionViewOpen: false,
+    snapshot: null,
+    comparison: null,
+    activeTab: 'changes',
+    listLoading: true,
+    previewLoading: false,
+    compareLoading: false,
+    listError: null,
+    previewError: null,
+    nextCursor: '',
+    loadingMore: false,
+  })
+
+  try {
+    const historyData = await listRevisions(pageId)
+
+    if (historyData.revisions.length === 0) {
+      update({
+        revisions: [],
+        nextCursor: historyData.nextCursor,
+        latestRevisionId: null,
+        selectedRevisionId: null,
+      })
+      return
+    }
+
+    const latestRevision = await getLatestRevision(pageId)
+
+    const visibleRevisions = excludeLatestRevision(
+      historyData.revisions,
+      latestRevision.id,
+    )
+    const firstVisibleRevision = visibleRevisions[0] ?? null
+
+    update({
+      revisions: visibleRevisions,
+      nextCursor: historyData.nextCursor,
+      latestRevisionId: latestRevision.id,
+      selectedRevisionId: firstVisibleRevision?.id ?? null,
+    })
+  } catch (err) {
+    update({
+      listError: mapApiError(err, 'Failed to load page history'),
+      revisions: [],
+      nextCursor: '',
+      latestRevisionId: null,
+    })
+  } finally {
+    update({ listLoading: false })
+  }
+}
+
 export const usePageHistoryStore = create<PageHistoryStore>((set) => ({
   ...initialState,
   update: (patch) => set((state) => ({ ...state, ...patch })),
@@ -67,7 +125,6 @@ export const usePageHistoryStore = create<PageHistoryStore>((set) => ({
     set({
       selectedRevisionId: revisionId,
       isRevisionViewOpen: true,
-      activeTab: 'changes',
       previewError: null,
       snapshot: null,
       comparison: null,
@@ -82,6 +139,15 @@ export const usePageHistoryStore = create<PageHistoryStore>((set) => ({
     }),
   setActiveTab: (activeTab) => set({ activeTab }),
 }))
+
+function excludeLatestRevision(
+  revisions: Revision[],
+  latestRevisionId: string | null,
+): Revision[] {
+  if (!latestRevisionId) return revisions
+
+  return revisions.filter((revision) => revision.id !== latestRevisionId)
+}
 
 export function usePageHistory(pageId: string | null, enabled = true) {
   const update = usePageHistoryStore((state) => state.update)
@@ -107,68 +173,17 @@ export function usePageHistory(pageId: string | null, enabled = true) {
     let cancelled = false
 
     const load = async () => {
-      update({
-        pageId,
-        revisions: [],
-        selectedRevisionId: null,
-        latestRevisionId: null,
-        isRevisionViewOpen: false,
-        snapshot: null,
-        comparison: null,
-        activeTab: 'changes',
-        listLoading: true,
-        previewLoading: false,
-        compareLoading: false,
-        listError: null,
-        previewError: null,
-        nextCursor: '',
-        loadingMore: false,
-      })
-
-      try {
-        const historyData = await listRevisions(pageId)
-        if (cancelled) return
-
-        const firstRevision = historyData.revisions[0] ?? null
-        if (!firstRevision) {
-          update({
-            revisions: [],
-            nextCursor: historyData.nextCursor,
-            latestRevisionId: null,
-            selectedRevisionId: null,
-          })
-          return
-        }
-
-        const latestRevision = await getLatestRevision(pageId)
-        if (cancelled) return
-
-        update({
-          revisions: historyData.revisions,
-          nextCursor: historyData.nextCursor,
-          latestRevisionId: latestRevision.id,
-          selectedRevisionId: firstRevision?.id ?? null,
-        })
-      } catch (err) {
-        if (cancelled) return
-        update({
-          listError: mapApiError(err, 'Failed to load page history'),
-          revisions: [],
-          nextCursor: '',
-          latestRevisionId: null,
-        })
-      } finally {
+      await loadPageHistoryState(pageId, (patch) => {
         if (!cancelled) {
-          update({ listLoading: false })
+          update(patch)
         }
-      }
+      })
     }
 
     void load()
 
     return () => {
       cancelled = true
-      reset()
     }
   }, [enabled, pageId, reset, update])
 
@@ -274,8 +289,12 @@ export async function loadMorePageHistory() {
   try {
     const data = await listRevisions(state.pageId, state.nextCursor)
     const currentRevisions = usePageHistoryStore.getState().revisions
+    const visibleRevisions = excludeLatestRevision(
+      data.revisions,
+      usePageHistoryStore.getState().latestRevisionId,
+    )
     usePageHistoryStore.getState().update({
-      revisions: [...currentRevisions, ...data.revisions],
+      revisions: [...currentRevisions, ...visibleRevisions],
       nextCursor: data.nextCursor,
     })
   } catch (err) {
@@ -287,4 +306,8 @@ export async function loadMorePageHistory() {
       loadingMore: false,
     })
   }
+}
+
+export async function reloadPageHistory(pageId: string) {
+  await loadPageHistoryState(pageId, usePageHistoryStore.getState().update)
 }
