@@ -11,6 +11,7 @@ type SearchResultItem struct {
 	PageID  string  `json:"page_id"`
 	Title   string  `json:"title"`
 	Path    string  `json:"path"`
+	Kind    string  `json:"kind"`
 	Rank    float64 `json:"rank"`
 	Excerpt string  `json:"excerpt"`
 }

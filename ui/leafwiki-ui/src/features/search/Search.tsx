@@ -1,3 +1,4 @@
+import { ListView, ListViewList, ListViewStatus } from '@/components/ListView'
 import { Pagination } from '@/components/Pagination'
 import { Input } from '@/components/ui/input'
 import { searchPages, SearchResultItem } from '@/lib/api/search'
@@ -169,27 +170,61 @@ export default function Search({ active = false }: SearchProps) {
       </div>
       <div className="search__body">
         {loading && (
-          <div className="search__status search__status--loading">
-            Loading results...
-          </div>
+          <ListView
+            as="div"
+            className="search__results-view"
+            contentClassName="search__content"
+          >
+            <ListViewStatus className="search__result-summary">
+              Loading results...
+            </ListViewStatus>
+          </ListView>
         )}
 
         {!loading && query && visibleResults.length === 0 && (
-          <div className="search__status search__status--empty">
-            No results found for "<strong>{query}</strong>"
-          </div>
+          <ListView
+            as="div"
+            className="search__results-view"
+            contentClassName="search__content"
+          >
+            <ListViewStatus className="search__result-summary">
+              No results found for "{query}"
+            </ListViewStatus>
+          </ListView>
         )}
 
         {!loading && visibleResults.length > 0 && (
-          <div className="search__result-summary">
-            Found <strong>{visibleTotalCount}</strong> result
-            {visibleTotalCount !== 1 ? 's' : ''} for "<strong>{query}</strong>"
-          </div>
+          <ListViewStatus className="search__result-summary">
+            {'Found '}
+            <strong>{visibleTotalCount}</strong>
+            {` result${visibleTotalCount !== 1 ? 's' : ''} for "`}
+            <strong>{query}</strong>
+            {'"'}
+          </ListViewStatus>
         )}
 
         {!loading && visibleResults.length > 0 && (
-          <>
-            <div className="search__results">
+          <ListView
+            as="div"
+            className="search__results-view"
+            contentClassName="search__content"
+            footer={
+              <div className="search__pagination">
+                <Pagination
+                  total={visibleTotalCount}
+                  page={page}
+                  limit={limit}
+                  onPageChange={(newPage) => {
+                    invalidatePendingRequests()
+                    setLoading(true)
+                    setPage(newPage)
+                    setActiveIndex(0)
+                  }}
+                />
+              </div>
+            }
+          >
+            <ListViewList>
               {visibleResults.map((item, index) => {
                 if (item.page_id && item.path && item.title) {
                   return (
@@ -200,24 +235,15 @@ export default function Search({ active = false }: SearchProps) {
                       }}
                       item={item}
                       isSelected={index === clampedActiveIndex}
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onFocus={() => setActiveIndex(index)}
                     />
                   )
                 }
                 return null
               })}
-            </div>
-            <Pagination
-              total={visibleTotalCount}
-              page={page}
-              limit={limit}
-              onPageChange={(newPage) => {
-                invalidatePendingRequests()
-                setLoading(true)
-                setPage(newPage)
-                setActiveIndex(0)
-              }}
-            />
-          </>
+            </ListViewList>
+          </ListView>
         )}
       </div>
     </div>

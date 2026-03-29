@@ -11,7 +11,7 @@ export function HistoryTitleBar() {
 
   return (
     <div className="history-title-bar" data-testid="history-title-bar">
-      <span className="history-title-bar__mode">History</span>
+      <span className="history-title-bar__mode">Revision</span>
       <span className="history-title-bar__title">{page.title}</span>
       <span className="history-title-bar__slug">{page.slug}</span>
     </div>
