@@ -24,75 +24,106 @@ const schema = {
 type Props = {
   content: string
   path?: string
+  resolveAssetUrl?: (src: string) => string
+  enableHeadlineLinks?: boolean
 }
 
-export default function MarkdownPreview({ content, path }: Props) {
+export default function MarkdownPreview({
+  content,
+  path,
+  resolveAssetUrl,
+  enableHeadlineLinks = true,
+}: Props) {
   const markdownLink = useCallback(
     (
       props: ClassAttributes<HTMLAnchorElement> &
         HTMLAttributes<HTMLAnchorElement>,
-    ) => <MarkdownLink path={path} {...props} />,
-    [path],
+    ) => (
+      <MarkdownLink path={path} resolveAssetUrl={resolveAssetUrl} {...props} />
+    ),
+    [path, resolveAssetUrl],
   )
 
   const components = useMemo(
     () => ({
       a: markdownLink,
-      img: MarkdownImage,
+      img: (
+        props: JSX.IntrinsicAttributes &
+          ClassAttributes<HTMLImageElement> &
+          HTMLAttributes<HTMLImageElement>,
+      ) => <MarkdownImage resolveAssetUrl={resolveAssetUrl} {...props} />,
       h1: ({
         children,
         ...props
       }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={1} {...props}>
-          {children}
-        </Headline>
-      ),
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
+          <Headline level={1} {...props}>
+            {children}
+          </Headline>
+        ) : (
+          <h1 {...props}>{children}</h1>
+        ),
       h2: ({
         children,
         ...props
       }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={2} {...props}>
-          {children}
-        </Headline>
-      ),
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
+          <Headline level={2} {...props}>
+            {children}
+          </Headline>
+        ) : (
+          <h2 {...props}>{children}</h2>
+        ),
       h3: ({
         children,
         ...props
       }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={3} {...props}>
-          {children}
-        </Headline>
-      ),
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
+          <Headline level={3} {...props}>
+            {children}
+          </Headline>
+        ) : (
+          <h3 {...props}>{children}</h3>
+        ),
       h4: ({
         children,
         ...props
       }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={4} {...props}>
-          {children}
-        </Headline>
-      ),
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
+          <Headline level={4} {...props}>
+            {children}
+          </Headline>
+        ) : (
+          <h4 {...props}>{children}</h4>
+        ),
       h5: ({
         children,
         ...props
       }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={5} {...props}>
-          {children}
-        </Headline>
-      ),
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
+          <Headline level={5} {...props}>
+            {children}
+          </Headline>
+        ) : (
+          <h5 {...props}>{children}</h5>
+        ),
       h6: ({
         children,
         ...props
       }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={6} {...props}>
-          {children}
-        </Headline>
-      ),
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
+          <Headline level={6} {...props}>
+            {children}
+          </Headline>
+        ) : (
+          <h6 {...props}>{children}</h6>
+        ),
       table: (
         props: ClassAttributes<HTMLTableElement> &
           HTMLAttributes<HTMLTableElement>,
@@ -133,7 +164,7 @@ export default function MarkdownPreview({ content, path }: Props) {
         )
       },
     }),
-    [markdownLink],
+    [enableHeadlineLinks, markdownLink, resolveAssetUrl],
   )
 
   return (

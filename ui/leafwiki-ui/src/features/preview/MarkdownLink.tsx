@@ -19,9 +19,15 @@ interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string
   children?: ReactNode
   path?: string
+  resolveAssetUrl?: (src: string) => string
 }
 
-export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
+export function MarkdownLink({
+  href,
+  children,
+  resolveAssetUrl,
+  ...props
+}: MarkdownLinkProps) {
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
   const user = useSessionStore((s) => s.user)
@@ -53,7 +59,8 @@ export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
         ? href
         : '/assets/' + href.slice('assets/'.length)
 
-      const assetHref = withBasePath(path)
+      const resolvedPath = resolveAssetUrl?.(path) ?? path
+      const assetHref = withBasePath(resolvedPath)
       return (
         <a
           href={assetHref}

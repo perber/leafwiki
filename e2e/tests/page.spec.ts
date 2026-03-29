@@ -327,6 +327,37 @@ for the page edited at ${new Date().toISOString()}
     await expectMarkdownLinkAutocompleteWorks(page);
   });
 
+  test('open-revision-from-sidebar-in-view-mode', async ({ page }) => {
+    const title = `Page Revision Sidebar ${Date.now()}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await treeView.clickPageByTitle(title);
+
+    const viewPage = new ViewPage(page);
+    test.expect(await viewPage.getTitle()).toBe(title);
+
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openAssetManager();
+    await editPage.uploadAsset(currentDir + '/../assets/upload-test.png');
+    await editPage.insertFirstAssetIntoPage();
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await viewPage.switchToRevisionsTab();
+    await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
+    await expect(page.getByTestId('history-sidebar')).toContainText('system');
+  });
+
   test('unsaved changes-warning', async ({ page }) => {
     const title = `Page With Unsaved Changes ${Date.now()}`;
     const newContent = `This is some unsaved content!  
@@ -907,11 +938,11 @@ graph TD;
     const viewPage = new ViewPage(page);
     await expect(page.locator('article > h1')).toHaveText(childTitle);
 
-    await viewPage.clickPageHistoryButton();
+    await viewPage.openCurrentPageHistory();
 
     await page.waitForURL(new RegExp('/history/' + parentTitle + '/' + childTitle + '$'));
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
-    await expect(page.getByTestId('history-title-bar')).toContainText(childTitle);
+    await expect(page.getByTestId('page-history-page-content')).toContainText(childTitle);
     await expect(page.getByText('Error: Page not found')).toHaveCount(0);
   });
 
@@ -947,5 +978,48 @@ graph TD;
     await viewPage.amountOfImages().then((count) => {
       test.expect(count).toBeGreaterThan(0);
     });
+  });
+
+  test('revision-preview-renders-deleted-assets', async ({ page }) => {
+    const title = `Revision Asset Preview ${Date.now()}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await treeView.clickPageByTitle(title);
+
+    let viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openAssetManager();
+    await editPage.uploadAsset(currentDir + '/../assets/upload-test.png');
+    await editPage.insertFirstAssetIntoPage();
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await viewPage.amountOfImages().then((count) => {
+      test.expect(count).toBeGreaterThan(0);
+    });
+
+    await viewPage.clickEditPageButton();
+    await editPage.openAssetManager();
+    await editPage.deleteFirstAsset();
+    await editPage.closeAssetManager();
+    await editPage.closeEditor();
+
+    viewPage = new ViewPage(page);
+    await viewPage.openCurrentPageHistory();
+    await viewPage.switchToRevisionsTab();
+    await viewPage.openRevisionAt(1);
+    await expect(page.getByTestId('page-history-page-content')).toBeVisible();
+    await viewPage.switchToHistoryPreviewTab();
+    await viewPage.expectHistoryPreviewImageLoaded();
   });
 });

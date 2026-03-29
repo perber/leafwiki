@@ -4,7 +4,7 @@ import { NODE_KIND_PAGE, type Page } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
-import { Copy, History, Pencil, Printer, Trash2 } from 'lucide-react'
+import { Copy, Pencil, Printer, Trash2 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useToolbarStore } from '../toolbar/toolbar'
 
@@ -14,7 +14,6 @@ export interface ToolbarActionsOptions {
   editPage: () => void
   deletePage: () => void
   copyPage: () => void
-  showHistory: () => void
 }
 
 export function useToolbarActions({
@@ -23,7 +22,6 @@ export function useToolbarActions({
   editPage,
   deletePage,
   copyPage,
-  showHistory,
 }: ToolbarActionsOptions) {
   const setButtons = useToolbarStore((state) => state.setButtons)
   const appMode = useAppMode()
@@ -47,14 +45,6 @@ export function useToolbarActions({
         variant: 'outline',
         className: 'hover:text-red-600 hover:bg-red-100 hover:border-red-300',
         action: deletePage,
-      },
-      {
-        id: 'page-history',
-        label: `${itemLabel} History`,
-        hotkey: 'Ctrl+Shift+H',
-        icon: <History size={18} />,
-        variant: 'outline',
-        action: showHistory,
       },
       {
         id: 'copy-page',
@@ -108,25 +98,16 @@ export function useToolbarActions({
       action: deletePage,
     }
 
-    const historyHotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+Shift+H',
-      enabled: true,
-      mode: ['view'],
-      action: showHistory,
-    }
-
     registerHotkey(editHotkey)
     registerHotkey(copyHotkey)
     registerHotkey(printHotkey)
     registerHotkey(deleteHotkey)
-    registerHotkey(historyHotkey)
 
     return () => {
       unregisterHotkey(editHotkey.keyCombo)
       unregisterHotkey(copyHotkey.keyCombo)
       unregisterHotkey(printHotkey.keyCombo)
       unregisterHotkey(deleteHotkey.keyCombo)
-      unregisterHotkey(historyHotkey.keyCombo)
     }
   }, [
     appMode,
@@ -134,7 +115,6 @@ export function useToolbarActions({
     setButtons,
     deletePage,
     copyPage,
-    showHistory,
     editPage,
     printPage,
     registerHotkey,

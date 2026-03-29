@@ -10,6 +10,7 @@ import {
 } from '@/lib/api/revisions'
 import { useEffect } from 'react'
 import { create } from 'zustand'
+import { useProgressbarStore } from '../progressbar/progressbar'
 
 export type HistoryTab = 'changes' | 'preview' | 'raw' | 'assets'
 
@@ -18,6 +19,7 @@ type PageHistoryState = {
   revisions: Revision[]
   selectedRevisionId: string | null
   latestRevisionId: string | null
+  isRevisionViewOpen: boolean
   snapshot: RevisionSnapshot | null
   comparison: RevisionComparison | null
   activeTab: HistoryTab
@@ -34,6 +36,8 @@ type PageHistoryStore = PageHistoryState & {
   update: (patch: Partial<PageHistoryState>) => void
   reset: () => void
   selectRevision: (revisionId: string) => void
+  openRevisionView: () => void
+  closeRevisionView: () => void
   setActiveTab: (tab: HistoryTab) => void
 }
 
@@ -42,6 +46,7 @@ const initialState: PageHistoryState = {
   revisions: [],
   selectedRevisionId: null,
   latestRevisionId: null,
+  isRevisionViewOpen: false,
   snapshot: null,
   comparison: null,
   activeTab: 'changes',
@@ -61,6 +66,16 @@ export const usePageHistoryStore = create<PageHistoryStore>((set) => ({
   selectRevision: (revisionId) =>
     set({
       selectedRevisionId: revisionId,
+      isRevisionViewOpen: true,
+      activeTab: 'changes',
+      previewError: null,
+      snapshot: null,
+      comparison: null,
+    }),
+  openRevisionView: () => set({ isRevisionViewOpen: true }),
+  closeRevisionView: () =>
+    set({
+      isRevisionViewOpen: false,
       previewError: null,
       snapshot: null,
       comparison: null,
@@ -68,7 +83,7 @@ export const usePageHistoryStore = create<PageHistoryStore>((set) => ({
   setActiveTab: (activeTab) => set({ activeTab }),
 }))
 
-export function usePageHistory(pageId: string | null) {
+export function usePageHistory(pageId: string | null, enabled = true) {
   const update = usePageHistoryStore((state) => state.update)
   const reset = usePageHistoryStore((state) => state.reset)
   const selectedRevisionId = usePageHistoryStore(
@@ -85,6 +100,10 @@ export function usePageHistory(pageId: string | null) {
       return
     }
 
+    if (!enabled) {
+      return
+    }
+
     let cancelled = false
 
     const load = async () => {
@@ -93,6 +112,7 @@ export function usePageHistory(pageId: string | null) {
         revisions: [],
         selectedRevisionId: null,
         latestRevisionId: null,
+        isRevisionViewOpen: false,
         snapshot: null,
         comparison: null,
         activeTab: 'changes',
@@ -106,13 +126,23 @@ export function usePageHistory(pageId: string | null) {
       })
 
       try {
-        const [historyData, latestRevision] = await Promise.all([
-          listRevisions(pageId),
-          getLatestRevision(pageId),
-        ])
+        const historyData = await listRevisions(pageId)
         if (cancelled) return
 
         const firstRevision = historyData.revisions[0] ?? null
+        if (!firstRevision) {
+          update({
+            revisions: [],
+            nextCursor: historyData.nextCursor,
+            latestRevisionId: null,
+            selectedRevisionId: null,
+          })
+          return
+        }
+
+        const latestRevision = await getLatestRevision(pageId)
+        if (cancelled) return
+
         update({
           revisions: historyData.revisions,
           nextCursor: historyData.nextCursor,
@@ -140,7 +170,7 @@ export function usePageHistory(pageId: string | null) {
       cancelled = true
       reset()
     }
-  }, [pageId, reset, update])
+  }, [enabled, pageId, reset, update])
 
   useEffect(() => {
     if (
@@ -154,10 +184,10 @@ export function usePageHistory(pageId: string | null) {
     let cancelled = false
 
     const loadSnapshot = async () => {
+      useProgressbarStore.getState().setLoading(true)
       update({
         previewLoading: true,
         previewError: null,
-        comparison: null,
       })
       try {
         const data = await getRevisionSnapshot(pageId, selectedRevisionId)
@@ -173,6 +203,7 @@ export function usePageHistory(pageId: string | null) {
         if (!cancelled) {
           update({ previewLoading: false })
         }
+        useProgressbarStore.getState().setLoading(false)
       }
     }
 
@@ -196,10 +227,10 @@ export function usePageHistory(pageId: string | null) {
     let cancelled = false
 
     const loadComparison = async () => {
+      useProgressbarStore.getState().setLoading(true)
       update({
         compareLoading: true,
         previewError: null,
-        snapshot: null,
       })
       try {
         const data = await compareRevisions(
@@ -219,6 +250,7 @@ export function usePageHistory(pageId: string | null) {
         if (!cancelled) {
           update({ compareLoading: false })
         }
+        useProgressbarStore.getState().setLoading(false)
       }
     }
 

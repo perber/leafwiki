@@ -51,4 +51,15 @@ export default class EditPage {
     const firstAsset = this.page.locator('li[data-testid="asset-item"]').first();
     await firstAsset.dblclick();
   }
+
+  async deleteFirstAsset() {
+    const firstAsset = this.page.locator('li[data-testid="asset-item"]').first();
+    await firstAsset.locator('button[title="Delete"]').click();
+    await this.page.waitForTimeout(300);
+  }
+
+  async closeAssetManager() {
+    await this.page.keyboard.press('Escape');
+    await this.page.locator('div[role="dialog"]').waitFor({ state: 'hidden' });
+  }
 }

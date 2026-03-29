@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 export default class ViewPage {
   constructor(private page: Page) {}
@@ -89,9 +89,71 @@ export default class ViewPage {
     await copyButton.click();
   }
 
-  async clickPageHistoryButton() {
-    const historyButton = this.page.locator('button[data-testid="page-history-button"]');
-    await historyButton.click();
+  async openCurrentPageHistory() {
+    const url = new URL(this.page.url());
+    await this.page.goto(`/history${url.pathname}`);
+    await this.page.locator('[data-testid="page-history-page-content"]').waitFor({
+      state: 'visible',
+    });
+  }
+
+  async switchToRevisionsTab() {
+    const revisionsTabButton = this.page.locator(
+      'button[data-testid="sidebar-history-tab-button"]',
+    );
+    await revisionsTabButton.click();
+    await this.expectRevisionsSidebarOpen();
+  }
+
+  async expectRevisionsSidebarOpen() {
+    await this.page.locator('[data-testid="history-sidebar"]').waitFor({ state: 'visible' });
+    await expect(
+      this.page.locator('button[data-testid="sidebar-history-tab-button"]'),
+    ).toHaveClass(/sidebar__tab-button--active/);
+  }
+
+  async openFirstRevision() {
+    const firstRevision = this.page.locator('[data-testid^="history-sidebar-revision-"]').first();
+    await firstRevision.waitFor({ state: 'visible' });
+    await firstRevision.click();
+  }
+
+  async openRevisionAt(index: number) {
+    const revision = this.page.locator('[data-testid^="history-sidebar-revision-"]').nth(index);
+    await revision.waitFor({ state: 'visible' });
+    await revision.click();
+  }
+
+  async expectRevisionViewOpen() {
+    await this.page
+      .locator('[data-testid="page-history-page-content"]')
+      .waitFor({ state: 'visible' });
+    await this.expectRevisionsSidebarOpen();
+    await this.page.locator('button[data-testid="back-to-page-button"]').waitFor({
+      state: 'visible',
+    });
+  }
+
+  async returnToPage() {
+    const backButton = this.page.locator('button[data-testid="back-to-page-button"]');
+    await backButton.click();
+  }
+
+  async switchToHistoryPreviewTab() {
+    await this.page.locator('[data-testid="page-history-page-preview-tab"]').click();
+    await this.page.locator('[data-testid="page-history-page-content"]').waitFor({
+      state: 'visible',
+    });
+  }
+
+  async expectHistoryPreviewImageLoaded() {
+    const image = this.page.locator('[data-testid="page-history-page-content"] img').first();
+    await image.waitFor({ state: 'visible' });
+    await expect
+      .poll(async () => {
+        return image.evaluate((img) => img.complete && img.naturalWidth > 0);
+      })
+      .toBe(true);
   }
 
   async clickEditPageButton() {

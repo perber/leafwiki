@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom'
 
 export type AppMode =
   | 'edit'
-  | 'history'
   | 'view'
   | 'dialog'
   | 'user-management'
@@ -15,14 +14,6 @@ export function useAppMode(): AppMode {
 
   if (location.pathname.startsWith('/e/')) {
     return 'edit'
-  }
-
-  if (
-    location.pathname === '/history' ||
-    location.pathname === '/history/' ||
-    location.pathname.startsWith('/history/')
-  ) {
-    return 'history'
   }
 
   if (location.pathname.startsWith('/users')) {

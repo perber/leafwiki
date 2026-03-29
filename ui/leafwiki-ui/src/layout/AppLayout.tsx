@@ -5,7 +5,6 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import UserToolbar from '@/components/UserToolbar'
 import DesignToggle from '@/features/designtoggle/DesignToggle'
 import { EditorTitleBar } from '@/features/editor/EditorTitleBar'
-import { HistoryTitleBar } from '@/features/history/HistoryTitleBar'
 import { PageQuickSwitcherTrigger } from '@/features/page-switcher/PageQuickSwitcherTrigger'
 import Progressbar from '@/features/progressbar/Progressbar'
 import Sidebar from '@/features/sidebar/Sidebar'
@@ -216,7 +215,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="app-layout__editor-title-bar-container">
             <EditorTitleBar />
-            <HistoryTitleBar />
           </div>
           <div className="app-layout__editor-toolbar-container">
             <PageQuickSwitcherTrigger />
@@ -233,9 +231,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           id="sidebar-container"
           className={
             'app-layout__sidebar-container ' +
-            (appMode === 'history'
-              ? 'app-layout__sidebar-container--flush '
-              : '') +
             (resizing ? '' : ' transition-[width] duration-200')
           }
           style={{

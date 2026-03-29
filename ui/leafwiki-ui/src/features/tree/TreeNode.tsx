@@ -28,11 +28,15 @@ export const TreeNode = React.memo(function TreeNode({
   const toggleNode = useTreeStore((s) => s.toggleNode)
   const appMode = useAppMode()
   const hasChildren = node.children && node.children.length > 0
+  const isHistoryPath =
+    pathname === '/history' ||
+    pathname === '/history/' ||
+    pathname.startsWith('/history/')
 
   const currentPath =
     appMode === 'edit'
       ? buildEditUrl(node.path)
-      : appMode === 'history'
+      : isHistoryPath
         ? buildHistoryUrl(node.path)
         : buildViewUrl(node.path.startsWith('/') ? node.path : `/${node.path}`)
 

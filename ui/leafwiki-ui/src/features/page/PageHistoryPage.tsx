@@ -4,7 +4,7 @@ import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { type HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useToolbarStore } from '../toolbar/toolbar'
 import { toWikiLookupPath } from '@/lib/wikiPath'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -49,19 +49,18 @@ export default function PageHistoryPage() {
     setToolbarButtons([
       {
         id: 'close-history',
-        label: 'Close History',
+        label: 'Back to Page',
         hotkey: 'Esc',
-        icon: <X size={18} />,
+        icon: <ArrowLeft size={18} />,
         action: closeHistory,
-        variant: 'destructive',
-        className: 'toolbar-button__close-editor',
+        variant: 'outline',
       },
     ])
 
     const closeHotkey: HotKeyDefinition = {
       keyCombo: 'Escape',
       enabled: true,
-      mode: ['history'],
+      mode: ['view'],
       action: closeHistory,
     }
 

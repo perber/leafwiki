@@ -36,9 +36,7 @@ export function ListView({
   return (
     <Component className={`list-view ${className}`.trim()} data-testid={testId}>
       {header ? <div className="list-view__header">{header}</div> : null}
-      <div
-        className={`list-view__content custom-scrollbar ${contentClassName}`.trim()}
-      >
+      <div className={`list-view__content ${contentClassName}`.trim()}>
         {children}
       </div>
       {footer ? <div className="list-view__footer">{footer}</div> : null}
