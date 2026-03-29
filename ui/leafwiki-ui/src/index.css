@@ -358,7 +358,7 @@
   }
 
   .list-view {
-    @apply bg-surface flex h-full w-full flex-col overflow-hidden;
+    @apply bg-surface flex h-full w-full flex-col;
   }
 
   .list-view__header {
@@ -370,7 +370,7 @@
   }
 
   .list-view__content {
-    @apply min-h-0 flex-1 overflow-y-auto;
+    @apply min-h-0 flex-1;
   }
 
   .list-view__list {
@@ -414,7 +414,7 @@
   }
 
   .history-sidebar .list-view__list {
-    @apply pr-1 pl-0 pt-0 pb-0;
+    @apply pt-0 pr-0 pb-0 pl-0;
   }
 
   .history-sidebar__group {
@@ -1076,7 +1076,7 @@
   }
 
   .search-result-card__badge {
-    @apply border-surface-border bg-surface-alt text-muted-foreground inline-flex items-center border px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.08em];
+    @apply border-surface-border bg-surface-alt text-muted-foreground inline-flex items-center border px-2 py-0.5 text-[11px] font-medium tracking-[0.08em] uppercase;
   }
 
   .search-result-card__path {
@@ -1314,6 +1314,18 @@
     @apply px-4 py-6;
   }
 
+  .page-history__empty-state {
+    @apply flex flex-1 flex-col items-center justify-center px-6 py-12 text-center;
+  }
+
+  .page-history__empty-state-title {
+    @apply text-interface-text text-lg font-semibold;
+  }
+
+  .page-history__empty-state-message {
+    @apply text-muted-foreground mt-2 max-w-md text-sm leading-6;
+  }
+
   .page-history__section-heading,
   .page-history__asset-name {
     @apply text-sm font-medium;
@@ -1352,11 +1364,11 @@
   }
 
   .page-history__diff {
-    @apply border-surface-border overflow-hidden rounded-xl border;
+    @apply border-surface-border bg-surface overflow-hidden rounded-xl border;
   }
 
   .page-history__diff-line {
-    @apply border-surface-border grid grid-cols-[3.5rem_3.5rem_1.5rem_minmax(0,1fr)] border-b font-mono text-sm;
+    @apply border-surface-border grid grid-cols-[3rem_3rem_1.25rem_minmax(0,1fr)] border-b font-mono text-xs leading-5;
   }
 
   .page-history__diff-line:last-child {
@@ -1368,24 +1380,34 @@
   }
 
   .page-history__diff-line--added {
-    @apply bg-emerald-50;
+    @apply bg-success/10;
   }
 
   .page-history__diff-line--removed {
-    @apply bg-red-50;
+    @apply bg-error/10;
   }
 
   .page-history__diff-gutter,
   .page-history__diff-marker {
-    @apply text-muted-foreground border-surface-border bg-surface-alt/60 px-3 py-2 text-right text-xs;
+    @apply text-muted-foreground border-surface-border bg-surface-alt/70 px-2 py-1.5 text-right text-[11px];
   }
 
   .page-history__diff-marker {
     @apply text-center;
   }
 
+  .page-history__diff-line--added .page-history__diff-gutter,
+  .page-history__diff-line--added .page-history__diff-marker {
+    @apply border-success/20 bg-success/10 text-success;
+  }
+
+  .page-history__diff-line--removed .page-history__diff-gutter,
+  .page-history__diff-line--removed .page-history__diff-marker {
+    @apply border-error/20 bg-error/10 text-error;
+  }
+
   .page-history__diff-content {
-    @apply block overflow-x-auto px-3 py-2 break-words whitespace-pre-wrap;
+    @apply text-interface-text block overflow-x-auto px-2.5 py-1.5 break-words whitespace-pre-wrap;
   }
 
   .page-history__preview-panel {
@@ -1393,7 +1415,11 @@
   }
 
   .page-history__preview-body {
-    @apply prose prose-base max-w-none px-4 py-5;
+    @apply prose prose-base text-page-text dark:prose-invert max-w-none px-4 py-5 leading-relaxed;
+  }
+
+  .page-history__preview-body :where(h1, h2, h3, h4, h5, h6) {
+    @apply font-medium;
   }
 
   .page-history__snapshot-content {
@@ -1458,7 +1484,8 @@
 
   /* Markdown content tweaks */
   .markdown-editor__preview-container img,
-  .page-viewer__content img {
+  .page-viewer__content img,
+  .page-history__preview-body img {
     height: auto;
     max-width: 100%;
   }
@@ -1501,17 +1528,23 @@
   .page-viewer__content ol ol,
   .page-viewer__content ol ul,
   .page-viewer__content ul ol,
-  .page-viewer__content ul ul {
+  .page-viewer__content ul ul,
+  .page-history__preview-body ol ol,
+  .page-history__preview-body ol ul,
+  .page-history__preview-body ul ol,
+  .page-history__preview-body ul ul {
     @apply mt-0 mb-0;
   }
 
   .markdown-editor__preview-container li::marker,
-  .page-viewer__content li::marker {
+  .page-viewer__content li::marker,
+  .page-history__preview-body li::marker {
     @apply text-page-text;
   }
 
   .markdown-editor__preview-container ul li,
-  .page-viewer__content ul li {
+  .page-viewer__content ul li,
+  .page-history__preview-body ul li {
     @apply list-disc;
   }
 
@@ -2256,6 +2289,7 @@
     }
 
     .page-viewer__content,
+    .page-history__preview-body,
     .markdown-editor__preview {
       --tw-prose-body: #000 !important;
       --tw-prose-headings: #000 !important;
@@ -2275,6 +2309,7 @@
     }
 
     .page-viewer__content strong,
+    .page-history__preview-body strong,
     .markdown-editor__preview strong {
       font-weight: 700 !important;
     }

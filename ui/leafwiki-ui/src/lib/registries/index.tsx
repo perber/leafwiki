@@ -57,10 +57,15 @@ panelItemRegistry.register({
 panelItemRegistry.register({
   id: SIDEBAR_HISTORY_PANEL_ID,
   label: 'Revisions',
-  modes: ['history'],
+  hotkey: 'Mod+Shift+H',
+  modes: ['view'],
   icon: () => <History size={16} />,
-  render: () => {
-    return <HistorySidebar />
+  render: (props: unknown) => {
+    return (
+      <HistorySidebar
+        {...(props as React.ComponentProps<typeof HistorySidebar>)}
+      />
+    )
   },
 })
 

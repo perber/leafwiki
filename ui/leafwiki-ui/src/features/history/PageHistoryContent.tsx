@@ -1,13 +1,13 @@
 import { Button } from '@/components/ui/button'
 import { type ApiUiError } from '@/lib/api/errors'
 import {
+  buildRevisionAssetUrl,
   type Revision,
   type RevisionAssetChange,
   type RevisionComparison,
   type RevisionSnapshot,
 } from '@/lib/api/revisions'
 import { formatRelativeTime } from '@/lib/formatDate'
-import { Loader2 } from 'lucide-react'
 import { type ReactNode, useMemo } from 'react'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { type HistoryTab, usePageHistoryStore } from './pageHistory'
@@ -199,6 +199,15 @@ function MetaChip({ children }: { children: ReactNode }) {
   return <span className="page-history__meta-chip">{children}</span>
 }
 
+function EmptyState({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="page-history__empty-state">
+      <div className="page-history__empty-state-title">{title}</div>
+      <div className="page-history__empty-state-message">{message}</div>
+    </div>
+  )
+}
+
 function SummaryStat({
   label,
   value,
@@ -347,12 +356,29 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
 }
 
 function PreviewPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
+  const resolveAssetUrl = (src: string) => {
+    const normalizedSrc = src.startsWith('assets/') ? `/${src}` : src
+    const assetPrefix = `/assets/${snapshot.revision.pageId}/`
+
+    if (!normalizedSrc.startsWith(assetPrefix)) {
+      return src
+    }
+
+    return buildRevisionAssetUrl(
+      snapshot.revision.pageId,
+      snapshot.revision.id,
+      normalizedSrc.slice(assetPrefix.length),
+    )
+  }
+
   return (
     <div className="page-history__preview-panel custom-scrollbar">
       <div className="page-history__preview-body">
         <MarkdownPreview
           content={snapshot.content}
           path={snapshot.revision.path}
+          resolveAssetUrl={resolveAssetUrl}
+          enableHeadlineLinks={false}
         />
       </div>
     </div>
@@ -453,13 +479,36 @@ export function PageHistoryContent({
       ? compareLoading
       : previewLoading
 
+  if (!listLoading && !listError && revisions.length === 0) {
+    return (
+      <div className="page-history" data-testid={`${testidPrefix}-content`}>
+        <div className="page-history__header">
+          <div className="page-history__header-copy">
+            <div className="page-history__header-title">{pageTitle}</div>
+            <div className="page-history__header-subtitle">
+              Revisions will appear here after this page is changed.
+            </div>
+          </div>
+        </div>
+
+        <div className="page-history__workspace">
+          <div className="page-history__panel page-history__panel--detail">
+            <div className="page-history__detail-content custom-scrollbar">
+              <EmptyState
+                title="No revisions yet"
+                message="This page does not have any saved revision history yet."
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const renderPanelContent = () => {
     if (listLoading) {
       return (
-        <div className="page-history__loading-state">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading history...
-        </div>
+        <div className="page-history__loading-state">Loading history...</div>
       )
     }
 
@@ -467,26 +516,18 @@ export function PageHistoryContent({
       return <ErrorNotice error={listError} />
     }
 
-    if (revisions.length === 0) {
-      return (
-        <div className="page-history__empty-message page-history__empty-message--padded">
-          No revisions available yet.
-        </div>
-      )
-    }
-
     if (!selectedRevision) {
       return (
-        <div className="page-history__empty-message page-history__empty-message--padded">
-          Select a revision from the timeline.
-        </div>
+        <EmptyState
+          title="No revision to display"
+          message="There is currently no revision available that can be shown for this page."
+        />
       )
     }
 
-    if (detailLoading) {
+    if (detailLoading && !comparison && !snapshot) {
       return (
         <div className="page-history__loading-state">
-          <Loader2 className="h-4 w-4 animate-spin" />
           {activeTab === 'changes' || activeTab === 'assets'
             ? 'Loading diff...'
             : 'Loading preview...'}

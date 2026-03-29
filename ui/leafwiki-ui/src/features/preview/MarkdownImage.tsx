@@ -5,6 +5,9 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useEffect, useState } from 'react'
 
 type Props = React.ImgHTMLAttributes<HTMLImageElement> & { node?: unknown }
+type MarkdownImageProps = Omit<Props, 'node'> & {
+  resolveAssetUrl?: (src: string) => string
+}
 
 function shouldOpenPreview(e: React.MouseEvent<HTMLImageElement>) {
   if (e.button !== 0) return false
@@ -16,31 +19,43 @@ function shouldOpenInNewTab(e: React.MouseEvent<HTMLImageElement>) {
   return e.button === 0 && (e.metaKey || e.ctrlKey)
 }
 
-export function MarkdownImage({ src = '', style, alt, node, ...rest }: Props) {
+export function MarkdownImage({
+  src = '',
+  style,
+  alt,
+  node,
+  resolveAssetUrl,
+  ...rest
+}: MarkdownImageProps & { node?: unknown }) {
   void node
   const [versionedSrc, setVersionedSrc] = useState(src)
   const openDialog = useDialogsStore((s) => s.openDialog)
 
   useEffect(() => {
-    if (!src?.startsWith('/assets/')) {
-      setVersionedSrc(src)
+    const resolvedSrc = resolveAssetUrl?.(src) ?? src
+
+    if (
+      !resolvedSrc?.startsWith('/assets/') &&
+      !resolvedSrc?.startsWith('/api/')
+    ) {
+      setVersionedSrc(resolvedSrc)
       return
     }
 
     const checkVersion = async () => {
       try {
         const v = Date.now()
-        const prefixedSrc = withBasePath(src)
+        const prefixedSrc = withBasePath(resolvedSrc)
         const url = new URL(prefixedSrc, location.origin)
         url.searchParams.set('v', v.toString())
         setVersionedSrc(url.toString())
       } catch {
-        setVersionedSrc(src) // fallback
+        setVersionedSrc(resolvedSrc) // fallback
       }
     }
 
     checkVersion()
-  }, [src])
+  }, [resolveAssetUrl, src])
 
   return (
     <img

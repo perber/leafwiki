@@ -7,9 +7,16 @@ import {
 import { Button } from '@/components/ui/button'
 import { type Revision } from '@/lib/api/revisions'
 import { formatRelativeTime } from '@/lib/formatDate'
+import { buildHistoryUrl } from '@/lib/routePath'
+import { useViewerStore } from '@/features/viewer/viewer'
 import { Loader2 } from 'lucide-react'
 import { useMemo } from 'react'
-import { loadMorePageHistory, usePageHistoryStore } from './pageHistory'
+import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  loadMorePageHistory,
+  usePageHistory,
+  usePageHistoryStore,
+} from './pageHistory'
 
 type RevisionGroup = {
   label: string
@@ -99,7 +106,14 @@ function groupRevisions(revisions: Revision[]): RevisionGroup[] {
   return groups
 }
 
-export function HistorySidebar() {
+type HistorySidebarProps = {
+  active?: boolean
+}
+
+export function HistorySidebar({ active = false }: HistorySidebarProps) {
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const page = useViewerStore((state) => state.page)
   const revisions = usePageHistoryStore((state) => state.revisions)
   const selectedRevisionId = usePageHistoryStore(
     (state) => state.selectedRevisionId,
@@ -110,7 +124,13 @@ export function HistorySidebar() {
   const loadingMore = usePageHistoryStore((state) => state.loadingMore)
   const selectRevision = usePageHistoryStore((state) => state.selectRevision)
 
+  usePageHistory(page?.id ?? null, active)
+
   const groupedRevisions = useMemo(() => groupRevisions(revisions), [revisions])
+  const isHistoryRoute =
+    pathname === '/history' ||
+    pathname === '/history/' ||
+    pathname.startsWith('/history/')
 
   return (
     <ListView
@@ -127,21 +147,27 @@ export function HistorySidebar() {
       ) : listError ? (
         <ListViewStatus error>{listError.message}</ListViewStatus>
       ) : revisions.length === 0 ? (
-        <ListViewStatus>No revisions available yet.</ListViewStatus>
+        <ListViewStatus>
+          No revisions yet. They will appear here after the page changes.
+        </ListViewStatus>
       ) : (
         <ListViewList>
           {groupedRevisions.map((group) => (
             <div key={group.label} className="history-sidebar__group">
               <div className="history-sidebar__group-label">{group.label}</div>
               {group.revisions.map((revision) => {
-                const selected = revision.id === selectedRevisionId
+                const selected =
+                  isHistoryRoute && revision.id === selectedRevisionId
 
                 return (
                   <ListViewItem
                     key={revision.id}
                     active={selected}
                     className="history-sidebar__item"
-                    onClick={() => selectRevision(revision.id)}
+                    onClick={() => {
+                      selectRevision(revision.id)
+                      navigate(buildHistoryUrl(revision.path))
+                    }}
                     testId={`history-sidebar-revision-${revision.id}`}
                   >
                     <div className="history-sidebar__item-title">

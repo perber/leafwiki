@@ -98,3 +98,22 @@ export async function compareRevisions(
     `/api/pages/${pageId}/revisions/compare?${params.toString()}`,
   )) as RevisionComparison
 }
+
+function encodeAssetName(name: string): string {
+  return name
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')
+}
+
+export function buildRevisionAssetUrl(
+  pageId: string,
+  revisionId: string,
+  assetName: string,
+): string {
+  const normalizedAssetName = assetName.replace(/^\/+/, '')
+  return `/api/pages/${pageId}/revisions/${revisionId}/assets/${encodeAssetName(
+    normalizedAssetName,
+  )}`
+}

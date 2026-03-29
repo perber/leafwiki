@@ -4,7 +4,6 @@ import { useLocation } from 'react-router-dom'
 
 export type AppMode =
   | 'edit'
-  | 'history'
   | 'view'
   | 'dialog'
   | 'user-management'

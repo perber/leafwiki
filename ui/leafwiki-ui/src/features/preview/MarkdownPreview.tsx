@@ -2,21 +2,21 @@ import './markdownPreviewCodeTheme.css'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { withBasePath } from '@/lib/routePath'
 import {
-  Children,
   AnchorHTMLAttributes,
   AudioHTMLAttributes,
   BlockquoteHTMLAttributes,
+  Children,
   ClassAttributes,
   Component,
   ErrorInfo,
   HTMLAttributes,
   ReactElement,
-  isValidElement,
   ReactNode,
+  VideoHTMLAttributes,
+  isValidElement,
   useCallback,
   useMemo,
   useSyncExternalStore,
-  VideoHTMLAttributes,
 } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
@@ -59,6 +59,8 @@ const schema = {
 type Props = {
   content: string
   path?: string
+  resolveAssetUrl?: (src: string) => string
+  enableHeadlineLinks?: boolean
 }
 
 type MarkdownPreviewErrorBoundaryState = {
@@ -92,7 +94,6 @@ function getTextContent(node: ReactNode): string {
 
 function getAlertKind(children: ReactNode): AlertKind | null {
   const childArray = Children.toArray(children)
-  // HAST includes whitespace text nodes between block elements; skip them
   const firstChild = childArray.find(
     (child) => typeof child !== 'string' || child.trim() !== '',
   )
@@ -186,7 +187,12 @@ function isPlainListParagraph(
   return propKeys.every((key) => key === 'children' || key === 'data-line')
 }
 
-export default function MarkdownPreview({ content, path }: Props) {
+export default function MarkdownPreview({
+  content,
+  path,
+  resolveAssetUrl,
+  enableHeadlineLinks = true,
+}: Props) {
   const designMode = useDesignModeStore((state) => state.mode)
   const prefersLight = useSyncExternalStore(
     (onStoreChange) => {
@@ -221,31 +227,43 @@ export default function MarkdownPreview({ content, path }: Props) {
       return (
         <MarkdownLink
           path={path}
+          resolveAssetUrl={resolveAssetUrl}
           {...props}
           href={normalizeFootnoteHref(props.href)}
         />
       )
     },
-    [path],
+    [path, resolveAssetUrl],
   )
 
   const components = useMemo(
     () => ({
       a: markdownLink,
-      img: MarkdownImage,
+      img: ({
+        node,
+        ...props
+      }: MarkdownNodeProp &
+        JSX.IntrinsicAttributes &
+        ClassAttributes<HTMLImageElement> &
+        HTMLAttributes<HTMLImageElement>) => {
+        void node
+        return <MarkdownImage resolveAssetUrl={resolveAssetUrl} {...props} />
+      },
       audio: ({
         node,
         ...props
       }: MarkdownNodeProp & AudioHTMLAttributes<HTMLAudioElement>) => {
         void node
-        return <audio {...props} src={normalizeAssetMediaSrc(props.src)} />
+        const resolvedSrc = resolveAssetUrl?.(props.src ?? '') ?? props.src
+        return <audio {...props} src={normalizeAssetMediaSrc(resolvedSrc)} />
       },
       video: ({
         node,
         ...props
       }: MarkdownNodeProp & VideoHTMLAttributes<HTMLVideoElement>) => {
         void node
-        return <video {...props} src={normalizeAssetMediaSrc(props.src)} />
+        const resolvedSrc = resolveAssetUrl?.(props.src ?? '') ?? props.src
+        return <video {...props} src={normalizeAssetMediaSrc(resolvedSrc)} />
       },
       section: ({
         children,
@@ -320,8 +338,6 @@ export default function MarkdownPreview({ content, path }: Props) {
         }
 
         const childArray = Children.toArray(children)
-        // Find the marker paragraph index so content starts after it,
-        // accounting for leading whitespace text nodes
         const markerIndex = childArray.findIndex(
           (child) => isValidElement(child) && child.type === 'p',
         )
@@ -348,84 +364,84 @@ export default function MarkdownPreview({ content, path }: Props) {
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => {
-        void node
-        return (
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
           <Headline level={1} {...props}>
             {children}
           </Headline>
-        )
-      },
+        ) : (
+          <h1 {...props}>{children}</h1>
+        ),
       h2: ({
         children,
         node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => {
-        void node
-        return (
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
           <Headline level={2} {...props}>
             {children}
           </Headline>
-        )
-      },
+        ) : (
+          <h2 {...props}>{children}</h2>
+        ),
       h3: ({
         children,
         node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => {
-        void node
-        return (
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
           <Headline level={3} {...props}>
             {children}
           </Headline>
-        )
-      },
+        ) : (
+          <h3 {...props}>{children}</h3>
+        ),
       h4: ({
         children,
         node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => {
-        void node
-        return (
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
           <Headline level={4} {...props}>
             {children}
           </Headline>
-        )
-      },
+        ) : (
+          <h4 {...props}>{children}</h4>
+        ),
       h5: ({
         children,
         node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => {
-        void node
-        return (
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
           <Headline level={5} {...props}>
             {children}
           </Headline>
-        )
-      },
+        ) : (
+          <h5 {...props}>{children}</h5>
+        ),
       h6: ({
         children,
         node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => {
-        void node
-        return (
+        HTMLAttributes<HTMLHeadingElement>) =>
+        enableHeadlineLinks ? (
           <Headline level={6} {...props}>
             {children}
           </Headline>
-        )
-      },
+        ) : (
+          <h6 {...props}>{children}</h6>
+        ),
       table: ({
         node,
         ...props
@@ -484,7 +500,7 @@ export default function MarkdownPreview({ content, path }: Props) {
         )
       },
     }),
-    [markdownLink, resolvedMode],
+    [enableHeadlineLinks, markdownLink, resolveAssetUrl, resolvedMode],
   )
 
   const normalizedContent = useMemo(
