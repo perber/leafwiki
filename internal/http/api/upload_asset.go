@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/shared"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -34,7 +35,12 @@ func UploadAssetHandler(w *wiki.Wiki, maxUploadSize int64) gin.HandlerFunc {
 			}
 		}()
 
-		url, err := w.UploadAsset(pageID, file, header.Filename, maxUploadSize)
+		user := auth_middleware.MustGetUser(c)
+		if user == nil {
+			return
+		}
+
+		url, err := w.UploadAsset(user.ID, pageID, file, header.Filename, maxUploadSize)
 		if err != nil {
 			if errors.Is(err, shared.ErrFileTooLarge) {
 				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})

@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -255,6 +256,43 @@ func GetPageRevisionHandler(w *wiki.Wiki) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, ToAPIRevisionSnapshot(snapshot, w.GetUserResolver()))
+	}
+}
+
+func GetPageRevisionAssetHandler(w *wiki.Wiki) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		pageID := strings.TrimSpace(c.Param("id"))
+		revisionID := strings.TrimSpace(c.Param("revisionId"))
+		assetName := strings.TrimSpace(strings.TrimPrefix(c.Param("name"), "/"))
+		if pageID == "" {
+			respondWithRevisionStatusError(c, http.StatusBadRequest, "revision_invalid_page_id", "Page ID is required", "page id is required")
+			return
+		}
+		if revisionID == "" {
+			respondWithRevisionStatusError(c, http.StatusBadRequest, "revision_invalid_revision_id", "Revision ID is required", "revision id is required")
+			return
+		}
+		if assetName == "" {
+			respondWithRevisionStatusError(c, http.StatusBadRequest, "revision_preview_asset_invalid_name", "Revision asset name is invalid", "revision asset name for page %s revision %s is invalid", pageID, revisionID)
+			return
+		}
+
+		asset, err := w.GetRevisionAsset(pageID, revisionID, assetName)
+		if err != nil {
+			respondWithRevisionError(c, err)
+			return
+		}
+		if asset == nil {
+			respondWithRevisionStatusError(c, http.StatusNotFound, "revision_preview_asset_not_found", "Revision asset not found", "revision asset %s for page %s revision %s not found", assetName, pageID, revisionID)
+			return
+		}
+
+		contentType := asset.Asset.MIMEType
+		if contentType == "" {
+			contentType = http.DetectContentType(asset.Content)
+		}
+		c.Header("Content-Disposition", `inline; filename="`+path.Base(assetName)+`"`)
+		c.Data(http.StatusOK, contentType, asset.Content)
 	}
 }
 

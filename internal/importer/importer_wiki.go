@@ -11,5 +11,5 @@ type ImporterWiki interface {
 	LookupPagePath(path string) (*tree.PathLookup, error)
 	EnsurePath(userID string, targetPath string, title string, kind *tree.NodeKind) (*tree.Page, error)
 	UpdatePage(userID string, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error)
-	UploadAsset(pageID string, file multipart.File, filename string, maxBytes int64) (string, error)
+	UploadAsset(userID, pageID string, file multipart.File, filename string, maxBytes int64) (string, error)
 }

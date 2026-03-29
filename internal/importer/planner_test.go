@@ -82,7 +82,7 @@ func (f *fakeWiki) UpdatePage(userID string, id, title, slug string, content *st
 	}}, nil
 }
 
-func (f *fakeWiki) UploadAsset(pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
+func (f *fakeWiki) UploadAsset(userID, pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
 	return "/assets/" + pageID + "/" + filename, nil
 }
 

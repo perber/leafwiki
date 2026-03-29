@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -21,7 +22,12 @@ func RenameAssetHandler(w *wiki.Wiki) gin.HandlerFunc {
 			return
 		}
 
-		url, err := w.RenameAsset(pageID, req.OldFilename, req.NewFilename)
+		user := auth_middleware.MustGetUser(c)
+		if user == nil {
+			return
+		}
+
+		url, err := w.RenameAsset(user.ID, pageID, req.OldFilename, req.NewFilename)
 		if err != nil {
 			respondWithError(c, err)
 			return

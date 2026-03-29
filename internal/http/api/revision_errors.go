@@ -51,6 +51,12 @@ func revisionErrorStatus(code string) int {
 		return http.StatusNotFound
 	case "revision_preview_content_unavailable", "revision_preview_assets_unavailable":
 		return http.StatusInternalServerError
+	case "revision_preview_asset_not_found":
+		return http.StatusNotFound
+	case "revision_preview_asset_invalid_name":
+		return http.StatusBadRequest
+	case "revision_preview_asset_blob_unavailable":
+		return http.StatusInternalServerError
 	case "revision_restore_slug_conflict":
 		return http.StatusConflict
 	case "revision_restore_invalid_page_id", "revision_restore_invalid_revision", "revision_restore_invalid_kind", "revision_restore_parent_required":

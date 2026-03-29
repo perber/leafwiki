@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -66,6 +67,102 @@ func TestRestorePageHandlerReturnsStructuredRevisionError(t *testing.T) {
 	}
 	if len(body.Error.Args) != 1 || body.Error.Args[0] != "missing-page" {
 		t.Fatalf("error.args = %#v", body.Error.Args)
+	}
+}
+
+func TestGetPageRevisionAssetHandlerReturnsAssetBlobAfterLiveDelete(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	w := createRevisionTestWiki(t)
+	t.Cleanup(func() { _ = w.Close() })
+
+	kind := tree.NodeKindPage
+	page, err := w.CreatePage("editor", nil, "Page", "page", &kind)
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	tmpFile, err := os.CreateTemp(t.TempDir(), "revision-asset-*.png")
+	if err != nil {
+		t.Fatalf("CreateTemp failed: %v", err)
+	}
+	defer func() { _ = tmpFile.Close() }()
+	if _, err := tmpFile.WriteString("asset-image"); err != nil {
+		t.Fatalf("WriteString failed: %v", err)
+	}
+	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+		t.Fatalf("Seek failed: %v", err)
+	}
+
+	if _, err := w.UploadAsset("editor", page.ID, tmpFile, "image.png", 1024); err != nil {
+		t.Fatalf("UploadAsset failed: %v", err)
+	}
+
+	rev, err := w.GetLatestRevision(page.ID)
+	if err != nil || rev == nil {
+		t.Fatalf("GetLatestRevision failed: %#v %v", rev, err)
+	}
+
+	if err := w.DeleteAsset("editor", page.ID, "image.png"); err != nil {
+		t.Fatalf("DeleteAsset failed: %v", err)
+	}
+
+	router := gin.New()
+	router.GET("/pages/:id/revisions/:revisionId/assets/*name", GetPageRevisionAssetHandler(w))
+
+	req := httptest.NewRequest(http.MethodGet, "/pages/"+page.ID+"/revisions/"+rev.ID+"/assets/image.png", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.Code, http.StatusOK)
+	}
+	if body := resp.Body.String(); body != "asset-image" {
+		t.Fatalf("body = %q", body)
+	}
+	if contentType := resp.Header().Get("Content-Type"); contentType == "" {
+		t.Fatal("expected Content-Type header")
+	}
+}
+
+func TestGetPageRevisionAssetHandlerReturnsStructuredNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	w := createRevisionTestWiki(t)
+	t.Cleanup(func() { _ = w.Close() })
+
+	kind := tree.NodeKindPage
+	page, err := w.CreatePage("editor", nil, "Page", "page", &kind)
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	content := "historical content"
+	page, err = w.UpdatePage("editor", page.ID, page.Title, page.Slug, &content, &kind)
+	if err != nil {
+		t.Fatalf("UpdatePage failed: %v", err)
+	}
+	rev, err := w.GetLatestRevision(page.ID)
+	if err != nil || rev == nil {
+		t.Fatalf("GetLatestRevision failed: %#v %v", rev, err)
+	}
+
+	router := gin.New()
+	router.GET("/pages/:id/revisions/:revisionId/assets/*name", GetPageRevisionAssetHandler(w))
+
+	req := httptest.NewRequest(http.MethodGet, "/pages/"+page.ID+"/revisions/"+rev.ID+"/assets/missing.png", nil)
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", resp.Code, http.StatusNotFound)
+	}
+
+	var body RevisionErrorResponse
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body.Error.Code != "revision_preview_asset_not_found" {
+		t.Fatalf("error.code = %q", body.Error.Code)
 	}
 }
 

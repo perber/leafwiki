@@ -1095,3 +1095,52 @@ func TestCompareRevisionSnapshots(t *testing.T) {
 		t.Fatalf("asset changes = %#v", comparison.AssetChanges)
 	}
 }
+
+func TestGetRevisionAssetReturnsBlobForDeletedLiveAsset(t *testing.T) {
+	service, treeService, storageDir := newRevisionTestService(t)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "one")
+	writeLiveAsset(t, storageDir, pageID, "image.png", "asset-image")
+
+	rev, _, err := service.RecordAssetChange(pageID, "tester", "with asset")
+	if err != nil {
+		t.Fatalf("RecordAssetChange failed: %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(storageDir, "assets", pageID, "image.png")); err != nil {
+		t.Fatalf("Remove live asset failed: %v", err)
+	}
+
+	asset, err := service.GetRevisionAsset(pageID, rev.ID, "image.png")
+	if err != nil {
+		t.Fatalf("GetRevisionAsset failed: %v", err)
+	}
+	if asset == nil {
+		t.Fatal("expected revision asset content")
+	}
+	if asset.Asset.Name != "image.png" {
+		t.Fatalf("asset name = %q", asset.Asset.Name)
+	}
+	if string(asset.Content) != "asset-image" {
+		t.Fatalf("asset content = %q", string(asset.Content))
+	}
+}
+
+func TestGetRevisionAssetReturnsNotFoundForMissingManifestEntry(t *testing.T) {
+	service, treeService, storageDir := newRevisionTestService(t)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "one")
+	writeLiveAsset(t, storageDir, pageID, "image.png", "asset-image")
+
+	rev, _, err := service.RecordAssetChange(pageID, "tester", "with asset")
+	if err != nil {
+		t.Fatalf("RecordAssetChange failed: %v", err)
+	}
+
+	_, err = service.GetRevisionAsset(pageID, rev.ID, "missing.png")
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok {
+		t.Fatalf("expected localized error, got %T", err)
+	}
+	if localized.Code != "revision_preview_asset_not_found" {
+		t.Fatalf("localized.Code = %q", localized.Code)
+	}
+}

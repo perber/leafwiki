@@ -85,6 +85,11 @@ type RevisionSnapshot struct {
 	Assets   []AssetRef
 }
 
+type RevisionAssetContent struct {
+	Asset   AssetRef
+	Content []byte
+}
+
 type RevisionAssetDelta struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`

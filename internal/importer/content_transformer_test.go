@@ -126,7 +126,7 @@ func TestContentTransformer_TransformContent_TableDriven(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := transformer.TransformContent(tt.sourcePath, page, tt.content, wiki)
+			got, err := transformer.TransformContent("editor", tt.sourcePath, page, tt.content, wiki)
 			if err != nil {
 				t.Fatalf("TransformContent err: %v", err)
 			}

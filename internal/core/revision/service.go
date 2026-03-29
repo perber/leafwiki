@@ -375,6 +375,71 @@ func (s *Service) CompareRevisionSnapshots(pageID, baseRevisionID, targetRevisio
 	}, nil
 }
 
+func (s *Service) GetRevisionAsset(pageID, revisionID, assetName string) (*RevisionAssetContent, error) {
+	assetName = strings.TrimSpace(strings.TrimPrefix(assetName, "/"))
+	if assetName == "" {
+		return nil, sharederrors.NewLocalizedError(
+			"revision_preview_asset_invalid_name",
+			"Revision asset name is invalid",
+			"revision asset name for page %s revision %s is invalid",
+			fmt.Errorf("asset name is required"),
+			pageID,
+			revisionID,
+		)
+	}
+
+	rev, err := s.store.GetRevision(pageID, revisionID)
+	if err != nil {
+		return nil, err
+	}
+
+	assets, err := s.store.LoadAssetManifest(rev.AssetManifestHash)
+	if err != nil {
+		return nil, sharederrors.NewLocalizedError(
+			"revision_preview_assets_unavailable",
+			"Revision assets are unavailable",
+			"revision assets for page %s revision %s are unavailable",
+			err,
+			pageID,
+			revisionID,
+		)
+	}
+
+	for _, asset := range assets {
+		if asset.Name != assetName {
+			continue
+		}
+
+		content, err := s.store.ReadAssetBlob(asset.SHA256)
+		if err != nil {
+			return nil, sharederrors.NewLocalizedError(
+				"revision_preview_asset_blob_unavailable",
+				"Revision asset is unavailable",
+				"revision asset %s for page %s revision %s is unavailable",
+				err,
+				assetName,
+				pageID,
+				revisionID,
+			)
+		}
+
+		return &RevisionAssetContent{
+			Asset:   asset,
+			Content: content,
+		}, nil
+	}
+
+	return nil, sharederrors.NewLocalizedError(
+		"revision_preview_asset_not_found",
+		"Revision asset not found",
+		"revision asset %s for page %s revision %s not found",
+		fmt.Errorf("asset %q not found in revision manifest", assetName),
+		assetName,
+		pageID,
+		revisionID,
+	)
+}
+
 func compareRevisionAssets(baseAssets, targetAssets []AssetRef) []RevisionAssetDelta {
 	baseByName := make(map[string]AssetRef, len(baseAssets))
 	for _, asset := range baseAssets {
