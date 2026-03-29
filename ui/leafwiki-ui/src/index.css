@@ -409,12 +409,16 @@
     @apply p-0;
   }
 
-  .history-sidebar .list-view__list {
+  .history-sidebar .list-view__content {
     @apply p-0;
   }
 
+  .history-sidebar .list-view__list {
+    @apply pr-1 pl-0 pt-0 pb-0;
+  }
+
   .history-sidebar__group {
-    @apply border-b-0;
+    @apply w-full border-b-0;
   }
 
   .history-sidebar__group-label {
@@ -422,7 +426,7 @@
   }
 
   .history-sidebar__item {
-    @apply rounded-none px-3 py-3;
+    @apply w-full rounded-none px-3 py-3;
   }
 
   .history-sidebar__item:hover {
