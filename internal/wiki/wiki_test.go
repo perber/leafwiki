@@ -1,8 +1,10 @@
 package wiki
 
 import (
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1681,33 +1683,124 @@ func TestWiki_MovePageRecordsStructureRevision(t *testing.T) {
 	}
 }
 
-func TestWiki_RenameAssetRecordsAssetRevision(t *testing.T) {
+func TestWiki_AssetMutationsRecordAssetRevisionForUser(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
-	page, err := w.CreatePage("system", nil, "Asset Page", "asset-page", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
+	writeAsset := func(t *testing.T, pageID, name string, content []byte) {
+		t.Helper()
+
+		assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), pageID)
+		if err := os.MkdirAll(assetDir, 0o755); err != nil {
+			t.Fatalf("MkdirAll(assetDir) failed: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(assetDir, name), content, 0o644); err != nil {
+			t.Fatalf("WriteFile(asset) failed: %v", err)
+		}
 	}
 
-	assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), page.ID)
-	if err := os.MkdirAll(assetDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll(assetDir) failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(assetDir, "old.txt"), []byte("payload"), 0o644); err != nil {
-		t.Fatalf("WriteFile(asset) failed: %v", err)
+	tests := []struct {
+		name      string
+		setup     func(t *testing.T, pageID string)
+		operate   func(t *testing.T, pageID string)
+		wantAsset string
+	}{
+		{
+			name: "upload",
+			operate: func(t *testing.T, pageID string) {
+				t.Helper()
+
+				file, err := os.CreateTemp(t.TempDir(), "asset-upload-*")
+				if err != nil {
+					t.Fatalf("CreateTemp failed: %v", err)
+				}
+				t.Cleanup(func() {
+					if err := file.Close(); err != nil {
+						t.Fatalf("Close(file) failed: %v", err)
+					}
+				})
+				if _, err := file.WriteString("payload"); err != nil {
+					t.Fatalf("WriteString(file) failed: %v", err)
+				}
+				if _, err := file.Seek(0, io.SeekStart); err != nil {
+					t.Fatalf("Seek(file) failed: %v", err)
+				}
+
+				if _, err := w.UploadAsset("editor", pageID, file, "uploaded.txt", 1024); err != nil {
+					t.Fatalf("UploadAsset failed: %v", err)
+				}
+			},
+			wantAsset: "uploaded.txt",
+		},
+		{
+			name: "rename",
+			setup: func(t *testing.T, pageID string) {
+				t.Helper()
+				writeAsset(t, pageID, "old.txt", []byte("payload"))
+			},
+			operate: func(t *testing.T, pageID string) {
+				t.Helper()
+				if _, err := w.RenameAsset("editor", pageID, "old.txt", "new.txt"); err != nil {
+					t.Fatalf("RenameAsset failed: %v", err)
+				}
+			},
+			wantAsset: "new.txt",
+		},
+		{
+			name: "delete",
+			setup: func(t *testing.T, pageID string) {
+				t.Helper()
+				writeAsset(t, pageID, "delete.txt", []byte("payload"))
+			},
+			operate: func(t *testing.T, pageID string) {
+				t.Helper()
+				if err := w.DeleteAsset("editor", pageID, "delete.txt"); err != nil {
+					t.Fatalf("DeleteAsset failed: %v", err)
+				}
+			},
+		},
 	}
 
-	if _, err := w.RenameAsset(page.ID, "old.txt", "new.txt"); err != nil {
-		t.Fatalf("RenameAsset failed: %v", err)
-	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			page, err := w.CreatePage("system", nil, "Asset Page "+tc.name, "asset-page-"+tc.name, pageNodeKind())
+			if err != nil {
+				t.Fatalf("CreatePage failed: %v", err)
+			}
 
-	latest, err := w.GetLatestRevision(page.ID)
-	if err != nil {
-		t.Fatalf("GetLatestRevision failed: %v", err)
-	}
-	if latest == nil || latest.Type != revision.RevisionTypeAssetUpdate {
-		t.Fatalf("latest revision = %#v", latest)
+			if tc.setup != nil {
+				tc.setup(t, page.ID)
+			}
+
+			tc.operate(t, page.ID)
+
+			latest, err := w.GetLatestRevision(page.ID)
+			if err != nil {
+				t.Fatalf("GetLatestRevision failed: %v", err)
+			}
+			if latest == nil || latest.Type != revision.RevisionTypeAssetUpdate {
+				t.Fatalf("latest revision = %#v", latest)
+			}
+			if latest.AuthorID != "editor" {
+				t.Fatalf("latest author = %q, want %q", latest.AuthorID, "editor")
+			}
+
+			assets, err := w.ListAssets(page.ID)
+			if err != nil {
+				t.Fatalf("ListAssets failed: %v", err)
+			}
+
+			if tc.wantAsset == "" {
+				if len(assets) != 0 {
+					t.Fatalf("assets = %#v, want empty", assets)
+				}
+				return
+			}
+
+			if len(assets) != 1 || !strings.HasSuffix(assets[0], "/"+tc.wantAsset) {
+				t.Fatalf("assets = %#v, want suffix %q", assets, tc.wantAsset)
+			}
+		})
 	}
 }
 

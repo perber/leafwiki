@@ -63,24 +63,26 @@ func newContentTransformer(plan *PlanResult, sourceBasePath string, assetMaxByte
 // TransformContent rewrites Markdown links, wiki links, and asset references for one imported page.
 // Rewrites only happen outside inline code and fenced blocks so code examples remain untouched.
 func (t *contentTransformer) TransformContent(
+	userID string,
 	sourcePath string,
 	page *tree.Page,
 	content string,
 	wiki ImporterWiki,
 ) (string, error) {
 	rewritten, err := rewriteOutsideCodeSpans(content, func(segment string) (string, error) {
-		return t.rewriteMarkdownLinks(sourcePath, page, segment, wiki)
+		return t.rewriteMarkdownLinks(userID, sourcePath, page, segment, wiki)
 	})
 	if err != nil {
 		return "", err
 	}
 	return rewriteOutsideCodeSpans(rewritten, func(segment string) (string, error) {
-		return t.rewriteWikiLinks(sourcePath, page, segment, wiki)
+		return t.rewriteWikiLinks(userID, sourcePath, page, segment, wiki)
 	})
 }
 
 // rewriteMarkdownLinks rewrites regular Markdown links and images in non-code segments only.
 func (t *contentTransformer) rewriteMarkdownLinks(
+	userID string,
 	sourcePath string,
 	page *tree.Page,
 	content string,
@@ -120,7 +122,7 @@ func (t *contentTransformer) rewriteMarkdownLinks(
 		}
 
 		destination := content[destStart:destEnd]
-		rewritten, err := t.rewriteDestination(sourcePath, page, destination, wiki)
+		rewritten, err := t.rewriteDestination(userID, sourcePath, page, destination, wiki)
 		if err != nil {
 			return "", err
 		}
@@ -139,6 +141,7 @@ func (t *contentTransformer) rewriteMarkdownLinks(
 
 // rewriteWikiLinks handles Obsidian-style wiki links and converts them to plain Markdown links.
 func (t *contentTransformer) rewriteWikiLinks(
+	userID string,
 	sourcePath string,
 	page *tree.Page,
 	content string,
@@ -179,7 +182,7 @@ func (t *contentTransformer) rewriteWikiLinks(
 		inner := strings.TrimSpace(content[next+startOffset : end])
 		targetPart, label := splitWikiLink(inner)
 		targetPart = normalizeImportedHref(targetPart)
-		href, isAsset, err := t.resolveDestination(sourcePath, page, targetPart, wiki)
+		href, isAsset, err := t.resolveDestination(userID, sourcePath, page, targetPart, wiki)
 		if err != nil {
 			return "", err
 		}
@@ -219,6 +222,7 @@ func (t *contentTransformer) rewriteWikiLinks(
 // rewriteDestination keeps the original Markdown destination wrapper and title suffix intact
 // while only replacing the actual href when we can resolve it safely.
 func (t *contentTransformer) rewriteDestination(
+	userID string,
 	sourcePath string,
 	page *tree.Page,
 	destination string,
@@ -231,7 +235,7 @@ func (t *contentTransformer) rewriteDestination(
 
 	prefix, href, suffix := splitMarkdownDestination(trimmed)
 	href = normalizeImportedHref(href)
-	resolved, _, err := t.resolveDestination(sourcePath, page, href, wiki)
+	resolved, _, err := t.resolveDestination(userID, sourcePath, page, href, wiki)
 	if err != nil {
 		return "", err
 	}
@@ -244,6 +248,7 @@ func (t *contentTransformer) rewriteDestination(
 // resolveDestination first tries to map the href to another imported page.
 // If that fails, it falls back to importing a local asset from the source package.
 func (t *contentTransformer) resolveDestination(
+	userID string,
 	sourcePath string,
 	page *tree.Page,
 	href string,
@@ -259,7 +264,7 @@ func (t *contentTransformer) resolveDestination(
 		return "/" + targetPath + suffix, false, nil
 	}
 
-	assetPath, err := t.resolveAndUploadAsset(sourcePath, page, rawTarget, wiki)
+	assetPath, err := t.resolveAndUploadAsset(userID, sourcePath, page, rawTarget, wiki)
 	if err != nil {
 		return "", false, err
 	}
@@ -318,6 +323,7 @@ func (t *contentTransformer) resolveUniqueTargetPathSuffix(href string) (string,
 // resolveAndUploadAsset imports local non-Markdown files into the target page's asset folder
 // and caches the public path so repeated references on the same page reuse the upload result.
 func (t *contentTransformer) resolveAndUploadAsset(
+	userID string,
 	sourcePath string,
 	page *tree.Page,
 	href string,
@@ -341,7 +347,7 @@ func (t *contentTransformer) resolveAndUploadAsset(
 		_ = file.Close()
 	}()
 
-	publicPath, err := wiki.UploadAsset(page.ID, multipart.File(file), filepath.Base(assetAbs), t.assetMaxBytes)
+	publicPath, err := wiki.UploadAsset(userID, page.ID, multipart.File(file), filepath.Base(assetAbs), t.assetMaxBytes)
 	if err != nil {
 		return "", fmt.Errorf("upload asset %q: %w", assetAbs, err)
 	}

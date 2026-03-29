@@ -944,7 +944,7 @@ func (w *Wiki) GetUserByID(id string) (*auth.PublicUser, error) {
 	return user.ToPublicUser(), nil
 }
 
-func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
+func (w *Wiki) UploadAsset(userID, pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
 	page, err := w.tree.FindPageByID(pageID)
 	if err != nil {
 		return "", err
@@ -953,8 +953,7 @@ func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string, 
 	if err != nil {
 		return "", err
 	}
-	// fix: no userID in current method signature, so we fall back to system.
-	w.recordAssetRevision(pageID, SYSTEM_USER_ID, "")
+	w.recordAssetRevision(pageID, userID, "")
 	return assetPath, nil
 }
 
@@ -966,7 +965,7 @@ func (w *Wiki) ListAssets(pageID string) ([]string, error) {
 	return w.asset.ListAssetsForPage(page)
 }
 
-func (w *Wiki) RenameAsset(pageID string, oldFilename, newFilename string) (string, error) {
+func (w *Wiki) RenameAsset(userID, pageID string, oldFilename, newFilename string) (string, error) {
 	page, err := w.tree.FindPageByID(pageID)
 	if err != nil {
 		return "", err
@@ -976,11 +975,11 @@ func (w *Wiki) RenameAsset(pageID string, oldFilename, newFilename string) (stri
 		return "", err
 	}
 
-	w.recordAssetRevision(pageID, SYSTEM_USER_ID, "")
+	w.recordAssetRevision(pageID, userID, "")
 	return newPath, nil
 }
 
-func (w *Wiki) DeleteAsset(pageID string, filename string) error {
+func (w *Wiki) DeleteAsset(userID, pageID string, filename string) error {
 	page, err := w.tree.FindPageByID(pageID)
 	if err != nil {
 		return err
@@ -989,8 +988,7 @@ func (w *Wiki) DeleteAsset(pageID string, filename string) error {
 		return err
 	}
 
-	// fix: no userID in current method signature, so we fall back to system.
-	w.recordAssetRevision(pageID, SYSTEM_USER_ID, "")
+	w.recordAssetRevision(pageID, userID, "")
 
 	return nil
 }
@@ -1125,6 +1123,13 @@ func (w *Wiki) CompareRevisionSnapshots(pageID, baseRevisionID, targetRevisionID
 		return nil, nil
 	}
 	return w.revision.CompareRevisionSnapshots(pageID, baseRevisionID, targetRevisionID)
+}
+
+func (w *Wiki) GetRevisionAsset(pageID, revisionID, assetName string) (*revision.RevisionAssetContent, error) {
+	if w.revision == nil {
+		return nil, nil
+	}
+	return w.revision.GetRevisionAsset(pageID, revisionID, assetName)
 }
 
 func (w *Wiki) GetTrashEntry(pageID string) (*revision.TrashEntry, error) {

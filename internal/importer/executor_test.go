@@ -61,7 +61,7 @@ func (f *fakeExecWiki) UpdatePage(userID string, id, title, slug string, content
 	return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
 }
 
-func (f *fakeExecWiki) UploadAsset(pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
+func (f *fakeExecWiki) UploadAsset(userID, pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
 	f.uploadCalls++
 	f.uploadedAssets = append(f.uploadedAssets, filename)
 	f.lastUploadMaxBytes = maxBytes

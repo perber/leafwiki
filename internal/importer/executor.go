@@ -187,7 +187,7 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 				e.logger.Error("Failed to prepare imported content", "source_path", sourceAbs, "error", err)
 				continue
 			}
-			importedContent, err = transformer.TransformContent(item.SourcePath, page, importedContent, e.wiki)
+			importedContent, err = transformer.TransformContent(userID, item.SourcePath, page, importedContent, e.wiki)
 			if err != nil {
 				errMsg := err.Error()
 				execItem.Action = ExecutionActionSkipped
