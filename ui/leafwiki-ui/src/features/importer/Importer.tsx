@@ -192,46 +192,51 @@ export default function Importer() {
                   </div>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="default"
-                  onClick={() => {
-                    executeImportPlan()
-                  }}
-                  disabled={
-                    executingImportPlan ||
-                    creatingImportPlan ||
-                    cancelingImportPlan
-                  }
-                >
-                  {executingImportPlan ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <PlayIcon className="mr-2 h-4 w-4" />
-                  )}
-                  Execute Import Plan
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    cancelImportPlan()
-                  }}
-                  disabled={
-                    cancelingImportPlan ||
-                    creatingImportPlan ||
-                    executingImportPlan
-                  }
-                >
-                  {cancelingImportPlan ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <XIcon className="mr-2 h-4 w-4" />
-                  )}
-                  Cancel Import Plan
-                </Button>
-              </div>
             </div>
           </>
+        )}
+        {importPlan && (
+          <div className="settings__section">
+            <div className="flex gap-2">
+              <Button
+                variant="default"
+                onClick={() => {
+                  executeImportPlan()
+                }}
+                disabled={
+                  importPlan.items.length === 0 ||
+                  executingImportPlan ||
+                  creatingImportPlan ||
+                  cancelingImportPlan
+                }
+              >
+                {executingImportPlan ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <PlayIcon className="mr-2 h-4 w-4" />
+                )}
+                Execute Import Plan
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  cancelImportPlan()
+                }}
+                disabled={
+                  cancelingImportPlan ||
+                  executingImportPlan ||
+                  creatingImportPlan
+                }
+              >
+                {cancelingImportPlan ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <XIcon className="mr-2 h-4 w-4" />
+                )}
+                Cancel Import Plan
+              </Button>
+            </div>
+          </div>
         )}
         {importResult && (
           <div className="settings__section">

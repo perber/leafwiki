@@ -338,6 +338,10 @@ func TestCancelImportPlanEndpoint(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
 
 	cookies := loginRes.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies on login response, got none")
+	}
+
 	csrfToken := loginRec.Header().Get("X-CSRF-Token")
 	if csrfToken == "" {
 		for _, c := range cookies {
@@ -346,6 +350,10 @@ func TestCancelImportPlanEndpoint(t *testing.T) {
 				break
 			}
 		}
+	}
+
+	if csrfToken == "" {
+		t.Fatalf("Expected CSRF token after login, got none")
 	}
 
 	createReq := httptest.NewRequest(http.MethodPost, "/api/import/plan", &body)
@@ -377,8 +385,8 @@ func TestCancelImportPlanEndpoint(t *testing.T) {
 	}
 
 	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/import/plan", nil)
-	if getRec.Code != http.StatusInternalServerError {
-		t.Fatalf("Expected status 500 when fetching canceled import plan, got %d: %s", getRec.Code, getRec.Body.String())
+	if getRec.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404 when fetching canceled import plan, got %d: %s", getRec.Code, getRec.Body.String())
 	}
 
 	var resp map[string]string

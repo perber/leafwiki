@@ -1,4 +1,5 @@
 import * as importAPI from '@/lib/api/import'
+import { ApiError } from '@/lib/api/auth'
 import { toast } from 'sonner'
 import { create } from 'zustand'
 import { useTreeStore } from './tree'
@@ -56,6 +57,10 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       const importPlan = await importAPI.getImportPlan()
       set({ importPlan })
     } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        set({ importPlan: null })
+        return
+      }
       toast.error('Failed to load import plan: ' + getErrorMessage(err))
       return
     } finally {

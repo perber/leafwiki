@@ -12,6 +12,16 @@ export type AuthResponse = {
   }
 }
 
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 // Helper to get CSRF token from cookie
 function getCsrfTokenFromCookie(): string | null {
   if (typeof document === 'undefined') return null
@@ -135,12 +145,14 @@ export async function fetchWithAuth(
       errorBody = await res.json()
     } catch {
       const text = await res.text()
-      throw new Error(text || 'Request failed')
+      throw new ApiError(text || 'Request failed', res.status)
     }
 
     if (errorBody?.error === 'validation_error') throw errorBody
-    if (errorBody?.error) throw errorBody
-    throw new Error(errorBody?.message || 'Request failed')
+    if (errorBody?.error) {
+      throw new ApiError(errorBody.error, res.status)
+    }
+    throw new ApiError(errorBody?.message || 'Request failed', res.status)
   }
 
   try {
