@@ -24,7 +24,9 @@ func pageDirectoryDiskPath(storageDir string, pagePath string) string {
 }
 
 func pageMarkdownDiskPath(storageDir string, pagePath string) string {
-	return filepath.Join(storageDir, filepath.FromSlash(pagePath+".md"))
+	normalizedStorageDir := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
+	normalizedPagePath := filepath.FromSlash(strings.ReplaceAll(pagePath, `\`, `/`))
+	return filepath.Join(normalizedStorageDir, normalizedPagePath+".md")
 }
 
 func pageIndexDiskPath(storageDir string, pagePath string) string {

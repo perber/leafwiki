@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func TestLinksStore_CreatesDatabaseInStorageDir(t *testing.T) {
@@ -13,11 +15,7 @@ func TestLinksStore_CreatesDatabaseInStorageDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLinksStore err: %v", err)
 	}
-	defer func() {
-		if err := store.Close(); err != nil {
-			t.Fatalf("Close err: %v", err)
-		}
-	}()
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
 	if _, err := os.Stat(filepath.Join(tmp, "links.db")); err != nil {
 		t.Fatalf("expected links.db in storage dir, got err: %v", err)
