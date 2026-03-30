@@ -212,7 +212,7 @@ export default function Importer() {
                   Execute Import Plan
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="destructive"
                   onClick={() => {
                     cancelImportPlan()
                   }}
