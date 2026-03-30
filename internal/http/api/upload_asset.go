@@ -37,7 +37,7 @@ func UploadAssetHandler(w *wiki.Wiki, maxUploadSize int64) gin.HandlerFunc {
 		url, err := w.UploadAsset(pageID, file, header.Filename, maxUploadSize)
 		if err != nil {
 			if errors.Is(err, shared.ErrFileTooLarge) {
-				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
+				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
 				return
 			}
 			respondWithError(c, err)

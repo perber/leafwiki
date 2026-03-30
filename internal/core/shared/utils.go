@@ -123,7 +123,7 @@ func CopyWithLimit(dst io.Writer, src io.Reader, max int64) error {
 }
 
 func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64) error {
-	dir := path.Dir(targetPath)
+	dir := atomicWriteDir(targetPath)
 
 	out, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
