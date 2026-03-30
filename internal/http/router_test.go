@@ -44,6 +44,7 @@ func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 		AccessTokenTimeout:      15 * time.Minute,   // 15 minutes
 		RefreshTokenTimeout:     7 * 24 * time.Hour, // 7 days
 		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: 50 * 1024 * 1024,
 	})
 }
 
@@ -268,6 +269,112 @@ func TestGetTreeEndpoint(t *testing.T) {
 
 	if resp["id"] != "root" {
 		t.Errorf("Expected root node id to be 'root', got: %v", resp)
+	}
+}
+
+func TestConfigEndpoint_IncludesMaxAssetUploadSizeBytes(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	const maxAssetUploadSizeBytes int64 = 123456
+	router := NewRouter(w, RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: maxAssetUploadSizeBytes,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	gotSize, ok := resp["maxAssetUploadSizeBytes"].(float64)
+	if !ok {
+		t.Fatalf("Expected maxAssetUploadSizeBytes in config response, got %v", resp)
+	}
+
+	if int64(gotSize) != maxAssetUploadSizeBytes {
+		t.Fatalf("Expected maxAssetUploadSizeBytes=%d, got %v", maxAssetUploadSizeBytes, gotSize)
+	}
+}
+
+func TestUploadAssetEndpoint_RejectsFilesExceedingConfiguredLimit(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := NewRouter(w, RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: 32,
+	})
+
+	page, err := w.CreatePage("system", nil, "Asset Limit Test", "asset-limit-test", pageNodeKind())
+	if err != nil {
+		t.Fatalf("Failed to create page: %v", err)
+	}
+
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Failed to login: %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	cookies := loginRec.Result().Cookies()
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "large.txt")
+	if err != nil {
+		t.Fatalf("Failed to create form file: %v", err)
+	}
+	if _, err := part.Write([]byte(strings.Repeat("a", 128))); err != nil {
+		t.Fatalf("Failed to write file content: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Failed to close multipart writer: %v", err)
+	}
+
+	uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	uploadReq.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		uploadReq.AddCookie(cookie)
+	}
+
+	uploadRec := httptest.NewRecorder()
+	router.ServeHTTP(uploadRec, uploadReq)
+
+	if uploadRec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("Expected 413 Request Entity Too Large, got %d - %s", uploadRec.Code, uploadRec.Body.String())
 	}
 }
 

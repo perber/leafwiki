@@ -30,6 +30,8 @@ var EmbedFrontend = "false"
 // Environment is a flag to set the environment
 var Environment = "development"
 
+const defaultMaxAssetUploadSizeBytes int64 = 50 * 1024 * 1024
+
 // Slog Wrapper for Gin (Info level)
 type slogWriter struct {
 	logger *slog.Logger
@@ -59,6 +61,7 @@ type RouterOptions struct {
 	HideLinkMetadataSection bool          // Whether to hide the link metadata section in the frontend UI
 	AuthDisabled            bool          // Whether authentication is disabled
 	BasePath                string        // URL prefix when served behind a reverse proxy (e.g. "/wiki")
+	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset uploads
 }
 
 // wireImporterService sets up and returns an ImporterService instance
@@ -76,6 +79,10 @@ func wireImporterService(w *wiki.Wiki) *importer.ImporterService {
 //   - wikiInstance: the wiki instance to serve
 //   - options: RouterOptions struct containing configuration options
 func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
+	if options.MaxAssetUploadSizeBytes <= 0 {
+		options.MaxAssetUploadSizeBytes = defaultMaxAssetUploadSizeBytes
+	}
+
 	if Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
@@ -124,7 +131,13 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
 				return
 			}
-			c.JSON(200, gin.H{"publicAccess": options.PublicAccess, "hideLinkMetadataSection": options.HideLinkMetadataSection, "authDisabled": options.AuthDisabled, "basePath": options.BasePath})
+			c.JSON(200, gin.H{
+				"publicAccess":            options.PublicAccess,
+				"hideLinkMetadataSection": options.HideLinkMetadataSection,
+				"authDisabled":            options.AuthDisabled,
+				"basePath":                options.BasePath,
+				"maxAssetUploadSizeBytes": options.MaxAssetUploadSizeBytes,
+			})
 		})
 
 		// Branding (public, no auth required)
@@ -197,7 +210,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		}
 
 		// Assets
-		requiresAuthGroup.POST("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.UploadAssetHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.UploadAssetHandler(wikiInstance, options.MaxAssetUploadSizeBytes))
 		requiresAuthGroup.GET("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.ListAssetsHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id/assets/rename", auth_middleware.RequireEditorOrAdmin(), api.RenameAssetHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id/assets/:name", auth_middleware.RequireEditorOrAdmin(), api.DeleteAssetHandler(wikiInstance))

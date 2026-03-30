@@ -8,10 +8,9 @@ import (
 	"github.com/perber/wiki/internal/wiki"
 )
 
-func UploadAssetHandler(w *wiki.Wiki) gin.HandlerFunc {
+func UploadAssetHandler(w *wiki.Wiki, maxUploadSize int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		const maxUploadSize = 500 << 20 // 50 MB
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
 
 		// Parse form

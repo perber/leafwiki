@@ -4,10 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/perber/wiki/internal/core/tools"
 	"github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/wiki"
@@ -37,6 +39,7 @@ func printUsage() {
 	--disable-auth                Disable authentication completely (default: false) (WARNING: only use in trusted networks!)
 	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false)
 	--base-path                   URL prefix when served behind a reverse proxy (e.g. /wiki) (default: "")
+	--max-asset-upload-size       Maximum size for asset uploads (for example 50MB, 50MiB, 52428800) (default: 50MB)
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -53,6 +56,7 @@ func printUsage() {
 	LEAFWIKI_DISABLE_AUTH
 	LEAFWIKI_HIDE_LINK_METADATA_SECTION
 	LEAFWIKI_BASE_PATH
+	LEAFWIKI_MAX_ASSET_UPLOAD_SIZE
 	`)
 }
 
@@ -96,6 +100,7 @@ func main() {
 	accessTokenTimeoutFlag := flag.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)")
 	refreshTokenTimeoutFlag := flag.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)")
 	basePathFlag := flag.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)")
+	maxAssetUploadSizeFlag := flag.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MB, 50MiB, 52428800)")
 	flag.Parse()
 
 	// Track which flags were explicitly set on CLI
@@ -116,6 +121,10 @@ func main() {
 	// If disable-auth is set, later logic will override publicAccess accordingly
 	disableAuth := resolveBool("disable-auth", *disableAuthFlag, visited, "LEAFWIKI_DISABLE_AUTH")
 	basePath := normalizeBasePath(resolveString("base-path", *basePathFlag, visited, "LEAFWIKI_BASE_PATH", ""))
+	maxAssetUploadSize := parseByteSize(
+		resolveString("max-asset-upload-size", *maxAssetUploadSizeFlag, visited, "LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50MB"),
+		"max asset upload size",
+	)
 
 	args := flag.Args()
 	if len(args) > 0 {
@@ -191,6 +200,7 @@ func main() {
 		RefreshTokenTimeout:     refreshTokenTimeout,
 		AuthDisabled:            disableAuth,
 		BasePath:                basePath,
+		MaxAssetUploadSizeBytes: maxAssetUploadSize,
 	})
 
 	// Start server - combine host and port
@@ -243,6 +253,20 @@ func resolveDuration(flagName string, flagVal time.Duration, visited map[string]
 		fail("Invalid environment variable value", "variable", envVar, "value", env, "expected", "duration like 24h, 15m")
 	}
 	return flagVal // default from flag
+}
+
+func parseByteSize(raw string, label string) int64 {
+	size, err := humanize.ParseBytes(strings.TrimSpace(raw))
+	if err != nil {
+		fail("Invalid byte size value", "setting", label, "value", raw, "error", err)
+	}
+	if size == 0 {
+		fail("Byte size value must be greater than zero", "setting", label, "value", raw)
+	}
+	if size > math.MaxInt64 {
+		fail("Byte size value is too large", "setting", label, "value", raw)
+	}
+	return int64(size)
 }
 
 func parseBool(s string) (bool, bool) {

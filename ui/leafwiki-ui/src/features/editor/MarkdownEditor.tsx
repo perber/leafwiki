@@ -21,11 +21,8 @@ import MarkdownToolbar from './MarkdownToolbar'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 
 import { uploadAsset, UploadAssetResponse } from '@/lib/api/assets'
-import {
-  IMAGE_EXTENSIONS,
-  MAX_UPLOAD_SIZE,
-  MAX_UPLOAD_SIZE_MB,
-} from '@/lib/config'
+import { formatBytes, IMAGE_EXTENSIONS } from '@/lib/config'
+import { useConfigStore } from '@/stores/config'
 import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
 import { usePageEditorStore } from './pageEditor'
@@ -69,6 +66,9 @@ const MarkdownEditor = (
   const [markdown, setMarkdown] = useState(initialValue)
   const debouncedPreview = useDebounce(markdown, 100)
   const isMobile = useIsMobile()
+  const maxAssetUploadSizeBytes = useConfigStore(
+    (s) => s.maxAssetUploadSizeBytes,
+  )
 
   const { previewVisible: showPreview, togglePreview } = useEditorStore()
 
@@ -106,8 +106,10 @@ const MarkdownEditor = (
 
       // Process each file
       for (const file of files) {
-        if (file.size > MAX_UPLOAD_SIZE) {
-          toast.error(`File too large. Max ${MAX_UPLOAD_SIZE_MB}MB allowed.`)
+        if (file.size > maxAssetUploadSizeBytes) {
+          toast.error(
+            `File too large. Max ${formatBytes(maxAssetUploadSizeBytes)} allowed.`,
+          )
           continue
         }
 
@@ -148,7 +150,7 @@ const MarkdownEditor = (
         }
       }
     },
-    [onChange, pageId, setMarkdown, editorViewRef],
+    [editorViewRef, maxAssetUploadSizeBytes, onChange, pageId, setMarkdown],
   )
 
   // Set initial markdown value when component mounts
