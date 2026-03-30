@@ -146,7 +146,9 @@ const MarkdownEditor = (
           editorViewRef.current?.focus()
         } catch (err) {
           console.error('Upload failed', err)
-          toast.error(`Failed to upload ${file.name}`)
+          const message =
+            err instanceof Error ? err.message : `Failed to upload ${file.name}`
+          toast.error(message)
         }
       }
     },

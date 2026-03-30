@@ -904,12 +904,12 @@ func (w *Wiki) GetUserByID(id string) (*auth.PublicUser, error) {
 	return user.ToPublicUser(), nil
 }
 
-func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string) (string, error) {
+func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
 	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
 	if err != nil {
 		return "", err
 	}
-	return w.asset.SaveAssetForPage(page, file, filename)
+	return w.asset.SaveAssetForPage(page, file, filename, maxBytes)
 }
 
 func (w *Wiki) ListAssets(pageID string) ([]string, error) {

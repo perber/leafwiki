@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -83,7 +84,7 @@ func (s *AssetService) buildPublicPath(page *tree.PageNode, filename string) str
 }
 
 // SaveAssetForPage saves a file under a page's slug-based path and returns its public URL.
-func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File, originalFilename string) (string, error) {
+func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File, originalFilename string, maxBytes int64) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -102,19 +103,7 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 	finalFilename := s.slugger.GenerateUniqueFilename(existing, originalFilename)
 	fullPath := assetFileDiskPath(uploadPath, finalFilename)
 
-	// Create and write the file
-	out, err := os.Create(fullPath)
-	if err != nil {
-		return "", fmt.Errorf("could not create file: %w", err)
-	}
-	defer func() {
-		err := out.Close()
-		if err != nil {
-			s.log.Warn("failed to close file", "file", fullPath, "error", err)
-		}
-	}()
-
-	if _, err := io.Copy(out, file); err != nil {
+	if err := shared.WriteStreamAtomic(fullPath, file, maxBytes); err != nil {
 		return "", fmt.Errorf("could not write file: %w", err)
 	}
 

@@ -437,7 +437,7 @@ func TestWiki_CopyPages_WithAssets(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(file.Close, t)
 
 	// Save asset for the original page
-	if _, err := w.GetAssetService().SaveAssetForPage(&originalNode, file, "image.png"); err != nil {
+	if _, err := w.GetAssetService().SaveAssetForPage(&originalNode, file, "image.png", 1024); err != nil {
 		t.Fatalf("Failed to save asset for original page: %v", err)
 	}
 

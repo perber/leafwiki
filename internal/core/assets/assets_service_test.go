@@ -1,15 +1,19 @@
 package assets
 
 import (
+	"errors"
 	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
 )
+
+const testAssetMaxBytes int64 = 1024
 
 func TestSaveAndListAsset(t *testing.T) {
 	tmp := t.TempDir()
@@ -35,7 +39,7 @@ func TestSaveAndListAsset(t *testing.T) {
 		}
 	}()
 
-	url, err := service.SaveAssetForPage(page, file, name)
+	url, err := service.SaveAssetForPage(page, file, name, testAssetMaxBytes)
 	if err != nil {
 		t.Fatalf("SaveAsset failed: %v", err)
 	}
@@ -78,7 +82,7 @@ func TestDeletePageAndEnsureAllAssetsAreDeleted(t *testing.T) {
 		}
 	}()
 
-	_, err = service.SaveAssetForPage(page, file, name)
+	_, err = service.SaveAssetForPage(page, file, name, testAssetMaxBytes)
 	if err != nil {
 		t.Fatalf("SaveAsset failed: %v", err)
 	}
@@ -114,7 +118,7 @@ func TestSlugCollision(t *testing.T) {
 			}
 		}(file)
 
-		_, err = service.SaveAssetForPage(page, file, name)
+		_, err = service.SaveAssetForPage(page, file, name, testAssetMaxBytes)
 		if err != nil {
 			t.Fatalf("upload %d failed: %v", i, err)
 		}
@@ -154,7 +158,7 @@ func TestAssetRename(t *testing.T) {
 		}
 	}()
 
-	if _, err := service.SaveAssetForPage(page, file, name); err != nil {
+	if _, err := service.SaveAssetForPage(page, file, name, testAssetMaxBytes); err != nil {
 		t.Fatalf("SaveAsset failed: %v", err)
 	}
 
@@ -194,5 +198,37 @@ func TestAssetPublicPath_UsesForwardSlashes(t *testing.T) {
 
 	if got, want := service.buildPublicPath(page, "my-image.png"), "/assets/a7b3/my-image.png"; got != want {
 		t.Fatalf("public path = %q, want %q", got, want)
+	}
+}
+
+func TestSaveAssetForPage_TooLarge_DoesNotLeavePartialFile(t *testing.T) {
+	tmp := t.TempDir()
+	page := &tree.PageNode{Slug: "limit-page", ID: "limit-page-id"}
+	service := NewAssetService(tmp, tree.NewSlugService())
+
+	file, name, err := test_utils.CreateMultipartFile("too-large.bin", []byte(strings.Repeat("a", 32)))
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			t.Fatalf("Close() error: %v", err)
+		}
+	}()
+
+	err = nil
+	_, err = service.SaveAssetForPage(page, file, name, 8)
+	if !errors.Is(err, shared.ErrFileTooLarge) {
+		t.Fatalf("expected ErrFileTooLarge, got %v", err)
+	}
+
+	assetDir := filepath.Join(service.GetAssetsDir(), page.ID)
+	entries, readErr := os.ReadDir(assetDir)
+	if readErr != nil {
+		t.Fatalf("failed to read asset directory: %v", readErr)
+	}
+
+	if len(entries) != 0 {
+		t.Fatalf("expected no files after failed upload, got %d", len(entries))
 	}
 }
