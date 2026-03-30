@@ -24,11 +24,17 @@ export const useConfigStore = create<ConfigStore>((set) => ({
     set({ loading: true })
     try {
       const config = await getConfig()
+      const maxAssetUploadSizeBytes = Number.isFinite(
+        config.maxAssetUploadSizeBytes,
+      )
+        ? config.maxAssetUploadSizeBytes
+        : DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES
+
       set({
         publicAccess: config.publicAccess,
         hideLinkMetadataSection: config.hideLinkMetadataSection,
         authDisabled: config.authDisabled,
-        maxAssetUploadSizeBytes: config.maxAssetUploadSizeBytes,
+        maxAssetUploadSizeBytes,
         hasLoaded: true,
       })
     } catch (error) {

@@ -298,6 +298,7 @@ These options control how the server runs after installation.
 | `--refresh-token-timeout`       | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`          | v0.7.0            |
 | `--disable-auth`                | ⚠️ Disable authentication & authorization (internal networks only!)    | `false`       | v0.7.0            |
 | `--base-path`                   | URL prefix when served behind a reverse proxy (e.g. /wiki)              | `""`        | v0.8.2            |
+| `--max-asset-upload-size`       | Maximum size for asset uploads (e.g. `50MiB`, `50MB`, `52428800`)      | `50MiB`       | v0.8.5            |
 
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
@@ -322,6 +323,7 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`       | Refresh token timeout duration (e.g. 168h, 7d)                          | `7d`       | v0.7.0          |
 | `LEAFWIKI_DISABLE_AUTH`                | ⚠️ Disable authentication & authorization (internal networks only!)     | `false`    | v0.7.0          |
 | `LEAFWIKI_BASE_PATH`                   | URL prefix when served behind a reverse proxy (e.g. /wiki)              | `""`       | v0.8.2          |
+| `LEAFWIKI_MAX_ASSET_UPLOAD_SIZE`       | Maximum size for asset uploads (e.g. `50MiB`, `50MB`, `52428800`)       | `50MiB`    | v0.8.5          |
 
 
 These environment variables override the default values and are especially useful in containerized or production environments.
@@ -479,4 +481,3 @@ If you have ideas, questions, or run into issues, feel free to open an issue or 
 ## Stay in the loop
 
 Follow the repository to get updates about new releases and ongoing development.
-

@@ -27,7 +27,7 @@ export function formatBytes(bytes: number): string {
     return `${bytes} B`
   }
 
-  const units = ['KB', 'MB', 'GB', 'TB']
+  const units = ['KiB', 'MiB', 'GiB', 'TiB']
   let value = bytes
   let unitIndex = -1
 

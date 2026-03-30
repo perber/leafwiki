@@ -10,11 +10,12 @@ import (
 
 func UploadAssetHandler(w *wiki.Wiki, maxUploadSize int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		const maxMultipartMemory = 32 << 20 // 32 MiB in memory before spilling multipart data to disk
 
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
 
 		// Parse form
-		if err := c.Request.ParseMultipartForm(maxUploadSize); err != nil {
+		if err := c.Request.ParseMultipartForm(maxMultipartMemory); err != nil {
 			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
 			return
 		}

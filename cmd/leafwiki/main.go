@@ -39,7 +39,7 @@ func printUsage() {
 	--disable-auth                Disable authentication completely (default: false) (WARNING: only use in trusted networks!)
 	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false)
 	--base-path                   URL prefix when served behind a reverse proxy (e.g. /wiki) (default: "")
-	--max-asset-upload-size       Maximum size for asset uploads (for example 50MB, 50MiB, 52428800) (default: 50MB)
+	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -100,7 +100,7 @@ func main() {
 	accessTokenTimeoutFlag := flag.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)")
 	refreshTokenTimeoutFlag := flag.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)")
 	basePathFlag := flag.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)")
-	maxAssetUploadSizeFlag := flag.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MB, 50MiB, 52428800)")
+	maxAssetUploadSizeFlag := flag.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)")
 	flag.Parse()
 
 	// Track which flags were explicitly set on CLI
@@ -122,7 +122,7 @@ func main() {
 	disableAuth := resolveBool("disable-auth", *disableAuthFlag, visited, "LEAFWIKI_DISABLE_AUTH")
 	basePath := normalizeBasePath(resolveString("base-path", *basePathFlag, visited, "LEAFWIKI_BASE_PATH", ""))
 	maxAssetUploadSize := parseByteSize(
-		resolveString("max-asset-upload-size", *maxAssetUploadSizeFlag, visited, "LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50MB"),
+		resolveString("max-asset-upload-size", *maxAssetUploadSizeFlag, visited, "LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50MiB"),
 		"max asset upload size",
 	)
 
