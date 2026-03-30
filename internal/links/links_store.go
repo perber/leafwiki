@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	_ "modernc.org/sqlite" // Import SQLite driver
@@ -16,6 +17,11 @@ type LinksStore struct {
 	storageDir string
 	filename   string
 	db         *sql.DB
+}
+
+func linksDatabasePath(storageDir string, filename string) string {
+	normalizedStorageDir := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
+	return filepath.Join(normalizedStorageDir, filename)
 }
 
 func NewLinksStore(storageDir string) (*LinksStore, error) {
@@ -43,7 +49,7 @@ func (s *LinksStore) Connect() error {
 		return nil
 	}
 	// Connect to the database
-	db, err := sql.Open("sqlite", path.Join(s.storageDir, s.filename))
+	db, err := sql.Open("sqlite", linksDatabasePath(s.storageDir, s.filename))
 	if err != nil {
 		return err
 	}

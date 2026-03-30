@@ -178,3 +178,21 @@ func TestAssetRename(t *testing.T) {
 		t.Errorf("unexpected asset list after rename: %v", files)
 	}
 }
+
+func TestAssetDiskPaths_WindowsPath(t *testing.T) {
+	if got, want := strings.ReplaceAll(assetPageDiskPath(`C:\wiki\data\assets`, "a7b3"), `\`, `/`), `C:/wiki/data/assets/a7b3`; got != want {
+		t.Fatalf("asset page path = %q, want %q", got, want)
+	}
+	if got, want := strings.ReplaceAll(assetFileDiskPath(`C:\wiki\data\assets\a7b3`, "my-image.png"), `\`, `/`), `C:/wiki/data/assets/a7b3/my-image.png`; got != want {
+		t.Fatalf("asset file path = %q, want %q", got, want)
+	}
+}
+
+func TestAssetPublicPath_UsesForwardSlashes(t *testing.T) {
+	service := NewAssetService(t.TempDir(), tree.NewSlugService())
+	page := &tree.PageNode{ID: "a7b3"}
+
+	if got, want := service.buildPublicPath(page, "my-image.png"), "/assets/a7b3/my-image.png"; got != want {
+		t.Fatalf("public path = %q, want %q", got, want)
+	}
+}

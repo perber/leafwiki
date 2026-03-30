@@ -2,6 +2,8 @@ package search
 
 import (
 	"database/sql"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -57,6 +59,28 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 	}
 	if !strings.HasPrefix(gotContent, expectedContent) {
 		t.Errorf("expected content '%s', got '%s'", expectedContent, gotContent)
+	}
+}
+
+func TestSearchIndexDatabasePath_WindowsPath(t *testing.T) {
+	got := strings.ReplaceAll(searchIndexDatabasePath(`C:\wiki\data`, "search.db"), `\`, `/`)
+	want := `C:/wiki/data/search.db`
+	if got != want {
+		t.Fatalf("path = %q, want %q", got, want)
+	}
+}
+
+func TestSQLiteIndex_CreatesDatabaseInStorageDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	if _, err := os.Stat(filepath.Join(tmpDir, "search.db")); err != nil {
+		t.Fatalf("expected search.db in storage dir, got err: %v", err)
 	}
 }
 

@@ -91,7 +91,7 @@ func (mf *MarkdownFile) GetTitle() (string, error) {
 		return title, nil
 	}
 
-	base := path.Base(mf.path)
+	base := path.Base(strings.ReplaceAll(mf.path, `\`, "/"))
 	name := strings.TrimSuffix(base, path.Ext(base))
 	return name, nil
 }

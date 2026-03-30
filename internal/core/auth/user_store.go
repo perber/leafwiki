@@ -3,7 +3,7 @@ package auth
 import (
 	"database/sql"
 	"log/slog"
-	"path"
+	"path/filepath"
 	"strings"
 
 	_ "modernc.org/sqlite"
@@ -13,6 +13,11 @@ type UserStore struct {
 	storageDir string
 	filename   string
 	db         *sql.DB
+}
+
+func databasePath(storageDir string, filename string) string {
+	normalizedStorageDir := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
+	return filepath.Join(normalizedStorageDir, filename)
 }
 
 func NewUserStore(storageDir string) (*UserStore, error) {
@@ -36,7 +41,7 @@ func (f *UserStore) Connect() error {
 		return nil
 	}
 	// Connect to the database
-	db, err := sql.Open("sqlite", path.Join(f.storageDir, f.filename))
+	db, err := sql.Open("sqlite", databasePath(f.storageDir, f.filename))
 	if err != nil {
 		return err
 	}

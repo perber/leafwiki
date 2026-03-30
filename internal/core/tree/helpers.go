@@ -3,7 +3,8 @@ package tree
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
+	"strings"
 )
 
 func GeneratePathFromPageNode(entry *PageNode) string {
@@ -16,11 +17,25 @@ func GeneratePathFromPageNode(entry *PageNode) string {
 	return path
 }
 
+func pageDirectoryDiskPath(storageDir string, pagePath string) string {
+	normalizedStorageDir := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
+	normalizedPagePath := filepath.FromSlash(strings.ReplaceAll(pagePath, `\`, `/`))
+	return filepath.Join(normalizedStorageDir, normalizedPagePath)
+}
+
+func pageMarkdownDiskPath(storageDir string, pagePath string) string {
+	return filepath.Join(storageDir, filepath.FromSlash(pagePath+".md"))
+}
+
+func pageIndexDiskPath(storageDir string, pagePath string) string {
+	return filepath.Join(pageDirectoryDiskPath(storageDir, pagePath), "index.md")
+}
+
 // EnsurePageIsFolder checks if a page path is still a flat .md file,
 // and if so, converts it into a folder with an index.md file.
 func EnsurePageIsFolder(storageDir string, pagePath string) error {
-	mdPath := path.Join(storageDir, pagePath+".md")
-	dirPath := path.Join(storageDir, pagePath)
+	mdPath := pageMarkdownDiskPath(storageDir, pagePath)
+	dirPath := pageDirectoryDiskPath(storageDir, pagePath)
 
 	// Already a folder? Nothing to do.
 	if info, err := os.Stat(dirPath); err == nil && info.IsDir() {
@@ -33,7 +48,7 @@ func EnsurePageIsFolder(storageDir string, pagePath string) error {
 			return fmt.Errorf("could not create folder: %w", err)
 		}
 
-		newPath := path.Join(dirPath, "index.md")
+		newPath := pageIndexDiskPath(storageDir, pagePath)
 		if err := os.Rename(mdPath, newPath); err != nil {
 			return fmt.Errorf("could not move file to index.md: %w", err)
 		}
@@ -45,9 +60,9 @@ func EnsurePageIsFolder(storageDir string, pagePath string) error {
 // FoldPageFolderIfEmpty converts a page folder back into a flat file
 // if it contains only "index.md" and nothing else.
 func FoldPageFolderIfEmpty(storageDir string, pagePath string) error {
-	dirPath := path.Join(storageDir, pagePath)
-	mdPath := path.Join(storageDir, pagePath+".md")
-	indexPath := path.Join(dirPath, "index.md")
+	dirPath := pageDirectoryDiskPath(storageDir, pagePath)
+	mdPath := pageMarkdownDiskPath(storageDir, pagePath)
+	indexPath := pageIndexDiskPath(storageDir, pagePath)
 
 	// Only run if it's actually a folder
 	info, err := os.Stat(dirPath)

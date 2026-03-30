@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
 )
@@ -182,6 +183,47 @@ func TestPlanner_CreatePlan_PrefersLeafWikiTitleOverTitle(t *testing.T) {
 
 	if got := res.Items[0].Title; got != "Preferred Title" {
 		t.Fatalf("Title = %q (want Preferred Title)", got)
+	}
+}
+
+func TestPlanner_CreatePlan_TitleFallbackPriority_WindowsPathFilenameFallback(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{
+			name:    "frontmatter wins",
+			content: "---\nleafwiki_title: Frontmatter Title\n---\n\n# Heading Title",
+			want:    "Frontmatter Title",
+		},
+		{
+			name:    "first heading wins when frontmatter missing",
+			content: "Intro text\n\n# Heading Title\nBody",
+			want:    "Heading Title",
+		},
+		{
+			name:    "filename fallback strips windows path",
+			content: "Body without title markers",
+			want:    "1999-07-23 - Memo to Staff",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mdFile, err := markdown.NewMarkdownFileFromRaw(`C:\Users\johnjkr\AppData\Local\Temp\import-1280817455\1999-07-23 - Memo to Staff.md`, tt.content)
+			if err != nil {
+				t.Fatalf("err: %v", err)
+			}
+
+			title, err := mdFile.GetTitle()
+			if err != nil {
+				t.Fatalf("err: %v", err)
+			}
+			if title != tt.want {
+				t.Fatalf("title = %q (want %q)", title, tt.want)
+			}
+		})
 	}
 }
 

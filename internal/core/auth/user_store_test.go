@@ -1,10 +1,21 @@
 package auth
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/test_utils"
 )
+
+func TestDatabasePath_WindowsPath(t *testing.T) {
+	got := strings.ReplaceAll(databasePath(`C:\wiki\data`, "users.db"), `\`, `/`)
+	want := `C:/wiki/data/users.db`
+	if got != want {
+		t.Fatalf("path = %q, want %q", got, want)
+	}
+}
 
 func setupTestUserStore(t *testing.T) *UserStore {
 	t.Helper()
@@ -15,6 +26,19 @@ func setupTestUserStore(t *testing.T) *UserStore {
 		t.Fatalf("Failed to create user store: %v", err)
 	}
 	return userStore
+}
+
+func TestUserStore_CreatesDatabaseInStorageDir(t *testing.T) {
+	storageDir := t.TempDir()
+	userStore, err := NewUserStore(storageDir)
+	if err != nil {
+		t.Fatalf("Failed to create user store: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(userStore.Close, t)
+
+	if _, err := os.Stat(filepath.Join(storageDir, "users.db")); err != nil {
+		t.Fatalf("expected users.db in storage dir, got err: %v", err)
+	}
 }
 
 func TestUserStore_CreateUser(t *testing.T) {
