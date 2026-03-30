@@ -10,6 +10,7 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 	verrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/importer"
 )
 
 func respondWithError(c *gin.Context, err error) {
@@ -27,6 +28,8 @@ func respondWithError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Page not found"})
 	case errors.Is(err, tree.ErrParentNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "Parent page not found"})
+	case errors.Is(err, importer.ErrNoPlan):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, tree.ErrPageHasChildren):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Page has children, use recursive delete"})
 	case errors.Is(err, tree.ErrTreeNotLoaded):

@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { useImportStore } from '@/stores/import'
-import { FileUp, Loader2, PlayIcon, UploadIcon } from 'lucide-react'
+import { FileUp, Loader2, PlayIcon, UploadIcon, XIcon } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useSetTitle } from '../viewer/setTitle'
 import { useToolbarActions } from './useToolbarActions'
@@ -14,10 +14,14 @@ export default function Importer() {
 
   const createImportPlan = useImportStore((store) => store.createImportPlan)
   const executeImportPlan = useImportStore((store) => store.executeImportPlan)
+  const cancelImportPlan = useImportStore((store) => store.cancelImportPlan)
   const importResult = useImportStore((store) => store.importResult)
   const creatingImportPlan = useImportStore((store) => store.creatingImportPlan)
   const executingImportPlan = useImportStore(
     (store) => store.executingImportPlan,
+  )
+  const cancelingImportPlan = useImportStore(
+    (store) => store.cancelingImportPlan,
   )
 
   const importPlan = useImportStore((store) => store.importPlan)
@@ -188,12 +192,23 @@ export default function Importer() {
                   </div>
                 </div>
               </div>
+            </div>
+          </>
+        )}
+        {importPlan && (
+          <div className="settings__section">
+            <div className="flex gap-2">
               <Button
                 variant="default"
                 onClick={() => {
                   executeImportPlan()
                 }}
-                disabled={executingImportPlan || creatingImportPlan}
+                disabled={
+                  importPlan.items.length === 0 ||
+                  executingImportPlan ||
+                  creatingImportPlan ||
+                  cancelingImportPlan
+                }
               >
                 {executingImportPlan ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -202,8 +217,26 @@ export default function Importer() {
                 )}
                 Execute Import Plan
               </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  cancelImportPlan()
+                }}
+                disabled={
+                  cancelingImportPlan ||
+                  executingImportPlan ||
+                  creatingImportPlan
+                }
+              >
+                {cancelingImportPlan ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <XIcon className="mr-2 h-4 w-4" />
+                )}
+                Cancel Import Plan
+              </Button>
             </div>
-          </>
+          </div>
         )}
         {importResult && (
           <div className="settings__section">

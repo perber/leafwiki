@@ -1,4 +1,5 @@
 import * as importAPI from '@/lib/api/import'
+import { ApiError } from '@/lib/api/auth'
 import { toast } from 'sonner'
 import { create } from 'zustand'
 import { useTreeStore } from './tree'
@@ -23,17 +24,20 @@ function getErrorMessage(err: unknown): string {
 type ImportStore = {
   creatingImportPlan: boolean
   executingImportPlan: boolean
+  cancelingImportPlan: boolean
   importPlan: importAPI.ImportPlan | null
   importResult: importAPI.ImportResult | null
   createImportPlan: (sourcePath: File) => Promise<void>
   loadImportPlan: () => Promise<void>
   executeImportPlan: () => Promise<void>
+  cancelImportPlan: () => Promise<void>
 }
 
 export const useImportStore = create<ImportStore>((set, get) => ({
   importPlan: null,
   creatingImportPlan: false,
   executingImportPlan: false,
+  cancelingImportPlan: false,
   importResult: null,
   createImportPlan: async (sourcePath: File) => {
     set({ creatingImportPlan: true, importPlan: null, importResult: null })
@@ -53,6 +57,10 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       const importPlan = await importAPI.getImportPlan()
       set({ importPlan })
     } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        set({ importPlan: null })
+        return
+      }
       toast.error('Failed to load import plan: ' + getErrorMessage(err))
       return
     } finally {
@@ -76,6 +84,23 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       set({ executingImportPlan: false })
       // reload tree
       useTreeStore.getState().reloadTree()
+    }
+  },
+  cancelImportPlan: async () => {
+    const importPlan = get().importPlan
+    if (importPlan === null) {
+      toast.error('No import plan to cancel')
+      return
+    }
+    try {
+      set({ cancelingImportPlan: true })
+      await importAPI.cancelImportPlan()
+      toast.success('Import plan canceled')
+      set({ importPlan: null, importResult: null })
+    } catch (err) {
+      toast.error('Failed to cancel import plan: ' + getErrorMessage(err))
+    } finally {
+      set({ cancelingImportPlan: false })
     }
   },
 }))
