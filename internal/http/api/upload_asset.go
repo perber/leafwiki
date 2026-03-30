@@ -1,10 +1,12 @@
 package api
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -32,8 +34,12 @@ func UploadAssetHandler(w *wiki.Wiki, maxUploadSize int64) gin.HandlerFunc {
 			}
 		}()
 
-		url, err := w.UploadAsset(pageID, file, header.Filename)
+		url, err := w.UploadAsset(pageID, file, header.Filename, maxUploadSize)
 		if err != nil {
+			if errors.Is(err, shared.ErrFileTooLarge) {
+				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
+				return
+			}
 			respondWithError(c, err)
 			return
 		}

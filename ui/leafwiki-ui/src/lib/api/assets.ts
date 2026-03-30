@@ -10,14 +10,10 @@ export async function uploadAsset(
 ): Promise<UploadAssetResponse> {
   const form = new FormData()
   form.append('file', file)
-  try {
-    return (await fetchWithAuth(`/api/pages/${pageId}/assets`, {
-      method: 'POST',
-      body: form,
-    })) as UploadAssetResponse
-  } catch {
-    throw new Error('Asset upload failed')
-  }
+  return (await fetchWithAuth(`/api/pages/${pageId}/assets`, {
+    method: 'POST',
+    body: form,
+  })) as UploadAssetResponse
 }
 
 export async function getAssets(pageId: string): Promise<string[]> {

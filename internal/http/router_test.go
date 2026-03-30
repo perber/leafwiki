@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -376,6 +377,19 @@ func TestUploadAssetEndpoint_RejectsFilesExceedingConfiguredLimit(t *testing.T) 
 
 	if uploadRec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("Expected 413 Request Entity Too Large, got %d - %s", uploadRec.Code, uploadRec.Body.String())
+	}
+
+	assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), page.ID)
+	entries, err := os.ReadDir(assetDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		t.Fatalf("Failed to read asset directory: %v", err)
+	}
+
+	if len(entries) != 0 {
+		t.Fatalf("Expected no files after rejected upload, got %d", len(entries))
 	}
 }
 

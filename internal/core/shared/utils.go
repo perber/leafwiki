@@ -2,11 +2,11 @@ package shared
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"math/big"
-	"mime/multipart"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,6 +26,8 @@ func GenerateUniqueID() (string, error) {
 }
 
 var charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+
+var ErrFileTooLarge = errors.New("file too large")
 
 func GenerateRandomPassword(length int) (string, error) {
 	password := make([]byte, length)
@@ -108,29 +110,37 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 	return nil
 }
 
-// CopyWithLimit copies from src to dst but returns an error if more than max bytes are copied
-func CopyWithLimit(dst *os.File, src io.Reader, max int64) error {
+// CopyWithLimit copies from src to dst but returns an error if more than max bytes are copied.
+func CopyWithLimit(dst io.Writer, src io.Reader, max int64) error {
 	n, err := io.Copy(dst, io.LimitReader(src, max+1))
 	if err != nil {
 		return err
 	}
 	if n > max {
-		return fmt.Errorf("file too large: %d bytes (max %d)", n, max)
+		return fmt.Errorf("%w: %d bytes (max %d)", ErrFileTooLarge, n, max)
 	}
 	return nil
 }
 
-func WriteStreamAtomic(targetPath string, src multipart.File, maxBytes int64) error {
-	tmp := targetPath + ".tmp"
+func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64) error {
+	dir := atomicWriteDir(targetPath)
 
-	out, err := os.Create(tmp)
+	out, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
 		return err
 	}
+	tmp := out.Name()
 
 	// Ensure cleanup on failure
 	ok := false
 	defer func() {
+		if out == nil {
+			if !ok {
+				_ = os.Remove(tmp)
+			}
+			return
+		}
+
 		if err := out.Close(); err != nil {
 			slog.Default().Error("Failed to close temp file", "file", tmp, "error", err)
 			return
@@ -151,8 +161,9 @@ func WriteStreamAtomic(targetPath string, src multipart.File, maxBytes int64) er
 	if err := out.Close(); err != nil {
 		return err
 	}
+	out = nil
 
-	if err := os.Rename(tmp, targetPath); err != nil {
+	if err := atomicReplace(tmp, targetPath); err != nil {
 		return err
 	}
 

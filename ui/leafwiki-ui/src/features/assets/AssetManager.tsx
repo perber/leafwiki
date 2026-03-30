@@ -73,6 +73,8 @@ export function AssetManager({
       onAssetVersionChange?.()
     } catch (err) {
       console.error('Upload failed', err)
+      const message = err instanceof Error ? err.message : 'Asset upload failed'
+      toast.error(message)
     } finally {
       setUploadingFiles((prev) => {
         const next = new Set(prev)
