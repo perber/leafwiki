@@ -5,7 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"mime/multipart"
-	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -38,6 +38,11 @@ type Wiki struct {
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
 
 const SYSTEM_USER_ID = "system"
+
+func searchRootDir(storageDir string) string {
+	normalized := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
+	return filepath.Join(normalized, "root")
+}
 
 func collectSubtreeIDs(node *tree.PageNode) []string {
 	var ids []string
@@ -131,14 +136,14 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	var searchWatcher *search.Watcher
 	// starts the indexing process in a separate goroutine
 	go func() {
-		err := search.BuildAndRunIndexer(treeService, sqliteIndex, path.Join(options.StorageDir, "root"), 4, status)
+		err := search.BuildAndRunIndexer(treeService, sqliteIndex, searchRootDir(options.StorageDir), 4, status)
 		if err != nil {
 			logger.Warn("indexing failed", "error", err)
 		}
 	}()
 
 	// Start the file watcher for indexing
-	searchWatcher, err = search.NewWatcher(path.Join(options.StorageDir, "root"), treeService, sqliteIndex, status)
+	searchWatcher, err = search.NewWatcher(searchRootDir(options.StorageDir), treeService, sqliteIndex, status)
 	if err != nil {
 		logger.Warn("failed to create file watcher", "error", err)
 	} else {

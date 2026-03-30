@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"log"
-	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,11 @@ type SessionStore struct {
 	db         *sql.DB
 	cancel     context.CancelFunc
 	done       chan struct{}
+}
+
+func sessionDatabasePath(storageDir string, filename string) string {
+	normalizedStorageDir := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
+	return filepath.Join(normalizedStorageDir, filename)
 }
 
 func NewSessionStore(storageDir string) (*SessionStore, error) {
@@ -66,7 +72,7 @@ func (s *SessionStore) withDB(fn func(db *sql.DB) error) error {
 	defer s.mu.Unlock()
 
 	if s.db == nil {
-		db, err := sql.Open("sqlite", path.Join(s.storageDir, s.filename))
+		db, err := sql.Open("sqlite", sessionDatabasePath(s.storageDir, s.filename))
 		if err != nil {
 			return err
 		}

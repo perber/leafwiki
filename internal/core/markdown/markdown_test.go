@@ -76,6 +76,21 @@ func TestPlanner_extractTitleFromMDFile_FilenameFallback(t *testing.T) {
 	}
 }
 
+func TestPlanner_extractTitleFromMDFile_FilenameFallback_WindowsPath(t *testing.T) {
+	mdFile, err := NewMarkdownFileFromRaw(`C:\Users\johnjkr\AppData\Local\Temp\import-1280817455\1999-07-23 - Memo to Staff.md`, "no title")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	title, err := mdFile.GetTitle()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if title != "1999-07-23 - Memo to Staff" {
+		t.Fatalf("title = %q", title)
+	}
+}
+
 func TestMarkdownFile_WriteToFile_PreservesCustomFrontmatter(t *testing.T) {
 	tmp := t.TempDir()
 	abs := test_utils.WriteFile(t, tmp, "t.md", `---

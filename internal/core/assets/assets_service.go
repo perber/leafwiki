@@ -7,6 +7,8 @@ import (
 	"mime/multipart"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/perber/wiki/internal/core/tree"
@@ -20,13 +22,23 @@ type AssetService struct {
 	mu sync.RWMutex
 }
 
+func assetPageDiskPath(assetsDir string, pageID string) string {
+	normalizedAssetsDir := filepath.FromSlash(strings.ReplaceAll(assetsDir, `\`, `/`))
+	return filepath.Join(normalizedAssetsDir, pageID)
+}
+
+func assetFileDiskPath(assetPath string, filename string) string {
+	normalizedAssetPath := filepath.FromSlash(strings.ReplaceAll(assetPath, `\`, `/`))
+	return filepath.Join(normalizedAssetPath, filename)
+}
+
 func NewAssetService(storageDir string, slugger *tree.SlugService) *AssetService {
 	// Ensure the storage directory exists
 	if err := os.MkdirAll(storageDir, 0755); err != nil {
 		panic(fmt.Sprintf("could not create storage directory: %v", err))
 	}
 	// Ensure the assets directory exists
-	assetsDir := path.Join(storageDir, "assets")
+	assetsDir := filepath.Join(storageDir, "assets")
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
 		panic(fmt.Sprintf("could not create assets directory: %v", err))
 	}
@@ -43,7 +55,7 @@ func (s *AssetService) GetAssetsDir() string {
 }
 
 func (s *AssetService) ensureAssetPagePathExists(page *tree.PageNode) (string, error) {
-	pagePath := path.Join(s.assetsDir, page.ID)
+	pagePath := assetPageDiskPath(s.assetsDir, page.ID)
 	// check if the page path exists
 	if _, err := os.Stat(pagePath); os.IsNotExist(err) {
 		// create the page path
@@ -56,7 +68,7 @@ func (s *AssetService) ensureAssetPagePathExists(page *tree.PageNode) (string, e
 }
 
 func (s *AssetService) getAssetPagePath(page *tree.PageNode) (string, error) {
-	pagePath := path.Join(s.assetsDir, page.ID)
+	pagePath := assetPageDiskPath(s.assetsDir, page.ID)
 
 	// check if the page path exists
 	if _, err := os.Stat(pagePath); os.IsNotExist(err) {
@@ -88,7 +100,7 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 	}
 
 	finalFilename := s.slugger.GenerateUniqueFilename(existing, originalFilename)
-	fullPath := path.Join(uploadPath, finalFilename)
+	fullPath := assetFileDiskPath(uploadPath, finalFilename)
 
 	// Create and write the file
 	out, err := os.Create(fullPath)
@@ -145,7 +157,7 @@ func (s *AssetService) DeleteAsset(page *tree.PageNode, filename string) error {
 		return fmt.Errorf("asset not found: %s", filename)
 	}
 
-	fullPath := path.Join(assetPath, filename)
+	fullPath := assetFileDiskPath(assetPath, filename)
 
 	if err := os.Remove(fullPath); err != nil {
 		return fmt.Errorf("could not delete asset: %w", err)
@@ -185,8 +197,8 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 		return "", fmt.Errorf("could not rename asset: %w", err)
 	}
 
-	oldFullPath := path.Join(assetPath, oldFilename)
-	newFullPath := path.Join(assetPath, newFilename)
+	oldFullPath := assetFileDiskPath(assetPath, oldFilename)
+	newFullPath := assetFileDiskPath(assetPath, newFilename)
 
 	// Ensure that the new filename has the same extension as the old one
 	oldExt := path.Ext(oldFilename)
@@ -252,8 +264,8 @@ func (s *AssetService) CopyAllAssets(sourcePage *tree.PageNode, targetPage *tree
 }
 
 func (s *AssetService) copySingleAsset(sourceAssetPath string, targetAssetPath string, entry os.DirEntry) error {
-	sourceFilePath := path.Join(sourceAssetPath, entry.Name())
-	targetFilePath := path.Join(targetAssetPath, entry.Name())
+	sourceFilePath := assetFileDiskPath(sourceAssetPath, entry.Name())
+	targetFilePath := assetFileDiskPath(targetAssetPath, entry.Name())
 
 	sourceFile, err := os.Open(sourceFilePath)
 	if err != nil {

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"log"
 	"log/slog"
-	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -22,6 +22,11 @@ type SQLiteIndex struct {
 	storageDir string
 	filename   string
 	db         *sql.DB
+}
+
+func searchIndexDatabasePath(storageDir string, filename string) string {
+	normalizedStorageDir := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
+	return filepath.Join(normalizedStorageDir, filename)
 }
 
 func extractHeadings(markdown string) string {
@@ -113,7 +118,7 @@ func (s *SQLiteIndex) withDB(fn func(db *sql.DB) error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.db == nil {
-		db, err := sql.Open("sqlite", path.Join(s.storageDir, s.filename))
+		db, err := sql.Open("sqlite", searchIndexDatabasePath(s.storageDir, s.filename))
 		if err != nil {
 			return err
 		}

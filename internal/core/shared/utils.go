@@ -8,8 +8,9 @@ import (
 	"math/big"
 	"mime/multipart"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/teris-io/shortid"
 )
@@ -49,10 +50,15 @@ func atomicReplace(src, dst string) error {
 	return os.Rename(src, dst)
 }
 
+func atomicWriteDir(filename string) string {
+	normalized := strings.ReplaceAll(filename, `\`, `/`)
+	return filepath.Dir(filepath.FromSlash(normalized))
+}
+
 // WriteFileAtomic writes data to filename atomically by writing to a temp file
 // in the same directory and then renaming it over the target.
 func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
-	dir := path.Dir(filename)
+	dir := atomicWriteDir(filename)
 
 	tmpFile, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
