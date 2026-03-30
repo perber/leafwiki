@@ -56,3 +56,9 @@ export async function executeImportPlan(): Promise<ImportResult> {
     method: 'POST',
   })) as ImportResult
 }
+
+export async function cancelImportPlan(): Promise<void> {
+  await fetchWithAuth('/api/import/plan', {
+    method: 'DELETE',
+  })
+}

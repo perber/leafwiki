@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -293,6 +294,100 @@ func TestSuggestSlugEndpoint(t *testing.T) {
 
 	if resp["slug"] != "newpage" {
 		t.Errorf("Expected 'newpage' as slug suggestion, got: %v", resp)
+	}
+}
+
+func TestCancelImportPlanEndpoint(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	fileWriter, err := writer.CreateFormFile("file", "fixture-1.zip")
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+
+	zipFile, err := os.Open("../importer/fixtures/fixture-1.zip")
+	if err != nil {
+		t.Fatalf("Open fixture zip failed: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(zipFile.Close, t)
+
+	if _, err := io.Copy(fileWriter, zipFile); err != nil {
+		t.Fatalf("Copy zip fixture failed: %v", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close multipart writer failed: %v", err)
+	}
+
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Failed to login: %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
+
+	cookies := loginRes.Cookies()
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+
+	createReq := httptest.NewRequest(http.MethodPost, "/api/import/plan", &body)
+	createReq.Header.Set("Content-Type", writer.FormDataContentType())
+	createReq.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		createReq.AddCookie(cookie)
+	}
+
+	createRec := httptest.NewRecorder()
+	router.ServeHTTP(createRec, createReq)
+
+	if createRec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 when creating import plan, got %d: %s", createRec.Code, createRec.Body.String())
+	}
+
+	cancelReq := httptest.NewRequest(http.MethodDelete, "/api/import/plan", nil)
+	cancelReq.Header.Set("Content-Type", "application/json")
+	cancelReq.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		cancelReq.AddCookie(cookie)
+	}
+
+	cancelRec := httptest.NewRecorder()
+	router.ServeHTTP(cancelRec, cancelReq)
+
+	if cancelRec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 when canceling import plan, got %d: %s", cancelRec.Code, cancelRec.Body.String())
+	}
+
+	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/import/plan", nil)
+	if getRec.Code != http.StatusInternalServerError {
+		t.Fatalf("Expected status 500 when fetching canceled import plan, got %d: %s", getRec.Code, getRec.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.Unmarshal(getRec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	if resp["error"] == "" {
+		t.Fatalf("Expected error message after canceling import plan, got: %v", resp)
 	}
 }
 
