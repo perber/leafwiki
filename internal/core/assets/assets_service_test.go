@@ -216,7 +216,6 @@ func TestSaveAssetForPage_TooLarge_DoesNotLeavePartialFile(t *testing.T) {
 		}
 	}()
 
-	err = nil
 	_, err = service.SaveAssetForPage(page, file, name, 8)
 	if !errors.Is(err, shared.ErrFileTooLarge) {
 		t.Fatalf("expected ErrFileTooLarge, got %v", err)
