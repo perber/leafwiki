@@ -8,14 +8,14 @@ import (
 	"github.com/perber/wiki/internal/wiki"
 )
 
-func UploadAssetHandler(w *wiki.Wiki) gin.HandlerFunc {
+func UploadAssetHandler(w *wiki.Wiki, maxUploadSize int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		const maxMultipartMemory = 32 << 20 // 32 MiB in memory before spilling multipart data to disk
 
-		const maxUploadSize = 500 << 20 // 50 MB
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
 
 		// Parse form
-		if err := c.Request.ParseMultipartForm(maxUploadSize); err != nil {
+		if err := c.Request.ParseMultipartForm(maxMultipartMemory); err != nil {
 			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
 			return
 		}

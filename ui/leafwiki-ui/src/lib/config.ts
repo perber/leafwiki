@@ -20,8 +20,26 @@ export const API_BASE_URL = (BASE_PATH ? `${BASE_PATH}` : '').replace(
   '',
 )
 
-export const MAX_UPLOAD_SIZE_MB = 50
-export const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+export const DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+
+  const units = ['KiB', 'MiB', 'GiB', 'TiB']
+  let value = bytes
+  let unitIndex = -1
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+
+  const fractionDigits = value >= 10 ? 0 : 1
+  return `${value.toFixed(fractionDigits)} ${units[unitIndex]}`
+}
+
 export const IMAGE_EXTENSIONS = [
   'png',
   'jpg',

@@ -1,5 +1,6 @@
 import { getAssets, uploadAsset } from '@/lib/api/assets'
-import { MAX_UPLOAD_SIZE, MAX_UPLOAD_SIZE_MB } from '@/lib/config'
+import { formatBytes } from '@/lib/config'
+import { useConfigStore } from '@/stores/config'
 import { UploadCloud } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -28,6 +29,9 @@ export function AssetManager({
   const [isHovered, setIsHovered] = useState(false)
   const [editingFilename, setEditingFilename] = useState<string | null>(null)
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
+  const maxAssetUploadSizeBytes = useConfigStore(
+    (s) => s.maxAssetUploadSizeBytes,
+  )
 
   const handleSetEditingFilename = (filename: string | null) => {
     isRenamingRef.current = !!filename
@@ -54,8 +58,10 @@ export function AssetManager({
   }, [pageId, loadAssets])
 
   const handleUploadFile = async (file: File) => {
-    if (file.size > MAX_UPLOAD_SIZE) {
-      toast.error(`File too large. Max ${MAX_UPLOAD_SIZE_MB}MB allowed.`)
+    if (file.size > maxAssetUploadSizeBytes) {
+      toast.error(
+        `File too large. Max ${formatBytes(maxAssetUploadSizeBytes)} allowed.`,
+      )
       return
     }
 
@@ -126,6 +132,9 @@ export function AssetManager({
         <UploadCloud className="asset-manager__dropzone-icon" size={20} />
         <p className="asset-manager__dropzone-text">
           Drop files here or click to upload
+        </p>
+        <p className="asset-manager__dropzone-text">
+          Max file size: {formatBytes(maxAssetUploadSizeBytes)}
         </p>
         <input
           type="file"
