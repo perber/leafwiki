@@ -240,6 +240,7 @@ func (t *contentTransformer) resolveDestination(
 	if rawTarget == "" || isExternalHref(rawTarget) || strings.HasPrefix(rawTarget, "#") {
 		return "", false, nil
 	}
+	rawTarget = decodeImportTarget(rawTarget)
 
 	if targetPath, ok := t.resolvePagePath(sourcePath, rawTarget); ok {
 		return "/" + targetPath + suffix, false, nil
@@ -320,7 +321,7 @@ func normalizePlanSourcePath(p string) string {
 }
 
 func basenameOnlyLookupKey(href string) (string, bool) {
-	trimmed := strings.TrimSpace(href)
+	trimmed := strings.TrimSpace(decodeImportTarget(href))
 	if trimmed == "" || strings.Contains(trimmed, "/") || strings.HasPrefix(trimmed, ".") {
 		return "", false
 	}
@@ -330,7 +331,7 @@ func basenameOnlyLookupKey(href string) (string, bool) {
 }
 
 func normalizePageBasenameForLookup(value string) string {
-	base, _ := splitURLSuffix(strings.TrimSpace(value))
+	base, _ := splitURLSuffix(strings.TrimSpace(decodeImportTarget(value)))
 	base = path.Base(base)
 	if strings.EqualFold(path.Ext(base), ".md") {
 		base = strings.TrimSuffix(base, path.Ext(base))
@@ -340,6 +341,14 @@ func normalizePageBasenameForLookup(value string) string {
 		return ""
 	}
 	return strings.ToLower(base)
+}
+
+func decodeImportTarget(value string) string {
+	decoded, err := url.PathUnescape(value)
+	if err != nil {
+		return value
+	}
+	return decoded
 }
 
 func buildSourceCandidates(sourcePath string, href string) []string {
