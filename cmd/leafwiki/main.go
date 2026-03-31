@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"os"
@@ -15,8 +16,8 @@ import (
 	"github.com/perber/wiki/internal/wiki"
 )
 
-func printUsage() {
-	fmt.Println(`LeafWiki – lightweight selfhosted wiki 🌿
+func writeUsage(w io.Writer) {
+	fmt.Fprintln(w, `LeafWiki – lightweight selfhosted wiki 🌿
 
 	Usage:
 	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
@@ -63,6 +64,10 @@ func printUsage() {
 	`)
 }
 
+func printUsage() {
+	writeUsage(os.Stdout)
+}
+
 func setupLogger() {
 	level := slog.LevelInfo
 	if os.Getenv("LEAFWIKI_LOG_LEVEL") == "debug" {
@@ -86,48 +91,74 @@ func fail(msg string, args ...any) {
 	os.Exit(1)
 }
 
+type cliFlags struct {
+	host                    *string
+	port                    *string
+	dataDir                 *string
+	adminPassword           *string
+	jwtSecret               *string
+	publicAccess            *bool
+	allowInsecure           *bool
+	injectCodeInHeader      *string
+	customStylesheet        *string
+	disableAuth             *bool
+	hideLinkMetadataSection *bool
+	accessTokenTimeout      *time.Duration
+	refreshTokenTimeout     *time.Duration
+	basePath                *string
+	maxAssetUploadSize      *string
+}
+
+func registerFlags(fs *flag.FlagSet) *cliFlags {
+	return &cliFlags{
+		host:                    fs.String("host", "", "host/IP address to bind the server to (e.g. 127.0.0.1 or 0.0.0.0)"),
+		port:                    fs.String("port", "", "port to run the server on"),
+		dataDir:                 fs.String("data-dir", "", "path to data directory"),
+		adminPassword:           fs.String("admin-password", "", "initial admin password"),
+		jwtSecret:               fs.String("jwt-secret", "", "JWT secret for authentication"),
+		publicAccess:            fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
+		allowInsecure:           fs.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)"),
+		injectCodeInHeader:      fs.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")"),
+		customStylesheet:        fs.String("custom-stylesheet", "", "path to a custom CSS file served as /custom.css"),
+		disableAuth:             fs.Bool("disable-auth", false, "disable authentication completely (default: false) (WARNING: only use in trusted networks!)"),
+		hideLinkMetadataSection: fs.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)"),
+		accessTokenTimeout:      fs.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)"),
+		refreshTokenTimeout:     fs.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)"),
+		basePath:                fs.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)"),
+		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
+	}
+}
+
 func main() {
 	setupLogger()
+	flag.Usage = func() {
+		writeUsage(flag.CommandLine.Output())
+	}
 
-	// flags
-	hostFlag := flag.String("host", "", "host/IP address to bind the server to (e.g. 127.0.0.1 or 0.0.0.0)")
-	portFlag := flag.String("port", "", "port to run the server on")
-	dataDirFlag := flag.String("data-dir", "", "path to data directory")
-	adminPasswordFlag := flag.String("admin-password", "", "initial admin password")
-	jwtSecretFlag := flag.String("jwt-secret", "", "JWT secret for authentication")
-	publicAccessFlag := flag.Bool("public-access", false, "allow public access to the wiki with read access (default: false)")
-	allowInsecureFlag := flag.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)")
-	injectCodeInHeaderFlag := flag.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")")
-	customStylesheetFlag := flag.String("custom-stylesheet", "", "path to a custom CSS file served as /custom.css")
-	disableAuthFlag := flag.Bool("disable-auth", false, "disable authentication completely (default: false) (WARNING: only use in trusted networks!)")
-	hideLinkMetadataSectionFlag := flag.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)")
-	accessTokenTimeoutFlag := flag.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)")
-	refreshTokenTimeoutFlag := flag.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)")
-	basePathFlag := flag.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)")
-	maxAssetUploadSizeFlag := flag.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)")
+	flags := registerFlags(flag.CommandLine)
 	flag.Parse()
 
 	// Track which flags were explicitly set on CLI
 	visited := map[string]bool{}
 	flag.Visit(func(f *flag.Flag) { visited[f.Name] = true })
 
-	host := resolveString("host", *hostFlag, visited, "LEAFWIKI_HOST", "127.0.0.1")
-	port := resolveString("port", *portFlag, visited, "LEAFWIKI_PORT", "8080")
-	dataDir := resolveString("data-dir", *dataDirFlag, visited, "LEAFWIKI_DATA_DIR", "./data")
-	adminPassword := resolveString("admin-password", *adminPasswordFlag, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
-	jwtSecret := resolveString("jwt-secret", *jwtSecretFlag, visited, "LEAFWIKI_JWT_SECRET", "")
-	injectCodeInHeader := resolveString("inject-code-in-header", *injectCodeInHeaderFlag, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
-	customStylesheet := resolveString("custom-stylesheet", *customStylesheetFlag, visited, "LEAFWIKI_CUSTOM_STYLESHEET", "")
-	allowInsecure := resolveBool("allow-insecure", *allowInsecureFlag, visited, "LEAFWIKI_ALLOW_INSECURE")
-	publicAccess := resolveBool("public-access", *publicAccessFlag, visited, "LEAFWIKI_PUBLIC_ACCESS")
-	hideLinkMetadataSection := resolveBool("hide-link-metadata-section", *hideLinkMetadataSectionFlag, visited, "LEAFWIKI_HIDE_LINK_METADATA_SECTION")
-	accessTokenTimeout := resolveDuration("access-token-timeout", *accessTokenTimeoutFlag, visited, "LEAFWIKI_ACCESS_TOKEN_TIMEOUT")
-	refreshTokenTimeout := resolveDuration("refresh-token-timeout", *refreshTokenTimeoutFlag, visited, "LEAFWIKI_REFRESH_TOKEN_TIMEOUT")
+	host := resolveString("host", *flags.host, visited, "LEAFWIKI_HOST", "127.0.0.1")
+	port := resolveString("port", *flags.port, visited, "LEAFWIKI_PORT", "8080")
+	dataDir := resolveString("data-dir", *flags.dataDir, visited, "LEAFWIKI_DATA_DIR", "./data")
+	adminPassword := resolveString("admin-password", *flags.adminPassword, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
+	jwtSecret := resolveString("jwt-secret", *flags.jwtSecret, visited, "LEAFWIKI_JWT_SECRET", "")
+	injectCodeInHeader := resolveString("inject-code-in-header", *flags.injectCodeInHeader, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
+	customStylesheet := resolveString("custom-stylesheet", *flags.customStylesheet, visited, "LEAFWIKI_CUSTOM_STYLESHEET", "")
+	allowInsecure := resolveBool("allow-insecure", *flags.allowInsecure, visited, "LEAFWIKI_ALLOW_INSECURE")
+	publicAccess := resolveBool("public-access", *flags.publicAccess, visited, "LEAFWIKI_PUBLIC_ACCESS")
+	hideLinkMetadataSection := resolveBool("hide-link-metadata-section", *flags.hideLinkMetadataSection, visited, "LEAFWIKI_HIDE_LINK_METADATA_SECTION")
+	accessTokenTimeout := resolveDuration("access-token-timeout", *flags.accessTokenTimeout, visited, "LEAFWIKI_ACCESS_TOKEN_TIMEOUT")
+	refreshTokenTimeout := resolveDuration("refresh-token-timeout", *flags.refreshTokenTimeout, visited, "LEAFWIKI_REFRESH_TOKEN_TIMEOUT")
 	// If disable-auth is set, later logic will override publicAccess accordingly
-	disableAuth := resolveBool("disable-auth", *disableAuthFlag, visited, "LEAFWIKI_DISABLE_AUTH")
-	basePath := normalizeBasePath(resolveString("base-path", *basePathFlag, visited, "LEAFWIKI_BASE_PATH", ""))
+	disableAuth := resolveBool("disable-auth", *flags.disableAuth, visited, "LEAFWIKI_DISABLE_AUTH")
+	basePath := normalizeBasePath(resolveString("base-path", *flags.basePath, visited, "LEAFWIKI_BASE_PATH", ""))
 	maxAssetUploadSize := parseByteSize(
-		resolveString("max-asset-upload-size", *maxAssetUploadSizeFlag, visited, "LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50MiB"),
+		resolveString("max-asset-upload-size", *flags.maxAssetUploadSize, visited, "LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50MiB"),
 		"max asset upload size",
 	)
 

@@ -57,6 +57,19 @@ func createRouterTestInstanceWithMaxAssetUploadSize(w *wiki.Wiki, t *testing.T, 
 	})
 }
 
+func createRouterTestInstanceWithAllowInsecure(w *wiki.Wiki, allowInsecure bool, t *testing.T) *gin.Engine {
+	return NewRouter(w, RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		CustomStylesheet:        "",
+		AllowInsecure:           allowInsecure,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+	})
+}
+
 func authenticatedRequest(t *testing.T, router http.Handler, method, url string, body *strings.Reader) *httptest.ResponseRecorder {
 	// Login
 	loginBody := `{"identifier": "admin", "password": "admin"}`
@@ -247,6 +260,44 @@ func TestCreatePageEndpoint(t *testing.T) {
 
 	if resp["slug"] != expectedSlug {
 		t.Errorf("Expected slug in response, got: %v", resp)
+	}
+}
+
+func TestConfigEndpoint_ExplainsAllowInsecureRequirementOnHTTP(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstanceWithAllowInsecure(w, false, t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rec.Code)
+	}
+
+	if !strings.Contains(rec.Body.String(), "--allow-insecure") {
+		t.Fatalf("expected response to explain allow-insecure requirement, got %s", rec.Body.String())
+	}
+}
+
+func TestLoginEndpoint_ExplainsAllowInsecureRequirementOnHTTP(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstanceWithAllowInsecure(w, false, t)
+
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d with body %s", rec.Code, rec.Body.String())
+	}
+
+	if !strings.Contains(rec.Body.String(), "--allow-insecure") {
+		t.Fatalf("expected response to explain allow-insecure requirement, got %s", rec.Body.String())
 	}
 }
 

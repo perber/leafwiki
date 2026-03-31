@@ -2,6 +2,7 @@ package http
 
 import (
 	"embed"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/perber/wiki/internal/http/api"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
+	"github.com/perber/wiki/internal/http/middleware/utils"
 	"github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/wiki"
 )
@@ -138,6 +140,12 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
 			if _, err := csrfCookie.Issue(c); err != nil {
+				if errors.Is(err, utils.ErrHTTPSRequired) {
+					c.JSON(http.StatusBadRequest, gin.H{
+						"error": "HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
+					})
+					return
+				}
 				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
 				return
 			}

@@ -8,6 +8,7 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
+	"github.com/perber/wiki/internal/http/middleware/utils"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -35,11 +36,23 @@ func RefreshTokenUserHandler(wikiInstance *wiki.Wiki, authCookies *auth_middlewa
 		}
 
 		if _, err := csrfCookie.Issue(c); err != nil {
+			if errors.Is(err, utils.ErrHTTPSRequired) {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": "HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
+				})
+				return
+			}
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
 			return
 		}
 
 		if err := authCookies.Set(c, data.Token, data.RefreshToken); err != nil {
+			if errors.Is(err, utils.ErrHTTPSRequired) {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": "HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
+				})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set authentication cookies"})
 			return
 		}
