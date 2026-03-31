@@ -371,7 +371,7 @@
   }
 
   .app-layout__logo-image {
-    @apply inline-block h-8 max-w-32 w-auto shrink-0 object-contain align-middle;
+    @apply inline-block h-8 w-auto max-w-32 shrink-0 object-contain align-middle;
   }
 
   .app-layout__logo-emoji {
@@ -635,7 +635,7 @@
   }
 
   .login__logo-image {
-    @apply inline-block h-10 max-w-48 w-auto object-contain align-middle;
+    @apply inline-block h-10 w-auto max-w-48 object-contain align-middle;
   }
 
   .login__field {
@@ -1302,7 +1302,7 @@
   }
 
   .settings__preview-image {
-    @apply h-12 max-w-48 w-auto object-contain;
+    @apply h-12 w-auto max-w-48 object-contain;
   }
 
   .settings__preview-favicon {
