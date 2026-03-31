@@ -70,7 +70,7 @@ func (t *contentTransformer) rewriteMarkdownLinks(
 ) (string, error) {
 	var out strings.Builder
 	for i := 0; i < len(content); i++ {
-		if content[i] != '[' && !(content[i] == '!' && i+1 < len(content) && content[i+1] == '[') {
+		if content[i] != '[' && (content[i] != '!' || i+1 >= len(content) || content[i+1] != '[') {
 			out.WriteByte(content[i])
 			continue
 		}
