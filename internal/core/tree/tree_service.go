@@ -22,6 +22,8 @@ type TreeService struct {
 	tree       *PageNode
 	store      *NodeStore
 	log        *slog.Logger
+	nodesByID  map[string]*PageNode
+	childSlugs map[string]map[string]*PageNode
 
 	mu sync.RWMutex
 }
@@ -35,6 +37,8 @@ func NewTreeService(storageDir string) *TreeService {
 		tree:       nil,
 		store:      NewNodeStore(storageDir),
 		log:        slog.Default().With("component", "TreeService"),
+		nodesByID:  make(map[string]*PageNode),
+		childSlugs: make(map[string]map[string]*PageNode),
 	}
 }
 
@@ -60,6 +64,7 @@ func (t *TreeService) LoadTree() error {
 			return fmt.Errorf("internal error: tree reconstruction returned nil tree")
 		}
 		t.tree = reconstructed
+		t.rebuildIndexesLocked()
 		return nil
 	}
 
@@ -101,6 +106,7 @@ func (t *TreeService) LoadTree() error {
 	}
 
 	t.tree = reconstructed
+	t.rebuildIndexesLocked()
 
 	if err := os.Remove(legacyTreePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		t.log.Warn("Could not remove migrated legacy tree snapshot", "path", legacyTreePath, "error", err)
@@ -156,12 +162,14 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 	// Note: oldTree may be nil if this is the first reconstruction (which is expected)
 	oldTree := t.tree
 	t.tree = newTree
+	t.rebuildIndexesLocked()
 
 	// Reconstructed nodes already carry metadata from frontmatter or safe defaults.
 
 	if err := saveSchema(t.storageDir, CurrentSchemaVersion); err != nil {
 		t.log.Error("Error saving schema after reconstruction", "error", err)
 		t.tree = oldTree
+		t.rebuildIndexesLocked()
 		return err
 	}
 
@@ -207,15 +215,14 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 	// Resolve the parent
 	parent := t.tree
 	if parentID != nil && *parentID != "" && *parentID != "root" {
-		var err error
-		parent, err = t.findPageByIDLocked(t.tree.Children, *parentID)
-		if err != nil {
+		parent = t.getNodeByIDLocked(*parentID)
+		if parent == nil {
 			return nil, ErrParentNotFound
 		}
 	}
 
 	// Check if a child with the same slug already exists
-	if parent.ChildAlreadyExists(slug) {
+	if t.findChildBySlugInParentLocked(parent, slug) != nil {
 		return nil, ErrPageAlreadyExists
 	}
 
@@ -274,6 +281,7 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 
 	// Add the new page to the parent
 	parent.Children = append(parent.Children, entry)
+	t.indexNodeLocked(entry)
 	if err := t.store.SaveChildOrder(parent); err != nil {
 		rollbackErr := t.rollbackCreatedNodeLocked(parent, entry, parentWasConverted)
 		if rollbackErr != nil {
@@ -300,6 +308,7 @@ func (t *TreeService) rollbackCreatedNodeLocked(parent *PageNode, entry *PageNod
 			break
 		}
 	}
+	t.removeNodeIndexLocked(entry)
 
 	switch entry.Kind {
 	case NodeKindSection:
@@ -359,6 +368,120 @@ func (t *TreeService) findPageByIDLocked(entry []*PageNode, id string) (*PageNod
 	return nil, ErrPageNotFound
 }
 
+func (t *TreeService) getNodeByIDLocked(id string) *PageNode {
+	if id == "" {
+		return nil
+	}
+	if id == "root" {
+		return t.tree
+	}
+
+	return t.nodesByID[id]
+}
+
+func (t *TreeService) rebuildIndexesLocked() {
+	t.nodesByID = make(map[string]*PageNode)
+	t.childSlugs = make(map[string]map[string]*PageNode)
+
+	if t.tree == nil {
+		return
+	}
+
+	var walk func(node *PageNode)
+	walk = func(node *PageNode) {
+		if node == nil {
+			return
+		}
+
+		if node.ID != "" && node.ID != "root" {
+			t.nodesByID[node.ID] = node
+		}
+		t.rebuildChildSlugIndexForParentLocked(node)
+
+		for _, child := range node.Children {
+			walk(child)
+		}
+	}
+
+	walk(t.tree)
+}
+
+func (t *TreeService) rebuildChildSlugIndexForParentLocked(parent *PageNode) {
+	if parent == nil {
+		return
+	}
+
+	index := make(map[string]*PageNode, len(parent.Children))
+	for _, child := range parent.Children {
+		if child == nil {
+			continue
+		}
+		index[strings.ToLower(child.Slug)] = child
+	}
+	t.childSlugs[parent.ID] = index
+}
+
+func (t *TreeService) indexNodeLocked(node *PageNode) {
+	if node == nil {
+		return
+	}
+
+	if node.ID != "" && node.ID != "root" {
+		t.nodesByID[node.ID] = node
+	}
+	t.rebuildChildSlugIndexForParentLocked(node)
+	if node.Parent != nil {
+		t.rebuildChildSlugIndexForParentLocked(node.Parent)
+	}
+}
+
+func (t *TreeService) removeNodeIndexLocked(node *PageNode) {
+	if node == nil {
+		return
+	}
+
+	var walk func(current *PageNode)
+	walk = func(current *PageNode) {
+		if current == nil {
+			return
+		}
+
+		delete(t.nodesByID, current.ID)
+		delete(t.childSlugs, current.ID)
+
+		for _, child := range current.Children {
+			walk(child)
+		}
+	}
+
+	walk(node)
+	if node.Parent != nil {
+		t.rebuildChildSlugIndexForParentLocked(node.Parent)
+	}
+}
+
+func (t *TreeService) findChildBySlugLocked(entry []*PageNode, slug string) *PageNode {
+	for _, child := range entry {
+		if child != nil && strings.EqualFold(child.Slug, slug) {
+			return child
+		}
+	}
+
+	return nil
+}
+
+func (t *TreeService) findChildBySlugInParentLocked(parent *PageNode, slug string) *PageNode {
+	if parent == nil {
+		return nil
+	}
+
+	if index, ok := t.childSlugs[parent.ID]; ok {
+		return index[strings.ToLower(slug)]
+	}
+
+	return t.findChildBySlugLocked(parent.Children, slug)
+}
+
 // DeleteNode deletes a node from the tree
 func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error {
 	err := t.withLockedTree(func() error {
@@ -367,8 +490,8 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error
 		}
 
 		// Find the node to delete
-		node, err := t.findPageByIDLocked(t.tree.Children, id)
-		if err != nil {
+		node := t.getNodeByIDLocked(id)
+		if node == nil {
 			return ErrPageNotFound
 		}
 
@@ -416,6 +539,7 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error
 				break
 			}
 		}
+		t.removeNodeIndexLocked(node)
 
 		t.reindexPositions(parent)
 		if err := t.store.SaveChildOrder(parent); err != nil {
@@ -434,14 +558,17 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		}
 
 		// Find node
-		node, err := t.findPageByIDLocked(t.tree.Children, id)
-		if err != nil {
+		node := t.getNodeByIDLocked(id)
+		if node == nil {
 			return ErrPageNotFound
 		}
 
 		// Slug must be unique under same parent (when changed)
-		if slug != node.Slug && node.Parent != nil && node.Parent.ChildAlreadyExists(slug) {
-			return ErrPageAlreadyExists
+		if slug != node.Slug && node.Parent != nil {
+			existing := t.findChildBySlugInParentLocked(node.Parent, slug)
+			if existing != nil && existing.ID != node.ID {
+				return ErrPageAlreadyExists
+			}
 		}
 
 		// Content update?
@@ -459,6 +586,9 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 				return fmt.Errorf("could not rename node: %w", err)
 			}
 			node.Slug = slug
+			if node.Parent != nil {
+				t.rebuildChildSlugIndexForParentLocked(node.Parent)
+			}
 		}
 
 		// Update title in tree
@@ -486,8 +616,8 @@ func (t *TreeService) ConvertNode(userID string, id string, kind NodeKind) error
 		}
 
 		// Find node
-		node, err := t.findPageByIDLocked(t.tree.Children, id)
-		if err != nil {
+		node := t.getNodeByIDLocked(id)
+		if node == nil {
 			return ErrPageNotFound
 		}
 
@@ -540,8 +670,8 @@ func (t *TreeService) GetPage(id string) (*Page, error) {
 	}
 
 	// Find the page
-	page, err := t.findPageByIDLocked(t.tree.Children, id)
-	if err != nil {
+	page := t.getNodeByIDLocked(id)
+	if page == nil {
 		return nil, ErrPageNotFound
 	}
 
@@ -567,27 +697,30 @@ func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (
 	// recursive function to find the entry
 	var findEntry func(entry []*PageNode, routePart []string) (*Page, error)
 	findEntry = func(entry []*PageNode, routePart []string) (*Page, error) {
-		for _, e := range entry {
-			if e.Slug == routePart[0] {
-				if len(routePart) == 1 {
-					// Get the content of the entry
-					content, err := t.store.ReadPageContent(e)
-					if err != nil {
-						return nil, fmt.Errorf("could not get page content: %w", err)
-					}
-
-					return &Page{
-						PageNode: e,
-						Content:  content,
-					}, nil
-				}
-
-				// Find the entry in the children
-				return findEntry(e.Children, routePart[1:])
-			}
+		if len(routePart) == 0 {
+			return nil, ErrPageNotFound
 		}
 
-		return nil, ErrPageNotFound
+		e := t.findChildBySlugLocked(entry, routePart[0])
+		if e == nil {
+			return nil, ErrPageNotFound
+		}
+
+		if len(routePart) == 1 {
+			// Get the content of the entry
+			content, err := t.store.ReadPageContent(e)
+			if err != nil {
+				return nil, fmt.Errorf("could not get page content: %w", err)
+			}
+
+			return &Page{
+				PageNode: e,
+				Content:  content,
+			}, nil
+		}
+
+		// Find the entry in the children
+		return findEntry(e.Children, routePart[1:])
 	}
 
 	return findEntry(t.tree.Children, routePart)
@@ -651,18 +784,16 @@ func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLo
 		lookup.Segments[i] = segment
 
 		// Check if the segment exists in the current entry
-		for _, e := range entry {
-			if strings.EqualFold(e.Slug, part) {
-				// Segment exists
-				lookup.Segments[i].Exists = true
-				lookup.Segments[i].ID = &e.ID
-				lookup.Segments[i].Kind = &e.Kind
-				lookup.Segments[i].Title = &e.Title
+		e := t.findChildBySlugLocked(entry, part)
+		if e != nil {
+			// Segment exists
+			lookup.Segments[i].Exists = true
+			lookup.Segments[i].ID = &e.ID
+			lookup.Segments[i].Kind = &e.Kind
+			lookup.Segments[i].Title = &e.Title
 
-				// Move to the next entry
-				entry = e.Children
-				break
-			}
+			// Move to the next entry
+			entry = e.Children
 		}
 
 		// If the segment does not exist, set the pathExists flag to false
@@ -707,9 +838,9 @@ func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string
 	// Path exists -> return existing
 	if lookup.Exists {
 		last := lookup.Segments[len(lookup.Segments)-1]
-		page, err := t.findPageByIDLocked(t.tree.Children, *last.ID)
-		if err != nil {
-			return nil, fmt.Errorf("could not find existing page by ID: %w", err)
+		page := t.getNodeByIDLocked(*last.ID)
+		if page == nil {
+			return nil, fmt.Errorf("could not find existing page by ID: %w", ErrPageNotFound)
 		}
 		return &EnsurePathResult{Exists: true, Page: page}, nil
 	}
@@ -752,9 +883,9 @@ func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string
 	if currentID == nil {
 		return nil, fmt.Errorf("could not ensure page path")
 	}
-	page, err := t.findPageByIDLocked(t.tree.Children, *currentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not find created page by ID: %w", err)
+	page := t.getNodeByIDLocked(*currentID)
+	if page == nil {
+		return nil, fmt.Errorf("could not find created page by ID: %w", ErrPageNotFound)
 	}
 
 	// Save once
@@ -775,8 +906,8 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 	}
 
 	// Find node to move
-	node, err := t.findPageByIDLocked(t.tree.Children, id)
-	if err != nil {
+	node := t.getNodeByIDLocked(id)
+	if node == nil {
 		return ErrPageNotFound
 	}
 
@@ -788,14 +919,14 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 	// Resolve destination parent (default root)
 	newParent := t.tree
 	if parentID != "" && parentID != "root" {
-		newParent, err = t.findPageByIDLocked(t.tree.Children, parentID)
-		if err != nil {
+		newParent = t.getNodeByIDLocked(parentID)
+		if newParent == nil {
 			return fmt.Errorf("new parent not found: %w", ErrParentNotFound)
 		}
 	}
 
 	// Same slug collision under new parent
-	if newParent.ChildAlreadyExists(node.Slug) {
+	if existing := t.findChildBySlugInParentLocked(newParent, node.Slug); existing != nil && existing.ID != node.ID {
 		return fmt.Errorf("child with the same slug already exists: %w", ErrPageAlreadyExists)
 	}
 
@@ -843,6 +974,8 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 	node.Position = len(newParent.Children)
 	newParent.Children = append(newParent.Children, node)
 	node.Parent = newParent
+	t.rebuildChildSlugIndexForParentLocked(oldParent)
+	t.rebuildChildSlugIndexForParentLocked(newParent)
 	node.Metadata.UpdatedAt = time.Now().UTC()
 	node.Metadata.LastAuthorID = userID
 
@@ -916,6 +1049,10 @@ func (t *TreeService) rollbackMovedNodeLocked(node *PageNode, oldParent *PageNod
 	if newParent != oldParent {
 		restoreChildSnapshot(newParent, previousNewChildren, previousNewPositions)
 	}
+	t.rebuildChildSlugIndexForParentLocked(oldParent)
+	if newParent != oldParent {
+		t.rebuildChildSlugIndexForParentLocked(newParent)
+	}
 	node.Parent = oldParent
 	node.Position = previousPosition
 	node.Metadata = previousMetadata
@@ -959,10 +1096,8 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 	parent := t.tree
 
 	if parentID != "" && parentID != "root" {
-		// Find the parent page
-		var err error
-		parent, err = t.findPageByIDLocked(t.tree.Children, parentID)
-		if err != nil {
+		parent = t.getNodeByIDLocked(parentID)
+		if parent == nil {
 			return ErrParentNotFound
 		}
 	}

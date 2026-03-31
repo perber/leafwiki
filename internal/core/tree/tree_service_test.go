@@ -1354,6 +1354,23 @@ func TestTreeService_FindPageByRoutePath_ReturnsContent(t *testing.T) {
 	}
 }
 
+func TestTreeService_FindPageByRoutePath_ReturnsNotFoundForMissingPath(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	homeID, err := svc.CreateNode("system", nil, "Home", "home", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode home failed: %v", err)
+	}
+	if _, err := svc.CreateNode("system", homeID, "About", "about", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode about failed: %v", err)
+	}
+
+	_, err = svc.FindPageByRoutePath(svc.GetTree().Children, "home/team")
+	if !errors.Is(err, ErrPageNotFound) {
+		t.Fatalf("expected ErrPageNotFound, got %v", err)
+	}
+}
+
 func TestTreeService_LookupPagePath_Segments(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
@@ -1398,6 +1415,71 @@ func TestTreeService_LookupPagePath_IsCaseInsensitive(t *testing.T) {
 	}
 	if !lookup.Exists {
 		t.Fatalf("expected case-insensitive path lookup to resolve existing path")
+	}
+}
+
+func TestTreeService_LookupPagePath_RespectsProvidedEntrySlice(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	firstID, err := svc.CreateNode("system", nil, "Alpha", "alpha", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode alpha failed: %v", err)
+	}
+	if _, err := svc.CreateNode("system", nil, "Beta", "beta", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode beta failed: %v", err)
+	}
+
+	firstNode, err := svc.FindPageByID(svc.GetTree().Children, *firstID)
+	if err != nil {
+		t.Fatalf("FindPageByID alpha failed: %v", err)
+	}
+
+	lookup, err := svc.LookupPagePath([]*PageNode{firstNode}, "beta")
+	if err != nil {
+		t.Fatalf("LookupPagePath failed: %v", err)
+	}
+	if lookup.Exists {
+		t.Fatalf("expected lookup to respect provided entry slice")
+	}
+}
+
+func TestTreeService_LookupPagePath_ReflectsSlugRename(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	id, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode docs failed: %v", err)
+	}
+	if _, err := svc.CreateNode("system", id, "Guide", "guide", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode guide failed: %v", err)
+	}
+
+	if err := svc.UpdateNode("system", *id, "Documentation", "documentation", nil); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	oldLookup, err := svc.LookupPagePath(svc.GetTree().Children, "docs/guide")
+	if err != nil {
+		t.Fatalf("LookupPagePath old path failed: %v", err)
+	}
+	if oldLookup.Exists {
+		t.Fatalf("expected old path to stop resolving after slug rename")
+	}
+
+	newLookup, err := svc.LookupPagePath(svc.GetTree().Children, "documentation/guide")
+	if err != nil {
+		t.Fatalf("LookupPagePath new path failed: %v", err)
+	}
+	if !newLookup.Exists {
+		t.Fatalf("expected renamed path to resolve")
+	}
+
+	page, err := svc.FindPageByRoutePath(svc.GetTree().Children, "documentation/guide")
+	if err != nil {
+		t.Fatalf("FindPageByRoutePath renamed path failed: %v", err)
+	}
+	if page.Slug != "guide" {
+		t.Fatalf("expected guide page, got %q", page.Slug)
 	}
 }
 
@@ -1452,6 +1534,66 @@ func TestTreeService_EnsurePagePath_CreatesIntermediateSectionsAndFinalPage(t *t
 	}
 	if !lookup.Exists {
 		t.Fatalf("expected path to exist after EnsurePagePath")
+	}
+}
+
+func TestTreeService_EnsurePagePath_ReturnsExistingPageWithoutCreatingNodes(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	res, err := svc.EnsurePagePath("system", "home/about/team/members", "Members", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("EnsurePagePath initial create failed: %v", err)
+	}
+
+	existing, err := svc.EnsurePagePath("system", "home/about/team/members", "Ignored", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("EnsurePagePath existing failed: %v", err)
+	}
+	if !existing.Exists {
+		t.Fatalf("expected existing path lookup to report Exists")
+	}
+	if existing.Page == nil || existing.Page.ID != res.Page.ID {
+		t.Fatalf("expected EnsurePagePath to return the existing page")
+	}
+	if len(existing.Created) != 0 {
+		t.Fatalf("expected no nodes to be created for an existing path, got %d", len(existing.Created))
+	}
+}
+
+func TestTreeService_MoveNode_UpdatesPathLookup(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	docsID, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode docs failed: %v", err)
+	}
+	archiveID, err := svc.CreateNode("system", nil, "Archive", "archive", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode archive failed: %v", err)
+	}
+	guideID, err := svc.CreateNode("system", docsID, "Guide", "guide", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode guide failed: %v", err)
+	}
+
+	if err := svc.MoveNode("system", *guideID, *archiveID); err != nil {
+		t.Fatalf("MoveNode failed: %v", err)
+	}
+
+	oldLookup, err := svc.LookupPagePath(svc.GetTree().Children, "docs/guide")
+	if err != nil {
+		t.Fatalf("LookupPagePath old path failed: %v", err)
+	}
+	if oldLookup.Exists {
+		t.Fatalf("expected old path to stop resolving after move")
+	}
+
+	newLookup, err := svc.LookupPagePath(svc.GetTree().Children, "archive/guide")
+	if err != nil {
+		t.Fatalf("LookupPagePath new path failed: %v", err)
+	}
+	if !newLookup.Exists {
+		t.Fatalf("expected moved path to resolve at destination")
 	}
 }
 
