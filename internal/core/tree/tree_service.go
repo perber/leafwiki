@@ -338,34 +338,23 @@ func (t *TreeService) rollbackCreatedNodeLocked(parent *PageNode, entry *PageNod
 	return nil
 }
 
-// FindPageByID finds a page in the tree by its ID
-// If the page is not found, it returns an error
-func (t *TreeService) FindPageByID(entry []*PageNode, id string) (*PageNode, error) {
+// FindPageByID finds a page in the tree by its ID.
+func (t *TreeService) FindPageByID(id string) (*PageNode, error) {
 	var result *PageNode
 	err := t.withRLockedTree(func() error {
-		var err error
-		result, err = t.findPageByIDLocked(entry, id)
-		return err
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+
+		result = t.getNodeByIDLocked(id)
+		if result == nil {
+			return ErrPageNotFound
+		}
+
+		return nil
 	})
 
 	return result, err
-}
-
-// findPageByIDLocked finds a page in the tree by its ID
-// Lock must be held by the caller
-func (t *TreeService) findPageByIDLocked(entry []*PageNode, id string) (*PageNode, error) {
-	for _, e := range entry {
-		if e.ID == id {
-			return e, nil
-		}
-
-		if e.Children != nil {
-			if page, err := t.findPageByIDLocked(e.Children, id); err == nil {
-				return page, nil
-			}
-		}
-	}
-	return nil, ErrPageNotFound
 }
 
 func (t *TreeService) getNodeByIDLocked(id string) *PageNode {
@@ -460,16 +449,6 @@ func (t *TreeService) removeNodeIndexLocked(node *PageNode) {
 	}
 }
 
-func (t *TreeService) findChildBySlugLocked(entry []*PageNode, slug string) *PageNode {
-	for _, child := range entry {
-		if child != nil && strings.EqualFold(child.Slug, slug) {
-			return child
-		}
-	}
-
-	return nil
-}
-
 func (t *TreeService) findChildBySlugInParentLocked(parent *PageNode, slug string) *PageNode {
 	if parent == nil {
 		return nil
@@ -479,7 +458,13 @@ func (t *TreeService) findChildBySlugInParentLocked(parent *PageNode, slug strin
 		return index[strings.ToLower(slug)]
 	}
 
-	return t.findChildBySlugLocked(parent.Children, slug)
+	for _, child := range parent.Children {
+		if child != nil && strings.EqualFold(child.Slug, slug) {
+			return child
+		}
+	}
+
+	return nil
 }
 
 // DeleteNode deletes a node from the tree
@@ -687,58 +672,64 @@ func (t *TreeService) GetPage(id string) (*Page, error) {
 	}, nil
 }
 
-// FindPageByRoutePath finds a page in the tree by its path
-func (t *TreeService) FindPageByRoutePath(entry []*PageNode, routePath string) (*Page, error) {
+// FindPageByRoutePath finds a page in the tree by its path.
+func (t *TreeService) FindPageByRoutePath(routePath string) (*Page, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+
+	if t.tree == nil {
+		return nil, ErrTreeNotLoaded
+	}
 
 	// Split the routePath into parts
 	routePart := strings.Split(routePath, "/")
-	// recursive function to find the entry
-	var findEntry func(entry []*PageNode, routePart []string) (*Page, error)
-	findEntry = func(entry []*PageNode, routePart []string) (*Page, error) {
-		if len(routePart) == 0 {
-			return nil, ErrPageNotFound
-		}
-
-		e := t.findChildBySlugLocked(entry, routePart[0])
-		if e == nil {
-			return nil, ErrPageNotFound
-		}
-
-		if len(routePart) == 1 {
-			// Get the content of the entry
-			content, err := t.store.ReadPageContent(e)
-			if err != nil {
-				return nil, fmt.Errorf("could not get page content: %w", err)
-			}
-
-			return &Page{
-				PageNode: e,
-				Content:  content,
-			}, nil
-		}
-
-		// Find the entry in the children
-		return findEntry(e.Children, routePart[1:])
+	if len(routePart) == 0 {
+		return nil, ErrPageNotFound
 	}
 
-	return findEntry(t.tree.Children, routePart)
+	parent := t.tree
+	var node *PageNode
+	for _, part := range routePart {
+		if part == "" {
+			return nil, ErrPageNotFound
+		}
+
+		node = t.findChildBySlugInParentLocked(parent, part)
+		if node == nil {
+			return nil, ErrPageNotFound
+		}
+
+		parent = node
+	}
+
+	content, err := t.store.ReadPageContent(node)
+	if err != nil {
+		return nil, fmt.Errorf("could not get page content: %w", err)
+	}
+
+	return &Page{
+		PageNode: node,
+		Content:  content,
+	}, nil
 }
 
 // LookupPagePath looks up a path in the tree and returns a PathLookup struct
-// that contains information about the path and its segments and whether they exist
-func (t *TreeService) LookupPagePath(entry []*PageNode, p string) (*PathLookup, error) {
+// that contains information about the path and its segments and whether they exist.
+func (t *TreeService) LookupPagePath(p string) (*PathLookup, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	return t.LookupPagePathLocked(entry, p)
+	return t.lookupPagePathLocked(p)
 }
 
-// LookupPagePathLocked looks up a path in the tree and returns a PathLookup struct
-// that contains information about the path and its segments and whether they exist
-// Lock must be held by the caller
-func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLookup, error) {
+// lookupPagePathLocked looks up a path in the tree and returns a PathLookup struct
+// that contains information about the path and its segments and whether they exist.
+// Lock must be held by the caller.
+func (t *TreeService) lookupPagePathLocked(p string) (*PathLookup, error) {
+	if t.tree == nil {
+		return nil, ErrTreeNotLoaded
+	}
+
 	path := strings.TrimSpace(p)
 	path = strings.Trim(path, "/")
 	if path == "" {
@@ -768,6 +759,8 @@ func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLo
 		Exists:   true,
 	}
 
+	parent := t.tree
+
 	// Check each segment in the path
 	for i, part := range pathParts {
 		if part == "" || part == "." || part == ".." {
@@ -783,8 +776,8 @@ func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLo
 		// push the segment to the lookup
 		lookup.Segments[i] = segment
 
-		// Check if the segment exists in the current entry
-		e := t.findChildBySlugLocked(entry, part)
+		// Check if the segment exists under the current parent.
+		e := t.findChildBySlugInParentLocked(parent, part)
 		if e != nil {
 			// Segment exists
 			lookup.Segments[i].Exists = true
@@ -792,8 +785,8 @@ func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLo
 			lookup.Segments[i].Kind = &e.Kind
 			lookup.Segments[i].Title = &e.Title
 
-			// Move to the next entry
-			entry = e.Children
+			// Move to the next parent
+			parent = e
 		}
 
 		// If the segment does not exist, set the pathExists flag to false
@@ -809,8 +802,7 @@ func (t *TreeService) LookupPagePathLocked(entry []*PageNode, p string) (*PathLo
 
 			lookup.Exists = false
 
-			// Set entry to nil to avoid further checks
-			entry = nil
+			parent = nil
 		}
 	}
 
@@ -830,7 +822,7 @@ func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string
 
 	created := []*PageNode{}
 
-	lookup, err := t.LookupPagePathLocked(t.tree.Children, p)
+	lookup, err := t.lookupPagePathLocked(p)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup page path: %w", err)
 	}

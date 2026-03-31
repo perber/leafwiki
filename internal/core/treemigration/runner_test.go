@@ -183,7 +183,7 @@ func TestTreeMigration_LoadTree_MigratesToV3_BackfillsMetadataFrontmatter(t *tes
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	node, err := svc.FindPageByID(*id)
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestTreeMigration_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	node, err := svc.FindPageByID(*id)
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}
@@ -441,7 +441,7 @@ func TestTreeMigration_LoadTree_MigratesToV4_ReturnsErrorWhenSectionIndexCannotB
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	node, err := svc.FindPageByID(*id)
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}

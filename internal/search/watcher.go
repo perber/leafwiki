@@ -159,7 +159,7 @@ func reindexFile(fullPath, dataDir string, treeService *tree.TreeService, index 
 	routePath := strings.TrimSuffix(rel, filepath.Ext(rel))
 	routePath = filepath.ToSlash(strings.TrimSuffix(routePath, "/index"))
 
-	page, err := treeService.FindPageByRoutePath(treeService.GetTree().Children, routePath)
+	page, err := treeService.FindPageByRoutePath(routePath)
 	if err != nil {
 		log.Printf("[watcher] not in tree: %s", rel)
 		return

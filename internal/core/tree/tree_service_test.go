@@ -547,7 +547,7 @@ func TestTreeService_CreateChild_UnderPage_AutoConvertsParentToSection(t *testin
 	mustStat(t, childFile)
 
 	// Tree kind updated
-	parentNode, err := svc.FindPageByID(svc.GetTree().Children, *parentID)
+	parentNode, err := svc.FindPageByID(*parentID)
 	if err != nil {
 		t.Fatalf("FindPageByID: %v", err)
 	}
@@ -958,7 +958,7 @@ func TestTreeService_MoveNode_PersistsMovedNodeMetadataToFrontmatter(t *testing.
 		t.Fatalf("CreateNode move: %v", err)
 	}
 
-	node, err := svc.FindPageByID(svc.GetTree().Children, *moveID)
+	node, err := svc.FindPageByID(*moveID)
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}
@@ -990,7 +990,7 @@ func TestTreeService_MoveNode_PersistsMovedNodeMetadataToFrontmatter(t *testing.
 	if err := reloaded.LoadTree(); err != nil {
 		t.Fatalf("LoadTree after move failed: %v", err)
 	}
-	reloadedNode, err := reloaded.FindPageByID(reloaded.GetTree().Children, *moveID)
+	reloadedNode, err := reloaded.FindPageByID(*moveID)
 	if err != nil {
 		t.Fatalf("FindPageByID after reload failed: %v", err)
 	}
@@ -1284,7 +1284,7 @@ func TestTreeService_ConvertNode_PageToSection_MaterializesIndexWithNodeMetadata
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	node, err := svc.FindPageByID(*id)
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}
@@ -1342,7 +1342,7 @@ func TestTreeService_FindPageByRoutePath_ReturnsContent(t *testing.T) {
 		t.Fatalf("UpdateNode content failed: %v", err)
 	}
 
-	page, err := svc.FindPageByRoutePath(svc.GetTree().Children, "architecture/project-a/specs")
+	page, err := svc.FindPageByRoutePath("architecture/project-a/specs")
 	if err != nil {
 		t.Fatalf("FindPageByRoutePath failed: %v", err)
 	}
@@ -1365,7 +1365,7 @@ func TestTreeService_FindPageByRoutePath_ReturnsNotFoundForMissingPath(t *testin
 		t.Fatalf("CreateNode about failed: %v", err)
 	}
 
-	_, err = svc.FindPageByRoutePath(svc.GetTree().Children, "home/team")
+	_, err = svc.FindPageByRoutePath("home/team")
 	if !errors.Is(err, ErrPageNotFound) {
 		t.Fatalf("expected ErrPageNotFound, got %v", err)
 	}
@@ -1377,7 +1377,7 @@ func TestTreeService_LookupPagePath_Segments(t *testing.T) {
 	homeID, _ := svc.CreateNode("system", nil, "Home", "home", ptrKind(NodeKindPage))
 	_, _ = svc.CreateNode("system", homeID, "About", "about", ptrKind(NodeKindPage))
 
-	lookup, err := svc.LookupPagePath(svc.GetTree().Children, "home/about/team")
+	lookup, err := svc.LookupPagePath("home/about/team")
 	if err != nil {
 		t.Fatalf("LookupPagePath failed: %v", err)
 	}
@@ -1409,37 +1409,12 @@ func TestTreeService_LookupPagePath_IsCaseInsensitive(t *testing.T) {
 		t.Fatalf("CreateNode about failed: %v", err)
 	}
 
-	lookup, err := svc.LookupPagePath(svc.GetTree().Children, "home/about")
+	lookup, err := svc.LookupPagePath("home/about")
 	if err != nil {
 		t.Fatalf("LookupPagePath failed: %v", err)
 	}
 	if !lookup.Exists {
 		t.Fatalf("expected case-insensitive path lookup to resolve existing path")
-	}
-}
-
-func TestTreeService_LookupPagePath_RespectsProvidedEntrySlice(t *testing.T) {
-	svc, _ := newLoadedService(t)
-
-	firstID, err := svc.CreateNode("system", nil, "Alpha", "alpha", ptrKind(NodeKindPage))
-	if err != nil {
-		t.Fatalf("CreateNode alpha failed: %v", err)
-	}
-	if _, err := svc.CreateNode("system", nil, "Beta", "beta", ptrKind(NodeKindPage)); err != nil {
-		t.Fatalf("CreateNode beta failed: %v", err)
-	}
-
-	firstNode, err := svc.FindPageByID(svc.GetTree().Children, *firstID)
-	if err != nil {
-		t.Fatalf("FindPageByID alpha failed: %v", err)
-	}
-
-	lookup, err := svc.LookupPagePath([]*PageNode{firstNode}, "beta")
-	if err != nil {
-		t.Fatalf("LookupPagePath failed: %v", err)
-	}
-	if lookup.Exists {
-		t.Fatalf("expected lookup to respect provided entry slice")
 	}
 }
 
@@ -1458,7 +1433,7 @@ func TestTreeService_LookupPagePath_ReflectsSlugRename(t *testing.T) {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
-	oldLookup, err := svc.LookupPagePath(svc.GetTree().Children, "docs/guide")
+	oldLookup, err := svc.LookupPagePath("docs/guide")
 	if err != nil {
 		t.Fatalf("LookupPagePath old path failed: %v", err)
 	}
@@ -1466,7 +1441,7 @@ func TestTreeService_LookupPagePath_ReflectsSlugRename(t *testing.T) {
 		t.Fatalf("expected old path to stop resolving after slug rename")
 	}
 
-	newLookup, err := svc.LookupPagePath(svc.GetTree().Children, "documentation/guide")
+	newLookup, err := svc.LookupPagePath("documentation/guide")
 	if err != nil {
 		t.Fatalf("LookupPagePath new path failed: %v", err)
 	}
@@ -1474,7 +1449,7 @@ func TestTreeService_LookupPagePath_ReflectsSlugRename(t *testing.T) {
 		t.Fatalf("expected renamed path to resolve")
 	}
 
-	page, err := svc.FindPageByRoutePath(svc.GetTree().Children, "documentation/guide")
+	page, err := svc.FindPageByRoutePath("documentation/guide")
 	if err != nil {
 		t.Fatalf("FindPageByRoutePath renamed path failed: %v", err)
 	}
@@ -1528,7 +1503,7 @@ func TestTreeService_EnsurePagePath_CreatesIntermediateSectionsAndFinalPage(t *t
 	}
 
 	// home/about/team should exist as path now
-	lookup, err := svc.LookupPagePath(svc.GetTree().Children, "home/about/team/members")
+	lookup, err := svc.LookupPagePath("home/about/team/members")
 	if err != nil {
 		t.Fatalf("LookupPagePath failed: %v", err)
 	}
@@ -1580,7 +1555,7 @@ func TestTreeService_MoveNode_UpdatesPathLookup(t *testing.T) {
 		t.Fatalf("MoveNode failed: %v", err)
 	}
 
-	oldLookup, err := svc.LookupPagePath(svc.GetTree().Children, "docs/guide")
+	oldLookup, err := svc.LookupPagePath("docs/guide")
 	if err != nil {
 		t.Fatalf("LookupPagePath old path failed: %v", err)
 	}
@@ -1588,7 +1563,7 @@ func TestTreeService_MoveNode_UpdatesPathLookup(t *testing.T) {
 		t.Fatalf("expected old path to stop resolving after move")
 	}
 
-	newLookup, err := svc.LookupPagePath(svc.GetTree().Children, "archive/guide")
+	newLookup, err := svc.LookupPagePath("archive/guide")
 	if err != nil {
 		t.Fatalf("LookupPagePath new path failed: %v", err)
 	}
@@ -1633,7 +1608,7 @@ func TestTreeService_LoadTree_MigratesToV5_BackfillsChildOrderFiles(t *testing.T
 		child.Position = i
 	}
 
-	docsNode, err := svc.FindPageByID(root.Children, *docsID)
+	docsNode, err := svc.FindPageByID(*docsID)
 	if err != nil {
 		t.Fatalf("FindPageByID docs failed: %v", err)
 	}
@@ -1693,7 +1668,7 @@ func TestTreeService_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *te
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	node, err := svc.FindPageByID(*id)
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}
@@ -1765,7 +1740,7 @@ func TestTreeService_LoadTree_ResumesInterruptedMigrationWithPersistedLegacySnap
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	node, err := svc.FindPageByID(*id)
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}
@@ -1852,7 +1827,7 @@ func TestTreeService_LoadTree_MigratesToV3_BackfillsMetadataFrontmatter(t *testi
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	node, err := svc.FindPageByID(*id)
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}
@@ -2674,7 +2649,7 @@ func TestTreeService_LoadTree_MigratesToV4_ReturnsErrorWhenSectionIndexCannotBeW
 		t.Fatalf("CreateNode failed: %v", err)
 	}
 
-	node, err := svc.FindPageByID(svc.GetTree().Children, *id)
+	node, err := svc.FindPageByID(*id)
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}

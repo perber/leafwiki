@@ -270,7 +270,7 @@ func (w *Wiki) CreatePage(userID string, parentID *string, title string, slug st
 	// Check if the parentID exists
 	if parentID != nil && *parentID != "" {
 		var err error
-		_, err = w.tree.FindPageByID(w.tree.GetTree().Children, *parentID)
+		_, err = w.tree.FindPageByID(*parentID)
 		if err != nil {
 			return nil, err
 		}
@@ -322,7 +322,7 @@ func (w *Wiki) EnsurePath(userID string, targetPath string, targetTitle string, 
 		return nil, ve
 	}
 
-	lookup, err := w.tree.LookupPagePath(w.tree.GetTree().Children, cleanTargetPath)
+	lookup, err := w.tree.LookupPagePath(cleanTargetPath)
 	if err != nil {
 		return nil, err
 	}
@@ -529,7 +529,7 @@ func (w *Wiki) DeletePage(userID string, id string, recursive bool) error {
 	if recursive {
 		root := w.tree.GetTree()
 		if root != nil {
-			node, err := w.tree.FindPageByID(root.Children, id)
+			node, err := w.tree.FindPageByID(id)
 			if err == nil && node != nil {
 				subtreeIDs = collectSubtreeIDs(node)
 				oldPrefix = node.CalculatePath() // IMPORTANT: before delete
@@ -614,7 +614,7 @@ func (w *Wiki) MovePage(userID, id, parentID string) error {
 
 	root := w.tree.GetTree()
 	if root != nil {
-		node, err := w.tree.FindPageByID(root.Children, id)
+		node, err := w.tree.FindPageByID(id)
 		if err == nil && node != nil {
 			oldPrefix = node.CalculatePath()
 			subtreeIDs = collectSubtreeIDs(node)
@@ -687,11 +687,11 @@ func (w *Wiki) GetPage(id string) (*tree.Page, error) {
 }
 
 func (w *Wiki) FindByPath(route string) (*tree.Page, error) {
-	return w.tree.FindPageByRoutePath(w.tree.GetTree().Children, route)
+	return w.tree.FindPageByRoutePath(route)
 }
 
 func (w *Wiki) LookupPagePath(path string) (*tree.PathLookup, error) {
-	return w.tree.LookupPagePath(w.tree.GetTree().Children, path)
+	return w.tree.LookupPagePath(path)
 }
 
 func (w *Wiki) SuggestSlug(parentID string, currentID string, title string) (string, error) {
@@ -701,7 +701,7 @@ func (w *Wiki) SuggestSlug(parentID string, currentID string, title string) (str
 		return w.slug.GenerateUniqueSlug(w.tree.GetTree(), currentID, title), nil
 	}
 
-	parent, err := w.tree.FindPageByID(w.tree.GetTree().Children, parentID)
+	parent, err := w.tree.FindPageByID(parentID)
 	if err != nil {
 		return "", fmt.Errorf("parent not found: %w", err)
 	}
@@ -905,7 +905,7 @@ func (w *Wiki) GetUserByID(id string) (*auth.PublicUser, error) {
 }
 
 func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
-	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
+	page, err := w.tree.FindPageByID(pageID)
 	if err != nil {
 		return "", err
 	}
@@ -913,7 +913,7 @@ func (w *Wiki) UploadAsset(pageID string, file multipart.File, filename string, 
 }
 
 func (w *Wiki) ListAssets(pageID string) ([]string, error) {
-	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
+	page, err := w.tree.FindPageByID(pageID)
 	if err != nil {
 		return nil, err
 	}
@@ -921,7 +921,7 @@ func (w *Wiki) ListAssets(pageID string) ([]string, error) {
 }
 
 func (w *Wiki) RenameAsset(pageID string, oldFilename, newFilename string) (string, error) {
-	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
+	page, err := w.tree.FindPageByID(pageID)
 	if err != nil {
 		return "", err
 	}
@@ -929,7 +929,7 @@ func (w *Wiki) RenameAsset(pageID string, oldFilename, newFilename string) (stri
 }
 
 func (w *Wiki) DeleteAsset(pageID string, filename string) error {
-	page, err := w.tree.FindPageByID(w.tree.GetTree().Children, pageID)
+	page, err := w.tree.FindPageByID(pageID)
 	if err != nil {
 		return err
 	}

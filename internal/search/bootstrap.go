@@ -23,7 +23,7 @@ func BuildAndRunIndexer(treeService *tree.TreeService, sqliteIndex *SQLiteIndex,
 		// Remove "/index" suffix from the route path unconditionally
 		routePath = strings.TrimSuffix(routePath, "/index")
 
-		page, err := treeService.FindPageByRoutePath(treeService.GetTree().Children, routePath)
+		page, err := treeService.FindPageByRoutePath(routePath)
 		if err != nil {
 			// the page is on the filesystem but not in the tree, skip it
 			log.Printf("[indexer] skipping file not in tree: %s", rel)
