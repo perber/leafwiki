@@ -12,6 +12,7 @@ import { Toolbar } from '@/features/toolbar/Toolbar'
 import { useAppMode } from '@/lib/useAppMode'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
 import {
   MAX_SIDEBAR_WIDTH,
@@ -47,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useAutoCloseSidebarOnMobile()
 
-  const { siteName, logoFile } = useBrandingStore()
+  const { siteName, logoFile, logoVersion } = useBrandingStore()
 
   const sidebarContainerRef = useRef<HTMLDivElement | null>(null)
   const liveSidebarWidthRef = useRef(sidebarWidth)
@@ -201,7 +202,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Link to="/">
                 {logoFile ? (
                   <img
-                    src={`/branding/${logoFile}`}
+                    src={`${withBasePath(`/branding/${logoFile}`)}?v=${logoVersion}`}
                     alt={siteName}
                     className="app-layout__logo-image"
                   />

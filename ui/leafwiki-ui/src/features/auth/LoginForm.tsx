@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { login } from '@/lib/api/auth'
+import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
 import { useSessionStore } from '@/stores/session'
 import { useState } from 'react'
@@ -14,7 +15,7 @@ export default function LoginForm() {
 
   const navigate = useNavigate()
   const user = useSessionStore((s) => s.user)
-  const { siteName, logoFile } = useBrandingStore()
+  const { siteName, logoFile, logoVersion } = useBrandingStore()
 
   // If already logged in, redirect to home
   if (user) {
@@ -45,7 +46,7 @@ export default function LoginForm() {
           <h1 className="login__title">
             {logoFile ? (
               <img
-                src={`/branding/${logoFile}`}
+                src={`${withBasePath(`/branding/${logoFile}`)}?v=${logoVersion}`}
                 alt={siteName}
                 className="login__logo-image"
               />

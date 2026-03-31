@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
 import {
   ImageIcon,
@@ -19,6 +20,8 @@ export default function BrandingSettings() {
     siteName,
     logoFile,
     faviconFile,
+    logoVersion,
+    faviconVersion,
     isLoading,
     logoExts,
     maxLogoSize,
@@ -139,7 +142,7 @@ export default function BrandingSettings() {
             {logoFile ? (
               <>
                 <img
-                  src={`/branding/${logoFile}`}
+                  src={`${withBasePath(`/branding/${logoFile}`)}?v=${logoVersion}`}
                   alt="Logo"
                   className="settings__preview-image"
                 />
@@ -195,7 +198,7 @@ export default function BrandingSettings() {
               <>
                 {' '}
                 <img
-                  src={`/branding/${faviconFile}`}
+                  src={`${withBasePath(`/branding/${faviconFile}`)}?v=${faviconVersion}`}
                   alt="Favicon"
                   className="settings__preview-favicon"
                 />

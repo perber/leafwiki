@@ -2439,6 +2439,76 @@ func TestCustomStylesheetRoute_RejectsNonCSSFile(t *testing.T) {
 	}
 }
 
+func TestBrandingAssetRoute_DisablesClientCache(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	logoFile, err := os.CreateTemp(t.TempDir(), "logo-*.png")
+	if err != nil {
+		t.Fatalf("create temp logo: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(logoFile.Close, t)
+
+	if _, err := logoFile.Write([]byte("logo")); err != nil {
+		t.Fatalf("write temp logo: %v", err)
+	}
+	if _, err := logoFile.Seek(0, io.SeekStart); err != nil {
+		t.Fatalf("seek temp logo: %v", err)
+	}
+
+	if _, err := w.UploadBrandingLogo(logoFile, "logo.png"); err != nil {
+		t.Fatalf("upload branding logo: %v", err)
+	}
+
+	router := createRouterTestInstance(w, t)
+
+	req := httptest.NewRequest(http.MethodGet, "/branding/logo.png", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected Cache-Control no-store, got %q", got)
+	}
+}
+
+func TestFaviconRoute_DisablesClientCache(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	EmbedFrontendOrig := EmbedFrontend
+	EmbedFrontend = "true"
+	defer func() {
+		EmbedFrontend = EmbedFrontendOrig
+	}()
+
+	router := NewRouter(w, RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		CustomStylesheet:        "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		AuthDisabled:            false,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/favicon.svg", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected Cache-Control no-store, got %q", got)
+	}
+}
+
 func TestBuildCustomStylesheetTag_WhitespacePath(t *testing.T) {
 	tag := buildCustomStylesheetTag("/wiki", "   ")
 	if tag != "" {
