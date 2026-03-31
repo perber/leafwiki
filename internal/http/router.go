@@ -53,7 +53,7 @@ func (sew *slogErrorWriter) Write(p []byte) (n int, err error) {
 func disableClientCache(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("Pragma", "no-cache")
-	c.Header("Expires", "0")
+	c.Header("Expires", time.Unix(0, 0).UTC().Format(http.TimeFormat))
 }
 
 type RouterOptions struct {
