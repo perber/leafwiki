@@ -50,6 +50,12 @@ func (sew *slogErrorWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+func disableClientCache(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+}
+
 type RouterOptions struct {
 	PublicAccess            bool          // Whether the wiki allows public read access
 	InjectCodeInHeader      string        // Raw HTML/JS code to inject into the <head> tag
@@ -291,6 +297,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		}
 
 		// Serve the file
+		disableClientCache(c)
 		c.File(cleanPath)
 	})
 
@@ -327,6 +334,8 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		base.StaticFS("/static", http.FS(staticFS))
 
 		base.GET("/favicon.svg", func(c *gin.Context) {
+			disableClientCache(c)
+
 			// Get branding config to check for custom favicon
 			brandingConfig, err := wikiInstance.GetBranding()
 			if err == nil && brandingConfig.FaviconFile != "" {

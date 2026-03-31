@@ -1,10 +1,13 @@
 import * as brandingAPI from '@/lib/api/branding'
+import { withBasePath } from '@/lib/routePath'
 import { create } from 'zustand'
 
 type BrandingStore = {
   siteName: string
   logoFile: string
   faviconFile: string
+  logoVersion: number
+  faviconVersion: number
   logoExts: string[]
   maxLogoSize: number
   faviconExts: string[]
@@ -25,6 +28,8 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
   siteName: 'LeafWiki',
   logoFile: '',
   faviconFile: '',
+  logoVersion: 0,
+  faviconVersion: 0,
   logoExts: [],
   maxLogoSize: 0,
   faviconExts: [],
@@ -37,12 +42,15 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const config = await brandingAPI.getBranding()
+      const assetVersion = Date.now()
       set({
         siteName: config.siteName,
         logoFile: config.logoFile,
+        logoVersion: assetVersion,
         logoExts: config.brandingConstraints.logoExts,
         maxLogoSize: config.brandingConstraints.maxLogoSize,
         faviconFile: config.faviconFile,
+        faviconVersion: assetVersion,
         faviconExts: config.brandingConstraints.faviconExts,
         maxFaviconSize: config.brandingConstraints.maxFaviconSize,
         isLoaded: true,
@@ -79,8 +87,10 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const result = await brandingAPI.uploadBrandingLogo(file)
+      const assetVersion = Date.now()
       set({
         logoFile: result.branding.logoFile,
+        logoVersion: assetVersion,
       })
     } catch (err) {
       set({
@@ -96,11 +106,13 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const result = await brandingAPI.uploadBrandingFavicon(file)
+      const assetVersion = Date.now()
       set({
         faviconFile: result.branding.faviconFile,
+        faviconVersion: assetVersion,
       })
       // Refresh favicon in browser
-      refreshFavicon()
+      refreshFavicon(assetVersion)
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : 'Failed to upload favicon',
@@ -115,8 +127,10 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     set({ isLoading: true, error: null })
     try {
       await brandingAPI.deleteBrandingLogo()
+      const assetVersion = Date.now()
       set({
         logoFile: '',
+        logoVersion: assetVersion,
       })
     } catch (err) {
       set({
@@ -132,11 +146,13 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     set({ isLoading: true, error: null })
     try {
       await brandingAPI.deleteBrandingFavicon()
+      const assetVersion = Date.now()
       set({
         faviconFile: '',
+        faviconVersion: assetVersion,
       })
       // Refresh favicon in browser
-      refreshFavicon()
+      refreshFavicon(assetVersion)
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : 'Failed to delete favicon',
@@ -149,12 +165,11 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
 }))
 
 // Helper to refresh favicon in browser
-function refreshFavicon() {
+function refreshFavicon(version: number) {
   const link = document.querySelector(
     "link[rel*='icon']",
   ) as HTMLLinkElement | null
   if (link) {
-    const href = link.href.split('?')[0]
-    link.href = `${href}?v=${Date.now()}`
+    link.href = `${withBasePath('/favicon.svg')}?v=${version}`
   }
 }
