@@ -466,6 +466,54 @@ func TestExecutor_Create_WikiLinkToNonImageAssetStaysNormalLink(t *testing.T) {
 	}
 }
 
+func TestExecutor_Create_WikiLinkFallsBackToUniqueNestedBasenameOnly(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Home.md", strings.Join([]string{
+		"# Home",
+		"",
+		"[[Brainstorm]]",
+		"[[Meeting Notes]]",
+	}, "\n"))
+	writeTmp(t, tmp, "Daily/Brainstorm.md", "# Brainstorm")
+	writeTmp(t, tmp, "Daily/Meeting Notes.md", "# Daily Meeting Notes")
+	writeTmp(t, tmp, "Archive/Meeting Notes.md", "# Archived Meeting Notes")
+
+	w := &fakeExecWiki{hash: "h1"}
+	updatedContentByTitle := map[string]string{}
+	w.updateFn = func(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
+		w.lastUpdatedContent = content
+		if content != nil {
+			updatedContentByTitle[title] = *content
+		}
+		w.hash = w.hash + "-changed"
+		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
+	}
+
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Home.md", TargetPath: "home", Title: "Home", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Daily/Brainstorm.md", TargetPath: "daily/brainstorm", Title: "Brainstorm", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Daily/Meeting Notes.md", TargetPath: "daily/meeting-notes", Title: "Meeting Notes", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Archive/Meeting Notes.md", TargetPath: "archive/meeting-notes", Title: "Meeting Notes", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	homeContent := updatedContentByTitle["Home"]
+	if !strings.Contains(homeContent, "[Brainstorm](/daily/brainstorm)") {
+		t.Fatalf("expected unique basename wiki link rewrite, got:\n%s", homeContent)
+	}
+	if !strings.Contains(homeContent, "[[Meeting Notes]]") {
+		t.Fatalf("expected ambiguous basename wiki link to stay unchanged, got:\n%s", homeContent)
+	}
+}
+
 func TestExecutor_Create_DoesNotRewriteLinksInsideCode(t *testing.T) {
 	tmp := t.TempDir()
 	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{

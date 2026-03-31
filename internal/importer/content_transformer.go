@@ -18,28 +18,36 @@ type importTarget struct {
 }
 
 type contentTransformer struct {
-	sourceBasePath string
-	assetMaxBytes  int64
-	pagesBySource  map[string]importTarget
-	assetUploads   map[string]string
+	sourceBasePath  string
+	assetMaxBytes   int64
+	pagesBySource   map[string]importTarget
+	pagesByBasename map[string][]string
+	assetUploads    map[string]string
 }
 
 // newContentTransformer precomputes source->target lookups from the import plan.
 // We resolve links against planned imports so we only rewrite destinations we can actually create.
 func newContentTransformer(plan *PlanResult, sourceBasePath string, assetMaxBytes int64) *contentTransformer {
 	pagesBySource := make(map[string]importTarget, len(plan.Items))
+	pagesByBasename := make(map[string][]string, len(plan.Items))
 	for _, item := range plan.Items {
-		pagesBySource[normalizePlanSourcePath(item.SourcePath)] = importTarget{
+		normalizedSource := normalizePlanSourcePath(item.SourcePath)
+		pagesBySource[normalizedSource] = importTarget{
 			targetPath: item.TargetPath,
 			kind:       item.Kind,
+		}
+
+		if basenameKey := normalizePageBasenameForLookup(path.Base(normalizedSource)); basenameKey != "" {
+			pagesByBasename[basenameKey] = append(pagesByBasename[basenameKey], item.TargetPath)
 		}
 	}
 
 	return &contentTransformer{
-		sourceBasePath: sourceBasePath,
-		assetMaxBytes:  assetMaxBytes,
-		pagesBySource:  pagesBySource,
-		assetUploads:   map[string]string{},
+		sourceBasePath:  sourceBasePath,
+		assetMaxBytes:   assetMaxBytes,
+		pagesBySource:   pagesBySource,
+		pagesByBasename: pagesByBasename,
+		assetUploads:    map[string]string{},
 	}
 }
 
@@ -260,6 +268,15 @@ func (t *contentTransformer) resolvePagePath(sourcePath string, href string) (st
 			return target.targetPath, true
 		}
 	}
+
+	// Obsidian also resolves links by note name when that name is unique in the vault.
+	// We only apply that fallback for basename-only links within the current import package.
+	if basenameKey, ok := basenameOnlyLookupKey(href); ok {
+		if matches := uniqueStrings(t.pagesByBasename[basenameKey]); len(matches) == 1 {
+			return matches[0], true
+		}
+	}
+
 	return "", false
 }
 
@@ -300,6 +317,29 @@ func (t *contentTransformer) resolveAndUploadAsset(
 
 func normalizePlanSourcePath(p string) string {
 	return strings.ToLower(path.Clean(strings.TrimPrefix(filepath.ToSlash(strings.TrimSpace(p)), "/")))
+}
+
+func basenameOnlyLookupKey(href string) (string, bool) {
+	trimmed := strings.TrimSpace(href)
+	if trimmed == "" || strings.Contains(trimmed, "/") || strings.HasPrefix(trimmed, ".") {
+		return "", false
+	}
+
+	key := normalizePageBasenameForLookup(trimmed)
+	return key, key != ""
+}
+
+func normalizePageBasenameForLookup(value string) string {
+	base, _ := splitURLSuffix(strings.TrimSpace(value))
+	base = path.Base(base)
+	if strings.EqualFold(path.Ext(base), ".md") {
+		base = strings.TrimSuffix(base, path.Ext(base))
+	}
+	base = strings.TrimSpace(base)
+	if base == "" || strings.EqualFold(base, "index") {
+		return ""
+	}
+	return strings.ToLower(base)
 }
 
 func buildSourceCandidates(sourcePath string, href string) []string {

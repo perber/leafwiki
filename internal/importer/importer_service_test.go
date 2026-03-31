@@ -623,8 +623,8 @@ func TestImporterService_ExecuteCurrentPlan_ImportsObsidianWikiLinksFixture(t *t
 	if err != nil {
 		t.Fatalf("createImportPlanFromFolder err: %v", err)
 	}
-	if len(plan.Items) != 3 {
-		t.Fatalf("expected three plan items, got %#v", plan.Items)
+	if len(plan.Items) != 5 {
+		t.Fatalf("expected five plan items, got %#v", plan.Items)
 	}
 
 	if _, err := is.ExecuteCurrentPlan("system"); err != nil {
@@ -639,13 +639,22 @@ func TestImporterService_ExecuteCurrentPlan_ImportsObsidianWikiLinksFixture(t *t
 	if err != nil {
 		t.Fatalf("FindByPath project-plan err: %v", err)
 	}
+	brainstormPage, err := w.FindByPath("daily/brainstorm")
+	if err != nil {
+		t.Fatalf("FindByPath daily/brainstorm err: %v", err)
+	}
 	meetingNotesPage, err := w.FindByPath("daily/meeting-notes")
 	if err != nil {
 		t.Fatalf("FindByPath daily/meeting-notes err: %v", err)
 	}
+	if _, err := w.FindByPath("archive/meeting-notes"); err != nil {
+		t.Fatalf("FindByPath archive/meeting-notes err: %v", err)
+	}
 
 	for _, expected := range []string{
 		"[Project Plan](/project-plan)",
+		"[Brainstorm](/daily/brainstorm)",
+		"[[Meeting Notes]]",
 		"[Meeting Alias](/daily/meeting-notes)",
 		"![diagram.png](/assets/" + homePage.ID + "/diagram.png)",
 		"`[[Project Plan]]`",
@@ -668,6 +677,9 @@ func TestImporterService_ExecuteCurrentPlan_ImportsObsidianWikiLinksFixture(t *t
 
 	if !strings.Contains(meetingNotesPage.Content, "[Home](/home)") {
 		t.Fatalf("expected meeting-notes content to contain rewritten home link, got:\n%s", meetingNotesPage.Content)
+	}
+	if !strings.Contains(brainstormPage.Content, "[Home](/home)") {
+		t.Fatalf("expected brainstorm content to contain rewritten home link, got:\n%s", brainstormPage.Content)
 	}
 
 	assets, err := w.ListAssets(homePage.ID)

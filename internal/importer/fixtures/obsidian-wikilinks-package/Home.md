@@ -5,6 +5,8 @@ Welcome to the vault.
 Links:
 
 - [[Project Plan]]
+- [[Brainstorm]]
+- [[Meeting Notes]]
 - [[Daily/Meeting Notes|Meeting Alias]]
 - ![[Attachments/diagram.png]]
 
