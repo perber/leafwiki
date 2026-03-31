@@ -46,13 +46,13 @@ func LoginUserHandler(wikiInstance *wiki.Wiki, authCookies *auth_middleware.Auth
 		}
 
 		if _, err := csrfCookie.Issue(c); err != nil {
-			if errors.Is(err, utils.ErrHTTPSRequired) {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error": "HTTPS is required for login cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-				})
-				return
-			}
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
+			writeAuthCookieError(
+				c,
+				err,
+				"HTTPS is required for login cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
+				"Failed to issue CSRF cookie",
+				"failed to issue login CSRF cookie",
+			)
 			return
 		}
 
