@@ -467,6 +467,20 @@ func (t *TreeService) findChildBySlugInParentLocked(parent *PageNode, slug strin
 	return nil
 }
 
+func (t *TreeService) findChildBySlugExactInParentLocked(parent *PageNode, slug string) *PageNode {
+	if parent == nil {
+		return nil
+	}
+
+	for _, child := range parent.Children {
+		if child != nil && child.Slug == slug {
+			return child
+		}
+	}
+
+	return nil
+}
+
 // DeleteNode deletes a node from the tree
 func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error {
 	err := t.withLockedTree(func() error {
@@ -694,7 +708,7 @@ func (t *TreeService) FindPageByRoutePath(routePath string) (*Page, error) {
 			return nil, ErrPageNotFound
 		}
 
-		node = t.findChildBySlugInParentLocked(parent, part)
+		node = t.findChildBySlugExactInParentLocked(parent, part)
 		if node == nil {
 			return nil, ErrPageNotFound
 		}

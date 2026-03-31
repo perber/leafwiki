@@ -1371,6 +1371,31 @@ func TestTreeService_FindPageByRoutePath_ReturnsNotFoundForMissingPath(t *testin
 	}
 }
 
+func TestTreeService_FindPageByRoutePath_IsCaseSensitive(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	homeID, err := svc.CreateNode("system", nil, "Home", "Home", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode home failed: %v", err)
+	}
+	if _, err := svc.CreateNode("system", homeID, "About", "About", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode about failed: %v", err)
+	}
+
+	_, err = svc.FindPageByRoutePath("home/About")
+	if !errors.Is(err, ErrPageNotFound) {
+		t.Fatalf("expected ErrPageNotFound for case-mismatched route, got %v", err)
+	}
+
+	page, err := svc.FindPageByRoutePath("Home/About")
+	if err != nil {
+		t.Fatalf("FindPageByRoutePath exact case failed: %v", err)
+	}
+	if page.Slug != "About" {
+		t.Fatalf("expected exact-case route to resolve About, got %q", page.Slug)
+	}
+}
+
 func TestTreeService_LookupPagePath_Segments(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
