@@ -28,6 +28,7 @@ type fakeExecWiki struct {
 	updateTitles       []string
 	uploadCalls        int
 	uploadedAssets     []string
+	lastUploadMaxBytes int64
 }
 
 func (f *fakeExecWiki) TreeHash() string { return f.hash }
@@ -63,6 +64,7 @@ func (f *fakeExecWiki) UpdatePage(userID string, id, title, slug string, content
 func (f *fakeExecWiki) UploadAsset(pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
 	f.uploadCalls++
 	f.uploadedAssets = append(f.uploadedAssets, filename)
+	f.lastUploadMaxBytes = maxBytes
 	return "/assets/" + pageID + "/" + filename, nil
 }
 
@@ -81,7 +83,7 @@ func TestExecutor_StalePlan(t *testing.T) {
 	w := &fakeExecWiki{hash: "new"}
 	plan := &PlanResult{TreeHash: "old"}
 	opts := &PlanOptions{SourceBasePath: t.TempDir()}
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 
 	got, err := ex.Execute("user1")
 	if err == nil {
@@ -105,7 +107,7 @@ func TestExecutor_Create_HappyPath_PreservesNonInternalFrontmatter(t *testing.T)
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 
 	res, err := ex.Execute("user1")
 	if err != nil {
@@ -173,7 +175,7 @@ func TestExecutor_Create_HappyPath_PreservesDistinctExtraFieldValues(t *testing.
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	if _, err := ex.Execute("user1"); err != nil {
 		t.Fatalf("Execute err: %v", err)
 	}
@@ -212,7 +214,7 @@ func TestExecutor_Skip_DoesNotCallWiki(t *testing.T) {
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	res, err := ex.Execute("user1")
 	if err != nil {
 		t.Fatalf("Execute err: %v", err)
@@ -244,7 +246,7 @@ func TestExecutor_Create_EnsurePathError_SkipsItem(t *testing.T) {
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	res, err := ex.Execute("user1")
 	if err != nil {
 		t.Fatalf("Execute err: %v", err)
@@ -271,7 +273,7 @@ func TestExecutor_UnknownAction_SkipsItem(t *testing.T) {
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	res, err := ex.Execute("user1")
 	if err != nil {
 		t.Fatalf("Execute err: %v", err)
@@ -303,7 +305,7 @@ title: Ordner
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	res, err := ex.Execute("user1")
 	if err != nil {
 		t.Fatalf("Execute err: %v", err)
@@ -360,7 +362,7 @@ func TestExecutor_Create_RewritesMarkdownAndWikiLinksToImportedPages(t *testing.
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	if _, err := ex.Execute("user1"); err != nil {
 		t.Fatalf("Execute err: %v", err)
 	}
@@ -404,7 +406,7 @@ func TestExecutor_Create_UploadsRelativeAndRootAssets(t *testing.T) {
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 1234, w, slog.Default())
 	if _, err := ex.Execute("user1"); err != nil {
 		t.Fatalf("Execute err: %v", err)
 	}
@@ -423,6 +425,44 @@ func TestExecutor_Create_UploadsRelativeAndRootAssets(t *testing.T) {
 	}
 	if !strings.Contains(*w.lastUpdatedContent, "![logo.png](/assets/p1/logo.png)") {
 		t.Fatalf("expected wiki asset link rewrite, got:\n%s", *w.lastUpdatedContent)
+	}
+	if w.lastUploadMaxBytes != 1234 {
+		t.Fatalf("expected asset uploads to use configured max bytes, got %d", w.lastUploadMaxBytes)
+	}
+}
+
+func TestExecutor_Create_WikiLinkToNonImageAssetStaysNormalLink(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{
+		"# Setup",
+		"",
+		"[[../shared/manual.pdf]]",
+		"![[../shared/manual.pdf]]",
+	}, "\n"))
+	writeTmp(t, tmp, "shared/manual.pdf", "pdf-bytes")
+
+	w := &fakeExecWiki{hash: "h1"}
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Guides/Setup.md", TargetPath: "guides/setup", Title: "Setup", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	if w.lastUpdatedContent == nil {
+		t.Fatalf("expected content to be updated")
+	}
+	if !strings.Contains(*w.lastUpdatedContent, "[manual.pdf](/assets/p1/manual.pdf)") {
+		t.Fatalf("expected non-embed wiki asset to stay a normal link, got:\n%s", *w.lastUpdatedContent)
+	}
+	if !strings.Contains(*w.lastUpdatedContent, "![manual.pdf](/assets/p1/manual.pdf)") {
+		t.Fatalf("expected embed wiki asset to use embed syntax, got:\n%s", *w.lastUpdatedContent)
 	}
 }
 
@@ -463,7 +503,7 @@ func TestExecutor_Create_DoesNotRewriteLinksInsideCode(t *testing.T) {
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	if _, err := ex.Execute("user1"); err != nil {
 		t.Fatalf("Execute err: %v", err)
 	}
@@ -513,7 +553,7 @@ func TestExecutor_Create_RewritesWindowsStyleMarkdownAndAssetPaths(t *testing.T)
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	if _, err := ex.Execute("user1"); err != nil {
 		t.Fatalf("Execute err: %v", err)
 	}
@@ -547,7 +587,7 @@ func TestExecutor_Create_LeavesWindowsDriveLetterPathsUntouched(t *testing.T) {
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	if _, err := ex.Execute("user1"); err != nil {
 		t.Fatalf("Execute err: %v", err)
 	}

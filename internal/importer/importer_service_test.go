@@ -278,7 +278,7 @@ func TestImporterService_ExecuteCurrentPlan_WritesPreservedFrontmatterToDisk(t *
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore())
+	is := NewImporterService(planner, NewPlanStore(), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
@@ -362,7 +362,7 @@ func TestImporterService_ExecuteCurrentPlan_RewritesLinksAndUploadsAssetsToDisk(
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore())
+	is := NewImporterService(planner, NewPlanStore(), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
@@ -418,7 +418,7 @@ func TestImporterService_ExecuteCurrentPlan_ImportsFixturePackage(t *testing.T) 
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore())
+	is := NewImporterService(planner, NewPlanStore(), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
@@ -495,7 +495,7 @@ func TestImporterService_ExecuteCurrentPlan_ImportsLeafWikiNestedFixture(t *test
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore())
+	is := NewImporterService(planner, NewPlanStore(), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
@@ -617,7 +617,7 @@ func TestImporterService_ExecuteCurrentPlan_ImportsObsidianWikiLinksFixture(t *t
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore())
+	is := NewImporterService(planner, NewPlanStore(), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {

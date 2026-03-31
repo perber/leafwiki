@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -20,13 +19,14 @@ type importTarget struct {
 
 type contentTransformer struct {
 	sourceBasePath string
+	assetMaxBytes  int64
 	pagesBySource  map[string]importTarget
 	assetUploads   map[string]string
 }
 
 // newContentTransformer precomputes source->target lookups from the import plan.
 // We resolve links against planned imports so we only rewrite destinations we can actually create.
-func newContentTransformer(plan *PlanResult, sourceBasePath string) *contentTransformer {
+func newContentTransformer(plan *PlanResult, sourceBasePath string, assetMaxBytes int64) *contentTransformer {
 	pagesBySource := make(map[string]importTarget, len(plan.Items))
 	for _, item := range plan.Items {
 		pagesBySource[normalizePlanSourcePath(item.SourcePath)] = importTarget{
@@ -37,6 +37,7 @@ func newContentTransformer(plan *PlanResult, sourceBasePath string) *contentTran
 
 	return &contentTransformer{
 		sourceBasePath: sourceBasePath,
+		assetMaxBytes:  assetMaxBytes,
 		pagesBySource:  pagesBySource,
 		assetUploads:   map[string]string{},
 	}
@@ -175,7 +176,7 @@ func (t *contentTransformer) rewriteWikiLinks(
 			label = defaultWikiLinkLabel(targetPart)
 		}
 
-		if isImage || isAsset {
+		if shouldRenderWikiLinkAsImage(isImage, isAsset, targetPart) {
 			out.WriteString("![")
 			out.WriteString(label)
 			out.WriteString("](")
@@ -288,7 +289,7 @@ func (t *contentTransformer) resolveAndUploadAsset(
 		_ = file.Close()
 	}()
 
-	publicPath, err := wiki.UploadAsset(page.ID, multipart.File(file), filepath.Base(assetAbs), assets.DefaultMaxUploadSizeBytes)
+	publicPath, err := wiki.UploadAsset(page.ID, multipart.File(file), filepath.Base(assetAbs), t.assetMaxBytes)
 	if err != nil {
 		return "", fmt.Errorf("upload asset %q: %w", assetAbs, err)
 	}
@@ -470,6 +471,26 @@ func defaultWikiLinkLabel(target string) string {
 		return target
 	}
 	return base
+}
+
+func shouldRenderWikiLinkAsImage(isEmbed bool, resolvedAsset bool, target string) bool {
+	if isEmbed {
+		return true
+	}
+	if !resolvedAsset {
+		return false
+	}
+	return isImageAssetTarget(target)
+}
+
+func isImageAssetTarget(target string) bool {
+	base, _ := splitURLSuffix(target)
+	switch strings.ToLower(path.Ext(base)) {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".avif":
+		return true
+	default:
+		return false
+	}
 }
 
 func findMarkdownLinkDestinationEnd(content string, start int) int {

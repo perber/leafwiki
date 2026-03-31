@@ -9,21 +9,28 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/perber/wiki/internal/core/assets"
 )
 
 type ImporterService struct {
-	planner   *Planner
-	planStore *PlanStore
-	extractor *ZipExtractor
-	logger    *slog.Logger
+	planner                 *Planner
+	planStore               *PlanStore
+	extractor               *ZipExtractor
+	logger                  *slog.Logger
+	assetMaxUploadSizeBytes int64
 }
 
-func NewImporterService(planner *Planner, planStore *PlanStore) *ImporterService {
+func NewImporterService(planner *Planner, planStore *PlanStore, assetMaxUploadSizeBytes int64) *ImporterService {
+	if assetMaxUploadSizeBytes <= 0 {
+		assetMaxUploadSizeBytes = assets.DefaultMaxUploadSizeBytes
+	}
 	return &ImporterService{
-		planner:   planner,
-		planStore: planStore,
-		extractor: NewZipExtractor(),
-		logger:    slog.Default().With("component", "ImporterService"),
+		planner:                 planner,
+		planStore:               planStore,
+		extractor:               NewZipExtractor(),
+		logger:                  slog.Default().With("component", "ImporterService"),
+		assetMaxUploadSizeBytes: assetMaxUploadSizeBytes,
 	}
 }
 
@@ -90,7 +97,7 @@ func (is *ImporterService) ExecuteCurrentPlan(userID string) (*ExecutionResult, 
 		return nil, err
 	}
 
-	exec := NewExecutor(sp.Plan, &sp.PlanOptions, is.planner.wiki, is.planner.log)
+	exec := NewExecutor(sp.Plan, &sp.PlanOptions, is.assetMaxUploadSizeBytes, is.planner.wiki, is.planner.log)
 	res, err := exec.Execute(userID)
 	if err != nil {
 		return nil, err

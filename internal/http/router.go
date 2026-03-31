@@ -66,11 +66,11 @@ type RouterOptions struct {
 // wireImporterService sets up and returns an ImporterService instance
 // Parameters:
 //   - w: the wiki instance to use for importing
-func wireImporterService(w *wiki.Wiki) *importer.ImporterService {
+func wireImporterService(w *wiki.Wiki, maxAssetUploadSizeBytes int64) *importer.ImporterService {
 	slugger := w.GetSlugService()
 	planner := importer.NewPlanner(w, slugger)
 	store := importer.NewPlanStore()
-	return importer.NewImporterService(planner, store)
+	return importer.NewImporterService(planner, store, maxAssetUploadSizeBytes)
 }
 
 // NewRouter creates a new HTTP router for the wiki application.
@@ -97,7 +97,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	gin.DefaultWriter = &slogWriter{logger: slog.Default().With("component", "gin")}
 	gin.DefaultErrorWriter = &slogErrorWriter{logger: slog.Default().With("component", "gin")}
 
-	importerService := wireImporterService(wikiInstance)
+	importerService := wireImporterService(wikiInstance, options.MaxAssetUploadSizeBytes)
 
 	router := gin.Default()
 

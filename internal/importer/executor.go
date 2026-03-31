@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"path/filepath"
 
+	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/markdown"
 )
 
@@ -34,18 +35,23 @@ type ExecutionItemResult struct {
 }
 
 type Executor struct {
-	plan        *PlanResult
-	planOptions *PlanOptions
-	wiki        ImporterWiki
-	logger      *slog.Logger
+	plan          *PlanResult
+	planOptions   *PlanOptions
+	assetMaxBytes int64
+	wiki          ImporterWiki
+	logger        *slog.Logger
 }
 
-func NewExecutor(plan *PlanResult, planOptions *PlanOptions, wiki ImporterWiki, logger *slog.Logger) *Executor {
+func NewExecutor(plan *PlanResult, planOptions *PlanOptions, assetMaxBytes int64, wiki ImporterWiki, logger *slog.Logger) *Executor {
+	if assetMaxBytes <= 0 {
+		assetMaxBytes = assets.DefaultMaxUploadSizeBytes
+	}
 	return &Executor{
-		plan:        plan,
-		planOptions: planOptions,
-		wiki:        wiki,
-		logger:      logger.With("component", "ImporterExecutor"),
+		plan:          plan,
+		planOptions:   planOptions,
+		assetMaxBytes: assetMaxBytes,
+		wiki:          wiki,
+		logger:        logger.With("component", "ImporterExecutor"),
 	}
 }
 
@@ -60,7 +66,7 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 		return nil, fmt.Errorf("plan is stale: expected tree_hash %s but got %s", e.plan.TreeHash, beforeExecution)
 	}
 
-	transformer := newContentTransformer(e.plan, e.planOptions.SourceBasePath)
+	transformer := newContentTransformer(e.plan, e.planOptions.SourceBasePath, e.assetMaxBytes)
 
 	result := &ExecutionResult{
 		TreeHashBefore: beforeExecution,
