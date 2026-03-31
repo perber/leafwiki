@@ -36,6 +36,8 @@ func printUsage() {
 	--refresh-token-timeout Refresh token timeout duration (e.g. 168h, 7d) (default: 7d)
 	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
 	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
+	--custom-stylesheet      Path to a .css file inside the data dir, served publicly as /custom.css
+	                         (or <base-path>/custom.css when --base-path is set) (default: "")
 	--disable-auth                Disable authentication completely (default: false) (WARNING: only use in trusted networks!)
 	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false)
 	--base-path                   URL prefix when served behind a reverse proxy (e.g. /wiki) (default: "")
@@ -51,6 +53,7 @@ func printUsage() {
 	LEAFWIKI_PUBLIC_ACCESS
 	LEAFWIKI_ALLOW_INSECURE
 	LEAFWIKI_INJECT_CODE_IN_HEADER
+	LEAFWIKI_CUSTOM_STYLESHEET
 	LEAFWIKI_ACCESS_TOKEN_TIMEOUT
 	LEAFWIKI_REFRESH_TOKEN_TIMEOUT
 	LEAFWIKI_DISABLE_AUTH
@@ -95,6 +98,7 @@ func main() {
 	publicAccessFlag := flag.Bool("public-access", false, "allow public access to the wiki with read access (default: false)")
 	allowInsecureFlag := flag.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)")
 	injectCodeInHeaderFlag := flag.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")")
+	customStylesheetFlag := flag.String("custom-stylesheet", "", "path to a custom CSS file served as /custom.css")
 	disableAuthFlag := flag.Bool("disable-auth", false, "disable authentication completely (default: false) (WARNING: only use in trusted networks!)")
 	hideLinkMetadataSectionFlag := flag.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)")
 	accessTokenTimeoutFlag := flag.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)")
@@ -113,6 +117,7 @@ func main() {
 	adminPassword := resolveString("admin-password", *adminPasswordFlag, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
 	jwtSecret := resolveString("jwt-secret", *jwtSecretFlag, visited, "LEAFWIKI_JWT_SECRET", "")
 	injectCodeInHeader := resolveString("inject-code-in-header", *injectCodeInHeaderFlag, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
+	customStylesheet := resolveString("custom-stylesheet", *customStylesheetFlag, visited, "LEAFWIKI_CUSTOM_STYLESHEET", "")
 	allowInsecure := resolveBool("allow-insecure", *allowInsecureFlag, visited, "LEAFWIKI_ALLOW_INSECURE")
 	publicAccess := resolveBool("public-access", *publicAccessFlag, visited, "LEAFWIKI_PUBLIC_ACCESS")
 	hideLinkMetadataSection := resolveBool("hide-link-metadata-section", *hideLinkMetadataSectionFlag, visited, "LEAFWIKI_HIDE_LINK_METADATA_SECTION")
@@ -194,6 +199,7 @@ func main() {
 	router := http.NewRouter(w, http.RouterOptions{
 		PublicAccess:            publicAccess,
 		InjectCodeInHeader:      injectCodeInHeader,
+		CustomStylesheet:        customStylesheet,
 		AllowInsecure:           allowInsecure,
 		HideLinkMetadataSection: hideLinkMetadataSection,
 		AccessTokenTimeout:      accessTokenTimeout,

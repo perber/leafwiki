@@ -293,6 +293,7 @@ These options control how the server runs after installation.
 | `--public-access`               | Allow public read-only access                                          | `false`       | –                 |
 | `--hide-link-metadata-section`  | Hide link metadata section                                             | `false`       | –                 |
 | `--inject-code-in-header`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS)| `""`          | v0.6.0            |
+| `--custom-stylesheet`           | Path to a `.css` file inside the data dir, served publicly as `/custom.css` or `${base-path}/custom.css` | `""`          | next release      |
 | `--allow-insecure`              | ⚠️ Allows insecure HTTP usage for auth cookies (required for plain HTTP) | `false`       | v0.7.0            |
 | `--access-token-timeout`        | Access token timeout duration (e.g. 24h, 15m)                          | `15m`         | v0.7.0            |
 | `--refresh-token-timeout`       | Refresh token timeout duration (e.g. 168h, 7d)                         | `7d`          | v0.7.0            |
@@ -318,6 +319,7 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_PUBLIC_ACCESS`               | Allow public read-only access                                           | `false`    | -               |
 | `LEAFWIKI_HIDE_LINK_METADATA_SECTION`  | Hide link metadata section                                              | `false`    | -               |
 | `LEAFWIKI_INJECT_CODE_IN_HEADER`       | Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) | `""`       | v0.6.0          |
+| `LEAFWIKI_CUSTOM_STYLESHEET`           | Path to a `.css` file inside the data dir, served publicly as `/custom.css` or `${LEAFWIKI_BASE_PATH}/custom.css` | `""`       | next release   |
 | `LEAFWIKI_ALLOW_INSECURE`              | ⚠️ Allows insecure HTTP usage for auth cookies (required for plain HTTP) | `false`    | v0.7.0          |
 | `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`        | Access token timeout duration (e.g. 24h, 15m)                           | `15m`      | v0.7.0          |
 | `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`       | Refresh token timeout duration (e.g. 168h, 7d)                          | `7d`       | v0.7.0          |
@@ -329,6 +331,30 @@ This is especially useful in containerized or production environments.
 These environment variables override the default values and are especially useful in containerized or production environments.
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
+
+### Custom Stylesheet
+
+The custom stylesheet feature is not part of `v0.8.4` yet.
+It will be available in the next release.
+
+To use it, place a `.css` file inside your configured data directory and pass its path via `--custom-stylesheet` or `LEAFWIKI_CUSTOM_STYLESHEET`.
+
+Example:
+
+```bash
+./leafwiki \
+  --data-dir=./data \
+  --custom-stylesheet=custom.css \
+  --jwt-secret=yoursecret \
+  --admin-password=yourpassword
+```
+
+With the example above:
+
+- The file must exist at `./data/custom.css`
+- Without a base path, it is served as `/custom.css`
+- With `--base-path=/wiki`, it is served as `/wiki/custom.css`
+- The stylesheet endpoint is publicly accessible
 
 ### Security Overview - Since v0.7.0
 

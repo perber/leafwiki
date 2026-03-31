@@ -3,7 +3,6 @@ package http
 import (
 	"embed"
 	"io/fs"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -55,6 +54,7 @@ func (sew *slogErrorWriter) Write(p []byte) (n int, err error) {
 type RouterOptions struct {
 	PublicAccess            bool          // Whether the wiki allows public read access
 	InjectCodeInHeader      string        // Raw HTML/JS code to inject into the <head> tag
+	CustomStylesheet        string        // Path to a custom CSS file exposed as custom.css relative to BasePath (e.g. "/wiki/custom.css")
 	AllowInsecure           bool          // Whether to allow insecure HTTP connections
 	AccessTokenTimeout      time.Duration // Duration for access token validity
 	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
@@ -81,6 +81,11 @@ func wireImporterService(w *wiki.Wiki) *importer.ImporterService {
 func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	if options.MaxAssetUploadSizeBytes <= 0 {
 		options.MaxAssetUploadSizeBytes = defaultMaxAssetUploadSizeBytes
+	}
+
+	customStylesheetPath, err := normalizeCustomStylesheetPath(wikiInstance.GetStorageDir(), options.CustomStylesheet)
+	if err != nil {
+		slog.Default().Error("custom stylesheet disabled", "error", err)
 	}
 
 	if Environment == "production" {
@@ -239,7 +244,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		// Get allowed extensions from branding constraints
 		constraints, err := wikiInstance.GetBrandingConstraints()
 		if err != nil {
-			log.Printf("Failed to get branding constraints: %v", err)
+			slog.Default().Error("failed to get branding constraints", "error", err)
 			c.Status(http.StatusInternalServerError)
 			return
 		}
@@ -281,7 +286,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 			c.Status(http.StatusNotFound)
 			return
 		} else if err != nil {
-			log.Printf("Error checking file existence: %v", err)
+			slog.Default().Error("error checking branding file existence", "error", err, "path", cleanPath)
 			c.Status(http.StatusInternalServerError)
 			return
 		}
@@ -289,6 +294,23 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		// Serve the file
 		c.File(cleanPath)
 	})
+
+	// Serve custom stylesheet if specified
+	if customStylesheetPath != "" {
+		base.GET("/custom.css", func(c *gin.Context) {
+			if _, err := os.Stat(customStylesheetPath); os.IsNotExist(err) {
+				c.Status(http.StatusNotFound)
+				return
+			} else if err != nil {
+				slog.Default().Error("error checking custom stylesheet existence", "error", err, "path", customStylesheetPath)
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+
+			c.Header("Content-Type", "text/css; charset=utf-8")
+			c.File(customStylesheetPath)
+		})
+	}
 
 	// If frontend embedding is enabled, serve it on all unknown routes
 	if EmbedFrontend == "true" {
@@ -371,13 +393,10 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 					html = strings.ReplaceAll(html, `"/favicon.svg"`, `"`+options.BasePath+`/favicon.svg"`)
 				}
 
+				html = injectIntoHead(html, buildCustomStylesheetTag(options.BasePath, customStylesheetPath))
+
 				if options.InjectCodeInHeader != "" {
-					// replaces the closing </head> tag with the injected code
-					newHtml := strings.Replace(html, "</head>", "  "+options.InjectCodeInHeader+"\n  </head>", 1)
-					if newHtml == html {
-						log.Printf("Warning: could not inject code into header, </head> tag not found")
-					}
-					html = newHtml
+					html = injectIntoHead(html, options.InjectCodeInHeader)
 				}
 
 				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
@@ -389,4 +408,53 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	}
 
 	return router
+}
+
+func buildCustomStylesheetTag(basePath string, customStylesheet string) string {
+	if strings.TrimSpace(customStylesheet) == "" {
+		return ""
+	}
+
+	return `<link rel="stylesheet" href="` + basePath + `/custom.css">`
+}
+
+func normalizeCustomStylesheetPath(storageDir string, customStylesheet string) (string, error) {
+	cssPath := strings.TrimSpace(customStylesheet)
+	if cssPath == "" {
+		return "", nil
+	}
+
+	if strings.ToLower(filepath.Ext(cssPath)) != ".css" {
+		return "", os.ErrPermission
+	}
+
+	if !filepath.IsAbs(cssPath) {
+		cssPath = filepath.Join(storageDir, cssPath)
+	}
+
+	cleanStorageDir := filepath.Clean(storageDir)
+	cleanCSSPath := filepath.Clean(cssPath)
+
+	relPath, err := filepath.Rel(cleanStorageDir, cleanCSSPath)
+	if err != nil {
+		return "", err
+	}
+	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(os.PathSeparator)) {
+		return "", os.ErrPermission
+	}
+
+	return cleanCSSPath, nil
+}
+
+func injectIntoHead(html string, snippet string) string {
+	if strings.TrimSpace(snippet) == "" {
+		return html
+	}
+
+	newHTML := strings.Replace(html, "</head>", "  "+snippet+"\n  </head>", 1)
+	if newHTML == html {
+		slog.Default().Warn("could not inject code into header", "reason", "</head> tag not found")
+	}
+
+	return newHTML
 }
