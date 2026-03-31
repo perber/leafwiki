@@ -54,7 +54,7 @@ func (sew *slogErrorWriter) Write(p []byte) (n int, err error) {
 type RouterOptions struct {
 	PublicAccess            bool          // Whether the wiki allows public read access
 	InjectCodeInHeader      string        // Raw HTML/JS code to inject into the <head> tag
-	CustomStylesheet        string        // Path to a custom CSS file exposed as /custom.css
+	CustomStylesheet        string        // Path to a custom CSS file exposed as custom.css relative to BasePath (e.g. "/wiki/custom.css")
 	AllowInsecure           bool          // Whether to allow insecure HTTP connections
 	AccessTokenTimeout      time.Duration // Duration for access token validity
 	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
