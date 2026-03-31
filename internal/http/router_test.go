@@ -42,6 +42,7 @@ func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return NewRouter(w, RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
+		CustomStylesheet:        "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,   // 15 minutes
 		RefreshTokenTimeout:     7 * 24 * time.Hour, // 7 days
@@ -1891,6 +1892,7 @@ func TestAssetAccessControl(t *testing.T) {
 		router := NewRouter(w, RouterOptions{
 			PublicAccess:            false,
 			InjectCodeInHeader:      "",
+			CustomStylesheet:        "",
 			AllowInsecure:           true,
 			AccessTokenTimeout:      15 * time.Minute,
 			RefreshTokenTimeout:     7 * 24 * time.Hour,
@@ -1920,6 +1922,7 @@ func TestAssetAccessControl(t *testing.T) {
 		router := NewRouter(w, RouterOptions{
 			PublicAccess:            false,
 			InjectCodeInHeader:      "",
+			CustomStylesheet:        "",
 			AllowInsecure:           true,
 			AccessTokenTimeout:      15 * time.Minute,
 			RefreshTokenTimeout:     7 * 24 * time.Hour,
@@ -1958,6 +1961,7 @@ func TestAssetAccessControl(t *testing.T) {
 		router := NewRouter(w, RouterOptions{
 			PublicAccess:            true,
 			InjectCodeInHeader:      "",
+			CustomStylesheet:        "",
 			AllowInsecure:           true,
 			AccessTokenTimeout:      15 * time.Minute,
 			RefreshTokenTimeout:     7 * 24 * time.Hour,
@@ -1993,6 +1997,7 @@ func TestAssetAccessControl(t *testing.T) {
 		router := NewRouter(w, RouterOptions{
 			PublicAccess:            false,
 			InjectCodeInHeader:      "",
+			CustomStylesheet:        "",
 			AllowInsecure:           true,
 			AccessTokenTimeout:      15 * time.Minute,
 			RefreshTokenTimeout:     7 * 24 * time.Hour,
@@ -2019,4 +2024,62 @@ func TestAssetAccessControl(t *testing.T) {
 			t.Errorf("Expected 'test content no auth', got '%s'", content)
 		}
 	})
+}
+
+func TestBuildCustomStylesheetTag(t *testing.T) {
+	tag := buildCustomStylesheetTag("/wiki", "/tmp/custom.css")
+
+	expected := `<link rel="stylesheet" href="/wiki/custom.css">`
+	if tag != expected {
+		t.Fatalf("expected %q, got %q", expected, tag)
+	}
+}
+
+func TestBuildCustomStylesheetTag_EmptyPath(t *testing.T) {
+	tag := buildCustomStylesheetTag("", "")
+	if tag != "" {
+		t.Fatalf("expected empty tag, got %q", tag)
+	}
+}
+
+func TestInjectIntoHead(t *testing.T) {
+	html := "<html><head></head><body></body></html>"
+	got := injectIntoHead(html, `<link rel="stylesheet" href="/custom.css">`)
+
+	if !strings.Contains(got, `<link rel="stylesheet" href="/custom.css">`) {
+		t.Fatalf("expected stylesheet link to be injected, got %q", got)
+	}
+}
+
+func TestCustomStylesheetRoute(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	customCSSPath := filepath.Join(t.TempDir(), "custom.css")
+	if err := os.WriteFile(customCSSPath, []byte("body { color: red; }"), 0644); err != nil {
+		t.Fatalf("failed to create custom stylesheet: %v", err)
+	}
+
+	router := NewRouter(w, RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		CustomStylesheet:        customCSSPath,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		AuthDisabled:            false,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/custom.css", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	if !strings.Contains(rec.Body.String(), "body { color: red; }") {
+		t.Fatalf("expected CSS body, got %q", rec.Body.String())
+	}
 }
