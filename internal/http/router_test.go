@@ -2055,7 +2055,7 @@ func TestCustomStylesheetRoute(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
-	customCSSPath := filepath.Join(t.TempDir(), "custom.css")
+	customCSSPath := filepath.Join(w.GetStorageDir(), "custom.css")
 	if err := os.WriteFile(customCSSPath, []byte("body { color: red; }"), 0644); err != nil {
 		t.Fatalf("failed to create custom stylesheet: %v", err)
 	}
@@ -2079,7 +2079,76 @@ func TestCustomStylesheetRoute(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
+	if got := rec.Header().Get("Content-Type"); got != "text/css; charset=utf-8" {
+		t.Fatalf("expected css content-type, got %q", got)
+	}
+
 	if !strings.Contains(rec.Body.String(), "body { color: red; }") {
 		t.Fatalf("expected CSS body, got %q", rec.Body.String())
+	}
+}
+
+func TestCustomStylesheetRoute_RejectsPathOutsideStorageDir(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	outsideCSSPath := filepath.Join(t.TempDir(), "outside.css")
+	if err := os.WriteFile(outsideCSSPath, []byte("body { color: blue; }"), 0644); err != nil {
+		t.Fatalf("failed to create stylesheet outside storage dir: %v", err)
+	}
+
+	router := NewRouter(w, RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		CustomStylesheet:        outsideCSSPath,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		AuthDisabled:            false,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/custom.css", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 when stylesheet path is outside storage dir, got %d", rec.Code)
+	}
+}
+
+func TestCustomStylesheetRoute_RejectsNonCSSFile(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	textFilePath := filepath.Join(w.GetStorageDir(), "custom.txt")
+	if err := os.WriteFile(textFilePath, []byte("not css"), 0644); err != nil {
+		t.Fatalf("failed to create non-css file: %v", err)
+	}
+
+	router := NewRouter(w, RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		CustomStylesheet:        textFilePath,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		AuthDisabled:            false,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/custom.css", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 when stylesheet path is not a css file, got %d", rec.Code)
+	}
+}
+
+func TestBuildCustomStylesheetTag_WhitespacePath(t *testing.T) {
+	tag := buildCustomStylesheetTag("/wiki", "   ")
+	if tag != "" {
+		t.Fatalf("expected empty tag for whitespace path, got %q", tag)
 	}
 }

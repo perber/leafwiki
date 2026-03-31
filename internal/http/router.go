@@ -83,6 +83,11 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		options.MaxAssetUploadSizeBytes = defaultMaxAssetUploadSizeBytes
 	}
 
+	customStylesheetPath, err := normalizeCustomStylesheetPath(wikiInstance.GetStorageDir(), options.CustomStylesheet)
+	if err != nil {
+		slog.Default().Error("custom stylesheet disabled", "error", err)
+	}
+
 	if Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	} else {
@@ -291,18 +296,19 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	})
 
 	// Serve custom stylesheet if specified
-	if options.CustomStylesheet != "" {
+	if customStylesheetPath != "" {
 		base.GET("/custom.css", func(c *gin.Context) {
-			if _, err := os.Stat(options.CustomStylesheet); os.IsNotExist(err) {
+			if _, err := os.Stat(customStylesheetPath); os.IsNotExist(err) {
 				c.Status(http.StatusNotFound)
 				return
 			} else if err != nil {
-				slog.Default().Error("error checking custom stylesheet existence", "error", err, "path", options.CustomStylesheet)
+				slog.Default().Error("error checking custom stylesheet existence", "error", err, "path", customStylesheetPath)
 				c.Status(http.StatusInternalServerError)
 				return
 			}
 
-			c.File(options.CustomStylesheet)
+			c.Header("Content-Type", "text/css; charset=utf-8")
+			c.File(customStylesheetPath)
 		})
 	}
 
@@ -387,7 +393,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 					html = strings.ReplaceAll(html, `"/favicon.svg"`, `"`+options.BasePath+`/favicon.svg"`)
 				}
 
-				html = injectIntoHead(html, buildCustomStylesheetTag(options.BasePath, options.CustomStylesheet))
+				html = injectIntoHead(html, buildCustomStylesheetTag(options.BasePath, customStylesheetPath))
 
 				if options.InjectCodeInHeader != "" {
 					html = injectIntoHead(html, options.InjectCodeInHeader)
@@ -410,6 +416,34 @@ func buildCustomStylesheetTag(basePath string, customStylesheet string) string {
 	}
 
 	return `<link rel="stylesheet" href="` + basePath + `/custom.css">`
+}
+
+func normalizeCustomStylesheetPath(storageDir string, customStylesheet string) (string, error) {
+	cssPath := strings.TrimSpace(customStylesheet)
+	if cssPath == "" {
+		return "", nil
+	}
+
+	if strings.ToLower(filepath.Ext(cssPath)) != ".css" {
+		return "", os.ErrPermission
+	}
+
+	if !filepath.IsAbs(cssPath) {
+		cssPath = filepath.Join(storageDir, cssPath)
+	}
+
+	cleanStorageDir := filepath.Clean(storageDir)
+	cleanCSSPath := filepath.Clean(cssPath)
+
+	relPath, err := filepath.Rel(cleanStorageDir, cleanCSSPath)
+	if err != nil {
+		return "", err
+	}
+	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(os.PathSeparator)) {
+		return "", os.ErrPermission
+	}
+
+	return cleanCSSPath, nil
 }
 
 func injectIntoHead(html string, snippet string) string {

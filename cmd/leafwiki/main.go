@@ -36,7 +36,8 @@ func printUsage() {
 	--refresh-token-timeout Refresh token timeout duration (e.g. 168h, 7d) (default: 7d)
 	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
 	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
-	--custom-stylesheet      Path to a custom CSS file served as /custom.css (default: "")
+	--custom-stylesheet      Path to a .css file inside the data dir, served publicly as /custom.css
+	                         (or <base-path>/custom.css when --base-path is set) (default: "")
 	--disable-auth                Disable authentication completely (default: false) (WARNING: only use in trusted networks!)
 	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false)
 	--base-path                   URL prefix when served behind a reverse proxy (e.g. /wiki) (default: "")
