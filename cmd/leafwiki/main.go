@@ -17,7 +17,7 @@ import (
 )
 
 func writeUsage(w io.Writer) {
-	fmt.Fprintln(w, `LeafWiki – lightweight selfhosted wiki 🌿
+	if _, err := fmt.Fprintln(w, `LeafWiki – lightweight selfhosted wiki 🌿
 
 	Usage:
 	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
@@ -61,7 +61,9 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_HIDE_LINK_METADATA_SECTION
 	LEAFWIKI_BASE_PATH
 	LEAFWIKI_MAX_ASSET_UPLOAD_SIZE
-	`)
+	`); err != nil {
+		panic(err)
+	}
 }
 
 func printUsage() {
