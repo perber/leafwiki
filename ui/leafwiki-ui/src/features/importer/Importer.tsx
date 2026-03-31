@@ -54,7 +54,7 @@ export default function Importer() {
             to LeafWiki asset paths. <br />
             <br />
             If you run into problems, unexpected results, or unsupported edge
-            cases, please create a ticket on our{' '}
+            cases, please create an issue on our{' '}
             <a
               href="https://github.com/perber/leafwiki/issues"
               target="_blank"

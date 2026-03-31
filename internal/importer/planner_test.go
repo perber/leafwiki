@@ -447,8 +447,8 @@ func TestPlanner_analyzeEntry_ReservedSlugSegmentsUseCentralizedSafeNormalizatio
 }
 
 func TestPlanner_analyzeEntry_InvalidSourceDirSegment_ReturnsError(t *testing.T) {
-	// NormalizePath(validate=true) nutzt IsValidSlug() nach slug.Make().
-	// Ein Segment wie "!!!" sluggt zu "" => invalid.
+	// Import path normalization still rejects segments that collapse to an empty slug.
+	// A segment like "!!!" normalizes to "", so planning should report an error.
 	tmp := t.TempDir()
 	test_utils.WriteFile(t, tmp, "!!!/a.md", "# A")
 

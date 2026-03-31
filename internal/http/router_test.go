@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
@@ -40,7 +41,7 @@ func createWikiTestInstance(t *testing.T) *wiki.Wiki {
 }
 
 func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
-	return createRouterTestInstanceWithMaxAssetUploadSize(w, t, 50*1024*1024)
+	return createRouterTestInstanceWithMaxAssetUploadSize(w, t, assets.DefaultMaxUploadSizeBytes)
 }
 
 func createRouterTestInstanceWithMaxAssetUploadSize(w *wiki.Wiki, t *testing.T, maxAssetUploadSizeBytes int64) *gin.Engine {
@@ -170,24 +171,7 @@ func authenticatedRequestAs(t *testing.T, router http.Handler, username, passwor
 func importerFixturePathForHTTPTests(t *testing.T, rel string) string {
 	t.Helper()
 
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-
-	candidates := []string{
-		filepath.Join(wd, "..", "importer", "fixtures", rel),
-		filepath.Join(wd, "internal", "importer", "fixtures", rel),
-	}
-
-	for _, candidate := range candidates {
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate
-		}
-	}
-
-	t.Fatalf("fixture path not found for %q from working directory %q", rel, wd)
-	return ""
+	return test_utils.FixturePath(t, rel, "../importer/fixtures", "internal/importer/fixtures")
 }
 
 func createZipFromDir(t *testing.T, root string) []byte {
