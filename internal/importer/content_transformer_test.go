@@ -105,6 +105,12 @@ func TestContentTransformer_TransformContent_TableDriven(t *testing.T) {
 			want:       "[Three laws](/three-laws-of-motion)",
 		},
 		{
+			name:       "scheme relative url stays external",
+			sourcePath: "docs/current.md",
+			content:    "[CDN](//example.com/assets/note.md)",
+			want:       "[CDN](//example.com/assets/note.md)",
+		},
+		{
 			name:       "inline code stays unchanged",
 			sourcePath: "docs/current.md",
 			content:    "`[[Note]]`",

@@ -559,12 +559,12 @@ func findMarkdownLinkDestinationEnd(content string, start int) int {
 }
 
 func isExternalHref(href string) bool {
-	if strings.HasPrefix(href, "mailto:") || strings.HasPrefix(href, "tel:") {
+	if strings.HasPrefix(href, "//") || strings.HasPrefix(href, "mailto:") || strings.HasPrefix(href, "tel:") {
 		return true
 	}
 
 	u, err := url.Parse(href)
-	return err == nil && u.Scheme != "" && u.Host != ""
+	return err == nil && u.Host != ""
 }
 
 func uniqueStrings(values []string) []string {
