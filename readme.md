@@ -1,6 +1,6 @@
 # 🌿 LeafWiki
 
-**LeafWiki is the self-hosted documentation app for people who think in folders, not feeds.**  
+**LeafWiki – A fast wiki for people who think in folders, not feeds**  
 Fast editing. Explicit tree navigation. Markdown stored on disk. Single Go binary.
 
 LeafWiki is a lightweight wiki for runbooks, internal docs, and technical notes. It combines fast writing, structured navigation, and search in a focused app, while keeping your content portable as plain Markdown files on disk.
