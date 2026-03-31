@@ -9,10 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/tree"
 )
-
-const defaultImportAssetMaxBytes int64 = 50 * 1024 * 1024
 
 type importTarget struct {
 	targetPath string
@@ -25,6 +24,8 @@ type contentTransformer struct {
 	assetUploads   map[string]string
 }
 
+// newContentTransformer precomputes source->target lookups from the import plan.
+// We resolve links against planned imports so we only rewrite destinations we can actually create.
 func newContentTransformer(plan *PlanResult, sourceBasePath string) *contentTransformer {
 	pagesBySource := make(map[string]importTarget, len(plan.Items))
 	for _, item := range plan.Items {
@@ -41,6 +42,8 @@ func newContentTransformer(plan *PlanResult, sourceBasePath string) *contentTran
 	}
 }
 
+// TransformContent rewrites Markdown links, wiki links, and asset references for one imported page.
+// Rewrites only happen outside inline code and fenced blocks so code examples remain untouched.
 func (t *contentTransformer) TransformContent(
 	sourcePath string,
 	page *tree.Page,
@@ -58,6 +61,7 @@ func (t *contentTransformer) TransformContent(
 	})
 }
 
+// rewriteMarkdownLinks rewrites regular Markdown links and images in non-code segments only.
 func (t *contentTransformer) rewriteMarkdownLinks(
 	sourcePath string,
 	page *tree.Page,
@@ -115,6 +119,7 @@ func (t *contentTransformer) rewriteMarkdownLinks(
 	return out.String(), nil
 }
 
+// rewriteWikiLinks handles Obsidian-style wiki links and converts them to plain Markdown links.
 func (t *contentTransformer) rewriteWikiLinks(
 	sourcePath string,
 	page *tree.Page,
@@ -189,6 +194,8 @@ func (t *contentTransformer) rewriteWikiLinks(
 	return out.String(), nil
 }
 
+// rewriteDestination keeps the original Markdown destination wrapper and title suffix intact
+// while only replacing the actual href when we can resolve it safely.
 func (t *contentTransformer) rewriteDestination(
 	sourcePath string,
 	page *tree.Page,
@@ -212,6 +219,8 @@ func (t *contentTransformer) rewriteDestination(
 	return prefix + resolved + suffix, nil
 }
 
+// resolveDestination first tries to map the href to another imported page.
+// If that fails, it falls back to importing a local asset from the source package.
 func (t *contentTransformer) resolveDestination(
 	sourcePath string,
 	page *tree.Page,
@@ -238,6 +247,8 @@ func (t *contentTransformer) resolveDestination(
 	return "", false, nil
 }
 
+// resolvePagePath resolves links only against files that are part of the current import plan.
+// This avoids guessing against unrelated existing wiki pages and keeps imports predictable.
 func (t *contentTransformer) resolvePagePath(sourcePath string, href string) (string, bool) {
 	candidates := buildSourceCandidates(sourcePath, href)
 	if !strings.HasPrefix(href, "/") && !strings.HasPrefix(href, ".") {
@@ -251,6 +262,8 @@ func (t *contentTransformer) resolvePagePath(sourcePath string, href string) (st
 	return "", false
 }
 
+// resolveAndUploadAsset imports local non-Markdown files into the target page's asset folder
+// and caches the public path so repeated references on the same page reuse the upload result.
 func (t *contentTransformer) resolveAndUploadAsset(
 	sourcePath string,
 	page *tree.Page,
@@ -275,7 +288,7 @@ func (t *contentTransformer) resolveAndUploadAsset(
 		_ = file.Close()
 	}()
 
-	publicPath, err := wiki.UploadAsset(page.ID, multipart.File(file), filepath.Base(assetAbs), defaultImportAssetMaxBytes)
+	publicPath, err := wiki.UploadAsset(page.ID, multipart.File(file), filepath.Base(assetAbs), assets.DefaultMaxUploadSizeBytes)
 	if err != nil {
 		return "", fmt.Errorf("upload asset %q: %w", assetAbs, err)
 	}
@@ -327,6 +340,8 @@ func buildSourceCandidates(sourcePath string, href string) []string {
 	return uniqueStrings(candidates)
 }
 
+// resolveAssetPath keeps asset resolution inside the extracted import workspace.
+// This prevents uploaded archives from referencing files outside the package on disk.
 func resolveAssetPath(sourceBasePath string, sourcePath string, href string) (string, bool) {
 	raw := filepath.ToSlash(strings.TrimSpace(href))
 	if raw == "" {
@@ -498,6 +513,8 @@ func uniqueStrings(values []string) []string {
 	return out
 }
 
+// rewriteOutsideCodeSpans applies rewrites only to plain text segments.
+// The importer must not rewrite examples inside inline code or fenced code blocks.
 func rewriteOutsideCodeSpans(content string, rewrite func(string) (string, error)) (string, error) {
 	var out strings.Builder
 	plainStart := 0

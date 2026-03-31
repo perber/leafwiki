@@ -4,20 +4,20 @@ import (
 	"testing"
 )
 
-func TestGenerateUniqueSlug_NoConflict(t *testing.T) {
+func TestGenerateUniqueChildSlug_NoConflict(t *testing.T) {
 	parent := &PageNode{
 		Children: []*PageNode{},
 	}
 
 	s := NewSlugService()
-	result := s.GenerateUniqueSlug(parent, "", "My Page")
+	result := s.GenerateUniqueChildSlug(parent, "", "My Page")
 
 	if result != "my-page" {
 		t.Errorf("Expected 'my-page', got '%s'", result)
 	}
 }
 
-func TestGenerateUniqueSlug_WithConflict(t *testing.T) {
+func TestGenerateUniqueChildSlug_WithConflict(t *testing.T) {
 	parent := &PageNode{
 		Children: []*PageNode{
 			{ID: "id", Slug: "my-page"},
@@ -25,14 +25,14 @@ func TestGenerateUniqueSlug_WithConflict(t *testing.T) {
 	}
 
 	s := NewSlugService()
-	result := s.GenerateUniqueSlug(parent, "new-id-same-parent", "My Page")
+	result := s.GenerateUniqueChildSlug(parent, "new-id-same-parent", "My Page")
 
 	if result != "my-page-1" {
 		t.Errorf("Expected 'my-page-1', got '%s'", result)
 	}
 }
 
-func TestGenerateUniqueSlug_MultipleConflicts(t *testing.T) {
+func TestGenerateUniqueChildSlug_MultipleConflicts(t *testing.T) {
 	parent := &PageNode{
 		Children: []*PageNode{
 			{ID: "id1", Slug: "my-page"},
@@ -42,14 +42,14 @@ func TestGenerateUniqueSlug_MultipleConflicts(t *testing.T) {
 	}
 
 	s := NewSlugService()
-	result := s.GenerateUniqueSlug(parent, "new-id", "My Page")
+	result := s.GenerateUniqueChildSlug(parent, "new-id", "My Page")
 
 	if result != "my-page-3" {
 		t.Errorf("Expected 'my-page-3', got '%s'", result)
 	}
 }
 
-func TestGenerateUniqueSlug_SlugShouldBeTheSame(t *testing.T) {
+func TestGenerateUniqueChildSlug_SlugShouldBeTheSame(t *testing.T) {
 	parent := &PageNode{
 		Children: []*PageNode{
 			{ID: "id1", Slug: "my-page"},
@@ -57,18 +57,18 @@ func TestGenerateUniqueSlug_SlugShouldBeTheSame(t *testing.T) {
 	}
 
 	s := NewSlugService()
-	result := s.GenerateUniqueSlug(parent, "id1", "My Page")
+	result := s.GenerateUniqueChildSlug(parent, "id1", "My Page")
 
 	if result != "my-page" {
 		t.Errorf("Expected 'my-page', got '%s'", result)
 	}
 }
 
-func TestGenerateUniqueSlug_SpecialCharacters(t *testing.T) {
+func TestGenerateUniqueChildSlug_SpecialCharacters(t *testing.T) {
 	parent := &PageNode{}
 
 	s := NewSlugService()
-	result := s.GenerateUniqueSlug(parent, "", "Äpfel & Bäume!")
+	result := s.GenerateUniqueChildSlug(parent, "", "Äpfel & Bäume!")
 
 	if result != "apfel-and-baume" {
 		t.Errorf("Expected 'aepfel-and-baume', got '%s'", result)
@@ -112,34 +112,34 @@ func TestIsValidSlug_AllowsUppercase(t *testing.T) {
 	}
 }
 
-func TestGenerateSafeSlug_ReservedSlugGetsSuffix(t *testing.T) {
+func TestGenerateValidSlug_ReservedSlugGetsSuffix(t *testing.T) {
 	s := NewSlugService()
 
-	if got := s.GenerateSafeSlug("api"); got != "api-1" {
-		t.Fatalf("GenerateSafeSlug(api) = %q, want api-1", got)
+	if got := s.GenerateValidSlug("api"); got != "api-1" {
+		t.Fatalf("GenerateValidSlug(api) = %q, want api-1", got)
 	}
 }
 
-func TestNormalizePathForCreation_ReservedSegmentGetsSuffix(t *testing.T) {
+func TestNormalizePathToValidSlugs_ReservedSegmentGetsSuffix(t *testing.T) {
 	s := NewSlugService()
 
-	got, err := s.NormalizePathForCreation("Reference/API")
+	got, err := s.NormalizePathToValidSlugs("Reference/API")
 	if err != nil {
-		t.Fatalf("NormalizePathForCreation err: %v", err)
+		t.Fatalf("NormalizePathToValidSlugs err: %v", err)
 	}
 	if got != "reference/api-1" {
-		t.Fatalf("NormalizePathForCreation = %q, want reference/api-1", got)
+		t.Fatalf("NormalizePathToValidSlugs = %q, want reference/api-1", got)
 	}
 }
 
-func TestNormalizeFilenameForCreation_ReservedSlugGetsSuffix(t *testing.T) {
+func TestNormalizeFilenameToValidSlug_ReservedSlugGetsSuffix(t *testing.T) {
 	s := NewSlugService()
 
-	got, err := s.NormalizeFilenameForCreation("API.md")
+	got, err := s.NormalizeFilenameToValidSlug("API.md")
 	if err != nil {
-		t.Fatalf("NormalizeFilenameForCreation err: %v", err)
+		t.Fatalf("NormalizeFilenameToValidSlug err: %v", err)
 	}
 	if got != "api-1.md" {
-		t.Fatalf("NormalizeFilenameForCreation = %q, want api-1.md", got)
+		t.Fatalf("NormalizeFilenameToValidSlug = %q, want api-1.md", got)
 	}
 }

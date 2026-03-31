@@ -122,8 +122,9 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 		sourceDir = ""
 	}
 
-	// normalize ONLY the source dir segments
-	normalizedSourceDir, err := p.slugger.NormalizePathForCreation(sourceDir)
+	// Normalize import path segments into valid route slugs before we look anything up in the wiki.
+	// At planning time we intentionally do not try to enforce sibling uniqueness in the tree.
+	normalizedSourceDir, err := p.slugger.NormalizePathToValidSlugs(sourceDir)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +140,8 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 		kind = tree.NodeKindSection
 		wikiPath = strings.Trim(path.Join(targetBase, normalizedSourceDir), "/")
 	} else {
-		normalizedFilename, err := p.slugger.NormalizeFilenameForCreation(filenameLower) // e.g. "my-page.md"
+		// File names map to page slugs, so we normalize the basename but preserve the extension.
+		normalizedFilename, err := p.slugger.NormalizeFilenameToValidSlug(filenameLower) // e.g. "my-page.md"
 		if err != nil {
 			return nil, err
 		}

@@ -15,6 +15,8 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 )
 
+const DefaultMaxUploadSizeBytes int64 = 50 * 1024 * 1024
+
 type AssetService struct {
 	assetsDir string
 	slugger   *tree.SlugService
