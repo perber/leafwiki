@@ -77,6 +77,22 @@ func (s *SlugService) IsValidSlug(slug string) error {
 	return nil
 }
 
+func (s *SlugService) GenerateSafeSlug(desired string) string {
+	slug := normalizeSlug(desired)
+	if slug == "" {
+		return ""
+	}
+
+	original := slug
+	i := 1
+	for s.IsValidSlug(slug) != nil {
+		slug = fmt.Sprintf("%s-%d", original, i)
+		i++
+	}
+
+	return slug
+}
+
 // normalizeSlug creates a URL-friendly slug (can be improved)
 func normalizeSlug(title string) string {
 	return slug.Make(title)
@@ -121,6 +137,34 @@ func (s *SlugService) NormalizeFilename(filename string) string {
 	ext := filepath.Ext(filename)
 	base := filename[:len(filename)-len(ext)]
 	return normalizeSlug(base) + ext
+}
+
+func (s *SlugService) NormalizePathForCreation(value string) (string, error) {
+	segments := make([]string, 0)
+
+	for _, segment := range strings.Split(value, "/") {
+		if segment == "" {
+			continue
+		}
+
+		safe := s.GenerateSafeSlug(segment)
+		if safe == "" {
+			return "", fmt.Errorf("segment '%s' is not a valid slug: slug must not be empty", segment)
+		}
+		segments = append(segments, safe)
+	}
+
+	return strings.Join(segments, "/"), nil
+}
+
+func (s *SlugService) NormalizeFilenameForCreation(filename string) (string, error) {
+	ext := filepath.Ext(filename)
+	base := filename[:len(filename)-len(ext)]
+	safe := s.GenerateSafeSlug(base)
+	if safe == "" {
+		return "", fmt.Errorf("filename '%s' is not a valid slug: slug must not be empty", filename)
+	}
+	return safe + ext, nil
 }
 
 func (s *SlugService) GenerateUniqueFilename(existing []string, desired string) string {

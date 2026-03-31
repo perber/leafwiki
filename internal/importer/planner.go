@@ -123,7 +123,7 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 	}
 
 	// normalize ONLY the source dir segments
-	normalizedSourceDir, err := p.slugger.NormalizePath(sourceDir, true)
+	normalizedSourceDir, err := p.slugger.NormalizePathForCreation(sourceDir)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,10 @@ func (p *Planner) analyzeEntry(mdFile ImportMDFile, options PlanOptions) (*PlanI
 		kind = tree.NodeKindSection
 		wikiPath = strings.Trim(path.Join(targetBase, normalizedSourceDir), "/")
 	} else {
-		normalizedFilename := p.slugger.NormalizeFilename(filenameLower) // e.g. "my-page.md"
+		normalizedFilename, err := p.slugger.NormalizeFilenameForCreation(filenameLower) // e.g. "my-page.md"
+		if err != nil {
+			return nil, err
+		}
 		baseSlug := strings.TrimSuffix(normalizedFilename, path.Ext(normalizedFilename))
 		wikiPath = strings.Trim(path.Join(targetBase, normalizedSourceDir, baseSlug), "/")
 	}

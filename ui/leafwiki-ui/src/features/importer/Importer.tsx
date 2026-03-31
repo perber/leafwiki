@@ -45,13 +45,16 @@ export default function Importer() {
           <p className="settings__section-description">
             Import Markdown Files from a Zip. <br />
             <br />
-            <b>Note:</b> Links between pages will not be updated automatically
-            and the import is only importing markdown files. <br />
-            You may need to adjust links and add images manually after the
-            import. <br />
+            <b>Alpha status:</b> The importer is still in alpha and may not work
+            correctly for every Markdown or wiki format. <br />
             <br />
-            If you require a more advanced import solution, please create an
-            issue on our{' '}
+            The importer now resolves many internal Markdown links, wiki links,
+            and asset references automatically during import. <br />
+            Assets referenced from the import package are uploaded and rewritten
+            to LeafWiki asset paths. <br />
+            <br />
+            If you run into problems, unexpected results, or unsupported edge
+            cases, please create a ticket on our{' '}
             <a
               href="https://github.com/perber/leafwiki/issues"
               target="_blank"

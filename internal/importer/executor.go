@@ -60,6 +60,8 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 		return nil, fmt.Errorf("plan is stale: expected tree_hash %s but got %s", e.plan.TreeHash, beforeExecution)
 	}
 
+	transformer := newContentTransformer(e.plan, e.planOptions.SourceBasePath)
+
 	result := &ExecutionResult{
 		TreeHashBefore: beforeExecution,
 	}
@@ -115,6 +117,16 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 				result.SkippedCount++
 				result.Items = append(result.Items, execItem)
 				e.logger.Error("Failed to prepare imported content", "source_path", sourceAbs, "error", err)
+				continue
+			}
+			importedContent, err = transformer.TransformContent(item.SourcePath, page, importedContent, e.wiki)
+			if err != nil {
+				errMsg := err.Error()
+				execItem.Action = ExecutionActionSkipped
+				execItem.Error = &errMsg
+				result.SkippedCount++
+				result.Items = append(result.Items, execItem)
+				e.logger.Error("Failed to transform imported content", "source_path", sourceAbs, "error", err)
 				continue
 			}
 			if _, err := e.wiki.UpdatePage(userID, page.ID, page.Title, page.Slug, &importedContent, &page.Kind); err != nil {

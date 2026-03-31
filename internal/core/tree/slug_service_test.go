@@ -111,3 +111,35 @@ func TestIsValidSlug_AllowsUppercase(t *testing.T) {
 		t.Fatalf("expected uppercase slug to be valid, got %v", err)
 	}
 }
+
+func TestGenerateSafeSlug_ReservedSlugGetsSuffix(t *testing.T) {
+	s := NewSlugService()
+
+	if got := s.GenerateSafeSlug("api"); got != "api-1" {
+		t.Fatalf("GenerateSafeSlug(api) = %q, want api-1", got)
+	}
+}
+
+func TestNormalizePathForCreation_ReservedSegmentGetsSuffix(t *testing.T) {
+	s := NewSlugService()
+
+	got, err := s.NormalizePathForCreation("Reference/API")
+	if err != nil {
+		t.Fatalf("NormalizePathForCreation err: %v", err)
+	}
+	if got != "reference/api-1" {
+		t.Fatalf("NormalizePathForCreation = %q, want reference/api-1", got)
+	}
+}
+
+func TestNormalizeFilenameForCreation_ReservedSlugGetsSuffix(t *testing.T) {
+	s := NewSlugService()
+
+	got, err := s.NormalizeFilenameForCreation("API.md")
+	if err != nil {
+		t.Fatalf("NormalizeFilenameForCreation err: %v", err)
+	}
+	if got != "api-1.md" {
+		t.Fatalf("NormalizeFilenameForCreation = %q, want api-1.md", got)
+	}
+}
