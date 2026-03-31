@@ -481,3 +481,86 @@ func TestExecutor_Create_DoesNotRewriteLinksInsideCode(t *testing.T) {
 		}
 	}
 }
+
+func TestExecutor_Create_RewritesWindowsStyleMarkdownAndAssetPaths(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{
+		"# Setup",
+		"",
+		"[Doc](..\\Reference\\Endpoints.md)",
+		"![Diagram](images\\diagram.png)",
+	}, "\n"))
+	writeTmp(t, tmp, "Reference/Endpoints.md", "# Endpoints")
+	writeTmp(t, tmp, "Guides/images/diagram.png", "png-bytes")
+
+	w := &fakeExecWiki{hash: "h1"}
+	updatedContentByTitle := map[string]string{}
+	w.updateFn = func(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
+		w.lastUpdatedContent = content
+		if content != nil {
+			updatedContentByTitle[title] = *content
+		}
+		w.hash = w.hash + "-changed"
+		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
+	}
+
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Guides/Setup.md", TargetPath: "guides/setup", Title: "Setup", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Reference/Endpoints.md", TargetPath: "reference/endpoints", Title: "Endpoints", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	setupContent := updatedContentByTitle["Setup"]
+	for _, expected := range []string{
+		"[Doc](/reference/endpoints)",
+		"![Diagram](/assets/p1/diagram.png)",
+	} {
+		if !strings.Contains(setupContent, expected) {
+			t.Fatalf("expected content to contain %q, got:\n%s", expected, setupContent)
+		}
+	}
+}
+
+func TestExecutor_Create_LeavesWindowsDriveLetterPathsUntouched(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{
+		"# Setup",
+		"",
+		"[Windows File](C:\\Users\\John\\Notes\\Endpoints.md)",
+		"![Windows Image](C:\\Users\\John\\Images\\diagram.png)",
+	}, "\n"))
+
+	w := &fakeExecWiki{hash: "h1"}
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Guides/Setup.md", TargetPath: "guides/setup", Title: "Setup", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	if w.lastUpdatedContent == nil {
+		t.Fatalf("expected updated content")
+	}
+	for _, expected := range []string{
+		"[Windows File](C:\\Users\\John\\Notes\\Endpoints.md)",
+		"![Windows Image](C:\\Users\\John\\Images\\diagram.png)",
+	} {
+		if !strings.Contains(*w.lastUpdatedContent, expected) {
+			t.Fatalf("expected content to keep %q untouched, got:\n%s", expected, *w.lastUpdatedContent)
+		}
+	}
+}

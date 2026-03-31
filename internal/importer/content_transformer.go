@@ -155,6 +155,7 @@ func (t *contentTransformer) rewriteWikiLinks(
 
 		inner := strings.TrimSpace(content[next+startOffset : end])
 		targetPart, label := splitWikiLink(inner)
+		targetPart = normalizeImportedHref(targetPart)
 		href, isAsset, err := t.resolveDestination(sourcePath, page, targetPart, wiki)
 		if err != nil {
 			return "", err
@@ -200,6 +201,7 @@ func (t *contentTransformer) rewriteDestination(
 	}
 
 	prefix, href, suffix := splitMarkdownDestination(trimmed)
+	href = normalizeImportedHref(href)
 	resolved, _, err := t.resolveDestination(sourcePath, page, href, wiki)
 	if err != nil {
 		return "", err
@@ -416,6 +418,27 @@ func splitWikiLink(inner string) (target string, label string) {
 		label = strings.TrimSpace(parts[1])
 	}
 	return target, label
+}
+
+func normalizeImportedHref(href string) string {
+	trimmed := strings.TrimSpace(href)
+	if trimmed == "" {
+		return href
+	}
+	if looksLikeWindowsDrivePath(trimmed) {
+		return href
+	}
+	return strings.ReplaceAll(href, `\`, "/")
+}
+
+func looksLikeWindowsDrivePath(value string) bool {
+	if len(value) < 3 {
+		return false
+	}
+	drive := value[0]
+	return ((drive >= 'a' && drive <= 'z') || (drive >= 'A' && drive <= 'Z')) &&
+		value[1] == ':' &&
+		(value[2] == '\\' || value[2] == '/')
 }
 
 func defaultWikiLinkLabel(target string) string {
