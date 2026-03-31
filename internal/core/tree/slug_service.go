@@ -30,12 +30,9 @@ func NewSlugService() *SlugService {
 	return &SlugService{}
 }
 
-// GenerateUniqueSlug generates a unique slug for a page under the given parent
-// It normalizes the desired slug and checks for conflicts with siblings and reserved slugs.
-// If there is a conflict, it appends a number to the slug until it finds a unique one.
-// currentID is used to exclude the current page when checking for conflicts (useful for updates)
-// For example, if desired is "about" and there is already an "about" page, it will try "about-1", "about-2", etc.
-func (s *SlugService) GenerateUniqueSlug(parent *PageNode, currentID, desired string) string {
+// GenerateUniqueChildSlug returns a slug that is both valid and unique under the given parent.
+// Use this when creating or renaming a page in the actual tree, where sibling collisions matter.
+func (s *SlugService) GenerateUniqueChildSlug(parent *PageNode, currentID, desired string) string {
 	slug := normalizeSlug(desired)
 	original := slug
 	i := 1
@@ -75,6 +72,25 @@ func (s *SlugService) IsValidSlug(slug string) error {
 	}
 
 	return nil
+}
+
+// GenerateValidSlug returns the first valid slug for the desired value.
+// Unlike GenerateUniqueChildSlug, this only enforces slug rules and reserved words.
+// It does not check for collisions in the tree because no parent context is involved.
+func (s *SlugService) GenerateValidSlug(desired string) string {
+	slug := normalizeSlug(desired)
+	if slug == "" {
+		return ""
+	}
+
+	original := slug
+	i := 1
+	for s.IsValidSlug(slug) != nil {
+		slug = fmt.Sprintf("%s-%d", original, i)
+		i++
+	}
+
+	return slug
 }
 
 // normalizeSlug creates a URL-friendly slug (can be improved)
@@ -121,6 +137,38 @@ func (s *SlugService) NormalizeFilename(filename string) string {
 	ext := filepath.Ext(filename)
 	base := filename[:len(filename)-len(ext)]
 	return normalizeSlug(base) + ext
+}
+
+// NormalizePathToValidSlugs converts a slash-separated source path into valid route segments.
+// This is used by imports before pages exist in the tree, so it must not depend on sibling lookups.
+func (s *SlugService) NormalizePathToValidSlugs(value string) (string, error) {
+	segments := make([]string, 0)
+
+	for _, segment := range strings.Split(value, "/") {
+		if segment == "" {
+			continue
+		}
+
+		safe := s.GenerateValidSlug(segment)
+		if safe == "" {
+			return "", fmt.Errorf("segment '%s' is not a valid slug: slug must not be empty", segment)
+		}
+		segments = append(segments, safe)
+	}
+
+	return strings.Join(segments, "/"), nil
+}
+
+// NormalizeFilenameToValidSlug normalizes the basename of a file into a valid page slug
+// while keeping the original extension intact.
+func (s *SlugService) NormalizeFilenameToValidSlug(filename string) (string, error) {
+	ext := filepath.Ext(filename)
+	base := filename[:len(filename)-len(ext)]
+	safe := s.GenerateValidSlug(base)
+	if safe == "" {
+		return "", fmt.Errorf("filename '%s' is not a valid slug: slug must not be empty", filename)
+	}
+	return safe + ext, nil
 }
 
 func (s *SlugService) GenerateUniqueFilename(existing []string, desired string) string {

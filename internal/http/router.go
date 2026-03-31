@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/http/api"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
@@ -28,8 +29,6 @@ var EmbedFrontend = "false"
 
 // Environment is a flag to set the environment
 var Environment = "development"
-
-const defaultMaxAssetUploadSizeBytes int64 = 50 * 1024 * 1024
 
 // Slog Wrapper for Gin (Info level)
 type slogWriter struct {
@@ -67,11 +66,11 @@ type RouterOptions struct {
 // wireImporterService sets up and returns an ImporterService instance
 // Parameters:
 //   - w: the wiki instance to use for importing
-func wireImporterService(w *wiki.Wiki) *importer.ImporterService {
+func wireImporterService(w *wiki.Wiki, maxAssetUploadSizeBytes int64) *importer.ImporterService {
 	slugger := w.GetSlugService()
 	planner := importer.NewPlanner(w, slugger)
 	store := importer.NewPlanStore()
-	return importer.NewImporterService(planner, store)
+	return importer.NewImporterService(planner, store, maxAssetUploadSizeBytes)
 }
 
 // NewRouter creates a new HTTP router for the wiki application.
@@ -80,7 +79,7 @@ func wireImporterService(w *wiki.Wiki) *importer.ImporterService {
 //   - options: RouterOptions struct containing configuration options
 func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	if options.MaxAssetUploadSizeBytes <= 0 {
-		options.MaxAssetUploadSizeBytes = defaultMaxAssetUploadSizeBytes
+		options.MaxAssetUploadSizeBytes = assets.DefaultMaxUploadSizeBytes
 	}
 
 	customStylesheetPath, err := normalizeCustomStylesheetPath(wikiInstance.GetStorageDir(), options.CustomStylesheet)
@@ -98,7 +97,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 	gin.DefaultWriter = &slogWriter{logger: slog.Default().With("component", "gin")}
 	gin.DefaultErrorWriter = &slogErrorWriter{logger: slog.Default().With("component", "gin")}
 
-	importerService := wireImporterService(wikiInstance)
+	importerService := wireImporterService(wikiInstance, options.MaxAssetUploadSizeBytes)
 
 	router := gin.Default()
 

@@ -698,7 +698,7 @@ func (w *Wiki) SuggestSlug(parentID string, currentID string, title string) (str
 	// if no parentID is set or it's the root page
 	// We don't need to look for a page id
 	if parentID == "" || parentID == "root" {
-		return w.slug.GenerateUniqueSlug(w.tree.GetTree(), currentID, title), nil
+		return w.slug.GenerateUniqueChildSlug(w.tree.GetTree(), currentID, title), nil
 	}
 
 	parent, err := w.tree.FindPageByID(parentID)
@@ -706,7 +706,7 @@ func (w *Wiki) SuggestSlug(parentID string, currentID string, title string) (str
 		return "", fmt.Errorf("parent not found: %w", err)
 	}
 
-	return w.slug.GenerateUniqueSlug(parent, currentID, title), nil
+	return w.slug.GenerateUniqueChildSlug(parent, currentID, title), nil
 }
 
 func (w *Wiki) ReindexLinks() error {

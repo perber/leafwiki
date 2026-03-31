@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,6 +80,10 @@ func (f *fakeWiki) UpdatePage(userID string, id, title, slug string, content *st
 		Slug:  slug,
 		Kind:  k,
 	}}, nil
+}
+
+func (f *fakeWiki) UploadAsset(pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
+	return "/assets/" + pageID + "/" + filename, nil
 }
 
 func newPlannerWithFake(w *fakeWiki) *Planner {
@@ -394,7 +399,7 @@ func TestPlanner_CreatePlan_TitleExtractionError_AddsNote(t *testing.T) {
 }
 
 func TestPlanner_analyzeEntry_NormalizesSourceDirSegments(t *testing.T) {
-	// "My Guides/Intro.md" -> "my-guides/intro" (SlugService.NormalizePath + NormalizeFilename)
+	// "My Guides/Intro.md" -> "my-guides/intro" via centralized SlugService creation normalization.
 	tmp := t.TempDir()
 	test_utils.WriteFile(t, tmp, "My Guides/Intro.md", "# Intro")
 
@@ -416,9 +421,34 @@ func TestPlanner_analyzeEntry_NormalizesSourceDirSegments(t *testing.T) {
 	}
 }
 
+func TestPlanner_analyzeEntry_ReservedSlugSegmentsUseCentralizedSafeNormalization(t *testing.T) {
+	tmp := t.TempDir()
+	test_utils.WriteFile(t, tmp, "Reference/API.md", "# API")
+
+	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
+	p := newPlannerWithFake(wiki)
+
+	res, err := p.CreatePlan([]ImportMDFile{{SourcePath: "Reference/API.md"}}, PlanOptions{
+		SourceBasePath: tmp,
+		TargetBasePath: "docs",
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan err: %v", err)
+	}
+	if len(res.Errors) != 0 {
+		t.Fatalf("Errors = %#v", res.Errors)
+	}
+	if got := res.Items[0].TargetPath; got != "docs/reference/api-1" {
+		t.Fatalf("TargetPath = %q (want docs/reference/api-1)", got)
+	}
+	if got := res.Items[0].DesiredSlug; got != "api-1" {
+		t.Fatalf("DesiredSlug = %q (want api-1)", got)
+	}
+}
+
 func TestPlanner_analyzeEntry_InvalidSourceDirSegment_ReturnsError(t *testing.T) {
-	// NormalizePath(validate=true) nutzt IsValidSlug() nach slug.Make().
-	// Ein Segment wie "!!!" sluggt zu "" => invalid.
+	// Import path normalization still rejects segments that collapse to an empty slug.
+	// A segment like "!!!" normalizes to "", so planning should report an error.
 	tmp := t.TempDir()
 	test_utils.WriteFile(t, tmp, "!!!/a.md", "# A")
 

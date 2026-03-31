@@ -1,6 +1,7 @@
 package http
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
@@ -39,6 +41,10 @@ func createWikiTestInstance(t *testing.T) *wiki.Wiki {
 }
 
 func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
+	return createRouterTestInstanceWithMaxAssetUploadSize(w, t, assets.DefaultMaxUploadSizeBytes)
+}
+
+func createRouterTestInstanceWithMaxAssetUploadSize(w *wiki.Wiki, t *testing.T, maxAssetUploadSizeBytes int64) *gin.Engine {
 	return NewRouter(w, RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
@@ -47,7 +53,7 @@ func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 		AccessTokenTimeout:      15 * time.Minute,   // 15 minutes
 		RefreshTokenTimeout:     7 * 24 * time.Hour, // 7 days
 		HideLinkMetadataSection: false,
-		MaxAssetUploadSizeBytes: 50 * 1024 * 1024,
+		MaxAssetUploadSizeBytes: maxAssetUploadSizeBytes,
 	})
 }
 
@@ -160,6 +166,54 @@ func authenticatedRequestAs(t *testing.T, router http.Handler, username, passwor
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	return rec
+}
+
+func importerFixturePathForHTTPTests(t *testing.T, rel string) string {
+	t.Helper()
+
+	return test_utils.FixturePath(t, rel, "../importer/fixtures", "internal/importer/fixtures")
+}
+
+func createZipFromDir(t *testing.T, root string) []byte {
+	t.Helper()
+
+	var body bytes.Buffer
+	zipWriter := zip.NewWriter(&body)
+
+	err := filepath.Walk(root, func(sourcePath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		relativePath, err := filepath.Rel(root, sourcePath)
+		if err != nil {
+			return err
+		}
+
+		entry, err := zipWriter.Create(filepath.ToSlash(relativePath))
+		if err != nil {
+			return err
+		}
+
+		raw, err := os.ReadFile(sourcePath)
+		if err != nil {
+			return err
+		}
+		_, err = entry.Write(raw)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("create zip from dir: %v", err)
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+
+	return body.Bytes()
 }
 
 func TestCreatePageEndpoint(t *testing.T) {
@@ -518,6 +572,245 @@ func TestCancelImportPlanEndpoint(t *testing.T) {
 
 	if resp["error"] == "" {
 		t.Fatalf("Expected error message after canceling import plan, got: %v", resp)
+	}
+}
+
+func TestImportExecuteEndpoint_WithZipUpload_ImportsPagesLinksAndAssets(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	fixtureDir := importerFixturePathForHTTPTests(t, "link-assets-package")
+	zipBytes := createZipFromDir(t, fixtureDir)
+
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Failed to login: %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
+
+	cookies := loginRes.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies on login response, got none")
+	}
+
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+	if csrfToken == "" {
+		t.Fatalf("Expected CSRF token after login, got none")
+	}
+
+	var planBody bytes.Buffer
+	planWriter := multipart.NewWriter(&planBody)
+	fileWriter, err := planWriter.CreateFormFile("file", "link-assets-package.zip")
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+	if _, err := fileWriter.Write(zipBytes); err != nil {
+		t.Fatalf("Write zip bytes failed: %v", err)
+	}
+	if err := planWriter.Close(); err != nil {
+		t.Fatalf("Close multipart writer failed: %v", err)
+	}
+
+	planReq := httptest.NewRequest(http.MethodPost, "/api/import/plan", &planBody)
+	planReq.Header.Set("Content-Type", planWriter.FormDataContentType())
+	planReq.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		planReq.AddCookie(cookie)
+	}
+
+	planRec := httptest.NewRecorder()
+	router.ServeHTTP(planRec, planReq)
+
+	if planRec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 when creating import plan, got %d: %s", planRec.Code, planRec.Body.String())
+	}
+
+	var planResp struct {
+		Items []map[string]any `json:"items"`
+	}
+	if err := json.Unmarshal(planRec.Body.Bytes(), &planResp); err != nil {
+		t.Fatalf("Invalid import plan response JSON: %v", err)
+	}
+	if len(planResp.Items) != 5 {
+		t.Fatalf("expected 5 plan items, got %d", len(planResp.Items))
+	}
+
+	execReq := httptest.NewRequest(http.MethodPost, "/api/import/execute", strings.NewReader(""))
+	execReq.Header.Set("Content-Type", "application/json")
+	execReq.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		execReq.AddCookie(cookie)
+	}
+
+	execRec := httptest.NewRecorder()
+	router.ServeHTTP(execRec, execReq)
+
+	if execRec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 when executing import, got %d: %s", execRec.Code, execRec.Body.String())
+	}
+
+	var execResp struct {
+		ImportedCount int `json:"imported_count"`
+		SkippedCount  int `json:"skipped_count"`
+	}
+	if err := json.Unmarshal(execRec.Body.Bytes(), &execResp); err != nil {
+		t.Fatalf("Invalid import execute response JSON: %v", err)
+	}
+	if execResp.ImportedCount != 5 || execResp.SkippedCount != 0 {
+		t.Fatalf("unexpected execution result: imported=%d skipped=%d", execResp.ImportedCount, execResp.SkippedCount)
+	}
+
+	setupPage, err := w.FindByPath("guides/setup")
+	if err != nil {
+		t.Fatalf("FindByPath guides/setup err: %v", err)
+	}
+	for _, expected := range []string{
+		"[Relative MD](/reference/endpoints)",
+		"[Absolute MD](/reference/endpoints)",
+		"[Container](/guides)",
+		"[Endpoints](/reference/endpoints)",
+		"[API Alias](/reference/endpoints)",
+		"![Relative Image](/assets/" + setupPage.ID + "/logo.png)",
+		"[Manual](/assets/" + setupPage.ID + "/manual.pdf)",
+	} {
+		if !strings.Contains(setupPage.Content, expected) {
+			t.Fatalf("expected setup content to contain %q, got:\n%s", expected, setupPage.Content)
+		}
+	}
+
+	assets, err := w.ListAssets(setupPage.ID)
+	if err != nil {
+		t.Fatalf("ListAssets err: %v", err)
+	}
+	if len(assets) != 2 {
+		t.Fatalf("expected 2 uploaded assets, got %#v", assets)
+	}
+	if _, err := w.FindByPath("reference/api-1"); err != nil {
+		t.Fatalf("FindByPath reference/api-1 err: %v", err)
+	}
+}
+
+func TestImportExecuteEndpoint_UsesConfiguredAssetUploadLimit(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstanceWithMaxAssetUploadSize(w, t, 1024)
+
+	fixtureDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(fixtureDir, "docs"), 0o755); err != nil {
+		t.Fatalf("mkdir fixture dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fixtureDir, "docs", "setup.md"), []byte("# Setup\n\n[Manual](./manual.pdf)\n"), 0o644); err != nil {
+		t.Fatalf("write markdown fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fixtureDir, "docs", "manual.pdf"), bytes.Repeat([]byte("a"), 2048), 0o644); err != nil {
+		t.Fatalf("write oversized asset fixture: %v", err)
+	}
+
+	zipBytes := createZipFromDir(t, fixtureDir)
+
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Failed to login: %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
+
+	cookies := loginRes.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies on login response, got none")
+	}
+
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+	if csrfToken == "" {
+		t.Fatalf("Expected CSRF token after login, got none")
+	}
+
+	var planBody bytes.Buffer
+	planWriter := multipart.NewWriter(&planBody)
+	fileWriter, err := planWriter.CreateFormFile("file", "oversized-assets.zip")
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+	if _, err := fileWriter.Write(zipBytes); err != nil {
+		t.Fatalf("Write zip bytes failed: %v", err)
+	}
+	if err := planWriter.Close(); err != nil {
+		t.Fatalf("Close multipart writer failed: %v", err)
+	}
+
+	planReq := httptest.NewRequest(http.MethodPost, "/api/import/plan", &planBody)
+	planReq.Header.Set("Content-Type", planWriter.FormDataContentType())
+	planReq.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		planReq.AddCookie(cookie)
+	}
+
+	planRec := httptest.NewRecorder()
+	router.ServeHTTP(planRec, planReq)
+
+	if planRec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 when creating import plan, got %d: %s", planRec.Code, planRec.Body.String())
+	}
+
+	execReq := httptest.NewRequest(http.MethodPost, "/api/import/execute", strings.NewReader(""))
+	execReq.Header.Set("Content-Type", "application/json")
+	execReq.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		execReq.AddCookie(cookie)
+	}
+
+	execRec := httptest.NewRecorder()
+	router.ServeHTTP(execRec, execReq)
+
+	if execRec.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 when executing import, got %d: %s", execRec.Code, execRec.Body.String())
+	}
+
+	var execResp struct {
+		ImportedCount int `json:"imported_count"`
+		SkippedCount  int `json:"skipped_count"`
+		Items         []struct {
+			Error *string `json:"error"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(execRec.Body.Bytes(), &execResp); err != nil {
+		t.Fatalf("Invalid import execute response JSON: %v", err)
+	}
+	if execResp.ImportedCount != 0 || execResp.SkippedCount != 1 {
+		t.Fatalf("unexpected execution result: imported=%d skipped=%d", execResp.ImportedCount, execResp.SkippedCount)
+	}
+	if len(execResp.Items) != 1 || execResp.Items[0].Error == nil || !strings.Contains(*execResp.Items[0].Error, "file too large") {
+		t.Fatalf("expected import error about configured asset limit, got %#v", execResp.Items)
 	}
 }
 

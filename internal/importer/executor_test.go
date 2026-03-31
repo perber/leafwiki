@@ -3,6 +3,7 @@ package importer
 import (
 	"errors"
 	"log/slog"
+	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,6 +26,9 @@ type fakeExecWiki struct {
 	ensureTargets      []string
 	ensureKinds        []tree.NodeKind
 	updateTitles       []string
+	uploadCalls        int
+	uploadedAssets     []string
+	lastUploadMaxBytes int64
 }
 
 func (f *fakeExecWiki) TreeHash() string { return f.hash }
@@ -57,6 +61,13 @@ func (f *fakeExecWiki) UpdatePage(userID string, id, title, slug string, content
 	return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
 }
 
+func (f *fakeExecWiki) UploadAsset(pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
+	f.uploadCalls++
+	f.uploadedAssets = append(f.uploadedAssets, filename)
+	f.lastUploadMaxBytes = maxBytes
+	return "/assets/" + pageID + "/" + filename, nil
+}
+
 func writeTmp(t *testing.T, dir, rel, content string) {
 	t.Helper()
 	abs := filepath.Join(dir, filepath.FromSlash(rel))
@@ -72,7 +83,7 @@ func TestExecutor_StalePlan(t *testing.T) {
 	w := &fakeExecWiki{hash: "new"}
 	plan := &PlanResult{TreeHash: "old"}
 	opts := &PlanOptions{SourceBasePath: t.TempDir()}
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 
 	got, err := ex.Execute("user1")
 	if err == nil {
@@ -96,7 +107,7 @@ func TestExecutor_Create_HappyPath_PreservesNonInternalFrontmatter(t *testing.T)
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 
 	res, err := ex.Execute("user1")
 	if err != nil {
@@ -164,7 +175,7 @@ func TestExecutor_Create_HappyPath_PreservesDistinctExtraFieldValues(t *testing.
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	if _, err := ex.Execute("user1"); err != nil {
 		t.Fatalf("Execute err: %v", err)
 	}
@@ -203,7 +214,7 @@ func TestExecutor_Skip_DoesNotCallWiki(t *testing.T) {
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	res, err := ex.Execute("user1")
 	if err != nil {
 		t.Fatalf("Execute err: %v", err)
@@ -235,7 +246,7 @@ func TestExecutor_Create_EnsurePathError_SkipsItem(t *testing.T) {
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	res, err := ex.Execute("user1")
 	if err != nil {
 		t.Fatalf("Execute err: %v", err)
@@ -262,7 +273,7 @@ func TestExecutor_UnknownAction_SkipsItem(t *testing.T) {
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	res, err := ex.Execute("user1")
 	if err != nil {
 		t.Fatalf("Execute err: %v", err)
@@ -294,7 +305,7 @@ title: Ordner
 	}
 	opts := &PlanOptions{SourceBasePath: tmp}
 
-	ex := NewExecutor(plan, opts, w, slog.Default())
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
 	res, err := ex.Execute("user1")
 	if err != nil {
 		t.Fatalf("Execute err: %v", err)
@@ -313,5 +324,331 @@ title: Ordner
 	}
 	if len(w.updateTitles) != 2 || w.updateTitles[0] != "Ordner" || w.updateTitles[1] != "Unterseite" {
 		t.Fatalf("unexpected update titles: %#v", w.updateTitles)
+	}
+}
+
+func TestExecutor_Create_RewritesMarkdownAndWikiLinksToImportedPages(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Guides/index.md", "# Guides")
+	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{
+		"# Setup",
+		"",
+		"[Relative](../Reference/Endpoints.md)",
+		"[Absolute](/Guides/index.md)",
+		"[RouteStyle](/Reference/Endpoints)",
+		"[Container](/Guides/)",
+		"[[Reference/Endpoints|API Alias]]",
+	}, "\n"))
+	writeTmp(t, tmp, "Reference/Endpoints.md", "# Endpoints")
+
+	w := &fakeExecWiki{hash: "h1"}
+	updatedContentByTitle := map[string]string{}
+	w.updateFn = func(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
+		w.lastUpdatedContent = content
+		w.updateTitles = append(w.updateTitles, title)
+		if content != nil {
+			updatedContentByTitle[title] = *content
+		}
+		w.hash = w.hash + "-changed"
+		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
+	}
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Guides/index.md", TargetPath: "guides", Title: "Guides", Kind: tree.NodeKindSection, Action: PlanActionCreate},
+			{SourcePath: "Guides/Setup.md", TargetPath: "guides/setup", Title: "Setup", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Reference/Endpoints.md", TargetPath: "reference/endpoints", Title: "Endpoints", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	setupContent, ok := updatedContentByTitle["Setup"]
+	if !ok {
+		t.Fatalf("expected setup content to be updated")
+	}
+
+	for _, expected := range []string{
+		"[Relative](/reference/endpoints)",
+		"[Absolute](/guides)",
+		"[RouteStyle](/reference/endpoints)",
+		"[Container](/guides)",
+		"[API Alias](/reference/endpoints)",
+	} {
+		if !strings.Contains(setupContent, expected) {
+			t.Fatalf("expected rewritten content to contain %q, got:\n%s", expected, setupContent)
+		}
+	}
+}
+
+func TestExecutor_Create_UploadsRelativeAndRootAssets(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{
+		"# Setup",
+		"",
+		"![Relative](./images/logo.png)",
+		"[Asset](/shared/manual.pdf)",
+		"![[./images/logo.png]]",
+	}, "\n"))
+	writeTmp(t, tmp, "Guides/images/logo.png", "png-bytes")
+	writeTmp(t, tmp, "shared/manual.pdf", "pdf-bytes")
+
+	w := &fakeExecWiki{hash: "h1"}
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Guides/Setup.md", TargetPath: "guides/setup", Title: "Setup", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 1234, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	if w.uploadCalls != 2 {
+		t.Fatalf("expected 2 asset uploads, got %d", w.uploadCalls)
+	}
+	if w.lastUpdatedContent == nil {
+		t.Fatalf("expected content to be updated")
+	}
+	if !strings.Contains(*w.lastUpdatedContent, "![Relative](/assets/p1/logo.png)") {
+		t.Fatalf("expected relative asset link rewrite, got:\n%s", *w.lastUpdatedContent)
+	}
+	if !strings.Contains(*w.lastUpdatedContent, "[Asset](/assets/p1/manual.pdf)") {
+		t.Fatalf("expected root asset link rewrite, got:\n%s", *w.lastUpdatedContent)
+	}
+	if !strings.Contains(*w.lastUpdatedContent, "![logo.png](/assets/p1/logo.png)") {
+		t.Fatalf("expected wiki asset link rewrite, got:\n%s", *w.lastUpdatedContent)
+	}
+	if w.lastUploadMaxBytes != 1234 {
+		t.Fatalf("expected asset uploads to use configured max bytes, got %d", w.lastUploadMaxBytes)
+	}
+}
+
+func TestExecutor_Create_WikiLinkToNonImageAssetStaysNormalLink(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{
+		"# Setup",
+		"",
+		"[[../shared/manual.pdf]]",
+		"![[../shared/manual.pdf]]",
+	}, "\n"))
+	writeTmp(t, tmp, "shared/manual.pdf", "pdf-bytes")
+
+	w := &fakeExecWiki{hash: "h1"}
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Guides/Setup.md", TargetPath: "guides/setup", Title: "Setup", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	if w.lastUpdatedContent == nil {
+		t.Fatalf("expected content to be updated")
+	}
+	if !strings.Contains(*w.lastUpdatedContent, "[manual.pdf](/assets/p1/manual.pdf)") {
+		t.Fatalf("expected non-embed wiki asset to stay a normal link, got:\n%s", *w.lastUpdatedContent)
+	}
+	if !strings.Contains(*w.lastUpdatedContent, "![manual.pdf](/assets/p1/manual.pdf)") {
+		t.Fatalf("expected embed wiki asset to use embed syntax, got:\n%s", *w.lastUpdatedContent)
+	}
+}
+
+func TestExecutor_Create_WikiLinkFallsBackToUniqueNestedBasenameOnly(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Home.md", strings.Join([]string{
+		"# Home",
+		"",
+		"[[Brainstorm]]",
+		"[[Meeting Notes]]",
+	}, "\n"))
+	writeTmp(t, tmp, "Daily/Brainstorm.md", "# Brainstorm")
+	writeTmp(t, tmp, "Daily/Meeting Notes.md", "# Daily Meeting Notes")
+	writeTmp(t, tmp, "Archive/Meeting Notes.md", "# Archived Meeting Notes")
+
+	w := &fakeExecWiki{hash: "h1"}
+	updatedContentByTitle := map[string]string{}
+	w.updateFn = func(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
+		w.lastUpdatedContent = content
+		if content != nil {
+			updatedContentByTitle[title] = *content
+		}
+		w.hash = w.hash + "-changed"
+		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
+	}
+
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Home.md", TargetPath: "home", Title: "Home", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Daily/Brainstorm.md", TargetPath: "daily/brainstorm", Title: "Brainstorm", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Daily/Meeting Notes.md", TargetPath: "daily/meeting-notes", Title: "Meeting Notes", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Archive/Meeting Notes.md", TargetPath: "archive/meeting-notes", Title: "Meeting Notes", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	homeContent := updatedContentByTitle["Home"]
+	if !strings.Contains(homeContent, "[Brainstorm](/daily/brainstorm)") {
+		t.Fatalf("expected unique basename wiki link rewrite, got:\n%s", homeContent)
+	}
+	if !strings.Contains(homeContent, "[[Meeting Notes]]") {
+		t.Fatalf("expected ambiguous basename wiki link to stay unchanged, got:\n%s", homeContent)
+	}
+}
+
+func TestExecutor_Create_DoesNotRewriteLinksInsideCode(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{
+		"# Setup",
+		"",
+		"`[Inline](../Reference/Endpoints.md)`",
+		"",
+		"```md",
+		"[Fence](../Reference/Endpoints.md)",
+		"[[Reference/Endpoints|Fence Alias]]",
+		"```",
+		"",
+		"[Real](../Reference/Endpoints.md)",
+		"[[Reference/Endpoints|Real Alias]]",
+	}, "\n"))
+	writeTmp(t, tmp, "Reference/Endpoints.md", "# Endpoints")
+
+	w := &fakeExecWiki{hash: "h1"}
+	updatedContentByTitle := map[string]string{}
+	w.updateFn = func(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
+		w.lastUpdatedContent = content
+		if content != nil {
+			updatedContentByTitle[title] = *content
+		}
+		w.hash = w.hash + "-changed"
+		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
+	}
+
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Guides/Setup.md", TargetPath: "guides/setup", Title: "Setup", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Reference/Endpoints.md", TargetPath: "reference/endpoints", Title: "Endpoints", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	setupContent := updatedContentByTitle["Setup"]
+	for _, expected := range []string{
+		"`[Inline](../Reference/Endpoints.md)`",
+		"[Fence](../Reference/Endpoints.md)",
+		"[[Reference/Endpoints|Fence Alias]]",
+		"[Real](/reference/endpoints)",
+		"[Real Alias](/reference/endpoints)",
+	} {
+		if !strings.Contains(setupContent, expected) {
+			t.Fatalf("expected content to contain %q, got:\n%s", expected, setupContent)
+		}
+	}
+}
+
+func TestExecutor_Create_RewritesWindowsStyleMarkdownAndAssetPaths(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{
+		"# Setup",
+		"",
+		"[Doc](..\\Reference\\Endpoints.md)",
+		"![Diagram](images\\diagram.png)",
+	}, "\n"))
+	writeTmp(t, tmp, "Reference/Endpoints.md", "# Endpoints")
+	writeTmp(t, tmp, "Guides/images/diagram.png", "png-bytes")
+
+	w := &fakeExecWiki{hash: "h1"}
+	updatedContentByTitle := map[string]string{}
+	w.updateFn = func(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
+		w.lastUpdatedContent = content
+		if content != nil {
+			updatedContentByTitle[title] = *content
+		}
+		w.hash = w.hash + "-changed"
+		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
+	}
+
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Guides/Setup.md", TargetPath: "guides/setup", Title: "Setup", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "Reference/Endpoints.md", TargetPath: "reference/endpoints", Title: "Endpoints", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	setupContent := updatedContentByTitle["Setup"]
+	for _, expected := range []string{
+		"[Doc](/reference/endpoints)",
+		"![Diagram](/assets/p1/diagram.png)",
+	} {
+		if !strings.Contains(setupContent, expected) {
+			t.Fatalf("expected content to contain %q, got:\n%s", expected, setupContent)
+		}
+	}
+}
+
+func TestExecutor_Create_LeavesWindowsDriveLetterPathsUntouched(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{
+		"# Setup",
+		"",
+		"[Windows File](C:\\Users\\John\\Notes\\Endpoints.md)",
+		"![Windows Image](C:\\Users\\John\\Images\\diagram.png)",
+	}, "\n"))
+
+	w := &fakeExecWiki{hash: "h1"}
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Guides/Setup.md", TargetPath: "guides/setup", Title: "Setup", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	if w.lastUpdatedContent == nil {
+		t.Fatalf("expected updated content")
+	}
+	for _, expected := range []string{
+		"[Windows File](C:\\Users\\John\\Notes\\Endpoints.md)",
+		"![Windows Image](C:\\Users\\John\\Images\\diagram.png)",
+	} {
+		if !strings.Contains(*w.lastUpdatedContent, expected) {
+			t.Fatalf("expected content to keep %q untouched, got:\n%s", expected, *w.lastUpdatedContent)
+		}
 	}
 }
