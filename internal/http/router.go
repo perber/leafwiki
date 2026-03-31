@@ -138,7 +138,7 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
 		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
 			if _, err := csrfCookie.Issue(c); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to issue CSRF cookie"})
+				api.WriteConfigAuthCookieError(c, err)
 				return
 			}
 			c.JSON(200, gin.H{

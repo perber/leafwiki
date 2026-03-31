@@ -197,11 +197,14 @@ docker run -p 8080:8080 \
     -v ~/leafwiki-data:/app/data \
     ghcr.io/perber/leafwiki:latest \
     --jwt-secret=yoursecret \
-    --admin-password=yourpassword
+    --admin-password=yourpassword \
+    --allow-insecure=true
 ```
 
 By default, the container binds to `0.0.0.0` so the wiki is reachable from your network.
 The data directory inside the container is `/app/data`.
+The example above exposes LeafWiki over plain HTTP on port `8080`, so `--allow-insecure=true` is required for login cookies to work.
+If you serve LeafWiki behind HTTPS or a reverse proxy that forwards HTTPS headers, omit `--allow-insecure=true`.
 
 ---
 
@@ -214,7 +217,8 @@ docker run -p 8080:8080 \
     -v ~/leafwiki-data:/app/data \
     ghcr.io/perber/leafwiki:latest \
     --jwt-secret=yoursecret \
-    --admin-password=yourpassword
+    --admin-password=yourpassword \
+    --allow-insecure=true
 ```
 
 Make sure that the mounted data directory is writable by the specified user.
@@ -252,19 +256,21 @@ Download the latest release binary from GitHub, make it executable, and start th
 
 ```
 chmod +x leafwiki
-./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword
+./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --allow-insecure=true
 ```
 
 **Note:** By default, the server listens on `127.0.0.1`, which means it will only be accessible from localhost. If you want to access the server from other machines on your network, add `--host=0.0.0.0` to the command:
 
 ```
-./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --host=0.0.0.0
+./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --host=0.0.0.0 --allow-insecure=true
 ```
 
 Default port is `8080`, and the default data directory is `./data`.
 You can change the data directory with the `--data-dir` flag.
 
 The JWT secret is required for authentication and should be kept secure.
+For plain HTTP setups such as localhost testing or direct LAN access, `--allow-insecure=true` is required so the browser accepts login and CSRF cookies.
+When LeafWiki is served over HTTPS, leave `--allow-insecure` disabled.
 
 
 ## Authentication and admin user
