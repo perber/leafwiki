@@ -1,6 +1,6 @@
 import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
-import { copyPage, NODE_KIND_PAGE, Page, PageNode } from '@/lib/api/pages'
+import { copyPage, NODE_KIND_PAGE, PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_COPY_PAGE } from '@/lib/registries'
 import { buildEditUrl } from '@/lib/routePath'
@@ -11,7 +11,9 @@ import { toast } from 'sonner'
 import { PageSelect } from './PageSelect'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
-export function CopyPageDialog({ sourcePage }: { sourcePage: Page }) {
+type CopyPageSource = Pick<PageNode, 'id' | 'title' | 'kind'>
+
+export function CopyPageDialog({ sourcePage }: { sourcePage: CopyPageSource }) {
   const [targetParentID, setTargetParentID] = useState<string>('root')
   const [title, setTitle] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)

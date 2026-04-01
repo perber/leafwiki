@@ -13,6 +13,7 @@ import {
 } from '@/lib/api/pages'
 import {
   DIALOG_ADD_PAGE,
+  DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
   DIALOG_MOVE_PAGE,
   DIALOG_SORT_PAGES,
@@ -22,6 +23,7 @@ import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import {
+  Copy,
   FilePlus,
   FolderPlus,
   List,
@@ -125,6 +127,16 @@ export default function TreeNodeActionsMenu({
           <Pencil size={18} className="tree-node__action-icon" /> Edit{' '}
           {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
         </DropdownMenuItem>
+        {nodeKind === NODE_KIND_PAGE && (
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => {
+              openDialog(DIALOG_COPY_PAGE, { sourcePage: node })
+            }}
+          >
+            <Copy size={18} className="tree-node__action-icon" /> Copy Page
+          </DropdownMenuItem>
+        )}
         {nodeKind === NODE_KIND_SECTION && hasChildren && (
           <DropdownMenuItem
             className="cursor-pointer"
