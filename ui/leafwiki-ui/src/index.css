@@ -247,6 +247,7 @@
 
   body {
     @apply bg-page-bg text-page-text font-sans;
+    font-variant-emoji: emoji;
   }
 
   button:not(:disabled),
