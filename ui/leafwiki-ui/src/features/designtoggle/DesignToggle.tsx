@@ -26,7 +26,9 @@ export default function DesignToggle() {
         }}
       >
         <Moon
-          className={mode === 'light' || mode === 'system' ? 'visible' : 'hidden'}
+          className={
+            mode === 'light' || mode === 'system' ? 'visible' : 'hidden'
+          }
         />
         <Sun className={mode === 'dark' ? 'visible' : 'hidden'} />
       </Button>
