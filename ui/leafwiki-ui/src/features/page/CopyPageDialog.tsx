@@ -13,11 +13,7 @@ import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
 type CopyPageSource = Pick<PageNode, 'id' | 'title' | 'kind'>
 
-export function CopyPageDialog({
-  sourcePage,
-}: {
-  sourcePage: CopyPageSource
-}) {
+export function CopyPageDialog({ sourcePage }: { sourcePage: CopyPageSource }) {
   const [targetParentID, setTargetParentID] = useState<string>('root')
   const [title, setTitle] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
