@@ -38,6 +38,7 @@ jobs:
         with:
           scan-type: fs
           scan-ref: 'ui/leafwiki-ui'
+          trivyignores: '.trivyignore.yaml'
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: 1
