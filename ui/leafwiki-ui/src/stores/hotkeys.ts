@@ -9,6 +9,7 @@ export type HotKeyDefinition = {
   enabled: boolean
   mode: string[] // defines in which app modes the hotkey is active
   action: () => void
+  shouldHandle?: () => boolean
 }
 
 type HotKeysStore = {

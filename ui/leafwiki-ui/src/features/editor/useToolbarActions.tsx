@@ -13,6 +13,9 @@ import { usePageEditorStore } from './pageEditor'
 export interface ToolbarActionsOptions {
   savePage: () => void
   closePage: () => void
+  formatBold: () => void
+  formatItalic: () => void
+  insertHeading: (level: 1 | 2 | 3) => void
   getEditorView?: () => EditorView | null
 }
 
@@ -20,6 +23,9 @@ export interface ToolbarActionsOptions {
 export function useToolbarActions({
   savePage,
   closePage,
+  formatBold,
+  formatItalic,
+  insertHeading,
   getEditorView,
 }: ToolbarActionsOptions) {
   const setButtons = useToolbarStore((state) => state.setButtons)
@@ -72,7 +78,7 @@ export function useToolbarActions({
       return
     }
     const saveHotKey: HotKeyDefinition = {
-      keyCombo: 'Mod+s',
+      keyCombo: 'Mod+KeyS',
       enabled: true,
       mode: ['edit'],
       action: savePage,
@@ -92,12 +98,67 @@ export function useToolbarActions({
       },
     }
 
+    const editorShouldHandle = () => {
+      const view = getEditorView?.()
+      return Boolean(view?.hasFocus)
+    }
+
+    const boldHotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+KeyB',
+      enabled: true,
+      mode: ['edit'],
+      action: formatBold,
+      shouldHandle: editorShouldHandle,
+    }
+
+    const italicHotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+KeyI',
+      enabled: true,
+      mode: ['edit'],
+      action: formatItalic,
+      shouldHandle: editorShouldHandle,
+    }
+
+    const heading1Hotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+Alt+Digit1',
+      enabled: true,
+      mode: ['edit'],
+      action: () => insertHeading(1),
+      shouldHandle: editorShouldHandle,
+    }
+
+    const heading2Hotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+Alt+Digit2',
+      enabled: true,
+      mode: ['edit'],
+      action: () => insertHeading(2),
+      shouldHandle: editorShouldHandle,
+    }
+
+    const heading3Hotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+Alt+Digit3',
+      enabled: true,
+      mode: ['edit'],
+      action: () => insertHeading(3),
+      shouldHandle: editorShouldHandle,
+    }
+
     registerHotkey(saveHotKey)
     registerHotkey(closeHotkey)
+    registerHotkey(boldHotkey)
+    registerHotkey(italicHotkey)
+    registerHotkey(heading1Hotkey)
+    registerHotkey(heading2Hotkey)
+    registerHotkey(heading3Hotkey)
 
     return () => {
       unregisterHotkey(saveHotKey.keyCombo)
       unregisterHotkey(closeHotkey.keyCombo)
+      unregisterHotkey(boldHotkey.keyCombo)
+      unregisterHotkey(italicHotkey.keyCombo)
+      unregisterHotkey(heading1Hotkey.keyCombo)
+      unregisterHotkey(heading2Hotkey.keyCombo)
+      unregisterHotkey(heading3Hotkey.keyCombo)
     }
   }, [
     appMode,
@@ -105,6 +166,9 @@ export function useToolbarActions({
     setButtons,
     savePage,
     closePage,
+    formatBold,
+    formatItalic,
+    insertHeading,
     getEditorView,
     registerHotkey,
     unregisterHotkey,

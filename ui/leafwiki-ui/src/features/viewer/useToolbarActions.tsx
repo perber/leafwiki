@@ -71,17 +71,24 @@ export function useToolbarActions({
     ])
 
     const copyHotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+Shift+S',
+      keyCombo: 'Mod+Shift+KeyS',
       enabled: true,
       mode: ['view'],
       action: copyPage,
     }
 
     const editHotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+e',
+      keyCombo: 'Mod+KeyE',
       enabled: true,
       mode: ['view'],
       action: editPage,
+    }
+
+    const printHotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+KeyP',
+      enabled: true,
+      mode: ['view'],
+      action: printPage,
     }
 
     const deleteHotkey: HotKeyDefinition = {
@@ -93,11 +100,13 @@ export function useToolbarActions({
 
     registerHotkey(editHotkey)
     registerHotkey(copyHotkey)
+    registerHotkey(printHotkey)
     registerHotkey(deleteHotkey)
 
     return () => {
       unregisterHotkey(editHotkey.keyCombo)
       unregisterHotkey(copyHotkey.keyCombo)
+      unregisterHotkey(printHotkey.keyCombo)
       unregisterHotkey(deleteHotkey.keyCombo)
     }
   }, [

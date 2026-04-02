@@ -15,6 +15,163 @@ const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
 
 const currentDir = __dirname;
 
+async function dispatchLayoutShortcut(
+  page: import('@playwright/test').Page,
+  eventInit: {
+    key: string;
+    code: string;
+    ctrlKey?: boolean;
+    altKey?: boolean;
+    shiftKey?: boolean;
+  },
+) {
+  await page.evaluate((keyboardEventInit) => {
+    const target = document.activeElement instanceof HTMLElement ? document.activeElement : window;
+
+    const event = new KeyboardEvent('keydown', {
+      key: keyboardEventInit.key,
+      code: keyboardEventInit.code,
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: keyboardEventInit.ctrlKey ?? false,
+      altKey: keyboardEventInit.altKey ?? false,
+      shiftKey: keyboardEventInit.shiftKey ?? false,
+    });
+
+    target.dispatchEvent(event);
+  }, eventInit);
+}
+
+async function createPageAndOpenViewer(page: import('@playwright/test').Page, title: string) {
+  const treeView = new TreeView(page);
+  const curNodeCount = await treeView.getNumberOfTreeNodes();
+  await treeView.clickRootAddButton();
+
+  const addPageDialog = new AddPageDialog(page);
+  await addPageDialog.fillTitle(title);
+  await addPageDialog.submitWithoutRedirect();
+
+  await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+  await treeView.clickPageByTitle(title);
+
+  const viewPage = new ViewPage(page);
+  test.expect(await viewPage.getTitle()).toBe(title);
+
+  return viewPage;
+}
+
+async function expectEditAndSaveShortcutWorks(
+  page: import('@playwright/test').Page,
+  shortcutKeys: { editKey: string; saveKey: string },
+) {
+  const title = `Layout Shortcut Page ${Date.now()}`;
+  const newContent = `Saved through layout-independent shortcut at ${new Date().toISOString()}`;
+
+  await createPageAndOpenViewer(page, title);
+
+  await dispatchLayoutShortcut(page, {
+    key: shortcutKeys.editKey,
+    code: 'KeyE',
+    ctrlKey: true,
+  });
+  await page.locator('.cm-editor').waitFor({ state: 'visible' });
+
+  const editPage = new EditPage(page);
+  await editPage.writeContent(newContent);
+
+  await dispatchLayoutShortcut(page, {
+    key: shortcutKeys.saveKey,
+    code: 'KeyS',
+    ctrlKey: true,
+  });
+  await page.getByText('Page saved successfully').waitFor({ state: 'visible' });
+
+  await editPage.closeEditor();
+
+  await page.locator('article').getByText(newContent).waitFor({ state: 'visible' });
+}
+
+async function expectEditorFormattingShortcutsWork(
+  page: import('@playwright/test').Page,
+  shortcutKeys: { boldKey: string; italicKey: string },
+) {
+  const title = `Editor Shortcut Page ${Date.now()}`;
+  const viewPage = await createPageAndOpenViewer(page, title);
+
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.writeContent('Intro\n');
+
+  await dispatchLayoutShortcut(page, {
+    key: shortcutKeys.boldKey,
+    code: 'KeyB',
+    ctrlKey: true,
+  });
+  await page.keyboard.type('Bold Text');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+
+  await editPage.writeContent('\n');
+
+  await dispatchLayoutShortcut(page, {
+    key: shortcutKeys.italicKey,
+    code: 'KeyI',
+    ctrlKey: true,
+  });
+  await page.keyboard.type('Italic Text');
+  await page.keyboard.press('ArrowRight');
+
+  await editPage.writeContent('\nHeading Line');
+
+  await dispatchLayoutShortcut(page, {
+    key: '1',
+    code: 'Digit1',
+    ctrlKey: true,
+    altKey: true,
+  });
+
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  await page.locator('article strong').getByText('Bold Text').waitFor({
+    state: 'visible',
+  });
+  await page.locator('article em').getByText('Italic Text').waitFor({
+    state: 'visible',
+  });
+  await page
+    .locator('article h1, article h2, article h3')
+    .getByText('Heading Line')
+    .waitFor({ state: 'visible' });
+}
+
+async function expectMarkdownLinkAutocompleteWorks(page: import('@playwright/test').Page) {
+  const title = `Markdown Link Shortcut Page ${Date.now()}`;
+  const viewPage = await createPageAndOpenViewer(page, title);
+
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.writeContent('[Welcome](/wel');
+
+  const completionList = page.locator('.cm-tooltip-autocomplete');
+  await completionList.waitFor({ state: 'visible' });
+  const completionOption = completionList
+    .locator('li')
+    .filter({ hasText: 'Welcome to LeafWiki' })
+    .first();
+  await completionOption.waitFor({ state: 'visible' });
+  await completionOption.click();
+  await page.keyboard.type(')');
+
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  const welcomeLink = page.locator('article a[href="/welcome-to-leafwiki"]');
+  await welcomeLink.getByText('Welcome').waitFor({ state: 'visible' });
+}
+
 test.describe('Authenticated', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
@@ -135,6 +292,38 @@ for the page edited at ${new Date().toISOString()}
     const content = await viewPage.getContent();
     test.expect(content).toContain('This is the new content!');
     test.expect(content).toContain('Bold Text');
+  });
+
+  test('layout-independent shortcuts work with latin keys', async ({ page }) => {
+    await expectEditAndSaveShortcutWorks(page, {
+      editKey: 'e',
+      saveKey: 's',
+    });
+  });
+
+  test('layout-independent shortcuts work with cyrillic keys', async ({ page }) => {
+    await expectEditAndSaveShortcutWorks(page, {
+      editKey: 'е',
+      saveKey: 'с',
+    });
+  });
+
+  test('editor formatting shortcuts work with latin keys', async ({ page }) => {
+    await expectEditorFormattingShortcutsWork(page, {
+      boldKey: 'b',
+      italicKey: 'i',
+    });
+  });
+
+  test('editor formatting shortcuts work with cyrillic keys', async ({ page }) => {
+    await expectEditorFormattingShortcutsWork(page, {
+      boldKey: 'б',
+      italicKey: 'и',
+    });
+  });
+
+  test('markdown link autocomplete works', async ({ page }) => {
+    await expectMarkdownLinkAutocompleteWorks(page);
   });
 
   test('unsaved changes-warning', async ({ page }) => {
