@@ -1,0 +1,10 @@
+vulnerabilities:
+  - id: CVE-2026-4800
+    paths:
+      - ui/leafwiki-ui/package-lock.json
+    expired_at: 2026-10-01
+    statement: >-
+      ui/leafwiki-ui overrides lodash-es to 4.18.1 and the resolved installed
+      dependency tree uses lodash-es@4.18.1. The remaining 4.17.23 values in
+      this lockfile are transitive dependency requirement strings recorded for
+      chevrotain-related packages, not installed package nodes.

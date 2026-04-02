@@ -1,0 +1,4 @@
+# False positive in ui/leafwiki-ui/package-lock.json:
+# resolved install uses lodash-es@4.18.1, but Trivy still reports the
+# chevrotain dependency requirement string recorded in lockfile metadata.
+CVE-2026-4800
