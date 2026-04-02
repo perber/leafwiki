@@ -24,6 +24,10 @@ const keyAliases: Record<string, string> = {
 }
 
 function normalizeEventCode(code: string) {
+  if (code === 'Space') {
+    return 'Space'
+  }
+
   if (/^Key[A-Za-z]$/.test(code)) {
     return `Key${code.slice(3).toUpperCase()}`
   }
