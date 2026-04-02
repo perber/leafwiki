@@ -19,20 +19,6 @@ export function HotKeyHandler() {
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Open print Dialog!
-      // It is a hotfix, because for some reason the layout is looking different when the browser is opening the printdialog!
-      const isPrint =
-        (e.ctrlKey || e.metaKey) &&
-        !e.altKey &&
-        !e.shiftKey &&
-        e.key.toLowerCase() === 'p'
-      if (isPrint) {
-        window.print()
-        e.preventDefault()
-        e.stopPropagation()
-        return
-      }
-
       const comboString = getHotkeyComboFromEvent(e)
 
       // Always allow Escape
@@ -66,7 +52,8 @@ export function HotKeyHandler() {
       if (
         registeredKey &&
         registeredKey.enabled &&
-        registeredKey.mode.includes(currentMode)
+        registeredKey.mode.includes(currentMode) &&
+        (registeredKey.shouldHandle?.() ?? true)
       ) {
         e.stopPropagation()
         e.preventDefault()

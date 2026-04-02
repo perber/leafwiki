@@ -19,7 +19,7 @@ export function PageQuickSwitcherTrigger() {
 
   useEffect(() => {
     const hotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+Alt+p',
+      keyCombo: 'Mod+Alt+KeyP',
       enabled: true,
       mode: ['view'],
       action: () => openDialog(DIALOG_PAGE_QUICK_SWITCHER),

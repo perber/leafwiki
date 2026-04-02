@@ -83,6 +83,9 @@ export default function PageEditor() {
   useToolbarActions({
     savePage: () => handleSave(),
     closePage: handleClose,
+    formatBold: () => editorRef.current?.insertWrappedText('**', '**'),
+    formatItalic: () => editorRef.current?.insertWrappedText('_', '_'),
+    insertHeading: (level) => editorRef.current?.insertHeading(level),
     getEditorView: () => editorRef.current?.editorViewRef.current ?? null,
   })
 

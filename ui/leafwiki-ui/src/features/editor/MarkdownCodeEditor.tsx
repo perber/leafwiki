@@ -16,11 +16,8 @@ import { EditorView, keymap } from '@codemirror/view'
 import { githubLight } from '@fsegurai/codemirror-theme-github-light'
 import { useEffect, useRef, useState } from 'react'
 import { useDesignModeStore } from '../designtoggle/designmode'
-import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
-import {
-  InternalLinkCompletion,
-  internalLinkCompletionSource,
-} from './internalLinkCompletion'
+import type { InternalLinkCompletion } from './internalLinkCompletion'
+import { internalLinkCompletionSource } from './internalLinkCompletion'
 
 type MarkdownCodeEditorProps = {
   initialValue: string
@@ -80,51 +77,6 @@ export default function MarkdownCodeEditor({
           return closeCompletion(view)
         },
         stopPropagation: true,
-      },
-      {
-        key: 'Mod-b',
-        run: () => {
-          const view = editorViewRef.current
-          if (!view) return false
-          insertWrappedText(view, '**', '**')
-          return true
-        },
-      },
-      {
-        key: 'Mod-i',
-        run: () => {
-          const view = editorViewRef.current
-          if (!view) return false
-          insertWrappedText(view, '_', '_')
-          return true
-        },
-      },
-      {
-        key: 'Mod-Alt-1',
-        run: () => {
-          const view = editorViewRef.current
-          if (!view) return false
-          insertHeadingAtStart(view, 1)
-          return true
-        },
-      },
-      {
-        key: 'Mod-Alt-2',
-        run: () => {
-          const view = editorViewRef.current
-          if (!view) return false
-          insertHeadingAtStart(view, 2)
-          return true
-        },
-      },
-      {
-        key: 'Mod-Alt-3',
-        run: () => {
-          const view = editorViewRef.current
-          if (!view) return false
-          insertHeadingAtStart(view, 3)
-          return true
-        },
       },
     ]
 

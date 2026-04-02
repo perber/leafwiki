@@ -23,6 +23,25 @@ const keyAliases: Record<string, string> = {
   tab: 'Tab',
 }
 
+function normalizeEventCode(code: string) {
+  if (code === 'Space') {
+    return 'Space'
+  }
+
+  if (/^Key[A-Za-z]$/.test(code)) {
+    return `Key${code.slice(3).toUpperCase()}`
+  }
+
+  if (/^Digit\d$/.test(code)) {
+    return code
+  }
+
+  return ''
+}
+
+// Prefer physical key codes for letter and digit shortcuts so hotkeys stay
+// layout-independent across non-Latin keyboard layouts such as Cyrillic,
+// Greek, or Serbian. IME composition behavior is intentionally out of scope.
 function normalizeHotkeyKey(key: string) {
   const trimmedKey = key.trim()
   if (!trimmedKey) {
@@ -34,7 +53,20 @@ function normalizeHotkeyKey(key: string) {
     return aliasedKey
   }
 
-  return trimmedKey.length === 1 ? trimmedKey.toLowerCase() : trimmedKey
+  const normalizedCode = normalizeEventCode(trimmedKey)
+  if (normalizedCode) {
+    return normalizedCode
+  }
+
+  if (/^[A-Za-z]$/.test(trimmedKey)) {
+    return `Key${trimmedKey.toUpperCase()}`
+  }
+
+  if (/^\d$/.test(trimmedKey)) {
+    return `Digit${trimmedKey}`
+  }
+
+  return trimmedKey
 }
 
 export function normalizeHotkeyCombo(keyCombo: string) {
@@ -71,10 +103,9 @@ export function getHotkeyComboFromEvent(event: KeyboardEvent) {
   if (event.shiftKey) parts.push('Shift')
   if (event.altKey) parts.push('Alt')
 
-  if (event.code.startsWith('Key')) {
-    parts.push(event.code.slice(3).toLowerCase())
-  } else if (event.code.startsWith('Digit')) {
-    parts.push(event.code.slice(5))
+  const normalizedCode = normalizeEventCode(event.code)
+  if (normalizedCode) {
+    parts.push(normalizedCode)
   } else {
     parts.push(normalizeHotkeyKey(event.key))
   }

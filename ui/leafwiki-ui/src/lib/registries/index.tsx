@@ -31,7 +31,7 @@ export const SIDEBAR_SEARCH_PANEL_ID = 'search'
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
   label: 'Explorer',
-  hotkey: 'Mod+Shift+E',
+  hotkey: 'Mod+Shift+KeyE',
   icon: () => <FolderTree size={16} />,
   render: () => {
     return <TreeView />
@@ -41,7 +41,7 @@ panelItemRegistry.register({
 panelItemRegistry.register({
   id: SIDEBAR_SEARCH_PANEL_ID,
   label: 'Search',
-  hotkey: 'Mod+Shift+F',
+  hotkey: 'Mod+Shift+KeyF',
   icon: () => <SearchIcon size={16} />,
   render: (props: unknown) => {
     const SearchProps = props as React.ComponentProps<typeof Search>
