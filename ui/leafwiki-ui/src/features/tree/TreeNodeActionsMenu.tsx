@@ -18,6 +18,7 @@ import {
   DIALOG_MOVE_PAGE,
   DIALOG_SORT_PAGES,
 } from '@/lib/registries'
+import { stripBasePath } from '@/lib/routePath'
 import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
@@ -33,7 +34,7 @@ import {
   Trash,
 } from 'lucide-react'
 import { useCallback } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { usePageEditorStore } from '../editor/pageEditor'
 import { TreeViewActionButton } from './TreeViewActionButton'
@@ -166,8 +167,10 @@ export default function TreeNodeActionsMenu({
           data-testid="tree-view-action-button-delete"
           onClick={() => {
             const currentRoutePath = getCurrentRoutePath()
+            const currentRouterPath =
+              stripBasePath(currentRoutePath) ?? currentRoutePath
             const isCurrentlyEditedNode =
-              currentRoutePath.startsWith('/e/') &&
+              currentRouterPath.startsWith('/e/') &&
               currentEditorPageId === node.id
 
             if (isCurrentlyEditedNode) {
