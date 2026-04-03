@@ -1,10 +1,11 @@
 import { expect, Page } from '@playwright/test';
+import { toAppPath } from './appPath';
 
 export default class LoginPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/login');
+    await this.page.goto(toAppPath('/login'));
     await this.page.locator('input[data-testid="login-identifier"]').waitFor({ state: 'visible' });
   }
 

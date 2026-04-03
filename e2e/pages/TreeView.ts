@@ -26,7 +26,15 @@ export default class TreeView {
   }
 
   async findPageByTitle(title: string) {
-    return this.page.locator(`a[data-testid^="tree-node-link-"] >> text=${title}`);
+    return this.page
+      .locator('a[data-testid^="tree-node-link-"]')
+      .filter({ hasText: title })
+      .first();
+  }
+
+  async expectPageHighlighted(title: string) {
+    const pageNode = await this.findPageByTitle(title);
+    await expect(pageNode).toHaveAttribute('aria-current', 'page');
   }
 
   async clickPageByTitle(title: string) {

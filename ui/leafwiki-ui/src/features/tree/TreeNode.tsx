@@ -18,7 +18,7 @@ type Props = {
 
 export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   const open = useTreeStore((s) => !!s.openNodeIdSet?.[node.id])
-  const isActive = useTreeStore((s) => s.activeNodeId === node.id)
+  const isStoreActive = useTreeStore((s) => s.activeNodeId === node.id)
   const toggleNode = useTreeStore((s) => s.toggleNode)
   const hasChildren = node.children && node.children.length > 0
   const openDialog = useDialogsStore((state) => state.openDialog)
@@ -28,6 +28,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   const isActionsMenuOpen = useTreeNodeActionsMenusStore(
     (s) => s.openMenuNodeId === node.id,
   )
+  const isActive = isStoreActive
 
   const indent = 4
   const markerOffset = 8 // Distance from left for the vertical line
@@ -38,6 +39,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
         to={`/${node.path}`}
         className="tree-node__link"
         data-testid={`tree-node-link-${node.id}`}
+        aria-current={isActive ? 'page' : undefined}
       >
         <span
           className={clsx('tree-node__title', {

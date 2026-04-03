@@ -1,10 +1,11 @@
 import { Page } from '@playwright/test';
+import { toAppPath } from './appPath';
 
 export default class NotFoundPage {
   constructor(private page: Page) {}
 
   async goto(pagePath: string = '/') {
-    await this.page.goto(`${pagePath}`);
+    await this.page.goto(toAppPath(pagePath));
   }
 
   async isNotFoundPage() {

@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
-    "format": "prettier --write src/**"
+    "format": "prettier --write \"src/**/*.{css,ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{css,ts,tsx}\""
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",

@@ -2,7 +2,9 @@ import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE, DIALOG_SORT_PAGES } from '@/lib/registries'
 import { buildViewUrl } from '@/lib/routePath'
+import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { toWikiLookupPath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import {
@@ -14,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
+import { usePageEditorStore } from '../editor/pageEditor'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
@@ -24,10 +27,15 @@ export default function TreeView() {
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const openAncestorsForPath = useTreeStore((s) => s.openAncestorsForPath)
   const setActiveNodeId = useTreeStore((s) => s.setActiveNodeId)
+  const openNode = useTreeStore((s) => s.openNode)
   const expandAll = useTreeStore((s) => s.expandAll)
   const collapseAll = useTreeStore((s) => s.collapseAll)
+  const appMode = useAppMode()
+  const currentEditorPageId = usePageEditorStore(
+    (state) => state.page?.id ?? state.initialPage?.id,
+  )
 
-  const currentPath = buildViewUrl(pathname).replace(/^\/+/, '')
+  const currentPath = toWikiLookupPath(buildViewUrl(pathname))
 
   const openDialog = useDialogsStore((state) => state.openDialog)
   const readOnlyMode = useIsReadOnly()
@@ -39,6 +47,12 @@ export default function TreeView() {
 
   useEffect(() => {
     if (!tree) return
+    if (appMode === 'edit' && currentEditorPageId) {
+      openNode(currentEditorPageId)
+      setActiveNodeId(currentEditorPageId)
+      return
+    }
+
     if (!currentPath) {
       setActiveNodeId(null)
       return
@@ -46,7 +60,14 @@ export default function TreeView() {
 
     const node = useTreeStore.getState().getPageByPath(currentPath)
     setActiveNodeId(node?.id ?? null)
-  }, [tree, currentPath, setActiveNodeId])
+  }, [
+    tree,
+    appMode,
+    currentEditorPageId,
+    currentPath,
+    openNode,
+    setActiveNodeId,
+  ])
 
   useEffect(() => {
     if (tree === null) {

@@ -1,6 +1,9 @@
 import { SearchResultItem } from '@/lib/api/search'
+import { buildViewUrl } from '@/lib/routePath'
+import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { forwardRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { usePageEditorStore } from '../editor/pageEditor'
 
 type SearchResultCardProps = {
   item: SearchResultItem
@@ -10,8 +13,16 @@ type SearchResultCardProps = {
 const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
   function SearchResultCard({ item, isSelected = false }, ref) {
     const location = useLocation()
-    const isRouteActive = location.pathname === `${item.path}`
-    const isActive = isRouteActive || isSelected
+    const currentEditorPageId = usePageEditorStore(
+      (state) => state.page?.id ?? state.initialPage?.id,
+    )
+    const currentViewPath = normalizeWikiRoutePath(
+      buildViewUrl(location.pathname),
+    )
+    const resultPath = normalizeWikiRoutePath(item.path)
+    const isRouteActive = currentViewPath === resultPath
+    const isEditorActive = currentEditorPageId === item.page_id
+    const isActive = isRouteActive || isEditorActive || isSelected
 
     return (
       <Link
