@@ -13,6 +13,15 @@ type SeedPage = {
   slug: string;
 };
 
+type CreatedPage = SeedPage & {
+  id: string;
+};
+
+type SeedResult = {
+  createdPages: CreatedPage[];
+  durationMs: number;
+};
+
 async function seedPages(page: import('@playwright/test').Page, pages: SeedPage[]) {
   const result = await page.evaluate(async (seedPagesInput) => {
     function getCsrfTokenFromCookie(): string | null {
@@ -35,6 +44,7 @@ async function seedPages(page: import('@playwright/test').Page, pages: SeedPage[
     }
 
     const startedAt = performance.now();
+    const createdPages: CreatedPage[] = [];
 
     for (const seedPage of seedPagesInput) {
       const response = await fetch('/api/pages', {
@@ -56,12 +66,62 @@ async function seedPages(page: import('@playwright/test').Page, pages: SeedPage[
         const bodyText = await response.text();
         throw new Error(`Failed to seed ${seedPage.slug}: ${response.status} ${bodyText}`);
       }
+
+      const createdPage = (await response.json()) as { id: string; title: string; slug: string };
+      createdPages.push({
+        id: createdPage.id,
+        title: seedPage.title,
+        slug: seedPage.slug,
+      });
     }
 
-    return performance.now() - startedAt;
+    return {
+      createdPages,
+      durationMs: performance.now() - startedAt,
+    };
   }, pages);
 
   return result;
+}
+
+async function cleanupPages(page: import('@playwright/test').Page, createdPages: CreatedPage[]) {
+  if (createdPages.length === 0) return;
+
+  await page.evaluate(async (pagesToDelete) => {
+    function getCsrfTokenFromCookie(): string | null {
+      const hostMatch =
+        document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+        document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
+
+      if (!hostMatch) return null;
+
+      try {
+        return decodeURIComponent(hostMatch[1]);
+      } catch {
+        return hostMatch[1];
+      }
+    }
+
+    const csrfToken = getCsrfTokenFromCookie();
+    if (!csrfToken) {
+      throw new Error('Missing CSRF token cookie for benchmark cleanup');
+    }
+
+    for (const createdPage of [...pagesToDelete].reverse()) {
+      const response = await fetch(`/api/pages/${createdPage.id}?recursive=false`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'X-CSRF-Token': csrfToken,
+        },
+      });
+
+      if (!response.ok) {
+        const bodyText = await response.text();
+        throw new Error(`Failed to delete ${createdPage.slug}: ${response.status} ${bodyText}`);
+      }
+    }
+  }, createdPages);
 }
 
 async function measureTreeNavigation(
@@ -125,67 +185,75 @@ test.describe('Performance', () => {
       };
     });
 
-    const seedDurationMs = await seedPages(page, benchmarkPages);
-    await page.reload();
+    let createdPages: CreatedPage[] = [];
 
-    const treeView = new TreeView(page);
-    await expect
-      .poll(async () => treeView.getNumberOfTreeNodes(), {
-        timeout: 60_000,
-        message: `Expected at least ${seedCount} benchmark nodes to be visible in the tree`,
-      })
-      .toBeGreaterThanOrEqual(seedCount);
+    try {
+      const seedResult: SeedResult = await seedPages(page, benchmarkPages);
+      createdPages = seedResult.createdPages;
+      await page.reload();
 
-    const samples = [
-      benchmarkPages[0],
-      benchmarkPages[Math.floor(benchmarkPages.length / 2)],
-      benchmarkPages[benchmarkPages.length - 1],
-    ];
+      const treeView = new TreeView(page);
+      await expect
+        .poll(async () => treeView.getNumberOfTreeNodes(), {
+          timeout: 60_000,
+          message: `Expected at least ${seedCount} benchmark nodes to be visible in the tree`,
+        })
+        .toBeGreaterThanOrEqual(seedCount);
 
-    const navigationDurationsMs: number[] = [];
-    const requestStartedDurationsMs: number[] = [];
-    const responseDurationsMs: number[] = [];
-    const requestDurationsMs: number[] = [];
-    const renderAfterResponseDurationsMs: number[] = [];
-    for (const sample of samples) {
-      const measurement = await measureTreeNavigation(page, sample.title, sample.slug);
-      navigationDurationsMs.push(measurement.totalMs);
-      requestStartedDurationsMs.push(measurement.requestStartedMs);
-      responseDurationsMs.push(measurement.responseMs);
-      requestDurationsMs.push(measurement.requestDurationMs);
-      renderAfterResponseDurationsMs.push(measurement.renderAfterResponseMs);
+      const samples = [
+        benchmarkPages[0],
+        benchmarkPages[Math.floor(benchmarkPages.length / 2)],
+        benchmarkPages[benchmarkPages.length - 1],
+      ];
+
+      const navigationDurationsMs: number[] = [];
+      const requestStartedDurationsMs: number[] = [];
+      const responseDurationsMs: number[] = [];
+      const requestDurationsMs: number[] = [];
+      const renderAfterResponseDurationsMs: number[] = [];
+      for (const sample of samples) {
+        const measurement = await measureTreeNavigation(page, sample.title, sample.slug);
+        navigationDurationsMs.push(measurement.totalMs);
+        requestStartedDurationsMs.push(measurement.requestStartedMs);
+        responseDurationsMs.push(measurement.responseMs);
+        requestDurationsMs.push(measurement.requestDurationMs);
+        renderAfterResponseDurationsMs.push(measurement.renderAfterResponseMs);
+      }
+
+      const averageDurationMs =
+        navigationDurationsMs.reduce((sum, duration) => sum + duration, 0) /
+        navigationDurationsMs.length;
+      const averageRequestStartedMs =
+        requestStartedDurationsMs.reduce((sum, duration) => sum + duration, 0) /
+        requestStartedDurationsMs.length;
+      const averageResponseMs =
+        responseDurationsMs.reduce((sum, duration) => sum + duration, 0) /
+        responseDurationsMs.length;
+      const averageRequestDurationMs =
+        requestDurationsMs.reduce((sum, duration) => sum + duration, 0) / requestDurationsMs.length;
+      const averageRenderAfterResponseMs =
+        renderAfterResponseDurationsMs.reduce((sum, duration) => sum + duration, 0) /
+        renderAfterResponseDurationsMs.length;
+
+      console.log(
+        JSON.stringify({
+          benchmark: 'tree-navigation-benchmark-500-pages',
+          seedCount,
+          seedDurationMs: Math.round(seedResult.durationMs),
+          navigationDurationsMs,
+          requestStartedDurationsMs,
+          responseDurationsMs,
+          requestDurationsMs,
+          renderAfterResponseDurationsMs,
+          averageDurationMs: Math.round(averageDurationMs),
+          averageRequestStartedMs: Math.round(averageRequestStartedMs),
+          averageResponseMs: Math.round(averageResponseMs),
+          averageRequestDurationMs: Math.round(averageRequestDurationMs),
+          averageRenderAfterResponseMs: Math.round(averageRenderAfterResponseMs),
+        }),
+      );
+    } finally {
+      await cleanupPages(page, createdPages);
     }
-
-    const averageDurationMs =
-      navigationDurationsMs.reduce((sum, duration) => sum + duration, 0) /
-      navigationDurationsMs.length;
-    const averageRequestStartedMs =
-      requestStartedDurationsMs.reduce((sum, duration) => sum + duration, 0) /
-      requestStartedDurationsMs.length;
-    const averageResponseMs =
-      responseDurationsMs.reduce((sum, duration) => sum + duration, 0) / responseDurationsMs.length;
-    const averageRequestDurationMs =
-      requestDurationsMs.reduce((sum, duration) => sum + duration, 0) / requestDurationsMs.length;
-    const averageRenderAfterResponseMs =
-      renderAfterResponseDurationsMs.reduce((sum, duration) => sum + duration, 0) /
-      renderAfterResponseDurationsMs.length;
-
-    console.log(
-      JSON.stringify({
-        benchmark: 'tree-navigation-benchmark-500-pages',
-        seedCount,
-        seedDurationMs: Math.round(seedDurationMs),
-        navigationDurationsMs,
-        requestStartedDurationsMs,
-        responseDurationsMs,
-        requestDurationsMs,
-        renderAfterResponseDurationsMs,
-        averageDurationMs: Math.round(averageDurationMs),
-        averageRequestStartedMs: Math.round(averageRequestStartedMs),
-        averageResponseMs: Math.round(averageResponseMs),
-        averageRequestDurationMs: Math.round(averageRequestDurationMs),
-        averageRenderAfterResponseMs: Math.round(averageRenderAfterResponseMs),
-      }),
-    );
   });
 });

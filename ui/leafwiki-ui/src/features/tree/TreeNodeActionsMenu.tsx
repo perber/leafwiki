@@ -183,7 +183,7 @@ export default function TreeNodeActionsMenu({
             openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
               pageId: node?.id,
               redirectTo: getDeleteRedirectRoutePath(
-                currentRoutePath,
+                currentRouterPath,
                 node.path,
               ),
             })
