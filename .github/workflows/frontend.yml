@@ -31,7 +31,7 @@ jobs:
         run: npm run lint -- --max-warnings=0
 
       - name: Run Prettier check
-        run: npx prettier --check src/**
+        run: npm run format:check
 
       - name: Scan dependencies with Trivy
         uses: aquasecurity/trivy-action@0.35.0
