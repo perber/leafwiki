@@ -9,9 +9,12 @@ import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
+import { toAppPath } from '../pages/appPath';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
 const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
+const e2eBaseUrl = process.env.E2E_BASE_URL || 'http://localhost:8080';
+const configuredBasePath = new URL(e2eBaseUrl).pathname.replace(/\/$/, '');
 
 const currentDir = __dirname;
 
@@ -172,6 +175,25 @@ async function expectMarkdownLinkAutocompleteWorks(page: import('@playwright/tes
   await welcomeLink.getByText('Welcome').waitFor({ state: 'visible' });
 }
 
+async function expectOpenedPageMarkedInNavigationDuringEditMode(
+  page: import('@playwright/test').Page,
+) {
+  const title = 'Welcome to LeafWiki';
+  const viewPage = new ViewPage(page);
+  await viewPage.goto('/welcome-to-leafwiki');
+
+  const treeView = new TreeView(page);
+  await treeView.expectPageHighlighted(title);
+
+  await viewPage.clickEditPageButton();
+
+  await treeView.expectPageHighlighted(title);
+
+  const editPage = new EditPage(page);
+  await editPage.closeEditor();
+  await page.locator('article').waitFor({ state: 'visible' });
+}
+
 test.describe('Authenticated', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
@@ -294,6 +316,22 @@ for the page edited at ${new Date().toISOString()}
     test.expect(content).toContain('Bold Text');
   });
 
+  test('opened page stays marked in navigation during edit mode without base path', async ({
+    page,
+  }) => {
+    test.skip(configuredBasePath !== '', `Expected no base path, got "${configuredBasePath}"`);
+
+    await expectOpenedPageMarkedInNavigationDuringEditMode(page);
+  });
+
+  test('opened page stays marked in navigation during edit mode with base path', async ({
+    page,
+  }) => {
+    test.skip(configuredBasePath === '', 'Expected a configured base path for this test run');
+
+    await expectOpenedPageMarkedInNavigationDuringEditMode(page);
+  });
+
   test('layout-independent shortcuts work with latin keys', async ({ page }) => {
     await expectEditAndSaveShortcutWorks(page, {
       editKey: 'e',
@@ -365,7 +403,7 @@ for the page edited at ${new Date().toISOString()}
     let navError: unknown = null;
 
     try {
-      await page.goto('/');
+      await page.goto(toAppPath('/'));
     } catch (e) {
       navError = e;
     }

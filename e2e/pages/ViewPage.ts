@@ -1,10 +1,11 @@
 import { Page } from '@playwright/test';
+import { toAppPath } from './appPath';
 
 export default class ViewPage {
   constructor(private page: Page) {}
 
   async goto(pagePath: string = '/') {
-    await this.page.goto(`${pagePath}`);
+    await this.page.goto(toAppPath(pagePath));
     await this.page.locator('article').waitFor({ state: 'visible' });
   }
 

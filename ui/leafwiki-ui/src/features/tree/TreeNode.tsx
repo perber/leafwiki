@@ -1,14 +1,17 @@
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
+import { buildViewUrl } from '@/lib/routePath'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { ChevronUp, FilePlus } from 'lucide-react'
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import { usePageEditorStore } from '../editor/pageEditor'
 import { useTreeNodeActionsMenusStore } from './treeNodeActionsMenus'
 import TreeNodeActionsMenu from './TreeNodeActionsMenu'
 
@@ -18,16 +21,25 @@ type Props = {
 
 export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   const open = useTreeStore((s) => !!s.openNodeIdSet?.[node.id])
-  const isActive = useTreeStore((s) => s.activeNodeId === node.id)
+  const isStoreActive = useTreeStore((s) => s.activeNodeId === node.id)
   const toggleNode = useTreeStore((s) => s.toggleNode)
   const hasChildren = node.children && node.children.length > 0
   const openDialog = useDialogsStore((state) => state.openDialog)
   const isMobile = useIsMobile()
   const readOnlyMode = useIsReadOnly()
+  const { pathname } = useLocation()
   const [hovered, setHovered] = useState(false)
   const isActionsMenuOpen = useTreeNodeActionsMenusStore(
     (s) => s.openMenuNodeId === node.id,
   )
+  const currentEditorPageId = usePageEditorStore(
+    (state) => state.page?.id ?? state.initialPage?.id,
+  )
+  const currentViewPath = normalizeWikiRoutePath(buildViewUrl(pathname))
+  const nodePath = normalizeWikiRoutePath(node.path)
+  const isRouteActive = currentViewPath === nodePath
+  const isEditorActive = currentEditorPageId === node.id
+  const isActive = isStoreActive || isRouteActive || isEditorActive
 
   const indent = 4
   const markerOffset = 8 // Distance from left for the vertical line
@@ -38,6 +50,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
         to={`/${node.path}`}
         className="tree-node__link"
         data-testid={`tree-node-link-${node.id}`}
+        aria-current={isActive ? 'page' : undefined}
       >
         <span
           className={clsx('tree-node__title', {
