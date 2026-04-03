@@ -409,6 +409,116 @@ graph TD;
     test.expect(svgCount).toBeGreaterThan(0);
   });
 
+  test('light-mode preview uses light syntax highlighting and mermaid theme', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('design-mode', 'light');
+    });
+
+    const title = `Light Mode Preview ${Date.now()}`;
+    const content = `Inline \`const foo = 1\`
+
+\`\`\`ts
+const greeting = 'hello';
+function sum(a: number, b: number) {
+  return a + b;
+}
+\`\`\`
+
+\`\`\`mermaid
+graph TD;
+    Light-->Preview;
+\`\`\``;
+
+    const viewPage = await createPageAndOpenViewer(page, title);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent(content);
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    const inlineCode = page.locator('article code.inline-code').first();
+    await inlineCode.waitFor({ state: 'visible' });
+
+    const codeBlock = page.locator('article pre code.hljs').first();
+    await codeBlock.waitFor({ state: 'visible' });
+
+    const codeBlockContainer = page.locator('article pre').first();
+    await codeBlockContainer.waitFor({ state: 'visible' });
+
+    const mermaidContainer = page.locator('article pre').nth(1);
+    await mermaidContainer.waitFor({ state: 'visible' });
+
+    const mermaidSvg = page.locator('article .my-4 svg').first();
+    await mermaidSvg.waitFor({ state: 'visible' });
+
+    const inlineStyles = await inlineCode.evaluate((element) => {
+      const styles = window.getComputedStyle(element);
+      return {
+        backgroundColor: styles.backgroundColor,
+        color: styles.color,
+      };
+    });
+
+    test.expect(inlineStyles.backgroundColor).toBe('rgb(241, 245, 249)');
+    test.expect(inlineStyles.color).toBe('rgb(15, 23, 41)');
+
+    const codeBlockContainerStyles = await codeBlockContainer.evaluate((element) => {
+      const styles = window.getComputedStyle(element);
+      return {
+        backgroundColor: styles.backgroundColor,
+        color: styles.color,
+      };
+    });
+
+    test.expect(codeBlockContainerStyles.backgroundColor).toBe('rgb(248, 250, 252)');
+    test.expect(codeBlockContainerStyles.color).toBe('rgb(36, 41, 46)');
+
+    const codeBlockStyles = await codeBlock.evaluate((element) => {
+      const styles = window.getComputedStyle(element);
+      const keyword = element.querySelector('.hljs-keyword');
+      const keywordStyles = keyword ? window.getComputedStyle(keyword) : null;
+
+      return {
+        backgroundColor: styles.backgroundColor,
+        color: styles.color,
+        keywordColor: keywordStyles?.color ?? null,
+      };
+    });
+
+    test.expect(codeBlockStyles.backgroundColor).toBe('rgb(248, 250, 252)');
+    test.expect(codeBlockStyles.color).toBe('rgb(36, 41, 46)');
+    test.expect(codeBlockStyles.keywordColor).toBe('rgb(215, 58, 73)');
+
+    const mermaidContainerStyles = await mermaidContainer.evaluate((element) => {
+      const styles = window.getComputedStyle(element);
+      return {
+        backgroundColor: styles.backgroundColor,
+        color: styles.color,
+      };
+    });
+
+    test.expect(mermaidContainerStyles.backgroundColor).toBe('rgb(248, 250, 252)');
+    test.expect(mermaidContainerStyles.color).toBe('rgb(36, 41, 46)');
+
+    const mermaidStyles = await mermaidSvg.evaluate((element) => {
+      const styles = window.getComputedStyle(element);
+      const firstNode = element.querySelector(
+        '.node rect, .node polygon, .node circle, .node ellipse',
+      ) as SVGGraphicsElement | null;
+      const nodeStyles = firstNode ? window.getComputedStyle(firstNode) : null;
+
+      return {
+        backgroundColor: styles.backgroundColor,
+        fill: nodeStyles?.fill ?? null,
+        stroke: nodeStyles?.stroke ?? null,
+      };
+    });
+
+    test.expect(mermaidStyles.fill).not.toBe('rgb(30, 30, 30)');
+    test.expect(mermaidStyles.stroke).not.toBe('rgb(231, 231, 231)');
+  });
+
   test('create-page-on-not-found-page', async ({ page }) => {
     const slug = `page-from-not-found-${Date.now()}`;
     const pagePath = `/${slug}`;
