@@ -9,12 +9,10 @@ import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
-import { toAppPath } from '../pages/appPath';
+import { e2eBasePath, toAppPath } from '../pages/appPath';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
 const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
-const e2eBaseUrl = process.env.E2E_BASE_URL || 'http://localhost:8080';
-const configuredBasePath = new URL(e2eBaseUrl).pathname.replace(/\/$/, '');
 
 const currentDir = __dirname;
 
@@ -171,7 +169,7 @@ async function expectMarkdownLinkAutocompleteWorks(page: import('@playwright/tes
   await editPage.savePage();
   await editPage.closeEditor();
 
-  const welcomeLink = page.locator('article a[href="/welcome-to-leafwiki"]');
+  const welcomeLink = page.locator(`article a[href="${toAppPath('/welcome-to-leafwiki')}"]`);
   await welcomeLink.getByText('Welcome').waitFor({ state: 'visible' });
 }
 
@@ -319,7 +317,7 @@ for the page edited at ${new Date().toISOString()}
   test('opened page stays marked in navigation during edit mode without base path', async ({
     page,
   }) => {
-    test.skip(configuredBasePath !== '', `Expected no base path, got "${configuredBasePath}"`);
+    test.skip(e2eBasePath !== '', `Expected no base path, got "${e2eBasePath}"`);
 
     await expectOpenedPageMarkedInNavigationDuringEditMode(page);
   });
@@ -327,7 +325,7 @@ for the page edited at ${new Date().toISOString()}
   test('opened page stays marked in navigation during edit mode with base path', async ({
     page,
   }) => {
-    test.skip(configuredBasePath === '', 'Expected a configured base path for this test run');
+    test.skip(e2eBasePath === '', 'Expected a configured base path for this test run');
 
     await expectOpenedPageMarkedInNavigationDuringEditMode(page);
   });
