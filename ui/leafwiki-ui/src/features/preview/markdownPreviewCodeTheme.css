@@ -110,6 +110,11 @@
   padding: 1em;
 }
 
+.page-viewer__content .markdown-code-block pre code.hljs,
+.markdown-editor__preview .markdown-code-block pre code.hljs {
+  padding-right: 3.5rem;
+}
+
 .page-viewer__content pre,
 .markdown-editor__preview pre {
   background: var(--hljs-background) !important;
