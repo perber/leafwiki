@@ -1,5 +1,12 @@
-import 'highlight.js/styles/github-dark.css'
-import { ClassAttributes, HTMLAttributes, useCallback, useMemo } from 'react'
+import './markdownPreviewCodeTheme.css'
+import { useDesignModeStore } from '@/features/designtoggle/designmode'
+import {
+  ClassAttributes,
+  HTMLAttributes,
+  useCallback,
+  useMemo,
+  useSyncExternalStore,
+} from 'react'
 import ReactMarkdown from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
@@ -27,6 +34,29 @@ type Props = {
 }
 
 export default function MarkdownPreview({ content, path }: Props) {
+  const designMode = useDesignModeStore((state) => state.mode)
+  const prefersLight = useSyncExternalStore(
+    (onStoreChange) => {
+      if (typeof window === 'undefined' || designMode !== 'system') {
+        return () => {}
+      }
+
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: light)')
+      mediaQuery.addEventListener('change', onStoreChange)
+      return () => {
+        mediaQuery.removeEventListener('change', onStoreChange)
+      }
+    },
+    () => {
+      if (typeof window === 'undefined') return true
+      return window.matchMedia('(prefers-color-scheme: light)').matches
+    },
+    () => true,
+  )
+
+  const resolvedMode =
+    designMode === 'system' ? (prefersLight ? 'light' : 'dark') : designMode
+
   const markdownLink = useCallback(
     (
       props: ClassAttributes<HTMLAnchorElement> &
@@ -109,7 +139,13 @@ export default function MarkdownPreview({ content, path }: Props) {
         const { className, children, 'data-line': dataLine } = props
         if (className?.includes('language-mermaid')) {
           const code = String(children ?? '').trim()
-          return <MermaidBlock code={code} dataLine={dataLine} />
+          return (
+            <MermaidBlock
+              code={code}
+              dataLine={dataLine}
+              theme={resolvedMode === 'dark' ? 'dark' : 'default'}
+            />
+          )
         }
 
         if (className?.includes('language-')) {
@@ -133,7 +169,7 @@ export default function MarkdownPreview({ content, path }: Props) {
         )
       },
     }),
-    [markdownLink],
+    [markdownLink, resolvedMode],
   )
 
   return (

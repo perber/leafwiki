@@ -1,10 +1,30 @@
 import mermaid, { RenderResult } from 'mermaid'
 import { useEffect, useRef } from 'react'
 
+let initializedTheme: 'default' | 'dark' | null = null
+
+function ensureMermaidInitialized(theme: 'default' | 'dark') {
+  if (initializedTheme === theme) return
+
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'strict',
+    theme,
+    deterministicIds: true,
+    deterministicIDSeed: 'leafwiki',
+  })
+  mermaid.setParseErrorHandler((err) => {
+    console.warn('Mermaid parse error:', err)
+  })
+
+  initializedTheme = theme
+}
+
 export type MermaidInjectorOps = {
   containerRef: React.RefObject<HTMLDivElement | null>
   code: string
   dataLine: string
+  theme: 'default' | 'dark'
 }
 
 function djb2(str: string) {
@@ -32,27 +52,20 @@ export function useMermaidInjector({
   containerRef,
   code,
   dataLine,
+  theme,
 }: MermaidInjectorOps) {
   const lastHashRef = useRef<string | null>(null)
   const lastDataLineRef = useRef<string | null>(null)
-  const mermaidInitializedRef = useRef(false)
+  const lastThemeRef = useRef<'default' | 'dark' | null>(null)
 
-  // Initialize mermaid only once in useEffect to avoid issues with React Strict Mode
   useEffect(() => {
-    if (!mermaidInitializedRef.current) {
-      mermaid.initialize({
-        startOnLoad: false,
-        securityLevel: 'strict',
-        theme: 'dark',
-        deterministicIds: true,
-        deterministicIDSeed: 'leafwiki',
-      })
-      mermaid.setParseErrorHandler((err) => {
-        console.warn('Mermaid parse error:', err)
-      })
-      mermaidInitializedRef.current = true
+    ensureMermaidInitialized(theme)
+
+    if (lastThemeRef.current !== theme) {
+      lastHashRef.current = null
+      lastThemeRef.current = theme
     }
-  }, [])
+  }, [theme])
 
   useEffect(() => {
     if (!containerRef) return
@@ -130,5 +143,5 @@ export function useMermaidInjector({
       cancelled = true
       if (raf1) cancelAnimationFrame(raf1)
     }
-  }, [containerRef, code, dataLine])
+  }, [containerRef, code, dataLine, theme])
 }

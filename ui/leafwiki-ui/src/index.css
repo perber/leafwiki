@@ -1445,26 +1445,6 @@
     font-family: 'Courier New', Courier, monospace !important;
   }
 
-  /* Inline code */
-  .inline-code {
-    @apply bg-border rounded p-1 px-2 text-xs;
-    color: oklch(92.8% 0.006 264.531) !important;
-    font-weight: 500 !important;
-  }
-
-  .inline-code::after,
-  .inline-code::before {
-    content: '';
-  }
-
-  code,
-  pre {
-    background: #1f2937 !important;
-  }
-
-  code.hljs {
-    @apply pl-0!;
-  }
 }
 
 /* -------------------------------------------------------

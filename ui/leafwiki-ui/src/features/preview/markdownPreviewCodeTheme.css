@@ -1,0 +1,223 @@
+/* Scoped markdown code styling for viewer + editor preview.
+   We intentionally keep this local to markdown preview surfaces so global prose
+   and generic pre/code styling do not interfere with syntax highlighting. */
+
+.page-viewer__content .inline-code,
+.markdown-editor__preview .inline-code {
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.page-viewer__content .inline-code::after,
+.page-viewer__content .inline-code::before,
+.markdown-editor__preview .inline-code::after,
+.markdown-editor__preview .inline-code::before {
+  content: '';
+}
+
+:root:not(.dark) .page-viewer__content .inline-code,
+:root:not(.dark) .markdown-editor__preview .inline-code {
+  background: hsl(var(--surface-alt)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+:root:not(.dark) .page-viewer__content,
+:root:not(.dark) .markdown-editor__preview {
+  --hljs-foreground: #24292e;
+  --hljs-background: #f8fafc;
+  --hljs-keyword: #d73a49;
+  --hljs-title: #6f42c1;
+  --hljs-constant: #005cc5;
+  --hljs-string: #032f62;
+  --hljs-symbol: #e36209;
+  --hljs-comment: #6a737d;
+  --hljs-name: #22863a;
+  --hljs-subst: #24292e;
+  --hljs-section: #005cc5;
+  --hljs-bullet: #735c0f;
+  --hljs-addition: #22863a;
+  --hljs-addition-bg: #f0fff4;
+  --hljs-deletion: #b31d28;
+  --hljs-deletion-bg: #ffeef0;
+}
+
+.dark .page-viewer__content .inline-code,
+.dark .markdown-editor__preview .inline-code {
+  background: hsl(var(--surface-border)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark .page-viewer__content,
+.dark .markdown-editor__preview {
+  --hljs-foreground: #c9d1d9;
+  --hljs-background: #111827;
+  --hljs-keyword: #ff7b72;
+  --hljs-title: #d2a8ff;
+  --hljs-constant: #79c0ff;
+  --hljs-string: #a5d6ff;
+  --hljs-symbol: #ffa657;
+  --hljs-comment: #8b949e;
+  --hljs-name: #7ee787;
+  --hljs-subst: #c9d1d9;
+  --hljs-section: #1f6feb;
+  --hljs-bullet: #f2cc60;
+  --hljs-addition: #aff5b4;
+  --hljs-addition-bg: #033a16;
+  --hljs-deletion: #ffdcd7;
+  --hljs-deletion-bg: #67060c;
+}
+
+.page-viewer__content code.hljs,
+.markdown-editor__preview code.hljs {
+  padding-left: 0 !important;
+  padding-right: 0;
+}
+
+.page-viewer__content pre code.hljs,
+.markdown-editor__preview pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+}
+
+.page-viewer__content pre,
+.markdown-editor__preview pre {
+  background: var(--hljs-background) !important;
+  color: var(--hljs-foreground) !important;
+  border: 1px solid color-mix(in oklab, var(--hljs-foreground) 10%, transparent);
+}
+
+.page-viewer__content .hljs,
+.markdown-editor__preview .hljs {
+  color: var(--hljs-foreground);
+  background: var(--hljs-background);
+}
+
+.page-viewer__content .hljs-doctag,
+.page-viewer__content .hljs-keyword,
+.page-viewer__content .hljs-meta .hljs-keyword,
+.page-viewer__content .hljs-template-tag,
+.page-viewer__content .hljs-template-variable,
+.page-viewer__content .hljs-type,
+.page-viewer__content .hljs-variable.language_,
+.markdown-editor__preview .hljs-doctag,
+.markdown-editor__preview .hljs-keyword,
+.markdown-editor__preview .hljs-meta .hljs-keyword,
+.markdown-editor__preview .hljs-template-tag,
+.markdown-editor__preview .hljs-template-variable,
+.markdown-editor__preview .hljs-type,
+.markdown-editor__preview .hljs-variable.language_ {
+  color: var(--hljs-keyword);
+}
+
+.page-viewer__content .hljs-title,
+.page-viewer__content .hljs-title.class_,
+.page-viewer__content .hljs-title.class_.inherited__,
+.page-viewer__content .hljs-title.function_,
+.markdown-editor__preview .hljs-title,
+.markdown-editor__preview .hljs-title.class_,
+.markdown-editor__preview .hljs-title.class_.inherited__,
+.markdown-editor__preview .hljs-title.function_ {
+  color: var(--hljs-title);
+}
+
+.page-viewer__content .hljs-attr,
+.page-viewer__content .hljs-attribute,
+.page-viewer__content .hljs-literal,
+.page-viewer__content .hljs-meta,
+.page-viewer__content .hljs-number,
+.page-viewer__content .hljs-operator,
+.page-viewer__content .hljs-variable,
+.page-viewer__content .hljs-selector-attr,
+.page-viewer__content .hljs-selector-class,
+.page-viewer__content .hljs-selector-id,
+.markdown-editor__preview .hljs-attr,
+.markdown-editor__preview .hljs-attribute,
+.markdown-editor__preview .hljs-literal,
+.markdown-editor__preview .hljs-meta,
+.markdown-editor__preview .hljs-number,
+.markdown-editor__preview .hljs-operator,
+.markdown-editor__preview .hljs-variable,
+.markdown-editor__preview .hljs-selector-attr,
+.markdown-editor__preview .hljs-selector-class,
+.markdown-editor__preview .hljs-selector-id {
+  color: var(--hljs-constant);
+}
+
+.page-viewer__content .hljs-regexp,
+.page-viewer__content .hljs-string,
+.page-viewer__content .hljs-meta .hljs-string,
+.markdown-editor__preview .hljs-regexp,
+.markdown-editor__preview .hljs-string,
+.markdown-editor__preview .hljs-meta .hljs-string {
+  color: var(--hljs-string);
+}
+
+.page-viewer__content .hljs-built_in,
+.page-viewer__content .hljs-symbol,
+.markdown-editor__preview .hljs-built_in,
+.markdown-editor__preview .hljs-symbol {
+  color: var(--hljs-symbol);
+}
+
+.page-viewer__content .hljs-comment,
+.page-viewer__content .hljs-code,
+.page-viewer__content .hljs-formula,
+.markdown-editor__preview .hljs-comment,
+.markdown-editor__preview .hljs-code,
+.markdown-editor__preview .hljs-formula {
+  color: var(--hljs-comment);
+}
+
+.page-viewer__content .hljs-name,
+.page-viewer__content .hljs-quote,
+.page-viewer__content .hljs-selector-tag,
+.page-viewer__content .hljs-selector-pseudo,
+.markdown-editor__preview .hljs-name,
+.markdown-editor__preview .hljs-quote,
+.markdown-editor__preview .hljs-selector-tag,
+.markdown-editor__preview .hljs-selector-pseudo {
+  color: var(--hljs-name);
+}
+
+.page-viewer__content .hljs-subst,
+.markdown-editor__preview .hljs-subst {
+  color: var(--hljs-subst);
+}
+
+.page-viewer__content .hljs-section,
+.markdown-editor__preview .hljs-section {
+  color: var(--hljs-section);
+  font-weight: bold;
+}
+
+.page-viewer__content .hljs-bullet,
+.markdown-editor__preview .hljs-bullet {
+  color: var(--hljs-bullet);
+}
+
+.page-viewer__content .hljs-emphasis,
+.markdown-editor__preview .hljs-emphasis {
+  color: var(--hljs-foreground);
+  font-style: italic;
+}
+
+.page-viewer__content .hljs-strong,
+.markdown-editor__preview .hljs-strong {
+  color: var(--hljs-foreground);
+  font-weight: bold;
+}
+
+.page-viewer__content .hljs-addition,
+.markdown-editor__preview .hljs-addition {
+  color: var(--hljs-addition);
+  background-color: var(--hljs-addition-bg);
+}
+
+.page-viewer__content .hljs-deletion,
+.markdown-editor__preview .hljs-deletion {
+  color: var(--hljs-deletion);
+  background-color: var(--hljs-deletion-bg);
+}
