@@ -1,44 +1,33 @@
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
-import { buildEditUrl, buildViewUrl } from '@/lib/routePath'
-import { useAppMode } from '@/lib/useAppMode'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { ChevronUp, FilePlus } from 'lucide-react'
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTreeNodeActionsMenusStore } from './treeNodeActionsMenus'
 import TreeNodeActionsMenu from './TreeNodeActionsMenu'
 
 type Props = {
   node: PageNode
-  level?: number
-  pathname?: string
 }
 
-export const TreeNode = React.memo(function TreeNode({
-  node,
-  level = 0,
-  pathname = '',
-}: Props) {
+export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   const open = useTreeStore((s) => !!s.openNodeIdSet?.[node.id])
+  const isActive = useTreeStore((s) => s.activeNodeId === node.id)
   const toggleNode = useTreeStore((s) => s.toggleNode)
-  const appMode = useAppMode()
   const hasChildren = node.children && node.children.length > 0
-
-  const currentPath =
-    appMode === 'edit'
-      ? buildEditUrl(node.path)
-      : buildViewUrl(node.path.startsWith('/') ? node.path : `/${node.path}`)
-
-  const isActive = currentPath === pathname
   const openDialog = useDialogsStore((state) => state.openDialog)
-
   const isMobile = useIsMobile()
   const readOnlyMode = useIsReadOnly()
+  const [hovered, setHovered] = useState(false)
+  const isActionsMenuOpen = useTreeNodeActionsMenusStore(
+    (s) => s.openMenuNodeId === node.id,
+  )
 
   const indent = 4
   const markerOffset = 8 // Distance from left for the vertical line
@@ -72,6 +61,8 @@ export const TreeNode = React.memo(function TreeNode({
         })}
         data-testid={`tree-node-${node.id}`}
         style={{ paddingLeft: indent }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         <div
           className={clsx('tree-node__marker', {
@@ -101,7 +92,7 @@ export const TreeNode = React.memo(function TreeNode({
             )
           }
           {linkText}
-          {!readOnlyMode && (
+          {!readOnlyMode && (isMobile || hovered || isActionsMenuOpen) && (
             <div className={clsx('tree-node__actions', treeActionButtonStyle)}>
               <TreeViewActionButton
                 actionName="add"
@@ -124,12 +115,7 @@ export const TreeNode = React.memo(function TreeNode({
       >
         {hasChildren &&
           node.children?.map((child) => (
-            <TreeNode
-              key={child.id}
-              node={child}
-              level={level + 1}
-              pathname={pathname}
-            />
+            <TreeNode key={child.id} node={child} />
           ))}
       </div>
     </>

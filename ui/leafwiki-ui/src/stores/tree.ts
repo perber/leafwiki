@@ -50,12 +50,14 @@ type TreeStore = {
   tree: PageNode | null
   loading: boolean
   error: string | null
+  activeNodeId: string | null
   expandAll: () => void
   collapseAll: () => void
   reloadTree: () => Promise<void>
   toggleNode: (id: string) => void
   openNode: (id: string) => void
   closeNode: (id: string) => void
+  setActiveNodeId: (id: string | null) => void
   isNodeOpen: (id: string) => boolean
   getPageById: (id: string) => PageNode | null
   getPageByPath: (path: string) => PageNode | null
@@ -74,6 +76,7 @@ export const useTreeStore = create<TreeStore>()(
       tree: null,
       loading: false,
       error: null,
+      activeNodeId: null,
       openNodeIds: [],
       openNodeIdSet: {},
       byPath: {},
@@ -99,6 +102,9 @@ export const useTreeStore = create<TreeStore>()(
       },
 
       openNode: (id: string) => {
+        if (get().openNodeIdSet?.[id]) {
+          return
+        }
         const current = new Set(get().openNodeIds)
         current.add(id)
         const ids = Array.from(current)
@@ -106,10 +112,20 @@ export const useTreeStore = create<TreeStore>()(
       },
 
       closeNode: (id: string) => {
+        if (!get().openNodeIdSet?.[id]) {
+          return
+        }
         const current = new Set(get().openNodeIds)
         current.delete(id)
         const ids = Array.from(current)
         set({ openNodeIds: ids, openNodeIdSet: toSetRecord(ids) })
+      },
+
+      setActiveNodeId: (id: string | null) => {
+        if (get().activeNodeId === id) {
+          return
+        }
+        set({ activeNodeId: id })
       },
 
       isNodeOpen: (id: string) => !!get().openNodeIdSet?.[id],
@@ -137,7 +153,17 @@ export const useTreeStore = create<TreeStore>()(
         if (ancestors.length === 0) return
 
         const merged = new Set(get().openNodeIds)
+        let changed = false
         for (const id of ancestors) merged.add(id)
+        for (const id of ancestors) {
+          if (!get().openNodeIdSet?.[id]) {
+            changed = true
+          }
+        }
+
+        if (!changed) {
+          return
+        }
 
         const ids = Array.from(merged)
         set({ openNodeIds: ids, openNodeIdSet: toSetRecord(ids) })

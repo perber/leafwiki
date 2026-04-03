@@ -18,7 +18,6 @@ import {
   DIALOG_MOVE_PAGE,
   DIALOG_SORT_PAGES,
 } from '@/lib/registries'
-import { useAppMode } from '@/lib/useAppMode'
 import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
@@ -34,7 +33,7 @@ import {
   Trash,
 } from 'lucide-react'
 import { useCallback } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { usePageEditorStore } from '../editor/pageEditor'
 import { TreeViewActionButton } from './TreeViewActionButton'
@@ -48,13 +47,11 @@ export default function TreeNodeActionsMenu({
   node,
 }: TreeNodeActionsMenuProps) {
   const { id: nodeId, kind: nodeKind, children } = node
-  const appMode = useAppMode()
   const currentEditorPageId = usePageEditorStore((state) => state.page?.id)
   const openDialog = useDialogsStore((state) => state.openDialog)
   const reloadTree = useTreeStore((state) => state.reloadTree)
   const hasChildren = children && children.length > 0
   const navigate = useNavigate()
-  const location = useLocation()
   const setOpenMenuNodeId = useTreeNodeActionsMenusStore(
     (s) => s.setOpenMenuNodeId,
   )
@@ -74,12 +71,12 @@ export default function TreeNodeActionsMenu({
       })
   }, [nodeId, nodeKind, reloadTree])
 
-  const redirectUrlAfterDelete = useCallback(() => {
-    return getDeleteRedirectRoutePath(location.pathname, node.path)
-  }, [location.pathname, node.path])
-
-  const isCurrentlyEditedNode =
-    appMode === 'edit' && currentEditorPageId === node.id
+  const getCurrentRoutePath = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return '/'
+    }
+    return window.location.pathname
+  }, [])
 
   return (
     <DropdownMenu
@@ -168,6 +165,11 @@ export default function TreeNodeActionsMenu({
           className="text-error cursor-pointer"
           data-testid="tree-view-action-button-delete"
           onClick={() => {
+            const currentRoutePath = getCurrentRoutePath()
+            const isCurrentlyEditedNode =
+              currentRoutePath.startsWith('/e/') &&
+              currentEditorPageId === node.id
+
             if (isCurrentlyEditedNode) {
               toast.warning(
                 `This ${nodeKind === NODE_KIND_PAGE ? 'page' : 'section'} is currently being edited. Please close the editor before deleting it.`,
@@ -177,7 +179,10 @@ export default function TreeNodeActionsMenu({
 
             openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
               pageId: node?.id,
-              redirectTo: redirectUrlAfterDelete(),
+              redirectTo: getDeleteRedirectRoutePath(
+                currentRoutePath,
+                node.path,
+              ),
             })
           }}
         >
