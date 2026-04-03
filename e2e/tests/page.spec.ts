@@ -260,6 +260,24 @@ test.describe('Authenticated', () => {
     await treeView.sortPagesOfParent(parentTitle, desiredOrder);
   });
 
+  test('copy-markdown-code-block', async ({ page }) => {
+    const title = `Copy Code Block ${Date.now()}`;
+    const viewPage = await createPageAndOpenViewer(page, title);
+
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent('```ts\nconst answer = 42;\nconsole.log(answer);\n```');
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    const copyButton = page.locator('button[data-testid="markdown-code-copy-button"]').first();
+    await copyButton.waitFor({ state: 'visible' });
+    await copyButton.click();
+
+    await page.getByText('Code copied').waitFor({ state: 'visible' });
+  });
+
   test('view-page', async ({ page }) => {
     const title = `Page To View ${Date.now()}`;
 

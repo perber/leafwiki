@@ -36,6 +36,7 @@
     "@types/codemirror": "^5.60.15",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "copy-to-clipboard": "^3.3.3",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.37.0",
     "lucide-react": "^1.7.0",
