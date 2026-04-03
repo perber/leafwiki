@@ -60,10 +60,6 @@ export default function MarkdownCodeBlock(
   const className = child.props.className ?? ''
   const code = readTextContent(child.props.children)
 
-  if (className.includes('language-mermaid')) {
-    return <>{children}</>
-  }
-
   const isCodeBlock = className.includes('language-') || code.includes('\n')
   if (!isCodeBlock) {
     return <pre {...preProps}>{children}</pre>
