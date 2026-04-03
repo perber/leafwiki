@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 export default class SearchView {
   constructor(private page: Page) {}
@@ -38,5 +38,15 @@ export default class SearchView {
       }
     }
     return false;
+  }
+
+  async expectResultHighlighted(title: string) {
+    const result = this.page
+      .locator('a[data-testid^="search-result-card-"]')
+      .filter({ hasText: title })
+      .first();
+
+    await result.waitFor({ state: 'visible' });
+    await expect(result).toHaveAttribute('aria-current', 'page');
   }
 }
