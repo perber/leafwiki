@@ -456,9 +456,7 @@ graph TD;
 
     const inlineStyles = await inlineCode.evaluate((element) => {
       const styles = window.getComputedStyle(element);
-      const parentStyles = window.getComputedStyle(
-        element.parentElement as Element,
-      );
+      const parentStyles = window.getComputedStyle(element.parentElement as Element);
       return {
         backgroundColor: styles.backgroundColor,
         color: styles.color,
@@ -470,7 +468,7 @@ graph TD;
     test.expect(inlineStyles.color).toBe(inlineStyles.parentColor);
 
     const viewerBackground = await pageViewer.evaluate((element) => {
-      return window.getComputedStyle(element).backgroundColor
+      return window.getComputedStyle(element).backgroundColor;
     });
 
     const codeBlockContainerStyles = await codeBlockContainer.evaluate((element) => {
@@ -482,12 +480,8 @@ graph TD;
       };
     });
 
-    test.expect(codeBlockContainerStyles.backgroundColor).not.toBe(
-      viewerBackground,
-    );
-    test.expect(codeBlockContainerStyles.borderTopColor).not.toBe(
-      'rgba(0, 0, 0, 0)',
-    );
+    test.expect(codeBlockContainerStyles.backgroundColor).not.toBe(viewerBackground);
+    test.expect(codeBlockContainerStyles.borderTopColor).not.toBe('rgba(0, 0, 0, 0)');
 
     const codeBlockStyles = await codeBlock.evaluate((element) => {
       const styles = window.getComputedStyle(element);
@@ -501,31 +495,29 @@ graph TD;
       };
     });
 
-    test.expect(codeBlockStyles.backgroundColor).toBe(
-      codeBlockContainerStyles.backgroundColor,
-    );
+    test.expect(codeBlockStyles.backgroundColor).toBe(codeBlockContainerStyles.backgroundColor);
     test.expect(codeBlockStyles.keywordColor).not.toBe(codeBlockStyles.color);
 
     const mermaidContainerStyles = await mermaidSvg.evaluate((element) => {
-      const container = element.closest('pre')
+      const container = element.closest('pre');
       if (!container) {
-        throw new Error('Mermaid pre container not found')
+        throw new Error('Mermaid pre container not found');
       }
 
-      const styles = window.getComputedStyle(container)
+      const styles = window.getComputedStyle(container);
       return {
         backgroundColor: styles.backgroundColor,
         color: styles.color,
         borderTopColor: styles.borderTopColor,
-      }
-    })
+      };
+    });
 
-    test.expect(mermaidContainerStyles.backgroundColor).toBe(
-      codeBlockContainerStyles.backgroundColor,
-    );
-    test.expect(mermaidContainerStyles.borderTopColor).toBe(
-      codeBlockContainerStyles.borderTopColor,
-    );
+    test
+      .expect(mermaidContainerStyles.backgroundColor)
+      .toBe(codeBlockContainerStyles.backgroundColor);
+    test
+      .expect(mermaidContainerStyles.borderTopColor)
+      .toBe(codeBlockContainerStyles.borderTopColor);
 
     const mermaidStyles = await mermaidSvg.evaluate((element) => {
       const styles = window.getComputedStyle(element);
