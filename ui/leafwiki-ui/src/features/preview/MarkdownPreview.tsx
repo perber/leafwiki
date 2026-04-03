@@ -37,7 +37,9 @@ export default function MarkdownPreview({ content, path }: Props) {
   const designMode = useDesignModeStore((state) => state.mode)
   const prefersLight = useSyncExternalStore(
     (onStoreChange) => {
-      if (typeof window === 'undefined') return () => {}
+      if (typeof window === 'undefined' || designMode !== 'system') {
+        return () => {}
+      }
 
       const mediaQuery = window.matchMedia('(prefers-color-scheme: light)')
       mediaQuery.addEventListener('change', onStoreChange)
@@ -52,11 +54,8 @@ export default function MarkdownPreview({ content, path }: Props) {
     () => true,
   )
 
-  const resolvedMode = designMode === 'system'
-    ? prefersLight
-      ? 'light'
-      : 'dark'
-    : designMode
+  const resolvedMode =
+    designMode === 'system' ? (prefersLight ? 'light' : 'dark') : designMode
 
   const markdownLink = useCallback(
     (

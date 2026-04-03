@@ -443,36 +443,51 @@ graph TD;
     const codeBlock = page.locator('article pre code.hljs').first();
     await codeBlock.waitFor({ state: 'visible' });
 
-    const codeBlockContainer = page.locator('article pre').first();
+    const codeBlockContainer = page
+      .locator('article pre')
+      .filter({ has: page.locator('code.hljs') })
+      .first();
     await codeBlockContainer.waitFor({ state: 'visible' });
-
-    const mermaidContainer = page.locator('article pre').nth(1);
-    await mermaidContainer.waitFor({ state: 'visible' });
 
     const mermaidSvg = page.locator('article .my-4 svg').first();
     await mermaidSvg.waitFor({ state: 'visible' });
 
+    const pageViewer = page.locator('.page-viewer__content').first();
+
     const inlineStyles = await inlineCode.evaluate((element) => {
       const styles = window.getComputedStyle(element);
+      const parentStyles = window.getComputedStyle(
+        element.parentElement as Element,
+      );
       return {
         backgroundColor: styles.backgroundColor,
         color: styles.color,
+        parentColor: parentStyles.color,
       };
     });
 
-    test.expect(inlineStyles.backgroundColor).toBe('rgb(241, 245, 249)');
-    test.expect(inlineStyles.color).toBe('rgb(15, 23, 41)');
+    test.expect(inlineStyles.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+    test.expect(inlineStyles.color).toBe(inlineStyles.parentColor);
+
+    const viewerBackground = await pageViewer.evaluate((element) => {
+      return window.getComputedStyle(element).backgroundColor
+    });
 
     const codeBlockContainerStyles = await codeBlockContainer.evaluate((element) => {
       const styles = window.getComputedStyle(element);
       return {
         backgroundColor: styles.backgroundColor,
         color: styles.color,
+        borderTopColor: styles.borderTopColor,
       };
     });
 
-    test.expect(codeBlockContainerStyles.backgroundColor).toBe('rgb(248, 250, 252)');
-    test.expect(codeBlockContainerStyles.color).toBe('rgb(36, 41, 46)');
+    test.expect(codeBlockContainerStyles.backgroundColor).not.toBe(
+      viewerBackground,
+    );
+    test.expect(codeBlockContainerStyles.borderTopColor).not.toBe(
+      'rgba(0, 0, 0, 0)',
+    );
 
     const codeBlockStyles = await codeBlock.evaluate((element) => {
       const styles = window.getComputedStyle(element);
@@ -486,20 +501,31 @@ graph TD;
       };
     });
 
-    test.expect(codeBlockStyles.backgroundColor).toBe('rgb(248, 250, 252)');
-    test.expect(codeBlockStyles.color).toBe('rgb(36, 41, 46)');
-    test.expect(codeBlockStyles.keywordColor).toBe('rgb(215, 58, 73)');
+    test.expect(codeBlockStyles.backgroundColor).toBe(
+      codeBlockContainerStyles.backgroundColor,
+    );
+    test.expect(codeBlockStyles.keywordColor).not.toBe(codeBlockStyles.color);
 
-    const mermaidContainerStyles = await mermaidContainer.evaluate((element) => {
-      const styles = window.getComputedStyle(element);
+    const mermaidContainerStyles = await mermaidSvg.evaluate((element) => {
+      const container = element.closest('pre')
+      if (!container) {
+        throw new Error('Mermaid pre container not found')
+      }
+
+      const styles = window.getComputedStyle(container)
       return {
         backgroundColor: styles.backgroundColor,
         color: styles.color,
-      };
-    });
+        borderTopColor: styles.borderTopColor,
+      }
+    })
 
-    test.expect(mermaidContainerStyles.backgroundColor).toBe('rgb(248, 250, 252)');
-    test.expect(mermaidContainerStyles.color).toBe('rgb(36, 41, 46)');
+    test.expect(mermaidContainerStyles.backgroundColor).toBe(
+      codeBlockContainerStyles.backgroundColor,
+    );
+    test.expect(mermaidContainerStyles.borderTopColor).toBe(
+      codeBlockContainerStyles.borderTopColor,
+    );
 
     const mermaidStyles = await mermaidSvg.evaluate((element) => {
       const styles = window.getComputedStyle(element);

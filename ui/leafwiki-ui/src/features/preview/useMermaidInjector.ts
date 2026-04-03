@@ -1,6 +1,25 @@
 import mermaid, { RenderResult } from 'mermaid'
 import { useEffect, useRef } from 'react'
 
+let initializedTheme: 'default' | 'dark' | null = null
+
+function ensureMermaidInitialized(theme: 'default' | 'dark') {
+  if (initializedTheme === theme) return
+
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'strict',
+    theme,
+    deterministicIds: true,
+    deterministicIDSeed: 'leafwiki',
+  })
+  mermaid.setParseErrorHandler((err) => {
+    console.warn('Mermaid parse error:', err)
+  })
+
+  initializedTheme = theme
+}
+
 export type MermaidInjectorOps = {
   containerRef: React.RefObject<HTMLDivElement | null>
   code: string
@@ -40,16 +59,7 @@ export function useMermaidInjector({
   const lastThemeRef = useRef<'default' | 'dark' | null>(null)
 
   useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      theme,
-      deterministicIds: true,
-      deterministicIDSeed: 'leafwiki',
-    })
-    mermaid.setParseErrorHandler((err) => {
-      console.warn('Mermaid parse error:', err)
-    })
+    ensureMermaidInitialized(theme)
 
     if (lastThemeRef.current !== theme) {
       lastHashRef.current = null
