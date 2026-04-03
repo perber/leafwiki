@@ -1,6 +1,7 @@
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE, DIALOG_SORT_PAGES } from '@/lib/registries'
+import { buildViewUrl } from '@/lib/routePath'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
@@ -22,10 +23,11 @@ export default function TreeView() {
   const { pathname } = useLocation()
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const openAncestorsForPath = useTreeStore((s) => s.openAncestorsForPath)
+  const setActiveNodeId = useTreeStore((s) => s.setActiveNodeId)
   const expandAll = useTreeStore((s) => s.expandAll)
   const collapseAll = useTreeStore((s) => s.collapseAll)
 
-  const currentPath = pathname.replace(/^\/(e\/)?/, '') // z.B. docs/setup/intro
+  const currentPath = buildViewUrl(pathname).replace(/^\/+/, '')
 
   const openDialog = useDialogsStore((state) => state.openDialog)
   const readOnlyMode = useIsReadOnly()
@@ -34,6 +36,17 @@ export default function TreeView() {
     if (!tree || !currentPath) return
     openAncestorsForPath(currentPath)
   }, [tree, currentPath, openAncestorsForPath])
+
+  useEffect(() => {
+    if (!tree) return
+    if (!currentPath) {
+      setActiveNodeId(null)
+      return
+    }
+
+    const node = useTreeStore.getState().getPageByPath(currentPath)
+    setActiveNodeId(node?.id ?? null)
+  }, [tree, currentPath, setActiveNodeId])
 
   useEffect(() => {
     if (tree === null) {
@@ -107,7 +120,7 @@ export default function TreeView() {
       </div>
       <div className="tree-view__nodes">
         {tree?.children?.map((node) => (
-          <TreeNode key={node.id} node={node} pathname={pathname} />
+          <TreeNode key={node.id} node={node} />
         ))}
       </div>
     </div>
