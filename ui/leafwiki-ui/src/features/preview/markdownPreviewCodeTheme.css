@@ -75,11 +75,44 @@
   padding-right: 0;
 }
 
+.page-viewer__content .markdown-code-block,
+.markdown-editor__preview .markdown-code-block {
+  position: relative;
+}
+
+.page-viewer__content .markdown-code-block__actions,
+.markdown-editor__preview .markdown-code-block__actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 1;
+}
+
+.page-viewer__content .markdown-code-block__copy-button,
+.markdown-editor__preview .markdown-code-block__copy-button {
+  height: 2rem;
+  width: 2rem;
+  border-color: color-mix(in oklab, var(--hljs-foreground) 12%, transparent);
+  background: color-mix(in oklab, var(--hljs-background) 92%, transparent);
+  color: var(--hljs-foreground);
+}
+
+.page-viewer__content .markdown-code-block__copy-button:hover,
+.markdown-editor__preview .markdown-code-block__copy-button:hover {
+  background: color-mix(in oklab, var(--hljs-background) 82%, white 10%);
+  color: var(--hljs-foreground);
+}
+
 .page-viewer__content pre code.hljs,
 .markdown-editor__preview pre code.hljs {
   display: block;
   overflow-x: auto;
   padding: 1em;
+}
+
+.page-viewer__content .markdown-code-block pre code.hljs,
+.markdown-editor__preview .markdown-code-block pre code.hljs {
+  padding-right: 3.5rem;
 }
 
 .page-viewer__content pre,

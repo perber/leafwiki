@@ -14,6 +14,7 @@ import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 import Headline from './Headline'
+import MarkdownCodeBlock from './MarkdownCodeBlock'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
 import MermaidBlock from './MermaidBlock'
@@ -128,9 +129,13 @@ export default function MarkdownPreview({ content, path }: Props) {
           HTMLAttributes<HTMLTableElement>,
       ) => (
         <div className="table-wrapper custom-scrollbar">
-          <table {...props} />
+          <table
+            {...props}
+            className={`custom-scrollbar ${props.className ?? ''}`.trim()}
+          />
         </div>
       ),
+      pre: MarkdownCodeBlock,
       code: (
         props: JSX.IntrinsicAttributes &
           ClassAttributes<HTMLElement> &
