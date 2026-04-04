@@ -514,6 +514,84 @@ func TestExecutor_Create_WikiLinkFallsBackToUniqueNestedBasenameOnly(t *testing.
 	}
 }
 
+func TestExecutor_Create_WikiLinkResolvesUniqueNestedPathSuffix(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "knowledge-main/tools/kubernetes/resources/StatefulSet.md", strings.Join([]string{
+		"# StatefulSet",
+		"",
+		"[[Tools/Kubernetes/Resources/Deployment|Deployment]]",
+	}, "\n"))
+	writeTmp(t, tmp, "knowledge-main/tools/kubernetes/resources/Deployment.md", "# Deployment")
+
+	w := &fakeExecWiki{hash: "h1"}
+	updatedContentByTitle := map[string]string{}
+	w.updateFn = func(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
+		w.lastUpdatedContent = content
+		if content != nil {
+			updatedContentByTitle[title] = *content
+		}
+		w.hash = w.hash + "-changed"
+		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
+	}
+
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "knowledge-main/tools/kubernetes/resources/StatefulSet.md", TargetPath: "knowledge-main/tools/kubernetes/resources/statefulset", Title: "StatefulSet", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+			{SourcePath: "knowledge-main/tools/kubernetes/resources/Deployment.md", TargetPath: "knowledge-main/tools/kubernetes/resources/deployment", Title: "Deployment", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	statefulSetContent := updatedContentByTitle["StatefulSet"]
+	if !strings.Contains(statefulSetContent, "[Deployment](/knowledge-main/tools/kubernetes/resources/deployment)") {
+		t.Fatalf("expected unique nested path suffix wiki link rewrite, got:\n%s", statefulSetContent)
+	}
+}
+
+func TestExecutor_Create_UnresolvedWikiLinkFallsBackToDeadMarkdownLink(t *testing.T) {
+	tmp := t.TempDir()
+	writeTmp(t, tmp, "Home.md", strings.Join([]string{
+		"# Home",
+		"",
+		"[[Missing Note]]",
+	}, "\n"))
+
+	w := &fakeExecWiki{hash: "h1"}
+	updatedContentByTitle := map[string]string{}
+	w.updateFn = func(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
+		w.lastUpdatedContent = content
+		if content != nil {
+			updatedContentByTitle[title] = *content
+		}
+		w.hash = w.hash + "-changed"
+		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
+	}
+
+	plan := &PlanResult{
+		TreeHash: "h1",
+		Items: []PlanItem{
+			{SourcePath: "Home.md", TargetPath: "home", Title: "Home", Kind: tree.NodeKindPage, Action: PlanActionCreate},
+		},
+	}
+	opts := &PlanOptions{SourceBasePath: tmp}
+
+	ex := NewExecutor(plan, opts, 0, w, slog.Default())
+	if _, err := ex.Execute("user1"); err != nil {
+		t.Fatalf("Execute err: %v", err)
+	}
+
+	homeContent := updatedContentByTitle["Home"]
+	if !strings.Contains(homeContent, "[Missing Note](/missing-note)") {
+		t.Fatalf("expected unresolved wiki link fallback to dead markdown link, got:\n%s", homeContent)
+	}
+}
+
 func TestExecutor_Create_DoesNotRewriteLinksInsideCode(t *testing.T) {
 	tmp := t.TempDir()
 	writeTmp(t, tmp, "Guides/Setup.md", strings.Join([]string{

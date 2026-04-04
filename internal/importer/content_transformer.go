@@ -175,9 +175,13 @@ func (t *contentTransformer) rewriteWikiLinks(
 			return "", err
 		}
 		if href == "" {
-			out.WriteString(content[next : end+2])
-			i = end + 2
-			continue
+			fallbackHref, ok := t.fallbackWikiPageHref(sourcePath, targetPart)
+			if !ok {
+				out.WriteString(content[next : end+2])
+				i = end + 2
+				continue
+			}
+			href = fallbackHref
 		}
 
 		if label == "" {
@@ -278,7 +282,31 @@ func (t *contentTransformer) resolvePagePath(sourcePath string, href string) (st
 		}
 	}
 
+	if match, ok := t.resolveUniqueTargetPathSuffix(href); ok {
+		return match, true
+	}
+
 	return "", false
+}
+
+func (t *contentTransformer) resolveUniqueTargetPathSuffix(href string) (string, bool) {
+	suffix, ok := normalizeWikiHrefToRoutePath(href)
+	if !ok || suffix == "" || !strings.Contains(suffix, "/") {
+		return "", false
+	}
+
+	var matches []string
+	for _, target := range t.pagesBySource {
+		if target.targetPath == suffix || strings.HasSuffix(target.targetPath, "/"+suffix) {
+			matches = append(matches, target.targetPath)
+		}
+	}
+
+	matches = uniqueStrings(matches)
+	if len(matches) != 1 {
+		return "", false
+	}
+	return matches[0], true
 }
 
 // resolveAndUploadAsset imports local non-Markdown files into the target page's asset folder
@@ -388,6 +416,95 @@ func buildSourceCandidates(sourcePath string, href string) []string {
 	}
 
 	return uniqueStrings(candidates)
+}
+
+func (t *contentTransformer) fallbackWikiPageHref(sourcePath string, href string) (string, bool) {
+	rawTarget, suffix := splitURLSuffix(href)
+	if rawTarget == "" || isExternalHref(rawTarget) || strings.HasPrefix(rawTarget, "#") {
+		return "", false
+	}
+
+	if isNonMarkdownAssetTarget(rawTarget) {
+		return "", false
+	}
+
+	if basenameKey, ok := basenameOnlyLookupKey(rawTarget); ok {
+		if matches := uniqueStrings(t.pagesByBasename[basenameKey]); len(matches) > 1 {
+			return "", false
+		}
+	}
+
+	if strings.HasPrefix(rawTarget, ".") || strings.HasPrefix(rawTarget, "/") {
+		candidates := buildSourceCandidates(sourcePath, rawTarget)
+		if len(candidates) == 0 {
+			return "", false
+		}
+		routePath, ok := normalizeSourceCandidateToRoutePath(candidates[0])
+		if !ok {
+			return "", false
+		}
+		return "/" + routePath + suffix, true
+	}
+
+	routePath, ok := normalizeWikiHrefToRoutePath(rawTarget)
+	if !ok {
+		return "", false
+	}
+	return "/" + routePath + suffix, true
+}
+
+func isNonMarkdownAssetTarget(href string) bool {
+	decoded := strings.TrimSpace(decodeImportTarget(href))
+	ext := strings.ToLower(path.Ext(decoded))
+	return ext != "" && ext != ".md"
+}
+
+func normalizeWikiHrefToRoutePath(href string) (string, bool) {
+	decoded := strings.TrimSpace(decodeImportTarget(href))
+	if decoded == "" {
+		return "", false
+	}
+
+	decoded = strings.TrimPrefix(decoded, "/")
+	decoded = strings.TrimSuffix(decoded, "/")
+	if decoded == "" {
+		return "", false
+	}
+
+	segments := strings.Split(decoded, "/")
+	for i, segment := range segments {
+		segment = strings.TrimSpace(segment)
+		if segment == "" {
+			return "", false
+		}
+
+		if i == len(segments)-1 && strings.EqualFold(path.Ext(segment), ".md") {
+			segment = strings.TrimSuffix(segment, path.Ext(segment))
+		}
+
+		safe := tree.NewSlugService().GenerateValidSlug(segment)
+		if safe == "" {
+			return "", false
+		}
+		segments[i] = safe
+	}
+
+	return strings.Join(segments, "/"), true
+}
+
+func normalizeSourceCandidateToRoutePath(candidate string) (string, bool) {
+	normalized, ok := normalizeWikiHrefToRoutePath(candidate)
+	if !ok {
+		return "", false
+	}
+
+	normalized = strings.TrimSuffix(normalized, "/index")
+	normalized = strings.Trim(normalized, "/")
+	if normalized == "" {
+		return "", false
+	}
+
+	return normalized, true
 }
 
 // resolveAssetPath keeps asset resolution inside the extracted import workspace.
