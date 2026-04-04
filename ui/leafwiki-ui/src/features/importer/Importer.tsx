@@ -113,6 +113,18 @@ export default function Importer() {
     navigate('/')
   }, [cancelImportPlan, importPlan, navigate])
 
+  const startNewImport = useCallback(async () => {
+    if (importPlan) {
+      await cancelImportPlan()
+    }
+    if (zipRef.current) {
+      zipRef.current.value = ''
+    }
+    setZipFileName('')
+    setResultFilter('all')
+    setResultSearch('')
+  }, [cancelImportPlan, importPlan])
+
   const importStatus = importPlan?.execution_status ?? null
   const progressLabel =
     importPlan && importPlan.total_items > 0
@@ -511,6 +523,20 @@ export default function Importer() {
               </div>
             </div>
             <div className="mt-4 flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void startNewImport()
+                }}
+                disabled={cancelingImportPlan}
+              >
+                {cancelingImportPlan ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <UploadIcon className="mr-2 h-4 w-4" />
+                )}
+                Start New Import
+              </Button>
               <Button
                 variant="default"
                 onClick={() => {
