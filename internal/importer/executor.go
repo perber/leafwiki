@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"time"
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/markdown"
@@ -16,6 +17,14 @@ type ExecutionResult struct {
 	Items          []ExecutionItemResult `json:"items"`
 	TreeHash       string                `json:"tree_hash"`        // hash of the state of the wiki tree after import
 	TreeHashBefore string                `json:"tree_hash_before"` // hash of the state of the wiki tree before import
+}
+
+type ExecutionProgress struct {
+	ProcessedItems        int        `json:"processed_items"`
+	TotalItems            int        `json:"total_items"`
+	CurrentItemSourcePath *string    `json:"current_item_source_path,omitempty"`
+	StartedAt             *time.Time `json:"started_at,omitempty"`
+	FinishedAt            *time.Time `json:"finished_at,omitempty"`
 }
 
 type ExecutionAction string
@@ -40,6 +49,10 @@ type Executor struct {
 	assetMaxBytes int64
 	wiki          ImporterWiki
 	logger        *slog.Logger
+	progressFn    func(ExecutionProgress, *ExecutionResult)
+	cancelFn      func() bool
+	startIndex    int
+	initialResult *ExecutionResult
 }
 
 func NewExecutor(plan *PlanResult, planOptions *PlanOptions, assetMaxBytes int64, wiki ImporterWiki, logger *slog.Logger) *Executor {
@@ -55,6 +68,22 @@ func NewExecutor(plan *PlanResult, planOptions *PlanOptions, assetMaxBytes int64
 	}
 }
 
+func (e *Executor) WithProgressCallback(progressFn func(ExecutionProgress, *ExecutionResult)) *Executor {
+	e.progressFn = progressFn
+	return e
+}
+
+func (e *Executor) WithCancelCheck(cancelFn func() bool) *Executor {
+	e.cancelFn = cancelFn
+	return e
+}
+
+func (e *Executor) WithResumeState(startIndex int, initialResult *ExecutionResult) *Executor {
+	e.startIndex = startIndex
+	e.initialResult = cloneExecutionResult(initialResult)
+	return e
+}
+
 func buildImportedContent(mdFile *markdown.MarkdownFile) (string, error) {
 	return markdown.BuildMarkdownWithExtraFrontmatter(mdFile.GetFrontmatter().ExtraFields, mdFile.GetContent())
 }
@@ -62,17 +91,50 @@ func buildImportedContent(mdFile *markdown.MarkdownFile) (string, error) {
 // Execute runs the import based on the provided plan
 func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 	beforeExecution := e.wiki.TreeHash()
-	if e.plan.TreeHash != beforeExecution {
-		return nil, fmt.Errorf("plan is stale: expected tree_hash %s but got %s", e.plan.TreeHash, beforeExecution)
+	expectedTreeHash := e.plan.TreeHash
+	if e.startIndex > 0 {
+		if e.initialResult == nil || e.initialResult.TreeHash == "" {
+			return nil, fmt.Errorf("resume state missing tree hash")
+		}
+		expectedTreeHash = e.initialResult.TreeHash
+	}
+	if expectedTreeHash != beforeExecution {
+		return nil, fmt.Errorf("plan is stale: expected tree_hash %s but got %s", expectedTreeHash, beforeExecution)
 	}
 
 	transformer := newContentTransformer(e.plan, e.planOptions.SourceBasePath, e.assetMaxBytes)
+	startedAt := time.Now()
 
-	result := &ExecutionResult{
-		TreeHashBefore: beforeExecution,
+	result := cloneExecutionResult(e.initialResult)
+	if result == nil {
+		result = &ExecutionResult{
+			TreeHashBefore: beforeExecution,
+		}
+	}
+	if result.TreeHashBefore == "" {
+		result.TreeHashBefore = beforeExecution
 	}
 
-	for _, item := range e.plan.Items {
+	e.reportProgress(ExecutionProgress{
+		ProcessedItems: e.startIndex,
+		TotalItems:     len(e.plan.Items),
+		StartedAt:      &startedAt,
+	}, result)
+
+	for index := e.startIndex; index < len(e.plan.Items); index++ {
+		if e.cancelFn != nil && e.cancelFn() {
+			return result, ErrImportCanceled
+		}
+
+		item := e.plan.Items[index]
+		currentItemSourcePath := item.SourcePath
+		e.reportProgress(ExecutionProgress{
+			ProcessedItems:        index,
+			TotalItems:            len(e.plan.Items),
+			CurrentItemSourcePath: &currentItemSourcePath,
+			StartedAt:             &startedAt,
+		}, result)
+
 		execItem := ExecutionItemResult{
 			SourcePath: item.SourcePath,
 			TargetPath: item.TargetPath,
@@ -160,9 +222,29 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 		}
 
 		result.Items = append(result.Items, execItem)
+		result.TreeHash = e.wiki.TreeHash()
+		e.reportProgress(ExecutionProgress{
+			ProcessedItems: index + 1,
+			TotalItems:     len(e.plan.Items),
+			StartedAt:      &startedAt,
+		}, result)
 	}
 
 	result.TreeHash = e.wiki.TreeHash()
+	finishedAt := time.Now()
+	e.reportProgress(ExecutionProgress{
+		ProcessedItems: len(e.plan.Items),
+		TotalItems:     len(e.plan.Items),
+		StartedAt:      &startedAt,
+		FinishedAt:     &finishedAt,
+	}, result)
 
 	return result, nil
+}
+
+func (e *Executor) reportProgress(progress ExecutionProgress, result *ExecutionResult) {
+	if e.progressFn == nil {
+		return
+	}
+	e.progressFn(progress, result)
 }

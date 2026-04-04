@@ -14,6 +14,7 @@ func TestContentTransformer_TransformContent_TableDriven(t *testing.T) {
 	writeTmp(t, tmp, "Document.pdf", "pdf-bytes")
 	writeTmp(t, tmp, "Image.png", "png-bytes")
 	writeTmp(t, tmp, "img.png", "png-bytes")
+	writeTmp(t, tmp, "obsidian_repo.png", "png-bytes")
 
 	transformer := newContentTransformer(&PlanResult{
 		Items: []PlanItem{
@@ -97,6 +98,12 @@ func TestContentTransformer_TransformContent_TableDriven(t *testing.T) {
 			sourcePath: "docs/current.md",
 			content:    "[[../Image.png]]",
 			want:       "![Image.png](/assets/p1/Image.png)",
+		},
+		{
+			name:       "image wiki asset with underscore filename renders as image",
+			sourcePath: "docs/current.md",
+			content:    "![[../obsidian_repo.png]]",
+			want:       "![obsidian_repo.png](/assets/p1/obsidian_repo.png)",
 		},
 		{
 			name:       "relative markdown link",

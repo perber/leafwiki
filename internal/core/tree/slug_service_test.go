@@ -143,3 +143,15 @@ func TestNormalizeFilenameToValidSlug_ReservedSlugGetsSuffix(t *testing.T) {
 		t.Fatalf("NormalizeFilenameToValidSlug = %q, want api-1.md", got)
 	}
 }
+
+func TestNormalizeFilenameToValidSlug_UnderscoreFilename(t *testing.T) {
+	s := NewSlugService()
+
+	got, err := s.NormalizeFilenameToValidSlug("CODE_OF_CONDUCT.md")
+	if err != nil {
+		t.Fatalf("NormalizeFilenameToValidSlug err: %v", err)
+	}
+	if got != "code-of-conduct.md" {
+		t.Fatalf("NormalizeFilenameToValidSlug = %q, want code-of-conduct.md", got)
+	}
+}

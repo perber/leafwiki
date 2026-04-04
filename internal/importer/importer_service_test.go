@@ -32,12 +32,14 @@ func mustWrite(t *testing.T, base, rel, content string) string {
 func newServiceWithFakeWiki(t *testing.T, w *fakeWiki) *ImporterService {
 	t.Helper()
 	planner := NewPlanner(w, tree.NewSlugService())
-	store := NewPlanStore()
+	importerDir := filepath.Join(t.TempDir(), ".importer")
+	store := NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
 	return &ImporterService{
-		planner:   planner,
-		planStore: store,
-		extractor: NewZipExtractor(), // unused in these tests
-		logger:    slog.Default().With("component", "ImporterServiceTest"),
+		planner:          planner,
+		planStore:        store,
+		extractor:        NewZipExtractor(), // unused in these tests
+		logger:           slog.Default().With("component", "ImporterServiceTest"),
+		workspaceBaseDir: filepath.Join(importerDir, "workspaces"),
 	}
 }
 
@@ -84,6 +86,23 @@ func copyFixtureToTemp(t *testing.T, rel string) string {
 	return destRoot
 }
 
+func waitForExecutionStatus(t *testing.T, is *ImporterService, want ExecutionStatus) *CurrentPlanState {
+	t.Helper()
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		state, err := is.GetCurrentPlan()
+		if err == nil && state.ExecutionStatus == want {
+			return state
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	state, err := is.GetCurrentPlan()
+	t.Fatalf("timed out waiting for execution status %q, state=%#v err=%v", want, state, err)
+	return nil
+}
+
 // --- Tests ------------------------------------------------------------------
 
 func TestImporterService_createImportPlanFromFolder_StoresPlan(t *testing.T) {
@@ -120,12 +139,14 @@ func TestImporterService_createImportPlanFromFolder_CleansUpOldWorkspace(t *test
 	is := newServiceWithFakeWiki(t, w)
 
 	// seed old plan in store
-	is.planStore.Set(&StoredPlan{
+	if err := is.planStore.Set(&StoredPlan{
 		Plan:          &PlanResult{ID: "old", TreeHash: "h1"},
 		PlanOptions:   PlanOptions{SourceBasePath: oldWS},
 		WorkspaceRoot: oldWS,
 		CreatedAt:     time.Now(),
-	})
+	}); err != nil {
+		t.Fatalf("Set err: %v", err)
+	}
 
 	_, err := is.createImportPlanFromFolder(newWS, "")
 	if err != nil {
@@ -166,7 +187,9 @@ func TestImporterService_ClearCurrentPlan(t *testing.T) {
 		t.Fatalf("createImportPlanFromFolder err: %v", err)
 	}
 
-	is.ClearCurrentPlan()
+	if err := is.ClearCurrentPlan(); err != nil {
+		t.Fatalf("ClearCurrentPlan err: %v", err)
+	}
 	_, err = is.GetCurrentPlan()
 	if !errors.Is(err, ErrNoPlan) {
 		t.Fatalf("expected ErrNoPlan after clear, got %v", err)
@@ -180,6 +203,266 @@ func TestImporterService_ExecuteCurrentPlan_NoPlan(t *testing.T) {
 	_, err := is.ExecuteCurrentPlan("user1")
 	if !errors.Is(err, ErrNoPlan) {
 		t.Fatalf("expected ErrNoPlan, got %v", err)
+	}
+}
+
+func TestImporterService_StartCurrentPlanExecution_RunsInBackgroundAndStoresResult(t *testing.T) {
+	ws := t.TempDir()
+	mustWrite(t, ws, "a.md", "# A\nbody")
+
+	allowEnsure := make(chan struct{})
+	w := &fakeWiki{
+		treeHash: "h1",
+		lookups:  map[string]*tree.PathLookup{},
+		ensureFn: func(userID, targetPath, title string, kind *tree.NodeKind) (*tree.Page, error) {
+			<-allowEnsure
+			return &tree.Page{PageNode: &tree.PageNode{ID: "p1", Title: title, Slug: "slug", Kind: *kind}}, nil
+		},
+	}
+	is := newServiceWithFakeWiki(t, w)
+
+	if _, err := is.createImportPlanFromFolder(ws, ""); err != nil {
+		t.Fatalf("createImportPlanFromFolder err: %v", err)
+	}
+
+	state, started, err := is.StartCurrentPlanExecution("user1")
+	if err != nil {
+		t.Fatalf("StartCurrentPlanExecution err: %v", err)
+	}
+	if !started {
+		t.Fatalf("expected execution to start")
+	}
+	if state.ExecutionStatus != ExecutionStatusRunning {
+		t.Fatalf("expected running state, got %q", state.ExecutionStatus)
+	}
+	if state.TotalItems != 1 || state.ProcessedItems != 0 {
+		t.Fatalf("expected initial progress 0/1, got %d/%d", state.ProcessedItems, state.TotalItems)
+	}
+	if state.StartedAt == nil {
+		t.Fatalf("expected started_at to be set")
+	}
+
+	runningState, err := is.GetCurrentPlan()
+	if err != nil {
+		t.Fatalf("GetCurrentPlan err: %v", err)
+	}
+	if runningState.ExecutionStatus != ExecutionStatusRunning {
+		t.Fatalf("expected stored running state, got %q", runningState.ExecutionStatus)
+	}
+
+	close(allowEnsure)
+
+	completedState := waitForExecutionStatus(t, is, ExecutionStatusCompleted)
+	if completedState.ExecutionResult == nil {
+		t.Fatalf("expected execution result to be stored")
+	}
+	if completedState.ExecutionResult.ImportedCount != 1 {
+		t.Fatalf("expected imported count 1, got %#v", completedState.ExecutionResult)
+	}
+	if completedState.ProcessedItems != 1 || completedState.TotalItems != 1 {
+		t.Fatalf("expected final progress 1/1, got %d/%d", completedState.ProcessedItems, completedState.TotalItems)
+	}
+	if completedState.CurrentItemSourcePath != nil {
+		t.Fatalf("expected current item to be cleared after completion, got %q", *completedState.CurrentItemSourcePath)
+	}
+	if completedState.FinishedAt == nil {
+		t.Fatalf("expected finished_at to be set")
+	}
+}
+
+func TestImporterService_ClearCurrentPlan_WhileRunning_ReturnsError(t *testing.T) {
+	ws := t.TempDir()
+	mustWrite(t, ws, "a.md", "# A\nbody")
+
+	allowEnsure := make(chan struct{})
+	w := &fakeWiki{
+		treeHash: "h1",
+		lookups:  map[string]*tree.PathLookup{},
+		ensureFn: func(userID, targetPath, title string, kind *tree.NodeKind) (*tree.Page, error) {
+			<-allowEnsure
+			return &tree.Page{PageNode: &tree.PageNode{ID: "p1", Title: title, Slug: "slug", Kind: *kind}}, nil
+		},
+	}
+	is := newServiceWithFakeWiki(t, w)
+
+	if _, err := is.createImportPlanFromFolder(ws, ""); err != nil {
+		t.Fatalf("createImportPlanFromFolder err: %v", err)
+	}
+	if _, _, err := is.StartCurrentPlanExecution("user1"); err != nil {
+		t.Fatalf("StartCurrentPlanExecution err: %v", err)
+	}
+
+	err := is.ClearCurrentPlan()
+	if !errors.Is(err, ErrImportExecutionRunning) {
+		t.Fatalf("expected ErrImportExecutionRunning, got %v", err)
+	}
+
+	close(allowEnsure)
+	waitForExecutionStatus(t, is, ExecutionStatusCompleted)
+}
+
+func TestImporterService_CancelCurrentPlan_StopsBeforeNextItem(t *testing.T) {
+	ws := t.TempDir()
+	mustWrite(t, ws, "a.md", "# A\nbody")
+	mustWrite(t, ws, "b.md", "# B\nbody")
+
+	enterFirstEnsure := make(chan struct{}, 1)
+	allowFirstEnsure := make(chan struct{})
+	w := &fakeWiki{
+		treeHash: "h1",
+		lookups:  map[string]*tree.PathLookup{},
+		ensureFn: func(userID, targetPath, title string, kind *tree.NodeKind) (*tree.Page, error) {
+			if targetPath == "a" {
+				enterFirstEnsure <- struct{}{}
+				<-allowFirstEnsure
+			}
+			return &tree.Page{PageNode: &tree.PageNode{ID: "p1", Title: title, Slug: "slug", Kind: *kind}}, nil
+		},
+	}
+	is := newServiceWithFakeWiki(t, w)
+
+	if _, err := is.createImportPlanFromFolder(ws, ""); err != nil {
+		t.Fatalf("createImportPlanFromFolder err: %v", err)
+	}
+	if _, _, err := is.StartCurrentPlanExecution("user1"); err != nil {
+		t.Fatalf("StartCurrentPlanExecution err: %v", err)
+	}
+
+	<-enterFirstEnsure
+
+	state, requested, err := is.CancelCurrentPlan()
+	if err != nil {
+		t.Fatalf("CancelCurrentPlan err: %v", err)
+	}
+	if !requested || !state.CancelRequested {
+		t.Fatalf("expected cancel request to be recorded, got requested=%v state=%#v", requested, state)
+	}
+
+	close(allowFirstEnsure)
+
+	canceledState := waitForExecutionStatus(t, is, ExecutionStatusCanceled)
+	if canceledState.ExecutionResult == nil {
+		t.Fatalf("expected partial result on cancellation")
+	}
+	if canceledState.ExecutionResult.ImportedCount != 1 {
+		t.Fatalf("expected one imported item before cancel, got %#v", canceledState.ExecutionResult)
+	}
+	if canceledState.ProcessedItems != 1 || canceledState.TotalItems != 2 {
+		t.Fatalf("expected progress 1/2 after cancel, got %d/%d", canceledState.ProcessedItems, canceledState.TotalItems)
+	}
+}
+
+func TestImporterService_ResumesRunningImportFromPersistedState(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	mustWrite(t, workspaceRoot, "a.md", "# A\nbody")
+	mustWrite(t, workspaceRoot, "b.md", "# B\nbody")
+
+	stateRoot := t.TempDir()
+	stateFile := filepath.Join(stateRoot, "current-plan.json")
+	w := &fakeWiki{treeHash: "partial-tree", lookups: map[string]*tree.PathLookup{}}
+	planner := NewPlanner(w, tree.NewSlugService())
+	store := NewPlanStore(stateFile)
+
+	service := &ImporterService{
+		planner:          planner,
+		planStore:        store,
+		extractor:        NewZipExtractor(),
+		logger:           slog.Default().With("component", "ImporterServiceTest"),
+		workspaceBaseDir: filepath.Join(stateRoot, "workspaces"),
+	}
+
+	plan, err := service.createImportPlanFromFolder(workspaceRoot, "")
+	if err != nil {
+		t.Fatalf("createImportPlanFromFolder err: %v", err)
+	}
+	plan.TreeHash = "original-tree"
+
+	sp, started, err := store.TryStartExecution("user1")
+	if err != nil || !started {
+		t.Fatalf("TryStartExecution err=%v started=%v", err, started)
+	}
+	startedAt := time.Now()
+	if err := store.UpdateExecutionProgress(plan.ID, ExecutionProgress{
+		ProcessedItems: 1,
+		TotalItems:     2,
+		StartedAt:      &startedAt,
+	}, &ExecutionResult{
+		ImportedCount:  1,
+		TreeHashBefore: "original-tree",
+		TreeHash:       "partial-tree",
+		Items: []ExecutionItemResult{
+			{SourcePath: "a.md", TargetPath: "a", Action: ExecutionActionCreated},
+		},
+	}); err != nil {
+		t.Fatalf("UpdateExecutionProgress err: %v", err)
+	}
+
+	resumed := NewImporterService(planner, NewPlanStore(stateFile), filepath.Join(stateRoot, "workspaces"), 0)
+	_ = sp
+
+	completedState := waitForExecutionStatus(t, resumed, ExecutionStatusCompleted)
+	if completedState.ExecutionResult == nil {
+		t.Fatalf("expected completed result after resume")
+	}
+	if completedState.ExecutionResult.ImportedCount != 2 {
+		t.Fatalf("expected resumed import to keep prior count and finish with 2 imports, got %#v", completedState.ExecutionResult)
+	}
+	if completedState.ProcessedItems != 2 || completedState.TotalItems != 2 {
+		t.Fatalf("expected final progress 2/2 after resume, got %d/%d", completedState.ProcessedItems, completedState.TotalItems)
+	}
+}
+
+func TestImporterService_ResumeRunningImport_FailsWhenTreeHashChanged(t *testing.T) {
+	workspaceRoot := t.TempDir()
+	mustWrite(t, workspaceRoot, "a.md", "# A\nbody")
+	mustWrite(t, workspaceRoot, "b.md", "# B\nbody")
+
+	stateRoot := t.TempDir()
+	stateFile := filepath.Join(stateRoot, "current-plan.json")
+	w := &fakeWiki{treeHash: "changed-tree", lookups: map[string]*tree.PathLookup{}}
+	planner := NewPlanner(w, tree.NewSlugService())
+	store := NewPlanStore(stateFile)
+
+	service := &ImporterService{
+		planner:          planner,
+		planStore:        store,
+		extractor:        NewZipExtractor(),
+		logger:           slog.Default().With("component", "ImporterServiceTest"),
+		workspaceBaseDir: filepath.Join(stateRoot, "workspaces"),
+	}
+
+	plan, err := service.createImportPlanFromFolder(workspaceRoot, "")
+	if err != nil {
+		t.Fatalf("createImportPlanFromFolder err: %v", err)
+	}
+	plan.TreeHash = "original-tree"
+	if err := store.Set(&StoredPlan{
+		Plan:            plan,
+		PlanOptions:     PlanOptions{SourceBasePath: workspaceRoot},
+		WorkspaceRoot:   workspaceRoot,
+		CreatedAt:       time.Now(),
+		ExecutionStatus: ExecutionStatusRunning,
+		ExecutionUserID: "user1",
+		ExecutionResult: &ExecutionResult{
+			ImportedCount:  1,
+			TreeHashBefore: "original-tree",
+			TreeHash:       "partially-imported-tree",
+			Items: []ExecutionItemResult{
+				{SourcePath: "a.md", TargetPath: "a", Action: ExecutionActionCreated},
+			},
+		},
+		ExecutionProgress: ExecutionProgress{
+			ProcessedItems: 1,
+			TotalItems:     2,
+		},
+	}); err != nil {
+		t.Fatalf("Set err: %v", err)
+	}
+
+	resumed := NewImporterService(planner, NewPlanStore(stateFile), filepath.Join(stateRoot, "workspaces"), 0)
+	failedState := waitForExecutionStatus(t, resumed, ExecutionStatusFailed)
+	if failedState.ExecutionError == nil || !strings.Contains(*failedState.ExecutionError, "plan is stale") {
+		t.Fatalf("expected stale-plan failure after resume, got %#v", failedState)
 	}
 }
 
@@ -261,7 +544,8 @@ func TestImporterService_ExecuteCurrentPlan_WritesPreservedFrontmatterToDisk(t *
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore(), 0)
+	importerDir := filepath.Join(w.GetStorageDir(), ".importer")
+	is := NewImporterService(planner, NewPlanStore(filepath.Join(importerDir, "current-plan.json")), filepath.Join(importerDir, "workspaces"), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
@@ -345,7 +629,8 @@ func TestImporterService_ExecuteCurrentPlan_RewritesLinksAndUploadsAssetsToDisk(
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore(), 0)
+	importerDir := filepath.Join(w.GetStorageDir(), ".importer")
+	is := NewImporterService(planner, NewPlanStore(filepath.Join(importerDir, "current-plan.json")), filepath.Join(importerDir, "workspaces"), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
@@ -401,7 +686,8 @@ func TestImporterService_ExecuteCurrentPlan_ImportsFixturePackage(t *testing.T) 
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore(), 0)
+	importerDir := filepath.Join(w.GetStorageDir(), ".importer")
+	is := NewImporterService(planner, NewPlanStore(filepath.Join(importerDir, "current-plan.json")), filepath.Join(importerDir, "workspaces"), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
@@ -478,7 +764,8 @@ func TestImporterService_ExecuteCurrentPlan_ImportsLeafWikiNestedFixture(t *test
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore(), 0)
+	importerDir := filepath.Join(w.GetStorageDir(), ".importer")
+	is := NewImporterService(planner, NewPlanStore(filepath.Join(importerDir, "current-plan.json")), filepath.Join(importerDir, "workspaces"), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {
@@ -600,7 +887,8 @@ func TestImporterService_ExecuteCurrentPlan_ImportsObsidianWikiLinksFixture(t *t
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	planner := NewPlanner(w, tree.NewSlugService())
-	is := NewImporterService(planner, NewPlanStore(), 0)
+	importerDir := filepath.Join(w.GetStorageDir(), ".importer")
+	is := NewImporterService(planner, NewPlanStore(filepath.Join(importerDir, "current-plan.json")), filepath.Join(importerDir, "workspaces"), 0)
 
 	plan, err := is.createImportPlanFromFolder(ws, "")
 	if err != nil {

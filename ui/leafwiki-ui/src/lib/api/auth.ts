@@ -140,12 +140,13 @@ export async function fetchWithAuth(
   }
 
   if (!res.ok) {
+    const errorText = await res.text()
     let errorBody: { error?: string; message?: string } | null = null
+
     try {
-      errorBody = await res.json()
+      errorBody = errorText ? JSON.parse(errorText) : null
     } catch {
-      const text = await res.text()
-      throw new ApiError(text || 'Request failed', res.status)
+      throw new ApiError(errorText || 'Request failed', res.status)
     }
 
     if (errorBody?.error === 'validation_error') throw errorBody

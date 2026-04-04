@@ -299,6 +299,10 @@ func (t *contentTransformer) resolvePagePath(sourcePath string, href string) (st
 }
 
 func (t *contentTransformer) resolveUniqueTargetPathSuffix(href string) (string, bool) {
+	if isNonMarkdownAssetTarget(href) {
+		return "", false
+	}
+
 	suffix, ok := t.normalizeWikiHrefToRoutePath(href)
 	if !ok || suffix == "" || !strings.Contains(suffix, "/") {
 		return "", false

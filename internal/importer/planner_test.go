@@ -24,6 +24,7 @@ type fakeWiki struct {
 	updateCalls        int
 	lastUpdatedContent *string
 
+	ensureFn      func(userID, targetPath, title string, kind *tree.NodeKind) (*tree.Page, error)
 	ensureErr     error
 	ensureNilPage bool
 	updateErr     error
@@ -43,6 +44,9 @@ func (f *fakeWiki) LookupPagePath(p string) (*tree.PathLookup, error) {
 
 func (f *fakeWiki) EnsurePath(userID string, targetPath string, title string, kind *tree.NodeKind) (*tree.Page, error) {
 	f.ensureCalls++
+	if f.ensureFn != nil {
+		return f.ensureFn(userID, targetPath, title, kind)
+	}
 	if f.ensureErr != nil {
 		return nil, f.ensureErr
 	}
