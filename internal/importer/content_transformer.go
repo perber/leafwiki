@@ -20,8 +20,10 @@ type importTarget struct {
 type contentTransformer struct {
 	sourceBasePath  string
 	assetMaxBytes   int64
+	slugger         *tree.SlugService
 	pagesBySource   map[string]importTarget
 	pagesByBasename map[string][]string
+	pagesBySuffix   map[string][]string
 	assetUploads    map[string]string
 }
 
@@ -30,6 +32,7 @@ type contentTransformer struct {
 func newContentTransformer(plan *PlanResult, sourceBasePath string, assetMaxBytes int64) *contentTransformer {
 	pagesBySource := make(map[string]importTarget, len(plan.Items))
 	pagesByBasename := make(map[string][]string, len(plan.Items))
+	pagesBySuffix := make(map[string][]string, len(plan.Items))
 	for _, item := range plan.Items {
 		normalizedSource := normalizePlanSourcePath(item.SourcePath)
 		pagesBySource[normalizedSource] = importTarget{
@@ -40,13 +43,19 @@ func newContentTransformer(plan *PlanResult, sourceBasePath string, assetMaxByte
 		if basenameKey := normalizePageBasenameForLookup(path.Base(normalizedSource)); basenameKey != "" {
 			pagesByBasename[basenameKey] = append(pagesByBasename[basenameKey], item.TargetPath)
 		}
+
+		for _, suffixKey := range buildTargetPathSuffixKeys(item.TargetPath) {
+			pagesBySuffix[suffixKey] = append(pagesBySuffix[suffixKey], item.TargetPath)
+		}
 	}
 
 	return &contentTransformer{
 		sourceBasePath:  sourceBasePath,
 		assetMaxBytes:   assetMaxBytes,
+		slugger:         tree.NewSlugService(),
 		pagesBySource:   pagesBySource,
 		pagesByBasename: pagesByBasename,
+		pagesBySuffix:   pagesBySuffix,
 		assetUploads:    map[string]string{},
 	}
 }
@@ -290,19 +299,12 @@ func (t *contentTransformer) resolvePagePath(sourcePath string, href string) (st
 }
 
 func (t *contentTransformer) resolveUniqueTargetPathSuffix(href string) (string, bool) {
-	suffix, ok := normalizeWikiHrefToRoutePath(href)
+	suffix, ok := t.normalizeWikiHrefToRoutePath(href)
 	if !ok || suffix == "" || !strings.Contains(suffix, "/") {
 		return "", false
 	}
 
-	var matches []string
-	for _, target := range t.pagesBySource {
-		if target.targetPath == suffix || strings.HasSuffix(target.targetPath, "/"+suffix) {
-			matches = append(matches, target.targetPath)
-		}
-	}
-
-	matches = uniqueStrings(matches)
+	matches := uniqueStrings(t.pagesBySuffix[suffix])
 	if len(matches) != 1 {
 		return "", false
 	}
@@ -439,14 +441,14 @@ func (t *contentTransformer) fallbackWikiPageHref(sourcePath string, href string
 		if len(candidates) == 0 {
 			return "", false
 		}
-		routePath, ok := normalizeSourceCandidateToRoutePath(candidates[0])
+		routePath, ok := t.normalizeSourceCandidateToRoutePath(candidates[0])
 		if !ok {
 			return "", false
 		}
 		return "/" + routePath + suffix, true
 	}
 
-	routePath, ok := normalizeWikiHrefToRoutePath(rawTarget)
+	routePath, ok := t.normalizeWikiHrefToRoutePath(rawTarget)
 	if !ok {
 		return "", false
 	}
@@ -459,7 +461,7 @@ func isNonMarkdownAssetTarget(href string) bool {
 	return ext != "" && ext != ".md"
 }
 
-func normalizeWikiHrefToRoutePath(href string) (string, bool) {
+func (t *contentTransformer) normalizeWikiHrefToRoutePath(href string) (string, bool) {
 	decoded := strings.TrimSpace(decodeImportTarget(href))
 	if decoded == "" {
 		return "", false
@@ -482,7 +484,7 @@ func normalizeWikiHrefToRoutePath(href string) (string, bool) {
 			segment = strings.TrimSuffix(segment, path.Ext(segment))
 		}
 
-		safe := tree.NewSlugService().GenerateValidSlug(segment)
+		safe := t.slugger.GenerateValidSlug(segment)
 		if safe == "" {
 			return "", false
 		}
@@ -492,8 +494,8 @@ func normalizeWikiHrefToRoutePath(href string) (string, bool) {
 	return strings.Join(segments, "/"), true
 }
 
-func normalizeSourceCandidateToRoutePath(candidate string) (string, bool) {
-	normalized, ok := normalizeWikiHrefToRoutePath(candidate)
+func (t *contentTransformer) normalizeSourceCandidateToRoutePath(candidate string) (string, bool) {
+	normalized, ok := t.normalizeWikiHrefToRoutePath(candidate)
 	if !ok {
 		return "", false
 	}
@@ -505,6 +507,21 @@ func normalizeSourceCandidateToRoutePath(candidate string) (string, bool) {
 	}
 
 	return normalized, true
+}
+
+func buildTargetPathSuffixKeys(targetPath string) []string {
+	trimmed := strings.Trim(strings.TrimSpace(targetPath), "/")
+	if trimmed == "" {
+		return nil
+	}
+
+	segments := strings.Split(trimmed, "/")
+	suffixes := make([]string, 0, len(segments))
+	for i := range segments {
+		suffixes = append(suffixes, strings.Join(segments[i:], "/"))
+	}
+
+	return uniqueStrings(suffixes)
 }
 
 // resolveAssetPath keeps asset resolution inside the extracted import workspace.
