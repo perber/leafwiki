@@ -75,6 +75,12 @@ func TestContentTransformer_TransformContent_TableDriven(t *testing.T) {
 			want:       "[Note](/note#^block-id)",
 		},
 		{
+			name:       "unresolved wiki link falls back to dead markdown link",
+			sourcePath: "docs/current.md",
+			content:    "[[Missing Note]]",
+			want:       "[Missing Note](/missing-note)",
+		},
+		{
 			name:       "asset embed",
 			sourcePath: "docs/current.md",
 			content:    "![[../img.png]]",
