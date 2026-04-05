@@ -21,6 +21,10 @@ func NewZipExtractor() *ZipExtractor {
 }
 
 func (x *ZipExtractor) ExtractToTemp(zipPath string) (*ZipWorkspace, error) {
+	return x.ExtractToDir(zipPath, "")
+}
+
+func (x *ZipExtractor) ExtractToDir(zipPath string, baseDir string) (*ZipWorkspace, error) {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return nil, fmt.Errorf("open zip: %w", err)
@@ -31,7 +35,14 @@ func (x *ZipExtractor) ExtractToTemp(zipPath string) (*ZipWorkspace, error) {
 		}
 	}()
 
-	root, err := os.MkdirTemp("", "import-*")
+	parentDir := baseDir
+	if parentDir == "" {
+		parentDir = ""
+	} else if err := os.MkdirAll(parentDir, 0o755); err != nil {
+		return nil, fmt.Errorf("mkdirall: %w", err)
+	}
+
+	root, err := os.MkdirTemp(parentDir, "import-*")
 	if err != nil {
 		return nil, fmt.Errorf("mkdtemp: %w", err)
 	}

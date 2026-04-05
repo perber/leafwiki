@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,30 +20,54 @@ type ImporterService struct {
 	extractor               *ZipExtractor
 	logger                  *slog.Logger
 	assetMaxUploadSizeBytes int64
+	workspaceBaseDir        string
 }
 
-func NewImporterService(planner *Planner, planStore *PlanStore, assetMaxUploadSizeBytes int64) *ImporterService {
+type CurrentPlanState struct {
+	ID              string           `json:"id"`
+	TreeHash        string           `json:"tree_hash"`
+	Items           []PlanItem       `json:"items"`
+	Errors          []string         `json:"errors"`
+	ExecutionStatus ExecutionStatus  `json:"execution_status"`
+	CancelRequested bool             `json:"cancel_requested"`
+	ExecutionResult *ExecutionResult `json:"execution_result,omitempty"`
+	ExecutionError  *string          `json:"execution_error,omitempty"`
+	ExecutionProgress
+}
+
+func NewImporterService(planner *Planner, planStore *PlanStore, workspaceBaseDir string, assetMaxUploadSizeBytes int64) *ImporterService {
 	if assetMaxUploadSizeBytes <= 0 {
 		assetMaxUploadSizeBytes = assets.DefaultMaxUploadSizeBytes
 	}
-	return &ImporterService{
+	if workspaceBaseDir == "" {
+		workspaceBaseDir = filepath.Join(os.TempDir(), "wiki-imports")
+	}
+	service := &ImporterService{
 		planner:                 planner,
 		planStore:               planStore,
 		extractor:               NewZipExtractor(),
 		logger:                  slog.Default().With("component", "ImporterService"),
 		assetMaxUploadSizeBytes: assetMaxUploadSizeBytes,
+		workspaceBaseDir:        workspaceBaseDir,
 	}
+	service.resumeInterruptedExecution()
+	return service
 }
 
 // CreateImportPlanFromFolder creates an import plan from a folder path
 func (is *ImporterService) createImportPlanFromFolder(folderPath string, targetBasePath string) (*PlanResult, error) {
 	// single-plan semantics: cleanup old plan workspace if present
 	if old, err := is.planStore.Get(); err == nil && old != nil {
+		if old.ExecutionStatus == ExecutionStatusRunning {
+			return nil, ErrImportExecutionRunning
+		}
 		err = os.RemoveAll(old.WorkspaceRoot)
 		if err != nil {
 			return nil, fmt.Errorf("cleanup old import workspace: %w", err)
 		}
-		is.planStore.Clear()
+		if _, err := is.planStore.Clear(); err != nil {
+			return nil, err
+		}
 		is.logger.Info("Old import workspace cleaned up")
 	}
 
@@ -61,57 +86,102 @@ func (is *ImporterService) createImportPlanFromFolder(folderPath string, targetB
 		return nil, err
 	}
 
-	is.planStore.Set(&StoredPlan{
-		Plan:          plan,
-		PlanOptions:   opts,
-		WorkspaceRoot: folderPath,
-		CreatedAt:     time.Now(),
-	})
+	if err := is.planStore.Set(&StoredPlan{
+		Plan:            plan,
+		PlanOptions:     opts,
+		WorkspaceRoot:   folderPath,
+		CreatedAt:       time.Now(),
+		ExecutionStatus: ExecutionStatusPlanned,
+	}); err != nil {
+		return nil, err
+	}
 	is.logger.Info("Import plan created", "entries", len(entries), "workspace", folderPath)
 	return plan, nil
 }
 
 // GetCurrentPlan retrieves the currently stored import plan
-func (is *ImporterService) GetCurrentPlan() (*PlanResult, error) {
+func (is *ImporterService) GetCurrentPlan() (*CurrentPlanState, error) {
 	sp, err := is.planStore.Get()
 	if err != nil {
 		return nil, err
 	}
-	return sp.Plan, nil
+	return currentPlanStateFromStored(sp), nil
 }
 
 // ClearCurrentPlan clears the currently stored import plan
-func (is *ImporterService) ClearCurrentPlan() {
+func (is *ImporterService) ClearCurrentPlan() error {
 	if sp, err := is.planStore.Get(); err == nil && sp != nil {
+		if sp.ExecutionStatus == ExecutionStatusRunning {
+			return ErrImportExecutionRunning
+		}
 		if err := os.RemoveAll(sp.WorkspaceRoot); err != nil {
 			is.logger.Error("remove workspace failed", "error", err)
 		}
 	}
-	is.planStore.Clear()
+	_, err := is.planStore.Clear()
+	return err
+}
+
+func (is *ImporterService) CancelCurrentPlan() (*CurrentPlanState, bool, error) {
+	sp, requested, err := is.planStore.RequestCancel()
+	if err != nil {
+		return nil, false, err
+	}
+	return currentPlanStateFromStored(sp), requested, nil
 }
 
 // ExecuteCurrentPlan executes the currently stored import plan
 func (is *ImporterService) ExecuteCurrentPlan(userID string) (*ExecutionResult, error) {
-	sp, err := is.planStore.Get()
+	sp, started, err := is.planStore.TryStartExecution(userID)
 	if err != nil {
 		return nil, err
 	}
-
-	exec := NewExecutor(sp.Plan, &sp.PlanOptions, is.assetMaxUploadSizeBytes, is.planner.wiki, is.planner.log)
-	res, err := exec.Execute(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	// After successful execution, clear the plan
-	if sp, err := is.planStore.Get(); err == nil && sp != nil {
-		if err := os.RemoveAll(sp.WorkspaceRoot); err != nil {
-			is.logger.Error("remove workspace failed", "error", err)
+	if !started {
+		switch sp.ExecutionStatus {
+		case ExecutionStatusRunning:
+			return nil, ErrImportExecutionRunning
+		case ExecutionStatusCompleted:
+			if sp.ExecutionResult == nil {
+				return nil, errors.New("import completed without result")
+			}
+			return sp.ExecutionResult, nil
+		case ExecutionStatusFailed:
+			if sp.ExecutionError != nil {
+				return nil, errors.New(*sp.ExecutionError)
+			}
+			return nil, errors.New("import execution failed")
 		}
 	}
-	is.planStore.Clear()
 
+	res, err := is.executeStoredPlan(sp)
+	if finishErr := is.planStore.FinishExecution(sp.Plan.ID, res, err); finishErr != nil {
+		return nil, finishErr
+	}
+	is.cleanupWorkspace(sp.WorkspaceRoot)
+	if err != nil {
+		return nil, err
+	}
 	return res, nil
+}
+
+func (is *ImporterService) StartCurrentPlanExecution(userID string) (*CurrentPlanState, bool, error) {
+	sp, started, err := is.planStore.TryStartExecution(userID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if started {
+		go func(snapshot *StoredPlan) {
+			res, execErr := is.executeStoredPlan(snapshot)
+			if finishErr := is.planStore.FinishExecution(snapshot.Plan.ID, res, execErr); finishErr != nil {
+				is.logger.Error("failed to persist finished import state", "error", finishErr)
+				return
+			}
+			is.cleanupWorkspace(snapshot.WorkspaceRoot)
+		}(sp)
+	}
+
+	return currentPlanStateFromStored(sp), started, nil
 }
 
 // FindMarkdownEntries finds markdown files in the given source base path
@@ -195,12 +265,11 @@ func (is *ImporterService) CreateImportPlanFromZipUpload(
 }
 
 func (is *ImporterService) extractZipReaderToTemp(r io.Reader) (*ZipWorkspace, error) {
-	tempDir := filepath.Join(os.TempDir(), "wiki-imports")
-	if err := os.MkdirAll(tempDir, 0o755); err != nil {
+	if err := os.MkdirAll(is.workspaceBaseDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create import temp dir: %w", err)
 	}
 
-	tmp, err := os.CreateTemp(tempDir, "import-*.zip")
+	tmp, err := os.CreateTemp(is.workspaceBaseDir, "upload-*.zip")
 	if err != nil {
 		return nil, fmt.Errorf("create temp zip: %w", err)
 	}
@@ -219,9 +288,81 @@ func (is *ImporterService) extractZipReaderToTemp(r io.Reader) (*ZipWorkspace, e
 		return nil, fmt.Errorf("close temp zip: %w", err)
 	}
 
-	ws, err := is.extractor.ExtractToTemp(tmpPath)
+	ws, err := is.extractor.ExtractToDir(tmpPath, is.workspaceBaseDir)
 	if err != nil {
 		return nil, fmt.Errorf("extract zip: %w", err)
 	}
 	return ws, nil
+}
+
+func (is *ImporterService) executeStoredPlan(sp *StoredPlan) (*ExecutionResult, error) {
+	exec := NewExecutor(sp.Plan, &sp.PlanOptions, is.assetMaxUploadSizeBytes, is.planner.wiki, is.planner.log).
+		WithProgressCallback(func(progress ExecutionProgress, result *ExecutionResult) {
+			if err := is.planStore.UpdateExecutionProgress(sp.Plan.ID, progress, result); err != nil {
+				is.logger.Error("failed to persist import progress", "error", err)
+			}
+		}).
+		WithCancelCheck(func() bool {
+			return is.planStore.IsCancelRequested(sp.Plan.ID)
+		}).
+		WithResumeState(sp.ProcessedItems, sp.ExecutionResult)
+	return exec.Execute(sp.ExecutionUserID)
+}
+
+func (is *ImporterService) cleanupWorkspace(workspaceRoot string) {
+	if workspaceRoot == "" {
+		return
+	}
+	if err := os.RemoveAll(workspaceRoot); err != nil {
+		is.logger.Error("remove workspace failed", "error", err)
+	}
+}
+
+func currentPlanStateFromStored(sp *StoredPlan) *CurrentPlanState {
+	if sp == nil || sp.Plan == nil {
+		return nil
+	}
+
+	return &CurrentPlanState{
+		ID:              sp.Plan.ID,
+		TreeHash:        sp.Plan.TreeHash,
+		Items:           sp.Plan.Items,
+		Errors:          sp.Plan.Errors,
+		ExecutionStatus: sp.ExecutionStatus,
+		CancelRequested: sp.CancelRequested,
+		ExecutionResult: sp.ExecutionResult,
+		ExecutionError:  sp.ExecutionError,
+		ExecutionProgress: ExecutionProgress{
+			ProcessedItems:        sp.ProcessedItems,
+			TotalItems:            sp.TotalItems,
+			CurrentItemSourcePath: sp.CurrentItemSourcePath,
+			StartedAt:             sp.StartedAt,
+			FinishedAt:            sp.FinishedAt,
+		},
+	}
+}
+
+func (is *ImporterService) resumeInterruptedExecution() {
+	sp, err := is.planStore.Get()
+	if err != nil || sp == nil {
+		if err != nil && !errors.Is(err, ErrNoPlan) {
+			is.logger.Error("failed to load persisted importer state", "error", err)
+		}
+		return
+	}
+	if sp.ExecutionStatus != ExecutionStatusRunning {
+		return
+	}
+	if sp.ExecutionUserID == "" {
+		sp.ExecutionUserID = "system"
+	}
+
+	go func(snapshot *StoredPlan) {
+		res, execErr := is.executeStoredPlan(snapshot)
+		if finishErr := is.planStore.FinishExecution(snapshot.Plan.ID, res, execErr); finishErr != nil {
+			is.logger.Error("failed to persist resumed import completion", "error", finishErr)
+			return
+		}
+		is.cleanupWorkspace(snapshot.WorkspaceRoot)
+	}(sp)
 }

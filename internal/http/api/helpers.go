@@ -30,6 +30,10 @@ func respondWithError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Parent page not found"})
 	case errors.Is(err, importer.ErrNoPlan):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case errors.Is(err, importer.ErrImportExecutionRunning):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, importer.ErrImportStateUnavailable):
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	case errors.Is(err, tree.ErrPageHasChildren):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Page has children, use recursive delete"})
 	case errors.Is(err, tree.ErrTreeNotLoaded):

@@ -23,6 +23,8 @@ var reservedSlugs = map[string]bool{
 	"settings": true,
 }
 
+var slugPattern = regexp.MustCompile(`^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$`)
+
 type SlugService struct {
 }
 
@@ -62,8 +64,7 @@ func (s *SlugService) IsValidSlug(slug string) error {
 		return fmt.Errorf("slug '%s' is reserved", slug)
 	}
 
-	matched, err := regexp.MatchString(`^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$`, slug)
-	if err != nil || !matched {
+	if !slugPattern.MatchString(slug) {
 		return errors.New("slug must contain only letters, numbers and hyphens")
 	}
 
@@ -95,7 +96,7 @@ func (s *SlugService) GenerateValidSlug(desired string) string {
 
 // normalizeSlug creates a URL-friendly slug (can be improved)
 func normalizeSlug(title string) string {
-	return slug.Make(title)
+	return slug.Make(strings.ReplaceAll(title, "_", "-"))
 }
 
 // Checks if the given slug already exists among parent's children

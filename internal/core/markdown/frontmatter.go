@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -27,10 +29,18 @@ type Frontmatter struct {
 	ExtraFields          map[string]interface{} `yaml:"-" json:"-"`
 }
 
+var unquotedTemplatePlaceholderLine = regexp.MustCompile(`^(\s*[^:\n]+:\s*)(\{\{[^}\n]+\}\})(\s*(?:#.*)?)$`)
+
 func parseFrontmatterYAML(yamlPart string) (Frontmatter, error) {
 	var raw map[string]interface{}
 	if err := yaml.Unmarshal([]byte(yamlPart), &raw); err != nil {
-		return Frontmatter{}, errors.Join(ErrFrontmatterParse, err)
+		sanitized, changed := sanitizeTemplatePlaceholderFrontmatter(yamlPart)
+		if !changed {
+			return Frontmatter{}, errors.Join(ErrFrontmatterParse, err)
+		}
+		if retryErr := yaml.Unmarshal([]byte(sanitized), &raw); retryErr != nil {
+			return Frontmatter{}, errors.Join(ErrFrontmatterParse, err)
+		}
 	}
 	if raw == nil {
 		raw = map[string]interface{}{}
@@ -74,6 +84,23 @@ func parseFrontmatterYAML(yamlPart string) (Frontmatter, error) {
 	}
 
 	return fm, nil
+}
+
+func sanitizeTemplatePlaceholderFrontmatter(yamlPart string) (string, bool) {
+	lines := strings.Split(yamlPart, "\n")
+	changed := false
+
+	for i, line := range lines {
+		matches := unquotedTemplatePlaceholderLine.FindStringSubmatch(line)
+		if matches == nil {
+			continue
+		}
+
+		lines[i] = matches[1] + strconv.Quote(matches[2]) + matches[3]
+		changed = true
+	}
+
+	return strings.Join(lines, "\n"), changed
 }
 
 func valueToString(value interface{}) string {

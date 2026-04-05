@@ -5,7 +5,23 @@ export type ImportPlan = {
   tree_hash: string
   items: ImportPlanItem[]
   errors: string[]
+  execution_status: ImportExecutionStatus
+  cancel_requested: boolean
+  execution_result?: ImportResult
+  execution_error?: string
+  processed_items: number
+  total_items: number
+  current_item_source_path?: string
+  started_at?: string
+  finished_at?: string
 }
+
+export type ImportExecutionStatus =
+  | 'planned'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'canceled'
 
 export type ImportPlanItem = {
   source_path: string
@@ -51,14 +67,14 @@ export async function getImportPlan(): Promise<ImportPlan> {
   })) as ImportPlan
 }
 
-export async function executeImportPlan(): Promise<ImportResult> {
+export async function executeImportPlan(): Promise<ImportPlan> {
   return (await fetchWithAuth('/api/import/execute', {
     method: 'POST',
-  })) as ImportResult
+  })) as ImportPlan
 }
 
-export async function cancelImportPlan(): Promise<void> {
-  await fetchWithAuth('/api/import/plan', {
+export async function cancelImportPlan(): Promise<ImportPlan | null> {
+  return (await fetchWithAuth('/api/import/plan', {
     method: 'DELETE',
-  })
+  })) as ImportPlan | null
 }
