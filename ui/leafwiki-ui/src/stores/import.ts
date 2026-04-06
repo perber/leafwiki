@@ -28,10 +28,10 @@ type ImportStore = {
   loadingImportPlan: boolean
   importPlan: importAPI.ImportPlan | null
   importResult: importAPI.ImportResult | null
-  createImportPlan: (sourcePath: File) => Promise<void>
+  createImportPlan: (sourcePath: File) => Promise<boolean>
   loadImportPlan: () => Promise<void>
   executeImportPlan: () => Promise<void>
-  cancelImportPlan: () => Promise<void>
+  cancelImportPlan: () => Promise<boolean>
 }
 
 const IMPORT_POLL_INTERVAL_MS = 1000
@@ -77,13 +77,15 @@ export const useImportStore = create<ImportStore>((set, get) => ({
   loadingImportPlan: false,
   importResult: null,
   createImportPlan: async (sourcePath: File) => {
-    set({ creatingImportPlan: true, importPlan: null, importResult: null })
+    set({ creatingImportPlan: true })
     try {
       const importPlan = await importAPI.createImportPlanFromZip(sourcePath)
       toast.success('Import plan created successfully')
-      set({ importPlan })
+      set({ importPlan, importResult: null })
+      return true
     } catch (err) {
       toast.error('Failed to create import plan: ' + getErrorMessage(err))
+      return false
     } finally {
       set({ creatingImportPlan: false })
     }
@@ -159,7 +161,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
     const importPlan = get().importPlan
     if (importPlan === null) {
       toast.error('No import plan to clear')
-      return
+      return false
     }
     try {
       set({ cancelingImportPlan: true })
@@ -182,15 +184,17 @@ export const useImportStore = create<ImportStore>((set, get) => ({
           importResult: finalPlan.execution_result ?? null,
         })
         useTreeStore.getState().reloadTree()
-        return
+        return finalPlan.execution_status === 'canceled'
       }
 
       toast.success('Import plan cleared')
       set({ importPlan: null, importResult: null })
+      return true
     } catch (err) {
       toast.error(
         'Failed to cancel or clear import plan: ' + getErrorMessage(err),
       )
+      return false
     } finally {
       set({ cancelingImportPlan: false })
     }

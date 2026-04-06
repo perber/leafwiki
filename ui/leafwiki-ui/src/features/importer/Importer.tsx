@@ -103,19 +103,21 @@ export default function Importer() {
     if (!zipFile) {
       return
     }
-    createImportPlan(zipFile)
+    void createImportPlan(zipFile)
   }, [createImportPlan])
 
   const closeImporter = useCallback(async () => {
-    if (importPlan) {
-      await cancelImportPlan()
+    const cleared = importPlan ? await cancelImportPlan() : true
+    if (!cleared) {
+      return
     }
     navigate('/')
   }, [cancelImportPlan, importPlan, navigate])
 
   const startNewImport = useCallback(async () => {
-    if (importPlan) {
-      await cancelImportPlan()
+    const cleared = importPlan ? await cancelImportPlan() : true
+    if (!cleared) {
+      return
     }
     if (zipRef.current) {
       zipRef.current.value = ''

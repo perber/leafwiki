@@ -52,4 +52,18 @@ test.describe('Importer', () => {
 
     await importerPage.startNewImport();
   });
+
+  test('close-and-clear-removes-completed-import-state', async ({ page }) => {
+    const importerPage = new ImporterPage(page);
+    await importerPage.goto();
+    await importerPage.clearImportPlanIfPresent();
+
+    await importerPage.uploadZip(importZipPath, importZipFileName);
+    await importerPage.createImportPlan();
+    await importerPage.executeImportPlan();
+
+    await importerPage.closeAndClear();
+    await importerPage.goto();
+    await importerPage.expectNoStoredPlan();
+  });
 });
