@@ -74,7 +74,21 @@ export async function executeImportPlan(): Promise<ImportPlan> {
 }
 
 export async function cancelImportPlan(): Promise<ImportPlan | null> {
-  return (await fetchWithAuth('/api/import/plan', {
+  const response = await fetchWithAuth('/api/import/plan', {
     method: 'DELETE',
-  })) as ImportPlan | null
+  })
+
+  if (response === null) {
+    return null
+  }
+
+  if (
+    typeof response === 'object' &&
+    response !== null &&
+    'execution_status' in response
+  ) {
+    return response as ImportPlan
+  }
+
+  throw new Error('Unexpected import cancel response')
 }

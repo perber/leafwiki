@@ -610,6 +610,9 @@ func TestCancelImportPlanEndpoint(t *testing.T) {
 	if cancelRec.Code != http.StatusOK {
 		t.Fatalf("Expected status 200 when canceling import plan, got %d: %s", cancelRec.Code, cancelRec.Body.String())
 	}
+	if got := strings.TrimSpace(cancelRec.Body.String()); got != "null" {
+		t.Fatalf("Expected null response body when clearing import plan, got %q", got)
+	}
 
 	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/import/plan", nil)
 	if getRec.Code != http.StatusNotFound {

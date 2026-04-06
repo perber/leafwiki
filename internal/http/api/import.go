@@ -111,6 +111,6 @@ func ClearImportPlanHandler(svc *importer.ImporterService) gin.HandlerFunc {
 			respondWithError(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"ok": true})
+		c.JSON(http.StatusOK, nil)
 	}
 }

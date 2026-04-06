@@ -107,6 +107,9 @@ func (ps *PlanStore) TryStartExecution(userID string) (*StoredPlan, bool, error)
 	if ps.plan == nil {
 		return nil, false, ErrNoPlan
 	}
+	if ps.plan.Plan == nil {
+		return nil, false, ErrImportStateUnavailable
+	}
 
 	switch ps.plan.ExecutionStatus {
 	case ExecutionStatusRunning, ExecutionStatusCompleted:
@@ -194,14 +197,14 @@ func (ps *PlanStore) UpdateExecutionProgress(planID string, progress ExecutionPr
 		return nil
 	}
 
-	ps.plan.ExecutionProgress.ProcessedItems = progress.ProcessedItems
-	ps.plan.ExecutionProgress.TotalItems = progress.TotalItems
-	ps.plan.ExecutionProgress.CurrentItemSourcePath = progress.CurrentItemSourcePath
+	ps.plan.ProcessedItems = progress.ProcessedItems
+	ps.plan.TotalItems = progress.TotalItems
+	ps.plan.CurrentItemSourcePath = progress.CurrentItemSourcePath
 	if progress.StartedAt != nil {
-		ps.plan.ExecutionProgress.StartedAt = progress.StartedAt
+		ps.plan.StartedAt = progress.StartedAt
 	}
 	if progress.FinishedAt != nil {
-		ps.plan.ExecutionProgress.FinishedAt = progress.FinishedAt
+		ps.plan.FinishedAt = progress.FinishedAt
 	}
 	if partialResult != nil {
 		ps.plan.ExecutionResult = cloneExecutionResult(partialResult)

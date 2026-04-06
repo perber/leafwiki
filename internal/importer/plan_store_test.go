@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestPlanStoreSet(t *testing.T) {
@@ -107,5 +108,56 @@ func TestPlanStore_LoadError_IsReported(t *testing.T) {
 	store := NewPlanStore(stateFile)
 	if _, err := store.Get(); !errors.Is(err, ErrImportStateUnavailable) {
 		t.Fatalf("expected ErrImportStateUnavailable, got %v", err)
+	}
+}
+
+func TestPlanStoreTryStartExecution_WithNilPlanPayload(t *testing.T) {
+	store := NewPlanStore()
+	if err := store.Set(&StoredPlan{
+		Plan:            nil,
+		ExecutionStatus: ExecutionStatusPlanned,
+	}); err != nil {
+		t.Fatalf("Set err: %v", err)
+	}
+
+	_, _, err := store.TryStartExecution("user-1")
+	if !errors.Is(err, ErrImportStateUnavailable) {
+		t.Fatalf("expected ErrImportStateUnavailable, got %v", err)
+	}
+}
+
+func TestPlanStoreUpdateExecutionProgress_UpdatesEmbeddedFields(t *testing.T) {
+	store := NewPlanStore()
+	if err := store.Set(&StoredPlan{
+		Plan:            &PlanResult{ID: "plan-1"},
+		ExecutionStatus: ExecutionStatusRunning,
+	}); err != nil {
+		t.Fatalf("Set err: %v", err)
+	}
+
+	now := time.Now()
+	sourcePath := "docs/readme.md"
+	err := store.UpdateExecutionProgress("plan-1", ExecutionProgress{
+		ProcessedItems:        2,
+		TotalItems:            5,
+		CurrentItemSourcePath: &sourcePath,
+		StartedAt:             &now,
+	}, nil)
+	if err != nil {
+		t.Fatalf("UpdateExecutionProgress err: %v", err)
+	}
+
+	retrieved, err := store.Get()
+	if err != nil {
+		t.Fatalf("Get err: %v", err)
+	}
+	if retrieved.ProcessedItems != 2 || retrieved.TotalItems != 5 {
+		t.Fatalf("unexpected progress values: %#v", retrieved.ExecutionProgress)
+	}
+	if retrieved.CurrentItemSourcePath == nil || *retrieved.CurrentItemSourcePath != sourcePath {
+		t.Fatalf("unexpected current item source path: %#v", retrieved.CurrentItemSourcePath)
+	}
+	if retrieved.StartedAt == nil || !retrieved.StartedAt.Equal(now) {
+		t.Fatalf("expected started_at to be updated, got %#v", retrieved.StartedAt)
 	}
 }

@@ -165,7 +165,11 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       set({ cancelingImportPlan: true })
       const response = await importAPI.cancelImportPlan()
 
-      if (importPlan.execution_status === 'running' && response) {
+      if (
+        response &&
+        response.execution_status === 'running' &&
+        response.cancel_requested
+      ) {
         set({ importPlan: response })
         const finalPlan = await pollImportPlanUntilSettled(response, set)
         toast.success(
