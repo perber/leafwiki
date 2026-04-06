@@ -250,7 +250,7 @@ export default function Importer() {
           ? 'Cancellation was requested. The importer will stop after the current item finishes.'
           : 'The import is running. You can stay on this page and watch the progress update.'
         : importStatus === 'completed'
-          ? 'The import finished successfully. Review created, skipped, or failed items below.'
+          ? 'The import finished successfully. Review the result below, or start a new import with another zip package.'
           : importStatus === 'failed'
             ? 'The import stopped with an error. Check the message and result items below.'
             : importStatus === 'canceled'
@@ -538,7 +538,7 @@ export default function Importer() {
                 Start New Import
               </Button>
               <Button
-                variant="default"
+                variant="destructive"
                 onClick={() => {
                   void closeImporter()
                 }}
@@ -549,7 +549,7 @@ export default function Importer() {
                 ) : (
                   <XIcon className="mr-2 h-4 w-4" />
                 )}
-                Close Importer
+                Close and Clear
               </Button>
             </div>
           </div>
@@ -730,6 +730,17 @@ export default function Importer() {
               need manual review, while failed items need attention before
               retrying.
             </p>
+            <div className="importer__callout">
+              <div className="importer__callout-title">
+                Want to import another package?
+              </div>
+              <div className="importer__callout-body">
+                <span>
+                  Start a new import to clear this result and choose a different
+                  zip file.
+                </span>
+              </div>
+            </div>
             <div className="importer__summary-grid">
               <div className="importer__summary-card">
                 <div className="importer__summary-label">Created</div>
@@ -778,6 +789,36 @@ export default function Importer() {
                   </tbody>
                 </table>
               </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void startNewImport()
+                }}
+                disabled={cancelingImportPlan}
+              >
+                {cancelingImportPlan ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <UploadIcon className="mr-2 h-4 w-4" />
+                )}
+                Start New Import
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  void closeImporter()
+                }}
+                disabled={cancelingImportPlan}
+              >
+                {cancelingImportPlan ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <XIcon className="mr-2 h-4 w-4" />
+                )}
+                Close and Clear
+              </Button>
             </div>
           </div>
         )}

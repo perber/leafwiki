@@ -40,4 +40,16 @@ test.describe('Importer', () => {
 
     await importerPage.clearImportPlan();
   });
+
+  test('can-start-a-new-import-after-successful-import', async ({ page }) => {
+    const importerPage = new ImporterPage(page);
+    await importerPage.goto();
+    await importerPage.clearImportPlanIfPresent();
+
+    await importerPage.uploadZip(importZipPath, importZipFileName);
+    await importerPage.createImportPlan();
+    await importerPage.executeImportPlan();
+
+    await importerPage.startNewImport();
+  });
 });

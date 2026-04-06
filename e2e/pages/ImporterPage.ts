@@ -22,6 +22,13 @@ export default class ImporterPage {
     await expect(this.page.getByRole('heading', { name: 'Import Plan' })).toBeVisible();
   }
 
+  async executeImportPlan() {
+    await this.page.getByRole('button', { name: 'Execute Import Plan' }).click();
+    await expect(this.page.getByText('Import completed successfully')).toBeVisible();
+    await this.expectPlanStatus('Completed');
+    await expect(this.page.getByRole('heading', { name: 'Import Result' })).toBeVisible();
+  }
+
   async expectPlanStatus(status: 'Planned' | 'Running' | 'Completed' | 'Canceled' | 'Failed') {
     await expect(this.page.locator('.importer__status-title')).toHaveText(status);
   }
@@ -49,5 +56,15 @@ export default class ImporterPage {
       await expect(this.page.getByText('Import plan cleared')).toBeVisible();
       await expect(this.page.getByRole('heading', { name: 'Import Plan' })).toHaveCount(0);
     }
+  }
+
+  async startNewImport() {
+    await this.page.getByRole('button', { name: 'Start New Import' }).click();
+    await expect(this.page.getByRole('heading', { name: 'Choose Import Package' })).toBeVisible();
+    await expect(
+      this.page.getByText(
+        'Start a new import to clear this result and choose a different zip file.',
+      ),
+    ).toHaveCount(0);
   }
 }
