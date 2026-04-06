@@ -53,16 +53,12 @@ export default class EditPage {
   }
 
   async insertAssetAsPlayer(filename: string) {
-    const asset = this.page
-      .locator('li[data-testid="asset-item"]')
-      .filter({ hasText: filename });
+    const asset = this.page.locator('li[data-testid="asset-item"]').filter({ hasText: filename });
     await asset.locator('[data-testid="asset-insert-player-button"]').click();
   }
 
   async insertAssetAsLink(filename: string) {
-    const asset = this.page
-      .locator('li[data-testid="asset-item"]')
-      .filter({ hasText: filename });
+    const asset = this.page.locator('li[data-testid="asset-item"]').filter({ hasText: filename });
     await asset.locator('[data-testid="asset-insert-link-button"]').click();
   }
 }

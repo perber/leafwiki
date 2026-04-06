@@ -77,9 +77,7 @@ test.describe('Asset Uploads', () => {
 
     test.expect(await page.locator('article img').count()).toBe(0);
     await page.locator('article a[href*="upload-test.png"]').waitFor({ state: 'visible' });
-    test.expect(
-      await page.locator('article a[href*="upload-test.png"]').count(),
-    ).toBe(1);
+    test.expect(await page.locator('article a[href*="upload-test.png"]').count()).toBe(1);
   });
 
   test('upload-audio-and-video-assets-and-insert-players', async ({ page }) => {
