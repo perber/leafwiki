@@ -27,7 +27,9 @@ export default class ImporterPage {
   }
 
   async expectPlanItemCount(count: number) {
-    await expect(this.page.getByRole('heading', { name: `Planned Items (${count})` })).toBeVisible();
+    await expect(
+      this.page.getByRole('heading', { name: `Planned Items (${count})` }),
+    ).toBeVisible();
   }
 
   async expectPlanContainsSourcePath(sourcePath: string) {
