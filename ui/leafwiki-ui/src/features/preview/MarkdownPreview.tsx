@@ -23,9 +23,17 @@ import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 
 const schema = {
   ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames || []), 'audio', 'video'],
   attributes: {
     ...defaultSchema.attributes,
     '*': [...(defaultSchema.attributes?.['*'] || []), 'data-line', 'style'],
+    audio: [...(defaultSchema.attributes?.audio || []), 'controls', 'src'],
+    video: [
+      ...(defaultSchema.attributes?.video || []),
+      'controls',
+      'src',
+      'preload',
+    ],
   },
 }
 
