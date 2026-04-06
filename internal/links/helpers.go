@@ -18,6 +18,14 @@ type TargetLink struct {
 
 var markdownParser = goldmark.New()
 
+func isAssetLinkDestination(dest string) bool {
+	dest = strings.TrimSpace(dest)
+	dest = strings.TrimPrefix(dest, "<")
+	dest = strings.TrimSuffix(dest, ">")
+
+	return strings.HasPrefix(dest, "/assets/") || strings.HasPrefix(dest, "assets/")
+}
+
 // extractLinksFromMarkdown extracts all links from the given markdown content.
 func extractLinksFromMarkdown(content string) []string {
 	links := []string{}
@@ -28,7 +36,8 @@ func extractLinksFromMarkdown(content string) []string {
 		if link, ok := n.(*ast.Link); ok && entering {
 			// ignore external links
 			dest := string(link.Destination)
-			if strings.HasPrefix(dest, "http://") || strings.HasPrefix(dest, "https://") || strings.HasPrefix(dest, "mailto:") || strings.HasPrefix(dest, "#") {
+			lower := strings.ToLower(dest)
+			if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "mailto:") || strings.HasPrefix(lower, "#") {
 				return ast.WalkContinue, nil
 			}
 			// strip hash fragments
@@ -38,6 +47,9 @@ func extractLinksFromMarkdown(content string) []string {
 			// strip query parameters
 			if idx := strings.Index(dest, "?"); idx != -1 {
 				dest = dest[:idx]
+			}
+			if isAssetLinkDestination(dest) {
+				return ast.WalkContinue, nil
 			}
 
 			links = append(links, dest)
@@ -120,6 +132,10 @@ func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []stri
 	var targetLinks []TargetLink
 
 	for _, link := range links {
+		if isAssetLinkDestination(link) {
+			continue
+		}
+
 		// resolve link against current path
 		resolvedPath, err := resolveURLPath(currentPath, link)
 		if err != nil || resolvedPath == "" {
