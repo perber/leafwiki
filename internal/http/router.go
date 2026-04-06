@@ -75,8 +75,9 @@ type RouterOptions struct {
 func wireImporterService(w *wiki.Wiki, maxAssetUploadSizeBytes int64) *importer.ImporterService {
 	slugger := w.GetSlugService()
 	planner := importer.NewPlanner(w, slugger)
-	store := importer.NewPlanStore()
-	return importer.NewImporterService(planner, store, maxAssetUploadSizeBytes)
+	importerDir := filepath.Join(w.GetStorageDir(), ".importer")
+	store := importer.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
+	return importer.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), maxAssetUploadSizeBytes)
 }
 
 // NewRouter creates a new HTTP router for the wiki application.

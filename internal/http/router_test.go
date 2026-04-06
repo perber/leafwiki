@@ -610,6 +610,9 @@ func TestCancelImportPlanEndpoint(t *testing.T) {
 	if cancelRec.Code != http.StatusOK {
 		t.Fatalf("Expected status 200 when canceling import plan, got %d: %s", cancelRec.Code, cancelRec.Body.String())
 	}
+	if got := strings.TrimSpace(cancelRec.Body.String()); got != "null" {
+		t.Fatalf("Expected null response body when clearing import plan, got %q", got)
+	}
 
 	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/import/plan", nil)
 	if getRec.Code != http.StatusNotFound {
@@ -712,19 +715,67 @@ func TestImportExecuteEndpoint_WithZipUpload_ImportsPagesLinksAndAssets(t *testi
 	execRec := httptest.NewRecorder()
 	router.ServeHTTP(execRec, execReq)
 
-	if execRec.Code != http.StatusOK {
-		t.Fatalf("Expected status 200 when executing import, got %d: %s", execRec.Code, execRec.Body.String())
+	if execRec.Code != http.StatusAccepted {
+		t.Fatalf("Expected status 202 when starting import, got %d: %s", execRec.Code, execRec.Body.String())
 	}
 
 	var execResp struct {
-		ImportedCount int `json:"imported_count"`
-		SkippedCount  int `json:"skipped_count"`
+		ImportedCount   int    `json:"imported_count"`
+		SkippedCount    int    `json:"skipped_count"`
+		ExecutionStatus string `json:"execution_status"`
+		ExecutionResult *struct {
+			ImportedCount int `json:"imported_count"`
+			SkippedCount  int `json:"skipped_count"`
+		} `json:"execution_result"`
 	}
 	if err := json.Unmarshal(execRec.Body.Bytes(), &execResp); err != nil {
 		t.Fatalf("Invalid import execute response JSON: %v", err)
 	}
-	if execResp.ImportedCount != 5 || execResp.SkippedCount != 0 {
-		t.Fatalf("unexpected execution result: imported=%d skipped=%d", execResp.ImportedCount, execResp.SkippedCount)
+
+	if execResp.ExecutionStatus != "running" {
+		t.Fatalf("expected running execution status, got %q", execResp.ExecutionStatus)
+	}
+
+	var completedResp struct {
+		ExecutionStatus string `json:"execution_status"`
+		ExecutionResult *struct {
+			ImportedCount int `json:"imported_count"`
+			SkippedCount  int `json:"skipped_count"`
+		} `json:"execution_result"`
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		statusReq := httptest.NewRequest(http.MethodGet, "/api/import/plan", nil)
+		for _, cookie := range cookies {
+			statusReq.AddCookie(cookie)
+		}
+
+		statusRec := httptest.NewRecorder()
+		router.ServeHTTP(statusRec, statusReq)
+
+		if statusRec.Code != http.StatusOK {
+			t.Fatalf("Expected status 200 when fetching import plan, got %d: %s", statusRec.Code, statusRec.Body.String())
+		}
+		if err := json.Unmarshal(statusRec.Body.Bytes(), &completedResp); err != nil {
+			t.Fatalf("Invalid import status response JSON: %v", err)
+		}
+		if completedResp.ExecutionStatus == "completed" {
+			break
+		}
+
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if completedResp.ExecutionStatus != "completed" || completedResp.ExecutionResult == nil {
+		t.Fatalf("expected completed execution result, got %#v", completedResp)
+	}
+	if completedResp.ExecutionResult.ImportedCount != 5 || completedResp.ExecutionResult.SkippedCount != 0 {
+		t.Fatalf(
+			"unexpected execution result: imported=%d skipped=%d",
+			completedResp.ExecutionResult.ImportedCount,
+			completedResp.ExecutionResult.SkippedCount,
+		)
 	}
 
 	setupPage, err := w.FindByPath("guides/setup")
@@ -843,25 +894,66 @@ func TestImportExecuteEndpoint_UsesConfiguredAssetUploadLimit(t *testing.T) {
 	execRec := httptest.NewRecorder()
 	router.ServeHTTP(execRec, execReq)
 
-	if execRec.Code != http.StatusOK {
-		t.Fatalf("Expected status 200 when executing import, got %d: %s", execRec.Code, execRec.Body.String())
+	if execRec.Code != http.StatusAccepted {
+		t.Fatalf("Expected status 202 when starting import, got %d: %s", execRec.Code, execRec.Body.String())
 	}
 
 	var execResp struct {
-		ImportedCount int `json:"imported_count"`
-		SkippedCount  int `json:"skipped_count"`
-		Items         []struct {
-			Error *string `json:"error"`
-		} `json:"items"`
+		ExecutionStatus string `json:"execution_status"`
 	}
 	if err := json.Unmarshal(execRec.Body.Bytes(), &execResp); err != nil {
 		t.Fatalf("Invalid import execute response JSON: %v", err)
 	}
-	if execResp.ImportedCount != 0 || execResp.SkippedCount != 1 {
-		t.Fatalf("unexpected execution result: imported=%d skipped=%d", execResp.ImportedCount, execResp.SkippedCount)
+	if execResp.ExecutionStatus != "running" {
+		t.Fatalf("expected running execution status, got %q", execResp.ExecutionStatus)
 	}
-	if len(execResp.Items) != 1 || execResp.Items[0].Error == nil || !strings.Contains(*execResp.Items[0].Error, "file too large") {
-		t.Fatalf("expected import error about configured asset limit, got %#v", execResp.Items)
+
+	var completedResp struct {
+		ExecutionStatus string `json:"execution_status"`
+		ExecutionResult *struct {
+			ImportedCount int `json:"imported_count"`
+			SkippedCount  int `json:"skipped_count"`
+			Items         []struct {
+				Error *string `json:"error"`
+			} `json:"items"`
+		} `json:"execution_result"`
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		statusReq := httptest.NewRequest(http.MethodGet, "/api/import/plan", nil)
+		for _, cookie := range cookies {
+			statusReq.AddCookie(cookie)
+		}
+
+		statusRec := httptest.NewRecorder()
+		router.ServeHTTP(statusRec, statusReq)
+
+		if statusRec.Code != http.StatusOK {
+			t.Fatalf("Expected status 200 when fetching import plan, got %d: %s", statusRec.Code, statusRec.Body.String())
+		}
+		if err := json.Unmarshal(statusRec.Body.Bytes(), &completedResp); err != nil {
+			t.Fatalf("Invalid import status response JSON: %v", err)
+		}
+		if completedResp.ExecutionStatus == "completed" {
+			break
+		}
+
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if completedResp.ExecutionStatus != "completed" || completedResp.ExecutionResult == nil {
+		t.Fatalf("expected completed execution result, got %#v", completedResp)
+	}
+	if completedResp.ExecutionResult.ImportedCount != 0 || completedResp.ExecutionResult.SkippedCount != 1 {
+		t.Fatalf(
+			"unexpected execution result: imported=%d skipped=%d",
+			completedResp.ExecutionResult.ImportedCount,
+			completedResp.ExecutionResult.SkippedCount,
+		)
+	}
+	if len(completedResp.ExecutionResult.Items) != 1 || completedResp.ExecutionResult.Items[0].Error == nil || !strings.Contains(*completedResp.ExecutionResult.Items[0].Error, "file too large") {
+		t.Fatalf("expected import error about configured asset limit, got %#v", completedResp.ExecutionResult.Items)
 	}
 }
 

@@ -47,7 +47,12 @@ func CreateImportPlanHandler(svc *importer.ImporterService) gin.HandlerFunc {
 		// optional: targetBasePath from form (defaults to empty string = root)
 		targetBasePath := c.PostForm("targetBasePath")
 
-		plan, err := svc.CreateImportPlanFromZipUpload(file, targetBasePath)
+		if _, err := svc.CreateImportPlanFromZipUpload(file, targetBasePath); err != nil {
+			respondWithError(c, err)
+			return
+		}
+
+		plan, err := svc.GetCurrentPlan()
 		if err != nil {
 			respondWithError(c, err)
 			return
@@ -75,19 +80,37 @@ func ExecuteImportHandler(svc *importer.ImporterService, w *wiki.Wiki) gin.Handl
 			return
 		}
 
-		res, err := svc.ExecuteCurrentPlan(user.ID)
+		res, started, err := svc.StartCurrentPlanExecution(user.ID)
 		if err != nil {
 			respondWithError(c, err)
 			return
 		}
 
-		c.JSON(http.StatusOK, res)
+		statusCode := http.StatusOK
+		if started || res.ExecutionStatus == importer.ExecutionStatusRunning {
+			statusCode = http.StatusAccepted
+		}
+
+		c.JSON(statusCode, res)
 	}
 }
 
 func ClearImportPlanHandler(svc *importer.ImporterService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		svc.ClearCurrentPlan()
-		c.JSON(http.StatusOK, gin.H{"ok": true})
+		state, _, err := svc.CancelCurrentPlan()
+		if err == nil && state != nil && state.ExecutionStatus == importer.ExecutionStatusRunning && state.CancelRequested {
+			c.JSON(http.StatusAccepted, state)
+			return
+		}
+		if err != nil && err != importer.ErrNoPlan {
+			respondWithError(c, err)
+			return
+		}
+
+		if err := svc.ClearCurrentPlan(); err != nil {
+			respondWithError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, nil)
 	}
 }

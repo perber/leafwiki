@@ -231,6 +231,18 @@ func TestParseFrontmatter(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:  "template placeholder scalar is treated as string",
+			input: "---\nDatum: {{date}}\n---\nBody",
+			wantFM: Frontmatter{
+				ExtraFields: map[string]interface{}{
+					"Datum": "{{date}}",
+				},
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
 			name:  "frontmatter with whitespace in values",
 			input: "---\nleafwiki_id: \"  abc123  \"\nleafwiki_title: \"  My Title  \"\n---\nBody",
 			wantFM: Frontmatter{

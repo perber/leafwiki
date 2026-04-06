@@ -1341,6 +1341,150 @@
     @apply text-xs;
   }
 
+  .importer__steps {
+    @apply grid gap-3 md:grid-cols-4;
+  }
+
+  .importer__step {
+    @apply border-surface-border bg-surface-alt rounded-md border p-4;
+  }
+
+  .importer__step--active {
+    @apply border-brand bg-brand/5;
+  }
+
+  .importer__step--done {
+    @apply border-success/30 bg-success/5;
+  }
+
+  .importer__step-number {
+    @apply text-interface-text mb-3 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold;
+  }
+
+  .importer__step--active .importer__step-number {
+    @apply bg-brand/15 text-brand;
+  }
+
+  .importer__step--done .importer__step-number {
+    @apply bg-success/15 text-success;
+  }
+
+  .importer__step--upcoming .importer__step-number {
+    @apply bg-surface text-muted;
+  }
+
+  .importer__step-title {
+    @apply text-interface-text text-sm font-semibold;
+  }
+
+  .importer__step-description {
+    @apply text-muted mt-1 text-xs;
+  }
+
+  .importer__callout {
+    @apply border-brand/20 bg-brand/5 mb-4 rounded-md border p-4;
+  }
+
+  .importer__callout-title {
+    @apply text-interface-text mb-2 text-sm font-semibold;
+  }
+
+  .importer__callout-body {
+    @apply text-muted flex flex-col gap-1 text-sm;
+  }
+
+  .importer__info-grid {
+    @apply grid gap-3 md:grid-cols-3;
+  }
+
+  .importer__info-card {
+    @apply border-surface-border bg-surface-alt rounded-md border p-4;
+  }
+
+  .importer__info-title {
+    @apply text-interface-text text-sm font-semibold;
+  }
+
+  .importer__info-text {
+    @apply text-muted mt-1 text-xs leading-5;
+  }
+
+  .importer__status-banner {
+    @apply border-surface-border bg-surface-alt mb-4 rounded-md border p-4;
+  }
+
+  .importer__status-header {
+    @apply mb-3 flex items-start justify-between gap-3;
+  }
+
+  .importer__status-title {
+    @apply text-interface-text text-xl font-semibold;
+  }
+
+  .importer__status-meta {
+    @apply text-muted mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs;
+  }
+
+  .importer__progress {
+    @apply bg-surface h-2 w-full overflow-hidden rounded-full;
+  }
+
+  .importer__progress-bar {
+    @apply bg-brand h-full rounded-full transition-all duration-300;
+  }
+
+  .importer__summary-grid {
+    @apply mb-4 grid gap-3 md:grid-cols-4;
+  }
+
+  .importer__summary-grid--three {
+    @apply md:grid-cols-3;
+  }
+
+  .importer__summary-card {
+    @apply border-surface-border bg-surface-alt rounded-md border p-4;
+  }
+
+  .importer__summary-label {
+    @apply text-muted text-xs tracking-wide uppercase;
+  }
+
+  .importer__summary-value {
+    @apply text-interface-text mt-2 text-2xl font-semibold;
+  }
+
+  .importer__status-copy {
+    @apply leading-6;
+  }
+
+  .importer__details-cell {
+    @apply max-w-xl leading-6;
+  }
+
+  .importer__muted-copy {
+    @apply text-muted italic;
+  }
+
+  .importer__result-toolbar {
+    @apply mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between;
+  }
+
+  .importer__filter-group {
+    @apply flex flex-wrap gap-2;
+  }
+
+  .importer__filter-chip {
+    @apply border-surface-border bg-surface-alt text-interface-text rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors;
+  }
+
+  .importer__filter-chip--active {
+    @apply border-brand bg-brand/10 text-brand;
+  }
+
+  .importer__search {
+    @apply border-surface-border bg-surface text-interface-text w-full rounded-md border px-3 py-2 text-sm md:max-w-sm;
+  }
+
   .settings__table-head {
     @apply bg-surface-alt text-left;
   }
