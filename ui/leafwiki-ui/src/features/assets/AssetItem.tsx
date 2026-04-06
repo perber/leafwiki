@@ -1,14 +1,20 @@
 import { Button } from '@/components/ui/button'
 import { deleteAsset, renameAsset } from '@/lib/api/assets'
-import { IMAGE_EXTENSIONS } from '@/lib/config'
+import {
+  AUDIO_EXTENSIONS,
+  IMAGE_EXTENSIONS,
+  VIDEO_EXTENSIONS,
+} from '@/lib/config'
 import { withBasePath } from '@/lib/routePath'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
-import { Check, FileText, Pencil, Trash2, X } from 'lucide-react'
+import { Check, FileText, Link2, Pencil, Play, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AssetPreviewTooltip } from './AssetPreviewTooltip'
 
 const imageExtensions = IMAGE_EXTENSIONS
+const audioExtensions = AUDIO_EXTENSIONS
+const videoExtensions = VIDEO_EXTENSIONS
 
 type Props = {
   pageId: string
@@ -40,6 +46,9 @@ export function AssetItem({
   const assetUrl = withBasePath(assetPath)
   const ext = filename.split('.').pop()?.toLowerCase()
   const isImage = imageExtensions.includes(ext ?? '')
+  const isAudio = audioExtensions.includes(ext ?? '')
+  const isVideo = videoExtensions.includes(ext ?? '')
+  const isPlayableMedia = isAudio || isVideo
   const baseName = filename.split('/').pop() ?? filename
   const isEditing = editingFilename === filename
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
@@ -92,12 +101,34 @@ export function AssetItem({
 
   const handleInsertMarkdown = () => {
     if (isEditing) return
+    onInsert(buildInsertMarkdown('default'))
+  }
 
-    const markdown = isImage
-      ? `![${newName}](${markdownAssetUrl})\n`
+  const handleInsertLink = () => {
+    if (isEditing) return
+    onInsert(buildInsertMarkdown('link'))
+  }
+
+  const handleInsertPlayer = () => {
+    if (isEditing || !isPlayableMedia) return
+    onInsert(buildInsertMarkdown('player'))
+  }
+
+  const buildInsertMarkdown = (mode: 'default' | 'link' | 'player') => {
+    if (mode === 'player' && isPlayableMedia) {
+      if (isAudio) {
+        return `<audio controls src="${markdownAssetUrl}"></audio>\n`
+      }
+      return `<video controls preload="metadata" src="${markdownAssetUrl}"></video>\n`
+    }
+
+    if (mode === 'link') {
+      return `[${baseName}](${markdownAssetUrl})\n`
+    }
+
+    return isImage
+      ? `![${baseName}](${markdownAssetUrl})\n`
       : `[${baseName}](${markdownAssetUrl})\n`
-
-    onInsert(markdown)
   }
 
   // hotkeys for rename
@@ -197,6 +228,49 @@ export function AssetItem({
         </>
       ) : (
         <>
+          {isImage && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="asset-item__action-button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleInsertLink()
+              }}
+              title="Insert image link"
+              data-testid="asset-insert-link-button"
+            >
+              <Link2 size={16} />
+            </Button>
+          )}
+          {isPlayableMedia && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="asset-item__action-button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleInsertPlayer()
+              }}
+              title={isAudio ? 'Insert audio player' : 'Insert video player'}
+              data-testid="asset-insert-player-button"
+            >
+              <Play size={16} />
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            className="asset-item__action-button"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleInsertMarkdown()
+            }}
+            title={isImage ? 'Insert image' : 'Insert link'}
+            data-testid="asset-insert-default-button"
+          >
+            <FileText size={16} />
+          </Button>
           <Button
             variant="outline"
             size="icon"

@@ -178,7 +178,8 @@ export function AssetManager({
       </div>
 
       <p className="asset-manager__tip">
-        Tip: Double-click on an asset to insert it into the page.
+        Tip: Double-click inserts the default markup. Images can also be added
+        as links, and audio/video have a player insert button.
       </p>
     </div>
   )

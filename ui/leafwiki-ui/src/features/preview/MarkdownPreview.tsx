@@ -1,11 +1,14 @@
 import './markdownPreviewCodeTheme.css'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
+import { withBasePath } from '@/lib/routePath'
 import {
+  AudioHTMLAttributes,
   ClassAttributes,
   HTMLAttributes,
   useCallback,
   useMemo,
   useSyncExternalStore,
+  VideoHTMLAttributes,
 } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
@@ -23,15 +26,34 @@ import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 
 const schema = {
   ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames || []), 'audio', 'video'],
   attributes: {
     ...defaultSchema.attributes,
     '*': [...(defaultSchema.attributes?.['*'] || []), 'data-line', 'style'],
+    audio: [...(defaultSchema.attributes?.audio || []), 'controls', 'src'],
+    video: [
+      ...(defaultSchema.attributes?.video || []),
+      'controls',
+      'src',
+      'preload',
+    ],
   },
 }
 
 type Props = {
   content: string
   path?: string
+}
+
+function normalizeAssetMediaSrc(src?: string) {
+  if (!src) return src
+  if (src.startsWith('/assets/')) {
+    return withBasePath(src)
+  }
+  if (src.startsWith('assets/')) {
+    return withBasePath(`/${src}`)
+  }
+  return src
 }
 
 export default function MarkdownPreview({ content, path }: Props) {
@@ -70,6 +92,12 @@ export default function MarkdownPreview({ content, path }: Props) {
     () => ({
       a: markdownLink,
       img: MarkdownImage,
+      audio: (props: AudioHTMLAttributes<HTMLAudioElement>) => (
+        <audio {...props} src={normalizeAssetMediaSrc(props.src)} />
+      ),
+      video: (props: VideoHTMLAttributes<HTMLVideoElement>) => (
+        <video {...props} src={normalizeAssetMediaSrc(props.src)} />
+      ),
       h1: ({
         children,
         ...props

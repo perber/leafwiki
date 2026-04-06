@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 export default class EditPage {
   constructor(private page: Page) {}
@@ -23,6 +23,9 @@ export default class EditPage {
   async openAssetManager() {
     const assetManagerButton = this.page.locator('button[data-testid="open-asset-manager-button"]');
     await assetManagerButton.click();
+    await this.page
+      .locator('div[data-testid="asset-upload-dropzone"]')
+      .waitFor({ state: 'visible' });
   }
 
   async openMetadataDialog() {
@@ -32,6 +35,8 @@ export default class EditPage {
 
   async uploadAsset(filePath: string) {
     const dropzone = this.page.locator('div[data-testid="asset-upload-dropzone"]');
+    const assets = this.page.locator('li[data-testid="asset-item"]');
+    const existingCount = await assets.count();
 
     const [fileChooser] = await Promise.all([
       this.page.waitForEvent('filechooser'),
@@ -39,7 +44,7 @@ export default class EditPage {
     ]);
 
     await fileChooser.setFiles(filePath);
-    await this.page.locator('li[data-testid="asset-item"]').first().waitFor({ state: 'visible' });
+    await expect(assets).toHaveCount(existingCount + 1);
   }
 
   async listAmountOfAssets(): Promise<number> {
@@ -50,5 +55,15 @@ export default class EditPage {
   async insertFirstAssetIntoPage() {
     const firstAsset = this.page.locator('li[data-testid="asset-item"]').first();
     await firstAsset.dblclick();
+  }
+
+  async insertAssetAsPlayer(filename: string) {
+    const asset = this.page.locator('li[data-testid="asset-item"]').filter({ hasText: filename });
+    await asset.locator('[data-testid="asset-insert-player-button"]').click();
+  }
+
+  async insertAssetAsLink(filename: string) {
+    const asset = this.page.locator('li[data-testid="asset-item"]').filter({ hasText: filename });
+    await asset.locator('[data-testid="asset-insert-link-button"]').click();
   }
 }
