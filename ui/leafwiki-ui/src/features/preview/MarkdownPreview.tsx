@@ -4,7 +4,10 @@ import { withBasePath } from '@/lib/routePath'
 import {
   AudioHTMLAttributes,
   ClassAttributes,
+  Component,
+  ErrorInfo,
   HTMLAttributes,
+  ReactNode,
   useCallback,
   useMemo,
   useSyncExternalStore,
@@ -26,10 +29,16 @@ import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 
 const schema = {
   ...defaultSchema,
+  clobberPrefix: '',
   tagNames: [...(defaultSchema.tagNames || []), 'audio', 'video'],
   attributes: {
     ...defaultSchema.attributes,
-    '*': [...(defaultSchema.attributes?.['*'] || []), 'data-line', 'style'],
+    '*': [
+      ...(defaultSchema.attributes?.['*'] || []),
+      'data-leafwiki-generated-id',
+      'data-line',
+      'style',
+    ],
     audio: [...(defaultSchema.attributes?.audio || []), 'controls', 'src'],
     video: [
       ...(defaultSchema.attributes?.video || []),
@@ -43,6 +52,43 @@ const schema = {
 type Props = {
   content: string
   path?: string
+}
+
+type MarkdownPreviewErrorBoundaryState = {
+  hasError: boolean
+}
+
+class MarkdownPreviewErrorBoundary extends Component<
+  { children: ReactNode; resetKey: string },
+  MarkdownPreviewErrorBoundaryState
+> {
+  state: MarkdownPreviewErrorBoundaryState = { hasError: false }
+
+  static getDerivedStateFromError(): MarkdownPreviewErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Markdown preview failed to render', error, errorInfo)
+  }
+
+  componentDidUpdate(prevProps: { children: ReactNode; resetKey: string }) {
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false })
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border p-4 text-sm">
+          This page contains Markdown that could not be rendered safely.
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
 }
 
 function normalizeAssetMediaSrc(src?: string) {
@@ -206,21 +252,23 @@ export default function MarkdownPreview({ content, path }: Props) {
   )
 
   return (
-    <>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[
-          rehypeRaw,
-          rehypeLineNumber,
-          rehypeWhitelistStyles,
-          [rehypeSanitize, schema],
-          rehypeHighlight,
-        ]}
-        components={components}
-      >
-        {content}
-      </ReactMarkdown>
-      <div id="mermaid-renderer"></div>
-    </>
+    <MarkdownPreviewErrorBoundary resetKey={`${path ?? ''}:${content}`}>
+      <>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[
+            rehypeRaw,
+            rehypeLineNumber,
+            rehypeWhitelistStyles,
+            [rehypeSanitize, schema],
+            rehypeHighlight,
+          ]}
+          components={components}
+        >
+          {content}
+        </ReactMarkdown>
+        <div id="mermaid-renderer"></div>
+      </>
+    </MarkdownPreviewErrorBoundary>
   )
 }

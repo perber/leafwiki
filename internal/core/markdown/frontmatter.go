@@ -174,7 +174,8 @@ func splitFrontmatter(md string) (yamlPart string, body string, has bool) {
 		if trim != "" && !strings.HasPrefix(trim, "#") {
 			if idx := strings.IndexByte(trim, ':'); idx > 0 {
 				key := strings.TrimSpace(trim[:idx])
-				if key != "" && strings.IndexFunc(key, invalidYAMLKeyRune) == -1 {
+				hasYAMLSeparator := idx == len(trim)-1 || unicode.IsSpace(rune(trim[idx+1]))
+				if hasYAMLSeparator && key != "" && strings.IndexFunc(key, invalidYAMLKeyRune) == -1 {
 					looksLikeYAML = true
 				}
 			}
