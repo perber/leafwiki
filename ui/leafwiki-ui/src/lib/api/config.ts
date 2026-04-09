@@ -17,22 +17,21 @@ export async function getConfig(): Promise<Config> {
   if (!res.ok) {
     const errorText = await res.text()
     const fallbackMessage = `Could not load config: ${res.status} ${res.statusText}`
+    let errorBody: ConfigErrorResponse | null = null
 
     try {
-      const errorBody: ConfigErrorResponse | null = errorText
+      errorBody = errorText
         ? (JSON.parse(errorText) as ConfigErrorResponse)
         : null
-      if (errorBody?.error || errorBody?.message) {
-        throw new Error(errorBody.error || errorBody.message)
-      }
-
-      throw new Error(fallbackMessage)
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
+    } catch {
       throw new Error(fallbackMessage)
     }
+
+    if (errorBody?.error || errorBody?.message) {
+      throw new Error(errorBody.error || errorBody.message)
+    }
+
+    throw new Error(fallbackMessage)
   }
   return await res.json()
 }

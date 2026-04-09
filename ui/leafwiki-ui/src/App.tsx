@@ -38,7 +38,12 @@ function App() {
   }, [loadBranding])
 
   useEffect(() => {
-    if (!configError || lastConfigErrorRef.current === configError) return
+    if (!configError) {
+      lastConfigErrorRef.current = null
+      return
+    }
+
+    if (lastConfigErrorRef.current === configError) return
 
     lastConfigErrorRef.current = configError
     toast.error(configError)
@@ -54,17 +59,12 @@ function App() {
     [isReadOnlyViewer, authDisabled],
   )
 
-  if (!configHasLoaded) return <Toaster richColors position="bottom-right" />
-
-  // Avoid router flicker before bootstrapping finished, show loading state if auth is enabled and still refreshing session
-  if (isRefreshing && !authDisabled) {
-    return <Toaster richColors position="bottom-right" /> // avoid router flicker before bootstrapping finished
-  }
-
   return (
     <>
       <Toaster richColors position="bottom-right" />
-      <RouterProvider router={router} />
+      {configHasLoaded && !(isRefreshing && !authDisabled) ? (
+        <RouterProvider router={router} />
+      ) : null}
     </>
   )
 }
