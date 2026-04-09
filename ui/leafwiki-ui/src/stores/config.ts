@@ -7,6 +7,7 @@ type ConfigStore = {
   hideLinkMetadataSection: boolean
   authDisabled: boolean
   maxAssetUploadSizeBytes: number
+  error: string | null
   loading: boolean
   hasLoaded: boolean
   loadConfig: () => Promise<void>
@@ -17,11 +18,12 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   hideLinkMetadataSection: false,
   authDisabled: false,
   maxAssetUploadSizeBytes: DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
+  error: null,
   loading: false,
   hasLoaded: false,
 
   loadConfig: async () => {
-    set({ loading: true })
+    set({ loading: true, error: null })
     try {
       const config = await getConfig()
       const maxAssetUploadSizeBytes = Number.isFinite(
@@ -35,11 +37,18 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         hideLinkMetadataSection: config.hideLinkMetadataSection,
         authDisabled: config.authDisabled,
         maxAssetUploadSizeBytes,
+        error: null,
         hasLoaded: true,
       })
     } catch (error) {
       console.warn('Error loading configuration:', error)
-      set({ hasLoaded: true })
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Could not load configuration',
+        hasLoaded: true,
+      })
     } finally {
       set({ loading: false })
     }
