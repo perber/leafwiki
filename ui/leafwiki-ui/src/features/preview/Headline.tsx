@@ -41,6 +41,7 @@ export default function Headline({
   const tagName = `h${level}` as keyof HTMLElementTagNameMap
   const shouldRenderAnchor = hasGeneratedId === 'true' && !!id
   const hasNestedLink = containsLink(children)
+  const sectionLinkLabel = 'Link to section'
 
   return createElement(
     tagName,
@@ -54,7 +55,12 @@ export default function Headline({
       hasNestedLink ? (
         <>
           {children}
-          <a className="headline-anchor" href={`#${id}`}>
+          <a
+            className="headline-anchor"
+            href={`#${id}`}
+            aria-label={sectionLinkLabel}
+            title={sectionLinkLabel}
+          >
             <span>
               <Paperclip size={18} />
             </span>

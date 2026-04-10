@@ -23,7 +23,7 @@ function ensureMermaidInitialized(theme: 'default' | 'dark') {
 export type MermaidInjectorOps = {
   containerRef: React.RefObject<HTMLDivElement | null>
   code: string
-  dataLine: string
+  dataLine?: string
   theme: 'default' | 'dark'
   onError: (message: string | null) => void
 }
@@ -57,7 +57,7 @@ export function useMermaidInjector({
   onError,
 }: MermaidInjectorOps) {
   const lastHashRef = useRef<string | null>(null)
-  const lastDataLineRef = useRef<string | null>(null)
+  const lastDataLineRef = useRef<string | undefined>(undefined)
   const lastThemeRef = useRef<'default' | 'dark' | null>(null)
 
   useEffect(() => {

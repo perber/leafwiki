@@ -16,7 +16,7 @@ export default memo(function MermaidBlock({
   useMermaidInjector({
     containerRef,
     code,
-    dataLine: dataLine as string,
+    dataLine,
     theme,
     onError: setErrorMessage,
   })

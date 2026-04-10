@@ -476,7 +476,7 @@ Target content`;
       .poll(async () => page.evaluate(() => window.location.hash), {
         timeout: 5000,
       })
-      .toBe('#intro');
+      .toBe('#leafwiki-intro');
   });
 
   test('headline anchor supports non-ascii headings', async ({ page }) => {
@@ -502,7 +502,7 @@ Target content`;
       .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
         timeout: 5000,
       })
-      .toBe('#привет-мир');
+      .toBe('#leafwiki-привет-мир');
 
     const latinHeading = page.locator('article h2').getByText('Café Überblick');
     await latinHeading.waitFor({ state: 'visible' });
@@ -512,7 +512,7 @@ Target content`;
       .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
         timeout: 5000,
       })
-      .toBe('#cafe-uberblick');
+      .toBe('#leafwiki-cafe-uberblick');
 
     const hanHeading = page.locator('article h3').getByText('你好 世界');
     await hanHeading.waitFor({ state: 'visible' });
@@ -522,7 +522,7 @@ Target content`;
       .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
         timeout: 5000,
       })
-      .toBe('#你好-世界');
+      .toBe('#leafwiki-你好-世界');
   });
 
   test('navigating away from page with footnote headline stays responsive', async ({ page }) => {

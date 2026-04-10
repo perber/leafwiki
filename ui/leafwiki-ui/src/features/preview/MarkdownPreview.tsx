@@ -29,7 +29,7 @@ import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 
 const schema = {
   ...defaultSchema,
-  clobberPrefix: '',
+  clobberPrefix: 'leafwiki-',
   tagNames: [...(defaultSchema.tagNames || []), 'audio', 'video'],
   attributes: {
     ...defaultSchema.attributes,
