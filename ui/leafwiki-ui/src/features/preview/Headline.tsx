@@ -1,61 +1,81 @@
 import { Paperclip } from 'lucide-react'
-import { ReactNode, useEffect } from 'react'
-import { JSX } from 'react/jsx-runtime'
-import { useHeadlinesStore } from './headlines'
+import clsx from 'clsx'
+import { createElement, HTMLAttributes, isValidElement, ReactNode } from 'react'
 
-function getText(node: ReactNode): string {
-  if (typeof node === 'string' || typeof node === 'number') {
-    return String(node)
-  }
+function containsLink(node: ReactNode): boolean {
+  if (node == null || typeof node === 'boolean') return false
+  if (typeof node === 'string' || typeof node === 'number') return false
   if (Array.isArray(node)) {
-    return node.map(getText).join('')
+    return node.some(containsLink)
   }
-  if (node && typeof node === 'object' && 'props' in node) {
-    // @ts-expect-error -- props exist
-    return getText(node.props.children)
+  if (!isValidElement(node)) return false
+  const props = (node.props ?? {}) as { href?: string; children?: ReactNode }
+
+  if (typeof node.type === 'string' && node.type === 'a') {
+    return true
   }
-  return ''
+
+  if (typeof props.href === 'string') {
+    return true
+  }
+
+  return containsLink(props.children)
 }
 
-export type HeadlineProps = {
+export type HeadlineProps = HTMLAttributes<HTMLHeadingElement> & {
   level: number
   children: ReactNode
   'data-line'?: string
+  'data-leafwiki-generated-id'?: string
 }
 
 export default function Headline({
   level,
   children,
+  className,
+  id,
   'data-line': dataLine,
+  'data-leafwiki-generated-id': hasGeneratedId,
+  ...props
 }: HeadlineProps) {
-  const text = getText(children)
-  const Tag = `h${level}` as keyof JSX.IntrinsicElements
+  const tagName = `h${level}` as keyof HTMLElementTagNameMap
+  const shouldRenderAnchor = hasGeneratedId === 'true' && !!id
+  const hasNestedLink = containsLink(children)
+  const sectionLinkLabel = 'Link to section'
 
-  const registerHeadline = useHeadlinesStore((s) => s.registerHeadline)
-  const unregisterHeadline = useHeadlinesStore((s) => s.unregisterHeadline)
-
-  // Register headline synchronously before reading slug
-  registerHeadline(level, text, dataLine ? dataLine : '')
-
-  const slug =
-    useHeadlinesStore((s) =>
-      s.getSlug(level, text, dataLine ? dataLine : ''),
-    ) || ''
-
-  useEffect(() => {
-    return () => {
-      unregisterHeadline(level, text, dataLine ? dataLine : '')
-    }
-  }, [level, text, dataLine, unregisterHeadline])
-
-  return (
-    <Tag id={slug} className="anchor" data-line={dataLine}>
-      <a className="" href={`#${slug}`}>
-        {children}
-        <span>
-          <Paperclip size={18} />
-        </span>
-      </a>
-    </Tag>
+  return createElement(
+    tagName,
+    {
+      id,
+      className: clsx(className, shouldRenderAnchor && 'anchor'),
+      'data-line': dataLine,
+      ...props,
+    },
+    shouldRenderAnchor ? (
+      hasNestedLink ? (
+        <>
+          {children}
+          <a
+            className="headline-anchor"
+            href={`#${id}`}
+            aria-label={sectionLinkLabel}
+            title={sectionLinkLabel}
+          >
+            <span>
+              <Paperclip size={18} />
+            </span>
+          </a>
+        </>
+      ) : (
+        <a className="headline-anchor headline-anchor--full" href={`#${id}`}>
+          {children}
+          <span>
+            <Paperclip size={18} />
+          </span>
+        </a>
+      )
+    ) : (
+      children
+    ),
   )
 }

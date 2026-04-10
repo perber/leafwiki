@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test from '@playwright/test';
 import AddPageDialog from '../pages/AddPageDialog';
 import CopyPageDialog from '../pages/CopyPageDialog';
@@ -15,6 +17,7 @@ const user = process.env.E2E_ADMIN_USER || 'admin';
 const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
 
 const currentDir = __dirname;
+const markdownItSamplePath = join(currentDir, '..', 'assets', 'markdown-it-sample.md');
 
 async function dispatchLayoutShortcut(
   page: import('@playwright/test').Page,
@@ -59,6 +62,74 @@ async function createPageAndOpenViewer(page: import('@playwright/test').Page, ti
   test.expect(await viewPage.getTitle()).toBe(title);
 
   return viewPage;
+}
+
+async function createPageWithContent(
+  page: import('@playwright/test').Page,
+  input: { title: string; slug: string; content: string },
+) {
+  await page.evaluate(async ({ title, slug, content }) => {
+    function getCsrfTokenFromCookie(): string | null {
+      const hostMatch =
+        document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+        document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
+
+      if (!hostMatch) return null;
+
+      try {
+        return decodeURIComponent(hostMatch[1]);
+      } catch {
+        return hostMatch[1];
+      }
+    }
+
+    const csrfToken = getCsrfTokenFromCookie();
+    if (!csrfToken) {
+      throw new Error('Missing CSRF token cookie for test page setup');
+    }
+
+    const createResponse = await fetch('/api/pages', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({
+        parentId: null,
+        title,
+        slug,
+        kind: 'page',
+      }),
+    });
+
+    if (!createResponse.ok) {
+      throw new Error(`Failed to create page ${slug}: ${createResponse.status}`);
+    }
+
+    const createdPage = (await createResponse.json()) as {
+      id: string;
+      title: string;
+    };
+
+    const updateResponse = await fetch(`/api/pages/${createdPage.id}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({
+        title: createdPage.title,
+        slug,
+        content,
+      }),
+    });
+
+    if (!updateResponse.ok) {
+      throw new Error(`Failed to update page ${slug}: ${updateResponse.status}`);
+    }
+  }, input);
 }
 
 async function expectEditAndSaveShortcutWorks(
@@ -380,6 +451,184 @@ for the page edited at ${new Date().toISOString()}
     await expectMarkdownLinkAutocompleteWorks(page);
   });
 
+  test('headline anchor keeps classic hash navigation for plain headings', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `headline-anchor-${timestamp}`;
+    const title = `Headline Anchor ${timestamp}`;
+    const content = `# Intro
+
+${Array.from({ length: 18 }, (_, index) => `Line ${index + 1}`).join('\n\n')}
+
+## Anchor Target
+
+Target content`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const anchorTarget = page.locator('article h1').getByText('Intro');
+    await anchorTarget.waitFor({ state: 'visible' });
+    await anchorTarget.click();
+
+    await test.expect
+      .poll(async () => page.evaluate(() => window.location.hash), {
+        timeout: 5000,
+      })
+      .toBe('#leafwiki-intro');
+  });
+
+  test('headline anchor supports non-ascii headings', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `headline-anchor-unicode-${timestamp}`;
+    const title = `Headline Anchor Unicode ${timestamp}`;
+    const content = `# Привет мир
+
+## Café Überblick
+
+### 你好 世界`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const cyrillicHeading = page.locator('article h1').getByText('Привет мир');
+    await cyrillicHeading.waitFor({ state: 'visible' });
+    await cyrillicHeading.click();
+
+    await test.expect
+      .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
+        timeout: 5000,
+      })
+      .toBe('#leafwiki-привет-мир');
+
+    const latinHeading = page.locator('article h2').getByText('Café Überblick');
+    await latinHeading.waitFor({ state: 'visible' });
+    await latinHeading.click();
+
+    await test.expect
+      .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
+        timeout: 5000,
+      })
+      .toBe('#leafwiki-cafe-uberblick');
+
+    const hanHeading = page.locator('article h3').getByText('你好 世界');
+    await hanHeading.waitFor({ state: 'visible' });
+    await hanHeading.click();
+
+    await test.expect
+      .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
+        timeout: 5000,
+      })
+      .toBe('#leafwiki-你好-世界');
+  });
+
+  test('navigating away from page with footnote headline stays responsive', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `footnotes-navigation-repro-${timestamp}`;
+    const title = `Footnotes Navigation Repro ${timestamp}`;
+    const content = `# Repro
+
+This paragraph creates a footnote reference.[^leafwiki]
+
+### [Footnotes](https://github.com/markdown-it/markdown-it-footnote)
+
+[^leafwiki]: This is the matching footnote definition.`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const contentText = await viewPage.getContent();
+    test.expect(contentText).toContain('This paragraph creates a footnote reference.');
+    test.expect(contentText).toContain('This is the matching footnote definition.');
+    test
+      .expect(
+        await page
+          .locator('article a[href="https://github.com/markdown-it/markdown-it-footnote"]')
+          .count(),
+      )
+      .toBeGreaterThan(0);
+
+    const reactErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() !== 'error') return;
+      const text = message.text();
+      if (
+        /minified react error|cannot update a component while rendering a different component|maximum update depth exceeded/i.test(
+          text,
+        )
+      ) {
+        reactErrors.push(text);
+      }
+    });
+
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+
+    const treeView = new TreeView(page);
+    await treeView.clickPageByTitle('Welcome to LeafWiki');
+
+    await page.locator('article > h1').getByText('Welcome to LeafWiki').waitFor({
+      state: 'visible',
+      timeout: 10000,
+    });
+
+    test.expect(reactErrors).toEqual([]);
+    test.expect(pageErrors).toEqual([]);
+  });
+
+  test('navigating away from markdown-it sample stays responsive', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `markdown-it-sample-${timestamp}`;
+    const title = `Markdown It Sample ${timestamp}`;
+    const content = readFileSync(markdownItSamplePath, 'utf8');
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const contentText = await viewPage.getContent();
+    test.expect(contentText).toContain('h1 Heading 8-)');
+    test.expect(contentText).toContain('Footnote text.');
+    test.expect(contentText).toContain('This is HTML abbreviation example.');
+
+    const reactErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() !== 'error') return;
+      const text = message.text();
+      if (
+        /minified react error|cannot update a component while rendering a different component|maximum update depth exceeded/i.test(
+          text,
+        )
+      ) {
+        reactErrors.push(text);
+      }
+    });
+
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+
+    const treeView = new TreeView(page);
+    await treeView.clickPageByTitle('Welcome to LeafWiki');
+
+    await page.locator('article > h1').getByText('Welcome to LeafWiki').waitFor({
+      state: 'visible',
+      timeout: 10000,
+    });
+
+    test.expect(reactErrors).toEqual([]);
+    test.expect(pageErrors).toEqual([]);
+  });
+
   test('unsaved changes-warning', async ({ page }) => {
     const title = `Page With Unsaved Changes ${Date.now()}`;
     const newContent = `This is some unsaved content!  
@@ -461,6 +710,45 @@ graph TD;
     // expects at least one SVG element (the mermaid diagram)
     const svgCount = await viewPage.amountOfSVGElements();
     test.expect(svgCount).toBeGreaterThan(0);
+  });
+
+  test('invalid mermaid degrades locally without page crash', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `invalid-mermaid-${timestamp}`;
+    const title = `Invalid Mermaid ${timestamp}`;
+    const content = `# Invalid Mermaid
+
+\`\`\`mermaid
+graph TD
+A -->
+\`\`\``;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    await page.getByText('Unable to render Mermaid diagram.').waitFor({
+      state: 'visible',
+      timeout: 10000,
+    });
+    await page.locator('article pre code').getByText('graph TD').waitFor({
+      state: 'visible',
+    });
+
+    const treeView = new TreeView(page);
+    await treeView.clickPageByTitle('Welcome to LeafWiki');
+    await page.locator('article > h1').getByText('Welcome to LeafWiki').waitFor({
+      state: 'visible',
+      timeout: 10000,
+    });
+
+    test.expect(pageErrors).toEqual([]);
   });
 
   test('light-mode preview uses light syntax highlighting and mermaid theme', async ({ page }) => {

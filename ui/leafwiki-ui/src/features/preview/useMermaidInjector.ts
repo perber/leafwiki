@@ -23,8 +23,9 @@ function ensureMermaidInitialized(theme: 'default' | 'dark') {
 export type MermaidInjectorOps = {
   containerRef: React.RefObject<HTMLDivElement | null>
   code: string
-  dataLine: string
+  dataLine?: string
   theme: 'default' | 'dark'
+  onError: (message: string | null) => void
 }
 
 function djb2(str: string) {
@@ -53,9 +54,10 @@ export function useMermaidInjector({
   code,
   dataLine,
   theme,
+  onError,
 }: MermaidInjectorOps) {
   const lastHashRef = useRef<string | null>(null)
-  const lastDataLineRef = useRef<string | null>(null)
+  const lastDataLineRef = useRef<string | undefined>(undefined)
   const lastThemeRef = useRef<'default' | 'dark' | null>(null)
 
   useEffect(() => {
@@ -92,6 +94,7 @@ export function useMermaidInjector({
           }
           lastDataLineRef.current = dataLine
         }
+        onError(null)
         return // No need to re-render
       }
       // This is required to prevent layout shifts
@@ -100,42 +103,52 @@ export function useMermaidInjector({
         console.warn('Mermaid renderer element not found')
         return
       }
-      await mermaid.parse(normalizedCode)
-      const { svg }: RenderResult = await mermaid.render(
-        `mermaid-${codeHash}-${dataLine || '0'}`,
-        normalizedCode,
-        sandbox,
-      )
+      try {
+        await mermaid.parse(normalizedCode)
+        const { svg }: RenderResult = await mermaid.render(
+          `mermaid-${codeHash}-${dataLine || '0'}`,
+          normalizedCode,
+          sandbox,
+        )
 
-      if (cancelled) return
+        if (cancelled) return
 
-      const doc = new DOMParser().parseFromString(svg, 'image/svg+xml')
-      const newSvg = doc.documentElement as unknown as SVGSVGElement
-      newSvg.setAttribute('width', '100%')
-      newSvg.removeAttribute('height')
-      newSvg.setAttribute('preserveAspectRatio', 'xMinYMin meet')
-      if (dataLine != null) newSvg.setAttribute('data-line', String(dataLine))
+        const doc = new DOMParser().parseFromString(svg, 'image/svg+xml')
+        const newSvg = doc.documentElement as unknown as SVGSVGElement
+        newSvg.setAttribute('width', '100%')
+        newSvg.removeAttribute('height')
+        newSvg.setAttribute('preserveAspectRatio', 'xMinYMin meet')
+        if (dataLine != null) newSvg.setAttribute('data-line', String(dataLine))
 
-      const oldSVG = el.querySelector('svg')
-      if (oldSVG) {
-        el.replaceChild(newSvg, oldSVG)
-      } else {
-        el.appendChild(newSvg)
+        const oldSVG = el.querySelector('svg')
+        if (oldSVG) {
+          el.replaceChild(newSvg, oldSVG)
+        } else {
+          el.appendChild(newSvg)
+        }
+
+        // Update refs
+        lastHashRef.current = codeHash
+        lastDataLineRef.current = dataLine
+
+        // Add dataLine to Parent container
+        if (dataLine != null) {
+          el.setAttribute('data-line', String(dataLine))
+        } else {
+          el.removeAttribute('data-line')
+        }
+
+        // Unlock height
+        el.style.minHeight = ''
+        onError(null)
+      } catch (error) {
+        if (cancelled) return
+
+        lastHashRef.current = null
+        const message = error instanceof Error ? error.message : String(error)
+        console.warn('Mermaid diagram could not be rendered:', message)
+        onError(message)
       }
-
-      // Update refs
-      lastHashRef.current = codeHash
-      lastDataLineRef.current = dataLine
-
-      // Add dataLine to Parent container
-      if (dataLine != null) {
-        el.setAttribute('data-line', String(dataLine))
-      } else {
-        el.removeAttribute('data-line')
-      }
-
-      // Unlock height
-      el.style.minHeight = ''
     }
 
     const raf1 = requestAnimationFrame(inject)
@@ -143,5 +156,5 @@ export function useMermaidInjector({
       cancelled = true
       if (raf1) cancelAnimationFrame(raf1)
     }
-  }, [containerRef, code, dataLine, theme])
+  }, [containerRef, code, dataLine, theme, onError])
 }

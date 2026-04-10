@@ -92,6 +92,20 @@ func TestSplitFrontmatter(t *testing.T) {
 			wantBody: "---\n- item1\n- item2\n---\nBody\n",
 			wantHas:  false,
 		},
+		{
+			name:     "markdown separator block with smiley is not frontmatter",
+			input:    "---\n__Advertisement :)__\n---\nBody\n",
+			wantFM:   "",
+			wantBody: "---\n__Advertisement :)__\n---\nBody\n",
+			wantHas:  false,
+		},
+		{
+			name:     "reference-style link definition is not frontmatter",
+			input:    "---\n[id]: https://example.com/demo\n---\nBody\n",
+			wantFM:   "",
+			wantBody: "---\n[id]: https://example.com/demo\n---\nBody\n",
+			wantHas:  false,
+		},
 	}
 
 	for _, tt := range tests {
