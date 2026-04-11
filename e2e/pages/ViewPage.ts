@@ -98,12 +98,16 @@ export default class ViewPage {
 
   async clickDeletePageMenuItem() {
     await this.openToolbarOverflow();
-    await this.page.getByTestId('delete-page-menu-item').click();
+    const deleteMenuItem = this.page.getByTestId('delete-page-menu-item');
+    await deleteMenuItem.waitFor({ state: 'visible' });
+    await deleteMenuItem.click();
   }
 
   async clickCopyPageMenuItem() {
     await this.openToolbarOverflow();
-    await this.page.getByTestId('copy-page-menu-item').click();
+    const copyMenuItem = this.page.getByTestId('copy-page-menu-item');
+    await copyMenuItem.waitFor({ state: 'visible' });
+    await copyMenuItem.click();
   }
 
   async clickEditPageButton() {
