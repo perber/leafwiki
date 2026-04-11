@@ -1496,4 +1496,98 @@ Paragraph outside the list.
       test.expect(count).toBeGreaterThan(0);
     });
   });
+
+  test('markdown shoutouts render with type-specific classes and content', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `shoutouts-${timestamp}`;
+    const title = `Shoutouts ${timestamp}`;
+    const content = `:::info
+Info content
+:::
+
+:::success
+Success content
+:::
+
+:::warning
+Warning content
+:::
+
+:::error
+Error content
+:::
+
+:::note
+Note alias content
+:::`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const infoShoutout = page.locator('article aside.markdown-shoutout--info');
+    const successShoutout = page.locator('article aside.markdown-shoutout--success');
+    const warningShoutout = page.locator('article aside.markdown-shoutout--warning');
+    const errorShoutout = page.locator('article aside.markdown-shoutout--error');
+
+    await infoShoutout.first().waitFor({ state: 'visible' });
+    await successShoutout.waitFor({ state: 'visible' });
+    await warningShoutout.waitFor({ state: 'visible' });
+    await errorShoutout.waitFor({ state: 'visible' });
+
+    // note is an alias for info, so there should be two info shoutouts
+    await test.expect(page.locator('article aside.markdown-shoutout--info')).toHaveCount(2);
+
+    await test.expect(infoShoutout.first().locator('.markdown-shoutout__title')).toHaveText('Info');
+    await test.expect(successShoutout.locator('.markdown-shoutout__title')).toHaveText('Success');
+    await test.expect(warningShoutout.locator('.markdown-shoutout__title')).toHaveText('Warning');
+    await test.expect(errorShoutout.locator('.markdown-shoutout__title')).toHaveText('Error');
+
+    await test
+      .expect(infoShoutout.first().locator('.markdown-shoutout__content'))
+      .toContainText('Info content');
+    await test
+      .expect(successShoutout.locator('.markdown-shoutout__content'))
+      .toContainText('Success content');
+    await test
+      .expect(warningShoutout.locator('.markdown-shoutout__content'))
+      .toContainText('Warning content');
+    await test
+      .expect(errorShoutout.locator('.markdown-shoutout__content'))
+      .toContainText('Error content');
+    await test
+      .expect(infoShoutout.last().locator('.markdown-shoutout__content'))
+      .toContainText('Note alias content');
+
+    // verify each shoutout has a non-transparent background (CSS color classes applied)
+    const infoBackground = await infoShoutout.first().evaluate((el) => {
+      return window.getComputedStyle(el).backgroundColor;
+    });
+    test.expect(infoBackground).not.toBe('rgba(0, 0, 0, 0)');
+
+    const successBackground = await successShoutout.evaluate((el) => {
+      return window.getComputedStyle(el).backgroundColor;
+    });
+    test.expect(successBackground).not.toBe('rgba(0, 0, 0, 0)');
+
+    const warningBackground = await warningShoutout.evaluate((el) => {
+      return window.getComputedStyle(el).backgroundColor;
+    });
+    test.expect(warningBackground).not.toBe('rgba(0, 0, 0, 0)');
+
+    const errorBackground = await errorShoutout.evaluate((el) => {
+      return window.getComputedStyle(el).backgroundColor;
+    });
+    test.expect(errorBackground).not.toBe('rgba(0, 0, 0, 0)');
+
+    // the four variant backgrounds must be distinct from each other
+    const backgrounds = new Set([
+      infoBackground,
+      successBackground,
+      warningBackground,
+      errorBackground,
+    ]);
+    test.expect(backgrounds.size).toBe(4);
+  });
 });

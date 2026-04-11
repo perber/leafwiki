@@ -2,8 +2,10 @@ import './markdownPreviewCodeTheme.css'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { withBasePath } from '@/lib/routePath'
 import {
+  Children,
   AnchorHTMLAttributes,
   AudioHTMLAttributes,
+  BlockquoteHTMLAttributes,
   ClassAttributes,
   Component,
   ErrorInfo,
@@ -28,6 +30,7 @@ import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
+import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 
@@ -67,6 +70,54 @@ const FOOTNOTE_TARGET_PREFIX = '#user-content-fn'
 
 type MarkdownNodeProp = {
   node?: unknown
+}
+
+type AlertKind = 'info' | 'success' | 'warning' | 'error'
+
+function getTextContent(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node)
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(getTextContent).join('')
+  }
+
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return getTextContent(node.props.children)
+  }
+
+  return ''
+}
+
+function getAlertKind(children: ReactNode): AlertKind | null {
+  const childArray = Children.toArray(children)
+  // HAST includes whitespace text nodes between block elements; skip them
+  const firstChild = childArray.find(
+    (child) => typeof child !== 'string' || child.trim() !== '',
+  )
+
+  if (!isValidElement<{ children?: ReactNode }>(firstChild)) {
+    return null
+  }
+
+  if (firstChild.type !== 'p') {
+    return null
+  }
+
+  const marker = getTextContent(firstChild.props.children).trim()
+  if (marker === '[!INFO]') return 'info'
+  if (marker === '[!SUCCESS]') return 'success'
+  if (marker === '[!WARNING]') return 'warning'
+  if (marker === '[!ERROR]') return 'error'
+  return null
+}
+
+function getAlertLabel(kind: AlertKind) {
+  if (kind === 'info') return 'Info'
+  if (kind === 'success') return 'Success'
+  if (kind === 'warning') return 'Warning'
+  return 'Error'
 }
 
 class MarkdownPreviewErrorBoundary extends Component<
@@ -246,6 +297,51 @@ export default function MarkdownPreview({ content, path }: Props) {
 
         return <li {...props}>{children}</li>
       },
+      blockquote: ({
+        children,
+        node,
+        className,
+        'data-line': dataLine,
+        ...props
+      }: MarkdownNodeProp &
+        ClassAttributes<HTMLQuoteElement> &
+        BlockquoteHTMLAttributes<HTMLQuoteElement> & {
+          'data-line'?: string
+        }) => {
+        void node
+        const alertKind = getAlertKind(children)
+
+        if (!alertKind) {
+          return (
+            <blockquote {...props} data-line={dataLine} className={className}>
+              {children}
+            </blockquote>
+          )
+        }
+
+        const childArray = Children.toArray(children)
+        // Find the marker paragraph index so content starts after it,
+        // accounting for leading whitespace text nodes
+        const markerIndex = childArray.findIndex(
+          (child) => isValidElement(child) && child.type === 'p',
+        )
+        const contentChildren = (
+          markerIndex >= 0 ? childArray.slice(markerIndex + 1) : []
+        ).filter((child) => typeof child !== 'string' || child.trim() !== '')
+
+        return (
+          <aside
+            {...props}
+            data-line={dataLine}
+            className={`markdown-shoutout markdown-shoutout--${alertKind} ${className ?? ''}`.trim()}
+          >
+            <p className="markdown-shoutout__title">
+              {getAlertLabel(alertKind)}
+            </p>
+            <div className="markdown-shoutout__content">{contentChildren}</div>
+          </aside>
+        )
+      },
       h1: ({
         children,
         node,
@@ -392,7 +488,7 @@ export default function MarkdownPreview({ content, path }: Props) {
   )
 
   const normalizedContent = useMemo(
-    () => normalizeMarkdownListIndentation(content),
+    () => normalizeMarkdownListIndentation(normalizeMarkdownShoutouts(content)),
     [content],
   )
 

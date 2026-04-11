@@ -1199,6 +1199,76 @@
     @apply ml-0.5 text-[0.7em];
   }
 
+  .markdown-editor__preview-container .markdown-shoutout,
+  .page-viewer__content .markdown-shoutout {
+    @apply border-border/70 bg-surface-alt text-page-text my-6 rounded-lg border px-4 py-3;
+  }
+
+  .markdown-editor__preview-container .markdown-shoutout__title,
+  .page-viewer__content .markdown-shoutout__title {
+    @apply mb-2 text-sm font-semibold tracking-[0.08em] uppercase;
+  }
+
+  .markdown-editor__preview-container
+    .markdown-shoutout__content
+    > :first-child,
+  .page-viewer__content .markdown-shoutout__content > :first-child {
+    @apply mt-0;
+  }
+
+  .markdown-editor__preview-container .markdown-shoutout__content > :last-child,
+  .page-viewer__content .markdown-shoutout__content > :last-child {
+    @apply mb-0;
+  }
+
+  .markdown-editor__preview-container .markdown-shoutout--info,
+  .page-viewer__content .markdown-shoutout--info {
+    @apply border-brand/30 bg-brand/5;
+  }
+
+  .markdown-editor__preview-container
+    .markdown-shoutout--info
+    .markdown-shoutout__title,
+  .page-viewer__content .markdown-shoutout--info .markdown-shoutout__title {
+    @apply text-brand;
+  }
+
+  .markdown-editor__preview-container .markdown-shoutout--success,
+  .page-viewer__content .markdown-shoutout--success {
+    @apply border-success/30 bg-success/5;
+  }
+
+  .markdown-editor__preview-container
+    .markdown-shoutout--success
+    .markdown-shoutout__title,
+  .page-viewer__content .markdown-shoutout--success .markdown-shoutout__title {
+    @apply text-success;
+  }
+
+  .markdown-editor__preview-container .markdown-shoutout--warning,
+  .page-viewer__content .markdown-shoutout--warning {
+    @apply border-warning/30 bg-warning/10;
+  }
+
+  .markdown-editor__preview-container
+    .markdown-shoutout--warning
+    .markdown-shoutout__title,
+  .page-viewer__content .markdown-shoutout--warning .markdown-shoutout__title {
+    @apply text-warning;
+  }
+
+  .markdown-editor__preview-container .markdown-shoutout--error,
+  .page-viewer__content .markdown-shoutout--error {
+    @apply border-error/30 bg-error/5;
+  }
+
+  .markdown-editor__preview-container
+    .markdown-shoutout--error
+    .markdown-shoutout__title,
+  .page-viewer__content .markdown-shoutout--error .markdown-shoutout__title {
+    @apply text-error;
+  }
+
   .tree-view {
     @apply w-full;
   }
