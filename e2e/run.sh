@@ -10,6 +10,7 @@ run_mode="${E2E_RUN_MODE:-docker}"
 server_pid=""
 server_log=""
 local_data_dir=""
+docker_data_volume=""
 
 build_frontend_for_local_e2e() {
   if [ "${E2E_SKIP_UI_BUILD:-0}" = "1" ]; then
@@ -42,10 +43,13 @@ start_docker() {
     docker rm -f wiki-e2e-tests >/dev/null 2>&1 || true
   fi
 
+  docker_data_volume="wiki-e2e-tests-data-${RANDOM}${RANDOM}"
+  docker volume create "$docker_data_volume" >/dev/null
+
   docker run -d \
     -p "$app_port:8080" \
     --name wiki-e2e-tests \
-    -v e2e-tests-data:/app/data \
+    -v "$docker_data_volume":/app/data \
     wiki-e2e-tests \
     --allow-insecure=true \
     --jwt-secret=e2e-tests-secret \
@@ -59,6 +63,9 @@ stop_docker() {
   docker stop wiki-e2e-tests >/dev/null 2>&1 || true
   docker rm wiki-e2e-tests >/dev/null 2>&1 || true
   docker rmi wiki-e2e-tests >/dev/null 2>&1 || true
+  if [ -n "$docker_data_volume" ]; then
+    docker volume rm "$docker_data_volume" >/dev/null 2>&1 || true
+  fi
 }
 
 start_local() {
@@ -113,19 +120,20 @@ run_playwright_tests() {
   (
     cd "$current_dir"
     local reporter="${E2E_PLAYWRIGHT_REPORTER:-line}"
+    local workers="${E2E_PLAYWRIGHT_WORKERS:-1}"
 
     if command -v stdbuf >/dev/null 2>&1; then
       E2E_BASE_URL="$app_url" \
       E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
       E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
       PLAYWRIGHT_FORCE_TTY=1 \
-      stdbuf -oL -eL npx playwright test --reporter="$reporter" "$@"
+      stdbuf -oL -eL npx playwright test --workers="$workers" --reporter="$reporter" "$@"
     else
       E2E_BASE_URL="$app_url" \
       E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
       E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
       PLAYWRIGHT_FORCE_TTY=1 \
-      npx playwright test --reporter="$reporter" "$@"
+      npx playwright test --workers="$workers" --reporter="$reporter" "$@"
     fi
   )
 }

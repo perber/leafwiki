@@ -1383,7 +1383,7 @@ Paragraph outside the list.
     await deletePageDialog.confirmDeletion();
     await page.waitForURL(new RegExp('/' + parentTitle + '$'));
 
-    test.expect(await viewPage.getTitle()).toBe(parentTitle);
+    await test.expect(page.locator('article>h1')).toHaveText(parentTitle);
   });
 
   test('delete-unrelated-page-keeps-current-page-open', async ({ page }) => {
