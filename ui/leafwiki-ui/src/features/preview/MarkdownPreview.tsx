@@ -325,11 +325,13 @@ export default function MarkdownPreview({ content, path }: Props) {
         const markerIndex = childArray.findIndex(
           (child) => isValidElement(child) && child.type === 'p',
         )
-        const contentChildren =
+        const contentChildren = (
           markerIndex >= 0 ? childArray.slice(markerIndex + 1) : []
+        ).filter((child) => typeof child !== 'string' || child.trim() !== '')
 
         return (
           <aside
+            {...props}
             data-line={dataLine}
             className={`markdown-shoutout markdown-shoutout--${alertKind} ${className ?? ''}`.trim()}
           >
