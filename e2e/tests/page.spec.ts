@@ -476,7 +476,7 @@ Target content`;
       .poll(async () => page.evaluate(() => window.location.hash), {
         timeout: 5000,
       })
-      .toBe('#leafwiki-intro');
+      .toBe('#intro');
   });
 
   test('headline anchor supports non-ascii headings', async ({ page }) => {
@@ -502,7 +502,7 @@ Target content`;
       .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
         timeout: 5000,
       })
-      .toBe('#leafwiki-привет-мир');
+      .toBe('#привет-мир');
 
     const latinHeading = page.locator('article h2').getByText('Café Überblick');
     await latinHeading.waitFor({ state: 'visible' });
@@ -512,7 +512,7 @@ Target content`;
       .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
         timeout: 5000,
       })
-      .toBe('#leafwiki-cafe-uberblick');
+      .toBe('#cafe-uberblick');
 
     const hanHeading = page.locator('article h3').getByText('你好 世界');
     await hanHeading.waitFor({ state: 'visible' });
@@ -522,7 +522,7 @@ Target content`;
       .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
         timeout: 5000,
       })
-      .toBe('#leafwiki-你好-世界');
+      .toBe('#你好-世界');
   });
 
   test('navigating away from page with footnote headline stays responsive', async ({ page }) => {
@@ -603,28 +603,28 @@ This paragraph creates a footnote reference.[^leafwiki]
     await test.expect(footnoteReference).not.toHaveAttribute('node', /.+/);
     await test
       .expect(footnoteReference)
-      .toHaveAttribute('href', /#leafwiki-user-content-fn-leafwiki$/);
+      .toHaveAttribute('href', /#user-content-fn-leafwiki$/);
     await footnoteReference.click();
 
     await test.expect
       .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
         timeout: 5000,
       })
-      .toBe('#leafwiki-user-content-fn-leafwiki');
+      .toBe('#user-content-fn-leafwiki');
 
     const footnoteBacklink = page.locator('article a[data-footnote-backref]');
     await footnoteBacklink.waitFor({ state: 'visible' });
     await test.expect(footnoteBacklink).not.toHaveAttribute('node', /.+/);
     await test
       .expect(footnoteBacklink)
-      .toHaveAttribute('href', /#leafwiki-user-content-fnref-leafwiki$/);
+      .toHaveAttribute('href', /#user-content-fnref-leafwiki$/);
     await footnoteBacklink.click();
 
     await test.expect
       .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
         timeout: 5000,
       })
-      .toBe('#leafwiki-user-content-fnref-leafwiki');
+      .toBe('#user-content-fnref-leafwiki');
 
     await test.expect(page.locator('article .footnotes')).not.toHaveAttribute('node', /.+/);
 
@@ -657,19 +657,19 @@ First reference[^leafwiki] and second reference[^leafwiki]
     await test.expect(footnoteReferences.nth(1)).not.toHaveAttribute('node', /.+/);
     await test
       .expect(footnoteReferences.nth(0))
-      .toHaveAttribute('href', /#leafwiki-user-content-fn-leafwiki$/);
+      .toHaveAttribute('href', /#user-content-fn-leafwiki$/);
     await test
       .expect(footnoteReferences.nth(1))
-      .toHaveAttribute('href', /#leafwiki-user-content-fn-leafwiki$/);
+      .toHaveAttribute('href', /#user-content-fn-leafwiki$/);
 
     const footnoteBacklinks = page.locator('article a[data-footnote-backref]');
     await test.expect(footnoteBacklinks).toHaveCount(2);
     await test
       .expect(footnoteBacklinks.nth(0))
-      .toHaveAttribute('href', /#leafwiki-user-content-fnref-leafwiki$/);
+      .toHaveAttribute('href', /#user-content-fnref-leafwiki$/);
     await test
       .expect(footnoteBacklinks.nth(1))
-      .toHaveAttribute('href', /#leafwiki-user-content-fnref-leafwiki-2$/);
+      .toHaveAttribute('href', /#user-content-fnref-leafwiki-2$/);
     await test.expect(footnoteBacklinks.nth(1)).not.toHaveAttribute('node', /.+/);
 
     await footnoteBacklinks.nth(1).click();
@@ -678,7 +678,7 @@ First reference[^leafwiki] and second reference[^leafwiki]
       .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
         timeout: 5000,
       })
-      .toBe('#leafwiki-user-content-fnref-leafwiki-2');
+      .toBe('#user-content-fnref-leafwiki-2');
   });
 
   test('navigating away from markdown-it sample stays responsive', async ({ page }) => {
