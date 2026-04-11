@@ -17,7 +17,7 @@ type ParsedListLine = {
 }
 
 type ParsedLinePrefix = {
-  containerPrefix: string
+  containerKey: string
   indent: number
 }
 
@@ -26,6 +26,11 @@ const fencePattern =
 const listPattern =
   /^(?<containerPrefix>(?: {0,3}>\s*)*)(?<indent> *)(?<listMarker>(?:[-+*])|(?:\d+[.)]))(?<spacing>\s+)(?<rest>.*)$/
 const linePrefixPattern = /^(?<containerPrefix>(?: {0,3}>\s*)*)(?<indent> *)/
+
+function getContainerKey(containerPrefix: string) {
+  const quoteDepth = (containerPrefix.match(/>/g) ?? []).length
+  return `blockquote:${quoteDepth}`
+}
 
 function parseListLine(line: string): ParsedListLine | null {
   const match = listPattern.exec(line)
@@ -42,15 +47,13 @@ function parseListLine(line: string): ParsedListLine | null {
   }
 }
 
-function parseLinePrefix(line: string): ParsedLinePrefix | null {
+function parseLinePrefix(line: string): ParsedLinePrefix {
   const match = linePrefixPattern.exec(line)
-  if (!match?.groups) {
-    return null
-  }
+  const containerPrefix = match?.groups?.containerPrefix ?? ''
 
   return {
-    containerPrefix: match.groups.containerPrefix ?? '',
-    indent: (match.groups.indent ?? '').length,
+    containerKey: getContainerKey(containerPrefix),
+    indent: (match?.groups?.indent ?? '').length,
   }
 }
 
@@ -92,13 +95,9 @@ function clearCompletedContexts(
   }
 
   const parsedPrefix = parseLinePrefix(line)
-  if (!parsedPrefix) {
-    listContexts.clear()
-    return
-  }
 
   for (const [containerKey, stack] of listContexts) {
-    if (containerKey !== parsedPrefix.containerPrefix) {
+    if (containerKey !== parsedPrefix.containerKey) {
       listContexts.delete(containerKey)
       continue
     }
@@ -127,7 +126,7 @@ function normalizeListItemIndentation(
   }
 
   const rawIndent = parsed.indent.length
-  const containerKey = parsed.containerPrefix
+  const containerKey = getContainerKey(parsed.containerPrefix)
   const contextStack = [...(listContexts.get(containerKey) ?? [])]
 
   while (
