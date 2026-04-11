@@ -43,14 +43,12 @@ export default class ViewPage {
     const avatar = this.page.getByTestId('user-toolbar-avatar');
 
     // wait for avatar to be visible
-    let avatarVisible = false;
     try {
-      avatarVisible = await avatar.isVisible({ timeout: 2000 });
+      if (!(await avatar.isVisible({ timeout: 2000 }))) {
+        // not logged in / wrong page / page already gone
+        return;
+      }
     } catch {
-      avatarVisible = false;
-    }
-
-    if (!avatarVisible) {
       // not logged in / wrong page / page already gone
       return;
     }
