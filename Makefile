@@ -1,6 +1,6 @@
 BINARY_NAME=leafwiki
 CMD_DIR=./cmd/leafwiki
-VERSION ?= v0.1.0
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || printf 'v0.1.0')
 RELEASE_DIR := releases
 DOCKER_BUILDER := Dockerfile.builder
 
@@ -41,6 +41,7 @@ $(PLATFORMS):
 	 docker build -f $(DOCKER_BUILDER) \
 		--build-arg GOOS=$$GOOS \
 		--build-arg GOARCH=$$GOARCH \
+		--build-arg APP_VERSION=$(VERSION) \
 		--build-arg OUTPUT=$(BINARY_NAME) \
 		-t leafwiki-builder-$$GOOS-$$GOARCH . ; \
 	 ID=$$(docker create leafwiki-builder-$$GOOS-$$GOARCH) ; \
@@ -61,6 +62,7 @@ endif
 		--platform linux/amd64,linux/arm64 \
 		--file Dockerfile \
 		--target final \
+		--build-arg APP_VERSION=$(VERSION) \
 		--tag ghcr.io/$(REPO_OWNER)/leafwiki:$(VERSION) \
 		--tag ghcr.io/$(REPO_OWNER)/leafwiki:latest \
 		--annotation "index:org.opencontainers.image.title=LeafWiki" \
