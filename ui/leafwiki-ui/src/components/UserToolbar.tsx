@@ -83,8 +83,8 @@ export default function UserToolbar() {
             >
               Import
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
           </RoleGuard>
-          <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
             Version {__APP_VERSION__}
           </DropdownMenuLabel>
