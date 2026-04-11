@@ -7,6 +7,7 @@ import {
   Component,
   ErrorInfo,
   HTMLAttributes,
+  ReactElement,
   isValidElement,
   ReactNode,
   useCallback,
@@ -103,8 +104,13 @@ function normalizeAssetMediaSrc(src?: string) {
   return src
 }
 
-function isPlainListParagraph(child: ReactNode) {
-  if (!isValidElement<{ children?: ReactNode }>(child) || child.type !== 'p') {
+function isPlainListParagraph(
+  child: ReactNode,
+): child is ReactElement<{ children?: ReactNode; 'data-line'?: string }> {
+  if (
+    !isValidElement<{ children?: ReactNode; 'data-line'?: string }>(child) ||
+    child.type !== 'p'
+  ) {
     return false
   }
 
@@ -164,7 +170,10 @@ export default function MarkdownPreview({ content, path }: Props) {
         )
         const onlyChild = meaningfulChildren[0]
 
-        if (meaningfulChildren.length === 1 && isPlainListParagraph(onlyChild)) {
+        if (
+          meaningfulChildren.length === 1 &&
+          isPlainListParagraph(onlyChild)
+        ) {
           return <li {...props}>{onlyChild.props.children}</li>
         }
 
