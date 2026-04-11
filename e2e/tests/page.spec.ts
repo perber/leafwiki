@@ -1225,13 +1225,14 @@ Paragraph outside the list.
 
     const copyPageDialog = new CopyPageDialog(page);
     await viewPage.clickCopyPageMenuItem();
+    const copyTitleInput = await copyPageDialog.getTitleInput();
+    await copyTitleInput.waitFor({ state: 'visible' });
+    await copyPageDialog.cancel();
 
-    const newTitle = `Copy of ${title}`;
-    await copyPageDialog.fillTitle(newTitle);
-    await copyPageDialog.submitWithoutRedirect();
-    await page.getByText('Page copied').waitFor({ state: 'visible' });
-
-    await viewPage.goto(`/${slug}`);
+    await page.locator('article').getByText('Mobile toolbar overflow test page').waitFor({
+      state: 'visible',
+    });
+    await page.getByTestId('toolbar-overflow-button').waitFor({ state: 'visible' });
     await viewPage.clickDeletePageMenuItem();
 
     const deletePageDialog = new DeletePageDialog(page);

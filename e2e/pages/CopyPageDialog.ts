@@ -45,4 +45,11 @@ export default class CopyPageDialog {
     await createButton.click();
     await createButton.waitFor({ state: 'detached' });
   }
+
+  async cancel() {
+    const cancelButton = this.page.locator('button[data-testid="copy-page-dialog-button-cancel"]');
+    await cancelButton.waitFor({ state: 'visible' });
+    await cancelButton.click();
+    await cancelButton.waitFor({ state: 'detached' });
+  }
 }
