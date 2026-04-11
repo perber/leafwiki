@@ -85,16 +85,25 @@ run-e2e-local:
 	@echo "⚡ Starting end-to-end tests (local fast path)..."
 	@E2E_RUN_MODE=local ./e2e/run.sh
 
+# Skip the Vite build when dist/ is already up to date; useful when iterating
+# on tests without changing the frontend. Pass GREP=<pattern> to filter tests,
+# e.g.: make run-e2e-local-fast GREP="shoutout"
+run-e2e-local-fast:
+	@echo "⚡ Starting end-to-end tests (local, skip UI build)..."
+	@E2E_RUN_MODE=local E2E_SKIP_UI_BUILD=1 ./e2e/run.sh $(if $(GREP),--grep "$(GREP)",)
+
 help:
 	@echo "Available commands:"
-	@echo "  make build      – Build binary for current system"
-	@echo "  make release    – Cross-compile binaries for all platforms (via Docker)"
-	@echo "  make clean      – Clean all generated files"
-	@echo "  make test       – Run all Go tests"
-	@echo "  make run-e2e    – Run end-to-end tests (using Docker)"
-	@echo "  make run-e2e-local – Run end-to-end tests via local fast path"
-	@echo "  make run        – Run development server"
-	@echo "  make docker-build-publish    – Build and push multi-arch Docker image"
-	@echo "  make changelog – Generate changelog"
+	@echo "  make build                – Build binary for current system"
+	@echo "  make release              – Cross-compile binaries for all platforms (via Docker)"
+	@echo "  make clean                – Clean all generated files"
+	@echo "  make test                 – Run all Go tests"
+	@echo "  make run-e2e              – Run end-to-end tests (using Docker)"
+	@echo "  make run-e2e-local        – Run end-to-end tests via local fast path"
+	@echo "  make run-e2e-local-fast   – Run E2E tests locally, skip UI build (use when dist/ is current)"
+	@echo "                              Optional: GREP=<pattern> to filter tests"
+	@echo "  make run                  – Run development server"
+	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
+	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build run clean test fmt lint help docker-build-publish changelog run-e2e run-e2e-local
+.PHONY: all build run clean test fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast
