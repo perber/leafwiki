@@ -583,6 +583,104 @@ This paragraph creates a footnote reference.[^leafwiki]
     test.expect(pageErrors).toEqual([]);
   });
 
+  test('footnote reference and backlink navigate to matching anchors', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `footnotes-links-${timestamp}`;
+    const title = `Footnotes Links ${timestamp}`;
+    const content = `# Footnotes
+
+This paragraph creates a footnote reference.[^leafwiki]
+
+[^leafwiki]: This is the matching footnote definition.`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const footnoteReference = page.locator('article sup a[data-footnote-ref]');
+    await footnoteReference.waitFor({ state: 'visible' });
+    await test.expect(footnoteReference).not.toHaveAttribute('node', /.+/);
+    await test
+      .expect(footnoteReference)
+      .toHaveAttribute('href', /#leafwiki-user-content-fn-leafwiki$/);
+    await footnoteReference.click();
+
+    await test.expect
+      .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
+        timeout: 5000,
+      })
+      .toBe('#leafwiki-user-content-fn-leafwiki');
+
+    const footnoteBacklink = page.locator('article a[data-footnote-backref]');
+    await footnoteBacklink.waitFor({ state: 'visible' });
+    await test.expect(footnoteBacklink).not.toHaveAttribute('node', /.+/);
+    await test
+      .expect(footnoteBacklink)
+      .toHaveAttribute('href', /#leafwiki-user-content-fnref-leafwiki$/);
+    await footnoteBacklink.click();
+
+    await test.expect
+      .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
+        timeout: 5000,
+      })
+      .toBe('#leafwiki-user-content-fnref-leafwiki');
+
+    await test.expect(page.locator('article .footnotes')).not.toHaveAttribute('node', /.+/);
+
+    const footnoteContainer = page.locator('article .markdown-footnotes');
+    await footnoteContainer.waitFor({ state: 'visible' });
+    await test.expect(footnoteContainer).toHaveClass(/footnotes/);
+    await test.expect(footnoteContainer).toHaveJSProperty('tagName', 'DIV');
+  });
+
+  test('duplicate footnote references keep distinct backlinks without leaked node attributes', async ({
+    page,
+  }) => {
+    const timestamp = Date.now();
+    const slug = `footnotes-duplicate-links-${timestamp}`;
+    const title = `Footnotes Duplicate Links ${timestamp}`;
+    const content = `# Footnotes
+
+First reference[^leafwiki] and second reference[^leafwiki]
+
+[^leafwiki]: This is the matching footnote definition.`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const footnoteReferences = page.locator('article sup a[data-footnote-ref]');
+    await test.expect(footnoteReferences).toHaveCount(2);
+    await test.expect(footnoteReferences.nth(0)).not.toHaveAttribute('node', /.+/);
+    await test.expect(footnoteReferences.nth(1)).not.toHaveAttribute('node', /.+/);
+    await test
+      .expect(footnoteReferences.nth(0))
+      .toHaveAttribute('href', /#leafwiki-user-content-fn-leafwiki$/);
+    await test
+      .expect(footnoteReferences.nth(1))
+      .toHaveAttribute('href', /#leafwiki-user-content-fn-leafwiki$/);
+
+    const footnoteBacklinks = page.locator('article a[data-footnote-backref]');
+    await test.expect(footnoteBacklinks).toHaveCount(2);
+    await test
+      .expect(footnoteBacklinks.nth(0))
+      .toHaveAttribute('href', /#leafwiki-user-content-fnref-leafwiki$/);
+    await test
+      .expect(footnoteBacklinks.nth(1))
+      .toHaveAttribute('href', /#leafwiki-user-content-fnref-leafwiki-2$/);
+    await test.expect(footnoteBacklinks.nth(1)).not.toHaveAttribute('node', /.+/);
+
+    await footnoteBacklinks.nth(1).click();
+
+    await test.expect
+      .poll(async () => page.evaluate(() => decodeURIComponent(window.location.hash)), {
+        timeout: 5000,
+      })
+      .toBe('#leafwiki-user-content-fnref-leafwiki-2');
+  });
+
   test('navigating away from markdown-it sample stays responsive', async ({ page }) => {
     const timestamp = Date.now();
     const slug = `markdown-it-sample-${timestamp}`;

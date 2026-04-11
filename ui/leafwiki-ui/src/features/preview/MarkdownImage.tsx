@@ -4,7 +4,7 @@ import { withBasePath } from '@/lib/routePath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useEffect, useState } from 'react'
 
-type Props = React.ImgHTMLAttributes<HTMLImageElement>
+type Props = React.ImgHTMLAttributes<HTMLImageElement> & { node?: unknown }
 
 function shouldOpenPreview(e: React.MouseEvent<HTMLImageElement>) {
   if (e.button !== 0) return false
@@ -16,7 +16,8 @@ function shouldOpenInNewTab(e: React.MouseEvent<HTMLImageElement>) {
   return e.button === 0 && (e.metaKey || e.ctrlKey)
 }
 
-export function MarkdownImage({ src = '', style, alt, ...rest }: Props) {
+export function MarkdownImage({ src = '', style, alt, node, ...rest }: Props) {
+  void node
   const [versionedSrc, setVersionedSrc] = useState(src)
   const openDialog = useDialogsStore((s) => s.openDialog)
 

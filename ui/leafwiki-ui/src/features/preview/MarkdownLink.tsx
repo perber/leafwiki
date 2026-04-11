@@ -19,9 +19,16 @@ interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string
   children?: ReactNode
   path?: string
+  node?: unknown
 }
 
-export function MarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
+export function MarkdownLink({
+  href,
+  children,
+  node,
+  ...props
+}: MarkdownLinkProps) {
+  void node
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
   const user = useSessionStore((s) => s.user)
