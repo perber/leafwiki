@@ -879,6 +879,125 @@ graph TD;
     test.expect(mermaidStyles.stroke).not.toBe('rgb(231, 231, 231)');
   });
 
+  test('nested lists support 2 and 4 space indentation outside fences', async ({ page }) => {
+    const timestamp = Date.now();
+    const title = `Nested List Support ${timestamp}`;
+    const slug = `nested-list-support-${timestamp}`;
+    const content = `1. Ordered top
+  1. Ordered nested with two spaces
+2. Ordered top again
+    1. Ordered nested with four spaces
+
+- Unordered top
+  - Unordered nested with two spaces
+- Unordered top again
+    - Unordered nested with four spaces
+
+\`\`\`md
+1. Fence ordered top
+  1. Fence ordered nested with two spaces
+- Fence unordered top
+  - Fence unordered nested with two spaces
+\`\`\`
+`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    await page
+      .locator('article ol ol li')
+      .filter({ hasText: 'Ordered nested with two spaces' })
+      .waitFor({ state: 'visible' });
+    await page
+      .locator('article ol ol li')
+      .filter({ hasText: 'Ordered nested with four spaces' })
+      .waitFor({ state: 'visible' });
+    await page
+      .locator('article ul ul li')
+      .filter({ hasText: 'Unordered nested with two spaces' })
+      .waitFor({ state: 'visible' });
+    await page
+      .locator('article ul ul li')
+      .filter({ hasText: 'Unordered nested with four spaces' })
+      .waitFor({ state: 'visible' });
+
+    const codeBlockText = await page.locator('article pre code').textContent();
+    test.expect(codeBlockText).toContain('  1. Fence ordered nested with two spaces');
+    test.expect(codeBlockText).toContain('  - Fence unordered nested with two spaces');
+  });
+
+  test('nested list normalization does not leak across later paragraphs', async ({ page }) => {
+    const timestamp = Date.now();
+    const title = `Nested List Reset ${timestamp}`;
+    const slug = `nested-list-reset-${timestamp}`;
+    const content = `1. Parent item
+  1. Nested child
+
+Paragraph outside the list.
+
+  1. Restarted top-level item
+  2. Restarted top-level item two
+`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    await page.getByText('Paragraph outside the list.').waitFor({ state: 'visible' });
+
+    const topLevelLists = page.locator('article > ol');
+    await test.expect(topLevelLists).toHaveCount(2);
+
+    await page
+      .locator('article > ol > li')
+      .getByText('Restarted top-level item', { exact: true })
+      .waitFor({ state: 'visible' });
+
+    await test
+      .expect(page.locator('article ol ol li').filter({ hasText: 'Restarted top-level item' }))
+      .toHaveCount(0);
+  });
+
+  test('nested fenced code in lists stays untouched', async ({ page }) => {
+    const timestamp = Date.now();
+    const title = `Nested Fence List ${timestamp}`;
+    const slug = `nested-fence-list-${timestamp}`;
+    const content = `1. Parent item
+
+   \`\`\`md
+   1. fenced ordered line
+     1. still fenced ordered line
+   - fenced unordered line
+     - still fenced unordered line
+   \`\`\`
+
+2. Sibling item
+`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    await page
+      .locator('article > ol > li')
+      .filter({ hasText: 'Sibling item' })
+      .waitFor({ state: 'visible' });
+
+    const codeBlockText = await page.locator('article pre code').textContent();
+    test.expect(codeBlockText).toContain('1. fenced ordered line');
+    test.expect(codeBlockText).toContain('  1. still fenced ordered line');
+    test.expect(codeBlockText).toContain('- fenced unordered line');
+    test.expect(codeBlockText).toContain('  - still fenced unordered line');
+    test.expect(codeBlockText).not.toContain('    1. still fenced ordered line');
+    test.expect(codeBlockText).not.toContain('    - still fenced unordered line');
+
+    await test.expect(page.locator('article pre')).toHaveCount(1);
+  });
+
   test('create-page-on-not-found-page', async ({ page }) => {
     const slug = `page-from-not-found-${Date.now()}`;
     const pagePath = `/${slug}`;
