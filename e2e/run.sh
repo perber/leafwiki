@@ -112,10 +112,21 @@ run_playwright_tests() {
   echo "Running Playwright tests..."
   (
     cd "$current_dir"
-    E2E_BASE_URL="$app_url" \
-    E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
-    E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
-    npx playwright test "$@"
+    local reporter="${E2E_PLAYWRIGHT_REPORTER:-line}"
+
+    if command -v stdbuf >/dev/null 2>&1; then
+      E2E_BASE_URL="$app_url" \
+      E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
+      E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
+      PLAYWRIGHT_FORCE_TTY=1 \
+      stdbuf -oL -eL npx playwright test --reporter="$reporter" "$@"
+    else
+      E2E_BASE_URL="$app_url" \
+      E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
+      E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
+      PLAYWRIGHT_FORCE_TTY=1 \
+      npx playwright test --reporter="$reporter" "$@"
+    fi
   )
 }
 
