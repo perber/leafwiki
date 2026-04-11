@@ -1,6 +1,6 @@
+import test from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import test from '@playwright/test';
 import AddPageDialog from '../pages/AddPageDialog';
 import CopyPageDialog from '../pages/CopyPageDialog';
 import CreatePageByPathDialog from '../pages/CreatePageByPathDialog';
@@ -601,9 +601,7 @@ This paragraph creates a footnote reference.[^leafwiki]
     const footnoteReference = page.locator('article sup a[data-footnote-ref]');
     await footnoteReference.waitFor({ state: 'visible' });
     await test.expect(footnoteReference).not.toHaveAttribute('node', /.+/);
-    await test
-      .expect(footnoteReference)
-      .toHaveAttribute('href', /#user-content-fn-leafwiki$/);
+    await test.expect(footnoteReference).toHaveAttribute('href', /#user-content-fn-leafwiki$/);
     await footnoteReference.click();
 
     await test.expect
@@ -615,9 +613,7 @@ This paragraph creates a footnote reference.[^leafwiki]
     const footnoteBacklink = page.locator('article a[data-footnote-backref]');
     await footnoteBacklink.waitFor({ state: 'visible' });
     await test.expect(footnoteBacklink).not.toHaveAttribute('node', /.+/);
-    await test
-      .expect(footnoteBacklink)
-      .toHaveAttribute('href', /#user-content-fnref-leafwiki$/);
+    await test.expect(footnoteBacklink).toHaveAttribute('href', /#user-content-fnref-leafwiki$/);
     await footnoteBacklink.click();
 
     await test.expect
