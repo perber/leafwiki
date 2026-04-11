@@ -1228,9 +1228,7 @@ Paragraph outside the list.
 
     const newTitle = `Copy of ${title}`;
     await copyPageDialog.fillTitle(newTitle);
-    const copiedSlug = await copyPageDialog.getSlugInput().then((input) =>
-      input.inputValue(),
-    );
+    const copiedSlug = await copyPageDialog.getSlugInput().then((input) => input.inputValue());
     await copyPageDialog.submitWithoutRedirect();
     await viewPage.goto(`/${copiedSlug}`);
     await page.locator('article').getByText('Mobile toolbar overflow test page').waitFor({
