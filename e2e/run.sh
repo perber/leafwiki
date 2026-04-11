@@ -4,8 +4,8 @@ set -euo pipefail
 
 current_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$current_dir/.." && pwd)"
-app_url="${E2E_BASE_URL:-http://localhost:8085}"
 app_port="${E2E_PORT:-8085}"
+app_url="${E2E_BASE_URL:-http://localhost:${app_port}}"
 run_mode="${E2E_RUN_MODE:-docker}"
 server_pid=""
 server_log=""
