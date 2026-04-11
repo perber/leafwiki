@@ -118,10 +118,6 @@ function normalizeFootnoteHref(href?: string) {
     return href
   }
 
-  if (href.startsWith(`#${CLOBBER_PREFIX}`)) {
-    return href
-  }
-
   return `#${CLOBBER_PREFIX}${href.slice(1)}`
 }
 
@@ -186,12 +182,20 @@ export default function MarkdownPreview({ content, path }: Props) {
     () => ({
       a: markdownLink,
       img: MarkdownImage,
-      audio: (props: AudioHTMLAttributes<HTMLAudioElement>) => (
-        <audio {...props} src={normalizeAssetMediaSrc(props.src)} />
-      ),
-      video: (props: VideoHTMLAttributes<HTMLVideoElement>) => (
-        <video {...props} src={normalizeAssetMediaSrc(props.src)} />
-      ),
+      audio: ({
+        node,
+        ...props
+      }: MarkdownNodeProp & AudioHTMLAttributes<HTMLAudioElement>) => {
+        void node
+        return <audio {...props} src={normalizeAssetMediaSrc(props.src)} />
+      },
+      video: ({
+        node,
+        ...props
+      }: MarkdownNodeProp & VideoHTMLAttributes<HTMLVideoElement>) => {
+        void node
+        return <video {...props} src={normalizeAssetMediaSrc(props.src)} />
+      },
       section: ({
         children,
         node,

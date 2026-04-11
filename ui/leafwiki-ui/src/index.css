@@ -1141,7 +1141,7 @@
 
   .markdown-editor__preview-container .markdown-footnotes,
   .page-viewer__content .markdown-footnotes {
-    @apply border-border/70 mt-10 border-t pt-6 text-sm;
+    @apply border-border/70 relative mt-10 overflow-x-hidden border-t pt-6 text-sm;
   }
 
   .markdown-editor__preview-container .markdown-footnotes > ol,
@@ -1171,7 +1171,17 @@
 
   .markdown-editor__preview-container .markdown-footnotes > .sr-only,
   .page-viewer__content .markdown-footnotes > .sr-only {
-    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .markdown-editor__preview-container a[data-footnote-ref],
