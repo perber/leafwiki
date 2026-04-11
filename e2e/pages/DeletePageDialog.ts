@@ -25,17 +25,35 @@ export default class DeletePageDialog {
     const cancelButton = this.page.locator(
       'button[data-testid="delete-page-dialog-button-cancel"]',
     );
+    await cancelButton.waitFor({ state: 'visible' });
     await cancelButton.click();
-    // Wait a 600 ms to ensure the dialog has processed the deletion
-    await this.page.waitForTimeout(600);
+    await cancelButton.waitFor({ state: 'detached' });
   }
 
   async confirmDeletion() {
     const deleteButton = this.page.locator(
       'button[data-testid="delete-page-dialog-button-confirm"]',
     );
+    await deleteButton.waitFor({ state: 'visible' });
     await deleteButton.click();
-    // We will be redirected to another page, so wait a bit
-    await this.page.waitForTimeout(1000);
+    await deleteButton.waitFor({ state: 'detached' });
+  }
+
+  /**
+   * Clicks the confirm button and waits for the DELETE API call to complete,
+   * without waiting for the dialog to close. Use this when the delete is
+   * expected to fail (e.g. non-recursive delete of a page with children).
+   */
+  async tryConfirmDeletion() {
+    const deleteButton = this.page.locator(
+      'button[data-testid="delete-page-dialog-button-confirm"]',
+    );
+    await deleteButton.waitFor({ state: 'visible' });
+    await Promise.all([
+      this.page.waitForResponse(
+        (r) => r.url().includes('/api/pages/') && r.request().method() === 'DELETE',
+      ),
+      deleteButton.click(),
+    ]);
   }
 }

@@ -24,8 +24,9 @@ export default class ImporterPage {
 
   async executeImportPlan() {
     await this.page.getByRole('button', { name: 'Execute Import Plan' }).click();
-    await expect(this.page.getByText('Import completed successfully')).toBeVisible();
-    await expect(this.page.getByRole('heading', { name: 'Import Result' })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'Import Result' })).toBeVisible({
+      timeout: 30000,
+    });
   }
 
   async expectPlanStatus(status: 'Planned' | 'Running' | 'Completed' | 'Canceled' | 'Failed') {

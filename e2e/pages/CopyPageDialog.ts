@@ -41,8 +41,15 @@ export default class CopyPageDialog {
 
   async submitWithoutRedirect() {
     const createButton = await this.getCreateButton();
+    await createButton.waitFor({ state: 'visible' });
     await createButton.click();
-    // Wait a 600 ms to ensure the dialog has processed the creation
-    await this.page.waitForTimeout(600);
+    await createButton.waitFor({ state: 'detached' });
+  }
+
+  async cancel() {
+    const cancelButton = this.page.locator('button[data-testid="copy-page-dialog-button-cancel"]');
+    await cancelButton.waitFor({ state: 'visible' });
+    await cancelButton.click();
+    await cancelButton.waitFor({ state: 'detached' });
   }
 }

@@ -10,6 +10,7 @@ export interface ToolbarButton {
   icon: React.ReactNode
   variant?: 'outline' | 'ghost' | 'link' | 'destructive' | 'default'
   className?: string
+  destructive?: boolean
   disabled?: boolean
   action: () => void
 }

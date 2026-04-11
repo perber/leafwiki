@@ -4,8 +4,8 @@ set -euo pipefail
 
 current_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$current_dir/.." && pwd)"
-app_url="${E2E_BASE_URL:-http://localhost:8085}"
 app_port="${E2E_PORT:-8085}"
+app_url="${E2E_BASE_URL:-http://localhost:${app_port}}"
 run_mode="${E2E_RUN_MODE:-docker}"
 server_pid=""
 server_log=""
@@ -112,10 +112,21 @@ run_playwright_tests() {
   echo "Running Playwright tests..."
   (
     cd "$current_dir"
-    E2E_BASE_URL="$app_url" \
-    E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
-    E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
-    npx playwright test "$@"
+    local reporter="${E2E_PLAYWRIGHT_REPORTER:-line}"
+
+    if command -v stdbuf >/dev/null 2>&1; then
+      E2E_BASE_URL="$app_url" \
+      E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
+      E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
+      PLAYWRIGHT_FORCE_TTY=1 \
+      stdbuf -oL -eL npx playwright test --reporter="$reporter" "$@"
+    else
+      E2E_BASE_URL="$app_url" \
+      E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
+      E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
+      PLAYWRIGHT_FORCE_TTY=1 \
+      npx playwright test --reporter="$reporter" "$@"
+    fi
   )
 }
 

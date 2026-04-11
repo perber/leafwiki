@@ -90,6 +90,26 @@ export default class ViewPage {
     await copyButton.click();
   }
 
+  async openToolbarOverflow() {
+    const overflowButton = this.page.getByTestId('toolbar-overflow-button');
+    await overflowButton.waitFor({ state: 'visible' });
+    await overflowButton.click();
+  }
+
+  async clickDeletePageMenuItem() {
+    await this.openToolbarOverflow();
+    const deleteMenuItem = this.page.getByTestId('delete-page-menu-item');
+    await deleteMenuItem.waitFor({ state: 'visible' });
+    await deleteMenuItem.click();
+  }
+
+  async clickCopyPageMenuItem() {
+    await this.openToolbarOverflow();
+    const copyMenuItem = this.page.getByTestId('copy-page-menu-item');
+    await copyMenuItem.waitFor({ state: 'visible' });
+    await copyMenuItem.click();
+  }
+
   async clickEditPageButton() {
     const editButton = this.page.locator('button[data-testid="edit-page-button"]');
     await editButton.click();
