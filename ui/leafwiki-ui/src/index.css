@@ -87,6 +87,18 @@
    BASE LAYER — global defaults, Shadcn theme, dark mode
 ------------------------------------------------------- */
 @layer base {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   :root {
     --background: 0 0% 100%;
     --foreground: 222 47% 11%;
@@ -1125,6 +1137,66 @@
   .markdown-editor__preview-container ul li,
   .page-viewer__content ul li {
     @apply list-disc;
+  }
+
+  .markdown-editor__preview-container .markdown-footnotes,
+  .page-viewer__content .markdown-footnotes {
+    @apply border-border/70 relative mt-10 overflow-x-hidden border-t pt-6 text-sm;
+  }
+
+  .markdown-editor__preview-container .markdown-footnotes > ol,
+  .page-viewer__content .markdown-footnotes > ol {
+    @apply my-0 pl-6;
+  }
+
+  .markdown-editor__preview-container .markdown-footnotes > ol > li,
+  .page-viewer__content .markdown-footnotes > ol > li {
+    @apply mb-4 pl-1;
+  }
+
+  .markdown-editor__preview-container .markdown-footnotes > ol > li:last-child,
+  .page-viewer__content .markdown-footnotes > ol > li:last-child {
+    @apply mb-0;
+  }
+
+  .markdown-editor__preview-container .markdown-footnotes > ol > li > p,
+  .page-viewer__content .markdown-footnotes > ol > li > p {
+    @apply my-0;
+  }
+
+  .markdown-editor__preview-container .markdown-footnotes > ol > li > p + p,
+  .page-viewer__content .markdown-footnotes > ol > li > p + p {
+    @apply mt-3;
+  }
+
+  .markdown-editor__preview-container .markdown-footnotes > .sr-only,
+  .page-viewer__content .markdown-footnotes > .sr-only {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .markdown-editor__preview-container a[data-footnote-ref],
+  .page-viewer__content a[data-footnote-ref] {
+    @apply text-brand font-semibold no-underline;
+  }
+
+  .markdown-editor__preview-container a[data-footnote-backref],
+  .page-viewer__content a[data-footnote-backref] {
+    @apply text-brand ml-1 inline-flex items-center no-underline;
+  }
+
+  .markdown-editor__preview-container a[data-footnote-backref] sup,
+  .page-viewer__content a[data-footnote-backref] sup {
+    @apply ml-0.5 text-[0.7em];
   }
 
   .tree-view {

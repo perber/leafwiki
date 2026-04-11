@@ -2,6 +2,7 @@ import './markdownPreviewCodeTheme.css'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { withBasePath } from '@/lib/routePath'
 import {
+  AnchorHTMLAttributes,
   AudioHTMLAttributes,
   ClassAttributes,
   Component,
@@ -61,6 +62,13 @@ type MarkdownPreviewErrorBoundaryState = {
   hasError: boolean
 }
 
+const CLOBBER_PREFIX = 'leafwiki-'
+const FOOTNOTE_TARGET_PREFIX = '#user-content-fn'
+
+type MarkdownNodeProp = {
+  node?: unknown
+}
+
 class MarkdownPreviewErrorBoundary extends Component<
   { children: ReactNode; resetKey: string },
   MarkdownPreviewErrorBoundaryState
@@ -105,6 +113,14 @@ function normalizeAssetMediaSrc(src?: string) {
   return src
 }
 
+function normalizeFootnoteHref(href?: string) {
+  if (!href?.startsWith(FOOTNOTE_TARGET_PREFIX)) {
+    return href
+  }
+
+  return `#${CLOBBER_PREFIX}${href.slice(1)}`
+}
+
 function isPlainListParagraph(
   child: ReactNode,
 ): child is ReactElement<{ children?: ReactNode; 'data-line'?: string }> {
@@ -144,10 +160,21 @@ export default function MarkdownPreview({ content, path }: Props) {
     designMode === 'system' ? (prefersLight ? 'light' : 'dark') : designMode
 
   const markdownLink = useCallback(
-    (
-      props: ClassAttributes<HTMLAnchorElement> &
-        HTMLAttributes<HTMLAnchorElement>,
-    ) => <MarkdownLink path={path} {...props} />,
+    ({
+      node,
+      ...props
+    }: MarkdownNodeProp &
+      ClassAttributes<HTMLAnchorElement> &
+      AnchorHTMLAttributes<HTMLAnchorElement>) => {
+      void node
+      return (
+        <MarkdownLink
+          path={path}
+          {...props}
+          href={normalizeFootnoteHref(props.href)}
+        />
+      )
+    },
     [path],
   )
 
@@ -155,16 +182,55 @@ export default function MarkdownPreview({ content, path }: Props) {
     () => ({
       a: markdownLink,
       img: MarkdownImage,
-      audio: (props: AudioHTMLAttributes<HTMLAudioElement>) => (
-        <audio {...props} src={normalizeAssetMediaSrc(props.src)} />
-      ),
-      video: (props: VideoHTMLAttributes<HTMLVideoElement>) => (
-        <video {...props} src={normalizeAssetMediaSrc(props.src)} />
-      ),
+      audio: ({
+        node,
+        ...props
+      }: MarkdownNodeProp & AudioHTMLAttributes<HTMLAudioElement>) => {
+        void node
+        return <audio {...props} src={normalizeAssetMediaSrc(props.src)} />
+      },
+      video: ({
+        node,
+        ...props
+      }: MarkdownNodeProp & VideoHTMLAttributes<HTMLVideoElement>) => {
+        void node
+        return <video {...props} src={normalizeAssetMediaSrc(props.src)} />
+      },
+      section: ({
+        children,
+        node,
+        className,
+        ...props
+      }: MarkdownNodeProp &
+        HTMLAttributes<HTMLElement> & {
+          'data-footnotes'?: boolean | string
+        }) => {
+        void node
+        if ('data-footnotes' in props) {
+          return (
+            <div
+              {...props}
+              className={`markdown-footnotes ${className ?? ''}`.trim()}
+            >
+              {children}
+            </div>
+          )
+        }
+
+        return (
+          <section {...props} className={className}>
+            {children}
+          </section>
+        )
+      },
       li: ({
         children,
+        node,
         ...props
-      }: ClassAttributes<HTMLLIElement> & HTMLAttributes<HTMLLIElement>) => {
+      }: MarkdownNodeProp &
+        ClassAttributes<HTMLLIElement> &
+        HTMLAttributes<HTMLLIElement>) => {
+        void node
         const childArray = Array.isArray(children) ? children : [children]
         const meaningfulChildren = childArray.filter(
           (child) => child !== null && child !== undefined && child !== false,
@@ -182,75 +248,113 @@ export default function MarkdownPreview({ content, path }: Props) {
       },
       h1: ({
         children,
+        node,
         ...props
-      }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={1} {...props}>
-          {children}
-        </Headline>
-      ),
+      }: MarkdownNodeProp &
+        ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => {
+        void node
+        return (
+          <Headline level={1} {...props}>
+            {children}
+          </Headline>
+        )
+      },
       h2: ({
         children,
+        node,
         ...props
-      }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={2} {...props}>
-          {children}
-        </Headline>
-      ),
+      }: MarkdownNodeProp &
+        ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => {
+        void node
+        return (
+          <Headline level={2} {...props}>
+            {children}
+          </Headline>
+        )
+      },
       h3: ({
         children,
+        node,
         ...props
-      }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={3} {...props}>
-          {children}
-        </Headline>
-      ),
+      }: MarkdownNodeProp &
+        ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => {
+        void node
+        return (
+          <Headline level={3} {...props}>
+            {children}
+          </Headline>
+        )
+      },
       h4: ({
         children,
+        node,
         ...props
-      }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={4} {...props}>
-          {children}
-        </Headline>
-      ),
+      }: MarkdownNodeProp &
+        ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => {
+        void node
+        return (
+          <Headline level={4} {...props}>
+            {children}
+          </Headline>
+        )
+      },
       h5: ({
         children,
+        node,
         ...props
-      }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={5} {...props}>
-          {children}
-        </Headline>
-      ),
+      }: MarkdownNodeProp &
+        ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => {
+        void node
+        return (
+          <Headline level={5} {...props}>
+            {children}
+          </Headline>
+        )
+      },
       h6: ({
         children,
+        node,
         ...props
-      }: ClassAttributes<HTMLHeadingElement> &
-        HTMLAttributes<HTMLHeadingElement>) => (
-        <Headline level={6} {...props}>
-          {children}
-        </Headline>
-      ),
-      table: (
-        props: ClassAttributes<HTMLTableElement> &
-          HTMLAttributes<HTMLTableElement>,
-      ) => (
-        <div className="table-wrapper custom-scrollbar">
-          <table
-            {...props}
-            className={`custom-scrollbar ${props.className ?? ''}`.trim()}
-          />
-        </div>
-      ),
+      }: MarkdownNodeProp &
+        ClassAttributes<HTMLHeadingElement> &
+        HTMLAttributes<HTMLHeadingElement>) => {
+        void node
+        return (
+          <Headline level={6} {...props}>
+            {children}
+          </Headline>
+        )
+      },
+      table: ({
+        node,
+        ...props
+      }: MarkdownNodeProp &
+        ClassAttributes<HTMLTableElement> &
+        HTMLAttributes<HTMLTableElement>) => {
+        void node
+        return (
+          <div className="table-wrapper custom-scrollbar">
+            <table
+              {...props}
+              className={`custom-scrollbar ${props.className ?? ''}`.trim()}
+            />
+          </div>
+        )
+      },
       pre: MarkdownCodeBlock,
-      code: (
-        props: JSX.IntrinsicAttributes &
-          ClassAttributes<HTMLElement> &
-          HTMLAttributes<HTMLElement> & { 'data-line'?: string },
-      ) => {
+      code: ({
+        node,
+        ...props
+      }: MarkdownNodeProp &
+        JSX.IntrinsicAttributes &
+        ClassAttributes<HTMLElement> &
+        HTMLAttributes<HTMLElement> & { 'data-line'?: string }) => {
+        void node
         const { className, children, 'data-line': dataLine } = props
         if (className?.includes('language-mermaid')) {
           const code = String(children ?? '').trim()

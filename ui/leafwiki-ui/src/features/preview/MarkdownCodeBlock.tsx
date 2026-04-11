@@ -35,9 +35,10 @@ function readTextContent(node: ReactNode): string {
 
 export default function MarkdownCodeBlock(
   props: ClassAttributes<HTMLPreElement> &
-    HTMLAttributes<HTMLPreElement> & { children?: ReactNode },
+    HTMLAttributes<HTMLPreElement> & { children?: ReactNode; node?: unknown },
 ) {
-  const { children, ...preProps } = props
+  const { children, node, ...preProps } = props
+  void node
   const [copied, setCopied] = useState(false)
   const child = Array.isArray(children) ? children[0] : children
 

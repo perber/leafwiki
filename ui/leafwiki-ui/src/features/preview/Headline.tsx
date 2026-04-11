@@ -27,6 +27,7 @@ export type HeadlineProps = HTMLAttributes<HTMLHeadingElement> & {
   children: ReactNode
   'data-line'?: string
   'data-leafwiki-generated-id'?: string
+  node?: unknown
 }
 
 export default function Headline({
@@ -36,8 +37,10 @@ export default function Headline({
   id,
   'data-line': dataLine,
   'data-leafwiki-generated-id': hasGeneratedId,
+  node,
   ...props
 }: HeadlineProps) {
+  void node
   const tagName = `h${level}` as keyof HTMLElementTagNameMap
   const shouldRenderAnchor = hasGeneratedId === 'true' && !!id
   const hasNestedLink = containsLink(children)
