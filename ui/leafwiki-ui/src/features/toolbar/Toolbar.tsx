@@ -54,7 +54,10 @@ export function Toolbar() {
                 key={button.id}
                 onClick={button.action}
                 disabled={button.disabled}
-                className={cn('cursor-pointer', button.destructive && 'text-red-600')}
+                className={cn(
+                  'cursor-pointer',
+                  button.destructive && 'text-red-600',
+                )}
                 data-testid={`${button.id}-menu-item`}
               >
                 {button.icon}
