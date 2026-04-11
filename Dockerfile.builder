@@ -2,13 +2,14 @@
 FROM node:25-alpine AS frontend
 
 WORKDIR /ui
+ARG APP_VERSION
 
 COPY ./ui/leafwiki-ui/package.json ./package.json
 COPY ./ui/leafwiki-ui/package-lock.json ./package-lock.json
 RUN npm install
 
 COPY ./ui/leafwiki-ui/ ./
-RUN VITE_API_URL=/ npm run build
+RUN VITE_API_URL=/ APP_VERSION=${APP_VERSION} npm run build
 
 # Stage 2: Go backend build
 FROM golang:1.26-alpine AS builder

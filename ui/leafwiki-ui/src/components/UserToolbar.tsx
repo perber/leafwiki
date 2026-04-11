@@ -3,6 +3,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
@@ -81,7 +83,12 @@ export default function UserToolbar() {
             >
               Import
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
           </RoleGuard>
+          <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+            Version {__APP_VERSION__}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={() => openDialog(DIALOG_CHANGE_OWN_PASSWORD)}

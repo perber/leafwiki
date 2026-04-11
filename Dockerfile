@@ -1,10 +1,11 @@
 # Step 1: Frontend
 FROM node:25-alpine AS frontend-build
 WORKDIR /app
+ARG APP_VERSION
 COPY ./ui/leafwiki-ui/package*.json ./
 RUN npm install
 COPY ./ui/leafwiki-ui/ ./
-RUN VITE_API_URL=/ npm run build
+RUN VITE_API_URL=/ APP_VERSION=${APP_VERSION} npm run build
 
 # Step 2: Backend + Build binary
 FROM golang:1.26-alpine AS backend-build
