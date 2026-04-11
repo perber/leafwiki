@@ -1240,6 +1240,10 @@ Paragraph outside the list.
     await deletePageDialog.confirmDeletion();
     await page.getByText('Page deleted successfully').waitFor({ state: 'visible' });
     await page.goto(toAppPath(`/${slug}`));
+    // Wait for the app to finish initialising (config load + auth refresh) before
+    // asserting the 404 state.  Without this the router is not yet mounted while
+    // isRefreshing === true, so .page404__title never appears in CI.
+    await viewPage.expectUserLoggedIn();
     await page.locator('.page404__title').waitFor({ state: 'visible' });
   });
 
