@@ -38,13 +38,18 @@ export function useToolbarActions({
 
     setButtons([
       {
-        id: 'delete-page',
-        label: `Delete ${itemLabel}`,
-        hotkey: 'Ctrl+Delete',
-        icon: <Trash2 size={18} />,
-        variant: 'outline',
-        className: 'hover:text-red-600 hover:bg-red-100 hover:border-red-300',
-        action: deletePage,
+        id: 'edit-page',
+        label: `Edit ${itemLabel}`,
+        hotkey: 'Ctrl+E',
+        icon: <Pencil size={18} />,
+        action: editPage,
+      },
+      {
+        id: 'print-page',
+        label: `Print ${itemLabel}`,
+        hotkey: 'Ctrl+P',
+        icon: <Printer size={18} />,
+        action: printPage,
       },
       {
         id: 'copy-page',
@@ -55,18 +60,14 @@ export function useToolbarActions({
         action: copyPage,
       },
       {
-        id: 'print-page',
-        label: `Print ${itemLabel}`,
-        hotkey: 'Ctrl+P',
-        icon: <Printer size={18} />,
-        action: printPage,
-      },
-      {
-        id: 'edit-page',
-        label: `Edit ${itemLabel}`,
-        hotkey: 'Ctrl+E',
-        icon: <Pencil size={18} />,
-        action: editPage,
+        id: 'delete-page',
+        label: `Delete ${itemLabel}`,
+        hotkey: 'Ctrl+Delete',
+        icon: <Trash2 size={18} />,
+        variant: 'outline',
+        destructive: true,
+        className: 'hover:text-red-600 hover:bg-red-100 hover:border-red-300',
+        action: deletePage,
       },
     ])
 

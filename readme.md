@@ -340,8 +340,7 @@ These environment variables override the default values and are especially usefu
 
 ### Custom Stylesheet
 
-The custom stylesheet feature is not part of `v0.8.4` yet.
-It will be available in the next release.
+The custom stylesheet feature is available since `v0.8.5`.
 
 To use it, place a `.css` file inside your configured data directory and pass its path via `--custom-stylesheet` or `LEAFWIKI_CUSTOM_STYLESHEET`.
 
@@ -415,10 +414,20 @@ If you use this flag, **you are fully responsible for securing access at the net
 
 ## Import Feature 
 
-LeafWiki includes a built-in Markdown Importer that allows you to import existing Markdown files and folders into the wiki structure.
-The importer is available as admin in the UI and can be used to quickly bring existing documentation into LeafWiki.
+LeafWiki includes a built-in Markdown importer that allows admins to import an existing Markdown package into the wiki structure from the UI.
+The current workflow is ZIP-based: upload a package, review the generated import plan, and then start the import.
 
-At the moment the importer does not support all features of the wiki (e.g. metadata, backlinks, assets, ...) but it provides a fast way to get started with existing Markdown content.
+The importer is designed to help you bring existing documentation into LeafWiki quickly while preserving the folder-oriented structure where possible.
+It currently supports:
+
+- importing Markdown files from a ZIP package
+- creating or updating pages based on the generated import plan
+- rewriting Markdown links between imported pages
+- rewriting Obsidian-style wiki links
+- importing linked local assets such as images and documents
+- preserving compatible frontmatter fields while keeping LeafWiki-managed fields under LeafWiki control
+
+There are still limits depending on the source content and package layout, so reviewing the generated plan before execution is recommended.
 
 Please open an issue if you have specific feature requests or feedback for the importer.
 

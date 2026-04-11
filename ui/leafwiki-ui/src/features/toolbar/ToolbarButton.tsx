@@ -11,6 +11,7 @@ export type ToolbarButtonProps = {
   disabled?: boolean
   icon: React.ReactNode
   className?: string
+  mobileHidden?: boolean
 }
 
 export function ToolbarButton({
@@ -22,8 +23,13 @@ export function ToolbarButton({
   icon,
   variant = 'outline',
   className,
+  mobileHidden = false,
 }: ToolbarButtonProps) {
-  const combinedClassName = cn('h-8 w-8 shadow-xs', className)
+  const combinedClassName = cn(
+    'h-8 w-8 shadow-xs',
+    mobileHidden && 'hidden md:inline-flex',
+    className,
+  )
 
   return (
     <TooltipWrapper label={`${label} (${hotkey})`} side="top" align="center">

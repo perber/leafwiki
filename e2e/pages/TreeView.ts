@@ -22,6 +22,7 @@ export default class TreeView {
   }
 
   async getNumberOfTreeNodes() {
+    await this.page.waitForLoadState('networkidle');
     return this.page.locator('a[data-testid^="tree-node-link-"]').count();
   }
 
@@ -141,7 +142,7 @@ export default class TreeView {
   }
 
   async expectNumberOfTreeNodes(expectedCount: number) {
-    const actualCount = await this.getNumberOfTreeNodes();
-    expect(actualCount).toBe(expectedCount);
+    await this.page.waitForLoadState('networkidle');
+    await expect(this.page.locator('a[data-testid^="tree-node-link-"]')).toHaveCount(expectedCount);
   }
 }

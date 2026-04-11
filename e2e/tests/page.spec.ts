@@ -1,6 +1,6 @@
+import test from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import test from '@playwright/test';
 import AddPageDialog from '../pages/AddPageDialog';
 import CopyPageDialog from '../pages/CopyPageDialog';
 import CreatePageByPathDialog from '../pages/CreatePageByPathDialog';
@@ -601,9 +601,7 @@ This paragraph creates a footnote reference.[^leafwiki]
     const footnoteReference = page.locator('article sup a[data-footnote-ref]');
     await footnoteReference.waitFor({ state: 'visible' });
     await test.expect(footnoteReference).not.toHaveAttribute('node', /.+/);
-    await test
-      .expect(footnoteReference)
-      .toHaveAttribute('href', /#user-content-fn-leafwiki$/);
+    await test.expect(footnoteReference).toHaveAttribute('href', /#user-content-fn-leafwiki$/);
     await footnoteReference.click();
 
     await test.expect
@@ -615,9 +613,7 @@ This paragraph creates a footnote reference.[^leafwiki]
     const footnoteBacklink = page.locator('article a[data-footnote-backref]');
     await footnoteBacklink.waitFor({ state: 'visible' });
     await test.expect(footnoteBacklink).not.toHaveAttribute('node', /.+/);
-    await test
-      .expect(footnoteBacklink)
-      .toHaveAttribute('href', /#user-content-fnref-leafwiki$/);
+    await test.expect(footnoteBacklink).toHaveAttribute('href', /#user-content-fnref-leafwiki$/);
     await footnoteBacklink.click();
 
     await test.expect
@@ -1208,6 +1204,48 @@ Paragraph outside the list.
     await treeView.expectNumberOfTreeNodes(curNodeCount);
   });
 
+  test('viewer toolbar overflow keeps copy and delete reachable on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    const title = `Mobile Toolbar Page ${Date.now()}`;
+    const slug = `mobile-toolbar-page-${Date.now()}`;
+
+    const viewPage = new ViewPage(page);
+    await createPageWithContent(page, {
+      title,
+      slug,
+      content: 'Mobile toolbar overflow test page',
+    });
+    await viewPage.goto(`/${slug}`);
+    await page.locator('article').getByText('Mobile toolbar overflow test page').waitFor({
+      state: 'visible',
+    });
+
+    await page.getByTestId('toolbar-overflow-button').waitFor({ state: 'visible' });
+
+    const copyPageDialog = new CopyPageDialog(page);
+    await viewPage.clickCopyPageMenuItem();
+    const copyTitleInput = await copyPageDialog.getTitleInput();
+    await copyTitleInput.waitFor({ state: 'visible' });
+    await copyPageDialog.cancel();
+
+    await page.locator('article').getByText('Mobile toolbar overflow test page').waitFor({
+      state: 'visible',
+    });
+    await page.getByTestId('toolbar-overflow-button').waitFor({ state: 'visible' });
+    await viewPage.clickDeletePageMenuItem();
+
+    const deletePageDialog = new DeletePageDialog(page);
+    test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.confirmDeletion();
+    await page.getByText('Page deleted successfully').waitFor({ state: 'visible' });
+    // After a successful delete the app performs a SPA navigation to the parent page.
+    // We verify the delete worked by checking we are no longer on the deleted page URL.
+    // Avoid a full page.goto() here: that triggers auth bootstrap again and the
+    // refresh-token API call can hang indefinitely in CI, causing a 3-minute timeout.
+    await page.waitForURL((url) => !url.pathname.endsWith(slug));
+  });
+
   test('nested-delete-operation', async ({ page }) => {
     const parentTitle = `Delete Parent Page ${Date.now()}`;
     const childTitle = `Child Page ${Date.now()}`;
@@ -1233,7 +1271,11 @@ Paragraph outside the list.
 
     const deletePageDialog = new DeletePageDialog(page);
     test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
-    await deletePageDialog.confirmDeletion();
+    // Attempt delete without the recursive flag — the API rejects this because
+    // the page has children. Use tryConfirmDeletion() so we wait for the API
+    // response without blocking on the dialog button to detach (it won't,
+    // because the dialog stays open on failure).
+    await deletePageDialog.tryConfirmDeletion();
 
     // The dialog stays open, because we need to confirm nested deletion
     test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
@@ -1341,7 +1383,7 @@ Paragraph outside the list.
     await deletePageDialog.confirmDeletion();
     await page.waitForURL(new RegExp('/' + parentTitle + '$'));
 
-    test.expect(await viewPage.getTitle()).toBe(parentTitle);
+    await test.expect(page.locator('article>h1')).toHaveText(parentTitle);
   });
 
   test('delete-unrelated-page-keeps-current-page-open', async ({ page }) => {
