@@ -7,6 +7,8 @@ import {
   Component,
   ErrorInfo,
   HTMLAttributes,
+  ReactElement,
+  isValidElement,
   ReactNode,
   useCallback,
   useMemo,
@@ -102,6 +104,20 @@ function normalizeAssetMediaSrc(src?: string) {
   return src
 }
 
+function isPlainListParagraph(
+  child: ReactNode,
+): child is ReactElement<{ children?: ReactNode; 'data-line'?: string }> {
+  if (
+    !isValidElement<{ children?: ReactNode; 'data-line'?: string }>(child) ||
+    child.type !== 'p'
+  ) {
+    return false
+  }
+
+  const propKeys = Object.keys(child.props)
+  return propKeys.every((key) => key === 'children' || key === 'data-line')
+}
+
 export default function MarkdownPreview({ content, path }: Props) {
   const designMode = useDesignModeStore((state) => state.mode)
   const prefersLight = useSyncExternalStore(
@@ -144,6 +160,25 @@ export default function MarkdownPreview({ content, path }: Props) {
       video: (props: VideoHTMLAttributes<HTMLVideoElement>) => (
         <video {...props} src={normalizeAssetMediaSrc(props.src)} />
       ),
+      li: ({
+        children,
+        ...props
+      }: ClassAttributes<HTMLLIElement> & HTMLAttributes<HTMLLIElement>) => {
+        const childArray = Array.isArray(children) ? children : [children]
+        const meaningfulChildren = childArray.filter(
+          (child) => child !== null && child !== undefined && child !== false,
+        )
+        const onlyChild = meaningfulChildren[0]
+
+        if (
+          meaningfulChildren.length === 1 &&
+          isPlainListParagraph(onlyChild)
+        ) {
+          return <li {...props}>{onlyChild.props.children}</li>
+        }
+
+        return <li {...props}>{children}</li>
+      },
       h1: ({
         children,
         ...props
