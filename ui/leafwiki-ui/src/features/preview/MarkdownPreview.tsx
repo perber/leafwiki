@@ -26,6 +26,7 @@ import MarkdownCodeBlock from './MarkdownCodeBlock'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
 import MermaidBlock from './MermaidBlock'
+import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 
@@ -286,6 +287,11 @@ export default function MarkdownPreview({ content, path }: Props) {
     [markdownLink, resolvedMode],
   )
 
+  const normalizedContent = useMemo(
+    () => normalizeMarkdownListIndentation(content),
+    [content],
+  )
+
   return (
     <MarkdownPreviewErrorBoundary resetKey={`${path ?? ''}:${content}`}>
       <>
@@ -300,7 +306,7 @@ export default function MarkdownPreview({ content, path }: Props) {
           ]}
           components={components}
         >
-          {content}
+          {normalizedContent}
         </ReactMarkdown>
         <div id="mermaid-renderer"></div>
       </>
