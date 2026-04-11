@@ -36,7 +36,7 @@ import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 
 const schema = {
   ...defaultSchema,
-  clobberPrefix: 'leafwiki-',
+  clobberPrefix: '',
   tagNames: [...(defaultSchema.tagNames || []), 'audio', 'video'],
   attributes: {
     ...defaultSchema.attributes,
@@ -65,7 +65,7 @@ type MarkdownPreviewErrorBoundaryState = {
   hasError: boolean
 }
 
-const CLOBBER_PREFIX = 'leafwiki-'
+const CLOBBER_PREFIX = ''
 const FOOTNOTE_TARGET_PREFIX = '#user-content-fn'
 
 type MarkdownNodeProp = {
