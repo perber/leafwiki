@@ -65,6 +65,7 @@ export function useToolbarActions({
         hotkey: 'Ctrl+Delete',
         icon: <Trash2 size={18} />,
         variant: 'outline',
+        destructive: true,
         className: 'hover:text-red-600 hover:bg-red-100 hover:border-red-300',
         action: deletePage,
       },

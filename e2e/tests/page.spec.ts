@@ -1204,6 +1204,45 @@ Paragraph outside the list.
     await treeView.expectNumberOfTreeNodes(curNodeCount);
   });
 
+  test('viewer toolbar overflow keeps copy and delete reachable on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    const title = `Mobile Toolbar Page ${Date.now()}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await treeView.clickPageByTitle(title);
+
+    const viewPage = new ViewPage(page);
+    test.expect(await viewPage.getTitle()).toBe(title);
+
+    await page.getByTestId('toolbar-overflow-button').waitFor({ state: 'visible' });
+
+    const copyPageDialog = new CopyPageDialog(page);
+    await viewPage.clickCopyPageMenuItem();
+
+    const newTitle = `Copy of ${title}`;
+    await copyPageDialog.fillTitle(newTitle);
+    await copyPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
+
+    await treeView.clickPageByTitle(title);
+    await viewPage.clickDeletePageMenuItem();
+
+    const deletePageDialog = new DeletePageDialog(page);
+    test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.confirmDeletion();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+  });
+
   test('nested-delete-operation', async ({ page }) => {
     const parentTitle = `Delete Parent Page ${Date.now()}`;
     const childTitle = `Child Page ${Date.now()}`;
