@@ -1208,20 +1208,18 @@ Paragraph outside the list.
     await page.setViewportSize({ width: 390, height: 844 });
 
     const title = `Mobile Toolbar Page ${Date.now()}`;
-
-    const treeView = new TreeView(page);
-    const curNodeCount = await treeView.getNumberOfTreeNodes();
-    await treeView.clickRootAddButton();
-
-    const addPageDialog = new AddPageDialog(page);
-    await addPageDialog.fillTitle(title);
-    await addPageDialog.submitWithoutRedirect();
-
-    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
-    await treeView.clickPageByTitle(title);
+    const slug = `mobile-toolbar-page-${Date.now()}`;
 
     const viewPage = new ViewPage(page);
-    test.expect(await viewPage.getTitle()).toBe(title);
+    await createPageWithContent(page, {
+      title,
+      slug,
+      content: 'Mobile toolbar overflow test page',
+    });
+    await viewPage.goto(`/${slug}`);
+    await page.locator('article').getByText('Mobile toolbar overflow test page').waitFor({
+      state: 'visible',
+    });
 
     await page.getByTestId('toolbar-overflow-button').waitFor({ state: 'visible' });
 
@@ -1230,17 +1228,23 @@ Paragraph outside the list.
 
     const newTitle = `Copy of ${title}`;
     await copyPageDialog.fillTitle(newTitle);
+    const copiedSlug = await copyPageDialog.getSlugInput().then((input) =>
+      input.inputValue(),
+    );
     await copyPageDialog.submitWithoutRedirect();
+    await viewPage.goto(`/${copiedSlug}`);
+    await page.locator('article').getByText('Mobile toolbar overflow test page').waitFor({
+      state: 'visible',
+    });
 
-    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
-
-    await treeView.clickPageByTitle(title);
+    await viewPage.goto(`/${slug}`);
     await viewPage.clickDeletePageMenuItem();
 
     const deletePageDialog = new DeletePageDialog(page);
     test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
     await deletePageDialog.confirmDeletion();
-    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await page.goto(toAppPath(`/${slug}`));
+    await page.locator('.page404__title').waitFor({ state: 'visible' });
   });
 
   test('nested-delete-operation', async ({ page }) => {
