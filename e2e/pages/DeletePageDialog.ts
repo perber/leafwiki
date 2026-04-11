@@ -38,4 +38,22 @@ export default class DeletePageDialog {
     await deleteButton.click();
     await deleteButton.waitFor({ state: 'detached' });
   }
+
+  /**
+   * Clicks the confirm button and waits for the DELETE API call to complete,
+   * without waiting for the dialog to close. Use this when the delete is
+   * expected to fail (e.g. non-recursive delete of a page with children).
+   */
+  async tryConfirmDeletion() {
+    const deleteButton = this.page.locator(
+      'button[data-testid="delete-page-dialog-button-confirm"]',
+    );
+    await deleteButton.waitFor({ state: 'visible' });
+    await Promise.all([
+      this.page.waitForResponse(
+        (r) => r.url().includes('/api/pages/') && r.request().method() === 'DELETE',
+      ),
+      deleteButton.click(),
+    ]);
+  }
 }

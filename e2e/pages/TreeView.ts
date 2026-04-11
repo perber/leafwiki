@@ -141,7 +141,6 @@ export default class TreeView {
   }
 
   async expectNumberOfTreeNodes(expectedCount: number) {
-    const actualCount = await this.getNumberOfTreeNodes();
-    expect(actualCount).toBe(expectedCount);
+    await expect(this.page.locator('a[data-testid^="tree-node-link-"]')).toHaveCount(expectedCount);
   }
 }

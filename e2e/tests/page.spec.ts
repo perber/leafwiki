@@ -1271,7 +1271,11 @@ Paragraph outside the list.
 
     const deletePageDialog = new DeletePageDialog(page);
     test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
-    await deletePageDialog.confirmDeletion();
+    // Attempt delete without the recursive flag — the API rejects this because
+    // the page has children. Use tryConfirmDeletion() so we wait for the API
+    // response without blocking on the dialog button to detach (it won't,
+    // because the dialog stays open on failure).
+    await deletePageDialog.tryConfirmDeletion();
 
     // The dialog stays open, because we need to confirm nested deletion
     test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();

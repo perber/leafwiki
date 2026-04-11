@@ -36,7 +36,7 @@ export function DeletePageDialog({
       await deletePage(pageId, deleteRecursive)
       toast.success(`${itemLabelCapitalized} deleted successfully`)
       navigate(redirectTo)
-      await reloadTree()
+      reloadTree().catch(console.error)
       return true
     } catch (err) {
       console.warn(err)
