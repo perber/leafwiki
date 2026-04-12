@@ -39,9 +39,7 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
         onMouseEnter={onMouseEnter}
         onFocus={onFocus}
         className={`list-view__item search-result-card ${
-          isActive
-            ? 'list-view__item--active search-result-card--selected'
-            : ''
+          isActive ? 'list-view__item--active search-result-card--selected' : ''
         } ${isRouteActive ? 'search-result-card--route-active' : ''}`.trim()}
       >
         <div

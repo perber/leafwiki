@@ -360,7 +360,6 @@ export default function MarkdownPreview({
       },
       h1: ({
         children,
-        node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
@@ -374,7 +373,6 @@ export default function MarkdownPreview({
         ),
       h2: ({
         children,
-        node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
@@ -388,7 +386,6 @@ export default function MarkdownPreview({
         ),
       h3: ({
         children,
-        node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
@@ -402,7 +399,6 @@ export default function MarkdownPreview({
         ),
       h4: ({
         children,
-        node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
@@ -416,7 +412,6 @@ export default function MarkdownPreview({
         ),
       h5: ({
         children,
-        node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &
@@ -430,7 +425,6 @@ export default function MarkdownPreview({
         ),
       h6: ({
         children,
-        node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLHeadingElement> &

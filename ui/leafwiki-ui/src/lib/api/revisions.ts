@@ -100,9 +100,12 @@ export async function compareRevisions(
 }
 
 export async function restoreRevision(pageId: string, revisionId: string) {
-  return await fetchWithAuth(`/api/pages/${pageId}/revisions/${revisionId}/restore`, {
-    method: 'POST',
-  })
+  return await fetchWithAuth(
+    `/api/pages/${pageId}/revisions/${revisionId}/restore`,
+    {
+      method: 'POST',
+    },
+  )
 }
 
 function encodeAssetName(name: string): string {

@@ -170,10 +170,7 @@ export async function fetchWithAuth(
       typeof errorBody === 'object' &&
       typeof (errorBody as { message?: unknown }).message === 'string'
     ) {
-      throw new ApiError(
-        (errorBody as { message: string }).message,
-        res.status,
-      )
+      throw new ApiError((errorBody as { message: string }).message, res.status)
     }
 
     throw new ApiError('Request failed', res.status)

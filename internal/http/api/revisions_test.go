@@ -249,7 +249,7 @@ func TestRestorePageRevisionHandlerRestoresLivePage(t *testing.T) {
 	if _, err := oldAssetFile.Seek(0, io.SeekStart); err != nil {
 		t.Fatalf("Seek(old asset) failed: %v", err)
 	}
-	if _, err := w.UploadAsset("editor", page.ID, oldAssetFile, "old.txt"); err != nil {
+	if _, err := w.UploadAsset("editor", page.ID, oldAssetFile, "old.txt", 1024); err != nil {
 		t.Fatalf("UploadAsset(old) failed: %v", err)
 	}
 

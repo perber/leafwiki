@@ -59,7 +59,10 @@ const initialState: PageHistoryState = {
   loadingMore: false,
 }
 
-async function loadPageHistoryState(pageId: string, update: (patch: Partial<PageHistoryState>) => void) {
+async function loadPageHistoryState(
+  pageId: string,
+  update: (patch: Partial<PageHistoryState>) => void,
+) {
   update({
     pageId,
     revisions: [],
