@@ -43,6 +43,9 @@ func writeUsage(w io.Writer) {
 	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false)
 	--base-path                   URL prefix when served behind a reverse proxy (e.g. /wiki) (default: "")
 	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
+	--enable-revision             Enable the revision / page history feature (default: false)
+	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
+	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -61,6 +64,9 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_HIDE_LINK_METADATA_SECTION
 	LEAFWIKI_BASE_PATH
 	LEAFWIKI_MAX_ASSET_UPLOAD_SIZE
+	LEAFWIKI_ENABLE_REVISION
+	LEAFWIKI_ENABLE_LINK_REFACTOR
+	LEAFWIKI_MAX_REVISION_HISTORY
 	`); err != nil {
 		panic(err)
 	}
@@ -109,6 +115,9 @@ type cliFlags struct {
 	refreshTokenTimeout     *time.Duration
 	basePath                *string
 	maxAssetUploadSize      *string
+	enableRevision          *bool
+	enableLinkRefactor      *bool
+	maxRevisionHistory      *int
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -128,6 +137,9 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		refreshTokenTimeout:     fs.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)"),
 		basePath:                fs.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)"),
 		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
+		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
+		enableLinkRefactor:      fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
+		maxRevisionHistory:      fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
 	}
 }
 
@@ -163,6 +175,9 @@ func main() {
 		resolveString("max-asset-upload-size", *flags.maxAssetUploadSize, visited, "LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50MiB"),
 		"max asset upload size",
 	)
+	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
+	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
+	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
 
 	args := flag.Args()
 	if len(args) > 0 {
@@ -219,6 +234,7 @@ func main() {
 		AccessTokenTimeout:  accessTokenTimeout,
 		RefreshTokenTimeout: refreshTokenTimeout,
 		AuthDisabled:        disableAuth,
+		MaxRevisionHistory:  maxRevisionHistory,
 	})
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)
@@ -240,6 +256,8 @@ func main() {
 		AuthDisabled:            disableAuth,
 		BasePath:                basePath,
 		MaxAssetUploadSizeBytes: maxAssetUploadSize,
+		EnableRevision:          enableRevision,
+		EnableLinkRefactor:      enableLinkRefactor,
 	})
 
 	// Start server - combine host and port
@@ -278,6 +296,20 @@ func resolveBool(flagName string, flagVal bool, visited map[string]bool, envVar 
 		fail("Invalid environment variable value", "variable", envVar, "value", env, "expected", "true/false/1/0/yes/no")
 	}
 	return flagVal // default from flag
+}
+
+func resolveInt(flagName string, flagVal int, visited map[string]bool, envVar string, def int) int {
+	if visited[flagName] {
+		return flagVal
+	}
+	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+		var n int
+		if _, err := fmt.Sscanf(env, "%d", &n); err == nil {
+			return n
+		}
+		fail("Invalid environment variable value", "variable", envVar, "value", env, "expected", "integer")
+	}
+	return def
 }
 
 func resolveDuration(flagName string, flagVal time.Duration, visited map[string]bool, envVar string) time.Duration {

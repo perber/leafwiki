@@ -8,6 +8,7 @@ import {
   previewPageRefactor,
   updatePage,
 } from '@/lib/api/pages'
+import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { create } from 'zustand'
 import { useLinkStatusStore } from '../links/linkstatus_store'
@@ -59,10 +60,11 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       useProgressbarStore.getState().setLoading(true)
       const titleChanged = page.title !== title
       const slugChanged = page.slug !== slug
+      const enableLinkRefactor = useConfigStore.getState().enableLinkRefactor
 
       let updatedPage: Page | null = null
 
-      if (slugChanged) {
+      if (slugChanged && enableLinkRefactor) {
         const preview = await previewPageRefactor(page.id, {
           kind: 'rename',
           title,

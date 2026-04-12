@@ -418,15 +418,15 @@
   }
 
   .history-sidebar__group {
-    @apply w-full border-b-0;
+    @apply w-full border-b-0 px-4;
   }
 
   .history-sidebar__group-label {
-    @apply text-muted-foreground bg-surface sticky top-0 z-10 px-0 py-2 text-[11px] font-semibold tracking-[0.12em] uppercase;
+    @apply text-muted-foreground bg-surface sticky top-0 z-10 px-0 py-3 text-[11px] font-semibold tracking-[0.12em] uppercase;
   }
 
   .history-sidebar__item {
-    @apply w-full rounded-none px-3 py-3;
+    @apply w-full rounded-none px-4 py-3;
   }
 
   .history-sidebar__item:hover {
@@ -450,7 +450,7 @@
   }
 
   .history-sidebar__load-more {
-    @apply px-3 pb-4;
+    @apply px-4 pt-4 pb-5;
   }
 
   /* App Layout */
@@ -1088,6 +1088,38 @@
     @apply text-brand-dark font-semibold;
   }
 
+  .page-refactor-dialog__results-view {
+    @apply max-h-60 rounded-none border-0;
+  }
+
+  .page-refactor-dialog__results-content {
+    @apply overflow-y-auto pr-1;
+  }
+
+  .page-refactor-dialog__result-summary {
+    @apply px-0 py-0;
+  }
+
+  .page-refactor-dialog__affected-page {
+    @apply rounded-none shadow-none;
+  }
+
+  .page-refactor-dialog__affected-page-title {
+    @apply text-brand mb-1 text-sm leading-5 font-semibold break-words whitespace-normal;
+  }
+
+  .page-refactor-dialog__affected-page-path {
+    @apply text-muted-foreground mb-2 font-mono text-xs break-all;
+  }
+
+  .page-refactor-dialog__affected-page-matches {
+    @apply text-interface-text text-xs break-words whitespace-normal;
+  }
+
+  .page-refactor-dialog__affected-page-warnings {
+    @apply mt-2 space-y-1 text-xs text-amber-700;
+  }
+
   /** backlink pane **/
   .backlinks__pane {
     @apply text-interface-text border-border mt-0 w-full border-t pt-2 pb-1 text-sm;
@@ -1283,11 +1315,45 @@
   }
 
   .page-history__workspace {
-    @apply flex min-h-0 flex-1 flex-col;
+    @apply bg-surface flex min-h-0 flex-1 flex-row;
+  }
+
+  .page-history__panel--list {
+    @apply bg-surface min-h-0 flex-none overflow-hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page-history__list-header {
+    @apply border-surface-border bg-surface flex h-12 items-center justify-between gap-3 border-b px-4;
+  }
+
+  .page-history__list-title {
+    @apply text-interface-text flex items-center gap-2 text-sm font-medium;
+  }
+
+  .page-history__list-scroll {
+    @apply bg-surface min-h-0 flex-1 overflow-y-auto pt-1 pb-3;
+  }
+
+  .page-history__list-scroll.custom-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--surface));
+  }
+
+  .page-history__list-status {
+    @apply text-muted-foreground flex items-start gap-2 px-4 py-4 text-sm;
+  }
+
+  .page-history__section-heading-note {
+    @apply text-muted-foreground text-xs font-normal tracking-normal normal-case;
   }
 
   .page-history__panel--detail {
     @apply flex min-h-0 flex-col;
+  }
+
+  .page-history__panel--detail-hidden {
+    @apply hidden;
   }
 
   .page-history__detail-content {
@@ -1300,6 +1366,53 @@
 
   .page-history__detail-stack {
     @apply flex flex-col gap-6 px-4 py-5;
+  }
+
+  .page-history__panel-resizer {
+    @apply relative inset-y-0 flex w-1 shrink-0 cursor-col-resize items-center justify-center;
+  }
+
+  .page-history__panel-resize-handle {
+    @apply pointer-events-none my-4 h-full w-full transition-colors duration-200;
+  }
+
+  .page-history__panel-resize-handle--hover {
+    @apply bg-brand-light;
+  }
+
+  .page-history__panel-resize-handle--default {
+    @apply bg-surface-border;
+  }
+
+  @media (max-width: 767px) {
+    .page-history__workspace {
+      @apply flex-col;
+    }
+
+    .page-history__panel--list {
+      @apply border-surface-border w-full min-w-0 flex-1 border-b;
+    }
+
+    .page-history__list-scroll {
+      @apply flex-1;
+      max-height: none;
+    }
+
+    .page-history__header {
+      @apply px-4 py-4;
+    }
+
+    .page-history__tabs {
+      @apply overflow-x-auto;
+    }
+
+    .page-history__tab-button {
+      @apply shrink-0;
+    }
+
+    .page-history__detail-stack {
+      @apply px-4 py-4;
+    }
   }
 
   .page-history__loading-state {

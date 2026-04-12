@@ -1,4 +1,5 @@
 import BaseDialog from '@/components/BaseDialog'
+import { ListView, ListViewList, ListViewStatus } from '@/components/ListView'
 import { Checkbox } from '@/components/ui/checkbox'
 import { PageRefactorPreview } from '@/lib/api/pages'
 import { DIALOG_PAGE_REFACTOR_CONFIRMATION } from '@/lib/registries'
@@ -99,53 +100,58 @@ export function PageRefactorDialog({
             </div>
           )}
 
-          {preview.affectedPages.length === 0 ? (
-            <p
-              className="text-muted-foreground text-sm"
-              data-testid="page-refactor-dialog-no-references"
-            >
-              No pages reference this path.
-            </p>
-          ) : (
-            <ul
-              className="max-h-60 space-y-2 overflow-auto pr-1 text-sm"
-              data-testid="page-refactor-dialog-affected-pages"
-            >
-              {preview.affectedPages.map((page) => {
-                const pageWarnings = page.warnings ?? []
-                const matchedPaths = page.matchedPaths ?? []
+          <ListView
+            as="div"
+            className="page-refactor-dialog__results-view"
+            contentClassName="page-refactor-dialog__results-content custom-scrollbar"
+            testId="page-refactor-dialog-affected-pages"
+          >
+            {preview.affectedPages.length === 0 ? (
+              <div data-testid="page-refactor-dialog-no-references">
+                <ListViewStatus className="page-refactor-dialog__result-summary">
+                  No pages reference this path.
+                </ListViewStatus>
+              </div>
+            ) : (
+              <ListViewList>
+                {preview.affectedPages.map((page) => {
+                  const pageWarnings = page.warnings ?? []
+                  const matchedPaths = page.matchedPaths ?? []
 
-                return (
-                  <li
-                    key={page.fromPageId}
-                    className="rounded border p-2"
-                    data-testid="page-refactor-dialog-affected-page"
-                  >
-                    <div className="font-medium">{page.fromTitle}</div>
-                    <div className="text-muted-foreground font-mono text-xs">
-                      {page.fromPath}
-                    </div>
+                  return (
                     <div
-                      className="mt-1 text-xs"
-                      data-testid="page-refactor-dialog-affected-page-matches"
+                      key={page.fromPageId}
+                      className="list-view__item page-refactor-dialog__affected-page"
+                      data-testid="page-refactor-dialog-affected-page"
                     >
-                      {matchedPaths.join(', ')}
-                    </div>
-                    {pageWarnings.length > 0 && (
-                      <div
-                        className="mt-2 space-y-1 text-xs text-amber-700"
-                        data-testid="page-refactor-dialog-affected-page-warnings"
-                      >
-                        {pageWarnings.map((warning) => (
-                          <div key={warning}>{warning}</div>
-                        ))}
+                      <div className="page-refactor-dialog__affected-page-title">
+                        {page.fromTitle}
                       </div>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+                      <div className="page-refactor-dialog__affected-page-path">
+                        {page.fromPath}
+                      </div>
+                      <div
+                        className="page-refactor-dialog__affected-page-matches"
+                        data-testid="page-refactor-dialog-affected-page-matches"
+                      >
+                        {matchedPaths.join(', ')}
+                      </div>
+                      {pageWarnings.length > 0 && (
+                        <div
+                          className="page-refactor-dialog__affected-page-warnings"
+                          data-testid="page-refactor-dialog-affected-page-warnings"
+                        >
+                          {pageWarnings.map((warning) => (
+                            <div key={warning}>{warning}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </ListViewList>
+            )}
+          </ListView>
         </div>
       </div>
     </BaseDialog>

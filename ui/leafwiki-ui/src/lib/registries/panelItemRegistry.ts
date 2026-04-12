@@ -9,6 +9,7 @@ export interface PanelItem {
   label: string
   hotkey?: string
   modes?: AppMode[]
+  isEnabled?: () => boolean
   icon: () => JSX.Element
   render: (props: unknown) => JSX.Element
 }

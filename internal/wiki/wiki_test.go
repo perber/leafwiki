@@ -417,6 +417,9 @@ func TestWiki_DeletePage_Simple(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeletePage failed: %v", err)
 	}
+	if _, err := w.GetPage(page.ID); err == nil {
+		t.Fatalf("expected deleted page to be gone")
+	}
 }
 
 func TestWiki_DeletePage_WithChildren(t *testing.T) {
@@ -435,11 +438,49 @@ func TestWiki_DeletePage_Recursive(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	parent, _ := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
-	_, _ = w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
+	child, _ := w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
 
 	err := w.DeletePage("system", parent.ID, true)
 	if err != nil {
 		t.Fatalf("DeletePage recursive failed: %v", err)
+	}
+	if _, err := w.GetPage(parent.ID); err == nil {
+		t.Fatalf("expected deleted parent to be gone")
+	}
+	if _, err := w.GetPage(child.ID); err == nil {
+		t.Fatalf("expected deleted child to be gone")
+	}
+}
+
+func TestWiki_DeletePage_PurgesRevisionData(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	page, err := w.CreatePage("system", nil, "Page", "page", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+	content := "updated"
+	if _, err := w.UpdatePage("system", page.ID, page.Title, page.Slug, &content, pageNodeKind()); err != nil {
+		t.Fatalf("UpdatePage failed: %v", err)
+	}
+	if _, _, err := w.revision.RecordDelete(page.ID, "system", "preexisting"); err != nil {
+		t.Fatalf("RecordDelete failed: %v", err)
+	}
+
+	if err := w.DeletePage("system", page.ID, false); err != nil {
+		t.Fatalf("DeletePage failed: %v", err)
+	}
+
+	revisions, err := w.ListRevisions(page.ID)
+	if err != nil {
+		t.Fatalf("ListRevisions failed: %v", err)
+	}
+	if len(revisions) != 0 {
+		t.Fatalf("expected revisions to be purged, got %#v", revisions)
+	}
+	if _, err := w.GetTrashEntry(page.ID); err == nil {
+		t.Fatalf("expected trash entry to be purged")
 	}
 }
 
@@ -1587,8 +1628,20 @@ func TestWiki_RestorePageWithNewParentPreservesIDAndAssets(t *testing.T) {
 	}
 	w.recordAssetRevision(child.ID, "system", "")
 
-	if err := w.DeletePage("system", parent.ID, true); err != nil {
-		t.Fatalf("DeletePage failed: %v", err)
+	if _, _, err := w.revision.RecordDelete(child.ID, "system", "delete"); err != nil {
+		t.Fatalf("RecordDelete(child) failed: %v", err)
+	}
+	if _, _, err := w.revision.RecordDelete(parent.ID, "system", "delete"); err != nil {
+		t.Fatalf("RecordDelete(parent) failed: %v", err)
+	}
+	if err := w.tree.DeleteNode("system", parent.ID, true); err != nil {
+		t.Fatalf("DeleteNode failed: %v", err)
+	}
+	if err := w.asset.DeleteAllAssetsForPage(&tree.PageNode{ID: child.ID}); err != nil {
+		t.Fatalf("DeleteAllAssetsForPage(child) failed: %v", err)
+	}
+	if err := w.asset.DeleteAllAssetsForPage(&tree.PageNode{ID: parent.ID}); err != nil {
+		t.Fatalf("DeleteAllAssetsForPage(parent) failed: %v", err)
 	}
 
 	rootParent := "root"
@@ -1636,8 +1689,14 @@ func TestWiki_RestorePageRequiresTargetWhenOriginalParentMissing(t *testing.T) {
 	parent, _ := w.CreatePage("system", nil, "Docs", "docs", &sectionKind)
 	child, _ := w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
 
-	if err := w.DeletePage("system", parent.ID, true); err != nil {
-		t.Fatalf("DeletePage failed: %v", err)
+	if _, _, err := w.revision.RecordDelete(child.ID, "system", "delete"); err != nil {
+		t.Fatalf("RecordDelete(child) failed: %v", err)
+	}
+	if _, _, err := w.revision.RecordDelete(parent.ID, "system", "delete"); err != nil {
+		t.Fatalf("RecordDelete(parent) failed: %v", err)
+	}
+	if err := w.tree.DeleteNode("system", parent.ID, true); err != nil {
+		t.Fatalf("DeleteNode failed: %v", err)
 	}
 
 	_, err := w.RestorePage("system", child.ID, nil)

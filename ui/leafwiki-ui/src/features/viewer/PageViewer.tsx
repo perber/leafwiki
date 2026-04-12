@@ -1,5 +1,6 @@
 import Page404 from '@/components/Page404'
 import { formatRelativeTime } from '@/lib/formatDate'
+import { buildHistoryUrl } from '@/lib/routePath'
 import {
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
@@ -42,6 +43,9 @@ export default function PageViewer() {
     editPage: useCallback(() => {
       navigate(`/e/${page?.path || ''}`)
     }, [page?.path, navigate]),
+    showHistory: useCallback(() => {
+      navigate(buildHistoryUrl(page?.path || pathname))
+    }, [navigate, page?.path, pathname]),
     deletePage: useCallback(() => {
       openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
         pageId: page?.id,

@@ -8,7 +8,6 @@ import { CopyPageDialog } from '@/features/page/CopyPageDialog'
 import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
 import { DeletePageDialog } from '@/features/page/DeletePageDialog'
 import { EditPageMetadataDialog } from '@/features/page/EditPageMetadataDialog'
-import { HistorySidebar } from '@/features/history/HistorySidebar'
 import { MovePageDialog } from '@/features/page/MovePageDialog'
 import { PageRefactorDialog } from '@/features/page/PageRefactorDialog'
 import { SortPagesDialog } from '@/features/page/SortPagesDialog'
@@ -20,7 +19,7 @@ import { DeleteUserDialog } from '@/features/users/DeleteUserDialog'
 import { UserFormDialog } from '@/features/users/UserFormDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
-import { FolderTree, History, Search as SearchIcon } from 'lucide-react'
+import { FolderTree, Search as SearchIcon } from 'lucide-react'
 
 export const panelItemRegistry = new PanelItemRegistry()
 export const dialogRegistry = new DialogRegistry()
@@ -29,13 +28,12 @@ export const dialogRegistry = new DialogRegistry()
 
 export const SIDEBAR_TREE_PANEL_ID = 'tree'
 export const SIDEBAR_SEARCH_PANEL_ID = 'search'
-export const SIDEBAR_HISTORY_PANEL_ID = 'history'
 
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
   label: 'Explorer',
   hotkey: 'Mod+Shift+KeyE',
-  modes: ['view', 'edit'],
+  modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <FolderTree size={16} />,
   render: () => {
     return <TreeView />
@@ -46,26 +44,11 @@ panelItemRegistry.register({
   id: SIDEBAR_SEARCH_PANEL_ID,
   label: 'Search',
   hotkey: 'Mod+Shift+KeyF',
-  modes: ['view', 'edit'],
+  modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <SearchIcon size={16} />,
   render: (props: unknown) => {
     const SearchProps = props as React.ComponentProps<typeof Search>
     return <Search {...SearchProps} />
-  },
-})
-
-panelItemRegistry.register({
-  id: SIDEBAR_HISTORY_PANEL_ID,
-  label: 'Revisions',
-  hotkey: 'Mod+Shift+H',
-  modes: ['view'],
-  icon: () => <History size={16} />,
-  render: (props: unknown) => {
-    return (
-      <HistorySidebar
-        {...(props as React.ComponentProps<typeof HistorySidebar>)}
-      />
-    )
   },
 })
 

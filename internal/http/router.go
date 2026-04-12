@@ -67,6 +67,8 @@ type RouterOptions struct {
 	AuthDisabled            bool          // Whether authentication is disabled
 	BasePath                string        // URL prefix when served behind a reverse proxy (e.g. "/wiki")
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset uploads
+	EnableRevision          bool          // Whether the revision / page history feature is enabled
+	EnableLinkRefactor      bool          // Whether the link refactoring feature is enabled in the frontend
 }
 
 // wireImporterService sets up and returns an ImporterService instance
@@ -148,6 +150,8 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 				"authDisabled":            options.AuthDisabled,
 				"basePath":                options.BasePath,
 				"maxAssetUploadSizeBytes": options.MaxAssetUploadSizeBytes,
+				"enableRevision":          options.EnableRevision,
+				"enableLinkRefactor":      options.EnableLinkRefactor,
 			})
 		})
 
@@ -204,13 +208,15 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.PUT("/pages/:id/sort", auth_middleware.RequireEditorOrAdmin(), api.SortPagesHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/slug-suggestion", auth_middleware.RequireEditorOrAdmin(), api.SuggestSlugHandler(wikiInstance))
 
-		// Revisions
-		requiresAuthGroup.GET("/pages/:id/revisions", api.ListPageRevisionsHandler(wikiInstance))
-		requiresAuthGroup.GET("/pages/:id/revisions/latest", api.GetLatestPageRevisionHandler(wikiInstance))
-		requiresAuthGroup.GET("/pages/:id/revisions/compare", api.ComparePageRevisionsHandler(wikiInstance))
-		requiresAuthGroup.GET("/pages/:id/revisions/:revisionId/assets/*name", api.GetPageRevisionAssetHandler(wikiInstance))
-		requiresAuthGroup.GET("/pages/:id/revisions/:revisionId", api.GetPageRevisionHandler(wikiInstance))
-		requiresAuthGroup.POST("/pages/:id/revisions/:revisionId/restore", auth_middleware.RequireEditorOrAdmin(), api.RestorePageRevisionHandler(wikiInstance))
+		// Revisions (only available when --enable-revision is set)
+		if options.EnableRevision {
+			requiresAuthGroup.GET("/pages/:id/revisions", api.ListPageRevisionsHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/revisions/latest", api.GetLatestPageRevisionHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/revisions/compare", api.ComparePageRevisionsHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/revisions/:revisionId/assets/*name", api.GetPageRevisionAssetHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/revisions/:revisionId", api.GetPageRevisionHandler(wikiInstance))
+			requiresAuthGroup.POST("/pages/:id/revisions/:revisionId/restore", auth_middleware.RequireEditorOrAdmin(), api.RestorePageRevisionHandler(wikiInstance))
+		}
 
 		// Trash
 		requiresAuthGroup.GET("/trash", auth_middleware.RequireEditorOrAdmin(), api.ListTrashHandler(wikiInstance))

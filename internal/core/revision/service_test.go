@@ -301,6 +301,20 @@ func TestServiceWrappersAndHelpers(t *testing.T) {
 		t.Fatalf("expected one trash entry, got %d", len(allTrash))
 	}
 
+	if err := service.DeletePageData(pageID); err != nil {
+		t.Fatalf("DeletePageData failed: %v", err)
+	}
+	revisions, err = service.ListRevisions(pageID)
+	if err != nil {
+		t.Fatalf("ListRevisions after delete failed: %v", err)
+	}
+	if len(revisions) != 0 {
+		t.Fatalf("expected revisions to be deleted, got %#v", revisions)
+	}
+	if _, err := service.GetTrashEntry(pageID); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected trash entry to be deleted, got %v", err)
+	}
+
 	if err := service.persistLiveAssets(pageID, nil); err != nil {
 		t.Fatalf("persistLiveAssets(nil) failed: %v", err)
 	}

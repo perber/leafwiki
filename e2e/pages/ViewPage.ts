@@ -122,19 +122,22 @@ export default class ViewPage {
     });
   }
 
+  // The revision list is now an inline left panel on the history page — there
+  // is no separate sidebar tab to click. This method waits for the list panel
+  // to be ready, which it always is once the history page is open.
   async switchToRevisionsTab() {
-    const revisionsTabButton = this.page.locator(
-      'button[data-testid="sidebar-history-tab-button"]',
-    );
-    await revisionsTabButton.click();
-    await this.expectRevisionsSidebarOpen();
+    await this.expectRevisionListVisible();
   }
 
+  async expectRevisionListVisible() {
+    await this.page
+      .locator('[data-testid="page-history-page-list"]')
+      .waitFor({ state: 'visible' });
+  }
+
+  // Kept for backward compatibility — alias of expectRevisionListVisible.
   async expectRevisionsSidebarOpen() {
-    await this.page.locator('[data-testid="history-sidebar"]').waitFor({ state: 'visible' });
-    await expect(
-      this.page.locator('button[data-testid="sidebar-history-tab-button"]'),
-    ).toHaveClass(/sidebar__tab-button--active/);
+    await this.expectRevisionListVisible();
   }
 
   async openFirstRevision() {

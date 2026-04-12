@@ -140,6 +140,47 @@ func TestFSStoreBlobAndTrashPaths(t *testing.T) {
 	}
 }
 
+func TestFSStoreDeletePageRevisions(t *testing.T) {
+	store := NewFSStore(t.TempDir())
+	createdAt := time.Date(2026, 4, 12, 18, 0, 0, 0, time.UTC)
+
+	revision := &Revision{
+		ID:        "rev1",
+		PageID:    "page-1",
+		CreatedAt: createdAt,
+		Type:      RevisionTypeContentUpdate,
+		Title:     "Page",
+		Slug:      "page",
+	}
+	if err := store.SaveRevision(revision); err != nil {
+		t.Fatalf("SaveRevision failed: %v", err)
+	}
+
+	if _, err := os.Stat(store.revisionsPageDir("page-1")); err != nil {
+		t.Fatalf("expected revisions dir to exist, got %v", err)
+	}
+
+	if err := store.DeletePageRevisions("page-1"); err != nil {
+		t.Fatalf("DeletePageRevisions failed: %v", err)
+	}
+
+	if _, err := os.Stat(store.revisionsPageDir("page-1")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected revisions dir to be removed, got %v", err)
+	}
+
+	revisions, err := store.ListRevisions("page-1")
+	if err != nil {
+		t.Fatalf("ListRevisions after delete failed: %v", err)
+	}
+	if len(revisions) != 0 {
+		t.Fatalf("expected no revisions after delete, got %#v", revisions)
+	}
+
+	if err := store.DeletePageRevisions("page-1"); err != nil {
+		t.Fatalf("DeletePageRevisions missing should be ignored: %v", err)
+	}
+}
+
 func TestFSStoreValidationAndEmptyPaths(t *testing.T) {
 	store := NewFSStore(t.TempDir())
 

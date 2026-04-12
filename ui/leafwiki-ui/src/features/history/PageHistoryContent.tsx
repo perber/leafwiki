@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { ListViewItem } from '@/components/ListView'
 import { mapApiError, type ApiUiError } from '@/lib/api/errors'
 import { type Page } from '@/lib/api/pages'
 import {
@@ -11,15 +12,25 @@ import {
 } from '@/lib/api/revisions'
 import { formatRelativeTime } from '@/lib/formatDate'
 import { buildHistoryUrl } from '@/lib/routePath'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useTreeStore } from '@/stores/tree'
-import { type ReactNode, useMemo, useState } from 'react'
+import {
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { History, Loader2, PanelLeftOpen } from 'lucide-react'
 import { useLinkStatusStore } from '../links/linkstatus_store'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { useViewerStore } from '../viewer/viewer'
 import {
   type HistoryTab,
+  loadMorePageHistory,
   reloadPageHistory,
   usePageHistoryStore,
 } from './pageHistory'
@@ -29,6 +40,77 @@ export type PageHistoryContentProps = {
   pageTitle: string
   testidPrefix?: string
 }
+
+const DEFAULT_HISTORY_LIST_WIDTH = 345
+const MIN_HISTORY_LIST_WIDTH = 220
+const MAX_HISTORY_LIST_WIDTH = 800
+
+function getInitialHistoryListWidth() {
+  if (typeof window === 'undefined') return DEFAULT_HISTORY_LIST_WIDTH
+
+  const storedValue = window.localStorage.getItem('leafwiki-history-list-width')
+  const parsed = Number.parseInt(storedValue ?? '', 10)
+
+  if (Number.isNaN(parsed)) return DEFAULT_HISTORY_LIST_WIDTH
+
+  return Math.min(
+    MAX_HISTORY_LIST_WIDTH,
+    Math.max(MIN_HISTORY_LIST_WIDTH, parsed),
+  )
+}
+
+// --- Revision list types and helpers ---
+
+type RevisionGroup = {
+  label: string
+  revisions: Revision[]
+}
+
+function groupLabel(value?: string) {
+  if (!value) return 'Unknown'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Unknown'
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+  }).format(date)
+}
+
+function groupRevisions(revisions: Revision[]): RevisionGroup[] {
+  const groups: RevisionGroup[] = []
+
+  revisions.forEach((revision) => {
+    const label = groupLabel(revision.createdAt)
+    const existingGroup = groups[groups.length - 1]
+
+    if (!existingGroup || existingGroup.label !== label) {
+      groups.push({ label, revisions: [revision] })
+      return
+    }
+
+    existingGroup.revisions.push(revision)
+  })
+
+  return groups
+}
+
+function revisionTitle(revision: Revision) {
+  if (!revision.createdAt) return 'Unknown time'
+
+  const date = new Date(revision.createdAt)
+  if (Number.isNaN(date.getTime())) return revision.createdAt
+
+  return new Intl.DateTimeFormat(undefined, {
+    timeStyle: 'short',
+  }).format(date)
+}
+
+function revisionMeta(revision: Revision) {
+  return revision.author?.username || revision.authorId || 'Unknown'
+}
+
+// --- Diff / detail helpers ---
 
 type DiffLine = {
   kind: 'context' | 'added' | 'removed'
@@ -189,10 +271,7 @@ function buildLineDiff(
 
   return {
     lines,
-    summary: {
-      addedLines,
-      removedLines,
-    },
+    summary: { addedLines, removedLines },
   }
 }
 
@@ -250,7 +329,7 @@ function DiffView({ comparison }: { comparison: RevisionComparison }) {
   if (!comparison.contentChanged) {
     return (
       <div className="page-history__empty-message">
-        No text difference between this revision and the current version.
+        No text difference between this revision and the active version.
       </div>
     )
   }
@@ -287,16 +366,10 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
   )
 
   const assetSummary = useMemo(() => {
-    const counts = {
-      added: 0,
-      modified: 0,
-      removed: 0,
-    }
-
+    const counts = { added: 0, modified: 0, removed: 0 }
     comparison.assetChanges.forEach((change) => {
       counts[change.status] += 1
     })
-
     return counts
   }, [comparison.assetChanges])
 
@@ -324,7 +397,12 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
       </section>
 
       <section className="page-history__section">
-        <div className="page-history__section-heading">Diff</div>
+        <div className="page-history__section-heading">
+          Diff{' '}
+          <span className="page-history__section-heading-note">
+            compared to the active version
+          </span>
+        </div>
         <DiffView comparison={comparison} />
       </section>
 
@@ -410,10 +488,15 @@ function AssetsPanel({ comparison }: { comparison: RevisionComparison }) {
   return (
     <div className="page-history__detail-stack">
       <section className="page-history__section">
-        <div className="page-history__section-heading">Asset Changes</div>
+        <div className="page-history__section-heading">
+          Asset Changes{' '}
+          <span className="page-history__section-heading-note">
+            compared to the active version
+          </span>
+        </div>
         {comparison.assetChanges.length === 0 ? (
           <div className="page-history__empty-message">
-            No asset changes between this revision and the current version.
+            No asset changes between this revision and the active version.
           </div>
         ) : (
           <div className="page-history__asset-list">
@@ -441,6 +524,7 @@ export function PageHistoryContent({
   testidPrefix = 'page-history',
 }: PageHistoryContentProps) {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const revisions = usePageHistoryStore((state) => state.revisions)
   const selectedRevisionId = usePageHistoryStore(
     (state) => state.selectedRevisionId,
@@ -457,12 +541,26 @@ export function PageHistoryContent({
   )
   const previewError = usePageHistoryStore((state) => state.previewError)
   const setActiveTab = usePageHistoryStore((state) => state.setActiveTab)
+  const nextCursor = usePageHistoryStore((state) => state.nextCursor)
+  const loadingMore = usePageHistoryStore((state) => state.loadingMore)
+  const selectRevision = usePageHistoryStore((state) => state.selectRevision)
   const [restoreLoading, setRestoreLoading] = useState(false)
+  const [listWidth, setListWidth] = useState(getInitialHistoryListWidth)
+  const [isResizingList, setIsResizingList] = useState(false)
+  const [isListResizeHovered, setIsListResizeHovered] = useState(false)
+  const [mobileListVisible, setMobileListVisible] = useState(true)
+  const liveListWidthRef = useRef(listWidth)
+  const resizeHandlersRef = useRef<{
+    onMouseMove: (event: MouseEvent) => void
+    onMouseUp: () => void
+  } | null>(null)
 
   const selectedRevision = useMemo(
     () => revisions.find((item) => item.id === selectedRevisionId) ?? null,
     [revisions, selectedRevisionId],
   )
+
+  const groupedRevisions = useMemo(() => groupRevisions(revisions), [revisions])
 
   const chips = useMemo(() => {
     if (!selectedRevision) return []
@@ -481,9 +579,11 @@ export function PageHistoryContent({
     return result
   }, [comparison, selectedRevision, snapshot])
 
+  // Preview is first and the default active tab so users immediately see the
+  // rendered content of the selected revision without an extra click.
   const tabs: { id: HistoryTab; label: string }[] = [
-    { id: 'changes', label: 'Changes' },
     { id: 'preview', label: 'Preview' },
+    { id: 'changes', label: 'Changes' },
     { id: 'raw', label: 'Raw Text' },
     { id: 'assets', label: 'Assets' },
   ]
@@ -493,119 +593,55 @@ export function PageHistoryContent({
       ? compareLoading
       : previewLoading
 
-  if (!listLoading && !listError && revisions.length === 0) {
-    return (
-      <div className="page-history" data-testid={`${testidPrefix}-content`}>
-        <div className="page-history__header">
-          <div className="page-history__header-copy">
-            <div className="page-history__header-title">{pageTitle}</div>
-            <div className="page-history__header-subtitle">
-              {latestRevisionId
-                ? 'Only the current revision exists right now.'
-                : 'Revisions will appear here after this page is changed.'}
-            </div>
-          </div>
-        </div>
+  useEffect(() => {
+    liveListWidthRef.current = listWidth
+  }, [listWidth])
 
-        <div className="page-history__workspace">
-          <div className="page-history__panel page-history__panel--detail">
-            <div className="page-history__detail-content custom-scrollbar">
-              <EmptyState
-                title={
-                  latestRevisionId
-                    ? 'No previous revisions yet'
-                    : 'No revisions yet'
-                }
-                message={
-                  latestRevisionId
-                    ? 'The current page state is saved, but there is no older revision to compare yet.'
-                    : 'This page does not have any saved revision history yet.'
-                }
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(
+      'leafwiki-history-list-width',
+      String(listWidth),
     )
-  }
+  }, [listWidth])
 
-  const renderPanelContent = () => {
-    if (listLoading) {
-      return (
-        <div className="page-history__loading-state">Loading history...</div>
-      )
-    }
-
-    if (listError) {
-      return <ErrorNotice error={listError} />
-    }
-
-    if (!selectedRevision) {
-      return (
-        <EmptyState
-          title="No revision to display"
-          message="There is currently no revision available that can be shown for this page."
-        />
-      )
-    }
-
-    if (detailLoading && !comparison && !snapshot) {
-      return (
-        <div className="page-history__loading-state">
-          {activeTab === 'changes' || activeTab === 'assets'
-            ? 'Loading diff...'
-            : 'Loading preview...'}
-        </div>
-      )
-    }
-
-    if (previewError) {
-      return <ErrorNotice error={previewError} />
-    }
-
-    if (activeTab === 'changes') {
-      return comparison ? (
-        <ChangesPanel comparison={comparison} />
-      ) : (
-        <div className="page-history__empty-message page-history__empty-message--padded">
-          No comparison data available.
-        </div>
-      )
-    }
-
-    if (activeTab === 'preview') {
-      return snapshot ? (
-        <PreviewPanel snapshot={snapshot} />
-      ) : (
-        <div className="page-history__empty-message page-history__empty-message--padded">
-          No preview available.
-        </div>
-      )
-    }
-
-    if (activeTab === 'raw') {
-      return snapshot ? (
-        <RawTextPanel snapshot={snapshot} />
-      ) : (
-        <div className="page-history__empty-message page-history__empty-message--padded">
-          No raw text available.
-        </div>
-      )
-    }
-
-    return comparison ? (
-      <AssetsPanel comparison={comparison} />
-    ) : (
-      <div className="page-history__empty-message page-history__empty-message--padded">
-        No asset data available.
-      </div>
-    )
-  }
-
-  const handleRestore = async () => {
-    if (!selectedRevision || restoreLoading) {
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileListVisible(true)
       return
     }
+
+    if (selectedRevisionId) {
+      setMobileListVisible(false)
+    }
+  }, [isMobile, selectedRevisionId])
+
+  useEffect(() => {
+    if (!isResizingList || !resizeHandlersRef.current) return
+
+    const { onMouseMove, onMouseUp } = resizeHandlersRef.current
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [isResizingList])
+
+  useEffect(
+    () => () => {
+      if (!resizeHandlersRef.current) return
+
+      const { onMouseMove, onMouseUp } = resizeHandlersRef.current
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    },
+    [],
+  )
+
+  const handleRestore = async () => {
+    if (!selectedRevision || restoreLoading) return
 
     setRestoreLoading(true)
     try {
@@ -634,63 +670,318 @@ export function PageHistoryContent({
     }
   }
 
+  const handleListResize = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (isMobile) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const startX = event.clientX
+    const startWidth = listWidth
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX
+      const viewportWidth = window.innerWidth
+      const maxWidth = Math.min(viewportWidth - 320, MAX_HISTORY_LIST_WIDTH)
+      const nextWidth = Math.min(
+        maxWidth,
+        Math.max(MIN_HISTORY_LIST_WIDTH, startWidth + delta),
+      )
+
+      liveListWidthRef.current = nextWidth
+      setListWidth(nextWidth)
+    }
+
+    const onMouseUp = () => {
+      setListWidth(liveListWidthRef.current)
+      setIsResizingList(false)
+      setIsListResizeHovered(false)
+      resizeHandlersRef.current = null
+    }
+
+    resizeHandlersRef.current = { onMouseMove, onMouseUp }
+    setIsResizingList(true)
+  }
+
+  const renderDetailContent = () => {
+    if (listLoading) {
+      return (
+        <div className="page-history__loading-state">Loading history...</div>
+      )
+    }
+
+    if (listError) {
+      return <ErrorNotice error={listError} />
+    }
+
+    if (!selectedRevision) {
+      return (
+        <EmptyState
+          title="No revision selected"
+          message="Select a revision from the list to view details."
+        />
+      )
+    }
+
+    if (detailLoading && !comparison && !snapshot) {
+      return (
+        <div className="page-history__loading-state">
+          {activeTab === 'changes' || activeTab === 'assets'
+            ? 'Loading diff...'
+            : 'Loading preview...'}
+        </div>
+      )
+    }
+
+    if (previewError) {
+      return <ErrorNotice error={previewError} />
+    }
+
+    if (activeTab === 'preview') {
+      return snapshot ? (
+        <PreviewPanel snapshot={snapshot} />
+      ) : (
+        <div className="page-history__empty-message page-history__empty-message--padded">
+          No preview available.
+        </div>
+      )
+    }
+
+    if (activeTab === 'changes') {
+      return comparison ? (
+        <ChangesPanel comparison={comparison} />
+      ) : (
+        <div className="page-history__empty-message page-history__empty-message--padded">
+          No comparison data available.
+        </div>
+      )
+    }
+
+    if (activeTab === 'raw') {
+      return snapshot ? (
+        <RawTextPanel snapshot={snapshot} />
+      ) : (
+        <div className="page-history__empty-message page-history__empty-message--padded">
+          No raw text available.
+        </div>
+      )
+    }
+
+    return comparison ? (
+      <AssetsPanel comparison={comparison} />
+    ) : (
+      <div className="page-history__empty-message page-history__empty-message--padded">
+        No asset data available.
+      </div>
+    )
+  }
+
+  const renderRevisionList = () => {
+    if (listLoading) {
+      return (
+        <div className="page-history__list-status">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading history...
+        </div>
+      )
+    }
+
+    if (listError) {
+      return (
+        <div className="page-history__list-status">
+          <ErrorNotice error={listError} />
+        </div>
+      )
+    }
+
+    if (revisions.length === 0) {
+      return (
+        <div className="page-history__list-status">
+          {latestRevisionId
+            ? 'No previous revisions yet. Older versions will appear here after more changes.'
+            : 'No revisions yet. They will appear here after the page changes.'}
+        </div>
+      )
+    }
+
+    return (
+      <>
+        {groupedRevisions.map((group) => (
+          <div key={group.label} className="history-sidebar__group">
+            <div className="history-sidebar__group-label">{group.label}</div>
+            {group.revisions.map((revision) => {
+              const selected = revision.id === selectedRevisionId
+
+              return (
+                <ListViewItem
+                  key={revision.id}
+                  active={selected}
+                  className="history-sidebar__item"
+                  onClick={() => {
+                    selectRevision(revision.id)
+                    if (isMobile) {
+                      setMobileListVisible(false)
+                    }
+                    navigate(buildHistoryUrl(revision.path))
+                  }}
+                  testId={`history-sidebar-revision-${revision.id}`}
+                >
+                  <div className="history-sidebar__item-title">
+                    {revisionTitle(revision)}
+                  </div>
+                  <div className="history-sidebar__item-meta">
+                    {revisionMeta(revision)}
+                  </div>
+                </ListViewItem>
+              )
+            })}
+          </div>
+        ))}
+
+        {nextCursor ? (
+          <div className="history-sidebar__load-more">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => void loadMorePageHistory()}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Loading...' : 'Load more'}
+            </Button>
+          </div>
+        ) : null}
+      </>
+    )
+  }
+
   return (
     <div className="page-history" data-testid={`${testidPrefix}-content`}>
-      <div className="page-history__header">
-        <div className="page-history__header-copy">
-          <div className="page-history__header-title">{pageTitle}</div>
-          {selectedRevision ? (
-            <div className="page-history__header-subtitle">
-              Revision by {displayAuthor(selectedRevision)} ·{' '}
-              {formatRelativeTime(selectedRevision.createdAt) ||
-                formatTimestamp(selectedRevision.createdAt)}
-            </div>
-          ) : null}
-          {selectedRevision ? (
-            <div className="page-history__meta-chips">
-              {chips.map((chip) => (
-                <MetaChip key={chip}>{chip}</MetaChip>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="page-history__actions">
-          <Button
-            variant="default"
-            disabled={!selectedRevision || restoreLoading}
-            onClick={() => void handleRestore()}
-            data-testid={`${testidPrefix}-restore`}
-          >
-            {restoreLoading ? 'Restoring...' : 'Restore'}
-          </Button>
-        </div>
-      </div>
-
-      <div className="page-history__tabs" role="tablist">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={
-              activeTab === tab.id
-                ? 'page-history__tab-button page-history__tab-button--active'
-                : 'page-history__tab-button page-history__tab-button--inactive'
-            }
-            data-testid={`${testidPrefix}-${tab.id}-tab`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       <div className="page-history__workspace">
-        <div className="page-history__panel page-history__panel--detail">
+        {(mobileListVisible || !isMobile) && (
+          <>
+            <div
+              className="page-history__panel page-history__panel--list"
+              data-testid={`${testidPrefix}-list`}
+              style={isMobile ? undefined : { width: `${listWidth}px` }}
+            >
+              <div className="page-history__list-header">
+                <div className="page-history__list-title">
+                  <History className="h-4 w-4" />
+                  Revision History
+                </div>
+                {isMobile && selectedRevision ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMobileListVisible(false)}
+                  >
+                    Show details
+                  </Button>
+                ) : null}
+              </div>
+              <div className="page-history__list-scroll custom-scrollbar">
+                {renderRevisionList()}
+              </div>
+            </div>
+
+            {!isMobile && (
+              <div
+                className="page-history__panel-resizer"
+                onMouseDown={handleListResize}
+                onMouseEnter={() => setIsListResizeHovered(true)}
+                onMouseLeave={() => {
+                  if (!resizeHandlersRef.current) setIsListResizeHovered(false)
+                }}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize revision list"
+                data-testid={`${testidPrefix}-list-resize-handle`}
+              >
+                <div
+                  className={`page-history__panel-resize-handle ${
+                    isListResizeHovered || isResizingList
+                      ? 'page-history__panel-resize-handle--hover'
+                      : 'page-history__panel-resize-handle--default'
+                  }`}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Right panel: selected revision detail */}
+        <div
+          className={`page-history__panel page-history__panel--detail ${
+            isMobile && mobileListVisible
+              ? 'page-history__panel--detail-hidden'
+              : ''
+          }`}
+        >
+          <div className="page-history__header">
+            <div className="page-history__header-copy">
+              <div className="page-history__header-title">{pageTitle}</div>
+              {selectedRevision ? (
+                <div className="page-history__header-subtitle">
+                  Revision by {displayAuthor(selectedRevision)} ·{' '}
+                  {formatRelativeTime(selectedRevision.createdAt) ||
+                    formatTimestamp(selectedRevision.createdAt)}
+                </div>
+              ) : null}
+              {selectedRevision ? (
+                <div className="page-history__meta-chips">
+                  {chips.map((chip) => (
+                    <MetaChip key={chip}>{chip}</MetaChip>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="page-history__actions">
+              {isMobile ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setMobileListVisible((current) => !current)}
+                  data-testid={`${testidPrefix}-toggle-list`}
+                >
+                  <PanelLeftOpen className="h-4 w-4" />
+                  Show revisions
+                </Button>
+              ) : null}
+              <Button
+                variant="default"
+                disabled={!selectedRevision || restoreLoading}
+                onClick={() => void handleRestore()}
+                data-testid={`${testidPrefix}-restore`}
+              >
+                {restoreLoading ? 'Restoring...' : 'Restore'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="page-history__tabs" role="tablist">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={
+                  activeTab === tab.id
+                    ? 'page-history__tab-button page-history__tab-button--active'
+                    : 'page-history__tab-button page-history__tab-button--inactive'
+                }
+                data-testid={`${testidPrefix}-${tab.id}-tab`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
           <div className="page-history__detail-content custom-scrollbar">
-            {renderPanelContent()}
+            {renderDetailContent()}
           </div>
         </div>
       </div>

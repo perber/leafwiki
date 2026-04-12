@@ -10,6 +10,8 @@ export type Config = {
   hideLinkMetadataSection: boolean
   authDisabled: boolean
   maxAssetUploadSizeBytes: number
+  enableRevision: boolean
+  enableLinkRefactor: boolean
 }
 
 export async function getConfig(): Promise<Config> {

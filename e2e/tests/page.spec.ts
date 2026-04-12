@@ -724,8 +724,8 @@ First reference[^leafwiki] and second reference[^leafwiki]
     test.expect(pageErrors).toEqual([]);
   });
 
-  test('open-revision-from-sidebar-in-view-mode', async ({ page }) => {
-    const title = `Page Revision Sidebar ${Date.now()}`;
+  test('open-revision-from-history-page', async ({ page }) => {
+    const title = `Page Revision List ${Date.now()}`;
 
     const treeView = new TreeView(page);
     const curNodeCount = await treeView.getNumberOfTreeNodes();
@@ -750,9 +750,11 @@ First reference[^leafwiki] and second reference[^leafwiki]
     await editPage.savePage();
     await editPage.closeEditor();
 
-    await viewPage.switchToRevisionsTab();
+    // Revisions are now shown as an inline left panel on the history page.
+    await viewPage.openCurrentPageHistory();
+    await viewPage.expectRevisionListVisible();
     await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
-    await expect(page.getByTestId('history-sidebar')).toContainText('system');
+    await expect(page.getByTestId('page-history-page-list')).toContainText('system');
   });
 
   test('unsaved changes-warning', async ({ page }) => {

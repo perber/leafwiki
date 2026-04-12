@@ -16,9 +16,11 @@ export default function Sidebar() {
 
   const items = useMemo(
     () =>
-      registeredItems.filter((item) =>
-        item.modes ? item.modes.includes(appMode) : true,
-      ),
+      registeredItems.filter((item) => {
+        if (item.modes && !item.modes.includes(appMode)) return false
+        if (item.isEnabled && !item.isEnabled()) return false
+        return true
+      }),
     [appMode],
   )
 

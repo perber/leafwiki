@@ -274,6 +274,50 @@ func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
 	return nil, os.ErrNotExist
 }
 
+// PruneRevisions removes the oldest revision files beyond keepCount for the given page.
+// Files are sorted newest-first, so names[keepCount:] are the oldest ones.
+// Content blobs and asset manifests are NOT deleted — they are content-addressed and
+// may be shared across multiple revisions.
+func (s *FSStore) PruneRevisions(pageID string, keepCount int) error {
+	if keepCount <= 0 {
+		return nil
+	}
+	names, err := s.revisionFileNames(pageID)
+	if err != nil || len(names) <= keepCount {
+		return err
+	}
+
+	index, err := s.loadRevisionIndex(pageID)
+	if err != nil {
+		return err
+	}
+
+	// Build reverse map: filename → revisionID for index cleanup
+	filenameToID := make(map[string]string, len(index))
+	for id, filename := range index {
+		filenameToID[filename] = id
+	}
+
+	toDelete := names[keepCount:]
+	dir := s.revisionsPageDir(pageID)
+	indexChanged := false
+
+	for _, name := range toDelete {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("delete revision file %s: %w", name, err)
+		}
+		if id, ok := filenameToID[name]; ok {
+			delete(index, id)
+			indexChanged = true
+		}
+	}
+
+	if indexChanged {
+		return s.saveRevisionIndex(pageID, index)
+	}
+	return nil
+}
+
 func (s *FSStore) revisionFileNames(pageID string) ([]string, error) {
 	dir := s.revisionsPageDir(pageID)
 	entries, err := os.ReadDir(dir)
@@ -395,6 +439,18 @@ func (s *FSStore) DeleteTrashEntry(pageID string) error {
 	err := os.Remove(s.trashEntryPath(pageID))
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("delete trash entry: %w", err)
+	}
+	return nil
+}
+
+func (s *FSStore) DeletePageRevisions(pageID string) error {
+	pageID = strings.TrimSpace(pageID)
+	if pageID == "" {
+		return nil
+	}
+
+	if err := os.RemoveAll(s.revisionsPageDir(pageID)); err != nil {
+		return fmt.Errorf("delete page revisions: %w", err)
 	}
 	return nil
 }

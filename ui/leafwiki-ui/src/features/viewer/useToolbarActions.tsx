@@ -4,7 +4,7 @@ import { NODE_KIND_PAGE, type Page } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
-import { Copy, Pencil, Printer, Trash2 } from 'lucide-react'
+import { Copy, History, Pencil, Printer, Trash2 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useToolbarStore } from '../toolbar/toolbar'
 
@@ -12,6 +12,7 @@ export interface ToolbarActionsOptions {
   pageKind?: Page['kind']
   printPage: () => void
   editPage: () => void
+  showHistory: () => void
   deletePage: () => void
   copyPage: () => void
 }
@@ -20,6 +21,7 @@ export function useToolbarActions({
   pageKind = NODE_KIND_PAGE,
   printPage,
   editPage,
+  showHistory,
   deletePage,
   copyPage,
 }: ToolbarActionsOptions) {
@@ -50,6 +52,14 @@ export function useToolbarActions({
         hotkey: 'Ctrl+P',
         icon: <Printer size={18} />,
         action: printPage,
+      },
+      {
+        id: 'page-history',
+        label: `${itemLabel} History`,
+        hotkey: 'Ctrl+H',
+        icon: <History size={18} />,
+        variant: 'outline',
+        action: showHistory,
       },
       {
         id: 'copy-page',
@@ -92,6 +102,13 @@ export function useToolbarActions({
       action: printPage,
     }
 
+    const historyHotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+KeyH',
+      enabled: true,
+      mode: ['view'],
+      action: showHistory,
+    }
+
     const deleteHotkey: HotKeyDefinition = {
       keyCombo: 'Mod+Delete',
       enabled: true,
@@ -102,12 +119,14 @@ export function useToolbarActions({
     registerHotkey(editHotkey)
     registerHotkey(copyHotkey)
     registerHotkey(printHotkey)
+    registerHotkey(historyHotkey)
     registerHotkey(deleteHotkey)
 
     return () => {
       unregisterHotkey(editHotkey.keyCombo)
       unregisterHotkey(copyHotkey.keyCombo)
       unregisterHotkey(printHotkey.keyCombo)
+      unregisterHotkey(historyHotkey.keyCombo)
       unregisterHotkey(deleteHotkey.keyCombo)
     }
   }, [
@@ -118,6 +137,7 @@ export function useToolbarActions({
     copyPage,
     editPage,
     printPage,
+    showHistory,
     registerHotkey,
     unregisterHotkey,
     itemLabel,

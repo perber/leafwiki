@@ -13,6 +13,7 @@ import ReadOnlyWrapper from './RouterReadOnlyWrapper'
 export const createLeafWikiRouter = (
   isReadOnlyViewer: boolean,
   authDisabled: boolean,
+  enableRevision: boolean,
   basename?: string,
 ) =>
   createBrowserRouter(
@@ -76,7 +77,9 @@ export const createLeafWikiRouter = (
       },
       {
         path: '/history/*',
-        element: isReadOnlyViewer ? (
+        element: !enableRevision ? (
+          <Navigate to="/" replace />
+        ) : isReadOnlyViewer ? (
           <ReadOnlyWrapper>
             <PageHistoryPage />
           </ReadOnlyWrapper>

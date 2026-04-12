@@ -71,6 +71,7 @@ type WikiOptions struct {
 	AccessTokenTimeout  time.Duration // Access token timeout duration
 	RefreshTokenTimeout time.Duration // Refresh token timeout duration
 	AuthDisabled        bool          // Whether authentication is disabled
+	MaxRevisionHistory  int           // Max revisions kept per page; 0 = unlimited
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
@@ -185,7 +186,9 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	}
 
 	// Revision service intentionally starts AFTER welcome page bootstrap.
-	wiki.revision = revision.NewService(options.StorageDir, treeService, logger)
+	wiki.revision = revision.NewService(options.StorageDir, treeService, logger, revision.ServiceOptions{
+		MaxRevisions: options.MaxRevisionHistory,
+	})
 
 	return wiki, nil
 }
@@ -559,19 +562,6 @@ func (w *Wiki) DeletePage(userID string, id string, recursive bool) error {
 		}
 	}
 
-	// Record delete revisions BEFORE live delete.
-	if w.revision != nil {
-		idsToRecord := []string{id}
-		if recursive {
-			if len(subtreeIDs) > 0 {
-				idsToRecord = subtreeIDs
-			}
-		}
-		if err := w.recordDeleteRevisions(idsToRecord, userID, ""); err != nil {
-			return err
-		}
-	}
-
 	// If recursive, also handle subtree
 	// we need to mark links broken for all pages in the subtree
 	if recursive {
@@ -608,6 +598,10 @@ func (w *Wiki) DeletePage(userID string, id string, recursive bool) error {
 			}
 		}
 
+		if err := w.deleteRevisionData(subtreeIDs); err != nil {
+			return err
+		}
+
 		return nil
 	}
 
@@ -633,6 +627,10 @@ func (w *Wiki) DeletePage(userID string, id string, recursive bool) error {
 	// Also delete all assets for the page
 	if err := w.asset.DeleteAllAssetsForPage(page.PageNode); err != nil {
 		log.Printf("warning: could not delete assets for page %s: %v", page.ID, err)
+	}
+
+	if err := w.deleteRevisionData([]string{id}); err != nil {
+		return err
 	}
 
 	return nil
@@ -1230,12 +1228,12 @@ func (w *Wiki) recordAssetRevision(pageID, userID, summary string) {
 	}
 }
 
-func (w *Wiki) recordDeleteRevisions(pageIDs []string, userID, summary string) error {
+func (w *Wiki) deleteRevisionData(pageIDs []string) error {
 	if w.revision == nil {
 		return nil
 	}
 	for _, pageID := range pageIDs {
-		if _, _, err := w.revision.RecordDelete(pageID, userID, summary); err != nil {
+		if err := w.revision.DeletePageData(pageID); err != nil {
 			return err
 		}
 	}

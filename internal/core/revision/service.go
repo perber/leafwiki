@@ -25,12 +25,22 @@ type Service struct {
 	pages            *tree.TreeService
 	store            *FSStore
 	deleteTrashEntry func(string) error
+	maxRevisions     int // 0 = unlimited
 	log              *slog.Logger
 }
 
-func NewService(storageDir string, pages *tree.TreeService, logger *slog.Logger) *Service {
+type ServiceOptions struct {
+	MaxRevisions int // Maximum revisions to keep per page; 0 = unlimited
+}
+
+func NewService(storageDir string, pages *tree.TreeService, logger *slog.Logger, opts ...ServiceOptions) *Service {
 	if logger == nil {
 		logger = slog.Default()
+	}
+
+	var maxRevisions int
+	if len(opts) > 0 {
+		maxRevisions = opts[0].MaxRevisions
 	}
 
 	store := NewFSStore(storageDir)
@@ -39,7 +49,19 @@ func NewService(storageDir string, pages *tree.TreeService, logger *slog.Logger)
 		pages:            pages,
 		store:            store,
 		deleteTrashEntry: store.DeleteTrashEntry,
+		maxRevisions:     maxRevisions,
 		log:              logger.With("component", "RevisionService"),
+	}
+}
+
+// pruneAfterSave removes the oldest revisions beyond the configured limit.
+// Errors are non-fatal and only logged — a prune failure must not fail the save.
+func (s *Service) pruneAfterSave(pageID string) {
+	if s.maxRevisions <= 0 {
+		return
+	}
+	if err := s.store.PruneRevisions(pageID, s.maxRevisions); err != nil {
+		s.log.Warn("failed to prune old revisions", "pageID", pageID, "maxRevisions", s.maxRevisions, "error", err)
 	}
 }
 
@@ -91,6 +113,7 @@ func (s *Service) RecordContentUpdate(pageID, authorID, summary string) (*Revisi
 	if err := s.store.SaveRevision(rev); err != nil {
 		return nil, false, err
 	}
+	s.pruneAfterSave(rev.PageID)
 
 	return rev, true, nil
 }
@@ -143,6 +166,7 @@ func (s *Service) RecordAssetChange(pageID, authorID, summary string) (*Revision
 	if err := s.store.SaveRevision(rev); err != nil {
 		return nil, false, err
 	}
+	s.pruneAfterSave(rev.PageID)
 
 	return rev, true, nil
 }
@@ -178,6 +202,7 @@ func (s *Service) RecordStructureChange(pageID, authorID, summary string) (*Revi
 	if err := s.store.SaveRevision(rev); err != nil {
 		return nil, false, err
 	}
+	s.pruneAfterSave(rev.PageID)
 
 	return rev, true, nil
 }
@@ -217,6 +242,7 @@ func (s *Service) RecordDelete(pageID, authorID, summary string) (*Revision, *Tr
 	if err := s.store.SaveRevision(rev); err != nil {
 		return nil, nil, err
 	}
+	s.pruneAfterSave(rev.PageID)
 
 	trash := &TrashEntry{
 		PageID:         state.PageID,
@@ -475,6 +501,22 @@ func (s *Service) GetTrashEntry(pageID string) (*TrashEntry, error) {
 
 func (s *Service) ListTrash() ([]*TrashEntry, error) {
 	return s.store.ListTrash()
+}
+
+func (s *Service) DeletePageData(pageID string) error {
+	pageID = strings.TrimSpace(pageID)
+	if pageID == "" {
+		return nil
+	}
+
+	if err := s.deleteTrashEntry(pageID); err != nil {
+		return err
+	}
+	if err := s.store.DeletePageRevisions(pageID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Service) CheckRevisionIntegrity(pageID string) ([]RevisionIntegrityIssue, error) {
