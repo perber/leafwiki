@@ -1193,17 +1193,6 @@ func (s *Service) restoreAssets(pageID string, refs []AssetRef) error {
 	return nil
 }
 
-func normalizeParentID(parentID *string) string {
-	if parentID == nil {
-		return ""
-	}
-	trimmed := strings.TrimSpace(*parentID)
-	if trimmed == "" || trimmed == "root" {
-		return ""
-	}
-	return trimmed
-}
-
 func (s *Service) recordRestoreRevision(pageID, authorID string) error {
 	state, err := s.capturePageState(pageID, true)
 	if err != nil {

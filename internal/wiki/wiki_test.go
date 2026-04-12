@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/perber/wiki/internal/core/revision"
-	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	verrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
@@ -1704,7 +1703,7 @@ func TestWiki_RestorePageRequiresTargetWhenOriginalParentMissing(t *testing.T) {
 		t.Fatalf("expected restore to fail without target parent")
 	}
 
-	localized, ok := sharederrors.AsLocalizedError(err)
+	localized, ok := verrors.AsLocalizedError(err)
 	if !ok {
 		t.Fatalf("expected localized revision error, got %T", err)
 	}
