@@ -130,9 +130,7 @@ export default class ViewPage {
   }
 
   async expectRevisionListVisible() {
-    await this.page
-      .locator('[data-testid="page-history-page-list"]')
-      .waitFor({ state: 'visible' });
+    await this.page.locator('[data-testid="page-history-page-list"]').waitFor({ state: 'visible' });
   }
 
   // Kept for backward compatibility — alias of expectRevisionListVisible.
@@ -214,9 +212,7 @@ export default class ViewPage {
   }
 
   async switchToExplorerTab() {
-    const explorerTabButton = this.page.locator(
-      'button[data-testid="sidebar-tree-tab-button"]',
-    );
+    const explorerTabButton = this.page.locator('button[data-testid="sidebar-tree-tab-button"]');
     await explorerTabButton.click();
     await this.page.locator('a[data-testid^="tree-node-link-"]').first().waitFor({
       state: 'visible',

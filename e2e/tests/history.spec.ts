@@ -52,15 +52,11 @@ test.describe('History', () => {
 
   test('revision-list-panel-visible-on-history-page', async ({ page }) => {
     const title = `History List Panel ${Date.now()}`;
-    const viewPage = await createPageWithRevisions(page, title, [
-      'First revision content',
-    ]);
+    const viewPage = await createPageWithRevisions(page, title, ['First revision content']);
 
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
-    await expect(
-      page.locator('[data-testid^="history-sidebar-revision-"]').first(),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
   });
 
   test('revision-list-stays-visible-after-selecting-revision', async ({ page }) => {
@@ -78,20 +74,14 @@ test.describe('History', () => {
     await viewPage.openRevisionAt(0);
 
     await viewPage.expectRevisionListVisible();
-    await expect(
-      page.locator('[data-testid^="history-sidebar-revision-"]').first(),
-    ).toBeVisible();
-    await expect(
-      page.getByTestId('page-history-page-content'),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
+    await expect(page.getByTestId('page-history-page-content')).toBeVisible();
   });
 
   test('preview-tab-is-active-by-default', async ({ page }) => {
     // Regression for: "Changes" was the default tab — "Preview" should be first and active.
     const title = `History Preview Default ${Date.now()}`;
-    const viewPage = await createPageWithRevisions(page, title, [
-      'Content for preview test',
-    ]);
+    const viewPage = await createPageWithRevisions(page, title, ['Content for preview test']);
 
     await viewPage.openCurrentPageHistory();
     await viewPage.openRevisionAt(0);
@@ -101,9 +91,7 @@ test.describe('History', () => {
 
     // Preview tab must be active without any user interaction.
     await expect(previewTab).toHaveClass(/page-history__tab-button--active/);
-    await expect(
-      page.getByTestId('page-history-page-content'),
-    ).toBeVisible();
+    await expect(page.getByTestId('page-history-page-content')).toBeVisible();
   });
 
   test('diff-section-references-active-version', async ({ page }) => {
@@ -130,9 +118,7 @@ test.describe('History', () => {
     // Revision list items should show a formatted timestamp, not generic
     // type labels like "Content changed" or "Assets changed".
     const title = `History Timestamp Title ${Date.now()}`;
-    const viewPage = await createPageWithRevisions(page, title, [
-      'Content to trigger a revision',
-    ]);
+    const viewPage = await createPageWithRevisions(page, title, ['Content to trigger a revision']);
 
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
@@ -151,9 +137,7 @@ test.describe('History', () => {
   test('tree-visible-in-sidebar-on-history-page', async ({ page }) => {
     // Regression for: tree sidebar tab not visible when on the history page.
     const title = `History Tree Sidebar ${Date.now()}`;
-    const viewPage = await createPageWithRevisions(page, title, [
-      'Some content',
-    ]);
+    const viewPage = await createPageWithRevisions(page, title, ['Some content']);
 
     await viewPage.openCurrentPageHistory();
 
@@ -162,9 +146,7 @@ test.describe('History', () => {
     await treeTabButton.waitFor({ state: 'visible' });
     await treeTabButton.click();
 
-    await expect(
-      page.locator('a[data-testid^="tree-node-link-"]').first(),
-    ).toBeVisible();
+    await expect(page.locator('a[data-testid^="tree-node-link-"]').first()).toBeVisible();
   });
 
   test('sidebar-tree-visible-in-settings', async ({ page }) => {
@@ -195,8 +177,6 @@ test.describe('History', () => {
 
     // After restore the history page should reload and show the restored state.
     await page.getByTestId('page-history-page-content').waitFor({ state: 'visible' });
-    await expect(
-      page.locator('[data-testid^="history-sidebar-revision-"]').first(),
-    ).toBeVisible();
+    await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
   });
 });
