@@ -2,6 +2,7 @@ import ScrollableContainer from '@/components/ScrollableContainer'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { panelItemRegistry } from '@/lib/registries'
 import { PanelItem } from '@/lib/registries/panelItemRegistry'
+import { useAppMode } from '@/lib/useAppMode'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSidebarStore } from '@/stores/sidebar'
 import { JSX, useEffect, useMemo } from 'react'
@@ -9,10 +10,19 @@ import { JSX, useEffect, useMemo } from 'react'
 const registeredItems = panelItemRegistry.getAllItems()
 
 export default function Sidebar() {
+  const appMode = useAppMode()
   const sidebarMode = useSidebarStore((state) => state.sidebarMode)
   const setSidebarMode = useSidebarStore((state) => state.setSidebarMode)
 
-  const items = registeredItems
+  const items = useMemo(
+    () =>
+      registeredItems.filter((item) => {
+        if (item.modes && !item.modes.includes(appMode)) return false
+        if (item.isEnabled && !item.isEnabled()) return false
+        return true
+      }),
+    [appMode],
+  )
 
   const tabs: { id: string; label: string; icon: () => JSX.Element }[] =
     useMemo(
@@ -24,6 +34,15 @@ export default function Sidebar() {
         })),
       [items],
     )
+
+  useEffect(() => {
+    if (items.length === 0) return
+
+    const hasActiveItem = items.some((item) => item.id === sidebarMode)
+    if (!hasActiveItem) {
+      setSidebarMode(items[0].id)
+    }
+  }, [items, setSidebarMode, sidebarMode])
 
   // add hotkeys for each tab
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
@@ -50,7 +69,7 @@ export default function Sidebar() {
             keyCombo: hotkey,
             enabled: true,
             action: actions.get(item.id)!,
-            mode: ['view', 'edit'],
+            mode: item.modes ?? ['view', 'edit', 'history'],
           }
         })
         .filter(Boolean) as {
@@ -85,34 +104,28 @@ export default function Sidebar() {
         so this element just stretches to full width.
       */}
       <div className="sidebar__inner">
-        {' '}
-        {/* Tab navigation */}
-        <div className="sidebar__tabs">
-          {/* Padding around the tabs */}
-          <div className="sidebar__tabs-list">
-            {tabs.map((tab) => (
-              <TooltipWrapper label={tab.label} key={tab.id}>
-                <button
-                  data-testid={`sidebar-${tab.id}-tab-button`}
-                  onClick={() => setSidebarMode(tab.id)}
-                  className={`sidebar__tab-button ${
-                    sidebarMode === tab.id
-                      ? 'sidebar__tab-button--active'
-                      : 'sidebar__tab-button--inactive'
-                  }`}
-                >
-                  {tab.icon()} {tab.label}
-                </button>
-              </TooltipWrapper>
-            ))}
+        {tabs.length > 0 ? (
+          <div className="sidebar__tabs">
+            <div className="sidebar__tabs-list">
+              {tabs.map((tab) => (
+                <TooltipWrapper label={tab.label} key={tab.id}>
+                  <button
+                    data-testid={`sidebar-${tab.id}-tab-button`}
+                    onClick={() => setSidebarMode(tab.id)}
+                    className={`sidebar__tab-button ${
+                      sidebarMode === tab.id
+                        ? 'sidebar__tab-button--active'
+                        : 'sidebar__tab-button--inactive'
+                    }`}
+                  >
+                    {tab.icon()} {tab.label}
+                  </button>
+                </TooltipWrapper>
+              ))}
+            </div>
           </div>
-        </div>
-        {/* Height 48px is the height of the tab navigation 
-            so the content area takes the rest of the height
-            I can't use a variable here because TailwindCSS doesn't support that
-        */}
+        ) : null}
         <div className={`sidebar__content`}>
-          {/* Content */}
           {items.map((item) => (
             <ScrollableContainer key={item.id} hidden={sidebarMode !== item.id}>
               {item.render({ active: sidebarMode === item.id })}

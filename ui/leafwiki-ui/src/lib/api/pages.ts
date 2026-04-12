@@ -39,6 +39,29 @@ export interface Page {
   metadata?: PageMetadata // optional metadata, because older API responses may not have it
 }
 
+export type PageRefactorKind = 'rename' | 'move'
+
+export type PageRefactorAffectedPage = {
+  fromPageId: string
+  fromTitle: string
+  fromPath: string
+  matchedPaths: string[]
+  warnings: string[]
+}
+
+export type PageRefactorPreview = {
+  kind: PageRefactorKind
+  pageId: string
+  oldPath: string
+  newPath: string
+  affectedPages: PageRefactorAffectedPage[]
+  counts: {
+    affectedPages: number
+    matchedLinks: number
+  }
+  warnings: string[]
+}
+
 export async function fetchTree(): Promise<PageNode> {
   return (await fetchWithAuth(`/api/tree`)) as PageNode
 }
@@ -140,6 +163,49 @@ export async function movePage(id: string, parentId: string | null) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parentId }),
   })
+}
+
+export async function previewPageRefactor(
+  id: string,
+  payload:
+    | {
+        kind: 'rename'
+        title: string
+        slug: string
+      }
+    | {
+        kind: 'move'
+        parentId: string | null
+      },
+): Promise<PageRefactorPreview> {
+  return (await fetchWithAuth(`/api/pages/${id}/refactor/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })) as PageRefactorPreview
+}
+
+export async function applyPageRefactor(
+  id: string,
+  payload:
+    | {
+        kind: 'rename'
+        title: string
+        slug: string
+        content: string
+        rewriteLinks: boolean
+      }
+    | {
+        kind: 'move'
+        parentId: string | null
+        rewriteLinks: boolean
+      },
+): Promise<Page | null> {
+  return (await fetchWithAuth(`/api/pages/${id}/refactor/apply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })) as Page | null
 }
 
 export async function sortPages(parentId: string, orderedIDs: string[]) {

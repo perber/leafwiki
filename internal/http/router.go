@@ -67,6 +67,8 @@ type RouterOptions struct {
 	AuthDisabled            bool          // Whether authentication is disabled
 	BasePath                string        // URL prefix when served behind a reverse proxy (e.g. "/wiki")
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset uploads
+	EnableRevision          bool          // Whether the revision / page history feature is enabled
+	EnableLinkRefactor      bool          // Whether the link refactoring feature is enabled in the frontend
 }
 
 // wireImporterService sets up and returns an ImporterService instance
@@ -148,6 +150,8 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 				"authDisabled":            options.AuthDisabled,
 				"basePath":                options.BasePath,
 				"maxAssetUploadSizeBytes": options.MaxAssetUploadSizeBytes,
+				"enableRevision":          options.EnableRevision,
+				"enableLinkRefactor":      options.EnableLinkRefactor,
 			})
 		})
 
@@ -195,12 +199,29 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		requiresAuthGroup.POST("/pages/ensure", auth_middleware.RequireEditorOrAdmin(), api.EnsurePageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/convert/:id", auth_middleware.RequireEditorOrAdmin(), api.ConvertPageHandler(wikiInstance))
 		requiresAuthGroup.POST("/pages/copy/:id", auth_middleware.RequireEditorOrAdmin(), api.CopyPageHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/:id/refactor/preview", auth_middleware.RequireEditorOrAdmin(), api.PreviewPageRefactorHandler(wikiInstance))
+		requiresAuthGroup.POST("/pages/:id/refactor/apply", auth_middleware.RequireEditorOrAdmin(), api.ApplyPageRefactorHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.UpdatePageHandler(wikiInstance))
 		requiresAuthGroup.DELETE("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.DeletePageHandler(wikiInstance))
 
 		requiresAuthGroup.PUT("/pages/:id/move", auth_middleware.RequireEditorOrAdmin(), api.MovePageHandler(wikiInstance))
 		requiresAuthGroup.PUT("/pages/:id/sort", auth_middleware.RequireEditorOrAdmin(), api.SortPagesHandler(wikiInstance))
 		requiresAuthGroup.GET("/pages/slug-suggestion", auth_middleware.RequireEditorOrAdmin(), api.SuggestSlugHandler(wikiInstance))
+
+		// Revisions (only available when --enable-revision is set)
+		if options.EnableRevision {
+			requiresAuthGroup.GET("/pages/:id/revisions", api.ListPageRevisionsHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/revisions/latest", api.GetLatestPageRevisionHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/revisions/compare", api.ComparePageRevisionsHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/revisions/:revisionId/assets/*name", api.GetPageRevisionAssetHandler(wikiInstance))
+			requiresAuthGroup.GET("/pages/:id/revisions/:revisionId", api.GetPageRevisionHandler(wikiInstance))
+			requiresAuthGroup.POST("/pages/:id/revisions/:revisionId/restore", auth_middleware.RequireEditorOrAdmin(), api.RestorePageRevisionHandler(wikiInstance))
+		}
+
+		// Trash
+		requiresAuthGroup.GET("/trash", auth_middleware.RequireEditorOrAdmin(), api.ListTrashHandler(wikiInstance))
+		requiresAuthGroup.GET("/trash/:id", auth_middleware.RequireEditorOrAdmin(), api.GetTrashEntryHandler(wikiInstance))
+		requiresAuthGroup.POST("/trash/:id/restore", auth_middleware.RequireEditorOrAdmin(), api.RestorePageHandler(wikiInstance))
 
 		// User
 		requiresAuthGroup.POST("/users", auth_middleware.RequireAdmin(options.AuthDisabled), api.CreateUserHandler(wikiInstance))

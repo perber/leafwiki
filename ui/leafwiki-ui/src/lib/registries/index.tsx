@@ -9,6 +9,7 @@ import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
 import { DeletePageDialog } from '@/features/page/DeletePageDialog'
 import { EditPageMetadataDialog } from '@/features/page/EditPageMetadataDialog'
 import { MovePageDialog } from '@/features/page/MovePageDialog'
+import { PageRefactorDialog } from '@/features/page/PageRefactorDialog'
 import { SortPagesDialog } from '@/features/page/SortPagesDialog'
 import Search from '@/features/search/Search'
 import TreeView from '@/features/tree/TreeView'
@@ -32,6 +33,7 @@ panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
   label: 'Explorer',
   hotkey: 'Mod+Shift+KeyE',
+  modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <FolderTree size={16} />,
   render: () => {
     return <TreeView />
@@ -42,6 +44,7 @@ panelItemRegistry.register({
   id: SIDEBAR_SEARCH_PANEL_ID,
   label: 'Search',
   hotkey: 'Mod+Shift+KeyF',
+  modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <SearchIcon size={16} />,
   render: (props: unknown) => {
     const SearchProps = props as React.ComponentProps<typeof Search>
@@ -66,6 +69,7 @@ export const DIALOG_DELETE_USER_CONFIRMATION = 'delete-user-confirmation'
 export const DIALOG_UNSAVED_CHANGES = 'unsaved-changes'
 export const DIALOG_IMAGE_PREVIEW = 'image-preview'
 export const DIALOG_PAGE_QUICK_SWITCHER = 'page-quick-switcher'
+export const DIALOG_PAGE_REFACTOR_CONFIRMATION = 'page-refactor-confirmation'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -234,5 +238,18 @@ dialogRegistry.register({
   type: DIALOG_PAGE_QUICK_SWITCHER,
   render: () => {
     return <PageQuickSwitcherDialog key={DIALOG_PAGE_QUICK_SWITCHER} />
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_PAGE_REFACTOR_CONFIRMATION,
+  render: (props) => {
+    const typedProps = props as React.ComponentProps<typeof PageRefactorDialog>
+    return (
+      <PageRefactorDialog
+        key={`${DIALOG_PAGE_REFACTOR_CONFIRMATION}-${typedProps.preview.pageId}-${typedProps.preview.newPath}`}
+        {...typedProps}
+      />
+    )
   },
 })

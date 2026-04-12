@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
@@ -27,7 +28,7 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 	content := "This is a **test** page."
 	expectedContent := "This is a test page."
 
-	err = index.IndexPage(path, path, pageID, title, content)
+	err = index.IndexPage(path, path, pageID, title, tree.NodeKindPage, content)
 	if err != nil {
 		t.Fatalf("IndexPage failed: %v", err)
 	}
@@ -94,12 +95,12 @@ func TestSQLiteIndex_Search(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
 
 	// Index two pages
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", "This content is about SQLite search.")
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	err = index.IndexPage("notes/beta", "notes/beta.md", "beta2", "Unrelated Page", "This content is not about the search term.")
+	err = index.IndexPage("notes/beta", "notes/beta.md", "beta2", "Unrelated Page", tree.NodeKindSection, "This content is not about the search term.")
 	if err != nil {
 		t.Fatalf("failed to index beta page: %v", err)
 	}
@@ -122,6 +123,14 @@ func TestSQLiteIndex_Search(t *testing.T) {
 	if result.Items[0].PageID != "alpha1" {
 		t.Errorf("expected alpha1 to be ranked first, got %s", result.Items[0].PageID)
 	}
+
+	if result.Items[0].Kind != string(tree.NodeKindPage) {
+		t.Errorf("expected first result kind %q, got %q", tree.NodeKindPage, result.Items[0].Kind)
+	}
+
+	if result.Items[1].Kind != string(tree.NodeKindSection) {
+		t.Errorf("expected second result kind %q, got %q", tree.NodeKindSection, result.Items[1].Kind)
+	}
 }
 
 func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
@@ -139,6 +148,7 @@ func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
 		"docs/titleMatch.md",
 		"titleMatch",
 		"Search term in title",
+		tree.NodeKindPage,
 		"Lorem ipsum dolor sit amet.",
 	)
 	if err != nil {
@@ -151,6 +161,7 @@ func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
 		"docs/contentMatch.md",
 		"contentMatch",
 		"Content only match",
+		tree.NodeKindPage,
 		"This page has the search term only in the content.",
 	)
 	if err != nil {
@@ -203,6 +214,7 @@ func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 		"docs/headingMatch.md",
 		"headingMatch",
 		"No search in title",
+		tree.NodeKindPage,
 		"## Search term in heading\n\nSome additional body text.",
 	)
 	if err != nil {
@@ -215,6 +227,7 @@ func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 		"docs/contentOnly.md",
 		"contentOnly",
 		"No search in title",
+		tree.NodeKindPage,
 		"This page has the search term only in the content.",
 	)
 	if err != nil {

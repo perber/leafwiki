@@ -66,4 +66,15 @@ export default class EditPage {
     const asset = this.page.locator('li[data-testid="asset-item"]').filter({ hasText: filename });
     await asset.locator('[data-testid="asset-insert-link-button"]').click();
   }
+
+  async deleteFirstAsset() {
+    const firstAsset = this.page.locator('li[data-testid="asset-item"]').first();
+    await firstAsset.locator('button[title="Delete"]').click();
+    await this.page.waitForTimeout(300);
+  }
+
+  async closeAssetManager() {
+    await this.page.keyboard.press('Escape');
+    await this.page.locator('div[role="dialog"]').waitFor({ state: 'hidden' });
+  }
 }

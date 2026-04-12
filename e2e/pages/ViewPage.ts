@@ -1,5 +1,6 @@
 import { Page } from '@playwright/test';
 import { toAppPath } from './appPath';
+import { expect } from '@playwright/test';
 
 export default class ViewPage {
   constructor(private page: Page) {}
@@ -108,6 +109,86 @@ export default class ViewPage {
     await copyMenuItem.click();
   }
 
+  async clickPageHistoryButton() {
+    const historyButton = this.page.getByTestId('page-history-button');
+    if (await historyButton.isVisible().catch(() => false)) {
+      await historyButton.click();
+      return;
+    }
+
+    await this.openToolbarOverflow();
+    const historyMenuItem = this.page.getByTestId('page-history-menu-item');
+    await historyMenuItem.waitFor({ state: 'visible' });
+    await historyMenuItem.click();
+  }
+
+  async openCurrentPageHistory() {
+    await this.clickPageHistoryButton();
+    await this.page.locator('[data-testid="page-history-page-content"]').waitFor({
+      state: 'visible',
+    });
+  }
+
+  // The revision list is now an inline left panel on the history page — there
+  // is no separate sidebar tab to click. This method waits for the list panel
+  // to be ready, which it always is once the history page is open.
+  async switchToRevisionsTab() {
+    await this.expectRevisionListVisible();
+  }
+
+  async expectRevisionListVisible() {
+    await this.page.locator('[data-testid="page-history-page-list"]').waitFor({ state: 'visible' });
+  }
+
+  // Kept for backward compatibility — alias of expectRevisionListVisible.
+  async expectRevisionsSidebarOpen() {
+    await this.expectRevisionListVisible();
+  }
+
+  async openFirstRevision() {
+    const firstRevision = this.page.locator('[data-testid^="history-sidebar-revision-"]').first();
+    await firstRevision.waitFor({ state: 'visible' });
+    await firstRevision.click();
+  }
+
+  async openRevisionAt(index: number) {
+    const revision = this.page.locator('[data-testid^="history-sidebar-revision-"]').nth(index);
+    await revision.waitFor({ state: 'visible' });
+    await revision.click();
+  }
+
+  async expectRevisionViewOpen() {
+    await this.page
+      .locator('[data-testid="page-history-page-content"]')
+      .waitFor({ state: 'visible' });
+    await this.expectRevisionsSidebarOpen();
+    await this.page.locator('button[data-testid="back-to-page-button"]').waitFor({
+      state: 'visible',
+    });
+  }
+
+  async returnToPage() {
+    const backButton = this.page.locator('button[data-testid="back-to-page-button"]');
+    await backButton.click();
+  }
+
+  async switchToHistoryPreviewTab() {
+    await this.page.locator('[data-testid="page-history-page-preview-tab"]').click();
+    await this.page.locator('[data-testid="page-history-page-content"]').waitFor({
+      state: 'visible',
+    });
+  }
+
+  async expectHistoryPreviewImageLoaded() {
+    const image = this.page.locator('[data-testid="page-history-page-content"] img').first();
+    await image.waitFor({ state: 'visible' });
+    await expect
+      .poll(async () => {
+        return image.evaluate((img) => img.complete && img.naturalWidth > 0);
+      })
+      .toBe(true);
+  }
+
   async clickEditPageButton() {
     const editButton = this.page.locator('button[data-testid="edit-page-button"]');
     await editButton.click();
@@ -135,5 +216,13 @@ export default class ViewPage {
     await searchTabButton.click();
     // wait for search input to be visible
     await this.page.locator('input[data-testid="search-input"]').waitFor({ state: 'visible' });
+  }
+
+  async switchToExplorerTab() {
+    const explorerTabButton = this.page.locator('button[data-testid="sidebar-tree-tab-button"]');
+    await explorerTabButton.click();
+    await this.page.locator('a[data-testid^="tree-node-link-"]').first().waitFor({
+      state: 'visible',
+    });
   }
 }

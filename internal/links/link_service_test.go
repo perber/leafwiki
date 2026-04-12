@@ -46,6 +46,24 @@ With both: [Both](/docs/page5?foo=bar#section)
 	}
 }
 
+func TestExtractLinksFromMarkdown_IgnoresExternalLinksCaseInsensitive(t *testing.T) {
+	md := `
+[HTTPS](HTTPS://example.com)
+[Mail](Mailto:test@example.com)
+[Anchor](#intro)
+[Wiki](/docs/page1)
+`
+
+	links := extractLinksFromMarkdown(md)
+
+	if len(links) != 1 {
+		t.Fatalf("expected 1 wiki link, got %d: %#v", len(links), links)
+	}
+	if links[0] != "/docs/page1" {
+		t.Fatalf("link[0] = %q, want %q", links[0], "/docs/page1")
+	}
+}
+
 func TestExtractLinksFromMarkdown_IgnoresAssetDestinations(t *testing.T) {
 	md := `
 Asset absolute: [File](/assets/abc/manual.pdf)
@@ -88,7 +106,6 @@ Internal: [Page](/docs/page1)
 		}
 	}
 }
-
 // helper to create a small tree structure:
 // root
 //

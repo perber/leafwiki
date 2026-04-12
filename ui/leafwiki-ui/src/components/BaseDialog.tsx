@@ -28,6 +28,7 @@ export type BaseDialogProps = {
   children?: ReactNode
   cancelButton: BaseDialogCancelButton
   buttons?: BaseDialogConfirmButton[]
+  contentClassName?: string
 }
 
 export type BaseDialogCancelButton = {
@@ -76,6 +77,7 @@ export default function BaseDialog({
   testidPrefix,
   cancelButton,
   buttons,
+  contentClassName,
 }: BaseDialogProps) {
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const open = useDialogsStore((s) => s.dialogType === dialogType)
@@ -155,6 +157,7 @@ export default function BaseDialog({
       }}
     >
       <DialogContent
+        className={contentClassName}
         onEscapeKeyDown={(e: KeyboardEvent) => {
           // The dialog isn't responsible to handle key events!
           e.preventDefault()

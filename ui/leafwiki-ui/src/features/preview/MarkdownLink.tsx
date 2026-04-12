@@ -20,12 +20,14 @@ interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   children?: ReactNode
   path?: string
   node?: unknown
+  resolveAssetUrl?: (src: string) => string
 }
 
 export function MarkdownLink({
   href,
   children,
   node,
+  resolveAssetUrl,
   ...props
 }: MarkdownLinkProps) {
   void node
@@ -60,7 +62,8 @@ export function MarkdownLink({
         ? href
         : '/assets/' + href.slice('assets/'.length)
 
-      const assetHref = withBasePath(path)
+      const resolvedPath = resolveAssetUrl?.(path) ?? path
+      const assetHref = withBasePath(resolvedPath)
       return (
         <a
           href={assetHref}

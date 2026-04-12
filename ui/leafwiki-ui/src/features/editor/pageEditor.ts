@@ -1,10 +1,18 @@
 // zustand store to manage the PageEditor state
 // e.g. loading, error, page, dirty, ...
 
-import { getPageByPath, Page, updatePage } from '@/lib/api/pages'
+import {
+  applyPageRefactor,
+  getPageByPath,
+  Page,
+  previewPageRefactor,
+  updatePage,
+} from '@/lib/api/pages'
+import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { create } from 'zustand'
 import { useLinkStatusStore } from '../links/linkstatus_store'
+import { confirmPageRefactor } from '../page/pageRefactorDialog'
 import { useProgressbarStore } from '../progressbar/progressbar'
 
 interface PageEditorState {
@@ -52,8 +60,32 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       useProgressbarStore.getState().setLoading(true)
       const titleChanged = page.title !== title
       const slugChanged = page.slug !== slug
+      const enableLinkRefactor = useConfigStore.getState().enableLinkRefactor
 
-      const updatedPage = await updatePage(page.id, title, slug, content)
+      let updatedPage: Page | null = null
+
+      if (slugChanged && enableLinkRefactor) {
+        const preview = await previewPageRefactor(page.id, {
+          kind: 'rename',
+          title,
+          slug,
+        })
+        const rewriteLinks = await confirmPageRefactor(preview)
+        if (rewriteLinks === null) {
+          return null
+        }
+
+        updatedPage = await applyPageRefactor(page.id, {
+          kind: 'rename',
+          title,
+          slug,
+          content,
+          rewriteLinks,
+        })
+      } else {
+        updatedPage = await updatePage(page.id, title, slug, content)
+      }
+
       // only update the page.content to avoid overwriting other fields
       set((state) => {
         if (!state.page) return {}

@@ -1,5 +1,7 @@
 import BaseDialog from '@/components/BaseDialog'
-import { movePage, NODE_KIND_PAGE, PageNode } from '@/lib/api/pages'
+import { NODE_KIND_PAGE, PageNode } from '@/lib/api/pages'
+
+import { applyPageRefactor, previewPageRefactor } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_MOVE_PAGE } from '@/lib/registries'
 import { useTreeStore } from '@/stores/tree'
@@ -7,14 +9,15 @@ import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PageSelect } from './PageSelect'
+import { refreshAfterPageRefactor } from './pageMutationRefresh'
+import { confirmPageRefactor } from './pageRefactorDialog'
 
 export function MovePageDialog({ pageId }: { pageId: string }) {
-  const { tree, reloadTree } = useTreeStore()
+  const { tree } = useTreeStore()
   const [loading, setLoading] = useState(false)
   const [, setFieldErrors] = useState<Record<string, string>>({})
-  const getPathById = useTreeStore((s) => s.getPathById)
   const page = useTreeStore((s) => s.getPageById(pageId))
-  const pagePath = getPathById(pageId) || ''
+  // get opened route from react router
   const currentPath = useLocation().pathname
   const navigate = useNavigate()
 
@@ -46,21 +49,28 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
 
     setLoading(true)
     try {
-      await movePage(pageId, newParentId)
-      if (`${currentPath}` === `/${pagePath}`) {
-        await reloadTree()
-        const newPath = getPathById(pageId) || ''
-        if (newPath) {
-          navigate(`/${newPath}`)
-        } else {
-          navigate('/')
-        }
-      } else {
-        await reloadTree()
+      const preview = await previewPageRefactor(pageId, {
+        kind: 'move',
+        parentId: newParentId,
+      })
+      const rewriteLinks = await confirmPageRefactor(preview)
+      if (rewriteLinks === null) {
+        return false
       }
 
-      toast.success(`${itemLabelCapitalized} moved successfully`)
-      return true
+      await applyPageRefactor(pageId, {
+        kind: 'move',
+        parentId: newParentId,
+        rewriteLinks,
+      })
+      await refreshAfterPageRefactor({
+        preview,
+        currentPath,
+        navigate,
+      })
+
+      toast.success('Page moved successfully')
+      return true // Close the dialog
     } catch (err: unknown) {
       console.warn(err)
       handleFieldErrors(err, setFieldErrors, `Error moving ${itemLabel}`)

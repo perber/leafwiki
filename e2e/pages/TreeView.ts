@@ -6,14 +6,29 @@ import SortPageDialog from './SortPageDialog';
 export default class TreeView {
   constructor(private page: Page) {}
 
+  private treeView() {
+    return this.page.locator('.tree-view:visible').first();
+  }
+
+  private async ensureSidebarVisible() {
+    if (!(await this.isSidebarVisible())) {
+      await this.page.getByTestId('sidebar-toggle-button').click();
+    }
+  }
+
+  private getNodeRowByTitle(title: string) {
+    const pageLink = this.page.locator('a[data-testid^="tree-node-link-"]', {
+      hasText: title,
+    });
+    return this.page.locator('div[data-testid^="tree-node-"]').filter({ has: pageLink }).first();
+  }
+
   async getRootAddButton() {
     return this.page.getByTestId('sidebar').getByTestId('tree-view-action-button-add').first();
   }
 
   async clickRootAddButton() {
-    if (!(await this.isSidebarVisible())) {
-      await this.page.getByTestId('sidebar-toggle-button').click();
-    }
+    await this.ensureSidebarVisible();
     await (await this.getRootAddButton()).click();
   }
 
@@ -23,13 +38,15 @@ export default class TreeView {
 
   async getNumberOfTreeNodes() {
     await this.page.waitForLoadState('networkidle');
-    return this.page.locator('a[data-testid^="tree-node-link-"]').count();
+    await this.ensureSidebarVisible();
+    return this.treeView().locator('a[data-testid^="tree-node-link-"]').count();
   }
 
   async findPageByTitle(title: string) {
     return this.page
-      .locator('a[data-testid^="tree-node-link-"]')
-      .filter({ hasText: title })
+      .locator('a[data-testid^="tree-node-link-"]', {
+        hasText: title,
+      })
       .first();
   }
 
@@ -39,33 +56,36 @@ export default class TreeView {
   }
 
   async clickPageByTitle(title: string) {
+    await this.ensureSidebarVisible();
     const pageNode = await this.findPageByTitle(title);
+    await pageNode.waitFor({ state: 'visible' });
     await pageNode.click();
     // wait 2000 ms to ensure the page has loaded
     await this.page.waitForTimeout(2000);
   }
 
   async expandNodeByTitle(title: string) {
-    const nodeRow = this.page
-      .locator('div[data-testid^="tree-node-"]')
-      .filter({ hasText: title })
-      .first();
+    await this.ensureSidebarVisible();
+    const nodeRow = this.getNodeRowByTitle(title);
 
+    await nodeRow.waitFor({ state: 'visible' });
     await nodeRow.scrollIntoViewIfNeeded();
     await nodeRow.hover();
 
     const toggleIcon = nodeRow.locator('svg[data-testid^="tree-node-toggle-icon-"]');
     if (await toggleIcon.isVisible()) {
-      await toggleIcon.click({ force: true });
+      const classes = (await toggleIcon.getAttribute('class')) || '';
+      if (!classes.includes('tree-node__toggle--open')) {
+        await toggleIcon.click({ force: true });
+      }
     }
   }
 
   async createSubPageOfParent(parentTitle: string, newSubpageTitle: string) {
-    const nodeRow = this.page
-      .locator('div[data-testid^="tree-node-"]')
-      .filter({ hasText: parentTitle })
-      .first();
+    await this.ensureSidebarVisible();
+    const nodeRow = this.getNodeRowByTitle(parentTitle);
 
+    await nodeRow.waitFor({ state: 'visible' });
     await nodeRow.scrollIntoViewIfNeeded();
     await nodeRow.hover(); // oder mouse.move, s.u.
 
@@ -78,20 +98,17 @@ export default class TreeView {
   }
 
   async createMultipleSubPagesOfParent(parentTitle: string, subpageTitles: string[]) {
-    if (!(await this.isSidebarVisible())) {
-      await this.page.getByTestId('sidebar-toggle-button').click();
-    }
+    await this.ensureSidebarVisible();
     for (const title of subpageTitles) {
       await this.createSubPageOfParent(parentTitle, title);
     }
   }
 
   async sortPagesOfParent(parentTitle: string, plannedOrder: string[]) {
-    const nodeRow = this.page
-      .locator('div[data-testid^="tree-node-"]')
-      .filter({ hasText: parentTitle })
-      .first();
+    await this.ensureSidebarVisible();
+    const nodeRow = this.getNodeRowByTitle(parentTitle);
 
+    await nodeRow.waitFor({ state: 'visible' });
     await nodeRow.scrollIntoViewIfNeeded();
     await nodeRow.hover(); // oder mouse.move, s.u.
 
@@ -116,23 +133,7 @@ export default class TreeView {
   }
 
   async movePageToTopLevel(parentPage: string, pageTitle: string) {
-    await this.expandNodeByTitle(parentPage);
-
-    const nodeRow = this.page
-      .locator('div[data-testid^="tree-node-"]')
-      .filter({ hasText: pageTitle })
-      .first();
-
-    await nodeRow.scrollIntoViewIfNeeded();
-    await nodeRow.hover(); // oder mouse.move, s.u.
-
-    const moreActionsButton = nodeRow.locator(
-      'button[data-testid="tree-view-action-button-open-more-actions"]',
-    );
-    await moreActionsButton.click({ force: true });
-
-    const moveButton = this.page.locator('div[data-testid="tree-view-action-button-move"]');
-    await moveButton.click({ force: true });
+    await this.openMoveDialogForPage(parentPage, pageTitle);
 
     const movePageDialog = new MovePageDialog(this.page);
     await movePageDialog.selectNewParentAsTopLevel();
@@ -141,8 +142,29 @@ export default class TreeView {
     await this.page.waitForTimeout(5000); // wait for move to be applied
   }
 
+  async openMoveDialogForPage(parentPage: string, pageTitle: string) {
+    await this.ensureSidebarVisible();
+    await this.expandNodeByTitle(parentPage);
+
+    const nodeRow = this.getNodeRowByTitle(pageTitle);
+
+    await nodeRow.waitFor({ state: 'visible' });
+    await nodeRow.scrollIntoViewIfNeeded();
+    await nodeRow.hover();
+
+    const moreActionsButton = nodeRow.locator(
+      'button[data-testid="tree-view-action-button-open-more-actions"]',
+    );
+    await moreActionsButton.click({ force: true });
+
+    const moveButton = this.page.locator('div[data-testid="tree-view-action-button-move"]');
+    await moveButton.click({ force: true });
+  }
+
   async expectNumberOfTreeNodes(expectedCount: number) {
     await this.page.waitForLoadState('networkidle');
-    await expect(this.page.locator('a[data-testid^="tree-node-link-"]')).toHaveCount(expectedCount);
+    await expect(this.treeView().locator('a[data-testid^="tree-node-link-"]')).toHaveCount(
+      expectedCount,
+    );
   }
 }

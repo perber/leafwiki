@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/assets"
+	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
@@ -415,6 +416,44 @@ func TestConfigEndpoint_IncludesMaxAssetUploadSizeBytes(t *testing.T) {
 
 	if int64(gotSize) != maxAssetUploadSizeBytes {
 		t.Fatalf("Expected maxAssetUploadSizeBytes=%d, got %v", maxAssetUploadSizeBytes, gotSize)
+	}
+}
+
+func TestConfigEndpoint_IncludesEnableLinkRefactor(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := NewRouter(w, RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		EnableLinkRefactor:      true,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	gotEnabled, ok := resp["enableLinkRefactor"].(bool)
+	if !ok {
+		t.Fatalf("Expected enableLinkRefactor in config response, got %v", resp)
+	}
+
+	if !gotEnabled {
+		t.Fatalf("Expected enableLinkRefactor=true, got %v", gotEnabled)
 	}
 }
 
@@ -2199,6 +2238,159 @@ func TestAssetEndpoints(t *testing.T) {
 	}
 	if len(listResp2["files"]) != 0 {
 		t.Errorf("Expected asset to be deleted, got: %v", listResp2["files"])
+	}
+}
+
+func TestAssetMutationRevisionsUseAuthenticatedUser(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+	adminUser, err := w.GetUserService().GetUserByEmailOrUsernameAndPassword("admin", "admin")
+	if err != nil {
+		t.Fatalf("GetUserByEmailOrUsernameAndPassword failed: %v", err)
+	}
+
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on login, got %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
+
+	cookies := loginRes.Cookies()
+	if len(cookies) == 0 {
+		t.Fatalf("Expected auth cookies after login, got none")
+	}
+
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+	if csrfToken == "" {
+		t.Fatalf("Expected CSRF token after login, got none")
+	}
+
+	addCookies := func(req *http.Request) {
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+		if req.Method != http.MethodGet && req.Method != http.MethodHead && req.Method != http.MethodOptions {
+			req.Header.Set("X-CSRF-Token", csrfToken)
+		}
+	}
+
+	writeAsset := func(t *testing.T, pageID, name string) {
+		t.Helper()
+
+		assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), pageID)
+		if err := os.MkdirAll(assetDir, 0o755); err != nil {
+			t.Fatalf("MkdirAll(assetDir) failed: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(assetDir, name), []byte("payload"), 0o644); err != nil {
+			t.Fatalf("WriteFile(asset) failed: %v", err)
+		}
+	}
+
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T, pageID string)
+		request func(t *testing.T, pageID string) *http.Request
+	}{
+		{
+			name: "upload",
+			request: func(t *testing.T, pageID string) *http.Request {
+				t.Helper()
+
+				body := &bytes.Buffer{}
+				writer := multipart.NewWriter(body)
+				part, err := writer.CreateFormFile("file", "upload.txt")
+				if err != nil {
+					t.Fatalf("CreateFormFile failed: %v", err)
+				}
+				if _, err := part.Write([]byte("payload")); err != nil {
+					t.Fatalf("Write(asset payload) failed: %v", err)
+				}
+				if err := writer.Close(); err != nil {
+					t.Fatalf("Close(writer) failed: %v", err)
+				}
+
+				req := httptest.NewRequest(http.MethodPost, "/api/pages/"+pageID+"/assets", body)
+				req.Header.Set("Content-Type", writer.FormDataContentType())
+				return req
+			},
+		},
+		{
+			name: "rename",
+			setup: func(t *testing.T, pageID string) {
+				t.Helper()
+				writeAsset(t, pageID, "old.txt")
+			},
+			request: func(t *testing.T, pageID string) *http.Request {
+				t.Helper()
+				req := httptest.NewRequest(http.MethodPut, "/api/pages/"+pageID+"/assets/rename", strings.NewReader(`{"old_filename":"old.txt","new_filename":"new.txt"}`))
+				req.Header.Set("Content-Type", "application/json")
+				return req
+			},
+		},
+		{
+			name: "delete",
+			setup: func(t *testing.T, pageID string) {
+				t.Helper()
+				writeAsset(t, pageID, "delete.txt")
+			},
+			request: func(t *testing.T, pageID string) *http.Request {
+				t.Helper()
+				return httptest.NewRequest(http.MethodDelete, "/api/pages/"+pageID+"/assets/delete.txt", nil)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			page, err := w.CreatePage("system", nil, "Assets "+tc.name, "assets-"+tc.name, pageNodeKind())
+			if err != nil {
+				t.Fatalf("CreatePage failed: %v", err)
+			}
+
+			if tc.setup != nil {
+				tc.setup(t, page.ID)
+			}
+
+			req := tc.request(t, page.ID)
+			addCookies(req)
+
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code < http.StatusOK || rec.Code >= http.StatusMultipleChoices {
+				t.Fatalf("Expected 2xx response, got %d - %s", rec.Code, rec.Body.String())
+			}
+
+			latest, err := w.GetLatestRevision(page.ID)
+			if err != nil {
+				t.Fatalf("GetLatestRevision failed: %v", err)
+			}
+			if latest == nil {
+				t.Fatal("expected latest revision")
+			}
+			if latest.Type != revision.RevisionTypeAssetUpdate {
+				t.Fatalf("latest type = %q, want %q", latest.Type, revision.RevisionTypeAssetUpdate)
+			}
+			if latest.AuthorID != adminUser.ID {
+				t.Fatalf("latest author = %q, want %q", latest.AuthorID, adminUser.ID)
+			}
+		})
 	}
 }
 
