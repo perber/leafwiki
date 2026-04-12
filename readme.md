@@ -145,7 +145,7 @@ LeafWiki's editor and live preview support standard Markdown plus a practical se
 - Shoutouts / callouts for highlighted blocks such as notes, tips, warnings, and danger messages
 - Syntax highlighting for fenced code blocks
 - Mermaid code blocks for diagrams
-- Audio and video embeds via Markdown media elements
+- Audio and video embeds via HTML5 media elements
 - A sanitized subset of inline HTML for cases where plain Markdown is not enough
 
 Markdown rendering is intentionally conservative: unsupported or unsafe HTML is filtered to keep page rendering predictable and safe.
