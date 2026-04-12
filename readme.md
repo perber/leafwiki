@@ -136,6 +136,19 @@ For details on the current model and its constraints, see [Known limitations](#k
 - Dark mode and mobile-friendly UI
 - Keyboard shortcuts for common actions such as save and search
 
+### Supported Markdown
+
+LeafWiki's editor and live preview support standard Markdown plus a practical set of extensions commonly used in technical documentation.
+
+- CommonMark-style headings, lists, blockquotes, links, images, and code blocks
+- GitHub Flavored Markdown features such as tables, task lists, strikethrough, and footnotes
+- Shoutouts / callouts for highlighted blocks such as notes, tips, warnings, and danger messages
+- Syntax highlighting for fenced code blocks
+- Mermaid code blocks for diagrams
+- Audio and video embeds via Markdown media elements
+- A sanitized subset of inline HTML for cases where plain Markdown is not enough
+
+Markdown rendering is intentionally conservative: unsupported or unsafe HTML is filtered to keep page rendering predictable and safe.
 
 ## What LeafWiki is not
 
