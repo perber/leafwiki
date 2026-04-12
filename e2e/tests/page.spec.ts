@@ -749,12 +749,14 @@ First reference[^leafwiki] and second reference[^leafwiki]
     await editPage.insertFirstAssetIntoPage();
     await editPage.savePage();
     await editPage.closeEditor();
+    await treeView.clickPageByTitle(title);
+    await expect(page.locator('article > h1')).toHaveText(title);
 
     // Revisions are now shown as an inline left panel on the history page.
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
     await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
-    await expect(page.getByTestId('page-history-page-list')).toContainText('system');
+    await expect(page.getByTestId('page-history-page-list')).toContainText('Revision History');
   });
 
   test('unsaved changes-warning', async ({ page }) => {
@@ -1838,14 +1840,18 @@ Note alias content
     await editPage.deleteFirstAsset();
     await editPage.closeAssetManager();
     await editPage.closeEditor();
+    await treeView.clickPageByTitle(title);
+    await expect(page.locator('article > h1')).toHaveText(title);
 
     viewPage = new ViewPage(page);
     await viewPage.openCurrentPageHistory();
     await viewPage.switchToRevisionsTab();
-    await viewPage.openRevisionAt(0);
+    await expect(page.locator('[data-testid^="history-sidebar-revision-"]')).toHaveCount(2);
+    await viewPage.openRevisionAt(1);
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
-    await viewPage.switchToHistoryPreviewTab();
-    await viewPage.expectHistoryPreviewImageLoaded();
+    await page.getByTestId('page-history-page-assets-tab').click();
+    await expect(page.getByTestId('page-history-page-content')).toContainText('upload-test.png');
+    await expect(page.getByTestId('page-history-page-content')).toContainText('Removed');
   });
 
   test('history-main-content-stays-visible-when-switching-sidebar-tabs', async ({ page }) => {
@@ -1875,15 +1881,17 @@ Note alias content
     await editPage.writeContent(`\n${secondRevisionContent}`);
     await editPage.savePage();
     await editPage.closeEditor();
+    await treeView.clickPageByTitle(title);
+    await expect(page.locator('article > h1')).toHaveText(title);
 
     await viewPage.openCurrentPageHistory();
     await viewPage.switchToRevisionsTab();
     await viewPage.openRevisionAt(0);
-    await viewPage.switchToHistoryPreviewTab();
+    await page.getByTestId('page-history-page-raw-tab').click();
 
     const historyContent = page.getByTestId('page-history-page-content');
     await expect(historyContent).toContainText(firstRevisionContent);
-    await expect(historyContent).not.toContainText('No revision to display');
+    await expect(historyContent).not.toContainText('No raw text available');
 
     const historyPathBeforeSwitch = new URL(page.url()).pathname;
 
@@ -1891,10 +1899,10 @@ Note alias content
 
     await expect.poll(() => new URL(page.url()).pathname).toBe(historyPathBeforeSwitch);
     await expect(historyContent).toContainText(firstRevisionContent);
-    await expect(historyContent).not.toContainText('No revision to display');
+    await expect(historyContent).not.toContainText('No raw text available');
 
     await viewPage.switchToRevisionsTab();
     await expect(historyContent).toContainText(firstRevisionContent);
-    await expect(historyContent).not.toContainText('No revision to display');
+    await expect(historyContent).not.toContainText('No raw text available');
   });
 });

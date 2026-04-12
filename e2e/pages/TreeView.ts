@@ -6,6 +6,10 @@ import SortPageDialog from './SortPageDialog';
 export default class TreeView {
   constructor(private page: Page) {}
 
+  private treeView() {
+    return this.page.locator('.tree-view:visible').first();
+  }
+
   private async ensureSidebarVisible() {
     if (!(await this.isSidebarVisible())) {
       await this.page.getByTestId('sidebar-toggle-button').click();
@@ -35,7 +39,7 @@ export default class TreeView {
   async getNumberOfTreeNodes() {
     await this.page.waitForLoadState('networkidle');
     await this.ensureSidebarVisible();
-    return this.page.locator('a[data-testid^="tree-node-link-"]').count();
+    return this.treeView().locator('a[data-testid^="tree-node-link-"]').count();
   }
 
   async findPageByTitle(title: string) {
@@ -159,6 +163,8 @@ export default class TreeView {
 
   async expectNumberOfTreeNodes(expectedCount: number) {
     await this.page.waitForLoadState('networkidle');
-    await expect(this.page.locator('a[data-testid^="tree-node-link-"]')).toHaveCount(expectedCount);
+    await expect(this.treeView().locator('a[data-testid^="tree-node-link-"]')).toHaveCount(
+      expectedCount,
+    );
   }
 }

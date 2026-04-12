@@ -110,13 +110,20 @@ export default class ViewPage {
   }
 
   async clickPageHistoryButton() {
-    const historyButton = this.page.locator('button[data-testid="page-history-button"]');
-    await historyButton.click();
+    const historyButton = this.page.getByTestId('page-history-button');
+    if (await historyButton.isVisible().catch(() => false)) {
+      await historyButton.click();
+      return;
+    }
+
+    await this.openToolbarOverflow();
+    const historyMenuItem = this.page.getByTestId('page-history-menu-item');
+    await historyMenuItem.waitFor({ state: 'visible' });
+    await historyMenuItem.click();
   }
 
   async openCurrentPageHistory() {
-    const url = new URL(this.page.url());
-    await this.page.goto(`/history${url.pathname}`);
+    await this.clickPageHistoryButton();
     await this.page.locator('[data-testid="page-history-page-content"]').waitFor({
       state: 'visible',
     });

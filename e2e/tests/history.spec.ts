@@ -33,6 +33,9 @@ async function createPageWithRevisions(
     await editPage.closeEditor();
   }
 
+  await treeView.clickPageByTitle(title);
+  await expect(page.locator('article > h1')).toHaveText(title);
+
   return viewPage;
 }
 
@@ -52,7 +55,10 @@ test.describe('History', () => {
 
   test('revision-list-panel-visible-on-history-page', async ({ page }) => {
     const title = `History List Panel ${Date.now()}`;
-    const viewPage = await createPageWithRevisions(page, title, ['First revision content']);
+    const viewPage = await createPageWithRevisions(page, title, [
+      'First revision content',
+      '\nSecond revision content',
+    ]);
 
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
@@ -81,7 +87,10 @@ test.describe('History', () => {
   test('preview-tab-is-active-by-default', async ({ page }) => {
     // Regression for: "Changes" was the default tab — "Preview" should be first and active.
     const title = `History Preview Default ${Date.now()}`;
-    const viewPage = await createPageWithRevisions(page, title, ['Content for preview test']);
+    const viewPage = await createPageWithRevisions(page, title, [
+      'Content for preview test',
+      '\nSecond preview revision',
+    ]);
 
     await viewPage.openCurrentPageHistory();
     await viewPage.openRevisionAt(0);
@@ -118,7 +127,10 @@ test.describe('History', () => {
     // Revision list items should show a formatted timestamp, not generic
     // type labels like "Content changed" or "Assets changed".
     const title = `History Timestamp Title ${Date.now()}`;
-    const viewPage = await createPageWithRevisions(page, title, ['Content to trigger a revision']);
+    const viewPage = await createPageWithRevisions(page, title, [
+      'Content to trigger a revision',
+      '\nSecond revision to keep one visible in the list',
+    ]);
 
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
