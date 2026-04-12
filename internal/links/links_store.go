@@ -280,6 +280,9 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 }
 
 func (s *LinksStore) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorLinkMatch, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	rows, err := s.db.Query(`
 		SELECT from_page_id, from_title, to_path, broken
 		FROM links

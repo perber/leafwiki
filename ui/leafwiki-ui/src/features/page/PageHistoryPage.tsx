@@ -60,7 +60,7 @@ export default function PageHistoryPage() {
     const closeHotkey: HotKeyDefinition = {
       keyCombo: 'Escape',
       enabled: true,
-      mode: ['view'],
+      mode: ['history'],
       action: closeHistory,
     }
 

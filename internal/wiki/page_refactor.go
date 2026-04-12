@@ -267,6 +267,7 @@ func (w *Wiki) rewriteRefactorAffectedPages(userID string, affectedPages []PageR
 		if err := w.tree.UpdateNode(userID, page.ID, page.Title, page.Slug, &updatedContent); err != nil {
 			return err
 		}
+		w.recordContentRevision(page.ID, userID, "")
 
 		if w.links != nil {
 			updatedPage, err := w.tree.GetPage(page.ID)
@@ -404,6 +405,7 @@ func (w *Wiki) rewritePathChangedSubtree(userID string, snapshots []pathChangeSn
 		if err := w.tree.UpdateNode(userID, currentPage.ID, currentPage.Title, currentPage.Slug, &updatedContent); err != nil {
 			return err
 		}
+		w.recordContentRevision(currentPage.ID, userID, "")
 
 		if w.links != nil {
 			updatedPage, err := w.tree.GetPage(currentPage.ID)

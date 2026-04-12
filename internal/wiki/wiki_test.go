@@ -243,6 +243,10 @@ func TestWiki_ApplyPageRefactor_RenameRewritesIncomingLinks(t *testing.T) {
 	if err := w.ReindexLinks(); err != nil {
 		t.Fatalf("ReindexLinks failed: %v", err)
 	}
+	beforeRefRevision, err := w.GetLatestRevision(ref.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision(ref before refactor) failed: %v", err)
+	}
 
 	updated, err := w.ApplyPageRefactor("system", target.ID, ApplyPageRefactorRequest{
 		PageRefactorPreviewRequest: PageRefactorPreviewRequest{
@@ -281,6 +285,23 @@ func TestWiki_ApplyPageRefactor_RenameRewritesIncomingLinks(t *testing.T) {
 	}
 	if outgoing.Outgoings[0].Broken {
 		t.Fatalf("expected rewritten link to be healed")
+	}
+
+	afterRefRevision, err := w.GetLatestRevision(ref.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision(ref after refactor) failed: %v", err)
+	}
+	if afterRefRevision == nil {
+		t.Fatalf("expected latest revision for rewritten ref page")
+	}
+	if beforeRefRevision == nil {
+		t.Fatalf("expected initial revision for ref page")
+	}
+	if afterRefRevision.ID == beforeRefRevision.ID {
+		t.Fatalf("expected rewritten ref page to create a new revision")
+	}
+	if afterRefRevision.Type != revision.RevisionTypeContentUpdate {
+		t.Fatalf("expected rewritten ref page latest revision type %q, got %q", revision.RevisionTypeContentUpdate, afterRefRevision.Type)
 	}
 }
 
@@ -366,6 +387,10 @@ func TestWiki_ApplyPageRefactor_Move_RewritesRelativeOutgoingLinksInMovedPage(t 
 	if err := w.ReindexLinks(); err != nil {
 		t.Fatalf("ReindexLinks failed: %v", err)
 	}
+	beforeMovedRevision, err := w.GetLatestRevision(pageA.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision(pageA before refactor) failed: %v", err)
+	}
 
 	updated, err := w.ApplyPageRefactor("system", pageA.ID, ApplyPageRefactorRequest{
 		PageRefactorPreviewRequest: PageRefactorPreviewRequest{
@@ -405,6 +430,23 @@ func TestWiki_ApplyPageRefactor_Move_RewritesRelativeOutgoingLinksInMovedPage(t 
 	}
 	if outgoing.Outgoings[0].Broken {
 		t.Fatalf("expected outgoing link to remain valid after move refactor")
+	}
+
+	afterMovedRevision, err := w.GetLatestRevision(pageA.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision(pageA after refactor) failed: %v", err)
+	}
+	if afterMovedRevision == nil {
+		t.Fatalf("expected latest revision for moved page")
+	}
+	if beforeMovedRevision == nil {
+		t.Fatalf("expected initial revision for moved page")
+	}
+	if afterMovedRevision.ID == beforeMovedRevision.ID {
+		t.Fatalf("expected moved page rewrite to create a new revision")
+	}
+	if afterMovedRevision.Type != revision.RevisionTypeContentUpdate {
+		t.Fatalf("expected moved page latest revision type %q, got %q", revision.RevisionTypeContentUpdate, afterMovedRevision.Type)
 	}
 }
 

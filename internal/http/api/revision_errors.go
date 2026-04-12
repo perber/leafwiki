@@ -39,7 +39,7 @@ func respondWithRevisionError(c *gin.Context, err error) {
 
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		respondWithRevisionStatusError(c, http.StatusNotFound, "revision_not_found", "Revision resource not found", "revision resource %s not found")
+		respondWithRevisionStatusError(c, http.StatusNotFound, "revision_not_found", "Revision resource not found", "revision resource not found")
 	default:
 		respondWithRevisionStatusError(c, http.StatusInternalServerError, "revision_internal_error", "Revision request failed", "revision request failed")
 	}
