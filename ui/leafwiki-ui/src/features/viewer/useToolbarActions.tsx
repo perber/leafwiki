@@ -3,10 +3,11 @@
 import { NODE_KIND_PAGE, type Page } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { useConfigStore } from '@/stores/config'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { Copy, History, Pencil, Printer, Trash2 } from 'lucide-react'
 import { useEffect } from 'react'
-import { useToolbarStore } from '../toolbar/toolbar'
+import { type ToolbarButton, useToolbarStore } from '../toolbar/toolbar'
 
 export interface ToolbarActionsOptions {
   pageKind?: Page['kind']
@@ -28,6 +29,7 @@ export function useToolbarActions({
   const setButtons = useToolbarStore((state) => state.setButtons)
   const appMode = useAppMode()
   const readOnlyMode = useIsReadOnly()
+  const enableRevision = useConfigStore((state) => state.enableRevision)
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
   const itemLabel = pageKind === NODE_KIND_PAGE ? 'Page' : 'Section'
@@ -38,7 +40,7 @@ export function useToolbarActions({
       return
     }
 
-    setButtons([
+    const toolbarButtons: ToolbarButton[] = [
       {
         id: 'edit-page',
         label: `Edit ${itemLabel}`,
@@ -52,14 +54,6 @@ export function useToolbarActions({
         hotkey: 'Ctrl+P',
         icon: <Printer size={18} />,
         action: printPage,
-      },
-      {
-        id: 'page-history',
-        label: `${itemLabel} History`,
-        hotkey: 'Ctrl+H',
-        icon: <History size={18} />,
-        variant: 'outline',
-        action: showHistory,
       },
       {
         id: 'copy-page',
@@ -79,7 +73,20 @@ export function useToolbarActions({
         className: 'hover:text-red-600 hover:bg-red-100 hover:border-red-300',
         action: deletePage,
       },
-    ])
+    ]
+
+    if (enableRevision) {
+      toolbarButtons.splice(2, 0, {
+        id: 'page-history',
+        label: `${itemLabel} History`,
+        hotkey: 'Ctrl+H',
+        icon: <History size={18} />,
+        variant: 'outline',
+        action: showHistory,
+      })
+    }
+
+    setButtons(toolbarButtons)
 
     const copyHotkey: HotKeyDefinition = {
       keyCombo: 'Mod+Shift+KeyS',
@@ -119,19 +126,24 @@ export function useToolbarActions({
     registerHotkey(editHotkey)
     registerHotkey(copyHotkey)
     registerHotkey(printHotkey)
-    registerHotkey(historyHotkey)
+    if (enableRevision) {
+      registerHotkey(historyHotkey)
+    }
     registerHotkey(deleteHotkey)
 
     return () => {
       unregisterHotkey(editHotkey.keyCombo)
       unregisterHotkey(copyHotkey.keyCombo)
       unregisterHotkey(printHotkey.keyCombo)
-      unregisterHotkey(historyHotkey.keyCombo)
+      if (enableRevision) {
+        unregisterHotkey(historyHotkey.keyCombo)
+      }
       unregisterHotkey(deleteHotkey.keyCombo)
     }
   }, [
     appMode,
     readOnlyMode,
+    enableRevision,
     setButtons,
     deletePage,
     copyPage,

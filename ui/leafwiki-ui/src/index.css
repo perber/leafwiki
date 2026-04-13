@@ -437,8 +437,16 @@
     @apply border-surface-border bg-surface-alt;
   }
 
+  .history-sidebar__item-heading {
+    @apply flex items-center justify-between gap-2;
+  }
+
   .history-sidebar__item-title {
     @apply text-sm leading-5 font-medium;
+  }
+
+  .history-sidebar__badge {
+    @apply bg-brand/10 text-brand inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold;
   }
 
   .history-sidebar__item-meta {
@@ -1286,8 +1294,36 @@
     @apply mt-3 flex flex-wrap gap-2;
   }
 
+  .page-history__change-chips {
+    @apply mt-3 flex flex-wrap gap-2;
+  }
+
   .page-history__meta-chip {
     @apply bg-surface-alt text-interface-text inline-flex items-center rounded-full px-3 py-1 text-xs font-medium;
+  }
+
+  .page-history__change-chip {
+    @apply border-surface-border bg-surface-alt text-interface-text inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs;
+  }
+
+  .page-history__change-chip-label {
+    @apply text-muted-foreground font-medium;
+  }
+
+  .page-history__change-chip-value {
+    @apply inline-flex items-center gap-2 font-mono;
+  }
+
+  .page-history__change-chip-from {
+    @apply text-muted-foreground line-through;
+  }
+
+  .page-history__change-chip-arrow {
+    @apply text-muted-foreground;
+  }
+
+  .page-history__change-chip-to {
+    @apply text-interface-text font-semibold;
   }
 
   .page-history__actions {
@@ -1329,7 +1365,7 @@
   }
 
   .page-history__list-title {
-    @apply text-interface-text flex items-center gap-2 text-sm font-medium;
+    @apply text-interface-text flex items-center gap-2 text-sm;
   }
 
   .page-history__list-scroll {
@@ -1468,6 +1504,14 @@
     @apply border-brand-light bg-brand-light/10;
   }
 
+  .page-history__summary-stat--added.page-history__summary-stat--emphasized {
+    @apply border-success/30 bg-success/10;
+  }
+
+  .page-history__summary-stat--removed.page-history__summary-stat--emphasized {
+    @apply border-destructive/30 bg-destructive/10;
+  }
+
   .page-history__summary-stat-value {
     @apply text-lg font-semibold;
   }
@@ -1548,11 +1592,23 @@
   }
 
   .page-history__snapshot-content {
-    @apply border-surface-border max-h-[60vh] overflow-auto rounded-xl border bg-[#202735] p-4 font-mono text-sm break-words whitespace-pre-wrap text-white;
+    @apply max-h-[60vh] overflow-auto rounded-xl p-0 font-mono text-sm break-words whitespace-pre-wrap;
   }
 
   .page-history__asset-list {
     @apply flex flex-col gap-2;
+  }
+
+  .page-history__asset-item {
+    @apply gap-2;
+  }
+
+  .page-history__asset-copy {
+    @apply flex min-w-0 flex-1 flex-col;
+  }
+
+  .page-history__asset-copy-meta {
+    @apply text-muted-foreground truncate text-xs;
   }
 
   .page-history__asset-change {

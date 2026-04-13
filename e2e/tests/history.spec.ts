@@ -1,6 +1,7 @@
 import test, { expect } from '@playwright/test';
 import AddPageDialog from '../pages/AddPageDialog';
 import EditPage from '../pages/EditPage';
+import EditPageMetadataDialog from '../pages/EditPageMetadataDialog';
 import LoginPage from '../pages/LoginPage';
 import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
@@ -65,6 +66,25 @@ test.describe('History', () => {
     await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
   });
 
+  test('current-revision-is-visible-and-badged', async ({ page }) => {
+    const title = `History Current Badge ${Date.now()}`;
+    const viewPage = await createPageWithRevisions(page, title, [
+      'First revision content',
+      '\nSecond revision content',
+    ]);
+
+    await viewPage.openCurrentPageHistory();
+    await viewPage.expectRevisionListVisible();
+
+    const currentBadge = page.locator('[data-testid^="history-sidebar-revision-current-badge-"]');
+    await expect(currentBadge).toHaveCount(1);
+    await expect(currentBadge).toHaveText('Active version');
+
+    const currentRevision = currentBadge.locator('xpath=ancestor::button[1]');
+    await currentRevision.click();
+    await expect(page.getByTestId('page-history-page-restore')).toBeDisabled();
+  });
+
   test('revision-list-stays-visible-after-selecting-revision', async ({ page }) => {
     // Regression for: revision list disappearing when a revision is opened.
     const title = `History Stays Visible ${Date.now()}`;
@@ -123,6 +143,97 @@ test.describe('History', () => {
     );
   });
 
+  test('active-revision-shows-no-diff', async ({ page }) => {
+    const title = `History Active Diff ${Date.now()}`;
+    const viewPage = await createPageWithRevisions(page, title, [
+      'First revision content',
+      '\nSecond revision content',
+    ]);
+
+    await viewPage.openCurrentPageHistory();
+
+    const currentBadge = page.locator(
+      '[data-testid^="history-sidebar-revision-current-badge-"]',
+    );
+    const currentRevision = currentBadge.locator('xpath=ancestor::button[1]');
+    await currentRevision.click();
+
+    await page.locator('[data-testid="page-history-page-changes-tab"]').click();
+    await expect(page.getByTestId('page-history-page-content')).toContainText(
+      'No differences from the current version.',
+    );
+  });
+
+  test('structure-changes-are-visible-in-history-header', async ({ page }) => {
+    const suffix = Date.now();
+    const originalTitle = `History Structure ${suffix}`;
+    const renamedTitle = `History Structure Renamed ${suffix}`;
+    const renamedSlug = `history-structure-renamed-${suffix}`;
+    const viewPage = await createPageWithRevisions(page, originalTitle, [
+      'First revision content',
+      '\nSecond revision content',
+    ]);
+
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openMetadataDialog();
+
+    const metadataDialog = new EditPageMetadataDialog(page);
+    await metadataDialog.fillTitle(renamedTitle);
+    await metadataDialog.fillSlug(renamedSlug);
+    await metadataDialog.submit();
+
+    await editPage.closeEditor();
+    await viewPage.openCurrentPageHistory();
+    await page.locator('[data-testid="page-history-page-changes-tab"]').click();
+
+    const structureChanges = page.getByTestId(
+      'page-history-page-structure-changes',
+    );
+    await expect(structureChanges).toContainText('Title');
+    await expect(structureChanges).toContainText(originalTitle);
+    await expect(structureChanges).toContainText(renamedTitle);
+    await expect(structureChanges).toContainText('Slug');
+    await expect(structureChanges).toContainText(`history-structure-${suffix}`);
+    await expect(structureChanges).toContainText(renamedSlug);
+  });
+
+  test('selecting-a-revision-keeps-current-history-route-after-rename', async ({
+    page,
+  }) => {
+    const suffix = Date.now();
+    const originalTitle = `History Route ${suffix}`;
+    const renamedTitle = `history-route-renamed-${suffix}`;
+    const viewPage = await createPageWithRevisions(page, originalTitle, [
+      'First revision content',
+      '\nSecond revision content',
+    ]);
+
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openMetadataDialog();
+
+    const metadataDialog = new EditPageMetadataDialog(page);
+    await metadataDialog.fillTitle(renamedTitle);
+    await metadataDialog.expectSlug(renamedTitle);
+    await metadataDialog.submit();
+
+    await editPage.closeEditor();
+
+    await viewPage.openCurrentPageHistory();
+
+    const historyPathBeforeSelection = new URL(page.url()).pathname;
+
+    await viewPage.openRevisionAt(0);
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe(
+      historyPathBeforeSelection,
+    );
+    await expect(page.getByTestId('page-history-page-content')).toBeVisible();
+  });
+
   test('revision-title-shows-timestamp-not-type-label', async ({ page }) => {
     // Revision list items should show a formatted timestamp, not generic
     // type labels like "Content changed" or "Assets changed".
@@ -174,11 +285,23 @@ test.describe('History', () => {
   test('restore-revision', async ({ page }) => {
     const originalContent = `Original ${Date.now()}`;
     const updatedContent = `Updated ${Date.now()}`;
-    const title = `History Restore ${Date.now()}`;
+    const title = `history-restore-${Date.now()}`;
+    const renamedTitle = `history-restore-renamed-${Date.now()}`;
     const viewPage = await createPageWithRevisions(page, title, [
       originalContent,
       `\n${updatedContent}`,
     ]);
+
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openMetadataDialog();
+
+    const metadataDialog = new EditPageMetadataDialog(page);
+    await metadataDialog.fillTitle(renamedTitle);
+    await metadataDialog.expectSlug(renamedTitle);
+    await metadataDialog.submit();
+    await editPage.closeEditor();
 
     await viewPage.openCurrentPageHistory();
     await viewPage.openRevisionAt(0);
@@ -190,5 +313,7 @@ test.describe('History', () => {
     // After restore the history page should reload and show the restored state.
     await page.getByTestId('page-history-page-content').waitFor({ state: 'visible' });
     await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
+    await expect(page.locator('article > h1')).toHaveText(title);
+    await expect.poll(() => new URL(page.url()).pathname).toContain(`/history/${title}`);
   });
 });

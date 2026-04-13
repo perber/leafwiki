@@ -95,18 +95,17 @@ async function loadPageHistoryState(
     }
 
     const latestRevision = await getLatestRevision(pageId)
-
-    const visibleRevisions = excludeLatestRevision(
-      historyData.revisions,
-      latestRevision.id,
-    )
-    const firstVisibleRevision = visibleRevisions[0] ?? null
+    const revisions = historyData.revisions
+    const firstHistoricalRevision =
+      revisions.find((revision) => revision.id !== latestRevision.id) ?? null
+    const initialSelectedRevision =
+      firstHistoricalRevision ?? revisions[0] ?? null
 
     update({
-      revisions: visibleRevisions,
+      revisions,
       nextCursor: historyData.nextCursor,
       latestRevisionId: latestRevision.id,
-      selectedRevisionId: firstVisibleRevision?.id ?? null,
+      selectedRevisionId: initialSelectedRevision?.id ?? null,
     })
   } catch (err) {
     update({
@@ -142,15 +141,6 @@ export const usePageHistoryStore = create<PageHistoryStore>((set) => ({
     }),
   setActiveTab: (activeTab) => set({ activeTab }),
 }))
-
-function excludeLatestRevision(
-  revisions: Revision[],
-  latestRevisionId: string | null,
-): Revision[] {
-  if (!latestRevisionId) return revisions
-
-  return revisions.filter((revision) => revision.id !== latestRevisionId)
-}
 
 export function usePageHistory(pageId: string | null, enabled = true) {
   const update = usePageHistoryStore((state) => state.update)
@@ -194,7 +184,7 @@ export function usePageHistory(pageId: string | null, enabled = true) {
     if (
       !pageId ||
       !selectedRevisionId ||
-      (activeTab !== 'preview' && activeTab !== 'raw')
+      (activeTab !== 'preview' && activeTab !== 'raw' && activeTab !== 'assets')
     ) {
       return
     }
@@ -237,7 +227,7 @@ export function usePageHistory(pageId: string | null, enabled = true) {
       !pageId ||
       !selectedRevisionId ||
       !latestRevisionId ||
-      (activeTab !== 'changes' && activeTab !== 'assets')
+      activeTab !== 'changes'
     ) {
       return
     }
@@ -292,12 +282,8 @@ export async function loadMorePageHistory() {
   try {
     const data = await listRevisions(state.pageId, state.nextCursor)
     const currentRevisions = usePageHistoryStore.getState().revisions
-    const visibleRevisions = excludeLatestRevision(
-      data.revisions,
-      usePageHistoryStore.getState().latestRevisionId,
-    )
     usePageHistoryStore.getState().update({
-      revisions: [...currentRevisions, ...visibleRevisions],
+      revisions: [...currentRevisions, ...data.revisions],
       nextCursor: data.nextCursor,
     })
   } catch (err) {
