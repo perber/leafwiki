@@ -14,7 +14,7 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
-    "@types/node": "^25.5.2",
+    "@types/node": "^25.6.0",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
     "eslint": "^10.2.0",
