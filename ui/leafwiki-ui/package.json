@@ -55,7 +55,7 @@
     "tailwindcss-animate": "^1.0.7",
     "unist-util-visit": "^5.1.0",
     "vaul": "^1.1.2",
-    "zustand": "^5.0.10"
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
