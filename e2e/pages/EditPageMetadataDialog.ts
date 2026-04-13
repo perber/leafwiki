@@ -20,6 +20,11 @@ export default class EditPageMetadataDialog {
     await input.fill(title);
   }
 
+  async fillSlug(slug: string) {
+    const input = await this.slugInput();
+    await input.fill(slug);
+  }
+
   async expectPath(path: string) {
     await expect(await this.pathDisplay()).toHaveText(`Path: ${path}`);
   }

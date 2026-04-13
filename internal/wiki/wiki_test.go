@@ -778,6 +778,43 @@ func TestWiki_CopyPages_WithAssets(t *testing.T) {
 	}
 }
 
+func TestWiki_CopyPages_RecordsContentRevision(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	original, err := w.CreatePage("system", nil, "Original", "original", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	content := "original content"
+	if _, err := w.UpdatePage("system", original.ID, original.Title, original.Slug, &content, pageNodeKind()); err != nil {
+		t.Fatalf("UpdatePage failed: %v", err)
+	}
+
+	copied, err := w.CopyPage("editor", original.ID, nil, "Copy of Original", "copy-of-original")
+	if err != nil {
+		t.Fatalf("CopyPage failed: %v", err)
+	}
+
+	latest, err := w.GetLatestRevision(copied.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision failed: %v", err)
+	}
+	if latest == nil {
+		t.Fatal("expected latest revision for copied page")
+	}
+	if latest.Type != revision.RevisionTypeContentUpdate {
+		t.Fatalf("latest revision type = %q, want %q", latest.Type, revision.RevisionTypeContentUpdate)
+	}
+	if latest.AuthorID != "editor" {
+		t.Fatalf("latest author = %q, want %q", latest.AuthorID, "editor")
+	}
+	if latest.Summary != "page copied" {
+		t.Fatalf("latest summary = %q, want %q", latest.Summary, "page copied")
+	}
+}
+
 func TestWiki_InitDefaultAdmin_UsesGivenPassword(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
@@ -1813,10 +1850,10 @@ func TestWiki_RestoreRevisionRestoresAssetsAndStructure(t *testing.T) {
 		t.Fatalf("RestoreRevision failed: %v", err)
 	}
 
-	if restored.Title != "Changed" || restored.Slug != "changed" {
+	if restored.Title != "Original" || restored.Slug != "original" {
 		t.Fatalf("restored identity = (%q,%q)", restored.Title, restored.Slug)
 	}
-	if restored.CalculatePath() != "/archive/changed" {
+	if restored.CalculatePath() != "/archive/original" {
 		t.Fatalf("restored path = %q", restored.CalculatePath())
 	}
 	if restored.Content != originalContent {
@@ -1861,6 +1898,60 @@ func TestWiki_MovePageRecordsStructureRevision(t *testing.T) {
 	}
 	if latest.ParentID != dest.ID {
 		t.Fatalf("latest parent id = %q, want %q", latest.ParentID, dest.ID)
+	}
+}
+
+func TestWiki_UpdatePage_TitleOnlyCreatesStructureRevision(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	page, err := w.CreatePage("system", nil, "Original", "original", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	content := "same content"
+	page, err = w.UpdatePage("system", page.ID, page.Title, page.Slug, &content, pageNodeKind())
+	if err != nil {
+		t.Fatalf("UpdatePage(initial content) failed: %v", err)
+	}
+
+	beforeLatest, err := w.GetLatestRevision(page.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision(before rename) failed: %v", err)
+	}
+	if beforeLatest == nil {
+		t.Fatal("expected initial content revision")
+	}
+
+	updatedPage, err := w.UpdatePage("system", page.ID, "Renamed Title", page.Slug, nil, pageNodeKind())
+	if err != nil {
+		t.Fatalf("UpdatePage(title only) failed: %v", err)
+	}
+	if updatedPage.Title != "Renamed Title" {
+		t.Fatalf("updated title = %q", updatedPage.Title)
+	}
+
+	afterLatest, err := w.GetLatestRevision(page.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision(after rename) failed: %v", err)
+	}
+	if afterLatest == nil {
+		t.Fatal("expected latest revision after title update")
+	}
+	if afterLatest.ID == beforeLatest.ID {
+		t.Fatalf("expected new revision for title-only change")
+	}
+	if afterLatest.Type != revision.RevisionTypeStructureUpdate {
+		t.Fatalf("latest revision type = %q", afterLatest.Type)
+	}
+
+	revisions, err := w.ListRevisions(page.ID)
+	if err != nil {
+		t.Fatalf("ListRevisions failed: %v", err)
+	}
+	if len(revisions) != 2 {
+		t.Fatalf("revision count = %d, want 2", len(revisions))
 	}
 }
 

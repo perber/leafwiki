@@ -1851,6 +1851,12 @@ Note alias content
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
     await page.getByTestId('page-history-page-assets-tab').click();
     await expect(page.getByTestId('page-history-page-content')).toContainText('upload-test.png');
+    await expect(page.getByTestId('page-history-page-content')).not.toContainText('Removed');
+    await expect(page.getByTestId('history-asset-open-upload-test.png')).toBeVisible();
+    await expect(page.getByTestId('history-asset-download-upload-test.png')).toBeVisible();
+
+    await viewPage.openRevisionAt(0);
+    await page.getByTestId('page-history-page-changes-tab').click();
     await expect(page.getByTestId('page-history-page-content')).toContainText('Removed');
   });
 

@@ -769,8 +769,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		)
 	}
 
-	page, err := s.pages.GetPage(pageID)
-	if err != nil {
+	if _, err := s.pages.GetPage(pageID); err != nil {
 		if errors.Is(err, tree.ErrPageNotFound) {
 			return sharederrors.NewLocalizedError(
 				"revision_restore_page_not_found",
@@ -801,7 +800,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	}
 
 	restoredContent := string(content)
-	if err := s.pages.UpdateNode(authorID, pageID, page.Title, page.Slug, &restoredContent); err != nil {
+	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, rev.Slug, &restoredContent); err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
 			"Failed to restore page",
@@ -813,7 +812,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 
 	if err := s.restoreAssets(pageID, assets); err != nil {
 		restoreRollbackContent := beforeState.Content
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, page.Title, page.Slug, &restoreRollbackContent); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
@@ -830,7 +829,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 
 	if err := s.recordRestoreRevision(pageID, authorID); err != nil {
 		restoreRollbackContent := beforeState.Content
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, page.Title, page.Slug, &restoreRollbackContent); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {

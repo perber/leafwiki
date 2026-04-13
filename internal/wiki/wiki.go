@@ -399,6 +399,7 @@ func (w *Wiki) UpdatePage(userID string, id, title, slug string, content *string
 	if err != nil {
 		return nil, err
 	}
+	oldTitle := before.Title
 	oldPrefix := before.CalculatePath()
 	renameOrPathChange := (slug != before.Slug)
 
@@ -459,7 +460,7 @@ func (w *Wiki) UpdatePage(userID string, id, title, slug string, content *string
 			}
 			w.recordStructureRevision(pid, userID, "")
 		}
-	} else if content == nil && before.Title != after.Title {
+	} else if content == nil && oldTitle != after.Title {
 		w.recordStructureRevision(id, userID, "")
 	}
 
@@ -532,7 +533,7 @@ func (w *Wiki) CopyPage(userID string, currentPageID string, targetParentID *str
 		}
 	}
 
-	w.recordAssetRevision(copy.ID, userID, "page copied")
+	w.recordContentRevision(copy.ID, userID, "page copied")
 
 	return copy, nil
 }

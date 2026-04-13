@@ -948,13 +948,13 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage failed: %v", err)
 	}
-	if page.Title != "Changed" || page.Slug != "changed" {
+	if page.Title != "Original" || page.Slug != "original" {
 		t.Fatalf("restored page identity = (%q,%q)", page.Title, page.Slug)
 	}
 	if page.Content != originalContent {
 		t.Fatalf("restored content = %q, want %q", page.Content, originalContent)
 	}
-	if got := page.CalculatePath(); got != "/archive/changed" {
+	if got := page.CalculatePath(); got != "/archive/original" {
 		t.Fatalf("restored path = %q", got)
 	}
 

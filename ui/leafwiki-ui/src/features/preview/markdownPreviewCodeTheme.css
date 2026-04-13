@@ -69,6 +69,16 @@
   --hljs-deletion-bg: #67060c;
 }
 
+:root:not(.dark) .page-history {
+  --hljs-foreground: #24292e;
+  --hljs-background: #f8fafc;
+}
+
+.dark .page-history {
+  --hljs-foreground: #c9d1d9;
+  --hljs-background: #111827;
+}
+
 .page-viewer__content code.hljs,
 .markdown-editor__preview code.hljs {
   padding-left: 0 !important;
@@ -77,6 +87,10 @@
 
 .page-viewer__content .markdown-code-block,
 .markdown-editor__preview .markdown-code-block {
+  position: relative;
+}
+
+.page-history .markdown-code-block {
   position: relative;
 }
 
@@ -120,6 +134,18 @@
   background: var(--hljs-background) !important;
   color: var(--hljs-foreground) !important;
   border: 1px solid color-mix(in oklab, var(--hljs-foreground) 10%, transparent);
+}
+
+.page-history .markdown-code-block pre {
+  background: var(--hljs-background) !important;
+  color: var(--hljs-foreground) !important;
+  border: 1px solid color-mix(in oklab, var(--hljs-foreground) 10%, transparent);
+}
+
+.page-history .markdown-code-block pre code {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
 }
 
 .page-viewer__content .hljs,
