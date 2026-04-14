@@ -1,9 +1,15 @@
 import BaseDialog from '@/components/BaseDialog'
-import { NODE_KIND_PAGE, PageNode } from '@/lib/api/pages'
-
-import { applyPageRefactor, previewPageRefactor } from '@/lib/api/pages'
+import {
+  applyPageRefactor,
+  movePage,
+  NODE_KIND_PAGE,
+  PageNode,
+  PageRefactorPreview,
+  previewPageRefactor,
+} from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_MOVE_PAGE } from '@/lib/registries'
+import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -17,6 +23,7 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
   const [loading, setLoading] = useState(false)
   const [, setFieldErrors] = useState<Record<string, string>>({})
   const page = useTreeStore((s) => s.getPageById(pageId))
+  const enableLinkRefactor = useConfigStore((s) => s.enableLinkRefactor)
   // get opened route from react router
   const currentPath = useLocation().pathname
   const navigate = useNavigate()
@@ -44,25 +51,57 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
   const itemLabel = page.kind === NODE_KIND_PAGE ? 'page' : 'section'
   const itemLabelCapitalized = page.kind === NODE_KIND_PAGE ? 'Page' : 'Section'
 
+  const getSyntheticMovePreview = (): PageRefactorPreview => {
+    const nextParent = newParentId
+      ? useTreeStore.getState().getPageById(newParentId)
+      : null
+    const nextParentPath = nextParent?.path ?? ''
+    const normalizedParentPath =
+      nextParentPath && nextParentPath !== '/' ? nextParentPath : ''
+
+    return {
+      kind: 'move',
+      pageId,
+      oldPath: page.path,
+      newPath: normalizedParentPath
+        ? `${normalizedParentPath}/${page.slug}`
+        : `/${page.slug}`,
+      affectedPages: [],
+      counts: {
+        affectedPages: 0,
+        matchedLinks: 0,
+      },
+      warnings: [],
+    }
+  }
+
   const handleMove = async (): Promise<boolean> => {
     if (!newParentId || newParentId === parentId) return false
 
     setLoading(true)
     try {
-      const preview = await previewPageRefactor(pageId, {
-        kind: 'move',
-        parentId: newParentId,
-      })
-      const rewriteLinks = await confirmPageRefactor(preview)
-      if (rewriteLinks === null) {
-        return false
+      let preview: PageRefactorPreview
+
+      if (enableLinkRefactor) {
+        preview = await previewPageRefactor(pageId, {
+          kind: 'move',
+          parentId: newParentId,
+        })
+        const rewriteLinks = await confirmPageRefactor(preview)
+        if (rewriteLinks === null) {
+          return false
+        }
+
+        await applyPageRefactor(pageId, {
+          kind: 'move',
+          parentId: newParentId,
+          rewriteLinks,
+        })
+      } else {
+        await movePage(pageId, newParentId)
+        preview = getSyntheticMovePreview()
       }
 
-      await applyPageRefactor(pageId, {
-        kind: 'move',
-        parentId: newParentId,
-        rewriteLinks,
-      })
       await refreshAfterPageRefactor({
         preview,
         currentPath,

@@ -1385,7 +1385,7 @@
   }
 
   .page-history__panel--detail {
-    @apply flex min-h-0 flex-col;
+    @apply flex min-h-0 min-w-0 flex-col;
   }
 
   .page-history__panel--detail-hidden {
@@ -1393,7 +1393,8 @@
   }
 
   .page-history__detail-content {
-    @apply min-h-0 flex-1 overflow-y-auto;
+    @apply min-h-0 min-w-0 flex-1 overflow-y-auto;
+    scrollbar-gutter: stable;
   }
 
   .page-history__detail-content {
@@ -1580,11 +1581,11 @@
   }
 
   .page-history__preview-panel {
-    @apply h-full;
+    @apply h-full min-w-0;
   }
 
   .page-history__preview-body {
-    @apply prose prose-base text-page-text dark:prose-invert max-w-none px-4 py-5 leading-relaxed;
+    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full min-w-0 flex-1 px-4 py-5 leading-relaxed;
   }
 
   .page-history__preview-body :where(h1, h2, h3, h4, h5, h6) {

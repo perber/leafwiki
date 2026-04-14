@@ -1,4 +1,4 @@
-package auth
+package auth_test
 
 import (
 	"net/http"
@@ -7,47 +7,67 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/perber/wiki/internal/core/auth"
-	"github.com/perber/wiki/internal/test_utils"
-	"github.com/perber/wiki/internal/wiki"
+	coreauth "github.com/perber/wiki/internal/core/auth"
+	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 )
 
-func createTestWiki(t *testing.T) *wiki.Wiki {
-	w, err := wiki.NewWiki(&wiki.WikiOptions{
-		StorageDir:          t.TempDir(),
-		AdminPassword:       "admin",
-		JWTSecret:           "test-secret-key",
-		AccessTokenTimeout:  15 * time.Minute,
-		RefreshTokenTimeout: 7 * 24 * time.Hour,
-	})
+type authFixture struct {
+	auth  *coreauth.AuthService
+	close func() error
+}
+
+func createTestAuthFixture(t *testing.T) *authFixture {
+	t.Helper()
+
+	storageDir := t.TempDir()
+	userStore, err := coreauth.NewUserStore(storageDir)
 	if err != nil {
-		t.Fatalf("Failed to create wiki instance: %v", err)
+		t.Fatalf("Failed to create user store: %v", err)
 	}
-	return w
+	sessionStore, err := coreauth.NewSessionStore(storageDir)
+	if err != nil {
+		_ = userStore.Close()
+		t.Fatalf("Failed to create session store: %v", err)
+	}
+
+	userService := coreauth.NewUserService(userStore)
+	if err := userService.InitDefaultAdmin("admin"); err != nil {
+		_ = sessionStore.Close()
+		_ = userStore.Close()
+		t.Fatalf("Failed to init default admin: %v", err)
+	}
+
+	return &authFixture{
+		auth: coreauth.NewAuthService(userService, sessionStore, "test-secret-key", 15*time.Minute, 7*24*time.Hour),
+		close: func() error {
+			if err := sessionStore.Close(); err != nil {
+				_ = userStore.Close()
+				return err
+			}
+			return userStore.Close()
+		},
+	}
 }
 
 func TestRequireAuth_WithAuthDisabled_UserExists(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	w := createTestWiki(t)
-	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	router := gin.New()
 
-	// Middleware to inject user (simulating InjectPublicEditor)
+	// Middleware to inject user (simulating authmw.InjectPublicEditor)
 	router.Use(func(c *gin.Context) {
-		c.Set("user", &auth.User{
+		c.Set("user", &coreauth.User{
 			ID:       "public-editor",
 			Username: "public-editor",
-			Role:     auth.RoleEditor,
+			Role:     coreauth.RoleEditor,
 		})
 		c.Next()
 	})
 
 	// Apply RequireAuth with authDisabled=true
-	router.Use(RequireAuth(w, authCookies, true))
+	router.Use(authmw.RequireAuth(nil, authCookies, true))
 
 	router.GET("/test", func(c *gin.Context) {
 		userValue, exists := c.Get("user")
@@ -56,7 +76,7 @@ func TestRequireAuth_WithAuthDisabled_UserExists(t *testing.T) {
 			return
 		}
 
-		user, ok := userValue.(*auth.User)
+		user, ok := userValue.(*coreauth.User)
 		if !ok {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user type"})
 			return
@@ -86,15 +106,12 @@ func TestRequireAuth_WithAuthDisabled_UserExists(t *testing.T) {
 func TestRequireAuth_WithAuthDisabled_NoUser(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	w := createTestWiki(t)
-	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	router := gin.New()
 
 	// Apply RequireAuth with authDisabled=true but no user injected
-	router.Use(RequireAuth(w, authCookies, true))
+	router.Use(authmw.RequireAuth(nil, authCookies, true))
 
 	router.GET("/test", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -118,13 +135,17 @@ func TestRequireAuth_WithAuthDisabled_NoUser(t *testing.T) {
 func TestRequireAuth_WithAuthEnabled_ValidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	wikiInstance := createTestWiki(t)
-	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+	fixture := createTestAuthFixture(t)
+	defer func() {
+		if err := fixture.close(); err != nil {
+			t.Fatalf("close auth fixture: %v", err)
+		}
+	}()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	// Login to get a valid token
-	authToken, err := wikiInstance.GetAuthService().Login("admin", "admin")
+	authToken, err := fixture.auth.Login("admin", "admin")
 	if err != nil {
 		t.Fatalf("Failed to login: %v", err)
 	}
@@ -132,7 +153,7 @@ func TestRequireAuth_WithAuthEnabled_ValidToken(t *testing.T) {
 	router := gin.New()
 
 	// Apply RequireAuth with authDisabled=false
-	router.Use(RequireAuth(wikiInstance, authCookies, false))
+	router.Use(authmw.RequireAuth(fixture.auth, authCookies, false))
 
 	router.GET("/test", func(c *gin.Context) {
 		userValue, exists := c.Get("user")
@@ -141,7 +162,7 @@ func TestRequireAuth_WithAuthEnabled_ValidToken(t *testing.T) {
 			return
 		}
 
-		u, ok := userValue.(*auth.User)
+		u, ok := userValue.(*coreauth.User)
 		if !ok {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user type"})
 			return
@@ -175,15 +196,19 @@ func TestRequireAuth_WithAuthEnabled_ValidToken(t *testing.T) {
 func TestRequireAuth_WithAuthEnabled_MissingToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	wikiInstance := createTestWiki(t)
-	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+	fixture := createTestAuthFixture(t)
+	defer func() {
+		if err := fixture.close(); err != nil {
+			t.Fatalf("close auth fixture: %v", err)
+		}
+	}()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	router := gin.New()
 
 	// Apply RequireAuth with authDisabled=false
-	router.Use(RequireAuth(wikiInstance, authCookies, false))
+	router.Use(authmw.RequireAuth(fixture.auth, authCookies, false))
 
 	router.GET("/test", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -204,18 +229,53 @@ func TestRequireAuth_WithAuthEnabled_MissingToken(t *testing.T) {
 	}
 }
 
+func TestRequireAuth_WithAuthEnabled_NilAuthService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
+
+	router := gin.New()
+	router.Use(authmw.RequireAuth(nil, authCookies, false))
+
+	router.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  "leafwiki_at",
+		Value: "some-token",
+	})
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500 when auth service is nil, got %d", w.Code)
+	}
+
+	expectedBody := `{"error":"Authentication service unavailable"}`
+	if w.Body.String() != expectedBody {
+		t.Errorf("Expected body %s, got %s", expectedBody, w.Body.String())
+	}
+}
+
 func TestRequireAuth_WithAuthEnabled_InvalidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	wikiInstance := createTestWiki(t)
-	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+	fixture := createTestAuthFixture(t)
+	defer func() {
+		if err := fixture.close(); err != nil {
+			t.Fatalf("close auth fixture: %v", err)
+		}
+	}()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	router := gin.New()
 
 	// Apply RequireAuth with authDisabled=false
-	router.Use(RequireAuth(wikiInstance, authCookies, false))
+	router.Use(authmw.RequireAuth(fixture.auth, authCookies, false))
 
 	router.GET("/test", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -243,13 +303,17 @@ func TestRequireAuth_WithAuthEnabled_InvalidToken(t *testing.T) {
 func TestRequireAuth_WithAuthEnabled_UserSetInContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	wikiInstance := createTestWiki(t)
-	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+	fixture := createTestAuthFixture(t)
+	defer func() {
+		if err := fixture.close(); err != nil {
+			t.Fatalf("close auth fixture: %v", err)
+		}
+	}()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	// Login to get a valid token
-	authToken, err := wikiInstance.GetAuthService().Login("admin", "admin")
+	authToken, err := fixture.auth.Login("admin", "admin")
 	if err != nil {
 		t.Fatalf("Failed to login: %v", err)
 	}
@@ -257,7 +321,7 @@ func TestRequireAuth_WithAuthEnabled_UserSetInContext(t *testing.T) {
 	router := gin.New()
 
 	// Apply RequireAuth with authDisabled=false
-	router.Use(RequireAuth(wikiInstance, authCookies, false))
+	router.Use(authmw.RequireAuth(fixture.auth, authCookies, false))
 
 	userSetInContext := false
 
@@ -290,15 +354,19 @@ func TestRequireAuth_WithAuthEnabled_UserSetInContext(t *testing.T) {
 func TestRequireAuth_NextNotCalledOnFailure(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	wikiInstance := createTestWiki(t)
-	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+	fixture := createTestAuthFixture(t)
+	defer func() {
+		if err := fixture.close(); err != nil {
+			t.Fatalf("close auth fixture: %v", err)
+		}
+	}()
 
-	authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	router := gin.New()
 
 	// Apply RequireAuth with authDisabled=false
-	router.Use(RequireAuth(wikiInstance, authCookies, false))
+	router.Use(authmw.RequireAuth(fixture.auth, authCookies, false))
 
 	nextCalled := false
 
@@ -384,27 +452,31 @@ func TestRequireAuth_ComprehensiveScenarios(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			wikiInstance := createTestWiki(t)
-			defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+			fixture := createTestAuthFixture(t)
+			defer func() {
+				if err := fixture.close(); err != nil {
+					t.Fatalf("close auth fixture: %v", err)
+				}
+			}()
 
-			authCookies := NewAuthCookies(true, time.Hour, time.Hour*24)
+			authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 			router := gin.New()
 
 			// Inject user if needed
 			if tc.injectUser {
 				router.Use(func(c *gin.Context) {
-					c.Set("user", &auth.User{
+					c.Set("user", &coreauth.User{
 						ID:       "public-editor",
 						Username: "public-editor",
-						Role:     auth.RoleEditor,
+						Role:     coreauth.RoleEditor,
 					})
 					c.Next()
 				})
 			}
 
 			// Apply RequireAuth
-			router.Use(RequireAuth(wikiInstance, authCookies, tc.authDisabled))
+			router.Use(authmw.RequireAuth(fixture.auth, authCookies, tc.authDisabled))
 
 			router.GET("/test", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -416,7 +488,7 @@ func TestRequireAuth_ComprehensiveScenarios(t *testing.T) {
 			if tc.provideToken {
 				var token string
 				if tc.validToken {
-					authToken, err := wikiInstance.GetAuthService().Login("admin", "admin")
+					authToken, err := fixture.auth.Login("admin", "admin")
 					if err != nil {
 						t.Fatalf("Failed to login: %v", err)
 					}

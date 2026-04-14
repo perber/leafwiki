@@ -86,16 +86,17 @@
 }
 
 .page-viewer__content .markdown-code-block,
-.markdown-editor__preview .markdown-code-block {
+.markdown-editor__preview .markdown-code-block,
+.page-history__preview-body .markdown-code-block {
   position: relative;
-}
-
-.page-history .markdown-code-block {
-  position: relative;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .page-viewer__content .markdown-code-block__actions,
-.markdown-editor__preview .markdown-code-block__actions {
+.markdown-editor__preview .markdown-code-block__actions,
+.page-history__preview-body .markdown-code-block__actions {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
@@ -103,7 +104,8 @@
 }
 
 .page-viewer__content .markdown-code-block__copy-button,
-.markdown-editor__preview .markdown-code-block__copy-button {
+.markdown-editor__preview .markdown-code-block__copy-button,
+.page-history__preview-body .markdown-code-block__copy-button {
   height: 2rem;
   width: 2rem;
   border-color: color-mix(in oklab, var(--hljs-foreground) 12%, transparent);
@@ -112,44 +114,38 @@
 }
 
 .page-viewer__content .markdown-code-block__copy-button:hover,
-.markdown-editor__preview .markdown-code-block__copy-button:hover {
+.markdown-editor__preview .markdown-code-block__copy-button:hover,
+.page-history__preview-body .markdown-code-block__copy-button:hover {
   background: color-mix(in oklab, var(--hljs-background) 82%, white 10%);
   color: var(--hljs-foreground);
 }
 
 .page-viewer__content pre code.hljs,
-.markdown-editor__preview pre code.hljs {
+.markdown-editor__preview pre code.hljs,
+.page-history__preview-body pre code.hljs {
   display: block;
   overflow-x: auto;
   padding: 1em;
 }
 
 .page-viewer__content .markdown-code-block pre code.hljs,
-.markdown-editor__preview .markdown-code-block pre code.hljs {
+.markdown-editor__preview .markdown-code-block pre code.hljs,
+.page-history__preview-body .markdown-code-block pre code.hljs {
   padding-right: 3.5rem;
 }
 
 .page-viewer__content pre,
-.markdown-editor__preview pre {
+.markdown-editor__preview pre,
+.page-history__preview-body pre {
   background: var(--hljs-background) !important;
   color: var(--hljs-foreground) !important;
   border: 1px solid color-mix(in oklab, var(--hljs-foreground) 10%, transparent);
-}
-
-.page-history .markdown-code-block pre {
-  background: var(--hljs-background) !important;
-  color: var(--hljs-foreground) !important;
-  border: 1px solid color-mix(in oklab, var(--hljs-foreground) 10%, transparent);
-}
-
-.page-history .markdown-code-block pre code {
-  display: block;
-  overflow-x: auto;
-  padding: 1em;
+  max-width: 100%;
 }
 
 .page-viewer__content .hljs,
-.markdown-editor__preview .hljs {
+.markdown-editor__preview .hljs,
+.page-history__preview-body .hljs {
   color: var(--hljs-foreground);
   background: var(--hljs-background);
 }
@@ -161,6 +157,13 @@
 .page-viewer__content .hljs-template-variable,
 .page-viewer__content .hljs-type,
 .page-viewer__content .hljs-variable.language_,
+.page-history__preview-body .hljs-doctag,
+.page-history__preview-body .hljs-keyword,
+.page-history__preview-body .hljs-meta .hljs-keyword,
+.page-history__preview-body .hljs-template-tag,
+.page-history__preview-body .hljs-template-variable,
+.page-history__preview-body .hljs-type,
+.page-history__preview-body .hljs-variable.language_,
 .markdown-editor__preview .hljs-doctag,
 .markdown-editor__preview .hljs-keyword,
 .markdown-editor__preview .hljs-meta .hljs-keyword,
@@ -175,6 +178,10 @@
 .page-viewer__content .hljs-title.class_,
 .page-viewer__content .hljs-title.class_.inherited__,
 .page-viewer__content .hljs-title.function_,
+.page-history__preview-body .hljs-title,
+.page-history__preview-body .hljs-title.class_,
+.page-history__preview-body .hljs-title.class_.inherited__,
+.page-history__preview-body .hljs-title.function_,
 .markdown-editor__preview .hljs-title,
 .markdown-editor__preview .hljs-title.class_,
 .markdown-editor__preview .hljs-title.class_.inherited__,
@@ -192,6 +199,16 @@
 .page-viewer__content .hljs-selector-attr,
 .page-viewer__content .hljs-selector-class,
 .page-viewer__content .hljs-selector-id,
+.page-history__preview-body .hljs-attr,
+.page-history__preview-body .hljs-attribute,
+.page-history__preview-body .hljs-literal,
+.page-history__preview-body .hljs-meta,
+.page-history__preview-body .hljs-number,
+.page-history__preview-body .hljs-operator,
+.page-history__preview-body .hljs-variable,
+.page-history__preview-body .hljs-selector-attr,
+.page-history__preview-body .hljs-selector-class,
+.page-history__preview-body .hljs-selector-id,
 .markdown-editor__preview .hljs-attr,
 .markdown-editor__preview .hljs-attribute,
 .markdown-editor__preview .hljs-literal,
@@ -208,6 +225,9 @@
 .page-viewer__content .hljs-regexp,
 .page-viewer__content .hljs-string,
 .page-viewer__content .hljs-meta .hljs-string,
+.page-history__preview-body .hljs-regexp,
+.page-history__preview-body .hljs-string,
+.page-history__preview-body .hljs-meta .hljs-string,
 .markdown-editor__preview .hljs-regexp,
 .markdown-editor__preview .hljs-string,
 .markdown-editor__preview .hljs-meta .hljs-string {
@@ -216,6 +236,8 @@
 
 .page-viewer__content .hljs-built_in,
 .page-viewer__content .hljs-symbol,
+.page-history__preview-body .hljs-built_in,
+.page-history__preview-body .hljs-symbol,
 .markdown-editor__preview .hljs-built_in,
 .markdown-editor__preview .hljs-symbol {
   color: var(--hljs-symbol);
@@ -224,6 +246,9 @@
 .page-viewer__content .hljs-comment,
 .page-viewer__content .hljs-code,
 .page-viewer__content .hljs-formula,
+.page-history__preview-body .hljs-comment,
+.page-history__preview-body .hljs-code,
+.page-history__preview-body .hljs-formula,
 .markdown-editor__preview .hljs-comment,
 .markdown-editor__preview .hljs-code,
 .markdown-editor__preview .hljs-formula {
@@ -234,6 +259,10 @@
 .page-viewer__content .hljs-quote,
 .page-viewer__content .hljs-selector-tag,
 .page-viewer__content .hljs-selector-pseudo,
+.page-history__preview-body .hljs-name,
+.page-history__preview-body .hljs-quote,
+.page-history__preview-body .hljs-selector-tag,
+.page-history__preview-body .hljs-selector-pseudo,
 .markdown-editor__preview .hljs-name,
 .markdown-editor__preview .hljs-quote,
 .markdown-editor__preview .hljs-selector-tag,
@@ -242,40 +271,47 @@
 }
 
 .page-viewer__content .hljs-subst,
+.page-history__preview-body .hljs-subst,
 .markdown-editor__preview .hljs-subst {
   color: var(--hljs-subst);
 }
 
 .page-viewer__content .hljs-section,
+.page-history__preview-body .hljs-section,
 .markdown-editor__preview .hljs-section {
   color: var(--hljs-section);
   font-weight: bold;
 }
 
 .page-viewer__content .hljs-bullet,
+.page-history__preview-body .hljs-bullet,
 .markdown-editor__preview .hljs-bullet {
   color: var(--hljs-bullet);
 }
 
 .page-viewer__content .hljs-emphasis,
+.page-history__preview-body .hljs-emphasis,
 .markdown-editor__preview .hljs-emphasis {
   color: var(--hljs-foreground);
   font-style: italic;
 }
 
 .page-viewer__content .hljs-strong,
+.page-history__preview-body .hljs-strong,
 .markdown-editor__preview .hljs-strong {
   color: var(--hljs-foreground);
   font-weight: bold;
 }
 
 .page-viewer__content .hljs-addition,
+.page-history__preview-body .hljs-addition,
 .markdown-editor__preview .hljs-addition {
   color: var(--hljs-addition);
   background-color: var(--hljs-addition-bg);
 }
 
 .page-viewer__content .hljs-deletion,
+.page-history__preview-body .hljs-deletion,
 .markdown-editor__preview .hljs-deletion {
   color: var(--hljs-deletion);
   background-color: var(--hljs-deletion-bg);

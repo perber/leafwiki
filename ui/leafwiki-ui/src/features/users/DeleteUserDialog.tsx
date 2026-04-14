@@ -1,4 +1,5 @@
 import BaseDialog from '@/components/BaseDialog'
+import { mapApiError } from '@/lib/api/errors'
 import { DIALOG_DELETE_USER_CONFIRMATION } from '@/lib/registries'
 import { useUserStore } from '@/stores/users'
 import { useState } from 'react'
@@ -20,17 +21,15 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
       await deleteUser(userId)
       toast.success('User deleted successfully')
       return true // Close the dialog
-    } catch (err: { error?: string } | unknown) {
-      if (err && typeof err === 'object' && 'error' in err) {
-        // Handle specific error message if available
-        console.error('Error deleting user:', (err as { error: string }).error)
-        toast.error(err.error as string)
-      } else {
-        // Handle generic error
-        console.error('Error deleting user:', err)
-        toast.error('Failed to delete user. Please try again.')
-      }
-
+    } catch (err) {
+      console.error('Error deleting user:', err)
+      const mapped = mapApiError(
+        err,
+        'Failed to delete user. Please try again.',
+      )
+      toast.error(
+        mapped.detail ? `${mapped.message}: ${mapped.detail}` : mapped.message,
+      )
       return false // Keep the dialog open
     } finally {
       setLoading(false)

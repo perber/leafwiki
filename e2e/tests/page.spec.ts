@@ -1187,7 +1187,7 @@ Paragraph outside the list.
     await movePageDialog.selectNewParentAsTopLevel();
     await movePageDialog.clickMoveButton();
     await movePageDialog.expectRefactorDialogHidden();
-    await page.waitForTimeout(5000);
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${childTitle}`);
 
     const nodeRow = page
       .locator('div[data-testid^="tree-node-"]')
@@ -1195,11 +1195,89 @@ Paragraph outside the list.
       .first();
 
     test.expect(await nodeRow.count()).toBe(1);
+    await expect(page.locator('article > h1')).toHaveText(childTitle);
+  });
 
+  test('move-current-page-to-another-parent-updates-url', async ({ page }) => {
+    const stamp = Date.now();
+    const sourceParentTitle = `move-source-parent-${stamp}`;
+    const targetParentTitle = `move-target-parent-${stamp}`;
+    const childTitle = `move-between-child-${stamp}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(sourceParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+
+    await treeView.clickRootAddButton();
+    await addPageDialog.fillTitle(targetParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
+
+    await treeView.createSubPageOfParent(sourceParentTitle, childTitle);
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 3);
+
+    await treeView.expandNodeByTitle(sourceParentTitle);
     await treeView.clickPageByTitle(childTitle);
-    await page.locator('article').getByRole('link', { name: siblingTitle }).click();
-    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${parentTitle}/${siblingTitle}`);
-    await expect(page.locator('article > h1')).toHaveText(siblingTitle);
+    await expect(page.locator('article > h1')).toHaveText(childTitle);
+
+    await treeView.openMoveDialogForPage(sourceParentTitle, childTitle);
+
+    const movePageDialog = new MovePageDialog(page);
+    await movePageDialog.selectNewParent(targetParentTitle);
+    await movePageDialog.clickMoveButton();
+    await movePageDialog.expectRefactorDialogHidden();
+
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe(`/${targetParentTitle}/${childTitle}`);
+    await expect(page.locator('article > h1')).toHaveText(childTitle);
+  });
+
+  test('move-current-page-while-editing-updates-editor-url', async ({ page }) => {
+    const stamp = Date.now();
+    const sourceParentTitle = `edit-move-source-parent-${stamp}`;
+    const targetParentTitle = `edit-move-target-parent-${stamp}`;
+    const childTitle = `edit-move-child-${stamp}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(sourceParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+
+    await treeView.clickRootAddButton();
+    await addPageDialog.fillTitle(targetParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
+
+    await treeView.createSubPageOfParent(sourceParentTitle, childTitle);
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 3);
+
+    await treeView.expandNodeByTitle(sourceParentTitle);
+    await treeView.clickPageByTitle(childTitle);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    await treeView.openMoveDialogForPage(sourceParentTitle, childTitle);
+
+    const movePageDialog = new MovePageDialog(page);
+    await movePageDialog.selectNewParent(targetParentTitle);
+    await movePageDialog.clickMoveButton();
+    await movePageDialog.expectRefactorDialogHidden();
+
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe(`/e/${targetParentTitle}/${childTitle}`);
+    await expect(page.locator('.cm-editor')).toBeVisible();
   });
 
   test('move-page-updates-incoming-links-via-refactor-dialog', async ({ page }) => {

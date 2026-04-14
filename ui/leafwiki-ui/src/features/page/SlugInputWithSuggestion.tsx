@@ -1,4 +1,5 @@
 import { FormInput } from '@/components/FormInput'
+import { mapApiError } from '@/lib/api/errors'
 import { suggestSlug } from '@/lib/api/pages'
 import { useDebounce } from '@/lib/useDebounce'
 import { useEffect, useState } from 'react'
@@ -49,8 +50,13 @@ export function SlugInputWithSuggestion({
         )
         onSlugChange(suggestion)
         onLastSlugTitleChange?.(debouncedTitle)
-      } catch {
-        toast.error('Error generating slug')
+      } catch (err) {
+        const mapped = mapApiError(err, 'Error generating slug')
+        toast.error(
+          mapped.detail
+            ? `${mapped.message}: ${mapped.detail}`
+            : mapped.message,
+        )
       } finally {
         onSlugLoadingChange?.(false)
       }

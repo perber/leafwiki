@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
@@ -82,157 +81,6 @@ func TestRecordContentUpdateHappyPathAndNoop(t *testing.T) {
 	}
 }
 
-func TestRecordAssetStructureDeleteAndRestoreHappyPath(t *testing.T) {
-	service, treeService, storageDir := newRevisionTestService(t)
-	parentKind := tree.NodeKindSection
-	parentID, err := treeService.CreateNode("tester", nil, "Docs", "docs", &parentKind)
-	if err != nil {
-		t.Fatalf("CreateNode(parent) failed: %v", err)
-	}
-	kind := tree.NodeKindPage
-	pageIDPtr, err := treeService.CreateNode("tester", parentID, "Child", "child", &kind)
-	if err != nil {
-		t.Fatalf("CreateNode(page) failed: %v", err)
-	}
-	pageID := *pageIDPtr
-	content := "hello"
-	if err := treeService.UpdateNode("tester", pageID, "Child", "child", &content); err != nil {
-		t.Fatalf("UpdateNode failed: %v", err)
-	}
-	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset-a")
-
-	assetRev, created, err := service.RecordAssetChange(pageID, "tester", "asset")
-	if err != nil {
-		t.Fatalf("RecordAssetChange failed: %v", err)
-	}
-	if !created || assetRev.Type != RevisionTypeAssetUpdate {
-		t.Fatalf("unexpected asset revision: %#v created=%v", assetRev, created)
-	}
-	if assetRev.ParentID != *parentID {
-		t.Fatalf("asset revision parent id = %q, want %q", assetRev.ParentID, *parentID)
-	}
-
-	if _, _, err := service.RecordStructureChange(pageID, "tester", "structure"); err != nil {
-		t.Fatalf("RecordStructureChange failed: %v", err)
-	}
-
-	if _, _, err := service.RecordDelete(pageID, "tester", "delete"); err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	if err := treeService.DeleteNode("tester", pageID, false); err != nil {
-		t.Fatalf("DeleteNode failed: %v", err)
-	}
-	if err := os.RemoveAll(filepath.Join(storageDir, "assets", pageID)); err != nil {
-		t.Fatalf("RemoveAll assets failed: %v", err)
-	}
-
-	rootParent := "root"
-	if err := service.RestorePage(pageID, "tester", &rootParent); err != nil {
-		t.Fatalf("RestorePage failed: %v", err)
-	}
-
-	page, err := treeService.GetPage(pageID)
-	if err != nil {
-		t.Fatalf("GetPage failed: %v", err)
-	}
-	if page.Content != content {
-		t.Fatalf("restored content = %q, want %q", page.Content, content)
-	}
-	assetBytes, err := os.ReadFile(filepath.Join(storageDir, "assets", pageID, "a.txt"))
-	if err != nil {
-		t.Fatalf("ReadFile restored asset failed: %v", err)
-	}
-	if string(assetBytes) != "asset-a" {
-		t.Fatalf("restored asset = %q", string(assetBytes))
-	}
-	latest, err := service.GetLatestRevision(pageID)
-	if err != nil {
-		t.Fatalf("GetLatestRevision failed: %v", err)
-	}
-	if latest == nil || latest.Type != RevisionTypeRestore {
-		t.Fatalf("latest revision = %#v", latest)
-	}
-}
-
-func TestRestorePageFailedPaths(t *testing.T) {
-	service, treeService, _ := newRevisionTestService(t)
-	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
-
-	if err := service.RestorePage("missing", "tester", nil); err == nil {
-		t.Fatalf("expected missing trash restore to fail")
-	}
-
-	contentRev, _, err := service.RecordContentUpdate(pageID, "tester", "content")
-	if err != nil {
-		t.Fatalf("RecordContentUpdate failed: %v", err)
-	}
-	if err := service.store.SaveTrashEntry(&TrashEntry{PageID: pageID, DeletedAt: time.Now().UTC(), DeletedBy: "tester", Title: "Page", Slug: "page", Path: "/page", LastRevisionID: contentRev.ID}); err != nil {
-		t.Fatalf("SaveTrashEntry failed: %v", err)
-	}
-	if err := treeService.DeleteNode("tester", pageID, false); err != nil {
-		t.Fatalf("DeleteNode failed: %v", err)
-	}
-
-	err = service.RestorePage(pageID, "tester", nil)
-	localized, ok := sharederrors.AsLocalizedError(err)
-	if !ok || localized.Code != "revision_restore_invalid_revision" {
-		t.Fatalf("expected invalid revision error, got %#v (%v)", localized, err)
-	}
-
-	service2, treeService2, storageDir2 := newRevisionTestService(t)
-	parentKind := tree.NodeKindSection
-	parentID, err := treeService2.CreateNode("tester", nil, "Docs", "docs", &parentKind)
-	if err != nil {
-		t.Fatalf("CreateNode(parent) failed: %v", err)
-	}
-	pageID2 := createRevisionTestPage(t, treeService2, "Child", "child", "hello")
-	if err := treeService2.MoveNode("tester", pageID2, *parentID); err != nil {
-		t.Fatalf("MoveNode failed: %v", err)
-	}
-	writeLiveAsset(t, storageDir2, pageID2, "a.txt", "asset-a")
-	_, trash, err := service2.RecordDelete(pageID2, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	if err := treeService2.DeleteNode("tester", pageID2, false); err != nil {
-		t.Fatalf("DeleteNode(page) failed: %v", err)
-	}
-	if err := treeService2.DeleteNode("tester", *parentID, true); err != nil {
-		t.Fatalf("DeleteNode(parent) failed: %v", err)
-	}
-	if err := os.RemoveAll(filepath.Join(storageDir2, "assets", pageID2)); err != nil {
-		t.Fatalf("RemoveAll assets failed: %v", err)
-	}
-
-	err = service2.RestorePage(pageID2, "tester", nil)
-	localized, ok = sharederrors.AsLocalizedError(err)
-	if !ok || localized.Code != "revision_restore_parent_required" {
-		t.Fatalf("expected parent required error, got %#v (%v), trash=%#v", localized, err, trash)
-	}
-
-	service3, treeService3, _ := newRevisionTestService(t)
-	pageID3 := createRevisionTestPage(t, treeService3, "Bad Kind", "bad-kind", "hello")
-	_, trash3, err := service3.RecordDelete(pageID3, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	if err := treeService3.DeleteNode("tester", pageID3, false); err != nil {
-		t.Fatalf("DeleteNode failed: %v", err)
-	}
-	rev3, err := service3.store.GetRevision(pageID3, trash3.LastRevisionID)
-	if err != nil {
-		t.Fatalf("GetRevision failed: %v", err)
-	}
-	rev3.Kind = "mystery"
-	if err := service3.store.SaveRevision(rev3); err != nil {
-		t.Fatalf("SaveRevision override failed: %v", err)
-	}
-	err = service3.RestorePage(pageID3, "tester", nil)
-	localized, ok = sharederrors.AsLocalizedError(err)
-	if !ok || localized.Code != "revision_restore_invalid_kind" {
-		t.Fatalf("expected invalid kind error, got %#v (%v)", localized, err)
-	}
-}
 
 func TestLocalizedErrorHelpers(t *testing.T) {
 	cause := errors.New("boom")
@@ -268,15 +116,12 @@ func TestServiceWrappersAndHelpers(t *testing.T) {
 	if _, _, err := service.RecordContentUpdate(pageID, "tester", "content"); err != nil {
 		t.Fatalf("RecordContentUpdate failed: %v", err)
 	}
-	if _, _, err := service.RecordDelete(pageID, "tester", "delete"); err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
 
 	revisions, err := service.ListRevisions(pageID)
 	if err != nil {
 		t.Fatalf("ListRevisions failed: %v", err)
 	}
-	if len(revisions) < 2 {
+	if len(revisions) < 1 {
 		t.Fatalf("expected revisions, got %#v", revisions)
 	}
 	paged, _, err := service.ListRevisionsPage(pageID, "", 1)
@@ -285,20 +130,6 @@ func TestServiceWrappersAndHelpers(t *testing.T) {
 	}
 	if len(paged) != 1 {
 		t.Fatalf("expected one paged revision, got %d", len(paged))
-	}
-	trash, err := service.GetTrashEntry(pageID)
-	if err != nil {
-		t.Fatalf("GetTrashEntry failed: %v", err)
-	}
-	if trash.PageID != pageID {
-		t.Fatalf("trash = %#v", trash)
-	}
-	allTrash, err := service.ListTrash()
-	if err != nil {
-		t.Fatalf("ListTrash failed: %v", err)
-	}
-	if len(allTrash) != 1 {
-		t.Fatalf("expected one trash entry, got %d", len(allTrash))
 	}
 
 	if err := service.DeletePageData(pageID); err != nil {
@@ -311,9 +142,6 @@ func TestServiceWrappersAndHelpers(t *testing.T) {
 	if len(revisions) != 0 {
 		t.Fatalf("expected revisions to be deleted, got %#v", revisions)
 	}
-	if _, err := service.GetTrashEntry(pageID); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected trash entry to be deleted, got %v", err)
-	}
 
 	if err := service.persistLiveAssets(pageID, nil); err != nil {
 		t.Fatalf("persistLiveAssets(nil) failed: %v", err)
@@ -323,78 +151,6 @@ func TestServiceWrappersAndHelpers(t *testing.T) {
 	}
 }
 
-func TestRestoreAndMappingHelpers(t *testing.T) {
-	service, treeService, storageDir := newRevisionTestService(t)
-	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
-	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset")
-
-	kind := tree.NodeKindSection
-	parentID, err := treeService.CreateNode("tester", nil, "Docs", "docs", &kind)
-	if err != nil {
-		t.Fatalf("CreateNode(parent) failed: %v", err)
-	}
-	if err := treeService.MoveNode("tester", pageID, *parentID); err != nil {
-		t.Fatalf("MoveNode failed: %v", err)
-	}
-
-	resolved, err := service.resolveRestoreParentID(pageID, *parentID, "/docs/page", nil)
-	if err != nil {
-		t.Fatalf("resolveRestoreParentID with stored parent failed: %v", err)
-	}
-	if resolved == nil || *resolved != *parentID {
-		t.Fatalf("resolved parent = %#v", resolved)
-	}
-
-	rootParent := "root"
-	resolvedRoot, err := service.resolveRestoreParentID(pageID, "", "/page", &rootParent)
-	if err != nil || resolvedRoot != nil {
-		t.Fatalf("resolveRestoreParentID root override = %#v, %v", resolvedRoot, err)
-	}
-
-	if got := restoreParentRoutePath("/docs/page"); got != "docs" {
-		t.Fatalf("restoreParentRoutePath = %q", got)
-	}
-	if _, err := restoreNodeKind("page"); err != nil {
-		t.Fatalf("restoreNodeKind(page) failed: %v", err)
-	}
-	if _, err := restoreNodeKind("weird"); err == nil {
-		t.Fatalf("expected restoreNodeKind to fail for invalid kind")
-	}
-
-	mapped := service.mapRestoreTreeError("page", "slug", resolved, tree.ErrParentNotFound)
-	localized, ok := sharederrors.AsLocalizedError(mapped)
-	if !ok || localized.Code != "revision_restore_parent_not_found" {
-		t.Fatalf("mapped parent error = %#v", mapped)
-	}
-	mapped = service.mapRestoreTreeError("page", "slug", resolved, tree.ErrPageAlreadyExists)
-	localized, ok = sharederrors.AsLocalizedError(mapped)
-	if !ok || localized.Code != "revision_restore_slug_conflict" {
-		t.Fatalf("mapped slug error = %#v", mapped)
-	}
-	mapped = service.mapRestoreTreeError("page", "slug", resolved, errors.New("boom"))
-	localized, ok = sharederrors.AsLocalizedError(mapped)
-	if !ok || localized.Code != "revision_restore_failed" {
-		t.Fatalf("mapped generic error = %#v", mapped)
-	}
-
-	if err := service.restoreAssets(pageID, []AssetRef{{Name: "../bad", SHA256: "x", SizeBytes: 1}}); err == nil {
-		t.Fatalf("expected restoreAssets to reject invalid names")
-	}
-
-	if err := os.MkdirAll(filepath.Join(storageDir, "assets", pageID), 0o755); err != nil {
-		t.Fatalf("MkdirAll assets failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(storageDir, "assets", pageID, "temp.txt"), []byte("temp"), 0o644); err != nil {
-		t.Fatalf("WriteFile temp asset failed: %v", err)
-	}
-	service.rollbackRestoredNode("tester", pageID)
-	if _, err := treeService.GetPage(pageID); err == nil {
-		t.Fatalf("expected rollbackRestoredNode to delete page")
-	}
-	if _, err := os.Stat(filepath.Join(storageDir, "assets", pageID)); !os.IsNotExist(err) {
-		t.Fatalf("expected rollbackRestoredNode to remove asset dir, got %v", err)
-	}
-}
 
 func TestRecordAssetAndStructureBranches(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)
@@ -433,104 +189,9 @@ func TestRecordAssetAndStructureBranches(t *testing.T) {
 	}
 }
 
-func TestRestorePageMissingSnapshotData(t *testing.T) {
+func TestRestoreAssetsHelpers(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)
 	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
-	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset")
-	_, trash, err := service.RecordDelete(pageID, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	if err := treeService.DeleteNode("tester", pageID, false); err != nil {
-		t.Fatalf("DeleteNode failed: %v", err)
-	}
-	if err := os.RemoveAll(filepath.Join(storageDir, "assets", pageID)); err != nil {
-		t.Fatalf("RemoveAll assets failed: %v", err)
-	}
-
-	rev, err := service.store.GetRevision(pageID, trash.LastRevisionID)
-	if err != nil {
-		t.Fatalf("GetRevision failed: %v", err)
-	}
-	if err := os.Remove(service.store.contentBlobPath(rev.ContentHash)); err != nil {
-		t.Fatalf("Remove content blob failed: %v", err)
-	}
-	err = service.RestorePage(pageID, "tester", nil)
-	localized, ok := sharederrors.AsLocalizedError(err)
-	if !ok || localized.Code != "revision_restore_content_missing" {
-		t.Fatalf("expected content missing error, got %#v (%v)", localized, err)
-	}
-
-	service2, treeService2, storageDir2 := newRevisionTestService(t)
-	pageID2 := createRevisionTestPage(t, treeService2, "Page2", "page2", "hello")
-	writeLiveAsset(t, storageDir2, pageID2, "a.txt", "asset")
-	_, trash2, err := service2.RecordDelete(pageID2, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete second failed: %v", err)
-	}
-	if err := treeService2.DeleteNode("tester", pageID2, false); err != nil {
-		t.Fatalf("DeleteNode second failed: %v", err)
-	}
-	if err := os.RemoveAll(filepath.Join(storageDir2, "assets", pageID2)); err != nil {
-		t.Fatalf("RemoveAll second assets failed: %v", err)
-	}
-	deleteRev2, err := service2.store.GetRevision(pageID2, trash2.LastRevisionID)
-	if err != nil {
-		t.Fatalf("GetRevision second failed: %v", err)
-	}
-	if err := os.Remove(service2.store.assetManifestPath(deleteRev2.AssetManifestHash)); err != nil {
-		t.Fatalf("Remove asset manifest failed: %v", err)
-	}
-	err = service2.RestorePage(pageID2, "tester", nil)
-	localized, ok = sharederrors.AsLocalizedError(err)
-	if !ok || localized.Code != "revision_restore_assets_missing" {
-		t.Fatalf("expected assets missing error, got %#v (%v)", localized, err)
-	}
-}
-
-func TestRestorePageAdditionalFailuresAndHelpers(t *testing.T) {
-	service, treeService, storageDir := newRevisionTestService(t)
-	if err := service.RestorePage("   ", "tester", nil); err == nil {
-		t.Fatalf("expected empty page id to fail")
-	} else if localized, ok := sharederrors.AsLocalizedError(err); !ok || localized.Code != "revision_restore_invalid_page_id" {
-		t.Fatalf("expected invalid page id error, got %#v (%v)", localized, err)
-	}
-
-	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
-	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset")
-	deleteRev, trash, err := service.RecordDelete(pageID, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	if err := treeService.DeleteNode("tester", pageID, false); err != nil {
-		t.Fatalf("DeleteNode failed: %v", err)
-	}
-	if err := os.RemoveAll(filepath.Join(storageDir, "assets", pageID)); err != nil {
-		t.Fatalf("RemoveAll assets failed: %v", err)
-	}
-	if err := service.store.DeleteTrashEntry(pageID); err != nil {
-		t.Fatalf("DeleteTrashEntry failed: %v", err)
-	}
-	trash.LastRevisionID = "missing-revision"
-	if err := service.store.SaveTrashEntry(trash); err != nil {
-		t.Fatalf("SaveTrashEntry failed: %v", err)
-	}
-
-	err = service.RestorePage(pageID, "tester", nil)
-	if localized, ok := sharederrors.AsLocalizedError(err); !ok || localized.Code != "revision_restore_revision_not_found" {
-		t.Fatalf("expected revision not found error, got %#v (%v)", localized, err)
-	}
-
-	trash.LastRevisionID = deleteRev.ID
-	if err := service.store.SaveTrashEntry(trash); err != nil {
-		t.Fatalf("SaveTrashEntry restore failed: %v", err)
-	}
-
-	badParent := "missing-parent"
-	err = service.RestorePage(pageID, "tester", &badParent)
-	if localized, ok := sharederrors.AsLocalizedError(err); !ok || localized.Code != "revision_restore_parent_not_found" {
-		t.Fatalf("expected parent not found error, got %#v (%v)", localized, err)
-	}
 
 	if err := service.restoreAssets(pageID, []AssetRef{{Name: "dup.txt", SHA256: "abc", SizeBytes: 1}, {Name: "dup.txt", SHA256: "def", SizeBytes: 1}}); err == nil {
 		t.Fatalf("expected duplicate asset names to fail")
@@ -553,18 +214,9 @@ func TestRestorePageAdditionalFailuresAndHelpers(t *testing.T) {
 	if _, err := buildAssetRef(filepath.Join(storageDir, "missing.txt"), "missing.txt"); err == nil {
 		t.Fatalf("expected buildAssetRef on missing file to fail")
 	}
-
-	if got := restoreParentRoutePath(" /docs/page/child/ "); got != "docs/page" {
-		t.Fatalf("restoreParentRoutePath nested = %q", got)
-	}
-	if _, err := restoreNodeKind(" section "); err != nil {
-		t.Fatalf("restoreNodeKind(section) failed: %v", err)
-	}
-
-	service.rollbackRestoredNode("tester", "missing-page")
 }
 
-func TestRecordDeleteAndRestoreRevisionHelpers(t *testing.T) {
+func TestRecordRestoreRevisionHelper(t *testing.T) {
 	loggerService := NewService(t.TempDir(), nil, nil)
 	if loggerService == nil || loggerService.log == nil {
 		t.Fatalf("expected NewService to initialize default logger")
@@ -573,14 +225,6 @@ func TestRecordDeleteAndRestoreRevisionHelpers(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)
 	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
 	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset")
-
-	deleteRev, trash, err := service.RecordDelete(pageID, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	if deleteRev.Type != RevisionTypeDelete || trash.LastRevisionID != deleteRev.ID {
-		t.Fatalf("unexpected delete revision/trash: %#v %#v", deleteRev, trash)
-	}
 
 	if err := service.recordRestoreRevision(pageID, "tester"); err != nil {
 		t.Fatalf("recordRestoreRevision failed: %v", err)
@@ -684,14 +328,6 @@ func TestRecordOperationsWithoutAssets(t *testing.T) {
 	if !created || structureRev.Type != RevisionTypeStructureUpdate || structureRev.AssetManifestHash == "" {
 		t.Fatalf("unexpected structure revision: %#v created=%v", structureRev, created)
 	}
-
-	deleteRev, trash, err := service.RecordDelete(pageID, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	if deleteRev.AssetManifestHash == "" || trash.PageID != pageID {
-		t.Fatalf("unexpected delete revision/trash: %#v %#v", deleteRev, trash)
-	}
 }
 
 func TestCapturePageStateAndNewRevisionHelpers(t *testing.T) {
@@ -722,38 +358,6 @@ func TestCapturePageStateAndNewRevisionHelpers(t *testing.T) {
 	}
 }
 
-func TestRecordUpdatesAfterDeleteRevisionDoNotNoop(t *testing.T) {
-	service, treeService, storageDir := newRevisionTestService(t)
-	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
-	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset")
-
-	deleteRev, _, err := service.RecordDelete(pageID, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	contentRev, created, err := service.RecordContentUpdate(pageID, "tester", "content after delete")
-	if err != nil {
-		t.Fatalf("RecordContentUpdate failed: %v", err)
-	}
-	if !created || contentRev.ID == deleteRev.ID || contentRev.Type != RevisionTypeContentUpdate {
-		t.Fatalf("unexpected content revision after delete: %#v created=%v", contentRev, created)
-	}
-
-	service2, treeService2, storageDir2 := newRevisionTestService(t)
-	pageID2 := createRevisionTestPage(t, treeService2, "Page2", "page2", "hello")
-	writeLiveAsset(t, storageDir2, pageID2, "a.txt", "asset")
-	deleteRev2, _, err := service2.RecordDelete(pageID2, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete second failed: %v", err)
-	}
-	assetRev, created, err := service2.RecordAssetChange(pageID2, "tester", "asset after delete")
-	if err != nil {
-		t.Fatalf("RecordAssetChange failed: %v", err)
-	}
-	if !created || assetRev.ID == deleteRev2.ID || assetRev.Type != RevisionTypeAssetUpdate {
-		t.Fatalf("unexpected asset revision after delete: %#v created=%v", assetRev, created)
-	}
-}
 
 func TestRecordContentAndAssetUpdatesWithoutAssets(t *testing.T) {
 	service, treeService, _ := newRevisionTestService(t)
@@ -799,101 +403,6 @@ func TestRecordContentAndAssetUpdatesWithoutAssets(t *testing.T) {
 	}
 }
 
-func TestRestorePageRollbackKeepsTrashOnAssetFailure(t *testing.T) {
-	service, treeService, storageDir := newRevisionTestService(t)
-	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
-	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset-a")
-
-	_, trash, err := service.RecordDelete(pageID, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	deleteRev, err := service.store.GetRevision(pageID, trash.LastRevisionID)
-	if err != nil {
-		t.Fatalf("GetRevision failed: %v", err)
-	}
-	assetRefs, err := service.store.LoadAssetManifest(deleteRev.AssetManifestHash)
-	if err != nil {
-		t.Fatalf("LoadAssetManifest failed: %v", err)
-	}
-	if len(assetRefs) != 1 {
-		t.Fatalf("expected 1 asset ref, got %#v", assetRefs)
-	}
-	assetBlobPath := service.store.assetBlobPath(assetRefs[0].SHA256)
-	if err := os.WriteFile(assetBlobPath, []byte("tampered"), 0o644); err != nil {
-		t.Fatalf("WriteFile tampered asset blob failed: %v", err)
-	}
-
-	if err := treeService.DeleteNode("tester", pageID, false); err != nil {
-		t.Fatalf("DeleteNode failed: %v", err)
-	}
-	if err := os.RemoveAll(filepath.Join(storageDir, "assets", pageID)); err != nil {
-		t.Fatalf("RemoveAll assets failed: %v", err)
-	}
-
-	err = service.RestorePage(pageID, "tester", nil)
-	localized, ok := sharederrors.AsLocalizedError(err)
-	if !ok || localized.Code != "revision_restore_failed" {
-		t.Fatalf("expected restore failure, got %#v (%v)", localized, err)
-	}
-	if _, err := treeService.GetPage(pageID); err == nil {
-		t.Fatalf("expected restored page to be rolled back")
-	}
-	if _, err := os.Stat(filepath.Join(storageDir, "assets", pageID)); !os.IsNotExist(err) {
-		t.Fatalf("expected asset dir to be removed after rollback, got %v", err)
-	}
-	if _, err := service.GetTrashEntry(pageID); err != nil {
-		t.Fatalf("expected trash entry to remain after failed restore: %v", err)
-	}
-}
-
-func TestRestorePagePreservesMetadataAndIdentity(t *testing.T) {
-	service, treeService, storageDir := newRevisionTestService(t)
-	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
-	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset-a")
-
-	before, err := treeService.GetPage(pageID)
-	if err != nil {
-		t.Fatalf("GetPage before delete failed: %v", err)
-	}
-	beforeCreatedAt := before.Metadata.CreatedAt
-	beforeUpdatedAt := before.Metadata.UpdatedAt
-	beforeCreator := before.Metadata.CreatorID
-	beforeAuthor := before.Metadata.LastAuthorID
-
-	_, _, err = service.RecordDelete(pageID, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	if err := treeService.DeleteNode("tester", pageID, false); err != nil {
-		t.Fatalf("DeleteNode failed: %v", err)
-	}
-	if err := os.RemoveAll(filepath.Join(storageDir, "assets", pageID)); err != nil {
-		t.Fatalf("RemoveAll assets failed: %v", err)
-	}
-
-	rootParent := "root"
-	if err := service.RestorePage(pageID, "tester", &rootParent); err != nil {
-		t.Fatalf("RestorePage failed: %v", err)
-	}
-
-	after, err := treeService.GetPage(pageID)
-	if err != nil {
-		t.Fatalf("GetPage after restore failed: %v", err)
-	}
-	if after.ID != pageID {
-		t.Fatalf("restored page id = %q, want %q", after.ID, pageID)
-	}
-	if !after.Metadata.CreatedAt.Equal(beforeCreatedAt) || !after.Metadata.UpdatedAt.Equal(beforeUpdatedAt) {
-		t.Fatalf("restored timestamps changed: before=(%v,%v) after=(%v,%v)", beforeCreatedAt, beforeUpdatedAt, after.Metadata.CreatedAt, after.Metadata.UpdatedAt)
-	}
-	if after.Metadata.CreatorID != beforeCreator || after.Metadata.LastAuthorID != beforeAuthor {
-		t.Fatalf("restored author metadata changed: before=(%q,%q) after=(%q,%q)", beforeCreator, beforeAuthor, after.Metadata.CreatorID, after.Metadata.LastAuthorID)
-	}
-	if _, err := service.GetTrashEntry(pageID); err == nil {
-		t.Fatalf("expected trash entry to be removed after successful restore")
-	}
-}
 
 func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)
@@ -948,13 +457,14 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage failed: %v", err)
 	}
-	if page.Title != "Original" || page.Slug != "original" {
+	// Restore preserves current title/slug; only content and assets are rolled back.
+	if page.Title != "Changed" || page.Slug != "changed" {
 		t.Fatalf("restored page identity = (%q,%q)", page.Title, page.Slug)
 	}
 	if page.Content != originalContent {
 		t.Fatalf("restored content = %q, want %q", page.Content, originalContent)
 	}
-	if got := page.CalculatePath(); got != "/archive/original" {
+	if got := page.CalculatePath(); got != "/archive/changed" {
 		t.Fatalf("restored path = %q", got)
 	}
 
@@ -978,73 +488,6 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	}
 }
 
-type failingDeleteOnceStore struct {
-	called int
-	err    error
-}
-
-func TestRestorePageIsIdempotentAfterDeleteTrashFailure(t *testing.T) {
-	service, treeService, storageDir := newRevisionTestService(t)
-	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
-	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset-a")
-
-	_, _, err := service.RecordDelete(pageID, "tester", "delete")
-	if err != nil {
-		t.Fatalf("RecordDelete failed: %v", err)
-	}
-	if err := treeService.DeleteNode("tester", pageID, false); err != nil {
-		t.Fatalf("DeleteNode failed: %v", err)
-	}
-	if err := os.RemoveAll(filepath.Join(storageDir, "assets", pageID)); err != nil {
-		t.Fatalf("RemoveAll assets failed: %v", err)
-	}
-
-	deleteHook := &failingDeleteOnceStore{err: errors.New("delete trash failed")}
-	service.deleteTrashEntry = func(id string) error {
-		deleteHook.called++
-		if deleteHook.called == 1 {
-			return deleteHook.err
-		}
-		return service.store.DeleteTrashEntry(id)
-	}
-
-	err = service.RestorePage(pageID, "tester", nil)
-	localized, ok := sharederrors.AsLocalizedError(err)
-	if !ok || localized.Code != "revision_restore_failed" {
-		t.Fatalf("expected restore failure on first commit attempt, got %#v (%v)", localized, err)
-	}
-	page, err := treeService.GetPage(pageID)
-	if err != nil || page == nil {
-		t.Fatalf("expected page to be restored before commit failure: %#v %v", page, err)
-	}
-	if _, err := service.GetTrashEntry(pageID); err != nil {
-		t.Fatalf("expected trash to remain after commit failure: %v", err)
-	}
-	latest, err := service.GetLatestRevision(pageID)
-	if err != nil {
-		t.Fatalf("GetLatestRevision failed: %v", err)
-	}
-	if latest == nil || latest.Type != RevisionTypeRestore {
-		t.Fatalf("expected restore revision to be recorded before trash delete, got %#v", latest)
-	}
-
-	if err := service.RestorePage(pageID, "tester", nil); err != nil {
-		t.Fatalf("expected second restore to complete idempotently: %v", err)
-	}
-	if _, err := service.GetTrashEntry(pageID); err == nil {
-		t.Fatalf("expected trash entry to be removed after retry")
-	}
-	latest, err = service.GetLatestRevision(pageID)
-	if err != nil {
-		t.Fatalf("GetLatestRevision second failed: %v", err)
-	}
-	if latest == nil || latest.Type != RevisionTypeRestore {
-		t.Fatalf("expected latest revision to stay restore after retry, got %#v", latest)
-	}
-	if deleteHook.called != 2 {
-		t.Fatalf("expected delete hook to be called twice, got %d", deleteHook.called)
-	}
-}
 
 func TestRecordContentAndStructureRebuildMissingPreviousManifest(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)

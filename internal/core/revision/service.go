@@ -21,12 +21,11 @@ import (
 )
 
 type Service struct {
-	storageDir       string
-	pages            *tree.TreeService
-	store            *FSStore
-	deleteTrashEntry func(string) error
-	maxRevisions     int // 0 = unlimited
-	log              *slog.Logger
+	storageDir   string
+	pages        *tree.TreeService
+	store        *FSStore
+	maxRevisions int // 0 = unlimited
+	log          *slog.Logger
 }
 
 type ServiceOptions struct {
@@ -45,12 +44,11 @@ func NewService(storageDir string, pages *tree.TreeService, logger *slog.Logger,
 
 	store := NewFSStore(storageDir)
 	return &Service{
-		storageDir:       storageDir,
-		pages:            pages,
-		store:            store,
-		deleteTrashEntry: store.DeleteTrashEntry,
-		maxRevisions:     maxRevisions,
-		log:              logger.With("component", "RevisionService"),
+		storageDir:   storageDir,
+		pages:        pages,
+		store:        store,
+		maxRevisions: maxRevisions,
+		log:          logger.With("component", "RevisionService"),
 	}
 }
 
@@ -89,7 +87,7 @@ func (s *Service) RecordContentUpdate(pageID, authorID, summary string) (*Revisi
 		return nil, false, err
 	}
 
-	if prev != nil && prev.Type != RevisionTypeDelete && prev.ContentHash == state.ContentHash {
+	if prev != nil && prev.ContentHash == state.ContentHash {
 		return prev, false, nil
 	}
 
@@ -133,7 +131,6 @@ func (s *Service) RecordAssetChange(pageID, authorID, summary string) (*Revision
 	}
 
 	if prev != nil &&
-		prev.Type != RevisionTypeDelete &&
 		prev.ContentHash == state.ContentHash &&
 		prev.AssetManifestHash == state.AssetManifestHash {
 		return prev, false, nil
@@ -207,58 +204,6 @@ func (s *Service) RecordStructureChange(pageID, authorID, summary string) (*Revi
 	return rev, true, nil
 }
 
-// RecordDelete writes a delete revision + trash entry BEFORE the live delete happens.
-// This is intentionally strict: if this fails, the caller should abort the live delete.
-func (s *Service) RecordDelete(pageID, authorID, summary string) (*Revision, *TrashEntry, error) {
-	state, err := s.capturePageState(pageID, true)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	contentHash, err := s.store.SaveContentBlob([]byte(state.Content))
-	if err != nil {
-		return nil, nil, err
-	}
-	if contentHash != state.ContentHash {
-		return nil, nil, fmt.Errorf("content hash mismatch: computed=%s saved=%s", state.ContentHash, contentHash)
-	}
-
-	if err := s.persistLiveAssets(pageID, state.Assets); err != nil {
-		return nil, nil, err
-	}
-
-	savedManifestHash, err := s.store.SaveAssetManifest(state.Assets)
-	if err != nil {
-		return nil, nil, err
-	}
-	if savedManifestHash != state.AssetManifestHash {
-		return nil, nil, fmt.Errorf("asset manifest hash mismatch: computed=%s saved=%s", state.AssetManifestHash, savedManifestHash)
-	}
-
-	rev, err := s.newRevision(RevisionTypeDelete, state, authorID, summary, savedManifestHash)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := s.store.SaveRevision(rev); err != nil {
-		return nil, nil, err
-	}
-	s.pruneAfterSave(rev.PageID)
-
-	trash := &TrashEntry{
-		PageID:         state.PageID,
-		DeletedAt:      rev.CreatedAt,
-		DeletedBy:      authorID,
-		Title:          state.Title,
-		Slug:           state.Slug,
-		Path:           state.Path,
-		LastRevisionID: rev.ID,
-	}
-	if err := s.store.SaveTrashEntry(trash); err != nil {
-		return nil, nil, err
-	}
-
-	return rev, trash, nil
-}
 
 func (s *Service) resolveAssetManifestHash(pageID string, prev *Revision) (string, error) {
 	if prev != nil && prev.AssetManifestHash != "" {
@@ -284,56 +229,6 @@ func (s *Service) resolveAssetManifestHash(pageID string, prev *Revision) (strin
 	return savedManifestHash, nil
 }
 
-func (s *Service) finalizeRestoreCommit(pageID, authorID string) error {
-	trash, err := s.store.GetTrashEntry(pageID)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return sharederrors.NewLocalizedError(
-			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
-			err,
-			pageID,
-		)
-	}
-
-	latest, err := s.store.GetLatestRevision(pageID)
-	if err != nil {
-		return sharederrors.NewLocalizedError(
-			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
-			err,
-			pageID,
-		)
-	}
-	if latest == nil || latest.Type != RevisionTypeRestore {
-		if err := s.recordRestoreRevision(pageID, authorID); err != nil {
-			return sharederrors.NewLocalizedError(
-				"revision_restore_failed",
-				"Failed to restore page",
-				"failed to restore page %s",
-				err,
-				pageID,
-			)
-		}
-	}
-
-	if err := s.deleteTrashEntry(pageID); err != nil {
-		return sharederrors.NewLocalizedError(
-			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
-			err,
-			pageID,
-		)
-	}
-
-	_ = trash
-	return nil
-}
 
 func (s *Service) ListRevisions(pageID string) ([]*Revision, error) {
 	return s.store.ListRevisions(pageID)
@@ -495,23 +390,12 @@ func compareRevisionAssets(baseAssets, targetAssets []AssetRef) []RevisionAssetD
 	return changes
 }
 
-func (s *Service) GetTrashEntry(pageID string) (*TrashEntry, error) {
-	return s.store.GetTrashEntry(pageID)
-}
-
-func (s *Service) ListTrash() ([]*TrashEntry, error) {
-	return s.store.ListTrash()
-}
-
 func (s *Service) DeletePageData(pageID string) error {
 	pageID = strings.TrimSpace(pageID)
 	if pageID == "" {
 		return nil
 	}
 
-	if err := s.deleteTrashEntry(pageID); err != nil {
-		return err
-	}
 	if err := s.store.DeletePageRevisions(pageID); err != nil {
 		return err
 	}
@@ -558,131 +442,6 @@ func (s *Service) CheckRevisionIntegrity(pageID string) ([]RevisionIntegrityIssu
 	return issues, nil
 }
 
-func (s *Service) RestorePage(pageID, authorID string, targetParentID *string) error {
-	pageID = strings.TrimSpace(pageID)
-	if pageID == "" {
-		return sharederrors.NewLocalizedError(
-			"revision_restore_invalid_page_id",
-			"Failed to restore page",
-			"failed to restore page %s",
-			nil,
-			pageID,
-		)
-	}
-
-	if s.pages != nil {
-		if page, err := s.pages.GetPage(pageID); err == nil && page != nil {
-			return s.finalizeRestoreCommit(pageID, authorID)
-		}
-	}
-
-	trash, err := s.store.GetTrashEntry(pageID)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return sharederrors.NewLocalizedError(
-				"revision_restore_trash_not_found",
-				"Trash entry not found",
-				"trash entry for page %s not found",
-				err,
-				pageID,
-			)
-		}
-		return sharederrors.NewLocalizedError(
-			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
-			err,
-			pageID,
-		)
-	}
-
-	rev, err := s.store.GetRevision(pageID, trash.LastRevisionID)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return sharederrors.NewLocalizedError(
-				"revision_restore_revision_not_found",
-				"Restore revision not found",
-				"restore revision %s for page %s not found",
-				err,
-				trash.LastRevisionID,
-				pageID,
-			)
-		}
-		return sharederrors.NewLocalizedError(
-			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
-			err,
-			pageID,
-		)
-	}
-	if rev.Type != RevisionTypeDelete {
-		return sharederrors.NewLocalizedError(
-			"revision_restore_invalid_revision",
-			"Restore revision is invalid",
-			"restore revision %s for page %s is invalid",
-			nil,
-			trash.LastRevisionID,
-			pageID,
-		)
-	}
-
-	parentID, err := s.resolveRestoreParentID(pageID, rev.ParentID, rev.Path, targetParentID)
-	if err != nil {
-		return err
-	}
-
-	kind, err := restoreNodeKind(rev.Kind)
-	if err != nil {
-		return sharederrors.NewLocalizedError(
-			"revision_restore_invalid_kind",
-			"Restore revision has an invalid page kind",
-			"restore revision for page %s has invalid kind %s",
-			err,
-			pageID,
-			rev.Kind,
-		)
-	}
-
-	content, err := s.store.ReadContentBlob(rev.ContentHash)
-	if err != nil {
-		return sharederrors.NewLocalizedError(
-			"revision_restore_content_missing",
-			"Restore content is unavailable",
-			"restore content for page %s is unavailable",
-			err,
-			pageID,
-		)
-	}
-
-	assets, err := s.store.LoadAssetManifest(rev.AssetManifestHash)
-	if err != nil {
-		return sharederrors.NewLocalizedError(
-			"revision_restore_assets_missing",
-			"Restore assets are unavailable",
-			"restore assets for page %s are unavailable",
-			err,
-			pageID,
-		)
-	}
-
-	if _, err := s.pages.RestoreNode(authorID, pageID, parentID, rev.Title, rev.Slug, kind, string(content), tree.PageMetadata{CreatedAt: rev.PageCreatedAt, UpdatedAt: rev.PageUpdatedAt, CreatorID: rev.CreatorID, LastAuthorID: rev.LastAuthorID}); err != nil {
-		return s.mapRestoreTreeError(pageID, rev.Slug, parentID, err)
-	}
-
-	if err := s.restoreAssets(pageID, assets); err != nil {
-		s.rollbackRestoredNode(authorID, pageID)
-		return sharederrors.NewLocalizedError(
-			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
-			err,
-			pageID,
-		)
-	}
-
-	return s.finalizeRestoreCommit(pageID, authorID)
-}
 
 func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	pageID = strings.TrimSpace(pageID)
@@ -800,7 +559,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	}
 
 	restoredContent := string(content)
-	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, rev.Slug, &restoredContent); err != nil {
+	if err := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoredContent); err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
 			"Failed to restore page",
@@ -1022,134 +781,6 @@ func computeAssetManifestHash(items []AssetRef) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-func (s *Service) resolveRestoreParentID(pageID, storedParentID, pagePath string, targetParentID *string) (*string, error) {
-	if targetParentID != nil {
-		trimmed := strings.TrimSpace(*targetParentID)
-		switch trimmed {
-		case "", "root":
-			return nil, nil
-		default:
-			if _, err := s.pages.GetPage(trimmed); err != nil {
-				return nil, sharederrors.NewLocalizedError(
-					"revision_restore_parent_not_found",
-					"Restore target parent not found",
-					"restore target parent %s for page %s not found",
-					err,
-					trimmed,
-					pageID,
-				)
-			}
-			parentID := trimmed
-			return &parentID, nil
-		}
-	}
-
-	trimmedStoredParentID := strings.TrimSpace(storedParentID)
-	if trimmedStoredParentID != "" {
-		if parent, err := s.pages.GetPage(trimmedStoredParentID); err == nil && parent != nil {
-			parentID := trimmedStoredParentID
-			return &parentID, nil
-		}
-	}
-
-	parentPath := restoreParentRoutePath(pagePath)
-	if parentPath == "" {
-		return nil, nil
-	}
-
-	parent, err := s.pages.FindPageByRoutePath(parentPath)
-	if err != nil {
-		return nil, sharederrors.NewLocalizedError(
-			"revision_restore_parent_required",
-			"Original parent no longer exists; choose a restore target",
-			"original parent for page %s no longer exists, choose a restore target",
-			err,
-			pageID,
-		)
-	}
-
-	parentID := parent.ID
-	return &parentID, nil
-}
-
-func restoreParentRoutePath(pagePath string) string {
-	trimmed := strings.Trim(strings.TrimSpace(pagePath), "/")
-	if trimmed == "" {
-		return ""
-	}
-	idx := strings.LastIndex(trimmed, "/")
-	if idx < 0 {
-		return ""
-	}
-	return trimmed[:idx]
-}
-
-func restoreNodeKind(kind string) (tree.NodeKind, error) {
-	switch tree.NodeKind(strings.TrimSpace(kind)) {
-	case tree.NodeKindPage:
-		return tree.NodeKindPage, nil
-	case tree.NodeKindSection:
-		return tree.NodeKindSection, nil
-	default:
-		return "", fmt.Errorf("invalid node kind: %s", kind)
-	}
-}
-
-func (s *Service) mapRestoreTreeError(pageID, slug string, parentID *string, err error) error {
-	if err == nil {
-		return nil
-	}
-
-	parentArg := "root"
-	if parentID != nil && strings.TrimSpace(*parentID) != "" {
-		parentArg = strings.TrimSpace(*parentID)
-	}
-
-	switch {
-	case errors.Is(err, tree.ErrParentNotFound):
-		return sharederrors.NewLocalizedError(
-			"revision_restore_parent_not_found",
-			"Restore target parent not found",
-			"restore target parent %s for page %s not found",
-			err,
-			parentArg,
-			pageID,
-		)
-	case errors.Is(err, tree.ErrPageAlreadyExists):
-		return sharederrors.NewLocalizedError(
-			"revision_restore_slug_conflict",
-			"Restore target already contains a page with the same slug",
-			"restore target already contains a page with slug %s",
-			err,
-			slug,
-		)
-	case errors.Is(err, tree.ErrPageHasChildren), errors.Is(err, tree.ErrMovePageCircularReference), errors.Is(err, tree.ErrPageCannotBeMovedToItself):
-		return sharederrors.NewLocalizedError(
-			"revision_restore_structure_conflict",
-			"Restore target conflicts with the current page structure",
-			"restore target for page %s conflicts with the current page structure",
-			err,
-			pageID,
-		)
-	default:
-		return sharederrors.NewLocalizedError(
-			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
-			err,
-			pageID,
-		)
-	}
-}
-
-func (s *Service) rollbackRestoredNode(authorID, pageID string) {
-	if err := s.pages.DeleteNode(authorID, pageID, true); err != nil {
-		s.log.Warn("failed to rollback restored page", "pageID", pageID, "error", err)
-	}
-	if err := os.RemoveAll(s.liveAssetDir(pageID)); err != nil {
-		s.log.Warn("failed to rollback restored assets", "pageID", pageID, "error", err)
-	}
-}
 
 func (s *Service) restoreAssets(pageID string, refs []AssetRef) error {
 	dir := s.liveAssetDir(pageID)

@@ -17,6 +17,7 @@ import { useTreeStore } from '@/stores/tree'
 import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -431,13 +432,13 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
         <div className="page-history__section-heading">Change Summary</div>
         <div className="page-history__summary-grid">
           <SummaryStat
-            label="Lines added"
+            label="Lines added since"
             value={String(diff.summary.addedLines)}
             emphasized={diff.summary.addedLines > 0}
             tone="added"
           />
           <SummaryStat
-            label="Lines removed"
+            label="Lines removed since"
             value={String(diff.summary.removedLines)}
             emphasized={diff.summary.removedLines > 0}
             tone="removed"
@@ -496,20 +497,26 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
 }
 
 function PreviewPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
-  const resolveAssetUrl = (src: string) => {
-    const normalizedSrc = src.startsWith('assets/') ? `/${src}` : src
-    const assetPrefix = `/assets/${snapshot.revision.pageId}/`
+  const pageId = snapshot.revision.pageId
+  const revisionId = snapshot.revision.id
 
-    if (!normalizedSrc.startsWith(assetPrefix)) {
-      return src
-    }
+  const resolveAssetUrl = useCallback(
+    (src: string) => {
+      const normalizedSrc = src.startsWith('assets/') ? `/${src}` : src
+      const assetPrefix = `/assets/${pageId}/`
 
-    return buildRevisionAssetUrl(
-      snapshot.revision.pageId,
-      snapshot.revision.id,
-      normalizedSrc.slice(assetPrefix.length),
-    )
-  }
+      if (!normalizedSrc.startsWith(assetPrefix)) {
+        return src
+      }
+
+      return buildRevisionAssetUrl(
+        pageId,
+        revisionId,
+        normalizedSrc.slice(assetPrefix.length),
+      )
+    },
+    [pageId, revisionId],
+  )
 
   return (
     <div className="page-history__preview-panel custom-scrollbar">
@@ -813,7 +820,10 @@ export function PageHistoryContent({
       navigate(buildHistoryUrl(restoredPage.path), { replace: true })
       toast.success('Revision restored')
     } catch (err) {
-      toast.error(mapApiError(err, 'Failed to restore revision').message)
+      const mapped = mapApiError(err, 'Failed to restore revision')
+      toast.error(
+        mapped.detail ? `${mapped.message}: ${mapped.detail}` : mapped.message,
+      )
     } finally {
       setRestoreLoading(false)
     }

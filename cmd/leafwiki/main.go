@@ -245,7 +245,7 @@ func main() {
 		}
 	}()
 
-	router := http.NewRouter(w, http.RouterOptions{
+	router := http.NewRouter(w.Registrars(), w.FrontendConfig(), http.RouterOptions{
 		PublicAccess:            publicAccess,
 		InjectCodeInHeader:      injectCodeInHeader,
 		CustomStylesheet:        customStylesheet,
