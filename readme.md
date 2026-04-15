@@ -76,6 +76,16 @@ See the [CHANGELOG](CHANGELOG.md) for release details.
 
 ---
 
+## Support LeafWiki
+
+If LeafWiki is useful to you or your team, consider sponsoring the project on GitHub.
+
+Sponsorship helps fund maintenance, bug fixes, documentation, and important improvements like versioning, imports, and collaboration features.
+
+👉 https://github.com/sponsors/perber
+
+---
+
 ## Why Another Wiki?
 
 Most wiki tools become projects of their own: databases to manage, plugins to maintain, workflows to configure, and too many setup decisions for a system that should just help you write, navigate, and find information.
