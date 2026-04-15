@@ -1,7 +1,5 @@
 # 🌿 LeafWiki
 
-[Support this project](https://github.com/sponsors/perber)
-
 **LeafWiki – A fast wiki for people who think in folders, not feeds**  
 Fast editing. Explicit tree navigation. Markdown stored on disk. Single Go binary.
 
