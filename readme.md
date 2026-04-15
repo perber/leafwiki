@@ -1,5 +1,7 @@
 # 🌿 LeafWiki
 
+[Support this project](https://github.com/sponsors/perber)
+
 **LeafWiki – A fast wiki for people who think in folders, not feeds**  
 Fast editing. Explicit tree navigation. Markdown stored on disk. Single Go binary.
 
@@ -73,6 +75,16 @@ The platform will evolve cautiously toward team workflows while maintaining its 
 > **LeafWiki** is actively developed and open to collaboration 🌿 
 
 See the [CHANGELOG](CHANGELOG.md) for release details.
+
+---
+
+## Support LeafWiki
+
+If LeafWiki is useful to you or your team, consider sponsoring the project on GitHub.
+
+Sponsorship helps fund maintenance, bug fixes, documentation, and important improvements like versioning, imports, and collaboration features.
+
+👉 https://github.com/sponsors/perber
 
 ---
 
