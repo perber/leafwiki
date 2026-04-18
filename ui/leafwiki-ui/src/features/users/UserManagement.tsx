@@ -1,3 +1,4 @@
+import { mapApiError } from '@/lib/api/errors'
 import { useUserStore } from '@/stores/users'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -17,7 +18,12 @@ export default function UserManagement() {
     loadUsers()
       .catch((err) => {
         console.warn(err)
-        toast.error('Error loading users')
+        const mapped = mapApiError(err, 'Error loading users')
+        toast.error(
+          mapped.detail
+            ? `${mapped.message}: ${mapped.detail}`
+            : mapped.message,
+        )
       })
       .finally(() => {
         setLoading(false)

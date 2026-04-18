@@ -5,10 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/auth"
-	"github.com/perber/wiki/internal/wiki"
 )
 
-func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies, authDisabled bool) gin.HandlerFunc {
+func RequireAuth(authService *auth.AuthService, authCookies *AuthCookies, authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		if authDisabled {
@@ -26,7 +25,12 @@ func RequireAuth(wikiInstance *wiki.Wiki, authCookies *AuthCookies, authDisabled
 			return
 		}
 
-		user, err := wikiInstance.GetAuthService().ValidateToken(token)
+		if authService == nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication service unavailable"})
+			return
+		}
+
+		user, err := authService.ValidateToken(token)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 			return

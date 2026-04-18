@@ -7,7 +7,6 @@ type RevisionType string
 const (
 	RevisionTypeContentUpdate   RevisionType = "content_update"
 	RevisionTypeAssetUpdate     RevisionType = "asset_update"
-	RevisionTypeDelete          RevisionType = "delete"
 	RevisionTypeRestore         RevisionType = "restore"
 	RevisionTypeStructureUpdate RevisionType = "structure_update"
 )
@@ -55,16 +54,6 @@ type Revision struct {
 	CreatorID         string       `json:"creator_id"`
 	LastAuthorID      string       `json:"last_author_id"`
 	Summary           string       `json:"summary,omitempty"`
-}
-
-type TrashEntry struct {
-	PageID         string    `json:"page_id"`
-	DeletedAt      time.Time `json:"deleted_at"`
-	DeletedBy      string    `json:"deleted_by"`
-	Title          string    `json:"title"`
-	Slug           string    `json:"slug"`
-	Path           string    `json:"path"`
-	LastRevisionID string    `json:"last_revision_id"`
 }
 
 type assetManifest struct {

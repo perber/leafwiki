@@ -152,9 +152,7 @@ test.describe('History', () => {
 
     await viewPage.openCurrentPageHistory();
 
-    const currentBadge = page.locator(
-      '[data-testid^="history-sidebar-revision-current-badge-"]',
-    );
+    const currentBadge = page.locator('[data-testid^="history-sidebar-revision-current-badge-"]');
     const currentRevision = currentBadge.locator('xpath=ancestor::button[1]');
     await currentRevision.click();
 
@@ -188,9 +186,7 @@ test.describe('History', () => {
     await viewPage.openCurrentPageHistory();
     await page.locator('[data-testid="page-history-page-changes-tab"]').click();
 
-    const structureChanges = page.getByTestId(
-      'page-history-page-structure-changes',
-    );
+    const structureChanges = page.getByTestId('page-history-page-structure-changes');
     await expect(structureChanges).toContainText('Title');
     await expect(structureChanges).toContainText(originalTitle);
     await expect(structureChanges).toContainText(renamedTitle);
@@ -199,9 +195,7 @@ test.describe('History', () => {
     await expect(structureChanges).toContainText(renamedSlug);
   });
 
-  test('selecting-a-revision-keeps-current-history-route-after-rename', async ({
-    page,
-  }) => {
+  test('selecting-a-revision-keeps-current-history-route-after-rename', async ({ page }) => {
     const suffix = Date.now();
     const originalTitle = `History Route ${suffix}`;
     const renamedTitle = `history-route-renamed-${suffix}`;
@@ -228,9 +222,7 @@ test.describe('History', () => {
 
     await viewPage.openRevisionAt(0);
 
-    await expect.poll(() => new URL(page.url()).pathname).toBe(
-      historyPathBeforeSelection,
-    );
+    await expect.poll(() => new URL(page.url()).pathname).toBe(historyPathBeforeSelection);
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
   });
 

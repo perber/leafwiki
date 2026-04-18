@@ -378,70 +378,6 @@ func (s *FSStore) ReadAssetBlob(hash string) ([]byte, error) {
 	return raw, nil
 }
 
-func (s *FSStore) SaveTrashEntry(entry *TrashEntry) error {
-	if entry == nil {
-		return fmt.Errorf("trash entry is required")
-	}
-	if strings.TrimSpace(entry.PageID) == "" {
-		return fmt.Errorf("page id is required")
-	}
-
-	dst := s.trashEntryPath(entry.PageID)
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return fmt.Errorf("ensure trash dir: %w", err)
-	}
-	if err := writeJSONAtomic(dst, entry); err != nil {
-		return fmt.Errorf("write trash entry: %w", err)
-	}
-	return nil
-}
-
-func (s *FSStore) GetTrashEntry(pageID string) (*TrashEntry, error) {
-	path := s.trashEntryPath(pageID)
-	var entry TrashEntry
-	if err := readJSON(path, &entry); err != nil {
-		return nil, err
-	}
-	return &entry, nil
-}
-
-func (s *FSStore) ListTrash() ([]*TrashEntry, error) {
-	dir := s.trashDir()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []*TrashEntry{}, nil
-		}
-		return nil, fmt.Errorf("read trash dir: %w", err)
-	}
-
-	trash := make([]*TrashEntry, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".json") || entry.Name() == revisionIndexFileName {
-			continue
-		}
-
-		var t TrashEntry
-		if err := readJSON(filepath.Join(dir, entry.Name()), &t); err != nil {
-			return nil, fmt.Errorf("read trash entry %s: %w", entry.Name(), err)
-		}
-		trash = append(trash, &t)
-	}
-
-	sort.SliceStable(trash, func(i, j int) bool {
-		return trash[i].DeletedAt.After(trash[j].DeletedAt)
-	})
-
-	return trash, nil
-}
-
-func (s *FSStore) DeleteTrashEntry(pageID string) error {
-	err := os.Remove(s.trashEntryPath(pageID))
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("delete trash entry: %w", err)
-	}
-	return nil
-}
 
 func (s *FSStore) DeletePageRevisions(pageID string) error {
 	pageID = strings.TrimSpace(pageID)
@@ -484,13 +420,6 @@ func (s *FSStore) assetManifestPath(hash string) string {
 	return filepath.Join(s.baseDir(), "manifests", "assets", "sha256", shardHash(hash), hash+".json")
 }
 
-func (s *FSStore) trashDir() string {
-	return filepath.Join(s.baseDir(), "trash")
-}
-
-func (s *FSStore) trashEntryPath(pageID string) string {
-	return filepath.Join(s.trashDir(), pageID+".json")
-}
 
 func shardHash(hash string) string {
 	if len(hash) < 2 {

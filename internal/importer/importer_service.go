@@ -35,6 +35,14 @@ type CurrentPlanState struct {
 	ExecutionProgress
 }
 
+// SetAssetMaxUploadSizeBytes overrides the asset upload size limit after construction.
+// Values <= 0 are ignored.
+func (is *ImporterService) SetAssetMaxUploadSizeBytes(n int64) {
+	if n > 0 {
+		is.assetMaxUploadSizeBytes = n
+	}
+}
+
 func NewImporterService(planner *Planner, planStore *PlanStore, workspaceBaseDir string, assetMaxUploadSizeBytes int64) *ImporterService {
 	if assetMaxUploadSizeBytes <= 0 {
 		assetMaxUploadSizeBytes = assets.DefaultMaxUploadSizeBytes
@@ -55,7 +63,7 @@ func NewImporterService(planner *Planner, planStore *PlanStore, workspaceBaseDir
 }
 
 // CreateImportPlanFromFolder creates an import plan from a folder path
-func (is *ImporterService) createImportPlanFromFolder(folderPath string, targetBasePath string) (*PlanResult, error) {
+func (is *ImporterService) CreateImportPlanFromFolder(folderPath string, targetBasePath string) (*PlanResult, error) {
 	// single-plan semantics: cleanup old plan workspace if present
 	if old, err := is.planStore.Get(); err == nil && old != nil {
 		if old.ExecutionStatus == ExecutionStatusRunning {
@@ -254,7 +262,7 @@ func (is *ImporterService) CreateImportPlanFromZipUpload(
 		return nil, fmt.Errorf("extract zip to temp: %w", err)
 	}
 
-	plan, err := is.createImportPlanFromFolder(ws.Root, targetBasePath)
+	plan, err := is.CreateImportPlanFromFolder(ws.Root, targetBasePath)
 	if err != nil {
 		if err := ws.Cleanup(); err != nil {
 			is.logger.Error("cleanup failed", "error", err)

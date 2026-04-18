@@ -12,38 +12,30 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/assets"
-	"github.com/perber/wiki/internal/http/api"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
-	"github.com/perber/wiki/internal/importer"
-	"github.com/perber/wiki/internal/wiki"
 )
 
 //go:embed dist/**
 var frontend embed.FS
 
-// EmbedFrontend is a flag to enable or disable embedding the frontend
-// This is useful for testing purposes, where we might not want to embed the frontend
-// During build time, we can set this to false to disable embedding the frontend
+// EmbedFrontend is a flag to enable or disable embedding the frontend.
+// Set to "true" at build time to embed the SPA.
 var EmbedFrontend = "false"
 
-// Environment is a flag to set the environment
+// Environment controls gin's run mode ("production" → ReleaseMode).
 var Environment = "development"
 
-// Slog Wrapper for Gin (Info level)
-type slogWriter struct {
-	logger *slog.Logger
-}
+// slogWriter forwards gin Info logs to slog.
+type slogWriter struct{ logger *slog.Logger }
 
 func (sw *slogWriter) Write(p []byte) (n int, err error) {
 	sw.logger.Info(strings.TrimSpace(string(p)))
 	return len(p), nil
 }
 
-// Slog Wrapper for Gin Errors (Error level)
-type slogErrorWriter struct {
-	logger *slog.Logger
-}
+// slogErrorWriter forwards gin Error logs to slog.
+type slogErrorWriter struct{ logger *slog.Logger }
 
 func (sew *slogErrorWriter) Write(p []byte) (n int, err error) {
 	sew.logger.Error(strings.TrimSpace(string(p)))
@@ -56,10 +48,11 @@ func disableClientCache(c *gin.Context) {
 	c.Header("Expires", time.Unix(0, 0).UTC().Format(http.TimeFormat))
 }
 
+// RouterOptions holds global HTTP server configuration shared across all domains.
 type RouterOptions struct {
 	PublicAccess            bool          // Whether the wiki allows public read access
 	InjectCodeInHeader      string        // Raw HTML/JS code to inject into the <head> tag
-	CustomStylesheet        string        // Path to a custom CSS file exposed as custom.css relative to BasePath (e.g. "/wiki/custom.css")
+	CustomStylesheet        string        // Path to a custom CSS file (resolved by wiki before passing)
 	AllowInsecure           bool          // Whether to allow insecure HTTP connections
 	AccessTokenTimeout      time.Duration // Duration for access token validity
 	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
@@ -71,29 +64,22 @@ type RouterOptions struct {
 	EnableLinkRefactor      bool          // Whether the link refactoring feature is enabled in the frontend
 }
 
-// wireImporterService sets up and returns an ImporterService instance
-// Parameters:
-//   - w: the wiki instance to use for importing
-func wireImporterService(w *wiki.Wiki, maxAssetUploadSizeBytes int64) *importer.ImporterService {
-	slugger := w.GetSlugService()
-	planner := importer.NewPlanner(w, slugger)
-	importerDir := filepath.Join(w.GetStorageDir(), ".importer")
-	store := importer.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
-	return importer.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), maxAssetUploadSizeBytes)
+// FrontendConfig carries the minimal runtime data required to serve the embedded SPA.
+type FrontendConfig struct {
+	// GetSiteName returns the current site name injected into the HTML.
+	GetSiteName func() string
+	// CustomStylesheetPath is the fully-resolved, validated path to a custom CSS file.
+	// Empty string disables custom stylesheet serving.
+	CustomStylesheetPath string
+	// StorageDir is used to validate that CustomStylesheet in RouterOptions is within the storage dir.
+	StorageDir string
 }
 
-// NewRouter creates a new HTTP router for the wiki application.
-// Parameters:
-//   - wikiInstance: the wiki instance to serve
-//   - options: RouterOptions struct containing configuration options
-func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
-	if options.MaxAssetUploadSizeBytes <= 0 {
-		options.MaxAssetUploadSizeBytes = assets.DefaultMaxUploadSizeBytes
-	}
-
-	customStylesheetPath, err := normalizeCustomStylesheetPath(wikiInstance.GetStorageDir(), options.CustomStylesheet)
-	if err != nil {
-		slog.Default().Error("custom stylesheet disabled", "error", err)
+// NewRouter creates the HTTP engine, builds the shared RouterContext, delegates all
+// API and static routes to the provided registrars, and wires up the embedded SPA.
+func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts RouterOptions) *gin.Engine {
+	if opts.MaxAssetUploadSizeBytes <= 0 {
+		opts.MaxAssetUploadSizeBytes = assets.DefaultMaxUploadSizeBytes
 	}
 
 	if Environment == "production" {
@@ -102,292 +88,85 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 		gin.SetMode(gin.DebugMode)
 	}
 
-	// Set Gin to use slog for logging
 	gin.DefaultWriter = &slogWriter{logger: slog.Default().With("component", "gin")}
 	gin.DefaultErrorWriter = &slogErrorWriter{logger: slog.Default().With("component", "gin")}
 
-	importerService := wireImporterService(wikiInstance, options.MaxAssetUploadSizeBytes)
+	authCookies := auth_middleware.NewAuthCookies(opts.AllowInsecure, opts.AccessTokenTimeout, opts.RefreshTokenTimeout)
+	csrfCookie := security.NewCSRFCookie(opts.AllowInsecure, 3*24*time.Hour)
 
-	router := gin.Default()
+	engine := gin.Default()
+	base := engine.Group(opts.BasePath)
 
-	authCookies := auth_middleware.NewAuthCookies(options.AllowInsecure, options.AccessTokenTimeout, options.RefreshTokenTimeout)
-	csrfCookie := security.NewCSRFCookie(options.AllowInsecure, 3*24*time.Hour)
-
-	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)  // limit to 10 login attempts per 5 minutes per IP - reset on success
-	refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false) // limit to 30 refresh attempts per minute per IP - do not reset on success
-
-	// The BasePath is always looking like "/wiki" or "" (no trailing slash).
-	base := router.Group(options.BasePath)
-
-	assetsFS := gin.Dir(wikiInstance.GetAssetService().GetAssetsDir(), false) // false = no directory listing
-
-	if options.PublicAccess || options.AuthDisabled {
-		// public read access or auth disabled -> assets are publicly accessible
-		base.StaticFS("/assets", assetsFS)
-	} else {
-		// private mode -> assets only accessible with authentication
-		assetsGroup := base.Group("/assets")
-		assetsGroup.Use(
-			auth_middleware.InjectPublicEditor(options.AuthDisabled),
-			auth_middleware.RequireAuth(wikiInstance, authCookies, options.AuthDisabled),
-		)
-		assetsGroup.StaticFS("/", assetsFS)
+	ctx := RouterContext{
+		Engine:      engine,
+		Base:        base,
+		AuthCookies: authCookies,
+		CSRFCookie:  csrfCookie,
+		Opts:        opts,
 	}
 
-	nonAuthApiGroup := base.Group("/api")
-	{
-		// Auth
-		nonAuthApiGroup.POST("/auth/login", loginRateLimiter, api.LoginUserHandler(wikiInstance, authCookies, csrfCookie))
-		nonAuthApiGroup.POST("/auth/refresh-token", refreshRateLimiter, api.RefreshTokenUserHandler(wikiInstance, authCookies, csrfCookie))
-		nonAuthApiGroup.GET("/config", func(c *gin.Context) {
-			if _, err := csrfCookie.Issue(c); err != nil {
-				api.WriteConfigAuthCookieError(c, err)
-				return
-			}
-			c.JSON(200, gin.H{
-				"publicAccess":            options.PublicAccess,
-				"hideLinkMetadataSection": options.HideLinkMetadataSection,
-				"authDisabled":            options.AuthDisabled,
-				"basePath":                options.BasePath,
-				"maxAssetUploadSizeBytes": options.MaxAssetUploadSizeBytes,
-				"enableRevision":          options.EnableRevision,
-				"enableLinkRefactor":      options.EnableLinkRefactor,
-			})
-		})
-
-		// Branding (public, no auth required)
-		nonAuthApiGroup.GET("/branding", api.GetBrandingHandler(wikiInstance))
-
-		// PUBLIC READ ACCESS (if enabled via flag or env):
-		// These routes are accessible without authentication when options.PublicAccess == true.
-		// Only safe, read-only operations are allowed here (GET tree/pages).
-		if options.PublicAccess {
-			nonAuthApiGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
-			nonAuthApiGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
-			nonAuthApiGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
-			nonAuthApiGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
-			nonAuthApiGroup.GET("/pages/:id/links", api.GetPageLinkStatusHandler(wikiInstance))
-
-			// Search
-			nonAuthApiGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))
-			nonAuthApiGroup.GET("/search", api.SearchHandler(wikiInstance))
-		}
+	for _, r := range registrars {
+		r.RegisterRoutes(ctx)
 	}
 
-	requiresAuthGroup := base.Group("/api")
-	requiresAuthGroup.Use(auth_middleware.InjectPublicEditor(options.AuthDisabled), auth_middleware.RequireAuth(wikiInstance, authCookies, options.AuthDisabled), security.CSRFMiddleware(csrfCookie))
-	{
-		// If public access is disabled, we need to ensure that the tree and pages routes are protected
-		// and require authentication. If public access is enabled, these routes are already handled
-		if !options.PublicAccess {
-			requiresAuthGroup.GET("/tree", api.GetTreeHandler(wikiInstance))
-			requiresAuthGroup.GET("/pages/:id", api.GetPageHandler(wikiInstance))
-			requiresAuthGroup.GET("/pages/lookup", api.LookupPagePathHandler(wikiInstance))
-			requiresAuthGroup.GET("/pages/by-path", api.GetPageByPathHandler(wikiInstance))
-			requiresAuthGroup.GET("/pages/:id/links", api.GetPageLinkStatusHandler(wikiInstance))
-
-			// Search
-			requiresAuthGroup.GET("/search/status", api.SearchStatusHandler(wikiInstance))
-			requiresAuthGroup.GET("/search", api.SearchHandler(wikiInstance))
-		}
-
-		// Auth
-		requiresAuthGroup.POST("/auth/logout", api.LogoutUserHandler(wikiInstance, authCookies, csrfCookie))
-
-		// Pages
-		requiresAuthGroup.POST("/pages", auth_middleware.RequireEditorOrAdmin(), api.CreatePageHandler(wikiInstance))
-		requiresAuthGroup.POST("/pages/ensure", auth_middleware.RequireEditorOrAdmin(), api.EnsurePageHandler(wikiInstance))
-		requiresAuthGroup.POST("/pages/convert/:id", auth_middleware.RequireEditorOrAdmin(), api.ConvertPageHandler(wikiInstance))
-		requiresAuthGroup.POST("/pages/copy/:id", auth_middleware.RequireEditorOrAdmin(), api.CopyPageHandler(wikiInstance))
-		requiresAuthGroup.POST("/pages/:id/refactor/preview", auth_middleware.RequireEditorOrAdmin(), api.PreviewPageRefactorHandler(wikiInstance))
-		requiresAuthGroup.POST("/pages/:id/refactor/apply", auth_middleware.RequireEditorOrAdmin(), api.ApplyPageRefactorHandler(wikiInstance))
-		requiresAuthGroup.PUT("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.UpdatePageHandler(wikiInstance))
-		requiresAuthGroup.DELETE("/pages/:id", auth_middleware.RequireEditorOrAdmin(), api.DeletePageHandler(wikiInstance))
-
-		requiresAuthGroup.PUT("/pages/:id/move", auth_middleware.RequireEditorOrAdmin(), api.MovePageHandler(wikiInstance))
-		requiresAuthGroup.PUT("/pages/:id/sort", auth_middleware.RequireEditorOrAdmin(), api.SortPagesHandler(wikiInstance))
-		requiresAuthGroup.GET("/pages/slug-suggestion", auth_middleware.RequireEditorOrAdmin(), api.SuggestSlugHandler(wikiInstance))
-
-		// Revisions (only available when --enable-revision is set)
-		if options.EnableRevision {
-			requiresAuthGroup.GET("/pages/:id/revisions", api.ListPageRevisionsHandler(wikiInstance))
-			requiresAuthGroup.GET("/pages/:id/revisions/latest", api.GetLatestPageRevisionHandler(wikiInstance))
-			requiresAuthGroup.GET("/pages/:id/revisions/compare", api.ComparePageRevisionsHandler(wikiInstance))
-			requiresAuthGroup.GET("/pages/:id/revisions/:revisionId/assets/*name", api.GetPageRevisionAssetHandler(wikiInstance))
-			requiresAuthGroup.GET("/pages/:id/revisions/:revisionId", api.GetPageRevisionHandler(wikiInstance))
-			requiresAuthGroup.POST("/pages/:id/revisions/:revisionId/restore", auth_middleware.RequireEditorOrAdmin(), api.RestorePageRevisionHandler(wikiInstance))
-		}
-
-		// Trash
-		requiresAuthGroup.GET("/trash", auth_middleware.RequireEditorOrAdmin(), api.ListTrashHandler(wikiInstance))
-		requiresAuthGroup.GET("/trash/:id", auth_middleware.RequireEditorOrAdmin(), api.GetTrashEntryHandler(wikiInstance))
-		requiresAuthGroup.POST("/trash/:id/restore", auth_middleware.RequireEditorOrAdmin(), api.RestorePageHandler(wikiInstance))
-
-		// User
-		requiresAuthGroup.POST("/users", auth_middleware.RequireAdmin(options.AuthDisabled), api.CreateUserHandler(wikiInstance))
-		requiresAuthGroup.GET("/users", auth_middleware.RequireAdmin(options.AuthDisabled), api.GetUsersHandler(wikiInstance))
-		requiresAuthGroup.PUT("/users/:id", auth_middleware.RequireSelfOrAdmin(options.AuthDisabled), api.UpdateUserHandler(wikiInstance))
-		requiresAuthGroup.DELETE("/users/:id", auth_middleware.RequireAdmin(options.AuthDisabled), api.DeleteUserHandler(wikiInstance))
-
-		// Change Own Password (only meaningful when authentication is enabled)
-		if !options.AuthDisabled {
-			requiresAuthGroup.PUT("/users/me/password", api.ChangeOwnPasswordUserHandler(wikiInstance))
-			// Branding (admin only)
-			// Only allowed when authentication is enabled
-			requiresAuthGroup.PUT("/branding", auth_middleware.RequireAdmin(options.AuthDisabled), api.UpdateBrandingHandler(wikiInstance))
-			requiresAuthGroup.POST("/branding/logo", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingLogoHandler(wikiInstance))
-			requiresAuthGroup.POST("/branding/favicon", auth_middleware.RequireAdmin(options.AuthDisabled), api.UploadBrandingFaviconHandler(wikiInstance))
-			requiresAuthGroup.DELETE("/branding/logo", auth_middleware.RequireAdmin(options.AuthDisabled), api.DeleteBrandingLogoHandler(wikiInstance))
-			requiresAuthGroup.DELETE("/branding/favicon", auth_middleware.RequireAdmin(options.AuthDisabled), api.DeleteBrandingFaviconHandler(wikiInstance))
-		}
-
-		// Assets
-		requiresAuthGroup.POST("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.UploadAssetHandler(wikiInstance, options.MaxAssetUploadSizeBytes))
-		requiresAuthGroup.GET("/pages/:id/assets", auth_middleware.RequireEditorOrAdmin(), api.ListAssetsHandler(wikiInstance))
-		requiresAuthGroup.PUT("/pages/:id/assets/rename", auth_middleware.RequireEditorOrAdmin(), api.RenameAssetHandler(wikiInstance))
-		requiresAuthGroup.DELETE("/pages/:id/assets/:name", auth_middleware.RequireEditorOrAdmin(), api.DeleteAssetHandler(wikiInstance))
-
-		// Importer
-		requiresAuthGroup.POST("/import/plan", auth_middleware.RequireEditorOrAdmin(), api.CreateImportPlanHandler(importerService))
-		requiresAuthGroup.GET("/import/plan", auth_middleware.RequireEditorOrAdmin(), api.GetImportPlanHandler(importerService))
-		requiresAuthGroup.POST("/import/execute", auth_middleware.RequireEditorOrAdmin(), api.ExecuteImportHandler(importerService, wikiInstance))
-		requiresAuthGroup.DELETE("/import/plan", auth_middleware.RequireEditorOrAdmin(), api.ClearImportPlanHandler(importerService))
-	}
-
-	// Serve branding assets (logos, favicons) with extension validation
-	base.GET("/branding/:filename", func(c *gin.Context) {
-		filename := c.Param("filename")
-
-		// Sanitize filename to prevent directory traversal and malicious input
-		// Only allow simple filenames (no path separators, no null bytes, no ..)
-		if strings.Contains(filename, "..") ||
-			strings.Contains(filename, "/") ||
-			strings.Contains(filename, "\\") ||
-			strings.Contains(filename, "\x00") {
-			c.Status(http.StatusForbidden)
-			return
-		}
-
-		// Get allowed extensions from branding constraints
-		constraints, err := wikiInstance.GetBrandingConstraints()
+	// Resolve custom stylesheet: prefer pre-validated FrontendConfig path,
+	// fall back to normalizing opts.CustomStylesheet against StorageDir.
+	customStylesheetPath := frontendCfg.CustomStylesheetPath
+	if customStylesheetPath == "" && opts.CustomStylesheet != "" {
+		resolved, err := NormalizeCustomStylesheetPath(frontendCfg.StorageDir, opts.CustomStylesheet)
 		if err != nil {
-			slog.Default().Error("failed to get branding constraints", "error", err)
-			c.Status(http.StatusInternalServerError)
-			return
+			slog.Default().Error("custom stylesheet disabled", "error", err)
+		} else {
+			customStylesheetPath = resolved
 		}
+	}
 
-		// Build a combined set of allowed extensions for O(1) lookup
-		allowedExts := make(map[string]bool)
-		for _, ext := range constraints.LogoExts {
-			allowedExts[ext] = true
-		}
-		for _, ext := range constraints.FaviconExts {
-			allowedExts[ext] = true
-		}
-
-		// Validate file extension against whitelist
-		ext := strings.ToLower(filepath.Ext(filename))
-		if !allowedExts[ext] {
-			c.Status(http.StatusForbidden)
-			return
-		}
-
-		// Construct file path
-		brandingDir := wikiInstance.GetBrandingService().GetBrandingAssetsDir()
-		filePath := filepath.Join(brandingDir, filename)
-
-		// Clean the path and verify it's within the branding directory
-		cleanPath := filepath.Clean(filePath)
-		cleanBrandingDir := filepath.Clean(brandingDir)
-
-		// Ensure the resolved path is still within the branding directory
-		// Use filepath.Rel to check the relative path doesn't escape the directory
-		rel, err := filepath.Rel(cleanBrandingDir, cleanPath)
-		if err != nil || strings.HasPrefix(rel, "..") {
-			c.Status(http.StatusForbidden)
-			return
-		}
-
-		// Check if file exists
-		if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
-			c.Status(http.StatusNotFound)
-			return
-		} else if err != nil {
-			slog.Default().Error("error checking branding file existence", "error", err, "path", cleanPath)
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		// Serve the file
-		disableClientCache(c)
-		c.File(cleanPath)
-	})
-
-	// Serve custom stylesheet if specified
+	// Serve custom stylesheet if a valid path was provided.
 	if customStylesheetPath != "" {
+		cssPath := customStylesheetPath
 		base.GET("/custom.css", func(c *gin.Context) {
-			if _, err := os.Stat(customStylesheetPath); os.IsNotExist(err) {
+			if _, err := os.Stat(cssPath); os.IsNotExist(err) {
 				c.Status(http.StatusNotFound)
 				return
 			} else if err != nil {
-				slog.Default().Error("error checking custom stylesheet existence", "error", err, "path", customStylesheetPath)
+				slog.Default().Error("error checking custom stylesheet existence", "error", err, "path", cssPath)
 				c.Status(http.StatusInternalServerError)
 				return
 			}
-
 			c.Header("Content-Type", "text/css; charset=utf-8")
-			c.File(customStylesheetPath)
+			c.File(cssPath)
 		})
 	}
 
-	// If frontend embedding is enabled, serve it on all unknown routes
+	// Serve the embedded frontend SPA on all unknown routes.
 	if EmbedFrontend == "true" {
 		fsys, err := fs.Sub(frontend, "dist")
 		if err != nil {
 			panic("failed to create sub FS: " + err.Error())
 		}
-
 		staticFS, err := fs.Sub(frontend, "dist/static")
 		if err != nil {
 			panic("failed to create sub FS: " + err.Error())
 		}
 
-		// Serve the embedded frontend files js, css, ...
 		base.StaticFS("/static", http.FS(staticFS))
 
 		base.GET("/favicon.svg", func(c *gin.Context) {
 			disableClientCache(c)
-
-			// Get branding config to check for custom favicon
-			brandingConfig, err := wikiInstance.GetBranding()
-			if err == nil && brandingConfig.FaviconFile != "" {
-				// Serve custom favicon from branding assets
-				faviconPath := filepath.Join(wikiInstance.GetBrandingService().GetBrandingAssetsDir(), brandingConfig.FaviconFile)
-				c.File(faviconPath)
-				return
-			}
-
-			// Serve default leaf favicon as SVG
+			// favicon is served by the branding registrar if a custom one exists;
+			// fall back to the default leaf SVG.
 			svgContent := `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🌿</text></svg>`
 			c.Data(http.StatusOK, "image/svg+xml", []byte(svgContent))
 		})
 
-		router.NoRoute(func(c *gin.Context) {
-			// Strip basePath prefix to check known route prefixes
+		engine.NoRoute(func(c *gin.Context) {
 			path := c.Request.URL.Path
-			if options.BasePath != "" {
-
-				// Ensure the pagePath is present
-				// If the pagePath does not match exactly render 404
-				if path != options.BasePath && !strings.HasPrefix(path, options.BasePath+"/") {
+			if opts.BasePath != "" {
+				if path != opts.BasePath && !strings.HasPrefix(path, opts.BasePath+"/") {
 					c.String(http.StatusNotFound, "Page not found")
 					return
 				}
-
-				// Strip the base path prefix to get the actual path for route checking
-				path = strings.TrimPrefix(path, options.BasePath)
-				// If the path is empty after stripping, set it to "/"
-				// This can happen when the request is exactly on the base path (e.g. "/wiki"), in which case we want to serve the frontend's index.html
+				path = strings.TrimPrefix(path, opts.BasePath)
 				if path == "" {
 					path = "/"
 				}
@@ -406,27 +185,26 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 					return
 				}
 
-				// get site name from branding config
-				var siteName = "LeafWiki"
-				if branding, err := wikiInstance.GetBranding(); err == nil {
-					siteName = branding.SiteName
+				siteName := "LeafWiki"
+				if frontendCfg.GetSiteName != nil {
+					if name := frontendCfg.GetSiteName(); name != "" {
+						siteName = name
+					}
 				}
 
 				html := string(data)
 				html = strings.ReplaceAll(html, "{{__SITE_NAME__}}", siteName)
-				html = strings.ReplaceAll(html, "{{__BASE_PATH__}}", options.BasePath)
+				html = strings.ReplaceAll(html, "{{__BASE_PATH__}}", opts.BasePath)
 
-				// Rewrite absolute asset paths in the built HTML so the browser
-				// fetches them under the base path (e.g. /wiki/static/...).
-				if options.BasePath != "" {
-					html = strings.ReplaceAll(html, `"/static/`, `"`+options.BasePath+`/static/`)
-					html = strings.ReplaceAll(html, `"/favicon.svg"`, `"`+options.BasePath+`/favicon.svg"`)
+				if opts.BasePath != "" {
+					html = strings.ReplaceAll(html, `"/static/`, `"`+opts.BasePath+`/static/`)
+					html = strings.ReplaceAll(html, `"/favicon.svg"`, `"`+opts.BasePath+`/favicon.svg"`)
 				}
 
-				html = injectIntoHead(html, buildCustomStylesheetTag(options.BasePath, customStylesheetPath))
+				html = injectIntoHead(html, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
 
-				if options.InjectCodeInHeader != "" {
-					html = injectIntoHead(html, options.InjectCodeInHeader)
+				if opts.InjectCodeInHeader != "" {
+					html = injectIntoHead(html, opts.InjectCodeInHeader)
 				}
 
 				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
@@ -434,21 +212,14 @@ func NewRouter(wikiInstance *wiki.Wiki, options RouterOptions) *gin.Engine {
 				c.String(http.StatusNotFound, "Page not found")
 			}
 		})
-
 	}
 
-	return router
+	return engine
 }
 
-func buildCustomStylesheetTag(basePath string, customStylesheet string) string {
-	if strings.TrimSpace(customStylesheet) == "" {
-		return ""
-	}
-
-	return `<link rel="stylesheet" href="` + basePath + `/custom.css">`
-}
-
-func normalizeCustomStylesheetPath(storageDir string, customStylesheet string) (string, error) {
+// NormalizeCustomStylesheetPath resolves and validates a CSS path relative to storageDir.
+// Returns empty string (no error) if cssPath is empty.
+func NormalizeCustomStylesheetPath(storageDir, customStylesheet string) (string, error) {
 	cssPath := strings.TrimSpace(customStylesheet)
 	if cssPath == "" {
 		return "", nil
@@ -476,15 +247,20 @@ func normalizeCustomStylesheetPath(storageDir string, customStylesheet string) (
 	return cleanCSSPath, nil
 }
 
-func injectIntoHead(html string, snippet string) string {
+func buildCustomStylesheetTag(basePath, customStylesheet string) string {
+	if strings.TrimSpace(customStylesheet) == "" {
+		return ""
+	}
+	return `<link rel="stylesheet" href="` + basePath + `/custom.css">`
+}
+
+func injectIntoHead(html, snippet string) string {
 	if strings.TrimSpace(snippet) == "" {
 		return html
 	}
-
 	newHTML := strings.Replace(html, "</head>", "  "+snippet+"\n  </head>", 1)
 	if newHTML == html {
 		slog.Default().Warn("could not inject code into header", "reason", "</head> tag not found")
 	}
-
 	return newHTML
 }

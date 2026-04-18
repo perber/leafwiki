@@ -30,7 +30,6 @@ export function BacklinkInfo() {
     fetchLinkStatusForPage(pageID)
   }, [fetchLinkStatusForPage, pageID, clear, hideLinkMetadataSection])
 
-  // if the link impact feature is disabled, do not show anything - return null
   if (hideLinkMetadataSection) return null
   const backlinks = status?.backlinks ?? []
   const brokenIncoming = status?.broken_incoming ?? []

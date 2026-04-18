@@ -1,12 +1,11 @@
 package wiki
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
-	"mime/multipart"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -14,30 +13,47 @@ import (
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/revision"
-	"github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	httpinternal "github.com/perber/wiki/internal/http"
+	coreimporter "github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/search"
+	wikiassets "github.com/perber/wiki/internal/wiki/assets"
+	wikiauth "github.com/perber/wiki/internal/wiki/auth"
+	wikibranding "github.com/perber/wiki/internal/wiki/branding"
+	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
+	wikilinks "github.com/perber/wiki/internal/wiki/links"
+	wikipages "github.com/perber/wiki/internal/wiki/pages"
+	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
+	wikisearch "github.com/perber/wiki/internal/wiki/search"
 )
 
 type Wiki struct {
-	tree          *tree.TreeService
-	slug          *tree.SlugService
-	auth          *auth.AuthService
-	userResolver  *auth.UserResolver
-	user          *auth.UserService
-	asset         *assets.AssetService
-	branding      *branding.BrandingService
-	searchIndex   *search.SQLiteIndex
-	status        *search.IndexingStatus
-	storageDir    string
-	searchWatcher *search.Watcher
-	revision      *revision.Service
-	links         *links.LinkService
-	log           *slog.Logger
-}
+	tree         *tree.TreeService
+	slug         *tree.SlugService
+	auth         *auth.AuthService
+	userResolver *auth.UserResolver
+	user         *auth.UserService
+	asset        *assets.AssetService
+	branding     *branding.BrandingService
+	searchIndex  *search.SQLiteIndex
+	status       *search.IndexingStatus
+	storageDir   string
 
-var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
+	// Domain route registrars (populated by NewWiki).
+	pagesRoutes     *wikipages.Routes
+	authRoutes      *wikiauth.Routes
+	assetsRoutes    *wikiassets.Routes
+	revisionsRoutes *wikirevisions.Routes
+	searchRoutes    *wikisearch.Routes
+	linksRoutes     *wikilinks.Routes
+	brandingRoutes  *wikibranding.Routes
+	importerRoutes  *wikiimporter.Routes
+	searchWatcher   *search.Watcher
+	revision        *revision.Service
+	links           *links.LinkService
+	log             *slog.Logger
+}
 
 const SYSTEM_USER_ID = "system"
 
@@ -46,151 +62,280 @@ func searchRootDir(storageDir string) string {
 	return filepath.Join(normalized, "root")
 }
 
-func collectSubtreeIDs(node *tree.PageNode) []string {
-	var ids []string
-	var walk func(n *tree.PageNode)
-	walk = func(n *tree.PageNode) {
-		if n == nil {
-			return
-		}
-		if n.ID != "root" {
-			ids = append(ids, n.ID)
-		}
-		for _, c := range n.Children {
-			walk(c)
-		}
-	}
-	walk(node)
-	return ids
-}
-
 type WikiOptions struct {
-	StorageDir          string        // Path to storage directory
-	AdminPassword       string        // Initial admin password
-	JWTSecret           string        // JWT secret for authentication
-	AccessTokenTimeout  time.Duration // Access token timeout duration
-	RefreshTokenTimeout time.Duration // Refresh token timeout duration
-	AuthDisabled        bool          // Whether authentication is disabled
-	MaxRevisionHistory  int           // Max revisions kept per page; 0 = unlimited
+	StorageDir              string        // Path to storage directory
+	AdminPassword           string        // Initial admin password
+	JWTSecret               string        // JWT secret for authentication
+	AccessTokenTimeout      time.Duration // Access token timeout duration
+	RefreshTokenTimeout     time.Duration // Refresh token timeout duration
+	AuthDisabled            bool          // Whether authentication is disabled
+	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
+	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
-
-	logger := slog.Default().With("component", "Wiki")
-
-	// Initialize the user store
-	store, err := auth.NewUserStore(options.StorageDir)
-	if err != nil {
+	w := &Wiki{
+		storageDir: options.StorageDir,
+		log:        slog.Default().With("component", "Wiki"),
+	}
+	if err := w.initAuth(options); err != nil {
 		return nil, err
 	}
+	if err := w.initCoreServices(options); err != nil {
+		return nil, err
+	}
+	if err := w.initLinkService(); err != nil {
+		return nil, err
+	}
+	if err := w.initSearch(); err != nil {
+		return nil, err
+	}
+	if err := w.initBranding(); err != nil {
+		return nil, err
+	}
+	// Welcome page must exist before the revision service starts recording.
+	if err := w.EnsureWelcomePage(); err != nil {
+		return nil, err
+	}
+	w.revision = revision.NewService(w.storageDir, w.tree, w.log,
+		revision.ServiceOptions{MaxRevisions: options.MaxRevisionHistory})
+	w.buildRoutes(options)
+	return w, nil
+}
 
-	// Initialize the user service
-	userService := auth.NewUserService(store)
+// ─── Subsystem initializers ───────────────────────────────────────────────────
+
+func (w *Wiki) initAuth(options *WikiOptions) error {
+	store, err := auth.NewUserStore(w.storageDir)
+	if err != nil {
+		return err
+	}
+	w.user = auth.NewUserService(store)
 	if !options.AuthDisabled {
-		if err := userService.InitDefaultAdmin(options.AdminPassword); err != nil {
-			return nil, err
+		if err := w.user.InitDefaultAdmin(options.AdminPassword); err != nil {
+			return err
 		}
 	}
-
-	userResolver, err := auth.NewUserResolver(userService)
+	w.userResolver, err = auth.NewUserResolver(w.user)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	var sessionStore *auth.SessionStore
-	var authService *auth.AuthService
 	if !options.AuthDisabled {
-		sessionStore, err = auth.NewSessionStore(options.StorageDir)
+		sessionStore, err := auth.NewSessionStore(w.storageDir)
 		if err != nil {
-			return nil, err
+			return err
 		}
-
-		// Initialize the auth service
-		authService = auth.NewAuthService(userService, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+		w.auth = auth.NewAuthService(w.user, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 	}
-	// Initialize the tree service
-	treeService := tree.NewTreeService(options.StorageDir)
-	if err := treeService.LoadTree(); err != nil {
-		return nil, err
+	return nil
+}
+
+func (w *Wiki) initCoreServices(options *WikiOptions) error {
+	w.tree = tree.NewTreeService(w.storageDir)
+	if err := w.tree.LoadTree(); err != nil {
+		return err
 	}
+	w.slug = tree.NewSlugService()
+	w.asset = assets.NewAssetService(w.storageDir, w.slug)
+	return nil
+}
 
-	slugService := tree.NewSlugService()
-
-	assetService := assets.NewAssetService(options.StorageDir, slugService)
-
-	// Backlink Service
-	linksStore, err := links.NewLinksStore(options.StorageDir)
+func (w *Wiki) initLinkService() error {
+	linksStore, err := links.NewLinksStore(w.storageDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init links store: %w", err)
+		return fmt.Errorf("failed to init links store: %w", err)
 	}
-	linkService := links.NewLinkService(options.StorageDir, treeService, linksStore)
-	if err := linkService.IndexAllPages(); err != nil {
-		logger.Warn("failed to index links on startup", "error", err)
+	w.links = links.NewLinkService(w.storageDir, w.tree, linksStore)
+	if err := w.links.IndexAllPages(); err != nil {
+		w.log.Warn("failed to index links on startup", "error", err)
 	}
+	return nil
+}
 
-	sqliteIndex, err := search.NewSQLiteIndex(options.StorageDir)
+func (w *Wiki) initSearch() error {
+	var err error
+	w.searchIndex, err = search.NewSQLiteIndex(w.storageDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init search index: %w", err)
+		return fmt.Errorf("failed to init search index: %w", err)
 	}
-
-	// status object for indexing
-	status := search.NewIndexingStatus()
-
-	var searchWatcher *search.Watcher
-	// starts the indexing process in a separate goroutine
+	w.status = search.NewIndexingStatus()
 	go func() {
-		err := search.BuildAndRunIndexer(treeService, sqliteIndex, searchRootDir(options.StorageDir), 4, status)
-		if err != nil {
-			logger.Warn("indexing failed", "error", err)
+		if err := search.BuildAndRunIndexer(w.tree, w.searchIndex, searchRootDir(w.storageDir), 4, w.status); err != nil {
+			w.log.Warn("indexing failed", "error", err)
 		}
 	}()
-
-	// Start the file watcher for indexing
-	searchWatcher, err = search.NewWatcher(searchRootDir(options.StorageDir), treeService, sqliteIndex, status)
+	w.searchWatcher, err = search.NewWatcher(searchRootDir(w.storageDir), w.tree, w.searchIndex, w.status)
 	if err != nil {
-		logger.Warn("failed to create file watcher", "error", err)
-	} else {
-		go func() {
-			if err := searchWatcher.Start(); err != nil {
-				logger.Warn("failed to start file watcher", "error", err)
-			}
-		}()
+		w.log.Warn("failed to create file watcher", "error", err)
+		return nil
 	}
+	go func() {
+		if err := w.searchWatcher.Start(); err != nil {
+			w.log.Warn("failed to start file watcher", "error", err)
+		}
+	}()
+	return nil
+}
 
-	// Initialize the branding service
-	brandingService, err := branding.NewBrandingService(options.StorageDir)
+func (w *Wiki) initBranding() error {
+	var err error
+	w.branding, err = branding.NewBrandingService(w.storageDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init branding service: %w", err)
+		return fmt.Errorf("failed to init branding service: %w", err)
 	}
+	return nil
+}
 
-	// Initialize the wiki service
-	wiki := &Wiki{
-		tree:          treeService,
-		slug:          slugService,
-		user:          userService,
-		auth:          authService,
-		userResolver:  userResolver,
-		asset:         assetService,
-		branding:      brandingService,
-		storageDir:    options.StorageDir,
-		searchIndex:   sqliteIndex,
-		status:        status,
-		searchWatcher: searchWatcher,
-		links:         linkService,
-		log:           logger,
-	}
+func (w *Wiki) buildRoutes(options *WikiOptions) {
+	w.pagesRoutes = w.buildPagesRoutes()
+	w.authRoutes = w.buildAuthRoutes()
+	w.assetsRoutes = w.buildAssetsRoutes()
+	w.revisionsRoutes = w.buildRevisionsRoutes()
+	w.searchRoutes = w.buildSearchRoutes()
+	w.linksRoutes = w.buildLinksRoutes()
+	w.brandingRoutes = w.buildBrandingRoutes()
+	w.importerRoutes = w.buildImporterRoutes(options)
+}
 
-	// Ensure the welcome page exists
-	if err := wiki.EnsureWelcomePage(); err != nil {
-		return nil, err
-	}
+// ─── Domain route builder helpers ────────────────────────────────────────────
 
-	// Revision service intentionally starts AFTER welcome page bootstrap.
-	wiki.revision = revision.NewService(options.StorageDir, treeService, logger, revision.ServiceOptions{
-		MaxRevisions: options.MaxRevisionHistory,
+func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
+	return wikipages.NewRoutes(wikipages.RoutesConfig{
+		TreeService:     w.tree,
+		CreatePage:      wikipages.NewCreatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log),
+		UpdatePage:      wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log),
+		DeletePage:      wikipages.NewDeletePageUseCase(w.tree, w.revision, w.links, w.asset, w.log),
+		MovePage:        wikipages.NewMovePageUseCase(w.tree, w.revision, w.links, w.log),
+		ConvertPage:     wikipages.NewConvertPageUseCase(w.tree, w.revision, w.log),
+		CopyPage:        wikipages.NewCopyPageUseCase(w.tree, w.slug, w.revision, w.links, w.asset, w.log),
+		GetPage:         wikipages.NewGetPageUseCase(w.tree),
+		FindByPath:      wikipages.NewFindByPathUseCase(w.tree),
+		LookupPath:      wikipages.NewLookupPagePathUseCase(w.tree),
+		SortPages:       wikipages.NewSortPagesUseCase(w.tree),
+		EnsurePath:      wikipages.NewEnsurePathUseCase(w.tree, w.slug, w.revision, w.links, w.log),
+		SuggestSlug:     wikipages.NewSuggestSlugUseCase(w.tree, w.slug),
+		PreviewRefactor: wikipages.NewPreviewPageRefactorUseCase(w.tree, w.slug, w.links, w.log),
+		ApplyRefactor:   wikipages.NewApplyPageRefactorUseCase(w.tree, w.slug, w.revision, w.links, w.log),
+		UserResolver:    w.userResolver,
+		AuthService:     w.auth,
 	})
+}
 
-	return wiki, nil
+func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
+	return wikiauth.NewRoutes(wikiauth.RoutesConfig{
+		Login:             wikiauth.NewLoginUseCase(w.auth),
+		Logout:            wikiauth.NewLogoutUseCase(w.auth),
+		RefreshToken:      wikiauth.NewRefreshTokenUseCase(w.auth),
+		CreateUser:        wikiauth.NewCreateUserUseCase(w.user, w.userResolver, w.log),
+		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.user, w.userResolver, w.log),
+		ChangeOwnPassword: wikiauth.NewChangeOwnPasswordUseCase(w.user),
+		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.user, w.userResolver, w.log),
+		GetUsers:          wikiauth.NewGetUsersUseCase(w.user),
+		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.user),
+		AuthService:       w.auth,
+	})
+}
+
+func (w *Wiki) buildAssetsRoutes() *wikiassets.Routes {
+	return wikiassets.NewRoutes(wikiassets.RoutesConfig{
+		Upload:      wikiassets.NewUploadAssetUseCase(w.tree, w.asset, w.revision, w.log),
+		List:        wikiassets.NewListAssetsUseCase(w.tree, w.asset),
+		Rename:      wikiassets.NewRenameAssetUseCase(w.tree, w.asset, w.revision, w.log),
+		Delete:      wikiassets.NewDeleteAssetUseCase(w.tree, w.asset, w.revision, w.log),
+		AuthService: w.auth,
+		AssetsDir:   w.asset.GetAssetsDir(),
+		Log:         w.log,
+	})
+}
+
+func (w *Wiki) buildRevisionsRoutes() *wikirevisions.Routes {
+	return wikirevisions.NewRoutes(wikirevisions.RoutesConfig{
+		ListRevisions:    wikirevisions.NewListRevisionsUseCase(w.revision),
+		GetRevision:      wikirevisions.NewGetRevisionUseCase(w.revision),
+		CompareRevisions: wikirevisions.NewCompareRevisionsUseCase(w.revision),
+		GetRevisionAsset: wikirevisions.NewGetRevisionAssetUseCase(w.revision),
+		GetLatest:        wikirevisions.NewGetLatestRevisionUseCase(w.revision),
+		RestoreRevision:  wikirevisions.NewRestoreRevisionUseCase(w.revision, w.tree, w.links, w.log),
+CheckIntegrity:   wikirevisions.NewCheckIntegrityUseCase(w.revision),
+		UserResolver:     w.userResolver,
+		AuthService:      w.auth,
+	})
+}
+
+func (w *Wiki) buildSearchRoutes() *wikisearch.Routes {
+	return wikisearch.NewRoutes(wikisearch.RoutesConfig{
+		Search:            wikisearch.NewSearchUseCase(w.searchIndex),
+		GetIndexingStatus: wikisearch.NewGetIndexingStatusUseCase(w.status),
+		AuthService:       w.auth,
+	})
+}
+
+func (w *Wiki) buildLinksRoutes() *wikilinks.Routes {
+	return wikilinks.NewRoutes(wikilinks.RoutesConfig{
+		GetLinkStatus: wikilinks.NewGetLinkStatusUseCase(w.links, w.tree),
+		AuthService:   w.auth,
+	})
+}
+
+func (w *Wiki) buildBrandingRoutes() *wikibranding.Routes {
+	return wikibranding.NewRoutes(wikibranding.RoutesConfig{
+		GetBranding:     wikibranding.NewGetBrandingUseCase(w.branding),
+		UpdateBranding:  wikibranding.NewUpdateBrandingUseCase(w.branding),
+		UploadLogo:      wikibranding.NewUploadLogoUseCase(w.branding),
+		DeleteLogo:      wikibranding.NewDeleteLogoUseCase(w.branding),
+		UploadFavicon:   wikibranding.NewUploadFaviconUseCase(w.branding),
+		DeleteFavicon:   wikibranding.NewDeleteFaviconUseCase(w.branding),
+		BrandingService: w.branding,
+		AuthService:     w.auth,
+		Log:             w.log,
+	})
+}
+
+func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
+	importerDir := filepath.Join(options.StorageDir, ".importer")
+	adapter := NewWikiImportAdapter(w)
+	planner := coreimporter.NewPlanner(adapter, w.slug)
+	store := coreimporter.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
+	svc := coreimporter.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), options.MaxAssetUploadSizeBytes)
+	return wikiimporter.NewRoutes(wikiimporter.RoutesConfig{
+		CreatePlan:  wikiimporter.NewCreateImportPlanUseCase(svc),
+		GetPlan:     wikiimporter.NewGetImportPlanUseCase(svc),
+		Execute:     wikiimporter.NewExecuteImportUseCase(svc),
+		ClearPlan:   wikiimporter.NewClearImportPlanUseCase(svc),
+		AuthService: w.auth,
+		Svc:         svc,
+		Log:         w.log,
+	})
+}
+
+// ─── Registrars / FrontendConfig ─────────────────────────────────────────────
+
+// Registrars returns all domain route registrars in registration order.
+func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
+	return []httpinternal.RouteRegistrar{
+		w.authRoutes,
+		w.pagesRoutes,
+		w.assetsRoutes,
+		w.revisionsRoutes,
+		w.searchRoutes,
+		w.linksRoutes,
+		w.brandingRoutes,
+		w.importerRoutes,
+	}
+}
+
+// FrontendConfig returns the minimal runtime data required by the router to serve the SPA.
+func (w *Wiki) FrontendConfig() httpinternal.FrontendConfig {
+	return httpinternal.FrontendConfig{
+		StorageDir: w.storageDir,
+		GetSiteName: func() string {
+			cfg, err := w.branding.GetBranding()
+			if err != nil || cfg == nil {
+				return ""
+			}
+			return cfg.SiteName
+		},
+	}
 }
 
 func (w *Wiki) EnsureWelcomePage() error {
@@ -199,829 +344,58 @@ func (w *Wiki) EnsureWelcomePage() error {
 		return nil
 	}
 	k := tree.NodeKindPage
-	p, err := w.CreatePage(SYSTEM_USER_ID, nil, "Welcome to LeafWiki", "welcome-to-leafwiki", &k)
+	createOut, err := wikipages.NewCreatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log).Execute(
+		context.Background(),
+		wikipages.CreatePageInput{UserID: SYSTEM_USER_ID, Title: "Welcome to LeafWiki", Slug: "welcome-to-leafwiki", Kind: &k},
+	)
 	if err != nil {
 		return err
 	}
+	p := createOut.Page
 
 	// Set the content of the welcome page
 	content := `# Welcome to LeafWiki!
 
-LeafWiki – A fast wiki for people who think in folders, not feeds.  
-Single Go binary. Markdown on disk. No external database service.  
+LeafWiki – A fast wiki for people who think in folders, not feeds.
+Single Go binary. Markdown on disk. No external database service.
 
 LeafWiki is a lightweight, self-hosted wiki for runbooks, internal docs, and technical notes — built for fast writing and explicit structure. It keeps your content as plain Markdown on disk and gives you fast navigation, search, and editing — without running additional services.
 
 
 ---
 
-## What you can do here
+## Features
 
-- Write and edit pages using plain Markdown
-- Organize content explicitly in a tree structure
-- Attach images and files per page
-- Keep full control over your data on your own server
+- **Markdown-based** pages stored on disk (no database required)
+- **Hierarchical navigation** with sections and pages
+- **Full-text search** powered by SQLite FTS5
+- **Asset management** (upload, rename, delete attachments)
+- **Revision history** with snapshots and restore
+- **Import** from Markdown zip archives
+- **Branding** customization (site name, logo, favicon)
+- **Multi-user** with role-based access control (admin / editor / viewer)
+- **Public access mode** for read-only anonymous browsing
 
-LeafWiki is designed for clarity, structure, and long-term maintainability — not for complex workflows or heavy collaboration features.
+## Getting Started
 
----
+1. Create your first page using the **+** button in the sidebar
+2. Write in **Markdown** — headings, lists, code blocks, and links are all supported
+3. Use **sections** to group related pages into a folder-like hierarchy
+4. Upload files by dragging them into the editor
 
-## Getting started
-
-- Click the + button to create new pages
-- Press the Pencil icon to edit the page
-- Use Markdown for formatting, like:
-
-` + "```" + `md
-- Lists
-- **Bold**
-` + "- `Inline code` \n```\n\n" + "Enjoy writing!"
-
-	if _, err := w.UpdatePage(SYSTEM_USER_ID, p.ID, p.Title, p.Slug, &content, &k); err != nil {
+For more information, visit the [LeafWiki GitHub repository](https://github.com/perber/leafwiki).
+`
+	if _, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log).Execute(
+		context.Background(),
+		wikipages.UpdatePageInput{UserID: SYSTEM_USER_ID, ID: p.ID, Title: p.Title, Slug: p.Slug, Content: &content, Kind: &k},
+	); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (w *Wiki) GetTree() *tree.PageNode {
-	return w.tree.GetTree()
-}
-
-func (w *Wiki) TreeHash() string {
-	return w.tree.TreeHash()
-}
-
-func (w *Wiki) CreatePage(userID string, parentID *string, title string, slug string, kind *tree.NodeKind) (*tree.Page, error) {
-	ve := errors.NewValidationErrors()
-
-	if title == "" {
-		ve.Add("title", "Title must not be empty")
-	}
-
-	if kind == nil {
-		ve.Add("kind", "Kind must be specified")
-	}
-
-	if kind != nil && *kind != tree.NodeKindPage && *kind != tree.NodeKindSection {
-		ve.Add("kind", "Kind must be either 'page' or 'section'")
-	}
-
-	if err := w.slug.IsValidSlug(slug); err != nil {
-		ve.Add("slug", err.Error())
-	}
-
-	if ve.HasErrors() {
-		return nil, ve
-	}
-
-	// Check if the parentID exists
-	if parentID != nil && *parentID != "" {
-		var err error
-		_, err = w.tree.FindPageByID(*parentID)
-		if err != nil {
-			return nil, err
-		}
-	}
-	var id *string
-	if *kind == tree.NodeKindPage {
-		var err error
-		id, err = w.tree.CreateNode(userID, parentID, title, slug, kind)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if *kind == tree.NodeKindSection {
-		var err error
-		id, err = w.tree.CreateNode(userID, parentID, title, slug, kind)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	page, err := w.tree.GetPage(*id)
-	if err != nil {
-		return nil, err
-	}
-
-	if w.links != nil {
-		if err := w.links.HealLinksForExactPath(page); err != nil {
-			log.Printf("warning: failed to heal links for page %s: %v", page.ID, err)
-		}
-	}
-
-	return page, nil
-}
-
-func (w *Wiki) EnsurePath(userID string, targetPath string, targetTitle string, kind *tree.NodeKind) (*tree.Page, error) {
-	ve := errors.NewValidationErrors()
-
-	cleanTargetPath := strings.Trim(strings.TrimSpace(targetPath), "/")
-	if cleanTargetPath == "" {
-		ve.Add("path", "Path must not be empty")
-	}
-
-	cleanTargetTitle := strings.TrimSpace(targetTitle)
-	if cleanTargetTitle == "" {
-		ve.Add("title", "Title must not be empty")
-	}
-
-	if ve.HasErrors() {
-		return nil, ve
-	}
-
-	lookup, err := w.tree.LookupPagePath(cleanTargetPath)
-	if err != nil {
-		return nil, err
-	}
-
-	// If the path exists, return the last page
-	if lookup.Exists {
-		return w.GetPage(*lookup.Segments[len(lookup.Segments)-1].ID)
-	}
-
-	// Check if not existing segments have a valid slug
-	for _, segment := range lookup.Segments {
-		if !segment.Exists {
-			if err := w.slug.IsValidSlug(segment.Slug); err != nil {
-				ve.Add("path", fmt.Sprintf("Invalid slug '%s': %s", segment.Slug, err.Error()))
-			}
-		}
-	}
-
-	if ve.HasErrors() {
-		return nil, ve
-	}
-
-	// Now we create the missing segments
-	result, err := w.tree.EnsurePagePath(userID, cleanTargetPath, cleanTargetTitle, kind)
-	if err != nil {
-		return nil, err
-	}
-
-	page, err := w.tree.GetPage(result.Page.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	if w.links != nil {
-		for _, n := range result.Created {
-			p, err := w.tree.GetPage(n.ID)
-			if err != nil {
-				log.Printf("warning: failed to get page %s for healing links: %v", n.ID, err)
-				continue
-			}
-			if err := w.links.HealLinksForExactPath(p); err != nil {
-				log.Printf("warning: failed to heal links for page %s: %v", n.ID, err)
-			}
-		}
-	}
-
-	return page, nil
-}
-
-func (w *Wiki) UpdatePage(userID string, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
-
-	// Validate the request
-	ve := errors.NewValidationErrors()
-	if title == "" {
-		ve.Add("title", "Title must not be empty")
-	}
-	if err := w.slug.IsValidSlug(slug); err != nil {
-		ve.Add("slug", err.Error())
-	}
-	if ve.HasErrors() {
-		return nil, ve
-	}
-
-	// Get page before update
-	before, err := w.tree.GetPage(id)
-	if err != nil {
-		return nil, err
-	}
-	oldTitle := before.Title
-	oldPrefix := before.CalculatePath()
-	renameOrPathChange := (slug != before.Slug)
-
-	var subtreeIDs []string
-	if renameOrPathChange {
-		subtreeIDs = collectSubtreeIDs(before.PageNode)
-		if len(subtreeIDs) == 0 {
-			subtreeIDs = []string{id}
-		}
-	}
-
-	if err = w.tree.UpdateNode(userID, id, title, slug, content); err != nil {
-		return nil, err
-	}
-
-	after, err := w.tree.GetPage(id)
-	if err != nil {
-		return after, err
-	}
-
-	if w.links != nil {
-		if renameOrPathChange {
-			if oldPrefix != "" {
-				if err := w.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
-					log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
-				}
-			}
-
-			for _, pid := range subtreeIDs {
-				p, err := w.tree.GetPage(pid)
-				if err != nil {
-					log.Printf("warning: failed to get page %s for healing links: %v", pid, err)
-					continue
-				}
-				if err := w.links.UpdateLinksForPage(p, p.Content); err != nil {
-					log.Printf("warning: failed to update links for page %s: %v", pid, err)
-				}
-				if err := w.links.HealLinksForExactPath(p); err != nil {
-					log.Printf("warning: failed to heal links for page %s: %v", p.ID, err)
-				}
-			}
-		} else {
-			if content != nil {
-				if err := w.links.UpdateLinksForPage(after, *content); err != nil {
-					log.Printf("warning: failed to update links for page %s: %v", after.ID, err)
-				}
-			}
-			if err := w.links.HealLinksForExactPath(after); err != nil {
-				log.Printf("warning: failed to heal links for page %s: %v", after.ID, err)
-			}
-		}
-	}
-
-	if renameOrPathChange {
-		for _, pid := range subtreeIDs {
-			if content != nil && pid == id {
-				continue
-			}
-			w.recordStructureRevision(pid, userID, "")
-		}
-	} else if content == nil && oldTitle != after.Title {
-		w.recordStructureRevision(id, userID, "")
-	}
-
-	if content != nil {
-		w.recordContentRevision(id, userID, "")
-	}
-
-	return after, nil
-}
-
-func (w *Wiki) CopyPage(userID string, currentPageID string, targetParentID *string, title string, slug string) (*tree.Page, error) {
-	// Validate the request
-	ve := errors.NewValidationErrors()
-	if title == "" {
-		ve.Add("title", "Title must not be empty")
-	}
-	if err := w.slug.IsValidSlug(slug); err != nil {
-		ve.Add("slug", err.Error())
-	}
-	if ve.HasErrors() {
-		return nil, ve
-	}
-
-	// Find the current page
-	page, err := w.tree.GetPage(currentPageID)
-	if err != nil {
-		log.Printf("error: could not find page to copy: %v", err)
-		return nil, err
-	}
-
-	kind := tree.NodeKindPage
-
-	// Create a copy of the page
-	copyID, err := w.tree.CreateNode(userID, targetParentID, title, slug, &kind)
-	if err != nil {
-		log.Printf("error: could not create page copy: %v", err)
-		return nil, err
-	}
-	cleanup := func() { _ = w.tree.DeleteNode(userID, *copyID, false) }
-
-	// Get the copied page
-	copy, err := w.tree.GetPage(*copyID)
-	if err != nil {
-		log.Printf("error: could not get copied page: %v", err)
-		cleanup()
-		return nil, err
-	}
-
-	// Copy assets!
-	if err := w.asset.CopyAllAssets(page.PageNode, copy.PageNode); err != nil {
-		cleanup()
-		log.Printf("error: could not copy assets: %v", err)
-		return nil, err
-	}
-
-	// Update the content to point to the new asset paths
-	updatedContent := strings.ReplaceAll(page.Content, "/assets/"+page.ID+"/", "/assets/"+copy.ID+"/")
-
-	// Write the content to the copied page
-	if err := w.tree.UpdateNode(userID, copy.ID, copy.Title, copy.Slug, &updatedContent); err != nil {
-		log.Printf("error: could not update copied page content: %v", err)
-		cleanup()
-		_ = w.asset.DeleteAllAssetsForPage(copy.PageNode)
-		return nil, err
-	}
-
-	if w.links != nil {
-		if err := w.links.HealLinksForExactPath(copy); err != nil {
-			log.Printf("warning: failed to heal links for page %s: %v", copy.ID, err)
-		}
-	}
-
-	w.recordContentRevision(copy.ID, userID, "page copied")
-
-	return copy, nil
-}
-
-func (w *Wiki) DeletePage(userID string, id string, recursive bool) error {
-	if id == "root" || id == "" {
-		return fmt.Errorf("cannot delete root page")
-	}
-
-	page, err := w.tree.GetPage(id)
-	if err != nil {
-		log.Printf("error: could not find page to delete: %v", err)
-		return err
-	}
-
-	var subtreeIDs []string
-	var oldPrefix string
-
-	if recursive {
-		root := w.tree.GetTree()
-		if root != nil {
-			node, err := w.tree.FindPageByID(id)
-			if err == nil && node != nil {
-				subtreeIDs = collectSubtreeIDs(node)
-				oldPrefix = node.CalculatePath() // IMPORTANT: before delete
-			}
-		}
-	}
-
-	// If recursive, also handle subtree
-	// we need to mark links broken for all pages in the subtree
-	if recursive {
-
-		// No pages in subtree or empty oldPrefix
-		// add current page id to subtreeIDs to delete its links and assets as well
-		if len(subtreeIDs) == 0 || oldPrefix == "" {
-			subtreeIDs = []string{id}
-			oldPrefix = page.CalculatePath()
-		}
-
-		if err := w.tree.DeleteNode(userID, id, recursive); err != nil {
-			log.Printf("error: could not delete page: %v", err)
-			return err
-		}
-
-		if w.links != nil {
-			for _, pid := range subtreeIDs {
-				if err := w.links.DeleteOutgoingLinksForPage(pid); err != nil {
-					log.Printf("warning: could not delete outgoing links for page %s: %v", pid, err)
-				}
-			}
-			if oldPrefix != "" {
-				if err := w.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
-					log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
-				}
-			}
-		}
-
-		// Delete assets for all pages in the subtree
-		for _, pid := range subtreeIDs {
-			if err := w.asset.DeleteAllAssetsForPage(&tree.PageNode{ID: pid}); err != nil {
-				log.Printf("warning: could not delete assets for page %s: %v", pid, err)
-			}
-		}
-
-		if err := w.deleteRevisionData(subtreeIDs); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	if err := w.tree.DeleteNode(userID, id, recursive); err != nil {
-		log.Printf("error: could not delete page: %v", err)
-		return err
-	}
-
-	// non-recursive case
-	if w.links != nil {
-		// Delete outgoing links and mark incoming links as broken
-		if err := w.links.DeleteOutgoingLinksForPage(id); err != nil {
-			log.Printf("warning: could not delete outgoing links for page %s: %v", id, err)
-		}
-		if err := w.links.MarkIncomingLinksBrokenForPage(id); err != nil {
-			log.Printf("warning: could not mark incoming links broken for page %s: %v", id, err)
-		}
-		if err := w.links.MarkLinksBrokenForPath(page.CalculatePath()); err != nil {
-			log.Printf("warning: could not mark links broken for path %s: %v", page.CalculatePath(), err)
-		}
-	}
-
-	// Also delete all assets for the page
-	if err := w.asset.DeleteAllAssetsForPage(page.PageNode); err != nil {
-		log.Printf("warning: could not delete assets for page %s: %v", page.ID, err)
-	}
-
-	if err := w.deleteRevisionData([]string{id}); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (w *Wiki) MovePage(userID, id, parentID string) error {
-	if id == "root" || id == "" {
-		return fmt.Errorf("cannot move root page")
-	}
-
-	// --- BEFORE: capture oldPrefix + subtree IDs (must be before the move) ---
-	var oldPrefix string
-	var subtreeIDs []string
-
-	root := w.tree.GetTree()
-	if root != nil {
-		node, err := w.tree.FindPageByID(id)
-		if err == nil && node != nil {
-			oldPrefix = node.CalculatePath()
-			subtreeIDs = collectSubtreeIDs(node)
-		}
-	}
-
-	// If no pages in subtree, add current page id to subtreeIDs
-	if len(subtreeIDs) == 0 {
-		subtreeIDs = []string{id}
-		// try to get oldPrefix from full page (still before move)
-		if p, err := w.tree.GetPage(id); err == nil && oldPrefix == "" {
-			oldPrefix = p.CalculatePath()
-		}
-	}
-	if err := w.tree.MoveNode(userID, id, parentID); err != nil {
-		return err
-	}
-
-	if w.links != nil {
-		if oldPrefix != "" {
-			if err := w.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
-				log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
-			}
-		}
-	}
-
-	// For each page in the moved subtree:
-	// - reindex outgoing (relative links depend on path)
-	// - heal incoming for exact new path (existence-heal only)
-	for _, pid := range subtreeIDs {
-		p, err := w.tree.GetPage(pid)
-		if err != nil {
-			log.Printf("warning: failed to get page %s after move: %v", pid, err)
-			continue
-		}
-
-		if w.links != nil {
-			if err := w.links.UpdateLinksForPage(p, p.Content); err != nil {
-				log.Printf("warning: failed to update links for page %s: %v", pid, err)
-			}
-
-			if err := w.links.HealLinksForExactPath(p); err != nil {
-				log.Printf("warning: failed to heal links for page %s: %v", pid, err)
-			}
-		}
-	}
-
-	for _, pid := range subtreeIDs {
-		w.recordStructureRevision(pid, userID, "")
-	}
-
-	return nil
-}
-
-func (w *Wiki) ConvertPage(userID, id string, targetKind tree.NodeKind) error {
-	if id == "root" || id == "" {
-		return fmt.Errorf("cannot convert root page")
-	}
-
-	err := w.tree.ConvertNode(userID, id, targetKind)
-	if err != nil {
-		return err
-	}
-
-	w.recordStructureRevision(id, userID, "")
-	return nil
-}
-
-func (w *Wiki) SortPages(parentID string, orderedIDs []string) error {
-	return w.tree.SortPages(parentID, orderedIDs)
-}
-
-func (w *Wiki) GetPage(id string) (*tree.Page, error) {
-	return w.tree.GetPage(id)
-}
-
-func (w *Wiki) FindByPath(route string) (*tree.Page, error) {
-	return w.tree.FindPageByRoutePath(route)
-}
-
-func (w *Wiki) LookupPagePath(path string) (*tree.PathLookup, error) {
-	return w.tree.LookupPagePath(path)
-}
-
-func (w *Wiki) SuggestSlug(parentID string, currentID string, title string) (string, error) {
-	// if no parentID is set or it's the root page
-	// We don't need to look for a page id
-	if parentID == "" || parentID == "root" {
-		return w.slug.GenerateUniqueChildSlug(w.tree.GetTree(), currentID, title), nil
-	}
-
-	parent, err := w.tree.FindPageByID(parentID)
-	if err != nil {
-		return "", fmt.Errorf("parent not found: %w", err)
-	}
-
-	return w.slug.GenerateUniqueChildSlug(parent, currentID, title), nil
-}
-
-func (w *Wiki) ReindexLinks() error {
-	if w.links == nil {
-		return nil
-	}
-	return w.links.IndexAllPages()
-}
-
-func (w *Wiki) GetBacklinks(pageID string) (*links.BacklinkResult, error) {
-	if w.links == nil {
-		return nil, fmt.Errorf("links not available")
-	}
-	return w.links.GetBacklinksForPage(pageID)
-}
-
-func (w *Wiki) GetOutgoingLinks(pageID string) (*links.OutgoingResult, error) {
-	if w.links == nil {
-		return nil, fmt.Errorf("outgoing links not available")
-	}
-	return w.links.GetOutgoingLinksForPage(pageID)
-}
-
-func (w *Wiki) GetLinkStatusForPage(pageID string) (*links.LinkStatusResult, error) {
-	if w.links == nil {
-		return nil, fmt.Errorf("link service not initialized")
-	}
-
-	page, err := w.tree.GetPage(pageID)
-	if err != nil {
-		return nil, err
-	}
-
-	return w.links.GetLinkStatusForPage(pageID, page.CalculatePath())
-}
-
-func (w *Wiki) Login(identifier, password string) (*auth.AuthToken, error) {
-	if w.auth == nil {
-		return nil, ErrAuthDisabled
-	}
-	return w.auth.Login(identifier, password)
-}
-
-func (w *Wiki) Logout(token string) error {
-	if w.auth == nil {
-		return ErrAuthDisabled
-	}
-	return w.auth.RevokeRefreshToken(token)
-}
-
-func (w *Wiki) RefreshToken(token string) (*auth.AuthToken, error) {
-	if w.auth == nil {
-		return nil, ErrAuthDisabled
-	}
-	return w.auth.RefreshToken(token)
-}
-
-func (w *Wiki) CreateUser(username, email, password, role string) (*auth.PublicUser, error) {
-	ve := errors.NewValidationErrors()
-	if username == "" {
-		ve.Add("username", "Username must not be empty")
-	}
-	if email == "" {
-		ve.Add("email", "Email must not be empty")
-	} else if !emailRegex.MatchString(email) {
-		ve.Add("email", "Email is not valid")
-	}
-	if password == "" {
-		ve.Add("password", "Password must not be empty")
-	} else if len(password) < 8 {
-		ve.Add("password", "Password must be at least 8 characters long")
-	}
-	if !auth.IsValidRole(role) {
-		ve.Add("role", "Invalid role")
-	}
-
-	if ve.HasErrors() {
-		return nil, ve
-	}
-
-	user, err := w.user.CreateUser(username, email, password, role)
-	if err != nil {
-		return nil, err
-	}
-
-	// Reload the user resolver cache
-	if err := w.userResolver.Reload(); err != nil {
-		log.Printf("warning: could not reload user resolver cache: %v", err)
-	}
-
-	return user.ToPublicUser(), nil
-}
-
-func (w *Wiki) UpdateUser(id, username, email, password, role string) (*auth.PublicUser, error) {
-
-	ve := errors.NewValidationErrors()
-	if username == "" {
-		ve.Add("username", "Username must not be empty")
-	}
-	if email == "" {
-		ve.Add("email", "Email must not be empty")
-	} else if !emailRegex.MatchString(email) {
-		ve.Add("email", "Email is not valid")
-	}
-	if !auth.IsValidRole(role) {
-		ve.Add("role", "Invalid role")
-	}
-
-	if ve.HasErrors() {
-		return nil, ve
-	}
-
-	user, err := w.user.UpdateUser(id, username, email, password, role)
-	if err != nil {
-		return nil, err
-	}
-
-	// Reload the user resolver cache
-	if err := w.userResolver.Reload(); err != nil {
-		log.Printf("warning: could not reload user resolver cache: %v", err)
-	}
-
-	return user.ToPublicUser(), nil
-}
-
-func (w *Wiki) ChangeOwnPassword(id, oldPassword, newPassword string) error {
-	ve := errors.NewValidationErrors()
-	if newPassword == "" {
-		ve.Add("newPassword", "New password must not be empty")
-	} else if len(newPassword) < 8 {
-		ve.Add("newPassword", "New password must be at least 8 characters long")
-	}
-
-	_, err := w.GetUserService().DoesIDAndPasswordMatch(id, oldPassword)
-	if err != nil {
-		ve.Add("oldPassword", "Old password is incorrect")
-	}
-
-	if ve.HasErrors() {
-		return ve
-	}
-
-	return w.user.ChangeOwnPassword(id, oldPassword, newPassword)
-}
-
-func (w *Wiki) DeleteUser(id string) error {
-	err := w.user.DeleteUser(id)
-	if err != nil {
-		return err
-	}
-
-	// Reload the user resolver cache
-	if err := w.userResolver.Reload(); err != nil {
-		log.Printf("warning: could not reload user resolver cache: %v", err)
-	}
-
-	return nil
-}
-
-func (w *Wiki) UpdatePassword(id, password string) error {
-	ve := errors.NewValidationErrors()
-	if password == "" {
-		ve.Add("password", "Password must not be empty")
-	} else if len(password) < 8 {
-		ve.Add("password", "Password must be at least 8 characters long")
-	}
-
-	if ve.HasErrors() {
-		return ve
-	}
-
-	return w.user.UpdatePassword(id, password)
-}
-
-func (w *Wiki) GetUsers() ([]*auth.PublicUser, error) {
-	users, err := w.user.GetUsers()
-	if err != nil {
-		return nil, err
-	}
-
-	publicUsers := make([]*auth.PublicUser, len(users))
-	for i, user := range users {
-		publicUsers[i] = user.ToPublicUser()
-	}
-
-	return publicUsers, nil
-}
-
-func (w *Wiki) GetUserByID(id string) (*auth.PublicUser, error) {
-	user, err := w.user.GetUserByID(id)
-	if err != nil {
-		return nil, err
-	}
-
-	return user.ToPublicUser(), nil
-}
-
-func (w *Wiki) UploadAsset(userID, pageID string, file multipart.File, filename string, maxBytes int64) (string, error) {
-	page, err := w.tree.FindPageByID(pageID)
-	if err != nil {
-		return "", err
-	}
-	assetPath, err := w.asset.SaveAssetForPage(page, file, filename, maxBytes)
-	if err != nil {
-		return "", err
-	}
-	w.recordAssetRevision(pageID, userID, "")
-	return assetPath, nil
-}
-
-func (w *Wiki) ListAssets(pageID string) ([]string, error) {
-	page, err := w.tree.FindPageByID(pageID)
-	if err != nil {
-		return nil, err
-	}
-	return w.asset.ListAssetsForPage(page)
-}
-
-func (w *Wiki) RenameAsset(userID, pageID string, oldFilename, newFilename string) (string, error) {
-	page, err := w.tree.FindPageByID(pageID)
-	if err != nil {
-		return "", err
-	}
-	newPath, err := w.asset.RenameAsset(page, oldFilename, newFilename)
-	if err != nil {
-		return "", err
-	}
-
-	w.recordAssetRevision(pageID, userID, "")
-	return newPath, nil
-}
-
-func (w *Wiki) DeleteAsset(userID, pageID string, filename string) error {
-	page, err := w.tree.FindPageByID(pageID)
-	if err != nil {
-		return err
-	}
-	if err := w.asset.DeleteAsset(page, filename); err != nil {
-		return err
-	}
-
-	w.recordAssetRevision(pageID, userID, "")
-
-	return nil
-}
-
-func (w *Wiki) GetIndexingStatus() *search.IndexingStatus {
-	return w.status.Snapshot()
-}
-
-func (w *Wiki) IsIndexingActive() bool {
-	return w.status != nil && w.status.IsActive()
-}
-
-func (w *Wiki) Search(query string, offset, limit int) (*search.SearchResult, error) {
-	if w.searchIndex == nil {
-		return nil, fmt.Errorf("search index not available")
-	}
-	return w.searchIndex.Search(query, offset, limit)
-}
-
-func (w *Wiki) GetUserService() *auth.UserService {
-	return w.user
-}
-
-func (w *Wiki) GetAuthService() *auth.AuthService {
-	return w.auth
-}
-
-func (w *Wiki) GetAssetService() *assets.AssetService {
-	return w.asset
-}
-
-func (w *Wiki) GetUserResolver() *auth.UserResolver {
-	return w.userResolver
-}
+// ─── Service getters (test infrastructure) ───────────────────────────────────
 
 func (w *Wiki) GetStorageDir() string {
 	return w.storageDir
@@ -1046,197 +420,4 @@ func (w *Wiki) Close() error {
 	}
 
 	return w.searchIndex.Close()
-}
-
-// Branding methods
-
-func (w *Wiki) GetBranding() (*branding.BrandingConfigResponse, error) {
-	return w.branding.GetBranding()
-}
-
-func (w *Wiki) GetBrandingConstraints() (*branding.BrandingConstraintsResponse, error) {
-	if b, err := w.branding.GetBranding(); err == nil {
-		return &b.BrandingConstraints, nil
-	}
-	return nil, fmt.Errorf("failed to get branding constraints")
-}
-
-func (w *Wiki) UpdateBranding(siteName string) error {
-	return w.branding.UpdateBranding(siteName)
-}
-
-func (w *Wiki) UploadBrandingLogo(file multipart.File, filename string) (string, error) {
-	return w.branding.UploadLogo(file, filename)
-}
-
-func (w *Wiki) DeleteBrandingLogo() error {
-	return w.branding.DeleteLogo()
-}
-
-func (w *Wiki) UploadBrandingFavicon(file multipart.File, filename string) (string, error) {
-	return w.branding.UploadFavicon(file, filename)
-}
-
-func (w *Wiki) DeleteBrandingFavicon() error {
-	return w.branding.DeleteFavicon()
-}
-
-func (w *Wiki) GetBrandingService() *branding.BrandingService {
-	return w.branding
-}
-
-func (w *Wiki) GetSlugService() *tree.SlugService {
-	return w.slug
-}
-
-func (w *Wiki) ListRevisions(pageID string) ([]*revision.Revision, error) {
-	if w.revision == nil {
-		return []*revision.Revision{}, nil
-	}
-	return w.revision.ListRevisions(pageID)
-}
-
-func (w *Wiki) ListRevisionsPage(pageID, cursor string, limit int) ([]*revision.Revision, string, error) {
-	if w.revision == nil {
-		return []*revision.Revision{}, "", nil
-	}
-	return w.revision.ListRevisionsPage(pageID, cursor, limit)
-}
-
-func (w *Wiki) GetLatestRevision(pageID string) (*revision.Revision, error) {
-	if w.revision == nil {
-		return nil, nil
-	}
-	return w.revision.GetLatestRevision(pageID)
-}
-
-func (w *Wiki) GetRevisionSnapshot(pageID, revisionID string) (*revision.RevisionSnapshot, error) {
-	if w.revision == nil {
-		return nil, nil
-	}
-	return w.revision.GetRevisionSnapshot(pageID, revisionID)
-}
-
-func (w *Wiki) CompareRevisionSnapshots(pageID, baseRevisionID, targetRevisionID string) (*revision.RevisionComparison, error) {
-	if w.revision == nil {
-		return nil, nil
-	}
-	return w.revision.CompareRevisionSnapshots(pageID, baseRevisionID, targetRevisionID)
-}
-
-func (w *Wiki) GetRevisionAsset(pageID, revisionID, assetName string) (*revision.RevisionAssetContent, error) {
-	if w.revision == nil {
-		return nil, nil
-	}
-	return w.revision.GetRevisionAsset(pageID, revisionID, assetName)
-}
-
-func (w *Wiki) GetTrashEntry(pageID string) (*revision.TrashEntry, error) {
-	if w.revision == nil {
-		return nil, nil
-	}
-	return w.revision.GetTrashEntry(pageID)
-}
-
-func (w *Wiki) ListTrash() ([]*revision.TrashEntry, error) {
-	if w.revision == nil {
-		return []*revision.TrashEntry{}, nil
-	}
-	return w.revision.ListTrash()
-}
-
-func (w *Wiki) CheckRevisionIntegrity(pageID string) ([]revision.RevisionIntegrityIssue, error) {
-	if w.revision == nil {
-		return []revision.RevisionIntegrityIssue{}, nil
-	}
-	return w.revision.CheckRevisionIntegrity(pageID)
-}
-
-func (w *Wiki) RestorePage(userID, pageID string, targetParentID *string) (*tree.Page, error) {
-	if w.revision == nil {
-		return nil, fmt.Errorf("revision service not available")
-	}
-	if err := w.revision.RestorePage(pageID, userID, targetParentID); err != nil {
-		return nil, err
-	}
-
-	page, err := w.tree.GetPage(pageID)
-	if err != nil {
-		return nil, err
-	}
-
-	if w.links != nil {
-		if err := w.links.UpdateLinksForPage(page, page.Content); err != nil {
-			w.log.Warn("failed to update links for restored page", "pageID", page.ID, "error", err)
-		}
-		if err := w.links.HealLinksForExactPath(page); err != nil {
-			w.log.Warn("failed to heal links for restored page", "pageID", page.ID, "error", err)
-		}
-	}
-
-	return page, nil
-}
-
-func (w *Wiki) RestoreRevision(userID, pageID, revisionID string) (*tree.Page, error) {
-	if w.revision == nil {
-		return nil, fmt.Errorf("revision service not available")
-	}
-	if err := w.revision.RestoreRevision(pageID, revisionID, userID); err != nil {
-		return nil, err
-	}
-
-	page, err := w.tree.GetPage(pageID)
-	if err != nil {
-		return nil, err
-	}
-
-	if w.links != nil {
-		if err := w.links.UpdateLinksForPage(page, page.Content); err != nil {
-			w.log.Warn("failed to update links for restored revision", "pageID", page.ID, "revisionID", revisionID, "error", err)
-		}
-		if err := w.links.HealLinksForExactPath(page); err != nil {
-			w.log.Warn("failed to heal links for restored revision", "pageID", page.ID, "revisionID", revisionID, "error", err)
-		}
-	}
-
-	return page, nil
-}
-
-func (w *Wiki) recordContentRevision(pageID, userID, summary string) {
-	if w.revision == nil {
-		return
-	}
-	if _, _, err := w.revision.RecordContentUpdate(pageID, userID, summary); err != nil {
-		w.log.Warn("failed to record content revision", "pageID", pageID, "error", err)
-	}
-}
-
-func (w *Wiki) recordStructureRevision(pageID, userID, summary string) {
-	if w.revision == nil {
-		return
-	}
-	if _, _, err := w.revision.RecordStructureChange(pageID, userID, summary); err != nil {
-		w.log.Warn("failed to record structure revision", "pageID", pageID, "error", err)
-	}
-}
-
-func (w *Wiki) recordAssetRevision(pageID, userID, summary string) {
-	if w.revision == nil {
-		return
-	}
-	if _, _, err := w.revision.RecordAssetChange(pageID, userID, summary); err != nil {
-		w.log.Warn("failed to record asset revision", "pageID", pageID, "error", err)
-	}
-}
-
-func (w *Wiki) deleteRevisionData(pageIDs []string) error {
-	if w.revision == nil {
-		return nil
-	}
-	for _, pageID := range pageIDs {
-		if err := w.revision.DeletePageData(pageID); err != nil {
-			return err
-		}
-	}
-	return nil
 }

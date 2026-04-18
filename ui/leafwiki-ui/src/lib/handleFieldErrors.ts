@@ -1,3 +1,4 @@
+import { mapApiError } from './api/errors'
 import { toast } from 'sonner'
 
 type FieldError = {
@@ -29,9 +30,10 @@ export function handleFieldErrors(
     }
     setFieldErrors?.(errorMap)
     toast.error('Validation failed')
-  } else if (error.error) {
-    toast.error(error.error)
   } else {
-    toast.error(fallbackMessage)
+    const mapped = mapApiError(err, fallbackMessage)
+    toast.error(
+      mapped.detail ? `${mapped.message}: ${mapped.detail}` : mapped.message,
+    )
   }
 }
