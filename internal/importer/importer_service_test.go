@@ -11,7 +11,6 @@ import (
 
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
-	"github.com/perber/wiki/internal/test_utils"
 )
 
 // --- Helpers ----------------------------------------------------------------
@@ -40,49 +39,6 @@ func newServiceWithFakeWiki(t *testing.T, w *fakeWiki) *ImporterService {
 		logger:           slog.Default().With("component", "ImporterServiceTest"),
 		workspaceBaseDir: filepath.Join(importerDir, "workspaces"),
 	}
-}
-
-func importerFixturePath(t *testing.T, rel string) string {
-	t.Helper()
-
-	return test_utils.FixturePath(t, rel, "fixtures", "internal/importer/fixtures")
-}
-
-func copyFixtureToTemp(t *testing.T, rel string) string {
-	t.Helper()
-
-	sourceRoot := importerFixturePath(t, rel)
-	destRoot := filepath.Join(t.TempDir(), rel)
-
-	err := filepath.Walk(sourceRoot, func(sourcePath string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		relativePath, err := filepath.Rel(sourceRoot, sourcePath)
-		if err != nil {
-			return err
-		}
-		if relativePath == "." {
-			return os.MkdirAll(destRoot, 0o755)
-		}
-
-		destPath := filepath.Join(destRoot, relativePath)
-		if info.IsDir() {
-			return os.MkdirAll(destPath, 0o755)
-		}
-
-		raw, err := os.ReadFile(sourcePath)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(destPath, raw, 0o644)
-	})
-	if err != nil {
-		t.Fatalf("copy fixture %q: %v", rel, err)
-	}
-
-	return destRoot
 }
 
 func waitForExecutionStatus(t *testing.T, is *ImporterService, want ExecutionStatus) *CurrentPlanState {
@@ -525,7 +481,6 @@ func TestImporterService_ExecuteCurrentPlan_HappyPath_PreservesNonInternalFrontm
 		t.Fatalf("expected source leafwiki_title to be dropped, got: %q", *w.lastUpdatedContent)
 	}
 }
-
 
 func TestImporterService_ExecuteCurrentPlan_ExecutorStalePlanPropagatesError(t *testing.T) {
 	ws := t.TempDir()

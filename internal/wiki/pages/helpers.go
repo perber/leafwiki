@@ -46,16 +46,6 @@ func recordStructureRevision(svc *revision.Service, log *slog.Logger, pageID, us
 	}
 }
 
-// recordAssetRevision records an asset revision; errors are logged but not fatal.
-func recordAssetRevision(svc *revision.Service, log *slog.Logger, pageID, userID string) {
-	if svc == nil {
-		return
-	}
-	if _, _, err := svc.RecordAssetChange(pageID, userID, ""); err != nil {
-		log.Warn("failed to record asset revision", "pageID", pageID, "error", err)
-	}
-}
-
 // deleteRevisionData removes all revision data for a list of page IDs.
 func deleteRevisionData(svc *revision.Service, pageIDs []string) error {
 	if svc == nil {

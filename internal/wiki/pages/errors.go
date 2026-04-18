@@ -12,27 +12,16 @@ import (
 
 // Error codes for the pages domain.
 const (
-	ErrCodePageNotFound         = "page_not_found"
-	ErrCodePageParentNotFound   = "page_parent_not_found"
-	ErrCodePageSlugConflict     = "page_slug_conflict"
-	ErrCodePageHasChildren      = "page_has_children"
-	ErrCodePageCircularMove     = "page_circular_move"
-	ErrCodePageCannotMoveToSelf = "page_cannot_move_to_self"
-	ErrCodePageRootOperation    = "page_root_operation"
+	ErrCodePageNotFound          = "page_not_found"
+	ErrCodePageParentNotFound    = "page_parent_not_found"
+	ErrCodePageSlugConflict      = "page_slug_conflict"
+	ErrCodePageHasChildren       = "page_has_children"
+	ErrCodePageCircularMove      = "page_circular_move"
+	ErrCodePageCannotMoveToSelf  = "page_cannot_move_to_self"
+	ErrCodePageRootOperation     = "page_root_operation"
 	ErrCodePageConvertNotAllowed = "page_convert_not_allowed"
-	ErrCodePageInternalError    = "page_internal_error"
+	ErrCodePageInternalError     = "page_internal_error"
 )
-
-// LocalizedError factories — allow the frontend to localize messages using the template + args.
-
-func newPageNotFoundError(id string) *sharederrors.LocalizedError {
-	return sharederrors.NewLocalizedError(
-		ErrCodePageNotFound,
-		fmt.Sprintf("page %s not found", id),
-		"page %s not found",
-		nil, id,
-	)
-}
 
 func newPageRootOperationError(operation string) *sharederrors.LocalizedError {
 	return sharederrors.NewLocalizedError(
