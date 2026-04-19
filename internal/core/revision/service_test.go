@@ -457,8 +457,8 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage failed: %v", err)
 	}
-	// Restore preserves current title/slug; only content and assets are rolled back.
-	if page.Title != "Changed" || page.Slug != "changed" {
+	// Restore rehydrates revision content and title while preserving the current slug/path.
+	if page.Title != "Original" || page.Slug != "changed" {
 		t.Fatalf("restored page identity = (%q,%q)", page.Title, page.Slug)
 	}
 	if page.Content != originalContent {
