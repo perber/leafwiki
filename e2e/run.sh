@@ -57,7 +57,10 @@ build_frontend_for_local_e2e() {
 
 start_docker() {
   echo "🟢 Starting Docker container..."
-  docker build -t wiki-e2e-tests "$repo_root"
+  docker build \
+    --build-arg DISABLE_REFRESH_TOKEN_RATE_LIMIT=true \
+    -t wiki-e2e-tests \
+    "$repo_root"
 
   if docker ps -a --format '{{.Names}}' | grep -q '^wiki-e2e-tests$'; then
     echo "⚠️ Removing existing container..."
@@ -101,7 +104,7 @@ start_local() {
   (
     cd "$repo_root"
     go run \
-      -ldflags="-X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production" \
+      -ldflags="-X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X github.com/perber/wiki/internal/wiki/auth.DisableRefreshTokenRateLimit=true" \
       ./cmd/leafwiki/main.go \
       --host 127.0.0.1 \
       --port "$app_port" \

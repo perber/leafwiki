@@ -15,18 +15,21 @@ import (
 	"github.com/perber/wiki/internal/http/middleware/utils"
 )
 
+// DisableRefreshTokenRateLimit can be set via ldflags for E2E/debug builds.
+var DisableRefreshTokenRateLimit = "false"
+
 // Routes is the RouteRegistrar for the auth domain.
 type Routes struct {
-	login            *LoginUseCase
-	logout           *LogoutUseCase
-	refreshToken     *RefreshTokenUseCase
-	createUser       *CreateUserUseCase
-	updateUser       *UpdateUserUseCase
+	login             *LoginUseCase
+	logout            *LogoutUseCase
+	refreshToken      *RefreshTokenUseCase
+	createUser        *CreateUserUseCase
+	updateUser        *UpdateUserUseCase
 	changeOwnPassword *ChangeOwnPasswordUseCase
-	deleteUser       *DeleteUserUseCase
-	getUsers         *GetUsersUseCase
-	getUserByID      *GetUserByIDUseCase
-	authService      *coreauth.AuthService
+	deleteUser        *DeleteUserUseCase
+	getUsers          *GetUsersUseCase
+	getUserByID       *GetUserByIDUseCase
+	authService       *coreauth.AuthService
 }
 
 // RoutesConfig holds the dependencies to build an auth Routes instance.
@@ -46,16 +49,16 @@ type RoutesConfig struct {
 // NewRoutes constructs the auth RouteRegistrar.
 func NewRoutes(cfg RoutesConfig) *Routes {
 	return &Routes{
-		login:            cfg.Login,
-		logout:           cfg.Logout,
-		refreshToken:     cfg.RefreshToken,
-		createUser:       cfg.CreateUser,
-		updateUser:       cfg.UpdateUser,
+		login:             cfg.Login,
+		logout:            cfg.Logout,
+		refreshToken:      cfg.RefreshToken,
+		createUser:        cfg.CreateUser,
+		updateUser:        cfg.UpdateUser,
 		changeOwnPassword: cfg.ChangeOwnPassword,
-		deleteUser:       cfg.DeleteUser,
-		getUsers:         cfg.GetUsers,
-		getUserByID:      cfg.GetUserByID,
-		authService:      cfg.AuthService,
+		deleteUser:        cfg.DeleteUser,
+		getUsers:          cfg.GetUsers,
+		getUserByID:       cfg.GetUserByID,
+		authService:       cfg.AuthService,
 	}
 }
 
@@ -64,11 +67,15 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
 	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)
-	refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false)
 
 	nonAuth := ctx.Base.Group("/api")
 	nonAuth.POST("/auth/login", loginRateLimiter, r.handleLogin(ctx))
-	nonAuth.POST("/auth/refresh-token", refreshRateLimiter, r.handleRefreshToken(ctx))
+	if DisableRefreshTokenRateLimit == "true" {
+		nonAuth.POST("/auth/refresh-token", r.handleRefreshToken(ctx))
+	} else {
+		refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false)
+		nonAuth.POST("/auth/refresh-token", refreshRateLimiter, r.handleRefreshToken(ctx))
+	}
 
 	// Config endpoint also lives here as it issues the CSRF cookie.
 	nonAuth.GET("/config", r.handleConfig(ctx))

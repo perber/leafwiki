@@ -10,12 +10,13 @@ RUN VITE_API_URL=/ APP_VERSION=${APP_VERSION} npm run build
 # Step 2: Backend + Build binary
 FROM golang:1.26-alpine AS backend-build
 WORKDIR /app
+ARG DISABLE_REFRESH_TOKEN_RATE_LIMIT=false
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=frontend-build /app/dist ./internal/http/dist
 RUN CGO_ENABLED=0 go build \
-	-ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production" \
+	-ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X github.com/perber/wiki/internal/wiki/auth.DisableRefreshTokenRateLimit=${DISABLE_REFRESH_TOKEN_RATE_LIMIT}" \
 	-o /out/leafwiki ./cmd/leafwiki/main.go
 
 # Step 3: Final image (small)
