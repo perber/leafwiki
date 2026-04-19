@@ -13,6 +13,8 @@ export type AuthResponse = {
   }
 }
 
+const REFRESH_TIMEOUT_MS = 15000
+
 export class ApiError extends Error {
   status: number
 
@@ -47,14 +49,25 @@ export async function login(identifier: string, password: string) {
   })
 
   if (!res.ok) {
-    let errorBody: { error?: string } | null = null
+    let errorBody: unknown = null
     try {
       errorBody = await res.json()
     } catch {
       throw new Error('Login failed')
     }
 
-    if (errorBody?.error) throw new Error(errorBody.error)
+    if (isApiLocalizedErrorResponse(errorBody)) {
+      throw new ApiLocalizedError(errorBody.error)
+    }
+
+    if (
+      errorBody &&
+      typeof errorBody === 'object' &&
+      typeof (errorBody as { error?: unknown }).error === 'string'
+    ) {
+      throw new Error((errorBody as { error: string }).error)
+    }
+
     throw new Error('Login failed')
   }
 
@@ -207,16 +220,32 @@ export function ensureRefresh(): Promise<void> {
 
 async function refreshAccessToken() {
   const store = useSessionStore.getState()
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    REFRESH_TIMEOUT_MS,
+  )
 
-  const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
-    method: 'POST',
-    credentials: 'include',
-  })
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
+      method: 'POST',
+      credentials: 'include',
+      signal: controller.signal,
+    })
 
-  if (!res.ok) {
-    throw new Error('Refresh failed')
+    if (!res.ok) {
+      throw new Error('Refresh failed')
+    }
+
+    const data = await res.json()
+    store.setUser(data.user)
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Refresh timed out')
+    }
+
+    throw error
+  } finally {
+    window.clearTimeout(timeoutId)
   }
-
-  const data = await res.json()
-  store.setUser(data.user)
 }

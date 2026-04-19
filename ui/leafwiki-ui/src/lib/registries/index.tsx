@@ -2,6 +2,7 @@
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
 import { ImagePreviewDialog } from '@/features/imagepreview/ImagePreviewDialog'
+import { RestoreRevisionDialog } from '@/features/history/RestoreRevisionDialog'
 import { PageQuickSwitcherDialog } from '@/features/page-switcher/PageQuickSwitcherDialog'
 import { AddPageDialog } from '@/features/page/AddPageDialog'
 import { CopyPageDialog } from '@/features/page/CopyPageDialog'
@@ -70,6 +71,8 @@ export const DIALOG_UNSAVED_CHANGES = 'unsaved-changes'
 export const DIALOG_IMAGE_PREVIEW = 'image-preview'
 export const DIALOG_PAGE_QUICK_SWITCHER = 'page-quick-switcher'
 export const DIALOG_PAGE_REFACTOR_CONFIRMATION = 'page-refactor-confirmation'
+export const DIALOG_RESTORE_REVISION_CONFIRMATION =
+  'restore-revision-confirmation'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -248,6 +251,21 @@ dialogRegistry.register({
     return (
       <PageRefactorDialog
         key={`${DIALOG_PAGE_REFACTOR_CONFIRMATION}-${typedProps.preview.pageId}-${typedProps.preview.newPath}`}
+        {...typedProps}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_RESTORE_REVISION_CONFIRMATION,
+  render: (props) => {
+    const typedProps = props as React.ComponentProps<
+      typeof RestoreRevisionDialog
+    >
+    return (
+      <RestoreRevisionDialog
+        key={`${DIALOG_RESTORE_REVISION_CONFIRMATION}-${typedProps.revision.id}`}
         {...typedProps}
       />
     )

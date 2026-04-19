@@ -11,6 +11,7 @@ import {
   NODE_KIND_SECTION,
   PageNode,
 } from '@/lib/api/pages'
+import { mapApiError } from '@/lib/api/errors'
 import {
   DIALOG_ADD_PAGE,
   DIALOG_COPY_PAGE,
@@ -67,8 +68,13 @@ export default function TreeNodeActionsMenu({
         toast.success('Page converted successfully')
         reloadTree()
       })
-      .catch(() => {
-        toast.error('Failed to convert page')
+      .catch((err) => {
+        const mapped = mapApiError(err, 'Failed to convert page')
+        toast.error(
+          mapped.detail
+            ? `${mapped.message}: ${mapped.detail}`
+            : mapped.message,
+        )
       })
   }, [nodeId, nodeKind, reloadTree])
 

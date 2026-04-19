@@ -90,6 +90,7 @@ export default function PageHistoryPage() {
             <PageHistoryContent
               pageId={page.id}
               pageTitle={page.title}
+              pageSlug={page.slug}
               testidPrefix="page-history-page"
             />
           </article>

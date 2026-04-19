@@ -64,7 +64,7 @@ func TestFSStoreRevisionReadPaths(t *testing.T) {
 	}
 }
 
-func TestFSStoreBlobAndTrashPaths(t *testing.T) {
+func TestFSStoreBlobPaths(t *testing.T) {
 	store := NewFSStore(t.TempDir())
 
 	contentHash, err := store.SaveContentBlob([]byte("hello"))
@@ -112,31 +112,6 @@ func TestFSStoreBlobAndTrashPaths(t *testing.T) {
 	}
 	if len(manifest) != 1 || manifest[0].Name != "asset.txt" {
 		t.Fatalf("manifest = %#v", manifest)
-	}
-
-	entry := &TrashEntry{PageID: "page-1", DeletedAt: time.Now().UTC(), DeletedBy: "tester", Title: "Page", Slug: "page", Path: "/page", LastRevisionID: "rev1"}
-	if err := store.SaveTrashEntry(entry); err != nil {
-		t.Fatalf("SaveTrashEntry failed: %v", err)
-	}
-	trash, err := store.GetTrashEntry("page-1")
-	if err != nil {
-		t.Fatalf("GetTrashEntry failed: %v", err)
-	}
-	if trash.PageID != "page-1" {
-		t.Fatalf("trash = %#v", trash)
-	}
-	listed, err := store.ListTrash()
-	if err != nil {
-		t.Fatalf("ListTrash failed: %v", err)
-	}
-	if len(listed) != 1 {
-		t.Fatalf("expected 1 trash entry, got %d", len(listed))
-	}
-	if err := store.DeleteTrashEntry("page-1"); err != nil {
-		t.Fatalf("DeleteTrashEntry failed: %v", err)
-	}
-	if _, err := store.GetTrashEntry("page-1"); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected os.ErrNotExist after delete, got %v", err)
 	}
 }
 
@@ -196,12 +171,6 @@ func TestFSStoreValidationAndEmptyPaths(t *testing.T) {
 	if err := store.SaveRevision(nil); err == nil {
 		t.Fatalf("expected SaveRevision(nil) to fail")
 	}
-	if err := store.SaveTrashEntry(nil); err == nil {
-		t.Fatalf("expected SaveTrashEntry(nil) to fail")
-	}
-	if err := store.DeleteTrashEntry("missing"); err != nil {
-		t.Fatalf("DeleteTrashEntry missing should be ignored: %v", err)
-	}
 }
 
 func TestFSStoreListRevisionWrappersAndValidation(t *testing.T) {
@@ -232,7 +201,7 @@ func TestFSStoreListRevisionWrappersAndValidation(t *testing.T) {
 	}
 }
 
-func TestFSStoreIdempotentSavesAndTrashSorting(t *testing.T) {
+func TestFSStoreIdempotentSaves(t *testing.T) {
 	store := NewFSStore(t.TempDir())
 
 	h1, err := store.SaveContentBlob([]byte("same"))
@@ -282,25 +251,6 @@ func TestFSStoreIdempotentSavesAndTrashSorting(t *testing.T) {
 
 	if err := store.SaveRevision(&Revision{}); err == nil {
 		t.Fatalf("expected zero-value revision to fail")
-	}
-	if err := store.SaveTrashEntry(&TrashEntry{}); err == nil {
-		t.Fatalf("expected trash entry without page id to fail")
-	}
-
-	older := &TrashEntry{PageID: "p1", DeletedAt: time.Now().UTC().Add(-time.Hour), DeletedBy: "tester", Title: "Older", Slug: "older", Path: "/older", LastRevisionID: "r1"}
-	newer := &TrashEntry{PageID: "p2", DeletedAt: time.Now().UTC(), DeletedBy: "tester", Title: "Newer", Slug: "newer", Path: "/newer", LastRevisionID: "r2"}
-	if err := store.SaveTrashEntry(older); err != nil {
-		t.Fatalf("SaveTrashEntry older failed: %v", err)
-	}
-	if err := store.SaveTrashEntry(newer); err != nil {
-		t.Fatalf("SaveTrashEntry newer failed: %v", err)
-	}
-	listed, err := store.ListTrash()
-	if err != nil {
-		t.Fatalf("ListTrash failed: %v", err)
-	}
-	if len(listed) != 2 || listed[0].PageID != "p2" {
-		t.Fatalf("trash order = %#v", listed)
 	}
 }
 
@@ -378,24 +328,10 @@ func TestFSStoreJSONHelpersAndLocalizedNil(t *testing.T) {
 	}
 }
 
-func TestFSStoreListTrashInvalidJSONAndAssetBlobErrors(t *testing.T) {
+func TestFSStoreAssetBlobErrors(t *testing.T) {
 	store := NewFSStore(t.TempDir())
 	if _, _, err := store.SaveAssetBlobFromPath(filepath.Join(t.TempDir(), "missing.txt")); err == nil {
 		t.Fatalf("expected SaveAssetBlobFromPath on missing file to fail")
-	}
-
-	trashDir := store.trashDir()
-	if err := os.MkdirAll(filepath.Join(trashDir, "ignored-dir"), 0o755); err != nil {
-		t.Fatalf("MkdirAll ignored dir failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(trashDir, "notes.txt"), []byte("ignore"), 0o644); err != nil {
-		t.Fatalf("WriteFile ignored file failed: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(trashDir, "broken.json"), []byte("{"), 0o644); err != nil {
-		t.Fatalf("WriteFile broken trash failed: %v", err)
-	}
-	if _, err := store.ListTrash(); err == nil {
-		t.Fatalf("expected ListTrash to fail on invalid json")
 	}
 }
 
@@ -426,15 +362,8 @@ func TestFSStoreFailuresOnInvalidBasePath(t *testing.T) {
 	if err := store.SaveRevision(rev); err == nil {
 		t.Fatalf("expected SaveRevision to fail")
 	}
-	entry := &TrashEntry{PageID: "page-1", DeletedAt: time.Now().UTC(), DeletedBy: "tester", Title: "Page", Slug: "page", Path: "/page", LastRevisionID: "rev1"}
-	if err := store.SaveTrashEntry(entry); err == nil {
-		t.Fatalf("expected SaveTrashEntry to fail")
-	}
 	if _, err := store.ListRevisions("page-1"); err == nil {
 		t.Fatalf("expected ListRevisions to fail")
-	}
-	if _, err := store.ListTrash(); err == nil {
-		t.Fatalf("expected ListTrash to fail")
 	}
 }
 

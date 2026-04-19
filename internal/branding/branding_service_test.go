@@ -498,8 +498,12 @@ func TestBrandingService_UploadLogo_InvalidExtension_ReturnsError(t *testing.T) 
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "invalid logo file type") {
-		t.Fatalf("expected invalid logo type error, got: %v", err)
+	localized, ok := errors.AsLocalizedError(err)
+	if !ok {
+		t.Fatalf("expected LocalizedError, got %T: %v", err, err)
+	}
+	if localized.Code != "branding_logo_invalid_type" {
+		t.Fatalf("code = %q, want %q", localized.Code, "branding_logo_invalid_type")
 	}
 }
 
@@ -521,8 +525,12 @@ func TestBrandingService_UploadFavicon_InvalidExtension_ReturnsError(t *testing.
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "invalid favicon file type") {
-		t.Fatalf("expected invalid favicon type error, got: %v", err)
+	localized, ok := errors.AsLocalizedError(err)
+	if !ok {
+		t.Fatalf("expected LocalizedError, got %T: %v", err, err)
+	}
+	if localized.Code != "branding_favicon_invalid_type" {
+		t.Fatalf("code = %q, want %q", localized.Code, "branding_favicon_invalid_type")
 	}
 }
 

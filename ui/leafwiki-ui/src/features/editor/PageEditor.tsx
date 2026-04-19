@@ -1,4 +1,5 @@
 import Page404 from '@/components/Page404'
+import { mapApiError } from '@/lib/api/errors'
 import { buildBrowserEditUrl } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useRef } from 'react'
@@ -66,8 +67,13 @@ export default function PageEditor() {
           toast.success('Page saved successfully')
         }
       })
-      .catch(() => {
-        toast.error('Error saving page')
+      .catch((err) => {
+        const mapped = mapApiError(err, 'Error saving page')
+        toast.error(
+          mapped.detail
+            ? `${mapped.message}: ${mapped.detail}`
+            : mapped.message,
+        )
       })
   }, [savePage])
 

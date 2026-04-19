@@ -308,6 +308,32 @@ test.describe('Authenticated', () => {
     await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
   });
 
+  test('edit-page-metadata-keeps-existing-slug', async ({ page }) => {
+    const slug = `metadata-stable-${Date.now()}`;
+    const title = `Metadata Stable ${Date.now()}`;
+
+    await createPageWithContent(page, {
+      title,
+      slug,
+      content: 'Metadata regression guard',
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openMetadataDialog();
+
+    const editPageMetadataDialog = new EditPageMetadataDialog(page);
+    await editPageMetadataDialog.expectSlug(slug);
+
+    await page.keyboard.press('Escape');
+    await page.locator('[data-testid="edit-page-metadata-dialog"]').waitFor({
+      state: 'hidden',
+    });
+  });
+
   test('sort-pages', async ({ page }) => {
     const parentTitle = `Sort Parent Page ${Date.now()}`;
     const childPages = ['Banana', 'Apple', 'Cherry', 'Date'];
@@ -755,7 +781,9 @@ First reference[^leafwiki] and second reference[^leafwiki]
     // Revisions are now shown as an inline left panel on the history page.
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
-    await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
+    await expect(
+      page.locator('button[data-testid^="history-sidebar-revision-"]').first(),
+    ).toBeVisible();
     await expect(page.getByTestId('page-history-page-list')).toContainText('Revision History');
   });
 
@@ -1187,7 +1215,7 @@ Paragraph outside the list.
     await movePageDialog.selectNewParentAsTopLevel();
     await movePageDialog.clickMoveButton();
     await movePageDialog.expectRefactorDialogHidden();
-    await page.waitForTimeout(5000);
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${childTitle}`);
 
     const nodeRow = page
       .locator('div[data-testid^="tree-node-"]')
@@ -1195,11 +1223,89 @@ Paragraph outside the list.
       .first();
 
     test.expect(await nodeRow.count()).toBe(1);
+    await expect(page.locator('article > h1')).toHaveText(childTitle);
+  });
 
+  test('move-current-page-to-another-parent-updates-url', async ({ page }) => {
+    const stamp = Date.now();
+    const sourceParentTitle = `move-source-parent-${stamp}`;
+    const targetParentTitle = `move-target-parent-${stamp}`;
+    const childTitle = `move-between-child-${stamp}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(sourceParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+
+    await treeView.clickRootAddButton();
+    await addPageDialog.fillTitle(targetParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
+
+    await treeView.createSubPageOfParent(sourceParentTitle, childTitle);
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 3);
+
+    await treeView.expandNodeByTitle(sourceParentTitle);
     await treeView.clickPageByTitle(childTitle);
-    await page.locator('article').getByRole('link', { name: siblingTitle }).click();
-    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${parentTitle}/${siblingTitle}`);
-    await expect(page.locator('article > h1')).toHaveText(siblingTitle);
+    await expect(page.locator('article > h1')).toHaveText(childTitle);
+
+    await treeView.openMoveDialogForPage(sourceParentTitle, childTitle);
+
+    const movePageDialog = new MovePageDialog(page);
+    await movePageDialog.selectNewParent(targetParentTitle);
+    await movePageDialog.clickMoveButton();
+    await movePageDialog.expectRefactorDialogHidden();
+
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe(`/${targetParentTitle}/${childTitle}`);
+    await expect(page.locator('article > h1')).toHaveText(childTitle);
+  });
+
+  test('move-current-page-while-editing-updates-editor-url', async ({ page }) => {
+    const stamp = Date.now();
+    const sourceParentTitle = `edit-move-source-parent-${stamp}`;
+    const targetParentTitle = `edit-move-target-parent-${stamp}`;
+    const childTitle = `edit-move-child-${stamp}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(sourceParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+
+    await treeView.clickRootAddButton();
+    await addPageDialog.fillTitle(targetParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
+
+    await treeView.createSubPageOfParent(sourceParentTitle, childTitle);
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 3);
+
+    await treeView.expandNodeByTitle(sourceParentTitle);
+    await treeView.clickPageByTitle(childTitle);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    await treeView.openMoveDialogForPage(sourceParentTitle, childTitle);
+
+    const movePageDialog = new MovePageDialog(page);
+    await movePageDialog.selectNewParent(targetParentTitle);
+    await movePageDialog.clickMoveButton();
+    await movePageDialog.expectRefactorDialogHidden();
+
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe(`/e/${targetParentTitle}/${childTitle}`);
+    await expect(page.locator('.cm-editor')).toBeVisible();
   });
 
   test('move-page-updates-incoming-links-via-refactor-dialog', async ({ page }) => {
@@ -1243,7 +1349,10 @@ Paragraph outside the list.
     await movePageDialog.expectAffectedPagesCount(1);
     await movePageDialog.expectAffectedPageTitle(referrerTitle);
     await movePageDialog.confirmRefactorDialog();
-    await page.waitForTimeout(5000);
+    await expect(page.locator('article').getByRole('link', { name: targetTitle })).toHaveAttribute(
+      'href',
+      toAppPath(`/${targetTitle}`),
+    );
 
     await page.locator('article').getByRole('link', { name: targetTitle }).click();
     await expect.poll(() => new URL(page.url()).pathname).toBe(`/${targetTitle}`);
@@ -1846,7 +1955,11 @@ Note alias content
     viewPage = new ViewPage(page);
     await viewPage.openCurrentPageHistory();
     await viewPage.switchToRevisionsTab();
-    await expect(page.locator('[data-testid^="history-sidebar-revision-"]')).toHaveCount(2);
+    await expect
+      .poll(async () => {
+        return page.locator('button[data-testid^="history-sidebar-revision-"]').count();
+      })
+      .toBeGreaterThanOrEqual(2);
     await viewPage.openRevisionAt(1);
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
     await page.getByTestId('page-history-page-assets-tab').click();
@@ -1855,7 +1968,6 @@ Note alias content
     await expect(page.getByTestId('history-asset-open-upload-test.png')).toBeVisible();
     await expect(page.getByTestId('history-asset-download-upload-test.png')).toBeVisible();
 
-    await viewPage.openRevisionAt(0);
     await page.getByTestId('page-history-page-changes-tab').click();
     await expect(page.getByTestId('page-history-page-content')).toContainText('Removed');
   });

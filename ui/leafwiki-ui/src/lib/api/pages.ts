@@ -71,27 +71,19 @@ export async function suggestSlug(
   title: string,
   currentId?: string,
 ): Promise<string> {
-  try {
-    if (!currentId) currentId = ''
+  if (!currentId) currentId = ''
 
-    const data = await fetchWithAuth(
-      `/api/pages/slug-suggestion?parentID=${parentId}&title=${encodeURIComponent(title)}${currentId ? `&currentID=${currentId}` : ''}`,
-    )
-    const typedData = data as { slug: string }
-    return typedData.slug
-  } catch {
-    throw new Error('Slug suggestion failed')
-  }
+  const data = await fetchWithAuth(
+    `/api/pages/slug-suggestion?parentId=${parentId}&title=${encodeURIComponent(title)}${currentId ? `&currentId=${currentId}` : ''}`,
+  )
+  const typedData = data as { slug: string }
+  return typedData.slug
 }
 
 export async function getPageByPath(path: string): Promise<Page> {
-  try {
-    return (await fetchWithAuth(
-      `/api/pages/by-path?path=${encodeURIComponent(path)}`,
-    )) as Page
-  } catch {
-    throw new Error('Page not found')
-  }
+  return (await fetchWithAuth(
+    `/api/pages/by-path?path=${encodeURIComponent(path)}`,
+  )) as Page
 }
 
 export async function createPage({
@@ -246,6 +238,6 @@ export async function ensurePage(path: string, targetTitle: string) {
   return await fetchWithAuth(`/api/pages/ensure`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, targetTitle }),
+    body: JSON.stringify({ path, title: targetTitle }),
   })
 }

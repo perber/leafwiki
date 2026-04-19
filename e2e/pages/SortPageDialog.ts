@@ -87,8 +87,8 @@ export default class SortPageDialog {
 
   async saveSorting() {
     const saveButton = this.page.locator('button[data-testid="sort-pages-dialog-button-confirm"]');
+    await saveButton.waitFor({ state: 'visible' });
     await saveButton.click();
-    // Wait a bit to ensure the sorting is processed
-    await this.page.waitForTimeout(1000);
+    await saveButton.waitFor({ state: 'detached' });
   }
 }

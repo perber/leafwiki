@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { login } from '@/lib/api/auth'
+import { mapApiError } from '@/lib/api/errors'
 import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
 import { useSessionStore } from '@/stores/session'
@@ -32,7 +33,10 @@ export default function LoginForm() {
       // Redirect to home page after successful login
       navigate('/')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Login failed')
+      const mapped = mapApiError(err, 'Login failed')
+      toast.error(
+        mapped.detail ? `${mapped.message}: ${mapped.detail}` : mapped.message,
+      )
     } finally {
       setLoading(false)
     }

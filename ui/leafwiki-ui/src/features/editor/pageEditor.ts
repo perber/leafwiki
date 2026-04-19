@@ -8,6 +8,7 @@ import {
   previewPageRefactor,
   updatePage,
 } from '@/lib/api/pages'
+import { mapApiError } from '@/lib/api/errors'
 import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { create } from 'zustand'
@@ -120,11 +121,12 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
 
       return updatedPage
     } catch (err) {
-      if (err instanceof Error) {
-        set({ error: err.message })
-      } else {
-        set({ error: 'An unknown error occurred' })
-      }
+      const mapped = mapApiError(err, 'An unknown error occurred')
+      set({
+        error: mapped.detail
+          ? `${mapped.message}: ${mapped.detail}`
+          : mapped.message,
+      })
 
       throw err
     } finally {
@@ -144,11 +146,12 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         content: page.content,
       })
     } catch (err) {
-      if (err instanceof Error) {
-        set({ error: err.message })
-      } else {
-        set({ error: 'An unknown error occurred' })
-      }
+      const mapped = mapApiError(err, 'An unknown error occurred')
+      set({
+        error: mapped.detail
+          ? `${mapped.message}: ${mapped.detail}`
+          : mapped.message,
+      })
     } finally {
       useProgressbarStore.getState().setLoading(false)
     }

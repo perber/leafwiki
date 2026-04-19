@@ -111,6 +111,16 @@ export default class ViewPage {
 
   async clickPageHistoryButton() {
     const historyButton = this.page.getByTestId('page-history-button');
+    const overflowButton = this.page.getByTestId('toolbar-overflow-button');
+
+    await expect
+      .poll(async () => {
+        const historyVisible = await historyButton.isVisible().catch(() => false);
+        const overflowVisible = await overflowButton.isVisible().catch(() => false);
+        return historyVisible || overflowVisible;
+      })
+      .toBe(true);
+
     if (await historyButton.isVisible().catch(() => false)) {
       await historyButton.click();
       return;
@@ -146,13 +156,17 @@ export default class ViewPage {
   }
 
   async openFirstRevision() {
-    const firstRevision = this.page.locator('[data-testid^="history-sidebar-revision-"]').first();
+    const firstRevision = this.page
+      .locator('button[data-testid^="history-sidebar-revision-"]')
+      .first();
     await firstRevision.waitFor({ state: 'visible' });
     await firstRevision.click();
   }
 
   async openRevisionAt(index: number) {
-    const revision = this.page.locator('[data-testid^="history-sidebar-revision-"]').nth(index);
+    const revision = this.page
+      .locator('button[data-testid^="history-sidebar-revision-"]')
+      .nth(index);
     await revision.waitFor({ state: 'visible' });
     await revision.click();
   }

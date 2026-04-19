@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 export default class CopyPageDialog {
   constructor(private page: Page) {}
@@ -26,17 +26,11 @@ export default class CopyPageDialog {
       .replace(/\s+/g, '-')
       .replace(/[^\w-]/g, '');
 
-    // Wait max 5 seconds for the slug to be auto-generated
-    for (let i = 0; i < 50; i++) {
-      const slugValue = await slugInput.inputValue();
-      if (slugValue === expectedSlug) {
-        return;
-      }
-      await this.page.waitForTimeout(100);
-    }
-    throw new Error(
-      `Expected slug to be "${expectedSlug}", but got "${await slugInput.inputValue()}"`,
-    );
+    await expect
+      .poll(async () => slugInput.inputValue(), {
+        message: `Expected slug to be "${expectedSlug}"`,
+      })
+      .toBe(expectedSlug);
   }
 
   async submitWithoutRedirect() {

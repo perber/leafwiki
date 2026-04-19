@@ -18,6 +18,13 @@ export default class MovePageDialog {
     await option.click();
   }
 
+  async selectNewParent(title: string) {
+    const parentSelection = await this.getParentSelection();
+    await parentSelection.click();
+    const option = this.page.locator(`div[role="option"]`).filter({ hasText: title }).first();
+    await option.click();
+  }
+
   async clickMoveButton() {
     const moveButton = this.page.locator('button[data-testid="move-page-dialog-button-confirm"]');
     await moveButton.click();

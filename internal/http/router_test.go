@@ -1,4 +1,4 @@
-package http
+package http_test
 
 import (
 	"archive/zip"
@@ -18,6 +18,7 @@ import (
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
+	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
@@ -45,8 +46,22 @@ func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return createRouterTestInstanceWithMaxAssetUploadSize(w, t, assets.DefaultMaxUploadSizeBytes)
 }
 
+func createRouterTestInstanceWithRevision(w *wiki.Wiki, t *testing.T) *gin.Engine {
+	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		CustomStylesheet:        "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		EnableRevision:          true,
+	})
+}
+
 func createRouterTestInstanceWithMaxAssetUploadSize(w *wiki.Wiki, t *testing.T, maxAssetUploadSizeBytes int64) *gin.Engine {
-	return NewRouter(w, RouterOptions{
+	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        "",
@@ -59,7 +74,7 @@ func createRouterTestInstanceWithMaxAssetUploadSize(w *wiki.Wiki, t *testing.T, 
 }
 
 func createRouterTestInstanceWithAllowInsecure(w *wiki.Wiki, allowInsecure bool, t *testing.T) *gin.Engine {
-	return NewRouter(w, RouterOptions{
+	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        "",
@@ -180,6 +195,274 @@ func authenticatedRequestAs(t *testing.T, router http.Handler, username, passwor
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	return rec
+}
+
+type apiPage struct {
+	ID       string        `json:"id"`
+	Title    string        `json:"title"`
+	Slug     string        `json:"slug"`
+	Content  string        `json:"content"`
+	Path     string        `json:"path"`
+	Kind     tree.NodeKind `json:"kind"`
+	Children []*apiPage    `json:"children"`
+}
+
+func createPageViaAPI(t *testing.T, router http.Handler, title, slug string, parentID *string, kind *tree.NodeKind) *apiPage {
+	t.Helper()
+
+	payload := map[string]any{
+		"title": title,
+		"slug":  slug,
+	}
+	if parentID != nil {
+		payload["parentId"] = *parentID
+	}
+	if kind != nil {
+		payload["kind"] = string(*kind)
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("Marshal(create page payload) failed: %v", err)
+	}
+
+	rec := authenticatedRequest(t, router, http.MethodPost, "/api/pages", strings.NewReader(string(body)))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("Expected 201 Created, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var page apiPage
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+		t.Fatalf("Unmarshal(create page response) failed: %v", err)
+	}
+
+	return &page
+}
+
+func getPageByPathViaAPI(t *testing.T, router http.Handler, path string) *apiPage {
+	t.Helper()
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path?path="+path, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var page apiPage
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+		t.Fatalf("Unmarshal(get page by path response) failed: %v", err)
+	}
+
+	return &page
+}
+
+func getTreeViaAPI(t *testing.T, router http.Handler) *apiPage {
+	t.Helper()
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/tree", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var node apiPage
+	if err := json.Unmarshal(rec.Body.Bytes(), &node); err != nil {
+		t.Fatalf("Unmarshal(tree response) failed: %v", err)
+	}
+
+	return &node
+}
+
+func deletePageViaAPI(t *testing.T, router http.Handler, pageID string, recursive bool) {
+	t.Helper()
+
+	url := "/api/pages/" + pageID
+	if recursive {
+		url += "?recursive=true"
+	}
+
+	rec := authenticatedRequest(t, router, http.MethodDelete, url, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+}
+
+func listAssetsViaAPI(t *testing.T, router http.Handler, pageID string) []string {
+	t.Helper()
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+pageID+"/assets", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Files []string `json:"files"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Unmarshal(list assets response) failed: %v", err)
+	}
+
+	return resp.Files
+}
+
+func uploadAssetViaAPI(t *testing.T, router http.Handler, pageID, filename, content string) string {
+	t.Helper()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+	if _, err := part.Write([]byte(content)); err != nil {
+		t.Fatalf("Write(asset payload) failed: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close(writer) failed: %v", err)
+	}
+
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on login, got %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
+
+	cookies := loginRes.Cookies()
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+	if csrfToken == "" {
+		t.Fatal("Expected CSRF token after login, got none")
+	}
+
+	uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+pageID+"/assets", body)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	uploadReq.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		uploadReq.AddCookie(cookie)
+	}
+
+	uploadRec := httptest.NewRecorder()
+	router.ServeHTTP(uploadRec, uploadReq)
+
+	if uploadRec.Code != http.StatusCreated {
+		t.Fatalf("Expected 201 Created on upload, got %d - %s", uploadRec.Code, uploadRec.Body.String())
+	}
+
+	var uploadResp map[string]string
+	if err := json.Unmarshal(uploadRec.Body.Bytes(), &uploadResp); err != nil {
+		t.Fatalf("Unmarshal(upload asset response) failed: %v", err)
+	}
+
+	return uploadResp["file"]
+}
+
+func getLatestRevisionViaAPI(t *testing.T, router http.Handler, pageID string) map[string]any {
+	t.Helper()
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+pageID+"/revisions/latest", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var rev map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &rev); err != nil {
+		t.Fatalf("Unmarshal(latest revision response) failed: %v", err)
+	}
+	return rev
+}
+
+func getAdminUserIDViaAPI(t *testing.T, router http.Handler) string {
+	t.Helper()
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/users", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var users []map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &users); err != nil {
+		t.Fatalf("Unmarshal(users response) failed: %v", err)
+	}
+	for _, user := range users {
+		if role, _ := user["role"].(string); role == "admin" {
+			if id, _ := user["id"].(string); id != "" {
+				return id
+			}
+		}
+	}
+	t.Fatal("admin user not found")
+	return ""
+}
+
+func uploadBrandingLogoViaAPI(t *testing.T, router http.Handler, filename string, content []byte) {
+	t.Helper()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("Write(logo payload) failed: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close(writer) failed: %v", err)
+	}
+
+	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on login, got %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
+
+	cookies := loginRes.Cookies()
+	csrfToken := loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+	if csrfToken == "" {
+		t.Fatal("Expected CSRF token after login, got none")
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/branding/logo", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
 }
 
 func importerFixturePathForHTTPTests(t *testing.T, rel string) string {
@@ -386,7 +669,7 @@ func TestConfigEndpoint_IncludesMaxAssetUploadSizeBytes(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	const maxAssetUploadSizeBytes int64 = 123456
-	router := NewRouter(w, RouterOptions{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            true,
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
@@ -423,7 +706,7 @@ func TestConfigEndpoint_IncludesEnableLinkRefactor(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
-	router := NewRouter(w, RouterOptions{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            true,
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
@@ -457,11 +740,61 @@ func TestConfigEndpoint_IncludesEnableLinkRefactor(t *testing.T) {
 	}
 }
 
+func TestRefactorPreviewEndpoint_UsesFrontendJSONShape(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := createRouterTestInstance(w, t)
+	target := createPageViaAPI(t, router, "Target", "target", nil, pageNodeKind())
+	ref := createPageViaAPI(t, router, "Ref", "ref", nil, pageNodeKind())
+
+	updateBody := strings.NewReader(`{"title":"Ref","slug":"ref","content":"[Target](/target)"}`)
+	updateRec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+ref.ID, updateBody)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on page update, got %d - %s", updateRec.Code, updateRec.Body.String())
+	}
+
+	previewBody := strings.NewReader(`{"kind":"rename","title":"Target","slug":"target-renamed"}`)
+	previewRec := authenticatedRequest(t, router, http.MethodPost, "/api/pages/"+target.ID+"/refactor/preview", previewBody)
+	if previewRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on refactor preview, got %d - %s", previewRec.Code, previewRec.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(previewRec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid refactor preview JSON: %v", err)
+	}
+
+	if _, ok := resp["counts"]; !ok {
+		t.Fatalf("Expected lowercase counts in response, got %v", resp)
+	}
+	if _, ok := resp["affectedPages"]; !ok {
+		t.Fatalf("Expected lowercase affectedPages in response, got %v", resp)
+	}
+	if _, ok := resp["Counts"]; ok {
+		t.Fatalf("Did not expect legacy Counts key in response, got %v", resp)
+	}
+	if _, ok := resp["AffectedPages"]; ok {
+		t.Fatalf("Did not expect legacy AffectedPages key in response, got %v", resp)
+	}
+
+	counts, ok := resp["counts"].(map[string]any)
+	if !ok {
+		t.Fatalf("Expected counts object, got %T", resp["counts"])
+	}
+	if got := counts["affectedPages"]; got != float64(1) {
+		t.Fatalf("Expected counts.affectedPages=1, got %v", got)
+	}
+	if _, ok := counts["matchedLinks"]; !ok {
+		t.Fatalf("Expected counts.matchedLinks in response, got %v", counts)
+	}
+}
+
 func TestUploadAssetEndpoint_RejectsFilesExceedingConfiguredLimit(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
-	router := NewRouter(w, RouterOptions{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
@@ -471,10 +804,7 @@ func TestUploadAssetEndpoint_RejectsFilesExceedingConfiguredLimit(t *testing.T) 
 		MaxAssetUploadSizeBytes: 32,
 	})
 
-	page, err := w.CreatePage("system", nil, "Asset Limit Test", "asset-limit-test", pageNodeKind())
-	if err != nil {
-		t.Fatalf("Failed to create page: %v", err)
-	}
+	page := createPageViaAPI(t, router, "Asset Limit Test", "asset-limit-test", nil, pageNodeKind())
 
 	loginBody := `{"identifier": "admin", "password": "admin"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
@@ -524,7 +854,7 @@ func TestUploadAssetEndpoint_RejectsFilesExceedingConfiguredLimit(t *testing.T) 
 		t.Fatalf("Expected 413 Request Entity Too Large, got %d - %s", uploadRec.Code, uploadRec.Body.String())
 	}
 
-	assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), page.ID)
+	assetDir := filepath.Join(w.GetStorageDir(), "assets", page.ID)
 	entries, err := os.ReadDir(assetDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -541,7 +871,7 @@ func TestUploadAssetEndpoint_RejectsFilesExceedingConfiguredLimit(t *testing.T) 
 func TestSuggestSlugEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-	router := createRouterTestInstance(w, t)
+	router := createRouterTestInstanceWithRevision(w, t)
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/slug-suggestion?title=NewPage", nil)
 
@@ -817,10 +1147,7 @@ func TestImportExecuteEndpoint_WithZipUpload_ImportsPagesLinksAndAssets(t *testi
 		)
 	}
 
-	setupPage, err := w.FindByPath("guides/setup")
-	if err != nil {
-		t.Fatalf("FindByPath guides/setup err: %v", err)
-	}
+	setupPage := getPageByPathViaAPI(t, router, "guides/setup")
 	for _, expected := range []string{
 		"[Relative MD](/reference/endpoints)",
 		"[Absolute MD](/reference/endpoints)",
@@ -835,16 +1162,11 @@ func TestImportExecuteEndpoint_WithZipUpload_ImportsPagesLinksAndAssets(t *testi
 		}
 	}
 
-	assets, err := w.ListAssets(setupPage.ID)
-	if err != nil {
-		t.Fatalf("ListAssets err: %v", err)
-	}
+	assets := listAssetsViaAPI(t, router, setupPage.ID)
 	if len(assets) != 2 {
 		t.Fatalf("expected 2 uploaded assets, got %#v", assets)
 	}
-	if _, err := w.FindByPath("reference/api-1"); err != nil {
-		t.Fatalf("FindByPath reference/api-1 err: %v", err)
-	}
+	_ = getPageByPathViaAPI(t, router, "reference/api-1")
 }
 
 func TestImportExecuteEndpoint_UsesConfiguredAssetUploadLimit(t *testing.T) {
@@ -1013,19 +1335,16 @@ func TestDeletePageEndpoint(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Delete Me", "delete-me", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page := w.GetTree().Children[0]
+	page := createPageViaAPI(t, router, "Delete Me", "delete-me", nil, pageNodeKind())
 	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+page.ID, nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK, got %d", rec.Code)
 	}
 
-	if _, err := w.GetPage(page.ID); err == nil {
-		t.Fatalf("Expected page to be deleted")
+	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID, nil)
+	if getRec.Code != http.StatusNotFound {
+		t.Fatalf("Expected deleted page to return 404, got %d", getRec.Code)
 	}
 }
 
@@ -1046,14 +1365,8 @@ func TestDeletePageEndpoint_HasChildren(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	parent, err := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	_, err = w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
+	parent := createPageViaAPI(t, router, "Parent", "parent", nil, pageNodeKind())
+	createPageViaAPI(t, router, "Child", "child", &parent.ID, pageNodeKind())
 
 	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+parent.ID, nil)
 
@@ -1067,22 +1380,17 @@ func TestDeletePageEndpoint_Recursive(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	parent, err := w.CreatePage("system", nil, "Parent", "parent", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	_, err = w.CreatePage("system", &parent.ID, "Child", "child", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
+	parent := createPageViaAPI(t, router, "Parent", "parent", nil, pageNodeKind())
+	createPageViaAPI(t, router, "Child", "child", &parent.ID, pageNodeKind())
 
 	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+parent.ID+"?recursive=true", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK, got %d", rec.Code)
 	}
 
-	if _, err := w.GetPage(parent.ID); err == nil {
-		t.Fatalf("Expected page to be deleted")
+	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+parent.ID, nil)
+	if getRec.Code != http.StatusNotFound {
+		t.Fatalf("Expected deleted page to return 404, got %d", getRec.Code)
 	}
 }
 
@@ -1091,11 +1399,7 @@ func TestUpdatePageEndpoint(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Original Title", "original-title", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page := w.GetTree().Children[0]
+	page := createPageViaAPI(t, router, "Original Title", "original-title", nil, pageNodeKind())
 
 	payload := map[string]string{
 		"title":   "Updated Title",
@@ -1144,10 +1448,7 @@ func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Create a page
-	created, err := w.CreatePage("system", nil, "Immutable Slug", "immutable-slug", pageNodeKind())
-	if err != nil {
-		t.Fatalf("Failed to create page: %v", err)
-	}
+	created := createPageViaAPI(t, router, "Immutable Slug", "immutable-slug", nil, pageNodeKind())
 
 	// Update title, but reuse slug
 	payload := map[string]string{
@@ -1178,16 +1479,8 @@ func TestUpdatePage_PageAlreadyExists(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Original Title", "original-title", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page := w.GetTree().Children[0]
-
-	_, err = w.CreatePage("system", nil, "Conflict Title", "conflict-title", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
+	page := createPageViaAPI(t, router, "Original Title", "original-title", nil, pageNodeKind())
+	createPageViaAPI(t, router, "Conflict Title", "conflict-title", nil, pageNodeKind())
 
 	payload := map[string]string{
 		"title":   "Conflict Title",
@@ -1247,12 +1540,7 @@ func TestGetPageEndpoint(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Create a page
-	_, err := w.CreatePage("system", nil, "Welcome", "welcome", pageNodeKind())
-	if err != nil {
-		t.Fatalf("Failed to create page: %v", err)
-	}
-
-	page := w.GetTree().Children[0]
+	page := createPageViaAPI(t, router, "Welcome", "welcome", nil, pageNodeKind())
 
 	// Get page
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID, nil)
@@ -1270,11 +1558,11 @@ func TestGetPageEndpoint(t *testing.T) {
 		t.Errorf("Expected id in response, got: %v", resp)
 	}
 
-	if resp["title"] != "Welcome to LeafWiki" {
+	if resp["title"] != page.Title {
 		t.Errorf("Expected title in response, got: %v", resp)
 	}
 
-	if resp["slug"] != "welcome-to-leafwiki" {
+	if resp["slug"] != page.Slug {
 		t.Errorf("Expected slug in response, got: %v", resp)
 	}
 }
@@ -1333,10 +1621,7 @@ func TestGetPageByPathEndpoint_PageReturnsNoChildren(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Create a standalone page (no children – adding children auto-converts it to a section)
-	_, err := w.CreatePage("system", nil, "My Page", "my-page", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
+	createPageViaAPI(t, router, "My Page", "my-page", nil, pageNodeKind())
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path?path=my-page", nil)
 
@@ -1366,18 +1651,9 @@ func TestGetPageByPathEndpoint_SectionReturnsDirectChildrenOnly(t *testing.T) {
 	sectionKind := tree.NodeKindSection
 
 	// Create a section with a child page that itself has a grandchild
-	section, err := w.CreatePage("system", nil, "My Section", "my-section", &sectionKind)
-	if err != nil {
-		t.Fatalf("CreatePage (section) failed: %v", err)
-	}
-	child, err := w.CreatePage("system", &section.ID, "Child Page", "child-page", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage (child) failed: %v", err)
-	}
-	_, err = w.CreatePage("system", &child.ID, "Grandchild Page", "grandchild-page", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage (grandchild) failed: %v", err)
-	}
+	section := createPageViaAPI(t, router, "My Section", "my-section", nil, &sectionKind)
+	child := createPageViaAPI(t, router, "Child Page", "child-page", &section.ID, pageNodeKind())
+	createPageViaAPI(t, router, "Grandchild Page", "grandchild-page", &child.ID, pageNodeKind())
 
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path?path=my-section", nil)
 
@@ -1412,17 +1688,8 @@ func TestMovePageEndpoint(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Create two pages a and b
-	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	_, err = w.CreatePage("system", nil, "Section B", "section-b", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	a := w.GetTree().Children[0]
-	b := w.GetTree().Children[1]
+	a := createPageViaAPI(t, router, "Section A", "section-a", nil, pageNodeKind())
+	b := createPageViaAPI(t, router, "Section B", "section-b", nil, pageNodeKind())
 
 	// Move a under b
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"`+b.ID+`"}`))
@@ -1432,7 +1699,8 @@ func TestMovePageEndpoint(t *testing.T) {
 	}
 
 	// Check if a is now a child of b
-	if len(b.Children) != 1 || b.Children[0].ID != a.ID {
+	movedParent := getPageByPathViaAPI(t, router, "section-b")
+	if len(movedParent.Children) != 1 || movedParent.Children[0].ID != a.ID {
 		t.Errorf("Expected page to be moved under new parent")
 	}
 }
@@ -1478,11 +1746,7 @@ func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	a := w.GetTree().Children[0]
+	a := createPageViaAPI(t, router, "Section A", "section-a", nil, pageNodeKind())
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"not-found-id"}`))
 
@@ -1499,17 +1763,8 @@ func TestMovePageEndpoint_CircularReference(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	a := w.GetTree().Children[0]
-
-	_, err = w.CreatePage("system", &a.ID, "Section B", "section-b", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	b := a.Children[0]
+	a := createPageViaAPI(t, router, "Section A", "section-a", nil, pageNodeKind())
+	b := createPageViaAPI(t, router, "Section B", "section-b", &a.ID, pageNodeKind())
 
 	// Verschiebe a → unter b
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+b.ID+"/move", strings.NewReader(`{"parentId":"`+a.ID+`"}`))
@@ -1524,22 +1779,11 @@ func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	a := w.GetTree().Children[0]
-
-	_, err = w.CreatePage("system", nil, "Section B", "section-b", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
+	a := createPageViaAPI(t, router, "Section A", "section-a", nil, pageNodeKind())
+	createPageViaAPI(t, router, "Section B", "section-b", nil, pageNodeKind())
 
 	// Create Conflict Page in b
-	conflictPage, err := w.CreatePage("system", &a.ID, "Section B", "section-b", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
+	conflictPage := createPageViaAPI(t, router, "Section B", "section-b", &a.ID, pageNodeKind())
 
 	// move conflictPage under root (where section-b already exists)
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+conflictPage.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
@@ -1554,11 +1798,7 @@ func TestMovePage_InTheSamePlace(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	_, err := w.CreatePage("system", nil, "Section A", "section-a", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	a := w.GetTree().Children[0]
+	a := createPageViaAPI(t, router, "Section A", "section-a", nil, pageNodeKind())
 
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
 
@@ -1573,30 +1813,11 @@ func TestSortPagesEndpoint(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Create pages
-	page1, err := w.CreatePage("system", nil, "Page 1", "page-1", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page2, err := w.CreatePage("system", nil, "Page 2", "page-2", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-	page3, err := w.CreatePage("system", nil, "Page 3", "page-3", pageNodeKind())
-	if err != nil {
-		t.Fatalf("CreatePage failed: %v", err)
-	}
-
-	// Get Welcome Page by path
-	welcomePage, err := w.FindByPath("welcome-to-leafwiki")
-	if err != nil {
-		t.Fatalf("FindByPath failed: %v", err)
-	}
-
-	// Delete Welcome Page
-	err = w.DeletePage("system", welcomePage.ID, false)
-	if err != nil {
-		t.Fatalf("DeletePage failed: %v", err)
-	}
+	page1 := createPageViaAPI(t, router, "Page 1", "page-1", nil, pageNodeKind())
+	page2 := createPageViaAPI(t, router, "Page 2", "page-2", nil, pageNodeKind())
+	page3 := createPageViaAPI(t, router, "Page 3", "page-3", nil, pageNodeKind())
+	welcomePage := getPageByPathViaAPI(t, router, "welcome-to-leafwiki")
+	deletePageViaAPI(t, router, welcomePage.ID, false)
 
 	// Sort pages
 	payload := map[string]interface{}{
@@ -1619,19 +1840,19 @@ func TestSortPagesEndpoint(t *testing.T) {
 		t.Errorf("Expected success message, got: %v", resp["message"])
 	}
 
-	tree := w.GetTree()
-	if len(tree.Children) != 3 {
-		t.Fatalf("Expected 3 children in root, got: %d", len(tree.Children))
+	root := getTreeViaAPI(t, router)
+	if len(root.Children) != 3 {
+		t.Fatalf("Expected 3 children in root, got: %d", len(root.Children))
 	}
 
-	if tree.Children[0].ID != page3.ID {
-		t.Errorf("Expected first child to be page 3, got: %v", tree.Children[0].ID)
+	if root.Children[0].ID != page3.ID {
+		t.Errorf("Expected first child to be page 3, got: %v", root.Children[0].ID)
 	}
-	if tree.Children[1].ID != page1.ID {
-		t.Errorf("Expected second child to be page 1, got: %v", tree.Children[1].ID)
+	if root.Children[1].ID != page1.ID {
+		t.Errorf("Expected second child to be page 1, got: %v", root.Children[1].ID)
 	}
-	if tree.Children[2].ID != page2.ID {
-		t.Errorf("Expected third child to be page 2, got: %v", tree.Children[2].ID)
+	if root.Children[2].ID != page2.ID {
+		t.Errorf("Expected third child to be page 2, got: %v", root.Children[2].ID)
 	}
 }
 
@@ -2028,7 +2249,7 @@ func TestRequireAdminMiddleware_BlockedWhenAuthDisabled(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	// Create router with auth disabled
-	router := NewRouter(w, RouterOptions{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
@@ -2152,10 +2373,7 @@ func TestAssetEndpoints(t *testing.T) {
 	}
 
 	// Step 1: Create page direkt über Wiki-API
-	page, err := w.CreatePage("system", nil, "Assets Page", "assets-page", pageNodeKind())
-	if err != nil {
-		t.Fatalf("Failed to create page: %v", err)
-	}
+	page := createPageViaAPI(t, router, "Assets Page", "assets-page", nil, pageNodeKind())
 
 	// Step 2: Upload file
 	body := &bytes.Buffer{}
@@ -2244,11 +2462,8 @@ func TestAssetEndpoints(t *testing.T) {
 func TestAssetMutationRevisionsUseAuthenticatedUser(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-	router := createRouterTestInstance(w, t)
-	adminUser, err := w.GetUserService().GetUserByEmailOrUsernameAndPassword("admin", "admin")
-	if err != nil {
-		t.Fatalf("GetUserByEmailOrUsernameAndPassword failed: %v", err)
-	}
+	router := createRouterTestInstanceWithRevision(w, t)
+	adminUserID := getAdminUserIDViaAPI(t, router)
 
 	loginBody := `{"identifier": "admin", "password": "admin"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
@@ -2293,7 +2508,7 @@ func TestAssetMutationRevisionsUseAuthenticatedUser(t *testing.T) {
 	writeAsset := func(t *testing.T, pageID, name string) {
 		t.Helper()
 
-		assetDir := filepath.Join(w.GetAssetService().GetAssetsDir(), pageID)
+		assetDir := filepath.Join(w.GetStorageDir(), "assets", pageID)
 		if err := os.MkdirAll(assetDir, 0o755); err != nil {
 			t.Fatalf("MkdirAll(assetDir) failed: %v", err)
 		}
@@ -2347,7 +2562,8 @@ func TestAssetMutationRevisionsUseAuthenticatedUser(t *testing.T) {
 			name: "delete",
 			setup: func(t *testing.T, pageID string) {
 				t.Helper()
-				writeAsset(t, pageID, "delete.txt")
+				// Upload through the HTTP API so the setup exercises the same path as production.
+				uploadAssetViaAPI(t, router, pageID, "delete.txt", "payload")
 			},
 			request: func(t *testing.T, pageID string) *http.Request {
 				t.Helper()
@@ -2358,10 +2574,7 @@ func TestAssetMutationRevisionsUseAuthenticatedUser(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			page, err := w.CreatePage("system", nil, "Assets "+tc.name, "assets-"+tc.name, pageNodeKind())
-			if err != nil {
-				t.Fatalf("CreatePage failed: %v", err)
-			}
+			page := createPageViaAPI(t, router, "Assets "+tc.name, "assets-"+tc.name, nil, pageNodeKind())
 
 			if tc.setup != nil {
 				tc.setup(t, page.ID)
@@ -2377,18 +2590,12 @@ func TestAssetMutationRevisionsUseAuthenticatedUser(t *testing.T) {
 				t.Fatalf("Expected 2xx response, got %d - %s", rec.Code, rec.Body.String())
 			}
 
-			latest, err := w.GetLatestRevision(page.ID)
-			if err != nil {
-				t.Fatalf("GetLatestRevision failed: %v", err)
+			latest := getLatestRevisionViaAPI(t, router, page.ID)
+			if latest["type"] != string(revision.RevisionTypeAssetUpdate) {
+				t.Fatalf("latest type = %v, want %q", latest["type"], revision.RevisionTypeAssetUpdate)
 			}
-			if latest == nil {
-				t.Fatal("expected latest revision")
-			}
-			if latest.Type != revision.RevisionTypeAssetUpdate {
-				t.Fatalf("latest type = %q, want %q", latest.Type, revision.RevisionTypeAssetUpdate)
-			}
-			if latest.AuthorID != adminUser.ID {
-				t.Fatalf("latest author = %q, want %q", latest.AuthorID, adminUser.ID)
+			if latest["authorId"] != adminUserID {
+				t.Fatalf("latest author = %v, want %q", latest["authorId"], adminUserID)
 			}
 		})
 	}
@@ -2421,9 +2628,9 @@ func TestIndexingStatusEndpoint(t *testing.T) {
 // If needsAuth is true, it will obtain authentication cookies; otherwise it will get CSRF token only (for AuthDisabled mode).
 func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content string, needsAuth bool) (assetURL string, cookies []*http.Cookie) {
 	// Create a page
-	page, err := w.CreatePage("system", nil, "Test Page", "test-page", pageNodeKind())
-	if err != nil {
-		t.Fatalf("Failed to create page: %v", err)
+	pageID := ""
+	if needsAuth {
+		pageID = createPageViaAPI(t, router, "Test Page", "test-page", nil, pageNodeKind()).ID
 	}
 
 	// Prepare the file upload
@@ -2465,6 +2672,10 @@ func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content str
 			}
 		}
 	} else {
+		createBody := `{"title":"Test Page","slug":"test-page"}`
+		createReq := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(createBody))
+		createReq.Header.Set("Content-Type", "application/json")
+
 		// Get CSRF token only (for AuthDisabled mode)
 		configReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 		configRec := httptest.NewRecorder()
@@ -2480,10 +2691,28 @@ func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content str
 				}
 			}
 		}
+
+		for _, cookie := range cookies {
+			createReq.AddCookie(cookie)
+		}
+		createReq.Header.Set("X-CSRF-Token", csrfToken)
+
+		createRec := httptest.NewRecorder()
+		router.ServeHTTP(createRec, createReq)
+
+		if createRec.Code != http.StatusCreated {
+			t.Fatalf("Expected 201 Created on page creation, got %d - %s", createRec.Code, createRec.Body.String())
+		}
+
+		var pageResp apiPage
+		if err := json.Unmarshal(createRec.Body.Bytes(), &pageResp); err != nil {
+			t.Fatalf("Invalid page creation JSON: %v", err)
+		}
+		pageID = pageResp.ID
 	}
 
 	// Upload the asset
-	uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+page.ID+"/assets", body)
+	uploadReq := httptest.NewRequest(http.MethodPost, "/api/pages/"+pageID+"/assets", body)
 	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
 	for _, cookie := range cookies {
 		uploadReq.AddCookie(cookie)
@@ -2517,7 +2746,7 @@ func TestAssetAccessControl(t *testing.T) {
 		defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 		// Create router with PublicAccess=false and AuthDisabled=false
-		router := NewRouter(w, RouterOptions{
+		router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 			PublicAccess:            false,
 			InjectCodeInHeader:      "",
 			CustomStylesheet:        "",
@@ -2547,7 +2776,7 @@ func TestAssetAccessControl(t *testing.T) {
 		defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 		// Create router with PublicAccess=false and AuthDisabled=false
-		router := NewRouter(w, RouterOptions{
+		router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 			PublicAccess:            false,
 			InjectCodeInHeader:      "",
 			CustomStylesheet:        "",
@@ -2586,7 +2815,7 @@ func TestAssetAccessControl(t *testing.T) {
 		defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 		// Create router with PublicAccess=true
-		router := NewRouter(w, RouterOptions{
+		router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 			PublicAccess:            true,
 			InjectCodeInHeader:      "",
 			CustomStylesheet:        "",
@@ -2622,7 +2851,7 @@ func TestAssetAccessControl(t *testing.T) {
 		defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 		// Create router with AuthDisabled=true
-		router := NewRouter(w, RouterOptions{
+		router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 			PublicAccess:            false,
 			InjectCodeInHeader:      "",
 			CustomStylesheet:        "",
@@ -2655,7 +2884,7 @@ func TestAssetAccessControl(t *testing.T) {
 }
 
 func TestBuildCustomStylesheetTag(t *testing.T) {
-	tag := buildCustomStylesheetTag("/wiki", "/tmp/custom.css")
+	tag := httpinternal.BuildCustomStylesheetTag("/wiki", "/tmp/custom.css")
 
 	expected := `<link rel="stylesheet" href="/wiki/custom.css">`
 	if tag != expected {
@@ -2664,7 +2893,7 @@ func TestBuildCustomStylesheetTag(t *testing.T) {
 }
 
 func TestBuildCustomStylesheetTag_EmptyPath(t *testing.T) {
-	tag := buildCustomStylesheetTag("", "")
+	tag := httpinternal.BuildCustomStylesheetTag("", "")
 	if tag != "" {
 		t.Fatalf("expected empty tag, got %q", tag)
 	}
@@ -2672,7 +2901,7 @@ func TestBuildCustomStylesheetTag_EmptyPath(t *testing.T) {
 
 func TestInjectIntoHead(t *testing.T) {
 	html := "<html><head></head><body></body></html>"
-	got := injectIntoHead(html, `<link rel="stylesheet" href="/custom.css">`)
+	got := httpinternal.InjectIntoHead(html, `<link rel="stylesheet" href="/custom.css">`)
 
 	if !strings.Contains(got, `<link rel="stylesheet" href="/custom.css">`) {
 		t.Fatalf("expected stylesheet link to be injected, got %q", got)
@@ -2688,7 +2917,7 @@ func TestCustomStylesheetRoute(t *testing.T) {
 		t.Fatalf("failed to create custom stylesheet: %v", err)
 	}
 
-	router := NewRouter(w, RouterOptions{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        customCSSPath,
@@ -2725,7 +2954,7 @@ func TestCustomStylesheetRoute_RejectsPathOutsideStorageDir(t *testing.T) {
 		t.Fatalf("failed to create stylesheet outside storage dir: %v", err)
 	}
 
-	router := NewRouter(w, RouterOptions{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        outsideCSSPath,
@@ -2754,7 +2983,7 @@ func TestCustomStylesheetRoute_RejectsNonCSSFile(t *testing.T) {
 		t.Fatalf("failed to create non-css file: %v", err)
 	}
 
-	router := NewRouter(w, RouterOptions{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        textFilePath,
@@ -2778,24 +3007,8 @@ func TestBrandingAssetRoute_DisablesClientCache(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
-	logoFile, err := os.CreateTemp(t.TempDir(), "logo-*.png")
-	if err != nil {
-		t.Fatalf("create temp logo: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(logoFile.Close, t)
-
-	if _, err := logoFile.Write([]byte("logo")); err != nil {
-		t.Fatalf("write temp logo: %v", err)
-	}
-	if _, err := logoFile.Seek(0, io.SeekStart); err != nil {
-		t.Fatalf("seek temp logo: %v", err)
-	}
-
-	if _, err := w.UploadBrandingLogo(logoFile, "logo.png"); err != nil {
-		t.Fatalf("upload branding logo: %v", err)
-	}
-
 	router := createRouterTestInstance(w, t)
+	uploadBrandingLogoViaAPI(t, router, "logo.png", []byte("logo"))
 
 	req := httptest.NewRequest(http.MethodGet, "/branding/logo.png", nil)
 	rec := httptest.NewRecorder()
@@ -2814,13 +3027,13 @@ func TestFaviconRoute_DisablesClientCache(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
-	EmbedFrontendOrig := EmbedFrontend
-	EmbedFrontend = "true"
+	EmbedFrontendOrig := httpinternal.EmbedFrontend
+	httpinternal.EmbedFrontend = "true"
 	defer func() {
-		EmbedFrontend = EmbedFrontendOrig
+		httpinternal.EmbedFrontend = EmbedFrontendOrig
 	}()
 
-	router := NewRouter(w, RouterOptions{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        "",
@@ -2845,7 +3058,7 @@ func TestFaviconRoute_DisablesClientCache(t *testing.T) {
 }
 
 func TestBuildCustomStylesheetTag_WhitespacePath(t *testing.T) {
-	tag := buildCustomStylesheetTag("/wiki", "   ")
+	tag := httpinternal.BuildCustomStylesheetTag("/wiki", "   ")
 	if tag != "" {
 		t.Fatalf("expected empty tag for whitespace path, got %q", tag)
 	}

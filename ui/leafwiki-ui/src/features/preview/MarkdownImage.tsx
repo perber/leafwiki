@@ -2,7 +2,7 @@
 import { DIALOG_IMAGE_PREVIEW } from '@/lib/registries'
 import { withBasePath } from '@/lib/routePath'
 import { useDialogsStore } from '@/stores/dialogs'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 type Props = React.ImgHTMLAttributes<HTMLImageElement> & { node?: unknown }
 type MarkdownImageProps = Omit<Props, 'node'> & {
@@ -19,6 +19,18 @@ function shouldOpenInNewTab(e: React.MouseEvent<HTMLImageElement>) {
   return e.button === 0 && (e.metaKey || e.ctrlKey)
 }
 
+function normalizeImageSrc(src: string) {
+  if (src.startsWith('/assets/') || src.startsWith('/api/')) {
+    return withBasePath(src)
+  }
+
+  if (src.startsWith('assets/')) {
+    return withBasePath(`/${src}`)
+  }
+
+  return src
+}
+
 export function MarkdownImage({
   src = '',
   style,
@@ -28,34 +40,35 @@ export function MarkdownImage({
   ...rest
 }: MarkdownImageProps & { node?: unknown }) {
   void node
-  const [versionedSrc, setVersionedSrc] = useState(src)
   const openDialog = useDialogsStore((s) => s.openDialog)
+  const resolvedSrc = useMemo(
+    () => resolveAssetUrl?.(src) ?? src,
+    [resolveAssetUrl, src],
+  )
+  const [versionedSrc, setVersionedSrc] = useState(() =>
+    normalizeImageSrc(resolvedSrc),
+  )
 
   useEffect(() => {
-    const resolvedSrc = resolveAssetUrl?.(src) ?? src
-
     if (
       !resolvedSrc?.startsWith('/assets/') &&
+      !resolvedSrc?.startsWith('assets/') &&
       !resolvedSrc?.startsWith('/api/')
     ) {
-      setVersionedSrc(resolvedSrc)
+      setVersionedSrc(normalizeImageSrc(resolvedSrc))
       return
     }
 
-    const checkVersion = async () => {
-      try {
-        const v = Date.now()
-        const prefixedSrc = withBasePath(resolvedSrc)
-        const url = new URL(prefixedSrc, location.origin)
-        url.searchParams.set('v', v.toString())
-        setVersionedSrc(url.toString())
-      } catch {
-        setVersionedSrc(resolvedSrc) // fallback
+    try {
+      const url = new URL(normalizeImageSrc(resolvedSrc), location.origin)
+      if (!url.searchParams.has('v')) {
+        url.searchParams.set('v', Date.now().toString())
       }
+      setVersionedSrc(url.toString())
+    } catch {
+      setVersionedSrc(normalizeImageSrc(resolvedSrc))
     }
-
-    checkVersion()
-  }, [resolveAssetUrl, src])
+  }, [resolvedSrc])
 
   return (
     <img

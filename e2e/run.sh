@@ -12,6 +12,27 @@ server_log=""
 local_data_dir=""
 docker_data_volume=""
 
+print_runner_diagnostics() {
+  echo "--- E2E runtime diagnostics ---"
+
+  if [ "$run_mode" = "docker" ]; then
+    if docker ps -a --format '{{.Names}}' | grep -q '^wiki-e2e-tests$'; then
+      echo "--- docker logs (last 200 lines) ---"
+      docker logs --tail 200 wiki-e2e-tests 2>&1 || true
+    else
+      echo "No Docker container logs available."
+    fi
+    return
+  fi
+
+  if [ -n "$server_log" ] && [ -f "$server_log" ]; then
+    echo "--- local server log (last 200 lines) ---"
+    tail -n 200 "$server_log" || true
+  else
+    echo "No local server log available."
+  fi
+}
+
 build_frontend_for_local_e2e() {
   if [ "${E2E_SKIP_UI_BUILD:-0}" = "1" ]; then
     echo "⚡ Skipping UI build for local E2E run..."
@@ -36,7 +57,10 @@ build_frontend_for_local_e2e() {
 
 start_docker() {
   echo "🟢 Starting Docker container..."
-  docker build -t wiki-e2e-tests "$repo_root"
+  docker build \
+    --build-arg DISABLE_REFRESH_TOKEN_RATE_LIMIT=true \
+    -t wiki-e2e-tests \
+    "$repo_root"
 
   if docker ps -a --format '{{.Names}}' | grep -q '^wiki-e2e-tests$'; then
     echo "⚠️ Removing existing container..."
@@ -53,6 +77,7 @@ start_docker() {
     wiki-e2e-tests \
     --allow-insecure=true \
     --enable-revision=true \
+    --enable-link-refactor=true \
     --jwt-secret=e2e-tests-secret \
     --admin-password=admin
 
@@ -79,13 +104,14 @@ start_local() {
   (
     cd "$repo_root"
     go run \
-      -ldflags="-X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production" \
+      -ldflags="-X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X github.com/perber/wiki/internal/wiki/auth.DisableRefreshTokenRateLimit=true" \
       ./cmd/leafwiki/main.go \
       --host 127.0.0.1 \
       --port "$app_port" \
       --data-dir "$local_data_dir" \
       --allow-insecure=true \
       --enable-revision=true \
+      --enable-link-refactor=true \
       --jwt-secret=e2e-tests-secret \
       --admin-password=admin
   ) >"$server_log" 2>&1 &
@@ -115,6 +141,17 @@ stop_runner() {
   else
     stop_local
   fi
+}
+
+cleanup_runner() {
+  local exit_code=$?
+
+  if [ "$exit_code" -ne 0 ]; then
+    print_runner_diagnostics
+  fi
+
+  stop_runner
+  exit "$exit_code"
 }
 
 run_playwright_tests() {
@@ -178,7 +215,7 @@ if [ "$run_mode" = "docker" ]; then
 else
   start_local
 fi
-trap stop_runner EXIT
+trap cleanup_runner EXIT
 
 wait_until_reachable
 run_playwright_tests "$@"

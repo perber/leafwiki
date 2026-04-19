@@ -17,6 +17,7 @@ import { useTreeStore } from '@/stores/tree'
 import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -36,6 +37,7 @@ import { useLinkStatusStore } from '../links/linkstatus_store'
 import { AssetPreviewTooltip } from '../assets/AssetPreviewTooltip'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { useViewerStore } from '../viewer/viewer'
+import { confirmRestoreRevision } from './restoreRevisionDialog'
 import {
   type HistoryTab,
   loadMorePageHistory,
@@ -46,6 +48,7 @@ import {
 export type PageHistoryContentProps = {
   pageId: string
   pageTitle: string
+  pageSlug?: string
   testidPrefix?: string
 }
 
@@ -431,13 +434,13 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
         <div className="page-history__section-heading">Change Summary</div>
         <div className="page-history__summary-grid">
           <SummaryStat
-            label="Lines added"
+            label="Lines added since"
             value={String(diff.summary.addedLines)}
             emphasized={diff.summary.addedLines > 0}
             tone="added"
           />
           <SummaryStat
-            label="Lines removed"
+            label="Lines removed since"
             value={String(diff.summary.removedLines)}
             emphasized={diff.summary.removedLines > 0}
             tone="removed"
@@ -496,20 +499,26 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
 }
 
 function PreviewPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
-  const resolveAssetUrl = (src: string) => {
-    const normalizedSrc = src.startsWith('assets/') ? `/${src}` : src
-    const assetPrefix = `/assets/${snapshot.revision.pageId}/`
+  const pageId = snapshot.revision.pageId
+  const revisionId = snapshot.revision.id
 
-    if (!normalizedSrc.startsWith(assetPrefix)) {
-      return src
-    }
+  const resolveAssetUrl = useCallback(
+    (src: string) => {
+      const normalizedSrc = src.startsWith('assets/') ? `/${src}` : src
+      const assetPrefix = `/assets/${pageId}/`
 
-    return buildRevisionAssetUrl(
-      snapshot.revision.pageId,
-      snapshot.revision.id,
-      normalizedSrc.slice(assetPrefix.length),
-    )
-  }
+      if (!normalizedSrc.startsWith(assetPrefix)) {
+        return src
+      }
+
+      return buildRevisionAssetUrl(
+        pageId,
+        revisionId,
+        normalizedSrc.slice(assetPrefix.length),
+      )
+    },
+    [pageId, revisionId],
+  )
 
   return (
     <div className="page-history__preview-panel custom-scrollbar">
@@ -644,6 +653,7 @@ function AssetsPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
 export function PageHistoryContent({
   pageId,
   pageTitle,
+  pageSlug,
   testidPrefix = 'page-history',
 }: PageHistoryContentProps) {
   const navigate = useNavigate()
@@ -691,9 +701,14 @@ export function PageHistoryContent({
     if (!selectedRevision) return []
 
     const result = [
+      `Revision slug: ${selectedRevision.slug || '/'}`,
       getPathLeaf(selectedRevision.path),
       revisionTriggerLabel(selectedRevision.type),
     ]
+
+    if (pageSlug && pageSlug !== selectedRevision.slug) {
+      result.unshift(`Current slug: ${pageSlug}`)
+    }
 
     if (comparison) {
       result.push(`${comparison.assetChanges.length} asset changes`)
@@ -702,7 +717,7 @@ export function PageHistoryContent({
     }
 
     return result
-  }, [comparison, selectedRevision, snapshot])
+  }, [comparison, pageSlug, selectedRevision, snapshot])
 
   const structureChanges = useMemo(() => {
     if (!comparison) return []
@@ -792,6 +807,12 @@ export function PageHistoryContent({
   const handleRestore = async () => {
     if (!selectedRevision || isSelectedRevisionLatest || restoreLoading) return
 
+    const confirmed = await confirmRestoreRevision(
+      selectedRevision,
+      pageSlug || '',
+    )
+    if (confirmed !== true) return
+
     setRestoreLoading(true)
     try {
       const restoredPage = (await restoreRevision(
@@ -813,7 +834,10 @@ export function PageHistoryContent({
       navigate(buildHistoryUrl(restoredPage.path), { replace: true })
       toast.success('Revision restored')
     } catch (err) {
-      toast.error(mapApiError(err, 'Failed to restore revision').message)
+      const mapped = mapApiError(err, 'Failed to restore revision')
+      toast.error(
+        mapped.detail ? `${mapped.message}: ${mapped.detail}` : mapped.message,
+      )
     } finally {
       setRestoreLoading(false)
     }
@@ -1085,7 +1109,9 @@ export function PageHistoryContent({
         >
           <div className="page-history__header">
             <div className="page-history__header-copy">
-              <div className="page-history__header-title">{pageTitle}</div>
+              <div className="page-history__header-title">
+                {selectedRevision?.title || pageTitle}
+              </div>
               {selectedRevision ? (
                 <div className="page-history__header-subtitle">
                   Revision by {displayAuthor(selectedRevision)} ·{' '}

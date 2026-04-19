@@ -8,11 +8,7 @@ export type User = {
 }
 
 export async function getUsers(): Promise<User[]> {
-  try {
-    return (await fetchWithAuth('/api/users')) as User[]
-  } catch {
-    throw new Error('User fetch failed')
-  }
+  return (await fetchWithAuth('/api/users')) as User[]
 }
 
 export async function createUser(
