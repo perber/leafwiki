@@ -221,7 +221,10 @@ export function ensureRefresh(): Promise<void> {
 async function refreshAccessToken() {
   const store = useSessionStore.getState()
   const controller = new AbortController()
-  const timeoutId = window.setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS)
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    REFRESH_TIMEOUT_MS,
+  )
 
   try {
     const res = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
