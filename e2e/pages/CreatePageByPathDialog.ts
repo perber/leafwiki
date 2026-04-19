@@ -7,7 +7,8 @@ export default class CreatePageByPathDialog {
     const createButton = this.page.locator(
       'button[data-testid="create-page-by-path-dialog-button-confirm"]',
     );
+    await createButton.waitFor({ state: 'visible' });
     await createButton.click();
-    await this.page.waitForTimeout(600); // wait for creation to complete
+    await createButton.waitFor({ state: 'detached' });
   }
 }

@@ -11,8 +11,9 @@ export default class EditPage {
 
   async savePage() {
     const saveButton = this.page.locator('button[data-testid="save-page-button"]');
+    await saveButton.waitFor({ state: 'visible' });
     await saveButton.click();
-    await this.page.waitForTimeout(500);
+    await this.page.getByText('Page saved successfully').last().waitFor({ state: 'visible' });
   }
 
   async closeEditor() {
@@ -69,8 +70,10 @@ export default class EditPage {
 
   async deleteFirstAsset() {
     const firstAsset = this.page.locator('li[data-testid="asset-item"]').first();
+    const assets = this.page.locator('li[data-testid="asset-item"]');
+    const existingCount = await assets.count();
     await firstAsset.locator('button[title="Delete"]').click();
-    await this.page.waitForTimeout(300);
+    await expect(assets).toHaveCount(existingCount - 1);
   }
 
   async closeAssetManager() {

@@ -755,7 +755,9 @@ First reference[^leafwiki] and second reference[^leafwiki]
     // Revisions are now shown as an inline left panel on the history page.
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
-    await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
+    await expect(
+      page.locator('button[data-testid^="history-sidebar-revision-"]').first(),
+    ).toBeVisible();
     await expect(page.getByTestId('page-history-page-list')).toContainText('Revision History');
   });
 
@@ -1321,7 +1323,10 @@ Paragraph outside the list.
     await movePageDialog.expectAffectedPagesCount(1);
     await movePageDialog.expectAffectedPageTitle(referrerTitle);
     await movePageDialog.confirmRefactorDialog();
-    await page.waitForTimeout(5000);
+    await expect(page.locator('article').getByRole('link', { name: targetTitle })).toHaveAttribute(
+      'href',
+      toAppPath(`/${targetTitle}`),
+    );
 
     await page.locator('article').getByRole('link', { name: targetTitle }).click();
     await expect.poll(() => new URL(page.url()).pathname).toBe(`/${targetTitle}`);
@@ -1924,7 +1929,7 @@ Note alias content
     viewPage = new ViewPage(page);
     await viewPage.openCurrentPageHistory();
     await viewPage.switchToRevisionsTab();
-    await expect(page.locator('[data-testid^="history-sidebar-revision-"]')).toHaveCount(2);
+    await expect(page.locator('button[data-testid^="history-sidebar-revision-"]')).toHaveCount(2);
     await viewPage.openRevisionAt(1);
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
     await page.getByTestId('page-history-page-assets-tab').click();

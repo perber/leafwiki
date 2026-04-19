@@ -47,14 +47,25 @@ export async function login(identifier: string, password: string) {
   })
 
   if (!res.ok) {
-    let errorBody: { error?: string } | null = null
+    let errorBody: unknown = null
     try {
       errorBody = await res.json()
     } catch {
       throw new Error('Login failed')
     }
 
-    if (errorBody?.error) throw new Error(errorBody.error)
+    if (isApiLocalizedErrorResponse(errorBody)) {
+      throw new ApiLocalizedError(errorBody.error)
+    }
+
+    if (
+      errorBody &&
+      typeof errorBody === 'object' &&
+      typeof (errorBody as { error?: unknown }).error === 'string'
+    ) {
+      throw new Error((errorBody as { error: string }).error)
+    }
+
     throw new Error('Login failed')
   }
 

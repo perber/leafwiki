@@ -60,8 +60,7 @@ export default class TreeView {
     const pageNode = await this.findPageByTitle(title);
     await pageNode.waitFor({ state: 'visible' });
     await pageNode.click();
-    // wait 2000 ms to ensure the page has loaded
-    await this.page.waitForTimeout(2000);
+    await expect(pageNode).toHaveAttribute('aria-current', 'page');
   }
 
   async expandNodeByTitle(title: string) {
@@ -129,7 +128,7 @@ export default class TreeView {
     expect(orderInDialog).toEqual(plannedOrder);
 
     await sortPageDialog.saveSorting();
-    await this.page.waitForTimeout(5000); // wait for sorting to be applied
+    await this.page.waitForLoadState('networkidle');
   }
 
   async movePageToTopLevel(parentPage: string, pageTitle: string) {
@@ -138,8 +137,7 @@ export default class TreeView {
     const movePageDialog = new MovePageDialog(this.page);
     await movePageDialog.selectNewParentAsTopLevel();
     await movePageDialog.clickMoveButton();
-
-    await this.page.waitForTimeout(5000); // wait for move to be applied
+    await this.page.waitForLoadState('networkidle');
   }
 
   async openMoveDialogForPage(parentPage: string, pageTitle: string) {

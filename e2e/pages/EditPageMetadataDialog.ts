@@ -37,6 +37,8 @@ export default class EditPageMetadataDialog {
     const button = this.page.locator(
       'button[data-testid="edit-page-metadata-dialog-button-confirm"]',
     );
+    await button.waitFor({ state: 'visible' });
     await button.click();
+    await button.waitFor({ state: 'detached' });
   }
 }

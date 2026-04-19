@@ -10,15 +10,16 @@ export default class SearchView {
   async enterSearchQuery(query: string) {
     const searchInput = await this.getSearchInput();
     await searchInput.fill(query);
-    // wait for results to update
-    await this.page.waitForTimeout(500);
+    await this.page
+      .locator('.search__result-summary, a[data-testid^="search-result-card-"]')
+      .first()
+      .waitFor({ state: 'visible' });
   }
 
   async clearSearch() {
     const clearButton = this.page.locator('button[data-testid="search-clear-button"]');
     await clearButton.click();
-    // wait for results to update
-    await this.page.waitForTimeout(500);
+    await expect(await this.getSearchInput()).toHaveValue('');
   }
 
   async searchResultContainsPageTitle(title: string): Promise<boolean> {

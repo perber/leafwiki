@@ -40,6 +40,27 @@ async function createPageWithRevisions(
   return viewPage;
 }
 
+async function openPreviousRevision(page: import('@playwright/test').Page) {
+  const revisions = page.locator('button[data-testid^="history-sidebar-revision-"]');
+  await revisions.nth(1).waitFor({ state: 'visible' });
+  const revisionCount = await revisions.count();
+
+  for (let index = 0; index < revisionCount; index++) {
+    const revision = revisions.nth(index);
+    const currentBadge = revision.locator(
+      '[data-testid^="history-sidebar-revision-current-badge-"]',
+    );
+    if ((await currentBadge.count()) > 0) {
+      continue;
+    }
+
+    await revision.click();
+    return;
+  }
+
+  throw new Error('Expected at least one non-current revision to be available');
+}
+
 test.describe('History', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
@@ -63,7 +84,9 @@ test.describe('History', () => {
 
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
-    await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
+    await expect(
+      page.locator('button[data-testid^="history-sidebar-revision-"]').first(),
+    ).toBeVisible();
   });
 
   test('current-revision-is-visible-and-badged', async ({ page }) => {
@@ -96,11 +119,12 @@ test.describe('History', () => {
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
 
-    // Select the first revision — the list must still be visible afterwards.
-    await viewPage.openRevisionAt(0);
+    await openPreviousRevision(page);
 
     await viewPage.expectRevisionListVisible();
-    await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
+    await expect(
+      page.locator('button[data-testid^="history-sidebar-revision-"]').first(),
+    ).toBeVisible();
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
   });
 
@@ -113,7 +137,7 @@ test.describe('History', () => {
     ]);
 
     await viewPage.openCurrentPageHistory();
-    await viewPage.openRevisionAt(0);
+    await openPreviousRevision(page);
 
     const previewTab = page.locator('[data-testid="page-history-page-preview-tab"]');
     await previewTab.waitFor({ state: 'visible' });
@@ -132,7 +156,7 @@ test.describe('History', () => {
     ]);
 
     await viewPage.openCurrentPageHistory();
-    await viewPage.openRevisionAt(0);
+    await openPreviousRevision(page);
 
     // Switch to the Changes tab.
     await page.locator('[data-testid="page-history-page-changes-tab"]').click();
@@ -181,9 +205,10 @@ test.describe('History', () => {
     await metadataDialog.fillTitle(renamedTitle);
     await metadataDialog.fillSlug(renamedSlug);
     await metadataDialog.submit();
-
+    await editPage.savePage();
     await editPage.closeEditor();
     await viewPage.openCurrentPageHistory();
+    await openPreviousRevision(page);
     await page.locator('[data-testid="page-history-page-changes-tab"]').click();
 
     const structureChanges = page.getByTestId('page-history-page-structure-changes');
@@ -213,14 +238,14 @@ test.describe('History', () => {
     await metadataDialog.fillTitle(renamedTitle);
     await metadataDialog.expectSlug(renamedTitle);
     await metadataDialog.submit();
-
+    await editPage.savePage();
     await editPage.closeEditor();
 
     await viewPage.openCurrentPageHistory();
 
     const historyPathBeforeSelection = new URL(page.url()).pathname;
 
-    await viewPage.openRevisionAt(0);
+    await openPreviousRevision(page);
 
     await expect.poll(() => new URL(page.url()).pathname).toBe(historyPathBeforeSelection);
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
@@ -238,7 +263,7 @@ test.describe('History', () => {
     await viewPage.openCurrentPageHistory();
     await viewPage.expectRevisionListVisible();
 
-    const firstItem = page.locator('[data-testid^="history-sidebar-revision-"]').first();
+    const firstItem = page.locator('button[data-testid^="history-sidebar-revision-"]').first();
     await firstItem.waitFor({ state: 'visible' });
 
     const itemTitle = firstItem.locator('.history-sidebar__item-title');
@@ -293,10 +318,11 @@ test.describe('History', () => {
     await metadataDialog.fillTitle(renamedTitle);
     await metadataDialog.expectSlug(renamedTitle);
     await metadataDialog.submit();
+    await editPage.savePage();
     await editPage.closeEditor();
 
     await viewPage.openCurrentPageHistory();
-    await viewPage.openRevisionAt(0);
+    await openPreviousRevision(page);
 
     const restoreButton = page.locator('[data-testid="page-history-page-restore"]');
     await restoreButton.waitFor({ state: 'visible' });
@@ -304,7 +330,9 @@ test.describe('History', () => {
 
     // After restore the history page should reload and show the restored state.
     await page.getByTestId('page-history-page-content').waitFor({ state: 'visible' });
-    await expect(page.locator('[data-testid^="history-sidebar-revision-"]').first()).toBeVisible();
+    await expect(
+      page.locator('button[data-testid^="history-sidebar-revision-"]').first(),
+    ).toBeVisible();
     await expect(page.locator('article > h1')).toHaveText(title);
     await expect.poll(() => new URL(page.url()).pathname).toContain(`/history/${title}`);
   });
