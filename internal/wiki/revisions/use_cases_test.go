@@ -63,7 +63,6 @@ func sectionKind() *tree.NodeKind {
 	return &k
 }
 
-
 func TestRestoreRevisionUseCase_RestoresAssetsAndStructure(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := wikipages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, nil)
@@ -142,7 +141,7 @@ func TestRestoreRevisionUseCase_RestoresAssetsAndStructure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RestoreRevision failed: %v", err)
 	}
-	if restored.Page.Title != "Changed" || restored.Page.Slug != "changed" {
+	if restored.Page.Title != "Original" || restored.Page.Slug != "changed" {
 		t.Fatalf("restored identity = (%q,%q)", restored.Page.Title, restored.Page.Slug)
 	}
 	if restored.Page.CalculatePath() != "/archive/changed" {

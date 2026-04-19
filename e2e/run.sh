@@ -53,6 +53,7 @@ start_docker() {
     wiki-e2e-tests \
     --allow-insecure=true \
     --enable-revision=true \
+    --enable-link-refactor=true \
     --jwt-secret=e2e-tests-secret \
     --admin-password=admin
 
@@ -86,6 +87,7 @@ start_local() {
       --data-dir "$local_data_dir" \
       --allow-insecure=true \
       --enable-revision=true \
+      --enable-link-refactor=true \
       --jwt-secret=e2e-tests-secret \
       --admin-password=admin
   ) >"$server_log" 2>&1 &

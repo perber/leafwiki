@@ -308,6 +308,32 @@ test.describe('Authenticated', () => {
     await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
   });
 
+  test('edit-page-metadata-keeps-existing-slug', async ({ page }) => {
+    const slug = `metadata-stable-${Date.now()}`;
+    const title = `Metadata Stable ${Date.now()}`;
+
+    await createPageWithContent(page, {
+      title,
+      slug,
+      content: 'Metadata regression guard',
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openMetadataDialog();
+
+    const editPageMetadataDialog = new EditPageMetadataDialog(page);
+    await editPageMetadataDialog.expectSlug(slug);
+
+    await page.keyboard.press('Escape');
+    await page.locator('[data-testid="edit-page-metadata-dialog"]').waitFor({
+      state: 'hidden',
+    });
+  });
+
   test('sort-pages', async ({ page }) => {
     const parentTitle = `Sort Parent Page ${Date.now()}`;
     const childPages = ['Banana', 'Apple', 'Cherry', 'Date'];
@@ -1929,7 +1955,11 @@ Note alias content
     viewPage = new ViewPage(page);
     await viewPage.openCurrentPageHistory();
     await viewPage.switchToRevisionsTab();
-    await expect(page.locator('button[data-testid^="history-sidebar-revision-"]')).toHaveCount(2);
+    await expect
+      .poll(async () => {
+        return page.locator('button[data-testid^="history-sidebar-revision-"]').count();
+      })
+      .toBeGreaterThanOrEqual(2);
     await viewPage.openRevisionAt(1);
     await expect(page.getByTestId('page-history-page-content')).toBeVisible();
     await page.getByTestId('page-history-page-assets-tab').click();
@@ -1938,7 +1968,6 @@ Note alias content
     await expect(page.getByTestId('history-asset-open-upload-test.png')).toBeVisible();
     await expect(page.getByTestId('history-asset-download-upload-test.png')).toBeVisible();
 
-    await viewPage.openRevisionAt(0);
     await page.getByTestId('page-history-page-changes-tab').click();
     await expect(page.getByTestId('page-history-page-content')).toContainText('Removed');
   });

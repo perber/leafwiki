@@ -74,7 +74,7 @@ export async function suggestSlug(
   if (!currentId) currentId = ''
 
   const data = await fetchWithAuth(
-    `/api/pages/slug-suggestion?parentID=${parentId}&title=${encodeURIComponent(title)}${currentId ? `&currentID=${currentId}` : ''}`,
+    `/api/pages/slug-suggestion?parentId=${parentId}&title=${encodeURIComponent(title)}${currentId ? `&currentId=${currentId}` : ''}`,
   )
   const typedData = data as { slug: string }
   return typedData.slug
@@ -238,6 +238,6 @@ export async function ensurePage(path: string, targetTitle: string) {
   return await fetchWithAuth(`/api/pages/ensure`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, targetTitle }),
+    body: JSON.stringify({ path, title: targetTitle }),
   })
 }

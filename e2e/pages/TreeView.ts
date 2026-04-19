@@ -58,9 +58,15 @@ export default class TreeView {
   async clickPageByTitle(title: string) {
     await this.ensureSidebarVisible();
     const pageNode = await this.findPageByTitle(title);
+    const href = await pageNode.getAttribute('href');
     await pageNode.waitFor({ state: 'visible' });
     await pageNode.click();
     await expect(pageNode).toHaveAttribute('aria-current', 'page');
+    if (href) {
+      const expectedPath = new URL(href, 'http://localhost').pathname;
+      await expect.poll(() => new URL(this.page.url()).pathname).toBe(expectedPath);
+    }
+    await this.page.locator('article').waitFor({ state: 'visible' });
   }
 
   async expandNodeByTitle(title: string) {

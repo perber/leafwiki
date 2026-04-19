@@ -204,7 +204,6 @@ func (s *Service) RecordStructureChange(pageID, authorID, summary string) (*Revi
 	return rev, true, nil
 }
 
-
 func (s *Service) resolveAssetManifestHash(pageID string, prev *Revision) (string, error) {
 	if prev != nil && prev.AssetManifestHash != "" {
 		if _, err := s.store.LoadAssetManifest(prev.AssetManifestHash); err == nil {
@@ -228,7 +227,6 @@ func (s *Service) resolveAssetManifestHash(pageID string, prev *Revision) (strin
 	}
 	return savedManifestHash, nil
 }
-
 
 func (s *Service) ListRevisions(pageID string) ([]*Revision, error) {
 	return s.store.ListRevisions(pageID)
@@ -442,7 +440,6 @@ func (s *Service) CheckRevisionIntegrity(pageID string) ([]RevisionIntegrityIssu
 	return issues, nil
 }
 
-
 func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	pageID = strings.TrimSpace(pageID)
 	revisionID = strings.TrimSpace(revisionID)
@@ -559,7 +556,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	}
 
 	restoredContent := string(content)
-	if err := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoredContent); err != nil {
+	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent); err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
 			"Failed to restore page",
@@ -780,7 +777,6 @@ func computeAssetManifestHash(items []AssetRef) (string, error) {
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:]), nil
 }
-
 
 func (s *Service) restoreAssets(pageID string, refs []AssetRef) error {
 	dir := s.liveAssetDir(pageID)

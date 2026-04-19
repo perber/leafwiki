@@ -111,6 +111,16 @@ export default class ViewPage {
 
   async clickPageHistoryButton() {
     const historyButton = this.page.getByTestId('page-history-button');
+    const overflowButton = this.page.getByTestId('toolbar-overflow-button');
+
+    await expect
+      .poll(async () => {
+        const historyVisible = await historyButton.isVisible().catch(() => false);
+        const overflowVisible = await overflowButton.isVisible().catch(() => false);
+        return historyVisible || overflowVisible;
+      })
+      .toBe(true);
+
     if (await historyButton.isVisible().catch(() => false)) {
       await historyButton.click();
       return;

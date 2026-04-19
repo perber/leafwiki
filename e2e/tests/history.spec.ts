@@ -220,6 +220,34 @@ test.describe('History', () => {
     await expect(structureChanges).toContainText(renamedSlug);
   });
 
+  test('selected-revision-title-is-shown-in-history-header', async ({ page }) => {
+    const suffix = Date.now();
+    const originalTitle = `History Header ${suffix}`;
+    const renamedTitle = `History Header Renamed ${suffix}`;
+    const renamedSlug = `history-header-renamed-${suffix}`;
+    const viewPage = await createPageWithRevisions(page, originalTitle, [
+      'First revision content',
+      '\nSecond revision content',
+    ]);
+
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.openMetadataDialog();
+
+    const metadataDialog = new EditPageMetadataDialog(page);
+    await metadataDialog.fillTitle(renamedTitle);
+    await metadataDialog.expectSlug(renamedSlug);
+    await metadataDialog.submit();
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await viewPage.openCurrentPageHistory();
+    await openPreviousRevision(page);
+
+    await expect(page.locator('.page-history__header-title')).toHaveText(originalTitle);
+  });
+
   test('selecting-a-revision-keeps-current-history-route-after-rename', async ({ page }) => {
     const suffix = Date.now();
     const originalTitle = `History Route ${suffix}`;
@@ -327,13 +355,13 @@ test.describe('History', () => {
     const restoreButton = page.locator('[data-testid="page-history-page-restore"]');
     await restoreButton.waitFor({ state: 'visible' });
     await restoreButton.click();
+    await page.locator('[data-testid="restore-revision-dialog-button-confirm"]').click();
 
     // After restore the history page should reload and show the restored state.
     await page.getByTestId('page-history-page-content').waitFor({ state: 'visible' });
     await expect(
       page.locator('button[data-testid^="history-sidebar-revision-"]').first(),
     ).toBeVisible();
-    await expect(page.locator('article > h1')).toHaveText(title);
-    await expect.poll(() => new URL(page.url()).pathname).toContain(`/history/${title}`);
+    await expect.poll(() => new URL(page.url()).pathname).toContain(`/history/${renamedTitle}`);
   });
 });

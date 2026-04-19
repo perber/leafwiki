@@ -1988,3 +1988,51 @@ func TestUpdatePageUseCase_TitleOnlyCreatesStructureRevision(t *testing.T) {
 		t.Fatalf("revision count = %d, want 3", len(revisions))
 	}
 }
+
+func TestUpdatePageUseCase_TitleOnlyWithUnchangedContentCreatesStructureRevision(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+
+	page, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Original", Slug: "original", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	content := "same content"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: page.Page.ID, Title: page.Page.Title, Slug: page.Page.Slug, Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(initial content) failed: %v", err)
+	}
+
+	beforeLatest, err := deps.revision.GetLatestRevision(page.Page.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision(before rename) failed: %v", err)
+	}
+	if beforeLatest == nil {
+		t.Fatal("expected initial content revision")
+	}
+
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: page.Page.ID, Title: "Renamed Title", Slug: page.Page.Slug, Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(title only with unchanged content) failed: %v", err)
+	}
+
+	afterLatest, err := deps.revision.GetLatestRevision(page.Page.ID)
+	if err != nil {
+		t.Fatalf("GetLatestRevision(after rename) failed: %v", err)
+	}
+	if afterLatest == nil || afterLatest.ID == beforeLatest.ID {
+		t.Fatalf("expected new revision for title-only change, got before=%#v after=%#v", beforeLatest, afterLatest)
+	}
+	if afterLatest.Type != revision.RevisionTypeStructureUpdate {
+		t.Fatalf("latest revision type = %q", afterLatest.Type)
+	}
+	if afterLatest.Title != "Renamed Title" {
+		t.Fatalf("latest revision title = %q", afterLatest.Title)
+	}
+}

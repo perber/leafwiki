@@ -5,8 +5,8 @@ import (
 	"log"
 	"log/slog"
 
-	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/revision"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
 )
@@ -83,6 +83,8 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 	if err != nil {
 		return nil, err
 	}
+	contentChanged := before.Content != after.Content
+	titleChanged := oldTitle != after.Title
 
 	if uc.links != nil {
 		if renameOrPathChange {
@@ -119,15 +121,15 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 	if uc.revision != nil {
 		if renameOrPathChange {
 			for _, pid := range subtreeIDs {
-				if in.Content != nil && pid == in.ID {
+				if contentChanged && pid == in.ID {
 					continue
 				}
 				recordStructureRevision(uc.revision, uc.log, pid, in.UserID)
 			}
-		} else if in.Content == nil && oldTitle != after.Title {
+		} else if titleChanged && !contentChanged {
 			recordStructureRevision(uc.revision, uc.log, in.ID, in.UserID)
 		}
-		if in.Content != nil {
+		if contentChanged {
 			recordContentRevision(uc.revision, uc.log, in.ID, in.UserID, "")
 		}
 	}

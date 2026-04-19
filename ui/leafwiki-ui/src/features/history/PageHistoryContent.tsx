@@ -37,6 +37,7 @@ import { useLinkStatusStore } from '../links/linkstatus_store'
 import { AssetPreviewTooltip } from '../assets/AssetPreviewTooltip'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { useViewerStore } from '../viewer/viewer'
+import { confirmRestoreRevision } from './restoreRevisionDialog'
 import {
   type HistoryTab,
   loadMorePageHistory,
@@ -47,6 +48,7 @@ import {
 export type PageHistoryContentProps = {
   pageId: string
   pageTitle: string
+  pageSlug?: string
   testidPrefix?: string
 }
 
@@ -651,6 +653,7 @@ function AssetsPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
 export function PageHistoryContent({
   pageId,
   pageTitle,
+  pageSlug,
   testidPrefix = 'page-history',
 }: PageHistoryContentProps) {
   const navigate = useNavigate()
@@ -698,9 +701,14 @@ export function PageHistoryContent({
     if (!selectedRevision) return []
 
     const result = [
+      `Revision slug: ${selectedRevision.slug || '/'}`,
       getPathLeaf(selectedRevision.path),
       revisionTriggerLabel(selectedRevision.type),
     ]
+
+    if (pageSlug && pageSlug !== selectedRevision.slug) {
+      result.unshift(`Current slug: ${pageSlug}`)
+    }
 
     if (comparison) {
       result.push(`${comparison.assetChanges.length} asset changes`)
@@ -709,7 +717,7 @@ export function PageHistoryContent({
     }
 
     return result
-  }, [comparison, selectedRevision, snapshot])
+  }, [comparison, pageSlug, selectedRevision, snapshot])
 
   const structureChanges = useMemo(() => {
     if (!comparison) return []
@@ -798,6 +806,12 @@ export function PageHistoryContent({
 
   const handleRestore = async () => {
     if (!selectedRevision || isSelectedRevisionLatest || restoreLoading) return
+
+    const confirmed = await confirmRestoreRevision(
+      selectedRevision,
+      pageSlug || '',
+    )
+    if (confirmed !== true) return
 
     setRestoreLoading(true)
     try {
@@ -1095,7 +1109,9 @@ export function PageHistoryContent({
         >
           <div className="page-history__header">
             <div className="page-history__header-copy">
-              <div className="page-history__header-title">{pageTitle}</div>
+              <div className="page-history__header-title">
+                {selectedRevision?.title || pageTitle}
+              </div>
               {selectedRevision ? (
                 <div className="page-history__header-subtitle">
                   Revision by {displayAuthor(selectedRevision)} ·{' '}
