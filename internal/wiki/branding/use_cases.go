@@ -2,10 +2,10 @@ package branding
 
 import (
 	"context"
-	"fmt"
 	"mime/multipart"
 
 	corebanding "github.com/perber/wiki/internal/branding"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
 // ─── GetBrandingUseCase ──────────────────────────────────────────────────────
@@ -25,7 +25,12 @@ func NewGetBrandingUseCase(b *corebanding.BrandingService) *GetBrandingUseCase {
 func (uc *GetBrandingUseCase) Execute(_ context.Context) (*GetBrandingOutput, error) {
 	cfg, err := uc.branding.GetBranding()
 	if err != nil {
-		return nil, err
+		return nil, sharederrors.NewLocalizedError(
+			ErrCodeBrandingConfigUnavailable,
+			"Failed to load branding config",
+			"failed to load branding config",
+			err,
+		)
 	}
 	return &GetBrandingOutput{Config: cfg}, nil
 }
@@ -50,7 +55,12 @@ func (uc *UpdateBrandingUseCase) Execute(_ context.Context, in UpdateBrandingInp
 	}
 	cfg, err := uc.branding.GetBranding()
 	if err != nil {
-		return nil, err
+		return nil, sharederrors.NewLocalizedError(
+			ErrCodeBrandingConfigUnavailable,
+			"Failed to load branding config",
+			"failed to load branding config",
+			err,
+		)
 	}
 	return &GetBrandingOutput{Config: cfg}, nil
 }
@@ -82,7 +92,12 @@ func (uc *UploadLogoUseCase) Execute(_ context.Context, in UploadLogoInput) (*Up
 	}
 	cfg, err := uc.branding.GetBranding()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load branding config: %w", err)
+		return nil, sharederrors.NewLocalizedError(
+			ErrCodeBrandingConfigUnavailable,
+			"Failed to load branding config",
+			"failed to load branding config",
+			err,
+		)
 	}
 	return &UploadLogoOutput{Path: path, Config: cfg}, nil
 }
@@ -103,7 +118,12 @@ func (uc *DeleteLogoUseCase) Execute(_ context.Context) (*GetBrandingOutput, err
 	}
 	cfg, err := uc.branding.GetBranding()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load branding config: %w", err)
+		return nil, sharederrors.NewLocalizedError(
+			ErrCodeBrandingConfigUnavailable,
+			"Failed to load branding config",
+			"failed to load branding config",
+			err,
+		)
 	}
 	return &GetBrandingOutput{Config: cfg}, nil
 }
@@ -135,7 +155,12 @@ func (uc *UploadFaviconUseCase) Execute(_ context.Context, in UploadFaviconInput
 	}
 	cfg, err := uc.branding.GetBranding()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load branding config: %w", err)
+		return nil, sharederrors.NewLocalizedError(
+			ErrCodeBrandingConfigUnavailable,
+			"Failed to load branding config",
+			"failed to load branding config",
+			err,
+		)
 	}
 	return &UploadFaviconOutput{Path: path, Config: cfg}, nil
 }
@@ -156,7 +181,12 @@ func (uc *DeleteFaviconUseCase) Execute(_ context.Context) (*GetBrandingOutput, 
 	}
 	cfg, err := uc.branding.GetBranding()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load branding config: %w", err)
+		return nil, sharederrors.NewLocalizedError(
+			ErrCodeBrandingConfigUnavailable,
+			"Failed to load branding config",
+			"failed to load branding config",
+			err,
+		)
 	}
 	return &GetBrandingOutput{Config: cfg}, nil
 }

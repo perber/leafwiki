@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	coreauth "github.com/perber/wiki/internal/core/auth"
 	corebanding "github.com/perber/wiki/internal/branding"
+	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
@@ -18,42 +18,42 @@ import (
 
 // Routes is the RouteRegistrar for the branding domain.
 type Routes struct {
-	getBranding    *GetBrandingUseCase
-	updateBranding *UpdateBrandingUseCase
-	uploadLogo     *UploadLogoUseCase
-	deleteLogo     *DeleteLogoUseCase
-	uploadFavicon  *UploadFaviconUseCase
-	deleteFavicon  *DeleteFaviconUseCase
+	getBranding     *GetBrandingUseCase
+	updateBranding  *UpdateBrandingUseCase
+	uploadLogo      *UploadLogoUseCase
+	deleteLogo      *DeleteLogoUseCase
+	uploadFavicon   *UploadFaviconUseCase
+	deleteFavicon   *DeleteFaviconUseCase
 	brandingService *corebanding.BrandingService
-	authService    *coreauth.AuthService
-	log            *slog.Logger
+	authService     *coreauth.AuthService
+	log             *slog.Logger
 }
 
 // RoutesConfig holds the dependencies required to build a Routes instance.
 type RoutesConfig struct {
-	GetBranding    *GetBrandingUseCase
-	UpdateBranding *UpdateBrandingUseCase
-	UploadLogo     *UploadLogoUseCase
-	DeleteLogo     *DeleteLogoUseCase
-	UploadFavicon  *UploadFaviconUseCase
-	DeleteFavicon  *DeleteFaviconUseCase
+	GetBranding     *GetBrandingUseCase
+	UpdateBranding  *UpdateBrandingUseCase
+	UploadLogo      *UploadLogoUseCase
+	DeleteLogo      *DeleteLogoUseCase
+	UploadFavicon   *UploadFaviconUseCase
+	DeleteFavicon   *DeleteFaviconUseCase
 	BrandingService *corebanding.BrandingService
-	AuthService    *coreauth.AuthService
-	Log            *slog.Logger
+	AuthService     *coreauth.AuthService
+	Log             *slog.Logger
 }
 
 // NewRoutes constructs the branding RouteRegistrar.
 func NewRoutes(cfg RoutesConfig) *Routes {
 	return &Routes{
-		getBranding:    cfg.GetBranding,
-		updateBranding: cfg.UpdateBranding,
-		uploadLogo:     cfg.UploadLogo,
-		deleteLogo:     cfg.DeleteLogo,
-		uploadFavicon:  cfg.UploadFavicon,
-		deleteFavicon:  cfg.DeleteFavicon,
+		getBranding:     cfg.GetBranding,
+		updateBranding:  cfg.UpdateBranding,
+		uploadLogo:      cfg.UploadLogo,
+		deleteLogo:      cfg.DeleteLogo,
+		uploadFavicon:   cfg.UploadFavicon,
+		deleteFavicon:   cfg.DeleteFavicon,
 		brandingService: cfg.BrandingService,
-		authService:    cfg.AuthService,
-		log:            cfg.Log,
+		authService:     cfg.AuthService,
+		log:             cfg.Log,
 	}
 }
 
@@ -88,7 +88,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 func (r *Routes) handleGetBranding(c *gin.Context) {
 	out, err := r.getBranding.Execute(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load branding config"})
+		respondWithBrandingError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, out.Config)
@@ -113,7 +113,7 @@ func (r *Routes) handleUpdateBranding(c *gin.Context) {
 func (r *Routes) handleUploadLogo(c *gin.Context) {
 	constraints, err := r.brandingService.GetBranding()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load branding config"})
+		respondWithBrandingError(c, err)
 		return
 	}
 	maxSize := constraints.BrandingConstraints.MaxLogoSize
@@ -134,7 +134,7 @@ func (r *Routes) handleUploadLogo(c *gin.Context) {
 	}()
 	out, err := r.uploadLogo.Execute(c.Request.Context(), UploadLogoInput{File: file, Filename: header.Filename})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondWithBrandingError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"path": out.Path, "branding": out.Config})
@@ -143,7 +143,7 @@ func (r *Routes) handleUploadLogo(c *gin.Context) {
 func (r *Routes) handleDeleteLogo(c *gin.Context) {
 	out, err := r.deleteLogo.Execute(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete logo"})
+		respondWithBrandingError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"branding": out.Config})
@@ -152,7 +152,7 @@ func (r *Routes) handleDeleteLogo(c *gin.Context) {
 func (r *Routes) handleUploadFavicon(c *gin.Context) {
 	constraints, err := r.brandingService.GetBranding()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load branding config"})
+		respondWithBrandingError(c, err)
 		return
 	}
 	maxSize := constraints.BrandingConstraints.MaxFaviconSize
@@ -173,7 +173,7 @@ func (r *Routes) handleUploadFavicon(c *gin.Context) {
 	}()
 	out, err := r.uploadFavicon.Execute(c.Request.Context(), UploadFaviconInput{File: file, Filename: header.Filename})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondWithBrandingError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"path": out.Path, "branding": out.Config})
@@ -182,7 +182,7 @@ func (r *Routes) handleUploadFavicon(c *gin.Context) {
 func (r *Routes) handleDeleteFavicon(c *gin.Context) {
 	out, err := r.deleteFavicon.Execute(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete favicon"})
+		respondWithBrandingError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"branding": out.Config})

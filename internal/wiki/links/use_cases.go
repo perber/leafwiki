@@ -4,11 +4,17 @@ import (
 	"context"
 	"errors"
 
-	corelinks "github.com/perber/wiki/internal/links"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	corelinks "github.com/perber/wiki/internal/links"
 )
 
-var ErrLinkServiceUnavailable = errors.New("link service not available")
+var ErrLinkServiceUnavailable = sharederrors.NewLocalizedError(
+	ErrCodeLinkUnavailable,
+	"Link service is unavailable",
+	"link service is unavailable",
+	nil,
+)
 
 // ─── GetLinkStatusUseCase ────────────────────────────────────────────────────
 
@@ -35,6 +41,14 @@ func (uc *GetLinkStatusUseCase) Execute(_ context.Context, in GetLinkStatusInput
 	}
 	page, err := uc.tree.GetPage(in.PageID)
 	if err != nil {
+		if errors.Is(err, tree.ErrPageNotFound) {
+			return nil, sharederrors.NewLocalizedError(
+				ErrCodeLinkPageNotFound,
+				"Page not found",
+				"page not found",
+				err,
+			)
+		}
 		return nil, err
 	}
 	status, err := uc.links.GetLinkStatusForPage(in.PageID, page.CalculatePath())

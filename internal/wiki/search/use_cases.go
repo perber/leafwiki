@@ -2,9 +2,16 @@ package search
 
 import (
 	"context"
-	"fmt"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	coresearch "github.com/perber/wiki/internal/search"
+)
+
+var ErrSearchUnavailable = sharederrors.NewLocalizedError(
+	ErrCodeSearchUnavailable,
+	"Search is currently unavailable",
+	"search is currently unavailable",
+	nil,
 )
 
 // ─── SearchUseCase ───────────────────────────────────────────────────────────
@@ -29,7 +36,7 @@ func NewSearchUseCase(idx *coresearch.SQLiteIndex) *SearchUseCase {
 
 func (uc *SearchUseCase) Execute(_ context.Context, in SearchInput) (*SearchOutput, error) {
 	if uc.index == nil {
-		return nil, fmt.Errorf("search index not available")
+		return nil, ErrSearchUnavailable
 	}
 	result, err := uc.index.Search(in.Query, in.Offset, in.Limit)
 	if err != nil {
