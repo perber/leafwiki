@@ -72,7 +72,7 @@
     "postcss": "^8.5.3",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.2.3",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.58.1",
     "vite": "^7.3.2"
