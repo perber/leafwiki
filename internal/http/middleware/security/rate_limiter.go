@@ -71,6 +71,7 @@ func NewRateLimiter(limit int, window time.Duration, resetOnSuccess bool) gin.Ha
 			}
 		}
 		if len(events) >= rl.limit {
+			rl.mu.Unlock()
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error": "Too many requests, please try again later",
 			})

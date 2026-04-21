@@ -70,6 +70,55 @@ func TestRateLimiter_ExceedsLimit(t *testing.T) {
 	}
 }
 
+func TestRateLimiter_ReleasesLockAfterLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	limiter := NewRateLimiter(1, time.Minute, false)
+
+	router := gin.New()
+	router.Use(limiter)
+	router.GET("/test", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "192.168.1.4:1234"
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
+	}
+
+	req = httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "192.168.1.4:1234"
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("Expected status 429, got %d", w.Code)
+	}
+
+	done := make(chan int, 1)
+
+	go func() {
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.RemoteAddr = "192.168.1.5:1234"
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		done <- w.Code
+	}()
+
+	select {
+	case code := <-done:
+		if code != http.StatusOK {
+			t.Fatalf("Expected status 200 for different key after limit hit, got %d", code)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Request blocked after limit hit; mutex was not released")
+	}
+}
+
 func TestRateLimiter_WindowExpires(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
