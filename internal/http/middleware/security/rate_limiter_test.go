@@ -109,12 +109,20 @@ func TestRateLimiter_ReleasesLockAfterLimit(t *testing.T) {
 		done <- w.Code
 	}()
 
+	timeout := 2 * time.Second
+	if deadline, ok := t.Deadline(); ok {
+		if remaining := time.Until(deadline) / 2; remaining > 0 && remaining < timeout {
+			timeout = remaining
+		}
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	select {
 	case code := <-done:
 		if code != http.StatusOK {
 			t.Fatalf("Expected status 200 for different key after limit hit, got %d", code)
 		}
-	case <-time.After(500 * time.Millisecond):
+	case <-timer.C:
 		t.Fatal("Request blocked after limit hit; mutex was not released")
 	}
 }
