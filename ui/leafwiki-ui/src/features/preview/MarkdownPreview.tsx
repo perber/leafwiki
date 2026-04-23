@@ -129,7 +129,12 @@ function getAlertLabel(kind: SemanticAlertKind) {
 }
 
 function getSemanticShoutoutTitle(kind: string) {
-  if (kind === 'info' || kind === 'success' || kind === 'warning' || kind === 'error') {
+  if (
+    kind === 'info' ||
+    kind === 'success' ||
+    kind === 'warning' ||
+    kind === 'error'
+  ) {
     return getAlertLabel(kind)
   }
 
