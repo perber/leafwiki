@@ -19,7 +19,8 @@ const shoutoutTypeMap: Record<string, string> = {
 }
 
 function normalizeShoutoutType(rawType: string) {
-  return shoutoutTypeMap[rawType.toLowerCase()] ?? 'info'
+  const normalizedType = rawType.toLowerCase().replace(/_/g, '-')
+  return shoutoutTypeMap[normalizedType] ?? normalizedType
 }
 
 function prefixQuoteLine(indent: string, line: string) {

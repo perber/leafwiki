@@ -76,7 +76,11 @@ type MarkdownNodeProp = {
   node?: unknown
 }
 
-type AlertKind = 'info' | 'success' | 'warning' | 'error'
+type SemanticAlertKind = 'info' | 'success' | 'warning' | 'error'
+
+type ShoutoutConfig = {
+  kind: string
+}
 
 function getTextContent(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') {
@@ -94,7 +98,7 @@ function getTextContent(node: ReactNode): string {
   return ''
 }
 
-function getAlertKind(children: ReactNode): AlertKind | null {
+function getShoutoutConfig(children: ReactNode): ShoutoutConfig | null {
   const childArray = Children.toArray(children)
   const firstChild = childArray.find(
     (child) => typeof child !== 'string' || child.trim() !== '',
@@ -109,18 +113,34 @@ function getAlertKind(children: ReactNode): AlertKind | null {
   }
 
   const marker = getTextContent(firstChild.props.children).trim()
-  if (marker === '[!INFO]') return 'info'
-  if (marker === '[!SUCCESS]') return 'success'
-  if (marker === '[!WARNING]') return 'warning'
-  if (marker === '[!ERROR]') return 'error'
-  return null
+  const match = marker.match(/^\[!(?<kind>[A-Z][A-Z0-9_-]*)\]$/)
+  if (!match?.groups?.kind) {
+    return null
+  }
+
+  const kind = match.groups.kind.toLowerCase()
+
+  return { kind }
 }
 
-function getAlertLabel(kind: AlertKind) {
+function getAlertLabel(kind: SemanticAlertKind) {
   if (kind === 'info') return 'Info'
   if (kind === 'success') return 'Success'
   if (kind === 'warning') return 'Warning'
   return 'Error'
+}
+
+function getSemanticShoutoutTitle(kind: string) {
+  if (
+    kind === 'info' ||
+    kind === 'success' ||
+    kind === 'warning' ||
+    kind === 'error'
+  ) {
+    return getAlertLabel(kind)
+  }
+
+  return null
 }
 
 class MarkdownPreviewErrorBoundary extends Component<
@@ -329,9 +349,9 @@ export default function MarkdownPreview({
           'data-line'?: string
         }) => {
         void node
-        const alertKind = getAlertKind(children)
+        const shoutoutConfig = getShoutoutConfig(children)
 
-        if (!alertKind) {
+        if (!shoutoutConfig) {
           return (
             <blockquote {...props} data-line={dataLine} className={className}>
               {children}
@@ -347,15 +367,15 @@ export default function MarkdownPreview({
           markerIndex >= 0 ? childArray.slice(markerIndex + 1) : []
         ).filter((child) => typeof child !== 'string' || child.trim() !== '')
 
+        const title = getSemanticShoutoutTitle(shoutoutConfig.kind)
+
         return (
           <aside
             {...props}
             data-line={dataLine}
-            className={`markdown-shoutout markdown-shoutout--${alertKind} ${className ?? ''}`.trim()}
+            className={`markdown-shoutout markdown-shoutout--${shoutoutConfig.kind} ${className ?? ''}`.trim()}
           >
-            <p className="markdown-shoutout__title">
-              {getAlertLabel(alertKind)}
-            </p>
+            {title ? <p className="markdown-shoutout__title">{title}</p> : null}
             <div className="markdown-shoutout__content">{contentChildren}</div>
           </aside>
         )
