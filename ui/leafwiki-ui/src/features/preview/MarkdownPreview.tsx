@@ -1,4 +1,3 @@
-import './markdownPreviewCodeTheme.css'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { withBasePath } from '@/lib/routePath'
 import {
@@ -28,6 +27,7 @@ import Headline from './Headline'
 import MarkdownCodeBlock from './MarkdownCodeBlock'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
+import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
 import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
@@ -42,6 +42,7 @@ const schema = {
     ...defaultSchema.attributes,
     '*': [
       ...(defaultSchema.attributes?.['*'] || []),
+      'class',
       'data-leafwiki-generated-id',
       'data-line',
       'style',
