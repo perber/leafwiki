@@ -1,11 +1,56 @@
 # 🌿 LeafWiki
 
-**LeafWiki – A fast wiki for people who think in folders, not feeds**  
-Fast editing. Explicit tree navigation. Markdown stored on disk. Single Go binary.
+**LeafWiki helps engineers, self-hosters, and small teams keep long-lived documentation structured, portable, and easy to operate.**  
+Self-hosted. Single Go binary. SQLite-based. Markdown stored on disk.
 
-LeafWiki is a lightweight wiki for runbooks, internal docs, and technical notes. It combines fast writing, structured navigation, and search in a focused app, while keeping your content portable as plain Markdown files on disk.
+If you want something lighter than a large wiki suite, but more structured than scattered notes, LeafWiki is built for that middle ground.
 
-If you want something lighter than a large wiki platform, but more structured than scattered notes, LeafWiki sits in that gap.
+LeafWiki is a real wiki application built around Markdown, not a plain Markdown file browser. It provides structured navigation, editing, search, roles, and managed content workflows inside the app.
+
+![LeafWiki](./assets/preview.png)
+
+## Why it exists
+
+LeafWiki is for documentation that needs to stay understandable over time: runbooks, internal docs, personal knowledge bases, and operational notes.
+
+The goal is not to become an all-in-one workspace. The goal is to give you a wiki that is small enough to operate comfortably and structured enough to trust for long-lived documentation.
+
+## Quick facts
+
+- Single Go binary
+- SQLite-based runtime storage
+- Markdown-first editing and content portability
+- Works with Docker or direct binary install
+- Multi-platform builds for Linux, macOS, Windows, and ARM64
+- Reverse-proxy friendly with `--base-path`
+- Public read-only mode available
+- Optional revision history and link refactoring behind feature flags
+
+## Why it fits this workflow
+
+- Explicit tree navigation instead of flat note feeds
+- Markdown content that is easy to back up, move, and version
+- Public read-only docs with authenticated editing
+- Optimistic locking for concurrent edits
+- Optional revision history and safe link refactoring
+- Small operational footprint without external database setup
+
+## Good fit
+
+- Personal wikis and engineering notebooks
+- Internal team documentation
+- Runbooks, SOPs, and operational guides
+- Homelab and self-hosted environments
+- Teams that prefer explicit tree navigation over flat note feeds
+
+## Probably not a fit
+
+- Large organizations needing complex enterprise permissions or workflow engines
+- Real-time collaborative editing
+- Knowledge management setups that expect databases, automations, and approval flows everywhere
+- Teams looking for a Confluence or Notion clone
+
+LeafWiki is intentionally narrower than those systems. That focus is part of the value.
 
 ---
 
@@ -22,12 +67,6 @@ The demo instance resets automatically every hour, so all changes are temporary.
 
 ---
 
-## Preview
-
-![LeafWiki](./assets/preview.png)
-
----
-
 **Mobile View:**
 
 Mobile-friendly UI for reading (and editing) docs & runbooks on the go.
@@ -40,131 +79,55 @@ Mobile-friendly UI for reading (and editing) docs & runbooks on the go.
 
 ---
 
-## What LeafWiki is good for today
+## Keep internal links intact
 
-LeafWiki focuses on personal and small-team documentation use cases today.
-It is designed for teams that want a focused documentation app with clear structure, fast editing, and full control over their data without taking on the weight of a larger platform.
+Renaming or moving pages often breaks internal documentation.
 
-LeafWiki is currently well-suited for:
-- Personal technical notes and documentation
-- Project documentation maintained by one main contributor
-- Runbooks, operational knowledge and engineering guides for small teams
-- Structured content that benefits from explicit hierarchy and ordering
+LeafWiki can rewrite internal links when:
+- a page is renamed
+- a page is moved in the tree
 
----
+This helps keep long-lived documentation coherent as the structure changes.
 
-## Project Status
-
-LeafWiki is stable for everyday use as a personal or primary-owner wiki.  
-The core features — writing, navigation, and search — are actively maintained and production-ready.
-
-Collaboration is currently limited and follows a *last-write-wins* approach.  
-More advanced team-oriented capabilities are under development, with a focus on durability and predictable behavior.
-
-
-**Current priorities:**  
-- Versioning
-- Importing existing Markdown content
-- Conflict handling for concurrent edits (optimistic locking)
-
-Priorities are shaped by real-world usage, and development is iterative.
-The platform will evolve cautiously toward team workflows while maintaining its principles of simplicity and low operational overhead.
-
-> **LeafWiki** is actively developed and open to collaboration 🌿 
-
-See the [CHANGELOG](CHANGELOG.md) for release details.
+> Revision history and link refactoring are currently available behind feature flags: `--enable-revision` and `--enable-link-refactor`.
 
 ---
 
-## Support LeafWiki
+## Import existing Markdown
 
-If LeafWiki is useful to you or your team, consider sponsoring the project on GitHub.
+LeafWiki includes a built-in Markdown importer for editors and admins.
 
-Sponsorship helps fund maintenance, bug fixes, documentation, and important improvements like versioning, imports, and collaboration features.
+What to expect:
+- ZIP-based import workflow
+- review the generated import plan before running it
+- best results when the source already has a reasonably clean folder structure
+- linked Markdown pages and local assets can be imported together
+- Obsidian-style wiki links can be rewritten during import
 
-👉 https://github.com/sponsors/perber
-
----
-
-## Why Another Wiki?
-
-Most wiki tools become projects of their own: databases to manage, plugins to maintain, workflows to configure, and too many setup decisions for a system that should just help you write, navigate, and find information.
-
-LeafWiki takes a narrower view:
-- Provide a focused documentation app instead of a sprawling platform
-- Make structure explicit instead of inferred
-- Keep content portable as plain Markdown on disk
-- Stay easy to self-host and easy to understand
-- Avoid turning documentation into platform maintenance
-
-In practice, that means:
-- A dedicated app for writing, reading, and organizing docs
-- Explicit tree structure
-- Markdown stored on disk
-- Single-binary or container deployment
-- Minimal operational overhead
-
----
-
-## Core principles
-
-LeafWiki is built around a small set of clear principles:
-
-- **App-first, file-backed**  
-  LeafWiki is built as a documentation app with its own navigation, editing, and search experience while keeping content stored as plain Markdown files on disk.
-
-- **No external database required**  
-  LeafWiki uses SQLite internally and does not require running or managing a separate database service.
-
-- **Explicit structure management**  
-  Structure is derived from the filesystem layout and persisted metadata files while page content stays plain Markdown.
-
-- **Self-hosted by design**
-  Designed to run on a single server with minimal operational overhead.
-
----
-
-### Data model
-
-LeafWiki stores page content as Markdown files on disk.
-Navigation is reconstructed from the filesystem layout, child ordering is stored in `.order.json`, and search uses SQLite.
-For details on the current model and its constraints, see [Known limitations](#known-limitations).
+It is intended as a pragmatic migration helper, not a fully automatic migration system for every source format.
 
 ---
 
 ## What LeafWiki supports
 
-- **Fast writing flow with editor shortcuts**
-- **Explicit tree navigation instead of flat note lists**
-- **Public read-only docs with authenticated editing**
+- Fast writing flow with keyboard shortcuts
 - Built-in Markdown editor with live preview
 - Full-text search across page titles and content
-- Image and asset support
-- Support for diagrams via Mermaid
-- Brand customization such as logo, favicon, and site name
-- Separation between admin, editor, and viewer users
+- Images, files, Mermaid diagrams, and practical Markdown extensions
+- Admin, editor, and viewer roles
+- Branding options such as logo, favicon, and site name
 - Dark mode and mobile-friendly UI
-- Keyboard shortcuts for common actions such as save and search
 
-### Supported Markdown
+Revision history and link refactoring are currently available behind feature flags: `--enable-revision` and `--enable-link-refactor`.
 
-LeafWiki's editor and live preview support standard Markdown plus a practical set of extensions commonly used in technical documentation.
-
-- CommonMark-style headings, lists, blockquotes, links, images, and code blocks
-- GitHub Flavored Markdown features such as tables, task lists, strikethrough, and footnotes
-- Shoutouts / callouts for highlighted blocks such as notes, tips, warnings, and danger messages
-- Syntax highlighting for fenced code blocks
-- Mermaid code blocks for diagrams
-- Audio and video embeds via HTML5 media elements
-- A sanitized subset of inline HTML for cases where plain Markdown is not enough
-
-Markdown rendering is intentionally conservative: unsupported or unsafe HTML is filtered to keep page rendering predictable and safe.
+LeafWiki's editor and live preview support standard Markdown plus practical documentation features such as tables, task lists, footnotes, shoutouts, Mermaid diagrams, embedded audio/video, and a sanitized subset of inline HTML.
 
 ## What LeafWiki is not
 
-- Not a Confluence replacement
+- Not a full Confluence replacement
 - Not real-time collaborative editing
 - Not a workflow, approval, or document-control platform
+- Not a database-heavy documentation stack
 
 LeafWiki is designed to stay focused, predictable, and easy to operate.
 
@@ -173,9 +136,47 @@ LeafWiki is designed to stay focused, predictable, and easy to operate.
 ## Installation
 
 LeafWiki is distributed as a single Go binary and can be run directly on the host or via Docker.
-The sections below show a recommended quick start and a few common installation examples.
+Start with the quickest path below. The more detailed deployment and configuration options follow after that.
 
 ### Quick start
+
+If you already run self-hosted apps with containers, start here:
+
+```bash
+docker run -p 8080:8080 \
+    -v ~/leafwiki-data:/app/data \
+    ghcr.io/perber/leafwiki:latest \
+    --jwt-secret=yoursecret \
+    --admin-password=yourpassword \
+    --allow-insecure=true
+```
+
+The container stores data in `/app/data` and binds to `0.0.0.0` by default.
+For plain HTTP setups, `--allow-insecure=true` is required for login cookies to work.
+If you serve LeafWiki behind HTTPS or a reverse proxy that forwards HTTPS headers, omit `--allow-insecure=true`.
+
+### Other deployment options
+
+- Use the installer if you want a system service on a Linux host
+- Use Docker Compose if you prefer a compose-based setup
+- Use the binary if you want the smallest and most direct install
+
+**Running as non-root user**
+To avoid running the container as root, specify a user ID:
+
+```bash
+docker run -p 8080:8080 \
+    -u 1000:1000 \
+    -v ~/leafwiki-data:/app/data \
+    ghcr.io/perber/leafwiki:latest \
+    --jwt-secret=yoursecret \
+    --admin-password=yourpassword \
+    --allow-insecure=true
+```
+
+Make sure that the mounted data directory is writable by the specified user.
+
+### Quick start with the installer
 
 The easiest way to install LeafWiki is using the provided installation script:
 
@@ -188,7 +189,7 @@ The service is started automatically after installation.
 > The installation script has been tested on Ubuntu.
 > Feedback for other distributions is welcome via GitHub issues.
 
-#### Deployment examples 
+#### Deployment examples
 - [Install LeafWiki with nginx on Ubuntu](docs/install/nginx.md)
 - [Install LeafWiki on a Raspberry Pi](docs/install/raspberry.md)
 
@@ -211,48 +212,9 @@ cp .env.example .env
 sudo ./install.sh --non-interactive --env-file ./.env
 ```
 
-### Docker
-
-You can run LeafWiki as a container using Docker.
-
-```bash
-docker run -p 8080:8080 \
-    -v ~/leafwiki-data:/app/data \
-    ghcr.io/perber/leafwiki:latest \
-    --jwt-secret=yoursecret \
-    --admin-password=yourpassword \
-    --allow-insecure=true
-```
-
-By default, the container binds to `0.0.0.0` so the wiki is reachable from your network.
-The data directory inside the container is `/app/data`.
-The example above exposes LeafWiki over plain HTTP on port `8080`, so `--allow-insecure=true` is required for login cookies to work.
-If you serve LeafWiki behind HTTPS or a reverse proxy that forwards HTTPS headers, omit `--allow-insecure=true`.
-
----
-
-**Running as non-root user**
-To avoid running the container as root, specify a user ID:
-
-```bash
-docker run -p 8080:8080 \
-    -u 1000:1000 \
-    -v ~/leafwiki-data:/app/data \
-    ghcr.io/perber/leafwiki:latest \
-    --jwt-secret=yoursecret \
-    --admin-password=yourpassword \
-    --allow-insecure=true
-```
-
-Make sure that the mounted data directory is writable by the specified user.
-
-The data directory inside the container will be `/app/data`..
-
 ---
 
 ### Docker Compose
-
-You can also run LeafWiki using Docker Compose:
 
 ```yaml
 services:
@@ -273,18 +235,18 @@ services:
 
 Make sure the mounted data directory (`~/leafwiki-data`) is writable by the user specified in the `user` field.
 
-### Manual installation
+### Quick start with a binary
 
 Download the latest release binary from GitHub, make it executable, and start the server:
 
-```
+```bash
 chmod +x leafwiki
 ./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --allow-insecure=true
 ```
 
 **Note:** By default, the server listens on `127.0.0.1`, which means it will only be accessible from localhost. If you want to access the server from other machines on your network, add `--host=0.0.0.0` to the command:
 
-```
+```bash
 ./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --host=0.0.0.0 --allow-insecure=true
 ```
 
@@ -295,11 +257,20 @@ The JWT secret is required for authentication and should be kept secure.
 For plain HTTP setups such as localhost testing or direct LAN access, `--allow-insecure=true` is required so the browser accepts login and CSRF cookies.
 When LeafWiki is served over HTTPS, leave `--allow-insecure` disabled.
 
+### Operations notes
+
+- Default bind address is `127.0.0.1` unless you set `--host` or use the official Docker image
+- Default data directory is `./data` on direct binary installs and `/app/data` in the container
+- `--public-access` allows public read-only access while keeping editing authenticated
+- `--disable-auth` is only appropriate for trusted internal networks or local development
+
+These defaults are intentionally conservative so a fresh install does not become network-exposed by accident.
+
 
 ## Authentication and admin user
 
 ### Reset Admin Password
-If you need to reset the admin password, you can do so by running:
+If you need to reset the admin password:
 
 ```bash
 ./leafwiki reset-admin-password
@@ -309,6 +280,16 @@ If you need to reset the admin password, you can do so by running:
 
 LeafWiki can be configured using command-line flags or environment variables.
 These options control how the server runs after installation.
+
+If you are just getting started, the most important options are usually:
+
+- `--jwt-secret`
+- `--admin-password`
+- `--host`
+- `--data-dir`
+- `--public-access`
+- `--base-path`
+- `--allow-insecure`
 
 ### CLI Flags
 
@@ -329,6 +310,9 @@ These options control how the server runs after installation.
 | `--disable-auth`                | ⚠️ Disable authentication & authorization (internal networks only!)    | `false`       | v0.7.0            |
 | `--base-path`                   | URL prefix when served behind a reverse proxy (e.g. /wiki)              | `""`        | v0.8.2            |
 | `--max-asset-upload-size`       | Maximum size for asset uploads (e.g. `50MiB`, `50MB`, `52428800`)      | `50MiB`       | v0.8.5            |
+| `--enable-revision`             | Enable revision history / page history                                  | `false`       | v0.9.0            |
+| `--enable-link-refactor`        | Enable link refactoring dialog and rewrite flow                         | `false`       | v0.9.0            |
+| `--max-revision-history`        | Maximum revisions kept per page; `0` means unlimited                    | `100`         | v0.9.0            |
 
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
@@ -355,6 +339,9 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_DISABLE_AUTH`                | ⚠️ Disable authentication & authorization (internal networks only!)     | `false`    | v0.7.0          |
 | `LEAFWIKI_BASE_PATH`                   | URL prefix when served behind a reverse proxy (e.g. /wiki)              | `""`       | v0.8.2          |
 | `LEAFWIKI_MAX_ASSET_UPLOAD_SIZE`       | Maximum size for asset uploads (e.g. `50MiB`, `50MB`, `52428800`)       | `50MiB`    | v0.8.5          |
+| `LEAFWIKI_ENABLE_REVISION`             | Enable revision history / page history                                  | `false`    | v0.9.0          |
+| `LEAFWIKI_ENABLE_LINK_REFACTOR`        | Enable link refactoring dialog and rewrite flow                         | `false`    | v0.9.0          |
+| `LEAFWIKI_MAX_REVISION_HISTORY`        | Maximum revisions kept per page; `0` means unlimited                    | `100`      | v0.9.0          |
 
 
 These environment variables override the default values and are especially useful in containerized or production environments.
@@ -394,94 +381,50 @@ LeafWiki includes several built-in security mechanisms enabled by default:
 - **Rate limiting** on authentication-related endpoints
 - **Role-based access** (admin, editor, viewer)
 
-These features are **enabled by default** and provide safe defaults for most deployments.
-
-⚠️ Disabling or weakening these protections (e.g. via `--disable-auth` or `--allow-insecure`)
-should only be done in **trusted, internal environments**.
+These defaults are intended to be safe for normal deployments. If you weaken them with `--disable-auth` or `--allow-insecure`, do so only in trusted environments.
 
 ---
 
-### ⚠️ Security Warning: `--disable-auth`
+### Security warning: `--disable-auth`
 
-> **⚠️ WARNING – USE WITH EXTREME CAUTION**
+`--disable-auth` completely disables authentication and authorization.
 
-The `--disable-auth` flag **completely disables authentication and authorization** in LeafWiki.
+Only use it for:
+- local development
+- trusted internal networks
+- isolated environments protected elsewhere
 
-When enabled:
-- **Anyone with network access can edit, delete and modify all content**
-- **No login, no roles, no session checks are enforced**
-- **All security mechanisms are bypassed**
+Do not use it on public or internet-facing deployments.
 
-**This flag MUST NOT be used on public or internet-facing deployments.**
-
-**Intended use cases only:**
-- Local development
-- Internal networks
-- Environments protected by VPN and/or firewall
-- Fully isolated test systems
-
-If you use this flag, **you are fully responsible for securing access at the network level**.
-
-**Safe example (local development only):**
+Safe local example:
 
 ```bash
 ./leafwiki --disable-auth --host=127.0.0.1
 ```
 
-**For most setups, prefer:**
+For most setups, prefer:
 - Authentication enabled (default)
 - `--public-access` for read-only public access
 - Viewer role for read-only access
 
 ---
 
-## Import Feature 
-
-LeafWiki includes a built-in Markdown importer that allows admins to import an existing Markdown package into the wiki structure from the UI.
-The current workflow is ZIP-based: upload a package, review the generated import plan, and then start the import.
-
-The importer is designed to help you bring existing documentation into LeafWiki quickly while preserving the folder-oriented structure where possible.
-It currently supports:
-
-- importing Markdown files from a ZIP package
-- creating or updating pages based on the generated import plan
-- rewriting Markdown links between imported pages
-- rewriting Obsidian-style wiki links
-- importing linked local assets such as images and documents
-- preserving compatible frontmatter fields while keeping LeafWiki-managed fields under LeafWiki control
-
-There are still limits depending on the source content and package layout, so reviewing the generated plan before execution is recommended.
-
-Please open an issue if you have specific feature requests or feedback for the importer.
-
----
-
 ## Quick Start (Dev)
 
-```
-# 1. Clone the repo
-
+```bash
 git clone https://github.com/perber/leafwiki.git
 cd leafwiki
 
-# 2. Install frontend dependencies
-
 cd ui/leafwiki-ui
 npm install
-npm run dev   # Starts Vite dev server on http://localhost:5173
-
-# 3. In another terminal, start the backend
+npm run dev
 
 cd ../../cmd/leafwiki
-
 go run main.go --jwt-secret=yoursecret --allow-insecure=true --admin-password=yourpassword
-
-# Note: The backend binds to 127.0.0.1 by default for security.
-# If you need to access it from a different machine or network interface
-# (e.g., testing on mobile or from another device), use:
-# go run main.go --host=0.0.0.0
-
 ```
+
+Vite starts on `http://localhost:5173`.
+The backend binds to `127.0.0.1` by default. Use `--host=0.0.0.0` only if you intentionally need network access.
 
 ---
 
@@ -490,10 +433,10 @@ go run main.go --jwt-secret=yoursecret --allow-insecure=true --admin-password=yo
 | Action                     | Shortcut                                   |
 |----------------------------|--------------------------------------------|
 | Switch to Edit Mode        | `Ctrl + E` (or `Cmd + E`)                  |
-| Go to Page                | `Ctrl + Alt + P` (or `Cmd + Option + P`)   |
+| Save Page                  | `Ctrl + S` (or `Cmd + S`)                  |
 | Switch to Search Pane      | `Ctrl + Shift + F` (or `Cmd + Shift + F`)  |
 | Switch to Navigation Pane  | `Ctrl + Shift + E` (or `Cmd + Shift + E`)  |
-| Save Page                  | `Ctrl + S` (or `Cmd + S`)                  |
+| Go to Page                 | `Ctrl + Alt + P` (or `Cmd + Option + P`)   |
 | Bold Text                  | `Ctrl + B` (or `Cmd + B`)                  |
 | Italic Text                | `Ctrl + I` (or `Cmd + I`)                  |
 | Headline 1                 | `Ctrl + Alt + 1` (or `Cmd + Alt + 1`)      |
@@ -507,25 +450,6 @@ More shortcuts may be added in future releases.
 
 ---
 
-## Known limitations
-
-LeafWiki focuses on simplicity with a well-defined scope.  
-As a result, the following limitations apply today:
-
-- **No built-in page history or versioning**  
-  Saving changes overwrites the previous state. Versioning is a planned feature.
-
-- **Basic concurrency handling**  
-  Edits follow a last-write-wins model. Best suited for single maintainers or low-concurrency use.
-
-- **Metadata not fully embedded in Markdown**  
-  Page content is plain Markdown, but ordering metadata, user accounts, and search indexes are stored outside the page body.
-
-- **Minimal access control**  
-  No role-based permissions or fine-grained restrictions at this time.
-
----
-
 ### Available Builds
 
 LeafWiki is available as a native binary for the following platforms:
@@ -534,6 +458,16 @@ LeafWiki is available as a native binary for the following platforms:
 - **macOS (x86_64 and ARM64)**
 - **Windows (x86_64)**
 - **Raspberry Pi (tested with 64-bit OS)**
+
+---
+
+## Support LeafWiki
+
+If LeafWiki is useful to you or your team, consider sponsoring the project on GitHub.
+
+Sponsorship helps fund maintenance, bug fixes, documentation, and improvements like tags and properties.
+
+👉 https://github.com/sponsors/perber
 
 ---
 
