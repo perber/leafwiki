@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -17,6 +18,12 @@ import (
 )
 
 var sanitize = bluemonday.StrictPolicy()
+
+var (
+	searchShoutoutOpenPattern  = regexp.MustCompile(`^(?P<indent> {0,3}):::\s*(?P<type>[A-Za-z][\w-]*)\s*$`)
+	searchShoutoutClosePattern = regexp.MustCompile(`^(?P<indent> {0,3}):::\s*$`)
+	searchFencePattern         = regexp.MustCompile(`^(?P<indent> {0,3})(?P<marker>` + "`{3,}|~{3,}" + `)(?P<rest>.*)$`)
+)
 
 type SQLiteIndex struct {
 	mu         sync.Mutex
@@ -68,6 +75,65 @@ func extractHeadings(markdown string) string {
 	})
 
 	return sanitize.Sanitize(buf.String())
+}
+
+type fenceState struct {
+	markerChar   byte
+	markerLength int
+}
+
+func getFenceState(line string, currentFence *fenceState) *fenceState {
+	match := searchFencePattern.FindStringSubmatch(line)
+	if match == nil {
+		return currentFence
+	}
+
+	marker := match[searchFencePattern.SubexpIndex("marker")]
+	if marker == "" {
+		return currentFence
+	}
+
+	if currentFence == nil {
+		return &fenceState{
+			markerChar:   marker[0],
+			markerLength: len(marker),
+		}
+	}
+
+	if marker[0] == currentFence.markerChar && len(marker) >= currentFence.markerLength {
+		return nil
+	}
+
+	return currentFence
+}
+
+func normalizeSearchMarkdownShoutouts(content string) string {
+	normalized := strings.ReplaceAll(content, "\r\n", "\n")
+	lines := strings.Split(normalized, "\n")
+	output := make([]string, 0, len(lines))
+	var outerFence *fenceState
+
+	for _, line := range lines {
+		if outerFence != nil {
+			output = append(output, line)
+			outerFence = getFenceState(line, outerFence)
+			continue
+		}
+
+		if match := searchShoutoutOpenPattern.FindStringSubmatch(line); match != nil {
+			output = append(output, match[searchShoutoutOpenPattern.SubexpIndex("type")])
+			continue
+		}
+
+		if searchShoutoutClosePattern.MatchString(line) {
+			continue
+		}
+
+		output = append(output, line)
+		outerFence = getFenceState(line, outerFence)
+	}
+
+	return strings.Join(output, "\n")
 }
 
 func buildFuzzyQuery(q string) string {
@@ -172,6 +238,8 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 	if err != nil {
 		return err
 	}
+
+	content = normalizeSearchMarkdownShoutouts(content)
 
 	// Headings extracted from the Markdown
 	headings := extractHeadings(content)
