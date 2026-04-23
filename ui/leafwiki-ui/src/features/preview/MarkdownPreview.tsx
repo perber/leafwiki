@@ -111,7 +111,7 @@ function getShoutoutConfig(children: ReactNode): ShoutoutConfig | null {
   }
 
   const marker = getTextContent(firstChild.props.children).trim()
-  const match = marker.match(/^\[!(?<kind>[A-Z][A-Z0-9-]*)\]$/)
+  const match = marker.match(/^\[!(?<kind>[A-Z][A-Z0-9_-]*)\]$/)
   if (!match?.groups?.kind) {
     return null
   }
@@ -365,16 +365,16 @@ export default function MarkdownPreview({
           markerIndex >= 0 ? childArray.slice(markerIndex + 1) : []
         ).filter((child) => typeof child !== 'string' || child.trim() !== '')
 
+        const title = getSemanticShoutoutTitle(shoutoutConfig.kind)
+
         return (
           <aside
             {...props}
             data-line={dataLine}
             className={`markdown-shoutout markdown-shoutout--${shoutoutConfig.kind} ${className ?? ''}`.trim()}
           >
-            {getSemanticShoutoutTitle(shoutoutConfig.kind) ? (
-              <p className="markdown-shoutout__title">
-                {getSemanticShoutoutTitle(shoutoutConfig.kind)}
-              </p>
+            {title ? (
+              <p className="markdown-shoutout__title">{title}</p>
             ) : null}
             <div className="markdown-shoutout__content">{contentChildren}</div>
           </aside>
