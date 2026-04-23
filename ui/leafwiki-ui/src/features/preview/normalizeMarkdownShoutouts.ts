@@ -19,7 +19,7 @@ const shoutoutTypeMap: Record<string, string> = {
 }
 
 function normalizeShoutoutType(rawType: string) {
-  const normalizedType = rawType.toLowerCase()
+  const normalizedType = rawType.toLowerCase().replace(/_/g, '-')
   return shoutoutTypeMap[normalizedType] ?? normalizedType
 }
 
