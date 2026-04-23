@@ -1,11 +1,17 @@
 # 🌿 LeafWiki
 
-**LeafWiki – A fast wiki for people who think in folders, not feeds**  
-Fast editing. Explicit tree navigation. Markdown stored on disk. Single Go binary.
+**LeafWiki – A lightweight documentation app for people who think in folders, not feeds**  
+Fast editing. Explicit tree navigation. Portable Markdown storage. Single Go binary.
 
-LeafWiki is a lightweight wiki for runbooks, internal docs, and technical notes. It combines fast writing, structured navigation, and search in a focused app, while keeping your content portable as plain Markdown files on disk.
+LeafWiki is a lightweight documentation app for runbooks, internal docs, technical notes, archives, and knowledge libraries. It combines fast writing, structured navigation, and search in a focused app, while keeping your content portable as plain Markdown files on disk.
 
-If you want something lighter than a large wiki platform, but more structured than scattered notes, LeafWiki sits in that gap.
+If you want something lighter than a large wiki platform, but better suited to long-lived documentation than scattered notes, LeafWiki sits in that gap.
+
+Typical use cases today:
+- Archives and knowledge libraries
+- Internal docs and runbooks
+- Public read-only documentation
+- Personal and primary-owner wikis
 
 ---
 
@@ -43,32 +49,34 @@ Mobile-friendly UI for reading (and editing) docs & runbooks on the go.
 ## What LeafWiki is good for today
 
 LeafWiki focuses on personal and small-team documentation use cases today.
-It is designed for teams that want a focused documentation app with clear structure, fast editing, and full control over their data without taking on the weight of a larger platform.
+It is designed for people who want a focused documentation app with clear structure, fast editing, and full control over their data without taking on the weight of a larger platform.
 
 LeafWiki is currently well-suited for:
 - Personal technical notes and documentation
 - Project documentation maintained by one main contributor
 - Runbooks, operational knowledge and engineering guides for small teams
+- Internal archives and knowledge libraries
+- External or read-mostly documentation portals
 - Structured content that benefits from explicit hierarchy and ordering
 
 ---
 
 ## Project Status
 
-LeafWiki is stable for everyday use as a personal or primary-owner wiki.  
+LeafWiki is stable for everyday use as a personal, archival, or primary-owner wiki.  
 The core features — writing, navigation, and search — are actively maintained and production-ready.
 
 Collaboration is currently limited and follows a *last-write-wins* approach.  
-More advanced team-oriented capabilities are under development, with a focus on durability and predictable behavior.
+LeafWiki already supports team use with roles and authenticated editing, but its current strengths are clearer structure, curated documentation, and low operational overhead rather than real-time collaboration.
 
 
 **Current priorities:**  
 - Versioning
-- Importing existing Markdown content
+- Localization
 - Conflict handling for concurrent edits (optimistic locking)
 
 Priorities are shaped by real-world usage, and development is iterative.
-The platform will evolve cautiously toward team workflows while maintaining its principles of simplicity and low operational overhead.
+The platform will evolve cautiously while maintaining its principles of simplicity, predictable behavior, and low operational overhead.
 
 > **LeafWiki** is actively developed and open to collaboration 🌿 
 
@@ -80,7 +88,7 @@ See the [CHANGELOG](CHANGELOG.md) for release details.
 
 If LeafWiki is useful to you or your team, consider sponsoring the project on GitHub.
 
-Sponsorship helps fund maintenance, bug fixes, documentation, and important improvements like versioning, imports, and collaboration features.
+Sponsorship helps fund maintenance, bug fixes, documentation, and important improvements like versioning, localization, and collaboration safeguards.
 
 👉 https://github.com/sponsors/perber
 
@@ -165,6 +173,7 @@ Markdown rendering is intentionally conservative: unsupported or unsafe HTML is 
 - Not a Confluence replacement
 - Not real-time collaborative editing
 - Not a workflow, approval, or document-control platform
+- Not a database-heavy documentation stack
 
 LeafWiki is designed to stay focused, predictable, and easy to operate.
 
