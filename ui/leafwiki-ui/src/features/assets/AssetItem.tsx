@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { deleteAsset, renameAsset } from '@/lib/api/assets'
+import { mapApiError } from '@/lib/api/errors'
 import {
   AUDIO_EXTENSIONS,
   IMAGE_EXTENSIONS,
@@ -70,11 +71,7 @@ export function AssetItem({
       onAssetVersionChange?.()
       onReload()
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        toast.error(`Rename failed: ${err.message}`)
-      } else if (typeof err === 'object' && err !== null && 'error' in err) {
-        toast.error(`Rename failed: ${(err as { error: string }).error}`)
-      }
+      toast.error(mapApiError(err, 'Rename failed').message)
     }
   }, [
     pageId,
@@ -94,7 +91,7 @@ export function AssetItem({
       onReload()
       onAssetVersionChange?.()
     } catch (err) {
-      toast.error('Delete failed')
+      toast.error(mapApiError(err, 'Delete failed').message)
       console.error('Delete failed', err)
     }
   }

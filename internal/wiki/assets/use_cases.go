@@ -2,11 +2,13 @@ package assets
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"mime/multipart"
 
 	coreassets "github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/revision"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -38,6 +40,9 @@ func NewUploadAssetUseCase(t *tree.TreeService, a *coreassets.AssetService, r *r
 func (uc *UploadAssetUseCase) Execute(_ context.Context, in UploadAssetInput) (*UploadAssetOutput, error) {
 	page, err := uc.tree.FindPageByID(in.PageID)
 	if err != nil {
+		if errors.Is(err, tree.ErrPageNotFound) {
+			return nil, sharederrors.NewLocalizedError("asset_page_not_found", "Page not found", "page %s not found", err, in.PageID)
+		}
 		return nil, err
 	}
 	url, err := uc.asset.SaveAssetForPage(page, in.File, in.Filename, in.MaxBytes)
@@ -70,6 +75,9 @@ func NewListAssetsUseCase(t *tree.TreeService, a *coreassets.AssetService) *List
 func (uc *ListAssetsUseCase) Execute(_ context.Context, in ListAssetsInput) (*ListAssetsOutput, error) {
 	page, err := uc.tree.FindPageByID(in.PageID)
 	if err != nil {
+		if errors.Is(err, tree.ErrPageNotFound) {
+			return nil, sharederrors.NewLocalizedError("asset_page_not_found", "Page not found", "page %s not found", err, in.PageID)
+		}
 		return nil, err
 	}
 	files, err := uc.asset.ListAssetsForPage(page)
@@ -106,6 +114,9 @@ func NewRenameAssetUseCase(t *tree.TreeService, a *coreassets.AssetService, r *r
 func (uc *RenameAssetUseCase) Execute(_ context.Context, in RenameAssetInput) (*RenameAssetOutput, error) {
 	page, err := uc.tree.FindPageByID(in.PageID)
 	if err != nil {
+		if errors.Is(err, tree.ErrPageNotFound) {
+			return nil, sharederrors.NewLocalizedError("asset_page_not_found", "Page not found", "page %s not found", err, in.PageID)
+		}
 		return nil, err
 	}
 	newPath, err := uc.asset.RenameAsset(page, in.OldFilename, in.NewFilename)
@@ -138,6 +149,9 @@ func NewDeleteAssetUseCase(t *tree.TreeService, a *coreassets.AssetService, r *r
 func (uc *DeleteAssetUseCase) Execute(_ context.Context, in DeleteAssetInput) error {
 	page, err := uc.tree.FindPageByID(in.PageID)
 	if err != nil {
+		if errors.Is(err, tree.ErrPageNotFound) {
+			return sharederrors.NewLocalizedError("asset_page_not_found", "Page not found", "page %s not found", err, in.PageID)
+		}
 		return err
 	}
 	if err := uc.asset.DeleteAsset(page, in.Filename); err != nil {

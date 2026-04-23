@@ -1,6 +1,7 @@
 package assets
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/perber/wiki/internal/core/shared"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -92,7 +94,7 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 
 	uploadPath, err := s.ensureAssetPagePathExists(page)
 	if err != nil {
-		return "", fmt.Errorf("could not upload file: %w", err)
+		return "", sharederrors.NewLocalizedError("asset_upload_failed", "Failed to upload asset", "failed to upload asset", err)
 	}
 
 	// Read existing filenames
@@ -106,7 +108,10 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 	fullPath := assetFileDiskPath(uploadPath, finalFilename)
 
 	if err := shared.WriteStreamAtomic(fullPath, file, maxBytes); err != nil {
-		return "", fmt.Errorf("could not write file: %w", err)
+		if errors.Is(err, shared.ErrFileTooLarge) {
+			return "", sharederrors.NewLocalizedError("asset_file_too_large", "File is too large", "file is too large", err)
+		}
+		return "", sharederrors.NewLocalizedError("asset_upload_failed", "Failed to upload asset", "failed to upload asset", err)
 	}
 
 	// Return public path (served from /assets)
@@ -145,13 +150,13 @@ func (s *AssetService) DeleteAsset(page *tree.PageNode, filename string) error {
 
 	assetPath, err := s.getAssetPagePath(page)
 	if err != nil {
-		return fmt.Errorf("asset not found: %s", filename)
+		return sharederrors.NewLocalizedError("asset_not_found", "Asset not found", "asset %s not found", nil, filename)
 	}
 
 	fullPath := assetFileDiskPath(assetPath, filename)
 
 	if err := os.Remove(fullPath); err != nil {
-		return fmt.Errorf("could not delete asset: %w", err)
+		return sharederrors.NewLocalizedError("asset_delete_failed", "Failed to delete asset", "failed to delete asset %s", err, filename)
 	}
 
 	// Check if the directory is empty and remove it if so
@@ -185,7 +190,7 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 
 	assetPath, err := s.getAssetPagePath(page)
 	if err != nil {
-		return "", fmt.Errorf("could not rename asset: %w", err)
+		return "", sharederrors.NewLocalizedError("asset_not_found", "Asset not found", "asset %s not found", nil, oldFilename)
 	}
 
 	oldFullPath := assetFileDiskPath(assetPath, oldFilename)
@@ -195,7 +200,7 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 	oldExt := path.Ext(oldFilename)
 	newExt := path.Ext(newFilename)
 	if oldExt != newExt {
-		return "", fmt.Errorf("new asset must have the same extension as the old one: %s", oldExt)
+		return "", sharederrors.NewLocalizedError("asset_invalid_extension", "Asset extension must not change", "asset extension must not change from %s", nil, oldExt)
 	}
 
 	// Used for slug validation
@@ -203,20 +208,20 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 	newFilenameWithoutExt := newFilename[:len(newFilename)-len(newExt)]
 	// Ensure that the new asset is a valid filename (slug)
 	if err := s.slugger.IsValidSlug(newFilenameWithoutExt); err != nil {
-		return "", fmt.Errorf("invalid asset name: %s", newFilename)
+		return "", sharederrors.NewLocalizedError("asset_invalid_name", "Invalid asset name", "invalid asset name %s", nil, newFilename)
 	}
 
 	// Ensure that no file with the new name already exists
-	if _, err := os.Stat(newFullPath); !os.IsNotExist(err) {
-		return "", fmt.Errorf("new asset already exists: %s", newFilename)
+	if _, statErr := os.Stat(newFullPath); statErr == nil {
+		return "", sharederrors.NewLocalizedError("asset_already_exists", "Asset already exists", "asset %s already exists", nil, newFilename)
 	}
 
 	if _, err := os.Stat(oldFullPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("old asset does not exist: %s", oldFilename)
+		return "", sharederrors.NewLocalizedError("asset_not_found", "Asset not found", "asset %s not found", nil, oldFilename)
 	}
 
 	if err := os.Rename(oldFullPath, newFullPath); err != nil {
-		return "", fmt.Errorf("could not rename asset: %w", err)
+		return "", sharederrors.NewLocalizedError("asset_rename_failed", "Failed to rename asset", "failed to rename asset %s", err, oldFilename)
 	}
 
 	return s.buildPublicPath(page, newFilename), nil

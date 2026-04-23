@@ -103,11 +103,11 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 func writeAuthCookieError(c *gin.Context, err error, httpsMsg, internalMsg, logMsg string) {
 	if errors.Is(err, utils.ErrHTTPSRequired) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": httpsMsg})
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, httpsMsg, "https required for auth cookies")
 		return
 	}
 	slog.Default().Error(logMsg, "error", err)
-	c.JSON(http.StatusInternalServerError, gin.H{"error": internalMsg})
+	respondWithAuthStatusError(c, http.StatusInternalServerError, ErrCodeAuthInternalError, internalMsg, "failed to issue auth cookie")
 }
 
 func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
@@ -140,7 +140,7 @@ func (r *Routes) handleLogin(rctx httpinternal.RouterContext) gin.HandlerFunc {
 			Password   string `json:"password" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid login payload"})
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidPayload, "Invalid login payload", "invalid login payload")
 			return
 		}
 		out, err := r.login.Execute(c.Request.Context(), LoginInput{
@@ -160,12 +160,12 @@ func (r *Routes) handleLogin(rctx httpinternal.RouterContext) gin.HandlerFunc {
 		}
 		if err := rctx.AuthCookies.Set(c, out.Token.Token, out.Token.RefreshToken); err != nil {
 			if errors.Is(err, utils.ErrHTTPSRequired) {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error": "HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-				})
+				respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed,
+					"HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
+					"https required for auth cookies")
 				return
 			}
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to set authentication cookies"})
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": out.Token.User})
@@ -182,12 +182,12 @@ func (r *Routes) handleLogout(rctx httpinternal.RouterContext) gin.HandlerFunc {
 		}
 		if err := rctx.AuthCookies.Clear(c); err != nil {
 			log.Printf("[INFO] Unable to clear auth cookies: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCsrfFailed, "Failed to clear authentication cookies", "failed to clear authentication cookies")
 			return
 		}
 		if err := rctx.CSRFCookie.Clear(c); err != nil {
 			log.Printf("[INFO] Unable to clear CSRF cookie: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to clear CSRF cookie"})
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCsrfFailed, "Failed to clear CSRF cookie", "failed to clear csrf cookie")
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
@@ -198,7 +198,7 @@ func (r *Routes) handleRefreshToken(rctx httpinternal.RouterContext) gin.Handler
 	return func(c *gin.Context) {
 		rt, err := rctx.AuthCookies.ReadRefresh(c)
 		if err != nil || rt == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid refresh token"})
+			respondWithAuthStatusError(c, http.StatusUnauthorized, ErrCodeAuthInvalidRefreshToken, "Missing or invalid refresh token", "missing or invalid refresh token")
 			return
 		}
 		out, err := r.refreshToken.Execute(c.Request.Context(), RefreshTokenInput{RefreshToken: rt})
@@ -216,12 +216,12 @@ func (r *Routes) handleRefreshToken(rctx httpinternal.RouterContext) gin.Handler
 		}
 		if err := rctx.AuthCookies.Set(c, out.Token.Token, out.Token.RefreshToken); err != nil {
 			if errors.Is(err, utils.ErrHTTPSRequired) {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error": "HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-				})
+				respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed,
+					"HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
+					"https required for auth cookies")
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set authentication cookies"})
+			respondWithAuthStatusError(c, http.StatusInternalServerError, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "Token refreshed", "user": out.Token.User})
@@ -236,7 +236,7 @@ func (r *Routes) handleCreateUser(c *gin.Context) {
 		Role     string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	out, err := r.createUser.Execute(c.Request.Context(), CreateUserInput{
@@ -267,7 +267,7 @@ func (r *Routes) handleUpdateUser(c *gin.Context) {
 		Role     string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	out, err := r.updateUser.Execute(c.Request.Context(), UpdateUserInput{
@@ -299,7 +299,7 @@ func (r *Routes) handleChangeOwnPassword(c *gin.Context) {
 		NewPassword string `json:"newPassword" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	if err := r.changeOwnPassword.Execute(c.Request.Context(), ChangeOwnPasswordInput{

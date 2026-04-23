@@ -19,6 +19,10 @@ const (
 	ErrCodeRevisionRestoreInvalidRevision      = "revision_restore_invalid_revision"
 	ErrCodeRevisionRestoreRevisionNotFound     = "revision_restore_revision_not_found"
 	ErrCodeRevisionRestorePageNotFound         = "revision_restore_page_not_found"
+	ErrCodeRevisionRestoreFailed               = "revision_restore_failed"
+	ErrCodeRevisionRestoreContentMissing       = "revision_restore_content_missing"
+	ErrCodeRevisionRestoreAssetsMissing        = "revision_restore_assets_missing"
+	ErrCodeRevisionServiceUnavailable          = "revision_service_unavailable"
 	ErrCodeRevisionPreviewContentUnavailable   = "revision_preview_content_unavailable"
 	ErrCodeRevisionPreviewAssetsUnavailable    = "revision_preview_assets_unavailable"
 	ErrCodeRevisionPreviewAssetNotFound        = "revision_preview_asset_not_found"
@@ -68,17 +72,9 @@ func respondWithRevisionError(c *gin.Context, err error) {
 
 func revisionErrorStatus(code string) int {
 	switch code {
-	case ErrCodeRevisionRestoreRevisionNotFound, ErrCodeRevisionRestorePageNotFound:
+	case ErrCodeRevisionRestoreRevisionNotFound, ErrCodeRevisionRestorePageNotFound, ErrCodeRevisionPreviewAssetNotFound:
 		return http.StatusNotFound
-	case ErrCodeRevisionPreviewContentUnavailable, ErrCodeRevisionPreviewAssetsUnavailable:
-		return http.StatusInternalServerError
-	case ErrCodeRevisionPreviewAssetNotFound:
-		return http.StatusNotFound
-	case ErrCodeRevisionPreviewAssetInvalidName:
-		return http.StatusBadRequest
-	case ErrCodeRevisionPreviewAssetBlobUnavailable:
-		return http.StatusInternalServerError
-	case ErrCodeRevisionRestoreInvalidPageID, ErrCodeRevisionRestoreInvalidRevision:
+	case ErrCodeRevisionRestoreInvalidPageID, ErrCodeRevisionRestoreInvalidRevision, ErrCodeRevisionPreviewAssetInvalidName:
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

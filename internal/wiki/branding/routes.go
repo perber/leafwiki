@@ -99,7 +99,7 @@ func (r *Routes) handleUpdateBranding(c *gin.Context) {
 		SiteName string `json:"siteName"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payload"})
+		respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingInvalidPayload, "Invalid payload", "invalid payload")
 		return
 	}
 	out, err := r.updateBranding.Execute(c.Request.Context(), UpdateBrandingInput{SiteName: req.SiteName})
@@ -119,12 +119,12 @@ func (r *Routes) handleUploadLogo(c *gin.Context) {
 	maxSize := constraints.BrandingConstraints.MaxLogoSize
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
 	if err := c.Request.ParseMultipartForm(maxSize); err != nil {
-		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
+		respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingLogoTooLarge, "File too large", "file too large")
 		return
 	}
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
+		respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingLogoMissing, "Missing file", "missing file")
 		return
 	}
 	defer func() {
@@ -158,12 +158,12 @@ func (r *Routes) handleUploadFavicon(c *gin.Context) {
 	maxSize := constraints.BrandingConstraints.MaxFaviconSize
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
 	if err := c.Request.ParseMultipartForm(maxSize); err != nil {
-		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
+		respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingFaviconTooLarge, "File too large", "file too large")
 		return
 	}
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
+		respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingFaviconMissing, "Missing file", "missing file")
 		return
 	}
 	defer func() {

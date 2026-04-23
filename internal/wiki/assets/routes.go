@@ -87,14 +87,14 @@ func (r *Routes) handleUpload(maxUploadSize int64) gin.HandlerFunc {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
 
 		if err := c.Request.ParseMultipartForm(maxMultipartMemory); err != nil {
-			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large"})
+			respondWithAssetStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeAssetFileTooLarge, "File too large", "file too large")
 			return
 		}
 
 		pageID := c.Param("id")
 		file, header, err := c.Request.FormFile("file")
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
+			respondWithAssetStatusError(c, http.StatusBadRequest, ErrCodeAssetMissingFile, "Missing file", "missing file")
 			return
 		}
 		defer func() {
@@ -136,7 +136,7 @@ func (r *Routes) handleRename(c *gin.Context) {
 		NewFilename string `json:"new_filename" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		respondWithAssetStatusError(c, http.StatusBadRequest, ErrCodeAssetInvalidPayload, "Invalid payload", "invalid payload")
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -157,7 +157,7 @@ func (r *Routes) handleDelete(c *gin.Context) {
 	pageID := c.Param("id")
 	filename := c.Param("name")
 	if filename == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing filename"})
+		respondWithAssetStatusError(c, http.StatusBadRequest, ErrCodeAssetMissingName, "Missing filename", "missing filename")
 		return
 	}
 	user := authmw.MustGetUser(c)

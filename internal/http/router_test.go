@@ -988,13 +988,14 @@ func TestCancelImportPlanEndpoint(t *testing.T) {
 		t.Fatalf("Expected status 404 when fetching canceled import plan, got %d: %s", getRec.Code, getRec.Body.String())
 	}
 
-	var resp map[string]string
+	var resp map[string]interface{}
 	if err := json.Unmarshal(getRec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("Invalid JSON response: %v", err)
 	}
 
-	if resp["error"] == "" {
-		t.Fatalf("Expected error message after canceling import plan, got: %v", resp)
+	errObj, ok := resp["error"].(map[string]interface{})
+	if !ok || errObj["code"] == nil {
+		t.Fatalf("Expected structured error response after canceling import plan, got: %v", resp)
 	}
 }
 

@@ -62,7 +62,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 func (r *Routes) handleSearch(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter 'q' is required"})
+		respondWithSearchStatusError(c, http.StatusBadRequest, ErrCodeSearchMissingQuery, "Query parameter 'q' is required", "query parameter q is required")
 		return
 	}
 
@@ -71,12 +71,12 @@ func (r *Routes) handleSearch(c *gin.Context) {
 
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid offset value"})
+		respondWithSearchStatusError(c, http.StatusBadRequest, ErrCodeSearchInvalidOffset, "Invalid offset value", "invalid offset value")
 		return
 	}
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit value"})
+		respondWithSearchStatusError(c, http.StatusBadRequest, ErrCodeSearchInvalidLimit, "Invalid limit value", "invalid limit value")
 		return
 	}
 

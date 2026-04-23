@@ -2,18 +2,16 @@ package revisions
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"time"
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/core/revision"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
-// ErrRevisionServiceUnavailable is returned when the revision service is nil (feature disabled).
-var ErrRevisionServiceUnavailable = errors.New("revision service not available")
 
 // ─── DTO types ───────────────────────────────────────────────────────────────
 
@@ -318,7 +316,12 @@ func NewRestoreRevisionUseCase(r *revision.Service, t *tree.TreeService, l *link
 
 func (uc *RestoreRevisionUseCase) Execute(_ context.Context, in RestoreRevisionInput) (*RestoreRevisionOutput, error) {
 	if uc.revision == nil {
-		return nil, ErrRevisionServiceUnavailable
+		return nil, sharederrors.NewLocalizedError(
+			ErrCodeRevisionServiceUnavailable,
+			"Revision service is not available",
+			"revision service is not available",
+			nil,
+		)
 	}
 	if err := uc.revision.RestoreRevision(in.PageID, in.RevisionID, in.UserID); err != nil {
 		return nil, err
