@@ -7,11 +7,18 @@ LeafWiki is a lightweight documentation app for runbooks, internal docs, technic
 
 If you want something lighter than a large wiki platform, but better suited to long-lived documentation than scattered notes, LeafWiki sits in that gap.
 
-Typical use cases today:
+Best for:
 - Archives and knowledge libraries
 - Internal docs and runbooks
 - Public read-only documentation
 - Personal and primary-owner wikis
+
+Why teams pick LeafWiki:
+- Explicit tree navigation instead of flat note lists
+- Portable Markdown storage with no external database to manage
+- Focused editor, live preview, and built-in search
+- Simple deployment as a single binary or Docker container
+- Roles for admin, editor, and viewer users
 
 ---
 
@@ -48,37 +55,23 @@ Mobile-friendly UI for reading (and editing) docs & runbooks on the go.
 
 ## What LeafWiki is good for today
 
-LeafWiki focuses on personal and small-team documentation use cases today.
-It is designed for people who want a focused documentation app with clear structure, fast editing, and full control over their data without taking on the weight of a larger platform.
-
-LeafWiki is currently well-suited for:
-- Personal technical notes and documentation
-- Project documentation maintained by one main contributor
-- Runbooks, operational knowledge and engineering guides for small teams
+LeafWiki works best for personal and small-team documentation that is curated over time:
+- Technical notes and project docs maintained by one main contributor
+- Runbooks and operational knowledge for small teams
 - Internal archives and knowledge libraries
 - External or read-mostly documentation portals
-- Structured content that benefits from explicit hierarchy and ordering
 
 ---
 
 ## Project Status
 
-LeafWiki is stable for everyday use as a personal, archival, or primary-owner wiki.  
-The core features — writing, navigation, and search — are actively maintained and production-ready.
-
-Collaboration is currently limited and follows a *last-write-wins* approach.  
-LeafWiki already supports team use with roles and authenticated editing, but its current strengths are clearer structure, curated documentation, and low operational overhead rather than real-time collaboration.
-
+LeafWiki is stable for everyday use as a personal, archival, or primary-owner wiki. The core features — writing, navigation, and search — are actively maintained and production-ready.
+It already supports team use with roles and authenticated editing, but its current strengths are clearer structure, curated documentation, and low operational overhead rather than real-time collaboration.
 
 **Current priorities:**  
 - Versioning
 - Localization
 - Conflict handling for concurrent edits (optimistic locking)
-
-Priorities are shaped by real-world usage, and development is iterative.
-The platform will evolve cautiously while maintaining its principles of simplicity, predictable behavior, and low operational overhead.
-
-> **LeafWiki** is actively developed and open to collaboration 🌿 
 
 See the [CHANGELOG](CHANGELOG.md) for release details.
 
@@ -94,49 +87,16 @@ Sponsorship helps fund maintenance, bug fixes, documentation, and important impr
 
 ---
 
-## Why Another Wiki?
+## Why LeafWiki
 
-Most wiki tools become projects of their own: databases to manage, plugins to maintain, workflows to configure, and too many setup decisions for a system that should just help you write, navigate, and find information.
-
-LeafWiki takes a narrower view:
-- Provide a focused documentation app instead of a sprawling platform
-- Make structure explicit instead of inferred
-- Keep content portable as plain Markdown on disk
-- Stay easy to self-host and easy to understand
-- Avoid turning documentation into platform maintenance
-
-In practice, that means:
-- A dedicated app for writing, reading, and organizing docs
-- Explicit tree structure
-- Markdown stored on disk
+LeafWiki is for teams and individuals who want a focused documentation app instead of a sprawling platform:
+- App-first, file-backed
+- Explicit structure instead of inferred organization
+- Portable Markdown storage with no external database to manage
 - Single-binary or container deployment
-- Minimal operational overhead
+- Low operational overhead
 
----
-
-## Core principles
-
-LeafWiki is built around a small set of clear principles:
-
-- **App-first, file-backed**  
-  LeafWiki is built as a documentation app with its own navigation, editing, and search experience while keeping content stored as plain Markdown files on disk.
-
-- **No external database required**  
-  LeafWiki uses SQLite internally and does not require running or managing a separate database service.
-
-- **Explicit structure management**  
-  Structure is derived from the filesystem layout and persisted metadata files while page content stays plain Markdown.
-
-- **Self-hosted by design**
-  Designed to run on a single server with minimal operational overhead.
-
----
-
-### Data model
-
-LeafWiki stores page content as Markdown files on disk.
-Navigation is reconstructed from the filesystem layout, child ordering is stored in `.order.json`, and search uses SQLite.
-For details on the current model and its constraints, see [Known limitations](#known-limitations).
+Page content is stored as Markdown files on disk. Navigation is reconstructed from the filesystem layout, child ordering is stored in `.order.json`, and search uses SQLite. For details on the current model and its constraints, see [Known limitations](#known-limitations).
 
 ---
 
@@ -154,19 +114,7 @@ For details on the current model and its constraints, see [Known limitations](#k
 - Dark mode and mobile-friendly UI
 - Keyboard shortcuts for common actions such as save and search
 
-### Supported Markdown
-
-LeafWiki's editor and live preview support standard Markdown plus a practical set of extensions commonly used in technical documentation.
-
-- CommonMark-style headings, lists, blockquotes, links, images, and code blocks
-- GitHub Flavored Markdown features such as tables, task lists, strikethrough, and footnotes
-- Shoutouts / callouts for highlighted blocks such as notes, tips, warnings, and danger messages
-- Syntax highlighting for fenced code blocks
-- Mermaid code blocks for diagrams
-- Audio and video embeds via HTML5 media elements
-- A sanitized subset of inline HTML for cases where plain Markdown is not enough
-
-Markdown rendering is intentionally conservative: unsupported or unsafe HTML is filtered to keep page rendering predictable and safe.
+LeafWiki's editor and live preview support standard Markdown plus practical documentation features such as tables, task lists, footnotes, shoutouts, Mermaid diagrams, media embeds, and a sanitized subset of inline HTML.
 
 ## What LeafWiki is not
 
