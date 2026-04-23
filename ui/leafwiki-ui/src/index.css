@@ -1826,7 +1826,9 @@
     .markdown-shoutout--info
     .markdown-shoutout__title,
   .page-viewer__content .markdown-shoutout--info .markdown-shoutout__title,
-  .page-history__preview-body .markdown-shoutout--info .markdown-shoutout__title {
+  .page-history__preview-body
+    .markdown-shoutout--info
+    .markdown-shoutout__title {
     @apply text-brand;
   }
 

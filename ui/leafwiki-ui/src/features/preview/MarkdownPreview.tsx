@@ -373,9 +373,7 @@ export default function MarkdownPreview({
             data-line={dataLine}
             className={`markdown-shoutout markdown-shoutout--${shoutoutConfig.kind} ${className ?? ''}`.trim()}
           >
-            {title ? (
-              <p className="markdown-shoutout__title">{title}</p>
-            ) : null}
+            {title ? <p className="markdown-shoutout__title">{title}</p> : null}
             <div className="markdown-shoutout__content">{contentChildren}</div>
           </aside>
         )
