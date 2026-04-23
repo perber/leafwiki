@@ -23,6 +23,9 @@ var (
 	searchShoutoutOpenPattern  = regexp.MustCompile(`^ {0,3}:::\s*(?P<type>[A-Za-z][\w-]*)\s*$`)
 	searchShoutoutClosePattern = regexp.MustCompile(`^ {0,3}:::\s*$`)
 	searchFencePattern         = regexp.MustCompile(`^ {0,3}(?P<marker>` + "`{3,}|~{3,}" + `).*$`)
+
+	searchShoutoutTypeIdx  = searchShoutoutOpenPattern.SubexpIndex("type")
+	searchFenceMarkerIdx   = searchFencePattern.SubexpIndex("marker")
 )
 
 type SQLiteIndex struct {
@@ -88,7 +91,7 @@ func getFenceState(line string, currentFence *fenceState) *fenceState {
 		return currentFence
 	}
 
-	marker := match[searchFencePattern.SubexpIndex("marker")]
+	marker := match[searchFenceMarkerIdx]
 	if marker == "" {
 		return currentFence
 	}
@@ -121,7 +124,7 @@ func normalizeSearchMarkdownShoutouts(content string) string {
 		}
 
 		if match := searchShoutoutOpenPattern.FindStringSubmatch(line); match != nil {
-			output = append(output, match[searchShoutoutOpenPattern.SubexpIndex("type")])
+			output = append(output, match[searchShoutoutTypeIdx])
 			continue
 		}
 
