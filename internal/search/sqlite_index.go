@@ -20,9 +20,9 @@ import (
 var sanitize = bluemonday.StrictPolicy()
 
 var (
-	searchShoutoutOpenPattern  = regexp.MustCompile(`^(?P<indent> {0,3}):::\s*(?P<type>[A-Za-z][\w-]*)\s*$`)
-	searchShoutoutClosePattern = regexp.MustCompile(`^(?P<indent> {0,3}):::\s*$`)
-	searchFencePattern         = regexp.MustCompile(`^(?P<indent> {0,3})(?P<marker>` + "`{3,}|~{3,}" + `)(?P<rest>.*)$`)
+	searchShoutoutOpenPattern  = regexp.MustCompile(`^ {0,3}:::\s*(?P<type>[A-Za-z][\w-]*)\s*$`)
+	searchShoutoutClosePattern = regexp.MustCompile(`^ {0,3}:::\s*$`)
+	searchFencePattern         = regexp.MustCompile(`^ {0,3}(?P<marker>` + "`{3,}|~{3,}" + `).*$`)
 )
 
 type SQLiteIndex struct {
