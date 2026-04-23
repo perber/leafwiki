@@ -43,6 +43,7 @@ const schema = {
     '*': [
       ...(defaultSchema.attributes?.['*'] || []),
       'class',
+      'className',
       'data-leafwiki-generated-id',
       'data-line',
       'style',
