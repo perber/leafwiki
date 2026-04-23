@@ -1860,6 +1860,21 @@
     @apply text-error;
   }
 
+  .markdown-editor__preview-container .markdown-shoutout--blue,
+  .page-viewer__content .markdown-shoutout--blue {
+    @apply border-blue-500/30 bg-blue-500/10;
+  }
+
+  .markdown-editor__preview-container .markdown-shoutout--red,
+  .page-viewer__content .markdown-shoutout--red {
+    @apply border-red-500/30 bg-red-500/10;
+  }
+
+  .markdown-editor__preview-container .markdown-shoutout--green,
+  .page-viewer__content .markdown-shoutout--green {
+    @apply border-green-500/30 bg-green-500/10;
+  }
+
   .tree-view {
     @apply w-full;
   }

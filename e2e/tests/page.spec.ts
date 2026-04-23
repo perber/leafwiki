@@ -1844,6 +1844,22 @@ Error content
 
 :::note
 Note alias content
+:::
+
+:::blue
+Blue content
+:::
+
+:::red
+Red content
+:::
+
+:::green
+Green content
+:::
+
+:::custom-banner
+Custom content
 :::`;
 
     await createPageWithContent(page, { title, slug, content });
@@ -1855,11 +1871,19 @@ Note alias content
     const successShoutout = page.locator('article aside.markdown-shoutout--success');
     const warningShoutout = page.locator('article aside.markdown-shoutout--warning');
     const errorShoutout = page.locator('article aside.markdown-shoutout--error');
+    const blueShoutout = page.locator('article aside.markdown-shoutout--blue');
+    const redShoutout = page.locator('article aside.markdown-shoutout--red');
+    const greenShoutout = page.locator('article aside.markdown-shoutout--green');
+    const customShoutout = page.locator('article aside.markdown-shoutout--custom-banner');
 
     await infoShoutout.first().waitFor({ state: 'visible' });
     await successShoutout.waitFor({ state: 'visible' });
     await warningShoutout.waitFor({ state: 'visible' });
     await errorShoutout.waitFor({ state: 'visible' });
+    await blueShoutout.waitFor({ state: 'visible' });
+    await redShoutout.waitFor({ state: 'visible' });
+    await greenShoutout.waitFor({ state: 'visible' });
+    await customShoutout.waitFor({ state: 'visible' });
 
     // note is an alias for info, so there should be two info shoutouts
     await test.expect(page.locator('article aside.markdown-shoutout--info')).toHaveCount(2);
@@ -1868,6 +1892,10 @@ Note alias content
     await test.expect(successShoutout.locator('.markdown-shoutout__title')).toHaveText('Success');
     await test.expect(warningShoutout.locator('.markdown-shoutout__title')).toHaveText('Warning');
     await test.expect(errorShoutout.locator('.markdown-shoutout__title')).toHaveText('Error');
+    await test.expect(blueShoutout.locator('.markdown-shoutout__title')).toHaveCount(0);
+    await test.expect(redShoutout.locator('.markdown-shoutout__title')).toHaveCount(0);
+    await test.expect(greenShoutout.locator('.markdown-shoutout__title')).toHaveCount(0);
+    await test.expect(customShoutout.locator('.markdown-shoutout__title')).toHaveCount(0);
 
     await test
       .expect(infoShoutout.first().locator('.markdown-shoutout__content'))
@@ -1884,6 +1912,18 @@ Note alias content
     await test
       .expect(infoShoutout.last().locator('.markdown-shoutout__content'))
       .toContainText('Note alias content');
+    await test
+      .expect(blueShoutout.locator('.markdown-shoutout__content'))
+      .toContainText('Blue content');
+    await test
+      .expect(redShoutout.locator('.markdown-shoutout__content'))
+      .toContainText('Red content');
+    await test
+      .expect(greenShoutout.locator('.markdown-shoutout__content'))
+      .toContainText('Green content');
+    await test
+      .expect(customShoutout.locator('.markdown-shoutout__content'))
+      .toContainText('Custom content');
 
     // verify each shoutout has a non-transparent background (CSS color classes applied)
     const infoBackground = await infoShoutout.first().evaluate((el) => {
@@ -1906,14 +1946,32 @@ Note alias content
     });
     test.expect(errorBackground).not.toBe('rgba(0, 0, 0, 0)');
 
+    const blueBackground = await blueShoutout.evaluate((el) => {
+      return window.getComputedStyle(el).backgroundColor;
+    });
+    test.expect(blueBackground).not.toBe('rgba(0, 0, 0, 0)');
+
+    const redBackground = await redShoutout.evaluate((el) => {
+      return window.getComputedStyle(el).backgroundColor;
+    });
+    test.expect(redBackground).not.toBe('rgba(0, 0, 0, 0)');
+
+    const greenBackground = await greenShoutout.evaluate((el) => {
+      return window.getComputedStyle(el).backgroundColor;
+    });
+    test.expect(greenBackground).not.toBe('rgba(0, 0, 0, 0)');
+
     // the four variant backgrounds must be distinct from each other
     const backgrounds = new Set([
       infoBackground,
       successBackground,
       warningBackground,
       errorBackground,
+      blueBackground,
+      redBackground,
+      greenBackground,
     ]);
-    test.expect(backgrounds.size).toBe(4);
+    test.expect(backgrounds.size).toBe(7);
   });
 
   test('revision-preview-renders-deleted-assets', async ({ page }) => {
