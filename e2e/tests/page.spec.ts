@@ -1961,7 +1961,7 @@ Custom content
     });
     test.expect(greenBackground).not.toBe('rgba(0, 0, 0, 0)');
 
-    // the four variant backgrounds must be distinct from each other
+    // all seven variant backgrounds must be distinct from each other
     const backgrounds = new Set([
       infoBackground,
       successBackground,
