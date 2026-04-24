@@ -711,10 +711,21 @@ func (t *TreeService) HasPages() bool {
 }
 
 // WalkPages calls fn for every non-root node in the tree (depth-first).
-// The read lock is held for the duration of the walk, so fn must not call
-// any TreeService method that acquires a write lock.
+// The read lock is held only while collecting the node list; fn is called
+// without the lock so it may safely call other TreeService methods.
 // Returns nil immediately when the tree is not yet loaded.
 func (t *TreeService) WalkPages(fn func(*PageNode) error) error {
+	nodes := t.collectNodesDFS()
+	for _, node := range nodes {
+		if err := fn(node); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// collectNodesDFS returns all non-root nodes in depth-first order under the read lock.
+func (t *TreeService) collectNodesDFS() []*PageNode {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -722,21 +733,18 @@ func (t *TreeService) WalkPages(fn func(*PageNode) error) error {
 		return nil
 	}
 
-	var walk func(*PageNode) error
-	walk = func(node *PageNode) error {
+	var nodes []*PageNode
+	var collect func(*PageNode)
+	collect = func(node *PageNode) {
 		if node.ID != "root" {
-			if err := fn(node); err != nil {
-				return err
-			}
+			nodes = append(nodes, node)
 		}
 		for _, child := range node.Children {
-			if err := walk(child); err != nil {
-				return err
-			}
+			collect(child)
 		}
-		return nil
 	}
-	return walk(t.tree)
+	collect(t.tree)
+	return nodes
 }
 
 // GetPage returns a page by its ID
