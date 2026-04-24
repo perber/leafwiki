@@ -175,7 +175,9 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       set({ importPlan: null, importResult: null })
       return true
     } catch (err) {
-      toast.error(mapApiError(err, 'Failed to cancel or clear import plan').message)
+      toast.error(
+        mapApiError(err, 'Failed to cancel or clear import plan').message,
+      )
       return false
     } finally {
       set({ cancelingImportPlan: false })
