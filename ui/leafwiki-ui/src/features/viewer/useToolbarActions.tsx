@@ -5,7 +5,7 @@ import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useConfigStore } from '@/stores/config'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
-import { Copy, History, Pencil, Printer, Trash2 } from 'lucide-react'
+import { Copy, History, Link2, Pencil, Printer, Trash2 } from 'lucide-react'
 import { useEffect } from 'react'
 import { type ToolbarButton, useToolbarStore } from '../toolbar/toolbar'
 
@@ -14,6 +14,7 @@ export interface ToolbarActionsOptions {
   printPage: () => void
   editPage: () => void
   showHistory: () => void
+  showPermalink: () => void
   deletePage: () => void
   copyPage: () => void
 }
@@ -23,6 +24,7 @@ export function useToolbarActions({
   printPage,
   editPage,
   showHistory,
+  showPermalink,
   deletePage,
   copyPage,
 }: ToolbarActionsOptions) {
@@ -54,6 +56,14 @@ export function useToolbarActions({
         hotkey: 'Ctrl+P',
         icon: <Printer size={18} />,
         action: printPage,
+      },
+      {
+        id: 'page-permalink',
+        label: `Share ${itemLabel}`,
+        hotkey: 'Ctrl+Shift+L',
+        icon: <Link2 size={18} />,
+        variant: 'outline',
+        action: showPermalink,
       },
       {
         id: 'copy-page',
@@ -95,6 +105,13 @@ export function useToolbarActions({
       action: copyPage,
     }
 
+    const permalinkHotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+Shift+KeyL',
+      enabled: true,
+      mode: ['view'],
+      action: showPermalink,
+    }
+
     const editHotkey: HotKeyDefinition = {
       keyCombo: 'Mod+KeyE',
       enabled: true,
@@ -124,6 +141,7 @@ export function useToolbarActions({
     }
 
     registerHotkey(editHotkey)
+    registerHotkey(permalinkHotkey)
     registerHotkey(copyHotkey)
     registerHotkey(printHotkey)
     if (enableRevision) {
@@ -133,6 +151,7 @@ export function useToolbarActions({
 
     return () => {
       unregisterHotkey(editHotkey.keyCombo)
+      unregisterHotkey(permalinkHotkey.keyCombo)
       unregisterHotkey(copyHotkey.keyCombo)
       unregisterHotkey(printHotkey.keyCombo)
       if (enableRevision) {
@@ -150,6 +169,7 @@ export function useToolbarActions({
     editPage,
     printPage,
     showHistory,
+    showPermalink,
     registerHotkey,
     unregisterHotkey,
     itemLabel,

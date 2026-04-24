@@ -42,6 +42,7 @@
   "invalid target kind": "Invalid target kind",
   "missing file": "Missing file",
   "missing filename": "Missing filename",
+  "missing id": "Page ID is required",
   "missing or invalid refresh token": "Missing or invalid refresh token",
   "missing path": "Missing path",
   "no import plan available": "No import plan available",

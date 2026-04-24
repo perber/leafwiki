@@ -775,6 +775,27 @@ func (t *TreeService) GetPage(id string) (*Page, error) {
 	}, nil
 }
 
+// ResolvePermalinkTarget resolves a stable page ID to the current route path.
+func (t *TreeService) ResolvePermalinkTarget(id string) (*PermalinkTarget, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	if t.tree == nil {
+		return nil, ErrTreeNotLoaded
+	}
+
+	node := t.getNodeByIDLocked(id)
+	if node == nil {
+		return nil, ErrPageNotFound
+	}
+
+	return &PermalinkTarget{
+		ID:   node.ID,
+		Slug: node.Slug,
+		Path: strings.TrimPrefix(node.CalculatePath(), "/"),
+	}, nil
+}
+
 // FindPageByRoutePath finds a page in the tree by its path.
 func (t *TreeService) FindPageByRoutePath(routePath string) (*Page, error) {
 	t.mu.RLock()

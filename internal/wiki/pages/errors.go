@@ -22,6 +22,7 @@ const (
 	ErrCodePageConvertNotAllowed = "page_convert_not_allowed"
 	ErrCodePageInternalError     = "page_internal_error"
 	ErrCodePageMissingPath       = "page_missing_path"
+	ErrCodePageMissingID         = "page_missing_id"
 	ErrCodePageMissingTitle      = "page_missing_title"
 	ErrCodePageInvalidRequest    = "page_invalid_request"
 	ErrCodePageInvalidPayload    = "page_invalid_payload"
@@ -107,7 +108,7 @@ func pageErrorStatus(code string) int {
 		return http.StatusNotFound
 	case ErrCodePageHasChildren, ErrCodePageCircularMove, ErrCodePageCannotMoveToSelf, ErrCodePageSlugConflict,
 		ErrCodePageConvertNotAllowed, ErrCodePageRootOperation,
-		ErrCodePageMissingPath, ErrCodePageMissingTitle, ErrCodePageInvalidRequest,
+		ErrCodePageMissingPath, ErrCodePageMissingID, ErrCodePageMissingTitle, ErrCodePageInvalidRequest,
 		ErrCodePageInvalidPayload, ErrCodePageInvalidTargetKind:
 		return http.StatusBadRequest
 	default:

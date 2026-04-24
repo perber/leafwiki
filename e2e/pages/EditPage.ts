@@ -27,6 +27,7 @@ export default class EditPage {
     await this.page
       .locator('div[data-testid="asset-upload-dropzone"]')
       .waitFor({ state: 'visible' });
+    await this.page.locator('.asset-manager__loading').waitFor({ state: 'hidden' });
   }
 
   async openMetadataDialog() {
@@ -49,6 +50,7 @@ export default class EditPage {
   }
 
   async listAmountOfAssets(): Promise<number> {
+    await this.page.locator('.asset-manager__loading').waitFor({ state: 'hidden' });
     const assets = this.page.locator('li[data-testid="asset-item"]');
     return assets.count();
   }

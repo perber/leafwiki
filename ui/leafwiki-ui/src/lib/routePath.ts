@@ -83,6 +83,22 @@ export function buildHistoryUrl(pathname: string): string {
 }
 
 /**
+ * Builds the internal permalink route for a page.
+ *
+ * The slug segment is decorative and may become stale after rename/move.
+ */
+export function buildPermalinkPath(id: string, slug?: string): string {
+  const encodedID = encodeURIComponent(id)
+  const normalizedSlug = slug?.trim()
+
+  if (!normalizedSlug) {
+    return `/p/${encodedID}`
+  }
+
+  return `/p/${encodedID}/${encodeURIComponent(normalizedSlug)}`
+}
+
+/**
  * Builds the browser URL for the editor, including the configured base path.
  */
 export function buildBrowserEditUrl(pathname: string): string {

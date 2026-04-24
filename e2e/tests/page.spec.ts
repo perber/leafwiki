@@ -334,6 +334,83 @@ test.describe('Authenticated', () => {
     });
   });
 
+  test('permalink-dialog-shows-shareable-url-and-resolves-after-move', async ({
+    page,
+    context,
+  }) => {
+    const stamp = Date.now();
+    const sourceParentTitle = `permalink-source-parent-${stamp}`;
+    const targetParentTitle = `permalink-target-parent-${stamp}`;
+    const childTitle = `permalink-child-${stamp}`;
+    const renamedChildTitle = `permalink-child-renamed-${stamp}`;
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(sourceParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.clickRootAddButton();
+    await addPageDialog.fillTitle(targetParentTitle);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.createSubPageOfParent(sourceParentTitle, childTitle);
+    await treeView.expandNodeByTitle(sourceParentTitle);
+    await treeView.clickPageByTitle(childTitle);
+
+    const viewPage = new ViewPage(page);
+    await expect(page.locator('article > h1')).toHaveText(childTitle);
+
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await viewPage.clickPermalinkButton();
+
+    const permalinkUrl = await viewPage.getPermalinkDialogUrl();
+    expect(permalinkUrl).toContain('/p/');
+    expect(permalinkUrl).toContain(childTitle);
+
+    await viewPage.copyPermalinkFromDialog();
+    await page.getByText('Permalink copied').waitFor({ state: 'visible' });
+
+    const clipboardText = await page.evaluate(async () => {
+      return await navigator.clipboard.readText();
+    });
+    expect(clipboardText).toBe(permalinkUrl);
+
+    await page.keyboard.press('Escape');
+    await page.locator('[data-testid="permalink-dialog-url-input"]').waitFor({
+      state: 'hidden',
+    });
+
+    await viewPage.clickEditPageButton();
+    const editPage = new EditPage(page);
+    await editPage.openMetadataDialog();
+
+    const metadataDialog = new EditPageMetadataDialog(page);
+    await metadataDialog.fillTitle(renamedChildTitle);
+    await metadataDialog.expectSlug(renamedChildTitle);
+    await metadataDialog.submit();
+
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await treeView.openMoveDialogForPage(sourceParentTitle, renamedChildTitle);
+    const movePageDialog = new MovePageDialog(page);
+    await movePageDialog.selectNewParent(targetParentTitle);
+    await movePageDialog.clickMoveButton();
+    await movePageDialog.expectRefactorDialogHidden();
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe(toAppPath(`/${targetParentTitle}/${renamedChildTitle}`));
+
+    await page.goto(permalinkUrl);
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe(toAppPath(`/${targetParentTitle}/${renamedChildTitle}`));
+    await page.locator('article').waitFor({ state: 'visible' });
+    await expect(page.locator('.breadcrumbs-nav__current')).toHaveText(renamedChildTitle);
+  });
+
   test('sort-pages', async ({ page }) => {
     const parentTitle = `Sort Parent Page ${Date.now()}`;
     const childPages = ['Banana', 'Apple', 'Cherry', 'Date'];

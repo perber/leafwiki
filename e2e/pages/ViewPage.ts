@@ -89,6 +89,41 @@ export default class ViewPage {
     await copyButton.click();
   }
 
+  async clickPermalinkButton() {
+    const permalinkButton = this.page.locator('button[data-testid="page-permalink-button"]');
+    const overflowButton = this.page.getByTestId('toolbar-overflow-button');
+
+    await expect
+      .poll(async () => {
+        const permalinkVisible = await permalinkButton.isVisible().catch(() => false);
+        const overflowVisible = await overflowButton.isVisible().catch(() => false);
+        return permalinkVisible || overflowVisible;
+      })
+      .toBe(true);
+
+    if (await permalinkButton.isVisible().catch(() => false)) {
+      await permalinkButton.click();
+      return;
+    }
+
+    await this.openToolbarOverflow();
+    const permalinkMenuItem = this.page.getByTestId('page-permalink-menu-item');
+    await permalinkMenuItem.waitFor({ state: 'visible' });
+    await permalinkMenuItem.click();
+  }
+
+  async getPermalinkDialogUrl() {
+    const input = this.page.locator('input[data-testid="permalink-dialog-url-input"]');
+    await input.waitFor({ state: 'visible' });
+    return (await input.inputValue()).trim();
+  }
+
+  async copyPermalinkFromDialog() {
+    const button = this.page.getByTestId('permalink-dialog-copy-button');
+    await button.waitFor({ state: 'visible' });
+    await button.click();
+  }
+
   async openToolbarOverflow() {
     const overflowButton = this.page.getByTestId('toolbar-overflow-button');
     await overflowButton.waitFor({ state: 'visible' });
