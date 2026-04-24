@@ -78,7 +78,7 @@ export function mapApiError(err: unknown, fallback: string): ApiUiError {
   if (localized) {
     const translated = i18next.t(localized.template, {
       ns: 'errors',
-      defaultValue: localized.message || fallback,
+      defaultValue: localized.template || localized.message || fallback,
     })
     const message = formatLocalizedErrorTemplate(translated, localized.args)
 
