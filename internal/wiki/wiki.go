@@ -339,7 +339,7 @@ func (w *Wiki) FrontendConfig() httpinternal.FrontendConfig {
 }
 
 func (w *Wiki) EnsureWelcomePage() error {
-	if len(w.tree.GetTree().Children) > 0 {
+	if w.tree.HasPages() {
 		w.log.Info("Welcome page already exists, skipping creation")
 		return nil
 	}

@@ -696,6 +696,49 @@ func (t *TreeService) GetTree() *PageNode {
 	return t.tree
 }
 
+// IsLoaded reports whether the tree has been loaded into memory.
+func (t *TreeService) IsLoaded() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.tree != nil
+}
+
+// HasPages reports whether the tree contains at least one non-root node.
+func (t *TreeService) HasPages() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.tree != nil && len(t.tree.Children) > 0
+}
+
+// WalkPages calls fn for every non-root node in the tree (depth-first).
+// The read lock is held for the duration of the walk, so fn must not call
+// any TreeService method that acquires a write lock.
+// Returns nil immediately when the tree is not yet loaded.
+func (t *TreeService) WalkPages(fn func(*PageNode) error) error {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	if t.tree == nil {
+		return nil
+	}
+
+	var walk func(*PageNode) error
+	walk = func(node *PageNode) error {
+		if node.ID != "root" {
+			if err := fn(node); err != nil {
+				return err
+			}
+		}
+		for _, child := range node.Children {
+			if err := walk(child); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return walk(t.tree)
+}
+
 // GetPage returns a page by its ID
 func (t *TreeService) GetPage(id string) (*Page, error) {
 	t.mu.RLock()

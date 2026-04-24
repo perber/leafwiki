@@ -44,7 +44,7 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 	var oldPrefix string
 	var subtreeIDs []string
 
-	if root := uc.tree.GetTree(); root != nil {
+	if uc.tree.IsLoaded() {
 		if node, err := uc.tree.FindPageByID(in.ID); err == nil && node != nil {
 			oldPrefix = node.CalculatePath()
 			subtreeIDs = collectSubtreeIDs(node)
