@@ -70,11 +70,7 @@ export default function TreeNodeActionsMenu({
       })
       .catch((err) => {
         const mapped = mapApiError(err, 'Failed to convert page')
-        toast.error(
-          mapped.detail
-            ? `${mapped.message}: ${mapped.detail}`
-            : mapped.message,
-        )
+        toast.error(mapped.message)
       })
   }, [nodeId, nodeKind, reloadTree])
 

@@ -1,3 +1,5 @@
+import i18next from '../i18n'
+
 export type ApiLocalizedErrorDetail = {
   code: string
   message: string
@@ -11,7 +13,6 @@ export type ApiLocalizedErrorResponse = {
 
 export type ApiUiError = {
   message: string
-  detail?: string
   code?: string
 }
 
@@ -75,14 +76,14 @@ export function formatLocalizedErrorTemplate(
 export function mapApiError(err: unknown, fallback: string): ApiUiError {
   const localized = asApiLocalizedError(err)
   if (localized) {
-    const detail = formatLocalizedErrorTemplate(
-      localized.template,
-      localized.args,
-    )
+    const translated = i18next.t(localized.template, {
+      ns: 'errors',
+      defaultValue: localized.message || fallback,
+    })
+    const message = formatLocalizedErrorTemplate(translated, localized.args)
 
     return {
-      message: localized.message || fallback,
-      detail: detail && detail !== localized.message ? detail : undefined,
+      message: message || fallback,
       code: localized.code,
     }
   }

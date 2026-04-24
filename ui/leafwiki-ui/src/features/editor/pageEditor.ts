@@ -123,9 +123,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     } catch (err) {
       const mapped = mapApiError(err, 'An unknown error occurred')
       set({
-        error: mapped.detail
-          ? `${mapped.message}: ${mapped.detail}`
-          : mapped.message,
+        error: mapped.message,
       })
 
       throw err
@@ -148,9 +146,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     } catch (err) {
       const mapped = mapApiError(err, 'An unknown error occurred')
       set({
-        error: mapped.detail
-          ? `${mapped.message}: ${mapped.detail}`
-          : mapped.message,
+        error: mapped.message,
       })
     } finally {
       useProgressbarStore.getState().setLoading(false)
