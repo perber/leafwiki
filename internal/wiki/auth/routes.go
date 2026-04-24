@@ -182,7 +182,7 @@ func (r *Routes) handleLogout(rctx httpinternal.RouterContext) gin.HandlerFunc {
 		}
 		if err := rctx.AuthCookies.Clear(c); err != nil {
 			log.Printf("[INFO] Unable to clear auth cookies: %v", err)
-			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCsrfFailed, "Failed to clear authentication cookies", "failed to clear authentication cookies")
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, "Failed to clear authentication cookies", "failed to clear authentication cookies")
 			return
 		}
 		if err := rctx.CSRFCookie.Clear(c); err != nil {

@@ -156,6 +156,9 @@ func (s *AssetService) DeleteAsset(page *tree.PageNode, filename string) error {
 	fullPath := assetFileDiskPath(assetPath, filename)
 
 	if err := os.Remove(fullPath); err != nil {
+		if os.IsNotExist(err) {
+			return sharederrors.NewLocalizedError("asset_not_found", "Asset not found", "asset %s not found", nil, filename)
+		}
 		return sharederrors.NewLocalizedError("asset_delete_failed", "Failed to delete asset", "failed to delete asset %s", err, filename)
 	}
 
@@ -214,6 +217,8 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 	// Ensure that no file with the new name already exists
 	if _, statErr := os.Stat(newFullPath); statErr == nil {
 		return "", sharederrors.NewLocalizedError("asset_already_exists", "Asset already exists", "asset %s already exists", nil, newFilename)
+	} else if !os.IsNotExist(statErr) {
+		return "", sharederrors.NewLocalizedError("asset_rename_failed", "Failed to rename asset", "failed to rename asset %s", statErr, oldFilename)
 	}
 
 	if _, err := os.Stat(oldFullPath); os.IsNotExist(err) {

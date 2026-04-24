@@ -92,11 +92,15 @@ export const useImportStore = create<ImportStore>((set, get) => ({
         })
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
+      const mapped = mapApiError(err, 'Failed to load import plan')
+      if (
+        (err instanceof ApiError && err.status === 404) ||
+        mapped.code === 'importer_no_plan'
+      ) {
         set({ importPlan: null, importResult: null })
         return
       }
-      toast.error(mapApiError(err, 'Failed to load import plan').message)
+      toast.error(mapped.message)
       return
     } finally {
       set({ loadingImportPlan: false, executingImportPlan: false })
