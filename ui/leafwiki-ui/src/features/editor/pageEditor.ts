@@ -117,7 +117,9 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       if (titleChanged || slugChanged) {
         await useTreeStore.getState().reloadTree()
       } else if (updatedPage?.id && updatedPage?.version) {
-        useTreeStore.getState().patchNodeVersion(updatedPage.id, updatedPage.version)
+        useTreeStore
+          .getState()
+          .patchNodeVersion(updatedPage.id, updatedPage.version)
       }
 
       // reload backlinks

@@ -171,10 +171,15 @@ export const useTreeStore = create<TreeStore>()(
       },
 
       patchNodeVersion: (id: string, version: string) => {
-        const node = get().byId?.[id]
+        const byId = get().byId
+        const byPath = get().byPath
+        const node = byId?.[id]
         if (!node) return
-        node.version = version
-        set({ byId: { ...get().byId } })
+        const updatedNode = { ...node, version }
+        set({
+          byId: { ...byId, [id]: updatedNode },
+          byPath: node.path ? { ...byPath, [node.path]: updatedNode } : byPath,
+        })
       },
 
       reloadTree: async () => {

@@ -54,7 +54,7 @@
   "page id is required": "Page ID is required",
   "page not found": "Page not found",
   "page version is required": "Page version is required",
-  "page was changed by another request": "This page changed in the meantime. Reload it before saving again.",
+  "page was changed by another request": "This page was changed in the meantime. Reload it before saving again.",
   "parent page not found": "Parent page not found",
   "query parameter q is required": "Query parameter 'q' is required",
   "restore revision %s for page %s is invalid": "Restore revision %s for page %s is invalid",

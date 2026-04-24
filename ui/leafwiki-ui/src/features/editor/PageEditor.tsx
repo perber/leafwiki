@@ -88,7 +88,10 @@ export default function PageEditor() {
                     }
                   })
                   .catch((overwriteErr) => {
-                    const overwriteMapped = mapApiError(overwriteErr, 'Error saving page')
+                    const overwriteMapped = mapApiError(
+                      overwriteErr,
+                      'Error saving page',
+                    )
                     toast.error(overwriteMapped.message)
                   })
               },
