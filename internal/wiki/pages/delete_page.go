@@ -53,8 +53,7 @@ func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) erro
 		var subtreeIDs []string
 		var oldPrefix string
 
-		root := uc.tree.GetTree()
-		if root != nil {
+		if uc.tree.IsLoaded() {
 			node, err := uc.tree.FindPageByID(in.ID)
 			if err == nil && node != nil {
 				subtreeIDs = collectSubtreeIDs(node)

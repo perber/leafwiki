@@ -1769,9 +1769,22 @@ func TestTreeService_LoadTree_ResumesInterruptedMigrationWithPersistedLegacySnap
 	if err != nil {
 		t.Fatalf("FindPageByID failed: %v", err)
 	}
-	svc.GetTree().Metadata = PageMetadata{}
-	node.Metadata = PageMetadata{}
-	persistLegacyTreeSnapshot(t, tmpDir, svc.GetTree())
+	root := svc.GetTree()
+	// Build a legacy snapshot with metadata stripped, without mutating the live tree.
+	legacySnapshot := &PageNode{
+		ID:    root.ID,
+		Slug:  root.Slug,
+		Title: root.Title,
+		Kind:  root.Kind,
+		Children: []*PageNode{{
+			ID:       node.ID,
+			Slug:     node.Slug,
+			Title:    node.Title,
+			Kind:     node.Kind,
+			Position: node.Position,
+		}},
+	}
+	persistLegacyTreeSnapshot(t, tmpDir, legacySnapshot)
 
 	pagePath := filepath.Join(tmpDir, "root", "page1.md")
 	legacyBody := "# Page 1 Content\nHello World\n"
@@ -2710,5 +2723,214 @@ func TestTreeService_LoadTree_MigratesToV4_ReturnsErrorWhenSectionIndexCannotBeW
 	}
 	if !strings.Contains(err.Error(), "materialize section index") {
 		t.Fatalf("expected migration error to mention section index materialization, got: %v", err)
+	}
+}
+
+// ─── IsLoaded ─────────────────────────────────────────────────────────────────
+
+func TestTreeService_IsLoaded_ReturnsFalseBeforeLoad(t *testing.T) {
+	svc := NewTreeService(t.TempDir())
+	if svc.IsLoaded() {
+		t.Fatal("expected IsLoaded to return false before LoadTree is called")
+	}
+}
+
+func TestTreeService_IsLoaded_ReturnsTrueAfterLoad(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if !svc.IsLoaded() {
+		t.Fatal("expected IsLoaded to return true after LoadTree")
+	}
+}
+
+// ─── HasPages ─────────────────────────────────────────────────────────────────
+
+func TestTreeService_HasPages_ReturnsFalseBeforeLoad(t *testing.T) {
+	svc := NewTreeService(t.TempDir())
+	if svc.HasPages() {
+		t.Fatal("expected HasPages to return false before LoadTree is called")
+	}
+}
+
+func TestTreeService_HasPages_ReturnsFalseForEmptyTree(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if svc.HasPages() {
+		t.Fatal("expected HasPages to return false for empty tree")
+	}
+}
+
+func TestTreeService_HasPages_ReturnsTrueWhenPagesExist(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if _, err := svc.CreateNode("user1", nil, "Test", "test", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+	if !svc.HasPages() {
+		t.Fatal("expected HasPages to return true after creating a page")
+	}
+}
+
+// ─── WalkNodes ────────────────────────────────────────────────────────────────
+
+func TestTreeService_WalkNodes_DoesNothingWhenNotLoaded(t *testing.T) {
+	svc := NewTreeService(t.TempDir())
+	called := false
+	err := svc.WalkNodes(func(_ string) error {
+		called = true
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if called {
+		t.Fatal("expected fn not to be called when tree is not loaded")
+	}
+}
+
+func TestTreeService_WalkNodes_VisitsAllNonRootNodes(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if _, err := svc.CreateNode("u", nil, "A", "a", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode A: %v", err)
+	}
+	if _, err := svc.CreateNode("u", nil, "B", "b", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode B: %v", err)
+	}
+
+	var visited []string
+	if err := svc.WalkNodes(func(id string) error {
+		page, err := svc.GetPage(id)
+		if err != nil {
+			return err
+		}
+		visited = append(visited, page.Slug)
+		return nil
+	}); err != nil {
+		t.Fatalf("WalkNodes failed: %v", err)
+	}
+
+	if len(visited) != 2 {
+		t.Fatalf("expected 2 visited nodes, got %d: %v", len(visited), visited)
+	}
+	for _, s := range []string{"a", "b"} {
+		found := false
+		for _, v := range visited {
+			if v == s {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected slug %q to be visited, got: %v", s, visited)
+		}
+	}
+}
+
+func TestTreeService_WalkNodes_SkipsRootNode(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	if err := svc.WalkNodes(func(id string) error {
+		if id == "root" {
+			return errors.New("root node must not be visited")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTreeService_WalkNodes_StopsOnError(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	for _, title := range []string{"A", "B", "C"} {
+		if _, err := svc.CreateNode("u", nil, title, strings.ToLower(title), ptrKind(NodeKindPage)); err != nil {
+			t.Fatalf("CreateNode %s: %v", title, err)
+		}
+	}
+
+	sentinel := errors.New("stop")
+	calls := 0
+	err := svc.WalkNodes(func(_ string) error {
+		calls++
+		return sentinel
+	})
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("expected sentinel error, got: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected fn called once before stop, got %d", calls)
+	}
+}
+
+func TestTreeService_WalkNodes_VisitsNestedNodes(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+	svc := NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	parentID, err := svc.CreateNode("u", nil, "Parent", "parent", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode parent: %v", err)
+	}
+	if _, err := svc.CreateNode("u", parentID, "Child", "child", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode child: %v", err)
+	}
+
+	var visited []string
+	if err := svc.WalkNodes(func(id string) error {
+		page, err := svc.GetPage(id)
+		if err != nil {
+			return err
+		}
+		visited = append(visited, page.Slug)
+		return nil
+	}); err != nil {
+		t.Fatalf("WalkNodes failed: %v", err)
+	}
+
+	if len(visited) != 2 {
+		t.Fatalf("expected 2 visited nodes (parent + child), got %d: %v", len(visited), visited)
 	}
 }

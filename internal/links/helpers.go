@@ -124,8 +124,7 @@ func resolveURLPath(currentPath, href string) (string, error) {
 }
 
 func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []string) []TargetLink {
-	root := tree.GetTree()
-	if root == nil {
+	if !tree.IsLoaded() {
 		return nil
 	}
 
@@ -183,8 +182,7 @@ func toBacklinkResult(tree *tree.TreeService, backlinks []Backlink) *BacklinkRes
 }
 
 func toBacklinkResultItem(tree *tree.TreeService, backlink Backlink) BacklinkResultItem {
-	root := tree.GetTree()
-	if root == nil {
+	if !tree.IsLoaded() {
 		return BacklinkResultItem{}
 	}
 
@@ -226,8 +224,7 @@ func toOutgoingResultItem(tree *tree.TreeService, outgoing Outgoing) OutgoingRes
 		return item
 	}
 
-	root := tree.GetTree()
-	if root == nil {
+	if !tree.IsLoaded() {
 		return item
 	}
 

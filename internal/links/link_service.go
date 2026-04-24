@@ -19,47 +19,23 @@ func NewLinkService(storageDir string, treeService *tree.TreeService, store *Lin
 }
 
 func (b *LinkService) IndexAllPages() error {
-	root := b.treeService.GetTree()
-
-	if root == nil {
+	if !b.treeService.IsLoaded() {
 		return nil
 	}
 
-	// Clear existing links
 	if err := b.store.Clear(); err != nil {
 		return err
 	}
 
-	var indexPage func(node *tree.PageNode) error
-	indexPage = func(node *tree.PageNode) error {
-		if node.ID != "root" {
-			page, err := b.treeService.GetPage(node.ID)
-			if err != nil {
-				return err
-			}
-
-			links := extractLinksFromMarkdown(page.Content)
-
-			targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
-
-			err = b.store.AddLinks(page.ID, page.Title, targets)
-			if err != nil {
-				return err
-			}
+	return b.treeService.WalkNodes(func(id string) error {
+		page, err := b.treeService.GetPage(id)
+		if err != nil {
+			return err
 		}
-		for _, child := range node.Children {
-			if err := indexPage(child); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	if err := indexPage(root); err != nil {
-		return err
-	}
-
-	return nil
+		links := extractLinksFromMarkdown(page.Content)
+		targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
+		return b.store.AddLinks(page.ID, page.Title, targets)
+	})
 }
 
 func (b *LinkService) ClearLinks() error {
