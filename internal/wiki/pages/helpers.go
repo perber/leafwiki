@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/perber/wiki/internal/core/revision"
@@ -62,6 +63,11 @@ func deleteRevisionData(svc *revision.Service, pageIDs []string) error {
 
 func requireCurrentPageVersion(page *tree.Page, expectedVersion string) error {
 	if page == nil {
+		return fmt.Errorf("page is nil")
+	}
+	pageVersion := page.Version()
+	// Legacy page with no UpdatedAt: skip locking for backward compatibility.
+	if pageVersion == "" {
 		return nil
 	}
 	if expectedVersion == "" {
@@ -72,7 +78,7 @@ func requireCurrentPageVersion(page *tree.Page, expectedVersion string) error {
 			nil,
 		)
 	}
-	if page.Version() != expectedVersion {
+	if pageVersion != expectedVersion {
 		return sharederrors.NewLocalizedError(
 			ErrCodePageVersionConflict,
 			"Page was changed by another request",

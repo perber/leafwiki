@@ -385,7 +385,7 @@ LeafWiki is a lightweight, self-hosted wiki for runbooks, internal docs, and tec
 4. Upload files by dragging them into the editor
 
 For more information, visit the [LeafWiki GitHub repository](https://github.com/perber/leafwiki).
-	`
+`
 	current, err := w.tree.GetPage(p.ID)
 	if err != nil {
 		return err

@@ -1,5 +1,5 @@
 import Page404 from '@/components/Page404'
-import { mapApiError } from '@/lib/api/errors'
+import { mapApiError, asApiLocalizedError } from '@/lib/api/errors'
 import { buildBrowserEditUrl } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useRef } from 'react'
@@ -18,6 +18,7 @@ export default function PageEditor() {
   const editorRef = useRef<MarkdownEditorRef>(null)
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const savePage = usePageEditorStore((s) => s.savePage)
+  const forceOverwrite = usePageEditorStore((s) => s.forceOverwrite)
   const setContent = usePageEditorStore((s) => s.setContent)
   const loadPageData = usePageEditorStore((s) => s.loadPageData)
   const initialPage = usePageEditorStore((s) => s.initialPage) // contains the initial page data when loaded
@@ -57,7 +58,6 @@ export default function PageEditor() {
   const handleSave = useCallback(() => {
     savePage()
       .then(async (page) => {
-        // update URL the new path after save without reloading
         if (page) {
           window.history.replaceState(
             null,
@@ -68,10 +68,38 @@ export default function PageEditor() {
         }
       })
       .catch((err) => {
-        const mapped = mapApiError(err, 'Error saving page')
-        toast.error(mapped.message)
+        const localized = asApiLocalizedError(err)
+        if (localized?.code === 'page_version_conflict') {
+          const mapped = mapApiError(err, 'Error saving page')
+          toast.error(mapped.message, {
+            duration: 10000,
+            action: {
+              label: 'Save anyway',
+              onClick: () => {
+                forceOverwrite()
+                  .then((page) => {
+                    if (page) {
+                      window.history.replaceState(
+                        null,
+                        '',
+                        buildBrowserEditUrl(`/${page.path}`),
+                      )
+                      toast.success('Page saved successfully')
+                    }
+                  })
+                  .catch((overwriteErr) => {
+                    const overwriteMapped = mapApiError(overwriteErr, 'Error saving page')
+                    toast.error(overwriteMapped.message)
+                  })
+              },
+            },
+          })
+        } else {
+          const mapped = mapApiError(err, 'Error saving page')
+          toast.error(mapped.message)
+        }
       })
-  }, [savePage])
+  }, [savePage, forceOverwrite])
 
   const handleClose = useCallback(() => {
     if (page?.path) {

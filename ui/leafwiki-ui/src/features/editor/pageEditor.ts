@@ -29,6 +29,7 @@ interface PageEditorState {
   setError: (error: string | null) => void // set the error message
   setPage: (page: Page | null) => void // set the current page
   savePage: () => Promise<Page | null | undefined> // save the current page
+  forceOverwrite: () => Promise<Page | null | undefined> // re-fetch server version, then save
   loadPageData: (path: string) => Promise<void> // load page data by path
 }
 
@@ -56,7 +57,6 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     const { page, title, slug, content } = get()
     if (!page || !isDirtyState(get())) return
 
-    set({ error: null })
     try {
       useProgressbarStore.getState().setLoading(true)
       const titleChanged = page.title !== title
@@ -113,10 +113,11 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         return { page: state.page }
       })
 
-      // if title or slug changed, we reload the tree to reflect changes
+      // sync tree: full reload on structural changes, version-only patch otherwise
       if (titleChanged || slugChanged) {
-        const reloadTree = useTreeStore.getState().reloadTree
-        await reloadTree()
+        await useTreeStore.getState().reloadTree()
+      } else if (updatedPage?.id && updatedPage?.version) {
+        useTreeStore.getState().patchNodeVersion(updatedPage.id, updatedPage.version)
       }
 
       // reload backlinks
@@ -128,16 +129,21 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       }
 
       return updatedPage
-    } catch (err) {
-      const mapped = mapApiError(err, 'An unknown error occurred')
-      set({
-        error: mapped.message,
-      })
-
-      throw err
     } finally {
       useProgressbarStore.getState().setLoading(false)
     }
+  },
+  forceOverwrite: async () => {
+    const { page } = get()
+    if (!page?.path) return
+
+    const fresh = await getPageByPath(page.path)
+    set((state) => {
+      if (!state.page) return {}
+      state.page.version = fresh.version
+      return { page: state.page }
+    })
+    return get().savePage()
   },
   loadPageData: async (path: string) => {
     set({ error: null, page: null, initialPage: null })
