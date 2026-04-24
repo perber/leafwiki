@@ -21,6 +21,7 @@ import MarkdownToolbar from './MarkdownToolbar'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 
 import { uploadAsset, UploadAssetResponse } from '@/lib/api/assets'
+import { mapApiError } from '@/lib/api/errors'
 import { formatBytes, IMAGE_EXTENSIONS } from '@/lib/config'
 import { useConfigStore } from '@/stores/config'
 import { useEditorStore } from '@/stores/editor'
@@ -146,9 +147,7 @@ const MarkdownEditor = (
           editorViewRef.current?.focus()
         } catch (err) {
           console.error('Upload failed', err)
-          const message =
-            err instanceof Error ? err.message : `Failed to upload ${file.name}`
-          toast.error(message)
+          toast.error(mapApiError(err, `Failed to upload ${file.name}`).message)
         }
       }
     },

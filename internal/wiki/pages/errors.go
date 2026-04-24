@@ -21,6 +21,11 @@ const (
 	ErrCodePageRootOperation     = "page_root_operation"
 	ErrCodePageConvertNotAllowed = "page_convert_not_allowed"
 	ErrCodePageInternalError     = "page_internal_error"
+	ErrCodePageMissingPath       = "page_missing_path"
+	ErrCodePageMissingTitle      = "page_missing_title"
+	ErrCodePageInvalidRequest    = "page_invalid_request"
+	ErrCodePageInvalidPayload    = "page_invalid_payload"
+	ErrCodePageInvalidTargetKind = "page_invalid_target_kind"
 )
 
 func newPageRootOperationError(operation string) *sharederrors.LocalizedError {
@@ -101,7 +106,9 @@ func pageErrorStatus(code string) int {
 	case ErrCodePageNotFound, ErrCodePageParentNotFound:
 		return http.StatusNotFound
 	case ErrCodePageHasChildren, ErrCodePageCircularMove, ErrCodePageCannotMoveToSelf, ErrCodePageSlugConflict,
-		ErrCodePageConvertNotAllowed, ErrCodePageRootOperation:
+		ErrCodePageConvertNotAllowed, ErrCodePageRootOperation,
+		ErrCodePageMissingPath, ErrCodePageMissingTitle, ErrCodePageInvalidRequest,
+		ErrCodePageInvalidPayload, ErrCodePageInvalidTargetKind:
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

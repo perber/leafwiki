@@ -10,15 +10,20 @@ import (
 )
 
 const (
-	ErrCodeAuthDisabled            = "auth_disabled"
-	ErrCodeAuthInvalidCredentials  = "auth_invalid_credentials"
-	ErrCodeAuthTokenExpired        = "auth_token_expired"
-	ErrCodeAuthUserNotFound        = "auth_user_not_found"
-	ErrCodeAuthUserAlreadyExists   = "auth_user_already_exists"
-	ErrCodeAuthInvalidRole         = "auth_invalid_role"
-	ErrCodeAuthForbidden           = "auth_forbidden"
-	ErrCodeAuthAdminCannotDelete   = "auth_admin_cannot_delete"
-	ErrCodeAuthInternalError       = "auth_internal_error"
+	ErrCodeAuthDisabled             = "auth_disabled"
+	ErrCodeAuthInvalidCredentials   = "auth_invalid_credentials"
+	ErrCodeAuthTokenExpired         = "auth_token_expired"
+	ErrCodeAuthUserNotFound         = "auth_user_not_found"
+	ErrCodeAuthUserAlreadyExists    = "auth_user_already_exists"
+	ErrCodeAuthInvalidRole          = "auth_invalid_role"
+	ErrCodeAuthForbidden            = "auth_forbidden"
+	ErrCodeAuthAdminCannotDelete    = "auth_admin_cannot_delete"
+	ErrCodeAuthInternalError        = "auth_internal_error"
+	ErrCodeAuthInvalidPayload       = "auth_invalid_payload"
+	ErrCodeAuthCookieFailed         = "auth_cookie_failed"
+	ErrCodeAuthCsrfFailed           = "auth_csrf_failed"
+	ErrCodeAuthInvalidRefreshToken  = "auth_invalid_refresh_token"
+	ErrCodeAuthInvalidRequest       = "auth_invalid_request"
 )
 
 // AuthErrorResponse is the structured JSON error body returned by auth endpoints.
@@ -75,7 +80,7 @@ func respondWithAuthError(c *gin.Context, err error) {
 	case errors.Is(err, ErrAuthDisabled):
 		respondWithAuthStatusError(c, http.StatusForbidden, ErrCodeAuthDisabled, "Authentication is disabled", "authentication is disabled")
 	default:
-		respondWithAuthStatusError(c, http.StatusInternalServerError, ErrCodeAuthInternalError, err.Error(), "internal error")
+		respondWithAuthStatusError(c, http.StatusInternalServerError, ErrCodeAuthInternalError, "Authentication request failed", "authentication request failed")
 	}
 }
 
@@ -83,11 +88,13 @@ func authErrorStatus(code string) int {
 	switch code {
 	case ErrCodeAuthUserNotFound:
 		return http.StatusNotFound
-	case ErrCodeAuthInvalidCredentials, ErrCodeAuthTokenExpired:
+	case ErrCodeAuthInvalidCredentials, ErrCodeAuthTokenExpired, ErrCodeAuthInvalidRefreshToken:
 		return http.StatusUnauthorized
 	case ErrCodeAuthUserAlreadyExists:
 		return http.StatusConflict
-	case ErrCodeAuthInvalidRole, ErrCodeAuthAdminCannotDelete:
+	case ErrCodeAuthInvalidRole, ErrCodeAuthAdminCannotDelete,
+		ErrCodeAuthInvalidPayload, ErrCodeAuthCookieFailed, ErrCodeAuthCsrfFailed,
+		ErrCodeAuthInvalidRequest:
 		return http.StatusBadRequest
 	case ErrCodeAuthDisabled, ErrCodeAuthForbidden:
 		return http.StatusForbidden

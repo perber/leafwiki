@@ -81,18 +81,18 @@ func (r *Routes) handleCreatePlan(c *gin.Context) {
 
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, importMaxUploadSize)
 	if err := c.Request.ParseMultipartForm(importMaxUploadSize); err != nil {
-		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "upload exceeds maximum size limit of 500 MiB"})
+		respondWithImporterStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeImporterUploadTooLarge, "Upload exceeds maximum size limit of 500 MiB", "upload exceeds maximum size limit")
 		return
 	}
 
 	fh, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
+		respondWithImporterStatusError(c, http.StatusBadRequest, ErrCodeImporterMissingFile, "Missing file", "missing file")
 		return
 	}
 	file, err := fh.Open()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to open uploaded file"})
+		respondWithImporterStatusError(c, http.StatusBadRequest, ErrCodeImporterFileOpenFailed, "Failed to open uploaded file", "failed to open uploaded file")
 		return
 	}
 	defer func() {

@@ -1,4 +1,5 @@
 import { getAssets, uploadAsset } from '@/lib/api/assets'
+import { mapApiError } from '@/lib/api/errors'
 import { formatBytes } from '@/lib/config'
 import { useConfigStore } from '@/stores/config'
 import { UploadCloud } from 'lucide-react'
@@ -73,8 +74,7 @@ export function AssetManager({
       onAssetVersionChange?.()
     } catch (err) {
       console.error('Upload failed', err)
-      const message = err instanceof Error ? err.message : 'Asset upload failed'
-      toast.error(message)
+      toast.error(mapApiError(err, 'Asset upload failed').message)
     } finally {
       setUploadingFiles((prev) => {
         const next = new Set(prev)

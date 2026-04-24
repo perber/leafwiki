@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { mapApiError } from '@/lib/api/errors'
 import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
 import {
@@ -57,8 +58,8 @@ export default function BrandingSettings() {
     try {
       await deleteLogo()
       toast.success('Logo deleted successfully')
-    } catch {
-      toast.error('Failed to delete logo')
+    } catch (err) {
+      toast.error(mapApiError(err, 'Failed to delete logo').message)
     }
   }
 
@@ -66,8 +67,8 @@ export default function BrandingSettings() {
     try {
       await deleteFavicon()
       toast.success('Favicon deleted successfully')
-    } catch {
-      toast.error('Failed to delete favicon')
+    } catch (err) {
+      toast.error(mapApiError(err, 'Failed to delete favicon').message)
     }
   }
 
@@ -78,8 +79,8 @@ export default function BrandingSettings() {
         siteName: localSiteName,
       })
       toast.success('Branding settings saved')
-    } catch {
-      toast.error('Failed to save branding settings')
+    } catch (err) {
+      toast.error(mapApiError(err, 'Failed to save branding settings').message)
     } finally {
       setSaving(false)
     }
@@ -92,8 +93,8 @@ export default function BrandingSettings() {
     try {
       await uploadLogo(file)
       toast.success('Logo uploaded successfully')
-    } catch {
-      toast.error('Failed to upload logo')
+    } catch (err) {
+      toast.error(mapApiError(err, 'Failed to upload logo').message)
     }
   }
 
@@ -106,8 +107,8 @@ export default function BrandingSettings() {
     try {
       await uploadFavicon(file)
       toast.success('Favicon uploaded successfully')
-    } catch {
-      toast.error('Failed to upload favicon')
+    } catch (err) {
+      toast.error(mapApiError(err, 'Failed to upload favicon').message)
     }
   }
 

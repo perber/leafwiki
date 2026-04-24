@@ -147,7 +147,7 @@ func (r *Routes) handleGetPage(c *gin.Context) {
 func (r *Routes) handleGetByPath(c *gin.Context) {
 	routePath := strings.TrimSpace(c.Query("path"))
 	if routePath == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing path"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageMissingPath, "Missing path", "missing path")
 		return
 	}
 	out, err := r.findByPath.Execute(c.Request.Context(), FindByPathInput{RoutePath: routePath})
@@ -175,7 +175,7 @@ func (r *Routes) handleLookupPath(c *gin.Context) {
 func (r *Routes) handleSuggestSlug(c *gin.Context) {
 	title := strings.TrimSpace(c.Query("title"))
 	if title == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "title query param is required"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageMissingTitle, "Title query param is required", "title query param is required")
 		return
 	}
 	out, err := r.suggestSlug.Execute(c.Request.Context(), SuggestSlugInput{
@@ -198,7 +198,7 @@ func (r *Routes) handleCreate(c *gin.Context) {
 		Kind     *string `json:"kind"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -224,7 +224,7 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 		Content *string `json:"content"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -264,7 +264,7 @@ func (r *Routes) handleMove(c *gin.Context) {
 		ParentID string `json:"parentId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidPayload, "Invalid payload", "invalid payload")
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -286,7 +286,7 @@ func (r *Routes) handleSort(c *gin.Context) {
 		OrderedIDs []string `json:"orderedIds"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	if err := r.sortPages.Execute(c.Request.Context(), SortPagesInput{
@@ -305,7 +305,7 @@ func (r *Routes) handleEnsurePath(c *gin.Context) {
 		Kind  *string `json:"kind"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -329,11 +329,11 @@ func (r *Routes) handleConvert(c *gin.Context) {
 		Kind string `json:"targetKind" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	if req.Kind != "page" && req.Kind != "section" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid targetKind"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidTargetKind, "Invalid targetKind", "invalid target kind")
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -357,7 +357,7 @@ func (r *Routes) handleCopy(c *gin.Context) {
 		Slug     string  `json:"slug" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -385,7 +385,7 @@ func (r *Routes) handleRefactorPreview(c *gin.Context) {
 		NewParentID *string `json:"parentId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	out, err := r.previewRefactor.Execute(c.Request.Context(), RefactorPreviewInput{
@@ -410,7 +410,7 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 		RewriteLinks bool    `json:"rewriteLinks"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
 	user := authmw.MustGetUser(c)

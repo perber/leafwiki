@@ -1,25 +1,9 @@
 import * as importAPI from '@/lib/api/import'
 import { ApiError } from '@/lib/api/auth'
+import { mapApiError } from '@/lib/api/errors'
 import { toast } from 'sonner'
 import { create } from 'zustand'
 import { useTreeStore } from './tree'
-
-// Helper to normalize error messages from various error types
-function getErrorMessage(err: unknown): string {
-  if (err instanceof Error) {
-    return err.message
-  }
-  if (typeof err === 'object' && err !== null) {
-    const errObj = err as Record<string, unknown>
-    if (typeof errObj.error === 'string') {
-      return errObj.error
-    }
-    if (typeof errObj.message === 'string') {
-      return errObj.message
-    }
-  }
-  return String(err)
-}
 
 type ImportStore = {
   creatingImportPlan: boolean
@@ -84,7 +68,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       set({ importPlan, importResult: null })
       return true
     } catch (err) {
-      toast.error('Failed to create import plan: ' + getErrorMessage(err))
+      toast.error(mapApiError(err, 'Failed to create import plan').message)
       return false
     } finally {
       set({ creatingImportPlan: false })
@@ -108,11 +92,15 @@ export const useImportStore = create<ImportStore>((set, get) => ({
         })
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
+      const mapped = mapApiError(err, 'Failed to load import plan')
+      if (
+        (err instanceof ApiError && err.status === 404) ||
+        mapped.code === 'importer_no_plan'
+      ) {
         set({ importPlan: null, importResult: null })
         return
       }
-      toast.error('Failed to load import plan: ' + getErrorMessage(err))
+      toast.error(mapped.message)
       return
     } finally {
       set({ loadingImportPlan: false, executingImportPlan: false })
@@ -150,7 +138,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
         )
       }
     } catch (err) {
-      toast.error('Failed to execute import plan: ' + getErrorMessage(err))
+      toast.error(mapApiError(err, 'Failed to execute import plan').message)
     } finally {
       set({ executingImportPlan: false })
       // reload tree
@@ -192,7 +180,7 @@ export const useImportStore = create<ImportStore>((set, get) => ({
       return true
     } catch (err) {
       toast.error(
-        'Failed to cancel or clear import plan: ' + getErrorMessage(err),
+        mapApiError(err, 'Failed to cancel or clear import plan').message,
       )
       return false
     } finally {

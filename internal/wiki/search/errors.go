@@ -8,8 +8,11 @@ import (
 )
 
 const (
-	ErrCodeSearchUnavailable = "search_unavailable"
-	ErrCodeSearchInternal    = "search_internal_error"
+	ErrCodeSearchUnavailable    = "search_unavailable"
+	ErrCodeSearchInternal       = "search_internal_error"
+	ErrCodeSearchMissingQuery   = "search_missing_query"
+	ErrCodeSearchInvalidOffset  = "search_invalid_offset"
+	ErrCodeSearchInvalidLimit   = "search_invalid_limit"
 )
 
 // SearchErrorResponse is the structured JSON error body returned by search endpoints.
@@ -50,6 +53,8 @@ func searchErrorStatus(code string) int {
 	switch code {
 	case ErrCodeSearchUnavailable:
 		return http.StatusServiceUnavailable
+	case ErrCodeSearchMissingQuery, ErrCodeSearchInvalidOffset, ErrCodeSearchInvalidLimit:
+		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
 	}

@@ -18,6 +18,11 @@ const (
 	ErrCodeBrandingFaviconDeleteFailed = "branding_favicon_delete_failed"
 	ErrCodeBrandingUpdateFailed        = "branding_update_failed"
 	ErrCodeBrandingInternalError       = "branding_internal_error"
+	ErrCodeBrandingInvalidPayload      = "branding_invalid_payload"
+	ErrCodeBrandingLogoTooLarge        = "branding_logo_too_large"
+	ErrCodeBrandingLogoMissing         = "branding_logo_missing"
+	ErrCodeBrandingFaviconTooLarge     = "branding_favicon_too_large"
+	ErrCodeBrandingFaviconMissing      = "branding_favicon_missing"
 )
 
 // BrandingErrorResponse is the structured JSON error body returned by branding endpoints.
@@ -65,8 +70,11 @@ func respondWithBrandingError(c *gin.Context, err error) {
 
 func brandingErrorStatus(code string) int {
 	switch code {
-	case ErrCodeBrandingLogoInvalidType, ErrCodeBrandingFaviconInvalidType:
+	case ErrCodeBrandingLogoInvalidType, ErrCodeBrandingFaviconInvalidType,
+		ErrCodeBrandingInvalidPayload, ErrCodeBrandingLogoMissing, ErrCodeBrandingFaviconMissing:
 		return http.StatusBadRequest
+	case ErrCodeBrandingLogoTooLarge, ErrCodeBrandingFaviconTooLarge:
+		return http.StatusRequestEntityTooLarge
 	default:
 		return http.StatusInternalServerError
 	}

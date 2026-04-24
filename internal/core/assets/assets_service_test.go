@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/perber/wiki/internal/core/shared"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
 )
@@ -180,6 +181,31 @@ func TestAssetRename(t *testing.T) {
 	expectedURL := "/assets/c3d4/new-name.png"
 	if len(files) != 1 || files[0] != expectedURL {
 		t.Errorf("unexpected asset list after rename: %v", files)
+	}
+}
+
+func TestDeleteMissingAssetReturnsNotFound(t *testing.T) {
+	tmp := t.TempDir()
+	page := &tree.PageNode{Slug: "delete-page", ID: "delete-page-id"}
+	service := NewAssetService(tmp, tree.NewSlugService())
+
+	pageAssetDir := filepath.Join(service.GetAssetsDir(), page.ID)
+	if err := os.MkdirAll(pageAssetDir, 0755); err != nil {
+		t.Fatalf("failed to create asset directory: %v", err)
+	}
+
+	err := service.DeleteAsset(page, "missing.png")
+	if err == nil {
+		t.Fatal("expected delete to fail for missing asset")
+	}
+
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok {
+		t.Fatalf("expected localized error, got %T", err)
+	}
+
+	if localized.Code != "asset_not_found" {
+		t.Fatalf("expected asset_not_found, got %s", localized.Code)
 	}
 }
 
