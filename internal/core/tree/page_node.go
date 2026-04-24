@@ -77,6 +77,17 @@ func (p *PageNode) CalculatePath() string {
 	return p.Parent.CalculatePath() + "/" + p.Slug
 }
 
+// Version returns a stable optimistic-lock token for the current node state.
+func (p *PageNode) Version() string {
+	if p == nil {
+		return ""
+	}
+	if p.Metadata.UpdatedAt.IsZero() {
+		return ""
+	}
+	return p.Metadata.UpdatedAt.UTC().Format(time.RFC3339Nano)
+}
+
 // Hash returns a deterministic hash of the node and all descendants.
 // Parent is intentionally ignored to avoid cycles.
 func (p *PageNode) Hash() string {

@@ -238,6 +238,7 @@ func (r *Routes) handleCreate(c *gin.Context) {
 func (r *Routes) handleUpdate(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	var req struct {
+		Version string  `json:"version" binding:"required"`
 		Title   string  `json:"title" binding:"required"`
 		Slug    string  `json:"slug" binding:"required"`
 		Content *string `json:"content"`
@@ -252,7 +253,7 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 	}
 	kind := tree.NodeKindPage
 	out, err := r.updatePage.Execute(c.Request.Context(), UpdatePageInput{
-		UserID: user.ID, ID: id, Title: req.Title, Slug: req.Slug, Content: req.Content, Kind: &kind,
+		UserID: user.ID, ID: id, Version: req.Version, Title: req.Title, Slug: req.Slug, Content: req.Content, Kind: &kind,
 	})
 	if err != nil {
 		respondWithPageError(c, err)
@@ -280,6 +281,7 @@ func (r *Routes) handleDelete(c *gin.Context) {
 func (r *Routes) handleMove(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	var req struct {
+		Version  string `json:"version" binding:"required"`
 		ParentID string `json:"parentId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -291,7 +293,7 @@ func (r *Routes) handleMove(c *gin.Context) {
 		return
 	}
 	if err := r.movePage.Execute(c.Request.Context(), MovePageInput{
-		UserID: user.ID, ID: id, ParentID: req.ParentID,
+		UserID: user.ID, ID: id, Version: req.Version, ParentID: req.ParentID,
 	}); err != nil {
 		respondWithPageError(c, err)
 		return
@@ -421,6 +423,7 @@ func (r *Routes) handleRefactorPreview(c *gin.Context) {
 func (r *Routes) handleRefactorApply(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	var req struct {
+		Version      string  `json:"version" binding:"required"`
 		Kind         string  `json:"kind" binding:"required"`
 		Title        string  `json:"title"`
 		Slug         string  `json:"slug"`
@@ -437,7 +440,8 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 		return
 	}
 	page, err := r.applyRefactor.Execute(c.Request.Context(), RefactorApplyInput{
-		UserID: user.ID,
+		Version: req.Version,
+		UserID:  user.ID,
 		RefactorPreviewInput: RefactorPreviewInput{
 			PageID: id, Kind: req.Kind, Title: req.Title, Slug: req.Slug,
 			Content: req.Content, NewParentID: req.NewParentID,

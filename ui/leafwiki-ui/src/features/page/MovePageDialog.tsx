@@ -94,11 +94,12 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
 
         await applyPageRefactor(pageId, {
           kind: 'move',
+          version: page.version,
           parentId: newParentId,
           rewriteLinks,
         })
       } else {
-        await movePage(pageId, newParentId)
+        await movePage(pageId, page.version, newParentId)
         preview = getSyntheticMovePreview()
       }
 

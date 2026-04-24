@@ -78,13 +78,20 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
 
         updatedPage = await applyPageRefactor(page.id, {
           kind: 'rename',
+          version: page.version,
           title,
           slug,
           content,
           rewriteLinks,
         })
       } else {
-        updatedPage = await updatePage(page.id, title, slug, content)
+        updatedPage = await updatePage(
+          page.id,
+          page.version,
+          title,
+          slug,
+          content,
+        )
       }
 
       // only update the page.content to avoid overwriting other fields
@@ -101,6 +108,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         state.page.slug = updatedPage.slug
         state.page.content = updatedPage.content
         state.page.path = updatedPage.path
+        state.page.version = updatedPage.version
 
         return { page: state.page }
       })

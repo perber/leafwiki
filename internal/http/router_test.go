@@ -203,6 +203,7 @@ type apiPage struct {
 	Slug     string        `json:"slug"`
 	Content  string        `json:"content"`
 	Path     string        `json:"path"`
+	Version  string        `json:"version"`
 	Kind     tree.NodeKind `json:"kind"`
 	Children []*apiPage    `json:"children"`
 }
@@ -770,7 +771,7 @@ func TestRefactorPreviewEndpoint_UsesFrontendJSONShape(t *testing.T) {
 	target := createPageViaAPI(t, router, "Target", "target", nil, pageNodeKind())
 	ref := createPageViaAPI(t, router, "Ref", "ref", nil, pageNodeKind())
 
-	updateBody := strings.NewReader(`{"title":"Ref","slug":"ref","content":"[Target](/target)"}`)
+	updateBody := strings.NewReader(`{"version":"` + ref.Version + `","title":"Ref","slug":"ref","content":"[Target](/target)"}`)
 	updateRec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+ref.ID, updateBody)
 	if updateRec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK on page update, got %d - %s", updateRec.Code, updateRec.Body.String())
@@ -1425,6 +1426,7 @@ func TestUpdatePageEndpoint(t *testing.T) {
 	page := createPageViaAPI(t, router, "Original Title", "original-title", nil, pageNodeKind())
 
 	payload := map[string]string{
+		"version": page.Version,
 		"title":   "Updated Title",
 		"slug":    "updated-title",
 		"content": "# Updated Content\nWith **Markdown** support.",
@@ -1458,7 +1460,7 @@ func TestUpdatePage_NotFound(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	body := `{"title": "Updated", "slug": "updated", "content": "New content"}`
+	body := `{"version":"stale-version","title":"Updated","slug":"updated","content":"New content"}`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/not-found-id", strings.NewReader(string(body)))
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("Expected 404 for unknown page, got %d", rec.Code)
@@ -1475,6 +1477,7 @@ func TestUpdatePage_SlugRemainsIfUnchanged(t *testing.T) {
 
 	// Update title, but reuse slug
 	payload := map[string]string{
+		"version": created.Version,
 		"title":   "Updated Title",
 		"slug":    created.Slug,
 		"content": "Updated content",
@@ -1506,6 +1509,7 @@ func TestUpdatePage_PageAlreadyExists(t *testing.T) {
 	createPageViaAPI(t, router, "Conflict Title", "conflict-title", nil, pageNodeKind())
 
 	payload := map[string]string{
+		"version": page.Version,
 		"title":   "Conflict Title",
 		"slug":    "conflict-title",
 		"content": "Updated content",
@@ -1537,7 +1541,7 @@ func TestUpdatePage_MissingTitle(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	body := `{"slug": "updated", "content": "New content"}`
+	body := `{"version":"required","slug":"updated","content":"New content"}`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-title", strings.NewReader(string(body)))
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400 for missing title, got %d", rec.Code)
@@ -1549,7 +1553,7 @@ func TestUpdatePage_MissingSlug(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	body := `{"title": "Updated", "content": "New content"}`
+	body := `{"version":"required","title":"Updated","content":"New content"}`
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-slug", strings.NewReader(string(body)))
 
 	if rec.Code != http.StatusBadRequest {
@@ -1780,7 +1784,7 @@ func TestMovePageEndpoint(t *testing.T) {
 	b := createPageViaAPI(t, router, "Section B", "section-b", nil, pageNodeKind())
 
 	// Move a under b
-	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"`+b.ID+`"}`))
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"version":"`+a.Version+`","parentId":"`+b.ID+`"}`))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected status 200, got %d", rec.Code)
@@ -1798,7 +1802,7 @@ func TestMovePageEndpoint_NotFound(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/not-found-id/move", strings.NewReader(`{"parentId":"root"}`))
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/not-found-id/move", strings.NewReader(`{"version":"missing","parentId":"root"}`))
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("Expected status 404, got %d", rec.Code)
@@ -1822,7 +1826,7 @@ func TestMovePageEndpoint_MissingParentID(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-parent/move", strings.NewReader(`{"parentId":""}`))
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/missing-parent/move", strings.NewReader(`{"version":"missing","parentId":""}`))
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("Expected status 404, got %d", rec.Code)
@@ -1836,7 +1840,7 @@ func TestMovePageEndpoint_ParentNotFound(t *testing.T) {
 
 	a := createPageViaAPI(t, router, "Section A", "section-a", nil, pageNodeKind())
 
-	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"not-found-id"}`))
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"version":"`+a.Version+`","parentId":"not-found-id"}`))
 
 	t.Logf("Response: %s", rec.Body.String())
 	t.Logf("Response Code: %d", rec.Code)
@@ -1855,7 +1859,7 @@ func TestMovePageEndpoint_CircularReference(t *testing.T) {
 	b := createPageViaAPI(t, router, "Section B", "section-b", &a.ID, pageNodeKind())
 
 	// Verschiebe a → unter b
-	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+b.ID+"/move", strings.NewReader(`{"parentId":"`+a.ID+`"}`))
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+b.ID+"/move", strings.NewReader(`{"version":"`+b.Version+`","parentId":"`+a.ID+`"}`))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("Expected status 400, got %d", rec.Code)
@@ -1874,7 +1878,7 @@ func TestMovePage_FailsIfTargetAlreadyHasPageWithSameSlug(t *testing.T) {
 	conflictPage := createPageViaAPI(t, router, "Section B", "section-b", &a.ID, pageNodeKind())
 
 	// move conflictPage under root (where section-b already exists)
-	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+conflictPage.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+conflictPage.ID+"/move", strings.NewReader(`{"version":"`+conflictPage.Version+`","parentId":"root"}`))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("Expected status 400, got %d", rec.Code)
@@ -1888,7 +1892,7 @@ func TestMovePage_InTheSamePlace(t *testing.T) {
 
 	a := createPageViaAPI(t, router, "Section A", "section-a", nil, pageNodeKind())
 
-	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"parentId":"root"}`))
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+a.ID+"/move", strings.NewReader(`{"version":"`+a.Version+`","parentId":"root"}`))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("Expected status 400, got %d", rec.Code)

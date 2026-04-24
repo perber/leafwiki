@@ -96,7 +96,7 @@ func formatMetadataTime(ts time.Time) string {
 	if ts.IsZero() {
 		return ""
 	}
-	return ts.UTC().Format(time.RFC3339)
+	return ts.UTC().Format(time.RFC3339Nano)
 }
 
 func (f *NodeStore) syncManagedFrontmatter(mdFile *markdown.MarkdownFile, entry *PageNode) {
@@ -161,7 +161,10 @@ func (f *NodeStore) parseMetadataTime(value string, fallback time.Time, field st
 	if trimmed == "" {
 		return fallback.UTC()
 	}
-	parsed, err := time.Parse(time.RFC3339, trimmed)
+	parsed, err := time.Parse(time.RFC3339Nano, trimmed)
+	if err != nil {
+		parsed, err = time.Parse(time.RFC3339, trimmed)
+	}
 	if err != nil {
 		f.log.Warn("invalid frontmatter metadata timestamp, using fallback", "path", filePath, "field", field, "value", trimmed, "fallback", fallback.UTC().Format(time.RFC3339), "error", err)
 		return fallback.UTC()

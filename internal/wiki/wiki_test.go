@@ -45,9 +45,14 @@ func createPageForTest(t *testing.T, w *Wiki, userID string, parentID *string, t
 func updatePageForTest(t *testing.T, w *Wiki, userID, id, title, slug string, content *string, kind *tree.NodeKind) *tree.Page {
 	t.Helper()
 
+	current, err := w.tree.GetPage(id)
+	if err != nil {
+		t.Fatalf("GetPage before update failed: %v", err)
+	}
+
 	out, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log).Execute(
 		context.Background(),
-		wikipages.UpdatePageInput{UserID: userID, ID: id, Title: title, Slug: slug, Content: content, Kind: kind},
+		wikipages.UpdatePageInput{UserID: userID, ID: id, Version: current.Version(), Title: title, Slug: slug, Content: content, Kind: kind},
 	)
 	if err != nil {
 		t.Fatalf("UpdatePage failed: %v", err)
