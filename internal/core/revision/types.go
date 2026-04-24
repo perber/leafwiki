@@ -75,8 +75,8 @@ type RevisionSnapshot struct {
 }
 
 type RevisionAssetContent struct {
-	Asset   AssetRef
-	Content []byte
+	Asset AssetRef
+	Path  string // filesystem path to the blob; caller streams from it
 }
 
 type RevisionAssetDelta struct {

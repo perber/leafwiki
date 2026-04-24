@@ -329,8 +329,8 @@ func (s *Service) GetRevisionAsset(pageID, revisionID, assetName string) (*Revis
 			continue
 		}
 
-		content, err := s.store.ReadAssetBlob(asset.SHA256)
-		if err != nil {
+		blobPath := s.store.AssetBlobPath(asset.SHA256)
+		if _, err := os.Stat(blobPath); err != nil {
 			return nil, sharederrors.NewLocalizedError(
 				"revision_preview_asset_blob_unavailable",
 				"Revision asset is unavailable",
@@ -343,8 +343,8 @@ func (s *Service) GetRevisionAsset(pageID, revisionID, assetName string) (*Revis
 		}
 
 		return &RevisionAssetContent{
-			Asset:   asset,
-			Content: content,
+			Asset: asset,
+			Path:  blobPath,
 		}, nil
 	}
 
@@ -423,17 +423,25 @@ func (s *Service) CheckRevisionIntegrity(pageID string) ([]RevisionIntegrityIssu
 			continue
 		}
 		for _, ref := range refs {
-			raw, err := s.store.ReadAssetBlob(ref.SHA256)
+			blobPath := s.store.AssetBlobPath(ref.SHA256)
+			f, err := s.store.OpenAssetBlob(ref.SHA256)
 			if err != nil {
-				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "missing_asset_blob", Message: fmt.Sprintf("Revision asset blob for %s is missing or unreadable", ref.Name), Path: s.store.assetBlobPath(ref.SHA256)})
+				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "missing_asset_blob", Message: fmt.Sprintf("Revision asset blob for %s is missing or unreadable", ref.Name), Path: blobPath})
 				continue
 			}
-			if sha256HexBytes(raw) != ref.SHA256 {
-				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "asset_blob_hash_mismatch", Message: fmt.Sprintf("Revision asset blob for %s failed hash verification", ref.Name), Path: s.store.assetBlobPath(ref.SHA256)})
+			hasher := sha256.New()
+			size, copyErr := io.Copy(hasher, f)
+			_ = f.Close()
+			if copyErr != nil {
+				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "missing_asset_blob", Message: fmt.Sprintf("Revision asset blob for %s is missing or unreadable", ref.Name), Path: blobPath})
 				continue
 			}
-			if int64(len(raw)) != ref.SizeBytes {
-				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "asset_blob_size_mismatch", Message: fmt.Sprintf("Revision asset blob for %s failed size verification", ref.Name), Path: s.store.assetBlobPath(ref.SHA256)})
+			if hex.EncodeToString(hasher.Sum(nil)) != ref.SHA256 {
+				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "asset_blob_hash_mismatch", Message: fmt.Sprintf("Revision asset blob for %s failed hash verification", ref.Name), Path: blobPath})
+				continue
+			}
+			if size != ref.SizeBytes {
+				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "asset_blob_size_mismatch", Message: fmt.Sprintf("Revision asset blob for %s failed size verification", ref.Name), Path: blobPath})
 			}
 		}
 	}
@@ -801,18 +809,8 @@ func (s *Service) restoreAssets(pageID string, refs []AssetRef) error {
 		}
 		seen[name] = struct{}{}
 
-		raw, err := s.store.ReadAssetBlob(ref.SHA256)
-		if err != nil {
-			return err
-		}
-		if sha256HexBytes(raw) != ref.SHA256 {
-			return fmt.Errorf("restored asset hash mismatch for %s", name)
-		}
-		if int64(len(raw)) != ref.SizeBytes {
-			return fmt.Errorf("restored asset size mismatch for %s", name)
-		}
-		if err := shared.WriteFileAtomic(filepath.Join(dir, name), raw, 0o644); err != nil {
-			return fmt.Errorf("write restored asset %s: %w", name, err)
+		if err := s.store.CopyAssetBlobToPath(ref.SHA256, ref.SizeBytes, filepath.Join(dir, name)); err != nil {
+			return fmt.Errorf("restore asset %s: %w", name, err)
 		}
 	}
 
