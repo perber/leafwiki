@@ -2789,12 +2789,12 @@ func TestTreeService_HasPages_ReturnsTrueWhenPagesExist(t *testing.T) {
 	}
 }
 
-// ─── WalkPages ────────────────────────────────────────────────────────────────
+// ─── WalkNodes ────────────────────────────────────────────────────────────────
 
-func TestTreeService_WalkPages_DoesNothingWhenNotLoaded(t *testing.T) {
+func TestTreeService_WalkNodes_DoesNothingWhenNotLoaded(t *testing.T) {
 	svc := NewTreeService(t.TempDir())
 	called := false
-	err := svc.WalkPages(func(_ *PageNode) error {
+	err := svc.WalkNodes(func(_ string) error {
 		called = true
 		return nil
 	})
@@ -2806,7 +2806,7 @@ func TestTreeService_WalkPages_DoesNothingWhenNotLoaded(t *testing.T) {
 	}
 }
 
-func TestTreeService_WalkPages_VisitsAllNonRootNodes(t *testing.T) {
+func TestTreeService_WalkNodes_VisitsAllNonRootNodes(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
@@ -2823,11 +2823,15 @@ func TestTreeService_WalkPages_VisitsAllNonRootNodes(t *testing.T) {
 	}
 
 	var visited []string
-	if err := svc.WalkPages(func(n *PageNode) error {
-		visited = append(visited, n.Slug)
+	if err := svc.WalkNodes(func(id string) error {
+		page, err := svc.GetPage(id)
+		if err != nil {
+			return err
+		}
+		visited = append(visited, page.Slug)
 		return nil
 	}); err != nil {
-		t.Fatalf("WalkPages failed: %v", err)
+		t.Fatalf("WalkNodes failed: %v", err)
 	}
 
 	if len(visited) != 2 {
@@ -2847,7 +2851,7 @@ func TestTreeService_WalkPages_VisitsAllNonRootNodes(t *testing.T) {
 	}
 }
 
-func TestTreeService_WalkPages_SkipsRootNode(t *testing.T) {
+func TestTreeService_WalkNodes_SkipsRootNode(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
@@ -2857,8 +2861,8 @@ func TestTreeService_WalkPages_SkipsRootNode(t *testing.T) {
 		t.Fatalf("LoadTree failed: %v", err)
 	}
 
-	if err := svc.WalkPages(func(n *PageNode) error {
-		if n.ID == "root" {
+	if err := svc.WalkNodes(func(id string) error {
+		if id == "root" {
 			return errors.New("root node must not be visited")
 		}
 		return nil
@@ -2867,7 +2871,7 @@ func TestTreeService_WalkPages_SkipsRootNode(t *testing.T) {
 	}
 }
 
-func TestTreeService_WalkPages_StopsOnError(t *testing.T) {
+func TestTreeService_WalkNodes_StopsOnError(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
@@ -2884,7 +2888,7 @@ func TestTreeService_WalkPages_StopsOnError(t *testing.T) {
 
 	sentinel := errors.New("stop")
 	calls := 0
-	err := svc.WalkPages(func(_ *PageNode) error {
+	err := svc.WalkNodes(func(_ string) error {
 		calls++
 		return sentinel
 	})
@@ -2896,7 +2900,7 @@ func TestTreeService_WalkPages_StopsOnError(t *testing.T) {
 	}
 }
 
-func TestTreeService_WalkPages_VisitsNestedNodes(t *testing.T) {
+func TestTreeService_WalkNodes_VisitsNestedNodes(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := saveSchema(tmpDir, CurrentSchemaVersion); err != nil {
 		t.Fatalf("saveSchema failed: %v", err)
@@ -2915,11 +2919,15 @@ func TestTreeService_WalkPages_VisitsNestedNodes(t *testing.T) {
 	}
 
 	var visited []string
-	if err := svc.WalkPages(func(n *PageNode) error {
-		visited = append(visited, n.Slug)
+	if err := svc.WalkNodes(func(id string) error {
+		page, err := svc.GetPage(id)
+		if err != nil {
+			return err
+		}
+		visited = append(visited, page.Slug)
 		return nil
 	}); err != nil {
-		t.Fatalf("WalkPages failed: %v", err)
+		t.Fatalf("WalkNodes failed: %v", err)
 	}
 
 	if len(visited) != 2 {

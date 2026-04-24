@@ -27,8 +27,8 @@ func (b *LinkService) IndexAllPages() error {
 		return err
 	}
 
-	return b.treeService.WalkPages(func(node *tree.PageNode) error {
-		page, err := b.treeService.GetPage(node.ID)
+	return b.treeService.WalkNodes(func(id string) error {
+		page, err := b.treeService.GetPage(id)
 		if err != nil {
 			return err
 		}
