@@ -405,9 +405,7 @@ test.describe('Authenticated', () => {
       .poll(() => new URL(page.url()).pathname)
       .toBe(toAppPath(`/${targetParentTitle}/${renamedChildTitle}`));
     await page.locator('article').waitFor({ state: 'visible' });
-    await expect(page.locator('.breadcrumbs-nav__current')).toHaveText(
-      renamedChildTitle,
-    );
+    await expect(page.locator('.breadcrumbs-nav__current')).toHaveText(renamedChildTitle);
   });
 
   test('sort-pages', async ({ page }) => {
