@@ -39,22 +39,12 @@ export function PermalinkDialog({ page }: PermalinkDialogProps) {
       dialogDescription={`Shareable URL for ${page.title}`}
       dialogType={DIALOG_PAGE_PERMALINK}
       onClose={handleClose}
-      onConfirm={async () => {
-        handleCopy()
-        return false
-      }}
+      onConfirm={async () => false}
       testidPrefix="permalink-dialog"
       cancelButton={{
         label: 'Close',
         variant: 'outline',
       }}
-      buttons={[
-        {
-          label: 'Copy link',
-          actionType: 'confirm',
-          variant: 'default',
-        },
-      ]}
     >
       <div className="space-y-3">
         <FormInput

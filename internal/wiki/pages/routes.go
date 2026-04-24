@@ -180,7 +180,7 @@ func (r *Routes) handleLookupPath(c *gin.Context) {
 func (r *Routes) handleResolvePermalink(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageMissingID, "Missing id", "missing id")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageMissingID, "Page ID is required", "page id is required")
 		return
 	}
 	out, err := r.resolvePermalink.Execute(c.Request.Context(), ResolvePermalinkInput{ID: id})
