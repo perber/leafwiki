@@ -34,9 +34,7 @@ export default function LoginForm() {
       navigate('/')
     } catch (err) {
       const mapped = mapApiError(err, 'Login failed')
-      toast.error(
-        mapped.detail ? `${mapped.message}: ${mapped.detail}` : mapped.message,
-      )
+      toast.error(mapped.message)
     } finally {
       setLoading(false)
     }

@@ -19,11 +19,7 @@ export default function UserManagement() {
       .catch((err) => {
         console.warn(err)
         const mapped = mapApiError(err, 'Error loading users')
-        toast.error(
-          mapped.detail
-            ? `${mapped.message}: ${mapped.detail}`
-            : mapped.message,
-        )
+        toast.error(mapped.message)
       })
       .finally(() => {
         setLoading(false)

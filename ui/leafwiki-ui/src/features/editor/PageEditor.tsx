@@ -69,11 +69,7 @@ export default function PageEditor() {
       })
       .catch((err) => {
         const mapped = mapApiError(err, 'Error saving page')
-        toast.error(
-          mapped.detail
-            ? `${mapped.message}: ${mapped.detail}`
-            : mapped.message,
-        )
+        toast.error(mapped.message)
       })
   }, [savePage])
 

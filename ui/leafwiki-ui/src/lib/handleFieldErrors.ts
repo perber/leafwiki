@@ -32,8 +32,6 @@ export function handleFieldErrors(
     toast.error('Validation failed')
   } else {
     const mapped = mapApiError(err, fallbackMessage)
-    toast.error(
-      mapped.detail ? `${mapped.message}: ${mapped.detail}` : mapped.message,
-    )
+    toast.error(mapped.message)
   }
 }

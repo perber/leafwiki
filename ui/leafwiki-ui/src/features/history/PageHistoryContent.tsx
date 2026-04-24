@@ -295,9 +295,6 @@ function ErrorNotice({ error }: { error: ApiUiError }) {
   return (
     <div className="page-history__error-notice">
       <div className="page-history__error-title">{error.message}</div>
-      {error.detail ? (
-        <div className="page-history__error-detail">{error.detail}</div>
-      ) : null}
     </div>
   )
 }
@@ -835,9 +832,7 @@ export function PageHistoryContent({
       toast.success('Revision restored')
     } catch (err) {
       const mapped = mapApiError(err, 'Failed to restore revision')
-      toast.error(
-        mapped.detail ? `${mapped.message}: ${mapped.detail}` : mapped.message,
-      )
+      toast.error(mapped.message)
     } finally {
       setRestoreLoading(false)
     }

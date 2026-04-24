@@ -52,11 +52,7 @@ export function SlugInputWithSuggestion({
         onLastSlugTitleChange?.(debouncedTitle)
       } catch (err) {
         const mapped = mapApiError(err, 'Error generating slug')
-        toast.error(
-          mapped.detail
-            ? `${mapped.message}: ${mapped.detail}`
-            : mapped.message,
-        )
+        toast.error(mapped.message)
       } finally {
         onSlugLoadingChange?.(false)
       }

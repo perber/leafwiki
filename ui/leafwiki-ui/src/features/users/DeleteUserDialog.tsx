@@ -27,9 +27,7 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
         err,
         'Failed to delete user. Please try again.',
       )
-      toast.error(
-        mapped.detail ? `${mapped.message}: ${mapped.detail}` : mapped.message,
-      )
+      toast.error(mapped.message)
       return false // Keep the dialog open
     } finally {
       setLoading(false)
