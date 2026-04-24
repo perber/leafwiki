@@ -399,6 +399,9 @@ test.describe('Authenticated', () => {
     await movePageDialog.selectNewParent(targetParentTitle);
     await movePageDialog.clickMoveButton();
     await movePageDialog.expectRefactorDialogHidden();
+    await expect
+      .poll(() => new URL(page.url()).pathname)
+      .toBe(toAppPath(`/${targetParentTitle}/${renamedChildTitle}`));
 
     await page.goto(permalinkUrl);
     await expect
