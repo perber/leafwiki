@@ -77,7 +77,7 @@ func (s *FSStore) SaveAssetBlobFromPath(srcPath string) (string, int64, error) {
 	}
 
 	hash := hex.EncodeToString(hasher.Sum(nil))
-	dst := s.assetBlobPath(hash)
+	dst := s.AssetBlobPath(hash)
 
 	if err := tmp.Chmod(0o644); err != nil {
 		cleanupTmp()
@@ -371,11 +371,71 @@ func (s *FSStore) ReadAssetBlob(hash string) ([]byte, error) {
 		return nil, fmt.Errorf("asset hash is required")
 	}
 
-	raw, err := os.ReadFile(s.assetBlobPath(hash))
+	raw, err := os.ReadFile(s.AssetBlobPath(hash))
 	if err != nil {
 		return nil, fmt.Errorf("read asset blob: %w", err)
 	}
 	return raw, nil
+}
+
+// OpenAssetBlob returns an open file handle for the given asset blob.
+// The caller is responsible for closing the returned file.
+func (s *FSStore) OpenAssetBlob(hash string) (*os.File, error) {
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return nil, fmt.Errorf("asset hash is required")
+	}
+	f, err := os.Open(s.AssetBlobPath(hash))
+	if err != nil {
+		return nil, fmt.Errorf("open asset blob: %w", err)
+	}
+	return f, nil
+}
+
+// CopyAssetBlobToPath streams the asset blob identified by hash to dstPath,
+// verifying hash and size during the copy. The write is atomic (temp + rename).
+func (s *FSStore) CopyAssetBlobToPath(hash string, expectedSize int64, dstPath string) error {
+	src, err := s.OpenAssetBlob(hash)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = src.Close() }()
+
+	tmpDir := filepath.Dir(dstPath)
+	tmp, err := os.CreateTemp(tmpDir, "asset-restore-*")
+	if err != nil {
+		return fmt.Errorf("create temp restore file: %w", err)
+	}
+	tmpName := tmp.Name()
+	cleanup := func() { _ = tmp.Close(); _ = os.Remove(tmpName) }
+
+	hasher := sha256.New()
+	written, err := io.Copy(io.MultiWriter(tmp, hasher), src)
+	if err != nil {
+		cleanup()
+		return fmt.Errorf("stream asset blob to %s: %w", dstPath, err)
+	}
+	if err := tmp.Chmod(0o644); err != nil {
+		cleanup()
+		return fmt.Errorf("chmod restored asset: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("close temp restore file: %w", err)
+	}
+	if computedHash := hex.EncodeToString(hasher.Sum(nil)); computedHash != hash {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("asset blob hash mismatch: computed %s, want %s", computedHash, hash)
+	}
+	if written != expectedSize {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("asset blob size mismatch: got %d, want %d", written, expectedSize)
+	}
+	if err := os.Rename(tmpName, dstPath); err != nil {
+		_ = os.Remove(tmpName)
+		return fmt.Errorf("move restored asset into place: %w", err)
+	}
+	return nil
 }
 
 
@@ -412,7 +472,7 @@ func (s *FSStore) contentBlobPath(hash string) string {
 	return filepath.Join(s.baseDir(), "blobs", "content", "sha256", shardHash(hash), hash)
 }
 
-func (s *FSStore) assetBlobPath(hash string) string {
+func (s *FSStore) AssetBlobPath(hash string) string {
 	return filepath.Join(s.baseDir(), "blobs", "assets", "sha256", shardHash(hash), hash)
 }
 

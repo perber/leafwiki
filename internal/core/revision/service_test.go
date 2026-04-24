@@ -290,7 +290,7 @@ func TestRestoreAssetsHashAndSizeMismatch(t *testing.T) {
 	service, _, _ := newRevisionTestService(t)
 
 	hash := sha256HexBytes([]byte("asset"))
-	assetBlob := service.store.assetBlobPath(hash)
+	assetBlob := service.store.AssetBlobPath(hash)
 	if err := os.MkdirAll(filepath.Dir(assetBlob), 0o755); err != nil {
 		t.Fatalf("MkdirAll asset blob dir failed: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestRestoreAssetsHashAndSizeMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SaveContentBlob second failed: %v", err)
 	}
-	assetBlob2 := service.store.assetBlobPath(hash2)
+	assetBlob2 := service.store.AssetBlobPath(hash2)
 	if err := os.MkdirAll(filepath.Dir(assetBlob2), 0o755); err != nil {
 		t.Fatalf("MkdirAll asset blob dir failed: %v", err)
 	}
@@ -589,7 +589,7 @@ func TestCheckRevisionIntegrityReportsBrokenArtifacts(t *testing.T) {
 	if err != nil || len(refs) != 1 {
 		t.Fatalf("LoadAssetManifest page3 failed: %#v %v", refs, err)
 	}
-	if err := os.WriteFile(service.store.assetBlobPath(refs[0].SHA256), []byte("tampered"), 0o644); err != nil {
+	if err := os.WriteFile(service.store.AssetBlobPath(refs[0].SHA256), []byte("tampered"), 0o644); err != nil {
 		t.Fatalf("WriteFile tampered asset blob failed: %v", err)
 	}
 	issues3, err := service.CheckRevisionIntegrity(pageID3)
@@ -660,8 +660,12 @@ func TestGetRevisionAssetReturnsBlobForDeletedLiveAsset(t *testing.T) {
 	if asset.Asset.Name != "image.png" {
 		t.Fatalf("asset name = %q", asset.Asset.Name)
 	}
-	if string(asset.Content) != "asset-image" {
-		t.Fatalf("asset content = %q", string(asset.Content))
+	content, err := os.ReadFile(asset.Path)
+	if err != nil {
+		t.Fatalf("read asset from path: %v", err)
+	}
+	if string(content) != "asset-image" {
+		t.Fatalf("asset content = %q", string(content))
 	}
 }
 

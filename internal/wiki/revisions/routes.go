@@ -2,9 +2,11 @@ package revisions
 
 import (
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
@@ -216,12 +218,20 @@ func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 		return
 	}
 
+	f, err := os.Open(out.Asset.Path)
+	if err != nil {
+		respondWithRevisionStatusError(c, http.StatusNotFound, ErrCodeRevisionPreviewAssetNotFound, "Revision asset not found", "revision asset %s for page %s revision %s not found", assetName, pageID, revisionID)
+		return
+	}
+	defer func() { _ = f.Close() }()
+
 	contentType := out.Asset.Asset.MIMEType
 	if contentType == "" {
-		contentType = http.DetectContentType(out.Asset.Content)
+		contentType = "application/octet-stream"
 	}
 	c.Header("Content-Disposition", `inline; filename="`+path.Base(assetName)+`"`)
-	c.Data(http.StatusOK, contentType, out.Asset.Content)
+	c.Writer.Header().Set("Content-Type", contentType)
+	http.ServeContent(c.Writer, c.Request, "", time.Time{}, f)
 }
 
 func (r *Routes) handleRestoreRevision(c *gin.Context) {
