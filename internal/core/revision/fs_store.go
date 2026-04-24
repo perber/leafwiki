@@ -395,6 +395,7 @@ func (s *FSStore) OpenAssetBlob(hash string) (*os.File, error) {
 // CopyAssetBlobToPath streams the asset blob identified by hash to dstPath,
 // verifying hash and size during the copy. The write is atomic (temp + rename).
 func (s *FSStore) CopyAssetBlobToPath(hash string, expectedSize int64, dstPath string) error {
+	hash = strings.ToLower(strings.TrimSpace(hash))
 	src, err := s.OpenAssetBlob(hash)
 	if err != nil {
 		return err

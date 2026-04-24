@@ -7,7 +7,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
@@ -221,18 +220,20 @@ func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 
 	f, err := os.Open(out.Asset.Path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			respondWithRevisionStatusError(c, http.StatusNotFound, ErrCodeRevisionPreviewAssetNotFound, "Revision asset not found", "revision asset %s for page %s revision %s not found", assetName, pageID, revisionID)
-		} else {
-			respondWithRevisionStatusError(c, http.StatusInternalServerError, ErrCodeRevisionInternalError, "Failed to load revision asset", "failed to load revision asset")
-		}
+		respondWithRevisionStatusError(c, http.StatusInternalServerError, ErrCodeRevisionPreviewAssetBlobUnavailable, "Revision asset blob is unavailable", "revision asset blob %s for page %s revision %s is unavailable", assetName, pageID, revisionID)
 		return
 	}
 	defer func() { _ = f.Close() }()
 
+	stat, err := f.Stat()
+	if err != nil {
+		respondWithRevisionStatusError(c, http.StatusInternalServerError, ErrCodeRevisionInternalError, "Failed to load revision asset", "failed to load revision asset")
+		return
+	}
+
 	contentType := out.Asset.Asset.MIMEType
 	if contentType == "" {
-		contentType = mime.TypeByExtension(path.Ext(assetName))
+		contentType = mime.TypeByExtension(strings.ToLower(path.Ext(assetName)))
 	}
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -243,7 +244,7 @@ func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 	}
 	c.Header("Content-Disposition", disposition)
 	c.Writer.Header().Set("Content-Type", contentType)
-	http.ServeContent(c.Writer, c.Request, "", time.Time{}, f)
+	http.ServeContent(c.Writer, c.Request, path.Base(assetName), stat.ModTime(), f)
 }
 
 func (r *Routes) handleRestoreRevision(c *gin.Context) {
