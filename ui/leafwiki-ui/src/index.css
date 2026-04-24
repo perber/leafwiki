@@ -1799,7 +1799,7 @@
   .markdown-editor__preview-container .markdown-shoutout__title,
   .page-viewer__content .markdown-shoutout__title,
   .page-history__preview-body .markdown-shoutout__title {
-    @apply mb-2 text-sm font-semibold tracking-[0.08em] uppercase;
+    @apply mt-0 mb-2 text-sm font-semibold tracking-[0.08em] uppercase;
   }
 
   .markdown-editor__preview-container
