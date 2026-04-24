@@ -224,7 +224,7 @@ func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 		if os.IsNotExist(err) {
 			respondWithRevisionStatusError(c, http.StatusNotFound, ErrCodeRevisionPreviewAssetNotFound, "Revision asset not found", "revision asset %s for page %s revision %s not found", assetName, pageID, revisionID)
 		} else {
-			respondWithRevisionStatusError(c, http.StatusInternalServerError, ErrCodeRevisionInternalError, "Failed to load revision asset", "failed to open revision asset %s for page %s revision %s: %v", assetName, pageID, revisionID, err.Error())
+			respondWithRevisionStatusError(c, http.StatusInternalServerError, ErrCodeRevisionInternalError, "Failed to load revision asset", "failed to load revision asset")
 		}
 		return
 	}

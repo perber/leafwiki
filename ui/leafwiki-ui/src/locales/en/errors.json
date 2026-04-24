@@ -15,6 +15,7 @@
   "failed to delete asset %s": "Failed to delete asset %s",
   "failed to issue auth cookie": "Failed to issue auth cookie",
   "failed to load link status": "Failed to load link status",
+  "failed to load revision asset": "Failed to load revision asset",
   "failed to open uploaded file": "Failed to open uploaded file",
   "failed to perform search": "Failed to perform search",
   "failed to rename asset %s": "Failed to rename asset %s",
