@@ -4,6 +4,7 @@ import { buildHistoryUrl } from '@/lib/routePath'
 import {
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
+  DIALOG_PAGE_PERMALINK,
 } from '@/lib/registries'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { getParentWikiRoutePath, toWikiLookupPath } from '@/lib/wikiPath'
@@ -46,6 +47,10 @@ export default function PageViewer() {
     showHistory: useCallback(() => {
       navigate(buildHistoryUrl(page?.path || pathname))
     }, [navigate, page?.path, pathname]),
+    showPermalink: useCallback(() => {
+      if (!page) return
+      openDialog(DIALOG_PAGE_PERMALINK, { page })
+    }, [page, openDialog]),
     deletePage: useCallback(() => {
       openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
         pageId: page?.id,

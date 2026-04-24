@@ -4,6 +4,7 @@ import BrandingSettings from '../branding/BrandingSettings'
 import PageEditor from '../editor/PageEditor'
 import Importer from '../importer/Importer'
 import PageHistoryPage from '../page/PageHistoryPage'
+import PermalinkRedirect from '../page/PermalinkRedirect'
 import RootRedirect from '../page/RootRedirect'
 import UserManagement from '../users/UserManagement'
 import PageViewer from '../viewer/PageViewer'
@@ -86,6 +87,18 @@ export const createLeafWikiRouter = (
         ) : (
           <AuthWrapper>
             <PageHistoryPage />
+          </AuthWrapper>
+        ),
+      },
+      {
+        path: '/p/:id/:slug?',
+        element: isReadOnlyViewer ? (
+          <ReadOnlyWrapper>
+            <PermalinkRedirect />
+          </ReadOnlyWrapper>
+        ) : (
+          <AuthWrapper>
+            <PermalinkRedirect />
           </AuthWrapper>
         ),
       },

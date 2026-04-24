@@ -1483,6 +1483,53 @@ func TestTreeService_LookupPagePath_ReflectsSlugRename(t *testing.T) {
 	}
 }
 
+func TestTreeService_ResolvePermalinkTarget_ReflectsRenameAndMove(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	docsID, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode docs failed: %v", err)
+	}
+	guideID, err := svc.CreateNode("system", docsID, "Guide", "guide", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode guide failed: %v", err)
+	}
+	archiveID, err := svc.CreateNode("system", nil, "Archive", "archive", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode archive failed: %v", err)
+	}
+
+	if err := svc.UpdateNode("system", *guideID, "User Guide", "user-guide", nil); err != nil {
+		t.Fatalf("UpdateNode guide failed: %v", err)
+	}
+	if err := svc.MoveNode("system", *guideID, *archiveID); err != nil {
+		t.Fatalf("MoveNode guide failed: %v", err)
+	}
+
+	target, err := svc.ResolvePermalinkTarget(*guideID)
+	if err != nil {
+		t.Fatalf("ResolvePermalinkTarget failed: %v", err)
+	}
+	if target.ID != *guideID {
+		t.Fatalf("expected permalink target ID %q, got %q", *guideID, target.ID)
+	}
+	if target.Slug != "user-guide" {
+		t.Fatalf("expected permalink target slug user-guide, got %q", target.Slug)
+	}
+	if target.Path != "archive/user-guide" {
+		t.Fatalf("expected permalink target path archive/user-guide, got %q", target.Path)
+	}
+}
+
+func TestTreeService_ResolvePermalinkTarget_ReturnsNotFoundForMissingPage(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	_, err := svc.ResolvePermalinkTarget("missing-page")
+	if !errors.Is(err, ErrPageNotFound) {
+		t.Fatalf("expected ErrPageNotFound, got %v", err)
+	}
+}
+
 func TestTreeService_EnsurePagePath_PersistsOrderFilesForCreatedPath(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 

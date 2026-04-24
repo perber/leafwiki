@@ -10,6 +10,7 @@ import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
 import { DeletePageDialog } from '@/features/page/DeletePageDialog'
 import { EditPageMetadataDialog } from '@/features/page/EditPageMetadataDialog'
 import { MovePageDialog } from '@/features/page/MovePageDialog'
+import PermalinkDialog from '@/features/page/PermalinkDialog'
 import { PageRefactorDialog } from '@/features/page/PageRefactorDialog'
 import { SortPagesDialog } from '@/features/page/SortPagesDialog'
 import Search from '@/features/search/Search'
@@ -71,6 +72,7 @@ export const DIALOG_UNSAVED_CHANGES = 'unsaved-changes'
 export const DIALOG_IMAGE_PREVIEW = 'image-preview'
 export const DIALOG_PAGE_QUICK_SWITCHER = 'page-quick-switcher'
 export const DIALOG_PAGE_REFACTOR_CONFIRMATION = 'page-refactor-confirmation'
+export const DIALOG_PAGE_PERMALINK = 'page-permalink'
 export const DIALOG_RESTORE_REVISION_CONFIRMATION =
   'restore-revision-confirmation'
 
@@ -252,6 +254,18 @@ dialogRegistry.register({
       <PageRefactorDialog
         key={`${DIALOG_PAGE_REFACTOR_CONFIRMATION}-${typedProps.preview.pageId}-${typedProps.preview.newPath}`}
         {...typedProps}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_PAGE_PERMALINK,
+  render: (props) => {
+    return (
+      <PermalinkDialog
+        key={DIALOG_PAGE_PERMALINK}
+        {...(props as React.ComponentProps<typeof PermalinkDialog>)}
       />
     )
   },

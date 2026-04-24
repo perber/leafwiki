@@ -97,6 +97,37 @@ func (uc *LookupPagePathUseCase) Execute(_ context.Context, in LookupPagePathInp
 	return &LookupPagePathOutput{Lookup: lookup}, nil
 }
 
+// ─── ResolvePermalink ───────────────────────────────────────────────────────
+
+// ResolvePermalinkInput is the input for ResolvePermalinkUseCase.
+type ResolvePermalinkInput struct {
+	ID string
+}
+
+// ResolvePermalinkOutput is the output of ResolvePermalinkUseCase.
+type ResolvePermalinkOutput struct {
+	Target *tree.PermalinkTarget
+}
+
+// ResolvePermalinkUseCase resolves a stable page ID to its current route path.
+type ResolvePermalinkUseCase struct {
+	tree *tree.TreeService
+}
+
+// NewResolvePermalinkUseCase constructs a ResolvePermalinkUseCase.
+func NewResolvePermalinkUseCase(t *tree.TreeService) *ResolvePermalinkUseCase {
+	return &ResolvePermalinkUseCase{tree: t}
+}
+
+// Execute resolves the permalink target for the given page ID.
+func (uc *ResolvePermalinkUseCase) Execute(_ context.Context, in ResolvePermalinkInput) (*ResolvePermalinkOutput, error) {
+	target, err := uc.tree.ResolvePermalinkTarget(in.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &ResolvePermalinkOutput{Target: target}, nil
+}
+
 // ─── SortPages ──────────────────────────────────────────────────────────────
 
 // SortPagesInput is the input for SortPagesUseCase.

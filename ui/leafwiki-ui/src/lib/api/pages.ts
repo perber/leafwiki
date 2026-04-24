@@ -39,6 +39,12 @@ export interface Page {
   metadata?: PageMetadata // optional metadata, because older API responses may not have it
 }
 
+export type PermalinkTarget = {
+  id: string
+  slug: string
+  path: string
+}
+
 export type PageRefactorKind = 'rename' | 'move'
 
 export type PageRefactorAffectedPage = {
@@ -84,6 +90,12 @@ export async function getPageByPath(path: string): Promise<Page> {
   return (await fetchWithAuth(
     `/api/pages/by-path?path=${encodeURIComponent(path)}`,
   )) as Page
+}
+
+export async function getPermalinkTarget(id: string): Promise<PermalinkTarget> {
+  return (await fetchWithAuth(
+    `/api/pages/permalink/${encodeURIComponent(id)}`,
+  )) as PermalinkTarget
 }
 
 export async function createPage({

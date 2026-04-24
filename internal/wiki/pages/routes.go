@@ -16,66 +16,69 @@ import (
 
 // Routes is the RouteRegistrar for the pages domain.
 type Routes struct {
-	treeService    *tree.TreeService
-	createPage     *CreatePageUseCase
-	updatePage     *UpdatePageUseCase
-	deletePage     *DeletePageUseCase
-	movePage       *MovePageUseCase
-	convertPage    *ConvertPageUseCase
-	copyPage       *CopyPageUseCase
-	getPage        *GetPageUseCase
-	findByPath     *FindByPathUseCase
-	lookupPath     *LookupPagePathUseCase
-	sortPages      *SortPagesUseCase
-	ensurePath     *EnsurePathUseCase
-	suggestSlug    *SuggestSlugUseCase
-	previewRefactor *PreviewPageRefactorUseCase
-	applyRefactor  *ApplyPageRefactorUseCase
-	userResolver   *coreauth.UserResolver
-	authService    *coreauth.AuthService
+	treeService      *tree.TreeService
+	createPage       *CreatePageUseCase
+	updatePage       *UpdatePageUseCase
+	deletePage       *DeletePageUseCase
+	movePage         *MovePageUseCase
+	convertPage      *ConvertPageUseCase
+	copyPage         *CopyPageUseCase
+	getPage          *GetPageUseCase
+	findByPath       *FindByPathUseCase
+	lookupPath       *LookupPagePathUseCase
+	resolvePermalink *ResolvePermalinkUseCase
+	sortPages        *SortPagesUseCase
+	ensurePath       *EnsurePathUseCase
+	suggestSlug      *SuggestSlugUseCase
+	previewRefactor  *PreviewPageRefactorUseCase
+	applyRefactor    *ApplyPageRefactorUseCase
+	userResolver     *coreauth.UserResolver
+	authService      *coreauth.AuthService
 }
 
 // RoutesConfig holds the dependencies required to build a Routes instance.
 type RoutesConfig struct {
-	TreeService    *tree.TreeService
-	CreatePage     *CreatePageUseCase
-	UpdatePage     *UpdatePageUseCase
-	DeletePage     *DeletePageUseCase
-	MovePage       *MovePageUseCase
-	ConvertPage    *ConvertPageUseCase
-	CopyPage       *CopyPageUseCase
-	GetPage        *GetPageUseCase
-	FindByPath     *FindByPathUseCase
-	LookupPath     *LookupPagePathUseCase
-	SortPages      *SortPagesUseCase
-	EnsurePath     *EnsurePathUseCase
-	SuggestSlug    *SuggestSlugUseCase
-	PreviewRefactor *PreviewPageRefactorUseCase
-	ApplyRefactor  *ApplyPageRefactorUseCase
-	UserResolver   *coreauth.UserResolver
-	AuthService    *coreauth.AuthService
+	TreeService      *tree.TreeService
+	CreatePage       *CreatePageUseCase
+	UpdatePage       *UpdatePageUseCase
+	DeletePage       *DeletePageUseCase
+	MovePage         *MovePageUseCase
+	ConvertPage      *ConvertPageUseCase
+	CopyPage         *CopyPageUseCase
+	GetPage          *GetPageUseCase
+	FindByPath       *FindByPathUseCase
+	LookupPath       *LookupPagePathUseCase
+	ResolvePermalink *ResolvePermalinkUseCase
+	SortPages        *SortPagesUseCase
+	EnsurePath       *EnsurePathUseCase
+	SuggestSlug      *SuggestSlugUseCase
+	PreviewRefactor  *PreviewPageRefactorUseCase
+	ApplyRefactor    *ApplyPageRefactorUseCase
+	UserResolver     *coreauth.UserResolver
+	AuthService      *coreauth.AuthService
 }
 
 // NewRoutes constructs the pages RouteRegistrar.
 func NewRoutes(cfg RoutesConfig) *Routes {
 	return &Routes{
-		treeService:    cfg.TreeService,
-		createPage:     cfg.CreatePage,
-		updatePage:     cfg.UpdatePage,
-		deletePage:     cfg.DeletePage,
-		movePage:       cfg.MovePage,
-		convertPage:    cfg.ConvertPage,
-		copyPage:       cfg.CopyPage,
-		getPage:        cfg.GetPage,
-		findByPath:     cfg.FindByPath,
-		lookupPath:     cfg.LookupPath,
-		sortPages:      cfg.SortPages,
-		ensurePath:     cfg.EnsurePath,
-		suggestSlug:    cfg.SuggestSlug,
-		previewRefactor: cfg.PreviewRefactor,
-		applyRefactor:  cfg.ApplyRefactor,
-		userResolver:   cfg.UserResolver,
-		authService:    cfg.AuthService,
+		treeService:      cfg.TreeService,
+		createPage:       cfg.CreatePage,
+		updatePage:       cfg.UpdatePage,
+		deletePage:       cfg.DeletePage,
+		movePage:         cfg.MovePage,
+		convertPage:      cfg.ConvertPage,
+		copyPage:         cfg.CopyPage,
+		getPage:          cfg.GetPage,
+		findByPath:       cfg.FindByPath,
+		lookupPath:       cfg.LookupPath,
+		resolvePermalink: cfg.ResolvePermalink,
+		sortPages:        cfg.SortPages,
+		ensurePath:       cfg.EnsurePath,
+		suggestSlug:      cfg.SuggestSlug,
+		previewRefactor:  cfg.PreviewRefactor,
+		applyRefactor:    cfg.ApplyRefactor,
+		userResolver:     cfg.UserResolver,
+		authService:      cfg.AuthService,
 	}
 }
 
@@ -88,6 +91,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		pub.GET("/tree", r.handleGetTree)
 		pub.GET("/pages/by-path", r.handleGetByPath)
 		pub.GET("/pages/lookup", r.handleLookupPath)
+		pub.GET("/pages/permalink/:id", r.handleResolvePermalink)
 		pub.GET("/pages/:id", r.handleGetPage)
 	}
 
@@ -103,6 +107,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		authGroup.GET("/pages/:id", r.handleGetPage)
 		authGroup.GET("/pages/lookup", r.handleLookupPath)
 		authGroup.GET("/pages/by-path", r.handleGetByPath)
+		authGroup.GET("/pages/permalink/:id", r.handleResolvePermalink)
 	}
 
 	authGroup.GET("/pages/slug-suggestion", authmw.RequireEditorOrAdmin(), r.handleSuggestSlug)
@@ -170,6 +175,20 @@ func (r *Routes) handleLookupPath(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, out.Lookup)
+}
+
+func (r *Routes) handleResolvePermalink(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageMissingID, "Missing id", "missing id")
+		return
+	}
+	out, err := r.resolvePermalink.Execute(c.Request.Context(), ResolvePermalinkInput{ID: id})
+	if err != nil {
+		respondWithPageError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out.Target)
 }
 
 func (r *Routes) handleSuggestSlug(c *gin.Context) {

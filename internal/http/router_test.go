@@ -207,6 +207,12 @@ type apiPage struct {
 	Children []*apiPage    `json:"children"`
 }
 
+type apiPermalinkTarget struct {
+	ID   string `json:"id"`
+	Slug string `json:"slug"`
+	Path string `json:"path"`
+}
+
 func createPageViaAPI(t *testing.T, router http.Handler, title, slug string, parentID *string, kind *tree.NodeKind) *apiPage {
 	t.Helper()
 
@@ -253,6 +259,22 @@ func getPageByPathViaAPI(t *testing.T, router http.Handler, path string) *apiPag
 	}
 
 	return &page
+}
+
+func getPermalinkTargetViaAPI(t *testing.T, router http.Handler, id string) *apiPermalinkTarget {
+	t.Helper()
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/permalink/"+id, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var target apiPermalinkTarget
+	if err := json.Unmarshal(rec.Body.Bytes(), &target); err != nil {
+		t.Fatalf("Unmarshal(get permalink target response) failed: %v", err)
+	}
+
+	return &target
 }
 
 func getTreeViaAPI(t *testing.T, router http.Handler) *apiPage {
@@ -1680,6 +1702,71 @@ func TestGetPageByPathEndpoint_SectionReturnsDirectChildrenOnly(t *testing.T) {
 	}
 	if grandchildren, ok := firstChild["children"]; ok && grandchildren != nil {
 		t.Errorf("Expected no grandchildren for section kind (depth=1), got: %v", grandchildren)
+	}
+}
+
+func TestGetPagePermalinkEndpoint_ReturnsCurrentPath(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	docs := createPageViaAPI(t, router, "Docs", "docs", nil, pageNodeKind())
+	guide := createPageViaAPI(t, router, "Guide", "guide", &docs.ID, pageNodeKind())
+	archive := createPageViaAPI(t, router, "Archive", "archive", nil, pageNodeKind())
+
+	movePayload := `{"parentId":"` + archive.ID + `"}`
+	moveRec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+guide.ID+"/move", strings.NewReader(movePayload))
+	if moveRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on move, got %d - %s", moveRec.Code, moveRec.Body.String())
+	}
+
+	updatePayload := `{"title":"User Guide","slug":"user-guide","content":""}`
+	updateRec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+guide.ID, strings.NewReader(updatePayload))
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on update, got %d - %s", updateRec.Code, updateRec.Body.String())
+	}
+
+	target := getPermalinkTargetViaAPI(t, router, guide.ID)
+	if target.ID != guide.ID {
+		t.Fatalf("expected ID %q, got %q", guide.ID, target.ID)
+	}
+	if target.Slug != "user-guide" {
+		t.Fatalf("expected slug user-guide, got %q", target.Slug)
+	}
+	if target.Path != "archive/user-guide" {
+		t.Fatalf("expected path archive/user-guide, got %q", target.Path)
+	}
+}
+
+func TestGetPagePermalinkEndpoint_PublicAccessAllowsUnauthenticatedReads(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		CustomStylesheet:        "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+	})
+
+	page := createPageViaAPI(t, router, "Public Page", "public-page", nil, pageNodeKind())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pages/permalink/"+page.ID, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var target apiPermalinkTarget
+	if err := json.Unmarshal(rec.Body.Bytes(), &target); err != nil {
+		t.Fatalf("Unmarshal(permalink response) failed: %v", err)
+	}
+	if target.Path != "public-page" {
+		t.Fatalf("expected path public-page, got %q", target.Path)
 	}
 }
 
