@@ -1,6 +1,7 @@
 package revisions
 
 import (
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -220,16 +221,27 @@ func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 
 	f, err := os.Open(out.Asset.Path)
 	if err != nil {
-		respondWithRevisionStatusError(c, http.StatusNotFound, ErrCodeRevisionPreviewAssetNotFound, "Revision asset not found", "revision asset %s for page %s revision %s not found", assetName, pageID, revisionID)
+		if os.IsNotExist(err) {
+			respondWithRevisionStatusError(c, http.StatusNotFound, ErrCodeRevisionPreviewAssetNotFound, "Revision asset not found", "revision asset %s for page %s revision %s not found", assetName, pageID, revisionID)
+		} else {
+			respondWithRevisionStatusError(c, http.StatusInternalServerError, ErrCodeRevisionInternalError, "Failed to load revision asset", "failed to open revision asset %s for page %s revision %s: %v", assetName, pageID, revisionID, err.Error())
+		}
 		return
 	}
 	defer func() { _ = f.Close() }()
 
 	contentType := out.Asset.Asset.MIMEType
 	if contentType == "" {
+		contentType = mime.TypeByExtension(path.Ext(assetName))
+	}
+	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	c.Header("Content-Disposition", `inline; filename="`+path.Base(assetName)+`"`)
+	disposition := mime.FormatMediaType("inline", map[string]string{"filename": path.Base(assetName)})
+	if disposition == "" {
+		disposition = "inline"
+	}
+	c.Header("Content-Disposition", disposition)
 	c.Writer.Header().Set("Content-Type", contentType)
 	http.ServeContent(c.Writer, c.Request, "", time.Time{}, f)
 }
