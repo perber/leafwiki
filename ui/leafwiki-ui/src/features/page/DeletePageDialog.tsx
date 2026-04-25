@@ -4,6 +4,7 @@ import { fetchLinkStatus, type Backlink } from '@/lib/api/links'
 import { asApiLocalizedError } from '@/lib/api/errors'
 import { deletePage, NODE_KIND_PAGE } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { useViewerStore } from '../viewer/viewer'
 import { DIALOG_DELETE_PAGE_CONFIRMATION } from '@/lib/registries'
 import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
@@ -28,6 +29,7 @@ export function DeletePageDialog({
 
   const [loading, setLoading] = useState(false)
   const [deleteRecursive, setDeleteRecursive] = useState(false)
+  const [pageModifiedWarning, setPageModifiedWarning] = useState(false)
   const [backlinksLoading, setBacklinksLoading] = useState(false)
   const [backlinksError, setBacklinksError] = useState<string | null>(null)
   const [backlinks, setBacklinks] = useState<Backlink[]>([])
@@ -88,21 +90,15 @@ export function DeletePageDialog({
       console.warn(err)
       const localized = asApiLocalizedError(err)
       if (localized?.code === 'page_version_conflict') {
-        try {
-          await reloadTree()
-          const freshPage = useTreeStore.getState().getPageById(pageId)
-          await deletePage(pageId, deleteRecursive, freshPage?.version ?? '')
-          toast.success(`${itemLabelCapitalized} deleted successfully`)
-          navigate(redirectTo)
-          reloadTree().catch(console.error)
-          return true
-        } catch (retryErr) {
-          handleFieldErrors(
-            retryErr,
-            setFieldErrors,
-            `Error deleting ${itemLabel}`,
-          )
+        reloadTree().catch(console.error)
+        const viewerPage = useViewerStore.getState().page
+        if (viewerPage?.id === pageId && viewerPage.path) {
+          useViewerStore
+            .getState()
+            .loadPageData(viewerPage.path)
+            .catch(console.error)
         }
+        setPageModifiedWarning(true)
       } else {
         handleFieldErrors(err, setFieldErrors, `Error deleting ${itemLabel}`)
       }
@@ -141,6 +137,20 @@ export function DeletePageDialog({
       ]}
     >
       <div className="space-y-3">
+        {pageModifiedWarning && (
+          <div
+            className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+            data-testid="delete-page-dialog-modified-warning"
+          >
+            <div className="flex items-start gap-2 font-medium">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>This page was modified by another user.</span>
+            </div>
+            <p className="mt-1">
+              The page has been refreshed. Do you still want to delete it?
+            </p>
+          </div>
+        )}
         {enableLinkRefactor &&
           (backlinksLoading ? (
             <p

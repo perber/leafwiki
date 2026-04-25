@@ -22,6 +22,7 @@ import {
 import { stripBasePath } from '@/lib/routePath'
 import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useViewerStore } from '@/features/viewer/viewer'
 import { useTreeStore } from '@/stores/tree'
 import {
   Copy,
@@ -72,8 +73,16 @@ export default function TreeNodeActionsMenu({
       .catch((err) => {
         const localized = asApiLocalizedError(err)
         if (localized?.code === 'page_version_conflict') {
+          reloadTree()
+          const viewerPage = useViewerStore.getState().page
+          if (viewerPage?.id === nodeId && viewerPage.path) {
+            useViewerStore
+              .getState()
+              .loadPageData(viewerPage.path)
+              .catch(console.error)
+          }
           toast.error(
-            'This page was modified by another user. Please reload and try again.',
+            'This page was modified by another user. Please try again.',
           )
         } else {
           const mapped = mapApiError(err, 'Failed to convert page')
