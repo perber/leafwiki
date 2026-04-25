@@ -253,6 +253,7 @@ export async function convertPage(
 export type PathLookupResult = {
   path: string
   exists: boolean
+  canCreate: boolean
   segments: { slug: string; id?: string; exists: boolean }[]
 }
 
@@ -262,6 +263,7 @@ export async function lookupPath(path: string): Promise<PathLookupResult> {
   )) as {
     path: string
     exists: boolean
+    canCreate: boolean
     segments: { slug: string; id?: string; exists: boolean }[]
   }
 }
