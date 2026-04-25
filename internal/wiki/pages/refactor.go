@@ -407,9 +407,12 @@ func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected
 
 	if uc.links != nil && len(updatedPages) > 0 {
 		if err := uc.links.UpdateLinksAndHealForPages(updatedPages); err != nil {
-			for _, page := range updatedPages {
-				uc.log.Warn("failed to update link index after rewrite", "pageID", page.ID, "error", err)
-			}
+			uc.log.Warn(
+				"failed to update link index after rewrite",
+				"pageCount", len(updatedPages),
+				"pageIDSample", samplePageIDs(updatedPages, 5),
+				"error", err,
+			)
 		}
 	}
 	return nil
@@ -469,9 +472,12 @@ func (uc *ApplyPageRefactorUseCase) rewritePathChangedSubtree(userID string, sna
 
 	if uc.links != nil && len(updatedPages) > 0 {
 		if err := uc.links.UpdateLinksAndHealForPages(updatedPages); err != nil {
-			for _, page := range updatedPages {
-				uc.log.Warn("failed to update link index after subtree rewrite", "pageID", page.ID, "error", err)
-			}
+			uc.log.Warn(
+				"failed to update link index after subtree rewrite",
+				"pageCount", len(updatedPages),
+				"pageIDSample", samplePageIDs(updatedPages, 5),
+				"error", err,
+			)
 		}
 	}
 	return nil
@@ -501,6 +507,24 @@ func ensureStrings(values []string) []string {
 		return []string{}
 	}
 	return values
+}
+
+func samplePageIDs(pages []*tree.Page, limit int) []string {
+	if limit <= 0 || len(pages) == 0 {
+		return []string{}
+	}
+	if len(pages) < limit {
+		limit = len(pages)
+	}
+
+	ids := make([]string, 0, limit)
+	for i := 0; i < limit; i++ {
+		if pages[i] == nil {
+			continue
+		}
+		ids = append(ids, pages[i].ID)
+	}
+	return ids
 }
 
 func collectPreviewWarnings(pages []RefactorAffectedPage) []string {

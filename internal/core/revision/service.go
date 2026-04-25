@@ -11,6 +11,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -110,11 +111,20 @@ func (s *Service) RecordContentUpdates(pages []*tree.Page, authorID, summary str
 		errs[i] = fmt.Errorf("page is required")
 	}
 
+	parallelism := runtime.GOMAXPROCS(0)
+	if parallelism < 1 {
+		parallelism = 1
+	}
+	sem := make(chan struct{}, parallelism)
+
 	var wg sync.WaitGroup
 	wg.Add(len(grouped))
 	for _, items := range grouped {
 		go func(items []batchItem) {
 			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
 			for _, item := range items {
 				if _, _, err := s.recordContentUpdateForPage(item.page, authorID, summary); err != nil {
 					errs[item.index] = err
