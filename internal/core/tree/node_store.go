@@ -72,26 +72,6 @@ func NewNodeStore(storageDir string) *NodeStore {
 	}
 }
 
-// writeIDToMarkdownFile writes a leafwiki_id to a markdown file's frontmatter and logs errors if the write fails
-func (f *NodeStore) writeIDToMarkdownFile(mdFile *markdown.MarkdownFile, id string) {
-	var originalModTime time.Time
-	if info, err := os.Stat(mdFile.GetPath()); err == nil {
-		originalModTime = info.ModTime()
-	}
-
-	mdFile.SetLeafWikiFrontmatter(id, mdFile.GetFrontmatter().LeafWikiTitle)
-	if err := mdFile.WriteToFile(); err != nil {
-		f.log.Error("could not write leafwiki_id back to file", "path", mdFile.GetPath(), "error", err)
-		return
-	}
-
-	if !originalModTime.IsZero() {
-		if err := os.Chtimes(mdFile.GetPath(), originalModTime, originalModTime); err != nil {
-			f.log.Warn("could not restore file mtime after writing leafwiki_id", "path", mdFile.GetPath(), "error", err)
-		}
-	}
-}
-
 // writeReconstructedFrontmatter writes the full managed frontmatter (ID, title, timestamps, authors)
 // back to disk while preserving the file's modification time. Called during reconstruct for files
 // that are missing any managed metadata field.

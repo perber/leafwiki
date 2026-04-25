@@ -49,7 +49,7 @@ export type TreeNodeActionsMenuProps = {
 export default function TreeNodeActionsMenu({
   node,
 }: TreeNodeActionsMenuProps) {
-  const { id: nodeId, kind: nodeKind, children } = node
+  const { id: nodeId, kind: nodeKind, children, version: nodeVersion } = node
   const currentEditorPageId = usePageEditorStore((state) => state.page?.id)
   const openDialog = useDialogsStore((state) => state.openDialog)
   const reloadTree = useTreeStore((state) => state.reloadTree)
@@ -64,7 +64,7 @@ export default function TreeNodeActionsMenu({
     convertPage(
       nodeId,
       nodeKind === NODE_KIND_PAGE ? NODE_KIND_SECTION : NODE_KIND_PAGE,
-      node.version,
+      nodeVersion,
     )
       .then(() => {
         toast.success('Page converted successfully')
@@ -89,7 +89,7 @@ export default function TreeNodeActionsMenu({
           toast.error(mapped.message)
         }
       })
-  }, [nodeId, nodeKind, reloadTree])
+  }, [nodeId, nodeKind, nodeVersion, reloadTree])
 
   const getCurrentRoutePath = useCallback(() => {
     if (typeof window === 'undefined') {
