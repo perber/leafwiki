@@ -67,10 +67,10 @@ func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) erro
 
 		// Build affected pages list before deletion (paths are no longer reachable after).
 		affectedPages := make([]*tree.Page, 0, len(subtreeIDs))
-		for _, pid := range subtreeIDs {
-			p, err := uc.tree.GetPage(pid)
-			if err != nil {
-				uc.log.Warn("failed to get page before recursive delete", "pageID", pid, "error", err)
+		pages, errs := uc.tree.GetPages(subtreeIDs)
+		for i, p := range pages {
+			if errs[i] != nil {
+				uc.log.Warn("failed to get page before recursive delete", "pageID", subtreeIDs[i], "error", errs[i])
 				continue
 			}
 			affectedPages = append(affectedPages, p)

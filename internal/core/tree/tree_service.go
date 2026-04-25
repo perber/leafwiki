@@ -748,6 +748,133 @@ func (t *TreeService) collectIDsDFS() []string {
 	return ids
 }
 
+// BulkContentUpdate is a single item for BulkUpdateContent.
+type BulkContentUpdate struct {
+	ID      string
+	Content string
+}
+
+// BulkUpdateContent updates content for multiple pages under a single write lock,
+// running disk writes in parallel. Returns per-item errors; nil means success.
+// Only content and metadata timestamps are updated; slug and title are unchanged.
+func (t *TreeService) BulkUpdateContent(userID string, updates []BulkContentUpdate) []error {
+	errs := make([]error, len(updates))
+	if len(updates) == 0 {
+		return errs
+	}
+
+	type task struct {
+		index   int
+		node    *PageNode
+		content string
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tree == nil {
+		for i := range errs {
+			errs[i] = ErrTreeNotLoaded
+		}
+		return errs
+	}
+
+	now := time.Now().UTC()
+	tasks := make([]task, 0, len(updates))
+	for i, u := range updates {
+		node := t.getNodeByIDLocked(u.ID)
+		if node == nil {
+			errs[i] = ErrPageNotFound
+			continue
+		}
+		// Update in-memory metadata before disk write so UpsertContent writes the correct timestamps.
+		node.Metadata.UpdatedAt = now
+		node.Metadata.LastAuthorID = userID
+		tasks = append(tasks, task{index: i, node: node, content: u.Content})
+	}
+
+	if len(tasks) == 0 {
+		return errs
+	}
+
+	// Each page lives in its own file — writes are independent and safe to parallelise.
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	wg.Add(len(tasks))
+	for _, tk := range tasks {
+		go func(tk task) {
+			defer wg.Done()
+			if err := t.store.UpsertContent(tk.node, tk.content); err != nil {
+				mu.Lock()
+				errs[tk.index] = err
+				mu.Unlock()
+			}
+		}(tk)
+	}
+	wg.Wait()
+
+	return errs
+}
+
+// GetPages returns pages for the given IDs under a single read lock,
+// reading files in parallel. Each entry is nil when the corresponding error is non-nil.
+func (t *TreeService) GetPages(ids []string) ([]*Page, []error) {
+	pages := make([]*Page, len(ids))
+	errs := make([]error, len(ids))
+	if len(ids) == 0 {
+		return pages, errs
+	}
+
+	type task struct {
+		index int
+		node  *PageNode
+	}
+
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	if t.tree == nil {
+		for i := range errs {
+			errs[i] = ErrTreeNotLoaded
+		}
+		return pages, errs
+	}
+
+	tasks := make([]task, 0, len(ids))
+	for i, id := range ids {
+		node := t.getNodeByIDLocked(id)
+		if node == nil {
+			errs[i] = ErrPageNotFound
+			continue
+		}
+		tasks = append(tasks, task{index: i, node: node})
+	}
+
+	if len(tasks) == 0 {
+		return pages, errs
+	}
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	wg.Add(len(tasks))
+	for _, tk := range tasks {
+		go func(tk task) {
+			defer wg.Done()
+			content, err := t.store.ReadPageContent(tk.node)
+			mu.Lock()
+			if err != nil {
+				errs[tk.index] = fmt.Errorf("could not get page content: %w", err)
+			} else {
+				pages[tk.index] = &Page{PageNode: tk.node, Content: content}
+			}
+			mu.Unlock()
+		}(tk)
+	}
+	wg.Wait()
+
+	return pages, errs
+}
+
 // GetPage returns a page by its ID
 func (t *TreeService) GetPage(id string) (*Page, error) {
 	t.mu.RLock()

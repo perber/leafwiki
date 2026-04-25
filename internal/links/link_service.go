@@ -27,15 +27,27 @@ func (b *LinkService) IndexAllPages() error {
 		return err
 	}
 
-	return b.treeService.WalkNodes(func(id string) error {
-		page, err := b.treeService.GetPage(id)
-		if err != nil {
-			return err
+	var ids []string
+	if err := b.treeService.WalkNodes(func(id string) error {
+		ids = append(ids, id)
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	pages, errs := b.treeService.GetPages(ids)
+	for i, page := range pages {
+		if errs[i] != nil {
+			return errs[i]
 		}
 		links := extractLinksFromMarkdown(page.Content)
 		targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
-		return b.store.AddLinks(page.ID, page.Title, targets)
-	})
+		if err := b.store.AddLinks(page.ID, page.Title, targets); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (b *LinkService) ClearLinks() error {

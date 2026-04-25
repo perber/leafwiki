@@ -89,15 +89,43 @@ func (uc *EnsurePathUseCase) Execute(_ context.Context, in EnsurePathInput) (*En
 		return nil, err
 	}
 
-	page, err := uc.tree.GetPage(result.Page.ID)
-	if err != nil {
-		return nil, err
+	ids := make([]string, 0, len(result.Created)+1)
+	seen := make(map[string]struct{}, len(result.Created)+1)
+	appendUnique := func(id string) {
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+
+	appendUnique(result.Page.ID)
+	for _, n := range result.Created {
+		appendUnique(n.ID)
+	}
+
+	pages, errs := uc.tree.GetPages(ids)
+	pageByID := make(map[string]*tree.Page, len(ids))
+	for i, p := range pages {
+		if errs[i] != nil {
+			if ids[i] == result.Page.ID {
+				return nil, errs[i]
+			}
+			uc.log.Warn("failed to get page for post-create processing", "pageID", ids[i], "error", errs[i])
+			continue
+		}
+		pageByID[ids[i]] = p
+	}
+
+	page := pageByID[result.Page.ID]
+	if page == nil {
+		return nil, tree.ErrPageNotFound
 	}
 
 	for _, n := range result.Created {
-		p, err := uc.tree.GetPage(n.ID)
-		if err != nil {
-			uc.log.Warn("failed to get page for post-create processing", "pageID", n.ID, "error", err)
+		p := pageByID[n.ID]
+		if p == nil {
+			uc.log.Warn("failed to get page for post-create processing", "pageID", n.ID, "error", tree.ErrPageNotFound)
 			continue
 		}
 		uc.orchestrator.Run(pagesave.PageSaveEvent{
