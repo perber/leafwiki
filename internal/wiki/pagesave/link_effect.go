@@ -15,6 +15,9 @@ type LinkIndexSideEffect struct {
 
 // NewLinkIndexSideEffect creates a LinkIndexSideEffect.
 func NewLinkIndexSideEffect(svc *links.LinkService, log *slog.Logger) *LinkIndexSideEffect {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &LinkIndexSideEffect{svc: svc, log: log}
 }
 

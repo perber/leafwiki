@@ -14,6 +14,9 @@ type RevisionSideEffect struct {
 
 // NewRevisionSideEffect creates a RevisionSideEffect.
 func NewRevisionSideEffect(svc *revision.Service, log *slog.Logger) *RevisionSideEffect {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &RevisionSideEffect{svc: svc, log: log}
 }
 

@@ -3007,3 +3007,108 @@ func TestTreeService_WalkNodes_VisitsNestedNodes(t *testing.T) {
 		t.Fatalf("expected 2 visited nodes (parent + child), got %d: %v", len(visited), visited)
 	}
 }
+
+func TestTreeService_GetPages_PreservesOrderAndAlignsErrors(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	firstID, err := svc.CreateNode("system", nil, "First", "first", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode(first) failed: %v", err)
+	}
+	secondID, err := svc.CreateNode("system", nil, "Second", "second", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode(second) failed: %v", err)
+	}
+
+	pages, errs := svc.GetPages([]string{*secondID, "missing-id", *firstID})
+	if len(pages) != 3 || len(errs) != 3 {
+		t.Fatalf("unexpected result lengths: pages=%d errs=%d", len(pages), len(errs))
+	}
+	if errs[0] != nil || pages[0] == nil || pages[0].ID != *secondID {
+		t.Fatalf("expected second page at index 0, got page=%v err=%v", pages[0], errs[0])
+	}
+	if !errors.Is(errs[1], ErrPageNotFound) || pages[1] != nil {
+		t.Fatalf("expected ErrPageNotFound at index 1, got page=%v err=%v", pages[1], errs[1])
+	}
+	if errs[2] != nil || pages[2] == nil || pages[2].ID != *firstID {
+		t.Fatalf("expected first page at index 2, got page=%v err=%v", pages[2], errs[2])
+	}
+}
+
+func TestTreeService_BulkUpdateContent_PartialFailure_RollsBackFailedMetadata(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	firstID, err := svc.CreateNode("system", nil, "First", "first", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode(first) failed: %v", err)
+	}
+	secondID, err := svc.CreateNode("system", nil, "Second", "second", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode(second) failed: %v", err)
+	}
+
+	beforeFirst, err := svc.GetPage(*firstID)
+	if err != nil {
+		t.Fatalf("GetPage(first before) failed: %v", err)
+	}
+	beforeSecond, err := svc.GetPage(*secondID)
+	if err != nil {
+		t.Fatalf("GetPage(second before) failed: %v", err)
+	}
+	beforeSecondVersion := beforeSecond.Version()
+	beforeSecondUpdatedAt := beforeSecond.Metadata.UpdatedAt
+	beforeSecondAuthor := beforeSecond.Metadata.LastAuthorID
+
+	errs := svc.BulkUpdateContent("bulk-user", []BulkContentUpdate{
+		{ID: *firstID, Content: "updated first"},
+		{ID: *secondID, Content: "---\ninvalid: [\n---\nbody"},
+		{ID: "missing-id", Content: "ignored"},
+	})
+
+	if len(errs) != 3 {
+		t.Fatalf("expected 3 errors, got %d", len(errs))
+	}
+	if errs[0] != nil {
+		t.Fatalf("expected index 0 success, got %v", errs[0])
+	}
+	if errs[1] == nil {
+		t.Fatal("expected index 1 parse failure, got nil")
+	}
+	if !strings.Contains(errs[1].Error(), "could not parse markdown content") {
+		t.Fatalf("expected parse failure at index 1, got %v", errs[1])
+	}
+	if !errors.Is(errs[2], ErrPageNotFound) {
+		t.Fatalf("expected ErrPageNotFound at index 2, got %v", errs[2])
+	}
+
+	afterFirst, err := svc.GetPage(*firstID)
+	if err != nil {
+		t.Fatalf("GetPage(first after) failed: %v", err)
+	}
+	if afterFirst.Content != "updated first" {
+		t.Fatalf("expected first content update, got %q", afterFirst.Content)
+	}
+	if afterFirst.Metadata.LastAuthorID != "bulk-user" {
+		t.Fatalf("expected first LastAuthorID updated, got %q", afterFirst.Metadata.LastAuthorID)
+	}
+	if !afterFirst.Metadata.UpdatedAt.After(beforeFirst.Metadata.UpdatedAt) && !afterFirst.Metadata.UpdatedAt.Equal(beforeFirst.Metadata.UpdatedAt) {
+		t.Fatalf("expected first UpdatedAt to stay monotonic, before=%s after=%s", beforeFirst.Metadata.UpdatedAt, afterFirst.Metadata.UpdatedAt)
+	}
+
+	afterSecond, err := svc.GetPage(*secondID)
+	if err != nil {
+		t.Fatalf("GetPage(second after) failed: %v", err)
+	}
+	if afterSecond.Content != beforeSecond.Content {
+		t.Fatalf("expected second content unchanged, before=%q after=%q", beforeSecond.Content, afterSecond.Content)
+	}
+	if afterSecond.Version() != beforeSecondVersion {
+		t.Fatalf("expected second version unchanged, before=%q after=%q", beforeSecondVersion, afterSecond.Version())
+	}
+	if !afterSecond.Metadata.UpdatedAt.Equal(beforeSecondUpdatedAt) {
+		t.Fatalf("expected second UpdatedAt restored, before=%s after=%s", beforeSecondUpdatedAt, afterSecond.Metadata.UpdatedAt)
+	}
+	if afterSecond.Metadata.LastAuthorID != beforeSecondAuthor {
+		t.Fatalf("expected second LastAuthorID restored, before=%q after=%q", beforeSecondAuthor, afterSecond.Metadata.LastAuthorID)
+	}
+}
