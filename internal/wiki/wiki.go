@@ -70,6 +70,7 @@ type WikiOptions struct {
 	AccessTokenTimeout      time.Duration // Access token timeout duration
 	RefreshTokenTimeout     time.Duration // Refresh token timeout duration
 	AuthDisabled            bool          // Whether authentication is disabled
+	EnableRevision          bool          // Whether revisions should be recorded and exposed
 	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 }
@@ -98,8 +99,10 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	if err := w.EnsureWelcomePage(); err != nil {
 		return nil, err
 	}
-	w.revision = revision.NewService(w.storageDir, w.tree, w.log,
-		revision.ServiceOptions{MaxRevisions: options.MaxRevisionHistory})
+	if options.EnableRevision {
+		w.revision = revision.NewService(w.storageDir, w.tree, w.log,
+			revision.ServiceOptions{MaxRevisions: options.MaxRevisionHistory})
+	}
 	w.buildRoutes(options)
 	return w, nil
 }

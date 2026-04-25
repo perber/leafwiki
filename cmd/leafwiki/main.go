@@ -234,6 +234,7 @@ func main() {
 		AccessTokenTimeout:  accessTokenTimeout,
 		RefreshTokenTimeout: refreshTokenTimeout,
 		AuthDisabled:        disableAuth,
+		EnableRevision:      enableRevision,
 		MaxRevisionHistory:  maxRevisionHistory,
 	})
 	if err != nil {

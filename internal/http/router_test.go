@@ -29,12 +29,17 @@ func pageNodeKind() *tree.NodeKind {
 }
 
 func createWikiTestInstance(t *testing.T) *wiki.Wiki {
+	return createWikiTestInstanceWithRevisionFlag(t, true)
+}
+
+func createWikiTestInstanceWithRevisionFlag(t *testing.T, enableRevision bool) *wiki.Wiki {
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
 		StorageDir:          t.TempDir(),
 		AdminPassword:       "admin",
 		JWTSecret:           "secretkey",
 		AccessTokenTimeout:  15 * time.Minute,
 		RefreshTokenTimeout: 7 * 24 * time.Hour,
+		EnableRevision:      enableRevision,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create wiki instance: %v", err)
@@ -842,6 +847,62 @@ func TestRefactorPreviewEndpoint_IsDisabledWhenFlagIsOff(t *testing.T) {
 	previewRec := authenticatedRequest(t, router, http.MethodPost, "/api/pages/"+target.ID+"/refactor/preview", previewBody)
 	if previewRec.Code != http.StatusNotFound {
 		t.Fatalf("Expected 404 when link refactor is disabled, got %d - %s", previewRec.Code, previewRec.Body.String())
+	}
+}
+
+func TestRefactorApply_DoesNotPersistRevisionsWhenRevisionDisabled(t *testing.T) {
+	w := createWikiTestInstanceWithRevisionFlag(t, false)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		EnableRevision:          false,
+		EnableLinkRefactor:      true,
+	})
+
+	target := createPageViaAPI(t, router, "Target", "target", nil, pageNodeKind())
+	ref := createPageViaAPI(t, router, "Ref", "ref", nil, pageNodeKind())
+
+	updateBody := strings.NewReader(`{"version":"` + ref.Version + `","title":"Ref","slug":"ref","content":"[Target](/target)"}`)
+	updateRec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+ref.ID, updateBody)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on page update, got %d - %s", updateRec.Code, updateRec.Body.String())
+	}
+
+	applyBody := strings.NewReader(`{"kind":"rename","version":"` + target.Version + `","title":"Target","slug":"target-renamed","rewriteLinks":true}`)
+	applyRec := authenticatedRequest(t, router, http.MethodPost, "/api/pages/"+target.ID+"/refactor/apply", applyBody)
+	if applyRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on refactor apply, got %d - %s", applyRec.Code, applyRec.Body.String())
+	}
+
+	refPageRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+ref.ID, strings.NewReader(""))
+	if refPageRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on ref page fetch, got %d - %s", refPageRec.Code, refPageRec.Body.String())
+	}
+
+	var refPage map[string]any
+	if err := json.Unmarshal(refPageRec.Body.Bytes(), &refPage); err != nil {
+		t.Fatalf("Invalid ref page JSON: %v", err)
+	}
+
+	if got, _ := refPage["content"].(string); got != "[Target](/target-renamed)" {
+		t.Fatalf("Expected rewritten ref content, got %q", got)
+	}
+
+	revisionsRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+target.ID+"/revisions", strings.NewReader(""))
+	if revisionsRec.Code != http.StatusNotFound {
+		t.Fatalf("Expected 404 on revisions endpoint when revision is disabled, got %d - %s", revisionsRec.Code, revisionsRec.Body.String())
+	}
+
+	revisionsDir := filepath.Join(w.GetStorageDir(), ".leafwiki", "revisions")
+	if _, err := os.Stat(revisionsDir); !os.IsNotExist(err) {
+		t.Fatalf("Expected no revision storage directory, got err=%v", err)
 	}
 }
 

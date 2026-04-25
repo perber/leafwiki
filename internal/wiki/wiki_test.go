@@ -17,6 +17,7 @@ func createWikiTestInstance(t *testing.T) *Wiki {
 		JWTSecret:           "secretkey",
 		AccessTokenTimeout:  15 * time.Minute,
 		RefreshTokenTimeout: 7 * 24 * time.Hour,
+		EnableRevision:      true,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create wiki instance: %v", err)
