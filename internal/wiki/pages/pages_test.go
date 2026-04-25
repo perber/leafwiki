@@ -18,6 +18,7 @@ import (
 	"github.com/perber/wiki/internal/test_utils"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	"github.com/perber/wiki/internal/wiki/pages"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 )
 
@@ -64,6 +65,13 @@ func newTestDeps(t *testing.T) *testDeps {
 	}
 }
 
+func (d *testDeps) orchestrator() *pagesave.PageSaveOrchestrator {
+	return pagesave.NewPageSaveOrchestrator(
+		pagesave.NewLinkIndexSideEffect(d.links, slog.Default()),
+		pagesave.NewRevisionSideEffect(d.revision, slog.Default()),
+	)
+}
+
 func pageKind() *tree.NodeKind {
 	k := tree.NodeKindPage
 	return &k
@@ -80,7 +88,7 @@ func sectionKind() *tree.NodeKind {
 
 func TestCreatePageUseCase_HappyPath_Root(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	out, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1",
@@ -101,7 +109,7 @@ func TestCreatePageUseCase_HappyPath_Root(t *testing.T) {
 
 func TestCreatePageUseCase_HappyPath_WithParent(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	parent, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1",
@@ -130,7 +138,7 @@ func TestCreatePageUseCase_HappyPath_WithParent(t *testing.T) {
 
 func TestCreatePageUseCase_EmptyTitle_ReturnsValidationError(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	_, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1",
@@ -149,7 +157,7 @@ func TestCreatePageUseCase_EmptyTitle_ReturnsValidationError(t *testing.T) {
 
 func TestCreatePageUseCase_ReservedSlug_ReturnsValidationError(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	_, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1",
@@ -168,7 +176,7 @@ func TestCreatePageUseCase_ReservedSlug_ReturnsValidationError(t *testing.T) {
 
 func TestCreatePageUseCase_NilKind_ReturnsValidationError(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	_, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1",
@@ -183,7 +191,7 @@ func TestCreatePageUseCase_NilKind_ReturnsValidationError(t *testing.T) {
 
 func TestCreatePageUseCase_Section_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	out, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1",
@@ -205,8 +213,8 @@ func TestCreatePageUseCase_Section_HappyPath(t *testing.T) {
 
 func TestUpdatePageUseCase_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Old Title", Slug: "old-title", Kind: pageKind(),
@@ -238,8 +246,8 @@ func TestUpdatePageUseCase_HappyPath(t *testing.T) {
 
 func TestUpdatePageUseCase_VersionConflict_ReturnsLocalizedError(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Old Title", Slug: "old-title", Kind: pageKind(),
@@ -287,8 +295,8 @@ func TestUpdatePageUseCase_VersionConflict_ReturnsLocalizedError(t *testing.T) {
 
 func TestUpdatePageUseCase_EmptyTitle_ReturnsValidationError(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	created, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Page", Slug: "page", Kind: pageKind(),
@@ -308,8 +316,8 @@ func TestUpdatePageUseCase_EmptyTitle_ReturnsValidationError(t *testing.T) {
 
 func TestDeletePageUseCase_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.links, deps.assets, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.assets, deps.orchestrator(), slog.Default())
 
 	created, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "To Delete", Slug: "to-delete", Kind: pageKind(),
@@ -332,7 +340,7 @@ func TestDeletePageUseCase_HappyPath(t *testing.T) {
 
 func TestDeletePageUseCase_Root_ReturnsError(t *testing.T) {
 	deps := newTestDeps(t)
-	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.links, deps.assets, slog.Default())
+	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.assets, deps.orchestrator(), slog.Default())
 
 	err := deleteUC.Execute(context.Background(), pages.DeletePageInput{
 		UserID: "user1", ID: "root", Recursive: false,
@@ -344,8 +352,8 @@ func TestDeletePageUseCase_Root_ReturnsError(t *testing.T) {
 
 func TestDeletePageUseCase_WithChildren_Recursive(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.links, deps.assets, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.assets, deps.orchestrator(), slog.Default())
 
 	parent, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Parent", Slug: "parent", Kind: pageKind(),
@@ -368,8 +376,8 @@ func TestDeletePageUseCase_WithChildren_Recursive(t *testing.T) {
 
 func TestMovePageUseCase_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	moveUC := pages.NewMovePageUseCase(deps.tree, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	moveUC := pages.NewMovePageUseCase(deps.tree, deps.orchestrator(), slog.Default())
 
 	parent, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Parent", Slug: "parent", Kind: pageKind(),
@@ -398,8 +406,8 @@ func TestMovePageUseCase_HappyPath(t *testing.T) {
 
 func TestMovePageUseCase_VersionConflict_ReturnsLocalizedError(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	moveUC := pages.NewMovePageUseCase(deps.tree, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	moveUC := pages.NewMovePageUseCase(deps.tree, deps.orchestrator(), slog.Default())
 
 	parentA, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Parent A", Slug: "parent-a", Kind: pageKind(),
@@ -460,7 +468,7 @@ func TestMovePageUseCase_VersionConflict_ReturnsLocalizedError(t *testing.T) {
 
 func TestMovePageUseCase_Root_ReturnsError(t *testing.T) {
 	deps := newTestDeps(t)
-	moveUC := pages.NewMovePageUseCase(deps.tree, deps.revision, deps.links, slog.Default())
+	moveUC := pages.NewMovePageUseCase(deps.tree, deps.orchestrator(), slog.Default())
 
 	err := moveUC.Execute(context.Background(), pages.MovePageInput{
 		UserID: "user1", ID: "root", Version: "root-version", ParentID: "root",
@@ -476,7 +484,7 @@ func TestMovePageUseCase_Root_ReturnsError(t *testing.T) {
 
 func TestEnsurePathUseCase_CreatesNewPath(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewEnsurePathUseCase(deps.tree, deps.slug, nil, deps.links, slog.Default())
+	uc := pages.NewEnsurePathUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	out, err := uc.Execute(context.Background(), pages.EnsurePathInput{
 		UserID:      "user1",
@@ -494,7 +502,7 @@ func TestEnsurePathUseCase_CreatesNewPath(t *testing.T) {
 
 func TestEnsurePathUseCase_ExistingPath_ReturnsExistingPage(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewEnsurePathUseCase(deps.tree, deps.slug, nil, deps.links, slog.Default())
+	uc := pages.NewEnsurePathUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	out1, err := uc.Execute(context.Background(), pages.EnsurePathInput{
 		UserID: "user1", TargetPath: "docs", TargetTitle: "Docs", Kind: pageKind(),
@@ -516,7 +524,7 @@ func TestEnsurePathUseCase_ExistingPath_ReturnsExistingPage(t *testing.T) {
 
 func TestEnsurePathUseCase_EmptyPath_ReturnsValidationError(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewEnsurePathUseCase(deps.tree, deps.slug, nil, deps.links, slog.Default())
+	uc := pages.NewEnsurePathUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	_, err := uc.Execute(context.Background(), pages.EnsurePathInput{
 		UserID: "user1", TargetPath: "", TargetTitle: "Title", Kind: pageKind(),
@@ -532,7 +540,7 @@ func TestEnsurePathUseCase_EmptyPath_ReturnsValidationError(t *testing.T) {
 
 func TestGetPageUseCase_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	getUC := pages.NewGetPageUseCase(deps.tree)
 
 	created, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -560,7 +568,7 @@ func TestGetPageUseCase_NotFound_ReturnsError(t *testing.T) {
 
 func TestCreatePageUseCase_ReservedHistorySlug_ReturnsValidationError(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	_, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1",
@@ -575,7 +583,7 @@ func TestCreatePageUseCase_ReservedHistorySlug_ReturnsValidationError(t *testing
 
 func TestCreatePageUseCase_PageExists_ReturnsError(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	if _, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Duplicate", Slug: "duplicate", Kind: pageKind(),
@@ -593,7 +601,7 @@ func TestCreatePageUseCase_PageExists_ReturnsError(t *testing.T) {
 
 func TestCreatePageUseCase_InvalidParent_ReturnsError(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	invalidID := "not-real"
 
 	_, err := uc.Execute(context.Background(), pages.CreatePageInput{
@@ -606,7 +614,7 @@ func TestCreatePageUseCase_InvalidParent_ReturnsError(t *testing.T) {
 
 func TestCreatePageUseCase_RejectsCaseInsensitiveSlugConflict(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	if _, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Upper", Slug: "ABCD-efg", Kind: pageKind(),
@@ -624,7 +632,7 @@ func TestCreatePageUseCase_RejectsCaseInsensitiveSlugConflict(t *testing.T) {
 
 func TestCreatePageUseCase_RecordsPageCreatedRevision(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	out, err := uc.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "editor", Title: "My Page", Slug: "my-page", Kind: pageKind(),
@@ -653,8 +661,8 @@ func TestCreatePageUseCase_RecordsPageCreatedRevision(t *testing.T) {
 
 func TestUpdatePageUseCase_AllowsUppercaseSlug(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Original", Slug: "original", Kind: pageKind(),
@@ -683,7 +691,7 @@ func TestUpdatePageUseCase_AllowsUppercaseSlug(t *testing.T) {
 
 func TestDeletePageUseCase_EmptyID_ReturnsError(t *testing.T) {
 	deps := newTestDeps(t)
-	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.links, deps.assets, slog.Default())
+	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.assets, deps.orchestrator(), slog.Default())
 
 	err := deleteUC.Execute(context.Background(), pages.DeletePageInput{
 		UserID: "user1", ID: "", Recursive: false,
@@ -695,7 +703,7 @@ func TestDeletePageUseCase_EmptyID_ReturnsError(t *testing.T) {
 
 func TestFindByPathUseCase_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	findUC := pages.NewFindByPathUseCase(deps.tree)
 
 	if _, err := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -725,7 +733,7 @@ func TestFindByPathUseCase_NotFound_ReturnsError(t *testing.T) {
 
 func TestSortPagesUseCase_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	sortUC := pages.NewSortPagesUseCase(deps.tree)
 
 	parent, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -774,7 +782,7 @@ func TestSuggestSlugUseCase_Unique(t *testing.T) {
 
 func TestSuggestSlugUseCase_Conflict(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	uc := pages.NewSuggestSlugUseCase(deps.tree, deps.slug)
 
 	if _, err := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -797,7 +805,7 @@ func TestSuggestSlugUseCase_Conflict(t *testing.T) {
 
 func TestSuggestSlugUseCase_DeepHierarchy(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	uc := pages.NewSuggestSlugUseCase(deps.tree, deps.slug)
 
 	arch, err := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -844,8 +852,8 @@ func TestSuggestSlugUseCase_DeepHierarchy(t *testing.T) {
 
 func TestCopyPageUseCase_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.revision, deps.links, deps.assets, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.orchestrator(), deps.assets, slog.Default())
 
 	original, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Original", Slug: "original", Kind: pageKind(),
@@ -870,8 +878,8 @@ func TestCopyPageUseCase_HappyPath(t *testing.T) {
 
 func TestCopyPageUseCase_WithParent(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.revision, deps.links, deps.assets, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.orchestrator(), deps.assets, slog.Default())
 
 	parent, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Parent", Slug: "parent", Kind: pageKind(),
@@ -893,7 +901,7 @@ func TestCopyPageUseCase_WithParent(t *testing.T) {
 
 func TestCopyPageUseCase_NonExistentSource_ReturnsError(t *testing.T) {
 	deps := newTestDeps(t)
-	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.revision, deps.links, deps.assets, slog.Default())
+	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.orchestrator(), deps.assets, slog.Default())
 
 	_, err := copyUC.Execute(context.Background(), pages.CopyPageInput{
 		UserID: "user1", SourcePageID: "non-existent-id", Title: "Copy", Slug: "copy",
@@ -905,8 +913,8 @@ func TestCopyPageUseCase_NonExistentSource_ReturnsError(t *testing.T) {
 
 func TestCopyPageUseCase_WithAssets(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.revision, deps.links, deps.assets, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.orchestrator(), deps.assets, slog.Default())
 
 	original, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Original", Slug: "original", Kind: pageKind(),
@@ -940,9 +948,9 @@ func TestCopyPageUseCase_WithAssets(t *testing.T) {
 
 func TestCopyPageUseCase_RecordsContentRevision(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.revision, deps.links, deps.assets, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.orchestrator(), deps.assets, slog.Default())
 
 	original, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Original", Slug: "original", Kind: pageKind(),
@@ -985,8 +993,8 @@ func TestCopyPageUseCase_RecordsContentRevision(t *testing.T) {
 
 func TestPreviewPageRefactorUseCase_RenameListsAffectedPages(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	previewUC := pages.NewPreviewPageRefactorUseCase(deps.tree, deps.slug, deps.links, slog.Default())
 
 	target, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -1030,8 +1038,8 @@ func TestPreviewPageRefactorUseCase_RenameListsAffectedPages(t *testing.T) {
 
 func TestApplyPageRefactorUseCase_RenameRewritesIncomingLinks(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
 
 	target, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -1110,7 +1118,7 @@ func TestApplyPageRefactorUseCase_RenameRewritesIncomingLinks(t *testing.T) {
 
 func TestPreviewPageRefactorUseCase_UsesEmptyWarningArrays(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	previewUC := pages.NewPreviewPageRefactorUseCase(deps.tree, deps.slug, deps.links, slog.Default())
 
 	page, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -1144,8 +1152,8 @@ func TestPreviewPageRefactorUseCase_UsesEmptyWarningArrays(t *testing.T) {
 
 func TestPreviewPageRefactorUseCase_Move_ExcludesMovedSubtreeFromOptionalAffectedPages(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	previewUC := pages.NewPreviewPageRefactorUseCase(deps.tree, deps.slug, deps.links, slog.Default())
 
 	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -1188,8 +1196,8 @@ func TestPreviewPageRefactorUseCase_Move_ExcludesMovedSubtreeFromOptionalAffecte
 
 func TestApplyPageRefactorUseCase_Move_RewritesRelativeOutgoingLinksInMovedPage(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
 
 	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -1276,9 +1284,9 @@ func TestApplyPageRefactorUseCase_Move_RewritesRelativeOutgoingLinksInMovedPage(
 
 func TestEnsurePathUseCase_HealsLinksForAllCreatedSegments(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	ensureUC := pages.NewEnsurePathUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	ensureUC := pages.NewEnsurePathUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	pageA, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Page A", Slug: "a", Kind: pageKind(),
@@ -1360,9 +1368,9 @@ func TestEnsurePathUseCase_HealsLinksForAllCreatedSegments(t *testing.T) {
 
 func TestDeletePageUseCase_NonRecursive_MarksIncomingBroken(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.links, deps.assets, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.assets, deps.orchestrator(), slog.Default())
 
 	a, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Page A", Slug: "a", Kind: pageKind(),
@@ -1422,9 +1430,9 @@ func TestDeletePageUseCase_NonRecursive_MarksIncomingBroken(t *testing.T) {
 
 func TestDeletePageUseCase_Recursive_RemovesOutgoingForSubtree_AndBreaksIncomingByPrefix(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.links, deps.assets, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.assets, deps.orchestrator(), slog.Default())
 
 	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Docs", Slug: "docs", Kind: pageKind(),
@@ -1496,8 +1504,8 @@ func TestDeletePageUseCase_Recursive_RemovesOutgoingForSubtree_AndBreaksIncoming
 
 func TestUpdatePageUseCase_RenamePage_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	a, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "A", Slug: "a", Kind: pageKind(),
@@ -1558,8 +1566,8 @@ func TestUpdatePageUseCase_RenamePage_MarksOldBroken_HealsNewExactPath(t *testin
 
 func TestUpdatePageUseCase_RenameSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Docs", Slug: "docs", Kind: pageKind(),
@@ -1620,9 +1628,9 @@ func TestUpdatePageUseCase_RenameSubtree_BreaksOldPrefix_HealsNewSubpaths(t *tes
 
 func TestMovePageUseCase_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	moveUC := pages.NewMovePageUseCase(deps.tree, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	moveUC := pages.NewMovePageUseCase(deps.tree, deps.orchestrator(), slog.Default())
 
 	a, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "A", Slug: "a", Kind: pageKind(),
@@ -1681,9 +1689,9 @@ func TestMovePageUseCase_MarksOldBroken_HealsNewExactPath(t *testing.T) {
 
 func TestMovePageUseCase_MoveSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	moveUC := pages.NewMovePageUseCase(deps.tree, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	moveUC := pages.NewMovePageUseCase(deps.tree, deps.orchestrator(), slog.Default())
 
 	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Docs", Slug: "docs", Kind: pageKind(),
@@ -1744,9 +1752,9 @@ func TestMovePageUseCase_MoveSubtree_BreaksOldPrefix_HealsNewSubpaths(t *testing
 
 func TestMovePageUseCase_ReindexesRelativeLinks(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	moveUC := pages.NewMovePageUseCase(deps.tree, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	moveUC := pages.NewMovePageUseCase(deps.tree, deps.orchestrator(), slog.Default())
 
 	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Docs", Slug: "docs", Kind: pageKind(),
@@ -1813,7 +1821,7 @@ func TestMovePageUseCase_ReindexesRelativeLinks(t *testing.T) {
 
 func TestAssetUseCases_RecordAssetRevisionForUser(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	uploadUC := wikiassets.NewUploadAssetUseCase(deps.tree, deps.assets, deps.revision, slog.Default())
 	renameUC := wikiassets.NewRenameAssetUseCase(deps.tree, deps.assets, deps.revision, slog.Default())
 	deleteUC := wikiassets.NewDeleteAssetUseCase(deps.tree, deps.assets, deps.revision, slog.Default())
@@ -1942,8 +1950,8 @@ func TestAssetUseCases_RecordAssetRevisionForUser(t *testing.T) {
 
 func TestCheckIntegrityUseCase_Passthrough(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	checkUC := wikirevisions.NewCheckIntegrityUseCase(deps.revision)
 
 	page, err := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -1983,7 +1991,7 @@ func TestCheckIntegrityUseCase_Passthrough(t *testing.T) {
 
 func TestEnsurePathUseCase_RecordsRevisionForEachCreatedSegment(t *testing.T) {
 	deps := newTestDeps(t)
-	uc := pages.NewEnsurePathUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	uc := pages.NewEnsurePathUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	out, err := uc.Execute(context.Background(), pages.EnsurePathInput{
 		UserID: "system", TargetPath: "/x/y", TargetTitle: "X Y", Kind: pageKind(),
@@ -2015,8 +2023,8 @@ func TestEnsurePathUseCase_RecordsRevisionForEachCreatedSegment(t *testing.T) {
 
 func TestMovePageUseCase_RecordsStructureRevision(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	moveUC := pages.NewMovePageUseCase(deps.tree, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	moveUC := pages.NewMovePageUseCase(deps.tree, deps.orchestrator(), slog.Default())
 
 	dest, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Dest", Slug: "dest", Kind: pageKind(),
@@ -2051,8 +2059,8 @@ func TestMovePageUseCase_RecordsStructureRevision(t *testing.T) {
 
 func TestUpdatePageUseCase_TitleOnlyCreatesStructureRevision(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	page, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Original", Slug: "original", Kind: pageKind(),
@@ -2108,8 +2116,8 @@ func TestUpdatePageUseCase_TitleOnlyCreatesStructureRevision(t *testing.T) {
 
 func TestUpdatePageUseCase_TitleOnlyWithUnchangedContentCreatesStructureRevision(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 
 	page, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Original", Slug: "original", Kind: pageKind(),

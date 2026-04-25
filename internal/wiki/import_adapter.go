@@ -11,6 +11,7 @@ import (
 	"github.com/perber/wiki/internal/links"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
 // WikiImportAdapter implements the importer.ImporterWiki interface using
@@ -57,8 +58,15 @@ func (a *WikiImportAdapter) ListAssets(pageID string) ([]string, error) {
 	return a.asset.ListAssetsForPage(page)
 }
 
+func (a *WikiImportAdapter) orchestrator() *pagesave.PageSaveOrchestrator {
+	return pagesave.NewPageSaveOrchestrator(
+		pagesave.NewLinkIndexSideEffect(a.links, a.log),
+		pagesave.NewRevisionSideEffect(a.revision, a.log),
+	)
+}
+
 func (a *WikiImportAdapter) EnsurePath(userID, targetPath, title string, kind *tree.NodeKind) (*tree.Page, error) {
-	out, err := wikipages.NewEnsurePathUseCase(a.tree, a.slug, a.revision, a.links, a.log).Execute(
+	out, err := wikipages.NewEnsurePathUseCase(a.tree, a.slug, a.orchestrator(), a.log).Execute(
 		context.Background(),
 		wikipages.EnsurePathInput{UserID: userID, TargetPath: targetPath, TargetTitle: title, Kind: kind},
 	)
@@ -73,7 +81,7 @@ func (a *WikiImportAdapter) UpdatePage(userID, id, title, slug string, content *
 	if err != nil {
 		return nil, err
 	}
-	out, err := wikipages.NewUpdatePageUseCase(a.tree, a.slug, a.revision, a.links, a.log).Execute(
+	out, err := wikipages.NewUpdatePageUseCase(a.tree, a.slug, a.orchestrator(), a.log).Execute(
 		context.Background(),
 		wikipages.UpdatePageInput{UserID: userID, ID: id, Version: current.Version(), Title: title, Slug: slug, Content: content, Kind: kind},
 	)

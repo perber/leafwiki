@@ -3,14 +3,12 @@ package pages
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"strings"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
-	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
-	"github.com/perber/wiki/internal/links"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
 // EnsurePathInput is the input for EnsurePathUseCase.
@@ -28,22 +26,20 @@ type EnsurePathOutput struct {
 
 // EnsurePathUseCase ensures a full path exists, creating intermediate nodes as needed.
 type EnsurePathUseCase struct {
-	tree     *tree.TreeService
-	slug     *tree.SlugService
-	revision *revision.Service
-	links    *links.LinkService
-	log      *slog.Logger
+	tree         *tree.TreeService
+	slug         *tree.SlugService
+	orchestrator *pagesave.PageSaveOrchestrator
+	log          *slog.Logger
 }
 
 // NewEnsurePathUseCase constructs an EnsurePathUseCase.
 func NewEnsurePathUseCase(
 	t *tree.TreeService,
 	s *tree.SlugService,
-	r *revision.Service,
-	l *links.LinkService,
+	o *pagesave.PageSaveOrchestrator,
 	log *slog.Logger,
 ) *EnsurePathUseCase {
-	return &EnsurePathUseCase{tree: t, slug: s, revision: r, links: l, log: log}
+	return &EnsurePathUseCase{tree: t, slug: s, orchestrator: o, log: log}
 }
 
 // Execute ensures the path exists and returns the final node.
@@ -101,17 +97,15 @@ func (uc *EnsurePathUseCase) Execute(_ context.Context, in EnsurePathInput) (*En
 	for _, n := range result.Created {
 		p, err := uc.tree.GetPage(n.ID)
 		if err != nil {
-			log.Printf("warning: failed to get page %s for post-create processing: %v", n.ID, err)
+			uc.log.Warn("failed to get page for post-create processing", "pageID", n.ID, "error", err)
 			continue
 		}
-		if uc.links != nil {
-			if err := uc.links.HealLinksForExactPath(p); err != nil {
-				log.Printf("warning: failed to heal links for page %s: %v", n.ID, err)
-			}
-		}
-		if uc.revision != nil {
-			recordContentRevision(uc.revision, uc.log, n.ID, in.UserID, "page created via ensure path")
-		}
+		uc.orchestrator.Run(pagesave.PageSaveEvent{
+			Operation: pagesave.PageOperationCreate,
+			UserID:    in.UserID,
+			After:     p,
+			Summary:   "page created via ensure path",
+		})
 	}
 
 	return &EnsurePathOutput{Page: page}, nil

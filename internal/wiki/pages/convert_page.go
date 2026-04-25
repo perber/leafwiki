@@ -44,7 +44,9 @@ func (uc *ConvertPageUseCase) Execute(_ context.Context, in ConvertPageInput) er
 		return err
 	}
 	if uc.revision != nil {
-		recordStructureRevision(uc.revision, uc.log, in.ID, in.UserID)
+		if _, _, err := uc.revision.RecordStructureChange(in.ID, in.UserID, ""); err != nil {
+			uc.log.Warn("failed to record structure revision", "pageID", in.ID, "error", err)
+		}
 	}
 	return nil
 }

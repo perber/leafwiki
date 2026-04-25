@@ -11,6 +11,7 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 )
 
@@ -53,6 +54,13 @@ func newTestDeps(t *testing.T) *testDeps {
 	}
 }
 
+func newTestOrchestrator(d *testDeps) *pagesave.PageSaveOrchestrator {
+	return pagesave.NewPageSaveOrchestrator(
+		pagesave.NewLinkIndexSideEffect(d.links, nil),
+		pagesave.NewRevisionSideEffect(d.revision, nil),
+	)
+}
+
 func pageKind() *tree.NodeKind {
 	k := tree.NodeKindPage
 	return &k
@@ -65,10 +73,10 @@ func sectionKind() *tree.NodeKind {
 
 func TestRestoreRevisionUseCase_RestoresAssetsAndStructure(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := wikipages.NewCreatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, nil)
-	updateUC := wikipages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.revision, deps.links, nil)
-	moveUC := wikipages.NewMovePageUseCase(deps.tree, deps.revision, deps.links, nil)
-	restoreUC := wikirevisions.NewRestoreRevisionUseCase(deps.revision, deps.tree, deps.links, nil)
+	createUC := wikipages.NewCreatePageUseCase(deps.tree, deps.slug, newTestOrchestrator(deps), nil)
+	updateUC := wikipages.NewUpdatePageUseCase(deps.tree, deps.slug, newTestOrchestrator(deps), nil)
+	moveUC := wikipages.NewMovePageUseCase(deps.tree, newTestOrchestrator(deps), nil)
+	restoreUC := wikirevisions.NewRestoreRevisionUseCase(deps.revision, deps.tree, newTestOrchestrator(deps), nil)
 
 	docs, err := createUC.Execute(context.Background(), wikipages.CreatePageInput{
 		UserID: "system", Title: "Docs", Slug: "docs", Kind: sectionKind(),

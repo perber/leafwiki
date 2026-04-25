@@ -2,7 +2,6 @@ package pages
 
 import (
 	"fmt"
-	"log/slog"
 
 	"github.com/perber/wiki/internal/core/revision"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
@@ -26,26 +25,6 @@ func collectSubtreeIDs(node *tree.PageNode) []string {
 	}
 	walk(node)
 	return ids
-}
-
-// recordContentRevision records a content revision; errors are logged but not fatal.
-func recordContentRevision(svc *revision.Service, log *slog.Logger, pageID, userID, summary string) {
-	if svc == nil {
-		return
-	}
-	if _, _, err := svc.RecordContentUpdate(pageID, userID, summary); err != nil {
-		log.Warn("failed to record content revision", "pageID", pageID, "error", err)
-	}
-}
-
-// recordStructureRevision records a structure revision; errors are logged but not fatal.
-func recordStructureRevision(svc *revision.Service, log *slog.Logger, pageID, userID string) {
-	if svc == nil {
-		return
-	}
-	if _, _, err := svc.RecordStructureChange(pageID, userID, ""); err != nil {
-		log.Warn("failed to record structure revision", "pageID", pageID, "error", err)
-	}
 }
 
 // deleteRevisionData removes all revision data for a list of page IDs.

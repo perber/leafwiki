@@ -2,13 +2,12 @@ package pages
 
 import (
 	"context"
-	"log"
 	"log/slog"
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
-	"github.com/perber/wiki/internal/links"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
 // DeletePageInput is the input for DeletePageUseCase.
@@ -21,25 +20,25 @@ type DeletePageInput struct {
 
 // DeletePageUseCase removes a page (and optionally its subtree) including assets, links, and revisions.
 type DeletePageUseCase struct {
-	tree     *tree.TreeService
-	revision *revision.Service
-	links    *links.LinkService
-	assets   *assets.AssetService
-	log      *slog.Logger
+	tree         *tree.TreeService
+	revision     *revision.Service
+	assets       *assets.AssetService
+	orchestrator *pagesave.PageSaveOrchestrator
+	log          *slog.Logger
 }
 
 // NewDeletePageUseCase constructs a DeletePageUseCase.
 func NewDeletePageUseCase(
 	t *tree.TreeService,
 	r *revision.Service,
-	l *links.LinkService,
 	a *assets.AssetService,
+	o *pagesave.PageSaveOrchestrator,
 	log *slog.Logger,
 ) *DeletePageUseCase {
-	return &DeletePageUseCase{tree: t, revision: r, links: l, assets: a, log: log}
+	return &DeletePageUseCase{tree: t, revision: r, assets: a, orchestrator: o, log: log}
 }
 
-// Execute deletes the page, cleaning up links, assets, and revision data.
+// Execute deletes the page, cleaning up links (via orchestrator), assets, and revision data.
 func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) error {
 	if in.ID == "root" || in.ID == "" {
 		return newPageRootOperationError("delete")
@@ -55,65 +54,68 @@ func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) erro
 
 	if in.Recursive {
 		var subtreeIDs []string
-		var oldPrefix string
 
 		if uc.tree.IsLoaded() {
 			node, err := uc.tree.FindPageByID(in.ID)
 			if err == nil && node != nil {
 				subtreeIDs = collectSubtreeIDs(node)
-				oldPrefix = node.CalculatePath()
 			}
 		}
-		if len(subtreeIDs) == 0 || oldPrefix == "" {
+		if len(subtreeIDs) == 0 {
 			subtreeIDs = []string{in.ID}
-			oldPrefix = page.CalculatePath()
 		}
+
+		// Build affected pages list before deletion (paths are no longer reachable after).
+		affectedPages := make([]*tree.Page, 0, len(subtreeIDs))
+		for _, pid := range subtreeIDs {
+			p, err := uc.tree.GetPage(pid)
+			if err != nil {
+				uc.log.Warn("failed to get page before recursive delete", "pageID", pid, "error", err)
+				continue
+			}
+			affectedPages = append(affectedPages, p)
+		}
+
+		oldPath := page.CalculatePath()
 
 		if err := uc.tree.DeleteNode(in.UserID, in.ID, true); err != nil {
 			return err
 		}
 
-		if uc.links != nil {
-			for _, pid := range subtreeIDs {
-				if err := uc.links.DeleteOutgoingLinksForPage(pid); err != nil {
-					log.Printf("warning: could not delete outgoing links for page %s: %v", pid, err)
-				}
-			}
-			if oldPrefix != "" {
-				if err := uc.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
-					log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
-				}
-			}
-		}
+		uc.orchestrator.Run(pagesave.PageSaveEvent{
+			Operation:     pagesave.PageOperationDelete,
+			UserID:        in.UserID,
+			Before:        page,
+			OldPath:       oldPath,
+			AffectedPages: affectedPages,
+		})
 
-		for _, pid := range subtreeIDs {
-			if err := uc.assets.DeleteAllAssetsForPage(&tree.PageNode{ID: pid}); err != nil {
-				log.Printf("warning: could not delete assets for page %s: %v", pid, err)
+		for _, p := range affectedPages {
+			if err := uc.assets.DeleteAllAssetsForPage(p.PageNode); err != nil {
+				uc.log.Warn("failed to delete assets for page", "pageID", p.ID, "error", err)
 			}
 		}
 
 		return deleteRevisionData(uc.revision, subtreeIDs)
 	}
 
-	// non-recursive
+	// Non-recursive delete.
+	oldPath := page.CalculatePath()
+
 	if err := uc.tree.DeleteNode(in.UserID, in.ID, false); err != nil {
 		return err
 	}
 
-	if uc.links != nil {
-		if err := uc.links.DeleteOutgoingLinksForPage(in.ID); err != nil {
-			log.Printf("warning: could not delete outgoing links for page %s: %v", in.ID, err)
-		}
-		if err := uc.links.MarkIncomingLinksBrokenForPage(in.ID); err != nil {
-			log.Printf("warning: could not mark incoming links broken for page %s: %v", in.ID, err)
-		}
-		if err := uc.links.MarkLinksBrokenForPath(page.CalculatePath()); err != nil {
-			log.Printf("warning: could not mark links broken for path %s: %v", page.CalculatePath(), err)
-		}
-	}
+	uc.orchestrator.Run(pagesave.PageSaveEvent{
+		Operation:     pagesave.PageOperationDelete,
+		UserID:        in.UserID,
+		Before:        page,
+		OldPath:       oldPath,
+		AffectedPages: []*tree.Page{page},
+	})
 
 	if err := uc.assets.DeleteAllAssetsForPage(page.PageNode); err != nil {
-		log.Printf("warning: could not delete assets for page %s: %v", page.ID, err)
+		uc.log.Warn("failed to delete assets for page", "pageID", page.ID, "error", err)
 	}
 
 	return deleteRevisionData(uc.revision, []string{in.ID})
