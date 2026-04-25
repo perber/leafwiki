@@ -70,7 +70,7 @@ type WikiOptions struct {
 	AccessTokenTimeout      time.Duration // Access token timeout duration
 	RefreshTokenTimeout     time.Duration // Refresh token timeout duration
 	AuthDisabled            bool          // Whether authentication is disabled
-	EnableRevision          bool          // Whether revisions should be recorded and exposed
+	EnableRevision          bool          // Whether revision recording/storage is enabled
 	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 }
