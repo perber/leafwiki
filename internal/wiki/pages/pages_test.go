@@ -72,6 +72,14 @@ func (d *testDeps) orchestrator() *pagesave.PageSaveOrchestrator {
 	)
 }
 
+type captureEffect struct {
+	events []pagesave.PageSaveEvent
+}
+
+func (e *captureEffect) Apply(event pagesave.PageSaveEvent) {
+	e.events = append(e.events, event)
+}
+
 func pageKind() *tree.NodeKind {
 	k := tree.NodeKindPage
 	return &k
@@ -988,6 +996,135 @@ func TestCopyPageUseCase_RecordsContentRevision(t *testing.T) {
 	}
 	if latest.Summary != "page copied" {
 		t.Fatalf("latest summary = %q, want %q", latest.Summary, "page copied")
+	}
+}
+
+func TestCopyPageUseCase_IndexesOutgoingLinksOnCreate(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	copyUC := pages.NewCopyPageUseCase(deps.tree, deps.slug, deps.orchestrator(), deps.assets, slog.Default())
+
+	target, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", Title: "Target", Slug: "target", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating target page: %v", err)
+	}
+
+	original, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", Title: "Original", Slug: "original", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating source page: %v", err)
+	}
+
+	content := "Links: [Target](/target)"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "user1", ID: original.Page.ID, Version: original.Page.Version(), Title: original.Page.Title, Slug: original.Page.Slug, Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("unexpected error updating source page: %v", err)
+	}
+
+	out, err := copyUC.Execute(context.Background(), pages.CopyPageInput{
+		UserID: "user1", SourcePageID: original.Page.ID, Title: "Copy", Slug: "copy",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error copying page: %v", err)
+	}
+
+	outgoing, err := deps.links.GetOutgoingLinksForPage(out.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage failed: %v", err)
+	}
+	if outgoing.Count != 1 {
+		t.Fatalf("expected 1 outgoing link on copied page, got %d", outgoing.Count)
+	}
+	if outgoing.Outgoings[0].ToPageID != target.Page.ID {
+		t.Fatalf("expected copied page link target %q, got %q", target.Page.ID, outgoing.Outgoings[0].ToPageID)
+	}
+}
+
+func TestUpdatePageUseCase_EventBeforeIsOmittedForLiveNodeSafety(t *testing.T) {
+	deps := newTestDeps(t)
+	effect := &captureEffect{}
+	orchestrator := pagesave.NewPageSaveOrchestrator(effect)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, orchestrator, slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, orchestrator, slog.Default())
+
+	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", Title: "Old", Slug: "old", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating page: %v", err)
+	}
+
+	content := "updated"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "user1", ID: created.Page.ID, Version: created.Page.Version(), Title: "New", Slug: "new", Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("unexpected error updating page: %v", err)
+	}
+
+	if len(effect.events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(effect.events))
+	}
+	event := effect.events[1]
+	if event.Operation != pagesave.PageOperationUpdate {
+		t.Fatalf("expected update event, got %q", event.Operation)
+	}
+	if event.Before != nil {
+		t.Fatal("expected Before to be omitted for update events")
+	}
+	if event.OldPath != "/old" {
+		t.Fatalf("expected OldPath=/old, got %q", event.OldPath)
+	}
+}
+
+func TestMovePageUseCase_EventBeforeIsOmittedForLiveNodeSafety(t *testing.T) {
+	deps := newTestDeps(t)
+	effect := &captureEffect{}
+	orchestrator := pagesave.NewPageSaveOrchestrator(effect)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, orchestrator, slog.Default())
+	moveUC := pages.NewMovePageUseCase(deps.tree, orchestrator, slog.Default())
+
+	parentA, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", Title: "A", Slug: "a", Kind: sectionKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating parent A: %v", err)
+	}
+	parentB, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", Title: "B", Slug: "b", Kind: sectionKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating parent B: %v", err)
+	}
+	child, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", ParentID: &parentA.Page.ID, Title: "Child", Slug: "child", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating child: %v", err)
+	}
+
+	if err := moveUC.Execute(context.Background(), pages.MovePageInput{
+		UserID: "user1", ID: child.Page.ID, Version: child.Page.Version(), ParentID: parentB.Page.ID,
+	}); err != nil {
+		t.Fatalf("unexpected error moving page: %v", err)
+	}
+
+	if len(effect.events) != 4 {
+		t.Fatalf("expected 4 events, got %d", len(effect.events))
+	}
+	event := effect.events[3]
+	if event.Operation != pagesave.PageOperationMove {
+		t.Fatalf("expected move event, got %q", event.Operation)
+	}
+	if event.Before != nil {
+		t.Fatal("expected Before to be omitted for move events")
+	}
+	if event.OldPath != "/a/child" {
+		t.Fatalf("expected OldPath=/a/child, got %q", event.OldPath)
 	}
 }
 

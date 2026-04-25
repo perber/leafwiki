@@ -767,7 +767,16 @@ func TestRefactorPreviewEndpoint_UsesFrontendJSONShape(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
-	router := createRouterTestInstance(w, t)
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		EnableLinkRefactor:      true,
+	})
 	target := createPageViaAPI(t, router, "Target", "target", nil, pageNodeKind())
 	ref := createPageViaAPI(t, router, "Ref", "ref", nil, pageNodeKind())
 
@@ -810,6 +819,29 @@ func TestRefactorPreviewEndpoint_UsesFrontendJSONShape(t *testing.T) {
 	}
 	if _, ok := counts["matchedLinks"]; !ok {
 		t.Fatalf("Expected counts.matchedLinks in response, got %v", counts)
+	}
+}
+
+func TestRefactorPreviewEndpoint_IsDisabledWhenFlagIsOff(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		EnableLinkRefactor:      false,
+	})
+
+	target := createPageViaAPI(t, router, "Target", "target", nil, pageNodeKind())
+	previewBody := strings.NewReader(`{"kind":"rename","title":"Target","slug":"target-renamed"}`)
+	previewRec := authenticatedRequest(t, router, http.MethodPost, "/api/pages/"+target.ID+"/refactor/preview", previewBody)
+	if previewRec.Code != http.StatusNotFound {
+		t.Fatalf("Expected 404 when link refactor is disabled, got %d - %s", previewRec.Code, previewRec.Body.String())
 	}
 }
 
