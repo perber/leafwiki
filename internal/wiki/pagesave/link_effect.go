@@ -27,7 +27,7 @@ func (e *LinkIndexSideEffect) Apply(event PageSaveEvent) {
 	}
 	switch event.Operation {
 	case PageOperationCreate:
-		e.healExact(event.After)
+		e.updateAndHeal(event.After)
 
 	case PageOperationRestore:
 		// Content was restored to a previous version; update outgoing links and heal incoming.

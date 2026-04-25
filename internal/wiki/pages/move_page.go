@@ -76,7 +76,6 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 	event := pagesave.PageSaveEvent{
 		Operation: pagesave.PageOperationMove,
 		UserID:    in.UserID,
-		Before:    beforePage,
 		OldPath:   oldPath,
 	}
 
