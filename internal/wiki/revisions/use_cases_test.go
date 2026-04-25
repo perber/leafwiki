@@ -91,7 +91,7 @@ func TestRestoreRevisionUseCase_RestoresAssetsAndStructure(t *testing.T) {
 
 	originalContent := "first version"
 	pageOut, err := updateUC.Execute(context.Background(), wikipages.UpdatePageInput{
-		UserID: "system", ID: page.Page.ID, Title: "Original", Slug: "original", Content: &originalContent, Kind: pageKind(),
+		UserID: "system", ID: page.Page.ID, Version: page.Page.Version(), Title: "Original", Slug: "original", Content: &originalContent, Kind: pageKind(),
 	})
 	if err != nil {
 		t.Fatalf("UpdatePage(original) failed: %v", err)
@@ -115,13 +115,13 @@ func TestRestoreRevisionUseCase_RestoresAssetsAndStructure(t *testing.T) {
 
 	changedContent := "second version"
 	pageOut, err = updateUC.Execute(context.Background(), wikipages.UpdatePageInput{
-		UserID: "system", ID: pageOut.Page.ID, Title: "Changed", Slug: "changed", Content: &changedContent, Kind: pageKind(),
+		UserID: "system", ID: pageOut.Page.ID, Version: pageOut.Page.Version(), Title: "Changed", Slug: "changed", Content: &changedContent, Kind: pageKind(),
 	})
 	if err != nil {
 		t.Fatalf("UpdatePage(changed) failed: %v", err)
 	}
 	if err := moveUC.Execute(context.Background(), wikipages.MovePageInput{
-		UserID: "system", ID: pageOut.Page.ID, ParentID: archive.Page.ID,
+		UserID: "system", ID: pageOut.Page.ID, Version: pageOut.Page.Version(), ParentID: archive.Page.ID,
 	}); err != nil {
 		t.Fatalf("MovePage failed: %v", err)
 	}

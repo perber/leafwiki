@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"sort"
 
-	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/revision"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
 )
@@ -55,7 +55,8 @@ type RefactorAffectedPage struct {
 
 // RefactorApplyInput extends the preview with apply options.
 type RefactorApplyInput struct {
-	UserID string
+	UserID  string
+	Version string
 	RefactorPreviewInput
 	RewriteLinks bool
 }
@@ -281,6 +282,7 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		updated, err := updateUC.Execute(ctx, UpdatePageInput{
 			UserID:  in.UserID,
 			ID:      in.PageID,
+			Version: in.Version,
 			Title:   in.Title,
 			Slug:    in.Slug,
 			Content: in.Content,
@@ -300,7 +302,7 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 			parentID = *in.NewParentID
 		}
 		moveUC := NewMovePageUseCase(uc.tree, uc.revision, uc.links, uc.log)
-		if err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, ParentID: parentID}); err != nil {
+		if err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, Version: in.Version, ParentID: parentID}); err != nil {
 			return nil, err
 		}
 		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, prev.OldPath, prev.NewPath); err != nil {

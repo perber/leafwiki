@@ -12,6 +12,7 @@ import (
 type ConvertPageInput struct {
 	UserID     string
 	ID         string
+	Version    string
 	TargetKind tree.NodeKind
 }
 
@@ -31,6 +32,13 @@ func NewConvertPageUseCase(t *tree.TreeService, r *revision.Service, log *slog.L
 func (uc *ConvertPageUseCase) Execute(_ context.Context, in ConvertPageInput) error {
 	if in.ID == "root" || in.ID == "" {
 		return newPageRootOperationError("convert")
+	}
+	page, err := uc.tree.GetPage(in.ID)
+	if err != nil {
+		return err
+	}
+	if err := requireCurrentPageVersion(page, in.Version); err != nil {
+		return err
 	}
 	if err := uc.tree.ConvertNode(in.UserID, in.ID, in.TargetKind); err != nil {
 		return err

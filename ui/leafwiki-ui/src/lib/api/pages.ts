@@ -23,6 +23,7 @@ export type PageNode = {
   title: string
   slug: string
   path: string
+  version: string
   parentId?: string | null
   children: PageNode[] | null
   kind: 'page' | 'section'
@@ -35,6 +36,7 @@ export interface Page {
   path: string
   title: string
   content: string
+  version: string
   kind: 'page' | 'section'
   metadata?: PageMetadata // optional metadata, because older API responses may not have it
 }
@@ -138,6 +140,7 @@ export async function copyPage(
 
 export async function updatePage(
   id: string,
+  version: string,
   title: string,
   slug: string,
   content: string,
@@ -145,27 +148,38 @@ export async function updatePage(
   return (await fetchWithAuth(`/api/pages/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, slug, content }),
+    body: JSON.stringify({ version, title, slug, content }),
   })) as Page | null
 }
 
-export async function deletePage(id: string, recursive: boolean) {
+export async function deletePage(
+  id: string,
+  recursive: boolean,
+  version: string,
+) {
   if (recursive === undefined) recursive = false
 
-  const recursiveQuery = recursive ? 'true' : 'false'
+  const params = new URLSearchParams({
+    recursive: recursive ? 'true' : 'false',
+  })
+  if (version) params.set('version', version)
 
-  return await fetchWithAuth(`/api/pages/${id}?recursive=${recursiveQuery}`, {
+  return await fetchWithAuth(`/api/pages/${id}?${params.toString()}`, {
     method: 'DELETE',
   })
 }
 
-export async function movePage(id: string, parentId: string | null) {
+export async function movePage(
+  id: string,
+  version: string,
+  parentId: string | null,
+) {
   if (parentId === '' || parentId == 'root') parentId = null
 
   return await fetchWithAuth(`/api/pages/${id}/move`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parentId }),
+    body: JSON.stringify({ version, parentId }),
   })
 }
 
@@ -194,6 +208,7 @@ export async function applyPageRefactor(
   payload:
     | {
         kind: 'rename'
+        version: string
         title: string
         slug: string
         content: string
@@ -201,6 +216,7 @@ export async function applyPageRefactor(
       }
     | {
         kind: 'move'
+        version: string
         parentId: string | null
         rewriteLinks: boolean
       },
@@ -222,11 +238,15 @@ export async function sortPages(parentId: string, orderedIDs: string[]) {
   })
 }
 
-export async function convertPage(id: string, targetKind: 'page' | 'section') {
+export async function convertPage(
+  id: string,
+  targetKind: 'page' | 'section',
+  version: string,
+) {
   return await fetchWithAuth(`/api/pages/convert/${id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ targetKind }),
+    body: JSON.stringify({ targetKind, version }),
   })
 }
 

@@ -69,9 +69,13 @@ func (a *WikiImportAdapter) EnsurePath(userID, targetPath, title string, kind *t
 }
 
 func (a *WikiImportAdapter) UpdatePage(userID, id, title, slug string, content *string, kind *tree.NodeKind) (*tree.Page, error) {
+	current, err := a.tree.GetPage(id)
+	if err != nil {
+		return nil, err
+	}
 	out, err := wikipages.NewUpdatePageUseCase(a.tree, a.slug, a.revision, a.links, a.log).Execute(
 		context.Background(),
-		wikipages.UpdatePageInput{UserID: userID, ID: id, Title: title, Slug: slug, Content: content, Kind: kind},
+		wikipages.UpdatePageInput{UserID: userID, ID: id, Version: current.Version(), Title: title, Slug: slug, Content: content, Kind: kind},
 	)
 	if err != nil {
 		return nil, err

@@ -111,6 +111,7 @@ async function createPageWithContent(
     const createdPage = (await createResponse.json()) as {
       id: string;
       title: string;
+      version: string;
     };
 
     const updateResponse = await fetch(`/api/pages/${createdPage.id}`, {
@@ -121,6 +122,7 @@ async function createPageWithContent(
         'X-CSRF-Token': csrfToken,
       },
       body: JSON.stringify({
+        version: createdPage.version,
         title: createdPage.title,
         slug,
         content,

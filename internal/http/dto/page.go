@@ -28,6 +28,7 @@ type Node struct {
 	Title    string        `json:"title"`
 	Slug     string        `json:"slug"`
 	Path     string        `json:"path"`
+	Version  string        `json:"version"`
 	Position int           `json:"position"`
 	Kind     tree.NodeKind `json:"kind"`
 	Children []*Node       `json:"children"`
@@ -91,6 +92,7 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 		Title:    node.Title,
 		Slug:     node.Slug,
 		Path:     path,
+		Version:  node.Version(),
 		Position: node.Position,
 		Kind:     node.Kind,
 		Metadata: NodeMetadata{

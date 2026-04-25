@@ -54,6 +54,7 @@ type TreeStore = {
   expandAll: () => void
   collapseAll: () => void
   reloadTree: () => Promise<void>
+  patchNodeVersion: (id: string, version: string) => void
   toggleNode: (id: string) => void
   openNode: (id: string) => void
   closeNode: (id: string) => void
@@ -167,6 +168,18 @@ export const useTreeStore = create<TreeStore>()(
 
         const ids = Array.from(merged)
         set({ openNodeIds: ids, openNodeIdSet: toSetRecord(ids) })
+      },
+
+      patchNodeVersion: (id: string, version: string) => {
+        const byId = get().byId
+        const byPath = get().byPath
+        const node = byId?.[id]
+        if (!node) return
+        const updatedNode = { ...node, version }
+        set({
+          byId: { ...byId, [id]: updatedNode },
+          byPath: node.path ? { ...byPath, [node.path]: updatedNode } : byPath,
+        })
       },
 
       reloadTree: async () => {

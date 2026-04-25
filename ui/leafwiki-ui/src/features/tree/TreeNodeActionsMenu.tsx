@@ -11,7 +11,7 @@ import {
   NODE_KIND_SECTION,
   PageNode,
 } from '@/lib/api/pages'
-import { mapApiError } from '@/lib/api/errors'
+import { asApiLocalizedError, mapApiError } from '@/lib/api/errors'
 import {
   DIALOG_ADD_PAGE,
   DIALOG_COPY_PAGE,
@@ -22,6 +22,7 @@ import {
 import { stripBasePath } from '@/lib/routePath'
 import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useViewerStore } from '@/features/viewer/viewer'
 import { useTreeStore } from '@/stores/tree'
 import {
   Copy,
@@ -48,7 +49,7 @@ export type TreeNodeActionsMenuProps = {
 export default function TreeNodeActionsMenu({
   node,
 }: TreeNodeActionsMenuProps) {
-  const { id: nodeId, kind: nodeKind, children } = node
+  const { id: nodeId, kind: nodeKind, children, version: nodeVersion } = node
   const currentEditorPageId = usePageEditorStore((state) => state.page?.id)
   const openDialog = useDialogsStore((state) => state.openDialog)
   const reloadTree = useTreeStore((state) => state.reloadTree)
@@ -63,16 +64,32 @@ export default function TreeNodeActionsMenu({
     convertPage(
       nodeId,
       nodeKind === NODE_KIND_PAGE ? NODE_KIND_SECTION : NODE_KIND_PAGE,
+      nodeVersion,
     )
       .then(() => {
         toast.success('Page converted successfully')
         reloadTree()
       })
       .catch((err) => {
-        const mapped = mapApiError(err, 'Failed to convert page')
-        toast.error(mapped.message)
+        const localized = asApiLocalizedError(err)
+        if (localized?.code === 'page_version_conflict') {
+          reloadTree()
+          const viewerPage = useViewerStore.getState().page
+          if (viewerPage?.id === nodeId && viewerPage.path) {
+            useViewerStore
+              .getState()
+              .loadPageData(viewerPage.path)
+              .catch(console.error)
+          }
+          toast.error(
+            'This page was modified by another user. Please try again.',
+          )
+        } else {
+          const mapped = mapApiError(err, 'Failed to convert page')
+          toast.error(mapped.message)
+        }
       })
-  }, [nodeId, nodeKind, reloadTree])
+  }, [nodeId, nodeKind, nodeVersion, reloadTree])
 
   const getCurrentRoutePath = useCallback(() => {
     if (typeof window === 'undefined') {

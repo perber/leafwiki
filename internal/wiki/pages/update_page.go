@@ -15,6 +15,7 @@ import (
 type UpdatePageInput struct {
 	UserID  string
 	ID      string
+	Version string
 	Title   string
 	Slug    string
 	Content *string
@@ -61,6 +62,9 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 
 	before, err := uc.tree.GetPage(in.ID)
 	if err != nil {
+		return nil, err
+	}
+	if err := requireCurrentPageVersion(before, in.Version); err != nil {
 		return nil, err
 	}
 	oldTitle := before.Title

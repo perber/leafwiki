@@ -14,6 +14,7 @@ import (
 type MovePageInput struct {
 	UserID   string
 	ID       string
+	Version  string
 	ParentID string
 }
 
@@ -55,6 +56,14 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 		if p, err := uc.tree.GetPage(in.ID); err == nil && oldPrefix == "" {
 			oldPrefix = p.CalculatePath()
 		}
+	}
+
+	page, err := uc.tree.GetPage(in.ID)
+	if err != nil {
+		return err
+	}
+	if err := requireCurrentPageVersion(page, in.Version); err != nil {
+		return err
 	}
 
 	if err := uc.tree.MoveNode(in.UserID, in.ID, in.ParentID); err != nil {

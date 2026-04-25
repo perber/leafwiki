@@ -386,9 +386,13 @@ LeafWiki is a lightweight, self-hosted wiki for runbooks, internal docs, and tec
 
 For more information, visit the [LeafWiki GitHub repository](https://github.com/perber/leafwiki).
 `
+	current, err := w.tree.GetPage(p.ID)
+	if err != nil {
+		return err
+	}
 	if _, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log).Execute(
 		context.Background(),
-		wikipages.UpdatePageInput{UserID: SYSTEM_USER_ID, ID: p.ID, Title: p.Title, Slug: p.Slug, Content: &content, Kind: &k},
+		wikipages.UpdatePageInput{UserID: SYSTEM_USER_ID, ID: p.ID, Version: current.Version(), Title: p.Title, Slug: p.Slug, Content: &content, Kind: &k},
 	); err != nil {
 		return err
 	}
