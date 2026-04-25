@@ -764,9 +764,10 @@ func (t *TreeService) BulkUpdateContent(userID string, updates []BulkContentUpda
 	}
 
 	type task struct {
-		index   int
-		node    *PageNode
-		content string
+		index       int
+		node        *PageNode
+		content     string
+		oldMetadata PageMetadata
 	}
 
 	t.mu.Lock()
@@ -787,10 +788,11 @@ func (t *TreeService) BulkUpdateContent(userID string, updates []BulkContentUpda
 			errs[i] = ErrPageNotFound
 			continue
 		}
+		oldMetadata := node.Metadata
 		// Update in-memory metadata before disk write so UpsertContent writes the correct timestamps.
 		node.Metadata.UpdatedAt = now
 		node.Metadata.LastAuthorID = userID
-		tasks = append(tasks, task{index: i, node: node, content: u.Content})
+		tasks = append(tasks, task{index: i, node: node, content: u.Content, oldMetadata: oldMetadata})
 	}
 
 	if len(tasks) == 0 {
@@ -812,6 +814,12 @@ func (t *TreeService) BulkUpdateContent(userID string, updates []BulkContentUpda
 		}(tk)
 	}
 	wg.Wait()
+
+	for _, tk := range tasks {
+		if errs[tk.index] != nil {
+			tk.node.Metadata = tk.oldMetadata
+		}
+	}
 
 	return errs
 }
