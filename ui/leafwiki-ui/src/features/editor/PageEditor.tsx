@@ -1,9 +1,10 @@
 import Page404 from '@/components/Page404'
 import { mapApiError, asApiLocalizedError } from '@/lib/api/errors'
 import { buildBrowserEditUrl } from '@/lib/routePath'
+import { getWikiTargetRoutePath } from '@/lib/wikiPath'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
@@ -14,6 +15,7 @@ import { useToolbarActions } from './useToolbarActions'
 export default function PageEditor() {
   const { '*': path } = useParams()
 
+  const { pathname } = useLocation()
   const navigate = useNavigate()
   const editorRef = useRef<MarkdownEditorRef>(null)
   const reloadTree = useTreeStore((s) => s.reloadTree)
@@ -22,6 +24,7 @@ export default function PageEditor() {
   const setContent = usePageEditorStore((s) => s.setContent)
   const loadPageData = usePageEditorStore((s) => s.loadPageData)
   const initialPage = usePageEditorStore((s) => s.initialPage) // contains the initial page data when loaded
+  const notFound = usePageEditorStore((s) => s.notFound)
   const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
   const page = usePageEditorStore((s) => s.page)
@@ -138,14 +141,13 @@ export default function PageEditor() {
     [setContent],
   )
 
+  if (notFound) {
+    return <Page404 targetPath={getWikiTargetRoutePath(pathname)} />
+  }
+
   if (error) return <p className="page-editor__error">Error: {error}</p>
 
-  if (!initialPage && !loading)
-    return (
-      <div className="page-editor__not-found">
-        <Page404 />
-      </div>
-    )
+  if (!initialPage && !loading) return null
 
   return (
     <>

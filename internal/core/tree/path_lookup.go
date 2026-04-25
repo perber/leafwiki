@@ -10,7 +10,8 @@ type PathSegment struct {
 }
 
 type PathLookup struct {
-	Path     string        `json:"path"`
-	Segments []PathSegment `json:"segments"`
-	Exists   bool          `json:"exists"`
+	Path      string        `json:"path"`
+	Segments  []PathSegment `json:"segments"`
+	Exists    bool          `json:"exists"`
+	CanCreate bool          `json:"canCreate"`
 }

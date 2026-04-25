@@ -53,6 +53,23 @@ export function asApiLocalizedError(err: unknown): ApiLocalizedError | null {
   return null
 }
 
+export function isPageNotFoundError(err: unknown): boolean {
+  if (err instanceof ApiLocalizedError) {
+    return err.code === 'page_not_found'
+  }
+
+  if (
+    err &&
+    typeof err === 'object' &&
+    'status' in err &&
+    (err as { status?: unknown }).status === 404
+  ) {
+    return true
+  }
+
+  return false
+}
+
 export function formatLocalizedErrorTemplate(
   template: string,
   args: string[] = [],

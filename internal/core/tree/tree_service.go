@@ -854,13 +854,15 @@ func (t *TreeService) lookupPagePathLocked(p string) (*PathLookup, error) {
 		return nil, ErrTreeNotLoaded
 	}
 
+	slugService := NewSlugService()
 	path := strings.TrimSpace(p)
 	path = strings.Trim(path, "/")
 	if path == "" {
 		return &PathLookup{
-			Path:     path,
-			Segments: []PathSegment{},
-			Exists:   false,
+			Path:      path,
+			Segments:  []PathSegment{},
+			Exists:    false,
+			CanCreate: false,
 		}, nil
 	}
 
@@ -871,16 +873,18 @@ func (t *TreeService) lookupPagePathLocked(p string) (*PathLookup, error) {
 	pathParts := strings.Split(path, "/")
 	if len(pathParts) == 0 {
 		return &PathLookup{
-			Path:     path,
-			Segments: []PathSegment{},
-			Exists:   false,
+			Path:      path,
+			Segments:  []PathSegment{},
+			Exists:    false,
+			CanCreate: false,
 		}, nil
 	}
 
 	lookup := &PathLookup{
-		Path:     path,
-		Segments: make([]PathSegment, len(pathParts)),
-		Exists:   true,
+		Path:      path,
+		Segments:  make([]PathSegment, len(pathParts)),
+		Exists:    true,
+		CanCreate: true,
 	}
 
 	parent := t.tree
@@ -915,9 +919,16 @@ func (t *TreeService) lookupPagePathLocked(p string) (*PathLookup, error) {
 
 		// If the segment does not exist, set the pathExists flag to false
 		if !lookup.Segments[i].Exists {
+			if lookup.CanCreate && slugService.IsValidSlug(part) != nil {
+				lookup.CanCreate = false
+			}
+
 			// No need to check further segments
 			// Set all remaining segments to non-existing
 			for j := i + 1; j < len(pathParts); j++ {
+				if lookup.CanCreate && slugService.IsValidSlug(pathParts[j]) != nil {
+					lookup.CanCreate = false
+				}
 				lookup.Segments[j] = PathSegment{
 					Slug:   pathParts[j],
 					Exists: false,

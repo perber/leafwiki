@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { toAppPath } from './appPath';
 
 export default class NotFoundPage {
@@ -9,19 +10,27 @@ export default class NotFoundPage {
   }
 
   async isNotFoundPage() {
-    // h1 selector text "Page Not Found"
-    const notFoundHeader = this.page.locator('h1');
-    const text = await notFoundHeader.innerText();
-    return text.includes('Page Not Found');
+    return this.page.getByTestId('page404').isVisible();
   }
 
-  async getCreatePageButton() {
-    // main button selector
-    return this.page.locator('main button').first();
+  async expectVisible() {
+    await expect(this.page.getByTestId('page404')).toBeVisible();
+  }
+
+  getCreatePageButton() {
+    return this.page.getByTestId('page404-create-page-button');
   }
 
   async clickCreatePageButton() {
-    const createPageButton = await this.getCreatePageButton();
+    const createPageButton = this.getCreatePageButton();
     await createPageButton.click();
+  }
+
+  async expectCreatePageButtonVisible() {
+    await expect(this.getCreatePageButton()).toBeVisible();
+  }
+
+  async expectCreatePageButtonHidden() {
+    await expect(this.getCreatePageButton()).toHaveCount(0);
   }
 }

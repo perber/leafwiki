@@ -574,6 +574,14 @@
 
   /** Page 404 **/
 
+  .page404-shell {
+    @apply mx-auto w-full max-w-6xl px-8 pt-8;
+  }
+
+  .page404 {
+    @apply text-page-text max-w-xl;
+  }
+
   .page404__title {
     @apply text-error mb-2 text-xl;
   }
@@ -916,10 +924,6 @@
 
   .page-editor__error {
     @apply text-error p-6 text-sm;
-  }
-
-  .page-editor__not-found {
-    @apply p-6;
   }
 
   .toolbar-button__close-editor {

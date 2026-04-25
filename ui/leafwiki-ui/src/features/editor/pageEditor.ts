@@ -8,7 +8,7 @@ import {
   previewPageRefactor,
   updatePage,
 } from '@/lib/api/pages'
-import { mapApiError } from '@/lib/api/errors'
+import { isPageNotFoundError, mapApiError } from '@/lib/api/errors'
 import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { create } from 'zustand'
@@ -21,6 +21,7 @@ interface PageEditorState {
   slug: string // current slug in the editor
   content: string // current markdown content in the editor
   error: string | null // error message, if any
+  notFound: boolean
   page: Page | null // current page being edited
   initialPage: Page | null // initial page data when loaded
   setTitle: (title: string) => void // set the current title
@@ -41,6 +42,7 @@ const isDirtyState = (s: PageEditorState) => {
 
 export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   error: null,
+  notFound: false,
   page: null,
   title: '',
   path: '',
@@ -148,21 +150,31 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     return get().savePage()
   },
   loadPageData: async (path: string) => {
-    set({ error: null, page: null, initialPage: null })
+    set({ error: null, notFound: false, page: null, initialPage: null })
     useProgressbarStore.getState().setLoading(true)
     try {
       const page = await getPageByPath(path)
       set({
         page,
         initialPage: { ...page },
+        notFound: false,
         title: page.title,
         slug: page.slug,
         content: page.content,
       })
     } catch (err) {
+      if (isPageNotFoundError(err)) {
+        set({
+          error: null,
+          notFound: true,
+        })
+        return
+      }
+
       const mapped = mapApiError(err, 'An unknown error occurred')
       set({
         error: mapped.message,
+        notFound: false,
       })
     } finally {
       useProgressbarStore.getState().setLoading(false)
