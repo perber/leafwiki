@@ -53,9 +53,11 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 		subtreeIDs = []string{in.ID}
 	}
 	if beforePage == nil {
-		if p, err := uc.tree.GetPage(in.ID); err == nil {
-			beforePage = p
+		p, err := uc.tree.GetPage(in.ID)
+		if err != nil {
+			return err
 		}
+		beforePage = p
 	}
 
 	if err := requireCurrentPageVersion(beforePage, in.Version); err != nil {
@@ -78,10 +80,10 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 		OldPath:   oldPath,
 	}
 
-	for _, pid := range subtreeIDs {
-		p, err := uc.tree.GetPage(pid)
-		if err != nil {
-			uc.log.Warn("failed to get page after move", "pageID", pid, "error", err)
+	pages, errs := uc.tree.GetPages(subtreeIDs)
+	for i, p := range pages {
+		if errs[i] != nil {
+			uc.log.Warn("failed to get page after move", "pageID", subtreeIDs[i], "error", errs[i])
 			continue
 		}
 		event.AffectedPages = append(event.AffectedPages, p)

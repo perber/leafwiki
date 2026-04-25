@@ -102,10 +102,10 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 	}
 
 	if slugChanged {
-		for _, pid := range subtreeIDs {
-			p, err := uc.tree.GetPage(pid)
-			if err != nil {
-				uc.log.Warn("failed to get page for affected list", "pageID", pid, "error", err)
+		pages, errs := uc.tree.GetPages(subtreeIDs)
+		for i, p := range pages {
+			if errs[i] != nil {
+				uc.log.Warn("failed to get page for affected list", "pageID", subtreeIDs[i], "error", errs[i])
 				continue
 			}
 			event.AffectedPages = append(event.AffectedPages, p)
