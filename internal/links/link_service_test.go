@@ -106,6 +106,7 @@ Internal: [Page](/docs/page1)
 		}
 	}
 }
+
 // helper to create a small tree structure:
 // root
 //
@@ -1078,5 +1079,161 @@ func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *tes
 	}
 	if backlinks[0].FromPageID != pageAID {
 		t.Errorf("backlink FromPageID = %q, want %q", backlinks[0].FromPageID, pageAID)
+	}
+}
+
+func TestLinkService_UpdateLinksAndHealForPages_UpdatesAndHealsMultiplePages(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	aIDPtr, err := ts.CreateNode("system", nil, "Page A", "a", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	cIDPtr, err := ts.CreateNode("system", nil, "Page C", "c", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode C failed: %v", err)
+	}
+	pageCID := *cIDPtr
+
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	contentA := "Link: [B](/b)"
+	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &contentA); err != nil {
+		t.Fatalf("UpdateNode A failed: %v", err)
+	}
+
+	pageC, err := ts.GetPage(pageCID)
+	if err != nil {
+		t.Fatalf("GetPage C failed: %v", err)
+	}
+	contentC := "Link: [D](/d)"
+	if err := ts.UpdateNode("system", pageC.ID, pageC.Title, pageC.Slug, &contentC); err != nil {
+		t.Fatalf("UpdateNode C failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	bIDPtr, err := ts.CreateNode("system", nil, "Page B", "b", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode B failed: %v", err)
+	}
+	pageB, err := ts.GetPage(*bIDPtr)
+	if err != nil {
+		t.Fatalf("GetPage B failed: %v", err)
+	}
+
+	dIDPtr, err := ts.CreateNode("system", nil, "Page D", "d", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode D failed: %v", err)
+	}
+	pageD, err := ts.GetPage(*dIDPtr)
+	if err != nil {
+		t.Fatalf("GetPage D failed: %v", err)
+	}
+
+	if err := svc.UpdateLinksAndHealForPages([]*tree.Page{pageB, pageD}); err != nil {
+		t.Fatalf("UpdateLinksAndHealForPages failed: %v", err)
+	}
+
+	outA, err := svc.GetOutgoingLinksForPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage(A) failed: %v", err)
+	}
+	if outA.Count != 1 {
+		t.Fatalf("expected 1 outgoing for A, got %d: %#v", outA.Count, outA.Outgoings)
+	}
+	if outA.Outgoings[0].Broken {
+		t.Fatalf("expected A link to be healed, got %#v", outA.Outgoings[0])
+	}
+	if outA.Outgoings[0].ToPageID != pageB.ID {
+		t.Fatalf("A ToPageID = %q, want %q", outA.Outgoings[0].ToPageID, pageB.ID)
+	}
+
+	outC, err := svc.GetOutgoingLinksForPage(pageCID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage(C) failed: %v", err)
+	}
+	if outC.Count != 1 {
+		t.Fatalf("expected 1 outgoing for C, got %d: %#v", outC.Count, outC.Outgoings)
+	}
+	if outC.Outgoings[0].Broken {
+		t.Fatalf("expected C link to be healed, got %#v", outC.Outgoings[0])
+	}
+	if outC.Outgoings[0].ToPageID != pageD.ID {
+		t.Fatalf("C ToPageID = %q, want %q", outC.Outgoings[0].ToPageID, pageD.ID)
+	}
+}
+
+func TestLinkService_UpdateLinksAndHealForPages_ReindexesOutgoingForSourcePages(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	sourceIDPtr, err := ts.CreateNode("system", nil, "Source", "source", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode source failed: %v", err)
+	}
+	sourceID := *sourceIDPtr
+
+	oldTargetIDPtr, err := ts.CreateNode("system", nil, "Old Target", "old-target", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode old target failed: %v", err)
+	}
+	oldTargetID := *oldTargetIDPtr
+
+	source, err := ts.GetPage(sourceID)
+	if err != nil {
+		t.Fatalf("GetPage source failed: %v", err)
+	}
+	oldContent := "Link: [Old](/old-target)"
+	if err := ts.UpdateNode("system", source.ID, source.Title, source.Slug, &oldContent); err != nil {
+		t.Fatalf("UpdateNode source failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	newTargetIDPtr, err := ts.CreateNode("system", nil, "New Target", "new-target", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode new target failed: %v", err)
+	}
+	newTargetID := *newTargetIDPtr
+
+	updatedContent := "Link: [New](/new-target)"
+	if err := ts.UpdateNode("system", source.ID, source.Title, source.Slug, &updatedContent); err != nil {
+		t.Fatalf("UpdateNode source (rewrite) failed: %v", err)
+	}
+
+	updatedSource, err := ts.GetPage(sourceID)
+	if err != nil {
+		t.Fatalf("GetPage source (updated) failed: %v", err)
+	}
+
+	if err := svc.UpdateLinksAndHealForPages([]*tree.Page{updatedSource}); err != nil {
+		t.Fatalf("UpdateLinksAndHealForPages failed: %v", err)
+	}
+
+	oldBacklinks, err := svc.GetBacklinksForPage(oldTargetID)
+	if err != nil {
+		t.Fatalf("GetBacklinksForPage(old target) failed: %v", err)
+	}
+	if oldBacklinks.Count != 0 {
+		t.Fatalf("expected 0 backlinks for old target, got %d: %#v", oldBacklinks.Count, oldBacklinks.Backlinks)
+	}
+
+	newBacklinks, err := svc.GetBacklinksForPage(newTargetID)
+	if err != nil {
+		t.Fatalf("GetBacklinksForPage(new target) failed: %v", err)
+	}
+	if newBacklinks.Count != 1 {
+		t.Fatalf("expected 1 backlink for new target, got %d: %#v", newBacklinks.Count, newBacklinks.Backlinks)
+	}
+	if newBacklinks.Backlinks[0].FromPageID != sourceID {
+		t.Fatalf("new backlink FromPageID = %q, want %q", newBacklinks.Backlinks[0].FromPageID, sourceID)
 	}
 }

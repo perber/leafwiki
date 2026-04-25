@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/perber/wiki/internal/core/shared"
@@ -77,43 +78,53 @@ func (s *Service) CapturePageState(pageID string) (*RevisionState, error) {
 //
 // Assumption: asset changes go through Upload/Rename/Delete hooks and call RecordAssetChange.
 func (s *Service) RecordContentUpdate(pageID, authorID, summary string) (*Revision, bool, error) {
-	prev, err := s.store.GetLatestRevision(pageID)
+	page, err := s.pages.GetPage(pageID)
 	if err != nil {
 		return nil, false, err
 	}
+	return s.recordContentUpdateForPage(page, authorID, summary)
+}
 
-	state, err := s.capturePageState(pageID, false)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if prev != nil && prev.ContentHash == state.ContentHash {
-		return prev, false, nil
-	}
-
-	assetManifestHash, err := s.resolveAssetManifestHash(pageID, prev)
-	if err != nil {
-		return nil, false, err
+func (s *Service) RecordContentUpdates(pages []*tree.Page, authorID, summary string) []error {
+	errs := make([]error, len(pages))
+	if len(pages) == 0 {
+		return errs
 	}
 
-	contentHash, err := s.store.SaveContentBlob([]byte(state.Content))
-	if err != nil {
-		return nil, false, err
-	}
-	if contentHash != state.ContentHash {
-		return nil, false, fmt.Errorf("content hash mismatch: computed=%s saved=%s", state.ContentHash, contentHash)
+	type batchItem struct {
+		index int
+		page  *tree.Page
 	}
 
-	rev, err := s.newRevision(RevisionTypeContentUpdate, state, authorID, summary, assetManifestHash)
-	if err != nil {
-		return nil, false, err
+	grouped := make(map[string][]batchItem)
+	nilItems := make([]int, 0)
+	for i, page := range pages {
+		if page == nil {
+			nilItems = append(nilItems, i)
+			continue
+		}
+		grouped[page.ID] = append(grouped[page.ID], batchItem{index: i, page: page})
 	}
-	if err := s.store.SaveRevision(rev); err != nil {
-		return nil, false, err
-	}
-	s.pruneAfterSave(rev.PageID)
 
-	return rev, true, nil
+	for _, i := range nilItems {
+		errs[i] = fmt.Errorf("page is required")
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(grouped))
+	for _, items := range grouped {
+		go func(items []batchItem) {
+			defer wg.Done()
+			for _, item := range items {
+				if _, _, err := s.recordContentUpdateForPage(item.page, authorID, summary); err != nil {
+					errs[item.index] = err
+				}
+			}
+		}(items)
+	}
+	wg.Wait()
+
+	return errs
 }
 
 // RecordAssetChange records a full snapshot when live assets changed.
@@ -617,26 +628,7 @@ func (s *Service) capturePageState(pageID string, withAssets bool) (*RevisionSta
 		return nil, err
 	}
 
-	parentID := ""
-	if page.Parent != nil && page.Parent.ID != "root" {
-		parentID = page.Parent.ID
-	}
-
-	state := &RevisionState{
-		PageID:        page.ID,
-		ParentID:      parentID,
-		Title:         page.Title,
-		Slug:          page.Slug,
-		Kind:          string(page.Kind),
-		Path:          page.CalculatePath(),
-		Content:       page.Content,
-		ContentHash:   sha256HexBytes([]byte(page.Content)),
-		PageCreatedAt: page.Metadata.CreatedAt.UTC(),
-		PageUpdatedAt: page.Metadata.UpdatedAt.UTC(),
-		CreatorID:     strings.TrimSpace(page.Metadata.CreatorID),
-		LastAuthorID:  strings.TrimSpace(page.Metadata.LastAuthorID),
-		CapturedAt:    time.Now().UTC(),
-	}
+	state := s.revisionStateFromPage(page)
 
 	if !withAssets {
 		return state, nil
@@ -655,6 +647,66 @@ func (s *Service) capturePageState(pageID string, withAssets bool) (*RevisionSta
 	state.AssetManifestHash = hash
 
 	return state, nil
+}
+
+func (s *Service) revisionStateFromPage(page *tree.Page) *RevisionState {
+	parentID := ""
+	if page.Parent != nil && page.Parent.ID != "root" {
+		parentID = page.Parent.ID
+	}
+
+	return &RevisionState{
+		PageID:        page.ID,
+		ParentID:      parentID,
+		Title:         page.Title,
+		Slug:          page.Slug,
+		Kind:          string(page.Kind),
+		Path:          page.CalculatePath(),
+		Content:       page.Content,
+		ContentHash:   sha256HexBytes([]byte(page.Content)),
+		PageCreatedAt: page.Metadata.CreatedAt.UTC(),
+		PageUpdatedAt: page.Metadata.UpdatedAt.UTC(),
+		CreatorID:     strings.TrimSpace(page.Metadata.CreatorID),
+		LastAuthorID:  strings.TrimSpace(page.Metadata.LastAuthorID),
+		CapturedAt:    time.Now().UTC(),
+	}
+}
+
+func (s *Service) recordContentUpdateForPage(page *tree.Page, authorID, summary string) (*Revision, bool, error) {
+	prev, err := s.store.GetLatestRevision(page.ID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	state := s.revisionStateFromPage(page)
+
+	if prev != nil && prev.ContentHash == state.ContentHash {
+		return prev, false, nil
+	}
+
+	assetManifestHash, err := s.resolveAssetManifestHash(page.ID, prev)
+	if err != nil {
+		return nil, false, err
+	}
+
+	contentHash, err := s.store.SaveContentBlob([]byte(state.Content))
+	if err != nil {
+		return nil, false, err
+	}
+	if contentHash != state.ContentHash {
+		return nil, false, fmt.Errorf("content hash mismatch: computed=%s saved=%s", state.ContentHash, contentHash)
+	}
+
+	rev, err := s.newRevision(RevisionTypeContentUpdate, state, authorID, summary, assetManifestHash)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := s.store.SaveRevision(rev); err != nil {
+		return nil, false, err
+	}
+	s.pruneAfterSave(rev.PageID)
+
+	return rev, true, nil
 }
 
 func (s *Service) newRevision(t RevisionType, state *RevisionState, authorID, summary, assetManifestHash string) (*Revision, error) {

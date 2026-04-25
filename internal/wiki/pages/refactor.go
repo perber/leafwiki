@@ -383,25 +383,32 @@ func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected
 	}
 
 	errs := uc.tree.BulkUpdateContent(userID, bulk)
+	updatedPages := make([]*tree.Page, 0, len(items))
 
 	for i, item := range items {
 		if errs[i] != nil {
 			uc.log.Warn("failed to rewrite links in page", "pageID", item.page.ID, "error", errs[i])
 			continue
 		}
-		if uc.revision != nil {
-			if _, _, err := uc.revision.RecordContentUpdate(item.page.ID, userID, ""); err != nil {
-				uc.log.Warn("failed to record content revision", "pageID", item.page.ID, "error", err)
+		updatedPages = append(updatedPages, &tree.Page{
+			PageNode: item.page.PageNode,
+			Content:  item.content,
+		})
+	}
+
+	if uc.revision != nil {
+		revErrs := uc.revision.RecordContentUpdates(updatedPages, userID, "")
+		for i, err := range revErrs {
+			if err != nil {
+				uc.log.Warn("failed to record content revision", "pageID", updatedPages[i].ID, "error", err)
 			}
 		}
-		if uc.links != nil {
-			updated, err := uc.tree.GetPage(item.page.ID)
-			if err != nil {
-				uc.log.Warn("failed to re-fetch page after link rewrite", "pageID", item.page.ID, "error", err)
-				continue
-			}
-			if err := uc.links.UpdateLinksForPage(updated, item.content); err != nil {
-				uc.log.Warn("failed to update link index after rewrite", "pageID", item.page.ID, "error", err)
+	}
+
+	if uc.links != nil && len(updatedPages) > 0 {
+		if err := uc.links.UpdateLinksAndHealForPages(updatedPages); err != nil {
+			for _, page := range updatedPages {
+				uc.log.Warn("failed to update link index after rewrite", "pageID", page.ID, "error", err)
 			}
 		}
 	}
@@ -438,28 +445,32 @@ func (uc *ApplyPageRefactorUseCase) rewritePathChangedSubtree(userID string, sna
 	}
 
 	errs := uc.tree.BulkUpdateContent(userID, bulk)
+	updatedPages := make([]*tree.Page, 0, len(items))
 
 	for i, item := range items {
 		if errs[i] != nil {
 			uc.log.Warn("failed to rewrite relative links in subtree page", "pageID", item.page.ID, "error", errs[i])
 			continue
 		}
-		if uc.revision != nil {
-			if _, _, err := uc.revision.RecordContentUpdate(item.page.ID, userID, ""); err != nil {
-				uc.log.Warn("failed to record content revision", "pageID", item.page.ID, "error", err)
+		updatedPages = append(updatedPages, &tree.Page{
+			PageNode: item.page.PageNode,
+			Content:  item.content,
+		})
+	}
+
+	if uc.revision != nil {
+		revErrs := uc.revision.RecordContentUpdates(updatedPages, userID, "")
+		for i, err := range revErrs {
+			if err != nil {
+				uc.log.Warn("failed to record content revision", "pageID", updatedPages[i].ID, "error", err)
 			}
 		}
-		if uc.links != nil {
-			updated, err := uc.tree.GetPage(item.page.ID)
-			if err != nil {
-				uc.log.Warn("failed to re-fetch subtree page after link rewrite", "pageID", item.page.ID, "error", err)
-				continue
-			}
-			if err := uc.links.UpdateLinksForPage(updated, item.content); err != nil {
-				uc.log.Warn("failed to update link index after subtree rewrite", "pageID", item.page.ID, "error", err)
-			}
-			if err := uc.links.HealLinksForExactPath(updated); err != nil {
-				uc.log.Warn("failed to heal links after subtree rewrite", "pageID", item.page.ID, "error", err)
+	}
+
+	if uc.links != nil && len(updatedPages) > 0 {
+		if err := uc.links.UpdateLinksAndHealForPages(updatedPages); err != nil {
+			for _, page := range updatedPages {
+				uc.log.Warn("failed to update link index after subtree rewrite", "pageID", page.ID, "error", err)
 			}
 		}
 	}

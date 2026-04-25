@@ -19,6 +19,13 @@ type LinksStore struct {
 	db         *sql.DB
 }
 
+type PageLinkUpdate struct {
+	FromPageID string
+	FromTitle  string
+	ToPath     string
+	Targets    []TargetLink
+}
+
 func linksDatabasePath(storageDir string, filename string) string {
 	normalizedStorageDir := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
 	return filepath.Join(normalizedStorageDir, filename)
@@ -199,6 +206,86 @@ func (s *LinksStore) AddLinks(fromPageID string, fromTitle string, toLinks []Tar
 	}
 
 	return tx.Commit()
+}
+
+func (s *LinksStore) ReplaceLinksAndHeal(updates []PageLinkUpdate) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if err := s.replaceLinksAndHealTx(tx, updates); err != nil {
+		rbErr := tx.Rollback()
+		if rbErr != nil {
+			return errors.Join(err, rbErr)
+		}
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *LinksStore) replaceLinksAndHealTx(tx *sql.Tx, updates []PageLinkUpdate) error {
+	deleteStmt, err := tx.Prepare(`DELETE FROM links WHERE from_page_id = ?`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare delete statement for batched link update: %w", err)
+	}
+	defer func() {
+		if err := deleteStmt.Close(); err != nil {
+			slog.Default().Error("could not close statement", "error", err)
+		}
+	}()
+
+	insertStmt, err := tx.Prepare(`INSERT OR REPLACE INTO links(from_page_id, to_page_id, to_path, from_title, broken) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare insert statement for batched link update: %w", err)
+	}
+	defer func() {
+		if err := insertStmt.Close(); err != nil {
+			slog.Default().Error("could not close statement", "error", err)
+		}
+	}()
+
+	healStmt, err := tx.Prepare(`
+		UPDATE links
+		SET to_page_id = ?, broken = 0
+		WHERE to_path = ? AND broken = 1
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare heal statement for batched link update: %w", err)
+	}
+	defer func() {
+		if err := healStmt.Close(); err != nil {
+			slog.Default().Error("could not close statement", "error", err)
+		}
+	}()
+
+	for _, update := range updates {
+		if _, err := deleteStmt.Exec(update.FromPageID); err != nil {
+			return fmt.Errorf("failed to clear existing links for page %s: %w", update.FromPageID, err)
+		}
+
+		for _, link := range update.Targets {
+			brokenInt := 0
+			if link.Broken {
+				brokenInt = 1
+			}
+			if _, err := insertStmt.Exec(update.FromPageID, link.TargetPageID, link.TargetPagePath, update.FromTitle, brokenInt); err != nil {
+				return fmt.Errorf("failed to insert link from %s to %s: %w", update.FromPageID, link.TargetPageID, err)
+			}
+		}
+	}
+
+	for _, update := range updates {
+		if _, err := healStmt.Exec(update.FromPageID, update.ToPath); err != nil {
+			return fmt.Errorf("failed to heal links for path %s: %w", update.ToPath, err)
+		}
+	}
+
+	return nil
 }
 
 func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {

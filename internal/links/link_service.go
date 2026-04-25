@@ -130,6 +130,30 @@ func (b *LinkService) UpdateLinksForPage(page *tree.Page, content string) error 
 	return nil
 }
 
+func (b *LinkService) UpdateLinksAndHealForPages(pages []*tree.Page) error {
+	updates := make([]PageLinkUpdate, 0, len(pages))
+	for _, page := range pages {
+		if page == nil {
+			continue
+		}
+		pagePath := normalizeWikiPath(page.CalculatePath())
+		links := extractLinksFromMarkdown(page.Content)
+		targets := resolveTargetLinks(b.treeService, pagePath, links)
+		updates = append(updates, PageLinkUpdate{
+			FromPageID: page.ID,
+			FromTitle:  page.Title,
+			ToPath:     pagePath,
+			Targets:    targets,
+		})
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	return b.store.ReplaceLinksAndHeal(updates)
+}
+
 // DeleteOutgoingLinksForPage removes all outgoing link records for a page.
 func (b *LinkService) DeleteOutgoingLinksForPage(pageID string) error {
 	return b.store.DeleteOutgoingLinks(pageID)

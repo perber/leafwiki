@@ -81,6 +81,150 @@ func TestRecordContentUpdateHappyPathAndNoop(t *testing.T) {
 	}
 }
 
+func TestRecordContentUpdatesHappyPathAndNoop(t *testing.T) {
+	service, treeService, storageDir := newRevisionTestService(t)
+	pageID1 := createRevisionTestPage(t, treeService, "Page 1", "page-1", "hello")
+	pageID2 := createRevisionTestPage(t, treeService, "Page 2", "page-2", "world")
+	writeLiveAsset(t, storageDir, pageID1, "a.txt", "asset-a")
+	writeLiveAsset(t, storageDir, pageID2, "b.txt", "asset-b")
+
+	page1, err := treeService.GetPage(pageID1)
+	if err != nil {
+		t.Fatalf("GetPage(page1) failed: %v", err)
+	}
+	page2, err := treeService.GetPage(pageID2)
+	if err != nil {
+		t.Fatalf("GetPage(page2) failed: %v", err)
+	}
+
+	errs := service.RecordContentUpdates([]*tree.Page{page1, page2}, "tester", "batch")
+	if len(errs) != 2 {
+		t.Fatalf("expected 2 result errors, got %d", len(errs))
+	}
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("RecordContentUpdates error[%d] = %v", i, err)
+		}
+	}
+
+	revisions1, err := service.ListRevisions(pageID1)
+	if err != nil {
+		t.Fatalf("ListRevisions(page1) failed: %v", err)
+	}
+	if len(revisions1) != 1 || revisions1[0].Type != RevisionTypeContentUpdate {
+		t.Fatalf("unexpected revisions for page1: %#v", revisions1)
+	}
+
+	revisions2, err := service.ListRevisions(pageID2)
+	if err != nil {
+		t.Fatalf("ListRevisions(page2) failed: %v", err)
+	}
+	if len(revisions2) != 1 || revisions2[0].Type != RevisionTypeContentUpdate {
+		t.Fatalf("unexpected revisions for page2: %#v", revisions2)
+	}
+
+	errs = service.RecordContentUpdates([]*tree.Page{page1, page2}, "tester", "batch")
+	if len(errs) != 2 {
+		t.Fatalf("expected 2 noop result errors, got %d", len(errs))
+	}
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("RecordContentUpdates noop error[%d] = %v", i, err)
+		}
+	}
+
+	revisions1After, err := service.ListRevisions(pageID1)
+	if err != nil {
+		t.Fatalf("ListRevisions(page1 after noop) failed: %v", err)
+	}
+	if len(revisions1After) != 1 {
+		t.Fatalf("expected page1 noop to keep 1 revision, got %d", len(revisions1After))
+	}
+
+	revisions2After, err := service.ListRevisions(pageID2)
+	if err != nil {
+		t.Fatalf("ListRevisions(page2 after noop) failed: %v", err)
+	}
+	if len(revisions2After) != 1 {
+		t.Fatalf("expected page2 noop to keep 1 revision, got %d", len(revisions2After))
+	}
+}
+
+func TestRecordContentUpdates_PreservesPerInputErrors(t *testing.T) {
+	service, treeService, storageDir := newRevisionTestService(t)
+	pageID1 := createRevisionTestPage(t, treeService, "Page 1", "page-1", "hello")
+	pageID2 := createRevisionTestPage(t, treeService, "Page 2", "page-2", "world")
+	writeLiveAsset(t, storageDir, pageID1, "a.txt", "asset-a")
+	writeLiveAsset(t, storageDir, pageID2, "b.txt", "asset-b")
+
+	page1, err := treeService.GetPage(pageID1)
+	if err != nil {
+		t.Fatalf("GetPage(page1) failed: %v", err)
+	}
+	page2, err := treeService.GetPage(pageID2)
+	if err != nil {
+		t.Fatalf("GetPage(page2) failed: %v", err)
+	}
+
+	errs := service.RecordContentUpdates([]*tree.Page{page1, nil, page2}, "tester", "batch")
+	if len(errs) != 3 {
+		t.Fatalf("expected 3 result errors, got %d", len(errs))
+	}
+	if errs[0] != nil {
+		t.Fatalf("unexpected error for page1: %v", errs[0])
+	}
+	if errs[1] == nil || errs[1].Error() != "page is required" {
+		t.Fatalf("expected nil-page error in slot 1, got %v", errs[1])
+	}
+	if errs[2] != nil {
+		t.Fatalf("unexpected error for page2: %v", errs[2])
+	}
+
+	revisions1, err := service.ListRevisions(pageID1)
+	if err != nil {
+		t.Fatalf("ListRevisions(page1) failed: %v", err)
+	}
+	if len(revisions1) != 1 {
+		t.Fatalf("expected 1 revision for page1, got %d", len(revisions1))
+	}
+
+	revisions2, err := service.ListRevisions(pageID2)
+	if err != nil {
+		t.Fatalf("ListRevisions(page2) failed: %v", err)
+	}
+	if len(revisions2) != 1 {
+		t.Fatalf("expected 1 revision for page2, got %d", len(revisions2))
+	}
+}
+
+func TestRecordContentUpdates_DuplicatePageIDsStayDeterministic(t *testing.T) {
+	service, treeService, storageDir := newRevisionTestService(t)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
+	writeLiveAsset(t, storageDir, pageID, "a.txt", "asset-a")
+
+	page, err := treeService.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage(page) failed: %v", err)
+	}
+
+	errs := service.RecordContentUpdates([]*tree.Page{page, page}, "tester", "batch")
+	if len(errs) != 2 {
+		t.Fatalf("expected 2 result errors, got %d", len(errs))
+	}
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("unexpected error in slot %d: %v", i, err)
+		}
+	}
+
+	revisions, err := service.ListRevisions(pageID)
+	if err != nil {
+		t.Fatalf("ListRevisions(page) failed: %v", err)
+	}
+	if len(revisions) != 1 {
+		t.Fatalf("expected duplicate batch entry to yield 1 revision, got %d", len(revisions))
+	}
+}
 
 func TestLocalizedErrorHelpers(t *testing.T) {
 	cause := errors.New("boom")
@@ -150,7 +294,6 @@ func TestServiceWrappersAndHelpers(t *testing.T) {
 		t.Fatalf("scanLiveAssets(missing) failed: %v", err)
 	}
 }
-
 
 func TestRecordAssetAndStructureBranches(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)
@@ -358,7 +501,6 @@ func TestCapturePageStateAndNewRevisionHelpers(t *testing.T) {
 	}
 }
 
-
 func TestRecordContentAndAssetUpdatesWithoutAssets(t *testing.T) {
 	service, treeService, _ := newRevisionTestService(t)
 	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
@@ -402,7 +544,6 @@ func TestRecordContentAndAssetUpdatesWithoutAssets(t *testing.T) {
 		t.Fatalf("unexpected content revision: %#v created=%v", contentRev, created)
 	}
 }
-
 
 func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)
@@ -487,7 +628,6 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 		t.Fatalf("latest revision = %#v", latest)
 	}
 }
-
 
 func TestRecordContentAndStructureRebuildMissingPreviousManifest(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)
