@@ -520,8 +520,14 @@ func TestNodeStore_ReconstructTreeFromFS_MissingMetadataFallsBackToMtimeAndSyste
 	if fm.LeafWikiID != page.ID {
 		t.Fatalf("expected generated ID to be written back, got %q want %q", fm.LeafWikiID, page.ID)
 	}
-	if fm.LeafWikiCreatedAt != "" || fm.LeafWikiUpdatedAt != "" || fm.LeafWikiCreatorID != "" || fm.LeafWikiLastAuthorID != "" {
-		t.Fatalf("expected reconstruct fallback metadata to stay out of frontmatter during read-only reconstruct, got %#v", fm)
+	if fm.LeafWikiCreatedAt != wantTime.Format(time.RFC3339) {
+		t.Fatalf("expected created_at fallback to be written back, got %q", fm.LeafWikiCreatedAt)
+	}
+	if fm.LeafWikiUpdatedAt != wantTime.Format(time.RFC3339) {
+		t.Fatalf("expected updated_at fallback to be written back, got %q", fm.LeafWikiUpdatedAt)
+	}
+	if fm.LeafWikiCreatorID != reconstructSystemUserID || fm.LeafWikiLastAuthorID != reconstructSystemUserID {
+		t.Fatalf("expected system metadata fallback to be written back, got %#v", fm)
 	}
 }
 

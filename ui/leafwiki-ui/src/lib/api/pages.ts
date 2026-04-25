@@ -152,12 +152,19 @@ export async function updatePage(
   })) as Page | null
 }
 
-export async function deletePage(id: string, recursive: boolean) {
+export async function deletePage(
+  id: string,
+  recursive: boolean,
+  version: string,
+) {
   if (recursive === undefined) recursive = false
 
-  const recursiveQuery = recursive ? 'true' : 'false'
+  const params = new URLSearchParams({
+    recursive: recursive ? 'true' : 'false',
+  })
+  if (version) params.set('version', version)
 
-  return await fetchWithAuth(`/api/pages/${id}?recursive=${recursiveQuery}`, {
+  return await fetchWithAuth(`/api/pages/${id}?${params.toString()}`, {
     method: 'DELETE',
   })
 }
@@ -231,11 +238,15 @@ export async function sortPages(parentId: string, orderedIDs: string[]) {
   })
 }
 
-export async function convertPage(id: string, targetKind: 'page' | 'section') {
+export async function convertPage(
+  id: string,
+  targetKind: 'page' | 'section',
+  version: string,
+) {
   return await fetchWithAuth(`/api/pages/convert/${id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ targetKind }),
+    body: JSON.stringify({ targetKind, version }),
   })
 }
 

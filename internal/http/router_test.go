@@ -294,12 +294,12 @@ func getTreeViaAPI(t *testing.T, router http.Handler) *apiPage {
 	return &node
 }
 
-func deletePageViaAPI(t *testing.T, router http.Handler, pageID string, recursive bool) {
+func deletePageViaAPI(t *testing.T, router http.Handler, pageID string, version string, recursive bool) {
 	t.Helper()
 
-	url := "/api/pages/" + pageID
+	url := "/api/pages/" + pageID + "?version=" + version
 	if recursive {
-		url += "?recursive=true"
+		url += "&recursive=true"
 	}
 
 	rec := authenticatedRequest(t, router, http.MethodDelete, url, nil)
@@ -1360,7 +1360,7 @@ func TestDeletePageEndpoint(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	page := createPageViaAPI(t, router, "Delete Me", "delete-me", nil, pageNodeKind())
-	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+page.ID, nil)
+	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+page.ID+"?version="+page.Version, nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK, got %d", rec.Code)
@@ -1392,7 +1392,7 @@ func TestDeletePageEndpoint_HasChildren(t *testing.T) {
 	parent := createPageViaAPI(t, router, "Parent", "parent", nil, pageNodeKind())
 	createPageViaAPI(t, router, "Child", "child", &parent.ID, pageNodeKind())
 
-	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+parent.ID, nil)
+	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+parent.ID+"?version="+parent.Version, nil)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("Expected 400 Bad Request, got %d", rec.Code)
@@ -1407,7 +1407,7 @@ func TestDeletePageEndpoint_Recursive(t *testing.T) {
 	parent := createPageViaAPI(t, router, "Parent", "parent", nil, pageNodeKind())
 	createPageViaAPI(t, router, "Child", "child", &parent.ID, pageNodeKind())
 
-	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+parent.ID+"?recursive=true", nil)
+	rec := authenticatedRequest(t, router, http.MethodDelete, "/api/pages/"+parent.ID+"?recursive=true&version="+parent.Version, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK, got %d", rec.Code)
 	}
@@ -1718,13 +1718,15 @@ func TestGetPagePermalinkEndpoint_ReturnsCurrentPath(t *testing.T) {
 	guide := createPageViaAPI(t, router, "Guide", "guide", &docs.ID, pageNodeKind())
 	archive := createPageViaAPI(t, router, "Archive", "archive", nil, pageNodeKind())
 
-	movePayload := `{"parentId":"` + archive.ID + `"}`
+	movePayload := `{"version":"` + guide.Version + `","parentId":"` + archive.ID + `"}`
 	moveRec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+guide.ID+"/move", strings.NewReader(movePayload))
 	if moveRec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK on move, got %d - %s", moveRec.Code, moveRec.Body.String())
 	}
 
-	updatePayload := `{"title":"User Guide","slug":"user-guide","content":""}`
+	guide = getPageByPathViaAPI(t, router, "archive/guide")
+
+	updatePayload := `{"version":"` + guide.Version + `","title":"User Guide","slug":"user-guide","content":""}`
 	updateRec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+guide.ID, strings.NewReader(updatePayload))
 	if updateRec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK on update, got %d - %s", updateRec.Code, updateRec.Body.String())
@@ -1909,7 +1911,7 @@ func TestSortPagesEndpoint(t *testing.T) {
 	page2 := createPageViaAPI(t, router, "Page 2", "page-2", nil, pageNodeKind())
 	page3 := createPageViaAPI(t, router, "Page 3", "page-3", nil, pageNodeKind())
 	welcomePage := getPageByPathViaAPI(t, router, "welcome-to-leafwiki")
-	deletePageViaAPI(t, router, welcomePage.ID, false)
+	deletePageViaAPI(t, router, welcomePage.ID, welcomePage.Version, false)
 
 	// Sort pages
 	payload := map[string]interface{}{

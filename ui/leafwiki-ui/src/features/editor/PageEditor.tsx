@@ -88,11 +88,19 @@ export default function PageEditor() {
                     }
                   })
                   .catch((overwriteErr) => {
-                    const overwriteMapped = mapApiError(
-                      overwriteErr,
-                      'Error saving page',
-                    )
-                    toast.error(overwriteMapped.message)
+                    const overwriteLocalized = asApiLocalizedError(overwriteErr)
+                    if (overwriteLocalized?.code === 'page_version_conflict') {
+                      toast.error(
+                        'The page was modified again while saving. Please reload the page and re-apply your changes.',
+                        { duration: 8000 },
+                      )
+                    } else {
+                      const overwriteMapped = mapApiError(
+                        overwriteErr,
+                        'Error saving page',
+                      )
+                      toast.error(overwriteMapped.message)
+                    }
                   })
               },
             },

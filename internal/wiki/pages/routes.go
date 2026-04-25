@@ -265,12 +265,13 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 func (r *Routes) handleDelete(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	recursive := c.DefaultQuery("recursive", "false") == "true"
+	version := c.Query("version")
 	user := authmw.MustGetUser(c)
 	if user == nil {
 		return
 	}
 	if err := r.deletePage.Execute(c.Request.Context(), DeletePageInput{
-		UserID: user.ID, ID: id, Recursive: recursive,
+		UserID: user.ID, ID: id, Version: version, Recursive: recursive,
 	}); err != nil {
 		respondWithPageError(c, err)
 		return
@@ -347,7 +348,8 @@ func (r *Routes) handleEnsurePath(c *gin.Context) {
 func (r *Routes) handleConvert(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	var req struct {
-		Kind string `json:"targetKind" binding:"required"`
+		Kind    string `json:"targetKind" binding:"required"`
+		Version string `json:"version" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
@@ -362,7 +364,7 @@ func (r *Routes) handleConvert(c *gin.Context) {
 		return
 	}
 	if err := r.convertPage.Execute(c.Request.Context(), ConvertPageInput{
-		UserID: user.ID, ID: id, TargetKind: tree.NodeKind(req.Kind),
+		UserID: user.ID, ID: id, Version: req.Version, TargetKind: tree.NodeKind(req.Kind),
 	}); err != nil {
 		respondWithPageError(c, err)
 		return

@@ -318,6 +318,7 @@ func TestDeletePageUseCase_HappyPath(t *testing.T) {
 	if err := deleteUC.Execute(context.Background(), pages.DeletePageInput{
 		UserID:    "user1",
 		ID:        created.Page.ID,
+		Version:   created.Page.Version(),
 		Recursive: false,
 	}); err != nil {
 		t.Fatalf("unexpected error deleting page: %v", err)
@@ -354,7 +355,7 @@ func TestDeletePageUseCase_WithChildren_Recursive(t *testing.T) {
 	})
 
 	err := deleteUC.Execute(context.Background(), pages.DeletePageInput{
-		UserID: "user1", ID: parent.Page.ID, Recursive: true,
+		UserID: "user1", ID: parent.Page.ID, Version: parent.Page.Version(), Recursive: true,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error on recursive delete: %v", err)
@@ -1393,7 +1394,7 @@ func TestDeletePageUseCase_NonRecursive_MarksIncomingBroken(t *testing.T) {
 		t.Fatalf("IndexAllPages failed: %v", err)
 	}
 	if err := deleteUC.Execute(context.Background(), pages.DeletePageInput{
-		UserID: "system", ID: b.Page.ID, Recursive: false,
+		UserID: "system", ID: b.Page.ID, Version: b.Page.Version(), Recursive: false,
 	}); err != nil {
 		t.Fatalf("DeletePage failed: %v", err)
 	}
@@ -1467,7 +1468,7 @@ func TestDeletePageUseCase_Recursive_RemovesOutgoingForSubtree_AndBreaksIncoming
 	}
 
 	if err := deleteUC.Execute(context.Background(), pages.DeletePageInput{
-		UserID: "system", ID: docs.Page.ID, Recursive: true,
+		UserID: "system", ID: docs.Page.ID, Version: docs.Page.Version(), Recursive: true,
 	}); err != nil {
 		t.Fatalf("DeletePage(docs, recursive) failed: %v", err)
 	}

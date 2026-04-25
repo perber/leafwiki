@@ -11,7 +11,7 @@ import {
   NODE_KIND_SECTION,
   PageNode,
 } from '@/lib/api/pages'
-import { mapApiError } from '@/lib/api/errors'
+import { asApiLocalizedError, mapApiError } from '@/lib/api/errors'
 import {
   DIALOG_ADD_PAGE,
   DIALOG_COPY_PAGE,
@@ -63,14 +63,22 @@ export default function TreeNodeActionsMenu({
     convertPage(
       nodeId,
       nodeKind === NODE_KIND_PAGE ? NODE_KIND_SECTION : NODE_KIND_PAGE,
+      node.version,
     )
       .then(() => {
         toast.success('Page converted successfully')
         reloadTree()
       })
       .catch((err) => {
-        const mapped = mapApiError(err, 'Failed to convert page')
-        toast.error(mapped.message)
+        const localized = asApiLocalizedError(err)
+        if (localized?.code === 'page_version_conflict') {
+          toast.error(
+            'This page was modified by another user. Please reload and try again.',
+          )
+        } else {
+          const mapped = mapApiError(err, 'Failed to convert page')
+          toast.error(mapped.message)
+        }
       })
   }, [nodeId, nodeKind, reloadTree])
 

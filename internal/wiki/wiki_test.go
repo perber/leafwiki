@@ -63,9 +63,14 @@ func updatePageForTest(t *testing.T, w *Wiki, userID, id, title, slug string, co
 func deletePageForTest(t *testing.T, w *Wiki, userID, id string, recursive bool) {
 	t.Helper()
 
+	current, err := w.tree.GetPage(id)
+	if err != nil {
+		t.Fatalf("GetPage before delete failed: %v", err)
+	}
+
 	if err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.links, w.asset, w.log).Execute(
 		context.Background(),
-		wikipages.DeletePageInput{UserID: userID, ID: id, Recursive: recursive},
+		wikipages.DeletePageInput{UserID: userID, ID: id, Version: current.Version(), Recursive: recursive},
 	); err != nil {
 		t.Fatalf("DeletePage failed: %v", err)
 	}
@@ -89,7 +94,7 @@ func TestWiki_DeletePage_WithChildren(t *testing.T) {
 
 	err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.links, w.asset, w.log).Execute(
 		context.Background(),
-		wikipages.DeletePageInput{UserID: "system", ID: parent.ID, Recursive: false},
+		wikipages.DeletePageInput{UserID: "system", ID: parent.ID, Version: parent.Version(), Recursive: false},
 	)
 	if err == nil {
 		t.Error("Expected error when deleting parent with children")

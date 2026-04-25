@@ -92,6 +92,28 @@ func (f *NodeStore) writeIDToMarkdownFile(mdFile *markdown.MarkdownFile, id stri
 	}
 }
 
+// writeReconstructedFrontmatter writes the full managed frontmatter (ID, title, timestamps, authors)
+// back to disk while preserving the file's modification time. Called during reconstruct for files
+// that are missing any managed metadata field.
+func (f *NodeStore) writeReconstructedFrontmatter(mdFile *markdown.MarkdownFile, entry *PageNode) {
+	var originalModTime time.Time
+	if info, err := os.Stat(mdFile.GetPath()); err == nil {
+		originalModTime = info.ModTime()
+	}
+
+	f.syncManagedFrontmatter(mdFile, entry)
+	if err := mdFile.WriteToFile(); err != nil {
+		f.log.Error("could not write metadata back to file during reconstruct", "path", mdFile.GetPath(), "error", err)
+		return
+	}
+
+	if !originalModTime.IsZero() {
+		if err := os.Chtimes(mdFile.GetPath(), originalModTime, originalModTime); err != nil {
+			f.log.Warn("could not restore file mtime after writing metadata", "path", mdFile.GetPath(), "error", err)
+		}
+	}
+}
+
 func formatMetadataTime(ts time.Time) string {
 	if ts.IsZero() {
 		return ""
@@ -302,6 +324,8 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 			}
 
 			indexPath := filepath.Join(currentPath, name, "index.md")
+			var sectionMdFile *markdown.MarkdownFile
+			needsWriteback := false
 			if fileExists(indexPath) {
 				mdFile, err := markdown.LoadMarkdownFile(indexPath)
 				if err != nil {
@@ -315,11 +339,12 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 						f.log.Error("could not extract title from index.md", "path", indexPath, "error", err)
 						// keep default title; still add the section and recurse
 					}
-					if mdFile.GetFrontmatter().LeafWikiID != "" {
-						id = mdFile.GetFrontmatter().LeafWikiID
-					} else {
-						// Generated ID needs to be written back
-						f.writeIDToMarkdownFile(mdFile, id)
+					if fm.LeafWikiID != "" {
+						id = fm.LeafWikiID
+					}
+					if fm.LeafWikiID == "" || fm.LeafWikiUpdatedAt == "" || fm.LeafWikiCreatedAt == "" {
+						sectionMdFile = mdFile
+						needsWriteback = true
 					}
 				}
 			}
@@ -341,6 +366,10 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 				return err
 			}
 			parent.Children = append(parent.Children, child)
+
+			if needsWriteback {
+				f.writeReconstructedFrontmatter(sectionMdFile, child)
+			}
 
 			if !fileExists(indexPath) {
 				if _, err := f.ensureSectionIndex(child); err != nil {
@@ -384,12 +413,10 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 			f.log.Error("could not extract title from file", "path", filePath, "error", err)
 			continue
 		}
-		if mdFile.GetFrontmatter().LeafWikiID != "" {
-			id = mdFile.GetFrontmatter().LeafWikiID
-		} else {
-			// Generated ID needs to be written back
-			f.writeIDToMarkdownFile(mdFile, id)
+		if fm.LeafWikiID != "" {
+			id = fm.LeafWikiID
 		}
+		needsWriteback := fm.LeafWikiID == "" || fm.LeafWikiUpdatedAt == "" || fm.LeafWikiCreatedAt == ""
 
 		child := &PageNode{
 			ID:       id,
@@ -406,6 +433,9 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 		}
 		if err := ensureUniqueReconstructedID(seenIDs, child.ID, filePath); err != nil {
 			return err
+		}
+		if needsWriteback {
+			f.writeReconstructedFrontmatter(mdFile, child)
 		}
 		parent.Children = append(parent.Children, child)
 	}

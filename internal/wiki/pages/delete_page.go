@@ -15,6 +15,7 @@ import (
 type DeletePageInput struct {
 	UserID    string
 	ID        string
+	Version   string
 	Recursive bool
 }
 
@@ -46,6 +47,9 @@ func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) erro
 
 	page, err := uc.tree.GetPage(in.ID)
 	if err != nil {
+		return err
+	}
+	if err := requireCurrentPageVersion(page, in.Version); err != nil {
 		return err
 	}
 

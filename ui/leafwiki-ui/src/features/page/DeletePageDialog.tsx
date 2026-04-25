@@ -1,6 +1,7 @@
 import BaseDialog from '@/components/BaseDialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { fetchLinkStatus, type Backlink } from '@/lib/api/links'
+import { asApiLocalizedError } from '@/lib/api/errors'
 import { deletePage, NODE_KIND_PAGE } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_DELETE_PAGE_CONFIRMATION } from '@/lib/registries'
@@ -78,14 +79,33 @@ export function DeletePageDialog({
   const handleDelete = async (): Promise<boolean> => {
     setLoading(true)
     try {
-      await deletePage(pageId, deleteRecursive)
+      await deletePage(pageId, deleteRecursive, page?.version ?? '')
       toast.success(`${itemLabelCapitalized} deleted successfully`)
       navigate(redirectTo)
       reloadTree().catch(console.error)
       return true
     } catch (err) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, `Error deleting ${itemLabel}`)
+      const localized = asApiLocalizedError(err)
+      if (localized?.code === 'page_version_conflict') {
+        try {
+          await reloadTree()
+          const freshPage = useTreeStore.getState().getPageById(pageId)
+          await deletePage(pageId, deleteRecursive, freshPage?.version ?? '')
+          toast.success(`${itemLabelCapitalized} deleted successfully`)
+          navigate(redirectTo)
+          reloadTree().catch(console.error)
+          return true
+        } catch (retryErr) {
+          handleFieldErrors(
+            retryErr,
+            setFieldErrors,
+            `Error deleting ${itemLabel}`,
+          )
+        }
+      } else {
+        handleFieldErrors(err, setFieldErrors, `Error deleting ${itemLabel}`)
+      }
       return false
     } finally {
       setLoading(false)
