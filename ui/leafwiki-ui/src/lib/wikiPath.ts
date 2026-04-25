@@ -44,6 +44,18 @@ export function toWikiLookupPath(path: string): string {
 }
 
 /**
+ * Converts any supported route variant to the normalized wiki route/path.
+ *
+ * Examples:
+ * - `/docs` -> `/docs`
+ * - `/e/docs` -> `/docs`
+ * - `/history/docs` -> `/docs`
+ */
+export function getWikiTargetRoutePath(pathname: string): string {
+  return normalizeWikiRoutePath(buildViewUrl(pathname))
+}
+
+/**
  * Resolves a relative Markdown link against the current wiki page path.
  *
  * The result is always an absolute wiki route/path without query or hash.

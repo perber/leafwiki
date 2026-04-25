@@ -7,7 +7,11 @@ import {
   DIALOG_PAGE_PERMALINK,
 } from '@/lib/registries'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
-import { getParentWikiRoutePath, toWikiLookupPath } from '@/lib/wikiPath'
+import {
+  getParentWikiRoutePath,
+  getWikiTargetRoutePath,
+  toWikiLookupPath,
+} from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect } from 'react'
@@ -33,6 +37,7 @@ export default function PageViewer() {
   const openNode = useTreeStore((state) => state.openNode)
   const loading = useProgressbarStore((s) => s.loading)
   const error = useViewerStore((s) => s.error)
+  const notFound = useViewerStore((s) => s.notFound)
   const page = useViewerStore((s) => s.page)
   const loadPageData = useViewerStore((s) => s.loadPageData)
 
@@ -79,8 +84,10 @@ export default function PageViewer() {
   }, [openNode, page?.id])
 
   const renderError = () => {
-    if (!loading && !page) {
-      return <Page404 />
+    if (!loading && notFound) {
+      return (
+        <Page404 allowCreate targetPath={getWikiTargetRoutePath(pathname)} />
+      )
     }
     if (!loading && error) {
       return <p className="page-viewer__error">Error: {error}</p>

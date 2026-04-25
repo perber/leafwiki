@@ -135,6 +135,13 @@ async function createPageWithContent(
   }, input);
 }
 
+async function navigateWithinApp(page: import('@playwright/test').Page, path: string) {
+  await page.evaluate((nextPath) => {
+    window.history.pushState({}, '', nextPath);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, path);
+}
+
 async function expectEditAndSaveShortcutWorks(
   page: import('@playwright/test').Page,
   shortcutKeys: { editKey: string; saveKey: string },
@@ -1242,7 +1249,8 @@ Paragraph outside the list.
     const notfoundPage = new NotFoundPage(page);
     await notfoundPage.goto(pagePath);
 
-    test.expect(await notfoundPage.isNotFoundPage()).toBeTruthy();
+    await notfoundPage.expectVisible();
+    await notfoundPage.expectCreatePageButtonVisible();
 
     await notfoundPage.clickCreatePageButton();
     const createPageByPathDialog = new CreatePageByPathDialog(page);
@@ -1256,6 +1264,50 @@ Paragraph outside the list.
     const viewPage = new ViewPage(page);
     const pageTitle = await viewPage.getTitle();
     test.expect(pageTitle).toBe(slug);
+  });
+
+  test('not-found-on-edit-page-hides-create-page-cta', async ({ page }) => {
+    const slug = `missing-edit-${Date.now()}`;
+    const notfoundPage = new NotFoundPage(page);
+    const viewPage = new ViewPage(page);
+
+    await viewPage.goto('/welcome-to-leafwiki');
+    await navigateWithinApp(page, `/e/${slug}`);
+
+    await notfoundPage.expectVisible();
+    await notfoundPage.expectCreatePageButtonHidden();
+  });
+
+  test('not-found-on-history-page-hides-create-page-cta', async ({ page }) => {
+    const slug = `missing-history-${Date.now()}`;
+    const notfoundPage = new NotFoundPage(page);
+    const viewPage = new ViewPage(page);
+
+    await viewPage.goto('/welcome-to-leafwiki');
+    await navigateWithinApp(page, `/history/${slug}`);
+
+    await notfoundPage.expectVisible();
+    await notfoundPage.expectCreatePageButtonHidden();
+    await expect(page.getByTestId('page404')).toBeVisible();
+  });
+
+  test('not-found-on-permalink-page-hides-create-page-cta', async ({ page }) => {
+    const notfoundPage = new NotFoundPage(page);
+    const missingId = `missing-permalink-${Date.now()}`;
+
+    await page.goto(toAppPath(`/p/${missingId}`));
+
+    await notfoundPage.expectVisible();
+    await notfoundPage.expectCreatePageButtonHidden();
+  });
+
+  test('not-found-for-reserved-slug-hides-create-page-cta', async ({ page }) => {
+    const notfoundPage = new NotFoundPage(page);
+
+    await notfoundPage.goto('/settings');
+
+    await notfoundPage.expectVisible();
+    await notfoundPage.expectCreatePageButtonHidden();
   });
 
   // test move

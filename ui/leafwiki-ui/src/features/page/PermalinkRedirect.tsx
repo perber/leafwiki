@@ -1,7 +1,7 @@
 import Page404 from '@/components/Page404'
 import { getPermalinkTarget } from '@/lib/api/pages'
 import { ApiError } from '@/lib/api/auth'
-import { ApiLocalizedError } from '@/lib/api/errors'
+import { isPageNotFoundError } from '@/lib/api/errors'
 import { useProgressbarStore } from '@/features/progressbar/progressbar'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -36,7 +36,7 @@ export default function PermalinkRedirect() {
 
         if (
           (err instanceof ApiError && err.status === 404) ||
-          (err instanceof ApiLocalizedError && err.code === 'page_not_found')
+          isPageNotFoundError(err)
         ) {
           setNotFound(true)
           return

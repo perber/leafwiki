@@ -1483,6 +1483,32 @@ func TestTreeService_LookupPagePath_ReflectsSlugRename(t *testing.T) {
 	}
 }
 
+func TestTreeService_LookupPagePath_CanCreateForMissingValidPath(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	lookup, err := svc.LookupPagePath("docs/guide")
+	if err != nil {
+		t.Fatalf("LookupPagePath failed: %v", err)
+	}
+
+	if !lookup.CanCreate {
+		t.Fatal("expected missing valid path to be creatable")
+	}
+}
+
+func TestTreeService_LookupPagePath_CannotCreateReservedMissingPath(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	lookup, err := svc.LookupPagePath("history/guide")
+	if err != nil {
+		t.Fatalf("LookupPagePath failed: %v", err)
+	}
+
+	if lookup.CanCreate {
+		t.Fatal("expected reserved slug path to be non-creatable")
+	}
+}
+
 func TestTreeService_ResolvePermalinkTarget_ReflectsRenameAndMove(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
