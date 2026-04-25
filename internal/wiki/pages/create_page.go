@@ -2,13 +2,11 @@ package pages
 
 import (
 	"context"
-	"log"
 	"log/slog"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
-	"github.com/perber/wiki/internal/core/revision"
-	"github.com/perber/wiki/internal/links"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
 // CreatePageInput is the input for CreatePageUseCase.
@@ -25,28 +23,25 @@ type CreatePageOutput struct {
 	Page *tree.Page
 }
 
-// CreatePageUseCase creates a new page in the tree and records the initial revision.
-// It will later serve as a transaction boundary.
+// CreatePageUseCase creates a new page in the tree and fires post-save side effects.
 type CreatePageUseCase struct {
-	tree     *tree.TreeService
-	slug     *tree.SlugService
-	revision *revision.Service
-	links    *links.LinkService
-	log      *slog.Logger
+	tree        *tree.TreeService
+	slug        *tree.SlugService
+	orchestrator *pagesave.PageSaveOrchestrator
+	log         *slog.Logger
 }
 
 // NewCreatePageUseCase constructs a CreatePageUseCase.
 func NewCreatePageUseCase(
 	t *tree.TreeService,
 	s *tree.SlugService,
-	r *revision.Service,
-	l *links.LinkService,
+	o *pagesave.PageSaveOrchestrator,
 	log *slog.Logger,
 ) *CreatePageUseCase {
-	return &CreatePageUseCase{tree: t, slug: s, revision: r, links: l, log: log}
+	return &CreatePageUseCase{tree: t, slug: s, orchestrator: o, log: log}
 }
 
-// Execute validates input, creates the page node, heals links, and records a revision.
+// Execute validates input, creates the page node, and fires post-save side effects.
 func (uc *CreatePageUseCase) Execute(_ context.Context, in CreatePageInput) (*CreatePageOutput, error) {
 	ve := sharederrors.NewValidationErrors()
 
@@ -82,19 +77,12 @@ func (uc *CreatePageUseCase) Execute(_ context.Context, in CreatePageInput) (*Cr
 		return nil, err
 	}
 
-	if uc.links != nil {
-		if err := uc.links.HealLinksForExactPath(page); err != nil {
-			log.Printf("warning: failed to heal links for page %s: %v", page.ID, err)
-		}
-	}
-
-	// Fix: CreatePage was missing revision recording in the original wiki.go implementation.
-	// Every other mutating operation (UpdatePage, CopyPage, MovePage) records a revision,
-	// so the absence here was a bug. Recording "page created" gives the revision history
-	// a baseline snapshot and makes RestorePage behaviour consistent.
-	if uc.revision != nil {
-		recordContentRevision(uc.revision, uc.log, page.ID, in.UserID, "page created")
-	}
+	uc.orchestrator.Run(pagesave.PageSaveEvent{
+		Operation: pagesave.PageOperationCreate,
+		UserID:    in.UserID,
+		After:     page,
+		Summary:   "page created",
+	})
 
 	return &CreatePageOutput{Page: page}, nil
 }

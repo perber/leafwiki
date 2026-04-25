@@ -6,10 +6,10 @@ import (
 	"time"
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
-	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/core/revision"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
 
@@ -304,14 +304,14 @@ type RestoreRevisionOutput struct {
 }
 
 type RestoreRevisionUseCase struct {
-	revision *revision.Service
-	tree     *tree.TreeService
-	links    *links.LinkService
-	log      *slog.Logger
+	revision     *revision.Service
+	tree         *tree.TreeService
+	orchestrator *pagesave.PageSaveOrchestrator
+	log          *slog.Logger
 }
 
-func NewRestoreRevisionUseCase(r *revision.Service, t *tree.TreeService, l *links.LinkService, log *slog.Logger) *RestoreRevisionUseCase {
-	return &RestoreRevisionUseCase{revision: r, tree: t, links: l, log: log}
+func NewRestoreRevisionUseCase(r *revision.Service, t *tree.TreeService, o *pagesave.PageSaveOrchestrator, log *slog.Logger) *RestoreRevisionUseCase {
+	return &RestoreRevisionUseCase{revision: r, tree: t, orchestrator: o, log: log}
 }
 
 func (uc *RestoreRevisionUseCase) Execute(_ context.Context, in RestoreRevisionInput) (*RestoreRevisionOutput, error) {
@@ -330,14 +330,11 @@ func (uc *RestoreRevisionUseCase) Execute(_ context.Context, in RestoreRevisionI
 	if err != nil {
 		return nil, err
 	}
-	if uc.links != nil {
-		if err := uc.links.UpdateLinksForPage(page, page.Content); err != nil {
-			uc.log.Warn("failed to update links for restored revision", "pageID", in.PageID, "revisionID", in.RevisionID, "error", err)
-		}
-		if err := uc.links.HealLinksForExactPath(page); err != nil {
-			uc.log.Warn("failed to heal links for restored revision", "pageID", in.PageID, "revisionID", in.RevisionID, "error", err)
-		}
-	}
+	uc.orchestrator.Run(pagesave.PageSaveEvent{
+		Operation: pagesave.PageOperationRestore,
+		UserID:    in.UserID,
+		After:     page,
+	})
 	return &RestoreRevisionOutput{Page: page}, nil
 }
 

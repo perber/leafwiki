@@ -32,7 +32,7 @@ func pageNodeKind() *tree.NodeKind {
 func createPageForTest(t *testing.T, w *Wiki, userID string, parentID *string, title, slug string, kind *tree.NodeKind) *tree.Page {
 	t.Helper()
 
-	out, err := wikipages.NewCreatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log).Execute(
+	out, err := wikipages.NewCreatePageUseCase(w.tree, w.slug, w.newPageOrchestrator(), w.log).Execute(
 		context.Background(),
 		wikipages.CreatePageInput{UserID: userID, ParentID: parentID, Title: title, Slug: slug, Kind: kind},
 	)
@@ -50,7 +50,7 @@ func updatePageForTest(t *testing.T, w *Wiki, userID, id, title, slug string, co
 		t.Fatalf("GetPage before update failed: %v", err)
 	}
 
-	out, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log).Execute(
+	out, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.newPageOrchestrator(), w.log).Execute(
 		context.Background(),
 		wikipages.UpdatePageInput{UserID: userID, ID: id, Version: current.Version(), Title: title, Slug: slug, Content: content, Kind: kind},
 	)
@@ -68,7 +68,7 @@ func deletePageForTest(t *testing.T, w *Wiki, userID, id string, recursive bool)
 		t.Fatalf("GetPage before delete failed: %v", err)
 	}
 
-	if err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.links, w.asset, w.log).Execute(
+	if err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.newPageOrchestrator(), w.log).Execute(
 		context.Background(),
 		wikipages.DeletePageInput{UserID: userID, ID: id, Version: current.Version(), Recursive: recursive},
 	); err != nil {
@@ -92,7 +92,7 @@ func TestWiki_DeletePage_WithChildren(t *testing.T) {
 	parent := createPageForTest(t, w, "system", nil, "Parent", "parent", pageNodeKind())
 	createPageForTest(t, w, "system", &parent.ID, "Child", "child", pageNodeKind())
 
-	err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.links, w.asset, w.log).Execute(
+	err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.newPageOrchestrator(), w.log).Execute(
 		context.Background(),
 		wikipages.DeletePageInput{UserID: "system", ID: parent.ID, Version: parent.Version(), Recursive: false},
 	)

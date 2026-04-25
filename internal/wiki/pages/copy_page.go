@@ -2,24 +2,22 @@ package pages
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"strings"
 
 	"github.com/perber/wiki/internal/core/assets"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
-	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
-	"github.com/perber/wiki/internal/links"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
 // CopyPageInput is the input for CopyPageUseCase.
 type CopyPageInput struct {
-	UserID          string
-	SourcePageID    string
-	TargetParentID  *string
-	Title           string
-	Slug            string
+	UserID         string
+	SourcePageID   string
+	TargetParentID *string
+	Title          string
+	Slug           string
 }
 
 // CopyPageOutput is the output of CopyPageUseCase.
@@ -29,24 +27,22 @@ type CopyPageOutput struct {
 
 // CopyPageUseCase duplicates a page and its assets under a new slug/title.
 type CopyPageUseCase struct {
-	tree     *tree.TreeService
-	slug     *tree.SlugService
-	revision *revision.Service
-	links    *links.LinkService
-	assets   *assets.AssetService
-	log      *slog.Logger
+	tree         *tree.TreeService
+	slug         *tree.SlugService
+	assets       *assets.AssetService
+	orchestrator *pagesave.PageSaveOrchestrator
+	log          *slog.Logger
 }
 
 // NewCopyPageUseCase constructs a CopyPageUseCase.
 func NewCopyPageUseCase(
 	t *tree.TreeService,
 	s *tree.SlugService,
-	r *revision.Service,
-	l *links.LinkService,
+	o *pagesave.PageSaveOrchestrator,
 	a *assets.AssetService,
 	log *slog.Logger,
 ) *CopyPageUseCase {
-	return &CopyPageUseCase{tree: t, slug: s, revision: r, links: l, assets: a, log: log}
+	return &CopyPageUseCase{tree: t, slug: s, assets: a, orchestrator: o, log: log}
 }
 
 // Execute copies the source page to a new node with duplicated assets.
@@ -92,15 +88,18 @@ func (uc *CopyPageUseCase) Execute(_ context.Context, in CopyPageInput) (*CopyPa
 		return nil, err
 	}
 
-	if uc.links != nil {
-		if err := uc.links.HealLinksForExactPath(copyPage); err != nil {
-			log.Printf("warning: failed to heal links for copied page %s: %v", copyPage.ID, err)
-		}
+	// Re-fetch after content update so After reflects the final state.
+	copyPage, err = uc.tree.GetPage(copyPage.ID)
+	if err != nil {
+		return nil, err
 	}
 
-	if uc.revision != nil {
-		recordContentRevision(uc.revision, uc.log, copyPage.ID, in.UserID, "page copied")
-	}
+	uc.orchestrator.Run(pagesave.PageSaveEvent{
+		Operation: pagesave.PageOperationCreate,
+		UserID:    in.UserID,
+		After:     copyPage,
+		Summary:   "page copied",
+	})
 
 	return &CopyPageOutput{Page: copyPage}, nil
 }

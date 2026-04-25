@@ -2,13 +2,11 @@ package pages
 
 import (
 	"context"
-	"log"
 	"log/slog"
 
-	"github.com/perber/wiki/internal/core/revision"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
-	"github.com/perber/wiki/internal/links"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
 // UpdatePageInput is the input for UpdatePageUseCase.
@@ -29,25 +27,23 @@ type UpdatePageOutput struct {
 
 // UpdatePageUseCase updates an existing page's content and/or structure.
 type UpdatePageUseCase struct {
-	tree     *tree.TreeService
-	slug     *tree.SlugService
-	revision *revision.Service
-	links    *links.LinkService
-	log      *slog.Logger
+	tree         *tree.TreeService
+	slug         *tree.SlugService
+	orchestrator *pagesave.PageSaveOrchestrator
+	log          *slog.Logger
 }
 
 // NewUpdatePageUseCase constructs an UpdatePageUseCase.
 func NewUpdatePageUseCase(
 	t *tree.TreeService,
 	s *tree.SlugService,
-	r *revision.Service,
-	l *links.LinkService,
+	o *pagesave.PageSaveOrchestrator,
 	log *slog.Logger,
 ) *UpdatePageUseCase {
-	return &UpdatePageUseCase{tree: t, slug: s, revision: r, links: l, log: log}
+	return &UpdatePageUseCase{tree: t, slug: s, orchestrator: o, log: log}
 }
 
-// Execute validates, updates the node, maintains link indexes, and records a revision.
+// Execute validates, updates the node, and fires post-save side effects.
 func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*UpdatePageOutput, error) {
 	ve := sharederrors.NewValidationErrors()
 	if in.Title == "" {
@@ -67,12 +63,15 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 	if err := requireCurrentPageVersion(before, in.Version); err != nil {
 		return nil, err
 	}
+
+	slugChanged := in.Slug != before.Slug
+	oldPath := before.CalculatePath()
+	// Snapshot mutable fields before UpdateNode mutates the live tree node.
 	oldTitle := before.Title
-	oldPrefix := before.CalculatePath()
-	renameOrPathChange := in.Slug != before.Slug
+	oldContent := before.Content
 
 	var subtreeIDs []string
-	if renameOrPathChange {
+	if slugChanged {
 		subtreeIDs = collectSubtreeIDs(before.PageNode)
 		if len(subtreeIDs) == 0 {
 			subtreeIDs = []string{in.ID}
@@ -87,56 +86,33 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 	if err != nil {
 		return nil, err
 	}
-	contentChanged := before.Content != after.Content
+
+	contentChanged := oldContent != after.Content
 	titleChanged := oldTitle != after.Title
 
-	if uc.links != nil {
-		if renameOrPathChange {
-			if oldPrefix != "" {
-				if err := uc.links.MarkLinksBrokenForPrefix(oldPrefix); err != nil {
-					log.Printf("warning: could not mark links broken for prefix %s: %v", oldPrefix, err)
-				}
+	event := pagesave.PageSaveEvent{
+		Operation:      pagesave.PageOperationUpdate,
+		UserID:         in.UserID,
+		Before:         before,
+		After:          after,
+		OldPath:        oldPath,
+		ContentChanged: contentChanged,
+		SlugChanged:    slugChanged,
+		TitleChanged:   titleChanged,
+	}
+
+	if slugChanged {
+		for _, pid := range subtreeIDs {
+			p, err := uc.tree.GetPage(pid)
+			if err != nil {
+				uc.log.Warn("failed to get page for affected list", "pageID", pid, "error", err)
+				continue
 			}
-			for _, pid := range subtreeIDs {
-				p, err := uc.tree.GetPage(pid)
-				if err != nil {
-					log.Printf("warning: failed to get page %s for healing links: %v", pid, err)
-					continue
-				}
-				if err := uc.links.UpdateLinksForPage(p, p.Content); err != nil {
-					log.Printf("warning: failed to update links for page %s: %v", pid, err)
-				}
-				if err := uc.links.HealLinksForExactPath(p); err != nil {
-					log.Printf("warning: failed to heal links for page %s: %v", p.ID, err)
-				}
-			}
-		} else {
-			if in.Content != nil {
-				if err := uc.links.UpdateLinksForPage(after, *in.Content); err != nil {
-					log.Printf("warning: failed to update links for page %s: %v", after.ID, err)
-				}
-			}
-			if err := uc.links.HealLinksForExactPath(after); err != nil {
-				log.Printf("warning: failed to heal links for page %s: %v", after.ID, err)
-			}
+			event.AffectedPages = append(event.AffectedPages, p)
 		}
 	}
 
-	if uc.revision != nil {
-		if renameOrPathChange {
-			for _, pid := range subtreeIDs {
-				if contentChanged && pid == in.ID {
-					continue
-				}
-				recordStructureRevision(uc.revision, uc.log, pid, in.UserID)
-			}
-		} else if titleChanged && !contentChanged {
-			recordStructureRevision(uc.revision, uc.log, in.ID, in.UserID)
-		}
-		if contentChanged {
-			recordContentRevision(uc.revision, uc.log, in.ID, in.UserID, "")
-		}
-	}
+	uc.orchestrator.Run(event)
 
 	return &UpdatePageOutput{Page: after}, nil
 }

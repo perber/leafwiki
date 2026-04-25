@@ -10,6 +10,7 @@ import (
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
 const (
@@ -276,9 +277,14 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		}
 	}
 
+	o := pagesave.NewPageSaveOrchestrator(
+		pagesave.NewLinkIndexSideEffect(uc.links, uc.log),
+		pagesave.NewRevisionSideEffect(uc.revision, uc.log),
+	)
+
 	switch in.Kind {
 	case RefactorKindRename:
-		updateUC := NewUpdatePageUseCase(uc.tree, uc.slug, uc.revision, uc.links, uc.log)
+		updateUC := NewUpdatePageUseCase(uc.tree, uc.slug, o, uc.log)
 		updated, err := updateUC.Execute(ctx, UpdatePageInput{
 			UserID:  in.UserID,
 			ID:      in.PageID,
@@ -301,7 +307,7 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		if in.NewParentID != nil {
 			parentID = *in.NewParentID
 		}
-		moveUC := NewMovePageUseCase(uc.tree, uc.revision, uc.links, uc.log)
+		moveUC := NewMovePageUseCase(uc.tree, o, uc.log)
 		if err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, Version: in.Version, ParentID: parentID}); err != nil {
 			return nil, err
 		}
@@ -353,7 +359,8 @@ func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected
 	for _, ap := range affected {
 		page, err := uc.tree.GetPage(ap.FromPageID)
 		if err != nil {
-			return err
+			uc.log.Warn("failed to get page for link rewrite, skipping", "pageID", ap.FromPageID, "error", err)
+			continue
 		}
 		result := engine.Rewrite(page.Content, page.CalculatePath(), rules)
 		if result.Count() == 0 || result.Content == page.Content {
@@ -361,18 +368,22 @@ func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected
 		}
 		content := result.Content
 		if err := uc.tree.UpdateNode(userID, page.ID, page.Title, page.Slug, &content); err != nil {
-			return err
+			uc.log.Warn("failed to rewrite links in page, skipping", "pageID", page.ID, "error", err)
+			continue
 		}
 		if uc.revision != nil {
-			recordContentRevision(uc.revision, uc.log, page.ID, userID, "")
+			if _, _, err := uc.revision.RecordContentUpdate(page.ID, userID, ""); err != nil {
+				uc.log.Warn("failed to record content revision", "pageID", page.ID, "error", err)
+			}
 		}
 		if uc.links != nil {
 			updated, err := uc.tree.GetPage(page.ID)
 			if err != nil {
-				return err
+				uc.log.Warn("failed to re-fetch page after link rewrite", "pageID", page.ID, "error", err)
+				continue
 			}
 			if err := uc.links.UpdateLinksForPage(updated, content); err != nil {
-				return err
+				uc.log.Warn("failed to update link index after rewrite", "pageID", page.ID, "error", err)
 			}
 		}
 	}
@@ -385,7 +396,8 @@ func (uc *ApplyPageRefactorUseCase) rewritePathChangedSubtree(userID string, sna
 	for _, snap := range snapshots {
 		current, err := uc.tree.GetPage(snap.PageID)
 		if err != nil {
-			return err
+			uc.log.Warn("failed to get subtree page for link rewrite, skipping", "pageID", snap.PageID, "error", err)
+			continue
 		}
 		result := engine.RewriteRelativeLinksForPathChange(snap.Content, snap.OldPath, current.CalculatePath(), rules)
 		if result.Count() == 0 && snap.Content == current.Content {
@@ -396,21 +408,25 @@ func (uc *ApplyPageRefactorUseCase) rewritePathChangedSubtree(userID string, sna
 			continue
 		}
 		if err := uc.tree.UpdateNode(userID, current.ID, current.Title, current.Slug, &content); err != nil {
-			return err
+			uc.log.Warn("failed to rewrite relative links in subtree page, skipping", "pageID", current.ID, "error", err)
+			continue
 		}
 		if uc.revision != nil {
-			recordContentRevision(uc.revision, uc.log, current.ID, userID, "")
+			if _, _, err := uc.revision.RecordContentUpdate(current.ID, userID, ""); err != nil {
+				uc.log.Warn("failed to record content revision", "pageID", current.ID, "error", err)
+			}
 		}
 		if uc.links != nil {
 			updated, err := uc.tree.GetPage(current.ID)
 			if err != nil {
-				return err
+				uc.log.Warn("failed to re-fetch subtree page after link rewrite", "pageID", current.ID, "error", err)
+				continue
 			}
 			if err := uc.links.UpdateLinksForPage(updated, content); err != nil {
-				return err
+				uc.log.Warn("failed to update link index after subtree rewrite", "pageID", current.ID, "error", err)
 			}
 			if err := uc.links.HealLinksForExactPath(updated); err != nil {
-				return err
+				uc.log.Warn("failed to heal links after subtree rewrite", "pageID", current.ID, "error", err)
 			}
 		}
 	}

@@ -24,6 +24,7 @@ import (
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
 )
@@ -199,21 +200,29 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 
 // ─── Domain route builder helpers ────────────────────────────────────────────
 
+func (w *Wiki) newPageOrchestrator() *pagesave.PageSaveOrchestrator {
+	return pagesave.NewPageSaveOrchestrator(
+		pagesave.NewLinkIndexSideEffect(w.links, w.log),
+		pagesave.NewRevisionSideEffect(w.revision, w.log),
+	)
+}
+
 func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
+	o := w.newPageOrchestrator()
 	return wikipages.NewRoutes(wikipages.RoutesConfig{
 		TreeService:      w.tree,
-		CreatePage:       wikipages.NewCreatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log),
-		UpdatePage:       wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log),
-		DeletePage:       wikipages.NewDeletePageUseCase(w.tree, w.revision, w.links, w.asset, w.log),
-		MovePage:         wikipages.NewMovePageUseCase(w.tree, w.revision, w.links, w.log),
+		CreatePage:       wikipages.NewCreatePageUseCase(w.tree, w.slug, o, w.log),
+		UpdatePage:       wikipages.NewUpdatePageUseCase(w.tree, w.slug, o, w.log),
+		DeletePage:       wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, o, w.log),
+		MovePage:         wikipages.NewMovePageUseCase(w.tree, o, w.log),
 		ConvertPage:      wikipages.NewConvertPageUseCase(w.tree, w.revision, w.log),
-		CopyPage:         wikipages.NewCopyPageUseCase(w.tree, w.slug, w.revision, w.links, w.asset, w.log),
+		CopyPage:         wikipages.NewCopyPageUseCase(w.tree, w.slug, o, w.asset, w.log),
 		GetPage:          wikipages.NewGetPageUseCase(w.tree),
 		FindByPath:       wikipages.NewFindByPathUseCase(w.tree),
 		LookupPath:       wikipages.NewLookupPagePathUseCase(w.tree),
 		ResolvePermalink: wikipages.NewResolvePermalinkUseCase(w.tree),
 		SortPages:        wikipages.NewSortPagesUseCase(w.tree),
-		EnsurePath:       wikipages.NewEnsurePathUseCase(w.tree, w.slug, w.revision, w.links, w.log),
+		EnsurePath:       wikipages.NewEnsurePathUseCase(w.tree, w.slug, o, w.log),
 		SuggestSlug:      wikipages.NewSuggestSlugUseCase(w.tree, w.slug),
 		PreviewRefactor:  wikipages.NewPreviewPageRefactorUseCase(w.tree, w.slug, w.links, w.log),
 		ApplyRefactor:    wikipages.NewApplyPageRefactorUseCase(w.tree, w.slug, w.revision, w.links, w.log),
@@ -256,7 +265,7 @@ func (w *Wiki) buildRevisionsRoutes() *wikirevisions.Routes {
 		CompareRevisions: wikirevisions.NewCompareRevisionsUseCase(w.revision),
 		GetRevisionAsset: wikirevisions.NewGetRevisionAssetUseCase(w.revision),
 		GetLatest:        wikirevisions.NewGetLatestRevisionUseCase(w.revision),
-		RestoreRevision:  wikirevisions.NewRestoreRevisionUseCase(w.revision, w.tree, w.links, w.log),
+		RestoreRevision:  wikirevisions.NewRestoreRevisionUseCase(w.revision, w.tree, w.newPageOrchestrator(), w.log),
 		CheckIntegrity:   wikirevisions.NewCheckIntegrityUseCase(w.revision),
 		UserResolver:     w.userResolver,
 		AuthService:      w.auth,
@@ -344,8 +353,9 @@ func (w *Wiki) EnsureWelcomePage() error {
 		w.log.Info("Welcome page already exists, skipping creation")
 		return nil
 	}
+	o := w.newPageOrchestrator()
 	k := tree.NodeKindPage
-	createOut, err := wikipages.NewCreatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log).Execute(
+	createOut, err := wikipages.NewCreatePageUseCase(w.tree, w.slug, o, w.log).Execute(
 		context.Background(),
 		wikipages.CreatePageInput{UserID: SYSTEM_USER_ID, Title: "Welcome to LeafWiki", Slug: "welcome-to-leafwiki", Kind: &k},
 	)
@@ -390,7 +400,7 @@ For more information, visit the [LeafWiki GitHub repository](https://github.com/
 	if err != nil {
 		return err
 	}
-	if _, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.revision, w.links, w.log).Execute(
+	if _, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, o, w.log).Execute(
 		context.Background(),
 		wikipages.UpdatePageInput{UserID: SYSTEM_USER_ID, ID: p.ID, Version: current.Version(), Title: p.Title, Slug: p.Slug, Content: &content, Kind: &k},
 	); err != nil {
