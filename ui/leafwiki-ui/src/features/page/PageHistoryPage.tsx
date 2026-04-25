@@ -6,7 +6,7 @@ import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useToolbarStore } from '../toolbar/toolbar'
-import { toWikiLookupPath } from '@/lib/wikiPath'
+import { getWikiTargetRoutePath, toWikiLookupPath } from '@/lib/wikiPath'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import { useSetPageTitle } from '../viewer/useSetPageTitle'
@@ -74,7 +74,13 @@ export default function PageHistoryPage() {
 
   const renderError = () => {
     if (!loading && !page) {
-      return <Page404 />
+      return (
+        <div className="page-viewer__body page-history-page__body">
+          <article className="page-history-page__content">
+            <Page404 targetPath={getWikiTargetRoutePath(pathname)} />
+          </article>
+        </div>
+      )
     }
     if (!loading && error) {
       return <p className="page-viewer__error">Error: {error}</p>

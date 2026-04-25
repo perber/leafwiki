@@ -1243,6 +1243,7 @@ Paragraph outside the list.
     await notfoundPage.goto(pagePath);
 
     test.expect(await notfoundPage.isNotFoundPage()).toBeTruthy();
+    await notfoundPage.expectCreatePageButtonVisible();
 
     await notfoundPage.clickCreatePageButton();
     const createPageByPathDialog = new CreatePageByPathDialog(page);
@@ -1256,6 +1257,36 @@ Paragraph outside the list.
     const viewPage = new ViewPage(page);
     const pageTitle = await viewPage.getTitle();
     test.expect(pageTitle).toBe(slug);
+  });
+
+  test('not-found-on-edit-page-hides-create-page-cta', async ({ page }) => {
+    const slug = `missing-edit-${Date.now()}`;
+    const notfoundPage = new NotFoundPage(page);
+
+    await notfoundPage.goto(`/e/${slug}`);
+
+    test.expect(await notfoundPage.isNotFoundPage()).toBeTruthy();
+    await notfoundPage.expectCreatePageButtonHidden();
+  });
+
+  test('not-found-on-history-page-hides-create-page-cta', async ({ page }) => {
+    const slug = `missing-history-${Date.now()}`;
+    const notfoundPage = new NotFoundPage(page);
+
+    await notfoundPage.goto(`/history/${slug}`);
+
+    test.expect(await notfoundPage.isNotFoundPage()).toBeTruthy();
+    await notfoundPage.expectCreatePageButtonHidden();
+    await expect(page.locator('.page-history-page .page-viewer__body')).toBeVisible();
+  });
+
+  test('not-found-for-reserved-slug-hides-create-page-cta', async ({ page }) => {
+    const notfoundPage = new NotFoundPage(page);
+
+    await notfoundPage.goto('/settings');
+
+    test.expect(await notfoundPage.isNotFoundPage()).toBeTruthy();
+    await notfoundPage.expectCreatePageButtonHidden();
   });
 
   // test move

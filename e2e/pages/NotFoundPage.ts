@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
 import { toAppPath } from './appPath';
 
 export default class NotFoundPage {
@@ -16,12 +17,19 @@ export default class NotFoundPage {
   }
 
   async getCreatePageButton() {
-    // main button selector
-    return this.page.locator('main button').first();
+    return this.page.getByTestId('page404-create-page-button');
   }
 
   async clickCreatePageButton() {
     const createPageButton = await this.getCreatePageButton();
     await createPageButton.click();
+  }
+
+  async expectCreatePageButtonVisible() {
+    await expect(this.getCreatePageButton()).toBeVisible();
+  }
+
+  async expectCreatePageButtonHidden() {
+    await expect(this.getCreatePageButton()).toHaveCount(0);
   }
 }
