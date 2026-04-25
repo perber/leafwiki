@@ -147,7 +147,8 @@ export default function PageEditor() {
 
   if (error) return <p className="page-editor__error">Error: {error}</p>
 
-  if (!initialPage && !loading) return null
+  if (!initialPage && !loading)
+    return <Page404 targetPath={getWikiTargetRoutePath(pathname)} />
 
   return (
     <>

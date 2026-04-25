@@ -136,10 +136,11 @@ async function createPageWithContent(
 }
 
 async function navigateWithinApp(page: import('@playwright/test').Page, path: string) {
+  const appPath = toAppPath(path);
   await page.evaluate((nextPath) => {
     window.history.pushState({}, '', nextPath);
     window.dispatchEvent(new PopStateEvent('popstate'));
-  }, path);
+  }, appPath);
 }
 
 async function expectEditAndSaveShortcutWorks(
