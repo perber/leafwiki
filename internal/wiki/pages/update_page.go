@@ -56,6 +56,8 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 		return nil, ve
 	}
 
+	in.Version = sanitizeClientVersion(in.Version)
+
 	before, err := uc.tree.GetPage(in.ID)
 	if err != nil {
 		return nil, err

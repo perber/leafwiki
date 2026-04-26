@@ -297,6 +297,33 @@ func TestUpdatePageUseCase_VersionConflict_ReturnsVersionConflictError(t *testin
 	}
 }
 
+func TestUpdatePageUseCase_VersionUncheckedSentinel_TreatedAsVersionRequired(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+
+	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", Title: "Page", Slug: "page", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating page: %v", err)
+	}
+
+	content := "new content"
+	_, err = updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID:  "user1",
+		ID:      created.Page.ID,
+		Version: tree.VersionUnchecked,
+		Title:   "Page",
+		Slug:    "page",
+		Content: &content,
+		Kind:    pageKind(),
+	})
+	if !errors.Is(err, tree.ErrVersionRequired) {
+		t.Fatalf("expected ErrVersionRequired when sending VersionUnchecked sentinel, got %v", err)
+	}
+}
+
 func TestUpdatePageUseCase_EmptyTitle_ReturnsValidationError(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())

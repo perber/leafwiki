@@ -33,6 +33,7 @@ func (uc *ConvertPageUseCase) Execute(_ context.Context, in ConvertPageInput) er
 	if in.ID == "root" || in.ID == "" {
 		return newPageRootOperationError("convert")
 	}
+	in.Version = sanitizeClientVersion(in.Version)
 	if err := uc.tree.ConvertNode(in.UserID, in.ID, in.TargetKind, in.Version); err != nil {
 		return err
 	}

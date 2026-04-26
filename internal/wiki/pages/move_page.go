@@ -38,6 +38,8 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 		return newPageRootOperationError("move")
 	}
 
+	in.Version = sanitizeClientVersion(in.Version)
+
 	var subtreeIDs []string
 	var beforePage *tree.Page
 

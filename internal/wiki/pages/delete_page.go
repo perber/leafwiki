@@ -44,6 +44,8 @@ func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) erro
 		return newPageRootOperationError("delete")
 	}
 
+	in.Version = sanitizeClientVersion(in.Version)
+
 	page, err := uc.tree.GetPage(in.ID)
 	if err != nil {
 		return err

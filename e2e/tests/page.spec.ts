@@ -135,6 +135,69 @@ async function createPageWithContent(
   }, input);
 }
 
+async function updatePageByPath(
+  page: import('@playwright/test').Page,
+  input: { path: string; title?: string; slug?: string; content: string },
+) {
+  await page.evaluate(async ({ path, title, slug, content }) => {
+    function getCsrfTokenFromCookie(): string | null {
+      const hostMatch =
+        document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+        document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
+
+      if (!hostMatch) return null;
+
+      try {
+        return decodeURIComponent(hostMatch[1]);
+      } catch {
+        return hostMatch[1];
+      }
+    }
+
+    const csrfToken = getCsrfTokenFromCookie();
+    if (!csrfToken) {
+      throw new Error('Missing CSRF token cookie for test page update');
+    }
+
+    const pageResponse = await fetch(`/api/pages/by-path?path=${encodeURIComponent(path)}`, {
+      credentials: 'include',
+      headers: {
+        'X-CSRF-Token': csrfToken,
+      },
+    });
+
+    if (!pageResponse.ok) {
+      throw new Error(`Failed to load page ${path}: ${pageResponse.status}`);
+    }
+
+    const currentPage = (await pageResponse.json()) as {
+      id: string;
+      title: string;
+      slug: string;
+      version: string;
+    };
+
+    const updateResponse = await fetch(`/api/pages/${currentPage.id}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({
+        version: currentPage.version,
+        title: title ?? currentPage.title,
+        slug: slug ?? currentPage.slug,
+        content,
+      }),
+    });
+
+    if (!updateResponse.ok) {
+      throw new Error(`Failed to update page ${path}: ${updateResponse.status}`);
+    }
+  }, input);
+}
+
 async function navigateWithinApp(page: import('@playwright/test').Page, path: string) {
   const appPath = toAppPath(path);
   await page.evaluate((nextPath) => {
@@ -515,6 +578,51 @@ for the page edited at ${new Date().toISOString()}
     const content = await viewPage.getContent();
     test.expect(content).toContain('This is the new content!');
     test.expect(content).toContain('Bold Text');
+  });
+
+  test('edit-page-recovers-from-optimistic-lock-conflict', async ({ page }) => {
+    const stamp = Date.now();
+    const title = `Optimistic Lock Page ${stamp}`;
+    const slug = `optimistic-lock-page-${stamp}`;
+    const originalContent = 'Original content before concurrent edit.\n';
+    const remoteContent = 'Content saved from another request.';
+    const localDraft = '\nLocal draft that should win after save anyway.';
+
+    await createPageWithContent(page, {
+      title,
+      slug,
+      content: originalContent,
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent(localDraft);
+
+    await updatePageByPath(page, {
+      path: `/${slug}`,
+      content: remoteContent,
+    });
+
+    await page.locator('button[data-testid="save-page-button"]').click();
+
+    await page.getByTestId('page-save-version-conflict-toast').waitFor({
+      state: 'visible',
+    });
+
+    await page.getByTestId('page-save-version-conflict-action').click();
+    await page.getByText('Page saved successfully').last().waitFor({
+      state: 'visible',
+    });
+
+    await editPage.closeEditor();
+
+    const content = await viewPage.getContent();
+    test.expect(content).toContain('Original content before concurrent edit.');
+    test.expect(content).toContain('Local draft that should win after save anyway.');
+    test.expect(content).not.toContain(remoteContent);
   });
 
   test('opened page stays marked in navigation during edit mode without base path', async ({
