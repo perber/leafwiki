@@ -209,8 +209,13 @@ func backfillChildOrder(deps Dependencies, node Node) error {
 
 	children := node.Children()
 	if len(children) > 0 {
-		if err := deps.Store.SaveChildOrder(node); err != nil {
-			return fmt.Errorf("persist child order for node %s: %w", node.ID(), err)
+		if node.ID() == "root" || node.Kind() == NodeKindSection {
+			if err := deps.Store.SaveChildOrder(node); err != nil {
+				return fmt.Errorf("persist child order for node %s: %w", node.ID(), err)
+			}
+		} else {
+			deps.Log.Warn("skipping child order backfill for non-section node with children — likely caused by a folder and .md file sharing the same name in a previous version",
+				"nodeID", node.ID(), "slug", node.Slug(), "kind", node.Kind())
 		}
 	}
 

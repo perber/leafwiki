@@ -377,6 +377,58 @@ func TestTreeMigration_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *
 	}
 }
 
+func TestTreeMigration_LoadTree_MigratesToV5_PageNodeWithChildrenDoesNotBreakMigration(t *testing.T) {
+	// Regression test for: https://github.com/perber/wiki/issues/932
+	// Legacy trees could contain page nodes that have children (e.g. when a directory and
+	// an .md file share the same name). The V5 migration must not try to write a .order.json
+	// for such page nodes — only root and section nodes carry child-order files.
+	if tree.CurrentSchemaVersion < 5 {
+		t.Skip("requires schema v5+")
+	}
+
+	tmpDir := t.TempDir()
+	writeSchema(t, tmpDir, tree.CurrentSchemaVersion)
+
+	svc := tree.NewTreeService(tmpDir)
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	// Build: root → notes (section) → guide (page)
+	notesID, err := svc.CreateNode("system", nil, "Notes", "notes", ptrKind(tree.NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode notes failed: %v", err)
+	}
+	_, err = svc.CreateNode("system", notesID, "Guide", "guide", ptrKind(tree.NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode guide failed: %v", err)
+	}
+
+	// Corrupt the tree snapshot: flip "notes" kind from section → page to simulate
+	// the legacy data shape reported in issue #932 (folder and .md file with same name).
+	root := svc.GetTree()
+	for _, child := range root.Children {
+		if child.ID == *notesID {
+			child.Kind = tree.NodeKindPage
+		}
+	}
+
+	if err := os.Remove(filepath.Join(tmpDir, "root", ".order.json")); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("remove root order file: %v", err)
+	}
+	if err := os.Remove(filepath.Join(tmpDir, "root", "notes", ".order.json")); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("remove notes order file: %v", err)
+	}
+
+	persistLegacyTreeSnapshot(t, tmpDir, root)
+	writeSchema(t, tmpDir, 4)
+
+	loaded := tree.NewTreeService(tmpDir)
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("migration failed for page node with children (issue #932): %v", err)
+	}
+}
+
 func TestTreeMigration_LoadTree_MigratesToV5_ReturnsErrorWhenOrderFileCannotBeWritten(t *testing.T) {
 	if tree.CurrentSchemaVersion < 5 {
 		t.Skip("requires schema v5+")
