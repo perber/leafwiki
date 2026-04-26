@@ -253,7 +253,7 @@ func TestTreeService_TreeHash_ChangesWhenTreeChanges(t *testing.T) {
 		t.Fatalf("expected hash to change after create")
 	}
 
-	if err := svc.UpdateNode("system", *pageID, "Welcome 2", "welcome", nil); err != nil {
+	if err := svc.UpdateNode("system", *pageID, "Welcome 2", "welcome", nil, VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 	afterUpdate := svc.TreeHash()
@@ -568,7 +568,7 @@ func TestTreeService_UpdateNode_TitleOnly_SyncsFrontmatterIfFileExists(t *testin
 	mustStat(t, p)
 
 	// Update title only: content=nil, slug unchanged
-	if err := svc.UpdateNode("system", *id, "Documentation", "docs", nil); err != nil {
+	if err := svc.UpdateNode("system", *id, "Documentation", "docs", nil, VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -600,7 +600,7 @@ func TestTreeService_UpdateNode_SlugRename_RenamesOnDisk(t *testing.T) {
 	mustStat(t, oldPath)
 
 	newSlug := "documentation"
-	if err := svc.UpdateNode("system", *id, "Docs", newSlug, nil); err != nil {
+	if err := svc.UpdateNode("system", *id, "Docs", newSlug, nil, VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -621,7 +621,7 @@ func TestTreeService_UpdateNode_RejectsCaseInsensitiveSlugConflict(t *testing.T)
 		t.Fatalf("CreateNode second failed: %v", err)
 	}
 
-	err = svc.UpdateNode("system", *secondID, "Beta", "alpha", nil)
+	err = svc.UpdateNode("system", *secondID, "Beta", "alpha", nil, VersionUnchecked)
 	if !errors.Is(err, ErrPageAlreadyExists) {
 		t.Fatalf("expected ErrPageAlreadyExists, got %v", err)
 	}
@@ -651,7 +651,7 @@ func TestTreeService_UpdateNode_SectionToPage_DisallowedWithChildren(t *testing.
 	}
 
 	// Now parent is section with children, attempt to convert back to page
-	err = svc.UpdateNode("system", *parentID, "Docs", "docs", nil)
+	err = svc.UpdateNode("system", *parentID, "Docs", "docs", nil, VersionUnchecked)
 	if err == nil {
 		t.Fatalf("expected error converting section->page with children")
 	}
@@ -667,7 +667,7 @@ func TestTreeService_DeleteNode_NonRecursiveErrorsWhenHasChildren(t *testing.T) 
 	parentID, _ := svc.CreateNode("system", nil, "Parent", "parent", ptrKind(NodeKindPage))
 	_, _ = svc.CreateNode("system", parentID, "Child", "child", ptrKind(NodeKindPage))
 
-	err := svc.DeleteNode("system", *parentID, false)
+	err := svc.DeleteNode("system", *parentID, false, VersionUnchecked)
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -686,7 +686,7 @@ func TestTreeService_DeleteNode_RecursiveDeletesDiskAndTree(t *testing.T) {
 	parentDir := filepath.Join(tmpDir, "root", "parent")
 	mustStat(t, parentDir)
 
-	err := svc.DeleteNode("system", *parentID, true)
+	err := svc.DeleteNode("system", *parentID, true, VersionUnchecked)
 	if err != nil {
 		t.Fatalf("DeleteNode recursive failed: %v", err)
 	}
@@ -726,7 +726,7 @@ func TestTreeService_DeletePage_Leaf_Success_RemovesFileAndTreeAndReindexes(t *t
 	}
 
 	// Delete middle page (B)
-	if err := svc.DeleteNode("system", *idB, false); err != nil {
+	if err := svc.DeleteNode("system", *idB, false, VersionUnchecked); err != nil {
 		t.Fatalf("DeleteNode failed: %v", err)
 	}
 
@@ -781,7 +781,7 @@ func TestTreeService_DeleteNode_UpdatesRootOrderFile(t *testing.T) {
 		t.Fatalf("CreateNode C: %v", err)
 	}
 
-	if err := svc.DeleteNode("system", *idB, false); err != nil {
+	if err := svc.DeleteNode("system", *idB, false, VersionUnchecked); err != nil {
 		t.Fatalf("DeleteNode failed: %v", err)
 	}
 
@@ -805,7 +805,7 @@ func TestTreeService_DeletePage_WithChildren_NonRecursive_ReturnsErrPageHasChild
 		t.Fatalf("CreateNode child: %v", err)
 	}
 
-	err = svc.DeleteNode("system", *parentID, false)
+	err = svc.DeleteNode("system", *parentID, false, VersionUnchecked)
 	if err == nil {
 		t.Fatalf("expected error deleting page with children without recursive")
 	}
@@ -833,7 +833,7 @@ func TestTreeService_DeletePage_WithChildren_Recursive_DeletesFolder(t *testing.
 	}
 
 	// Recursive delete should remove the folder
-	if err := svc.DeleteNode("system", *parentID, true); err != nil {
+	if err := svc.DeleteNode("system", *parentID, true, VersionUnchecked); err != nil {
 		t.Fatalf("DeleteNode recursive failed: %v", err)
 	}
 
@@ -850,7 +850,7 @@ func TestTreeService_DeletePage_WithChildren_Recursive_DeletesFolder(t *testing.
 func TestTreeService_DeletePage_InvalidID_ReturnsErrPageNotFound(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
-	err := svc.DeleteNode("system", "does-not-exist", false)
+	err := svc.DeleteNode("system", "does-not-exist", false, VersionUnchecked)
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -875,7 +875,7 @@ func TestTreeService_DeletePage_Drift_FileMissing_ReturnsError(t *testing.T) {
 	}
 
 	// Now delete node - should error (drift)
-	err = svc.DeleteNode("system", *id, false)
+	err = svc.DeleteNode("system", *id, false, VersionUnchecked)
 	if err == nil {
 		t.Fatalf("expected drift error")
 	}
@@ -895,7 +895,7 @@ func TestTreeService_MoveNode_TargetPageAutoConvertsToSection(t *testing.T) {
 	bID, _ := svc.CreateNode("system", nil, "B", "b", ptrKind(NodeKindPage))
 
 	// Move A under B (B is a page => should auto-convert to section)
-	if err := svc.MoveNode("system", *aID, *bID); err != nil {
+	if err := svc.MoveNode("system", *aID, *bID, VersionUnchecked); err != nil {
 		t.Fatalf("MoveNode failed: %v", err)
 	}
 
@@ -929,7 +929,7 @@ func TestTreeService_MoveNode_UpdatesSourceAndDestinationOrderFiles(t *testing.T
 		t.Fatalf("CreateNode nested: %v", err)
 	}
 
-	if err := svc.MoveNode("system", *moveID, *destID); err != nil {
+	if err := svc.MoveNode("system", *moveID, *destID, VersionUnchecked); err != nil {
 		t.Fatalf("MoveNode failed: %v", err)
 	}
 
@@ -964,7 +964,7 @@ func TestTreeService_MoveNode_PersistsMovedNodeMetadataToFrontmatter(t *testing.
 	}
 	beforeUpdatedAt := node.Metadata.UpdatedAt
 
-	if err := svc.MoveNode("alice", *moveID, *destID); err != nil {
+	if err := svc.MoveNode("alice", *moveID, *destID, VersionUnchecked); err != nil {
 		t.Fatalf("MoveNode failed: %v", err)
 	}
 
@@ -1027,7 +1027,7 @@ func TestTreeService_MoveNode_ReturnsErrorAndRollsBackWhenOrderPersistenceFails(
 	}
 	mustMkdir(t, filepath.Join(tmpDir, "root", "dest", ".order.json"))
 
-	err = svc.MoveNode("system", *moveID, *destID)
+	err = svc.MoveNode("system", *moveID, *destID, VersionUnchecked)
 	if err == nil {
 		t.Fatal("expected MoveNode to fail when child order persistence fails")
 	}
@@ -1061,7 +1061,7 @@ func TestTreeService_MoveNode_PreventsCircularReference(t *testing.T) {
 	bID, _ := svc.CreateNode("system", aID, "B", "b", ptrKind(NodeKindPage))
 
 	// Try move A under B (A -> ... -> B). Should error with circular reference.
-	err := svc.MoveNode("system", *aID, *bID)
+	err := svc.MoveNode("system", *aID, *bID, VersionUnchecked)
 	if err == nil {
 		t.Fatalf("expected error moving node under its descendant")
 	}
@@ -1075,7 +1075,7 @@ func TestTreeService_MoveNode_PreventsSelfParent(t *testing.T) {
 
 	aID, _ := svc.CreateNode("system", nil, "A", "a", ptrKind(NodeKindPage))
 
-	err := svc.MoveNode("system", *aID, *aID)
+	err := svc.MoveNode("system", *aID, *aID, VersionUnchecked)
 	if err == nil {
 		t.Fatalf("expected error moving node into itself")
 	}
@@ -1099,7 +1099,7 @@ func TestTreeService_MoveNode_RejectsCaseInsensitiveSlugConflict(t *testing.T) {
 		t.Fatalf("CreateNode existing failed: %v", err)
 	}
 
-	err = svc.MoveNode("system", *moveID, *parentID)
+	err = svc.MoveNode("system", *moveID, *parentID, VersionUnchecked)
 	if !errors.Is(err, ErrPageAlreadyExists) {
 		t.Fatalf("expected ErrPageAlreadyExists, got %v", err)
 	}
@@ -1293,7 +1293,7 @@ func TestTreeService_ConvertNode_PageToSection_MaterializesIndexWithNodeMetadata
 	node.Metadata.CreatorID = "alice"
 	node.Metadata.LastAuthorID = "bob"
 
-	if err := svc.ConvertNode("carol", *id, NodeKindSection); err != nil {
+	if err := svc.ConvertNode("carol", *id, NodeKindSection, VersionUnchecked); err != nil {
 		t.Fatalf("ConvertNode failed: %v", err)
 	}
 
@@ -1338,7 +1338,7 @@ func TestTreeService_FindPageByRoutePath_ReturnsContent(t *testing.T) {
 	// Update specs content
 	specsNode := svc.GetTree().Children[0].Children[0].Children[0]
 	body := "# Specs\nHello"
-	if err := svc.UpdateNode("system", specsNode.ID, "Specs", "specs", &body); err != nil {
+	if err := svc.UpdateNode("system", specsNode.ID, "Specs", "specs", &body, VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode content failed: %v", err)
 	}
 
@@ -1454,7 +1454,7 @@ func TestTreeService_LookupPagePath_ReflectsSlugRename(t *testing.T) {
 		t.Fatalf("CreateNode guide failed: %v", err)
 	}
 
-	if err := svc.UpdateNode("system", *id, "Documentation", "documentation", nil); err != nil {
+	if err := svc.UpdateNode("system", *id, "Documentation", "documentation", nil, VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -1525,10 +1525,10 @@ func TestTreeService_ResolvePermalinkTarget_ReflectsRenameAndMove(t *testing.T) 
 		t.Fatalf("CreateNode archive failed: %v", err)
 	}
 
-	if err := svc.UpdateNode("system", *guideID, "User Guide", "user-guide", nil); err != nil {
+	if err := svc.UpdateNode("system", *guideID, "User Guide", "user-guide", nil, VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode guide failed: %v", err)
 	}
-	if err := svc.MoveNode("system", *guideID, *archiveID); err != nil {
+	if err := svc.MoveNode("system", *guideID, *archiveID, VersionUnchecked); err != nil {
 		t.Fatalf("MoveNode guide failed: %v", err)
 	}
 
@@ -1649,7 +1649,7 @@ func TestTreeService_MoveNode_UpdatesPathLookup(t *testing.T) {
 		t.Fatalf("CreateNode guide failed: %v", err)
 	}
 
-	if err := svc.MoveNode("system", *guideID, *archiveID); err != nil {
+	if err := svc.MoveNode("system", *guideID, *archiveID, VersionUnchecked); err != nil {
 		t.Fatalf("MoveNode failed: %v", err)
 	}
 
@@ -3110,5 +3110,137 @@ func TestTreeService_BulkUpdateContent_PartialFailure_RollsBackFailedMetadata(t 
 	}
 	if afterSecond.Metadata.LastAuthorID != beforeSecondAuthor {
 		t.Fatalf("expected second LastAuthorID restored, before=%q after=%q", beforeSecondAuthor, afterSecond.Metadata.LastAuthorID)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Optimistic locking: version check is enforced inside the write lock
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestTreeService_UpdateNode_StaleVersion_ReturnsErrVersionConflict(t *testing.T) {
+	svc, _ := newLoadedService(t)
+	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
+
+	node, _ := svc.FindPageByID(*id)
+	currentVersion := node.Version()
+
+	// First update succeeds — advances the version.
+	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, currentVersion); err != nil {
+		t.Fatalf("first UpdateNode failed: %v", err)
+	}
+
+	// Second update with the same (now stale) version must fail.
+	err := svc.UpdateNode("system", *id, "Page v3", "page", nil, currentVersion)
+	if !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("expected ErrVersionConflict, got %v", err)
+	}
+}
+
+func TestTreeService_UpdateNode_MissingVersion_ReturnsErrVersionRequired(t *testing.T) {
+	svc, _ := newLoadedService(t)
+	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
+
+	err := svc.UpdateNode("system", *id, "Page v2", "page", nil, "")
+	if !errors.Is(err, ErrVersionRequired) {
+		t.Fatalf("expected ErrVersionRequired, got %v", err)
+	}
+}
+
+func TestTreeService_DeleteNode_StaleVersion_ReturnsErrVersionConflict(t *testing.T) {
+	svc, _ := newLoadedService(t)
+	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
+
+	node, _ := svc.FindPageByID(*id)
+	staleVersion := node.Version()
+
+	// Advance the version via an update.
+	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, staleVersion); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	err := svc.DeleteNode("system", *id, false, staleVersion)
+	if !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("expected ErrVersionConflict, got %v", err)
+	}
+}
+
+func TestTreeService_DeleteNode_MissingVersion_ReturnsErrVersionRequired(t *testing.T) {
+	svc, _ := newLoadedService(t)
+	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
+
+	err := svc.DeleteNode("system", *id, false, "")
+	if !errors.Is(err, ErrVersionRequired) {
+		t.Fatalf("expected ErrVersionRequired, got %v", err)
+	}
+}
+
+func TestTreeService_MoveNode_StaleVersion_ReturnsErrVersionConflict(t *testing.T) {
+	svc, _ := newLoadedService(t)
+	destID, _ := svc.CreateNode("system", nil, "Dest", "dest", ptrKind(NodeKindPage))
+	moveID, _ := svc.CreateNode("system", nil, "Move", "move", ptrKind(NodeKindPage))
+
+	node, _ := svc.FindPageByID(*moveID)
+	staleVersion := node.Version()
+
+	// Advance the version.
+	if err := svc.UpdateNode("system", *moveID, "Move v2", "move", nil, staleVersion); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	err := svc.MoveNode("system", *moveID, *destID, staleVersion)
+	if !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("expected ErrVersionConflict, got %v", err)
+	}
+}
+
+func TestTreeService_MoveNode_MissingVersion_ReturnsErrVersionRequired(t *testing.T) {
+	svc, _ := newLoadedService(t)
+	destID, _ := svc.CreateNode("system", nil, "Dest", "dest", ptrKind(NodeKindPage))
+	moveID, _ := svc.CreateNode("system", nil, "Move", "move", ptrKind(NodeKindPage))
+
+	err := svc.MoveNode("system", *moveID, *destID, "")
+	if !errors.Is(err, ErrVersionRequired) {
+		t.Fatalf("expected ErrVersionRequired, got %v", err)
+	}
+}
+
+func TestTreeService_ConvertNode_StaleVersion_ReturnsErrVersionConflict(t *testing.T) {
+	svc, _ := newLoadedService(t)
+	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
+
+	node, _ := svc.FindPageByID(*id)
+	staleVersion := node.Version()
+
+	// Advance the version.
+	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, staleVersion); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	err := svc.ConvertNode("system", *id, NodeKindSection, staleVersion)
+	if !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("expected ErrVersionConflict, got %v", err)
+	}
+}
+
+func TestTreeService_ConvertNode_MissingVersion_ReturnsErrVersionRequired(t *testing.T) {
+	svc, _ := newLoadedService(t)
+	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
+
+	err := svc.ConvertNode("system", *id, NodeKindSection, "")
+	if !errors.Is(err, ErrVersionRequired) {
+		t.Fatalf("expected ErrVersionRequired, got %v", err)
+	}
+}
+
+func TestTreeService_VersionUnchecked_BypassesVersionCheck(t *testing.T) {
+	svc, _ := newLoadedService(t)
+	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
+
+	// VersionUnchecked must always succeed regardless of actual node version.
+	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, VersionUnchecked); err != nil {
+		t.Fatalf("expected VersionUnchecked to bypass check, got: %v", err)
+	}
+	if err := svc.UpdateNode("system", *id, "Page v3", "page", nil, VersionUnchecked); err != nil {
+		t.Fatalf("expected VersionUnchecked to bypass check on second call, got: %v", err)
 	}
 }

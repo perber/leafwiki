@@ -17,6 +17,12 @@ var ErrFileNotFound = errors.New("file not found")
 var ErrDrift = errors.New("drift detected")
 var ErrInvalidOperation = errors.New("invalid operation")
 var ErrConvertNotAllowed = errors.New("convert not allowed")
+var ErrVersionConflict = errors.New("version conflict")
+var ErrVersionRequired = errors.New("version required")
+
+// VersionUnchecked bypasses optimistic locking for internal system operations
+// that have no client-supplied version (e.g. revision restore, copy cleanup).
+const VersionUnchecked = "\x00"
 
 // DriftError represents a drift error with detailed information.
 type DriftError struct {

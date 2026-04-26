@@ -519,7 +519,7 @@ func (t *TreeService) findChildBySlugExactInParentLocked(parent *PageNode, slug 
 }
 
 // DeleteNode deletes a node from the tree
-func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error {
+func (t *TreeService) DeleteNode(userID string, id string, recursive bool, expectedVersion string) error {
 	err := t.withLockedTree(func() error {
 		if t.tree == nil {
 			return ErrTreeNotLoaded
@@ -529,6 +529,10 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error
 		node := t.getNodeByIDLocked(id)
 		if node == nil {
 			return ErrPageNotFound
+		}
+
+		if err := checkNodeVersion(node, expectedVersion); err != nil {
+			return err
 		}
 
 		// Check if node has children
@@ -587,7 +591,7 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool) error
 }
 
 // UpdateNode updates a node (page/section) in the tree and syncs disk state via NodeStore.
-func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string) error {
+func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, expectedVersion string) error {
 	return t.withLockedTree(func() error {
 		if t.tree == nil {
 			return ErrTreeNotLoaded
@@ -597,6 +601,10 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		node := t.getNodeByIDLocked(id)
 		if node == nil {
 			return ErrPageNotFound
+		}
+
+		if err := checkNodeVersion(node, expectedVersion); err != nil {
+			return err
 		}
 
 		// Slug must be unique under same parent (when changed)
@@ -645,7 +653,7 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 
 }
 
-func (t *TreeService) ConvertNode(userID string, id string, kind NodeKind) error {
+func (t *TreeService) ConvertNode(userID string, id string, kind NodeKind, expectedVersion string) error {
 	return t.withLockedTree(func() error {
 		if t.tree == nil {
 			return ErrTreeNotLoaded
@@ -655,6 +663,10 @@ func (t *TreeService) ConvertNode(userID string, id string, kind NodeKind) error
 		node := t.getNodeByIDLocked(id)
 		if node == nil {
 			return ErrPageNotFound
+		}
+
+		if err := checkNodeVersion(node, expectedVersion); err != nil {
+			return err
 		}
 
 		if node.Kind == kind {
@@ -1159,7 +1171,7 @@ func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string
 }
 
 // MoveNode moves a node to another parent (root if parentID is empty/"root")
-func (t *TreeService) MoveNode(userID string, id string, parentID string) error {
+func (t *TreeService) MoveNode(userID string, id string, parentID string, expectedVersion string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -1171,6 +1183,10 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string) error 
 	node := t.getNodeByIDLocked(id)
 	if node == nil {
 		return ErrPageNotFound
+	}
+
+	if err := checkNodeVersion(node, expectedVersion); err != nil {
+		return err
 	}
 
 	oldParent := node.Parent
