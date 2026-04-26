@@ -48,9 +48,6 @@ func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) erro
 	if err != nil {
 		return err
 	}
-	if err := requireCurrentPageVersion(page, in.Version); err != nil {
-		return err
-	}
 
 	if in.Recursive {
 		var subtreeIDs []string
@@ -78,7 +75,7 @@ func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) erro
 
 		oldPath := page.CalculatePath()
 
-		if err := uc.tree.DeleteNode(in.UserID, in.ID, true); err != nil {
+		if err := uc.tree.DeleteNode(in.UserID, in.ID, true, in.Version); err != nil {
 			return err
 		}
 
@@ -102,7 +99,7 @@ func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) erro
 	// Non-recursive delete.
 	oldPath := page.CalculatePath()
 
-	if err := uc.tree.DeleteNode(in.UserID, in.ID, false); err != nil {
+	if err := uc.tree.DeleteNode(in.UserID, in.ID, false, in.Version); err != nil {
 		return err
 	}
 

@@ -60,9 +60,6 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 	if err != nil {
 		return nil, err
 	}
-	if err := requireCurrentPageVersion(before, in.Version); err != nil {
-		return nil, err
-	}
 
 	slugChanged := in.Slug != before.Slug
 	oldPath := before.CalculatePath()
@@ -78,7 +75,7 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 		}
 	}
 
-	if err = uc.tree.UpdateNode(in.UserID, in.ID, in.Title, in.Slug, in.Content); err != nil {
+	if err = uc.tree.UpdateNode(in.UserID, in.ID, in.Title, in.Slug, in.Content, in.Version); err != nil {
 		return nil, err
 	}
 

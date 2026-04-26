@@ -68,7 +68,7 @@ func (uc *CopyPageUseCase) Execute(_ context.Context, in CopyPageInput) (*CopyPa
 	if err != nil {
 		return nil, err
 	}
-	cleanup := func() { _ = uc.tree.DeleteNode(in.UserID, *copyID, false) }
+	cleanup := func() { _ = uc.tree.DeleteNode(in.UserID, *copyID, false, tree.VersionUnchecked) }
 
 	copyPage, err := uc.tree.GetPage(*copyID)
 	if err != nil {
@@ -82,7 +82,7 @@ func (uc *CopyPageUseCase) Execute(_ context.Context, in CopyPageInput) (*CopyPa
 	}
 
 	updatedContent := strings.ReplaceAll(page.Content, "/assets/"+page.ID+"/", "/assets/"+copyPage.ID+"/")
-	if err := uc.tree.UpdateNode(in.UserID, copyPage.ID, copyPage.Title, copyPage.Slug, &updatedContent); err != nil {
+	if err := uc.tree.UpdateNode(in.UserID, copyPage.ID, copyPage.Title, copyPage.Slug, &updatedContent, tree.VersionUnchecked); err != nil {
 		cleanup()
 		_ = uc.assets.DeleteAllAssetsForPage(copyPage.PageNode)
 		return nil, err
