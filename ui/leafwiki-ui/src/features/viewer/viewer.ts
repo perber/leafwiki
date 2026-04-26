@@ -23,7 +23,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
   clear: () => set({ error: null, notFound: false, page: null }),
   loadPageData: async (path: string) => {
     useProgressbarStore.getState().setLoading(true)
-    set({ error: null, notFound: false, page: null })
+    set({ error: null, notFound: false })
     try {
       const page = await getPageByPath(path)
       set({ page, notFound: false })
