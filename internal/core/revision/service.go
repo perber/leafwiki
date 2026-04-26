@@ -22,12 +22,18 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 )
 
+// assetManifestEntry is the in-memory cache entry for a page's latest asset manifest hash.
+type assetManifestEntry struct {
+	hash string
+}
+
 type Service struct {
-	storageDir   string
-	pages        *tree.TreeService
-	store        *FSStore
-	maxRevisions int // 0 = unlimited
-	log          *slog.Logger
+	storageDir          string
+	pages               *tree.TreeService
+	store               *FSStore
+	maxRevisions        int // 0 = unlimited
+	log                 *slog.Logger
+	assetManifestCache  sync.Map // pageID → assetManifestEntry
 }
 
 type ServiceOptions struct {
@@ -184,6 +190,7 @@ func (s *Service) RecordAssetChange(pageID, authorID, summary string) (*Revision
 	if err := s.store.SaveRevision(rev); err != nil {
 		return nil, false, err
 	}
+	s.assetManifestCache.Store(rev.PageID, assetManifestEntry{hash: savedManifestHash})
 	s.pruneAfterSave(rev.PageID)
 
 	return rev, true, nil
@@ -226,8 +233,19 @@ func (s *Service) RecordStructureChange(pageID, authorID, summary string) (*Revi
 }
 
 func (s *Service) resolveAssetManifestHash(pageID string, prev *Revision) (string, error) {
+	// Check in-memory cache first — avoids a full asset scan on every content save.
+	// Use a stat to verify the file still exists without parsing its JSON content.
+	if v, ok := s.assetManifestCache.Load(pageID); ok {
+		entry := v.(assetManifestEntry)
+		if s.store.AssetManifestExists(entry.hash) {
+			return entry.hash, nil
+		}
+		s.assetManifestCache.Delete(pageID)
+	}
+
 	if prev != nil && prev.AssetManifestHash != "" {
 		if _, err := s.store.LoadAssetManifest(prev.AssetManifestHash); err == nil {
+			s.assetManifestCache.Store(pageID, assetManifestEntry{hash: prev.AssetManifestHash})
 			return prev.AssetManifestHash, nil
 		}
 	}
@@ -246,6 +264,7 @@ func (s *Service) resolveAssetManifestHash(pageID string, prev *Revision) (strin
 	if savedManifestHash != fullState.AssetManifestHash {
 		return "", fmt.Errorf("asset manifest hash mismatch: computed=%s saved=%s", fullState.AssetManifestHash, savedManifestHash)
 	}
+	s.assetManifestCache.Store(pageID, assetManifestEntry{hash: savedManifestHash})
 	return savedManifestHash, nil
 }
 
@@ -418,6 +437,7 @@ func (s *Service) DeletePageData(pageID string) error {
 	if err := s.store.DeletePageRevisions(pageID); err != nil {
 		return err
 	}
+	s.assetManifestCache.Delete(pageID)
 
 	return nil
 }
@@ -434,8 +454,11 @@ func (s *Service) CheckRevisionIntegrity(pageID string) ([]RevisionIntegrityIssu
 			continue
 		}
 		if strings.TrimSpace(rev.ContentHash) != "" {
-			if _, err := s.store.ReadContentBlob(rev.ContentHash); err != nil {
+			rc, err := s.store.OpenContentBlob(rev.ContentHash)
+			if err != nil {
 				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "missing_content_blob", Message: "Revision content blob is missing or unreadable", Path: s.store.contentBlobPath(rev.ContentHash)})
+			} else {
+				_ = rc.Close()
 			}
 		}
 		refs, err := s.store.LoadAssetManifest(rev.AssetManifestHash)
@@ -554,25 +577,6 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		)
 	}
 
-	if _, err := s.pages.GetPage(pageID); err != nil {
-		if errors.Is(err, tree.ErrPageNotFound) {
-			return sharederrors.NewLocalizedError(
-				"revision_restore_page_not_found",
-				"Page not found",
-				"page %s not found",
-				err,
-				pageID,
-			)
-		}
-		return sharederrors.NewLocalizedError(
-			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
-			err,
-			pageID,
-		)
-	}
-
 	beforeState, err := s.capturePageState(pageID, true)
 	if err != nil {
 		return sharederrors.NewLocalizedError(
@@ -585,7 +589,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	}
 
 	restoredContent := string(content)
-	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent); err != nil {
+	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent, tree.VersionUnchecked); err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
 			"Failed to restore page",
@@ -597,7 +601,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 
 	if err := s.restoreAssets(pageID, assets); err != nil {
 		restoreRollbackContent := beforeState.Content
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
@@ -614,7 +618,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 
 	if err := s.recordRestoreRevision(pageID, authorID); err != nil {
 		restoreRollbackContent := beforeState.Content
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {

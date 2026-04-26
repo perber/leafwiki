@@ -30,7 +30,7 @@ func createRevisionTestPage(t *testing.T, treeService *tree.TreeService, title, 
 	if err != nil {
 		t.Fatalf("CreateNode failed: %v", err)
 	}
-	if err := treeService.UpdateNode("tester", *id, title, slug, &content); err != nil {
+	if err := treeService.UpdateNode("tester", *id, title, slug, &content, tree.VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 	return *id
@@ -320,7 +320,7 @@ func TestRecordAssetAndStructureBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateNode(parent) failed: %v", err)
 	}
-	if err := treeService.MoveNode("tester", pageID, *parentID); err != nil {
+	if err := treeService.MoveNode("tester", pageID, *parentID, tree.VersionUnchecked); err != nil {
 		t.Fatalf("MoveNode failed: %v", err)
 	}
 	structureRev, created3, err := service.RecordStructureChange(pageID, "tester", "structure")
@@ -521,7 +521,7 @@ func TestRecordContentAndAssetUpdatesWithoutAssets(t *testing.T) {
 	}
 
 	content := "hello-2"
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode content failed: %v", err)
 	}
 	assetRev3, created, err := service.RecordAssetChange(pageID, "tester", "asset after content")
@@ -533,7 +533,7 @@ func TestRecordContentAndAssetUpdatesWithoutAssets(t *testing.T) {
 	}
 
 	content = "hello-3"
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode second content failed: %v", err)
 	}
 	contentRev, created, err := service.RecordContentUpdate(pageID, "tester", "content")
@@ -566,7 +566,7 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	pageID := *pageIDPtr
 
 	originalContent := "first version"
-	if err := treeService.UpdateNode("tester", pageID, "Original", "original", &originalContent); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Original", "original", &originalContent, tree.VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode(original) failed: %v", err)
 	}
 	writeLiveAsset(t, storageDir, pageID, "old.txt", "old-asset")
@@ -579,10 +579,10 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	}
 
 	changedContent := "second version"
-	if err := treeService.UpdateNode("tester", pageID, "Changed", "changed", &changedContent); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Changed", "changed", &changedContent, tree.VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode(changed) failed: %v", err)
 	}
-	if err := treeService.MoveNode("tester", pageID, *archiveID); err != nil {
+	if err := treeService.MoveNode("tester", pageID, *archiveID, tree.VersionUnchecked); err != nil {
 		t.Fatalf("MoveNode failed: %v", err)
 	}
 	if err := os.Remove(filepath.Join(storageDir, "assets", pageID, "old.txt")); err != nil {
@@ -647,7 +647,7 @@ func TestRecordContentAndStructureRebuildMissingPreviousManifest(t *testing.T) {
 	}
 
 	content := "hello-updated"
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 	contentRev, created, err := service.RecordContentUpdate(pageID, "tester", "content")
@@ -752,7 +752,7 @@ func TestCompareRevisionSnapshots(t *testing.T) {
 	}
 
 	content := "two"
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 	writeLiveAsset(t, storageDir, pageID, "b.txt", "asset-b")

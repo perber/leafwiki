@@ -352,6 +352,21 @@ func (s *FSStore) ReadContentBlob(hash string) ([]byte, error) {
 	return raw, nil
 }
 
+// OpenContentBlob returns a streaming reader for the content blob.
+// The caller is responsible for closing the returned ReadCloser.
+// Use this instead of ReadContentBlob when you don't need the full content in memory.
+func (s *FSStore) OpenContentBlob(hash string) (io.ReadCloser, error) {
+	hash = strings.TrimSpace(hash)
+	if hash == "" {
+		return io.NopCloser(strings.NewReader("")), nil
+	}
+	f, err := os.Open(s.contentBlobPath(hash))
+	if err != nil {
+		return nil, fmt.Errorf("open content blob: %w", err)
+	}
+	return f, nil
+}
+
 func (s *FSStore) LoadAssetManifest(hash string) ([]AssetRef, error) {
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
@@ -475,6 +490,14 @@ func (s *FSStore) contentBlobPath(hash string) string {
 
 func (s *FSStore) AssetBlobPath(hash string) string {
 	return filepath.Join(s.baseDir(), "blobs", "assets", "sha256", shardHash(hash), hash)
+}
+
+func (s *FSStore) AssetManifestExists(hash string) bool {
+	if hash == "" {
+		return false
+	}
+	_, err := os.Stat(s.assetManifestPath(hash))
+	return err == nil
 }
 
 func (s *FSStore) assetManifestPath(hash string) string {
