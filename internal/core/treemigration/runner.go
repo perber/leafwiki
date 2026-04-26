@@ -209,13 +209,17 @@ func backfillChildOrder(deps Dependencies, node Node) error {
 
 	children := node.Children()
 	if len(children) > 0 {
-		if node.ID() == "root" || node.Kind() == NodeKindSection {
-			if err := deps.Store.SaveChildOrder(node); err != nil {
-				return fmt.Errorf("persist child order for node %s: %w", node.ID(), err)
-			}
-		} else {
-			deps.Log.Warn("skipping child order backfill for non-section node with children — likely caused by a folder and .md file sharing the same name in a previous version",
+		if node.ID() != "root" && node.Kind() != NodeKindSection {
+			// Legacy snapshots could have a page node with children when a folder and an
+			// .md file shared the same name. Coerce to section so SaveChildOrder can write
+			// the .order.json and preserve the legacy child ordering. ReconstructTreeFromFS
+			// will derive the correct kind from the filesystem after migration completes.
+			deps.Log.Warn("coercing non-section node with children to section for child order backfill — likely caused by a folder and .md file sharing the same name in a previous version",
 				"nodeID", node.ID(), "slug", node.Slug(), "kind", node.Kind())
+			node.SetKind(NodeKindSection)
+		}
+		if err := deps.Store.SaveChildOrder(node); err != nil {
+			return fmt.Errorf("persist child order for node %s: %w", node.ID(), err)
 		}
 	}
 

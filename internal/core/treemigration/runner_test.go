@@ -377,11 +377,11 @@ func TestTreeMigration_LoadTree_MigratesToV4_MaterializesMissingSectionIndex(t *
 	}
 }
 
-func TestTreeMigration_LoadTree_MigratesToV5_PageNodeWithChildrenDoesNotBreakMigration(t *testing.T) {
+func TestTreeMigration_LoadTree_MigratesToV5_PageNodeWithChildrenPreservesChildOrder(t *testing.T) {
 	// Regression test for: https://github.com/perber/wiki/issues/932
-	// Legacy trees could contain page nodes that have children (e.g. when a directory and
-	// an .md file share the same name). The V5 migration must not try to write a .order.json
-	// for such page nodes — only root and section nodes carry child-order files.
+	// Legacy trees could contain page nodes that have children when a folder and an .md file
+	// shared the same name. The V5 migration must coerce such nodes to section so that
+	// SaveChildOrder can write the .order.json and the legacy child ordering is preserved.
 	if tree.CurrentSchemaVersion < 5 {
 		t.Skip("requires schema v5+")
 	}
@@ -394,14 +394,19 @@ func TestTreeMigration_LoadTree_MigratesToV5_PageNodeWithChildrenDoesNotBreakMig
 		t.Fatalf("LoadTree failed: %v", err)
 	}
 
-	// Build: root → notes (section) → guide (page)
+	// Build: root → notes (section) → zebra, alpha (pages in non-alphabetical order)
+	// so we can verify the legacy ordering is preserved, not reset to alphabetical.
 	notesID, err := svc.CreateNode("system", nil, "Notes", "notes", ptrKind(tree.NodeKindSection))
 	if err != nil {
 		t.Fatalf("CreateNode notes failed: %v", err)
 	}
-	_, err = svc.CreateNode("system", notesID, "Guide", "guide", ptrKind(tree.NodeKindPage))
+	zebraID, err := svc.CreateNode("system", notesID, "Zebra", "zebra", ptrKind(tree.NodeKindPage))
 	if err != nil {
-		t.Fatalf("CreateNode guide failed: %v", err)
+		t.Fatalf("CreateNode zebra failed: %v", err)
+	}
+	alphaID, err := svc.CreateNode("system", notesID, "Alpha", "alpha", ptrKind(tree.NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode alpha failed: %v", err)
 	}
 
 	// Corrupt the tree snapshot: flip "notes" kind from section → page to simulate
@@ -426,6 +431,23 @@ func TestTreeMigration_LoadTree_MigratesToV5_PageNodeWithChildrenDoesNotBreakMig
 	loaded := tree.NewTreeService(tmpDir)
 	if err := loaded.LoadTree(); err != nil {
 		t.Fatalf("migration failed for page node with children (issue #932): %v", err)
+	}
+
+	// .order.json for notes must exist and reflect the legacy order (zebra before alpha),
+	// not the alphabetical fallback order that ReconstructTreeFromFS would produce without it.
+	var notesOrder struct {
+		OrderedIDs []string `json:"ordered_ids"`
+	}
+	rawOrder, err := os.ReadFile(filepath.Join(tmpDir, "root", "notes", ".order.json"))
+	if err != nil {
+		t.Fatalf("read notes order file: %v", err)
+	}
+	if err := json.Unmarshal(rawOrder, &notesOrder); err != nil {
+		t.Fatalf("unmarshal notes order file: %v", err)
+	}
+	want := []string{*zebraID, *alphaID}
+	if strings.Join(notesOrder.OrderedIDs, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected notes child order after migration: got %v want %v", notesOrder.OrderedIDs, want)
 	}
 }
 
