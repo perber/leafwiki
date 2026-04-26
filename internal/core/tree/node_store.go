@@ -38,7 +38,13 @@ func ensureUniqueReconstructedSlug(seenSlugs map[string]string, slug string, pat
 		return fmt.Errorf("reconstruct tree from fs: empty slug at %s", path)
 	}
 	if existingPath, exists := seenSlugs[key]; exists {
-		return fmt.Errorf("duplicate slug %q (case-insensitive) in %s and %s", slug, existingPath, path)
+		parentDir := filepath.Base(filepath.Dir(path))
+		return fmt.Errorf(
+			"duplicate slug %q: a directory and a .md file share the same name in %s/. "+
+				"Rename or remove one of them (e.g. rename %s.md -> %s-page.md) to resolve the conflict. "+
+				"Conflicting paths: %s and %s",
+			slug, parentDir, slug, slug, existingPath, path,
+		)
 	}
 	seenSlugs[key] = path
 	return nil

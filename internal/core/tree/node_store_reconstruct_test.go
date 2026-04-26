@@ -345,6 +345,31 @@ func TestNodeStore_ReconstructTreeFromFS_ReturnsErrorOnCaseInsensitiveDuplicateS
 	}
 }
 
+func TestNodeStore_ReconstructTreeFromFS_ReturnsActionableErrorOnDirectoryFileSlugConflict(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustMkdir(t, filepath.Join(tmp, "root", "notes"))
+	mustWriteFile(t, filepath.Join(tmp, "root", "notes", "index.md"), "# Notes section", 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "notes.md"), "# Notes page", 0o644)
+
+	_, err := store.ReconstructTreeFromFS()
+	if err == nil {
+		t.Fatalf("expected duplicate slug error")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, `duplicate slug "notes": a directory and a .md file share the same name in root/.`) {
+		t.Fatalf("expected actionable duplicate slug summary, got: %v", err)
+	}
+	if !strings.Contains(errMsg, "Rename or remove one of them") {
+		t.Fatalf("expected actionable remediation hint, got: %v", err)
+	}
+	if !strings.Contains(errMsg, "rename notes.md -> notes-page.md") {
+		t.Fatalf("expected rename example in error, got: %v", err)
+	}
+}
+
 func TestNodeStore_ReconstructTreeFromFS_WritesIDsBackToFiles(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
