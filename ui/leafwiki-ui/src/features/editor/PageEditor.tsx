@@ -76,8 +76,13 @@ export default function PageEditor() {
           const mapped = mapApiError(err, 'Error saving page')
           toast.error(mapped.message, {
             duration: 10000,
+            testId: 'page-save-version-conflict-toast',
             action: {
-              label: 'Save anyway',
+              label: (
+                <span data-testid="page-save-version-conflict-action">
+                  Save anyway
+                </span>
+              ),
               onClick: () => {
                 forceOverwrite()
                   .then((page) => {

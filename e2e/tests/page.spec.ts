@@ -140,6 +140,8 @@ async function updatePageByPath(
   input: { path: string; title?: string; slug?: string; content: string },
 ) {
   await page.evaluate(async ({ path, title, slug, content }) => {
+    const normalizedPath = path.replace(/^\/+/, '');
+
     function getCsrfTokenFromCookie(): string | null {
       const hostMatch =
         document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
@@ -159,15 +161,18 @@ async function updatePageByPath(
       throw new Error('Missing CSRF token cookie for test page update');
     }
 
-    const pageResponse = await fetch(`/api/pages/by-path?path=${encodeURIComponent(path)}`, {
-      credentials: 'include',
-      headers: {
-        'X-CSRF-Token': csrfToken,
+    const pageResponse = await fetch(
+      `/api/pages/by-path?path=${encodeURIComponent(normalizedPath)}`,
+      {
+        credentials: 'include',
+        headers: {
+          'X-CSRF-Token': csrfToken,
+        },
       },
-    });
+    );
 
     if (!pageResponse.ok) {
-      throw new Error(`Failed to load page ${path}: ${pageResponse.status}`);
+      throw new Error(`Failed to load page ${normalizedPath}: ${pageResponse.status}`);
     }
 
     const currentPage = (await pageResponse.json()) as {
@@ -193,7 +198,7 @@ async function updatePageByPath(
     });
 
     if (!updateResponse.ok) {
-      throw new Error(`Failed to update page ${path}: ${updateResponse.status}`);
+      throw new Error(`Failed to update page ${normalizedPath}: ${updateResponse.status}`);
     }
   }, input);
 }
