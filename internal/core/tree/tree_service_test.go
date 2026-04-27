@@ -253,7 +253,7 @@ func TestTreeService_TreeHash_ChangesWhenTreeChanges(t *testing.T) {
 		t.Fatalf("expected hash to change after create")
 	}
 
-	if err := svc.UpdateNode("system", *pageID, "Welcome 2", "welcome", nil, VersionUnchecked); err != nil {
+	if err := svc.UpdateNode("system", *pageID, "Welcome 2", "welcome", nil, VersionUnchecked, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 	afterUpdate := svc.TreeHash()
@@ -568,7 +568,7 @@ func TestTreeService_UpdateNode_TitleOnly_SyncsFrontmatterIfFileExists(t *testin
 	mustStat(t, p)
 
 	// Update title only: content=nil, slug unchanged
-	if err := svc.UpdateNode("system", *id, "Documentation", "docs", nil, VersionUnchecked); err != nil {
+	if err := svc.UpdateNode("system", *id, "Documentation", "docs", nil, VersionUnchecked, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -600,7 +600,7 @@ func TestTreeService_UpdateNode_SlugRename_RenamesOnDisk(t *testing.T) {
 	mustStat(t, oldPath)
 
 	newSlug := "documentation"
-	if err := svc.UpdateNode("system", *id, "Docs", newSlug, nil, VersionUnchecked); err != nil {
+	if err := svc.UpdateNode("system", *id, "Docs", newSlug, nil, VersionUnchecked, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -621,7 +621,7 @@ func TestTreeService_UpdateNode_RejectsCaseInsensitiveSlugConflict(t *testing.T)
 		t.Fatalf("CreateNode second failed: %v", err)
 	}
 
-	err = svc.UpdateNode("system", *secondID, "Beta", "alpha", nil, VersionUnchecked)
+	err = svc.UpdateNode("system", *secondID, "Beta", "alpha", nil, VersionUnchecked, false)
 	if !errors.Is(err, ErrPageAlreadyExists) {
 		t.Fatalf("expected ErrPageAlreadyExists, got %v", err)
 	}
@@ -651,7 +651,7 @@ func TestTreeService_UpdateNode_SectionToPage_DisallowedWithChildren(t *testing.
 	}
 
 	// Now parent is section with children, attempt to convert back to page
-	err = svc.UpdateNode("system", *parentID, "Docs", "docs", nil, VersionUnchecked)
+	err = svc.UpdateNode("system", *parentID, "Docs", "docs", nil, VersionUnchecked, false)
 	if err == nil {
 		t.Fatalf("expected error converting section->page with children")
 	}
@@ -1338,7 +1338,7 @@ func TestTreeService_FindPageByRoutePath_ReturnsContent(t *testing.T) {
 	// Update specs content
 	specsNode := svc.GetTree().Children[0].Children[0].Children[0]
 	body := "# Specs\nHello"
-	if err := svc.UpdateNode("system", specsNode.ID, "Specs", "specs", &body, VersionUnchecked); err != nil {
+	if err := svc.UpdateNode("system", specsNode.ID, "Specs", "specs", &body, VersionUnchecked, false); err != nil {
 		t.Fatalf("UpdateNode content failed: %v", err)
 	}
 
@@ -1454,7 +1454,7 @@ func TestTreeService_LookupPagePath_ReflectsSlugRename(t *testing.T) {
 		t.Fatalf("CreateNode guide failed: %v", err)
 	}
 
-	if err := svc.UpdateNode("system", *id, "Documentation", "documentation", nil, VersionUnchecked); err != nil {
+	if err := svc.UpdateNode("system", *id, "Documentation", "documentation", nil, VersionUnchecked, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -1525,7 +1525,7 @@ func TestTreeService_ResolvePermalinkTarget_ReflectsRenameAndMove(t *testing.T) 
 		t.Fatalf("CreateNode archive failed: %v", err)
 	}
 
-	if err := svc.UpdateNode("system", *guideID, "User Guide", "user-guide", nil, VersionUnchecked); err != nil {
+	if err := svc.UpdateNode("system", *guideID, "User Guide", "user-guide", nil, VersionUnchecked, false); err != nil {
 		t.Fatalf("UpdateNode guide failed: %v", err)
 	}
 	if err := svc.MoveNode("system", *guideID, *archiveID, VersionUnchecked); err != nil {
@@ -3051,14 +3051,9 @@ func TestTreeService_BulkUpdateContent_PartialFailure_RollsBackFailedMetadata(t 
 	if err != nil {
 		t.Fatalf("GetPage(first before) failed: %v", err)
 	}
-	beforeSecond, err := svc.GetPage(*secondID)
-	if err != nil {
-		t.Fatalf("GetPage(second before) failed: %v", err)
-	}
-	beforeSecondVersion := beforeSecond.Version()
-	beforeSecondUpdatedAt := beforeSecond.Metadata.UpdatedAt
-	beforeSecondAuthor := beforeSecond.Metadata.LastAuthorID
 
+	// Content that looks like invalid YAML frontmatter is now stored as plain
+	// body text — UpsertContent no longer parses frontmatter from UI content.
 	errs := svc.BulkUpdateContent("bulk-user", []BulkContentUpdate{
 		{ID: *firstID, Content: "updated first"},
 		{ID: *secondID, Content: "---\ninvalid: [\n---\nbody"},
@@ -3071,11 +3066,9 @@ func TestTreeService_BulkUpdateContent_PartialFailure_RollsBackFailedMetadata(t 
 	if errs[0] != nil {
 		t.Fatalf("expected index 0 success, got %v", errs[0])
 	}
-	if errs[1] == nil {
-		t.Fatal("expected index 1 parse failure, got nil")
-	}
-	if !strings.Contains(errs[1].Error(), "could not parse markdown content") {
-		t.Fatalf("expected parse failure at index 1, got %v", errs[1])
+	// Index 1 now succeeds: frontmatter-like content is treated as plain body.
+	if errs[1] != nil {
+		t.Fatalf("expected index 1 success (plain body), got %v", errs[1])
 	}
 	if !errors.Is(errs[2], ErrPageNotFound) {
 		t.Fatalf("expected ErrPageNotFound at index 2, got %v", errs[2])
@@ -3099,17 +3092,9 @@ func TestTreeService_BulkUpdateContent_PartialFailure_RollsBackFailedMetadata(t 
 	if err != nil {
 		t.Fatalf("GetPage(second after) failed: %v", err)
 	}
-	if afterSecond.Content != beforeSecond.Content {
-		t.Fatalf("expected second content unchanged, before=%q after=%q", beforeSecond.Content, afterSecond.Content)
-	}
-	if afterSecond.Version() != beforeSecondVersion {
-		t.Fatalf("expected second version unchanged, before=%q after=%q", beforeSecondVersion, afterSecond.Version())
-	}
-	if !afterSecond.Metadata.UpdatedAt.Equal(beforeSecondUpdatedAt) {
-		t.Fatalf("expected second UpdatedAt restored, before=%s after=%s", beforeSecondUpdatedAt, afterSecond.Metadata.UpdatedAt)
-	}
-	if afterSecond.Metadata.LastAuthorID != beforeSecondAuthor {
-		t.Fatalf("expected second LastAuthorID restored, before=%q after=%q", beforeSecondAuthor, afterSecond.Metadata.LastAuthorID)
+	// The "invalid YAML" block is now stored verbatim as body content.
+	if !strings.Contains(afterSecond.Content, "invalid: [") {
+		t.Fatalf("expected second content to contain plain body text, got %q", afterSecond.Content)
 	}
 }
 
@@ -3125,12 +3110,12 @@ func TestTreeService_UpdateNode_StaleVersion_ReturnsErrVersionConflict(t *testin
 	currentVersion := node.Version()
 
 	// First update succeeds — advances the version.
-	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, currentVersion); err != nil {
+	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, currentVersion, false); err != nil {
 		t.Fatalf("first UpdateNode failed: %v", err)
 	}
 
 	// Second update with the same (now stale) version must fail.
-	err := svc.UpdateNode("system", *id, "Page v3", "page", nil, currentVersion)
+	err := svc.UpdateNode("system", *id, "Page v3", "page", nil, currentVersion, false)
 	if !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("expected ErrVersionConflict, got %v", err)
 	}
@@ -3140,7 +3125,7 @@ func TestTreeService_UpdateNode_MissingVersion_ReturnsErrVersionRequired(t *test
 	svc, _ := newLoadedService(t)
 	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
 
-	err := svc.UpdateNode("system", *id, "Page v2", "page", nil, "")
+	err := svc.UpdateNode("system", *id, "Page v2", "page", nil, "", false)
 	if !errors.Is(err, ErrVersionRequired) {
 		t.Fatalf("expected ErrVersionRequired, got %v", err)
 	}
@@ -3154,7 +3139,7 @@ func TestTreeService_DeleteNode_StaleVersion_ReturnsErrVersionConflict(t *testin
 	staleVersion := node.Version()
 
 	// Advance the version via an update.
-	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, staleVersion); err != nil {
+	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, staleVersion, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -3183,7 +3168,7 @@ func TestTreeService_MoveNode_StaleVersion_ReturnsErrVersionConflict(t *testing.
 	staleVersion := node.Version()
 
 	// Advance the version.
-	if err := svc.UpdateNode("system", *moveID, "Move v2", "move", nil, staleVersion); err != nil {
+	if err := svc.UpdateNode("system", *moveID, "Move v2", "move", nil, staleVersion, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -3212,7 +3197,7 @@ func TestTreeService_ConvertNode_StaleVersion_ReturnsErrVersionConflict(t *testi
 	staleVersion := node.Version()
 
 	// Advance the version.
-	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, staleVersion); err != nil {
+	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, staleVersion, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -3237,10 +3222,10 @@ func TestTreeService_VersionUnchecked_BypassesVersionCheck(t *testing.T) {
 	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
 
 	// VersionUnchecked must always succeed regardless of actual node version.
-	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, VersionUnchecked); err != nil {
+	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, VersionUnchecked, false); err != nil {
 		t.Fatalf("expected VersionUnchecked to bypass check, got: %v", err)
 	}
-	if err := svc.UpdateNode("system", *id, "Page v3", "page", nil, VersionUnchecked); err != nil {
+	if err := svc.UpdateNode("system", *id, "Page v3", "page", nil, VersionUnchecked, false); err != nil {
 		t.Fatalf("expected VersionUnchecked to bypass check on second call, got: %v", err)
 	}
 }

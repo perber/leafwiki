@@ -589,7 +589,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	}
 
 	restoredContent := string(content)
-	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent, tree.VersionUnchecked); err != nil {
+	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent, tree.VersionUnchecked, false); err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
 			"Failed to restore page",
@@ -601,7 +601,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 
 	if err := s.restoreAssets(pageID, assets); err != nil {
 		restoreRollbackContent := beforeState.Content
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, false); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
@@ -618,7 +618,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 
 	if err := s.recordRestoreRevision(pageID, authorID); err != nil {
 		restoreRollbackContent := beforeState.Content
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, false); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {

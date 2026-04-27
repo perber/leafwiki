@@ -102,9 +102,37 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	if options.EnableRevision {
 		w.revision = revision.NewService(w.storageDir, w.tree, w.log,
 			revision.ServiceOptions{MaxRevisions: options.MaxRevisionHistory})
+		w.ensureBaselineRevisions()
 	}
 	w.buildRoutes(options)
 	return w, nil
+}
+
+func (w *Wiki) ensureBaselineRevisions() {
+	var ids []string
+	_ = w.tree.WalkNodes(func(id string) error {
+		ids = append(ids, id)
+		return nil
+	})
+	if len(ids) == 0 {
+		return
+	}
+	pages, _ := w.tree.GetPages(ids)
+	var valid []*tree.Page
+	for _, p := range pages {
+		if p != nil {
+			valid = append(valid, p)
+		}
+	}
+	if len(valid) == 0 {
+		return
+	}
+	errs := w.revision.RecordContentUpdates(valid, "", "")
+	for i, err := range errs {
+		if err != nil {
+			w.log.Warn("baseline revision failed", "pageID", valid[i].ID, "error", err)
+		}
+	}
 }
 
 // ─── Subsystem initializers ───────────────────────────────────────────────────

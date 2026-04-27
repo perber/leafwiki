@@ -591,7 +591,7 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool, expec
 }
 
 // UpdateNode updates a node (page/section) in the tree and syncs disk state via NodeStore.
-func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, expectedVersion string) error {
+func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, expectedVersion string, fromImport bool) error {
 	return t.withLockedTree(func() error {
 		if t.tree == nil {
 			return ErrTreeNotLoaded
@@ -618,8 +618,14 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		// Content update?
 		if content != nil {
 			t.log.Info("updating node content", "nodeID", node.ID)
-			if err := t.store.UpsertContent(node, *content); err != nil {
-				return fmt.Errorf("could not upsert content: %w", err)
+			var upsertErr error
+			if fromImport {
+				upsertErr = t.store.UpsertContentPreservingFrontmatter(node, *content)
+			} else {
+				upsertErr = t.store.UpsertContent(node, *content)
+			}
+			if upsertErr != nil {
+				return fmt.Errorf("could not upsert content: %w", upsertErr)
 			}
 		}
 

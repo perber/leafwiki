@@ -400,7 +400,9 @@ leafwiki_title: Old Title
 	}
 }
 
-func TestNodeStore_UpsertContent_RawFrontmatter_MergesExtrasIntoWrittenFrontmatter(t *testing.T) {
+// UpsertContent must treat incoming content that looks like frontmatter as plain
+// body text — matching the UI behaviour where the editor sends raw markdown.
+func TestNodeStore_UpsertContent_RawFrontmatter_TreatedAsPlainBody(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
@@ -423,6 +425,101 @@ func TestNodeStore_UpsertContent_RawFrontmatter_MergesExtrasIntoWrittenFrontmatt
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
 	if !has {
+		t.Fatalf("expected system frontmatter in written file")
+	}
+	// The full raw input must appear verbatim in the body.
+	if !strings.Contains(body, "custom_key: keep-me") {
+		t.Fatalf("expected raw content in body, got: %q", body)
+	}
+	if !strings.Contains(body, "# Imported Title") {
+		t.Fatalf("expected heading in body, got: %q", body)
+	}
+	// No user keys must leak into system ExtraFields.
+	if fm.ExtraFields["custom_key"] != nil {
+		t.Fatalf("expected custom_key to stay as body, got ExtraField %#v", fm.ExtraFields["custom_key"])
+	}
+	// Managed fields must come from the page node, not from user content.
+	if fm.LeafWikiID != "p1" {
+		t.Fatalf("expected managed leafwiki_id p1, got %q", fm.LeafWikiID)
+	}
+	if fm.LeafWikiTitle != "My Page" {
+		t.Fatalf("expected managed leafwiki_title 'My Page', got %q", fm.LeafWikiTitle)
+	}
+}
+
+// Regression test for #942: content typed in the UI that looks like frontmatter
+// must be stored as plain body text, not extracted and merged into system frontmatter.
+func TestNodeStore_UpsertContent_TreatsLeadingFrontmatterAsPlainBody(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "My Page", Kind: NodeKindPage, Parent: root}
+
+	if err := store.CreatePage(root, page); err != nil {
+		t.Fatalf("CreatePage: %v", err)
+	}
+
+	userContent := "---\ncustom: bar\ntitle: user-title\n---\n\n# Heading"
+	if err := store.UpsertContent(page, userContent); err != nil {
+		t.Fatalf("UpsertContent: %v", err)
+	}
+
+	path := filepath.Join(tmp, "root", "p.md")
+	raw := string(mustRead(t, path))
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected system frontmatter in written file")
+	}
+	// System frontmatter must use the page's managed identity, not the user-supplied value.
+	if fm.LeafWikiID != "p1" {
+		t.Fatalf("expected managed leafwiki_id, got %q", fm.LeafWikiID)
+	}
+	// User-supplied keys must NOT be extracted into ExtraFields.
+	if fm.ExtraFields["custom"] != nil {
+		t.Fatalf("expected custom to stay as body text, got ExtraField %#v", fm.ExtraFields["custom"])
+	}
+	if fm.ExtraFields["title"] != nil {
+		t.Fatalf("expected title to stay as body text, got ExtraField %#v", fm.ExtraFields["title"])
+	}
+	// The full user content (including the frontmatter-like block) must be in the body.
+	if !strings.Contains(body, "custom: bar") {
+		t.Fatalf("expected user frontmatter block preserved in body, got: %q", body)
+	}
+	if !strings.Contains(body, "# Heading") {
+		t.Fatalf("expected heading in body, got: %q", body)
+	}
+}
+
+// UpsertContentPreservingFrontmatter is used by the importer: it parses
+// frontmatter from the incoming content and merges extra fields into the
+// system-managed frontmatter block.
+func TestNodeStore_UpsertContentPreservingFrontmatter_MergesExtrasIntoWrittenFrontmatter(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "My Page", Kind: NodeKindPage, Parent: root}
+
+	if err := store.CreatePage(root, page); err != nil {
+		t.Fatalf("CreatePage: %v", err)
+	}
+
+	rawContent := "---\naliases:\n  - alpha\ncustom_key: keep-me\nleafwiki_id: source-id\nleafwiki_title: Source Title\ntitle: Imported Title\n---\n\n# Imported Title\nBody"
+	if err := store.UpsertContentPreservingFrontmatter(page, rawContent); err != nil {
+		t.Fatalf("UpsertContentPreservingFrontmatter: %v", err)
+	}
+
+	path := filepath.Join(tmp, "root", "p.md")
+	raw := string(mustRead(t, path))
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if !has {
 		t.Fatalf("expected frontmatter in written file")
 	}
 	if body != "\n# Imported Title\nBody" {
@@ -432,7 +529,7 @@ func TestNodeStore_UpsertContent_RawFrontmatter_MergesExtrasIntoWrittenFrontmatt
 		t.Fatalf("expected custom_key to be preserved, got %#v", got)
 	}
 	if got := fm.ExtraFields["title"]; got != "Imported Title" {
-		t.Fatalf("expected title to be preserved, got %#v", got)
+		t.Fatalf("expected title extra field to be preserved, got %#v", got)
 	}
 	aliases, ok := fm.ExtraFields["aliases"].([]interface{})
 	if !ok || len(aliases) != 1 || aliases[0] != "alpha" {
@@ -441,14 +538,8 @@ func TestNodeStore_UpsertContent_RawFrontmatter_MergesExtrasIntoWrittenFrontmatt
 	if strings.Contains(raw, "leafwiki_id: source-id") {
 		t.Fatalf("expected source leafwiki_id to be dropped, got: %q", raw)
 	}
-	if strings.Contains(raw, "leafwiki_title: Source Title") {
-		t.Fatalf("expected source leafwiki_title to be dropped, got: %q", raw)
-	}
 	if fm.LeafWikiID != "p1" {
 		t.Fatalf("expected managed leafwiki_id, got %q", fm.LeafWikiID)
-	}
-	if fm.LeafWikiTitle != "My Page" {
-		t.Fatalf("expected managed leafwiki_title, got %q", fm.LeafWikiTitle)
 	}
 }
 

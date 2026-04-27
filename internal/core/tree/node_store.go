@@ -636,11 +636,44 @@ func (f *NodeStore) CreateSection(parentEntry *PageNode, newEntry *PageNode) err
 	return nil
 }
 
-// UpsertContent updates the content of a page file on disk
-// It creates the file if it does not exist also for sections (index.md)
+// UpsertContent updates the content of a page file on disk, treating the
+// incoming content as plain body text. Any frontmatter-like blocks the caller
+// passes are stored verbatim in the body and are never extracted into the
+// system-managed frontmatter. Use this for all UI-originated writes.
+// It creates the file if it does not exist also for sections (index.md).
 func (f *NodeStore) UpsertContent(entry *PageNode, content string) error {
 	if entry == nil {
 		return &InvalidOpError{Op: "UpsertContent", Reason: "an entry is required"}
+	}
+
+	filePath, err := f.contentPathForNodeWrite(entry)
+	if err != nil {
+		return err
+	}
+
+	mdFile := markdown.NewMarkdownFile(filePath, "", markdown.Frontmatter{})
+	if fileExists(filePath) {
+		mdFile, err = markdown.LoadMarkdownFile(filePath)
+		if err != nil {
+			return fmt.Errorf("could not load markdown file: %w", err)
+		}
+	}
+
+	mdFile.SetContent(content)
+	f.syncManagedFrontmatter(mdFile, entry)
+	if err := mdFile.WriteToFile(); err != nil {
+		return fmt.Errorf("could not write markdown file: %w", err)
+	}
+
+	return nil
+}
+
+// UpsertContentPreservingFrontmatter is the importer variant of UpsertContent.
+// It parses any frontmatter block at the top of content and merges the extra
+// fields into the system-managed frontmatter block written to disk.
+func (f *NodeStore) UpsertContentPreservingFrontmatter(entry *PageNode, content string) error {
+	if entry == nil {
+		return &InvalidOpError{Op: "UpsertContentPreservingFrontmatter", Reason: "an entry is required"}
 	}
 
 	filePath, err := f.contentPathForNodeWrite(entry)

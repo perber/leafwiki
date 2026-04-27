@@ -11,13 +11,14 @@ import (
 
 // UpdatePageInput is the input for UpdatePageUseCase.
 type UpdatePageInput struct {
-	UserID  string
-	ID      string
-	Version string
-	Title   string
-	Slug    string
-	Content *string
-	Kind    *tree.NodeKind
+	UserID     string
+	ID         string
+	Version    string
+	Title      string
+	Slug       string
+	Content    *string
+	Kind       *tree.NodeKind
+	FromImport bool
 }
 
 // UpdatePageOutput is the output of UpdatePageUseCase.
@@ -77,7 +78,7 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 		}
 	}
 
-	if err = uc.tree.UpdateNode(in.UserID, in.ID, in.Title, in.Slug, in.Content, in.Version); err != nil {
+	if err = uc.tree.UpdateNode(in.UserID, in.ID, in.Title, in.Slug, in.Content, in.Version, in.FromImport); err != nil {
 		return nil, err
 	}
 
