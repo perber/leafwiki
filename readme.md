@@ -39,7 +39,9 @@ The goal is not to become an all-in-one workspace. The goal is to give you a wik
 
 - Personal wikis and engineering notebooks
 - Internal team documentation
+- Internal documentation archives and historical knowledge bases
 - Runbooks, SOPs, and operational guides
+- Existing Markdown documentation sets or Obsidian-style vaults that need a more structured internal wiki
 - Homelab and self-hosted environments
 - Teams that prefer explicit tree navigation over flat note feeds
 
@@ -97,12 +99,15 @@ This helps keep long-lived documentation coherent as the structure changes.
 
 LeafWiki includes a built-in Markdown importer for editors and admins.
 
+This is especially relevant if you already have a Markdown archive, a historical document collection, or an Obsidian-style vault that you want to bring into a self-hosted internal wiki.
+
 What to expect:
 - ZIP-based import workflow
 - review the generated import plan before running it
 - best results when the source already has a reasonably clean folder structure
 - linked Markdown pages and local assets can be imported together
 - Obsidian-style wiki links can be rewritten during import
+- metadata preservation is a relevant migration use case, but more advanced metadata workflows are still evolving
 
 It is intended as a pragmatic migration helper, not a fully automatic migration system for every source format.
 
