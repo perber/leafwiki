@@ -127,7 +127,7 @@ func (w *Wiki) ensureBaselineRevisions() {
 	if len(valid) == 0 {
 		return
 	}
-	errs := w.revision.RecordContentUpdates(valid, "", "")
+	errs := w.revision.RecordContentUpdates(valid, SYSTEM_USER_ID, "baseline")
 	for i, err := range errs {
 		if err != nil {
 			w.log.Warn("baseline revision failed", "pageID", valid[i].ID, "error", err)
