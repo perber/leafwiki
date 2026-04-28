@@ -191,7 +191,7 @@ sudo /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/perber/leafwik
 
 This installs LeafWiki as a system service on the target machine.
 The service is started automatically after installation.
-> The installation script has been tested on Ubuntu.
+> The installation script has been tested on Ubuntu, Debian, and Raspbian.
 > Feedback for other distributions is welcome via GitHub issues.
 
 #### Deployment examples
