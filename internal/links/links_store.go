@@ -19,6 +19,8 @@ type LinksStore struct {
 	db         *sql.DB
 }
 
+const maxOutgoingLinksQueryArgs = 900
+
 type PageLinkUpdate struct {
 	FromPageID string
 	FromTitle  string
@@ -375,6 +377,22 @@ func (s *LinksStore) GetOutgoingLinksForPages(pageIDs []string) (map[string][]Ou
 		return map[string][]Outgoing{}, nil
 	}
 
+	outgoingByPageID := make(map[string][]Outgoing, len(pageIDs))
+	for start := 0; start < len(pageIDs); start += maxOutgoingLinksQueryArgs {
+		end := start + maxOutgoingLinksQueryArgs
+		if end > len(pageIDs) {
+			end = len(pageIDs)
+		}
+
+		if err := s.appendOutgoingLinksForPageBatch(outgoingByPageID, pageIDs[start:end]); err != nil {
+			return nil, err
+		}
+	}
+
+	return outgoingByPageID, nil
+}
+
+func (s *LinksStore) appendOutgoingLinksForPageBatch(outgoingByPageID map[string][]Outgoing, pageIDs []string) error {
 	placeholders := strings.TrimRight(strings.Repeat("?,", len(pageIDs)), ",")
 	args := make([]any, 0, len(pageIDs))
 	for _, pageID := range pageIDs {
@@ -388,7 +406,7 @@ func (s *LinksStore) GetOutgoingLinksForPages(pageIDs []string) (map[string][]Ou
         ORDER BY from_page_id
     `, args...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -396,14 +414,13 @@ func (s *LinksStore) GetOutgoingLinksForPages(pageIDs []string) (map[string][]Ou
 		}
 	}()
 
-	outgoingByPageID := make(map[string][]Outgoing, len(pageIDs))
 	for rows.Next() {
 		var outgoing Outgoing
 		var toPageID sql.NullString
 		var brokenInt int
 
 		if err := rows.Scan(&outgoing.FromPageID, &toPageID, &outgoing.ToPath, &outgoing.FromTitle, &brokenInt); err != nil {
-			return nil, err
+			return err
 		}
 
 		if toPageID.Valid {
@@ -412,11 +429,8 @@ func (s *LinksStore) GetOutgoingLinksForPages(pageIDs []string) (map[string][]Ou
 		outgoing.Broken = brokenInt != 0
 		outgoingByPageID[outgoing.FromPageID] = append(outgoingByPageID[outgoing.FromPageID], outgoing)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
 
-	return outgoingByPageID, nil
+	return rows.Err()
 }
 
 func (s *LinksStore) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorLinkMatch, error) {

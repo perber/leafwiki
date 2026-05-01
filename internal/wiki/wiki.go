@@ -110,16 +110,23 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 
 func (w *Wiki) ensureBaselineRevisions() {
 	var ids []string
-	_ = w.tree.WalkNodes(func(id string) error {
+	if err := w.tree.WalkNodes(func(id string) error {
 		ids = append(ids, id)
 		return nil
-	})
+	}); err != nil {
+		w.log.Warn("failed to enumerate pages for baseline revisions", "error", err)
+		return
+	}
 	if len(ids) == 0 {
 		return
 	}
-	pages, _ := w.tree.GetPages(ids)
+	pages, pageErrs := w.tree.GetPages(ids)
 	var valid []*tree.Page
-	for _, p := range pages {
+	for i, p := range pages {
+		if pageErrs[i] != nil {
+			w.log.Warn("failed to load page for baseline revision", "pageID", ids[i], "error", pageErrs[i])
+			continue
+		}
 		if p != nil {
 			valid = append(valid, p)
 		}
