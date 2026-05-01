@@ -173,6 +173,55 @@ func TestFSStoreValidationAndEmptyPaths(t *testing.T) {
 	}
 }
 
+func TestFSStoreGetRevision_BackwardCompatibleWithoutExtraFrontmatterFields(t *testing.T) {
+	store := NewFSStore(t.TempDir())
+	createdAt := time.Date(2026, 4, 20, 15, 4, 5, 0, time.UTC)
+	pageID := "page-1"
+	revisionID := "rev-legacy"
+
+	payload := map[string]interface{}{
+		"id":              revisionID,
+		"page_id":         pageID,
+		"type":            string(RevisionTypeContentUpdate),
+		"author_id":       "tester",
+		"created_at":      createdAt.Format(time.RFC3339),
+		"title":           "Legacy",
+		"slug":            "legacy",
+		"kind":            "page",
+		"path":            "/legacy",
+		"content_hash":    "abc123",
+		"page_created_at": createdAt.Format(time.RFC3339),
+		"page_updated_at": createdAt.Format(time.RFC3339),
+		"creator_id":      "creator",
+		"last_author_id":  "editor",
+	}
+
+	revisionPath := store.revisionFilePath(pageID, revisionID, createdAt)
+	if err := os.MkdirAll(filepath.Dir(revisionPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	if err := writeJSONAtomic(revisionPath, payload); err != nil {
+		t.Fatalf("writeJSONAtomic failed: %v", err)
+	}
+	if err := store.saveRevisionIndex(pageID, revisionIndex{revisionID: filepath.Base(revisionPath)}); err != nil {
+		t.Fatalf("saveRevisionIndex failed: %v", err)
+	}
+
+	rev, err := store.GetRevision(pageID, revisionID)
+	if err != nil {
+		t.Fatalf("GetRevision failed: %v", err)
+	}
+	if rev == nil || rev.ID != revisionID {
+		t.Fatalf("unexpected revision = %#v", rev)
+	}
+	if rev.ExtraFrontmatter != nil {
+		t.Fatalf("expected legacy revision to decode without extra frontmatter, got %#v", rev.ExtraFrontmatter)
+	}
+	if rev.ExtraFrontmatterHash != "" {
+		t.Fatalf("expected empty extra frontmatter hash for legacy revision, got %q", rev.ExtraFrontmatterHash)
+	}
+}
+
 func TestFSStoreListRevisionWrappersAndValidation(t *testing.T) {
 	store := NewFSStore(t.TempDir())
 	if got, err := store.ListRevisions("missing"); err != nil || len(got) != 0 {

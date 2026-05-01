@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
@@ -28,12 +29,12 @@ type assetManifestEntry struct {
 }
 
 type Service struct {
-	storageDir          string
-	pages               *tree.TreeService
-	store               *FSStore
-	maxRevisions        int // 0 = unlimited
-	log                 *slog.Logger
-	assetManifestCache  sync.Map // pageID → assetManifestEntry
+	storageDir         string
+	pages              *tree.TreeService
+	store              *FSStore
+	maxRevisions       int // 0 = unlimited
+	log                *slog.Logger
+	assetManifestCache sync.Map // pageID → assetManifestEntry
 }
 
 type ServiceOptions struct {
@@ -588,8 +589,17 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		)
 	}
 
-	restoredContent := string(content)
-	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent, tree.VersionUnchecked, false); err != nil {
+	restoredContent, err := markdown.BuildMarkdownWithExtraFrontmatter(rev.ExtraFrontmatter, string(content))
+	if err != nil {
+		return sharederrors.NewLocalizedError(
+			"revision_restore_failed",
+			"Failed to restore page",
+			"failed to restore page %s",
+			err,
+			pageID,
+		)
+	}
+	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent, tree.VersionUnchecked, true); err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
 			"Failed to restore page",
@@ -600,8 +610,12 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	}
 
 	if err := s.restoreAssets(pageID, assets); err != nil {
-		restoreRollbackContent := beforeState.Content
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, false); rollbackErr != nil {
+		restoreRollbackContent, buildErr := markdown.BuildMarkdownWithExtraFrontmatter(beforeState.ExtraFrontmatter, beforeState.Content)
+		if buildErr != nil {
+			s.log.Warn("failed to rebuild rollback content", "pageID", pageID, "error", buildErr)
+			restoreRollbackContent = beforeState.Content
+		}
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, true); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
@@ -617,8 +631,12 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	}
 
 	if err := s.recordRestoreRevision(pageID, authorID); err != nil {
-		restoreRollbackContent := beforeState.Content
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, false); rollbackErr != nil {
+		restoreRollbackContent, buildErr := markdown.BuildMarkdownWithExtraFrontmatter(beforeState.ExtraFrontmatter, beforeState.Content)
+		if buildErr != nil {
+			s.log.Warn("failed to rebuild rollback content", "pageID", pageID, "error", buildErr)
+			restoreRollbackContent = beforeState.Content
+		}
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, true); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
@@ -643,6 +661,9 @@ func (s *Service) capturePageState(pageID string, withAssets bool) (*RevisionSta
 	}
 
 	state := s.revisionStateFromPage(page)
+	if err := s.enrichStateWithExtraFrontmatter(page.ID, state); err != nil {
+		return nil, err
+	}
 
 	if !withAssets {
 		return state, nil
@@ -693,8 +714,11 @@ func (s *Service) recordContentUpdateForPage(page *tree.Page, authorID, summary 
 	}
 
 	state := s.revisionStateFromPage(page)
+	if err := s.enrichStateWithExtraFrontmatter(page.ID, state); err != nil {
+		return nil, false, err
+	}
 
-	if prev != nil && prev.ContentHash == state.ContentHash {
+	if prev != nil && prev.ContentHash == state.ContentHash && prev.ExtraFrontmatterHash == state.ExtraFrontmatterHash {
 		return prev, false, nil
 	}
 
@@ -730,24 +754,67 @@ func (s *Service) newRevision(t RevisionType, state *RevisionState, authorID, su
 	}
 
 	return &Revision{
-		ID:                revisionID,
-		PageID:            state.PageID,
-		ParentID:          state.ParentID,
-		Type:              t,
-		AuthorID:          strings.TrimSpace(authorID),
-		CreatedAt:         time.Now().UTC(),
-		Title:             state.Title,
-		Slug:              state.Slug,
-		Kind:              state.Kind,
-		Path:              state.Path,
-		ContentHash:       state.ContentHash,
-		AssetManifestHash: assetManifestHash,
-		PageCreatedAt:     state.PageCreatedAt.UTC(),
-		PageUpdatedAt:     state.PageUpdatedAt.UTC(),
-		CreatorID:         strings.TrimSpace(state.CreatorID),
-		LastAuthorID:      strings.TrimSpace(state.LastAuthorID),
-		Summary:           summary,
+		ID:                   revisionID,
+		PageID:               state.PageID,
+		ParentID:             state.ParentID,
+		Type:                 t,
+		AuthorID:             strings.TrimSpace(authorID),
+		CreatedAt:            time.Now().UTC(),
+		Title:                state.Title,
+		Slug:                 state.Slug,
+		Kind:                 state.Kind,
+		Path:                 state.Path,
+		ContentHash:          state.ContentHash,
+		ExtraFrontmatter:     state.ExtraFrontmatter,
+		ExtraFrontmatterHash: state.ExtraFrontmatterHash,
+		AssetManifestHash:    assetManifestHash,
+		PageCreatedAt:        state.PageCreatedAt.UTC(),
+		PageUpdatedAt:        state.PageUpdatedAt.UTC(),
+		CreatorID:            strings.TrimSpace(state.CreatorID),
+		LastAuthorID:         strings.TrimSpace(state.LastAuthorID),
+		Summary:              summary,
 	}, nil
+}
+
+func (s *Service) enrichStateWithExtraFrontmatter(pageID string, state *RevisionState) error {
+	if state == nil {
+		return fmt.Errorf("revision state is required")
+	}
+
+	raw, err := s.pages.ReadPageRaw(pageID)
+	if err != nil {
+		return err
+	}
+
+	fm, _, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		return err
+	}
+	if !has || len(fm.ExtraFields) == 0 {
+		state.ExtraFrontmatter = nil
+		state.ExtraFrontmatterHash = ""
+		return nil
+	}
+
+	hash, err := hashExtraFrontmatter(fm.ExtraFields)
+	if err != nil {
+		return err
+	}
+	state.ExtraFrontmatter = fm.ExtraFields
+	state.ExtraFrontmatterHash = hash
+	return nil
+}
+
+func hashExtraFrontmatter(extra map[string]interface{}) (string, error) {
+	if len(extra) == 0 {
+		return "", nil
+	}
+
+	raw, err := json.Marshal(extra)
+	if err != nil {
+		return "", fmt.Errorf("marshal extra frontmatter: %w", err)
+	}
+	return sha256HexBytes(raw), nil
 }
 
 func (s *Service) persistLiveAssets(pageID string, refs []AssetRef) error {

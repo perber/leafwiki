@@ -928,6 +928,28 @@ func (t *TreeService) GetPage(id string) (*Page, error) {
 	}, nil
 }
 
+// ReadPageRaw returns the raw markdown of a page including frontmatter.
+func (t *TreeService) ReadPageRaw(id string) (string, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	if t.tree == nil {
+		return "", ErrTreeNotLoaded
+	}
+
+	page := t.getNodeByIDLocked(id)
+	if page == nil {
+		return "", ErrPageNotFound
+	}
+
+	raw, err := t.store.ReadPageRaw(page)
+	if err != nil {
+		return "", fmt.Errorf("could not get page raw content: %w", err)
+	}
+
+	return raw, nil
+}
+
 // ResolvePermalinkTarget resolves a stable page ID to the current route path.
 func (t *TreeService) ResolvePermalinkTarget(id string) (*PermalinkTarget, error) {
 	t.mu.RLock()
