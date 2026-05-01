@@ -9,6 +9,7 @@ import { completionStatus } from '@codemirror/autocomplete'
 import { Save, X } from 'lucide-react'
 import { useEffect } from 'react'
 import { useToolbarStore } from '../toolbar/toolbar'
+import { buildEditorFrontmatter } from './frontmatter'
 import { usePageEditorStore } from './pageEditor'
 
 export interface ToolbarActionsOptions {
@@ -36,10 +37,14 @@ export function useToolbarActions({
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
   const dirty = usePageEditorStore((s) => {
-    const { page, title, slug, content } = s
+    const { page, title, slug, content, frontmatterRaw, tags } = s
     if (!page) return false
     return (
-      page.title !== title || page.slug !== slug || page.content !== content
+      page.title !== title ||
+      page.slug !== slug ||
+      page.content !== content ||
+      (page.frontmatter ?? '') !==
+        buildEditorFrontmatter({ tags, raw: frontmatterRaw })
     )
   })
 

@@ -8,6 +8,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
+import { PageFrontmatterPanel } from './PageFrontmatterPanel'
+import { buildEditorFrontmatter } from './frontmatter'
 import { usePageEditorStore } from './pageEditor'
 import useNavigationGuard from './useNavigationGuard'
 import { useToolbarActions } from './useToolbarActions'
@@ -23,17 +25,25 @@ export default function PageEditor() {
   const savePage = usePageEditorStore((s) => s.savePage)
   const forceOverwrite = usePageEditorStore((s) => s.forceOverwrite)
   const setContent = usePageEditorStore((s) => s.setContent)
+  const setFrontmatterRaw = usePageEditorStore((s) => s.setFrontmatterRaw)
+  const setTags = usePageEditorStore((s) => s.setTags)
   const loadPageData = usePageEditorStore((s) => s.loadPageData)
   const initialPage = usePageEditorStore((s) => s.initialPage) // contains the initial page data when loaded
+  const frontmatterRaw = usePageEditorStore((s) => s.frontmatterRaw)
+  const tags = usePageEditorStore((s) => s.tags)
   const notFound = usePageEditorStore((s) => s.notFound)
   const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
   const openNode = useTreeStore((s) => s.openNode)
   const dirty = usePageEditorStore((s) => {
-    const { page, title, slug, content } = s
+    const { page, title, slug, content, frontmatterRaw, tags } = s
     if (!page) return false
     return (
-      page.title !== title || page.slug !== slug || page.content !== content
+      page.title !== title ||
+      page.slug !== slug ||
+      page.content !== content ||
+      (page.frontmatter ?? '') !==
+        buildEditorFrontmatter({ tags, raw: frontmatterRaw })
     )
   })
 
@@ -126,12 +136,19 @@ export default function PageEditor() {
       title: currentTitle,
       slug: currentSlug,
       content: currentContent,
+      frontmatterRaw: currentFrontmatterRaw,
+      tags: currentTags,
     } = usePageEditorStore.getState()
 
     const hasUnsavedChanges = currentPage
       ? currentPage.title !== currentTitle ||
         currentPage.slug !== currentSlug ||
-        currentPage.content !== currentContent
+        currentPage.content !== currentContent ||
+        (currentPage.frontmatter ?? '') !==
+          buildEditorFrontmatter({
+            tags: currentTags,
+            raw: currentFrontmatterRaw,
+          })
       : false
 
     if (!hasUnsavedChanges) {
@@ -179,12 +196,20 @@ export default function PageEditor() {
     <>
       <div className="page-editor">
         {initialPage && (
-          <MarkdownEditor
-            ref={editorRef}
-            pageId={initialPage.id}
-            initialValue={initialPage.content || ''}
-            onChange={handleEditorChange}
-          />
+          <>
+            <PageFrontmatterPanel
+              tags={tags}
+              rawValue={frontmatterRaw}
+              onTagsChange={setTags}
+              onRawValueChange={setFrontmatterRaw}
+            />
+            <MarkdownEditor
+              ref={editorRef}
+              pageId={initialPage.id}
+              initialValue={initialPage.content || ''}
+              onChange={handleEditorChange}
+            />
+          </>
         )}
       </div>
     </>

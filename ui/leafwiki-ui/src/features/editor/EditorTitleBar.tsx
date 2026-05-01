@@ -6,6 +6,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Pencil } from 'lucide-react'
 import { TooltipWrapper } from '../../components/TooltipWrapper'
+import { buildEditorFrontmatter } from './frontmatter'
 import { usePageEditorStore } from './pageEditor'
 
 export function EditorTitleBar() {
@@ -19,10 +20,14 @@ export function EditorTitleBar() {
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((state) => state.getPageByPath)
   const dirty = usePageEditorStore((s) => {
-    const { page, title, slug, content } = s
+    const { page, title, slug, content, frontmatterRaw, tags } = s
     if (!page) return false
     return (
-      page.title !== title || page.slug !== slug || page.content !== content
+      page.title !== title ||
+      page.slug !== slug ||
+      page.content !== content ||
+      (page.frontmatter ?? '') !==
+        buildEditorFrontmatter({ tags, raw: frontmatterRaw })
     )
   })
 

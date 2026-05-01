@@ -931,11 +931,83 @@
 
   /** PageEditor **/
   .page-editor {
-    @apply h-full w-full overflow-hidden;
+    @apply flex h-full w-full flex-col overflow-hidden;
   }
 
   .page-editor__error {
     @apply text-error p-6 text-sm;
+  }
+
+  .page-frontmatter-panel {
+    @apply border-surface-border bg-surface/95 mb-3 rounded-xl border px-4 py-3 shadow-xs;
+  }
+
+  .page-frontmatter-panel__header {
+    @apply mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between;
+  }
+
+  .page-frontmatter-panel__title-group {
+    @apply min-w-0;
+  }
+
+  .page-frontmatter-panel__eyebrow {
+    @apply text-muted-foreground text-[11px] font-medium tracking-[0.12em] uppercase;
+  }
+
+  .page-frontmatter-panel__title-row {
+    @apply text-interface-text mt-1 flex items-center gap-2;
+  }
+
+  .page-frontmatter-panel__title-icon {
+    @apply text-brand;
+  }
+
+  .page-frontmatter-panel__title {
+    @apply text-sm font-semibold;
+  }
+
+  .page-frontmatter-panel__toggle {
+    @apply self-start rounded-full;
+  }
+
+  .page-frontmatter-panel__toggle--open {
+    @apply border-brand text-brand;
+  }
+
+  .page-frontmatter-panel__tag-editor {
+    @apply space-y-2;
+  }
+
+  .page-frontmatter-panel__chips {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .page-frontmatter-panel__chip {
+    @apply bg-surface-alt text-interface-text inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm;
+  }
+
+  .page-frontmatter-panel__chip-remove {
+    @apply text-muted-foreground hover:text-interface-text inline-flex h-4 w-4 items-center justify-center rounded-full;
+  }
+
+  .page-frontmatter-panel__tag-input {
+    @apply min-w-52 flex-1 rounded-full;
+  }
+
+  .page-frontmatter-panel__advanced {
+    @apply border-surface-border mt-3 border-t pt-3;
+  }
+
+  .page-frontmatter-panel__advanced-label {
+    @apply text-interface-text mb-2 block text-sm font-medium;
+  }
+
+  .page-frontmatter-panel__textarea {
+    @apply border-input bg-background text-interface-text placeholder:text-muted-foreground focus-visible:ring-ring min-h-32 w-full rounded-xl border px-3 py-2 font-mono text-sm shadow-xs transition-colors focus-visible:ring-1 focus-visible:outline-hidden;
+  }
+
+  .page-frontmatter-panel__hint {
+    @apply text-muted-foreground text-xs leading-relaxed;
   }
 
   .toolbar-button__close-editor {

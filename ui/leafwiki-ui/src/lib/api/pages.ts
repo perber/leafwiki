@@ -36,6 +36,7 @@ export interface Page {
   path: string
   title: string
   content: string
+  frontmatter?: string
   version: string
   kind: 'page' | 'section'
   metadata?: PageMetadata // optional metadata, because older API responses may not have it
@@ -144,11 +145,12 @@ export async function updatePage(
   title: string,
   slug: string,
   content: string,
+  frontmatter?: string,
 ): Promise<Page | null> {
   return (await fetchWithAuth(`/api/pages/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ version, title, slug, content }),
+    body: JSON.stringify({ version, title, slug, content, frontmatter }),
   })) as Page | null
 }
 
