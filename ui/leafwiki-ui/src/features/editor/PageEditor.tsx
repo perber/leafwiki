@@ -3,7 +3,7 @@ import { mapApiError, asApiLocalizedError } from '@/lib/api/errors'
 import { buildBrowserEditUrl } from '@/lib/routePath'
 import { getWikiTargetRoutePath } from '@/lib/wikiPath'
 import { useTreeStore } from '@/stores/tree'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useProgressbarStore } from '../progressbar/progressbar'
@@ -18,6 +18,7 @@ export default function PageEditor() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const editorRef = useRef<MarkdownEditorRef>(null)
+  const [skipNavigationGuard, setSkipNavigationGuard] = useState(false)
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const savePage = usePageEditorStore((s) => s.savePage)
   const forceOverwrite = usePageEditorStore((s) => s.forceOverwrite)
@@ -27,7 +28,6 @@ export default function PageEditor() {
   const notFound = usePageEditorStore((s) => s.notFound)
   const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
-  const page = usePageEditorStore((s) => s.page)
   const openNode = useTreeStore((s) => s.openNode)
   const dirty = usePageEditorStore((s) => {
     const { page, title, slug, content } = s
@@ -39,11 +39,19 @@ export default function PageEditor() {
 
   // Shows Unsaved Changes Dialog when navigating away with dirty state
   useNavigationGuard({
-    when: dirty,
+    when: dirty && !skipNavigationGuard,
     onNavigate: async () => {
       await reloadTree()
     },
   })
+
+  useEffect(() => {
+    if (!skipNavigationGuard) {
+      return
+    }
+
+    setSkipNavigationGuard(false)
+  }, [pathname, skipNavigationGuard])
 
   // Load page data when path changes
   useEffect(() => {
@@ -121,12 +129,32 @@ export default function PageEditor() {
   }, [savePage, forceOverwrite])
 
   const handleClose = useCallback(() => {
-    if (page?.path) {
-      navigate(`/${page.path}`)
+    const {
+      page: currentPage,
+      title: currentTitle,
+      slug: currentSlug,
+      content: currentContent,
+    } = usePageEditorStore.getState()
+
+    const hasUnsavedChanges = currentPage
+      ? currentPage.title !== currentTitle ||
+        currentPage.slug !== currentSlug ||
+        currentPage.content !== currentContent
+      : false
+
+    if (!hasUnsavedChanges) {
+      // Saving updates the editor store before React finishes re-rendering.
+      // Skip the blocker for this close action when the latest store snapshot
+      // is already clean.
+      setSkipNavigationGuard(true)
+    }
+
+    if (currentPage?.path) {
+      navigate(`/${currentPage.path}`)
     } else {
       navigate('/')
     }
-  }, [page, navigate])
+  }, [navigate])
 
   // register toolbar actions
   useToolbarActions({
