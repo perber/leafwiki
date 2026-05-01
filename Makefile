@@ -26,6 +26,9 @@ clean:
 test:
 	go test ./...
 
+bench:
+	go test -bench=. -benchmem -benchtime=3s ./internal/links/... ./internal/core/revision/...
+
 # Build all platform targets
 release: $(PLATFORMS)
 	@echo "✅ All builds complete."
@@ -98,6 +101,7 @@ help:
 	@echo "  make release              – Cross-compile binaries for all platforms (via Docker)"
 	@echo "  make clean                – Clean all generated files"
 	@echo "  make test                 – Run all Go tests"
+	@echo "  make bench                – Run Go benchmarks for links and revision"
 	@echo "  make run-e2e              – Run end-to-end tests (using Docker)"
 	@echo "  make run-e2e-local        – Run end-to-end tests via local fast path"
 	@echo "  make run-e2e-local-fast   – Run E2E tests locally, skip UI build (use when dist/ is current)"
@@ -106,4 +110,4 @@ help:
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build run clean test fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast
+.PHONY: all build run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast
