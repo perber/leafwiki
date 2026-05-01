@@ -872,6 +872,71 @@ func TestRestoreRevision_LegacyRevisionPreservesCurrentCustomFrontmatter(t *test
 	}
 }
 
+func TestRestoreRevision_LegacyBodyThatLooksLikeFrontmatterStaysBody(t *testing.T) {
+	service, treeService, _ := newRevisionTestService(t)
+
+	pageKind := tree.NodeKindPage
+	pageIDPtr, err := treeService.CreateNode("creator", nil, "Page", "page", &pageKind)
+	if err != nil {
+		t.Fatalf("CreateNode(page) failed: %v", err)
+	}
+	pageID := *pageIDPtr
+
+	initialContent := "Current body"
+	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &initialContent, tree.VersionUnchecked, false); err != nil {
+		t.Fatalf("UpdateNode(initial content) failed: %v", err)
+	}
+
+	page, err := treeService.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage failed: %v", err)
+	}
+
+	legacyBody := "---\ntitle: not frontmatter\n---\nBody content"
+	state := service.revisionStateFromPage(page)
+	contentHash, err := service.store.SaveContentBlob([]byte(legacyBody))
+	if err != nil {
+		t.Fatalf("SaveContentBlob failed: %v", err)
+	}
+	legacyRevision, err := service.newRevision(RevisionTypeContentUpdate, state, "legacy-author", "legacy body-only", "")
+	if err != nil {
+		t.Fatalf("newRevision failed: %v", err)
+	}
+	legacyRevision.ContentHash = contentHash
+	legacyRevision.ExtraFrontmatter = nil
+	legacyRevision.ExtraFrontmatterHash = ""
+	if err := service.store.SaveRevision(legacyRevision); err != nil {
+		t.Fatalf("SaveRevision failed: %v", err)
+	}
+
+	if err := service.RestoreRevision(pageID, legacyRevision.ID, "restorer"); err != nil {
+		t.Fatalf("RestoreRevision failed: %v", err)
+	}
+
+	restoredPage, err := treeService.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage(after restore) failed: %v", err)
+	}
+	if restoredPage.Content != legacyBody {
+		t.Fatalf("expected YAML-looking content to stay body, got %q", restoredPage.Content)
+	}
+
+	raw, err := treeService.ReadPageRaw(pageID)
+	if err != nil {
+		t.Fatalf("ReadPageRaw failed: %v", err)
+	}
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter failed: %v", err)
+	}
+	if has && len(fm.ExtraFields) != 0 {
+		t.Fatalf("expected no custom frontmatter to be introduced, got %#v", fm.ExtraFields)
+	}
+	if body != legacyBody {
+		t.Fatalf("expected raw file body to keep legacy body-only content, got %q", body)
+	}
+}
+
 func TestRecordContentAndStructureRebuildMissingPreviousManifest(t *testing.T) {
 	service, treeService, storageDir := newRevisionTestService(t)
 	pageID := createRevisionTestPage(t, treeService, "Page", "page", "hello")
