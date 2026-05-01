@@ -19,41 +19,45 @@ type AssetRef struct {
 }
 
 type RevisionState struct {
-	PageID            string
-	ParentID          string
-	Title             string
-	Slug              string
-	Kind              string
-	Path              string
-	Content           string
-	ContentHash       string
-	Assets            []AssetRef
-	AssetManifestHash string
-	PageCreatedAt     time.Time
-	PageUpdatedAt     time.Time
-	CreatorID         string
-	LastAuthorID      string
-	CapturedAt        time.Time
+	PageID               string
+	ParentID             string
+	Title                string
+	Slug                 string
+	Kind                 string
+	Path                 string
+	Content              string
+	ContentHash          string
+	ExtraFrontmatter     map[string]interface{}
+	ExtraFrontmatterHash string
+	Assets               []AssetRef
+	AssetManifestHash    string
+	PageCreatedAt        time.Time
+	PageUpdatedAt        time.Time
+	CreatorID            string
+	LastAuthorID         string
+	CapturedAt           time.Time
 }
 
 type Revision struct {
-	ID                string       `json:"id"`
-	PageID            string       `json:"page_id"`
-	ParentID          string       `json:"parent_id,omitempty"`
-	Type              RevisionType `json:"type"`
-	AuthorID          string       `json:"author_id"`
-	CreatedAt         time.Time    `json:"created_at"`
-	Title             string       `json:"title"`
-	Slug              string       `json:"slug"`
-	Kind              string       `json:"kind"`
-	Path              string       `json:"path"`
-	ContentHash       string       `json:"content_hash"`
-	AssetManifestHash string       `json:"asset_manifest_hash"`
-	PageCreatedAt     time.Time    `json:"page_created_at"`
-	PageUpdatedAt     time.Time    `json:"page_updated_at"`
-	CreatorID         string       `json:"creator_id"`
-	LastAuthorID      string       `json:"last_author_id"`
-	Summary           string       `json:"summary,omitempty"`
+	ID                   string                 `json:"id"`
+	PageID               string                 `json:"page_id"`
+	ParentID             string                 `json:"parent_id,omitempty"`
+	Type                 RevisionType           `json:"type"`
+	AuthorID             string                 `json:"author_id"`
+	CreatedAt            time.Time              `json:"created_at"`
+	Title                string                 `json:"title"`
+	Slug                 string                 `json:"slug"`
+	Kind                 string                 `json:"kind"`
+	Path                 string                 `json:"path"`
+	ContentHash          string                 `json:"content_hash"`
+	ExtraFrontmatter     map[string]interface{} `json:"extra_frontmatter,omitempty"`
+	ExtraFrontmatterHash string                 `json:"extra_frontmatter_hash,omitempty"`
+	AssetManifestHash    string                 `json:"asset_manifest_hash"`
+	PageCreatedAt        time.Time              `json:"page_created_at"`
+	PageUpdatedAt        time.Time              `json:"page_updated_at"`
+	CreatorID            string                 `json:"creator_id"`
+	LastAuthorID         string                 `json:"last_author_id"`
+	Summary              string                 `json:"summary,omitempty"`
 }
 
 type assetManifest struct {

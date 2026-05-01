@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 )
@@ -626,6 +627,313 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	}
 	if latest == nil || latest.Type != RevisionTypeRestore {
 		t.Fatalf("latest revision = %#v", latest)
+	}
+}
+
+func TestRecordContentUpdate_CapturesHistoricalCustomFrontmatter(t *testing.T) {
+	service, treeService, _ := newRevisionTestService(t)
+
+	pageKind := tree.NodeKindPage
+	pageIDPtr, err := treeService.CreateNode("tester", nil, "Page", "page", &pageKind)
+	if err != nil {
+		t.Fatalf("CreateNode(page) failed: %v", err)
+	}
+	pageID := *pageIDPtr
+
+	firstRaw, err := markdown.BuildMarkdownWithExtraFrontmatter(map[string]interface{}{
+		"aliases":   []string{"one"},
+		"customKey": "first",
+	}, "Body")
+	if err != nil {
+		t.Fatalf("BuildMarkdownWithExtraFrontmatter(first) failed: %v", err)
+	}
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &firstRaw, tree.VersionUnchecked, true); err != nil {
+		t.Fatalf("UpdateNode(first raw) failed: %v", err)
+	}
+
+	firstRev, created, err := service.RecordContentUpdate(pageID, "tester", "first")
+	if err != nil {
+		t.Fatalf("RecordContentUpdate(first) failed: %v", err)
+	}
+	if !created {
+		t.Fatalf("expected first revision to be created")
+	}
+	if got := firstRev.ExtraFrontmatter["customKey"]; got != "first" {
+		t.Fatalf("expected first revision custom frontmatter, got %#v", firstRev.ExtraFrontmatter)
+	}
+
+	secondRaw, err := markdown.BuildMarkdownWithExtraFrontmatter(map[string]interface{}{
+		"aliases":   []string{"two"},
+		"customKey": "second",
+	}, "Body")
+	if err != nil {
+		t.Fatalf("BuildMarkdownWithExtraFrontmatter(second) failed: %v", err)
+	}
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &secondRaw, tree.VersionUnchecked, true); err != nil {
+		t.Fatalf("UpdateNode(second raw) failed: %v", err)
+	}
+
+	secondRev, created, err := service.RecordContentUpdate(pageID, "tester", "second")
+	if err != nil {
+		t.Fatalf("RecordContentUpdate(second) failed: %v", err)
+	}
+	if !created {
+		t.Fatalf("expected second revision to be created for frontmatter-only change")
+	}
+	if secondRev.ID == firstRev.ID {
+		t.Fatalf("expected distinct revision for changed custom frontmatter")
+	}
+	if got := secondRev.ExtraFrontmatter["customKey"]; got != "second" {
+		t.Fatalf("expected second revision custom frontmatter, got %#v", secondRev.ExtraFrontmatter)
+	}
+	aliases, ok := secondRev.ExtraFrontmatter["aliases"].([]interface{})
+	if !ok || len(aliases) != 1 || aliases[0] != "two" {
+		t.Fatalf("expected aliases to be preserved in revision, got %#v", secondRev.ExtraFrontmatter["aliases"])
+	}
+}
+
+func TestRestoreRevision_RestoresHistoricalCustomFrontmatterAndKeepsManagedFields(t *testing.T) {
+	service, treeService, _ := newRevisionTestService(t)
+
+	pageKind := tree.NodeKindPage
+	pageIDPtr, err := treeService.CreateNode("creator", nil, "Page", "page", &pageKind)
+	if err != nil {
+		t.Fatalf("CreateNode(page) failed: %v", err)
+	}
+	pageID := *pageIDPtr
+
+	firstRaw, err := markdown.BuildMarkdownWithExtraFrontmatter(map[string]interface{}{
+		"aliases":   []string{"one"},
+		"customKey": "first",
+	}, "Body")
+	if err != nil {
+		t.Fatalf("BuildMarkdownWithExtraFrontmatter(first) failed: %v", err)
+	}
+	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &firstRaw, tree.VersionUnchecked, true); err != nil {
+		t.Fatalf("UpdateNode(first raw) failed: %v", err)
+	}
+	firstRev, created, err := service.RecordContentUpdate(pageID, "creator", "first")
+	if err != nil {
+		t.Fatalf("RecordContentUpdate(first) failed: %v", err)
+	}
+	if !created {
+		t.Fatalf("expected first revision to be created")
+	}
+
+	secondRaw, err := markdown.BuildMarkdownWithExtraFrontmatter(map[string]interface{}{
+		"aliases":   []string{"two"},
+		"customKey": "second",
+	}, "Body changed")
+	if err != nil {
+		t.Fatalf("BuildMarkdownWithExtraFrontmatter(second) failed: %v", err)
+	}
+	if err := treeService.UpdateNode("editor", pageID, "Changed", "page", &secondRaw, tree.VersionUnchecked, true); err != nil {
+		t.Fatalf("UpdateNode(second raw) failed: %v", err)
+	}
+	if _, _, err := service.RecordContentUpdate(pageID, "editor", "second"); err != nil {
+		t.Fatalf("RecordContentUpdate(second) failed: %v", err)
+	}
+
+	beforeRestore, err := treeService.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage(before restore) failed: %v", err)
+	}
+	managedID := beforeRestore.ID
+	managedCreatedAt := beforeRestore.Metadata.CreatedAt
+	managedCreatorID := beforeRestore.Metadata.CreatorID
+	beforeUpdatedAt := beforeRestore.Metadata.UpdatedAt
+
+	if err := service.RestoreRevision(pageID, firstRev.ID, "restorer"); err != nil {
+		t.Fatalf("RestoreRevision failed: %v", err)
+	}
+
+	page, err := treeService.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage(after restore) failed: %v", err)
+	}
+	if page.ID != managedID {
+		t.Fatalf("expected page ID to remain stable, got %q want %q", page.ID, managedID)
+	}
+	if page.Title != "Page" {
+		t.Fatalf("expected restore to rehydrate revision title, got %q", page.Title)
+	}
+	if page.Metadata.CreatedAt != managedCreatedAt {
+		t.Fatalf("expected created_at to remain stable, got %s want %s", page.Metadata.CreatedAt, managedCreatedAt)
+	}
+	if page.Metadata.CreatorID != managedCreatorID {
+		t.Fatalf("expected creator_id to remain stable, got %q want %q", page.Metadata.CreatorID, managedCreatorID)
+	}
+	if page.Metadata.LastAuthorID != "restorer" {
+		t.Fatalf("expected last author to be restore actor, got %q", page.Metadata.LastAuthorID)
+	}
+	if !page.Metadata.UpdatedAt.After(beforeUpdatedAt) {
+		t.Fatalf("expected updated_at to advance on restore, before=%s after=%s", beforeUpdatedAt, page.Metadata.UpdatedAt)
+	}
+
+	raw, err := treeService.ReadPageRaw(pageID)
+	if err != nil {
+		t.Fatalf("ReadPageRaw failed: %v", err)
+	}
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter(restored raw) failed: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected restored page to have frontmatter")
+	}
+	if fm.LeafWikiID != managedID {
+		t.Fatalf("expected leafwiki_id to remain stable, got %q want %q", fm.LeafWikiID, managedID)
+	}
+	if fm.LeafWikiTitle != page.Title {
+		t.Fatalf("expected leafwiki_title to stay managed by the restored page title, got %q want %q", fm.LeafWikiTitle, page.Title)
+	}
+	if fm.LeafWikiCreatorID != managedCreatorID {
+		t.Fatalf("expected leafwiki_creator_id to remain stable, got %q want %q", fm.LeafWikiCreatorID, managedCreatorID)
+	}
+	if fm.LeafWikiLastAuthorID != "restorer" {
+		t.Fatalf("expected leafwiki_last_author_id to be restore actor, got %q", fm.LeafWikiLastAuthorID)
+	}
+	if fm.LeafWikiUpdatedAt == "" {
+		t.Fatalf("expected leafwiki_updated_at to be set on restore")
+	}
+	if got := fm.ExtraFields["customKey"]; got != "first" {
+		t.Fatalf("expected restored custom frontmatter, got %#v", fm.ExtraFields)
+	}
+	aliases, ok := fm.ExtraFields["aliases"].([]interface{})
+	if !ok || len(aliases) != 1 || aliases[0] != "one" {
+		t.Fatalf("expected restored aliases, got %#v", fm.ExtraFields["aliases"])
+	}
+	if body != "Body" {
+		t.Fatalf("expected restored body from revision, got %q", body)
+	}
+}
+
+func TestRestoreRevision_LegacyRevisionPreservesCurrentCustomFrontmatter(t *testing.T) {
+	service, treeService, _ := newRevisionTestService(t)
+
+	pageKind := tree.NodeKindPage
+	pageIDPtr, err := treeService.CreateNode("creator", nil, "Page", "page", &pageKind)
+	if err != nil {
+		t.Fatalf("CreateNode(page) failed: %v", err)
+	}
+	pageID := *pageIDPtr
+
+	initialRaw, err := markdown.BuildMarkdownWithExtraFrontmatter(map[string]interface{}{
+		"customKey": "current",
+	}, "Current body")
+	if err != nil {
+		t.Fatalf("BuildMarkdownWithExtraFrontmatter(initial) failed: %v", err)
+	}
+	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &initialRaw, tree.VersionUnchecked, true); err != nil {
+		t.Fatalf("UpdateNode(initial raw) failed: %v", err)
+	}
+
+	page, err := treeService.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage failed: %v", err)
+	}
+
+	state := service.revisionStateFromPage(page)
+	contentHash, err := service.store.SaveContentBlob([]byte("Legacy body"))
+	if err != nil {
+		t.Fatalf("SaveContentBlob failed: %v", err)
+	}
+	legacyRevision, err := service.newRevision(RevisionTypeContentUpdate, state, "legacy-author", "legacy", "")
+	if err != nil {
+		t.Fatalf("newRevision failed: %v", err)
+	}
+	legacyRevision.ContentHash = contentHash
+	legacyRevision.ExtraFrontmatter = nil
+	legacyRevision.ExtraFrontmatterHash = ""
+	if err := service.store.SaveRevision(legacyRevision); err != nil {
+		t.Fatalf("SaveRevision failed: %v", err)
+	}
+
+	if err := service.RestoreRevision(pageID, legacyRevision.ID, "restorer"); err != nil {
+		t.Fatalf("RestoreRevision failed: %v", err)
+	}
+
+	raw, err := treeService.ReadPageRaw(pageID)
+	if err != nil {
+		t.Fatalf("ReadPageRaw failed: %v", err)
+	}
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter failed: %v", err)
+	}
+	if !has {
+		t.Fatalf("expected frontmatter after restore")
+	}
+	if got := fm.ExtraFields["customKey"]; got != "current" {
+		t.Fatalf("expected legacy restore to preserve current custom frontmatter, got %#v", fm.ExtraFields)
+	}
+	if body != "Legacy body" {
+		t.Fatalf("expected legacy content to be restored, got %q", body)
+	}
+}
+
+func TestRestoreRevision_LegacyBodyThatLooksLikeFrontmatterStaysBody(t *testing.T) {
+	service, treeService, _ := newRevisionTestService(t)
+
+	pageKind := tree.NodeKindPage
+	pageIDPtr, err := treeService.CreateNode("creator", nil, "Page", "page", &pageKind)
+	if err != nil {
+		t.Fatalf("CreateNode(page) failed: %v", err)
+	}
+	pageID := *pageIDPtr
+
+	initialContent := "Current body"
+	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &initialContent, tree.VersionUnchecked, false); err != nil {
+		t.Fatalf("UpdateNode(initial content) failed: %v", err)
+	}
+
+	page, err := treeService.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage failed: %v", err)
+	}
+
+	legacyBody := "---\ntitle: not frontmatter\n---\nBody content"
+	state := service.revisionStateFromPage(page)
+	contentHash, err := service.store.SaveContentBlob([]byte(legacyBody))
+	if err != nil {
+		t.Fatalf("SaveContentBlob failed: %v", err)
+	}
+	legacyRevision, err := service.newRevision(RevisionTypeContentUpdate, state, "legacy-author", "legacy body-only", "")
+	if err != nil {
+		t.Fatalf("newRevision failed: %v", err)
+	}
+	legacyRevision.ContentHash = contentHash
+	legacyRevision.ExtraFrontmatter = nil
+	legacyRevision.ExtraFrontmatterHash = ""
+	if err := service.store.SaveRevision(legacyRevision); err != nil {
+		t.Fatalf("SaveRevision failed: %v", err)
+	}
+
+	if err := service.RestoreRevision(pageID, legacyRevision.ID, "restorer"); err != nil {
+		t.Fatalf("RestoreRevision failed: %v", err)
+	}
+
+	restoredPage, err := treeService.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage(after restore) failed: %v", err)
+	}
+	if restoredPage.Content != legacyBody {
+		t.Fatalf("expected YAML-looking content to stay body, got %q", restoredPage.Content)
+	}
+
+	raw, err := treeService.ReadPageRaw(pageID)
+	if err != nil {
+		t.Fatalf("ReadPageRaw failed: %v", err)
+	}
+	fm, body, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter failed: %v", err)
+	}
+	if has && len(fm.ExtraFields) != 0 {
+		t.Fatalf("expected no custom frontmatter to be introduced, got %#v", fm.ExtraFields)
+	}
+	if body != legacyBody {
+		t.Fatalf("expected raw file body to keep legacy body-only content, got %q", body)
 	}
 }
 
