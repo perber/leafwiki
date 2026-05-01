@@ -68,6 +68,38 @@ func (b *LinkService) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorL
 	return b.store.GetRefactorMatchesForPrefix(oldPrefix)
 }
 
+func (b *LinkService) GetRefactorSourcePageIDsForPrefix(oldPrefix string) ([]string, error) {
+	return b.store.GetRefactorSourcePageIDsForPrefix(oldPrefix)
+}
+
+func (b *LinkService) UpdateRewrittenLinksAndHealForPages(pages []*tree.Page, rules []RewriteRule) error {
+	outgoingByPageID, err := b.store.GetOutgoingLinksForPages(pageIDsForPages(pages))
+	if err != nil {
+		return err
+	}
+
+	updates := make([]PageLinkUpdate, 0, len(pages))
+	for _, page := range pages {
+		if page == nil {
+			continue
+		}
+		pagePath := normalizeWikiPath(page.CalculatePath())
+		targets := rewriteResolvedTargets(pagePath, outgoingByPageID[page.ID], rules, b.treeService)
+		updates = append(updates, PageLinkUpdate{
+			FromPageID: page.ID,
+			FromTitle:  page.Title,
+			ToPath:     pagePath,
+			Targets:    targets,
+		})
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	return b.store.ReplaceLinksAndHeal(updates)
+}
+
 func (b *LinkService) GetLinkStatusForPage(pageID string, pagePath string) (*LinkStatusResult, error) {
 	pagePath = normalizeWikiPath(pagePath)
 
@@ -186,4 +218,32 @@ func (b *LinkService) Close() error {
 		return nil
 	}
 	return b.store.Close()
+}
+
+func pageIDsForPages(pages []*tree.Page) []string {
+	ids := make([]string, 0, len(pages))
+	for _, page := range pages {
+		if page == nil {
+			continue
+		}
+		ids = append(ids, page.ID)
+	}
+	return ids
+}
+
+func rewriteResolvedTargets(currentPath string, outgoings []Outgoing, rules []RewriteRule, treeService *tree.TreeService) []TargetLink {
+	if len(outgoings) == 0 {
+		return nil
+	}
+
+	paths := make([]string, 0, len(outgoings))
+	for _, outgoing := range outgoings {
+		targetPath := normalizeWikiPath(outgoing.ToPath)
+		if rewritten, ok := applyRewriteRules(targetPath, rules); ok {
+			targetPath = rewritten
+		}
+		paths = append(paths, targetPath)
+	}
+
+	return resolveTargetLinks(treeService, currentPath, paths)
 }

@@ -82,7 +82,7 @@ func (uc *CopyPageUseCase) Execute(_ context.Context, in CopyPageInput) (*CopyPa
 	}
 
 	updatedContent := strings.ReplaceAll(page.Content, "/assets/"+page.ID+"/", "/assets/"+copyPage.ID+"/")
-	if err := uc.tree.UpdateNode(in.UserID, copyPage.ID, copyPage.Title, copyPage.Slug, &updatedContent, tree.VersionUnchecked); err != nil {
+	if err := uc.tree.UpdateNode(in.UserID, copyPage.ID, copyPage.Title, copyPage.Slug, &updatedContent, tree.VersionUnchecked, false); err != nil {
 		cleanup()
 		_ = uc.assets.DeleteAllAssetsForPage(copyPage.PageNode)
 		return nil, err

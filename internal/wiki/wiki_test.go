@@ -2,6 +2,8 @@ package wiki
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -276,4 +278,42 @@ func TestWiki_AuthDisabled_CoreFunctionalityWorks(t *testing.T) {
 
 	// Test deleting a page
 	deletePageForTest(t, wikiInstance, "system", page.ID, false)
+}
+
+func TestWiki_EnsureBaselineRevisions_SkipsUnreadablePages(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	okPage := createPageForTest(t, w, "system", nil, "Healthy", "healthy", pageNodeKind())
+	brokenPage := createPageForTest(t, w, "system", nil, "Broken", "broken", pageNodeKind())
+
+	if err := w.revision.DeletePageData(okPage.ID); err != nil {
+		t.Fatalf("DeletePageData(okPage) failed: %v", err)
+	}
+	if err := w.revision.DeletePageData(brokenPage.ID); err != nil {
+		t.Fatalf("DeletePageData(brokenPage) failed: %v", err)
+	}
+
+	brokenPath := filepath.Join(w.storageDir, "root", "broken.md")
+	if err := os.Remove(brokenPath); err != nil {
+		t.Fatalf("Remove(%s) failed: %v", brokenPath, err)
+	}
+
+	w.ensureBaselineRevisions()
+
+	okRevisions, err := w.revision.ListRevisions(okPage.ID)
+	if err != nil {
+		t.Fatalf("ListRevisions(okPage) failed: %v", err)
+	}
+	if len(okRevisions) == 0 {
+		t.Fatalf("expected baseline revision for readable page")
+	}
+
+	brokenRevisions, err := w.revision.ListRevisions(brokenPage.ID)
+	if err != nil {
+		t.Fatalf("ListRevisions(brokenPage) failed: %v", err)
+	}
+	if len(brokenRevisions) != 0 {
+		t.Fatalf("expected no baseline revision for unreadable page, got %d", len(brokenRevisions))
+	}
 }

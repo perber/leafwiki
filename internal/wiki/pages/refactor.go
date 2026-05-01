@@ -260,19 +260,19 @@ func NewApplyPageRefactorUseCase(
 
 // Execute applies the refactor operation to the page tree.
 func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorApplyInput) (*tree.Page, error) {
-	prev, err := uc.preview.Execute(ctx, in.RefactorPreviewInput)
+	plan, err := uc.buildApplyPlan(in)
 	if err != nil {
 		return nil, err
 	}
 
-	snapshots, err := uc.captureSnapshots(in)
+	snapshots, err := uc.captureSnapshots(plan.page, in)
 	if err != nil {
 		return nil, err
 	}
 
 	if in.RewriteLinks {
-		rules := []links.RewriteRule{{OldPath: prev.OldPath, NewPath: prev.NewPath}}
-		if err := uc.rewriteAffectedPages(in.UserID, prev.AffectedPages, rules); err != nil {
+		rules := []links.RewriteRule{{OldPath: plan.oldPath, NewPath: plan.newPath}}
+		if err := uc.rewriteAffectedPages(in.UserID, plan.affectedPageIDs, rules); err != nil {
 			return nil, err
 		}
 	}
@@ -297,7 +297,7 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		if err != nil {
 			return nil, err
 		}
-		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, prev.OldPath, prev.NewPath); err != nil {
+		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath); err != nil {
 			return nil, err
 		}
 		return uc.tree.GetPage(updated.Page.ID)
@@ -311,7 +311,7 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		if err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, Version: in.Version, ParentID: parentID}); err != nil {
 			return nil, err
 		}
-		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, prev.OldPath, prev.NewPath); err != nil {
+		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath); err != nil {
 			return nil, err
 		}
 		return uc.tree.GetPage(in.PageID)
@@ -321,6 +321,52 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 	}
 }
 
+type applyRefactorPlan struct {
+	page            *tree.Page
+	oldPath         string
+	newPath         string
+	affectedPageIDs []string
+}
+
+func (uc *ApplyPageRefactorUseCase) buildApplyPlan(in RefactorApplyInput) (*applyRefactorPlan, error) {
+	page, err := uc.tree.GetPage(in.PageID)
+	if err != nil {
+		return nil, err
+	}
+
+	oldPath := page.CalculatePath()
+	newPath, err := uc.preview.computeTargetPath(page, in.RefactorPreviewInput)
+	if err != nil {
+		return nil, err
+	}
+
+	plan := &applyRefactorPlan{
+		page:    page,
+		oldPath: oldPath,
+		newPath: newPath,
+	}
+
+	if !in.RewriteLinks || uc.links == nil {
+		return plan, nil
+	}
+
+	pageIDs, err := uc.links.GetRefactorSourcePageIDsForPrefix(oldPath)
+	if err != nil {
+		return nil, err
+	}
+
+	excludeIDs := subtreeIDSet(page.PageNode)
+	plan.affectedPageIDs = make([]string, 0, len(pageIDs))
+	for _, pageID := range pageIDs {
+		if _, excluded := excludeIDs[pageID]; excluded {
+			continue
+		}
+		plan.affectedPageIDs = append(plan.affectedPageIDs, pageID)
+	}
+
+	return plan, nil
+}
+
 type pathChangeSnapshot struct {
 	PageID   string
 	OldPath  string
@@ -328,11 +374,7 @@ type pathChangeSnapshot struct {
 	RootPage bool
 }
 
-func (uc *ApplyPageRefactorUseCase) captureSnapshots(in RefactorApplyInput) ([]pathChangeSnapshot, error) {
-	page, err := uc.tree.GetPage(in.PageID)
-	if err != nil {
-		return nil, err
-	}
+func (uc *ApplyPageRefactorUseCase) captureSnapshots(page *tree.Page, in RefactorApplyInput) ([]pathChangeSnapshot, error) {
 	ids := collectSubtreeIDs(page.PageNode)
 	if len(ids) == 0 {
 		ids = []string{in.PageID}
@@ -354,7 +396,7 @@ func (uc *ApplyPageRefactorUseCase) captureSnapshots(in RefactorApplyInput) ([]p
 	return snapshots, nil
 }
 
-func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected []RefactorAffectedPage, rules []links.RewriteRule) error {
+func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affectedPageIDs []string, rules []links.RewriteRule) error {
 	engine := links.NewMarkdownRefactorEngine()
 
 	type pending struct {
@@ -364,10 +406,11 @@ func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected
 	var items []pending
 	var bulk []tree.BulkContentUpdate
 
-	for _, ap := range affected {
-		page, err := uc.tree.GetPage(ap.FromPageID)
-		if err != nil {
-			uc.log.Warn("failed to get page for link rewrite, skipping", "pageID", ap.FromPageID, "error", err)
+	pagesByID := uc.loadPagesByID(affectedPageIDs, "failed to get page for link rewrite, skipping")
+
+	for _, pageID := range affectedPageIDs {
+		page, ok := pagesByID[pageID]
+		if !ok {
 			continue
 		}
 		result := engine.Rewrite(page.Content, page.CalculatePath(), rules)
@@ -406,7 +449,7 @@ func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected
 	}
 
 	if uc.links != nil && len(updatedPages) > 0 {
-		if err := uc.links.UpdateLinksAndHealForPages(updatedPages); err != nil {
+		if err := uc.links.UpdateRewrittenLinksAndHealForPages(updatedPages, rules); err != nil {
 			uc.log.Warn(
 				"failed to update link index after rewrite",
 				"pageCount", len(updatedPages),
@@ -429,10 +472,15 @@ func (uc *ApplyPageRefactorUseCase) rewritePathChangedSubtree(userID string, sna
 	var items []pending
 	var bulk []tree.BulkContentUpdate
 
+	pageIDs := make([]string, 0, len(snapshots))
 	for _, snap := range snapshots {
-		current, err := uc.tree.GetPage(snap.PageID)
-		if err != nil {
-			uc.log.Warn("failed to get subtree page for link rewrite, skipping", "pageID", snap.PageID, "error", err)
+		pageIDs = append(pageIDs, snap.PageID)
+	}
+	pagesByID := uc.loadPagesByID(pageIDs, "failed to get subtree page for link rewrite, skipping")
+
+	for _, snap := range snapshots {
+		current, ok := pagesByID[snap.PageID]
+		if !ok {
 			continue
 		}
 		result := engine.RewriteRelativeLinksForPathChange(snap.Content, snap.OldPath, current.CalculatePath(), rules)
@@ -525,6 +573,27 @@ func samplePageIDs(pages []*tree.Page, limit int) []string {
 		ids = append(ids, pages[i].ID)
 	}
 	return ids
+}
+
+func (uc *ApplyPageRefactorUseCase) loadPagesByID(ids []string, warningMessage string) map[string]*tree.Page {
+	if len(ids) == 0 {
+		return map[string]*tree.Page{}
+	}
+
+	pages, errs := uc.tree.GetPages(ids)
+	loaded := make(map[string]*tree.Page, len(ids))
+	for i, id := range ids {
+		if errs[i] != nil {
+			uc.log.Warn(warningMessage, "pageID", id, "error", errs[i])
+			continue
+		}
+		if pages[i] == nil {
+			continue
+		}
+		loaded[id] = pages[i]
+	}
+
+	return loaded
 }
 
 func collectPreviewWarnings(pages []RefactorAffectedPage) []string {

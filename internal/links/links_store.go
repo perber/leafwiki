@@ -19,6 +19,8 @@ type LinksStore struct {
 	db         *sql.DB
 }
 
+const maxOutgoingLinksQueryArgs = 900
+
 type PageLinkUpdate struct {
 	FromPageID string
 	FromTitle  string
@@ -82,6 +84,7 @@ func (s *LinksStore) ensureSchema() error {
 
 		CREATE INDEX IF NOT EXISTS idx_links_to_page_id ON links(to_page_id);
 		CREATE INDEX IF NOT EXISTS idx_links_to_path    ON links(to_path);
+		CREATE INDEX IF NOT EXISTS idx_links_to_path_from_page_id ON links(to_path, from_page_id);
 		CREATE INDEX IF NOT EXISTS idx_links_broken     ON links(broken);
 	`)
 	return err
@@ -366,6 +369,70 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 	return outgoings, nil
 }
 
+func (s *LinksStore) GetOutgoingLinksForPages(pageIDs []string) (map[string][]Outgoing, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(pageIDs) == 0 {
+		return map[string][]Outgoing{}, nil
+	}
+
+	outgoingByPageID := make(map[string][]Outgoing, len(pageIDs))
+	for start := 0; start < len(pageIDs); start += maxOutgoingLinksQueryArgs {
+		end := start + maxOutgoingLinksQueryArgs
+		if end > len(pageIDs) {
+			end = len(pageIDs)
+		}
+
+		if err := s.appendOutgoingLinksForPageBatch(outgoingByPageID, pageIDs[start:end]); err != nil {
+			return nil, err
+		}
+	}
+
+	return outgoingByPageID, nil
+}
+
+func (s *LinksStore) appendOutgoingLinksForPageBatch(outgoingByPageID map[string][]Outgoing, pageIDs []string) error {
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(pageIDs)), ",")
+	args := make([]any, 0, len(pageIDs))
+	for _, pageID := range pageIDs {
+		args = append(args, pageID)
+	}
+
+	rows, err := s.db.Query(`
+        SELECT from_page_id, to_page_id, to_path, from_title, broken
+        FROM links
+        WHERE from_page_id IN (`+placeholders+`)
+        ORDER BY from_page_id
+    `, args...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Default().Error("could not close rows", "error", err)
+		}
+	}()
+
+	for rows.Next() {
+		var outgoing Outgoing
+		var toPageID sql.NullString
+		var brokenInt int
+
+		if err := rows.Scan(&outgoing.FromPageID, &toPageID, &outgoing.ToPath, &outgoing.FromTitle, &brokenInt); err != nil {
+			return err
+		}
+
+		if toPageID.Valid {
+			outgoing.ToPageID = toPageID.String
+		}
+		outgoing.Broken = brokenInt != 0
+		outgoingByPageID[outgoing.FromPageID] = append(outgoingByPageID[outgoing.FromPageID], outgoing)
+	}
+
+	return rows.Err()
+}
+
 func (s *LinksStore) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorLinkMatch, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -374,7 +441,6 @@ func (s *LinksStore) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorLi
 		SELECT from_page_id, from_title, to_path, broken
 		FROM links
 		WHERE to_path = ? OR to_path LIKE ?
-		ORDER BY from_title, to_path
 	`, oldPrefix, oldPrefix+"/%")
 	if err != nil {
 		return nil, err
@@ -400,6 +466,39 @@ func (s *LinksStore) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorLi
 	}
 
 	return matches, nil
+}
+
+func (s *LinksStore) GetRefactorSourcePageIDsForPrefix(oldPrefix string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query(`
+		SELECT DISTINCT from_page_id
+		FROM links
+		WHERE to_path = ? OR to_path LIKE ?
+	`, oldPrefix, oldPrefix+"/%")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Default().Error("could not close rows", "error", err)
+		}
+	}()
+
+	var pageIDs []string
+	for rows.Next() {
+		var pageID string
+		if err := rows.Scan(&pageID); err != nil {
+			return nil, err
+		}
+		pageIDs = append(pageIDs, pageID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return pageIDs, nil
 }
 
 func (s *LinksStore) GetBrokenIncomingForPath(toPath string) ([]Backlink, error) {

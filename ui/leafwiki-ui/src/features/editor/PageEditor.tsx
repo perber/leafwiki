@@ -18,6 +18,7 @@ export default function PageEditor() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const editorRef = useRef<MarkdownEditorRef>(null)
+  const skipNavigationGuardRef = useRef(false)
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const savePage = usePageEditorStore((s) => s.savePage)
   const forceOverwrite = usePageEditorStore((s) => s.forceOverwrite)
@@ -27,7 +28,6 @@ export default function PageEditor() {
   const notFound = usePageEditorStore((s) => s.notFound)
   const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
-  const page = usePageEditorStore((s) => s.page)
   const openNode = useTreeStore((s) => s.openNode)
   const dirty = usePageEditorStore((s) => {
     const { page, title, slug, content } = s
@@ -39,7 +39,7 @@ export default function PageEditor() {
 
   // Shows Unsaved Changes Dialog when navigating away with dirty state
   useNavigationGuard({
-    when: dirty,
+    when: () => dirty && !skipNavigationGuardRef.current,
     onNavigate: async () => {
       await reloadTree()
     },
@@ -121,12 +121,32 @@ export default function PageEditor() {
   }, [savePage, forceOverwrite])
 
   const handleClose = useCallback(() => {
-    if (page?.path) {
-      navigate(`/${page.path}`)
+    const {
+      page: currentPage,
+      title: currentTitle,
+      slug: currentSlug,
+      content: currentContent,
+    } = usePageEditorStore.getState()
+
+    const hasUnsavedChanges = currentPage
+      ? currentPage.title !== currentTitle ||
+        currentPage.slug !== currentSlug ||
+        currentPage.content !== currentContent
+      : false
+
+    if (!hasUnsavedChanges) {
+      // Saving updates the editor store before React finishes re-rendering.
+      // Skip the blocker for this close action when the latest store snapshot
+      // is already clean.
+      skipNavigationGuardRef.current = true
+    }
+
+    if (currentPage?.path) {
+      navigate(`/${currentPage.path}`)
     } else {
       navigate('/')
     }
-  }, [page, navigate])
+  }, [navigate])
 
   // register toolbar actions
   useToolbarActions({
