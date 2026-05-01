@@ -10,7 +10,7 @@ import { useBlocker } from 'react-router-dom'
 import { useExternalUnloadBlocker } from './useExternalUnloadBlocker'
 
 type UseNavigationGuardProps = {
-  when: boolean
+  when: boolean | (() => boolean)
   onNavigate: () => void
 }
 
@@ -18,11 +18,14 @@ export default function useNavigationGuard({
   when,
   onNavigate,
 }: UseNavigationGuardProps) {
-  const blocker = useBlocker(() => when)
+  const shouldBlock = useCallback(() => {
+    return typeof when === 'function' ? when() : when
+  }, [when])
+  const blocker = useBlocker(shouldBlock)
   const openDialog = useDialogsStore((state) => state.openDialog)
   const closeDialog = useDialogsStore((state) => state.closeDialog)
 
-  useExternalUnloadBlocker(when)
+  useExternalUnloadBlocker(typeof when === 'function' ? when() : when)
 
   // onCancel resets the navigation blocker
   // so the user stays on the current page

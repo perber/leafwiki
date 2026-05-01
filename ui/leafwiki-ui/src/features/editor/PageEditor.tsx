@@ -3,7 +3,7 @@ import { mapApiError, asApiLocalizedError } from '@/lib/api/errors'
 import { buildBrowserEditUrl } from '@/lib/routePath'
 import { getWikiTargetRoutePath } from '@/lib/wikiPath'
 import { useTreeStore } from '@/stores/tree'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useProgressbarStore } from '../progressbar/progressbar'
@@ -18,7 +18,7 @@ export default function PageEditor() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const editorRef = useRef<MarkdownEditorRef>(null)
-  const [skipNavigationGuard, setSkipNavigationGuard] = useState(false)
+  const skipNavigationGuardRef = useRef(false)
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const savePage = usePageEditorStore((s) => s.savePage)
   const forceOverwrite = usePageEditorStore((s) => s.forceOverwrite)
@@ -39,19 +39,11 @@ export default function PageEditor() {
 
   // Shows Unsaved Changes Dialog when navigating away with dirty state
   useNavigationGuard({
-    when: dirty && !skipNavigationGuard,
+    when: () => dirty && !skipNavigationGuardRef.current,
     onNavigate: async () => {
       await reloadTree()
     },
   })
-
-  useEffect(() => {
-    if (!skipNavigationGuard) {
-      return
-    }
-
-    setSkipNavigationGuard(false)
-  }, [pathname, skipNavigationGuard])
 
   // Load page data when path changes
   useEffect(() => {
@@ -146,7 +138,7 @@ export default function PageEditor() {
       // Saving updates the editor store before React finishes re-rendering.
       // Skip the blocker for this close action when the latest store snapshot
       // is already clean.
-      setSkipNavigationGuard(true)
+      skipNavigationGuardRef.current = true
     }
 
     if (currentPage?.path) {
