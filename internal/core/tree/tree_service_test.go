@@ -3035,7 +3035,7 @@ func TestTreeService_GetPages_PreservesOrderAndAlignsErrors(t *testing.T) {
 	}
 }
 
-func TestTreeService_BulkUpdateContent_PartialFailure_RollsBackFailedMetadata(t *testing.T) {
+func TestTreeService_BulkUpdateContent_TreatsFrontmatterLikeInputAsBody(t *testing.T) {
 	svc, _ := newLoadedService(t)
 
 	firstID, err := svc.CreateNode("system", nil, "First", "first", ptrKind(NodeKindPage))
