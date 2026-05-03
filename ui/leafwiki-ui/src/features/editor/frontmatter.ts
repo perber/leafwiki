@@ -1,12 +1,34 @@
 const TAGS_KEY_PATTERN = /^tags\s*:\s*(.*)$/
+const FRONTMATTER_KEY_PATTERN = /^([A-Za-z0-9_.-]+)\s*:\s*(.*)$/
+
+export type EditorFrontmatterFieldType = 'text' | 'number' | 'boolean' | 'list'
+
+export type EditorFrontmatterField = {
+  key: string
+  value: string
+  type: EditorFrontmatterFieldType
+}
 
 export type ParsedEditorFrontmatter = {
   tags: string[]
-  raw: string
+  fields: EditorFrontmatterField[]
+  unsupportedRaw: string
 }
 
 function normalizeTag(tag: string) {
   return tag.trim()
+}
+
+function normalizeFieldKey(key: string) {
+  return key.trim()
+}
+
+function normalizeListValue(value: string) {
+  return value
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join('\n')
 }
 
 export function normalizeTags(tags: string[]) {
@@ -23,19 +45,69 @@ export function normalizeTags(tags: string[]) {
   return result
 }
 
-function parseInlineTags(value: string) {
+export function normalizeEditorFrontmatterFields(
+  fields: EditorFrontmatterField[],
+) {
+  const seen = new Set<string>()
+  const result: EditorFrontmatterField[] = []
+
+  for (const field of fields) {
+    const key = normalizeFieldKey(field.key)
+    if (!key) continue
+
+    const dedupeKey = key.toLocaleLowerCase()
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+
+    const normalizedValue =
+      field.type === 'list'
+        ? normalizeListValue(field.value)
+        : field.value.trim()
+
+    result.push({
+      key,
+      type: field.type,
+      value:
+        field.type === 'boolean'
+          ? normalizedValue === 'false'
+            ? 'false'
+            : 'true'
+          : normalizedValue,
+    })
+  }
+
+  return result
+}
+
+function parseInlineList(value: string) {
   const trimmed = value.trim()
   if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
     return null
   }
 
-  return normalizeTags(
-    trimmed
-      .slice(1, -1)
-      .split(',')
-      .map((part) => part.trim().replace(/^['"]|['"]$/g, ''))
-      .filter(Boolean),
-  )
+  return trimmed
+    .slice(1, -1)
+    .split(',')
+    .map((part) => part.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean)
+}
+
+function detectFieldType(value: string): EditorFrontmatterFieldType {
+  const trimmed = value.trim()
+  if (trimmed === 'true' || trimmed === 'false') {
+    return 'boolean'
+  }
+
+  if (trimmed !== '' && !Number.isNaN(Number(trimmed))) {
+    return 'number'
+  }
+
+  return 'text'
+}
+
+function appendBlock(target: string[], header: string, bodyLines: string[]) {
+  target.push(header)
+  target.push(...bodyLines)
 }
 
 export function parseEditorFrontmatter(
@@ -43,80 +115,154 @@ export function parseEditorFrontmatter(
 ): ParsedEditorFrontmatter {
   const source = frontmatter?.trim() ?? ''
   if (!source) {
-    return { tags: [], raw: '' }
+    return { tags: [], fields: [], unsupportedRaw: '' }
   }
 
   const lines = source.split('\n')
-  const kept: string[] = []
+  const unsupportedLines: string[] = []
+  const fields: EditorFrontmatterField[] = []
   let parsedTags: string[] | null = null
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
-    const match = line.match(TAGS_KEY_PATTERN)
 
-    if (!match || parsedTags !== null) {
-      kept.push(line)
+    if (line.trim() === '') continue
+
+    if (/^\s/.test(line)) {
+      unsupportedLines.push(line)
       continue
     }
 
-    const inlineTags = parseInlineTags(match[1] ?? '')
-    if (inlineTags !== null) {
-      parsedTags = inlineTags
+    const tagMatch = line.match(TAGS_KEY_PATTERN)
+    if (tagMatch && parsedTags === null) {
+      const inlineTags = parseInlineList(tagMatch[1] ?? '')
+      if (inlineTags !== null) {
+        parsedTags = normalizeTags(inlineTags)
+        continue
+      }
+
+      if ((tagMatch[1] ?? '').trim() === '') {
+        const collected: string[] = []
+        const listItems: string[] = []
+        let nextIndex = index + 1
+        let supported = true
+
+        while (nextIndex < lines.length && /^\s/.test(lines[nextIndex])) {
+          collected.push(lines[nextIndex])
+          const listItem = lines[nextIndex].match(/^\s*-\s*(.+?)\s*$/)
+          if (!listItem) {
+            supported = false
+          } else {
+            listItems.push(listItem[1])
+          }
+          nextIndex += 1
+        }
+
+        if (supported) {
+          parsedTags = normalizeTags(listItems)
+        } else {
+          appendBlock(unsupportedLines, line, collected)
+        }
+
+        index = nextIndex - 1
+        continue
+      }
+    }
+
+    const keyMatch = line.match(FRONTMATTER_KEY_PATTERN)
+    if (!keyMatch) {
+      unsupportedLines.push(line)
       continue
     }
 
-    if ((match[1] ?? '').trim() !== '') {
-      kept.push(line)
+    const [, rawKey, rawValue] = keyMatch
+    const key = normalizeFieldKey(rawKey)
+    const trimmedValue = rawValue.trim()
+
+    const inlineList = parseInlineList(trimmedValue)
+    if (inlineList !== null) {
+      fields.push({
+        key,
+        type: 'list',
+        value: inlineList.join('\n'),
+      })
+      continue
+    }
+
+    if (trimmedValue !== '') {
+      fields.push({
+        key,
+        type: detectFieldType(trimmedValue),
+        value: trimmedValue,
+      })
       continue
     }
 
     const collected: string[] = []
+    const listItems: string[] = []
     let nextIndex = index + 1
+    let supported = true
 
-    while (nextIndex < lines.length) {
-      const nextLine = lines[nextIndex]
-      const trimmed = nextLine.trim()
-
-      if (!trimmed) {
-        collected.push(nextLine)
-        nextIndex += 1
-        continue
-      }
-
-      const listItem = nextLine.match(/^\s*-\s*(.+?)\s*$/)
+    while (nextIndex < lines.length && /^\s/.test(lines[nextIndex])) {
+      collected.push(lines[nextIndex])
+      const listItem = lines[nextIndex].match(/^\s*-\s*(.+?)\s*$/)
       if (!listItem) {
-        break
+        supported = false
+      } else {
+        listItems.push(listItem[1])
       }
-
-      collected.push(listItem[1])
       nextIndex += 1
     }
 
-    const normalized = normalizeTags(collected)
-    if (
-      normalized.length === 0 &&
-      collected.some((line) => line.trim() === '')
-    ) {
-      kept.push(line)
-      continue
+    if (supported) {
+      fields.push({
+        key,
+        type: 'list',
+        value: listItems.join('\n'),
+      })
+    } else {
+      appendBlock(unsupportedLines, line, collected)
     }
 
-    parsedTags = normalized
     index = nextIndex - 1
   }
 
   return {
     tags: parsedTags ?? [],
-    raw: kept.join('\n').trim(),
+    fields: normalizeEditorFrontmatterFields(fields),
+    unsupportedRaw: unsupportedLines.join('\n').trim(),
   }
+}
+
+function buildFieldBlock(field: EditorFrontmatterField) {
+  const key = normalizeFieldKey(field.key)
+  if (!key) return ''
+
+  if (field.type === 'list') {
+    const items = normalizeListValue(field.value).split('\n').filter(Boolean)
+
+    if (items.length === 0) {
+      return `${key}: []`
+    }
+
+    return [key + ':', ...items.map((item) => `  - ${item}`)].join('\n')
+  }
+
+  if (field.type === 'boolean') {
+    return `${key}: ${field.value === 'false' ? 'false' : 'true'}`
+  }
+
+  return `${key}: ${field.value.trim()}`
 }
 
 export function buildEditorFrontmatter({
   tags,
-  raw,
+  fields,
+  unsupportedRaw,
 }: ParsedEditorFrontmatter): string {
   const normalizedTags = normalizeTags(tags)
-  const trimmedRaw = raw.trim()
+  const normalizedFields = normalizeEditorFrontmatterFields(fields)
+  const trimmedUnsupportedRaw = unsupportedRaw.trim()
   const parts: string[] = []
 
   if (normalizedTags.length > 0) {
@@ -125,8 +271,15 @@ export function buildEditorFrontmatter({
     )
   }
 
-  if (trimmedRaw) {
-    parts.push(trimmedRaw)
+  for (const field of normalizedFields) {
+    const block = buildFieldBlock(field)
+    if (block) {
+      parts.push(block)
+    }
+  }
+
+  if (trimmedUnsupportedRaw) {
+    parts.push(trimmedUnsupportedRaw)
   }
 
   return parts.join('\n\n').trim()

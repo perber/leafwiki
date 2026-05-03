@@ -25,25 +25,40 @@ export default function PageEditor() {
   const savePage = usePageEditorStore((s) => s.savePage)
   const forceOverwrite = usePageEditorStore((s) => s.forceOverwrite)
   const setContent = usePageEditorStore((s) => s.setContent)
-  const setFrontmatterRaw = usePageEditorStore((s) => s.setFrontmatterRaw)
   const setTags = usePageEditorStore((s) => s.setTags)
+  const setFrontmatterFields = usePageEditorStore((s) => s.setFrontmatterFields)
   const loadPageData = usePageEditorStore((s) => s.loadPageData)
   const initialPage = usePageEditorStore((s) => s.initialPage) // contains the initial page data when loaded
-  const frontmatterRaw = usePageEditorStore((s) => s.frontmatterRaw)
   const tags = usePageEditorStore((s) => s.tags)
+  const frontmatterFields = usePageEditorStore((s) => s.frontmatterFields)
+  const frontmatterUnsupported = usePageEditorStore(
+    (s) => s.frontmatterUnsupported,
+  )
   const notFound = usePageEditorStore((s) => s.notFound)
   const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
   const openNode = useTreeStore((s) => s.openNode)
   const dirty = usePageEditorStore((s) => {
-    const { page, title, slug, content, frontmatterRaw, tags } = s
+    const {
+      page,
+      title,
+      slug,
+      content,
+      tags,
+      frontmatterFields,
+      frontmatterUnsupported,
+    } = s
     if (!page) return false
     return (
       page.title !== title ||
       page.slug !== slug ||
       page.content !== content ||
       (page.frontmatter ?? '') !==
-        buildEditorFrontmatter({ tags, raw: frontmatterRaw })
+        buildEditorFrontmatter({
+          tags,
+          fields: frontmatterFields,
+          unsupportedRaw: frontmatterUnsupported,
+        })
     )
   })
 
@@ -136,8 +151,9 @@ export default function PageEditor() {
       title: currentTitle,
       slug: currentSlug,
       content: currentContent,
-      frontmatterRaw: currentFrontmatterRaw,
       tags: currentTags,
+      frontmatterFields: currentFrontmatterFields,
+      frontmatterUnsupported: currentFrontmatterUnsupported,
     } = usePageEditorStore.getState()
 
     const hasUnsavedChanges = currentPage
@@ -147,7 +163,8 @@ export default function PageEditor() {
         (currentPage.frontmatter ?? '') !==
           buildEditorFrontmatter({
             tags: currentTags,
-            raw: currentFrontmatterRaw,
+            fields: currentFrontmatterFields,
+            unsupportedRaw: currentFrontmatterUnsupported,
           })
       : false
 
@@ -199,9 +216,10 @@ export default function PageEditor() {
           <>
             <PageFrontmatterPanel
               tags={tags}
-              rawValue={frontmatterRaw}
+              fields={frontmatterFields}
+              hasUnsupportedFields={Boolean(frontmatterUnsupported)}
               onTagsChange={setTags}
-              onRawValueChange={setFrontmatterRaw}
+              onFieldsChange={setFrontmatterFields}
             />
             <MarkdownEditor
               ref={editorRef}

@@ -37,14 +37,26 @@ export function useToolbarActions({
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
   const dirty = usePageEditorStore((s) => {
-    const { page, title, slug, content, frontmatterRaw, tags } = s
+    const {
+      page,
+      title,
+      slug,
+      content,
+      tags,
+      frontmatterFields,
+      frontmatterUnsupported,
+    } = s
     if (!page) return false
     return (
       page.title !== title ||
       page.slug !== slug ||
       page.content !== content ||
       (page.frontmatter ?? '') !==
-        buildEditorFrontmatter({ tags, raw: frontmatterRaw })
+        buildEditorFrontmatter({
+          tags,
+          fields: frontmatterFields,
+          unsupportedRaw: frontmatterUnsupported,
+        })
     )
   })
 

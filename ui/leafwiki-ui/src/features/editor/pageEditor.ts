@@ -15,14 +15,19 @@ import { create } from 'zustand'
 import { useLinkStatusStore } from '../links/linkstatus_store'
 import { confirmPageRefactor } from '../page/pageRefactorDialog'
 import { useProgressbarStore } from '../progressbar/progressbar'
-import { buildEditorFrontmatter, parseEditorFrontmatter } from './frontmatter'
+import {
+  buildEditorFrontmatter,
+  EditorFrontmatterField,
+  parseEditorFrontmatter,
+} from './frontmatter'
 
 interface PageEditorState {
   title: string // current title in the editor
   slug: string // current slug in the editor
   content: string // current markdown content in the editor
-  frontmatterRaw: string // editable yaml body without tags
   tags: string[] // convenient tag editor state
+  frontmatterFields: EditorFrontmatterField[]
+  frontmatterUnsupported: string
   error: string | null // error message, if any
   notFound: boolean
   page: Page | null // current page being edited
@@ -30,8 +35,8 @@ interface PageEditorState {
   setTitle: (title: string) => void // set the current title
   setSlug: (slug: string) => void // set the current slug
   setContent: (content: string) => void // set the current markdown content
-  setFrontmatterRaw: (frontmatterRaw: string) => void
   setTags: (tags: string[]) => void
+  setFrontmatterFields: (fields: EditorFrontmatterField[]) => void
   setError: (error: string | null) => void // set the error message
   setPage: (page: Page | null) => void // set the current page
   savePage: () => Promise<Page | null | undefined> // save the current page
@@ -40,14 +45,26 @@ interface PageEditorState {
 }
 
 const isDirtyState = (s: PageEditorState) => {
-  const { page, title, slug, content, frontmatterRaw, tags } = s
+  const {
+    page,
+    title,
+    slug,
+    content,
+    tags,
+    frontmatterFields,
+    frontmatterUnsupported,
+  } = s
   if (!page) return false
   return (
     page.title !== title ||
     page.slug !== slug ||
     page.content !== content ||
     (page.frontmatter ?? '') !==
-      buildEditorFrontmatter({ tags, raw: frontmatterRaw })
+      buildEditorFrontmatter({
+        tags,
+        fields: frontmatterFields,
+        unsupportedRaw: frontmatterUnsupported,
+      })
   )
 }
 
@@ -59,19 +76,28 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   path: '',
   slug: '',
   content: '',
-  frontmatterRaw: '',
   tags: [],
+  frontmatterFields: [],
+  frontmatterUnsupported: '',
   lastStoredPage: null,
   initialPage: null,
   setTitle: (title) => set({ title }),
   setSlug: (slug) => set({ slug }),
   setContent: (content) => set({ content }),
-  setFrontmatterRaw: (frontmatterRaw) => set({ frontmatterRaw }),
   setTags: (tags) => set({ tags }),
+  setFrontmatterFields: (frontmatterFields) => set({ frontmatterFields }),
   setError: (error) => set({ error }),
   setPage: (page) => set({ page }),
   savePage: async () => {
-    const { page, title, slug, content, frontmatterRaw, tags } = get()
+    const {
+      page,
+      title,
+      slug,
+      content,
+      tags,
+      frontmatterFields,
+      frontmatterUnsupported,
+    } = get()
     if (!page || !isDirtyState(get())) return
 
     try {
@@ -79,7 +105,11 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       const titleChanged = page.title !== title
       const slugChanged = page.slug !== slug
       const enableLinkRefactor = useConfigStore.getState().enableLinkRefactor
-      const frontmatter = buildEditorFrontmatter({ tags, raw: frontmatterRaw })
+      const frontmatter = buildEditorFrontmatter({
+        tags,
+        fields: frontmatterFields,
+        unsupportedRaw: frontmatterUnsupported,
+      })
       const frontmatterChanged = (page.frontmatter ?? '') !== frontmatter
 
       let updatedPage: Page | null = null
@@ -192,8 +222,9 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         title: page.title,
         slug: page.slug,
         content: page.content,
-        frontmatterRaw: parsedFrontmatter.raw,
         tags: parsedFrontmatter.tags,
+        frontmatterFields: parsedFrontmatter.fields,
+        frontmatterUnsupported: parsedFrontmatter.unsupportedRaw,
       })
     } catch (err) {
       if (isPageNotFoundError(err)) {

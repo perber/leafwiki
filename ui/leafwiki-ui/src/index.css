@@ -939,75 +939,127 @@
   }
 
   .page-frontmatter-panel {
-    @apply border-surface-border bg-surface/95 mb-3 rounded-xl border px-4 py-3 shadow-xs;
+    @apply border-markdown-toolbar-border bg-markdown-toolbar mt-0 mb-0 border-b px-3 shadow-xs;
   }
 
-  .page-frontmatter-panel__header {
-    @apply mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between;
+  .page-frontmatter-panel__accordion {
+    @apply w-full;
   }
 
-  .page-frontmatter-panel__title-group {
-    @apply min-w-0;
+  .page-frontmatter-panel__item {
+    @apply border-none;
   }
 
-  .page-frontmatter-panel__eyebrow {
-    @apply text-muted-foreground text-[11px] font-medium tracking-[0.12em] uppercase;
+  .page-frontmatter-panel__trigger {
+    @apply min-h-9 py-0 no-underline hover:no-underline;
+    text-decoration: none !important;
+  }
+
+  .page-frontmatter-panel__trigger:hover,
+  .page-frontmatter-panel__trigger:focus-visible {
+    text-decoration: none !important;
+  }
+
+  .page-frontmatter-panel__trigger:hover .page-frontmatter-panel__title-row,
+  .page-frontmatter-panel__trigger:hover .page-frontmatter-panel__summary,
+  .page-frontmatter-panel__trigger:hover .page-frontmatter-panel__title-icon {
+    @apply text-brand no-underline;
+  }
+
+  .page-frontmatter-panel__content {
+    @apply px-px pt-1;
+  }
+
+  .page-frontmatter-panel__topline {
+    @apply flex w-full items-center justify-between pt-1.5 pb-1.25;
   }
 
   .page-frontmatter-panel__title-row {
-    @apply text-interface-text mt-1 flex items-center gap-2;
+    @apply text-interface-text flex items-center gap-2 text-sm font-normal;
   }
 
   .page-frontmatter-panel__title-icon {
-    @apply text-brand;
+    @apply text-interface-text;
   }
 
   .page-frontmatter-panel__title {
-    @apply text-sm font-semibold;
+    @apply text-sm font-normal;
   }
 
-  .page-frontmatter-panel__toggle {
-    @apply self-start rounded-full;
+  .page-frontmatter-panel__summary {
+    @apply text-muted-foreground text-sm leading-none font-normal;
   }
 
-  .page-frontmatter-panel__toggle--open {
-    @apply border-brand text-brand;
+  .page-frontmatter-panel__add-button {
+    @apply h-8 rounded-none px-3;
   }
 
-  .page-frontmatter-panel__tag-editor {
-    @apply space-y-2;
+  .page-frontmatter-panel__tags-row {
+    @apply mb-2 flex flex-col gap-2;
   }
 
   .page-frontmatter-panel__chips {
-    @apply flex flex-wrap items-center gap-2;
+    @apply flex min-h-9 w-full flex-wrap items-center gap-2;
   }
 
   .page-frontmatter-panel__chip {
-    @apply bg-surface-alt text-interface-text inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm;
+    @apply bg-surface-alt text-interface-text inline-flex items-center gap-1 border px-2 py-1 text-sm;
   }
 
   .page-frontmatter-panel__chip-remove {
-    @apply text-muted-foreground hover:text-interface-text inline-flex h-4 w-4 items-center justify-center rounded-full;
+    @apply text-muted-foreground hover:text-interface-text inline-flex h-4 w-4 items-center justify-center;
   }
 
   .page-frontmatter-panel__tag-input {
-    @apply min-w-52 flex-1 rounded-full;
+    @apply w-full rounded-none;
   }
 
-  .page-frontmatter-panel__advanced {
-    @apply border-surface-border mt-3 border-t pt-3;
+  .page-frontmatter-panel__section-heading {
+    @apply text-muted-foreground mb-2 text-[11px] font-medium tracking-[0.12em] uppercase;
   }
 
-  .page-frontmatter-panel__advanced-label {
-    @apply text-interface-text mb-2 block text-sm font-medium;
+  .page-frontmatter-panel__fields {
+    @apply mb-2 flex flex-col gap-2;
   }
 
-  .page-frontmatter-panel__textarea {
-    @apply border-input bg-background text-interface-text placeholder:text-muted-foreground focus-visible:ring-ring min-h-32 w-full rounded-xl border px-3 py-2 font-mono text-sm shadow-xs transition-colors focus-visible:ring-1 focus-visible:outline-hidden;
+  .page-frontmatter-panel__field-row {
+    @apply grid items-center gap-2 md:grid-cols-[minmax(9rem,12rem)_7rem_8rem_minmax(0,1fr)_2rem];
+  }
+
+  .page-frontmatter-panel__field-key {
+    @apply rounded-none;
+  }
+
+  .page-frontmatter-panel__field-select {
+    @apply rounded-none;
+  }
+
+  .page-frontmatter-panel__field-validation {
+    @apply rounded-none;
+  }
+
+  .page-frontmatter-panel__field-value {
+    @apply rounded-none;
+  }
+
+  .page-frontmatter-panel__field-value--list {
+    @apply border-input bg-background text-interface-text placeholder:text-muted-foreground focus-visible:ring-ring min-h-20 w-full rounded-none border px-3 py-2 text-sm shadow-xs transition-colors focus-visible:ring-1 focus-visible:outline-hidden;
+  }
+
+  .page-frontmatter-panel__field-remove {
+    @apply text-destructive hover:text-destructive border-destructive/30 bg-destructive/5 inline-flex h-8 w-8 items-center justify-center self-center border;
+  }
+
+  .page-frontmatter-panel__actions {
+    @apply mb-2 flex justify-start;
   }
 
   .page-frontmatter-panel__hint {
     @apply text-muted-foreground text-xs leading-relaxed;
+  }
+
+  .page-frontmatter-panel__notice {
+    @apply text-muted-foreground text-xs italic;
   }
 
   .toolbar-button__close-editor {

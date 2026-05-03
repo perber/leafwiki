@@ -20,14 +20,26 @@ export function EditorTitleBar() {
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((state) => state.getPageByPath)
   const dirty = usePageEditorStore((s) => {
-    const { page, title, slug, content, frontmatterRaw, tags } = s
+    const {
+      page,
+      title,
+      slug,
+      content,
+      tags,
+      frontmatterFields,
+      frontmatterUnsupported,
+    } = s
     if (!page) return false
     return (
       page.title !== title ||
       page.slug !== slug ||
       page.content !== content ||
       (page.frontmatter ?? '') !==
-        buildEditorFrontmatter({ tags, raw: frontmatterRaw })
+        buildEditorFrontmatter({
+          tags,
+          fields: frontmatterFields,
+          unsupportedRaw: frontmatterUnsupported,
+        })
     )
   })
 
