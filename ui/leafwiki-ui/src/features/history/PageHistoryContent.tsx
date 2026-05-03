@@ -1160,11 +1160,7 @@ export function PageHistoryContent({
                 onClick={() => void handleRestore()}
                 data-testid={`${testidPrefix}-restore`}
               >
-                {restoreLoading
-                  ? 'Restoring...'
-                  : isSelectedRevisionLatest
-                    ? 'Current version'
-                    : 'Restore'}
+                {restoreLoading ? 'Restoring...' : 'Restore'}
               </Button>
             </div>
           </div>
