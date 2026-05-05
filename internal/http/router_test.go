@@ -2371,6 +2371,52 @@ func TestUpdateUserEndpoint(t *testing.T) {
 
 }
 
+func TestChangeOwnPasswordEndpoint(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "editor"}`
+	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
+	var user map[string]interface{}
+	_ = json.Unmarshal(resp.Body.Bytes(), &user)
+
+	changePayload := `{"oldPassword":"secretpassword","newPassword":"newsecretpassword"}`
+	rec := authenticatedRequestAs(t, router, "jane", "secretpassword", http.MethodPut, "/api/users/me/password", strings.NewReader(changePayload))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("Expected 204 No Content for own password change, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	loginWithOld := map[string]string{
+		"identifier": "jane",
+		"password":   "secretpassword",
+	}
+	loginWithOldBody, _ := json.Marshal(loginWithOld)
+	oldReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(loginWithOldBody))
+	oldReq.Header.Set("Content-Type", "application/json")
+	oldRec := httptest.NewRecorder()
+	router.ServeHTTP(oldRec, oldReq)
+
+	if oldRec.Code != http.StatusUnauthorized {
+		t.Fatalf("Expected 401 Unauthorized with old password, got %d - %s", oldRec.Code, oldRec.Body.String())
+	}
+
+	loginWithNew := map[string]string{
+		"identifier": "jane",
+		"password":   "newsecretpassword",
+	}
+	loginWithNewBody, _ := json.Marshal(loginWithNew)
+	newReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(loginWithNewBody))
+	newReq.Header.Set("Content-Type", "application/json")
+	newRec := httptest.NewRecorder()
+	router.ServeHTTP(newRec, newReq)
+
+	if newRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK with new password, got %d - %s", newRec.Code, newRec.Body.String())
+	}
+}
+
 func TestDeleteUserEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

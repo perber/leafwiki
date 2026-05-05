@@ -34,8 +34,8 @@ export async function changeOwnPassword(
   return await fetchWithAuth(`/api/users/me/password`, {
     method: 'PUT',
     body: JSON.stringify({
-      new_password: newPassword,
-      old_password: oldPassword,
+      oldPassword,
+      newPassword,
     }),
   })
 }
