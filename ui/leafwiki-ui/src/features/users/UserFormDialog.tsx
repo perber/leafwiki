@@ -87,33 +87,39 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
         <FormInput
           autoFocus={true}
           label="username"
+          name="username"
           value={username}
           onChange={(val) => {
             setUsername(val)
             setFieldErrors((prev) => ({ ...prev, username: '' }))
           }}
           placeholder="username"
+          autoComplete="username"
           error={fieldErrors.username}
         />
         <FormInput
           label="email"
+          name="email"
           value={email}
           onChange={(val) => {
             setEmail(val)
             setFieldErrors((prev) => ({ ...prev, email: '' }))
           }}
           placeholder="email"
+          autoComplete="email"
           error={fieldErrors.email}
         />
         {!isEdit && (
           <FormInput
             label="password"
+            name="new-password"
             value={password}
             onChange={(val) => {
               setPassword(val)
               setFieldErrors((prev) => ({ ...prev, password: '' }))
             }}
             placeholder="password"
+            autoComplete="new-password"
             error={fieldErrors.password}
             type="password"
           />

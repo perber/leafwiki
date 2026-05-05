@@ -4,6 +4,7 @@ import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_CHANGE_USER_PASSWORD } from '@/lib/registries'
 import { useUserStore } from '@/stores/users'
 import { useCallback, useState } from 'react'
+import { toast } from 'sonner'
 
 type ChangePasswordDialogProps = {
   userId: string
@@ -67,6 +68,7 @@ export function ChangePasswordDialog({
         ...user,
         password,
       })
+      toast.success('Password changed successfully')
       return true // Close the dialog
     } catch (err) {
       console.warn(err)
@@ -104,21 +106,35 @@ export function ChangePasswordDialog({
       ]}
     >
       <div className="space-y-3 pt-2">
+        <input
+          aria-hidden="true"
+          autoComplete="username"
+          className="hidden"
+          name="username"
+          readOnly
+          tabIndex={-1}
+          type="text"
+          value={username}
+        />
         <FormInput
           autoFocus={true}
           label="New Password"
+          name="new-password"
           type="password"
           value={password}
           onChange={handlePasswordChange}
           placeholder="New Password"
+          autoComplete="new-password"
           error={fieldErrors.password}
         />
         <FormInput
           label="Confirm Password"
+          name="confirm-new-password"
           type="password"
           value={confirm}
           onChange={handleConfirmChange}
           placeholder="Confirm Password"
+          autoComplete="new-password"
           error={fieldErrors.confirm}
         />
       </div>

@@ -74,7 +74,6 @@ export function ChangeOwnPasswordDialog() {
   return (
     <BaseDialog
       dialogType={DIALOG_CHANGE_OWN_PASSWORD}
-      defaultAction="cancel"
       dialogTitle="Change Own Password"
       dialogDescription="Change your password. Make sure to remember it!"
       testidPrefix="change-own-password-dialog"
@@ -105,29 +104,45 @@ export function ChangeOwnPasswordDialog() {
       }}
     >
       <div className="space-y-3 pt-2">
+        <input
+          aria-hidden="true"
+          autoComplete="username"
+          className="hidden"
+          name="username"
+          readOnly
+          tabIndex={-1}
+          type="text"
+          value={user.username}
+        />
         <FormInput
           autoFocus={true}
           label="Old Password"
+          name="current-password"
           type="password"
           value={oldPassword}
           onChange={handleOldPasswordChange}
           placeholder="Old Password"
+          autoComplete="current-password"
           error={fieldErrors.oldPassword}
         />
         <FormInput
           label="New Password"
+          name="new-password"
           type="password"
           value={newPassword}
           onChange={handleNewPasswordChange}
           placeholder="New Password"
+          autoComplete="new-password"
           error={fieldErrors.newPassword}
         />
         <FormInput
           label="Confirm Password"
+          name="confirm-new-password"
           type="password"
           value={confirm}
           onChange={handleConfirmChange}
           placeholder="Confirm Password"
+          autoComplete="new-password"
           error={fieldErrors.confirm}
         />
       </div>
