@@ -31,6 +31,7 @@ export default class ViewPage {
 
   async logout() {
     const loginField = this.page.locator('input[data-testid="login-identifier"]');
+    const openDialog = this.page.locator('div[role="dialog"]');
 
     // Already logged out?
     try {
@@ -52,6 +53,17 @@ export default class ViewPage {
     } catch {
       // not logged in / wrong page / page already gone
       return;
+    }
+
+    // If a modal is still open from the test flow, close it before trying to
+    // use the user toolbar. Otherwise the dialog overlay can intercept clicks.
+    try {
+      if (await openDialog.isVisible({ timeout: 500 })) {
+        await this.page.keyboard.press('Escape');
+        await openDialog.waitFor({ state: 'hidden', timeout: 2000 });
+      }
+    } catch {
+      // ignore; if no dialog is open or it is already closing, continue
     }
 
     // 3) Open dropdown
