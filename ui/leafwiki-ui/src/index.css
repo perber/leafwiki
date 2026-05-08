@@ -985,6 +985,14 @@
 
   /* Sort pages dialog */
 
+  .sort-pages-dialog__toolbar {
+    @apply mb-3 flex items-center gap-2;
+  }
+
+  .sort-pages-dialog__toolbar-label {
+    @apply text-interface-text mr-1 text-sm;
+  }
+
   .sort-pages-dialog__list {
     @apply space-y-2;
   }
@@ -993,12 +1001,16 @@
     @apply bg-surface flex items-center justify-between rounded-lg border px-3 py-2 transition hover:shadow-xs;
   }
 
+  .sort-pages-dialog__drag-handle {
+    @apply text-interface-text/40 hover:text-interface-text mr-2 cursor-grab touch-none transition active:cursor-grabbing;
+  }
+
   .sort-pages-dialog__item-title {
-    @apply text-interface-text truncate text-sm;
+    @apply text-interface-text min-w-0 flex-1 truncate text-sm;
   }
 
   .sort-pages-dialog__item-actions {
-    @apply flex gap-1;
+    @apply ml-2 flex gap-1;
   }
 
   /** Search **/
