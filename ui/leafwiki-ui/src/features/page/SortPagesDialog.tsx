@@ -23,7 +23,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 function SortableItem({
@@ -108,6 +108,11 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
   const [, setFieldErrors] = useState<Record<string, string>>({})
   const reloadTree = useTreeStore((s) => s.reloadTree)
 
+  const nodeMap = useMemo(
+    () => new Map(parent.children?.map((c) => [c.id, c]) ?? []),
+    [parent.children],
+  )
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -147,8 +152,8 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
   const sortAlphabetically = (direction: 'asc' | 'desc') => {
     setOrder((prev) =>
       [...prev].sort((a, b) => {
-        const titleA = parent.children?.find((c) => c.id === a)?.title ?? ''
-        const titleB = parent.children?.find((c) => c.id === b)?.title ?? ''
+        const titleA = nodeMap.get(a)?.title ?? ''
+        const titleB = nodeMap.get(b)?.title ?? ''
         return direction === 'asc'
           ? titleA.localeCompare(titleB)
           : titleB.localeCompare(titleA)
@@ -241,7 +246,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
             }}
           >
             {order.map((id, i) => {
-              const node = parent.children?.find((c) => c.id === id)
+              const node = nodeMap.get(id)
               if (!node) return null
               return (
                 <SortableItem
