@@ -1,5 +1,6 @@
 import { useAppMode } from '@/lib/useAppMode'
 import { useTreeStore } from '@/stores/tree'
+import { FolderTree } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useViewerStore } from './viewer'
 
@@ -36,7 +37,10 @@ export default function Breadcrumbs() {
   const breadcrumbs = buildBreadcrumbs()
 
   return (
-    <nav className="breadcrumbs-nav">
+    <nav className="breadcrumbs-nav" aria-label="Breadcrumb">
+      <span className="breadcrumbs-nav__icon" aria-hidden="true">
+        <FolderTree size={14} strokeWidth={1.8} />
+      </span>
       <ol className="breadcrumbs-nav__list">
         {breadcrumbs.map((crumb, index) => (
           <li key={crumb.path} className="breadcrumbs-nav__item">

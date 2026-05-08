@@ -2,7 +2,7 @@ import { Element } from 'hast'
 import { Plugin } from 'unified'
 import { visit } from 'unist-util-visit'
 
-function slugifyHeadline(text: string) {
+export function slugifyHeadline(text: string) {
   return text
     .normalize('NFKD')
     .replace(/[ßẞ]/g, 'ss')
