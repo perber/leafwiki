@@ -79,7 +79,7 @@
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.58.1",
-    "vite": "^7.3.2"
+    "vite": "^8.0.11"
   },
   "overrides": {
     "lodash-es": "4.18.1"
