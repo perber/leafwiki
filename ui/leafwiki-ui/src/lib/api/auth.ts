@@ -40,6 +40,16 @@ function getCsrfTokenFromCookie(): string | null {
   }
 }
 
+export async function fetchMe(): Promise<AuthResponse['user']> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    throw new Error('Not authenticated')
+  }
+  return res.json()
+}
+
 export async function login(identifier: string, password: string) {
   const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',

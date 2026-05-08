@@ -12,7 +12,8 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/perber/wiki/internal/core/tools"
-	"github.com/perber/wiki/internal/http"
+	httpinternal "github.com/perber/wiki/internal/http"
+	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -46,6 +47,10 @@ func writeUsage(w io.Writer) {
 	--enable-revision             Enable the revision / page history feature (default: false)
 	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
+	--enable-http-remote-user       Enable reverse-proxy authentication via HTTP header (default: false)
+	--http-remote-user-header-name  HTTP header carrying the username from a trusted proxy (default: Remote-User)
+	--trusted-proxy-ips             Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
+	--http-remote-user-logout-url   URL the frontend redirects to after logout in proxy-auth mode (default: "")
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -67,6 +72,10 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_ENABLE_REVISION
 	LEAFWIKI_ENABLE_LINK_REFACTOR
 	LEAFWIKI_MAX_REVISION_HISTORY
+	LEAFWIKI_ENABLE_HTTP_REMOTE_USER
+	LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME
+	LEAFWIKI_TRUSTED_PROXY_IPS
+	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
 	`); err != nil {
 		panic(err)
 	}
@@ -118,6 +127,10 @@ type cliFlags struct {
 	enableRevision          *bool
 	enableLinkRefactor      *bool
 	maxRevisionHistory      *int
+	enableHTTPRemoteUser      *bool
+	httpRemoteUserHeader      *string
+	trustedProxyIPs           *string
+	httpRemoteUserLogoutURL   *string
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -140,6 +153,10 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
 		enableLinkRefactor:      fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
 		maxRevisionHistory:      fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
+		enableHTTPRemoteUser:    fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
+		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
+		trustedProxyIPs:         fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
+		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "URL the frontend redirects to after logout when reverse-proxy auth is active (e.g. https://auth.example.com/logout)"),
 	}
 }
 
@@ -178,6 +195,14 @@ func main() {
 	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
 	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
 	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
+	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
+	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
+	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
+	httpRemoteUserLogoutURL := resolveString("http-remote-user-logout-url", *flags.httpRemoteUserLogoutURL, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL", "")
+	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
+	if err != nil {
+		fail("invalid --trusted-proxy-ips value", "error", err)
+	}
 
 	args := flag.Args()
 	if len(args) > 0 {
@@ -246,7 +271,7 @@ func main() {
 		}
 	}()
 
-	router := http.NewRouter(w.Registrars(), w.FrontendConfig(), http.RouterOptions{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccess,
 		InjectCodeInHeader:      injectCodeInHeader,
 		CustomStylesheet:        customStylesheet,
@@ -259,6 +284,13 @@ func main() {
 		MaxAssetUploadSizeBytes: maxAssetUploadSize,
 		EnableRevision:          enableRevision,
 		EnableLinkRefactor:      enableLinkRefactor,
+		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
+			Enabled:        enableHTTPRemoteUser,
+			HeaderName:     httpRemoteUserHeader,
+			TrustedProxies: trustedProxies,
+			UserService:    w.UserService(),
+			LogoutURL:      httpRemoteUserLogoutURL,
+		},
 	})
 
 	// Start server - combine host and port

@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/assets"
+	coreauth "github.com/perber/wiki/internal/core/auth"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
 )
@@ -48,20 +49,30 @@ func disableClientCache(c *gin.Context) {
 	c.Header("Expires", time.Unix(0, 0).UTC().Format(http.TimeFormat))
 }
 
+// HTTPRemoteUserConfig configures reverse-proxy-based authentication.
+type HTTPRemoteUserConfig struct {
+	Enabled        bool
+	HeaderName     string
+	TrustedProxies *auth_middleware.TrustedProxies
+	UserService    *coreauth.UserService
+	LogoutURL      string // optional URL the frontend redirects to after logout
+}
+
 // RouterOptions holds global HTTP server configuration shared across all domains.
 type RouterOptions struct {
-	PublicAccess            bool          // Whether the wiki allows public read access
-	InjectCodeInHeader      string        // Raw HTML/JS code to inject into the <head> tag
-	CustomStylesheet        string        // Path to a custom CSS file (resolved by wiki before passing)
-	AllowInsecure           bool          // Whether to allow insecure HTTP connections
-	AccessTokenTimeout      time.Duration // Duration for access token validity
-	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
-	HideLinkMetadataSection bool          // Whether to hide the link metadata section in the frontend UI
-	AuthDisabled            bool          // Whether authentication is disabled
-	BasePath                string        // URL prefix when served behind a reverse proxy (e.g. "/wiki")
-	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset uploads
-	EnableRevision          bool          // Whether the revision / page history feature is enabled
-	EnableLinkRefactor      bool          // Whether the link refactoring feature is enabled in the frontend
+	PublicAccess            bool                 // Whether the wiki allows public read access
+	InjectCodeInHeader      string               // Raw HTML/JS code to inject into the <head> tag
+	CustomStylesheet        string               // Path to a custom CSS file (resolved by wiki before passing)
+	AllowInsecure           bool                 // Whether to allow insecure HTTP connections
+	AccessTokenTimeout      time.Duration        // Duration for access token validity
+	RefreshTokenTimeout     time.Duration        // Duration for refresh token validity
+	HideLinkMetadataSection bool                 // Whether to hide the link metadata section in the frontend UI
+	AuthDisabled            bool                 // Whether authentication is disabled
+	BasePath                string               // URL prefix when served behind a reverse proxy (e.g. "/wiki")
+	MaxAssetUploadSizeBytes int64                // Maximum allowed size in bytes for asset uploads
+	EnableRevision          bool                 // Whether the revision / page history feature is enabled
+	EnableLinkRefactor      bool                 // Whether the link refactoring feature is enabled in the frontend
+	HTTPRemoteUser          HTTPRemoteUserConfig // Reverse-proxy authentication via HTTP header
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.
@@ -96,6 +107,15 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 
 	engine := gin.Default()
 	base := engine.Group(opts.BasePath)
+
+	if opts.HTTPRemoteUser.Enabled {
+		base.Use(auth_middleware.InjectRemoteUser(auth_middleware.RemoteUserConfig{
+			Enabled:        opts.HTTPRemoteUser.Enabled,
+			HeaderName:     opts.HTTPRemoteUser.HeaderName,
+			TrustedProxies: opts.HTTPRemoteUser.TrustedProxies,
+			UserService:    opts.HTTPRemoteUser.UserService,
+		}))
+	}
 
 	ctx := RouterContext{
 		Engine:      engine,

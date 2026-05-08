@@ -20,6 +20,10 @@ export default function UserToolbar() {
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const authDisabled = useConfigStore((s) => s.authDisabled)
+  const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
+  const httpRemoteUserLogoutUrl = useConfigStore(
+    (s) => s.httpRemoteUserLogoutUrl,
+  )
 
   if (!user && !authDisabled) {
     // renders the login
@@ -47,7 +51,11 @@ export default function UserToolbar() {
 
   const handleLogout = () => {
     logout()
-    navigate('/login')
+    if (httpRemoteUserLogoutUrl) {
+      window.location.href = httpRemoteUserLogoutUrl
+    } else {
+      navigate('/login')
+    }
   }
 
   return (
@@ -95,13 +103,15 @@ export default function UserToolbar() {
           >
             Change Own Password
           </DropdownMenuItem>
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={handleLogout}
-            data-testid="user-toolbar-logout"
-          >
-            Logout
-          </DropdownMenuItem>
+          {(!httpRemoteUserEnabled || httpRemoteUserLogoutUrl) && (
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={handleLogout}
+              data-testid="user-toolbar-logout"
+            >
+              Logout
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

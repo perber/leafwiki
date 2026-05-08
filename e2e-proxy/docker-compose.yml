@@ -1,0 +1,42 @@
+services:
+  leafwiki:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        DISABLE_REFRESH_TOKEN_RATE_LIMIT: "true"
+    command:
+      - "--jwt-secret=proxy-e2e-secret"
+      - "--admin-password=admin"
+      - "--allow-insecure=true"
+      - "--enable-http-remote-user=true"
+      # Trust the entire proxy-net subnet so nginx can forward headers.
+      - "--trusted-proxy-ips=172.30.0.0/16"
+    networks:
+      proxy-net:
+        ipv4_address: 172.30.0.2
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/config"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8095:80"
+    depends_on:
+      leafwiki:
+        condition: service_healthy
+    networks:
+      proxy-net:
+        ipv4_address: 172.30.0.3
+
+networks:
+  proxy-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16

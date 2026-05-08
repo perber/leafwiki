@@ -1,10 +1,12 @@
+import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { useEffect } from 'react'
-import { ensureRefresh } from './api/auth'
+import { ensureRefresh, fetchMe } from './api/auth'
 
 export function useBootstrapAuth(enabled = true) {
   const setUser = useSessionStore((s) => s.setUser)
   const setRefreshing = useSessionStore((s) => s.setRefreshing)
+  const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
 
   useEffect(() => {
     if (!enabled) {
@@ -16,11 +18,17 @@ export function useBootstrapAuth(enabled = true) {
     ;(async () => {
       setRefreshing(true)
       try {
-        await ensureRefresh()
+        if (httpRemoteUserEnabled) {
+          // Proxy manages the session — resolve the current user via /api/auth/me.
+          // Token refresh does not apply in this mode.
+          const user = await fetchMe()
+          if (!cancelled) setUser(user)
+        } else {
+          await ensureRefresh()
+        }
       } catch (err) {
-        // Clear user state when refresh fails to prevent stale data
         if (!cancelled) setUser(null)
-        console.debug('[bootstrapAuth] Refresh token failed:', err)
+        console.debug('[bootstrapAuth] Auth bootstrap failed:', err)
       } finally {
         if (!cancelled) setRefreshing(false)
       }
@@ -29,5 +37,5 @@ export function useBootstrapAuth(enabled = true) {
     return () => {
       cancelled = true
     }
-  }, [setUser, setRefreshing, enabled])
+  }, [setUser, setRefreshing, enabled, httpRemoteUserEnabled])
 }

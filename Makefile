@@ -84,6 +84,10 @@ run-e2e:
 	@echo "🚀 Starting end-to-end tests..."
 	@./e2e/run.sh
 
+run-proxy-e2e:
+	@echo "🔐 Starting proxy auth E2E tests..."
+	@./e2e-proxy/run.sh
+
 run-e2e-local:
 	@echo "⚡ Starting end-to-end tests (local fast path)..."
 	@E2E_RUN_MODE=local ./e2e/run.sh
@@ -103,6 +107,7 @@ help:
 	@echo "  make test                 – Run all Go tests"
 	@echo "  make bench                – Run Go benchmarks for links and revision"
 	@echo "  make run-e2e              – Run end-to-end tests (using Docker)"
+	@echo "  make run-proxy-e2e        – Run reverse-proxy auth E2E tests (Docker + nginx)"
 	@echo "  make run-e2e-local        – Run end-to-end tests via local fast path"
 	@echo "  make run-e2e-local-fast   – Run E2E tests locally, skip UI build (use when dist/ is current)"
 	@echo "                              Optional: GREP=<pattern> to filter tests"
@@ -110,4 +115,4 @@ help:
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast
+.PHONY: all build run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e

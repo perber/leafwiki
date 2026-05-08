@@ -12,6 +12,8 @@ export type Config = {
   maxAssetUploadSizeBytes: number
   enableRevision: boolean
   enableLinkRefactor: boolean
+  httpRemoteUserEnabled: boolean
+  httpRemoteUserLogoutUrl: string
 }
 
 export async function getConfig(): Promise<Config> {

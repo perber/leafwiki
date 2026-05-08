@@ -9,13 +9,20 @@ import (
 
 func RequireAuth(authService *auth.AuthService, authCookies *AuthCookies, authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Short-circuit only when a trusted upstream already stored a valid user.
+		if userValue, exists := c.Get("user"); exists {
+			user, ok := userValue.(*auth.User)
+			if !ok || user == nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Invalid user context"})
+				return
+			}
+
+			c.Next()
+			return
+		}
 
 		if authDisabled {
-			if _, exists := c.Get("user"); exists {
-				c.Next()
-			} else {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated and auth is disabled"})
-			}
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated and auth is disabled"})
 			return
 		}
 

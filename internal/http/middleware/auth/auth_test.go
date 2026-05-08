@@ -132,6 +132,68 @@ func TestRequireAuth_WithAuthDisabled_NoUser(t *testing.T) {
 	}
 }
 
+func TestRequireAuth_WithInvalidUserContext_NilUser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user", (*coreauth.User)(nil))
+		c.Next()
+	})
+	router.Use(authmw.RequireAuth(nil, authCookies, true))
+
+	router.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500 for nil user context, got %d", w.Code)
+	}
+
+	expectedBody := `{"error":"Invalid user context"}`
+	if w.Body.String() != expectedBody {
+		t.Errorf("Expected body %s, got %s", expectedBody, w.Body.String())
+	}
+}
+
+func TestRequireAuth_WithInvalidUserContext_WrongType(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user", "not-a-user")
+		c.Next()
+	})
+	router.Use(authmw.RequireAuth(nil, authCookies, true))
+
+	router.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500 for invalid user type, got %d", w.Code)
+	}
+
+	expectedBody := `{"error":"Invalid user context"}`
+	if w.Body.String() != expectedBody {
+		t.Errorf("Expected body %s, got %s", expectedBody, w.Body.String())
+	}
+}
+
 func TestRequireAuth_WithAuthEnabled_ValidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
