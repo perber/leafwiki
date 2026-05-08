@@ -454,6 +454,10 @@ func (w *Wiki) GetStorageDir() string {
 	return w.storageDir
 }
 
+func (w *Wiki) UserService() *auth.UserService {
+	return w.user
+}
+
 func (w *Wiki) Close() error {
 	w.status.Finish()
 	if err := w.user.Close(); err != nil {

@@ -9,13 +9,14 @@ import (
 
 func RequireAuth(authService *auth.AuthService, authCookies *AuthCookies, authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Short-circuit: a trusted upstream (proxy auth or public-editor) already resolved the user.
+		if _, exists := c.Get("user"); exists {
+			c.Next()
+			return
+		}
 
 		if authDisabled {
-			if _, exists := c.Get("user"); exists {
-				c.Next()
-			} else {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated and auth is disabled"})
-			}
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated and auth is disabled"})
 			return
 		}
 

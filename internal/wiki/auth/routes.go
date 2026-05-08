@@ -87,6 +87,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
 
+	authGroup.GET("/auth/me", r.handleMe)
 	authGroup.POST("/auth/logout", r.handleLogout(ctx))
 
 	authGroup.POST("/users", authmw.RequireAdmin(opts.AuthDisabled), r.handleCreateUser)
@@ -122,15 +123,33 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"publicAccess":            opts.PublicAccess,
-			"hideLinkMetadataSection": opts.HideLinkMetadataSection,
-			"authDisabled":            opts.AuthDisabled,
-			"basePath":                opts.BasePath,
-			"maxAssetUploadSizeBytes": opts.MaxAssetUploadSizeBytes,
-			"enableRevision":          opts.EnableRevision,
-			"enableLinkRefactor":      opts.EnableLinkRefactor,
+			"publicAccess":              opts.PublicAccess,
+			"hideLinkMetadataSection":   opts.HideLinkMetadataSection,
+			"authDisabled":              opts.AuthDisabled,
+			"basePath":                  opts.BasePath,
+			"maxAssetUploadSizeBytes":   opts.MaxAssetUploadSizeBytes,
+			"enableRevision":            opts.EnableRevision,
+			"enableLinkRefactor":        opts.EnableLinkRefactor,
+			"httpRemoteUserEnabled":     opts.HTTPRemoteUser.Enabled,
+			"httpRemoteUserLogoutUrl":   opts.HTTPRemoteUser.LogoutURL,
 		})
 	}
+}
+
+// handleMe returns the currently authenticated user from the Gin context.
+// The user is already resolved and validated by the middleware chain
+// (InjectRemoteUser for proxy auth, RequireAuth for JWT) — no DB lookup needed.
+func (r *Routes) handleMe(c *gin.Context) {
+	user := authmw.MustGetUser(c)
+	if user == nil {
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":       user.ID,
+		"username": user.Username,
+		"email":    user.Email,
+		"role":     user.Role,
+	})
 }
 
 func (r *Routes) handleLogin(rctx httpinternal.RouterContext) gin.HandlerFunc {

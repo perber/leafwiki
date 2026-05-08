@@ -199,6 +199,14 @@ func (s *UserService) GetUsers() ([]*User, error) {
 	return users, nil
 }
 
+func (s *UserService) GetUserByUsername(username string) (*User, error) {
+	user, err := s.store.GetUserByUsername(username)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+	return user, nil
+}
+
 func (s *UserService) GetUserByEmailOrUsernameAndPassword(identifier, password string) (*User, error) {
 	user, err := s.store.GetUserByUsername(identifier)
 	if err != nil {
