@@ -33,6 +33,11 @@ func InjectRemoteUser(cfg RemoteUserConfig) gin.HandlerFunc {
 			return
 		}
 
+		if cfg.TrustedProxies == nil || cfg.UserService == nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Reverse proxy authentication misconfigured"})
+			return
+		}
+
 		if !cfg.TrustedProxies.IsTrusted(c.Request.RemoteAddr) {
 			c.Next()
 			return

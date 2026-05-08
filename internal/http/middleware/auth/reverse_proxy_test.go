@@ -238,6 +238,55 @@ func TestInjectRemoteUser_CIDRMatch(t *testing.T) {
 	}
 }
 
+func TestInjectRemoteUser_MisconfiguredTrustedProxies(t *testing.T) {
+	f := createProxyFixture(t)
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
+
+	cfg := authmw.RemoteUserConfig{
+		Enabled:        true,
+		HeaderName:     "Remote-User",
+		TrustedProxies: nil,
+		UserService:    f.userService,
+	}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("Remote-User", "admin")
+	w := httptest.NewRecorder()
+
+	proxyRouter(cfg).ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 for missing trusted proxies config, got %d", w.Code)
+	}
+	if body := w.Body.String(); body != `{"error":"Reverse proxy authentication misconfigured"}` {
+		t.Errorf("unexpected body: %s", body)
+	}
+}
+
+func TestInjectRemoteUser_MisconfiguredUserService(t *testing.T) {
+	cfg := authmw.RemoteUserConfig{
+		Enabled:        true,
+		HeaderName:     "Remote-User",
+		TrustedProxies: mustParseTrustedProxies(t, "127.0.0.1"),
+		UserService:    nil,
+	}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("Remote-User", "admin")
+	w := httptest.NewRecorder()
+
+	proxyRouter(cfg).ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 for missing user service config, got %d", w.Code)
+	}
+	if body := w.Body.String(); body != `{"error":"Reverse proxy authentication misconfigured"}` {
+		t.Errorf("unexpected body: %s", body)
+	}
+}
+
 // TestInjectRemoteUser_WithRequireAuth verifies the full middleware chain:
 // InjectRemoteUser sets the user, then RequireAuth short-circuits JWT validation.
 func TestInjectRemoteUser_WithRequireAuth(t *testing.T) {

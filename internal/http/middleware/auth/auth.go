@@ -9,8 +9,14 @@ import (
 
 func RequireAuth(authService *auth.AuthService, authCookies *AuthCookies, authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Short-circuit: a trusted upstream (proxy auth or public-editor) already resolved the user.
-		if _, exists := c.Get("user"); exists {
+		// Short-circuit only when a trusted upstream already stored a valid user.
+		if userValue, exists := c.Get("user"); exists {
+			user, ok := userValue.(*auth.User)
+			if !ok || user == nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Invalid user context"})
+				return
+			}
+
 			c.Next()
 			return
 		}
