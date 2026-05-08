@@ -15,6 +15,16 @@ type proxyFixture struct {
 	close       func() error
 }
 
+func cleanupWithErrorCheck(t *testing.T, name string, closeFn func() error) {
+	t.Helper()
+
+	t.Cleanup(func() {
+		if err := closeFn(); err != nil {
+			t.Errorf("close %s: %v", name, err)
+		}
+	})
+}
+
 func createProxyFixture(t *testing.T) *proxyFixture {
 	t.Helper()
 
@@ -63,7 +73,7 @@ func proxyRouter(cfg authmw.RemoteUserConfig) *gin.Engine {
 
 func TestInjectRemoteUser_Disabled(t *testing.T) {
 	f := createProxyFixture(t)
-	defer f.close()
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
 
 	cfg := authmw.RemoteUserConfig{
 		Enabled:        false,
@@ -87,7 +97,7 @@ func TestInjectRemoteUser_Disabled(t *testing.T) {
 
 func TestInjectRemoteUser_UntrustedIP(t *testing.T) {
 	f := createProxyFixture(t)
-	defer f.close()
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
 
 	cfg := authmw.RemoteUserConfig{
 		Enabled:        true,
@@ -111,7 +121,7 @@ func TestInjectRemoteUser_UntrustedIP(t *testing.T) {
 
 func TestInjectRemoteUser_TrustedIP_NoHeader(t *testing.T) {
 	f := createProxyFixture(t)
-	defer f.close()
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
 
 	cfg := authmw.RemoteUserConfig{
 		Enabled:        true,
@@ -135,7 +145,7 @@ func TestInjectRemoteUser_TrustedIP_NoHeader(t *testing.T) {
 
 func TestInjectRemoteUser_TrustedIP_ValidUser(t *testing.T) {
 	f := createProxyFixture(t)
-	defer f.close()
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
 
 	cfg := authmw.RemoteUserConfig{
 		Enabled:        true,
@@ -161,7 +171,7 @@ func TestInjectRemoteUser_TrustedIP_ValidUser(t *testing.T) {
 
 func TestInjectRemoteUser_TrustedIP_UnknownUser(t *testing.T) {
 	f := createProxyFixture(t)
-	defer f.close()
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
 
 	cfg := authmw.RemoteUserConfig{
 		Enabled:        true,
@@ -184,7 +194,7 @@ func TestInjectRemoteUser_TrustedIP_UnknownUser(t *testing.T) {
 
 func TestInjectRemoteUser_CustomHeaderName(t *testing.T) {
 	f := createProxyFixture(t)
-	defer f.close()
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
 
 	cfg := authmw.RemoteUserConfig{
 		Enabled:        true,
@@ -207,7 +217,7 @@ func TestInjectRemoteUser_CustomHeaderName(t *testing.T) {
 
 func TestInjectRemoteUser_CIDRMatch(t *testing.T) {
 	f := createProxyFixture(t)
-	defer f.close()
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
 
 	cfg := authmw.RemoteUserConfig{
 		Enabled:        true,
@@ -232,14 +242,14 @@ func TestInjectRemoteUser_CIDRMatch(t *testing.T) {
 // InjectRemoteUser sets the user, then RequireAuth short-circuits JWT validation.
 func TestInjectRemoteUser_WithRequireAuth(t *testing.T) {
 	f := createProxyFixture(t)
-	defer f.close()
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
 
 	storageDir := t.TempDir()
 	sessionStore, err := coreauth.NewSessionStore(storageDir)
 	if err != nil {
 		t.Fatalf("create session store: %v", err)
 	}
-	defer sessionStore.Close()
+	cleanupWithErrorCheck(t, "session store", sessionStore.Close)
 
 	authService := coreauth.NewAuthService(f.userService, sessionStore, "secret", 0, 0)
 	authCookies := authmw.NewAuthCookies(true, 0, 0)
