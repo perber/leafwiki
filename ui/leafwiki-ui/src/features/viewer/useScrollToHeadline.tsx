@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
+import { scrollToHeadlineHash } from '@/lib/scrollToHeadline'
 
 type UseScrollToHeadlineOptions = {
   content?: string
@@ -13,66 +14,6 @@ export function useScrollToHeadline({
   const { hash } = useLocation()
   useEffect(() => {
     if (isLoading || !content || !hash) return
-    scrollToHeadline(hash)
+    scrollToHeadlineHash(hash)
   }, [content, isLoading, hash])
-}
-
-function scrollToHeadline(hash: string) {
-  const contentContainer = document.querySelector('main') as HTMLElement | null
-  if (!contentContainer) return
-
-  function waitUntilHeightStabilizes(
-    element: HTMLElement,
-    callback: () => void,
-    interval = 250,
-    maxTotalTime = 3000,
-    stableTime = 500,
-  ) {
-    let lastHeight = element.scrollHeight
-    let stableFor = 0
-    let elapsedTime = 0
-
-    const checkHeight = () => {
-      const currentHeight = element.scrollHeight
-      if (currentHeight === lastHeight) {
-        stableFor += interval
-        if (stableFor >= stableTime) {
-          callback()
-          return
-        }
-      } else {
-        lastHeight = currentHeight
-        stableFor = 0
-      }
-      elapsedTime += interval
-      if (elapsedTime < maxTotalTime) {
-        setTimeout(checkHeight, interval)
-      } else {
-        callback()
-      }
-    }
-
-    setTimeout(checkHeight, interval)
-  }
-
-  waitUntilHeightStabilizes(contentContainer, () => {
-    const headlineId = decodeURIComponent(hash.substring(1)) // remove leading #
-    const headlineElement = document.getElementById(headlineId)
-    if (!headlineElement) {
-      console.warn(`Headline with id "${headlineId}" not found.`)
-      return
-    }
-    scroll(headlineElement)
-  })
-
-  function scroll(headlineElement: HTMLElement) {
-    if (!contentContainer || !headlineElement) return
-
-    const contentRect = contentContainer.getBoundingClientRect()
-    const headlineRect = headlineElement.getBoundingClientRect()
-
-    const offset =
-      headlineRect.top - contentRect.top + contentContainer.scrollTop
-    contentContainer.scrollTo({ top: offset, behavior: 'smooth' })
-  }
 }

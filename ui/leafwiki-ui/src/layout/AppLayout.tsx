@@ -272,13 +272,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {isMobile && sidebarVisible && (
           <div className="app-layout__sidebar-overlay-mobile" />
         )}
-        {/* Main content area */}
-        <main
-          className={`${mainContainerStyle} app-layout__main-content-area`}
-          id="scroll-container"
-        >
-          {children}
-        </main>
+        <div className="app-layout__main-column">
+          <div id="app-subheader-root" className="app-layout__subheader-root" />
+          {/* Main content area */}
+          <main
+            className={`${mainContainerStyle} app-layout__main-content-area`}
+            id="scroll-container"
+          >
+            {children}
+          </main>
+        </div>
       </div>
     </TooltipProvider>
   )

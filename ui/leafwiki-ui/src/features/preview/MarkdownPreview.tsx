@@ -14,7 +14,10 @@ import {
   VideoHTMLAttributes,
   isValidElement,
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
+  useState,
   useSyncExternalStore,
 } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -23,6 +26,8 @@ import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
+import { extractTocEntries } from './extractTocEntries'
+import { TocDropdownButton } from './TocDropdownButton'
 import Headline from './Headline'
 import MarkdownCodeBlock from './MarkdownCodeBlock'
 import { MarkdownImage } from './MarkdownImage'
@@ -63,6 +68,9 @@ type Props = {
   path?: string
   resolveAssetUrl?: (src: string) => string
   enableHeadlineLinks?: boolean
+  showToc?: boolean
+  tocClickable?: boolean
+  onStickyTocChange?: (show: boolean) => void
 }
 
 type MarkdownPreviewErrorBoundaryState = {
@@ -209,11 +217,24 @@ function isPlainListParagraph(
   return propKeys.every((key) => key === 'children' || key === 'data-line')
 }
 
+function findScrollParent(el: HTMLElement | null): HTMLElement | null {
+  let node: HTMLElement | null = el?.parentElement ?? null
+  while (node) {
+    const { overflow, overflowY } = getComputedStyle(node)
+    if (/auto|scroll/.test(overflow + overflowY)) return node
+    node = node.parentElement
+  }
+  return null
+}
+
 export default function MarkdownPreview({
   content,
   path,
   resolveAssetUrl,
   enableHeadlineLinks = true,
+  showToc = false,
+  tocClickable = true,
+  onStickyTocChange,
 }: Props) {
   const designMode = useDesignModeStore((state) => state.mode)
   const prefersLight = useSyncExternalStore(
@@ -524,7 +545,32 @@ export default function MarkdownPreview({
     [content],
   )
 
-  return (
+  const tocEntries = useMemo(
+    () => (showToc ? extractTocEntries(normalizedContent) : []),
+    [showToc, normalizedContent],
+  )
+
+  const inFlowRef = useRef<HTMLDivElement>(null)
+  const [showStickyToc, setShowStickyToc] = useState(false)
+
+  useEffect(() => {
+    if (!showToc || tocEntries.length <= 3) return
+    const el = inFlowRef.current
+    if (!el) return
+    const root = findScrollParent(el)
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const sticky = !entry.isIntersecting
+        setShowStickyToc(sticky)
+        onStickyTocChange?.(sticky)
+      },
+      { root, threshold: 0 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [showToc, tocEntries.length, onStickyTocChange])
+
+  const markdownBody = (
     <MarkdownPreviewErrorBoundary resetKey={`${path ?? ''}:${content}`}>
       <>
         <ReactMarkdown
@@ -543,5 +589,22 @@ export default function MarkdownPreview({
         <div id="mermaid-renderer"></div>
       </>
     </MarkdownPreviewErrorBoundary>
+  )
+
+  if (!showToc || tocEntries.length <= 3) {
+    return markdownBody
+  }
+
+  return (
+    <>
+      <div ref={inFlowRef} className="print:hidden">
+        {!showStickyToc && (
+          <div className="markdown-preview__toc-inline mb-2 flex sm:mb-4">
+            <TocDropdownButton entries={tocEntries} clickable={tocClickable} />
+          </div>
+        )}
+      </div>
+      {markdownBody}
+    </>
   )
 }

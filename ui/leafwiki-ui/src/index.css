@@ -542,6 +542,14 @@
     @apply flex flex-1 flex-col items-stretch transition-all duration-200;
   }
 
+  .app-layout__main-column {
+    @apply flex min-w-0 flex-1 flex-col;
+  }
+
+  .app-layout__subheader-root:empty {
+    display: none;
+  }
+
   .app-layout__main-content-area-viewer {
     @apply border-surface-border overflow-auto;
   }
@@ -1203,7 +1211,11 @@
   }
 
   .breadcrumbs-nav {
-    @apply text-muted mr-2 flex w-full flex-1 grow text-sm;
+    @apply text-muted flex w-full items-center gap-2 text-[12px];
+  }
+
+  .breadcrumbs-nav__icon {
+    @apply text-muted-foreground inline-flex shrink-0 items-center;
   }
 
   .breadcrumbs-nav__list {
@@ -1215,7 +1227,7 @@
   }
 
   .breadcrumbs-nav__separator {
-    @apply text-muted;
+    @apply text-muted-foreground/70;
   }
 
   .breadcrumbs-nav__current {
@@ -1223,7 +1235,7 @@
   }
 
   .breadcrumbs-nav__link {
-    @apply text-page-text hover:underline;
+    @apply text-brand hover:text-brand-dark no-underline;
   }
 
   /* readonly input */
@@ -1232,7 +1244,27 @@
   }
 
   .page-viewer {
-    @apply mx-auto flex min-h-full w-full max-w-6xl flex-col px-8 pt-8 pb-0;
+    @apply mx-auto flex min-h-full w-full max-w-6xl flex-col px-8 pt-3 pb-0;
+  }
+
+  .page-viewer__subheader {
+    @apply bg-background/92 border-surface-border border-b backdrop-blur-sm md:h-12;
+  }
+
+  .page-viewer__subheader-inner {
+    @apply flex w-full flex-col gap-2 pt-0.75 pr-4 pb-1.25 pl-4 md:h-full md:flex-row md:items-center md:justify-between md:gap-4 md:py-0;
+  }
+
+  .page-viewer__subheader-main {
+    @apply flex min-w-0 flex-1 items-center;
+  }
+
+  .page-viewer__subheader-copy {
+    @apply flex min-w-0 flex-col justify-center gap-0.5;
+  }
+
+  .page-viewer__toc-button {
+    @apply flex w-full items-center justify-end md:w-auto md:shrink-0 md:self-center;
   }
 
   .page-viewer__body {
@@ -1243,24 +1275,12 @@
     @apply text-error p-6;
   }
 
-  .page-viewer__header {
-    /* on small screens it shouold be a column */
-    @apply flex flex-col md:flex-row;
-  }
-
   .page-viewer__content {
-    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full flex-1 leading-relaxed;
+    @apply prose prose-base text-page-text dark:prose-invert mt-2 max-w-full flex-1 leading-relaxed;
   }
 
   .page-viewer__metadata {
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    margin-top: 0.25rem;
-    margin-bottom: 1rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    opacity: 0.8;
+    @apply text-muted-foreground flex flex-wrap items-center text-[11px] leading-4 opacity-80;
   }
 
   .page-viewer__metadata-item {
@@ -2564,7 +2584,7 @@
       height: 0 !important;
     }
 
-    .page-viewer__header {
+    .page-viewer__subheader {
       display: none !important;
     }
 

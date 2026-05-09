@@ -752,6 +752,57 @@ Target content`;
       .toBe('#你好-世界');
   });
 
+  test('headline hash navigation keeps target below sticky toc', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `headline-anchor-sticky-${timestamp}`;
+    const title = `Headline Anchor Sticky ${timestamp}`;
+    const content = `# Intro
+
+${Array.from({ length: 12 }, (_, index) => `Paragraph ${index + 1}`).join('\n\n')}
+
+## First Section
+
+${Array.from({ length: 10 }, (_, index) => `First ${index + 1}`).join('\n\n')}
+
+## Second Section
+
+${Array.from({ length: 10 }, (_, index) => `Second ${index + 1}`).join('\n\n')}
+
+## Third Section
+
+${Array.from({ length: 10 }, (_, index) => `Third ${index + 1}`).join('\n\n')}
+
+## Target Section
+
+Target content
+
+## Fifth Section
+
+Trailing content`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}#target-section`);
+
+    const stickyToc = page.locator('.page-viewer__subheader');
+    const targetHeading = page.locator('article h2').getByText('Target Section');
+
+    await stickyToc.waitFor({ state: 'visible' });
+    await targetHeading.waitFor({ state: 'visible' });
+
+    await expect
+      .poll(async () => {
+        const stickyBox = await stickyToc.boundingBox();
+        const headingBox = await targetHeading.boundingBox();
+
+        if (!stickyBox || !headingBox) return null;
+
+        return Math.round(headingBox.y - (stickyBox.y + stickyBox.height));
+      })
+      .toBeGreaterThanOrEqual(0);
+  });
+
   test('navigating away from page with footnote headline stays responsive', async ({ page }) => {
     const timestamp = Date.now();
     const slug = `footnotes-navigation-repro-${timestamp}`;

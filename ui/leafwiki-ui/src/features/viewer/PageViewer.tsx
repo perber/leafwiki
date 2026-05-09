@@ -14,10 +14,13 @@ import {
 } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BacklinkInfo } from '../links/LinkInfo'
 import MarkdownPreview from '../preview/MarkdownPreview'
+import { extractTocEntries } from '../preview/extractTocEntries'
+import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import Breadcrumbs from './Breadcrumbs'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
@@ -95,36 +98,63 @@ export default function PageViewer() {
     return null
   }
 
+  const tocEntries = useMemo(
+    () => (page ? extractTocEntries(page.content) : []),
+    [page],
+  )
+
   const editorName = displayUser(page?.metadata?.lastAuthor)
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
   const showUpdated = updatedRelative
+  const showTocButton = tocEntries.length > 3
+  const subheaderRoot = document.getElementById('app-subheader-root')
+
+  const subheader =
+    page && !error && subheaderRoot
+      ? createPortal(
+          <div className="page-viewer__subheader print:hidden">
+            <div className="page-viewer__subheader-inner">
+              <div className="page-viewer__subheader-main">
+                <div className="page-viewer__subheader-copy">
+                  <Breadcrumbs />
+                  {showUpdated && (
+                    <div className="page-viewer__metadata">
+                      <span className="page-viewer__metadata-item">
+                        Updated{' '}
+                        {editorName
+                          ? `by ${editorName} · ${updatedRelative}`
+                          : updatedRelative}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {showTocButton && (
+                <div className="page-viewer__toc-button">
+                  <TocDropdownButton entries={tocEntries} clickable />
+                </div>
+              )}
+            </div>
+          </div>,
+          subheaderRoot,
+        )
+      : null
 
   return (
-    <div className="page-viewer">
-      <div className="page-viewer__header">
-        <Breadcrumbs />
-        {page && showUpdated && (
-          <div className="page-viewer__metadata">
-            <span className="page-viewer__metadata-item">
-              Updated{' '}
-              {editorName
-                ? `by ${editorName} · ${updatedRelative}`
-                : updatedRelative}
-            </span>
+    <>
+      {subheader}
+      <div className="page-viewer">
+        {page && !error && (
+          <div className="page-viewer__body">
+            <article className="page-viewer__content">
+              <MarkdownPreview content={page.content} path={page.path} />
+              <EmptySectionChildrenList page={page} />
+            </article>
+            <BacklinkInfo />
           </div>
         )}
+        {renderError()}
       </div>
-
-      {page && !error && (
-        <div className="page-viewer__body">
-          <article className="page-viewer__content">
-            <MarkdownPreview content={page.content} path={page.path} />
-            <EmptySectionChildrenList page={page} />
-          </article>
-          <BacklinkInfo />
-        </div>
-      )}
-      {renderError()}
-    </div>
+    </>
   )
 }
