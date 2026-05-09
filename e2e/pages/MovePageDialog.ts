@@ -3,16 +3,23 @@ import { expect, Page } from '@playwright/test';
 export default class MovePageDialog {
   constructor(private page: Page) {}
 
+  private dialog() {
+    return this.page.locator('[role="dialog"]').last();
+  }
+
   async getParentSelection() {
-    return this.page.locator('button[role="combobox"]');
+    return this.dialog().locator('[role="combobox"]');
+  }
+
+  private getOptions() {
+    return this.dialog().locator('[role="option"]');
   }
 
   async selectNewParentAsTopLevel() {
     const parentSelection = await this.getParentSelection();
     await parentSelection.click();
     // find by text contains "Top Level" should be regex because at the beginning there is an emoji
-    const option = this.page
-      .locator(`div[role="option"]`)
+    const option = this.getOptions()
       .filter({ hasText: new RegExp('Top Level') })
       .first();
     await option.click();
@@ -21,7 +28,7 @@ export default class MovePageDialog {
   async selectNewParent(title: string) {
     const parentSelection = await this.getParentSelection();
     await parentSelection.click();
-    const option = this.page.locator(`div[role="option"]`).filter({ hasText: title }).first();
+    const option = this.getOptions().filter({ hasText: title }).first();
     await option.click();
   }
 
