@@ -145,11 +145,10 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
           actionType: 'confirm',
           disabled: newParentId === parentId || loading,
           variant: 'default',
-          autoFocus: true,
         },
       ]}
     >
-      <PageSelect pageID={newParentId} onChange={setNewParentId} />
+      <PageSelect pageID={newParentId} onChange={setNewParentId} autoFocus />
     </BaseDialog>
   )
 }
