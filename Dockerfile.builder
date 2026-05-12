@@ -1,5 +1,5 @@
 # Stage 1: Frontend build
-FROM node:25-alpine AS frontend
+FROM node:26-alpine AS frontend
 
 WORKDIR /ui
 ARG APP_VERSION

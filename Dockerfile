@@ -1,5 +1,5 @@
 # Step 1: Frontend
-FROM node:25-alpine AS frontend-build
+FROM node:26-alpine AS frontend-build
 WORKDIR /app
 ARG APP_VERSION
 COPY ./ui/leafwiki-ui/package*.json ./
