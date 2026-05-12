@@ -323,6 +323,57 @@ async function expectMarkdownLinkAutocompleteWorks(page: import('@playwright/tes
   await welcomeLink.getByText('Welcome').waitFor({ state: 'visible' });
 }
 
+async function expectSearchAndReplaceWorks(page: import('@playwright/test').Page) {
+  const timestamp = Date.now();
+  const slug = `search-replace-${timestamp}`;
+  const title = `Search Replace ${timestamp}`;
+  const originalContent = 'Alpha paragraph\n\nAlpha list item\n\nAlpha closing line';
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: originalContent,
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.openReplacePanel();
+  await editPage.replaceAll('Alpha', 'Beta');
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  const content = await viewPage.getContent();
+  test.expect(content).toContain('Beta paragraph');
+  test.expect(content).toContain('Beta list item');
+  test.expect(content).toContain('Beta closing line');
+  test.expect(content).not.toContain('Alpha');
+}
+
+async function expectEscapeClosesSearchPanelButNotEditor(page: import('@playwright/test').Page) {
+  const timestamp = Date.now();
+  const slug = `search-escape-${timestamp}`;
+  const title = `Search Escape ${timestamp}`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: 'Escape should close only the search panel.',
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.openReplacePanel();
+  await editPage.closeSearchPanelWithEscape();
+  await editPage.expectEditorStillOpen();
+  await viewPage.goto(`/${slug}`);
+}
+
 async function expectOpenedPageMarkedInNavigationDuringEditMode(
   page: import('@playwright/test').Page,
 ) {
@@ -676,6 +727,14 @@ for the page edited at ${new Date().toISOString()}
 
   test('markdown link autocomplete works', async ({ page }) => {
     await expectMarkdownLinkAutocompleteWorks(page);
+  });
+
+  test('search and replace works in markdown editor', async ({ page }) => {
+    await expectSearchAndReplaceWorks(page);
+  });
+
+  test('escape closes search panel but keeps editor open', async ({ page }) => {
+    await expectEscapeClosesSearchPanelButNotEditor(page);
   });
 
   test('headline anchor keeps classic hash navigation for plain headings', async ({ page }) => {

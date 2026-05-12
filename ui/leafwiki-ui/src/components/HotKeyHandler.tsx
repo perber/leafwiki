@@ -19,13 +19,26 @@ export function HotKeyHandler() {
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Skip events already handled by CodeMirror (e.g. search panel closing),
+      // but not in dialog mode: BaseDialog deliberately calls e.preventDefault()
+      // in onEscapeKeyDown to prevent Radix from self-closing the dialog, while
+      // still relying on HotKeyHandler to dispatch the registered cancelHotkey.
+      if (e.defaultPrevented && currentMode !== 'dialog') {
+        return
+      }
+
+      const target = e.target instanceof HTMLElement ? e.target : null
+      if (target?.closest('.cm-search')) {
+        return
+      }
+
       const comboString = getHotkeyComboFromEvent(e)
 
-      // Always allow Escape
+      // Escape bypasses the button/textarea guard below so it always reaches
+      // the registered hotkey (e.g. closing a dialog or the editor).
       if (comboString !== 'Escape') {
-        // if the focus in on an button or texarea, we don't trigger hotkeys
+        // if the focus is on a button or textarea, we don't trigger hotkeys;
         // this allows normal typing and button interactions
-        // On input fields, we allow hotkeys to function normally
         const activeElement = document.activeElement
         if (
           activeElement &&
