@@ -463,7 +463,7 @@
 
   /* App Layout */
   .app-layout__header {
-    @apply bg-surface fixed z-20 h-[85px] w-full border-b p-4;
+    @apply bg-surface fixed z-20 h-[55px] w-full border-b p-4;
   }
 
   .app-layout__header-inner {
@@ -483,7 +483,11 @@
   }
 
   .app-layout__logo-n-title h2 {
-    @apply text-xl font-bold;
+    @apply text-interface-text text-base font-normal;
+  }
+
+  .app-layout__site-name {
+    @apply text-interface-text pl-2;
   }
 
   .app-layout__logo-image {
@@ -503,15 +507,15 @@
   }
 
   .app-layout__header-spacer {
-    @apply h-[85px] w-full;
+    @apply h-[55px] w-full;
   }
 
   .app-layout__content-wrapper {
-    @apply flex h-[calc(100dvh-85px)];
+    @apply flex h-[calc(100dvh-55px)];
   }
 
   .app-layout__sidebar-container {
-    @apply relative z-20 box-border h-full overflow-auto pr-1 max-sm:fixed max-sm:h-[calc(100dvh-85px)];
+    @apply relative z-20 box-border h-full overflow-auto pr-1 max-sm:fixed max-sm:h-[calc(100dvh-55px)];
   }
 
   .app-layout__sidebar-container--flush {
@@ -535,7 +539,7 @@
   }
 
   .app-layout__sidebar-overlay-mobile {
-    @apply fixed inset-0 top-[85px] z-10 bg-black/50 max-sm:h-[calc(100dvh-85px)];
+    @apply fixed inset-0 top-[55px] z-10 bg-black/50 max-sm:h-[calc(100dvh-55px)];
   }
 
   .app-layout__main-content-area {
@@ -583,7 +587,7 @@
   /** Page 404 **/
 
   .page404-shell {
-    @apply mx-auto w-full max-w-6xl px-8 pt-8;
+    @apply mx-auto w-full max-w-4xl px-8 pt-8;
   }
 
   .page404 {
@@ -1244,7 +1248,7 @@
   }
 
   .page-viewer {
-    @apply mx-auto flex min-h-full w-full max-w-6xl flex-col px-8 pt-3 pb-0;
+    @apply mx-auto flex min-h-full w-full max-w-4xl flex-col px-8 pt-3 pb-0;
   }
 
   .page-viewer__subheader {
@@ -1252,7 +1256,7 @@
   }
 
   .page-viewer__subheader-inner {
-    @apply flex w-full flex-col gap-2 pt-0.75 pr-4 pb-1.25 pl-4 md:h-full md:flex-row md:items-center md:justify-between md:gap-4 md:py-0;
+    @apply mx-auto flex w-full max-w-5xl flex-col gap-2 px-8 pt-0.75 pb-1.25 md:h-full md:flex-row md:items-center md:justify-between md:gap-4 md:py-0;
   }
 
   .page-viewer__subheader-main {
@@ -1276,7 +1280,7 @@
   }
 
   .page-viewer__content {
-    @apply prose prose-base text-page-text dark:prose-invert mt-2 max-w-full flex-1 leading-relaxed;
+    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full flex-1 leading-relaxed;
   }
 
   .page-viewer__metadata {
@@ -2073,7 +2077,7 @@
   }
 
   .settings {
-    @apply mx-auto w-full max-w-6xl px-8 pt-8 pb-4;
+    @apply mx-auto w-full max-w-4xl px-8 pt-8 pb-4;
   }
 
   .settings__title {

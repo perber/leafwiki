@@ -9,10 +9,10 @@ import { PageQuickSwitcherTrigger } from '@/features/page-switcher/PageQuickSwit
 import Progressbar from '@/features/progressbar/Progressbar'
 import Sidebar from '@/features/sidebar/Sidebar'
 import { Toolbar } from '@/features/toolbar/Toolbar'
+import { withBasePath } from '@/lib/routePath'
 import { useAppMode } from '@/lib/useAppMode'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
 import {
   MAX_SIDEBAR_WIDTH,
@@ -209,7 +209,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 ) : (
                   <span className="app-layout__logo-emoji">🌿</span>
                 )}{' '}
-                <span className="max-md:hidden">{siteName}</span>
+                <span className="app-layout__site-name max-md:hidden">
+                  {siteName}
+                </span>
               </Link>
             </h2>
           </div>
