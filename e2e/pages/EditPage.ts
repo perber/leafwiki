@@ -9,6 +9,31 @@ export default class EditPage {
     await this.page.keyboard.type(content);
   }
 
+  async openReplacePanel() {
+    const editor = this.page.locator('.cm-editor');
+    await editor.click();
+    await this.page.keyboard.press('Control+h');
+    await this.page.locator('.cm-search input[main-field="true"]').waitFor({ state: 'visible' });
+  }
+
+  async replaceAll(search: string, replace: string) {
+    const searchInput = this.page.locator('.cm-search input[main-field="true"]');
+    const replaceInput = this.page.locator('.cm-search input[name="replace"]');
+
+    await searchInput.fill(search);
+    await replaceInput.fill(replace);
+    await this.page.locator('.cm-search button[name="replaceAll"]').click();
+  }
+
+  async closeSearchPanelWithEscape() {
+    await this.page.keyboard.press('Escape');
+    await this.page.locator('.cm-search').waitFor({ state: 'hidden' });
+  }
+
+  async expectEditorStillOpen() {
+    await this.page.locator('.cm-editor').waitFor({ state: 'visible' });
+  }
+
   async savePage() {
     const saveButton = this.page.locator('button[data-testid="save-page-button"]');
     await saveButton.waitFor({ state: 'visible' });

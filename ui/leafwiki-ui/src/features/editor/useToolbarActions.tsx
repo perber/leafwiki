@@ -3,6 +3,7 @@
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
+import { closeSearchPanel, searchPanelOpen } from '@codemirror/search'
 import type { EditorView } from '@codemirror/view'
 import { completionStatus } from '@codemirror/autocomplete'
 import { Save, X } from 'lucide-react'
@@ -77,6 +78,18 @@ export function useToolbarActions({
     if (readOnlyMode || appMode !== 'edit') {
       return
     }
+
+    const editorCloseShouldHandle = () => {
+      const view = getEditorView?.()
+      if (!view) return false
+
+      const activeElement = document.activeElement
+      return (
+        view.hasFocus ||
+        (activeElement instanceof Node && view.dom.contains(activeElement))
+      )
+    }
+
     const saveHotKey: HotKeyDefinition = {
       keyCombo: 'Mod+KeyS',
       enabled: true,
@@ -88,9 +101,15 @@ export function useToolbarActions({
       keyCombo: 'Escape',
       enabled: true,
       mode: ['edit'],
+      shouldHandle: editorCloseShouldHandle,
       action: () => {
         const view = getEditorView?.()
         if (view && completionStatus(view.state) !== null) {
+          return
+        }
+
+        if (view && searchPanelOpen(view.state)) {
+          closeSearchPanel(view)
           return
         }
 
@@ -98,17 +117,11 @@ export function useToolbarActions({
       },
     }
 
-    const editorShouldHandle = () => {
-      const view = getEditorView?.()
-      return Boolean(view?.hasFocus)
-    }
-
     const boldHotkey: HotKeyDefinition = {
       keyCombo: 'Mod+KeyB',
       enabled: true,
       mode: ['edit'],
       action: formatBold,
-      shouldHandle: editorShouldHandle,
     }
 
     const italicHotkey: HotKeyDefinition = {
@@ -116,7 +129,6 @@ export function useToolbarActions({
       enabled: true,
       mode: ['edit'],
       action: formatItalic,
-      shouldHandle: editorShouldHandle,
     }
 
     const heading1Hotkey: HotKeyDefinition = {
@@ -124,7 +136,6 @@ export function useToolbarActions({
       enabled: true,
       mode: ['edit'],
       action: () => insertHeading(1),
-      shouldHandle: editorShouldHandle,
     }
 
     const heading2Hotkey: HotKeyDefinition = {
@@ -132,7 +143,6 @@ export function useToolbarActions({
       enabled: true,
       mode: ['edit'],
       action: () => insertHeading(2),
-      shouldHandle: editorShouldHandle,
     }
 
     const heading3Hotkey: HotKeyDefinition = {
@@ -140,7 +150,6 @@ export function useToolbarActions({
       enabled: true,
       mode: ['edit'],
       action: () => insertHeading(3),
-      shouldHandle: editorShouldHandle,
     }
 
     registerHotkey(saveHotKey)

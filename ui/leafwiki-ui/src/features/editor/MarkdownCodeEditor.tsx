@@ -10,12 +10,14 @@ import {
   indentWithTab,
 } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
+import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { Compartment, EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, keymap } from '@codemirror/view'
 import { githubLight } from '@fsegurai/codemirror-theme-github-light'
 import { useEffect, useRef, useState } from 'react'
 import { useDesignModeStore } from '../designtoggle/designmode'
+import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 import type { InternalLinkCompletion } from './internalLinkCompletion'
 import { internalLinkCompletionSource } from './internalLinkCompletion'
 
@@ -28,6 +30,22 @@ type MarkdownCodeEditorProps = {
 
 // CodeMirror uses 80 for the built-in detail slot, so render the path just before it.
 const COMPLETION_PATH_POSITION_BEFORE_DETAIL = 79
+
+function openReplacePanel(view: EditorView) {
+  openSearchPanel(view)
+
+  requestAnimationFrame(() => {
+    if (!view.dom.isConnected) return
+    const replaceField = view.dom.querySelector(
+      '.cm-search input[name="replace"]',
+    ) as HTMLInputElement | null
+
+    replaceField?.focus()
+    replaceField?.select()
+  })
+
+  return true
+}
 
 export default function MarkdownCodeEditor({
   initialValue,
@@ -68,6 +86,51 @@ export default function MarkdownCodeEditor({
 
     const customShortcuts = [
       {
+        key: 'Mod-h',
+        run: openReplacePanel,
+        preventDefault: true,
+      },
+      {
+        key: 'Mod-b',
+        run: (view: EditorView) => {
+          insertWrappedText(view, '**', '**')
+          return true
+        },
+        preventDefault: true,
+      },
+      {
+        key: 'Mod-i',
+        run: (view: EditorView) => {
+          insertWrappedText(view, '_', '_')
+          return true
+        },
+        preventDefault: true,
+      },
+      {
+        key: 'Mod-Alt-1',
+        run: (view: EditorView) => {
+          insertHeadingAtStart(view, 1)
+          return true
+        },
+        preventDefault: true,
+      },
+      {
+        key: 'Mod-Alt-2',
+        run: (view: EditorView) => {
+          insertHeadingAtStart(view, 2)
+          return true
+        },
+        preventDefault: true,
+      },
+      {
+        key: 'Mod-Alt-3',
+        run: (view: EditorView) => {
+          insertHeadingAtStart(view, 3)
+          return true
+        },
+        preventDefault: true,
+      },
+      {
         key: 'Escape',
         run: (view: EditorView) => {
           if (completionStatus(view.state) === null) {
@@ -85,6 +148,9 @@ export default function MarkdownCodeEditor({
       extensions: [
         themeCompartment.of(designMode === 'light' ? githubLight : oneDark),
         markdown(),
+        search({
+          top: true,
+        }),
         autocompletion({
           override: [internalLinkCompletionSource],
           icons: false,
@@ -105,6 +171,7 @@ export default function MarkdownCodeEditor({
         history(),
         keymap.of([
           ...customShortcuts,
+          ...searchKeymap,
           indentWithTab,
           ...historyKeymap,
           ...defaultKeymap,
@@ -132,6 +199,58 @@ export default function MarkdownCodeEditor({
           },
           '.cm-gutters': {
             lineHeight: '1.5',
+          },
+          '.cm-panels': {
+            backgroundColor: 'hsl(var(--surface))',
+            color: 'hsl(var(--interface-text))',
+          },
+          '.cm-panel.cm-search': {
+            borderBottom: '1px solid hsl(var(--surface-border))',
+            padding: '10px 12px 8px',
+            gap: '4px',
+          },
+          '.cm-panel.cm-search [name="close"]': {
+            color: 'hsl(var(--muted-foreground))',
+            cursor: 'pointer',
+          },
+          '.cm-panel.cm-search label': {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+          },
+          '.cm-panel.cm-search input.cm-textfield': {
+            border: '1px solid hsl(var(--surface-border))',
+            borderRadius: '6px',
+            backgroundColor: 'hsl(var(--surface-alt))',
+            color: 'hsl(var(--interface-text))',
+            padding: '6px 8px',
+            minWidth: '140px',
+          },
+          '.cm-panel.cm-search input.cm-textfield:focus': {
+            outline: '2px solid hsl(var(--ring))',
+            outlineOffset: '1px',
+          },
+          '.cm-panel.cm-search button.cm-button': {
+            border: '1px solid hsl(var(--surface-border))',
+            borderRadius: '6px',
+            backgroundColor: 'hsl(var(--surface-alt))',
+            color: 'hsl(var(--interface-text))',
+            padding: '6px 10px',
+            cursor: 'pointer',
+          },
+          '.cm-panel.cm-search button.cm-button:hover': {
+            backgroundColor: 'hsl(var(--accent))',
+          },
+          '.cm-panel.cm-search button.cm-button:disabled': {
+            cursor: 'not-allowed',
+            opacity: '0.6',
+          },
+          '.cm-searchMatch': {
+            backgroundColor: 'hsl(var(--warning) / 0.22)',
+          },
+          '.cm-searchMatch.cm-searchMatch-selected': {
+            backgroundColor: 'hsl(var(--primary) / 0.28)',
           },
           '&.cm-focused': {
             outline: 'none',
