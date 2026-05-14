@@ -15,15 +15,27 @@ type Props = {
   clickable?: boolean
 }
 
+function getTocEntryClassName(level: number) {
+  if (level <= 1) {
+    return 'text-sm font-semibold'
+  }
+
+  if (level === 2) {
+    return 'pl-6 text-sm font-medium text-foreground/90'
+  }
+
+  if (level === 3) {
+    return 'pl-10 text-sm text-muted-foreground'
+  }
+
+  return 'pl-12 text-sm text-muted-foreground'
+}
+
 export function TocDropdownButton({ entries, clickable = true }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1 text-xs font-medium"
-        >
+        <Button variant="outline" size="sm">
           On this page
           <ChevronDown size={12} />
         </Button>
@@ -34,9 +46,8 @@ export function TocDropdownButton({ entries, clickable = true }: Props) {
             <DropdownMenuItem
               key={entry.id}
               className={cn(
-                'cursor-pointer text-sm',
-                entry.level === 2 && 'pl-6',
-                entry.level === 3 && 'pl-10',
+                'cursor-pointer',
+                getTocEntryClassName(entry.level),
               )}
               onSelect={() => {
                 scrollToHeadlineHash(`#${encodeURIComponent(entry.id)}`, {
@@ -49,11 +60,7 @@ export function TocDropdownButton({ entries, clickable = true }: Props) {
           ) : (
             <DropdownMenuItem
               key={entry.id}
-              className={cn(
-                'text-sm',
-                entry.level === 2 && 'pl-6',
-                entry.level === 3 && 'pl-10',
-              )}
+              className={getTocEntryClassName(entry.level)}
             >
               {entry.text}
             </DropdownMenuItem>
