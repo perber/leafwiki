@@ -16,9 +16,7 @@ import { useLinkStatusStore } from '../links/linkstatus_store'
 import { confirmPageRefactor } from '../page/pageRefactorDialog'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import {
-  buildEditorFrontmatter,
   EditorFrontmatterField,
-  parseEditorFrontmatter,
   validateEditorFrontmatterMetadata,
 } from './frontmatter'
 
@@ -47,27 +45,32 @@ interface PageEditorState {
   loadPageData: (path: string) => Promise<void> // load page data by path
 }
 
-const isDirtyState = (s: PageEditorState) => {
-  const {
-    page,
-    title,
-    slug,
-    content,
-    tags,
-    frontmatterFields,
-    frontmatterUnsupported,
-  } = s
+function tagsChanged(current: string[], original: string[]): boolean {
+  if (current.length !== original.length) return true
+  const a = [...current].sort()
+  const b = [...original].sort()
+  return a.some((v, i) => v !== b[i])
+}
+
+function propertiesChanged(
+  fields: EditorFrontmatterField[],
+  original: Record<string, unknown>,
+): boolean {
+  const editable = fields.filter((f) => !f.internal && f.type === 'text')
+  const origKeys = Object.keys(original)
+  if (editable.length !== origKeys.length) return true
+  return editable.some((f) => String(original[f.key] ?? '') !== f.value)
+}
+
+export const isDirtyState = (s: PageEditorState) => {
+  const { page, title, slug, content, tags, frontmatterFields } = s
   if (!page) return false
   return (
     page.title !== title ||
     page.slug !== slug ||
     page.content !== content ||
-    (page.frontmatter ?? '') !==
-      buildEditorFrontmatter({
-        tags,
-        fields: frontmatterFields,
-        unsupportedRaw: frontmatterUnsupported,
-      })
+    tagsChanged(tags, page.tags ?? []) ||
+    propertiesChanged(frontmatterFields, page.properties ?? {})
   )
 }
 
@@ -89,13 +92,11 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   setSlug: (slug) => set({ slug }),
   setContent: (content) => set({ content }),
   setTags: (tags) =>
-    set((state) => ({
-      tags,
-      frontmatterErrors: {
-        ...state.frontmatterErrors,
-        tags: '',
-      },
-    })),
+    set((state) => {
+      const nextErrors = { ...state.frontmatterErrors }
+      delete nextErrors.tags
+      return { tags, frontmatterErrors: nextErrors }
+    }),
   setFrontmatterFields: (frontmatterFields) =>
     set((state) => {
       const nextErrors = { ...state.frontmatterErrors }
@@ -114,15 +115,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   setError: (error) => set({ error }),
   setPage: (page) => set({ page }),
   savePage: async () => {
-    const {
-      page,
-      title,
-      slug,
-      content,
-      tags,
-      frontmatterFields,
-      frontmatterUnsupported,
-    } = get()
+    const { page, title, slug, content, tags, frontmatterFields } = get()
     if (!page || !isDirtyState(get())) return
 
     const frontmatterErrors = validateEditorFrontmatterMetadata(
@@ -134,18 +127,22 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       throw new Error('Please fix metadata errors before saving.')
     }
 
+    const properties: Record<string, string> = {}
+    for (const field of frontmatterFields) {
+      if (!field.internal && field.type === 'text' && field.key) {
+        properties[field.key] = field.value
+      }
+    }
+
     try {
       useProgressbarStore.getState().setLoading(true)
       set({ frontmatterErrors: {} })
       const titleChanged = page.title !== title
       const slugChanged = page.slug !== slug
       const enableLinkRefactor = useConfigStore.getState().enableLinkRefactor
-      const frontmatter = buildEditorFrontmatter({
-        tags,
-        fields: frontmatterFields,
-        unsupportedRaw: frontmatterUnsupported,
-      })
-      const frontmatterChanged = (page.frontmatter ?? '') !== frontmatter
+      const frontmatterChanged =
+        tagsChanged(tags, page.tags ?? []) ||
+        propertiesChanged(frontmatterFields, page.properties ?? {})
 
       let updatedPage: Page | null = null
 
@@ -176,7 +173,8 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
             title,
             slug,
             content,
-            frontmatter,
+            tags,
+            properties,
           )
         }
       } else {
@@ -186,7 +184,8 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
           title,
           slug,
           content,
-          frontmatter,
+          tags,
+          properties,
         )
       }
 
@@ -205,7 +204,8 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         state.page.content = updatedPage.content
         state.page.path = updatedPage.path
         state.page.version = updatedPage.version
-        state.page.frontmatter = updatedPage.frontmatter ?? frontmatter
+        state.page.tags = updatedPage.tags ?? tags
+        state.page.properties = updatedPage.properties ?? properties
 
         return { page: state.page }
       })
@@ -255,7 +255,13 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     useProgressbarStore.getState().setLoading(true)
     try {
       const page = await getPageByPath(path)
-      const parsedFrontmatter = parseEditorFrontmatter(page.frontmatter)
+      const fields: EditorFrontmatterField[] = Object.entries(
+        page.properties ?? {},
+      ).map(([key, value]) => ({
+        key,
+        value: String(value ?? ''),
+        type: 'text' as const,
+      }))
       set({
         page,
         initialPage: { ...page },
@@ -263,9 +269,9 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         title: page.title,
         slug: page.slug,
         content: page.content,
-        tags: parsedFrontmatter.tags,
-        frontmatterFields: parsedFrontmatter.fields,
-        frontmatterUnsupported: parsedFrontmatter.unsupportedRaw,
+        tags: page.tags ?? [],
+        frontmatterFields: fields,
+        frontmatterUnsupported: '',
       })
     } catch (err) {
       if (isPageNotFoundError(err)) {

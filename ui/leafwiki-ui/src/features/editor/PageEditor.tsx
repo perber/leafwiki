@@ -9,8 +9,7 @@ import { toast } from 'sonner'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
 import { PageFrontmatterPanel } from './PageFrontmatterPanel'
-import { buildEditorFrontmatter } from './frontmatter'
-import { usePageEditorStore } from './pageEditor'
+import { isDirtyState, usePageEditorStore } from './pageEditor'
 import useNavigationGuard from './useNavigationGuard'
 import { useToolbarActions } from './useToolbarActions'
 
@@ -39,29 +38,7 @@ export default function PageEditor() {
   const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
   const openNode = useTreeStore((s) => s.openNode)
-  const dirty = usePageEditorStore((s) => {
-    const {
-      page,
-      title,
-      slug,
-      content,
-      tags,
-      frontmatterFields,
-      frontmatterUnsupported,
-    } = s
-    if (!page) return false
-    return (
-      page.title !== title ||
-      page.slug !== slug ||
-      page.content !== content ||
-      (page.frontmatter ?? '') !==
-        buildEditorFrontmatter({
-          tags,
-          fields: frontmatterFields,
-          unsupportedRaw: frontmatterUnsupported,
-        })
-    )
-  })
+  const dirty = usePageEditorStore(isDirtyState)
 
   // Shows Unsaved Changes Dialog when navigating away with dirty state
   useNavigationGuard({
@@ -147,27 +124,9 @@ export default function PageEditor() {
   }, [savePage, forceOverwrite])
 
   const handleClose = useCallback(() => {
-    const {
-      page: currentPage,
-      title: currentTitle,
-      slug: currentSlug,
-      content: currentContent,
-      tags: currentTags,
-      frontmatterFields: currentFrontmatterFields,
-      frontmatterUnsupported: currentFrontmatterUnsupported,
-    } = usePageEditorStore.getState()
-
-    const hasUnsavedChanges = currentPage
-      ? currentPage.title !== currentTitle ||
-        currentPage.slug !== currentSlug ||
-        currentPage.content !== currentContent ||
-        (currentPage.frontmatter ?? '') !==
-          buildEditorFrontmatter({
-            tags: currentTags,
-            fields: currentFrontmatterFields,
-            unsupportedRaw: currentFrontmatterUnsupported,
-          })
-      : false
+    const state = usePageEditorStore.getState()
+    const currentPage = state.page
+    const hasUnsavedChanges = isDirtyState(state)
 
     if (!hasUnsavedChanges) {
       // Saving updates the editor store before React finishes re-rendering.

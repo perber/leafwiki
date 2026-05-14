@@ -1,7 +1,6 @@
 package pages
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -243,12 +242,12 @@ func (r *Routes) handleCreate(c *gin.Context) {
 func (r *Routes) handleUpdate(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	var req struct {
-		Version    string                 `json:"version" binding:"required"`
-		Title      string                 `json:"title" binding:"required"`
-		Slug       string                 `json:"slug" binding:"required"`
-		Content    *string                `json:"content"`
-		Tags       []string               `json:"tags"`
-		Properties map[string]interface{} `json:"properties"`
+		Version    string            `json:"version" binding:"required"`
+		Title      string            `json:"title" binding:"required"`
+		Slug       string            `json:"slug" binding:"required"`
+		Content    *string           `json:"content"`
+		Tags       []string          `json:"tags"`
+		Properties map[string]string `json:"properties"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
@@ -262,15 +261,46 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 	if user == nil {
 		return
 	}
+
+	contentToSave := req.Content
+	fromImport := false
+	if req.Content != nil {
+		extraFields := buildExtraFields(req.Tags, req.Properties)
+		combined, err := markdown.BuildMarkdownWithExtraFrontmatter(extraFields, *req.Content)
+		if err != nil {
+			respondWithPageStatusError(c, http.StatusInternalServerError, ErrCodePageInternalError, "Failed to build frontmatter", "failed to build frontmatter")
+			return
+		}
+		contentToSave = &combined
+		fromImport = true
+	}
+
 	kind := tree.NodeKindPage
 	out, err := r.updatePage.Execute(c.Request.Context(), UpdatePageInput{
-		UserID: user.ID, ID: id, Version: req.Version, Title: req.Title, Slug: req.Slug, Content: req.Content, Kind: &kind,
+		UserID: user.ID, ID: id, Version: req.Version, Title: req.Title, Slug: req.Slug,
+		Content: contentToSave, Kind: &kind, FromImport: fromImport,
 	})
 	if err != nil {
 		respondWithPageError(c, err)
 		return
 	}
 	r.respondPage(c, http.StatusOK, out.Page)
+}
+
+func buildExtraFields(tags []string, properties map[string]string) map[string]interface{} {
+	extra := make(map[string]interface{}, len(properties)+1)
+	for k, v := range properties {
+		extra[k] = v
+	}
+	normalizedTags := normalizeTagInputs(tags)
+	if len(normalizedTags) > 0 {
+		list := make([]interface{}, len(normalizedTags))
+		for i, t := range normalizedTags {
+			list[i] = t
+		}
+		extra["tags"] = list
+	}
+	return extra
 }
 
 func (r *Routes) handleDelete(c *gin.Context) {
@@ -486,7 +516,7 @@ func (r *Routes) enrichPageMetadata(page *dto.Page) {
 	}
 
 	page.Tags = []string{}
-	page.Properties = map[string]interface{}{}
+	page.Properties = map[string]string{}
 
 	raw, err := r.treeService.ReadPageRaw(page.ID)
 	if err != nil {
@@ -503,16 +533,40 @@ func (r *Routes) enrichPageMetadata(page *dto.Page) {
 	page.Properties = properties
 }
 
-func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]interface{}) {
-	tags := []string{}
-	properties := map[string]interface{}{}
+var reservedPropertyKeys = map[string]struct{}{
+	"tags":  {},
+	"title": {},
+}
 
-	for key, value := range fields {
-		if strings.EqualFold(strings.TrimSpace(key), "tags") {
+func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]string) {
+	tags := []string{}
+	properties := map[string]string{}
+
+	for rawKey, value := range fields {
+		key := strings.TrimSpace(rawKey)
+		lower := strings.ToLower(key)
+
+		if lower == "tags" {
 			tags = normalizeMetadataTags(value)
 			continue
 		}
-		properties[key] = value
+
+		if _, reserved := reservedPropertyKeys[lower]; reserved {
+			continue
+		}
+		if strings.HasPrefix(lower, "leafwiki_") {
+			continue
+		}
+
+		s, ok := value.(string)
+		if !ok {
+			continue
+		}
+		s = strings.TrimSpace(s)
+		if s == "" || strings.ContainsRune(s, '\n') {
+			continue
+		}
+		properties[key] = s
 	}
 
 	return tags, properties
@@ -524,30 +578,38 @@ func normalizeMetadataTags(value interface{}) []string {
 		return []string{}
 	}
 
-	result := make([]string, 0, len(list))
-	seen := make(map[string]struct{}, len(list))
-
+	rawTags := make([]string, 0, len(list))
 	for _, item := range list {
 		tag, ok := item.(string)
 		if !ok {
 			continue
 		}
-		trimmed := strings.TrimSpace(tag)
-		if trimmed == "" {
+		rawTags = append(rawTags, tag)
+	}
+
+	return normalizeTagInputs(rawTags)
+}
+
+func normalizeTagInputs(tags []string) []string {
+	seen := make(map[string]struct{}, len(tags))
+	result := make([]string, 0, len(tags))
+
+	for _, tag := range tags {
+		normalized := strings.ToLower(strings.TrimSpace(tag))
+		if normalized == "" {
 			continue
 		}
-		key := strings.ToLower(trimmed)
-		if _, exists := seen[key]; exists {
+		if _, exists := seen[normalized]; exists {
 			continue
 		}
-		seen[key] = struct{}{}
-		result = append(result, trimmed)
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
 	}
 
 	return result
 }
 
-func validatePageMetadataInput(tags []string, properties map[string]interface{}) error {
+func validatePageMetadataInput(tags []string, properties map[string]string) error {
 	ve := sharederrors.NewValidationErrors()
 	seenTags := map[string]struct{}{}
 
@@ -570,7 +632,7 @@ func validatePageMetadataInput(tags []string, properties map[string]interface{})
 		seenTags[key] = struct{}{}
 	}
 
-	for rawKey, value := range properties {
+	for rawKey := range properties {
 		key := strings.TrimSpace(rawKey)
 		field := "properties." + rawKey
 		switch {
@@ -582,10 +644,6 @@ func validatePageMetadataInput(tags []string, properties map[string]interface{})
 			ve.Add(field, "Property key uses a reserved prefix")
 		case strings.ToLower(key) == "tags" || strings.ToLower(key) == "title":
 			ve.Add(field, "Property key is reserved")
-		default:
-			if err := validatePropertyValue(value); err != nil {
-				ve.Add(field, err.Error())
-			}
 		}
 	}
 
@@ -594,31 +652,6 @@ func validatePageMetadataInput(tags []string, properties map[string]interface{})
 	}
 
 	return nil
-}
-
-func validatePropertyValue(value interface{}) error {
-	switch typed := value.(type) {
-	case nil, string, bool, float64:
-		return nil
-	case []interface{}:
-		for _, item := range typed {
-			if err := validatePropertyListItem(item); err != nil {
-				return err
-			}
-		}
-		return nil
-	default:
-		return errors.New("Property value must be a string, number, boolean, or flat list")
-	}
-}
-
-func validatePropertyListItem(value interface{}) error {
-	switch value.(type) {
-	case nil, string, bool, float64:
-		return nil
-	default:
-		return errors.New("Property value must be a string, number, boolean, or flat list")
-	}
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

@@ -34,13 +34,14 @@ func (s *TagsService) IndexAllPages() error {
 		return err
 	}
 
-	pages, errs := s.tree.GetPages(ids)
-	for i, page := range pages {
-		if errs[i] != nil {
-			return errs[i]
+	for _, id := range ids {
+		raw, err := s.tree.ReadPageRaw(id)
+		if err != nil {
+			return err
 		}
-		tags := ExtractTagsFromContent(page.Content)
-		if err := s.store.SetTagsForPage(page.ID, tags); err != nil {
+
+		tags := ExtractTagsFromContent(raw)
+		if err := s.store.SetTagsForPage(id, tags); err != nil {
 			return err
 		}
 	}
@@ -58,6 +59,10 @@ func (s *TagsService) DeleteTagsForPage(pageID string) error {
 
 func (s *TagsService) GetAllTags(filter string, limit int) ([]TagCount, error) {
 	return s.store.GetAllTags(filter, limit)
+}
+
+func (s *TagsService) GetAllTagsForSelection(filter string, selected []string, limit int) ([]TagCount, error) {
+	return s.store.GetAllTagsForSelection(filter, selected, limit)
 }
 
 func (s *TagsService) GetPageIDsByTags(tags []string) ([]string, error) {

@@ -11,8 +11,8 @@ import (
 )
 
 type TagsStore struct {
-	mu  sync.Mutex
-	db  *sql.DB
+	mu sync.Mutex
+	db *sql.DB
 }
 
 type TagCount struct {
@@ -134,6 +134,65 @@ func (s *TagsStore) GetAllTags(filter string, limit int) ([]TagCount, error) {
 	return result, rows.Err()
 }
 
+// GetAllTagsForSelection returns suggestion tags with counts for pages that
+// already match all selected tags. Selected tags themselves are excluded from
+// the result set so the caller only gets additive suggestions.
+func (s *TagsStore) GetAllTagsForSelection(filter string, selected []string, limit int) ([]TagCount, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(selected) == 0 {
+		return s.getAllTagsLocked(filter, limit)
+	}
+
+	filterArg := escapeLikePrefix(filter)
+	selectionPlaceholders := strings.TrimRight(strings.Repeat("?,", len(selected)), ",")
+	args := make([]any, 0, len(selected)*2+2)
+	for _, tag := range selected {
+		args = append(args, tag)
+	}
+	args = append(args, len(selected), filterArg)
+	for _, tag := range selected {
+		args = append(args, tag)
+	}
+
+	query := fmt.Sprintf(`
+		WITH matching_pages AS (
+			SELECT page_id
+			FROM page_tags
+			WHERE tag IN (%s)
+			GROUP BY page_id
+			HAVING COUNT(DISTINCT tag) = ?
+		)
+		SELECT pt.tag, COUNT(DISTINCT pt.page_id) AS count
+		FROM page_tags pt
+		JOIN matching_pages mp ON mp.page_id = pt.page_id
+		WHERE pt.tag LIKE ? || '%%' ESCAPE '\'
+		  AND pt.tag NOT IN (%s)
+		GROUP BY pt.tag
+		ORDER BY count DESC, tag ASC
+	`, selectionPlaceholders, selectionPlaceholders)
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []TagCount
+	for rows.Next() {
+		var tc TagCount
+		if err := rows.Scan(&tc.Tag, &tc.Count); err != nil {
+			return nil, err
+		}
+		result = append(result, tc)
+	}
+	return result, rows.Err()
+}
+
 // GetPageIDsByTags returns page IDs that have ALL of the given tags (AND logic).
 func (s *TagsStore) GetPageIDsByTags(tags []string) ([]string, error) {
 	s.mu.Lock()
@@ -171,6 +230,35 @@ func (s *TagsStore) GetPageIDsByTags(tags []string) ([]string, error) {
 		pageIDs = append(pageIDs, id)
 	}
 	return pageIDs, rows.Err()
+}
+
+func (s *TagsStore) getAllTagsLocked(filter string, limit int) ([]TagCount, error) {
+	query := `
+		SELECT tag, COUNT(DISTINCT page_id) AS count
+		FROM page_tags
+		WHERE tag LIKE ? || '%' ESCAPE '\'
+		GROUP BY tag
+		ORDER BY count DESC, tag ASC
+	`
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := s.db.Query(query, escapeLikePrefix(filter))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []TagCount
+	for rows.Next() {
+		var tc TagCount
+		if err := rows.Scan(&tc.Tag, &tc.Count); err != nil {
+			return nil, err
+		}
+		result = append(result, tc)
+	}
+	return result, rows.Err()
 }
 
 // GetTagsForPages returns a map of pageID → tags for the given page IDs.

@@ -1559,32 +1559,22 @@ func TestUpdatePageEndpoint(t *testing.T) {
 	}
 }
 
-func TestUpdatePageEndpoint_AcceptsTagsAndPropertiesWithoutPersisting(t *testing.T) {
+func TestUpdatePageEndpoint_WritesTagsAndStringProperties(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	page := createPageViaAPI(t, router, "Original Title", "original-title", nil, pageNodeKind())
-	writePageMarkdownForTest(t, w, page, `---
-leafwiki_id: `+page.ID+`
-leafwiki_title: Original Title
-tags:
-  - existing
-status: draft
----
-# Original
-`)
 
 	payload := map[string]interface{}{
 		"version": page.Version,
 		"title":   "Updated Title",
 		"slug":    "updated-title",
-		"content": "# Updated Content\nWith **Markdown** support.",
-		"tags":    []string{"new-tag", "another-tag"},
-		"properties": map[string]interface{}{
-			"priority":  2,
-			"published": true,
-			"owners":    []string{"alice", "bob"},
+		"content": "# Updated Content",
+		"tags":    []string{"React", "TypeScript"},
+		"properties": map[string]string{
+			"status": "published",
+			"author": "alice",
 		},
 	}
 	body, _ := json.Marshal(payload)
@@ -1594,21 +1584,9 @@ status: draft
 		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
 	}
 
-	var updated apiPage
-	if err := json.Unmarshal(rec.Body.Bytes(), &updated); err != nil {
-		t.Fatalf("Invalid JSON response: %v", err)
-	}
-
-	if len(updated.Tags) != 1 || updated.Tags[0] != "existing" {
-		t.Fatalf("expected response tags to reflect persisted state, got %#v", updated.Tags)
-	}
-	if got := updated.Properties["status"]; got != "draft" {
-		t.Fatalf("expected response properties to reflect persisted state, got %#v", updated.Properties)
-	}
-
 	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID, nil)
 	if getRec.Code != http.StatusOK {
-		t.Fatalf("Expected 200 OK on get, got %d - %s", getRec.Code, getRec.Body.String())
+		t.Fatalf("Expected 200 OK on get, got %d", getRec.Code)
 	}
 
 	var fetched apiPage
@@ -1616,11 +1594,155 @@ status: draft
 		t.Fatalf("Invalid get response JSON: %v", err)
 	}
 
-	if len(fetched.Tags) != 1 || fetched.Tags[0] != "existing" {
-		t.Fatalf("expected tags not to persist yet, got %#v", fetched.Tags)
+	if len(fetched.Tags) != 2 {
+		t.Fatalf("expected 2 tags, got %#v", fetched.Tags)
 	}
-	if _, exists := fetched.Properties["priority"]; exists {
-		t.Fatalf("expected request properties not to persist yet, got %#v", fetched.Properties)
+	if fetched.Tags[0] != "react" || fetched.Tags[1] != "typescript" {
+		t.Fatalf("expected lowercase normalized tags, got %#v", fetched.Tags)
+	}
+	if fetched.Properties["status"] != "published" {
+		t.Fatalf("expected status=published, got %#v", fetched.Properties)
+	}
+	if fetched.Properties["author"] != "alice" {
+		t.Fatalf("expected author=alice, got %#v", fetched.Properties)
+	}
+}
+
+func TestUpdatePageEndpoint_IndexesTagsForTagsEndpoint(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	page := createPageViaAPI(t, router, "Original Title", "original-title", nil, pageNodeKind())
+
+	payload := map[string]interface{}{
+		"version": page.Version,
+		"title":   "Updated Title",
+		"slug":    "updated-title",
+		"content": "# Updated Content",
+		"tags":    []string{"react", "typescript"},
+	}
+	body, _ := json.Marshal(payload)
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	tagsRec := authenticatedRequest(t, router, http.MethodGet, "/api/tags?q=react&limit=20", nil)
+	if tagsRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from tags endpoint, got %d - %s", tagsRec.Code, tagsRec.Body.String())
+	}
+
+	var tagsResp []map[string]interface{}
+	if err := json.Unmarshal(tagsRec.Body.Bytes(), &tagsResp); err != nil {
+		t.Fatalf("Invalid tags response JSON: %v", err)
+	}
+
+	if len(tagsResp) == 0 {
+		t.Fatalf("expected indexed tags, got empty response")
+	}
+	if tagsResp[0]["tag"] != "react" {
+		t.Fatalf("expected first indexed tag to be react, got %#v", tagsResp)
+	}
+}
+
+func TestGetTagsEndpoint_CountsSuggestionsWithinSelectedTags(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	pageA := createPageViaAPI(t, router, "Page A", "page-a", nil, pageNodeKind())
+	pageB := createPageViaAPI(t, router, "Page B", "page-b", nil, pageNodeKind())
+	pageC := createPageViaAPI(t, router, "Page C", "page-c", nil, pageNodeKind())
+
+	updatePageTags := func(page *apiPage, title, slug string, tags []string) {
+		payload := map[string]interface{}{
+			"version": page.Version,
+			"title":   title,
+			"slug":    slug,
+			"content": "# Content",
+			"tags":    tags,
+		}
+		body, _ := json.Marshal(payload)
+		rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(body)))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	updatePageTags(pageA, "Page A", "page-a", []string{"react", "typescript"})
+	updatePageTags(pageB, "Page B", "page-b", []string{"react", "testing"})
+	updatePageTags(pageC, "Page C", "page-c", []string{"react", "typescript"})
+
+	tagsRec := authenticatedRequest(t, router, http.MethodGet, "/api/tags?q=t&limit=20&selected=react", nil)
+	if tagsRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from tags endpoint, got %d - %s", tagsRec.Code, tagsRec.Body.String())
+	}
+
+	var tagsResp []map[string]interface{}
+	if err := json.Unmarshal(tagsRec.Body.Bytes(), &tagsResp); err != nil {
+		t.Fatalf("Invalid tags response JSON: %v", err)
+	}
+
+	if len(tagsResp) != 2 {
+		t.Fatalf("expected 2 suggestion tags, got %#v", tagsResp)
+	}
+	if tagsResp[0]["tag"] != "typescript" || tagsResp[0]["count"] != float64(2) {
+		t.Fatalf("expected first suggestion to be typescript with count 2, got %#v", tagsResp[0])
+	}
+	if tagsResp[1]["tag"] != "testing" || tagsResp[1]["count"] != float64(1) {
+		t.Fatalf("expected second suggestion to be testing with count 1, got %#v", tagsResp[1])
+	}
+}
+
+func TestGetPagesByTagsEndpoint_ReturnsExcerpt(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	page := createPageViaAPI(t, router, "Excerpt Page", "excerpt-page", nil, pageNodeKind())
+
+	payload := map[string]interface{}{
+		"version": page.Version,
+		"title":   "Excerpt Page",
+		"slug":    "excerpt-page",
+		"content": "# Heading\n\nThis is a tagged page with useful excerpt text and a [link](/docs) inside the content.",
+		"tags":    []string{"react"},
+	}
+	body, _ := json.Marshal(payload)
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	pagesRec := authenticatedRequest(t, router, http.MethodGet, "/api/tags/pages?tags=react", nil)
+	if pagesRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from tags pages endpoint, got %d - %s", pagesRec.Code, pagesRec.Body.String())
+	}
+
+	var pagesResp []map[string]interface{}
+	if err := json.Unmarshal(pagesRec.Body.Bytes(), &pagesResp); err != nil {
+		t.Fatalf("Invalid pages response JSON: %v", err)
+	}
+
+	if len(pagesResp) != 1 {
+		t.Fatalf("expected 1 tagged page, got %#v", pagesResp)
+	}
+
+	excerpt, _ := pagesResp[0]["excerpt"].(string)
+	if excerpt == "" {
+		t.Fatalf("expected excerpt to be present, got %#v", pagesResp[0])
+	}
+	if strings.Contains(excerpt, "#") {
+		t.Fatalf("expected excerpt without markdown heading markers, got %q", excerpt)
+	}
+	if strings.Contains(excerpt, "[link]") {
+		t.Fatalf("expected excerpt without markdown link syntax, got %q", excerpt)
+	}
+	if !strings.Contains(excerpt, "This is a tagged page with useful excerpt text") {
+		t.Fatalf("expected excerpt to contain page text, got %q", excerpt)
 	}
 }
 
@@ -1742,11 +1864,8 @@ func TestUpdatePage_InvalidProperties(t *testing.T) {
 		"title":   "Updated Title",
 		"slug":    "updated-title",
 		"content": "Updated content",
-		"properties": map[string]interface{}{
+		"properties": map[string]string{
 			"leafwiki_hidden": "forbidden",
-			"nested": map[string]interface{}{
-				"not": "allowed",
-			},
 		},
 	}
 	body, _ := json.Marshal(payload)
@@ -1778,9 +1897,6 @@ func TestUpdatePage_InvalidProperties(t *testing.T) {
 
 	if gotFields["properties.leafwiki_hidden"] != "Property key uses a reserved prefix" {
 		t.Fatalf("expected reserved prefix validation error, got %#v", gotFields)
-	}
-	if gotFields["properties.nested"] != "Property value must be a string, number, boolean, or flat list" {
-		t.Fatalf("expected nested property validation error, got %#v", gotFields)
 	}
 }
 
@@ -1836,15 +1952,19 @@ Body
 		t.Fatalf("Expected tags in response, got %#v", resp["tags"])
 	}
 
+	// Only string scalar properties are returned; numbers, booleans, and lists are excluded.
 	propertiesValue, ok := resp["properties"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("Expected properties in response, got %#v", resp["properties"])
+		t.Fatalf("Expected properties map in response, got %#v", resp["properties"])
 	}
-	if propertiesValue["priority"] != float64(2) {
-		t.Fatalf("Expected numeric property in response, got %#v", propertiesValue)
+	if _, exists := propertiesValue["priority"]; exists {
+		t.Fatalf("Numeric property must not be returned, got %#v", propertiesValue)
 	}
-	if propertiesValue["published"] != true {
-		t.Fatalf("Expected boolean property in response, got %#v", propertiesValue)
+	if _, exists := propertiesValue["published"]; exists {
+		t.Fatalf("Boolean property must not be returned, got %#v", propertiesValue)
+	}
+	if _, exists := propertiesValue["owners"]; exists {
+		t.Fatalf("List property must not be returned, got %#v", propertiesValue)
 	}
 }
 

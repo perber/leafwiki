@@ -20,7 +20,7 @@ export type ParsedEditorFrontmatter = {
 export type EditorFrontmatterValidationErrors = Record<string, string>
 
 function normalizeTag(tag: string) {
-  return tag.trim()
+  return tag.trim().toLocaleLowerCase()
 }
 
 function normalizeFieldKey(key: string) {

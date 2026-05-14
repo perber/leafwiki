@@ -282,8 +282,8 @@ func (w *Wiki) newPageOrchestrator() *pagesave.PageSaveOrchestrator {
 	return pagesave.NewPageSaveOrchestrator(
 		pagesave.NewLinkIndexSideEffect(w.links, w.log),
 		pagesave.NewRevisionSideEffect(w.revision, w.log),
-		pagesave.NewTagsSideEffect(w.tags, w.log),
-		pagesave.NewPropertiesSideEffect(w.props, w.log),
+		pagesave.NewTagsSideEffect(w.tags, w.tree, w.log),
+		pagesave.NewPropertiesSideEffect(w.props, w.tree, w.log),
 	)
 }
 

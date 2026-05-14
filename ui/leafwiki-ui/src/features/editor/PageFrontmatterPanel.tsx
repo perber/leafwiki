@@ -1,3 +1,4 @@
+import TagInputWithSuggestions from '@/components/TagInputWithSuggestions'
 import {
   Accordion,
   AccordionContent,
@@ -6,8 +7,8 @@ import {
 } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ChevronDown, ChevronRight, Plus, Tag, Trash2, X } from 'lucide-react'
-import { KeyboardEvent, useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Plus, Tag, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { EditorFrontmatterField } from './frontmatter'
 
 type PageFrontmatterPanelProps = {
@@ -17,10 +18,6 @@ type PageFrontmatterPanelProps = {
   hasUnsupportedFields: boolean
   onTagsChange: (tags: string[]) => void
   onFieldsChange: (fields: EditorFrontmatterField[]) => void
-}
-
-function normalizeTag(tag: string) {
-  return tag.trim()
 }
 
 function buildEmptyField(): EditorFrontmatterField {
@@ -51,17 +48,15 @@ export function PageFrontmatterPanel({
   onTagsChange,
   onFieldsChange,
 }: PageFrontmatterPanelProps) {
-  const [tagDraft, setTagDraft] = useState('')
   const [showInternalFields, setShowInternalFields] = useState(false)
 
   const normalizedTags = useMemo(() => {
     const seen = new Set<string>()
     return tags.filter((tag) => {
-      const normalized = normalizeTag(tag)
+      const normalized = tag.trim().toLocaleLowerCase()
       if (!normalized) return false
-      const key = normalized.toLocaleLowerCase()
-      if (seen.has(key)) return false
-      seen.add(key)
+      if (seen.has(normalized)) return false
+      seen.add(normalized)
       return true
     })
   }, [tags])
@@ -100,26 +95,6 @@ export function PageFrontmatterPanel({
     }
 
     onFieldsChange(merged)
-  }
-
-  const commitTag = (value: string) => {
-    const normalized = normalizeTag(value)
-    if (!normalized) return
-    const exists = normalizedTags.some(
-      (tag) => tag.toLocaleLowerCase() === normalized.toLocaleLowerCase(),
-    )
-    if (exists) return
-    onTagsChange([...normalizedTags, normalized])
-  }
-
-  const handleTagKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter' && event.key !== ',') {
-      return
-    }
-
-    event.preventDefault()
-    commitTag(tagDraft)
-    setTagDraft('')
   }
 
   const updateField = (
@@ -165,15 +140,19 @@ export function PageFrontmatterPanel({
           value="metadata"
           className="page-frontmatter-panel__item"
         >
-          <AccordionTrigger className="page-frontmatter-panel__trigger">
+          <AccordionTrigger
+            className={`page-frontmatter-panel__trigger${hasErrors ? 'page-frontmatter-panel__trigger--has-errors' : ''}`}
+          >
             <div className="page-frontmatter-panel__topline">
               <div
-                className={`page-frontmatter-panel__title-row${hasErrors ? ' page-frontmatter-panel__title-row--has-errors' : ''}`}
+                className={`page-frontmatter-panel__title-row${hasErrors ? 'page-frontmatter-panel__title-row--has-errors' : ''}`}
               >
                 <Tag className="page-frontmatter-panel__title-icon" size={14} />
                 <span className="page-frontmatter-panel__title">Metadata</span>
               </div>
-              <span className="page-frontmatter-panel__summary">
+              <span
+                className={`page-frontmatter-panel__summary${hasErrors ? 'page-frontmatter-panel__summary--has-errors' : ''}`}
+              >
                 {summaryParts.join(' • ')}
               </span>
             </div>
@@ -185,39 +164,13 @@ export function PageFrontmatterPanel({
                   Tags
                 </div>
                 <div className="page-frontmatter-panel__tags-field">
-                  <div className="page-frontmatter-panel__tags-inline">
-                    {normalizedTags.map((tag) => (
-                      <span key={tag} className="page-frontmatter-panel__chip">
-                        <span>{tag}</span>
-                        <button
-                          type="button"
-                          className="page-frontmatter-panel__chip-remove"
-                          onClick={() =>
-                            onTagsChange(
-                              normalizedTags.filter(
-                                (current) => current !== tag,
-                              ),
-                            )
-                          }
-                          aria-label={`Remove tag ${tag}`}
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-                    <Input
-                      value={tagDraft}
-                      onChange={(event) => setTagDraft(event.target.value)}
-                      onKeyDown={handleTagKeyDown}
-                      onBlur={() => {
-                        commitTag(tagDraft)
-                        setTagDraft('')
-                      }}
-                      placeholder="Add tag"
-                      className={`page-frontmatter-panel__tag-input${errors.tags ? ' page-frontmatter-panel__input--error' : ''}`}
-                      data-testid="page-frontmatter-tag-input"
-                    />
-                  </div>
+                  <TagInputWithSuggestions
+                    tags={normalizedTags}
+                    onTagsChange={onTagsChange}
+                    placeholder="Add tag"
+                    variant="metadata"
+                    inputTestId="page-frontmatter-tag-input"
+                  />
                   {errors.tags ? (
                     <p
                       className="page-frontmatter-panel__error"
@@ -248,7 +201,7 @@ export function PageFrontmatterPanel({
                                   })
                                 }
                                 placeholder="Key"
-                                className={`page-frontmatter-panel__field-key${errors[`properties.${index}.key`] ? ' page-frontmatter-panel__input--error' : ''}`}
+                                className={`page-frontmatter-panel__field-key${errors[`properties.${index}.key`] ? 'page-frontmatter-panel__input--error' : ''}`}
                                 data-testid={`page-frontmatter-field-key-${index}`}
                               />
                               <Input
@@ -261,7 +214,7 @@ export function PageFrontmatterPanel({
                                   })
                                 }
                                 placeholder="Value"
-                                className={`page-frontmatter-panel__field-value${errors[`properties.${index}.value`] ? ' page-frontmatter-panel__input--error' : ''}`}
+                                className={`page-frontmatter-panel__field-value${errors[`properties.${index}.value`] ? 'page-frontmatter-panel__input--error' : ''}`}
                                 data-testid={`page-frontmatter-field-value-${index}`}
                               />
                               <button

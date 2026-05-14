@@ -228,7 +228,7 @@ func createPageWithContent(t *testing.T, ts *tree.TreeService, title, slug, cont
 	if err != nil {
 		t.Fatalf("CreateNode %q: %v", slug, err)
 	}
-	if err := ts.UpdateNode("system", *idPtr, title, slug, &content, tree.VersionUnchecked, false); err != nil {
+	if err := ts.UpdateNode("system", *idPtr, title, slug, &content, tree.VersionUnchecked, true); err != nil {
 		t.Fatalf("UpdateNode %q: %v", slug, err)
 	}
 	return *idPtr
@@ -343,6 +343,31 @@ func TestPropertiesService_IndexAllPages_PagesWithoutPropertiesAreSkipped(t *tes
 	}
 	if len(keys) != 0 {
 		t.Errorf("expected no keys for page without properties, got %v", keys)
+	}
+}
+
+func TestPropertiesService_IndexAllPages_ReadsPropertiesFromRawFrontmatter(t *testing.T) {
+	svc, ts := setupPropertiesService(t)
+	pageID := createPageWithContent(t, ts, "Page A", "page-a", "---\nstatus: draft\n---\n# A")
+
+	page, err := ts.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage: %v", err)
+	}
+	if got := ExtractPropertiesFromContent(page.Content); got != nil {
+		t.Fatalf("expected parsed page content to exclude frontmatter properties, got %v", got)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages: %v", err)
+	}
+
+	ids, err := svc.GetPageIDsByProperty("status", "draft")
+	if err != nil {
+		t.Fatalf("GetPageIDsByProperty: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != pageID {
+		t.Fatalf("expected [%s], got %v", pageID, ids)
 	}
 }
 

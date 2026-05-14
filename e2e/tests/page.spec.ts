@@ -135,6 +135,83 @@ async function createPageWithContent(
   }, input);
 }
 
+async function createPageWithMetadata(
+  page: import('@playwright/test').Page,
+  input: {
+    title: string;
+    slug: string;
+    content: string;
+    tags?: string[];
+    properties?: Record<string, string>;
+  },
+) {
+  await page.evaluate(async ({ title, slug, content, tags, properties }) => {
+    function getCsrfTokenFromCookie(): string | null {
+      const hostMatch =
+        document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+        document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
+
+      if (!hostMatch) return null;
+
+      try {
+        return decodeURIComponent(hostMatch[1]);
+      } catch {
+        return hostMatch[1];
+      }
+    }
+
+    const csrfToken = getCsrfTokenFromCookie();
+    if (!csrfToken) {
+      throw new Error('Missing CSRF token cookie for test page setup');
+    }
+
+    const createResponse = await fetch('/api/pages', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({
+        parentId: null,
+        title,
+        slug,
+        kind: 'page',
+      }),
+    });
+
+    if (!createResponse.ok) {
+      throw new Error(`Failed to create page ${slug}: ${createResponse.status}`);
+    }
+
+    const createdPage = (await createResponse.json()) as {
+      id: string;
+      version: string;
+    };
+
+    const updateResponse = await fetch(`/api/pages/${createdPage.id}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({
+        version: createdPage.version,
+        title,
+        slug,
+        content,
+        tags: tags ?? [],
+        properties: properties ?? {},
+      }),
+    });
+
+    if (!updateResponse.ok) {
+      throw new Error(`Failed to update page ${slug}: ${updateResponse.status}`);
+    }
+  }, input);
+}
+
 async function updatePageByPath(
   page: import('@playwright/test').Page,
   input: { path: string; title?: string; slug?: string; content: string },
@@ -461,6 +538,54 @@ test.describe('Authenticated', () => {
     await page.locator('[data-testid="edit-page-metadata-dialog"]').waitFor({
       state: 'hidden',
     });
+  });
+
+  test('tags-panel-suggests-tags-and-lists-matching-pages', async ({ page }) => {
+    const stamp = Date.now();
+    const matchingTag = `e2e-tags-${stamp}`;
+    const otherTag = `e2e-other-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: `Tags Match A ${stamp}`,
+      slug: `tags-match-a-${stamp}`,
+      content: 'First page for tags panel.',
+      tags: [matchingTag],
+    });
+    await createPageWithMetadata(page, {
+      title: `Tags Match B ${stamp}`,
+      slug: `tags-match-b-${stamp}`,
+      content: 'Second page for tags panel.',
+      tags: [matchingTag],
+    });
+    await createPageWithMetadata(page, {
+      title: `Tags Other ${stamp}`,
+      slug: `tags-other-${stamp}`,
+      content: 'Page with different tag.',
+      tags: [otherTag],
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto('/');
+    await viewPage.switchToTagsTab();
+
+    const searchInput = page.getByTestId('tags-search-input');
+    await searchInput.fill(`e2e-tags-${stamp}`);
+
+    const suggestion = page.getByTestId(`tags-suggestion-${matchingTag}`);
+    await suggestion.waitFor({ state: 'visible' });
+    await suggestion.click();
+
+    await expect(page.getByTestId(`tags-selected-chip-${matchingTag}`)).toBeVisible();
+    await expect(page.getByTestId('tags-results-list')).toBeVisible();
+    await expect(
+      page.locator('.browse-results__item-title').filter({ hasText: `Tags Match A ${stamp}` }),
+    ).toBeVisible();
+    await expect(
+      page.locator('.browse-results__item-title').filter({ hasText: `Tags Match B ${stamp}` }),
+    ).toBeVisible();
+    await expect(
+      page.locator('.browse-results__item-title').filter({ hasText: `Tags Other ${stamp}` }),
+    ).toHaveCount(0);
   });
 
   test('permalink-dialog-shows-shareable-url-and-resolves-after-move', async ({

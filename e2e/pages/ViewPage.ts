@@ -310,4 +310,12 @@ export default class ViewPage {
       state: 'visible',
     });
   }
+
+  async switchToTagsTab() {
+    const tagsTabButton = this.page.locator('button[data-testid="sidebar-tags-tab-button"]');
+    await tagsTabButton.click();
+    await this.page.locator('input[data-testid="tags-search-input"]').waitFor({
+      state: 'visible',
+    });
+  }
 }

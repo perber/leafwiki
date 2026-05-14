@@ -18,6 +18,7 @@ type TaggedPage struct {
 	ID           string          `json:"id"`
 	Title        string          `json:"title"`
 	Path         string          `json:"path"`
+	Excerpt      string          `json:"excerpt,omitempty"`
 	Tags         []string        `json:"tags"`
 	CreatedAt    string          `json:"createdAt,omitempty"`
 	UpdatedAt    string          `json:"updatedAt,omitempty"`
@@ -27,7 +28,7 @@ type TaggedPage struct {
 }
 
 // ToTaggedPage builds a TaggedPage from a PageNode, its tags, and an optional user resolver.
-func ToTaggedPage(node *tree.PageNode, pageTags []string, userResolver *auth.UserResolver) *TaggedPage {
+func ToTaggedPage(node *tree.PageNode, pageTags []string, excerpt string, userResolver *auth.UserResolver) *TaggedPage {
 	if pageTags == nil {
 		pageTags = []string{}
 	}
@@ -36,6 +37,7 @@ func ToTaggedPage(node *tree.PageNode, pageTags []string, userResolver *auth.Use
 		ID:           node.ID,
 		Title:        node.Title,
 		Path:         BuildPathFromNode(node),
+		Excerpt:      excerpt,
 		Tags:         pageTags,
 		LastAuthorID: node.Metadata.LastAuthorID,
 		CreatorID:    node.Metadata.CreatorID,

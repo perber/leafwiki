@@ -6,8 +6,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Pencil } from 'lucide-react'
 import { TooltipWrapper } from '../../components/TooltipWrapper'
-import { buildEditorFrontmatter } from './frontmatter'
-import { usePageEditorStore } from './pageEditor'
+import { isDirtyState, usePageEditorStore } from './pageEditor'
 
 export function EditorTitleBar() {
   const isMobile = useIsMobile()
@@ -19,29 +18,7 @@ export function EditorTitleBar() {
   const setSlug = usePageEditorStore((state) => state.setSlug)
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((state) => state.getPageByPath)
-  const dirty = usePageEditorStore((s) => {
-    const {
-      page,
-      title,
-      slug,
-      content,
-      tags,
-      frontmatterFields,
-      frontmatterUnsupported,
-    } = s
-    if (!page) return false
-    return (
-      page.title !== title ||
-      page.slug !== slug ||
-      page.content !== content ||
-      (page.frontmatter ?? '') !==
-        buildEditorFrontmatter({
-          tags,
-          fields: frontmatterFields,
-          unsupportedRaw: frontmatterUnsupported,
-        })
-    )
-  })
+  const dirty = usePageEditorStore(isDirtyState)
 
   const onEditClicked = () => {
     if (!page) return

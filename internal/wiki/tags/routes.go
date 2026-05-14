@@ -63,6 +63,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 // handleGetTags handles GET /api/tags?q=&limit=
 func (r *Routes) handleGetTags(c *gin.Context) {
 	filter := c.DefaultQuery("q", "")
+	selectedRaw := c.Query("selected")
 	limitStr := c.DefaultQuery("limit", "50")
 
 	limit, err := strconv.Atoi(limitStr)
@@ -71,7 +72,11 @@ func (r *Routes) handleGetTags(c *gin.Context) {
 		return
 	}
 
-	out, err := r.getTags.Execute(c.Request.Context(), GetTagsInput{Filter: filter, Limit: limit})
+	out, err := r.getTags.Execute(c.Request.Context(), GetTagsInput{
+		Filter:   filter,
+		Selected: splitTags(selectedRaw),
+		Limit:    limit,
+	})
 	if err != nil {
 		respondWithTagsError(c, err)
 		return

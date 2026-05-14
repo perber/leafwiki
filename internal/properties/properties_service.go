@@ -41,13 +41,14 @@ func (s *PropertiesService) IndexAllPages() error {
 		return err
 	}
 
-	pages, errs := s.tree.GetPages(ids)
-	for i, page := range pages {
-		if errs[i] != nil {
-			return errs[i]
+	for _, id := range ids {
+		raw, err := s.tree.ReadPageRaw(id)
+		if err != nil {
+			return err
 		}
-		props := ExtractPropertiesFromContent(page.Content)
-		if err := s.store.SetPropertiesForPage(page.ID, props); err != nil {
+
+		props := ExtractPropertiesFromContent(raw)
+		if err := s.store.SetPropertiesForPage(id, props); err != nil {
 			return err
 		}
 	}

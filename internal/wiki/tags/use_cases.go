@@ -2,9 +2,11 @@ package tags
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/http/dto"
 	coretags "github.com/perber/wiki/internal/tags"
@@ -13,8 +15,9 @@ import (
 // ─── GetTagsUseCase ──────────────────────────────────────────────────────────
 
 type GetTagsInput struct {
-	Filter string
-	Limit  int
+	Filter   string
+	Selected []string
+	Limit    int
 }
 
 type GetTagsOutput struct {
@@ -38,7 +41,18 @@ func (uc *GetTagsUseCase) Execute(_ context.Context, in GetTagsInput) (*GetTagsO
 		limit = 200
 	}
 
-	tags, err := uc.svc.GetAllTags(strings.ToLower(strings.TrimSpace(in.Filter)), limit)
+	filter := strings.ToLower(strings.TrimSpace(in.Filter))
+	selected := normalizeTags(in.Selected)
+
+	var (
+		tags []coretags.TagCount
+		err  error
+	)
+	if len(selected) == 0 {
+		tags, err = uc.svc.GetAllTags(filter, limit)
+	} else {
+		tags, err = uc.svc.GetAllTagsForSelection(filter, selected, limit)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +77,16 @@ type GetPagesByTagsUseCase struct {
 	treeService  *tree.TreeService
 	userResolver *auth.UserResolver
 }
+
+const tagExcerptMaxRunes = 180
+
+var (
+	tagExcerptFencedCodePattern = regexp.MustCompile("(?s)```.*?```")
+	tagExcerptImagePattern      = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`)
+	tagExcerptLinkPattern       = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
+	tagExcerptHTMLPattern       = regexp.MustCompile(`<[^>]+>`)
+	tagExcerptLinePrefixPattern = regexp.MustCompile(`(?m)^\s{0,3}(#{1,6}\s*|[-*+]\s+|\d+\.\s+|>\s?)`)
+)
 
 func NewGetPagesByTagsUseCase(svc *coretags.TagsService, treeService *tree.TreeService, userResolver *auth.UserResolver) *GetPagesByTagsUseCase {
 	return &GetPagesByTagsUseCase{svc: svc, treeService: treeService, userResolver: userResolver}
@@ -93,7 +117,14 @@ func (uc *GetPagesByTagsUseCase) Execute(_ context.Context, in GetPagesByTagsInp
 		if err != nil || node == nil {
 			continue
 		}
-		pages = append(pages, dto.ToTaggedPage(node, tagsPerPage[id], uc.userResolver))
+
+		excerpt := ""
+		raw, err := uc.treeService.ReadPageRaw(id)
+		if err == nil {
+			excerpt = buildTagExcerpt(raw)
+		}
+
+		pages = append(pages, dto.ToTaggedPage(node, tagsPerPage[id], excerpt, uc.userResolver))
 	}
 
 	return &GetPagesByTagsOutput{Pages: pages}, nil
@@ -114,4 +145,37 @@ func normalizeTags(tags []string) []string {
 		result = append(result, n)
 	}
 	return result
+}
+
+func buildTagExcerpt(raw string) string {
+	_, body, _, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		body = raw
+	}
+
+	text := strings.ReplaceAll(body, "\r\n", "\n")
+	text = strings.ReplaceAll(text, "\r", "\n")
+	text = tagExcerptFencedCodePattern.ReplaceAllString(text, " ")
+	text = tagExcerptImagePattern.ReplaceAllString(text, "$1")
+	text = tagExcerptLinkPattern.ReplaceAllString(text, "$1")
+	text = strings.ReplaceAll(text, "`", "")
+	text = tagExcerptHTMLPattern.ReplaceAllString(text, " ")
+	text = tagExcerptLinePrefixPattern.ReplaceAllString(text, "")
+	text = strings.Join(strings.Fields(text), " ")
+
+	if text == "" {
+		return ""
+	}
+
+	runes := []rune(text)
+	if len(runes) <= tagExcerptMaxRunes {
+		return text
+	}
+
+	truncated := strings.TrimSpace(string(runes[:tagExcerptMaxRunes]))
+	if lastSpace := strings.LastIndex(truncated, " "); lastSpace >= 120 {
+		truncated = truncated[:lastSpace]
+	}
+
+	return strings.TrimSpace(truncated) + "..."
 }

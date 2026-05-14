@@ -140,7 +140,7 @@ func createPageWithTags(t *testing.T, ts *tree.TreeService, title, slug string, 
 	}
 	fm += "---\n\n# " + title
 
-	if err := ts.UpdateNode("system", *idPtr, title, slug, &fm, tree.VersionUnchecked, false); err != nil {
+	if err := ts.UpdateNode("system", *idPtr, title, slug, &fm, tree.VersionUnchecked, true); err != nil {
 		t.Fatalf("UpdateNode %q: %v", slug, err)
 	}
 
@@ -235,6 +235,31 @@ func TestTagsService_IndexAllPages_NormalizesTagsToLowercase(t *testing.T) {
 		if tc.Tag != lower(tc.Tag) {
 			t.Errorf("tag %q is not lowercase", tc.Tag)
 		}
+	}
+}
+
+func TestTagsService_IndexAllPages_ReadsTagsFromRawFrontmatter(t *testing.T) {
+	svc, ts := setupTagsService(t)
+	pageID := createPageWithTags(t, ts, "Tagged Page", "tagged-page", []string{"react"})
+
+	page, err := ts.GetPage(pageID)
+	if err != nil {
+		t.Fatalf("GetPage: %v", err)
+	}
+	if got := ExtractTagsFromContent(page.Content); got != nil {
+		t.Fatalf("expected parsed page content to exclude frontmatter tags, got %v", got)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages: %v", err)
+	}
+
+	pageIDs, err := svc.GetPageIDsByTags([]string{"react"})
+	if err != nil {
+		t.Fatalf("GetPageIDsByTags: %v", err)
+	}
+	if len(pageIDs) != 1 || pageIDs[0] != pageID {
+		t.Fatalf("expected [%s], got %v", pageID, pageIDs)
 	}
 }
 
