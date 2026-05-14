@@ -25,10 +25,10 @@ function getTocEntryClassName(level: number) {
   }
 
   if (level === 3) {
-    return 'pl-10 text-sm text-muted-foreground'
+    return 'pl-10 text-sm'
   }
 
-  return 'pl-12 text-sm text-muted-foreground'
+  return 'pl-12 text-sm'
 }
 
 export function TocDropdownButton({ entries, clickable = true }: Props) {

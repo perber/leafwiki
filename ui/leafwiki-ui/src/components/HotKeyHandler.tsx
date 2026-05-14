@@ -43,6 +43,8 @@ export function HotKeyHandler() {
         if (
           activeElement &&
           (activeElement.tagName === 'BUTTON' ||
+            activeElement.tagName === 'INPUT' ||
+            activeElement.tagName === 'SELECT' ||
             activeElement.tagName === 'TEXTAREA')
         ) {
           return

@@ -6,19 +6,9 @@ import {
 } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  EditorFrontmatterField,
-  EditorFrontmatterFieldType,
-} from './frontmatter'
-import { Plus, Tag, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Tag, Trash2, X } from 'lucide-react'
 import { KeyboardEvent, useMemo, useState } from 'react'
+import { EditorFrontmatterField } from './frontmatter'
 
 type PageFrontmatterPanelProps = {
   tags: string[]
@@ -40,52 +30,16 @@ function buildEmptyField(): EditorFrontmatterField {
   }
 }
 
-function valuePlaceholder(type: EditorFrontmatterFieldType) {
-  switch (type) {
-    case 'number':
-      return '42'
-    case 'boolean':
-      return 'true'
-    case 'list':
-      return 'one item per line'
-    default:
-      return 'Value'
-  }
-}
-
-function getFieldValidation(
-  field: EditorFrontmatterField,
-  fields: EditorFrontmatterField[],
-  index: number,
-) {
-  const key = field.key.trim()
-  if (!key) return 'Missing key'
-
-  const duplicate = fields.some(
-    (candidate, candidateIndex) =>
-      candidateIndex !== index &&
-      candidate.key.trim().toLocaleLowerCase() === key.toLocaleLowerCase(),
-  )
-  if (duplicate) return 'Duplicate key'
-
-  if (field.type === 'number' && field.value.trim() !== '') {
-    return Number.isNaN(Number(field.value.trim())) ? 'Invalid number' : 'OK'
-  }
-
+function getFieldValue(field: EditorFrontmatterField) {
   if (field.type === 'list') {
     return field.value
       .split('\n')
       .map((item) => item.trim())
-      .filter(Boolean).length > 0
-      ? 'OK'
-      : 'Empty list'
+      .filter(Boolean)
+      .join(', ')
   }
 
-  if (field.type === 'text' && field.value.trim() === '') {
-    return 'Empty value'
-  }
-
-  return 'OK'
+  return field.value
 }
 
 export function PageFrontmatterPanel({
@@ -96,6 +50,7 @@ export function PageFrontmatterPanel({
   onFieldsChange,
 }: PageFrontmatterPanelProps) {
   const [tagDraft, setTagDraft] = useState('')
+  const [showInternalFields, setShowInternalFields] = useState(false)
 
   const normalizedTags = useMemo(() => {
     const seen = new Set<string>()
@@ -108,6 +63,42 @@ export function PageFrontmatterPanel({
       return true
     })
   }, [tags])
+
+  const editableFields = useMemo(
+    () => fields.filter((field) => !field.internal),
+    [fields],
+  )
+
+  const internalFields = useMemo(
+    () => fields.filter((field) => field.internal),
+    [fields],
+  )
+
+  const mergeEditableFields = (
+    nextEditableFields: EditorFrontmatterField[],
+  ) => {
+    const merged: EditorFrontmatterField[] = []
+    let editableIndex = 0
+
+    for (const field of fields) {
+      if (field.internal) {
+        merged.push(field)
+        continue
+      }
+
+      if (editableIndex < nextEditableFields.length) {
+        merged.push(nextEditableFields[editableIndex])
+        editableIndex += 1
+      }
+    }
+
+    while (editableIndex < nextEditableFields.length) {
+      merged.push(nextEditableFields[editableIndex])
+      editableIndex += 1
+    }
+
+    onFieldsChange(merged)
+  }
 
   const commitTag = (value: string) => {
     const normalized = normalizeTag(value)
@@ -133,23 +124,27 @@ export function PageFrontmatterPanel({
     index: number,
     patch: Partial<EditorFrontmatterField>,
   ) => {
-    const next = fields.map((field, currentIndex) =>
+    const next = editableFields.map((field, currentIndex) =>
       currentIndex === index ? { ...field, ...patch } : field,
     )
-    onFieldsChange(next)
+    mergeEditableFields(next)
   }
 
   const removeField = (index: number) => {
-    onFieldsChange(fields.filter((_, currentIndex) => currentIndex !== index))
+    mergeEditableFields(
+      editableFields.filter((_, currentIndex) => currentIndex !== index),
+    )
   }
 
   const addField = () => {
-    onFieldsChange([...fields, buildEmptyField()])
+    mergeEditableFields([...editableFields, buildEmptyField()])
   }
 
   const summaryParts = [
     normalizedTags.length === 1 ? '1 tag' : `${normalizedTags.length} tags`,
-    fields.length === 1 ? '1 property' : `${fields.length} properties`,
+    editableFields.length === 1
+      ? '1 property'
+      : `${editableFields.length} properties`,
   ]
 
   return (
@@ -178,172 +173,170 @@ export function PageFrontmatterPanel({
             </div>
           </AccordionTrigger>
           <AccordionContent className="page-frontmatter-panel__content">
-            <div className="page-frontmatter-panel__tags-row">
-              <Input
-                value={tagDraft}
-                onChange={(event) => setTagDraft(event.target.value)}
-                onKeyDown={handleTagKeyDown}
-                onBlur={() => {
-                  commitTag(tagDraft)
-                  setTagDraft('')
-                }}
-                placeholder="Add tag"
-                className="page-frontmatter-panel__tag-input"
-                data-testid="page-frontmatter-tag-input"
-              />
-              <div className="page-frontmatter-panel__chips">
-                {normalizedTags.map((tag) => (
-                  <span key={tag} className="page-frontmatter-panel__chip">
-                    <span>{tag}</span>
-                    <button
-                      type="button"
-                      className="page-frontmatter-panel__chip-remove"
-                      onClick={() =>
-                        onTagsChange(
-                          normalizedTags.filter((current) => current !== tag),
-                        )
-                      }
-                      aria-label={`Remove tag ${tag}`}
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="page-frontmatter-panel__section-heading">
-              Properties
-            </div>
-
-            {fields.length > 0 ? (
-              <div className="page-frontmatter-panel__fields">
-                {fields.map((field, index) => (
-                  <div
-                    key={`${field.key}-${index}`}
-                    className="page-frontmatter-panel__field-row"
-                  >
+            <div className="page-frontmatter-panel__layout">
+              <div className="page-frontmatter-panel__group page-frontmatter-panel__group--tags">
+                <div className="page-frontmatter-panel__section-heading">
+                  Tags
+                </div>
+                <div className="page-frontmatter-panel__tags-field">
+                  <div className="page-frontmatter-panel__tags-inline">
+                    {normalizedTags.map((tag) => (
+                      <span key={tag} className="page-frontmatter-panel__chip">
+                        <span>{tag}</span>
+                        <button
+                          type="button"
+                          className="page-frontmatter-panel__chip-remove"
+                          onClick={() =>
+                            onTagsChange(
+                              normalizedTags.filter(
+                                (current) => current !== tag,
+                              ),
+                            )
+                          }
+                          aria-label={`Remove tag ${tag}`}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
                     <Input
-                      value={field.key}
-                      onChange={(event) =>
-                        updateField(index, { key: event.target.value })
-                      }
-                      placeholder="Key"
-                      className="page-frontmatter-panel__field-key"
-                      data-testid={`page-frontmatter-field-key-${index}`}
+                      value={tagDraft}
+                      onChange={(event) => setTagDraft(event.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      onBlur={() => {
+                        commitTag(tagDraft)
+                        setTagDraft('')
+                      }}
+                      placeholder="Add tag"
+                      className="page-frontmatter-panel__tag-input"
+                      data-testid="page-frontmatter-tag-input"
                     />
-                    <Select
-                      value={field.type}
-                      onValueChange={(value) =>
-                        updateField(index, {
-                          type: value as EditorFrontmatterFieldType,
-                          value:
-                            value === 'boolean'
-                              ? 'true'
-                              : value === 'list'
-                                ? field.type === 'list'
-                                  ? field.value
-                                  : ''
-                                : field.type === 'boolean'
-                                  ? ''
-                                  : field.value,
-                        })
-                      }
-                      data-testid={`page-frontmatter-field-type-${index}`}
-                    >
-                      <SelectTrigger className="page-frontmatter-panel__field-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="text">Text</SelectItem>
-                        <SelectItem value="number">Number</SelectItem>
-                        <SelectItem value="boolean">Boolean</SelectItem>
-                        <SelectItem value="list">List</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      value={getFieldValidation(field, fields, index)}
-                      readOnly
-                      className="page-frontmatter-panel__field-validation"
-                      data-testid={`page-frontmatter-field-validation-${index}`}
-                    />
-                    {field.type === 'list' ? (
-                      <textarea
-                        value={field.value}
-                        onChange={(event) =>
-                          updateField(index, { value: event.target.value })
-                        }
-                        placeholder={valuePlaceholder(field.type)}
-                        className="page-frontmatter-panel__field-value page-frontmatter-panel__field-value--list"
-                        data-testid={`page-frontmatter-field-value-${index}`}
-                      />
-                    ) : field.type === 'boolean' ? (
-                      <Select
-                        value={field.value === 'false' ? 'false' : 'true'}
-                        onValueChange={(value) => updateField(index, { value })}
-                        data-testid={`page-frontmatter-field-value-${index}`}
-                      >
-                        <SelectTrigger className="page-frontmatter-panel__field-select">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="true">True</SelectItem>
-                          <SelectItem value="false">False</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        type={field.type === 'number' ? 'number' : 'text'}
-                        value={field.value}
-                        onChange={(event) =>
-                          updateField(index, { value: event.target.value })
-                        }
-                        placeholder={valuePlaceholder(field.type)}
-                        className="page-frontmatter-panel__field-value"
-                        data-testid={`page-frontmatter-field-value-${index}`}
-                      />
-                    )}
-                    <button
-                      type="button"
-                      className="page-frontmatter-panel__field-remove"
-                      onClick={() => removeField(index)}
-                      aria-label={`Remove frontmatter field ${field.key || index + 1}`}
-                    >
-                      <Trash2 size={14} />
-                    </button>
                   </div>
-                ))}
+                </div>
               </div>
-            ) : null}
 
-            <div className="page-frontmatter-panel__actions">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addField}
-                className="page-frontmatter-panel__add-button"
-                data-testid="page-frontmatter-add-field"
-              >
-                <Plus size={14} />
-                Add field
-              </Button>
+              <div className="page-frontmatter-panel__group page-frontmatter-panel__group--properties">
+                <div className="page-frontmatter-panel__section-heading">
+                  Properties
+                </div>
+                <div className="page-frontmatter-panel__properties-scroll custom-scrollbar">
+                  {editableFields.length > 0 ? (
+                    <div className="page-frontmatter-panel__fields">
+                      {editableFields.map((field, index) => (
+                        <div
+                          key={`editable-field-${index}`}
+                          className="page-frontmatter-panel__field-row"
+                        >
+                          <Input
+                            value={field.key}
+                            onChange={(event) =>
+                              updateField(index, { key: event.target.value })
+                            }
+                            placeholder="Key"
+                            className="page-frontmatter-panel__field-key"
+                            data-testid={`page-frontmatter-field-key-${index}`}
+                          />
+                          <Input
+                            type="text"
+                            value={getFieldValue(field)}
+                            onChange={(event) =>
+                              updateField(index, {
+                                type: 'text',
+                                value: event.target.value,
+                              })
+                            }
+                            placeholder="Value"
+                            className="page-frontmatter-panel__field-value"
+                            data-testid={`page-frontmatter-field-value-${index}`}
+                          />
+                          <button
+                            type="button"
+                            className="page-frontmatter-panel__field-remove"
+                            onClick={() => removeField(index)}
+                            aria-label={`Remove frontmatter field ${field.key || index + 1}`}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="page-frontmatter-panel__actions">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addField}
+                      className="page-frontmatter-panel__add-button"
+                      data-testid="page-frontmatter-add-field"
+                    >
+                      <Plus size={14} />
+                      Add property
+                    </Button>
+                  </div>
+
+                  {internalFields.length > 0 ? (
+                    <div className="page-frontmatter-panel__internal">
+                      <button
+                        type="button"
+                        className="page-frontmatter-panel__internal-toggle"
+                        onClick={() =>
+                          setShowInternalFields((current) => !current)
+                        }
+                        data-testid="page-frontmatter-internal-toggle"
+                      >
+                        {showInternalFields ? (
+                          <ChevronDown size={14} />
+                        ) : (
+                          <ChevronRight size={14} />
+                        )}
+                        Internal fields
+                      </button>
+
+                      {showInternalFields ? (
+                        <div className="page-frontmatter-panel__fields page-frontmatter-panel__fields--internal">
+                          {internalFields.map((field, index) => (
+                            <div
+                              key={`internal-field-${index}`}
+                              className="page-frontmatter-panel__field-row"
+                            >
+                              <Input
+                                value={field.key}
+                                readOnly
+                                className="page-frontmatter-panel__field-key page-frontmatter-panel__field-key--readonly"
+                              />
+                              <Input
+                                type="text"
+                                value={getFieldValue(field)}
+                                readOnly
+                                className="page-frontmatter-panel__field-value page-frontmatter-panel__field-value--readonly"
+                              />
+                              <span className="page-frontmatter-panel__field-spacer" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <p className="page-frontmatter-panel__hint">
+                    Keep fields flat for now. If you need nested metadata later,
+                    use dot keys like <code>seo.title</code>.
+                  </p>
+
+                  {hasUnsupportedFields ? (
+                    <p
+                      className="page-frontmatter-panel__notice"
+                      data-testid="page-frontmatter-unsupported-notice"
+                    >
+                      Existing advanced frontmatter is preserved in the
+                      background but not editable in this compact view yet.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
             </div>
-
-            <p className="page-frontmatter-panel__hint">
-              Keep fields flat for now. If you need nested metadata later, use
-              dot keys like <code>seo.title</code>.
-            </p>
-
-            {hasUnsupportedFields ? (
-              <p
-                className="page-frontmatter-panel__notice"
-                data-testid="page-frontmatter-unsupported-notice"
-              >
-                Existing advanced frontmatter is preserved in the background but
-                not editable in this compact view yet.
-              </p>
-            ) : null}
           </AccordionContent>
         </AccordionItem>
       </Accordion>

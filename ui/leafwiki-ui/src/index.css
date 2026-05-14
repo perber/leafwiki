@@ -939,7 +939,7 @@
   }
 
   .page-frontmatter-panel {
-    @apply border-markdown-toolbar-border bg-markdown-toolbar mt-0 mb-0 border-b px-3 shadow-xs;
+    @apply border-surface-border bg-surface mt-0 mb-0 border-b px-3;
   }
 
   .page-frontmatter-panel__accordion {
@@ -951,12 +951,13 @@
   }
 
   .page-frontmatter-panel__trigger {
-    @apply min-h-9 py-0 no-underline hover:no-underline;
+    @apply min-h-9 border-none bg-transparent py-0 no-underline shadow-none hover:no-underline;
     text-decoration: none !important;
   }
 
   .page-frontmatter-panel__trigger:hover,
   .page-frontmatter-panel__trigger:focus-visible {
+    @apply border-none bg-transparent shadow-none ring-0 outline-hidden;
     text-decoration: none !important;
   }
 
@@ -967,7 +968,7 @@
   }
 
   .page-frontmatter-panel__content {
-    @apply px-px pt-1;
+    @apply px-px pt-1 pb-1;
   }
 
   .page-frontmatter-panel__topline {
@@ -990,68 +991,122 @@
     @apply text-muted-foreground text-sm leading-none font-normal;
   }
 
-  .page-frontmatter-panel__add-button {
-    @apply h-8 rounded-none px-3;
+  .page-frontmatter-panel__layout {
+    @apply flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] md:items-start;
+  }
+
+  .page-frontmatter-panel__group {
+    @apply mb-0 min-w-0;
+  }
+
+  .page-frontmatter-panel__group--tags {
+    @apply md:sticky md:top-0;
+  }
+
+  .page-frontmatter-panel__group--properties {
+    @apply border-surface-border border-t pt-3.5;
+  }
+
+  .page-frontmatter-panel__layout .page-frontmatter-panel__group--properties {
+    @apply md:border-t-0 md:border-l md:pt-0 md:pl-4;
   }
 
   .page-frontmatter-panel__tags-row {
-    @apply mb-2 flex flex-col gap-2;
+    @apply mb-0;
   }
 
-  .page-frontmatter-panel__chips {
-    @apply flex min-h-9 w-full flex-wrap items-center gap-2;
+  .page-frontmatter-panel__tags-field {
+    @apply border-surface-border min-h-6 rounded-md border px-2 py-0;
+  }
+
+  .page-frontmatter-panel__tags-inline {
+    @apply flex min-h-6 w-full flex-wrap items-center gap-1;
   }
 
   .page-frontmatter-panel__chip {
-    @apply bg-surface-alt text-interface-text inline-flex items-center gap-1 border px-2 py-1 text-sm;
+    @apply border-surface-border bg-surface-alt text-interface-text inline-flex h-6 items-center gap-1 rounded-sm border px-2 py-0.5 text-xs;
   }
 
   .page-frontmatter-panel__chip-remove {
-    @apply text-muted-foreground hover:text-interface-text inline-flex h-4 w-4 items-center justify-center;
+    @apply text-muted-foreground hover:text-error inline-flex h-4 w-4 items-center justify-center transition-colors;
   }
 
   .page-frontmatter-panel__tag-input {
-    @apply w-full rounded-none;
+    @apply h-7 min-w-24 flex-1 border-none bg-transparent px-0 text-sm shadow-none ring-0 outline-none focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:outline-hidden;
+  }
+
+  .page-frontmatter-panel__tag-input:focus,
+  .page-frontmatter-panel__tag-input:focus-visible {
+    border-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
   }
 
   .page-frontmatter-panel__section-heading {
-    @apply text-muted-foreground mb-2 text-[11px] font-medium tracking-[0.12em] uppercase;
+    @apply text-muted-foreground mb-2.5 text-[11px] font-medium tracking-[0.12em] uppercase;
+  }
+
+  .page-frontmatter-panel__properties-scroll {
+    @apply h-40 overflow-y-auto pr-1 md:h-48;
   }
 
   .page-frontmatter-panel__fields {
-    @apply mb-2 flex flex-col gap-2;
+    @apply mb-2 flex flex-col gap-1.5;
   }
 
   .page-frontmatter-panel__field-row {
-    @apply grid items-center gap-2 md:grid-cols-[minmax(9rem,12rem)_7rem_8rem_minmax(0,1fr)_2rem];
+    @apply grid items-center gap-1.5 md:grid-cols-[8.5rem_15rem_2rem];
   }
 
   .page-frontmatter-panel__field-key {
-    @apply rounded-none;
-  }
-
-  .page-frontmatter-panel__field-select {
-    @apply rounded-none;
-  }
-
-  .page-frontmatter-panel__field-validation {
-    @apply rounded-none;
+    @apply border-input bg-background h-8 rounded-md border pt-0.5 pr-2 pb-0 pl-2.5 text-sm leading-normal shadow-none focus:ring-0 focus-visible:ring-0 md:w-[8.5rem];
   }
 
   .page-frontmatter-panel__field-value {
-    @apply rounded-none;
+    @apply border-input bg-background h-8 rounded-md border pt-0.5 pr-2 pb-0 pl-2.5 text-sm leading-normal shadow-none focus:ring-0 focus-visible:ring-0 md:w-[15rem];
   }
 
-  .page-frontmatter-panel__field-value--list {
-    @apply border-input bg-background text-interface-text placeholder:text-muted-foreground focus-visible:ring-ring min-h-20 w-full rounded-none border px-3 py-2 text-sm shadow-xs transition-colors focus-visible:ring-1 focus-visible:outline-hidden;
+  .page-frontmatter-panel__field-key:focus,
+  .page-frontmatter-panel__field-key:focus-visible,
+  .page-frontmatter-panel__field-value:focus,
+  .page-frontmatter-panel__field-value:focus-visible {
+    border-color: transparent !important;
+    outline: 1px solid hsl(var(--brand)) !important;
+    outline-offset: -1px !important;
+    box-shadow: none !important;
+  }
+
+  .page-frontmatter-panel__field-key--readonly,
+  .page-frontmatter-panel__field-value--readonly {
+    @apply text-muted-foreground bg-surface-alt border-surface-border;
   }
 
   .page-frontmatter-panel__field-remove {
-    @apply text-destructive hover:text-destructive border-destructive/30 bg-destructive/5 inline-flex h-8 w-8 items-center justify-center self-center border;
+    @apply text-muted-foreground hover:text-error inline-flex h-8 w-8 items-center justify-center self-center border-none bg-transparent transition-colors;
+  }
+
+  .page-frontmatter-panel__field-spacer {
+    @apply inline-block h-8 w-8;
   }
 
   .page-frontmatter-panel__actions {
     @apply mb-2 flex justify-start;
+  }
+
+  .page-frontmatter-panel__add-button {
+    @apply border-surface-border bg-background text-brand hover:bg-surface-alt h-8 rounded-md px-3 text-xs shadow-none;
+  }
+
+  .page-frontmatter-panel__internal {
+    @apply mb-2;
+  }
+
+  .page-frontmatter-panel__internal-toggle {
+    @apply text-muted-foreground hover:text-interface-text inline-flex items-center gap-1 text-xs transition-colors;
+  }
+
+  .page-frontmatter-panel__fields--internal {
+    @apply mt-2;
   }
 
   .page-frontmatter-panel__hint {

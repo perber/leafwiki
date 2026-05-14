@@ -1,5 +1,6 @@
 const TAGS_KEY_PATTERN = /^tags\s*:\s*(.*)$/
-const FRONTMATTER_KEY_PATTERN = /^([A-Za-z0-9_.-]+)\s*:\s*(.*)$/
+const FRONTMATTER_KEY_PATTERN = /^([^:\n][^:\n]*?)\s*:\s*(.*)$/
+const INTERNAL_FIELD_PREFIX = 'leafwiki_'
 
 export type EditorFrontmatterFieldType = 'text' | 'number' | 'boolean' | 'list'
 
@@ -7,6 +8,7 @@ export type EditorFrontmatterField = {
   key: string
   value: string
   type: EditorFrontmatterFieldType
+  internal?: boolean
 }
 
 export type ParsedEditorFrontmatter = {
@@ -20,7 +22,14 @@ function normalizeTag(tag: string) {
 }
 
 function normalizeFieldKey(key: string) {
-  return key.trim()
+  const trimmed = key.trim()
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim()
+  }
+  return trimmed
 }
 
 function normalizeListValue(value: string) {
@@ -67,6 +76,7 @@ export function normalizeEditorFrontmatterFields(
     result.push({
       key,
       type: field.type,
+      internal: field.internal,
       value:
         field.type === 'boolean'
           ? normalizedValue === 'false'
@@ -103,6 +113,19 @@ function detectFieldType(value: string): EditorFrontmatterFieldType {
   }
 
   return 'text'
+}
+
+function isInternalFieldKey(key: string) {
+  return key.toLocaleLowerCase().startsWith(INTERNAL_FIELD_PREFIX)
+}
+
+function formatFieldKey(key: string) {
+  const trimmed = normalizeFieldKey(key)
+  if (/^[A-Za-z0-9_.-]+$/.test(trimmed)) {
+    return trimmed
+  }
+
+  return JSON.stringify(trimmed)
 }
 
 function appendBlock(target: string[], header: string, bodyLines: string[]) {
@@ -185,6 +208,7 @@ export function parseEditorFrontmatter(
         key,
         type: 'list',
         value: inlineList.join('\n'),
+        internal: isInternalFieldKey(key),
       })
       continue
     }
@@ -194,6 +218,7 @@ export function parseEditorFrontmatter(
         key,
         type: detectFieldType(trimmedValue),
         value: trimmedValue,
+        internal: isInternalFieldKey(key),
       })
       continue
     }
@@ -219,6 +244,7 @@ export function parseEditorFrontmatter(
         key,
         type: 'list',
         value: listItems.join('\n'),
+        internal: isInternalFieldKey(key),
       })
     } else {
       appendBlock(unsupportedLines, line, collected)
@@ -237,22 +263,25 @@ export function parseEditorFrontmatter(
 function buildFieldBlock(field: EditorFrontmatterField) {
   const key = normalizeFieldKey(field.key)
   if (!key) return ''
+  const formattedKey = formatFieldKey(key)
 
   if (field.type === 'list') {
     const items = normalizeListValue(field.value).split('\n').filter(Boolean)
 
     if (items.length === 0) {
-      return `${key}: []`
+      return `${formattedKey}: []`
     }
 
-    return [key + ':', ...items.map((item) => `  - ${item}`)].join('\n')
+    return [formattedKey + ':', ...items.map((item) => `  - ${item}`)].join(
+      '\n',
+    )
   }
 
   if (field.type === 'boolean') {
-    return `${key}: ${field.value === 'false' ? 'false' : 'true'}`
+    return `${formattedKey}: ${field.value === 'false' ? 'false' : 'true'}`
   }
 
-  return `${key}: ${field.value.trim()}`
+  return `${formattedKey}: ${field.value.trim()}`
 }
 
 export function buildEditorFrontmatter({
