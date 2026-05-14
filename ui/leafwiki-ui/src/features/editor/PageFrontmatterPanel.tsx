@@ -13,6 +13,7 @@ import { EditorFrontmatterField } from './frontmatter'
 type PageFrontmatterPanelProps = {
   tags: string[]
   fields: EditorFrontmatterField[]
+  errors: Record<string, string>
   hasUnsupportedFields: boolean
   onTagsChange: (tags: string[]) => void
   onFieldsChange: (fields: EditorFrontmatterField[]) => void
@@ -45,6 +46,7 @@ function getFieldValue(field: EditorFrontmatterField) {
 export function PageFrontmatterPanel({
   tags,
   fields,
+  errors,
   hasUnsupportedFields,
   onTagsChange,
   onFieldsChange,
@@ -140,6 +142,8 @@ export function PageFrontmatterPanel({
     mergeEditableFields([...editableFields, buildEmptyField()])
   }
 
+  const hasErrors = Object.keys(errors).length > 0
+
   const summaryParts = [
     normalizedTags.length === 1 ? '1 tag' : `${normalizedTags.length} tags`,
     editableFields.length === 1
@@ -163,7 +167,9 @@ export function PageFrontmatterPanel({
         >
           <AccordionTrigger className="page-frontmatter-panel__trigger">
             <div className="page-frontmatter-panel__topline">
-              <div className="page-frontmatter-panel__title-row">
+              <div
+                className={`page-frontmatter-panel__title-row${hasErrors ? ' page-frontmatter-panel__title-row--has-errors' : ''}`}
+              >
                 <Tag className="page-frontmatter-panel__title-icon" size={14} />
                 <span className="page-frontmatter-panel__title">Metadata</span>
               </div>
@@ -173,9 +179,9 @@ export function PageFrontmatterPanel({
             </div>
           </AccordionTrigger>
           <AccordionContent className="page-frontmatter-panel__content">
-            <div className="page-frontmatter-panel__layout">
-              <div className="page-frontmatter-panel__group page-frontmatter-panel__group--tags">
-                <div className="page-frontmatter-panel__section-heading">
+            <div className="page-frontmatter-panel__stack">
+              <div className="page-frontmatter-panel__row page-frontmatter-panel__row--tags">
+                <div className="page-frontmatter-panel__section-heading page-frontmatter-panel__section-heading--inline">
                   Tags
                 </div>
                 <div className="page-frontmatter-panel__tags-field">
@@ -208,59 +214,130 @@ export function PageFrontmatterPanel({
                         setTagDraft('')
                       }}
                       placeholder="Add tag"
-                      className="page-frontmatter-panel__tag-input"
+                      className={`page-frontmatter-panel__tag-input${errors.tags ? ' page-frontmatter-panel__input--error' : ''}`}
                       data-testid="page-frontmatter-tag-input"
                     />
                   </div>
+                  {errors.tags ? (
+                    <p
+                      className="page-frontmatter-panel__error"
+                      data-testid="page-frontmatter-tags-error"
+                    >
+                      {errors.tags}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="page-frontmatter-panel__group page-frontmatter-panel__group--properties">
-                <div className="page-frontmatter-panel__section-heading">
+              <div className="page-frontmatter-panel__row page-frontmatter-panel__row--properties">
+                <div className="page-frontmatter-panel__section-heading page-frontmatter-panel__section-heading--inline">
                   Properties
                 </div>
-                <div className="page-frontmatter-panel__properties-scroll custom-scrollbar">
-                  {editableFields.length > 0 ? (
-                    <div className="page-frontmatter-panel__fields">
-                      {editableFields.map((field, index) => (
-                        <div
-                          key={`editable-field-${index}`}
-                          className="page-frontmatter-panel__field-row"
+                <div className="page-frontmatter-panel__properties">
+                  <div className="page-frontmatter-panel__properties-scroll custom-scrollbar">
+                    {editableFields.length > 0 ? (
+                      <div className="page-frontmatter-panel__fields">
+                        {editableFields.map((field, index) => (
+                          <div key={`editable-field-${index}`}>
+                            <div className="page-frontmatter-panel__field-row">
+                              <Input
+                                value={field.key}
+                                onChange={(event) =>
+                                  updateField(index, {
+                                    key: event.target.value,
+                                  })
+                                }
+                                placeholder="Key"
+                                className={`page-frontmatter-panel__field-key${errors[`properties.${index}.key`] ? ' page-frontmatter-panel__input--error' : ''}`}
+                                data-testid={`page-frontmatter-field-key-${index}`}
+                              />
+                              <Input
+                                type="text"
+                                value={getFieldValue(field)}
+                                onChange={(event) =>
+                                  updateField(index, {
+                                    type: 'text',
+                                    value: event.target.value,
+                                  })
+                                }
+                                placeholder="Value"
+                                className={`page-frontmatter-panel__field-value${errors[`properties.${index}.value`] ? ' page-frontmatter-panel__input--error' : ''}`}
+                                data-testid={`page-frontmatter-field-value-${index}`}
+                              />
+                              <button
+                                type="button"
+                                className="page-frontmatter-panel__field-remove"
+                                onClick={() => removeField(index)}
+                                aria-label={`Remove frontmatter field ${field.key || index + 1}`}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            {errors[`properties.${index}.key`] ? (
+                              <p
+                                className="page-frontmatter-panel__error"
+                                data-testid={`page-frontmatter-field-key-error-${index}`}
+                              >
+                                {errors[`properties.${index}.key`]}
+                              </p>
+                            ) : null}
+                            {errors[`properties.${index}.value`] ? (
+                              <p
+                                className="page-frontmatter-panel__error"
+                                data-testid={`page-frontmatter-field-value-error-${index}`}
+                              >
+                                {errors[`properties.${index}.value`]}
+                              </p>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {internalFields.length > 0 ? (
+                      <div className="page-frontmatter-panel__internal">
+                        <button
+                          type="button"
+                          className="page-frontmatter-panel__internal-toggle"
+                          onClick={() =>
+                            setShowInternalFields((current) => !current)
+                          }
+                          data-testid="page-frontmatter-internal-toggle"
                         >
-                          <Input
-                            value={field.key}
-                            onChange={(event) =>
-                              updateField(index, { key: event.target.value })
-                            }
-                            placeholder="Key"
-                            className="page-frontmatter-panel__field-key"
-                            data-testid={`page-frontmatter-field-key-${index}`}
-                          />
-                          <Input
-                            type="text"
-                            value={getFieldValue(field)}
-                            onChange={(event) =>
-                              updateField(index, {
-                                type: 'text',
-                                value: event.target.value,
-                              })
-                            }
-                            placeholder="Value"
-                            className="page-frontmatter-panel__field-value"
-                            data-testid={`page-frontmatter-field-value-${index}`}
-                          />
-                          <button
-                            type="button"
-                            className="page-frontmatter-panel__field-remove"
-                            onClick={() => removeField(index)}
-                            aria-label={`Remove frontmatter field ${field.key || index + 1}`}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
+                          {showInternalFields ? (
+                            <ChevronDown size={14} />
+                          ) : (
+                            <ChevronRight size={14} />
+                          )}
+                          Internal fields
+                        </button>
+
+                        {showInternalFields ? (
+                          <div className="page-frontmatter-panel__fields page-frontmatter-panel__fields--internal">
+                            {internalFields.map((field, index) => (
+                              <div
+                                key={`internal-field-${index}`}
+                                className="page-frontmatter-panel__field-row"
+                              >
+                                <Input
+                                  value={field.key}
+                                  readOnly
+                                  className="page-frontmatter-panel__field-key page-frontmatter-panel__field-key--readonly"
+                                />
+                                <Input
+                                  type="text"
+                                  value={getFieldValue(field)}
+                                  readOnly
+                                  className="page-frontmatter-panel__field-value page-frontmatter-panel__field-value--readonly"
+                                />
+                                <span className="page-frontmatter-panel__field-spacer" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
 
                   <div className="page-frontmatter-panel__actions">
                     <Button
@@ -275,50 +352,6 @@ export function PageFrontmatterPanel({
                       Add property
                     </Button>
                   </div>
-
-                  {internalFields.length > 0 ? (
-                    <div className="page-frontmatter-panel__internal">
-                      <button
-                        type="button"
-                        className="page-frontmatter-panel__internal-toggle"
-                        onClick={() =>
-                          setShowInternalFields((current) => !current)
-                        }
-                        data-testid="page-frontmatter-internal-toggle"
-                      >
-                        {showInternalFields ? (
-                          <ChevronDown size={14} />
-                        ) : (
-                          <ChevronRight size={14} />
-                        )}
-                        Internal fields
-                      </button>
-
-                      {showInternalFields ? (
-                        <div className="page-frontmatter-panel__fields page-frontmatter-panel__fields--internal">
-                          {internalFields.map((field, index) => (
-                            <div
-                              key={`internal-field-${index}`}
-                              className="page-frontmatter-panel__field-row"
-                            >
-                              <Input
-                                value={field.key}
-                                readOnly
-                                className="page-frontmatter-panel__field-key page-frontmatter-panel__field-key--readonly"
-                              />
-                              <Input
-                                type="text"
-                                value={getFieldValue(field)}
-                                readOnly
-                                className="page-frontmatter-panel__field-value page-frontmatter-panel__field-value--readonly"
-                              />
-                              <span className="page-frontmatter-panel__field-spacer" />
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
 
                   <p className="page-frontmatter-panel__hint">
                     Keep fields flat for now. If you need nested metadata later,

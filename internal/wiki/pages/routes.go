@@ -1,12 +1,15 @@
 package pages
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/markdown"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/http/dto"
@@ -148,7 +151,7 @@ func (r *Routes) handleGetPage(c *gin.Context) {
 		respondWithPageError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.ToAPIPage(out.Page, r.userResolver))
+	r.respondPage(c, http.StatusOK, out.Page)
 }
 
 func (r *Routes) handleGetByPath(c *gin.Context) {
@@ -166,7 +169,7 @@ func (r *Routes) handleGetByPath(c *gin.Context) {
 	if out.Page.Kind == tree.NodeKindSection {
 		depth = 1
 	}
-	c.JSON(http.StatusOK, dto.ToAPIPageWithDepth(out.Page, r.userResolver, depth))
+	r.respondPageWithDepth(c, http.StatusOK, out.Page, depth)
 }
 
 func (r *Routes) handleLookupPath(c *gin.Context) {
@@ -234,19 +237,25 @@ func (r *Routes) handleCreate(c *gin.Context) {
 		respondWithPageError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, dto.ToAPIPage(out.Page, r.userResolver))
+	r.respondPage(c, http.StatusCreated, out.Page)
 }
 
 func (r *Routes) handleUpdate(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	var req struct {
-		Version string  `json:"version" binding:"required"`
-		Title   string  `json:"title" binding:"required"`
-		Slug    string  `json:"slug" binding:"required"`
-		Content *string `json:"content"`
+		Version    string                 `json:"version" binding:"required"`
+		Title      string                 `json:"title" binding:"required"`
+		Slug       string                 `json:"slug" binding:"required"`
+		Content    *string                `json:"content"`
+		Tags       []string               `json:"tags"`
+		Properties map[string]interface{} `json:"properties"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		return
+	}
+	if err := validatePageMetadataInput(req.Tags, req.Properties); err != nil {
+		respondWithPageError(c, err)
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -261,7 +270,7 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 		respondWithPageError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.ToAPIPage(out.Page, r.userResolver))
+	r.respondPage(c, http.StatusOK, out.Page)
 }
 
 func (r *Routes) handleDelete(c *gin.Context) {
@@ -344,7 +353,7 @@ func (r *Routes) handleEnsurePath(c *gin.Context) {
 		respondWithPageError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.ToAPIPage(out.Page, r.userResolver))
+	r.respondPage(c, http.StatusOK, out.Page)
 }
 
 func (r *Routes) handleConvert(c *gin.Context) {
@@ -397,7 +406,7 @@ func (r *Routes) handleCopy(c *gin.Context) {
 		respondWithPageError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, dto.ToAPIPage(out.Page, r.userResolver))
+	r.respondPage(c, http.StatusCreated, out.Page)
 }
 
 func (r *Routes) handleRefactorPreview(c *gin.Context) {
@@ -456,7 +465,160 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 		respondWithPageError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.ToAPIPage(page, r.userResolver))
+	r.respondPage(c, http.StatusOK, page)
+}
+
+func (r *Routes) respondPage(c *gin.Context, status int, page *tree.Page) {
+	apiPage := dto.ToAPIPage(page, r.userResolver)
+	r.enrichPageMetadata(apiPage)
+	c.JSON(status, apiPage)
+}
+
+func (r *Routes) respondPageWithDepth(c *gin.Context, status int, page *tree.Page, depth int) {
+	apiPage := dto.ToAPIPageWithDepth(page, r.userResolver, depth)
+	r.enrichPageMetadata(apiPage)
+	c.JSON(status, apiPage)
+}
+
+func (r *Routes) enrichPageMetadata(page *dto.Page) {
+	if page == nil {
+		return
+	}
+
+	page.Tags = []string{}
+	page.Properties = map[string]interface{}{}
+
+	raw, err := r.treeService.ReadPageRaw(page.ID)
+	if err != nil {
+		return
+	}
+
+	fm, _, has, err := markdown.ParseFrontmatter(raw)
+	if err != nil || !has || len(fm.ExtraFields) == 0 {
+		return
+	}
+
+	tags, properties := extractPageMetadata(fm.ExtraFields)
+	page.Tags = tags
+	page.Properties = properties
+}
+
+func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]interface{}) {
+	tags := []string{}
+	properties := map[string]interface{}{}
+
+	for key, value := range fields {
+		if strings.EqualFold(strings.TrimSpace(key), "tags") {
+			tags = normalizeMetadataTags(value)
+			continue
+		}
+		properties[key] = value
+	}
+
+	return tags, properties
+}
+
+func normalizeMetadataTags(value interface{}) []string {
+	list, ok := value.([]interface{})
+	if !ok {
+		return []string{}
+	}
+
+	result := make([]string, 0, len(list))
+	seen := make(map[string]struct{}, len(list))
+
+	for _, item := range list {
+		tag, ok := item.(string)
+		if !ok {
+			continue
+		}
+		trimmed := strings.TrimSpace(tag)
+		if trimmed == "" {
+			continue
+		}
+		key := strings.ToLower(trimmed)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, trimmed)
+	}
+
+	return result
+}
+
+func validatePageMetadataInput(tags []string, properties map[string]interface{}) error {
+	ve := sharederrors.NewValidationErrors()
+	seenTags := map[string]struct{}{}
+
+	for index, tag := range tags {
+		trimmed := strings.TrimSpace(tag)
+		field := "tags[" + strconv.Itoa(index) + "]"
+		if trimmed == "" {
+			ve.Add(field, "Tag must not be empty")
+			continue
+		}
+		if trimmed != tag {
+			ve.Add(field, "Tag must not contain leading or trailing whitespace")
+			continue
+		}
+		key := strings.ToLower(trimmed)
+		if _, exists := seenTags[key]; exists {
+			ve.Add(field, "Tag must be unique")
+			continue
+		}
+		seenTags[key] = struct{}{}
+	}
+
+	for rawKey, value := range properties {
+		key := strings.TrimSpace(rawKey)
+		field := "properties." + rawKey
+		switch {
+		case key == "":
+			ve.Add(field, "Property key must not be empty")
+		case key != rawKey:
+			ve.Add(field, "Property key must not contain leading or trailing whitespace")
+		case strings.HasPrefix(strings.ToLower(key), "leafwiki_"):
+			ve.Add(field, "Property key uses a reserved prefix")
+		case strings.ToLower(key) == "tags" || strings.ToLower(key) == "title":
+			ve.Add(field, "Property key is reserved")
+		default:
+			if err := validatePropertyValue(value); err != nil {
+				ve.Add(field, err.Error())
+			}
+		}
+	}
+
+	if ve.HasErrors() {
+		return ve
+	}
+
+	return nil
+}
+
+func validatePropertyValue(value interface{}) error {
+	switch typed := value.(type) {
+	case nil, string, bool, float64:
+		return nil
+	case []interface{}:
+		for _, item := range typed {
+			if err := validatePropertyListItem(item); err != nil {
+				return err
+			}
+		}
+		return nil
+	default:
+		return errors.New("Property value must be a string, number, boolean, or flat list")
+	}
+}
+
+func validatePropertyListItem(value interface{}) error {
+	switch value.(type) {
+	case nil, string, bool, float64:
+		return nil
+	default:
+		return errors.New("Property value must be a string, number, boolean, or flat list")
+	}
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

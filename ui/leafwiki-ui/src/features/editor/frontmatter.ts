@@ -17,6 +17,8 @@ export type ParsedEditorFrontmatter = {
   unsupportedRaw: string
 }
 
+export type EditorFrontmatterValidationErrors = Record<string, string>
+
 function normalizeTag(tag: string) {
   return tag.trim()
 }
@@ -38,6 +40,19 @@ function normalizeListValue(value: string) {
     .map((item) => item.trim())
     .filter(Boolean)
     .join('\n')
+}
+
+function normalizeFieldValue(value: string): string {
+  const trimmed = value.trim()
+  if (trimmed.length >= 2) {
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      return trimmed.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+    }
+    if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+      return trimmed.slice(1, -1).replace(/''/g, "'")
+    }
+  }
+  return trimmed
 }
 
 export function normalizeTags(tags: string[]) {
@@ -89,6 +104,87 @@ export function normalizeEditorFrontmatterFields(
   return result
 }
 
+export function validateEditorFrontmatterMetadata(
+  tags: string[],
+  fields: EditorFrontmatterField[],
+): EditorFrontmatterValidationErrors {
+  const errors: EditorFrontmatterValidationErrors = {}
+  const seenTags = new Set<string>()
+  const seenKeys = new Map<string, number>()
+
+  for (const tag of tags) {
+    if (tag.trim() !== tag) {
+      errors.tags = 'Tags must not contain leading or trailing whitespace.'
+      break
+    }
+
+    if (tag.trim() === '') {
+      errors.tags = 'Tags must not be empty.'
+      break
+    }
+
+    const key = tag.toLocaleLowerCase()
+    if (seenTags.has(key)) {
+      errors.tags = 'Tags must be unique.'
+      break
+    }
+    seenTags.add(key)
+  }
+
+  fields.forEach((field, index) => {
+    if (field.internal) return
+
+    const keyField = `properties.${index}.key`
+    const valueField = `properties.${index}.value`
+    const trimmedKey = field.key.trim()
+
+    if (trimmedKey === '') {
+      errors[keyField] = 'Property key must not be empty.'
+      return
+    }
+
+    if (trimmedKey !== field.key) {
+      errors[keyField] =
+        'Property key must not contain leading or trailing whitespace.'
+      return
+    }
+
+    if (trimmedKey.toLocaleLowerCase().startsWith(INTERNAL_FIELD_PREFIX)) {
+      errors[keyField] = 'Property key uses a reserved prefix.'
+      return
+    }
+
+    const lowerKey = trimmedKey.toLocaleLowerCase()
+    if (lowerKey === 'tags' || lowerKey === 'title') {
+      errors[keyField] = 'Property key is reserved.'
+      return
+    }
+
+    const dedupeKey = trimmedKey.toLocaleLowerCase()
+    const existingIndex = seenKeys.get(dedupeKey)
+    if (existingIndex !== undefined) {
+      errors[keyField] = 'Property key must be unique.'
+      if (!errors[`properties.${existingIndex}.key`]) {
+        errors[`properties.${existingIndex}.key`] =
+          'Property key must be unique.'
+      }
+      return
+    }
+    seenKeys.set(dedupeKey, index)
+
+    if (field.type === 'list') {
+      return
+    }
+
+    if (typeof field.value !== 'string') {
+      errors[valueField] =
+        'Property value must be a string, number, boolean, or flat list.'
+    }
+  })
+
+  return errors
+}
+
 function parseInlineList(value: string) {
   const trimmed = value.trim()
   if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
@@ -113,6 +209,15 @@ function detectFieldType(value: string): EditorFrontmatterFieldType {
   }
 
   return 'text'
+}
+
+// needsYamlQuoting returns true for values that YAML would parse as a
+// non-string type (number, boolean, null) when written bare.
+function needsYamlQuoting(value: string): boolean {
+  if (value === 'true' || value === 'false') return true
+  if (value === 'null' || value === '~') return true
+  if (value !== '' && !Number.isNaN(Number(value))) return true
+  return false
 }
 
 function isInternalFieldKey(key: string) {
@@ -214,10 +319,11 @@ export function parseEditorFrontmatter(
     }
 
     if (trimmedValue !== '') {
+      const normalizedValue = normalizeFieldValue(trimmedValue)
       fields.push({
         key,
-        type: detectFieldType(trimmedValue),
-        value: trimmedValue,
+        type: detectFieldType(normalizedValue),
+        value: normalizedValue,
         internal: isInternalFieldKey(key),
       })
       continue
@@ -277,11 +383,11 @@ function buildFieldBlock(field: EditorFrontmatterField) {
     )
   }
 
-  if (field.type === 'boolean') {
-    return `${formattedKey}: ${field.value === 'false' ? 'false' : 'true'}`
+  const trimmedValue = field.value.trim()
+  if (needsYamlQuoting(trimmedValue)) {
+    return `${formattedKey}: "${trimmedValue}"`
   }
-
-  return `${formattedKey}: ${field.value.trim()}`
+  return `${formattedKey}: ${trimmedValue}`
 }
 
 export function buildEditorFrontmatter({

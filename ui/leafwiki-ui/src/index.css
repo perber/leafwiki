@@ -499,7 +499,7 @@
   }
 
   .app-layout__editor-title-bar-container {
-    @apply flex min-h-full flex-1 items-center justify-center;
+    @apply flex min-h-full flex-1 items-center justify-center px-2;
   }
 
   .app-layout__editor-toolbar-container {
@@ -979,6 +979,13 @@
     @apply text-interface-text flex items-center gap-2 text-sm font-normal;
   }
 
+  .page-frontmatter-panel__title-row--has-errors
+    .page-frontmatter-panel__title-icon,
+  .page-frontmatter-panel__title-row--has-errors
+    .page-frontmatter-panel__title {
+    @apply text-error;
+  }
+
   .page-frontmatter-panel__title-icon {
     @apply text-interface-text;
   }
@@ -991,24 +998,16 @@
     @apply text-muted-foreground text-sm leading-none font-normal;
   }
 
-  .page-frontmatter-panel__layout {
-    @apply flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] md:items-start;
+  .page-frontmatter-panel__stack {
+    @apply flex flex-col gap-3;
   }
 
-  .page-frontmatter-panel__group {
-    @apply mb-0 min-w-0;
+  .page-frontmatter-panel__row {
+    @apply flex flex-col gap-2 md:grid md:grid-cols-[7rem_minmax(0,1fr)] md:items-start md:gap-3;
   }
 
-  .page-frontmatter-panel__group--tags {
-    @apply md:sticky md:top-0;
-  }
-
-  .page-frontmatter-panel__group--properties {
-    @apply border-surface-border border-t pt-3.5;
-  }
-
-  .page-frontmatter-panel__layout .page-frontmatter-panel__group--properties {
-    @apply md:border-t-0 md:border-l md:pt-0 md:pl-4;
+  .page-frontmatter-panel__row--properties {
+    @apply border-surface-border border-t pt-3;
   }
 
   .page-frontmatter-panel__tags-row {
@@ -1046,8 +1045,16 @@
     @apply text-muted-foreground mb-2.5 text-[11px] font-medium tracking-[0.12em] uppercase;
   }
 
+  .page-frontmatter-panel__section-heading--inline {
+    @apply mb-0 pt-2;
+  }
+
+  .page-frontmatter-panel__properties {
+    @apply min-w-0;
+  }
+
   .page-frontmatter-panel__properties-scroll {
-    @apply h-40 overflow-y-auto pr-1 md:h-48;
+    @apply max-h-44 overflow-y-auto pr-1;
   }
 
   .page-frontmatter-panel__fields {
@@ -1055,15 +1062,15 @@
   }
 
   .page-frontmatter-panel__field-row {
-    @apply grid items-center gap-1.5 md:grid-cols-[8.5rem_15rem_2rem];
+    @apply grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] items-center gap-1.5 md:grid-cols-[8.5rem_15rem_30px];
   }
 
   .page-frontmatter-panel__field-key {
-    @apply border-input bg-background h-8 rounded-md border pt-0.5 pr-2 pb-0 pl-2.5 text-sm leading-normal shadow-none focus:ring-0 focus-visible:ring-0 md:w-[8.5rem];
+    @apply border-input bg-background h-[30px] rounded-md border pt-0.5 pr-2 pb-0 pl-2.5 text-sm leading-normal shadow-none focus:ring-0 focus-visible:ring-0 md:w-[8.5rem];
   }
 
   .page-frontmatter-panel__field-value {
-    @apply border-input bg-background h-8 rounded-md border pt-0.5 pr-2 pb-0 pl-2.5 text-sm leading-normal shadow-none focus:ring-0 focus-visible:ring-0 md:w-[15rem];
+    @apply border-input bg-background h-[30px] rounded-md border pt-0.5 pr-2 pb-0 pl-2.5 text-sm leading-normal shadow-none focus:ring-0 focus-visible:ring-0 md:w-[15rem];
   }
 
   .page-frontmatter-panel__field-key:focus,
@@ -1082,11 +1089,11 @@
   }
 
   .page-frontmatter-panel__field-remove {
-    @apply text-muted-foreground hover:text-error inline-flex h-8 w-8 items-center justify-center self-center border-none bg-transparent transition-colors;
+    @apply text-muted-foreground hover:text-error inline-flex h-[30px] w-[30px] items-center justify-center self-center border-none bg-transparent transition-colors;
   }
 
   .page-frontmatter-panel__field-spacer {
-    @apply inline-block h-8 w-8;
+    @apply inline-block h-[30px] w-[30px];
   }
 
   .page-frontmatter-panel__actions {
@@ -1111,6 +1118,14 @@
 
   .page-frontmatter-panel__hint {
     @apply text-muted-foreground text-xs leading-relaxed;
+  }
+
+  .page-frontmatter-panel__error {
+    @apply text-error mt-1 text-xs;
+  }
+
+  .page-frontmatter-panel__input--error {
+    @apply border-error focus-visible:ring-error;
   }
 
   .page-frontmatter-panel__notice {

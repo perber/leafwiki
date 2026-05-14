@@ -19,6 +19,7 @@ import {
   buildEditorFrontmatter,
   EditorFrontmatterField,
   parseEditorFrontmatter,
+  validateEditorFrontmatterMetadata,
 } from './frontmatter'
 
 interface PageEditorState {
@@ -28,6 +29,7 @@ interface PageEditorState {
   tags: string[] // convenient tag editor state
   frontmatterFields: EditorFrontmatterField[]
   frontmatterUnsupported: string
+  frontmatterErrors: Record<string, string>
   error: string | null // error message, if any
   notFound: boolean
   page: Page | null // current page being edited
@@ -37,6 +39,7 @@ interface PageEditorState {
   setContent: (content: string) => void // set the current markdown content
   setTags: (tags: string[]) => void
   setFrontmatterFields: (fields: EditorFrontmatterField[]) => void
+  setFrontmatterErrors: (errors: Record<string, string>) => void
   setError: (error: string | null) => void // set the error message
   setPage: (page: Page | null) => void // set the current page
   savePage: () => Promise<Page | null | undefined> // save the current page
@@ -79,13 +82,35 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   tags: [],
   frontmatterFields: [],
   frontmatterUnsupported: '',
+  frontmatterErrors: {},
   lastStoredPage: null,
   initialPage: null,
   setTitle: (title) => set({ title }),
   setSlug: (slug) => set({ slug }),
   setContent: (content) => set({ content }),
-  setTags: (tags) => set({ tags }),
-  setFrontmatterFields: (frontmatterFields) => set({ frontmatterFields }),
+  setTags: (tags) =>
+    set((state) => ({
+      tags,
+      frontmatterErrors: {
+        ...state.frontmatterErrors,
+        tags: '',
+      },
+    })),
+  setFrontmatterFields: (frontmatterFields) =>
+    set((state) => {
+      const nextErrors = { ...state.frontmatterErrors }
+      for (const key of Object.keys(nextErrors)) {
+        if (key.startsWith('properties.')) {
+          delete nextErrors[key]
+        }
+      }
+
+      return {
+        frontmatterFields,
+        frontmatterErrors: nextErrors,
+      }
+    }),
+  setFrontmatterErrors: (frontmatterErrors) => set({ frontmatterErrors }),
   setError: (error) => set({ error }),
   setPage: (page) => set({ page }),
   savePage: async () => {
@@ -100,8 +125,18 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     } = get()
     if (!page || !isDirtyState(get())) return
 
+    const frontmatterErrors = validateEditorFrontmatterMetadata(
+      tags,
+      frontmatterFields,
+    )
+    if (Object.keys(frontmatterErrors).length > 0) {
+      set({ frontmatterErrors })
+      throw new Error('Please fix metadata errors before saving.')
+    }
+
     try {
       useProgressbarStore.getState().setLoading(true)
+      set({ frontmatterErrors: {} })
       const titleChanged = page.title !== title
       const slugChanged = page.slug !== slug
       const enableLinkRefactor = useConfigStore.getState().enableLinkRefactor
@@ -210,7 +245,13 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     return get().savePage()
   },
   loadPageData: async (path: string) => {
-    set({ error: null, notFound: false, page: null, initialPage: null })
+    set({
+      error: null,
+      notFound: false,
+      page: null,
+      initialPage: null,
+      frontmatterErrors: {},
+    })
     useProgressbarStore.getState().setLoading(true)
     try {
       const page = await getPageByPath(path)

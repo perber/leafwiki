@@ -203,14 +203,16 @@ func authenticatedRequestAs(t *testing.T, router http.Handler, username, passwor
 }
 
 type apiPage struct {
-	ID       string        `json:"id"`
-	Title    string        `json:"title"`
-	Slug     string        `json:"slug"`
-	Content  string        `json:"content"`
-	Path     string        `json:"path"`
-	Version  string        `json:"version"`
-	Kind     tree.NodeKind `json:"kind"`
-	Children []*apiPage    `json:"children"`
+	ID         string                 `json:"id"`
+	Title      string                 `json:"title"`
+	Slug       string                 `json:"slug"`
+	Content    string                 `json:"content"`
+	Path       string                 `json:"path"`
+	Version    string                 `json:"version"`
+	Kind       tree.NodeKind          `json:"kind"`
+	Children   []*apiPage             `json:"children"`
+	Tags       []string               `json:"tags"`
+	Properties map[string]interface{} `json:"properties"`
 }
 
 type apiPermalinkTarget struct {
@@ -433,6 +435,15 @@ func getAdminUserIDViaAPI(t *testing.T, router http.Handler) string {
 	}
 	t.Fatal("admin user not found")
 	return ""
+}
+
+func writePageMarkdownForTest(t *testing.T, w *wiki.Wiki, page *apiPage, raw string) {
+	t.Helper()
+
+	pagePath := filepath.Join(w.GetStorageDir(), "root", filepath.FromSlash(page.Path)+".md")
+	if err := os.WriteFile(pagePath, []byte(raw), 0o644); err != nil {
+		t.Fatalf("WriteFile(page markdown) failed: %v", err)
+	}
 }
 
 func uploadBrandingLogoViaAPI(t *testing.T, router http.Handler, filename string, content []byte) {
@@ -1548,6 +1559,71 @@ func TestUpdatePageEndpoint(t *testing.T) {
 	}
 }
 
+func TestUpdatePageEndpoint_AcceptsTagsAndPropertiesWithoutPersisting(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	page := createPageViaAPI(t, router, "Original Title", "original-title", nil, pageNodeKind())
+	writePageMarkdownForTest(t, w, page, `---
+leafwiki_id: `+page.ID+`
+leafwiki_title: Original Title
+tags:
+  - existing
+status: draft
+---
+# Original
+`)
+
+	payload := map[string]interface{}{
+		"version": page.Version,
+		"title":   "Updated Title",
+		"slug":    "updated-title",
+		"content": "# Updated Content\nWith **Markdown** support.",
+		"tags":    []string{"new-tag", "another-tag"},
+		"properties": map[string]interface{}{
+			"priority":  2,
+			"published": true,
+			"owners":    []string{"alice", "bob"},
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var updated apiPage
+	if err := json.Unmarshal(rec.Body.Bytes(), &updated); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	if len(updated.Tags) != 1 || updated.Tags[0] != "existing" {
+		t.Fatalf("expected response tags to reflect persisted state, got %#v", updated.Tags)
+	}
+	if got := updated.Properties["status"]; got != "draft" {
+		t.Fatalf("expected response properties to reflect persisted state, got %#v", updated.Properties)
+	}
+
+	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID, nil)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on get, got %d - %s", getRec.Code, getRec.Body.String())
+	}
+
+	var fetched apiPage
+	if err := json.Unmarshal(getRec.Body.Bytes(), &fetched); err != nil {
+		t.Fatalf("Invalid get response JSON: %v", err)
+	}
+
+	if len(fetched.Tags) != 1 || fetched.Tags[0] != "existing" {
+		t.Fatalf("expected tags not to persist yet, got %#v", fetched.Tags)
+	}
+	if _, exists := fetched.Properties["priority"]; exists {
+		t.Fatalf("expected request properties not to persist yet, got %#v", fetched.Properties)
+	}
+}
+
 func TestUpdatePage_NotFound(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
@@ -1654,6 +1730,60 @@ func TestUpdatePage_MissingSlug(t *testing.T) {
 	}
 }
 
+func TestUpdatePage_InvalidProperties(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	page := createPageViaAPI(t, router, "Original Title", "original-title", nil, pageNodeKind())
+
+	payload := map[string]interface{}{
+		"version": page.Version,
+		"title":   "Updated Title",
+		"slug":    "updated-title",
+		"content": "Updated content",
+		"properties": map[string]interface{}{
+			"leafwiki_hidden": "forbidden",
+			"nested": map[string]interface{}{
+				"not": "allowed",
+			},
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(body)))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400 Bad Request, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Error  string `json:"error"`
+		Fields []struct {
+			Field   string `json:"field"`
+			Message string `json:"message"`
+		} `json:"fields"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid validation response JSON: %v", err)
+	}
+
+	if resp.Error != "validation_error" {
+		t.Fatalf("expected validation_error, got %q", resp.Error)
+	}
+
+	gotFields := map[string]string{}
+	for _, field := range resp.Fields {
+		gotFields[field.Field] = field.Message
+	}
+
+	if gotFields["properties.leafwiki_hidden"] != "Property key uses a reserved prefix" {
+		t.Fatalf("expected reserved prefix validation error, got %#v", gotFields)
+	}
+	if gotFields["properties.nested"] != "Property value must be a string, number, boolean, or flat list" {
+		t.Fatalf("expected nested property validation error, got %#v", gotFields)
+	}
+}
+
 func TestGetPageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
@@ -1661,6 +1791,21 @@ func TestGetPageEndpoint(t *testing.T) {
 
 	// Create a page
 	page := createPageViaAPI(t, router, "Welcome", "welcome", nil, pageNodeKind())
+	writePageMarkdownForTest(t, w, page, `---
+leafwiki_id: `+page.ID+`
+leafwiki_title: Welcome
+tags:
+  - alpha
+  - beta
+priority: 2
+published: true
+owners:
+  - alice
+  - bob
+---
+# Welcome
+Body
+`)
 
 	// Get page
 	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID, nil)
@@ -1684,6 +1829,22 @@ func TestGetPageEndpoint(t *testing.T) {
 
 	if resp["slug"] != page.Slug {
 		t.Errorf("Expected slug in response, got: %v", resp)
+	}
+
+	tagsValue, ok := resp["tags"].([]interface{})
+	if !ok || len(tagsValue) != 2 || tagsValue[0] != "alpha" || tagsValue[1] != "beta" {
+		t.Fatalf("Expected tags in response, got %#v", resp["tags"])
+	}
+
+	propertiesValue, ok := resp["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected properties in response, got %#v", resp["properties"])
+	}
+	if propertiesValue["priority"] != float64(2) {
+		t.Fatalf("Expected numeric property in response, got %#v", propertiesValue)
+	}
+	if propertiesValue["published"] != true {
+		t.Fatalf("Expected boolean property in response, got %#v", propertiesValue)
 	}
 }
 

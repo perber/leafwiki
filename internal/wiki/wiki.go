@@ -18,6 +18,8 @@ import (
 	coreimporter "github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/search"
+	"github.com/perber/wiki/internal/properties"
+	"github.com/perber/wiki/internal/tags"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikiauth "github.com/perber/wiki/internal/wiki/auth"
 	wikibranding "github.com/perber/wiki/internal/wiki/branding"
@@ -25,8 +27,10 @@ import (
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
+	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
+	wikitags "github.com/perber/wiki/internal/wiki/tags"
 )
 
 type Wiki struct {
@@ -48,11 +52,15 @@ type Wiki struct {
 	revisionsRoutes *wikirevisions.Routes
 	searchRoutes    *wikisearch.Routes
 	linksRoutes     *wikilinks.Routes
-	brandingRoutes  *wikibranding.Routes
+	tagsRoutes        *wikitags.Routes
+	propertiesRoutes  *wikiproperties.Routes
+	brandingRoutes    *wikibranding.Routes
 	importerRoutes  *wikiimporter.Routes
 	searchWatcher   *search.Watcher
 	revision        *revision.Service
 	links           *links.LinkService
+	tags            *tags.TagsService
+	props           *properties.PropertiesService
 	log             *slog.Logger
 }
 
@@ -87,6 +95,12 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		return nil, err
 	}
 	if err := w.initLinkService(); err != nil {
+		return nil, err
+	}
+	if err := w.initTagsService(); err != nil {
+		return nil, err
+	}
+	if err := w.initPropertiesService(); err != nil {
 		return nil, err
 	}
 	if err := w.initSearch(); err != nil {
@@ -191,6 +205,30 @@ func (w *Wiki) initLinkService() error {
 	return nil
 }
 
+func (w *Wiki) initTagsService() error {
+	tagsStore, err := tags.NewTagsStore(w.storageDir)
+	if err != nil {
+		return fmt.Errorf("failed to init tags store: %w", err)
+	}
+	w.tags = tags.NewTagsService(w.tree, tagsStore)
+	if err := w.tags.IndexAllPages(); err != nil {
+		w.log.Warn("failed to index tags on startup", "error", err)
+	}
+	return nil
+}
+
+func (w *Wiki) initPropertiesService() error {
+	propsStore, err := properties.NewPropertiesStore(w.storageDir)
+	if err != nil {
+		return fmt.Errorf("failed to init properties store: %w", err)
+	}
+	w.props = properties.NewPropertiesService(w.tree, propsStore)
+	if err := w.props.IndexAllPages(); err != nil {
+		w.log.Warn("failed to index properties on startup", "error", err)
+	}
+	return nil
+}
+
 func (w *Wiki) initSearch() error {
 	var err error
 	w.searchIndex, err = search.NewSQLiteIndex(w.storageDir)
@@ -232,6 +270,8 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.revisionsRoutes = w.buildRevisionsRoutes()
 	w.searchRoutes = w.buildSearchRoutes()
 	w.linksRoutes = w.buildLinksRoutes()
+	w.tagsRoutes = w.buildTagsRoutes()
+	w.propertiesRoutes = w.buildPropertiesRoutes()
 	w.brandingRoutes = w.buildBrandingRoutes()
 	w.importerRoutes = w.buildImporterRoutes(options)
 }
@@ -242,6 +282,8 @@ func (w *Wiki) newPageOrchestrator() *pagesave.PageSaveOrchestrator {
 	return pagesave.NewPageSaveOrchestrator(
 		pagesave.NewLinkIndexSideEffect(w.links, w.log),
 		pagesave.NewRevisionSideEffect(w.revision, w.log),
+		pagesave.NewTagsSideEffect(w.tags, w.log),
+		pagesave.NewPropertiesSideEffect(w.props, w.log),
 	)
 }
 
@@ -325,6 +367,22 @@ func (w *Wiki) buildLinksRoutes() *wikilinks.Routes {
 	})
 }
 
+func (w *Wiki) buildTagsRoutes() *wikitags.Routes {
+	return wikitags.NewRoutes(wikitags.RoutesConfig{
+		GetTags:        wikitags.NewGetTagsUseCase(w.tags),
+		GetPagesByTags: wikitags.NewGetPagesByTagsUseCase(w.tags, w.tree, w.userResolver),
+		AuthService:    w.auth,
+	})
+}
+
+func (w *Wiki) buildPropertiesRoutes() *wikiproperties.Routes {
+	return wikiproperties.NewRoutes(wikiproperties.RoutesConfig{
+		GetPropertyKeys:    wikiproperties.NewGetPropertyKeysUseCase(w.props),
+		GetPagesByProperty: wikiproperties.NewGetPagesByPropertyUseCase(w.props, w.tree, w.userResolver),
+		AuthService:        w.auth,
+	})
+}
+
 func (w *Wiki) buildBrandingRoutes() *wikibranding.Routes {
 	return wikibranding.NewRoutes(wikibranding.RoutesConfig{
 		GetBranding:     wikibranding.NewGetBrandingUseCase(w.branding),
@@ -367,6 +425,8 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.revisionsRoutes,
 		w.searchRoutes,
 		w.linksRoutes,
+		w.tagsRoutes,
+		w.propertiesRoutes,
 		w.brandingRoutes,
 		w.importerRoutes,
 	}

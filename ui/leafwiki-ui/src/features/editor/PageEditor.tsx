@@ -34,6 +34,7 @@ export default function PageEditor() {
   const frontmatterUnsupported = usePageEditorStore(
     (s) => s.frontmatterUnsupported,
   )
+  const frontmatterErrors = usePageEditorStore((s) => s.frontmatterErrors)
   const notFound = usePageEditorStore((s) => s.notFound)
   const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
@@ -217,6 +218,7 @@ export default function PageEditor() {
             <PageFrontmatterPanel
               tags={tags}
               fields={frontmatterFields}
+              errors={frontmatterErrors}
               hasUnsupportedFields={Boolean(frontmatterUnsupported)}
               onTagsChange={setTags}
               onFieldsChange={setFrontmatterFields}
