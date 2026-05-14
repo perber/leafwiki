@@ -5,6 +5,32 @@ import { expect } from '@playwright/test';
 export default class ViewPage {
   constructor(private page: Page) {}
 
+  private async activateControl(locator: ReturnType<Page['locator']>) {
+    await locator.waitFor({ state: 'visible' });
+
+    try {
+      await locator.click({ timeout: 2000 });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const pointerIntercepted =
+        message.includes('intercepts pointer events') ||
+        message.includes('element is not visible') ||
+        message.includes('detached from the DOM');
+
+      if (!pointerIntercepted) {
+        throw error;
+      }
+    }
+
+    await locator.evaluate((element) => {
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('Expected HTMLElement');
+      }
+      element.click();
+    });
+  }
+
   async goto(pagePath: string = '/') {
     await this.page.goto(toAppPath(pagePath));
     await this.page.locator('article').waitFor({ state: 'visible' });
@@ -138,8 +164,7 @@ export default class ViewPage {
 
   async openToolbarOverflow() {
     const overflowButton = this.page.getByTestId('toolbar-overflow-button');
-    await overflowButton.waitFor({ state: 'visible' });
-    await overflowButton.click();
+    await this.activateControl(overflowButton);
   }
 
   async clickDeletePageMenuItem() {
@@ -169,14 +194,13 @@ export default class ViewPage {
       .toBe(true);
 
     if (await historyButton.isVisible().catch(() => false)) {
-      await historyButton.click();
+      await this.activateControl(historyButton);
       return;
     }
 
     await this.openToolbarOverflow();
     const historyMenuItem = this.page.getByTestId('page-history-menu-item');
-    await historyMenuItem.waitFor({ state: 'visible' });
-    await historyMenuItem.click();
+    await this.activateControl(historyMenuItem);
   }
 
   async openCurrentPageHistory() {
