@@ -4,12 +4,8 @@ export default class TagsView {
   constructor(private page: Page) {}
 
   async open() {
-    await this.page
-      .locator('button[data-testid="sidebar-tags-tab-button"]')
-      .click();
-    await this.page
-      .locator('input[data-testid="tags-search-input"]')
-      .waitFor({ state: 'visible' });
+    await this.page.locator('button[data-testid="sidebar-tags-tab-button"]').click();
+    await this.page.locator('input[data-testid="tags-search-input"]').waitFor({ state: 'visible' });
   }
 
   getSearchInput() {

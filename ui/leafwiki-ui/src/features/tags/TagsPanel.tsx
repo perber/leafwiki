@@ -185,7 +185,10 @@ export default function TagsPanel({ active = false }: TagsPanelProps) {
                 className="browse-results__view search__results-view"
                 contentClassName="search__content"
               >
-                <ListViewStatus className="browse-results__empty" data-testid="tags-fetch-error">
+                <ListViewStatus
+                  className="browse-results__empty"
+                  data-testid="tags-fetch-error"
+                >
                   Failed to load results. Please try again.
                 </ListViewStatus>
               </ListView>

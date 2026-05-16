@@ -32,23 +32,36 @@ async function createPageWithTags(
         document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
         document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
       if (!m) return null;
-      try { return decodeURIComponent(m[1]); } catch { return m[1]; }
+      try {
+        return decodeURIComponent(m[1]);
+      } catch {
+        return m[1];
+      }
     }
     const csrf = getCsrf();
     if (!csrf) throw new Error('Missing CSRF token');
 
     const cr = await fetch('/api/pages', {
-      method: 'POST', credentials: 'include',
+      method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
       body: JSON.stringify({ parentId: null, title, slug, kind: 'page' }),
     });
     if (!cr.ok) throw new Error(`create failed: ${cr.status}`);
-    const created = await cr.json() as { id: string; version: string };
+    const created = (await cr.json()) as { id: string; version: string };
 
     const ur = await fetch(`/api/pages/${created.id}`, {
-      method: 'PUT', credentials: 'include',
+      method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-      body: JSON.stringify({ version: created.version, title, slug, content, tags, properties: {} }),
+      body: JSON.stringify({
+        version: created.version,
+        title,
+        slug,
+        content,
+        tags,
+        properties: {},
+      }),
     });
     if (!ur.ok) throw new Error(`update failed: ${ur.status}`);
   }, input);

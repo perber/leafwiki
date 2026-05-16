@@ -340,7 +340,11 @@ function TagInputWithSuggestions({
                   onClick={() => addTag(tag)}
                   onMouseEnter={() => setActiveSuggestionIndex(index)}
                   aria-selected={index === clampedSuggestionIndex}
-                  data-testid={variant === 'browse' ? `tags-suggestion-${tag}` : `tag-suggestion-${variant}-${tag}`}
+                  data-testid={
+                    variant === 'browse'
+                      ? `tags-suggestion-${tag}`
+                      : `tag-suggestion-${variant}-${tag}`
+                  }
                 >
                   <span>{tag}</span>
                   <span className={classes.suggestionCount}>{count}</span>
@@ -359,7 +363,9 @@ function TagInputWithSuggestions({
           <span
             key={tag}
             className={classes.chip}
-            data-testid={variant === 'browse' ? `tags-selected-chip-${tag}` : undefined}
+            data-testid={
+              variant === 'browse' ? `tags-selected-chip-${tag}` : undefined
+            }
           >
             <span>{tag}</span>
             <button

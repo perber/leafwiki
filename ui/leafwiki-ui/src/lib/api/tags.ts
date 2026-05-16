@@ -26,7 +26,12 @@ export async function fetchTags(
   return (await fetchWithAuth(`/api/tags?${params}`)) as TagCount[]
 }
 
-export async function fetchPagesByTags(tags: string[], signal?: AbortSignal): Promise<TaggedPage[]> {
+export async function fetchPagesByTags(
+  tags: string[],
+  signal?: AbortSignal,
+): Promise<TaggedPage[]> {
   const params = new URLSearchParams({ tags: tags.join(',') })
-  return (await fetchWithAuth(`/api/tags/pages?${params}`, { signal })) as TaggedPage[]
+  return (await fetchWithAuth(`/api/tags/pages?${params}`, {
+    signal,
+  })) as TaggedPage[]
 }
