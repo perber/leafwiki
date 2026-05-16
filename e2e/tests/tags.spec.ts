@@ -6,22 +6,6 @@ import ViewPage from '../pages/ViewPage';
 const user = process.env.E2E_ADMIN_USER || 'admin';
 const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
 
-async function getCsrfToken(page: import('@playwright/test').Page): Promise<string> {
-  const token = await page.evaluate(() => {
-    const hostMatch =
-      document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
-      document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
-    if (!hostMatch) return null;
-    try {
-      return decodeURIComponent(hostMatch[1]);
-    } catch {
-      return hostMatch[1];
-    }
-  });
-  if (!token) throw new Error('Missing CSRF token');
-  return token;
-}
-
 async function createPageWithTags(
   page: import('@playwright/test').Page,
   input: { title: string; slug: string; content: string; tags: string[] },
@@ -220,9 +204,6 @@ test.describe('tags panel', () => {
     await tagsView.selectSuggestion(primaryTag);
     await tagsView.waitForResults();
 
-    // Click the secondary tag on the result card to add it to the filter
-    const secondaryTagButton = page.getByTestId(`tags-result-tag-${secondaryTag}`).first();
-    // Use a more resilient locator via text content
     const tagButton = page
       .locator('.tags-result-card__tags button')
       .filter({ hasText: secondaryTag })
