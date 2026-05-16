@@ -37,7 +37,7 @@ import { useLinkStatusStore } from '../links/linkstatus_store'
 import { AssetPreviewTooltip } from '../assets/AssetPreviewTooltip'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { useViewerStore } from '../viewer/viewer'
-import { confirmRestoreRevision } from './restoreRevisionDialog'
+import { confirmRestoreRevision } from './restoreRevisionDialogState'
 import {
   type HistoryTab,
   loadMorePageHistory,

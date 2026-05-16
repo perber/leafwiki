@@ -9,8 +9,9 @@ import type { EditorView } from '@codemirror/view'
 import { completionStatus } from '@codemirror/autocomplete'
 import { Save, X } from 'lucide-react'
 import { useEffect } from 'react'
-import { useToolbarStore } from '../toolbar/toolbar'
-import { isDirtyState, usePageEditorStore } from './pageEditor'
+import { useToolbarStore } from '../toolbar/toolbarStore'
+import { usePageEditorStore } from './pageEditorStore'
+import { isDirtyState } from './pageEditorStore'
 
 export interface ToolbarActionsOptions {
   savePage: () => void

@@ -10,7 +10,7 @@ import {
 } from '@/lib/api/revisions'
 import { useEffect } from 'react'
 import { create } from 'zustand'
-import { useProgressbarStore } from '../progressbar/progressbar'
+import { useProgressbarStore } from '../progressbar/progressbarStore'
 
 export type HistoryTab = 'changes' | 'preview' | 'raw' | 'assets'
 

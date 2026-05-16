@@ -16,7 +16,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PageSelect } from './PageSelect'
 import { refreshAfterPageRefactor } from './pageMutationRefresh'
-import { confirmPageRefactor } from './pageRefactorDialog'
+import { confirmPageRefactor } from './pageRefactorDialogState'
 
 export function MovePageDialog({ pageId }: { pageId: string }) {
   const { tree } = useTreeStore()

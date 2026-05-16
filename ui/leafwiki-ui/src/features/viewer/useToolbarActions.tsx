@@ -7,7 +7,7 @@ import { useConfigStore } from '@/stores/config'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { Copy, History, Link2, Pencil, Printer, Trash2 } from 'lucide-react'
 import { useEffect } from 'react'
-import { type ToolbarButton, useToolbarStore } from '../toolbar/toolbar'
+import { type ToolbarButton, useToolbarStore } from '../toolbar/toolbarStore'
 
 export interface ToolbarActionsOptions {
   pageKind?: Page['kind']

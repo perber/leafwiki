@@ -3,7 +3,7 @@ import { buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { forwardRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { usePageEditorStore } from '../editor/pageEditor'
+import { usePageEditorStore } from '../editor/pageEditorStore'
 
 type SearchResultCardProps = {
   item: SearchResultItem

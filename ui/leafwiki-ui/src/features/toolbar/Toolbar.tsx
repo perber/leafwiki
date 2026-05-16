@@ -9,7 +9,7 @@ import {
 import { ToolbarButton } from '@/features/toolbar/ToolbarButton'
 import { cn } from '@/lib/utils'
 import { MoreHorizontal } from 'lucide-react'
-import { useToolbarStore } from './toolbar'
+import { useToolbarStore } from './toolbarStore'
 
 const MOBILE_VISIBLE_BUTTONS = 2
 
