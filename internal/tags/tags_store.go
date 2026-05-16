@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/perber/wiki/internal/core/shared"
 	_ "modernc.org/sqlite"
 )
 
@@ -72,7 +73,7 @@ func (s *TagsStore) SetTagsForPage(pageID string, tags []string) error {
 			_ = tx.Rollback()
 			return fmt.Errorf("failed to prepare tag insert: %w", err)
 		}
-		defer stmt.Close()
+		defer shared.LogClose(stmt.Close, "could not close statement")
 
 		for _, tag := range tags {
 			if _, err := stmt.Exec(pageID, tag); err != nil {
@@ -121,7 +122,7 @@ func (s *TagsStore) GetAllTags(filter string, limit int) ([]TagCount, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer shared.LogClose(rows.Close, "could not close rows")
 
 	var result []TagCount
 	for rows.Next() {
@@ -180,7 +181,7 @@ func (s *TagsStore) GetAllTagsForSelection(filter string, selected []string, lim
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer shared.LogClose(rows.Close, "could not close rows")
 
 	var result []TagCount
 	for rows.Next() {
@@ -219,7 +220,7 @@ func (s *TagsStore) GetPageIDsByTags(tags []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer shared.LogClose(rows.Close, "could not close rows")
 
 	var pageIDs []string
 	for rows.Next() {
@@ -248,7 +249,7 @@ func (s *TagsStore) getAllTagsLocked(filter string, limit int) ([]TagCount, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer shared.LogClose(rows.Close, "could not close rows")
 
 	var result []TagCount
 	for rows.Next() {
@@ -284,7 +285,7 @@ func (s *TagsStore) GetTagsForPages(pageIDs []string) (map[string][]string, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer shared.LogClose(rows.Close, "could not close rows")
 
 	result := make(map[string][]string)
 	for rows.Next() {

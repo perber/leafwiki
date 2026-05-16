@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/perber/wiki/internal/core/shared"
 	_ "modernc.org/sqlite"
 )
 
@@ -83,7 +84,7 @@ func (s *PropertiesStore) SetPropertiesForPage(pageID string, props map[string]P
 			_ = tx.Rollback()
 			return fmt.Errorf("failed to prepare property insert: %w", err)
 		}
-		defer stmt.Close()
+		defer shared.LogClose(stmt.Close, "could not close statement")
 
 		for k, e := range props {
 			if _, err := stmt.Exec(pageID, k, e.Value, e.Type); err != nil {
@@ -133,7 +134,7 @@ func (s *PropertiesStore) GetAllPropertyKeys(filter string, limit int) ([]Proper
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer shared.LogClose(rows.Close, "could not close rows")
 
 	var result []PropertyKeyCount
 	for rows.Next() {
@@ -158,7 +159,7 @@ func (s *PropertiesStore) GetPageIDsByProperty(key, value string) ([]string, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer shared.LogClose(rows.Close, "could not close rows")
 
 	var pageIDs []string
 	for rows.Next() {
@@ -194,7 +195,7 @@ func (s *PropertiesStore) GetPropertiesForPages(pageIDs []string) (map[string]ma
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer shared.LogClose(rows.Close, "could not close rows")
 
 	result := make(map[string]map[string]PropertyEntry)
 	for rows.Next() {
