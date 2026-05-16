@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import {
   memo,
   KeyboardEvent,
+  CompositionEvent,
   useEffect,
   useMemo,
   useRef,
@@ -102,6 +103,8 @@ function TagInputWithSuggestions({
     width: number
   } | null>(null)
 
+  const [isComposing, setIsComposing] = useState(false)
+
   const normalizedTags = useMemo(() => normalizeTags(tags), [tags])
   const suggestedTags = useMemo(
     () =>
@@ -143,7 +146,7 @@ function TagInputWithSuggestions({
     if (filterTimerRef.current) clearTimeout(filterTimerRef.current)
     const query = draft.trim().toLocaleLowerCase()
 
-    if (!query) {
+    if (!query || isComposing) {
       latestRequestIdRef.current += 1
       setSuggestions([])
       setLoading(false)
@@ -175,7 +178,7 @@ function TagInputWithSuggestions({
     return () => {
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current)
     }
-  }, [draft, normalizedTags])
+  }, [draft, normalizedTags, isComposing])
 
   useEffect(() => {
     if (!showSuggestions) {
@@ -337,7 +340,7 @@ function TagInputWithSuggestions({
                   onClick={() => addTag(tag)}
                   onMouseEnter={() => setActiveSuggestionIndex(index)}
                   aria-selected={index === clampedSuggestionIndex}
-                  data-testid={`tag-suggestion-${variant}-${tag}`}
+                  data-testid={variant === 'browse' ? `tags-suggestion-${tag}` : `tag-suggestion-${variant}-${tag}`}
                 >
                   <span>{tag}</span>
                   <span className={classes.suggestionCount}>{count}</span>
@@ -353,7 +356,11 @@ function TagInputWithSuggestions({
     <div ref={rootRef} className={classes.root}>
       <div className={classes.selection}>
         {normalizedTags.map((tag) => (
-          <span key={tag} className={classes.chip}>
+          <span
+            key={tag}
+            className={classes.chip}
+            data-testid={variant === 'browse' ? `tags-selected-chip-${tag}` : undefined}
+          >
             <span>{tag}</span>
             <button
               type="button"
@@ -371,6 +378,11 @@ function TagInputWithSuggestions({
           onChange={(event) => {
             setDraft(event.target.value)
             setSuggestionsOpen(true)
+          }}
+          onCompositionStart={() => setIsComposing(true)}
+          onCompositionEnd={(event: CompositionEvent<HTMLInputElement>) => {
+            setIsComposing(false)
+            setDraft(event.currentTarget.value)
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => setSuggestionsOpen(true)}

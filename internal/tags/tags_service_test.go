@@ -297,6 +297,99 @@ func TestTagsService_GetTagsForPages_ReturnsCorrectTags(t *testing.T) {
 	assertStringSliceEqual(t, got["p2"], []string{"typescript"})
 }
 
+// ─── IndexPageContent ─────────────────────────────────────────────────────────
+
+func TestTagsService_IndexPageContent_StoresTagsAndExcerpt(t *testing.T) {
+	svc, _ := setupTagsService(t)
+
+	raw := "---\ntags:\n  - go\n  - testing\n---\n\nThis is the page body."
+	if err := svc.IndexPageContent("page-1", raw); err != nil {
+		t.Fatalf("IndexPageContent: %v", err)
+	}
+
+	tags, err := svc.GetAllTags("", 50)
+	if err != nil {
+		t.Fatalf("GetAllTags: %v", err)
+	}
+	if len(tags) != 2 {
+		t.Fatalf("expected 2 tags, got %v", tags)
+	}
+
+	exc, err := svc.GetExcerptsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if exc["page-1"] != "This is the page body." {
+		t.Errorf("excerpt = %q", exc["page-1"])
+	}
+}
+
+func TestTagsService_IndexPageContent_NoFrontmatterStoresEmptyTags(t *testing.T) {
+	svc, _ := setupTagsService(t)
+
+	raw := "# Just a page\n\nSome content without frontmatter."
+	if err := svc.IndexPageContent("page-1", raw); err != nil {
+		t.Fatalf("IndexPageContent: %v", err)
+	}
+
+	tags, err := svc.GetAllTags("", 50)
+	if err != nil {
+		t.Fatalf("GetAllTags: %v", err)
+	}
+	if len(tags) != 0 {
+		t.Errorf("expected no tags, got %v", tags)
+	}
+
+	exc, err := svc.GetExcerptsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if exc["page-1"] == "" {
+		t.Error("expected non-empty excerpt for page without frontmatter")
+	}
+}
+
+func TestTagsService_IndexPageContent_UpdatesExistingEntry(t *testing.T) {
+	svc, _ := setupTagsService(t)
+
+	_ = svc.IndexPageContent("page-1", "---\ntags:\n  - go\n---\n\nFirst version.")
+	_ = svc.IndexPageContent("page-1", "---\ntags:\n  - rust\n---\n\nSecond version.")
+
+	tags, err := svc.GetPageIDsByTags([]string{"rust"})
+	if err != nil {
+		t.Fatalf("GetPageIDsByTags: %v", err)
+	}
+	if len(tags) != 1 {
+		t.Fatalf("expected [page-1] for rust, got %v", tags)
+	}
+
+	oldTags, err := svc.GetPageIDsByTags([]string{"go"})
+	if err != nil {
+		t.Fatalf("GetPageIDsByTags: %v", err)
+	}
+	if len(oldTags) != 0 {
+		t.Errorf("old tag 'go' should be gone after update, got %v", oldTags)
+	}
+}
+
+func TestTagsService_IndexAllPages_StoresExcerpts(t *testing.T) {
+	svc, ts := setupTagsService(t)
+
+	pageID := createPageWithTags(t, ts, "Excerpt Page", "excerpt-page", []string{"go"})
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages: %v", err)
+	}
+
+	exc, err := svc.GetExcerptsForPages([]string{pageID})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if exc[pageID] == "" {
+		t.Errorf("expected non-empty excerpt after IndexAllPages")
+	}
+}
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 func trimmed(s string) string {

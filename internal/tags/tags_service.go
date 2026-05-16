@@ -39,14 +39,19 @@ func (s *TagsService) IndexAllPages() error {
 		if err != nil {
 			return err
 		}
-
-		tags := ExtractTagsFromContent(raw)
-		if err := s.store.SetTagsForPage(id, tags); err != nil {
+		if err := s.IndexPageContent(id, raw); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// IndexPageContent extracts tags and excerpt from rawContent and stores both atomically.
+func (s *TagsService) IndexPageContent(pageID, rawContent string) error {
+	tags := ExtractTagsFromContent(rawContent)
+	excerpt := ExtractExcerptFromContent(rawContent)
+	return s.store.SetPageIndex(pageID, tags, excerpt)
 }
 
 func (s *TagsService) SetTagsForPage(pageID string, tags []string) error {
@@ -55,6 +60,10 @@ func (s *TagsService) SetTagsForPage(pageID string, tags []string) error {
 
 func (s *TagsService) DeleteTagsForPage(pageID string) error {
 	return s.store.DeleteTagsForPage(pageID)
+}
+
+func (s *TagsService) DeletePageIndex(pageID string) error {
+	return s.store.DeletePageIndex(pageID)
 }
 
 func (s *TagsService) GetAllTags(filter string, limit int) ([]TagCount, error) {
@@ -71,6 +80,10 @@ func (s *TagsService) GetPageIDsByTags(tags []string) ([]string, error) {
 
 func (s *TagsService) GetTagsForPages(pageIDs []string) (map[string][]string, error) {
 	return s.store.GetTagsForPages(pageIDs)
+}
+
+func (s *TagsService) GetExcerptsForPages(pageIDs []string) (map[string]string, error) {
+	return s.store.GetExcerptsForPages(pageIDs)
 }
 
 // ExtractTagsFromContent parses frontmatter and returns lowercase-normalized tags.

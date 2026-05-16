@@ -46,6 +46,10 @@ func (s *TagsStore) ensureSchema() error {
 			PRIMARY KEY (page_id, tag)
 		);
 		CREATE INDEX IF NOT EXISTS idx_page_tags_tag ON page_tags(tag);
+		CREATE TABLE IF NOT EXISTS page_meta (
+			page_id TEXT PRIMARY KEY,
+			excerpt TEXT NOT NULL DEFAULT ''
+		);
 	`)
 	return err
 }
@@ -94,12 +98,123 @@ func (s *TagsStore) DeleteTagsForPage(pageID string) error {
 	return err
 }
 
+// SetPageIndex atomically replaces tags and excerpt for a page.
+// Tags must already be normalized (lowercase, trimmed, deduped) by the caller.
+func (s *TagsStore) SetPageIndex(pageID string, tags []string, excerpt string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`DELETE FROM page_tags WHERE page_id = ?`, pageID); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("failed to clear tags for page %s: %w", pageID, err)
+	}
+
+	if len(tags) > 0 {
+		stmt, err := tx.Prepare(`INSERT OR IGNORE INTO page_tags(page_id, tag) VALUES (?, ?)`)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("failed to prepare tag insert: %w", err)
+		}
+		defer shared.LogClose(stmt.Close, "could not close statement")
+
+		for _, tag := range tags {
+			if _, err := stmt.Exec(pageID, tag); err != nil {
+				_ = tx.Rollback()
+				return fmt.Errorf("failed to insert tag %q for page %s: %w", tag, pageID, err)
+			}
+		}
+	}
+
+	if _, err := tx.Exec(
+		`INSERT INTO page_meta(page_id, excerpt) VALUES (?, ?)
+		 ON CONFLICT(page_id) DO UPDATE SET excerpt = excluded.excerpt`,
+		pageID, excerpt,
+	); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("failed to upsert excerpt for page %s: %w", pageID, err)
+	}
+
+	return tx.Commit()
+}
+
+// DeletePageIndex removes tags and meta for a page atomically.
+func (s *TagsStore) DeletePageIndex(pageID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`DELETE FROM page_tags WHERE page_id = ?`, pageID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM page_meta WHERE page_id = ?`, pageID); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+// GetExcerptsForPages returns a map of pageID → excerpt for the given page IDs.
+func (s *TagsStore) GetExcerptsForPages(pageIDs []string) (map[string]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(pageIDs) == 0 {
+		return map[string]string{}, nil
+	}
+
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(pageIDs)), ",")
+	args := make([]any, len(pageIDs))
+	for i, id := range pageIDs {
+		args[i] = id
+	}
+
+	rows, err := s.db.Query(fmt.Sprintf(
+		`SELECT page_id, excerpt FROM page_meta WHERE page_id IN (%s)`,
+		placeholders,
+	), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer shared.LogClose(rows.Close, "could not close rows")
+
+	result := make(map[string]string)
+	for rows.Next() {
+		var pageID, excerpt string
+		if err := rows.Scan(&pageID, &excerpt); err != nil {
+			return nil, err
+		}
+		result[pageID] = excerpt
+	}
+	return result, rows.Err()
+}
+
 func (s *TagsStore) Clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.Exec(`DELETE FROM page_tags`)
-	return err
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM page_tags`); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM page_meta`); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 // GetAllTags returns tags with page count, optionally filtered by prefix. limit <= 0 means no limit.

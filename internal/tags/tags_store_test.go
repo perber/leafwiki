@@ -465,6 +465,169 @@ func TestTagsStore_Clear_RemovesAllEntries(t *testing.T) {
 	}
 }
 
+// ─── SetPageIndex ─────────────────────────────────────────────────────────────
+
+func TestTagsStore_SetPageIndex_StoresTagsAndExcerpt(t *testing.T) {
+	store := newTestStore(t)
+
+	if err := store.SetPageIndex("page-1", []string{"go", "testing"}, "some excerpt"); err != nil {
+		t.Fatalf("SetPageIndex: %v", err)
+	}
+
+	gotTags, err := store.GetTagsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetTagsForPages: %v", err)
+	}
+	assertStringSliceEqual(t, gotTags["page-1"], []string{"go", "testing"})
+
+	gotExcerpts, err := store.GetExcerptsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if gotExcerpts["page-1"] != "some excerpt" {
+		t.Errorf("excerpt = %q, want %q", gotExcerpts["page-1"], "some excerpt")
+	}
+}
+
+func TestTagsStore_SetPageIndex_UpdatesExcerptOnSecondCall(t *testing.T) {
+	store := newTestStore(t)
+
+	_ = store.SetPageIndex("page-1", []string{"go"}, "first excerpt")
+	_ = store.SetPageIndex("page-1", []string{"go"}, "updated excerpt")
+
+	got, err := store.GetExcerptsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if got["page-1"] != "updated excerpt" {
+		t.Errorf("excerpt = %q, want %q", got["page-1"], "updated excerpt")
+	}
+}
+
+func TestTagsStore_SetPageIndex_EmptyTagsClearsTagsButKeepsExcerpt(t *testing.T) {
+	store := newTestStore(t)
+
+	_ = store.SetPageIndex("page-1", []string{"go"}, "excerpt here")
+	_ = store.SetPageIndex("page-1", []string{}, "excerpt here")
+
+	tags, err := store.GetTagsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetTagsForPages: %v", err)
+	}
+	if len(tags["page-1"]) != 0 {
+		t.Errorf("expected no tags, got %v", tags["page-1"])
+	}
+
+	exc, err := store.GetExcerptsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if exc["page-1"] != "excerpt here" {
+		t.Errorf("excerpt = %q, want 'excerpt here'", exc["page-1"])
+	}
+}
+
+// ─── DeletePageIndex ─────────────────────────────────────────────────────────
+
+func TestTagsStore_DeletePageIndex_RemovesTagsAndExcerpt(t *testing.T) {
+	store := newTestStore(t)
+
+	_ = store.SetPageIndex("page-1", []string{"go"}, "some excerpt")
+	if err := store.DeletePageIndex("page-1"); err != nil {
+		t.Fatalf("DeletePageIndex: %v", err)
+	}
+
+	tags, err := store.GetTagsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetTagsForPages: %v", err)
+	}
+	if len(tags["page-1"]) != 0 {
+		t.Errorf("expected no tags after delete, got %v", tags["page-1"])
+	}
+
+	exc, err := store.GetExcerptsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if exc["page-1"] != "" {
+		t.Errorf("expected empty excerpt after delete, got %q", exc["page-1"])
+	}
+}
+
+func TestTagsStore_DeletePageIndex_NonExistentPageIsNoop(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.DeletePageIndex("does-not-exist"); err != nil {
+		t.Fatalf("DeletePageIndex on unknown page: %v", err)
+	}
+}
+
+// ─── GetExcerptsForPages ─────────────────────────────────────────────────────
+
+func TestTagsStore_GetExcerptsForPages_ReturnsCorrectExcerpts(t *testing.T) {
+	store := newTestStore(t)
+
+	_ = store.SetPageIndex("p1", []string{"go"}, "excerpt one")
+	_ = store.SetPageIndex("p2", []string{"ts"}, "excerpt two")
+
+	got, err := store.GetExcerptsForPages([]string{"p1", "p2"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if got["p1"] != "excerpt one" {
+		t.Errorf("p1 = %q", got["p1"])
+	}
+	if got["p2"] != "excerpt two" {
+		t.Errorf("p2 = %q", got["p2"])
+	}
+}
+
+func TestTagsStore_GetExcerptsForPages_UnknownIDReturnsNoEntry(t *testing.T) {
+	store := newTestStore(t)
+
+	got, err := store.GetExcerptsForPages([]string{"ghost"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if _, ok := got["ghost"]; ok {
+		t.Errorf("ghost should not be present")
+	}
+}
+
+func TestTagsStore_GetExcerptsForPages_EmptyInputReturnsEmptyMap(t *testing.T) {
+	store := newTestStore(t)
+
+	got, err := store.GetExcerptsForPages([]string{})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if got == nil {
+		t.Fatalf("expected non-nil empty map")
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty map, got %v", got)
+	}
+}
+
+// ─── Clear (with page_meta) ───────────────────────────────────────────────────
+
+func TestTagsStore_Clear_AlsoRemovesPageMeta(t *testing.T) {
+	store := newTestStore(t)
+
+	_ = store.SetPageIndex("page-1", []string{"go"}, "some excerpt")
+
+	if err := store.Clear(); err != nil {
+		t.Fatalf("Clear: %v", err)
+	}
+
+	exc, err := store.GetExcerptsForPages([]string{"page-1"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages after Clear: %v", err)
+	}
+	if exc["page-1"] != "" {
+		t.Errorf("expected empty excerpt after Clear, got %q", exc["page-1"])
+	}
+}
+
 // ─── GetAllTags — LIKE wildcard escaping ─────────────────────────────────────
 
 func TestTagsStore_GetAllTags_FilterEscapesLikeWildcards(t *testing.T) {

@@ -61,7 +61,7 @@ const TagsResultCard = forwardRef<HTMLDivElement, TagsResultCardProps>(
           className="tags-result-card__link"
         >
           <div
-            className="search-result-card__title"
+            className="search-result-card__title browse-results__item-title"
             data-testid={`tags-result-card-title-${item.id}`}
           >
             {item.title}

@@ -52,14 +52,13 @@ func (e *TagsSideEffect) setTags(p *tree.Page) {
 		}
 	}
 
-	t := tags.ExtractTagsFromContent(content)
-	if err := e.svc.SetTagsForPage(p.ID, t); err != nil {
-		e.log.Warn("failed to set tags for page", "pageID", p.ID, "error", err)
+	if err := e.svc.IndexPageContent(p.ID, content); err != nil {
+		e.log.Warn("failed to index page content", "pageID", p.ID, "error", err)
 	}
 }
 
 func (e *TagsSideEffect) deleteTags(p *tree.Page) {
-	if err := e.svc.DeleteTagsForPage(p.ID); err != nil {
-		e.log.Warn("failed to delete tags for page", "pageID", p.ID, "error", err)
+	if err := e.svc.DeletePageIndex(p.ID); err != nil {
+		e.log.Warn("failed to delete page index", "pageID", p.ID, "error", err)
 	}
 }

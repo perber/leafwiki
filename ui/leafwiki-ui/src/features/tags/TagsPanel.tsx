@@ -21,6 +21,7 @@ export default function TagsPanel({ active = false }: TagsPanelProps) {
 
   const [results, setResults] = useState<TaggedPage[]>([])
   const [loadingResults, setLoadingResults] = useState(false)
+  const [fetchError, setFetchError] = useState(false)
   const [page, setPage] = useState(0)
   const [activeIndex, setActiveIndex] = useState(0)
   const resultRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -31,19 +32,27 @@ export default function TagsPanel({ active = false }: TagsPanelProps) {
       return
     }
 
+    const controller = new AbortController()
+
     const loadResults = async () => {
       setLoadingResults(true)
+      setFetchError(false)
       try {
-        const pages = await fetchPagesByTags(activeTags)
+        const pages = await fetchPagesByTags(activeTags, controller.signal)
         setResults(pages)
         setPage(0)
         setActiveIndex(0)
+      } catch (e) {
+        if ((e as Error).name !== 'AbortError') {
+          setFetchError(true)
+        }
       } finally {
         setLoadingResults(false)
       }
     }
 
     void loadResults()
+    return () => controller.abort()
   }, [activeTags])
 
   const activeTagsLabel =
@@ -62,6 +71,7 @@ export default function TagsPanel({ active = false }: TagsPanelProps) {
       : Math.min(activeIndex, paginatedResults.length - 1)
   const showInitialResultsLoading = loadingResults && results.length === 0
   const showResultsRefreshing = loadingResults && results.length > 0
+  const showError = fetchError && !loadingResults
 
   useEffect(() => {
     resultRefs.current = resultRefs.current.slice(0, paginatedResults.length)
@@ -167,6 +177,16 @@ export default function TagsPanel({ active = false }: TagsPanelProps) {
               >
                 <ListViewStatus className="browse-results__empty">
                   Loading…
+                </ListViewStatus>
+              </ListView>
+            ) : showError ? (
+              <ListView
+                as="div"
+                className="browse-results__view search__results-view"
+                contentClassName="search__content"
+              >
+                <ListViewStatus className="browse-results__empty" data-testid="tags-fetch-error">
+                  Failed to load results. Please try again.
                 </ListViewStatus>
               </ListView>
             ) : results.length === 0 ? (
