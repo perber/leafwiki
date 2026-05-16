@@ -23,9 +23,11 @@ import {
 import ReactMarkdown from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
+import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
 import { extractTocEntries } from './extractTocEntries'
 import { TocDropdownButton } from './TocDropdownButton'
 import Headline from './Headline'
@@ -38,6 +40,7 @@ import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndenta
 import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
+import 'katex/dist/katex.min.css'
 
 const schema = {
   ...defaultSchema,
@@ -574,11 +577,12 @@ export default function MarkdownPreview({
     <MarkdownPreviewErrorBoundary resetKey={`${path ?? ''}:${content}`}>
       <>
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
+          remarkPlugins={[remarkMath, remarkGfm]}
           rehypePlugins={[
             rehypeRaw,
             rehypeLineNumber,
             rehypeWhitelistStyles,
+            [rehypeKatex, { output: 'html', strict: 'ignore' }],
             [rehypeSanitize, schema],
             rehypeHighlight,
           ]}
