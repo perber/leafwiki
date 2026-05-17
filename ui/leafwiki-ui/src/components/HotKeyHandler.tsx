@@ -1,7 +1,10 @@
 // The HotKeyHandler is responsible for handling hotkey events globally in the application.
 // It registers event listeners for keydown events and calls the actions defined in the hotkey map.
 
-import { getHotkeyComboFromEvent } from '@/lib/hotkeys'
+import {
+  getHotkeyComboFromEvent,
+  isHotkeyAllowedOnElement,
+} from '@/lib/hotkeys'
 import { useAppMode } from '@/lib/useAppMode'
 import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
@@ -47,7 +50,9 @@ export function HotKeyHandler() {
             activeElement.tagName === 'SELECT' ||
             activeElement.tagName === 'TEXTAREA')
         ) {
-          return
+          if (!isHotkeyAllowedOnElement(activeElement, comboString)) {
+            return
+          }
         }
       }
 
