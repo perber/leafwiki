@@ -1,6 +1,7 @@
 // Hook to provide toolbar actions for the page viewer
 
 import { useAppMode } from '@/lib/useAppMode'
+import { isHotkeyAllowedOnElement } from '@/lib/hotkeys'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { closeSearchPanel, searchPanelOpen } from '@codemirror/search'
@@ -78,6 +79,12 @@ export function useToolbarActions({
       if (!view) return false
 
       const activeElement = document.activeElement
+      if (activeElement instanceof Element) {
+        if (isHotkeyAllowedOnElement(activeElement, 'Escape')) {
+          return true
+        }
+      }
+
       return (
         view.hasFocus ||
         (activeElement instanceof Node && view.dom.contains(activeElement))

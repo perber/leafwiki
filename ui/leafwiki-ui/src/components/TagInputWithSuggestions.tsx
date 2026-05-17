@@ -20,6 +20,7 @@ type TagInputWithSuggestionsProps = {
   placeholder: string
   variant: TagInputVariant
   inputTestId?: string
+  inputHotkeys?: string
   active?: boolean
   onArrowDown?: () => boolean
   onArrowUp?: () => boolean
@@ -74,12 +75,17 @@ function allowsCustomTagCreation(variant: TagInputVariant) {
   return variant === 'metadata'
 }
 
+function usesSelectedTagSuggestions(variant: TagInputVariant) {
+  return variant === 'browse'
+}
+
 function TagInputWithSuggestions({
   tags,
   onTagsChange,
   placeholder,
   variant,
   inputTestId,
+  inputHotkeys,
   active = false,
   onArrowDown,
   onArrowUp,
@@ -87,6 +93,7 @@ function TagInputWithSuggestions({
 }: TagInputWithSuggestionsProps) {
   const classes = variantClasses(variant)
   const allowCustomTags = allowsCustomTagCreation(variant)
+  const useSelectedTagSuggestions = usesSelectedTagSuggestions(variant)
   const [draft, setDraft] = useState('')
   const [suggestions, setSuggestions] = useState<TagCount[]>([])
   const [loading, setLoading] = useState(false)
@@ -160,7 +167,11 @@ function TagInputWithSuggestions({
 
       let isCurrentRequest = true
       try {
-        const data = await fetchTags(query, 20, normalizedTags)
+        const data = await fetchTags(
+          query,
+          20,
+          useSelectedTagSuggestions ? normalizedTags : [],
+        )
         isCurrentRequest = latestRequestIdRef.current === requestId
         if (!isCurrentRequest) return
         setSuggestions(data)
@@ -178,7 +189,7 @@ function TagInputWithSuggestions({
     return () => {
       if (filterTimerRef.current) clearTimeout(filterTimerRef.current)
     }
-  }, [draft, normalizedTags, isComposing])
+  }, [draft, normalizedTags, isComposing, useSelectedTagSuggestions])
 
   useEffect(() => {
     if (!showSuggestions) {
@@ -328,7 +339,7 @@ function TagInputWithSuggestions({
                 No matching tags found.
               </p>
             ) : (
-              suggestedTags.map(({ tag, count }, index) => (
+              suggestedTags.map(({ tag }, index) => (
                 <button
                   key={tag}
                   type="button"
@@ -347,7 +358,6 @@ function TagInputWithSuggestions({
                   }
                 >
                   <span>{tag}</span>
-                  <span className={classes.suggestionCount}>{count}</span>
                 </button>
               ))
             )}
@@ -404,6 +414,7 @@ function TagInputWithSuggestions({
           placeholder={placeholder}
           className={classes.input}
           data-testid={inputTestId}
+          data-allow-hotkeys={inputHotkeys}
         />
       </div>
 

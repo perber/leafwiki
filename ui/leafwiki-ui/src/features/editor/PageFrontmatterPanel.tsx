@@ -11,6 +11,8 @@ import { ChevronDown, ChevronRight, Plus, Tag, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { EditorFrontmatterField } from './frontmatter'
 
+const METADATA_ALLOWED_HOTKEYS = 'Mod+KeyS Escape'
+
 type PageFrontmatterPanelProps = {
   tags: string[]
   fields: EditorFrontmatterField[]
@@ -170,6 +172,7 @@ export function PageFrontmatterPanel({
                     placeholder="Add tag"
                     variant="metadata"
                     inputTestId="page-frontmatter-tag-input"
+                    inputHotkeys={METADATA_ALLOWED_HOTKEYS}
                   />
                   {errors.tags ? (
                     <p
@@ -203,6 +206,7 @@ export function PageFrontmatterPanel({
                                 placeholder="Key"
                                 className={`page-frontmatter-panel__field-key${errors[`properties.${index}.key`] ? 'page-frontmatter-panel__input--error' : ''}`}
                                 data-testid={`page-frontmatter-field-key-${index}`}
+                                data-allow-hotkeys={METADATA_ALLOWED_HOTKEYS}
                               />
                               <Input
                                 type="text"
@@ -216,6 +220,7 @@ export function PageFrontmatterPanel({
                                 placeholder="Value"
                                 className={`page-frontmatter-panel__field-value${errors[`properties.${index}.value`] ? 'page-frontmatter-panel__input--error' : ''}`}
                                 data-testid={`page-frontmatter-field-value-${index}`}
+                                data-allow-hotkeys={METADATA_ALLOWED_HOTKEYS}
                               />
                               <button
                                 type="button"

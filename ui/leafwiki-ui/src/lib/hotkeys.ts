@@ -96,6 +96,24 @@ export function normalizeHotkeyCombo(keyCombo: string) {
     .join('+')
 }
 
+export function isHotkeyAllowedOnElement(
+  element: Element | null,
+  comboString: string,
+) {
+  const allowedCombos = element
+    ?.closest('[data-allow-hotkeys]')
+    ?.getAttribute('data-allow-hotkeys')
+
+  if (!allowedCombos) {
+    return false
+  }
+
+  return allowedCombos
+    .split(/\s+/)
+    .filter(Boolean)
+    .some((combo) => normalizeHotkeyCombo(combo) === comboString)
+}
+
 export function getHotkeyComboFromEvent(event: KeyboardEvent) {
   const parts: string[] = []
 
