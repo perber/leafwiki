@@ -8,7 +8,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useProgressbarStore } from '../progressbar/progressbar'
 import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
-import { usePageEditorStore } from './pageEditor'
+import { PageFrontmatterPanel } from './PageFrontmatterPanel'
+import { isDirtyState, usePageEditorStore } from './pageEditor'
 import useNavigationGuard from './useNavigationGuard'
 import { useToolbarActions } from './useToolbarActions'
 
@@ -23,19 +24,21 @@ export default function PageEditor() {
   const savePage = usePageEditorStore((s) => s.savePage)
   const forceOverwrite = usePageEditorStore((s) => s.forceOverwrite)
   const setContent = usePageEditorStore((s) => s.setContent)
+  const setTags = usePageEditorStore((s) => s.setTags)
+  const setFrontmatterFields = usePageEditorStore((s) => s.setFrontmatterFields)
   const loadPageData = usePageEditorStore((s) => s.loadPageData)
   const initialPage = usePageEditorStore((s) => s.initialPage) // contains the initial page data when loaded
+  const tags = usePageEditorStore((s) => s.tags)
+  const frontmatterFields = usePageEditorStore((s) => s.frontmatterFields)
+  const frontmatterUnsupported = usePageEditorStore(
+    (s) => s.frontmatterUnsupported,
+  )
+  const frontmatterErrors = usePageEditorStore((s) => s.frontmatterErrors)
   const notFound = usePageEditorStore((s) => s.notFound)
   const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
   const openNode = useTreeStore((s) => s.openNode)
-  const dirty = usePageEditorStore((s) => {
-    const { page, title, slug, content } = s
-    if (!page) return false
-    return (
-      page.title !== title || page.slug !== slug || page.content !== content
-    )
-  })
+  const dirty = usePageEditorStore(isDirtyState)
 
   // Shows Unsaved Changes Dialog when navigating away with dirty state
   useNavigationGuard({
@@ -121,18 +124,9 @@ export default function PageEditor() {
   }, [savePage, forceOverwrite])
 
   const handleClose = useCallback(() => {
-    const {
-      page: currentPage,
-      title: currentTitle,
-      slug: currentSlug,
-      content: currentContent,
-    } = usePageEditorStore.getState()
-
-    const hasUnsavedChanges = currentPage
-      ? currentPage.title !== currentTitle ||
-        currentPage.slug !== currentSlug ||
-        currentPage.content !== currentContent
-      : false
+    const state = usePageEditorStore.getState()
+    const currentPage = state.page
+    const hasUnsavedChanges = isDirtyState(state)
 
     if (!hasUnsavedChanges) {
       // Saving updates the editor store before React finishes re-rendering.
@@ -179,12 +173,22 @@ export default function PageEditor() {
     <>
       <div className="page-editor">
         {initialPage && (
-          <MarkdownEditor
-            ref={editorRef}
-            pageId={initialPage.id}
-            initialValue={initialPage.content || ''}
-            onChange={handleEditorChange}
-          />
+          <>
+            <PageFrontmatterPanel
+              tags={tags}
+              fields={frontmatterFields}
+              errors={frontmatterErrors}
+              hasUnsupportedFields={Boolean(frontmatterUnsupported)}
+              onTagsChange={setTags}
+              onFieldsChange={setFrontmatterFields}
+            />
+            <MarkdownEditor
+              ref={editorRef}
+              pageId={initialPage.id}
+              initialValue={initialPage.content || ''}
+              onChange={handleEditorChange}
+            />
+          </>
         )}
       </div>
     </>

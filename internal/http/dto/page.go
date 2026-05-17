@@ -38,25 +38,31 @@ type Node struct {
 // Page is the HTTP representation of a full page (node + content).
 type Page struct {
 	*Node
-	Content string `json:"content"`
-	Path    string `json:"path"`
+	Content    string            `json:"content"`
+	Path       string            `json:"path"`
+	Tags       []string          `json:"tags"`
+	Properties map[string]string `json:"properties"`
 }
 
 // ToAPIPage converts a tree.Page to its HTTP representation.
 func ToAPIPage(p *tree.Page, userResolver *auth.UserResolver) *Page {
 	return &Page{
-		Node:    ToAPINode(p.PageNode, "", userResolver),
-		Content: p.Content,
-		Path:    BuildPathFromNode(p.PageNode),
+		Node:       ToAPINode(p.PageNode, "", userResolver),
+		Content:    p.Content,
+		Path:       BuildPathFromNode(p.PageNode),
+		Tags:       []string{},
+		Properties: map[string]string{},
 	}
 }
 
 // ToAPIPageWithDepth converts a tree.Page with a depth-limited node tree.
 func ToAPIPageWithDepth(p *tree.Page, userResolver *auth.UserResolver, depth int) *Page {
 	return &Page{
-		Node:    ToAPINodeWithDepth(p.PageNode, "", userResolver, depth),
-		Content: p.Content,
-		Path:    BuildPathFromNode(p.PageNode),
+		Node:       ToAPINodeWithDepth(p.PageNode, "", userResolver, depth),
+		Content:    p.Content,
+		Path:       BuildPathFromNode(p.PageNode),
+		Tags:       []string{},
+		Properties: map[string]string{},
 	}
 }
 

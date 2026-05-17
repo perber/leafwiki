@@ -10,7 +10,9 @@ import (
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/importer"
+	"github.com/perber/wiki/internal/properties"
 	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/tags"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -152,6 +154,83 @@ func TestImporterService_ExecuteCurrentPlan_WritesPreservedFrontmatterToDisk(t *
 	}
 	if fm.LeafWikiTitle != "Imported Title" {
 		t.Fatalf("expected written file to contain effective leafwiki_title, got %q", fm.LeafWikiTitle)
+	}
+}
+
+func TestImporterService_ExecuteCurrentPlan_IndexesTagsAndPropertiesImmediately(t *testing.T) {
+	ws := t.TempDir()
+	integMustWrite(t, ws, "Imported.md", "---\ntags:\n  - React\n  - docs\nstatus: published\nowner: alice\npriority: 3\nowners:\n  - alice\n---\n\n# Imported Title\nBody")
+
+	w := newTestWiki(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	is := newTestImporterService(t, w)
+
+	if _, err := is.CreateImportPlanFromFolder(ws, ""); err != nil {
+		t.Fatalf("createImportPlanFromFolder err: %v", err)
+	}
+
+	if _, err := is.ExecuteCurrentPlan("system"); err != nil {
+		t.Fatalf("ExecuteCurrentPlan err: %v", err)
+	}
+
+	tagsStore, err := tags.NewTagsStore(w.GetStorageDir())
+	if err != nil {
+		t.Fatalf("NewTagsStore err: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(tagsStore.Close, t)
+
+	allTags, err := tagsStore.GetAllTags("", 20)
+	if err != nil {
+		t.Fatalf("GetAllTags err: %v", err)
+	}
+	if len(allTags) != 2 {
+		t.Fatalf("expected 2 indexed tags, got %#v", allTags)
+	}
+
+	reactPageIDs, err := tagsStore.GetPageIDsByTags([]string{"react"})
+	if err != nil {
+		t.Fatalf("GetPageIDsByTags err: %v", err)
+	}
+	if len(reactPageIDs) != 1 {
+		t.Fatalf("expected react tag to be indexed for one page, got %v", reactPageIDs)
+	}
+
+	propsStore, err := properties.NewPropertiesStore(w.GetStorageDir())
+	if err != nil {
+		t.Fatalf("NewPropertiesStore err: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(propsStore.Close, t)
+
+	keys, err := propsStore.GetAllPropertyKeys("", 20)
+	if err != nil {
+		t.Fatalf("GetAllPropertyKeys err: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Fatalf("expected 2 indexed string properties, got %#v", keys)
+	}
+
+	statusPageIDs, err := propsStore.GetPageIDsByProperty("status", "published")
+	if err != nil {
+		t.Fatalf("GetPageIDsByProperty(status) err: %v", err)
+	}
+	if len(statusPageIDs) != 1 {
+		t.Fatalf("expected status property to be indexed for one page, got %v", statusPageIDs)
+	}
+
+	ownerPageIDs, err := propsStore.GetPageIDsByProperty("owner", "alice")
+	if err != nil {
+		t.Fatalf("GetPageIDsByProperty(owner) err: %v", err)
+	}
+	if len(ownerPageIDs) != 1 {
+		t.Fatalf("expected owner property to be indexed for one page, got %v", ownerPageIDs)
+	}
+
+	priorityPageIDs, err := propsStore.GetPageIDsByProperty("priority", "3")
+	if err != nil {
+		t.Fatalf("GetPageIDsByProperty(priority) err: %v", err)
+	}
+	if len(priorityPageIDs) != 0 {
+		t.Fatalf("expected numeric property to be skipped, got %v", priorityPageIDs)
 	}
 }
 

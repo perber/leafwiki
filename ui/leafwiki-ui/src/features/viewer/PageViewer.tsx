@@ -19,6 +19,7 @@ import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BacklinkInfo } from '../links/LinkInfo'
 import MarkdownPreview from '../preview/MarkdownPreview'
+import { PageMetadata } from './PageMetadata'
 import { extractTocEntries } from '../preview/extractTocEntries'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { useProgressbarStore } from '../progressbar/progressbar'
@@ -147,6 +148,7 @@ export default function PageViewer() {
         {page && !error && (
           <div className="page-viewer__body">
             <article className="page-viewer__content">
+              <PageMetadata page={page} />
               <MarkdownPreview content={page.content} path={page.path} />
               <EmptySectionChildrenList page={page} />
             </article>

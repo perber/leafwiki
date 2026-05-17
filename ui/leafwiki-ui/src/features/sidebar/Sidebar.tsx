@@ -108,7 +108,11 @@ export default function Sidebar() {
           <div className="sidebar__tabs">
             <div className="sidebar__tabs-list">
               {tabs.map((tab) => (
-                <TooltipWrapper label={tab.label} key={tab.id}>
+                <TooltipWrapper
+                  label={tab.label}
+                  key={tab.id}
+                  parentClassName="flex-1 min-w-0"
+                >
                   <button
                     data-testid={`sidebar-${tab.id}-tab-button`}
                     onClick={() => setSidebarMode(tab.id)}
@@ -118,7 +122,7 @@ export default function Sidebar() {
                         : 'sidebar__tab-button--inactive'
                     }`}
                   >
-                    {tab.icon()} {tab.label}
+                    {tab.icon()} <span className="truncate">{tab.label}</span>
                   </button>
                 </TooltipWrapper>
               ))}

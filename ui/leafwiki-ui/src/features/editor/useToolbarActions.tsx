@@ -9,7 +9,7 @@ import { completionStatus } from '@codemirror/autocomplete'
 import { Save, X } from 'lucide-react'
 import { useEffect } from 'react'
 import { useToolbarStore } from '../toolbar/toolbar'
-import { usePageEditorStore } from './pageEditor'
+import { isDirtyState, usePageEditorStore } from './pageEditor'
 
 export interface ToolbarActionsOptions {
   savePage: () => void
@@ -35,13 +35,7 @@ export function useToolbarActions({
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
-  const dirty = usePageEditorStore((s) => {
-    const { page, title, slug, content } = s
-    if (!page) return false
-    return (
-      page.title !== title || page.slug !== slug || page.content !== content
-    )
-  })
+  const dirty = usePageEditorStore(isDirtyState)
 
   // useEffect to set toolbar buttons
   useEffect(() => {

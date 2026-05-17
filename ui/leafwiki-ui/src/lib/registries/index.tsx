@@ -14,6 +14,7 @@ import PermalinkDialog from '@/features/page/PermalinkDialog'
 import { PageRefactorDialog } from '@/features/page/PageRefactorDialog'
 import { SortPagesDialog } from '@/features/page/SortPagesDialog'
 import Search from '@/features/search/Search'
+import TagsPanel from '@/features/tags/TagsPanel'
 import TreeView from '@/features/tree/TreeView'
 import { ChangeOwnPasswordDialog } from '@/features/users/ChangeOwnPasswordDialog'
 import { ChangePasswordDialog } from '@/features/users/ChangePasswordDialog'
@@ -21,7 +22,7 @@ import { DeleteUserDialog } from '@/features/users/DeleteUserDialog'
 import { UserFormDialog } from '@/features/users/UserFormDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
-import { FolderTree, Search as SearchIcon } from 'lucide-react'
+import { FolderTree, Search as SearchIcon, Tag } from 'lucide-react'
 
 export const panelItemRegistry = new PanelItemRegistry()
 export const dialogRegistry = new DialogRegistry()
@@ -30,6 +31,7 @@ export const dialogRegistry = new DialogRegistry()
 
 export const SIDEBAR_TREE_PANEL_ID = 'tree'
 export const SIDEBAR_SEARCH_PANEL_ID = 'search'
+export const SIDEBAR_TAGS_PANEL_ID = 'tags'
 
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
@@ -51,6 +53,18 @@ panelItemRegistry.register({
   render: (props: unknown) => {
     const SearchProps = props as React.ComponentProps<typeof Search>
     return <Search {...SearchProps} />
+  },
+})
+
+panelItemRegistry.register({
+  id: SIDEBAR_TAGS_PANEL_ID,
+  label: 'Tags',
+  hotkey: 'Mod+Alt+KeyT',
+  modes: ['view', 'edit', 'history', 'settings', 'user-management'],
+  icon: () => <Tag size={16} />,
+  render: (props: unknown) => {
+    const TagsPanelProps = props as React.ComponentProps<typeof TagsPanel>
+    return <TagsPanel {...TagsPanelProps} />
   },
 })
 

@@ -9,6 +9,8 @@ import (
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
+	"github.com/perber/wiki/internal/properties"
+	"github.com/perber/wiki/internal/tags"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
@@ -22,6 +24,8 @@ type WikiImportAdapter struct {
 	revision *revision.Service
 	links    *links.LinkService
 	asset    *assets.AssetService
+	tags     *tags.TagsService
+	props    *properties.PropertiesService
 	log      *slog.Logger
 }
 
@@ -34,6 +38,8 @@ func NewWikiImportAdapter(w *Wiki) *WikiImportAdapter {
 		revision: w.revision,
 		links:    w.links,
 		asset:    w.asset,
+		tags:     w.tags,
+		props:    w.props,
 		log:      w.log,
 	}
 }
@@ -61,6 +67,8 @@ func (a *WikiImportAdapter) ListAssets(pageID string) ([]string, error) {
 func (a *WikiImportAdapter) orchestrator() *pagesave.PageSaveOrchestrator {
 	return pagesave.NewPageSaveOrchestrator(
 		pagesave.NewLinkIndexSideEffect(a.links, a.log),
+		pagesave.NewTagsSideEffect(a.tags, a.tree, a.log),
+		pagesave.NewPropertiesSideEffect(a.props, a.tree, a.log),
 		pagesave.NewRevisionSideEffect(a.revision, a.log),
 	)
 }
