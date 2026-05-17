@@ -3,7 +3,7 @@ import { useTagsStore } from '@/stores/tags'
 import { useSidebarStore } from '@/stores/sidebar'
 import { Page } from '@/lib/api/pages'
 import { ChevronDown, ChevronRight, Tag } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 type Props = {
   page: Page
@@ -19,6 +19,7 @@ function getEditableProperties(
 
 export function PageMetadata({ page }: Props) {
   const [propsOpen, setPropsOpen] = useState(false)
+  const propertiesListId = useId()
   const setActiveTags = useTagsStore((s) => s.setActiveTags)
   const setSidebarMode = useSidebarStore((s) => s.setSidebarMode)
 
@@ -61,6 +62,8 @@ export function PageMetadata({ page }: Props) {
           <button
             type="button"
             className="page-metadata__props-toggle"
+            aria-expanded={propsOpen}
+            aria-controls={propertiesListId}
             onClick={() => setPropsOpen((o) => !o)}
           >
             {propsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -68,7 +71,7 @@ export function PageMetadata({ page }: Props) {
           </button>
 
           {propsOpen && (
-            <dl className="page-metadata__props-list">
+            <dl id={propertiesListId} className="page-metadata__props-list">
               {editableProps.map(([key, value]) => (
                 <div key={key} className="page-metadata__prop-row">
                   <dt className="page-metadata__prop-key">{key}</dt>

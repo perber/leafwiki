@@ -186,6 +186,32 @@ test.describe('tags panel', () => {
     await expect(tagsView.getSelectedChip(tag)).not.toBeVisible();
   });
 
+  test('removing the last selected tag clears results', async ({ page }) => {
+    const stamp = Date.now();
+    const tag = `e2e-remove-last-${stamp}`;
+
+    await createPageWithTags(page, {
+      title: `Remove Last ${stamp}`,
+      slug: `remove-last-${stamp}`,
+      content: 'Will disappear when the last tag is removed.',
+      tags: [tag],
+    });
+
+    const tagsView = new TagsView(page);
+    await tagsView.open();
+    await tagsView.typeTag(tag);
+    await tagsView.selectSuggestion(tag);
+    await tagsView.waitForResults();
+    await tagsView.expectResultVisible(`Remove Last ${stamp}`);
+
+    const input = tagsView.getSearchInput();
+    await input.click();
+    await input.press('Backspace');
+
+    await expect(tagsView.getResultsList()).not.toBeVisible();
+    await expect(tagsView.getSelectedChip(tag)).not.toBeVisible();
+  });
+
   test('clicking tag on result card adds it to filter', async ({ page }) => {
     const stamp = Date.now();
     const primaryTag = `e2e-click-primary-${stamp}`;

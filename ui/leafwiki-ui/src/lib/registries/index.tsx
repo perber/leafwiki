@@ -59,7 +59,7 @@ panelItemRegistry.register({
 panelItemRegistry.register({
   id: SIDEBAR_TAGS_PANEL_ID,
   label: 'Tags',
-  hotkey: 'Mod+Shift+KeyT',
+  hotkey: 'Mod+Alt+KeyT',
   modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <Tag size={16} />,
   render: (props: unknown) => {

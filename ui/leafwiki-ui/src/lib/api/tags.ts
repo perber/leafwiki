@@ -22,7 +22,9 @@ export async function fetchTags(
 ): Promise<TagCount[]> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (filter) params.set('q', filter)
-  if (selected.length > 0) params.set('selected', selected.join(','))
+  for (const tag of selected) {
+    params.append('selected', tag)
+  }
   return (await fetchWithAuth(`/api/tags?${params}`)) as TagCount[]
 }
 
@@ -30,7 +32,10 @@ export async function fetchPagesByTags(
   tags: string[],
   signal?: AbortSignal,
 ): Promise<TaggedPage[]> {
-  const params = new URLSearchParams({ tags: tags.join(',') })
+  const params = new URLSearchParams()
+  for (const tag of tags) {
+    params.append('tags', tag)
+  }
   return (await fetchWithAuth(`/api/tags/pages?${params}`, {
     signal,
   })) as TaggedPage[]

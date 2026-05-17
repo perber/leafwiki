@@ -29,6 +29,11 @@ export default function TagsPanel({ active = false }: TagsPanelProps) {
 
   useEffect(() => {
     if (activeTags.length === 0) {
+      setResults([])
+      setLoadingResults(false)
+      setFetchError(false)
+      setPage(0)
+      setActiveIndex(0)
       return
     }
 
@@ -103,9 +108,6 @@ export default function TagsPanel({ active = false }: TagsPanelProps) {
           tags={activeTags}
           onTagsChange={(tags) => {
             setActiveTags(tags)
-            if (tags.length === 0) {
-              setResults([])
-            }
             setPage(0)
             setActiveIndex(0)
           }}
@@ -160,9 +162,6 @@ export default function TagsPanel({ active = false }: TagsPanelProps) {
                 className="browse-results__clear"
                 onClick={() => {
                   clearActiveTags()
-                  setResults([])
-                  setPage(0)
-                  setActiveIndex(0)
                 }}
                 title="Clear filter"
               >

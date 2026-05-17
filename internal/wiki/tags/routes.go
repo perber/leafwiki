@@ -63,7 +63,6 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 // handleGetTags handles GET /api/tags?q=&limit=
 func (r *Routes) handleGetTags(c *gin.Context) {
 	filter := c.DefaultQuery("q", "")
-	selectedRaw := c.Query("selected")
 	limitStr := c.DefaultQuery("limit", "50")
 
 	limit, err := strconv.Atoi(limitStr)
@@ -74,7 +73,7 @@ func (r *Routes) handleGetTags(c *gin.Context) {
 
 	out, err := r.getTags.Execute(c.Request.Context(), GetTagsInput{
 		Filter:   filter,
-		Selected: splitTags(selectedRaw),
+		Selected: queryTags(c, "selected"),
 		Limit:    limit,
 	})
 	if err != nil {
@@ -86,15 +85,9 @@ func (r *Routes) handleGetTags(c *gin.Context) {
 
 // handleGetPagesByTags handles GET /api/tags/pages?tags=react,typescript
 func (r *Routes) handleGetPagesByTags(c *gin.Context) {
-	raw := c.Query("tags")
-	if raw == "" {
-		respondWithTagsBadRequest(c, ErrCodeTagsMissingParam, "Query parameter 'tags' is required", "query parameter tags is required")
-		return
-	}
-
-	tagList := splitTags(raw)
+	tagList := queryTags(c, "tags")
 	if len(tagList) == 0 {
-		respondWithTagsBadRequest(c, ErrCodeTagsMissingParam, "At least one tag is required", "at least one tag is required")
+		respondWithTagsBadRequest(c, ErrCodeTagsMissingParam, "Query parameter 'tags' is required", "query parameter tags is required")
 		return
 	}
 
@@ -114,6 +107,19 @@ func splitTags(raw string) []string {
 		if t != "" {
 			result = append(result, t)
 		}
+	}
+	return result
+}
+
+func queryTags(c *gin.Context, key string) []string {
+	values := c.QueryArray(key)
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		result = append(result, splitTags(value)...)
 	}
 	return result
 }
