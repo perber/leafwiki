@@ -6,26 +6,14 @@ import (
 	"log"
 	"log/slog"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/perber/wiki/internal/core/excerpt"
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/russross/blackfriday/v2"
 	_ "modernc.org/sqlite" // Import SQLite driver
-)
-
-var sanitize = bluemonday.StrictPolicy()
-
-var (
-	searchShoutoutOpenPattern  = regexp.MustCompile(`^ {0,3}:::\s*(?P<type>[A-Za-z][\w-]*)\s*$`)
-	searchShoutoutClosePattern = regexp.MustCompile(`^ {0,3}:::\s*$`)
-	searchFencePattern         = regexp.MustCompile(`^ {0,3}(?P<marker>` + "`{3,}|~{3,}" + `).*$`)
-
-	searchShoutoutTypeIdx  = searchShoutoutOpenPattern.SubexpIndex("type")
-	searchFenceMarkerIdx   = searchFencePattern.SubexpIndex("marker")
 )
 
 type SQLiteIndex struct {
@@ -77,66 +65,7 @@ func extractHeadings(markdown string) string {
 		return blackfriday.GoToNext
 	})
 
-	return sanitize.Sanitize(buf.String())
-}
-
-type fenceState struct {
-	markerChar   byte
-	markerLength int
-}
-
-func getFenceState(line string, currentFence *fenceState) *fenceState {
-	match := searchFencePattern.FindStringSubmatch(line)
-	if match == nil {
-		return currentFence
-	}
-
-	marker := match[searchFenceMarkerIdx]
-	if marker == "" {
-		return currentFence
-	}
-
-	if currentFence == nil {
-		return &fenceState{
-			markerChar:   marker[0],
-			markerLength: len(marker),
-		}
-	}
-
-	if marker[0] == currentFence.markerChar && len(marker) >= currentFence.markerLength {
-		return nil
-	}
-
-	return currentFence
-}
-
-func normalizeSearchMarkdownShoutouts(content string) string {
-	normalized := strings.ReplaceAll(content, "\r\n", "\n")
-	lines := strings.Split(normalized, "\n")
-	output := make([]string, 0, len(lines))
-	var outerFence *fenceState
-
-	for _, line := range lines {
-		if outerFence != nil {
-			output = append(output, line)
-			outerFence = getFenceState(line, outerFence)
-			continue
-		}
-
-		if match := searchShoutoutOpenPattern.FindStringSubmatch(line); match != nil {
-			output = append(output, match[searchShoutoutTypeIdx])
-			continue
-		}
-
-		if searchShoutoutClosePattern.MatchString(line) {
-			continue
-		}
-
-		output = append(output, line)
-		outerFence = getFenceState(line, outerFence)
-	}
-
-	return strings.Join(output, "\n")
+	return excerpt.PlainTextFromMarkdown(buf.String())
 }
 
 func buildFuzzyQuery(q string) string {
@@ -242,14 +171,12 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 		return err
 	}
 
-	content = normalizeSearchMarkdownShoutouts(content)
+	content = excerpt.NormalizeMarkdownBody(content)
 
 	// Headings extracted from the Markdown
 	headings := extractHeadings(content)
 
-	// Body as plain text (existing logic)
-	html := blackfriday.Run([]byte(content))
-	sanitizedBody := sanitize.Sanitize(string(html))
+	sanitizedBody := excerpt.PlainTextFromMarkdown(content)
 
 	return s.withDB(func(db *sql.DB) error {
 		_, err := db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
@@ -320,6 +247,7 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 			kind,
 			highlight(pages, 4, '<b>', '</b>') AS highlighted_title,
 			snippet(pages, 6, '<b>', '</b>', '...', 16) AS excerpt,
+			content,
 			bm25(pages,
 				0.0,  -- path
 				0.0,  -- filepath
@@ -349,9 +277,13 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 		for rows.Next() {
 			var r SearchResultItem
 			var bm25Score float64
+			var content string
 
-			if err := rows.Scan(&r.PageID, &r.Path, &r.Kind, &r.Title, &r.Excerpt, &bm25Score); err != nil {
+			if err := rows.Scan(&r.PageID, &r.Path, &r.Kind, &r.Title, &r.Excerpt, &content, &bm25Score); err != nil {
 				return err
+			}
+			if strings.TrimSpace(r.Excerpt) == "" {
+				r.Excerpt = excerpt.FromBody(content)
 			}
 
 			// Convert bm25 score to a rank (lower score = higher rank)

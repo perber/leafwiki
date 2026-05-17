@@ -131,6 +131,10 @@ func TestSQLiteIndex_Search(t *testing.T) {
 	if result.Items[1].Kind != string(tree.NodeKindSection) {
 		t.Errorf("expected second result kind %q, got %q", tree.NodeKindSection, result.Items[1].Kind)
 	}
+
+	if !strings.Contains(result.Items[0].Excerpt, "<b>") {
+		t.Errorf("expected highlighted search snippet, got %q", result.Items[0].Excerpt)
+	}
 }
 
 func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
@@ -256,49 +260,6 @@ func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 	}
 }
 
-func TestNormalizeSearchMarkdownShoutouts_KeepsLabelsAndRemovesFenceSyntax(t *testing.T) {
-	content := strings.Join([]string{
-		"::: info",
-		"Helpful details.",
-		":::",
-		"",
-		"::: blue",
-		"Colored banner.",
-		":::",
-		"",
-		"::: custom-banner",
-		"Custom text.",
-		":::",
-	}, "\n")
-
-	got := normalizeSearchMarkdownShoutouts(content)
-
-	if strings.Contains(got, ":::") {
-		t.Fatalf("expected fence syntax to be removed, got %q", got)
-	}
-	for _, want := range []string{"info", "blue", "custom-banner", "Helpful details.", "Colored banner.", "Custom text."} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("expected normalized content to contain %q, got %q", want, got)
-		}
-	}
-}
-
-func TestNormalizeSearchMarkdownShoutouts_IgnoresCodeFences(t *testing.T) {
-	content := strings.Join([]string{
-		"```md",
-		"::: info",
-		"literal",
-		":::",
-		"```",
-	}, "\n")
-
-	got := normalizeSearchMarkdownShoutouts(content)
-
-	if got != content {
-		t.Fatalf("expected fenced code block to stay unchanged, got %q", got)
-	}
-}
-
 func TestSQLiteIndex_IndexPage_StripsShoutoutFenceSyntaxButKeepsLabel(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -339,5 +300,38 @@ func TestSQLiteIndex_IndexPage_StripsShoutoutFenceSyntaxButKeepsLabel(t *testing
 	}
 	if !strings.Contains(gotContent, "Shoutout body text.") {
 		t.Fatalf("expected indexed content to keep shoutout body, got %q", gotContent)
+	}
+}
+
+func TestSQLiteIndex_IndexPage_StripsMarkdownFormattingFromIndexedContent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage(
+		"docs/markdown",
+		"docs/markdown.md",
+		"markdown1",
+		"Markdown Page",
+		tree.NodeKindPage,
+		"LeafWiki **fett** und _kursiv_.",
+	)
+	if err != nil {
+		t.Fatalf("IndexPage failed: %v", err)
+	}
+
+	var gotContent string
+	if err := index.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`SELECT content FROM pages WHERE pageID = ?`, "markdown1").Scan(&gotContent)
+	}); err != nil {
+		t.Fatalf("failed to read indexed content: %v", err)
+	}
+
+	if strings.Contains(gotContent, "**") || strings.Contains(gotContent, "_") {
+		t.Fatalf("expected indexed content to exclude markdown emphasis markers, got %q", gotContent)
 	}
 }
