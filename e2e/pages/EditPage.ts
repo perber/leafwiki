@@ -44,6 +44,7 @@ export default class EditPage {
   async closeEditor() {
     const closeButton = this.page.locator('button[data-testid="close-editor-button"]');
     await closeButton.click();
+    await this.page.waitForLoadState('networkidle');
   }
 
   async openAssetManager() {

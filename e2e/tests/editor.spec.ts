@@ -168,8 +168,10 @@ test.describe('Editor', () => {
     const valueInputs = page.locator('[data-testid^="page-frontmatter-field-value-"]');
     await expect(keyInputs).toHaveCount(2);
 
-    const keys = await keyInputs.allInputValues();
-    const values = await valueInputs.allInputValues();
+    const keys = await keyInputs.evaluateAll((els: HTMLInputElement[]) => els.map((e) => e.value));
+    const values = await valueInputs.evaluateAll((els: HTMLInputElement[]) =>
+      els.map((e) => e.value),
+    );
     expect(keys).toContain('owner');
     expect(keys).toContain('priority');
     expect(values).toContain('alice');

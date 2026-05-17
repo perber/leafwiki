@@ -92,13 +92,16 @@ export default class ViewPage {
       // ignore; if no dialog is open or it is already closing, continue
     }
 
+    // Let any pending async activity (diffs, links) settle so the dropdown stays stable.
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
     // 3) Open dropdown
     await avatar.click();
 
     // 4) Click logout button
     const logoutButton = this.page.getByTestId('user-toolbar-logout');
-    await logoutButton.waitFor({ state: 'visible', timeout: 2000 });
-    await logoutButton.click();
+    await logoutButton.waitFor({ state: 'visible', timeout: 5000 });
+    await logoutButton.click({ timeout: 5000 });
 
     // 5) Wait for login field again
     await loginField.waitFor({ state: 'visible' });
@@ -269,7 +272,9 @@ export default class ViewPage {
     await image.waitFor({ state: 'visible' });
     await expect
       .poll(async () => {
-        return image.evaluate((img) => img.complete && img.naturalWidth > 0);
+        return image.evaluate(
+          (img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0,
+        );
       })
       .toBe(true);
   }

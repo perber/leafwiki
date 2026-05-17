@@ -57,7 +57,7 @@ test.describe('tags panel', () => {
     await loginPage.goto();
     await loginPage.login(user, password);
     const viewPage = new ViewPage(page);
-    await viewPage.goto('/');
+    await viewPage.expectUserLoggedIn();
   });
 
   test('suggests matching tags and shows result pages', async ({ page }) => {
