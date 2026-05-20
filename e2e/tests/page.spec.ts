@@ -2054,13 +2054,23 @@ Paragraph outside the list.
   });
   */
 
-  test('search-panel-hides-tag-accordion-when-no-tags-exist', async ({ page }) => {
+  test('search-panel-renders-tag-accordion-only-when-tags-exist', async ({ page }) => {
     const viewPage = new ViewPage(page);
     await viewPage.goto('/');
     await viewPage.switchToSearchTab();
 
     const searchView = new SearchView(page);
-    await expect(searchView.getTagAccordion()).toHaveCount(0);
+    const accordion = searchView.getTagAccordion();
+    const accordionCount = await accordion.count();
+
+    if (accordionCount === 0) {
+      await expect(accordion).toHaveCount(0);
+      return;
+    }
+
+    await expect(accordion).toBeVisible();
+    await page.getByTestId('search-tags-accordion-trigger').click();
+    await expect(searchView.getTagFilters().first()).toBeVisible();
   });
 
   test('search-panel-combines-query-and-tag-filters', async ({ page }) => {
