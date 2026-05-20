@@ -1,9 +1,9 @@
-import { SIDEBAR_TAGS_PANEL_ID } from '@/lib/registries'
-import { useTagsStore } from '@/stores/tags'
+import { SIDEBAR_SEARCH_PANEL_ID } from '@/lib/registries'
 import { useSidebarStore } from '@/stores/sidebar'
 import { Page } from '@/lib/api/pages'
 import { ChevronDown, ChevronRight, Tag } from 'lucide-react'
 import { useId, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 type Props = {
   page: Page
@@ -20,8 +20,8 @@ function getEditableProperties(
 export function PageMetadata({ page }: Props) {
   const [propsOpen, setPropsOpen] = useState(false)
   const propertiesListId = useId()
-  const setActiveTags = useTagsStore((s) => s.setActiveTags)
   const setSidebarMode = useSidebarStore((s) => s.setSidebarMode)
+  const [, setSearchParams] = useSearchParams()
 
   const tags = page.tags ?? []
   const allProperties = (page.properties ?? {}) as Record<string, unknown>
@@ -33,8 +33,17 @@ export function PageMetadata({ page }: Props) {
   if (!hasTags && !hasProperties) return null
 
   function handleTagClick(tag: string) {
-    setActiveTags([tag])
-    setSidebarMode(SIDEBAR_TAGS_PANEL_ID)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('q')
+        next.delete('tags')
+        next.append('tags', tag)
+        return next
+      },
+      { replace: true },
+    )
+    setSidebarMode(SIDEBAR_SEARCH_PANEL_ID)
   }
 
   return (

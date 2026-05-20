@@ -1734,6 +1734,214 @@ func TestGetTagsEndpoint_AcceptsRepeatedSelectedParams(t *testing.T) {
 	}
 }
 
+func TestSearchEndpoint_FiltersResultsByTags(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	reactPage := createPageViaAPI(t, router, "React Search Match", "react-search-match", nil, pageNodeKind())
+	plainPage := createPageViaAPI(t, router, "Plain Search Match", "plain-search-match", nil, pageNodeKind())
+
+	updatePage := func(page *apiPage, title, slug, content string, tags []string) {
+		payload := map[string]interface{}{
+			"version": page.Version,
+			"title":   title,
+			"slug":    slug,
+			"content": content,
+			"tags":    tags,
+		}
+		body, _ := json.Marshal(payload)
+		rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(body)))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	updatePage(reactPage, "React Search Match", "react-search-match", "Body with shared search token.", []string{"react"})
+	updatePage(plainPage, "Plain Search Match", "plain-search-match", "Body with shared search token.", []string{"docs"})
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/search?q=shared%20search&tags=react", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Count     int `json:"count"`
+		TagFacets []struct {
+			Tag   string `json:"tag"`
+			Count int    `json:"count"`
+		} `json:"tag_facets"`
+		Items []struct {
+			PageID string `json:"page_id"`
+			Title  string `json:"title"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid search response JSON: %v", err)
+	}
+
+	if resp.Count != 1 {
+		t.Fatalf("expected 1 filtered search result, got %d", resp.Count)
+	}
+	if len(resp.Items) != 1 {
+		t.Fatalf("expected 1 filtered search item, got %d", len(resp.Items))
+	}
+	if resp.Items[0].PageID != reactPage.ID {
+		t.Fatalf("expected filtered page %q, got %#v", reactPage.ID, resp.Items)
+	}
+	if len(resp.TagFacets) != 1 || resp.TagFacets[0].Tag != "react" || resp.TagFacets[0].Count != 1 {
+		t.Fatalf("expected tag facets to contain only react=1, got %#v", resp.TagFacets)
+	}
+}
+
+func TestSearchEndpoint_ReturnsTagMatchesWithoutQuery(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	reactPage := createPageViaAPI(t, router, "React Tag Match", "react-tag-match", nil, pageNodeKind())
+	plainPage := createPageViaAPI(t, router, "Plain Tag Match", "plain-tag-match", nil, pageNodeKind())
+
+	updatePage := func(page *apiPage, title, slug, content string, tags []string) {
+		payload := map[string]interface{}{
+			"version": page.Version,
+			"title":   title,
+			"slug":    slug,
+			"content": content,
+			"tags":    tags,
+		}
+		body, _ := json.Marshal(payload)
+		rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(body)))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	updatePage(reactPage, "React Tag Match", "react-tag-match", "Body without search token.", []string{"react"})
+	updatePage(plainPage, "Plain Tag Match", "plain-tag-match", "Body without search token.", []string{"docs"})
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/search?tags=react", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Count     int `json:"count"`
+		TagFacets []struct {
+			Tag   string `json:"tag"`
+			Count int    `json:"count"`
+		} `json:"tag_facets"`
+		Items []struct {
+			PageID string `json:"page_id"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid search response JSON: %v", err)
+	}
+
+	if resp.Count != 1 {
+		t.Fatalf("expected 1 tag-only result, got %d", resp.Count)
+	}
+	if len(resp.Items) != 1 {
+		t.Fatalf("expected 1 tag-only item, got %d", len(resp.Items))
+	}
+	if resp.Items[0].PageID != reactPage.ID {
+		t.Fatalf("expected tag-only page %q, got %#v", reactPage.ID, resp.Items)
+	}
+	if len(resp.TagFacets) != 1 || resp.TagFacets[0].Tag != "react" || resp.TagFacets[0].Count != 1 {
+		t.Fatalf("expected tag facets to contain only react=1, got %#v", resp.TagFacets)
+	}
+}
+
+func TestSearchEndpoint_TagFacetsShrinkWithAdditionalFilters(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	type searchResponse struct {
+		Count     int `json:"count"`
+		TagFacets []struct {
+			Tag   string `json:"tag"`
+			Count int    `json:"count"`
+		} `json:"tag_facets"`
+	}
+
+	updatePage := func(page *apiPage, title, slug, content string, tags []string) {
+		payload := map[string]interface{}{
+			"version": page.Version,
+			"title":   title,
+			"slug":    slug,
+			"content": content,
+			"tags":    tags,
+		}
+		body, _ := json.Marshal(payload)
+		rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(body)))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	pageOne := createPageViaAPI(t, router, "Facet Alpha", "facet-alpha", nil, pageNodeKind())
+	pageTwo := createPageViaAPI(t, router, "Facet Beta", "facet-beta", nil, pageNodeKind())
+	pageThree := createPageViaAPI(t, router, "Facet Gamma", "facet-gamma", nil, pageNodeKind())
+
+	updatePage(pageOne, "Facet Alpha", "facet-alpha", "Body with facet token.", []string{"alpha", "shared"})
+	updatePage(pageTwo, "Facet Beta", "facet-beta", "Body with facet token.", []string{"beta", "shared"})
+	updatePage(pageThree, "Facet Gamma", "facet-gamma", "Body with facet token.", []string{"alpha", "shared", "narrow"})
+
+	baseRec := authenticatedRequest(t, router, http.MethodGet, "/api/search?q=facet%20token", nil)
+	if baseRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", baseRec.Code, baseRec.Body.String())
+	}
+
+	var baseResp searchResponse
+	if err := json.Unmarshal(baseRec.Body.Bytes(), &baseResp); err != nil {
+		t.Fatalf("Invalid search response JSON: %v", err)
+	}
+
+	narrowRec := authenticatedRequest(t, router, http.MethodGet, "/api/search?q=facet%20token&tags=alpha", nil)
+	if narrowRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", narrowRec.Code, narrowRec.Body.String())
+	}
+
+	var narrowResp searchResponse
+	if err := json.Unmarshal(narrowRec.Body.Bytes(), &narrowResp); err != nil {
+		t.Fatalf("Invalid filtered search response JSON: %v", err)
+	}
+
+	if baseResp.Count != 3 {
+		t.Fatalf("expected 3 base results, got %d", baseResp.Count)
+	}
+	if narrowResp.Count != 2 {
+		t.Fatalf("expected 2 narrowed results, got %d", narrowResp.Count)
+	}
+
+	baseFacets := map[string]int{}
+	for _, facet := range baseResp.TagFacets {
+		baseFacets[facet.Tag] = facet.Count
+	}
+	narrowFacets := map[string]int{}
+	for _, facet := range narrowResp.TagFacets {
+		narrowFacets[facet.Tag] = facet.Count
+	}
+
+	if len(baseFacets) != 4 {
+		t.Fatalf("expected 4 base facets, got %#v", baseResp.TagFacets)
+	}
+	if len(narrowFacets) != 3 {
+		t.Fatalf("expected 3 narrowed facets, got %#v", narrowResp.TagFacets)
+	}
+	if baseFacets["beta"] != 1 {
+		t.Fatalf("expected base facets to include beta=1, got %#v", baseResp.TagFacets)
+	}
+	if _, ok := narrowFacets["beta"]; ok {
+		t.Fatalf("expected beta to disappear after narrowing, got %#v", narrowResp.TagFacets)
+	}
+	if narrowFacets["alpha"] != 2 || narrowFacets["shared"] != 2 || narrowFacets["narrow"] != 1 {
+		t.Fatalf("unexpected narrowed facets: %#v", narrowResp.TagFacets)
+	}
+}
+
 func TestGetPagesByTagsEndpoint_ReturnsExcerpt(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

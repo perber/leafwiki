@@ -111,7 +111,7 @@ export default function Sidebar() {
                 <TooltipWrapper
                   label={tab.label}
                   key={tab.id}
-                  parentClassName="flex-1 min-w-0"
+                  parentClassName="min-w-0"
                 >
                   <button
                     data-testid={`sidebar-${tab.id}-tab-button`}

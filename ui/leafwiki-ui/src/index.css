@@ -338,11 +338,11 @@
   }
 
   .sidebar__tabs-list {
-    @apply bg-surface flex w-full min-w-0 text-sm;
+    @apply bg-surface flex w-full min-w-0 justify-start gap-1 text-sm;
   }
 
   .sidebar__tab-button {
-    @apply -mb-px flex w-full min-w-0 items-center gap-1 overflow-hidden px-3 py-1.5;
+    @apply -mb-px inline-flex min-w-0 items-center gap-1 overflow-hidden px-3 py-1.5;
   }
 
   .sidebar__tab-button--active {
@@ -1328,6 +1328,17 @@
 
   .search__pagination {
     @apply px-3 py-3;
+  }
+
+  .search__tags-section {
+    @apply mt-2;
+  }
+
+  .search__tags-list {
+    @apply border-surface-border bg-surface flex flex-wrap gap-1.5 rounded-md border px-2 py-2;
+    max-height: 96px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   /* SearchResultCard */

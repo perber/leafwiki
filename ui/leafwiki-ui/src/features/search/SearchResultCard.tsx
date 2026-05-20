@@ -33,7 +33,10 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
     return (
       <Link
         ref={ref}
-        to={`${item.path}`}
+        to={{
+          pathname: `${item.path}`,
+          search: location.search,
+        }}
         data-testid={`search-result-card-${item.page_id}`}
         aria-current={isRouteActive ? 'page' : undefined}
         onMouseEnter={onMouseEnter}

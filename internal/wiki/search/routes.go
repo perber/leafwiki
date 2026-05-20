@@ -3,6 +3,7 @@ package search
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
@@ -13,9 +14,9 @@ import (
 
 // Routes is the RouteRegistrar for the search domain.
 type Routes struct {
-	search           *SearchUseCase
+	search            *SearchUseCase
 	getIndexingStatus *GetIndexingStatusUseCase
-	authService      *coreauth.AuthService
+	authService       *coreauth.AuthService
 }
 
 // RoutesConfig holds the dependencies required to build a Routes instance.
@@ -61,7 +62,8 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 func (r *Routes) handleSearch(c *gin.Context) {
 	query := c.Query("q")
-	if query == "" {
+	tags := queryTags(c, "tags")
+	if query == "" && len(tags) == 0 {
 		respondWithSearchStatusError(c, http.StatusBadRequest, ErrCodeSearchMissingQuery, "Query parameter 'q' is required", "query parameter q is required")
 		return
 	}
@@ -80,7 +82,7 @@ func (r *Routes) handleSearch(c *gin.Context) {
 		return
 	}
 
-	out, err := r.search.Execute(c.Request.Context(), SearchInput{Query: query, Offset: offset, Limit: limit})
+	out, err := r.search.Execute(c.Request.Context(), SearchInput{Query: query, Tags: tags, Offset: offset, Limit: limit})
 	if err != nil {
 		respondWithSearchError(c, err)
 		return
@@ -91,4 +93,29 @@ func (r *Routes) handleSearch(c *gin.Context) {
 func (r *Routes) handleGetIndexingStatus(c *gin.Context) {
 	out := r.getIndexingStatus.Execute(c.Request.Context())
 	c.JSON(http.StatusOK, out.Status)
+}
+
+func splitTags(raw string) []string {
+	parts := strings.Split(raw, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		tag := strings.TrimSpace(p)
+		if tag != "" {
+			result = append(result, tag)
+		}
+	}
+	return result
+}
+
+func queryTags(c *gin.Context, key string) []string {
+	values := c.QueryArray(key)
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		result = append(result, splitTags(value)...)
+	}
+	return result
 }

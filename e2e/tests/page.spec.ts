@@ -10,6 +10,7 @@ import EditPageMetadataDialog from '../pages/EditPageMetadataDialog';
 import LoginPage from '../pages/LoginPage';
 import MovePageDialog from '../pages/MovePageDialog';
 import NotFoundPage from '../pages/NotFoundPage';
+import SearchView from '../pages/SearchView';
 import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
 import { e2eBasePath, toAppPath } from '../pages/appPath';
@@ -2062,6 +2063,100 @@ Paragraph outside the list.
     await searchView.clearSearch();
   });
   */
+
+  test('search-panel-hides-tag-accordion-when-no-tags-exist', async ({ page }) => {
+    const viewPage = new ViewPage(page);
+    await viewPage.goto('/');
+    await viewPage.switchToSearchTab();
+
+    const searchView = new SearchView(page);
+    await expect(searchView.getTagAccordion()).toHaveCount(0);
+  });
+
+  test('search-panel-combines-query-and-tag-filters', async ({ page }) => {
+    const stamp = Date.now();
+    const matchingTitle = `Search Tag Match ${stamp}`;
+    const wrongTagTitle = `Search Wrong Tag ${stamp}`;
+    const wrongQueryTitle = `Search Wrong Query ${stamp}`;
+    const sharedTag = `search-tag-${stamp}`;
+    const otherTag = `search-other-${stamp}`;
+    const query = `shared search ${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: matchingTitle,
+      slug: `search-tag-match-${stamp}`,
+      content: `This page contains ${query}.`,
+      tags: [sharedTag],
+    });
+    await createPageWithMetadata(page, {
+      title: wrongTagTitle,
+      slug: `search-wrong-tag-${stamp}`,
+      content: `This page contains ${query}.`,
+      tags: [otherTag],
+    });
+    await createPageWithMetadata(page, {
+      title: wrongQueryTitle,
+      slug: `search-wrong-query-${stamp}`,
+      content: 'This page does not contain the search token.',
+      tags: [sharedTag],
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto('/');
+    await viewPage.switchToSearchTab();
+
+    const searchView = new SearchView(page);
+    await expect(searchView.getTagAccordion()).toBeVisible();
+
+    await searchView.clickTagFilter(sharedTag);
+    await searchView.enterSearchQuery(query);
+
+    await expect(searchView.getResultsList()).toBeVisible();
+    await expect(await searchView.searchResultContainsPageTitle(matchingTitle)).toBeTruthy();
+    await searchView.expectSearchResultMissing(wrongTagTitle);
+    await searchView.expectSearchResultMissing(wrongQueryTitle);
+  });
+
+  test('search-panel-shows-facets-from-full-result-set', async ({ page }) => {
+    const stamp = Date.now();
+    const query = `facet pagination ${stamp}`;
+    const sharedTag = `facet-shared-${stamp}`;
+    const lateTag = `facet-late-${stamp}`;
+
+    for (let i = 0; i < 10; i++) {
+      await createPageWithMetadata(page, {
+        title: `Facet Early ${stamp}-${i}`,
+        slug: `facet-early-${stamp}-${i}`,
+        content: `This page contains ${query}.`,
+        tags: [sharedTag],
+      });
+    }
+
+    await createPageWithMetadata(page, {
+      title: `Facet Late ${stamp}`,
+      slug: `facet-late-${stamp}`,
+      content: `This page contains ${query}.`,
+      tags: [sharedTag, lateTag],
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto('/');
+    await viewPage.switchToSearchTab();
+
+    const searchView = new SearchView(page);
+    await searchView.enterSearchQuery(query);
+
+    await expect(searchView.getResultsList()).toBeVisible();
+    await expect(searchView.getTagFilter(sharedTag)).toBeVisible();
+    await expect(searchView.getTagFilter(lateTag)).toBeVisible();
+
+    await searchView.clickTagFilter(lateTag);
+
+    await expect(searchView.getTagFilter(lateTag)).toBeVisible();
+    await expect(searchView.getTagFilter(sharedTag)).toBeVisible();
+    await expect(searchView.getTagFilters()).toHaveCount(2);
+    await expect(await searchView.searchResultContainsPageTitle(`Facet Late ${stamp}`)).toBeTruthy();
+  });
 
   test('markdown-relative-link-navigates-to-sibling-page', async ({ page }) => {
     const suffix = Date.now();

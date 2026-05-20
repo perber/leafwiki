@@ -7,6 +7,7 @@ import (
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
+	"github.com/perber/wiki/internal/search"
 )
 
 func TestNewLinkIndexSideEffect_DefaultsLogger(t *testing.T) {
@@ -27,6 +28,27 @@ func TestNewLinkIndexSideEffect_DefaultsLogger(t *testing.T) {
 func TestNewRevisionSideEffect_DefaultsLogger(t *testing.T) {
 	treeService := tree.NewTreeService(t.TempDir())
 	effect := NewRevisionSideEffect(revision.NewService(t.TempDir(), treeService, nil, revision.ServiceOptions{}), nil)
+	if effect.log == nil {
+		t.Fatal("expected default logger to be set")
+	}
+	if effect.log != slog.Default() {
+		t.Fatal("expected slog.Default() logger")
+	}
+}
+
+func TestNewSearchIndexSideEffect_DefaultsLogger(t *testing.T) {
+	treeService := tree.NewTreeService(t.TempDir())
+	index, err := search.NewSQLiteIndex(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSQLiteIndex failed: %v", err)
+	}
+	defer func() {
+		if err := index.Close(); err != nil {
+			t.Fatalf("Close failed: %v", err)
+		}
+	}()
+
+	effect := NewSearchIndexSideEffect(index, treeService, nil)
 	if effect.log == nil {
 		t.Fatal("expected default logger to be set")
 	}
