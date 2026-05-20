@@ -21,7 +21,9 @@ export default class TagsView {
   }
 
   getResultTitle(text: string) {
-    return this.page.locator('[data-testid^="search-result-card-title-"]').filter({ hasText: text });
+    return this.page
+      .locator('[data-testid^="search-result-card-title-"]')
+      .filter({ hasText: text });
   }
 
   getNoResults() {

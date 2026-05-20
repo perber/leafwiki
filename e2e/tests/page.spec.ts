@@ -11,6 +11,7 @@ import LoginPage from '../pages/LoginPage';
 import MovePageDialog from '../pages/MovePageDialog';
 import NotFoundPage from '../pages/NotFoundPage';
 import SearchView from '../pages/SearchView';
+import TagsView from '../pages/TagsView';
 import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
 import { e2eBasePath, toAppPath } from '../pages/appPath';
@@ -567,26 +568,15 @@ test.describe('Authenticated', () => {
 
     const viewPage = new ViewPage(page);
     await viewPage.goto('/');
-    await viewPage.switchToTagsTab();
+    const tagsView = new TagsView(page);
+    await tagsView.open();
+    await tagsView.clickTagFilter(matchingTag);
 
-    const searchInput = page.getByTestId('tags-search-input');
-    await searchInput.fill(`e2e-tags-${stamp}`);
-
-    const suggestion = page.getByTestId(`tags-suggestion-${matchingTag}`);
-    await suggestion.waitFor({ state: 'visible' });
-    await suggestion.click();
-
-    await expect(page.getByTestId(`tags-selected-chip-${matchingTag}`)).toBeVisible();
-    await expect(page.getByTestId('tags-results-list')).toBeVisible();
-    await expect(
-      page.locator('.browse-results__item-title').filter({ hasText: `Tags Match A ${stamp}` }),
-    ).toBeVisible();
-    await expect(
-      page.locator('.browse-results__item-title').filter({ hasText: `Tags Match B ${stamp}` }),
-    ).toBeVisible();
-    await expect(
-      page.locator('.browse-results__item-title').filter({ hasText: `Tags Other ${stamp}` }),
-    ).toHaveCount(0);
+    await tagsView.expectChipVisible(matchingTag);
+    await tagsView.waitForResults();
+    await tagsView.expectResultVisible(`Tags Match A ${stamp}`);
+    await tagsView.expectResultVisible(`Tags Match B ${stamp}`);
+    await tagsView.expectResultNotVisible(`Tags Other ${stamp}`);
   });
 
   test('permalink-dialog-shows-shareable-url-and-resolves-after-move', async ({
