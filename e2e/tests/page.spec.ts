@@ -2144,6 +2144,7 @@ Paragraph outside the list.
 
     const searchView = new SearchView(page);
     await searchView.enterSearchQuery(query);
+    await searchView.ensureTagFiltersVisible();
 
     await expect(searchView.getResultsList()).toBeVisible();
     await expect(searchView.getTagFilter(sharedTag)).toBeVisible();

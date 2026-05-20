@@ -38,6 +38,10 @@ export default class SearchView {
     await expect(this.getSearchInput()).toHaveValue('');
   }
 
+  async ensureTagFiltersVisible() {
+    await this.ensureTagListVisible();
+  }
+
   async clickTagFilter(tag: string) {
     await this.ensureTagListVisible();
     await this.getTagFilter(tag).click();
