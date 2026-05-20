@@ -67,9 +67,7 @@ export default class SearchView {
 
   async expectSearchResultMissing(title: string) {
     await expect(
-      this.page
-        .locator('a[data-testid^="search-result-card-"]')
-        .filter({ hasText: title }),
+      this.page.locator('a[data-testid^="search-result-card-"]').filter({ hasText: title }),
     ).toHaveCount(0);
   }
 

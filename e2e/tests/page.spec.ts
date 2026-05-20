@@ -2155,7 +2155,9 @@ Paragraph outside the list.
     await expect(searchView.getTagFilter(lateTag)).toBeVisible();
     await expect(searchView.getTagFilter(sharedTag)).toBeVisible();
     await expect(searchView.getTagFilters()).toHaveCount(2);
-    await expect(await searchView.searchResultContainsPageTitle(`Facet Late ${stamp}`)).toBeTruthy();
+    await expect(
+      await searchView.searchResultContainsPageTitle(`Facet Late ${stamp}`),
+    ).toBeTruthy();
   });
 
   test('markdown-relative-link-navigates-to-sibling-page', async ({ page }) => {

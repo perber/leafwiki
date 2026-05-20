@@ -7,11 +7,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Input } from '@/components/ui/input'
-import {
-  searchPages,
-  SearchResultItem,
-  SearchTagFacet,
-} from '@/lib/api/search'
+import { searchPages, SearchResultItem, SearchTagFacet } from '@/lib/api/search'
 import { fetchTags, TagCount } from '@/lib/api/tags'
 import { useDebounce } from '@/lib/useDebounce'
 import { X } from 'lucide-react'
