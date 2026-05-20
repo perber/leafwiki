@@ -2106,10 +2106,9 @@ Paragraph outside the list.
     await viewPage.switchToSearchTab();
 
     const searchView = new SearchView(page);
-    await expect(searchView.getTagAccordion()).toBeVisible();
-
-    await searchView.clickTagFilter(sharedTag);
     await searchView.enterSearchQuery(query);
+    await expect(searchView.getTagAccordion()).toBeVisible();
+    await searchView.clickTagFilter(sharedTag);
 
     await expect(searchView.getResultsList()).toBeVisible();
     await expect(await searchView.searchResultContainsPageTitle(matchingTitle)).toBeTruthy();
