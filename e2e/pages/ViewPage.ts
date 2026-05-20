@@ -101,7 +101,7 @@ export default class ViewPage {
     // 4) Click logout button
     const logoutButton = this.page.getByTestId('user-toolbar-logout');
     await logoutButton.waitFor({ state: 'visible', timeout: 5000 });
-    await logoutButton.click({ timeout: 5000 });
+    await this.activateControl(logoutButton);
 
     // 5) Wait for login field again
     await loginField.waitFor({ state: 'visible' });

@@ -339,7 +339,10 @@ export default function Search({ active = false }: SearchProps) {
             value="all-tags"
             className="browse-tags__accordion-item"
           >
-            <AccordionTrigger className="browse-tags__accordion-trigger">
+            <AccordionTrigger
+              className="browse-tags__accordion-trigger"
+              data-testid="search-tags-accordion-trigger"
+            >
               <span className="browse-tags__accordion-title">All Tags</span>
               <span className="browse-tags__accordion-summary">
                 {availableTagsLabel}
