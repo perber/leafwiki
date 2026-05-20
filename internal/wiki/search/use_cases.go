@@ -120,6 +120,13 @@ func (uc *SearchUseCase) searchByTags(pageIDs []string, offset, limit int) (*Sea
 		return items[i].Title < items[j].Title
 	})
 
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
 	count := len(items)
 	if offset > count {
 		offset = count
@@ -127,10 +134,6 @@ func (uc *SearchUseCase) searchByTags(pageIDs []string, offset, limit int) (*Sea
 	end := offset + limit
 	if end > count {
 		end = count
-	}
-	if limit <= 0 {
-		limit = 20
-		end = offset
 	}
 	pagedItems := items[offset:end]
 	uc.attachTags(pagedItems)

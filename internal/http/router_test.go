@@ -1853,6 +1853,57 @@ func TestSearchEndpoint_ReturnsTagMatchesWithoutQuery(t *testing.T) {
 	}
 }
 
+func TestSearchEndpoint_NormalizesTagOnlyPaginationBounds(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	page := createPageViaAPI(t, router, "React Tag Match", "react-tag-match-bounds", nil, pageNodeKind())
+
+	payload := map[string]interface{}{
+		"version": page.Version,
+		"title":   "React Tag Match",
+		"slug":    "react-tag-match-bounds",
+		"content": "Body without search token.",
+		"tags":    []string{"react"},
+	}
+	body, _ := json.Marshal(payload)
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	boundsRec := authenticatedRequest(t, router, http.MethodGet, "/api/search?tags=react&offset=-1&limit=0", nil)
+	if boundsRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", boundsRec.Code, boundsRec.Body.String())
+	}
+
+	var resp struct {
+		Count  int `json:"count"`
+		Limit  int `json:"limit"`
+		Offset int `json:"offset"`
+		Items  []struct {
+			PageID string `json:"page_id"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(boundsRec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid search response JSON: %v", err)
+	}
+
+	if resp.Count != 1 {
+		t.Fatalf("expected 1 tag-only result, got %d", resp.Count)
+	}
+	if resp.Offset != 0 {
+		t.Fatalf("expected offset to normalize to 0, got %d", resp.Offset)
+	}
+	if resp.Limit != 20 {
+		t.Fatalf("expected limit to normalize to 20, got %d", resp.Limit)
+	}
+	if len(resp.Items) != 1 || resp.Items[0].PageID != page.ID {
+		t.Fatalf("expected normalized request to return page %q, got %#v", page.ID, resp.Items)
+	}
+}
+
 func TestSearchEndpoint_TagFacetsShrinkWithAdditionalFilters(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

@@ -3,6 +3,8 @@ package tags
 import (
 	"strings"
 	"testing"
+
+	"github.com/perber/wiki/internal/core/excerpt"
 )
 
 func TestExtractExcerptFromContent_PlainText(t *testing.T) {
@@ -88,7 +90,7 @@ func TestExtractExcerptFromContent_TruncatesLongContent(t *testing.T) {
 		t.Errorf("long content should be truncated with ellipsis, got %q", got)
 	}
 	runes := []rune(got)
-	if len(runes) > 190 {
+	if len(runes) > excerpt.MaxRunes+10 {
 		t.Errorf("excerpt too long: %d runes", len(runes))
 	}
 }

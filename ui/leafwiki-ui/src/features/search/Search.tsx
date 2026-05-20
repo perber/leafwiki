@@ -23,10 +23,11 @@ export default function Search({ active = false }: SearchProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const urlQuery = searchParams.get('q') ?? ''
   const activeTags = searchParams.getAll('tags')
   const activeTagsKey = activeTags.join('\n')
   const debouncedActiveTagsKey = useDebounce(activeTagsKey, 180)
-  const initialQuery = searchParams.get('q') ?? ''
+  const initialQuery = urlQuery
 
   const [query, setQuery] = useState(initialQuery)
   const [loading, setLoading] = useState(
@@ -137,6 +138,30 @@ export default function Search({ active = false }: SearchProps) {
   }, [active])
 
   useEffect(() => {
+    if (!active) {
+      return
+    }
+
+    if (query === urlQuery) {
+      return
+    }
+
+    const syncHandle = window.setTimeout(() => {
+      setQuery(urlQuery)
+      setPage(0)
+      setActiveIndex(0)
+    }, 0)
+
+    return () => {
+      window.clearTimeout(syncHandle)
+    }
+  }, [active, query, urlQuery])
+
+  useEffect(() => {
+    if (!active) {
+      return
+    }
+
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev)
@@ -149,7 +174,7 @@ export default function Search({ active = false }: SearchProps) {
       },
       { replace: true },
     )
-  }, [debouncedQuery, setSearchParams])
+  }, [active, debouncedQuery, setSearchParams])
 
   useEffect(() => {
     if (!active) {
@@ -328,7 +353,9 @@ export default function Search({ active = false }: SearchProps) {
         )}
       </div>
 
-      {visibleTags.length > 0 && (
+      {(visibleTags.length > 0 ||
+        loadingAvailableTags ||
+        availableTagsError) && (
         <Accordion
           type="single"
           collapsible
