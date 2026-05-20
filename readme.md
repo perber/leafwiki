@@ -189,6 +189,13 @@ The easiest way to install LeafWiki is using the provided installation script:
 sudo /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh)"
 ```
 
+To update LeafWiki, you can use the following command:
+
+```bash
+sudo /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/perber/leafwiki/main/update.sh)"
+```
+> **Note:** This update script only works if you installed LeafWiki using the classic installer script above. It is not compatible with Docker or manual binary installations.
+
 This installs LeafWiki as a system service on the target machine.
 The service is started automatically after installation.
 > The installation script has been tested on Ubuntu, Debian, and Raspbian.
