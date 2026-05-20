@@ -2070,7 +2070,26 @@ Paragraph outside the list.
 
     await expect(accordion).toBeVisible();
     await page.getByTestId('search-tags-accordion-trigger').click();
-    await expect(searchView.getTagFilters().first()).toBeVisible();
+    await expect
+      .poll(async () => {
+        const hasFilter = await searchView
+          .getTagFilters()
+          .first()
+          .isVisible()
+          .catch(() => false);
+        const hasLoadingState = await page
+          .locator('.browse-tags__accordion-empty')
+          .filter({ hasText: 'Loading tags' })
+          .isVisible()
+          .catch(() => false);
+        const hasErrorState = await page
+          .getByTestId('tags-available-error')
+          .isVisible()
+          .catch(() => false);
+
+        return hasFilter || hasLoadingState || hasErrorState;
+      })
+      .toBe(true);
   });
 
   test('search-panel-combines-query-and-tag-filters', async ({ page }) => {

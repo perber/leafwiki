@@ -26,6 +26,16 @@ export default class SearchView {
   async enterSearchQuery(query: string) {
     const searchInput = this.getSearchInput();
     await searchInput.fill(query);
+    await expect
+      .poll(async () => {
+        const currentValue = await searchInput.inputValue();
+        if (currentValue !== query) {
+          await searchInput.fill(query);
+          return searchInput.inputValue();
+        }
+        return currentValue;
+      })
+      .toBe(query);
     await this.page
       .locator('.search__result-summary, [data-testid="search-results-list"]')
       .first()
