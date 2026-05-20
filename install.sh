@@ -14,6 +14,8 @@ ENV_FILE_PATH="/etc/leafwiki/.env"
 ENABLE_LINK_REFACTORING="false"
 ENABLE_REVISION="false"
 MAX_REVISION_HISTORY="100"
+RELEASE_LINK="https://github.com/perber/leafwiki/"
+PATH_TO_BINARY="/usr/local/bin/leafwiki"
 
 
 # Usage function
@@ -85,10 +87,10 @@ get_version(){
 }
 
 download_binary(){
-    wget "https://github.com/perber/leafwiki/releases/download/v${VERSION}/leafwiki-v${VERSION}-linux-${ARCH}" || exit 1
-    cp leafwiki-v${VERSION}-linux-${ARCH} /usr/local/bin/leafwiki
+    wget "${RELEASE_LINK}releases/download/v${VERSION}/leafwiki-v${VERSION}-linux-${ARCH}" || exit 1
+    cp leafwiki-v${VERSION}-linux-${ARCH} $PATH_TO_BINARY
     rm leafwiki-v${VERSION}-linux-${ARCH}
-    chmod +x /usr/local/bin/leafwiki
+    chmod +x $PATH_TO_BINARY
 }
 
 check_dependencies "systemctl"
@@ -269,7 +271,7 @@ After=network.target
 [Service]
 User=$RUN_USER
 EnvironmentFile=-${ENV_FILE_PATH:-$(realpath $PWD)/$ENV_FILE}
-ExecStart=/usr/local/bin/leafwiki
+ExecStart=${PATH_TO_BINARY}
 Restart=on-failure
 
 [Install]

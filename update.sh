@@ -33,10 +33,24 @@ get_version(){
 }
 
 download_binary(){
-    wget "${RELEASE_LINK}releases/download/v${VERSION}/leafwiki-v${VERSION}-linux-${ARCH}" || exit 1
-    cp leafwiki-v${VERSION}-linux-${ARCH} $PATH_TO_BINARY
-    rm leafwiki-v${VERSION}-linux-${ARCH}
-    chmod +x /usr/local/bin/leafwiki
+    TMP_FILE="/tmp/leafwiki-v${VERSION}-linux-${ARCH}"
+    wget -q -O "$TMP_FILE" "${RELEASE_LINK}releases/download/v${VERSION}/leafwiki-v${VERSION}-linux-${ARCH}" || {
+        echo "Download failed. Aborting update." >&2
+        exit 1
+    }
+    
+    if [ ! -s "$TMP_FILE" ]; then
+        echo "Downloaded file is empty. Aborting update." >&2
+        rm -f "$TMP_FILE"
+        exit 1
+    fi
+
+    # Backup current binary
+    mv "$PATH_TO_BINARY" "${PATH_TO_BINARY}.bak"
+    
+    # Install new binary
+    mv "$TMP_FILE" "$PATH_TO_BINARY"
+    chmod +x "$PATH_TO_BINARY"
 }
 
 EXIST=$(test -x $PATH_TO_BINARY && echo "true" || echo "false")
@@ -46,8 +60,6 @@ if [[ $EXIST == "false" ]]; then
     exit 1
 fi
 
-rm -f $PATH_TO_BINARY
-
 get_version
 download_binary
 
@@ -55,10 +67,8 @@ systemctl daemon-reload
 systemctl restart leafwiki
 
 echo "======================================="
-echo "======================================="
-echo "== LeafWiki update completed!  =="
+echo "== LeafWiki update completed!        =="
 echo "==                                   =="
 printf "== %-33s ==\n" "New Version: $VERSION"
-echo "==  
-echo "======================================="
+echo "==                                   =="
 echo "======================================="
