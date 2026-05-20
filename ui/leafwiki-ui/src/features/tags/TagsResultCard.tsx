@@ -3,7 +3,8 @@ import { buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { MouseEvent, forwardRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { usePageEditorStore } from '../editor/pageEditor'
+import type { PageEditorState } from '../editor/pageEditorStore'
+import { usePageEditorStore } from '../editor/pageEditorStore'
 
 type TagsResultCardProps = {
   item: TaggedPage
@@ -23,7 +24,7 @@ const TagsResultCard = forwardRef<HTMLDivElement, TagsResultCardProps>(
   ) {
     const location = useLocation()
     const currentEditorPageId = usePageEditorStore(
-      (state) => state.page?.id ?? state.initialPage?.id,
+      (state: PageEditorState) => state.page?.id ?? state.initialPage?.id,
     )
     const currentViewPath = normalizeWikiRoutePath(
       buildViewUrl(location.pathname),

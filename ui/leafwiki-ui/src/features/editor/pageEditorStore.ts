@@ -20,7 +20,7 @@ import {
   validateEditorFrontmatterMetadata,
 } from './frontmatter'
 
-interface PageEditorState {
+export interface PageEditorState {
   title: string // current title in the editor
   slug: string // current slug in the editor
   content: string // current markdown content in the editor
