@@ -1,7 +1,7 @@
 import Page404 from '@/components/Page404'
 import { getPermalinkTarget } from '@/lib/api/pages'
 import { isPageNotFoundError } from '@/lib/api/errors'
-import { useProgressbarStore } from '@/features/progressbar/progressbar'
+import { useProgressbarStore } from '@/features/progressbar/progressbarStore'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 

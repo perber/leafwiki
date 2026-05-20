@@ -38,7 +38,7 @@ import {
 import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { usePageEditorStore } from '../editor/pageEditor'
+import { usePageEditorStore } from '../editor/pageEditorStore'
 import { TreeViewActionButton } from './TreeViewActionButton'
 import { useTreeNodeActionsMenusStore } from './treeNodeActionsMenus'
 

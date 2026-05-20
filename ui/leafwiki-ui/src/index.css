@@ -2014,6 +2014,12 @@
     @apply pr-4!;
   }
 
+  .markdown-editor__preview-container .katex-display,
+  .page-viewer__content .katex-display,
+  .page-history__preview-body .katex-display {
+    @apply max-w-full overflow-x-auto overflow-y-hidden py-1;
+  }
+
   .markdown-editor__preview-container ol ol,
   .markdown-editor__preview-container ol ul,
   .markdown-editor__preview-container ul ol,

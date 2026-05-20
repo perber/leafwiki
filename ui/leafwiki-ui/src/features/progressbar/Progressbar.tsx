@@ -1,6 +1,6 @@
 import { Progress } from '@/components/ui/progress'
 import { useEffect, useRef, useState } from 'react'
-import { useProgressbarStore } from './progressbar'
+import { useProgressbarStore } from './progressbarStore'
 
 type TimeoutId = ReturnType<typeof setTimeout>
 type IntervalId = ReturnType<typeof setInterval>

@@ -1,7 +1,7 @@
 // Hook to provide toolbar actions for the page viewer
 
 import { useEffect } from 'react'
-import { useToolbarStore } from '../toolbar/toolbar'
+import { useToolbarStore } from '../toolbar/toolbarStore'
 
 // Hook to set up toolbar actions based on app mode and read-only status
 export function useToolbarActions() {

@@ -6,7 +6,8 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Pencil } from 'lucide-react'
 import { TooltipWrapper } from '../../components/TooltipWrapper'
-import { isDirtyState, usePageEditorStore } from './pageEditor'
+import { usePageEditorStore } from './pageEditorStore'
+import { isDirtyState } from './pageEditorStore'
 
 export function EditorTitleBar() {
   const isMobile = useIsMobile()

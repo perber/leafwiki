@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { usePageEditorStore } from '../editor/pageEditor'
+import { usePageEditorStore } from '../editor/pageEditorStore'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {

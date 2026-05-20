@@ -2454,6 +2454,33 @@ Custom content
     test.expect(backgrounds.size).toBe(7);
   });
 
+  test('block math renders with KaTeX instead of raw delimiters', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `block-math-${timestamp}`;
+    const title = `Block Math ${timestamp}`;
+    const content = `Intro paragraph
+
+$$
+\\sum_{i=1}^{n} a_i
+$$
+
+Outro paragraph`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const article = page.locator('article');
+    const blockMath = article.locator('.katex-display');
+
+    await blockMath.waitFor({ state: 'visible' });
+    await test.expect(article).toContainText('Intro paragraph');
+    await test.expect(article).toContainText('Outro paragraph');
+    await test.expect(article.locator('.katex-display .katex')).toHaveCount(1);
+    await test.expect(article).not.toContainText('$$');
+  });
+
   test('revision-preview-renders-deleted-assets', async ({ page }) => {
     const title = `Revision Asset Preview ${Date.now()}`;
 

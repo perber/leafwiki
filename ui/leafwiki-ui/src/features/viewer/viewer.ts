@@ -4,7 +4,7 @@
 import { getPageByPath, Page } from '@/lib/api/pages'
 import { isPageNotFoundError } from '@/lib/api/errors'
 import { create } from 'zustand'
-import { useProgressbarStore } from '../progressbar/progressbar'
+import { useProgressbarStore } from '../progressbar/progressbarStore'
 
 interface ViewerState {
   error: string | null

@@ -13,14 +13,14 @@ import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { create } from 'zustand'
 import { useLinkStatusStore } from '../links/linkstatus_store'
-import { confirmPageRefactor } from '../page/pageRefactorDialog'
-import { useProgressbarStore } from '../progressbar/progressbar'
+import { confirmPageRefactor } from '../page/pageRefactorDialogState'
+import { useProgressbarStore } from '../progressbar/progressbarStore'
 import {
   EditorFrontmatterField,
   validateEditorFrontmatterMetadata,
 } from './frontmatter'
 
-interface PageEditorState {
+export interface PageEditorState {
   title: string // current title in the editor
   slug: string // current slug in the editor
   content: string // current markdown content in the editor

@@ -26,7 +26,7 @@ import { formatBytes, IMAGE_EXTENSIONS } from '@/lib/config'
 import { useConfigStore } from '@/stores/config'
 import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
-import { usePageEditorStore } from './pageEditor'
+import { usePageEditorStore } from './pageEditorStore'
 
 export type MarkdownEditorRef = {
   insertAtCursor: (text: string) => void
