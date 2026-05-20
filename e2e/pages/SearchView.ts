@@ -39,6 +39,7 @@ export default class SearchView {
   }
 
   async clickTagFilter(tag: string) {
+    await this.ensureTagListVisible();
     await this.getTagFilter(tag).click();
     await this.page
       .locator('.search__result-summary, [data-testid="search-results-list"]')
@@ -79,5 +80,15 @@ export default class SearchView {
 
     await result.waitFor({ state: 'visible' });
     await expect(result).toHaveAttribute('aria-current', 'page');
+  }
+
+  private async ensureTagListVisible() {
+    const tagList = this.page.getByTestId('search-tags-list');
+    if (await tagList.isVisible().catch(() => false)) {
+      return;
+    }
+
+    await this.page.getByTestId('search-tags-accordion-trigger').click();
+    await tagList.waitFor({ state: 'visible' });
   }
 }
