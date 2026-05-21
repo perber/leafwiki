@@ -38,6 +38,11 @@ func TestScheduler_TriggerNow(t *testing.T) {
 	scheduler := NewScheduler(repo, 10*time.Minute)
 	defer scheduler.Stop()
 
+	// Add a file to back up so there's something to commit
+	if err := os.WriteFile(filepath.Join(rootDir, "test.txt"), []byte("content"), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
 	// Give it a moment to process the initial run
 	time.Sleep(100 * time.Millisecond)
 
@@ -119,6 +124,11 @@ func TestScheduler_RunsOnStart(t *testing.T) {
 	// Create scheduler with very long interval
 	scheduler := NewScheduler(repo, 10*time.Hour)
 	defer scheduler.Stop()
+
+	// Add a file to back up so there's something to commit
+	if err := os.WriteFile(filepath.Join(rootDir, "test.txt"), []byte("content"), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
 
 	// Wait a moment for the initial run
 	time.Sleep(100 * time.Millisecond)

@@ -204,9 +204,7 @@ func (r *Repository) RunBackup() error {
 	}
 
 	if status.IsClean() {
-		// Even when there's nothing to commit, record successful backup check
-		r.status.SetSuccess(time.Now())
-		return nil // Nothing to commit
+		return nil // Nothing to commit - don't update LastBackupAt
 	}
 
 	// Commit changes
@@ -233,7 +231,7 @@ func (r *Repository) RunBackup() error {
 	}
 
 	r.status.SetSuccess(time.Now())
-	slog.Default().Info("backup completed", "lastBackupAt", time.Now())
+	slog.Default().Info("backup pushed to remote")
 	return nil
 }
 
@@ -270,7 +268,7 @@ func (r *Repository) push(commitHash string) error {
 		slog.Default().Error("git push failed", "error", err, "remote", r.cfg.RemoteURL)
 		return fmt.Errorf("failed to push: %w", err)
 	}
-	slog.Default().Info("git push successful", "remote", r.cfg.RemoteURL)
+	slog.Default().Info("git push succeeded")
 	return nil
 }
 
