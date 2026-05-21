@@ -271,6 +271,11 @@ func (r *Repository) push(commitHash string) error {
 		RefSpecs: []config.RefSpec{refSpec},
 	})
 	if err != nil {
+		// "already up-to-date" means the remote already has this commit - not an error
+		if err.Error() == "already up-to-date" {
+			slog.Default().Info("backup skipped - already up-to-date")
+			return nil
+		}
 		slog.Default().Error("git push failed", "error", err, "remote", r.cfg.RemoteURL)
 		return fmt.Errorf("failed to push: %w", err)
 	}
