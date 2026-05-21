@@ -210,7 +210,8 @@ func (r *Repository) RunBackup() error {
 	}
 
 	if status.IsClean() {
-		return nil // Nothing to commit - don't update LastBackupAt
+		r.status.SetSuccess(time.Now())
+		return nil // Nothing to commit
 	}
 
 	// Commit changes
