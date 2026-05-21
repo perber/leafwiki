@@ -104,10 +104,11 @@ export default function BackupSettings() {
 
               {!enabled && (
                 <p className="settings__hint">
-                  To enable Git backup, set the environment variable{' '}
-                  <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP=true</code>{' '}
-                  and configure{' '}
-                  <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP_REMOTE</code>.
+                  To enable Git backup, set the following environment variables:{' '}
+                  <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP=true</code>,{' '}
+                  <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP_REMOTE</code>,{' '}
+                  and provide your SSH key via{' '}
+                  <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH</code>.
                 </p>
               )}
 
