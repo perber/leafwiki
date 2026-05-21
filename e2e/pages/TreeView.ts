@@ -40,7 +40,10 @@ export default class TreeView {
 
   private async openMoreActionsMenuForNodeRow(
     nodeRow: ReturnType<TreeView['getNodeRowByTitle']>,
-    expectedActionTestId: 'tree-view-action-button-sort' | 'tree-view-action-button-move',
+    expectedActionTestId:
+      | 'tree-view-action-button-sort'
+      | 'tree-view-action-button-move'
+      | 'tree-view-action-button-delete',
   ) {
     await nodeRow.waitFor({ state: 'visible' });
     await nodeRow.scrollIntoViewIfNeeded();
@@ -77,6 +80,23 @@ export default class TreeView {
       });
 
       try {
+        await expect(expectedActionButton).toBeVisible({ timeout: 3000 });
+        return;
+      } catch {
+        await moreActionsButton.focus().catch(() => {});
+      }
+
+      try {
+        await this.page.keyboard.press('Enter');
+        await expect(expectedActionButton).toBeVisible({ timeout: 3000 });
+        return;
+      } catch {
+        await this.page.keyboard.press('Escape').catch(() => {});
+      }
+
+      try {
+        await moreActionsButton.focus().catch(() => {});
+        await this.page.keyboard.press(' ');
         await expect(expectedActionButton).toBeVisible({ timeout: 3000 });
         return;
       } catch {
@@ -229,6 +249,24 @@ export default class TreeView {
     );
     await expect(moveButton).toBeVisible();
     await moveButton.click();
+  }
+
+  async openDeleteDialogForPage(pageTitle: string, parentPage?: string) {
+    await this.ensureSidebarVisible();
+    await this.closeBlockingOverlayIfPresent();
+
+    if (parentPage) {
+      await this.expandNodeByTitle(parentPage);
+    }
+
+    const nodeRow = this.getNodeRowByTitle(pageTitle);
+    await this.openMoreActionsMenuForNodeRow(nodeRow, 'tree-view-action-button-delete');
+
+    const deleteButton = this.page.locator(
+      '[role="menuitem"][data-testid="tree-view-action-button-delete"]',
+    );
+    await expect(deleteButton).toBeVisible();
+    await deleteButton.click();
   }
 
   async expectNumberOfTreeNodes(expectedCount: number) {
