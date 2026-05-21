@@ -17,8 +17,8 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	coreimporter "github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/links"
-	"github.com/perber/wiki/internal/search"
 	"github.com/perber/wiki/internal/properties"
+	"github.com/perber/wiki/internal/search"
 	"github.com/perber/wiki/internal/tags"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikiauth "github.com/perber/wiki/internal/wiki/auth"
@@ -46,22 +46,22 @@ type Wiki struct {
 	storageDir   string
 
 	// Domain route registrars (populated by NewWiki).
-	pagesRoutes     *wikipages.Routes
-	authRoutes      *wikiauth.Routes
-	assetsRoutes    *wikiassets.Routes
-	revisionsRoutes *wikirevisions.Routes
-	searchRoutes    *wikisearch.Routes
-	linksRoutes     *wikilinks.Routes
-	tagsRoutes        *wikitags.Routes
-	propertiesRoutes  *wikiproperties.Routes
-	brandingRoutes    *wikibranding.Routes
-	importerRoutes  *wikiimporter.Routes
-	searchWatcher   *search.Watcher
-	revision        *revision.Service
-	links           *links.LinkService
-	tags            *tags.TagsService
-	props           *properties.PropertiesService
-	log             *slog.Logger
+	pagesRoutes      *wikipages.Routes
+	authRoutes       *wikiauth.Routes
+	assetsRoutes     *wikiassets.Routes
+	revisionsRoutes  *wikirevisions.Routes
+	searchRoutes     *wikisearch.Routes
+	linksRoutes      *wikilinks.Routes
+	tagsRoutes       *wikitags.Routes
+	propertiesRoutes *wikiproperties.Routes
+	brandingRoutes   *wikibranding.Routes
+	importerRoutes   *wikiimporter.Routes
+	searchWatcher    *search.Watcher
+	revision         *revision.Service
+	links            *links.LinkService
+	tags             *tags.TagsService
+	props            *properties.PropertiesService
+	log              *slog.Logger
 }
 
 const SYSTEM_USER_ID = "system"
@@ -280,6 +280,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 
 func (w *Wiki) newPageOrchestrator() *pagesave.PageSaveOrchestrator {
 	return pagesave.NewPageSaveOrchestrator(
+		pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log),
 		pagesave.NewLinkIndexSideEffect(w.links, w.log),
 		pagesave.NewRevisionSideEffect(w.revision, w.log),
 		pagesave.NewTagsSideEffect(w.tags, w.tree, w.log),
@@ -354,7 +355,7 @@ func (w *Wiki) buildRevisionsRoutes() *wikirevisions.Routes {
 
 func (w *Wiki) buildSearchRoutes() *wikisearch.Routes {
 	return wikisearch.NewRoutes(wikisearch.RoutesConfig{
-		Search:            wikisearch.NewSearchUseCase(w.searchIndex),
+		Search:            wikisearch.NewSearchUseCase(w.searchIndex, w.tags, w.tree),
 		GetIndexingStatus: wikisearch.NewGetIndexingStatusUseCase(w.status),
 		AuthService:       w.auth,
 	})

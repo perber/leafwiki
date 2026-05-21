@@ -338,11 +338,11 @@
   }
 
   .sidebar__tabs-list {
-    @apply bg-surface flex w-full min-w-0 text-sm;
+    @apply bg-surface flex w-full min-w-0 justify-start gap-1 text-sm;
   }
 
   .sidebar__tab-button {
-    @apply -mb-px flex w-full min-w-0 items-center gap-1 overflow-hidden px-3 py-1.5;
+    @apply -mb-px inline-flex min-w-0 items-center gap-1 overflow-hidden px-3 py-1.5;
   }
 
   .sidebar__tab-button--active {
@@ -1328,6 +1328,17 @@
 
   .search__pagination {
     @apply px-3 py-3;
+  }
+
+  .search__tags-section {
+    @apply mt-2;
+  }
+
+  .search__tags-list {
+    @apply border-surface-border bg-surface flex flex-wrap gap-1.5 rounded-md border px-2 py-2;
+    max-height: 96px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   /* SearchResultCard */
@@ -2766,6 +2777,62 @@
 
   .browse-tags__suggestions-empty {
     @apply text-muted-foreground px-3 py-2 text-sm italic;
+  }
+
+  .browse-tags__accordion {
+    @apply border-surface-border bg-surface mt-2 rounded-md border px-3;
+  }
+
+  .browse-tags__accordion-item {
+    @apply border-b-0!;
+  }
+
+  .browse-tags__accordion-trigger {
+    @apply py-1 hover:no-underline!;
+  }
+
+  .browse-tags__accordion-trigger svg {
+    @apply text-muted-foreground;
+  }
+
+  .browse-tags__accordion-title {
+    @apply text-muted-foreground text-xs font-medium tracking-wide;
+  }
+
+  .browse-tags__accordion-summary {
+    @apply text-muted-foreground mr-2 text-xs;
+  }
+
+  .browse-tags__accordion-content {
+    @apply pb-0!;
+  }
+
+  .browse-tags__accordion-empty {
+    @apply text-muted-foreground pb-3 text-sm italic;
+  }
+
+  .browse-tags__tag-list {
+    @apply flex flex-wrap gap-2 pb-3;
+  }
+
+  .browse-tags__tag-filter {
+    @apply border-surface-border bg-surface-alt text-interface-text hover:border-brand/60 inline-flex min-h-7 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors;
+  }
+
+  .browse-tags__tag-filter--active {
+    @apply border-brand bg-brand/8 text-brand;
+  }
+
+  .browse-tags__tag-filter--muted {
+    @apply text-muted-foreground/80 bg-surface;
+  }
+
+  .browse-tags__tag-filter-label {
+    @apply leading-none font-medium;
+  }
+
+  .browse-tags__tag-filter-count {
+    @apply bg-background text-muted-foreground rounded-sm px-1 py-0.5 text-[11px] leading-none;
   }
 
   /* Properties browser */

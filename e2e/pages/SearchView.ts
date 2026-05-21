@@ -3,15 +3,41 @@ import { expect, Page } from '@playwright/test';
 export default class SearchView {
   constructor(private page: Page) {}
 
-  async getSearchInput() {
+  getSearchInput() {
     return this.page.locator('input[data-testid="search-input"]');
   }
 
+  getResultsList() {
+    return this.page.getByTestId('search-results-list');
+  }
+
+  getTagAccordion() {
+    return this.page.getByTestId('search-tags-accordion');
+  }
+
+  getTagFilter(tag: string) {
+    return this.page.getByTestId(`tags-filter-${tag}`);
+  }
+
+  getTagFilters() {
+    return this.page.locator('[data-testid^="tags-filter-"]');
+  }
+
   async enterSearchQuery(query: string) {
-    const searchInput = await this.getSearchInput();
+    const searchInput = this.getSearchInput();
     await searchInput.fill(query);
+    await expect
+      .poll(async () => {
+        const currentValue = await searchInput.inputValue();
+        if (currentValue !== query) {
+          await searchInput.fill(query);
+          return searchInput.inputValue();
+        }
+        return currentValue;
+      })
+      .toBe(query);
     await this.page
-      .locator('.search__result-summary, a[data-testid^="search-result-card-"]')
+      .locator('.search__result-summary, [data-testid="search-results-list"]')
       .first()
       .waitFor({ state: 'visible' });
   }
@@ -19,7 +45,20 @@ export default class SearchView {
   async clearSearch() {
     const clearButton = this.page.locator('button[data-testid="search-clear-button"]');
     await clearButton.click();
-    await expect(await this.getSearchInput()).toHaveValue('');
+    await expect(this.getSearchInput()).toHaveValue('');
+  }
+
+  async ensureTagFiltersVisible() {
+    await this.ensureTagListVisible();
+  }
+
+  async clickTagFilter(tag: string) {
+    await this.ensureTagListVisible();
+    await this.getTagFilter(tag).click();
+    await this.page
+      .locator('.search__result-summary, [data-testid="search-results-list"]')
+      .first()
+      .waitFor({ state: 'visible' });
   }
 
   async searchResultContainsPageTitle(title: string): Promise<boolean> {
@@ -41,6 +80,12 @@ export default class SearchView {
     return false;
   }
 
+  async expectSearchResultMissing(title: string) {
+    await expect(
+      this.page.locator('a[data-testid^="search-result-card-"]').filter({ hasText: title }),
+    ).toHaveCount(0);
+  }
+
   async expectResultHighlighted(title: string) {
     const result = this.page
       .locator('a[data-testid^="search-result-card-"]')
@@ -49,5 +94,15 @@ export default class SearchView {
 
     await result.waitFor({ state: 'visible' });
     await expect(result).toHaveAttribute('aria-current', 'page');
+  }
+
+  private async ensureTagListVisible() {
+    const tagList = this.page.getByTestId('search-tags-list');
+    if (await tagList.isVisible().catch(() => false)) {
+      return;
+    }
+
+    await this.page.getByTestId('search-tags-accordion-trigger').click();
+    await tagList.waitFor({ state: 'visible' });
   }
 }

@@ -60,7 +60,7 @@ test.describe('tags panel', () => {
     await viewPage.expectUserLoggedIn();
   });
 
-  test('suggests matching tags and shows result pages', async ({ page }) => {
+  test('clicking a tag filter shows matching result pages', async ({ page }) => {
     const stamp = Date.now();
     const matchTag = `e2e-match-${stamp}`;
     const otherTag = `e2e-other-${stamp}`;
@@ -86,8 +86,7 @@ test.describe('tags panel', () => {
 
     const tagsView = new TagsView(page);
     await tagsView.open();
-    await tagsView.typeTag(`e2e-match-${stamp}`);
-    await tagsView.selectSuggestion(matchTag);
+    await tagsView.clickTagFilter(matchTag);
 
     await tagsView.expectChipVisible(matchTag);
     await tagsView.waitForResults();
@@ -96,7 +95,7 @@ test.describe('tags panel', () => {
     await tagsView.expectResultNotVisible(`Other ${stamp}`);
   });
 
-  test('AND logic: multiple tags narrow results', async ({ page }) => {
+  test('AND logic: multiple tag filters narrow results', async ({ page }) => {
     const stamp = Date.now();
     const tagA = `e2e-and-a-${stamp}`;
     const tagB = `e2e-and-b-${stamp}`;
@@ -117,49 +116,45 @@ test.describe('tags panel', () => {
     const tagsView = new TagsView(page);
     await tagsView.open();
 
-    await tagsView.typeTag(tagA);
-    await tagsView.selectSuggestion(tagA);
+    await tagsView.clickTagFilter(tagA);
     await tagsView.waitForResults();
     await tagsView.expectResultVisible(`Both Tags ${stamp}`);
     await tagsView.expectResultVisible(`Only A ${stamp}`);
 
-    await tagsView.typeTag(tagB);
-    await tagsView.selectSuggestion(tagB);
+    await tagsView.clickTagFilter(tagB);
     await tagsView.waitForResults();
     await tagsView.expectResultVisible(`Both Tags ${stamp}`);
     await tagsView.expectResultNotVisible(`Only A ${stamp}`);
   });
 
-  test('no results message shown for unknown tag', async ({ page }) => {
+  test('no results message shown for non-overlapping tag filters', async ({ page }) => {
     const stamp = Date.now();
-    const unknownTag = `e2e-ghost-${stamp}`;
+    const tagA = `e2e-empty-a-${stamp}`;
+    const tagB = `e2e-empty-b-${stamp}`;
 
-    // Create a page so the tag can be suggested (we add it manually then search for a non-existent one)
-    // We search directly without a suggestion — use 'browse' mode's custom tag entry is disabled,
-    // so instead test via a tag that exists but returns no pages after clearing.
-    // Simpler: create one page, filter by a second non-existent tag via AND logic.
-    const existingTag = `e2e-existing-${stamp}`;
     await createPageWithTags(page, {
-      title: `Existing ${stamp}`,
-      slug: `existing-${stamp}`,
+      title: `Only A ${stamp}`,
+      slug: `only-a-empty-${stamp}`,
       content: 'Page body.',
-      tags: [existingTag],
+      tags: [tagA],
+    });
+    await createPageWithTags(page, {
+      title: `Only B ${stamp}`,
+      slug: `only-b-empty-${stamp}`,
+      content: 'Another page body.',
+      tags: [tagB],
     });
 
     const tagsView = new TagsView(page);
     await tagsView.open();
-
-    await tagsView.typeTag(existingTag);
-    await tagsView.selectSuggestion(existingTag);
-    await tagsView.waitForResults();
-    await tagsView.expectResultVisible(`Existing ${stamp}`);
-
-    // Add a second tag (with no pages) by manually entering it in the store via URL manipulation
-    // Instead just verify that a page filtered by two ANDed tags with no overlap shows empty.
-    await tagsView.typeTag(unknownTag);
-    // Since browse mode doesn't allow custom tags, nothing is added — verify no crash.
-    const input = tagsView.getSearchInput();
-    await expect(input).toBeVisible();
+    const currentUrl = new URL(page.url());
+    currentUrl.searchParams.delete('tags');
+    currentUrl.searchParams.append('tags', tagA);
+    currentUrl.searchParams.append('tags', tagB);
+    await page.goto(currentUrl.toString());
+    await tagsView.open();
+    await tagsView.waitForEmptyState();
+    await expect(tagsView.getResultsList()).not.toBeVisible();
   });
 
   test('clear filter removes results', async ({ page }) => {
@@ -175,15 +170,14 @@ test.describe('tags panel', () => {
 
     const tagsView = new TagsView(page);
     await tagsView.open();
-    await tagsView.typeTag(tag);
-    await tagsView.selectSuggestion(tag);
+    await tagsView.clickTagFilter(tag);
     await tagsView.waitForResults();
     await tagsView.expectResultVisible(`Clear Test ${stamp}`);
 
     await tagsView.clearFilter();
 
     await expect(tagsView.getResultsList()).not.toBeVisible();
-    await expect(tagsView.getSelectedChip(tag)).not.toBeVisible();
+    await tagsView.expectChipNotVisible(tag);
   });
 
   test('removing the last selected tag clears results', async ({ page }) => {
@@ -199,20 +193,17 @@ test.describe('tags panel', () => {
 
     const tagsView = new TagsView(page);
     await tagsView.open();
-    await tagsView.typeTag(tag);
-    await tagsView.selectSuggestion(tag);
+    await tagsView.clickTagFilter(tag);
     await tagsView.waitForResults();
     await tagsView.expectResultVisible(`Remove Last ${stamp}`);
 
-    const input = tagsView.getSearchInput();
-    await input.click();
-    await input.press('Backspace');
+    await tagsView.clickTagFilter(tag);
 
     await expect(tagsView.getResultsList()).not.toBeVisible();
-    await expect(tagsView.getSelectedChip(tag)).not.toBeVisible();
+    await tagsView.expectChipNotVisible(tag);
   });
 
-  test('clicking tag on result card adds it to filter', async ({ page }) => {
+  test('opening a search result keeps active tags in the URL', async ({ page }) => {
     const stamp = Date.now();
     const primaryTag = `e2e-click-primary-${stamp}`;
     const secondaryTag = `e2e-click-secondary-${stamp}`;
@@ -226,18 +217,19 @@ test.describe('tags panel', () => {
 
     const tagsView = new TagsView(page);
     await tagsView.open();
-    await tagsView.typeTag(primaryTag);
-    await tagsView.selectSuggestion(primaryTag);
+    await tagsView.clickTagFilter(primaryTag);
+    await tagsView.waitForResults();
+    await tagsView.clickTagFilter(secondaryTag);
     await tagsView.waitForResults();
 
-    const tagButton = page
-      .locator('.tags-result-card__tags button')
-      .filter({ hasText: secondaryTag })
+    const result = page
+      .locator('a[data-testid^="search-result-card-"]')
+      .filter({ hasText: `Tag Click Test ${stamp}` })
       .first();
-    await tagButton.waitFor({ state: 'visible' });
-    await tagButton.click();
+    await result.click();
 
-    await tagsView.expectChipVisible(secondaryTag);
+    await expect(page).toHaveURL(new RegExp(`tags=${primaryTag}`));
+    await expect(page).toHaveURL(new RegExp(`tags=${secondaryTag}`));
   });
 
   test('result card shows excerpt', async ({ page }) => {
@@ -254,15 +246,14 @@ test.describe('tags panel', () => {
 
     const tagsView = new TagsView(page);
     await tagsView.open();
-    await tagsView.typeTag(tag);
-    await tagsView.selectSuggestion(tag);
+    await tagsView.clickTagFilter(tag);
     await tagsView.waitForResults();
 
     const excerpt = page.locator('.search-result-card__excerpt').filter({ hasText: excerptText });
     await expect(excerpt).toBeVisible();
   });
 
-  test('backspace removes last selected tag', async ({ page }) => {
+  test('deselecting one of multiple tags broadens results again', async ({ page }) => {
     const stamp = Date.now();
     const tagA = `e2e-bs-a-${stamp}`;
     const tagB = `e2e-bs-b-${stamp}`;
@@ -277,23 +268,20 @@ test.describe('tags panel', () => {
     const tagsView = new TagsView(page);
     await tagsView.open();
 
-    // Select first tag
-    await tagsView.typeTag(tagA);
-    await tagsView.selectSuggestion(tagA);
+    await tagsView.clickTagFilter(tagA);
     await tagsView.waitForResults();
     await tagsView.expectChipVisible(tagA);
+    await tagsView.expectResultVisible(`Backspace Test ${stamp}`);
 
-    // Select second tag
-    await tagsView.typeTag(tagB);
-    await tagsView.selectSuggestion(tagB);
+    await tagsView.clickTagFilter(tagB);
     await tagsView.expectChipVisible(tagB);
+    await tagsView.waitForResults();
 
-    // Backspace with empty input removes last tag (tagB)
-    const input = tagsView.getSearchInput();
-    await input.click();
-    await input.press('Backspace');
+    await tagsView.clickTagFilter(tagB);
 
-    await expect(tagsView.getSelectedChip(tagB)).not.toBeVisible();
-    await expect(tagsView.getSelectedChip(tagA)).toBeVisible();
+    await tagsView.expectChipNotVisible(tagB);
+    await tagsView.expectChipVisible(tagA);
+    await tagsView.waitForResults();
+    await tagsView.expectResultVisible(`Backspace Test ${stamp}`);
   });
 });

@@ -4,50 +4,44 @@ export default class TagsView {
   constructor(private page: Page) {}
 
   async open() {
-    await this.page.locator('button[data-testid="sidebar-tags-tab-button"]').click();
-    await this.page.locator('input[data-testid="tags-search-input"]').waitFor({ state: 'visible' });
+    await this.page.getByTestId('sidebar-search-tab-button').click();
+    await this.page.getByTestId('search-input').waitFor({ state: 'visible' });
   }
 
-  getSearchInput() {
-    return this.page.locator('input[data-testid="tags-search-input"]');
-  }
-
-  getSuggestion(tag: string) {
-    return this.page.getByTestId(`tags-suggestion-${tag}`);
+  getTagFilter(tag: string) {
+    return this.page.getByTestId(`tags-filter-${tag}`);
   }
 
   getSelectedChip(tag: string) {
-    return this.page.getByTestId(`tags-selected-chip-${tag}`);
+    return this.getTagFilter(tag);
   }
 
   getResultsList() {
-    return this.page.getByTestId('tags-results-list');
+    return this.page.getByTestId('search-results-list');
   }
 
   getResultTitle(text: string) {
-    return this.page.locator('.browse-results__item-title').filter({ hasText: text });
-  }
-
-  getFetchError() {
-    return this.page.getByTestId('tags-fetch-error');
+    return this.page
+      .locator('[data-testid^="search-result-card-title-"]')
+      .filter({ hasText: text });
   }
 
   getNoResults() {
-    return this.page.locator('.browse-results__empty').filter({ hasText: 'No pages found' });
+    return this.page.locator('.search__result-summary').filter({ hasText: 'No results found.' });
   }
 
-  async typeTag(tag: string) {
-    await this.getSearchInput().fill(tag);
-  }
-
-  async selectSuggestion(tag: string) {
-    const suggestion = this.getSuggestion(tag);
-    await suggestion.waitFor({ state: 'visible' });
-    await suggestion.click();
+  async clickTagFilter(tag: string) {
+    await this.ensureTagListVisible();
+    await this.getTagFilter(tag).waitFor({ state: 'visible' });
+    await this.getTagFilter(tag).click();
   }
 
   async waitForResults() {
     await this.getResultsList().waitFor({ state: 'visible' });
+  }
+
+  async waitForEmptyState() {
+    await this.getNoResults().waitFor({ state: 'visible' });
   }
 
   async expectResultVisible(title: string) {
@@ -59,10 +53,24 @@ export default class TagsView {
   }
 
   async expectChipVisible(tag: string) {
-    await expect(this.getSelectedChip(tag)).toBeVisible();
+    await expect(this.page).toHaveURL(new RegExp(`tags=${tag}`));
+  }
+
+  async expectChipNotVisible(tag: string) {
+    await expect(this.page).not.toHaveURL(new RegExp(`tags=${tag}`));
   }
 
   async clearFilter() {
-    await this.page.locator('.browse-results__clear').click();
+    await this.page.getByTestId('search-tags-clear-button').click();
+  }
+
+  private async ensureTagListVisible() {
+    const tagList = this.page.getByTestId('search-tags-list');
+    if (await tagList.isVisible().catch(() => false)) {
+      return;
+    }
+
+    await this.page.getByTestId('search-tags-accordion-trigger').click();
+    await tagList.waitFor({ state: 'visible' });
   }
 }

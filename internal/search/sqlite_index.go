@@ -3,29 +3,18 @@ package search
 import (
 	"bytes"
 	"database/sql"
+	"fmt"
 	"log"
 	"log/slog"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/perber/wiki/internal/core/excerpt"
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/russross/blackfriday/v2"
 	_ "modernc.org/sqlite" // Import SQLite driver
-)
-
-var sanitize = bluemonday.StrictPolicy()
-
-var (
-	searchShoutoutOpenPattern  = regexp.MustCompile(`^ {0,3}:::\s*(?P<type>[A-Za-z][\w-]*)\s*$`)
-	searchShoutoutClosePattern = regexp.MustCompile(`^ {0,3}:::\s*$`)
-	searchFencePattern         = regexp.MustCompile(`^ {0,3}(?P<marker>` + "`{3,}|~{3,}" + `).*$`)
-
-	searchShoutoutTypeIdx  = searchShoutoutOpenPattern.SubexpIndex("type")
-	searchFenceMarkerIdx   = searchFencePattern.SubexpIndex("marker")
 )
 
 type SQLiteIndex struct {
@@ -77,66 +66,7 @@ func extractHeadings(markdown string) string {
 		return blackfriday.GoToNext
 	})
 
-	return sanitize.Sanitize(buf.String())
-}
-
-type fenceState struct {
-	markerChar   byte
-	markerLength int
-}
-
-func getFenceState(line string, currentFence *fenceState) *fenceState {
-	match := searchFencePattern.FindStringSubmatch(line)
-	if match == nil {
-		return currentFence
-	}
-
-	marker := match[searchFenceMarkerIdx]
-	if marker == "" {
-		return currentFence
-	}
-
-	if currentFence == nil {
-		return &fenceState{
-			markerChar:   marker[0],
-			markerLength: len(marker),
-		}
-	}
-
-	if marker[0] == currentFence.markerChar && len(marker) >= currentFence.markerLength {
-		return nil
-	}
-
-	return currentFence
-}
-
-func normalizeSearchMarkdownShoutouts(content string) string {
-	normalized := strings.ReplaceAll(content, "\r\n", "\n")
-	lines := strings.Split(normalized, "\n")
-	output := make([]string, 0, len(lines))
-	var outerFence *fenceState
-
-	for _, line := range lines {
-		if outerFence != nil {
-			output = append(output, line)
-			outerFence = getFenceState(line, outerFence)
-			continue
-		}
-
-		if match := searchShoutoutOpenPattern.FindStringSubmatch(line); match != nil {
-			output = append(output, match[searchShoutoutTypeIdx])
-			continue
-		}
-
-		if searchShoutoutClosePattern.MatchString(line) {
-			continue
-		}
-
-		output = append(output, line)
-		outerFence = getFenceState(line, outerFence)
-	}
-
-	return strings.Join(output, "\n")
+	return excerpt.PlainTextFromMarkdown(buf.String())
 }
 
 func buildFuzzyQuery(q string) string {
@@ -242,14 +172,12 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 		return err
 	}
 
-	content = normalizeSearchMarkdownShoutouts(content)
+	content = excerpt.NormalizeMarkdownBody(content)
 
 	// Headings extracted from the Markdown
 	headings := extractHeadings(content)
 
-	// Body as plain text (existing logic)
-	html := blackfriday.Run([]byte(content))
-	sanitizedBody := sanitize.Sanitize(string(html))
+	sanitizedBody := excerpt.PlainTextFromMarkdown(content)
 
 	return s.withDB(func(db *sql.DB) error {
 		_, err := db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
@@ -290,52 +218,65 @@ func (s *SQLiteIndex) RemovePageByFilePath(filePath string) (int64, error) {
 	return rows, err
 }
 
-func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, error) {
+func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) (*SearchResult, error) {
+	query = strings.TrimSpace(query)
 
-	if strings.TrimSpace(query) == "" {
+	if len(pageIDs) == 0 && pageIDs != nil {
 		return &SearchResult{
-			Count:  0,
-			Items:  []SearchResultItem{},
-			Offset: offset,
-			Limit:  limit,
+			Count:     0,
+			Items:     []SearchResultItem{},
+			Offset:    offset,
+			Limit:     limit,
+			TagFacets: []SearchTagFacet{},
 		}, nil
 	}
 
-	sr := &SearchResult{}
+	if query == "" && len(pageIDs) == 0 {
+		return &SearchResult{
+			Count:     0,
+			Items:     []SearchResultItem{},
+			Offset:    offset,
+			Limit:     limit,
+			TagFacets: []SearchTagFacet{},
+		}, nil
+	}
+
+	sr := &SearchResult{TagFacets: []SearchTagFacet{}}
 	ftsQuery := buildFuzzyQuery(query)
 
 	err := s.withDB(func(db *sql.DB) error {
 		var total int
+		whereClause, whereArgs := buildSearchWhereClause(query, ftsQuery, pageIDs)
 
-		countQuery := `SELECT COUNT(*) FROM pages WHERE pages MATCH ?;`
-		if err := db.QueryRow(countQuery, ftsQuery).Scan(&total); err != nil {
+		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM pages WHERE %s;`, whereClause)
+		if err := db.QueryRow(countQuery, whereArgs...).Scan(&total); err != nil {
 			return err
 		}
 		sr.Count = total
 
-		searchQuery := `
+		searchQuery := fmt.Sprintf(`
 		SELECT 
 			pageID,
 			path,
 			kind,
-			highlight(pages, 4, '<b>', '</b>') AS highlighted_title,
-			snippet(pages, 6, '<b>', '</b>', '...', 16) AS excerpt,
-			bm25(pages,
-				0.0,  -- path
-				0.0,  -- filepath
-				0.0,  -- pageID
-				0.0,  -- kind
-				20.0, -- title
-				5.0,   -- headings
-				1.0    -- content
-			) AS bm25_score
+			%s AS highlighted_title,
+			%s AS excerpt,
+			content,
+			%s AS bm25_score
 		FROM pages
-		WHERE pages MATCH ?
-		ORDER BY bm25_score ASC
+		WHERE %s
+		ORDER BY %s
 		LIMIT ? OFFSET ?;
-	`
+	`,
+			searchTitleExpr(query != ""),
+			searchExcerptExpr(query != ""),
+			searchRankExpr(query != ""),
+			whereClause,
+			searchOrderByExpr(query != ""),
+		)
 
-		rows, err := db.Query(searchQuery, ftsQuery, limit, offset)
+		queryArgs := append(append([]interface{}{}, whereArgs...), limit, offset)
+		rows, err := db.Query(searchQuery, queryArgs...)
 		if err != nil {
 			return err
 		}
@@ -349,16 +290,24 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 		for rows.Next() {
 			var r SearchResultItem
 			var bm25Score float64
+			var content string
 
-			if err := rows.Scan(&r.PageID, &r.Path, &r.Kind, &r.Title, &r.Excerpt, &bm25Score); err != nil {
+			if err := rows.Scan(&r.PageID, &r.Path, &r.Kind, &r.Title, &r.Excerpt, &content, &bm25Score); err != nil {
 				return err
 			}
-
-			// Convert bm25 score to a rank (lower score = higher rank)
-			if bm25Score < 0 {
-				bm25Score = 0
+			if strings.TrimSpace(r.Excerpt) == "" {
+				r.Excerpt = excerpt.FromBody(content)
 			}
-			r.Rank = 1.0 / (1.0 + bm25Score)
+
+			if query == "" {
+				r.Rank = 1
+			} else {
+				// Convert bm25 score to a rank (lower score = higher rank)
+				if bm25Score < 0 {
+					bm25Score = 0
+				}
+				r.Rank = 1.0 / (1.0 + bm25Score)
+			}
 
 			log.Printf("pageID=%s title=%q bm25=%f rank=%f", r.PageID, r.Title, bm25Score, r.Rank)
 
@@ -374,4 +323,108 @@ func (s *SQLiteIndex) Search(query string, offset, limit int) (*SearchResult, er
 	})
 
 	return sr, err
+}
+
+func (s *SQLiteIndex) SearchPageIDs(query string, pageIDs []string) ([]string, error) {
+	query = strings.TrimSpace(query)
+
+	if len(pageIDs) == 0 && pageIDs != nil {
+		return []string{}, nil
+	}
+
+	if query == "" && len(pageIDs) == 0 {
+		return []string{}, nil
+	}
+
+	ftsQuery := buildFuzzyQuery(query)
+	var result []string
+
+	err := s.withDB(func(db *sql.DB) error {
+		whereClause, whereArgs := buildSearchWhereClause(query, ftsQuery, pageIDs)
+		searchQuery := fmt.Sprintf(`
+		SELECT pageID, %s AS bm25_score
+		FROM pages
+		WHERE %s
+		ORDER BY %s;
+	`, searchRankExpr(query != ""), whereClause, searchOrderByExpr(query != ""))
+
+		rows, err := db.Query(searchQuery, whereArgs...)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := rows.Close(); err != nil {
+				slog.Default().Error("could not close rows", "error", err)
+			}
+		}()
+
+		for rows.Next() {
+			var pageID string
+			var bm25Score float64
+			if err := rows.Scan(&pageID, &bm25Score); err != nil {
+				return err
+			}
+			result = append(result, pageID)
+		}
+
+		return rows.Err()
+	})
+
+	return result, err
+}
+
+func buildSearchWhereClause(query string, ftsQuery string, pageIDs []string) (string, []interface{}) {
+	clauses := make([]string, 0, 2)
+	args := make([]interface{}, 0, 1+len(pageIDs))
+
+	if query != "" {
+		clauses = append(clauses, "pages MATCH ?")
+		args = append(args, ftsQuery)
+	}
+
+	if len(pageIDs) > 0 {
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(pageIDs)), ",")
+		clauses = append(clauses, fmt.Sprintf("pageID IN (%s)", placeholders))
+		for _, pageID := range pageIDs {
+			args = append(args, pageID)
+		}
+	}
+
+	return strings.Join(clauses, " AND "), args
+}
+
+func searchTitleExpr(hasQuery bool) string {
+	if hasQuery {
+		return "highlight(pages, 4, '<b>', '</b>')"
+	}
+	return "title"
+}
+
+func searchExcerptExpr(hasQuery bool) string {
+	if hasQuery {
+		return "snippet(pages, 6, '<b>', '</b>', '...', 16)"
+	}
+	return "''"
+}
+
+func searchRankExpr(hasQuery bool) string {
+	if hasQuery {
+		return `bm25(pages,
+				0.0,  -- path
+				0.0,  -- filepath
+				0.0,  -- pageID
+				0.0,  -- kind
+				20.0, -- title
+				5.0,   -- headings
+				1.0    -- content
+			)`
+	}
+	return "0.0"
+}
+
+func searchOrderByExpr(hasQuery bool) string {
+	if hasQuery {
+		return "bm25_score ASC"
+	}
+	return "title COLLATE NOCASE ASC, path COLLATE NOCASE ASC"
 }

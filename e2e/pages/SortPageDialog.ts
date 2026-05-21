@@ -1,10 +1,19 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 export default class SortPageDialog {
   constructor(private page: Page) {}
 
+  private dialog() {
+    const saveButton = this.page.locator('button[data-testid="sort-pages-dialog-button-confirm"]');
+    return this.page.locator('div[role="dialog"]').filter({ has: saveButton });
+  }
+
+  private items() {
+    return this.dialog().locator('li[data-testid^="sort-page-item-"]');
+  }
+
   async getCurrentOrder(): Promise<string[]> {
-    const items = this.page.locator('li[data-testid^="sort-page-item-"]');
+    const items = this.items();
     const count = await items.count();
     const titles: string[] = [];
 
@@ -17,7 +26,9 @@ export default class SortPageDialog {
   }
 
   async sortPageItems(plannedOrder: string[]) {
-    const items = this.page.locator('li[data-testid^="sort-page-item-"]');
+    const items = this.items();
+    await this.dialog().waitFor({ state: 'visible' });
+    await expect(items).toHaveCount(plannedOrder.length);
     const count = await items.count();
 
     const titles: string[] = [];
@@ -70,7 +81,7 @@ export default class SortPageDialog {
   }
 
   async getPageIdByTitle(title: string): Promise<string> {
-    const items = this.page.locator('li[data-testid^="sort-page-item-"]');
+    const items = this.items();
     const count = await items.count();
     for (let i = 0; i < count; i++) {
       const item = items.nth(i);
@@ -86,7 +97,9 @@ export default class SortPageDialog {
   }
 
   async saveSorting() {
-    const saveButton = this.page.locator('button[data-testid="sort-pages-dialog-button-confirm"]');
+    const saveButton = this.dialog().locator(
+      'button[data-testid="sort-pages-dialog-button-confirm"]',
+    );
     await saveButton.waitFor({ state: 'visible' });
     await saveButton.click();
     await saveButton.waitFor({ state: 'detached' });

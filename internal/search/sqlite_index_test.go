@@ -106,7 +106,7 @@ func TestSQLiteIndex_Search(t *testing.T) {
 	}
 
 	// Perform search
-	result, err := index.Search("content:search*", 0, 10)
+	result, err := index.Search("content:search*", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -130,6 +130,10 @@ func TestSQLiteIndex_Search(t *testing.T) {
 
 	if result.Items[1].Kind != string(tree.NodeKindSection) {
 		t.Errorf("expected second result kind %q, got %q", tree.NodeKindSection, result.Items[1].Kind)
+	}
+
+	if !strings.Contains(result.Items[0].Excerpt, "<b>") {
+		t.Errorf("expected highlighted search snippet, got %q", result.Items[0].Excerpt)
 	}
 }
 
@@ -169,7 +173,7 @@ func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
 	}
 
 	// "search" is converted by buildFuzzyQuery to "search*", matching both
-	result, err := index.Search("search", 0, 10)
+	result, err := index.Search("search", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -234,7 +238,7 @@ func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 		t.Fatalf("failed to index contentOnly page: %v", err)
 	}
 
-	result, err := index.Search("search", 0, 10)
+	result, err := index.Search("search", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -256,46 +260,128 @@ func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 	}
 }
 
-func TestNormalizeSearchMarkdownShoutouts_KeepsLabelsAndRemovesFenceSyntax(t *testing.T) {
-	content := strings.Join([]string{
-		"::: info",
-		"Helpful details.",
-		":::",
-		"",
-		"::: blue",
-		"Colored banner.",
-		":::",
-		"",
-		"::: custom-banner",
-		"Custom text.",
-		":::",
-	}, "\n")
+func TestSQLiteIndex_SearchPageIDs_RespectsQueryAndPageFilters(t *testing.T) {
+	tmpDir := t.TempDir()
 
-	got := normalizeSearchMarkdownShoutouts(content)
-
-	if strings.Contains(got, ":::") {
-		t.Fatalf("expected fence syntax to be removed, got %q", got)
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
 	}
-	for _, want := range []string{"info", "blue", "custom-banner", "Helpful details.", "Colored banner.", "Custom text."} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("expected normalized content to contain %q, got %q", want, got)
-		}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("docs/alpha", "docs/alpha.md", "alpha", "Alpha Page", tree.NodeKindPage, "Shared token in alpha.")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	err = index.IndexPage("docs/beta", "docs/beta.md", "beta", "Beta Page", tree.NodeKindPage, "Shared token in beta.")
+	if err != nil {
+		t.Fatalf("failed to index beta page: %v", err)
+	}
+
+	err = index.IndexPage("docs/gamma", "docs/gamma.md", "gamma", "Gamma Page", tree.NodeKindPage, "Gamma only content.")
+	if err != nil {
+		t.Fatalf("failed to index gamma page: %v", err)
+	}
+
+	pageIDs, err := index.SearchPageIDs("shared token", []string{"alpha"})
+	if err != nil {
+		t.Fatalf("SearchPageIDs failed: %v", err)
+	}
+
+	if len(pageIDs) != 1 || pageIDs[0] != "alpha" {
+		t.Fatalf("expected only alpha page, got %#v", pageIDs)
+	}
+
+	noMatches, err := index.SearchPageIDs("shared token", []string{})
+	if err != nil {
+		t.Fatalf("SearchPageIDs with empty page filter failed: %v", err)
+	}
+	if len(noMatches) != 0 {
+		t.Fatalf("expected no matches for empty page filter, got %#v", noMatches)
 	}
 }
 
-func TestNormalizeSearchMarkdownShoutouts_IgnoresCodeFences(t *testing.T) {
-	content := strings.Join([]string{
-		"```md",
-		"::: info",
-		"literal",
-		":::",
-		"```",
-	}, "\n")
+func TestSQLiteIndex_Search_FiltersByPageIDs(t *testing.T) {
+	tmpDir := t.TempDir()
 
-	got := normalizeSearchMarkdownShoutouts(content)
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
 
-	if got != content {
-		t.Fatalf("expected fenced code block to stay unchanged, got %q", got)
+	err = index.IndexPage(
+		"docs/react-guide",
+		"docs/react-guide.md",
+		"react-guide",
+		"React guide",
+		tree.NodeKindPage,
+		"Search term appears here.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index react-guide page: %v", err)
+	}
+
+	err = index.IndexPage(
+		"docs/plain-guide",
+		"docs/plain-guide.md",
+		"plain-guide",
+		"Plain guide",
+		tree.NodeKindPage,
+		"Search term appears here as well.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index plain-guide page: %v", err)
+	}
+
+	result, err := index.Search("search", []string{"react-guide"}, 0, 10)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	if result.Count != 1 {
+		t.Fatalf("expected 1 filtered result, got %d", result.Count)
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 filtered result item, got %d", len(result.Items))
+	}
+	if result.Items[0].PageID != "react-guide" {
+		t.Fatalf("expected filtered page react-guide, got %s", result.Items[0].PageID)
+	}
+}
+
+func TestSQLiteIndex_Search_ReturnsNoResultsWhenPageIDFilterIsEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage(
+		"docs/react-guide",
+		"docs/react-guide.md",
+		"react-guide",
+		"React guide",
+		tree.NodeKindPage,
+		"Search term appears here.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index react-guide page: %v", err)
+	}
+
+	result, err := index.Search("search", []string{}, 0, 10)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	if result.Count != 0 {
+		t.Fatalf("expected 0 filtered results, got %d", result.Count)
+	}
+	if len(result.Items) != 0 {
+		t.Fatalf("expected 0 filtered result items, got %d", len(result.Items))
 	}
 }
 
@@ -339,5 +425,38 @@ func TestSQLiteIndex_IndexPage_StripsShoutoutFenceSyntaxButKeepsLabel(t *testing
 	}
 	if !strings.Contains(gotContent, "Shoutout body text.") {
 		t.Fatalf("expected indexed content to keep shoutout body, got %q", gotContent)
+	}
+}
+
+func TestSQLiteIndex_IndexPage_StripsMarkdownFormattingFromIndexedContent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage(
+		"docs/markdown",
+		"docs/markdown.md",
+		"markdown1",
+		"Markdown Page",
+		tree.NodeKindPage,
+		"LeafWiki **fett** und _kursiv_.",
+	)
+	if err != nil {
+		t.Fatalf("IndexPage failed: %v", err)
+	}
+
+	var gotContent string
+	if err := index.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`SELECT content FROM pages WHERE pageID = ?`, "markdown1").Scan(&gotContent)
+	}); err != nil {
+		t.Fatalf("failed to read indexed content: %v", err)
+	}
+
+	if strings.Contains(gotContent, "**") || strings.Contains(gotContent, "_") {
+		t.Fatalf("expected indexed content to exclude markdown emphasis markers, got %q", gotContent)
 	}
 }

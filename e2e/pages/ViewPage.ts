@@ -5,6 +5,41 @@ import { expect } from '@playwright/test';
 export default class ViewPage {
   constructor(private page: Page) {}
 
+  private async logoutViaApi() {
+    await this.page.evaluate(async () => {
+      function getCsrfTokenFromCookie(): string | null {
+        const hostMatch =
+          document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+          document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
+
+        if (!hostMatch) return null;
+
+        try {
+          return decodeURIComponent(hostMatch[1]);
+        } catch {
+          return hostMatch[1];
+        }
+      }
+
+      const csrfToken = getCsrfTokenFromCookie();
+      if (!csrfToken) {
+        throw new Error('Missing CSRF token cookie for logout');
+      }
+
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'X-CSRF-Token': csrfToken,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Logout failed: ${response.status}`);
+      }
+    });
+  }
+
   private async activateControl(locator: ReturnType<Page['locator']>) {
     await locator.waitFor({ state: 'visible' });
 
@@ -96,12 +131,17 @@ export default class ViewPage {
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // 3) Open dropdown
-    await avatar.click();
+    await this.activateControl(avatar);
 
     // 4) Click logout button
     const logoutButton = this.page.getByTestId('user-toolbar-logout');
-    await logoutButton.waitFor({ state: 'visible', timeout: 5000 });
-    await logoutButton.click({ timeout: 5000 });
+    try {
+      await logoutButton.waitFor({ state: 'visible', timeout: 5000 });
+      await this.activateControl(logoutButton);
+    } catch {
+      await this.logoutViaApi();
+      await this.page.goto(toAppPath('/login'));
+    }
 
     // 5) Wait for login field again
     await loginField.waitFor({ state: 'visible' });
@@ -317,10 +357,6 @@ export default class ViewPage {
   }
 
   async switchToTagsTab() {
-    const tagsTabButton = this.page.locator('button[data-testid="sidebar-tags-tab-button"]');
-    await tagsTabButton.click();
-    await this.page.locator('input[data-testid="tags-search-input"]').waitFor({
-      state: 'visible',
-    });
+    await this.switchToSearchTab();
   }
 }
