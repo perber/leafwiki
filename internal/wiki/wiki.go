@@ -30,6 +30,7 @@ import (
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
 	wikitags "github.com/perber/wiki/internal/wiki/tags"
+	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 )
 
 type Wiki struct {
@@ -61,6 +62,7 @@ type Wiki struct {
 	tags             *tags.TagsService
 	props            *properties.PropertiesService
 	log              *slog.Logger
+	backupRoutes    *wikibackup.Routes
 }
 
 const SYSTEM_USER_ID = "system"
@@ -445,7 +447,7 @@ func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 
 // Registrars returns all domain route registrars in registration order.
 func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
-	return []httpinternal.RouteRegistrar{
+	registrars := []httpinternal.RouteRegistrar{
 		w.authRoutes,
 		w.pagesRoutes,
 		w.assetsRoutes,
@@ -458,6 +460,20 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.importerRoutes,
 		w.healthRoutes,
 	}
+	if w.backupRoutes != nil {
+		registrars = append(registrars, w.backupRoutes)
+	}
+	return registrars
+}
+
+// SetBackupRoutes sets the backup routes and must be called before router creation.
+func (w *Wiki) SetBackupRoutes(r *wikibackup.Routes) {
+	w.backupRoutes = r
+}
+
+// AuthService returns the authentication service.
+func (w *Wiki) AuthService() *auth.AuthService {
+	return w.auth
 }
 
 // FrontendConfig returns the minimal runtime data required by the router to serve the SPA.
