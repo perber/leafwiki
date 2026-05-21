@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Loader2 } from 'lucide-react'
+import { CloudUpload, Loader2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useBackupStore } from '@/stores/backup'
@@ -136,7 +136,9 @@ export default function BackupSettings() {
                 >
                   {isPolling ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
+                  ) : (
+                    <CloudUpload className="mr-2 h-4 w-4" />
+                  )}
                   Push now
                 </Button>
               </div>
