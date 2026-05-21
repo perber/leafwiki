@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom'
+import BackupSettings from '../backup/BackupSettings'
 import LoginForm from '../auth/LoginForm'
 import BrandingSettings from '../branding/BrandingSettings'
 import PageEditor from '../editor/PageEditor'
@@ -53,6 +54,16 @@ export const createLeafWikiRouter = (
         ) : (
           <AuthWrapper>
             <BrandingSettings />
+          </AuthWrapper>
+        ),
+      },
+      {
+        path: '/settings/backup',
+        element: isReadOnlyViewer ? (
+          <Navigate to="/" />
+        ) : (
+          <AuthWrapper>
+            <BackupSettings />
           </AuthWrapper>
         ),
       },
