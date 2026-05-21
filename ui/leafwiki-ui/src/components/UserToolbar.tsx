@@ -91,6 +91,12 @@ export default function UserToolbar() {
             >
               Import
             </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => navigate('/settings/backup')}
+            >
+              Backup Settings
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
           </RoleGuard>
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">

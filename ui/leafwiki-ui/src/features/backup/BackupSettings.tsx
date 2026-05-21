@@ -1,12 +1,13 @@
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useBackupStore } from '@/stores/backup'
 import { useSetTitle } from '../viewer/setTitle'
+import { useToolbarActions } from './useToolbarActions'
 
 const POLL_INTERVAL_MS = 5000
-const DEFAULT_BACKUP_INTERVAL_MINUTES = 60
 
 function formatDate(value: string | null): string {
   if (!value) return 'Never'
@@ -16,14 +17,6 @@ function formatDate(value: string | null): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date)
-}
-
-function getNextBackup(lastBackupAt: string | null): string {
-  if (!lastBackupAt) return '—'
-  const date = new Date(lastBackupAt)
-  if (Number.isNaN(date.getTime())) return '—'
-  const nextDate = new Date(date.getTime() + DEFAULT_BACKUP_INTERVAL_MINUTES * 60 * 1000)
-  return formatDate(nextDate.toISOString())
 }
 
 export default function BackupSettings() {
@@ -41,6 +34,8 @@ export default function BackupSettings() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastBackupAtRef = useRef<string | null>(null)
 
+  // reset toolbar actions on mount
+  useToolbarActions()
   useSetTitle({ title: 'Backup Settings' })
 
   useEffect(() => {
@@ -96,26 +91,33 @@ export default function BackupSettings() {
       {!isLoading && (
         <div className="settings__section">
           <h2 className="settings__section-title">Git Backup</h2>
+          <p className="settings__section-description">
+            Automatically pushes changes to the configured remote repository.
+          </p>
 
           <div className="settings__field">
-            <span>Status:</span>
+            <Label>Status</Label>
             <span>{enabled ? 'Enabled' : 'Disabled'}</span>
           </div>
+
+          {!enabled && (
+            <p className="settings__hint">
+              To enable Git backup, set the environment variable{' '}
+              <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP=true</code>{' '}
+              and configure{' '}
+              <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP_REMOTE</code>.
+            </p>
+          )}
 
           {enabled && (
             <>
               <div className="settings__field">
-                <span>Last backup:</span>
+                <Label>Last backup</Label>
                 <span>{formatDate(lastBackupAt)}</span>
               </div>
 
               <div className="settings__field">
-                <span>Next backup:</span>
-                <span>{getNextBackup(lastBackupAt)}</span>
-              </div>
-
-              <div className="settings__field">
-                <span>Last error:</span>
+                <Label>Last error</Label>
                 <span className={lastError ? 'text-destructive' : ''}>
                   {lastError || '—'}
                 </span>
