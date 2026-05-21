@@ -1,9 +1,7 @@
 import test, { expect } from '@playwright/test';
-import AddPageDialog from '../pages/AddPageDialog';
 import EditPage from '../pages/EditPage';
 import EditPageMetadataDialog from '../pages/EditPageMetadataDialog';
 import LoginPage from '../pages/LoginPage';
-import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
@@ -15,27 +13,91 @@ async function createPageWithRevisions(
   title: string,
   revisionContents: string[],
 ) {
-  const treeView = new TreeView(page);
-  await treeView.clickRootAddButton();
+  const slug = title
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]/g, '');
 
-  const addPageDialog = new AddPageDialog(page);
-  await addPageDialog.fillTitle(title);
-  await addPageDialog.submitWithoutRedirect();
+  const createdPage = await page.evaluate(
+    async ({ pageTitle, contents, slug }) => {
+      function getCsrfTokenFromCookie(): string | null {
+        const hostMatch =
+          document.cookie.match(/(?:^|;\\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+          document.cookie.match(/(?:^|;\\s*)leafwiki_csrf=([^;]+)/);
 
-  await treeView.clickPageByTitle(title);
+        if (!hostMatch) return null;
 
-  const editPage = new EditPage(page);
+        try {
+          return decodeURIComponent(hostMatch[1]);
+        } catch {
+          return hostMatch[1];
+        }
+      }
+
+      const csrfToken = getCsrfTokenFromCookie();
+      if (!csrfToken) {
+        throw new Error('Missing CSRF token cookie for history test setup');
+      }
+
+      const createResponse = await fetch('/api/pages', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken,
+        },
+        body: JSON.stringify({
+          parentId: null,
+          title: pageTitle,
+          slug,
+          kind: 'page',
+        }),
+      });
+
+      if (!createResponse.ok) {
+        throw new Error(`Failed to create page ${pageTitle}: ${createResponse.status}`);
+      }
+
+      let currentPage = (await createResponse.json()) as {
+        id: string;
+        title: string;
+        slug: string;
+        path: string;
+        version: string;
+      };
+
+      for (const content of contents) {
+        const updateResponse = await fetch(`/api/pages/${currentPage.id}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          body: JSON.stringify({
+            version: currentPage.version,
+            title: currentPage.title,
+            slug: currentPage.slug,
+            content,
+          }),
+        });
+
+        if (!updateResponse.ok) {
+          throw new Error(`Failed to update page ${currentPage.path}: ${updateResponse.status}`);
+        }
+
+        currentPage = (await updateResponse.json()) as typeof currentPage;
+      }
+
+      return {
+        path: currentPage.path,
+      };
+    },
+    { pageTitle: title, contents: revisionContents, slug },
+  );
+
   const viewPage = new ViewPage(page);
-
-  for (const content of revisionContents) {
-    await viewPage.clickEditPageButton();
-    await editPage.writeContent(content);
-    await editPage.savePage();
-    await editPage.closeEditor();
-  }
-
-  await treeView.clickPageByTitle(title);
-  await expect(page.locator('article > h1')).toHaveText(title);
+  await viewPage.goto(`/${createdPage.path}`);
 
   return viewPage;
 }

@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 export default class SortPageDialog {
   constructor(private page: Page) {}
@@ -18,6 +18,7 @@ export default class SortPageDialog {
 
   async sortPageItems(plannedOrder: string[]) {
     const items = this.page.locator('li[data-testid^="sort-page-item-"]');
+    await expect(items).toHaveCount(plannedOrder.length);
     const count = await items.count();
 
     const titles: string[] = [];

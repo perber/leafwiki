@@ -6,6 +6,21 @@ import SortPageDialog from './SortPageDialog';
 export default class TreeView {
   constructor(private page: Page) {}
 
+  private async closeBlockingOverlayIfPresent() {
+    const overlay = this.page.locator('div[data-state="open"][data-aria-hidden="true"]').last();
+
+    try {
+      if (!(await overlay.isVisible({ timeout: 500 }))) {
+        return;
+      }
+    } catch {
+      return;
+    }
+
+    await this.page.keyboard.press('Escape');
+    await overlay.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
   private treeView() {
     return this.page.locator('.tree-view:visible').first();
   }
@@ -21,6 +36,41 @@ export default class TreeView {
       hasText: title,
     });
     return this.page.locator('div[data-testid^="tree-node-"]').filter({ has: pageLink }).first();
+  }
+
+  private async openMoreActionsMenuForNodeRow(
+    nodeRow: ReturnType<TreeView['getNodeRowByTitle']>,
+    expectedActionTestId: 'tree-view-action-button-sort' | 'tree-view-action-button-move',
+  ) {
+    await nodeRow.waitFor({ state: 'visible' });
+    await nodeRow.scrollIntoViewIfNeeded();
+    await nodeRow.hover();
+
+    const moreActionsButton = nodeRow.locator(
+      'button[data-testid="tree-view-action-button-open-more-actions"]',
+    );
+    await expect(moreActionsButton).toBeVisible();
+    const expectedActionButton = this.page.getByTestId(expectedActionTestId);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await nodeRow.hover();
+      await moreActionsButton.waitFor({ state: 'visible' });
+
+      try {
+        await moreActionsButton.click({ timeout: 2000 });
+      } catch {
+        await moreActionsButton.click({ force: true });
+      }
+
+      try {
+        await expect(expectedActionButton).toBeVisible({ timeout: 2000 });
+        return;
+      } catch {
+        await this.page.keyboard.press('Escape').catch(() => {});
+      }
+    }
+
+    await expect(expectedActionButton).toBeVisible();
   }
 
   async getRootAddButton() {
@@ -57,6 +107,7 @@ export default class TreeView {
 
   async clickPageByTitle(title: string) {
     await this.ensureSidebarVisible();
+    await this.closeBlockingOverlayIfPresent();
     const pageNode = await this.findPageByTitle(title);
     const href = await pageNode.getAttribute('href');
     await pageNode.waitFor({ state: 'visible' });
@@ -71,6 +122,7 @@ export default class TreeView {
 
   async expandNodeByTitle(title: string) {
     await this.ensureSidebarVisible();
+    await this.closeBlockingOverlayIfPresent();
     const nodeRow = this.getNodeRowByTitle(title);
 
     await nodeRow.waitFor({ state: 'visible' });
@@ -88,6 +140,7 @@ export default class TreeView {
 
   async createSubPageOfParent(parentTitle: string, newSubpageTitle: string) {
     await this.ensureSidebarVisible();
+    await this.closeBlockingOverlayIfPresent();
     const nodeRow = this.getNodeRowByTitle(parentTitle);
 
     await nodeRow.waitFor({ state: 'visible' });
@@ -100,6 +153,7 @@ export default class TreeView {
     const addPageDialog = new AddPageDialog(this.page);
     await addPageDialog.fillTitle(newSubpageTitle);
     await addPageDialog.submitWithoutRedirect();
+    await this.page.waitForLoadState('networkidle');
   }
 
   async createMultipleSubPagesOfParent(parentTitle: string, subpageTitles: string[]) {
@@ -111,20 +165,20 @@ export default class TreeView {
 
   async sortPagesOfParent(parentTitle: string, plannedOrder: string[]) {
     await this.ensureSidebarVisible();
+    await this.closeBlockingOverlayIfPresent();
+    await this.expandNodeByTitle(parentTitle);
+
+    for (const title of plannedOrder) {
+      await expect(await this.findPageByTitle(title)).toBeVisible();
+    }
+
     const nodeRow = this.getNodeRowByTitle(parentTitle);
 
-    await nodeRow.waitFor({ state: 'visible' });
-    await nodeRow.scrollIntoViewIfNeeded();
-    await nodeRow.hover(); // oder mouse.move, s.u.
+    await this.openMoreActionsMenuForNodeRow(nodeRow, 'tree-view-action-button-sort');
 
-    // open more actions menu
-    const moreActionsButton = nodeRow.locator(
-      'button[data-testid="tree-view-action-button-open-more-actions"]',
-    );
-    await moreActionsButton.click({ force: true });
-
-    const sortButton = this.page.locator('div[data-testid="tree-view-action-button-sort"]');
-    await sortButton.click({ force: true });
+    const sortButton = this.page.getByTestId('tree-view-action-button-sort');
+    await expect(sortButton).toBeVisible();
+    await sortButton.click();
 
     const sortPageDialog = new SortPageDialog(this.page);
     await sortPageDialog.sortPageItems(plannedOrder);
@@ -148,21 +202,15 @@ export default class TreeView {
 
   async openMoveDialogForPage(parentPage: string, pageTitle: string) {
     await this.ensureSidebarVisible();
+    await this.closeBlockingOverlayIfPresent();
     await this.expandNodeByTitle(parentPage);
 
     const nodeRow = this.getNodeRowByTitle(pageTitle);
+    await this.openMoreActionsMenuForNodeRow(nodeRow, 'tree-view-action-button-move');
 
-    await nodeRow.waitFor({ state: 'visible' });
-    await nodeRow.scrollIntoViewIfNeeded();
-    await nodeRow.hover();
-
-    const moreActionsButton = nodeRow.locator(
-      'button[data-testid="tree-view-action-button-open-more-actions"]',
-    );
-    await moreActionsButton.click({ force: true });
-
-    const moveButton = this.page.locator('div[data-testid="tree-view-action-button-move"]');
-    await moveButton.click({ force: true });
+    const moveButton = this.page.getByTestId('tree-view-action-button-move');
+    await expect(moveButton).toBeVisible();
+    await moveButton.click();
   }
 
   async expectNumberOfTreeNodes(expectedCount: number) {
