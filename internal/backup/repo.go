@@ -2,6 +2,7 @@ package backup
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -232,6 +233,7 @@ func (r *Repository) RunBackup() error {
 	}
 
 	r.status.SetSuccess(time.Now())
+	slog.Default().Info("backup completed", "lastBackupAt", time.Now())
 	return nil
 }
 
@@ -265,9 +267,10 @@ func (r *Repository) push(commitHash string) error {
 		Auth: auth,
 	})
 	if err != nil {
+		slog.Default().Error("git push failed", "error", err, "remote", r.cfg.RemoteURL)
 		return fmt.Errorf("failed to push: %w", err)
 	}
-
+	slog.Default().Info("git push successful", "remote", r.cfg.RemoteURL)
 	return nil
 }
 
@@ -291,6 +294,7 @@ func (r *Repository) buildSSHAuth() (ssh.AuthMethod, error) {
 	// Parse the private key using x/crypto/ssh
 	signer, err := sshcrypto.ParsePrivateKey(privateKey)
 	if err != nil {
+		slog.Default().Error("failed to parse SSH key", "error", err, "path", r.cfg.SSHKeyPath)
 		return nil, fmt.Errorf("failed to parse SSH key: %w", err)
 	}
 
