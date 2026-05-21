@@ -272,7 +272,7 @@ func (r *Repository) push(commitHash string) error {
 	})
 	if err != nil {
 		// "already up-to-date" means the remote already has this commit - not an error
-		if strings.Contains(err.Error(), "already up-to-date") {
+		if strings.Contains(strings.ToLower(err.Error()), "already up-to-date") {
 			slog.Default().Info("backup skipped - already up-to-date")
 			return nil
 		}
