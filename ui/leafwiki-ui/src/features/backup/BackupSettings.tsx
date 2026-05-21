@@ -1,6 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { CloudUpload, Loader2 } from 'lucide-react'
+import { CloudUpload, Loader2, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useBackupStore } from '@/stores/backup'
@@ -50,7 +49,6 @@ export default function BackupSettings() {
         await loadStatus()
       }, POLL_INTERVAL_MS)
     }
-
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current)
@@ -85,7 +83,10 @@ export default function BackupSettings() {
 
         {isLoading && (
           <div className="settings__section">
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <div className="flex items-center gap-3 text-sm text-muted">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading backup status…
+            </div>
           </div>
         )}
 
@@ -94,44 +95,77 @@ export default function BackupSettings() {
             <div className="settings__section">
               <h2 className="settings__section-title">Git Backup</h2>
               <p className="settings__section-description">
-                Automatically pushes changes to the configured remote repository.
+                Automatically pushes wiki changes to the configured remote Git
+                repository. Configure the target repository and credentials in
+                your server settings.
               </p>
 
-              <div className="settings__field">
-                <Label>Status</Label>
-                <span>{enabled ? 'Enabled' : 'Disabled'}</span>
+              <div className="settings__preview">
+                <span className="settings__preview-label">Status</span>
+                {enabled ? (
+                  <span className="settings__pill settings__pill-success text-success font-medium">
+                    Enabled
+                  </span>
+                ) : (
+                  <span className="settings__role-pill settings__role-pill--default">
+                    Disabled
+                  </span>
+                )}
               </div>
 
               {enabled && (
                 <>
-                  <div className="settings__field">
-                    <Label>Last backup</Label>
-                    <span>{formatDate(lastBackupAt)}</span>
+                  <div className="settings__preview">
+                    <span className="settings__preview-label">Last backup</span>
+                    <span className="text-sm text-interface-text">
+                      {isPolling ? (
+                        <span className="flex items-center gap-2 text-muted">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Waiting for backup to complete…
+                        </span>
+                      ) : (
+                        formatDate(lastBackupAt)
+                      )}
+                    </span>
                   </div>
 
                   {lastError && (
-                    <div className="settings__field">
-                      <Label>Last error</Label>
-                      <span className="text-destructive">{lastError}</span>
+                    <div className="settings__preview border-error/20 bg-error/5">
+                      <span className="settings__preview-label flex items-center gap-1.5">
+                        <TriangleAlert className="h-3.5 w-3.5 text-error" />
+                        Last error
+                      </span>
+                      <span className="text-sm text-error">{lastError}</span>
                     </div>
                   )}
                 </>
               )}
+
+              {!enabled && (
+                <p className="settings__hint">
+                  Git backup is not enabled. To enable it, configure a remote
+                  repository in your server environment settings.
+                </p>
+              )}
             </div>
 
             {enabled && (
-              <div className="settings__actions">
-                <Button
-                  onClick={handlePush}
-                  disabled={isPolling}
-                >
-                  {isPolling ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <CloudUpload className="mr-2 h-4 w-4" />
-                  )}
-                  Push now
-                </Button>
+              <div className="settings__section">
+                <h2 className="settings__section-title">Manual Backup</h2>
+                <p className="settings__section-description">
+                  Trigger an immediate push of all current wiki content to the
+                  remote repository without waiting for the next scheduled sync.
+                </p>
+                <div className="settings__actions">
+                  <Button onClick={handlePush} disabled={isPolling}>
+                    {isPolling ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CloudUpload className="mr-2 h-4 w-4" />
+                    )}
+                    {isPolling ? 'Pushing…' : 'Push now'}
+                  </Button>
+                </div>
               </div>
             )}
           </>
