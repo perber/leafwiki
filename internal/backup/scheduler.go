@@ -2,7 +2,12 @@ package backup
 
 import (
 	"time"
+
+	"golang.org/x/exp/slog"
 )
+
+// Minimum interval to prevent time.NewTicker(0) panic
+const minInterval = 1 * time.Minute
 
 // Scheduler runs periodic git backups.
 type Scheduler struct {
@@ -14,6 +19,10 @@ type Scheduler struct {
 
 // NewScheduler creates and starts the background goroutine.
 func NewScheduler(repo *Repository, interval time.Duration) *Scheduler {
+	if interval < minInterval {
+		slog.Default().Warn("backup scheduler interval too small, using minimum", "requested", interval, "using", minInterval)
+		interval = minInterval
+	}
 	s := &Scheduler{
 		repo:   repo,
 		ticker: time.NewTicker(interval),
