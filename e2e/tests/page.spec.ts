@@ -351,6 +351,57 @@ async function createChildPagesByPath(
       }
     }
   }, input);
+
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(
+          async ({ parentPath }) => {
+            const normalizedParentPath = parentPath.replace(/^\/+/, '');
+            const response = await fetch('/api/tree', {
+              credentials: 'include',
+            });
+
+            if (!response.ok) {
+              throw new Error(
+                `Failed to reload tree for ${normalizedParentPath}: ${response.status}`,
+              );
+            }
+
+            const tree = (await response.json()) as {
+              path: string;
+              children?: Array<unknown> | null;
+            };
+
+            const findNode = (
+              node: { path: string; title?: string; children?: Array<unknown> | null },
+              path: string,
+            ): { children?: Array<{ title: string }> | null } | null => {
+              if (node.path === path) {
+                return node as { children?: Array<{ title: string }> | null };
+              }
+
+              for (const child of node.children ?? []) {
+                const match = findNode(
+                  child as { path: string; title?: string; children?: Array<unknown> | null },
+                  path,
+                );
+                if (match) {
+                  return match;
+                }
+              }
+
+              return null;
+            };
+
+            const parentPage = findNode(tree, normalizedParentPath);
+            return parentPage?.children?.map((child) => child.title).sort() ?? [];
+          },
+          { parentPath: input.parentPath },
+        ),
+      { timeout: 15000 },
+    )
+    .toEqual([...input.titles].sort());
 }
 
 async function movePageByPath(

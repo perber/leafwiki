@@ -50,7 +50,9 @@ export default class TreeView {
       'button[data-testid="tree-view-action-button-open-more-actions"]',
     );
     await expect(moreActionsButton).toBeVisible();
-    const expectedActionButton = this.page.getByTestId(expectedActionTestId);
+    const expectedActionButton = this.page.locator(
+      `[role="menu"] [data-testid="${expectedActionTestId}"]`,
+    );
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       await nodeRow.hover();
@@ -176,7 +178,9 @@ export default class TreeView {
 
     await this.openMoreActionsMenuForNodeRow(nodeRow, 'tree-view-action-button-sort');
 
-    const sortButton = this.page.getByTestId('tree-view-action-button-sort');
+    const sortButton = this.page.locator(
+      '[role="menu"] [data-testid="tree-view-action-button-sort"]',
+    );
     await expect(sortButton).toBeVisible();
     await sortButton.click();
 
