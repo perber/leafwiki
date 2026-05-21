@@ -57,15 +57,21 @@ export default function BackupSettings() {
     }
   }, [isPolling, loadStatus])
 
-  // Stop polling when lastBackupAt advances
+  // Stop polling when lastBackupAt advances or an error occurs
   useEffect(() => {
-    if (isPolling && lastBackupAtRef.current !== null && lastBackupAt !== null) {
-      if (lastBackupAtRef.current !== lastBackupAt) {
+    if (isPolling) {
+      const hasNewBackup = lastBackupAtRef.current !== null && lastBackupAt !== null && lastBackupAtRef.current !== lastBackupAt
+      const hasError = lastError !== ''
+      if (hasNewBackup || hasError) {
         stopPolling()
-        toast.success('Backup completed successfully')
+        if (hasError) {
+          toast.error(`Backup failed: ${lastError}`)
+        } else {
+          toast.success('Backup completed successfully')
+        }
       }
     }
-  }, [lastBackupAt, isPolling, stopPolling])
+  }, [lastBackupAt, lastError, isPolling, stopPolling])
 
   const handlePush = async () => {
     try {

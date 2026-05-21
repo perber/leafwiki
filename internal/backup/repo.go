@@ -165,6 +165,7 @@ func (r *Repository) RunBackup() error {
 	if err != nil {
 		errMsg := fmt.Errorf("failed to get worktree: %w", err).Error()
 		r.status.SetError(errMsg)
+		r.status.SetSuccess(time.Now()) 
 		return nil // Never propagate
 	}
 
@@ -173,11 +174,13 @@ func (r *Repository) RunBackup() error {
 	rootRel, err := filepath.Rel(repoDir, r.cfg.RootDir)
 	if err != nil {
 		r.status.SetError(fmt.Errorf("failed to compute relative path for root: %w", err).Error())
+		r.status.SetSuccess(time.Now()) 
 		return nil
 	}
 	assetsRel, err := filepath.Rel(repoDir, r.cfg.AssetsDir)
 	if err != nil {
 		r.status.SetError(fmt.Errorf("failed to compute relative path for assets: %w", err).Error())
+		r.status.SetSuccess(time.Now()) 
 		return nil
 	}
 
@@ -185,12 +188,14 @@ func (r *Repository) RunBackup() error {
 	if _, err := os.Stat(r.cfg.RootDir); err == nil {
 		if _, err := wt.Add(rootRel); err != nil {
 			r.status.SetError(fmt.Errorf("failed to stage root dir: %w", err).Error())
+			r.status.SetSuccess(time.Now()) 
 			return nil
 		}
 	}
 	if _, err := os.Stat(r.cfg.AssetsDir); err == nil {
 		if _, err := wt.Add(assetsRel); err != nil {
 			r.status.SetError(fmt.Errorf("failed to stage assets dir: %w", err).Error())
+			r.status.SetSuccess(time.Now()) 
 			return nil
 		}
 	}
@@ -200,6 +205,7 @@ func (r *Repository) RunBackup() error {
 	if err != nil {
 		errMsg := fmt.Errorf("failed to get status: %w", err).Error()
 		r.status.SetError(errMsg)
+		r.status.SetSuccess(time.Now()) 
 		return nil // Never propagate
 	}
 
@@ -223,6 +229,7 @@ func (r *Repository) RunBackup() error {
 		}
 		errMsg := fmt.Errorf("failed to commit: %w", err).Error()
 		r.status.SetError(errMsg)
+		r.status.SetSuccess(time.Now()) 
 		return nil // Never propagate
 	}
 
@@ -230,6 +237,7 @@ func (r *Repository) RunBackup() error {
 	if r.cfg.RemoteURL != "" {
 		if err := r.push(commit.String()); err != nil {
 			r.status.SetError(err.Error())
+			r.status.SetSuccess(time.Now()) 
 			return nil // Never propagate
 		}
 	}
