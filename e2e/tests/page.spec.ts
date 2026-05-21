@@ -2179,6 +2179,97 @@ Paragraph outside the list.
     ).toBeTruthy();
   });
 
+  test('search-panel-result-navigation-replaces-path-and-keeps-filters', async ({ page }) => {
+    const stamp = Date.now();
+    const startTitle = `Search Start ${stamp}`;
+    const resultTitle = `Search Result ${stamp}`;
+    const query = `nav query ${stamp}`;
+    const tag = `nav-tag-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: startTitle,
+      slug: `search-start-${stamp}`,
+      content: 'Starting page for search navigation.',
+      tags: [],
+    });
+    await createPageWithMetadata(page, {
+      title: resultTitle,
+      slug: `search-result-${stamp}`,
+      content: `This page contains ${query}.`,
+      tags: [tag],
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/search-start-${stamp}`);
+    await viewPage.switchToSearchTab();
+
+    const searchView = new SearchView(page);
+    await searchView.enterSearchQuery(query);
+    await searchView.clickTagFilter(tag);
+
+    const result = page
+      .locator('a[data-testid^="search-result-card-"]')
+      .filter({ hasText: resultTitle })
+      .first();
+    await result.click();
+
+    await expect(page).toHaveURL(new RegExp(`/search-result-${stamp}(\\?|$)`));
+    await expect(page).toHaveURL(new RegExp(`[?&]q=${query.replace(/ /g, '\\+')}`));
+    await expect(page).toHaveURL(new RegExp(`[?&]tags=${tag}(?:&|$)`));
+    await expect(page).not.toHaveURL(new RegExp(`/search-start-${stamp}/search-result-${stamp}`));
+  });
+
+  test('search-panel-allows-editing-an-existing-query-from-the-url', async ({ page }) => {
+    const initialQuery = 'alpha-query';
+    const updatedQuery = 'beta-query';
+
+    await page.goto(toAppPath(`/?q=${initialQuery}`));
+
+    const viewPage = new ViewPage(page);
+    await viewPage.switchToSearchTab();
+
+    const searchView = new SearchView(page);
+    await expect(searchView.getSearchInput()).toHaveValue(initialQuery);
+
+    await searchView.enterSearchQuery(updatedQuery);
+
+    await expect(searchView.getSearchInput()).toHaveValue(updatedQuery);
+    await expect(page).toHaveURL(new RegExp(`[?&]q=${updatedQuery}(?:&|$)`));
+  });
+
+  test('search-panel-keeps-q-in-the-url-while-typing', async ({ page }) => {
+    const viewPage = new ViewPage(page);
+    await viewPage.goto('/');
+    await viewPage.switchToSearchTab();
+
+    const searchView = new SearchView(page);
+    await searchView.getSearchInput().fill('abc');
+
+    await expect(searchView.getSearchInput()).toHaveValue('abc');
+    await expect(page).toHaveURL(/[?&]q=abc(?:&|$)/);
+  });
+
+  test('search-panel-does-not-drop-q-during-slow-typing', async ({ page }) => {
+    const viewPage = new ViewPage(page);
+    await viewPage.goto('/');
+    await viewPage.switchToSearchTab();
+
+    const searchView = new SearchView(page);
+    const seenUrls: string[] = [];
+
+    for (const value of ['a', 'ab', 'abc']) {
+      await searchView.getSearchInput().fill(value);
+      await page.waitForTimeout(150);
+      seenUrls.push(page.url());
+    }
+
+    expect(seenUrls).toEqual([
+      expect.stringMatching(/[?&]q=a(?:&|$)/),
+      expect.stringMatching(/[?&]q=ab(?:&|$)/),
+      expect.stringMatching(/[?&]q=abc(?:&|$)/),
+    ]);
+  });
+
   test('markdown-relative-link-navigates-to-sibling-page', async ({ page }) => {
     const suffix = Date.now();
     const parentTitle = 'markdown-link-parent-' + suffix;

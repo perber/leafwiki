@@ -103,7 +103,7 @@ export default function TreeNodeActionsMenu({
       open={open}
       onOpenChange={(nextOpen) => setOpenMenuNodeId(nextOpen ? node.id : null)}
     >
-      <DropdownMenuTrigger aria-label="More actions">
+      <DropdownMenuTrigger asChild aria-label="More actions">
         <TreeViewActionButton
           actionName="open-more-actions"
           icon={<MoreVertical size={18} className="tree-node__action-icon" />}

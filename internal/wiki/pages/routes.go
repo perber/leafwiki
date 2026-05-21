@@ -293,13 +293,11 @@ func buildExtraFields(tags []string, properties map[string]string) map[string]in
 		extra[k] = v
 	}
 	normalizedTags := normalizeTagInputs(tags)
-	if len(normalizedTags) > 0 {
-		list := make([]interface{}, len(normalizedTags))
-		for i, t := range normalizedTags {
-			list[i] = t
-		}
-		extra["tags"] = list
+	list := make([]interface{}, len(normalizedTags))
+	for i, t := range normalizedTags {
+		list[i] = t
 	}
+	extra["tags"] = list
 	return extra
 }
 

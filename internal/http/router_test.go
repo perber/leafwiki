@@ -1608,6 +1608,77 @@ func TestUpdatePageEndpoint_WritesTagsAndStringProperties(t *testing.T) {
 	}
 }
 
+func TestUpdatePageEndpoint_RemovesTagsWhenEmptyListIsSent(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	page := createPageViaAPI(t, router, "Original Title", "original-title", nil, pageNodeKind())
+
+	firstPayload := map[string]interface{}{
+		"version": page.Version,
+		"title":   "Original Title",
+		"slug":    "original-title",
+		"content": "# Updated Content",
+		"tags":    []string{"React", "TypeScript"},
+	}
+	firstBody, _ := json.Marshal(firstPayload)
+
+	firstRec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(firstBody)))
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("Expected first update to return 200 OK, got %d - %s", firstRec.Code, firstRec.Body.String())
+	}
+
+	var updated apiPage
+	if err := json.Unmarshal(firstRec.Body.Bytes(), &updated); err != nil {
+		t.Fatalf("Invalid first update response JSON: %v", err)
+	}
+
+	secondPayload := map[string]interface{}{
+		"version": updated.Version,
+		"title":   updated.Title,
+		"slug":    updated.Slug,
+		"content": updated.Content,
+		"tags":    []string{},
+	}
+	secondBody, _ := json.Marshal(secondPayload)
+
+	secondRec := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID, strings.NewReader(string(secondBody)))
+	if secondRec.Code != http.StatusOK {
+		t.Fatalf("Expected second update to return 200 OK, got %d - %s", secondRec.Code, secondRec.Body.String())
+	}
+
+	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID, nil)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on get, got %d", getRec.Code)
+	}
+
+	var fetched apiPage
+	if err := json.Unmarshal(getRec.Body.Bytes(), &fetched); err != nil {
+		t.Fatalf("Invalid get response JSON: %v", err)
+	}
+
+	if len(fetched.Tags) != 0 {
+		t.Fatalf("expected tags to be removed, got %#v", fetched.Tags)
+	}
+
+	tagsRec := authenticatedRequest(t, router, http.MethodGet, "/api/tags?q=react&limit=20", nil)
+	if tagsRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from tags endpoint, got %d - %s", tagsRec.Code, tagsRec.Body.String())
+	}
+
+	var tagsResp []map[string]interface{}
+	if err := json.Unmarshal(tagsRec.Body.Bytes(), &tagsResp); err != nil {
+		t.Fatalf("Invalid tags response JSON: %v", err)
+	}
+
+	for _, entry := range tagsResp {
+		if entry["tag"] == "react" {
+			t.Fatalf("expected react tag to be removed from index, got %#v", tagsResp)
+		}
+	}
+}
+
 func TestUpdatePageEndpoint_IndexesTagsForTagsEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

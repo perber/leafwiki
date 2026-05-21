@@ -110,6 +110,14 @@ async function addTag(page: Page, tag: string) {
   await page.keyboard.press('Enter');
 }
 
+async function removeTag(page: Page, tag: string) {
+  await page
+    .locator('.page-frontmatter-panel__chip')
+    .filter({ hasText: tag })
+    .locator('.page-frontmatter-panel__chip-remove')
+    .click();
+}
+
 async function addProperty(page: Page, key: string, value: string) {
   await page.locator('[data-testid="page-frontmatter-add-field"]').click();
   const fields = page.locator('[data-testid^="page-frontmatter-field-key-"]');
@@ -218,6 +226,50 @@ test.describe('Editor', () => {
     await expect(
       page.locator('.page-metadata__prop-value').filter({ hasText: 'draft' }),
     ).toBeVisible();
+  });
+
+  test('editor-removes-tags-when-all-tags-are-cleared', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-remove-tags-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: `Editor Remove Tags ${stamp}`,
+      slug,
+      content: 'Page with tags.',
+      tags: ['leafwiki', 'andere'],
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    await openFrontmatterPanel(page);
+    await removeTag(page, 'leafwiki');
+    await removeTag(page, 'andere');
+
+    const editPage = new EditPage(page);
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await expect(page.locator('.page-metadata__tag-chip')).toHaveCount(0);
+
+    const fetchedTags = await page.evaluate(
+      async ({ path, csrfScript }) => {
+        const csrfToken = new Function(csrfScript)() as string;
+        const response = await fetch(`/api/pages/by-path?path=${encodeURIComponent(path)}`, {
+          credentials: 'include',
+          headers: { 'X-CSRF-Token': csrfToken },
+        });
+        if (!response.ok) {
+          throw new Error(`load failed: ${response.status}`);
+        }
+        const data = (await response.json()) as { tags?: string[] };
+        return data.tags ?? [];
+      },
+      { path: slug, csrfScript: getCsrfScript() },
+    );
+
+    expect(fetchedTags).toEqual([]);
   });
 
   test('editor-updates-tags-and-properties-on-re-save', async ({ page }) => {

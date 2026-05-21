@@ -25,6 +25,7 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
       buildViewUrl(location.pathname),
     )
     const resultPath = normalizeWikiRoutePath(item.path)
+    const resultUrl = `${resultPath}${location.search}`
     const isRouteActive = currentViewPath === resultPath
     const isEditorActive = currentEditorPageId === item.page_id
     const isActive = isRouteActive || isEditorActive || isSelected
@@ -33,10 +34,7 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
     return (
       <Link
         ref={ref}
-        to={{
-          pathname: `${item.path}`,
-          search: location.search,
-        }}
+        to={resultUrl}
         data-testid={`search-result-card-${item.page_id}`}
         aria-current={isRouteActive ? 'page' : undefined}
         onMouseEnter={onMouseEnter}

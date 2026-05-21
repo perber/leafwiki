@@ -8,10 +8,19 @@ import {
 } from '@/components/ui/accordion'
 import { Input } from '@/components/ui/input'
 import { searchPages, SearchResultItem, SearchTagFacet } from '@/lib/api/search'
+import { deferStateUpdate } from '@/lib/deferState'
+import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { fetchTags, TagCount } from '@/lib/api/tags'
 import { useDebounce } from '@/lib/useDebounce'
 import { X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import SearchResultCard from './SearchResultCard'
 
@@ -24,14 +33,13 @@ export default function Search({ active = false }: SearchProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const urlQuery = searchParams.get('q') ?? ''
+  const [inputQuery, setInputQuery] = useState(urlQuery)
   const activeTags = searchParams.getAll('tags')
   const activeTagsKey = activeTags.join('\n')
   const debouncedActiveTagsKey = useDebounce(activeTagsKey, 180)
-  const initialQuery = urlQuery
 
-  const [query, setQuery] = useState(initialQuery)
   const [loading, setLoading] = useState(
-    () => initialQuery.length >= 3 || activeTags.length > 0,
+    () => urlQuery.length >= 3 || activeTags.length > 0,
   )
   const [results, setResults] = useState<SearchResultItem[]>([])
   const [totalCount, setTotalCount] = useState(0)
@@ -46,14 +54,14 @@ export default function Search({ active = false }: SearchProps) {
   const latestRequestIdRef = useRef(0)
 
   const limit = 10
-  const debouncedQuery = useDebounce(query, 300)
+  const debouncedQuery = useDebounce(inputQuery, 300)
   const debouncedActiveTags = useMemo(
     () =>
       debouncedActiveTagsKey === '' ? [] : debouncedActiveTagsKey.split('\n'),
     [debouncedActiveTagsKey],
   )
   const hasSearchQuery = debouncedQuery.length >= 3
-  const trimmedQuery = query.trim()
+  const trimmedQuery = inputQuery.trim()
   const activeQueryLabel = hasSearchQuery ? debouncedQuery : trimmedQuery
   const isIdleMode = trimmedQuery === '' && activeTags.length === 0
   const hasImmediateFilters = !isIdleMode
@@ -123,13 +131,13 @@ export default function Search({ active = false }: SearchProps) {
     )
     setPage(0)
     setActiveIndex(0)
-    if (query.trim().length < 3) {
+    if (urlQuery.trim().length < 3) {
       setResults([])
       setTotalCount(0)
       setFacetTags([])
       setLoading(false)
     }
-  }, [query, setSearchParams])
+  }, [setSearchParams, urlQuery])
 
   useEffect(() => {
     if (active) {
@@ -138,43 +146,10 @@ export default function Search({ active = false }: SearchProps) {
   }, [active])
 
   useEffect(() => {
-    if (!active) {
-      return
-    }
-
-    if (query === urlQuery) {
-      return
-    }
-
-    const syncHandle = window.setTimeout(() => {
-      setQuery(urlQuery)
-      setPage(0)
-      setActiveIndex(0)
-    }, 0)
-
-    return () => {
-      window.clearTimeout(syncHandle)
-    }
-  }, [active, query, urlQuery])
-
-  useEffect(() => {
-    if (!active) {
-      return
-    }
-
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        if (debouncedQuery) {
-          next.set('q', debouncedQuery)
-        } else {
-          next.delete('q')
-        }
-        return next
-      },
-      { replace: true },
-    )
-  }, [active, debouncedQuery, setSearchParams])
+    deferStateUpdate(() => {
+      setInputQuery(urlQuery)
+    })
+  }, [urlQuery])
 
   useEffect(() => {
     if (!active) {
@@ -257,15 +232,17 @@ export default function Search({ active = false }: SearchProps) {
 
   const clearSearch = () => {
     invalidatePendingRequests()
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        next.delete('q')
-        return next
-      },
-      { replace: true },
-    )
-    setQuery('')
+    setInputQuery('')
+    startTransition(() => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('q')
+          return next
+        },
+        { replace: true },
+      )
+    })
     setPage(0)
     setActiveIndex(0)
     if (activeTags.length === 0) {
@@ -284,7 +261,7 @@ export default function Search({ active = false }: SearchProps) {
     if (!activeResult) return
 
     navigate({
-      pathname: `${activeResult.path}`,
+      pathname: normalizeWikiRoutePath(activeResult.path),
       search: location.search,
     })
   }
@@ -297,12 +274,26 @@ export default function Search({ active = false }: SearchProps) {
           autoFocus
           type="text"
           placeholder="Search..."
-          value={query}
+          value={inputQuery}
           data-testid="search-input"
           onChange={(e) => {
             const nextQuery = e.target.value
             invalidatePendingRequests()
-            setQuery(nextQuery)
+            setInputQuery(nextQuery)
+            startTransition(() => {
+              setSearchParams(
+                (prev) => {
+                  const next = new URLSearchParams(prev)
+                  if (nextQuery) {
+                    next.set('q', nextQuery)
+                  } else {
+                    next.delete('q')
+                  }
+                  return next
+                },
+                { replace: true },
+              )
+            })
             setPage(0)
             setActiveIndex(0)
 
@@ -341,7 +332,7 @@ export default function Search({ active = false }: SearchProps) {
           }}
           className="search__input"
         />
-        {query && (
+        {inputQuery && (
           <button
             onClick={clearSearch}
             className="search__clear-button"
