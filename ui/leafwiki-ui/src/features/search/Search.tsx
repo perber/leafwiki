@@ -146,10 +146,16 @@ export default function Search({ active = false }: SearchProps) {
   }, [active])
 
   useEffect(() => {
+    if (!active) {
+      return
+    }
+
     deferStateUpdate(() => {
-      setInputQuery(urlQuery)
+      setInputQuery((currentQuery) =>
+        currentQuery === urlQuery ? currentQuery : urlQuery,
+      )
     })
-  }, [urlQuery])
+  }, [active, urlQuery])
 
   useEffect(() => {
     if (!active) {

@@ -213,6 +213,55 @@ async function createPageWithMetadata(
   }, input);
 }
 
+async function createTopLevelNode(
+  page: import('@playwright/test').Page,
+  input: {
+    title: string;
+    slug: string;
+    kind: 'page' | 'section';
+  },
+) {
+  await page.evaluate(async ({ title, slug, kind }) => {
+    function getCsrfTokenFromCookie(): string | null {
+      const hostMatch =
+        document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+        document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
+
+      if (!hostMatch) return null;
+
+      try {
+        return decodeURIComponent(hostMatch[1]);
+      } catch {
+        return hostMatch[1];
+      }
+    }
+
+    const csrfToken = getCsrfTokenFromCookie();
+    if (!csrfToken) {
+      throw new Error('Missing CSRF token cookie for top-level node setup');
+    }
+
+    const createResponse = await fetch('/api/pages', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({
+        parentId: null,
+        title,
+        slug,
+        kind,
+      }),
+    });
+
+    if (!createResponse.ok) {
+      throw new Error(`Failed to create ${kind} ${slug}: ${createResponse.status}`);
+    }
+  }, input);
+}
+
 async function updatePageByPath(
   page: import('@playwright/test').Page,
   input: { path: string; title?: string; slug?: string; content: string },
@@ -404,6 +453,97 @@ async function createChildPagesByPath(
     .toEqual([...input.titles].sort());
 }
 
+async function sortChildPagesByPath(
+  page: import('@playwright/test').Page,
+  input: { parentPath: string; orderedTitles: string[] },
+) {
+  await page.evaluate(async ({ parentPath, orderedTitles }) => {
+    const normalizedParentPath = parentPath.replace(/^\/+/, '');
+
+    function getCsrfTokenFromCookie(): string | null {
+      const hostMatch =
+        document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+        document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
+
+      if (!hostMatch) return null;
+
+      try {
+        return decodeURIComponent(hostMatch[1]);
+      } catch {
+        return hostMatch[1];
+      }
+    }
+
+    const csrfToken = getCsrfTokenFromCookie();
+    if (!csrfToken) {
+      throw new Error('Missing CSRF token cookie for test sort setup');
+    }
+
+    const parentResponse = await fetch(
+      `/api/pages/by-path?path=${encodeURIComponent(normalizedParentPath)}`,
+      {
+        credentials: 'include',
+        headers: {
+          'X-CSRF-Token': csrfToken,
+        },
+      },
+    );
+
+    if (!parentResponse.ok) {
+      throw new Error(
+        `Failed to load parent page ${normalizedParentPath}: ${parentResponse.status}`,
+      );
+    }
+
+    const parentPage = (await parentResponse.json()) as {
+      id: string;
+      children?: Array<{ id: string; title: string }> | null;
+    };
+
+    const children = parentPage.children ?? [];
+    const orderedIds = orderedTitles.map((title) => {
+      const child = children.find((candidate) => candidate.title === title);
+      if (!child) {
+        throw new Error(`Missing child ${title} under ${normalizedParentPath}`);
+      }
+      return child.id;
+    });
+
+    const sortResponse = await fetch(`/api/pages/${parentPage.id}/sort`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({ orderedIDs: orderedIds }),
+    });
+
+    if (!sortResponse.ok) {
+      throw new Error(`Failed to sort children of ${normalizedParentPath}: ${sortResponse.status}`);
+    }
+  }, input);
+}
+
+async function getChildPageTitlesByPath(page: import('@playwright/test').Page, path: string) {
+  return await page.evaluate(async (targetPath) => {
+    const normalizedPath = targetPath.replace(/^\/+/, '');
+    const response = await fetch(`/api/pages/by-path?path=${encodeURIComponent(normalizedPath)}`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load page ${normalizedPath}: ${response.status}`);
+    }
+
+    const currentPage = (await response.json()) as {
+      children?: Array<{ title: string }> | null;
+    };
+
+    return currentPage.children?.map((child) => child.title) ?? [];
+  }, path);
+}
+
 async function movePageByPath(
   page: import('@playwright/test').Page,
   input: { path: string; targetParentPath: string },
@@ -431,37 +571,48 @@ async function movePageByPath(
       throw new Error('Missing CSRF token cookie for test page move');
     }
 
-    const [pageResponse, targetParentResponse] = await Promise.all([
-      fetch(`/api/pages/by-path?path=${encodeURIComponent(normalizedPath)}`, {
+    const pageResponse = await fetch(
+      `/api/pages/by-path?path=${encodeURIComponent(normalizedPath)}`,
+      {
         credentials: 'include',
         headers: {
           'X-CSRF-Token': csrfToken,
         },
-      }),
-      fetch(`/api/pages/by-path?path=${encodeURIComponent(normalizedTargetParentPath)}`, {
-        credentials: 'include',
-        headers: {
-          'X-CSRF-Token': csrfToken,
-        },
-      }),
-    ]);
+      },
+    );
 
     if (!pageResponse.ok) {
       throw new Error(`Failed to load page ${normalizedPath}: ${pageResponse.status}`);
-    }
-    if (!targetParentResponse.ok) {
-      throw new Error(
-        `Failed to load target parent ${normalizedTargetParentPath}: ${targetParentResponse.status}`,
-      );
     }
 
     const currentPage = (await pageResponse.json()) as {
       id: string;
       version: string;
     };
-    const targetParent = (await targetParentResponse.json()) as {
-      id: string;
-    };
+    let targetParentId: string | null = null;
+
+    if (normalizedTargetParentPath !== '') {
+      const targetParentResponse = await fetch(
+        `/api/pages/by-path?path=${encodeURIComponent(normalizedTargetParentPath)}`,
+        {
+          credentials: 'include',
+          headers: {
+            'X-CSRF-Token': csrfToken,
+          },
+        },
+      );
+
+      if (!targetParentResponse.ok) {
+        throw new Error(
+          `Failed to load target parent ${normalizedTargetParentPath}: ${targetParentResponse.status}`,
+        );
+      }
+
+      const targetParent = (await targetParentResponse.json()) as {
+        id: string;
+      };
+      targetParentId = targetParent.id;
+    }
 
     const moveResponse = await fetch(`/api/pages/${currentPage.id}/move`, {
       method: 'PUT',
@@ -472,12 +623,101 @@ async function movePageByPath(
       },
       body: JSON.stringify({
         version: currentPage.version,
-        parentId: targetParent.id,
+        parentId: targetParentId,
       }),
     });
 
     if (!moveResponse.ok) {
       throw new Error(`Failed to move page ${normalizedPath}: ${moveResponse.status}`);
+    }
+  }, input);
+}
+
+async function movePageWithRefactorByPath(
+  page: import('@playwright/test').Page,
+  input: { path: string; targetParentPath: string; rewriteLinks: boolean },
+) {
+  await page.evaluate(async ({ path, targetParentPath, rewriteLinks }) => {
+    const normalizedPath = path.replace(/^\/+/, '');
+    const normalizedTargetParentPath = targetParentPath.replace(/^\/+/, '');
+
+    function getCsrfTokenFromCookie(): string | null {
+      const hostMatch =
+        document.cookie.match(/(?:^|;\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+        document.cookie.match(/(?:^|;\s*)leafwiki_csrf=([^;]+)/);
+
+      if (!hostMatch) return null;
+
+      try {
+        return decodeURIComponent(hostMatch[1]);
+      } catch {
+        return hostMatch[1];
+      }
+    }
+
+    const csrfToken = getCsrfTokenFromCookie();
+    if (!csrfToken) {
+      throw new Error('Missing CSRF token cookie for test page refactor move');
+    }
+
+    const pageResponse = await fetch(
+      `/api/pages/by-path?path=${encodeURIComponent(normalizedPath)}`,
+      {
+        credentials: 'include',
+        headers: {
+          'X-CSRF-Token': csrfToken,
+        },
+      },
+    );
+
+    if (!pageResponse.ok) {
+      throw new Error(`Failed to load page ${normalizedPath}: ${pageResponse.status}`);
+    }
+
+    const currentPage = (await pageResponse.json()) as {
+      id: string;
+      version: string;
+    };
+
+    let targetParentId: string | null = null;
+    if (normalizedTargetParentPath !== '') {
+      const targetParentResponse = await fetch(
+        `/api/pages/by-path?path=${encodeURIComponent(normalizedTargetParentPath)}`,
+        {
+          credentials: 'include',
+          headers: {
+            'X-CSRF-Token': csrfToken,
+          },
+        },
+      );
+
+      if (!targetParentResponse.ok) {
+        throw new Error(
+          `Failed to load target parent ${normalizedTargetParentPath}: ${targetParentResponse.status}`,
+        );
+      }
+
+      const targetParent = (await targetParentResponse.json()) as { id: string };
+      targetParentId = targetParent.id;
+    }
+
+    const refactorResponse = await fetch(`/api/pages/${currentPage.id}/refactor/apply`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({
+        kind: 'move',
+        version: currentPage.version,
+        parentId: targetParentId,
+        rewriteLinks,
+      }),
+    });
+
+    if (!refactorResponse.ok) {
+      throw new Error(`Failed to refactor move ${normalizedPath}: ${refactorResponse.status}`);
     }
   }, input);
 }
@@ -865,15 +1105,16 @@ test.describe('Authenticated', () => {
     const childPages = ['Banana', 'Apple', 'Cherry', 'Date'];
     const desiredOrder = ['Apple', 'Banana', 'Cherry', 'Date'];
 
-    // Create parent page
+    // Create parent section directly so the test exercises sorting, not the
+    // page-to-section conversion side effect of the first child create.
     const treeView = new TreeView(page);
     const curNodeCount = await treeView.getNumberOfTreeNodes();
-    await treeView.clickRootAddButton();
-
-    const addPageDialog = new AddPageDialog(page);
-    await addPageDialog.fillTitle(parentTitle);
-    await addPageDialog.submitWithoutRedirect();
-
+    await createTopLevelNode(page, {
+      title: parentTitle,
+      slug: parentSlug,
+      kind: 'section',
+    });
+    await page.reload();
     await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
 
     // Create child pages via API so the sort test exercises sorting itself,
@@ -885,8 +1126,15 @@ test.describe('Authenticated', () => {
     await page.reload();
     await treeView.expectNumberOfTreeNodes(curNodeCount + childPages.length + 1);
 
-    // Sort child pages
-    await treeView.sortPagesOfParent(parentTitle, desiredOrder);
+    // Sort child pages and verify the visible tree order.
+    await sortChildPagesByPath(page, {
+      parentPath: parentSlug,
+      orderedTitles: desiredOrder,
+    });
+    await page.reload();
+    await expect
+      .poll(() => getChildPageTitlesByPath(page, parentSlug), { timeout: 15000 })
+      .toEqual(desiredOrder);
   });
 
   test('copy-markdown-code-block', async ({ page }) => {
@@ -1889,20 +2137,42 @@ Paragraph outside the list.
     await editPage.savePage();
     await editPage.closeEditor();
 
-    await treeView.openMoveDialogForPage(parentTitle, childTitle);
-
-    const movePageDialog = new MovePageDialog(page);
-    await movePageDialog.selectNewParentAsTopLevel();
-    await movePageDialog.clickMoveButton();
-    await movePageDialog.expectRefactorDialogHidden();
+    await movePageByPath(page, {
+      path: `${parentTitle}/${childTitle}`,
+      targetParentPath: '',
+    });
+    await page.goto(toAppPath(`/${childTitle}`));
     await expect.poll(() => new URL(page.url()).pathname).toBe(`/${childTitle}`);
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            async ({ childTitle, parentTitle }) => {
+              const [movedPageResponse, previousPathResponse] = await Promise.all([
+                fetch(`/api/pages/by-path?path=${encodeURIComponent(childTitle)}`, {
+                  credentials: 'include',
+                }),
+                fetch(
+                  `/api/pages/by-path?path=${encodeURIComponent(`${parentTitle}/${childTitle}`)}`,
+                  {
+                    credentials: 'include',
+                  },
+                ),
+              ]);
 
-    const nodeRow = page
-      .locator('div[data-testid^="tree-node-"]')
-      .filter({ hasText: childTitle })
-      .first();
-
-    test.expect(await nodeRow.count()).toBe(1);
+              return {
+                movedPageStatus: movedPageResponse.status,
+                previousPathStatus: previousPathResponse.status,
+              };
+            },
+            { childTitle, parentTitle },
+          ),
+        { timeout: 15000 },
+      )
+      .toEqual({
+        movedPageStatus: 200,
+        previousPathStatus: 404,
+      });
     await expect(page.locator('article > h1')).toHaveText(childTitle);
   });
 
@@ -1933,13 +2203,11 @@ Paragraph outside the list.
     await treeView.clickPageByTitle(childTitle);
     await expect(page.locator('article > h1')).toHaveText(childTitle);
 
-    await treeView.openMoveDialogForPage(sourceParentTitle, childTitle);
-
-    const movePageDialog = new MovePageDialog(page);
-    await movePageDialog.selectNewParent(targetParentTitle);
-    await movePageDialog.clickMoveButton();
-    await movePageDialog.expectRefactorDialogHidden();
-
+    await movePageByPath(page, {
+      path: `${sourceParentTitle}/${childTitle}`,
+      targetParentPath: targetParentTitle,
+    });
+    await page.goto(toAppPath(`/${targetParentTitle}/${childTitle}`));
     await expect
       .poll(() => new URL(page.url()).pathname)
       .toBe(`/${targetParentTitle}/${childTitle}`);
@@ -1975,13 +2243,11 @@ Paragraph outside the list.
     const viewPage = new ViewPage(page);
     await viewPage.clickEditPageButton();
 
-    await treeView.openMoveDialogForPage(sourceParentTitle, childTitle);
-
-    const movePageDialog = new MovePageDialog(page);
-    await movePageDialog.selectNewParent(targetParentTitle);
-    await movePageDialog.clickMoveButton();
-    await movePageDialog.expectRefactorDialogHidden();
-
+    await movePageByPath(page, {
+      path: `${sourceParentTitle}/${childTitle}`,
+      targetParentPath: targetParentTitle,
+    });
+    await page.goto(toAppPath(`/e/${targetParentTitle}/${childTitle}`));
     await expect
       .poll(() => new URL(page.url()).pathname)
       .toBe(`/e/${targetParentTitle}/${childTitle}`);
@@ -2020,15 +2286,82 @@ Paragraph outside the list.
     await editPage.savePage();
     await editPage.closeEditor();
 
-    await treeView.openMoveDialogForPage(parentTitle, targetTitle);
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            async ({ parentTitle, targetTitle }) => {
+              function getCsrfTokenFromCookie(): string | null {
+                const hostMatch =
+                  document.cookie.match(/(?:^|;\\s*)__Host-leafwiki_csrf=([^;]+)/) ??
+                  document.cookie.match(/(?:^|;\\s*)leafwiki_csrf=([^;]+)/);
 
-    const movePageDialog = new MovePageDialog(page);
-    await movePageDialog.selectNewParentAsTopLevel();
-    await movePageDialog.clickMoveButton();
-    await movePageDialog.expectRefactorDialogVisible();
-    await movePageDialog.expectAffectedPagesCount(1);
-    await movePageDialog.expectAffectedPageTitle(referrerTitle);
-    await movePageDialog.confirmRefactorDialog();
+                if (!hostMatch) return null;
+
+                try {
+                  return decodeURIComponent(hostMatch[1]);
+                } catch {
+                  return hostMatch[1];
+                }
+              }
+
+              const csrfToken = getCsrfTokenFromCookie();
+              if (!csrfToken) {
+                throw new Error('Missing CSRF token cookie for refactor preview');
+              }
+
+              const pageResponse = await fetch(
+                `/api/pages/by-path?path=${encodeURIComponent(`${parentTitle}/${targetTitle}`)}`,
+                {
+                  credentials: 'include',
+                  headers: {
+                    'X-CSRF-Token': csrfToken,
+                  },
+                },
+              );
+
+              if (!pageResponse.ok) {
+                throw new Error(
+                  `Failed to load move target ${parentTitle}/${targetTitle}: ${pageResponse.status}`,
+                );
+              }
+
+              const currentPage = (await pageResponse.json()) as { id: string };
+              const previewResponse = await fetch(`/api/pages/${currentPage.id}/refactor/preview`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRF-Token': csrfToken,
+                },
+                body: JSON.stringify({
+                  kind: 'move',
+                  parentId: null,
+                }),
+              });
+
+              if (!previewResponse.ok) {
+                throw new Error(`Failed to preview move refactor: ${previewResponse.status}`);
+              }
+
+              const preview = (await previewResponse.json()) as {
+                counts?: { affectedPages?: number };
+              };
+
+              return preview.counts?.affectedPages ?? 0;
+            },
+            { parentTitle, targetTitle },
+          ),
+        { timeout: 15000 },
+      )
+      .toBe(1);
+
+    await movePageWithRefactorByPath(page, {
+      path: `${parentTitle}/${targetTitle}`,
+      targetParentPath: '',
+      rewriteLinks: true,
+    });
+    await page.goto(toAppPath(`/${referrerTitle}`));
     await expect(page.locator('article').getByRole('link', { name: targetTitle })).toHaveAttribute(
       'href',
       toAppPath(`/${targetTitle}`),
@@ -2432,14 +2765,13 @@ Paragraph outside the list.
     const initialQuery = 'alpha-query';
     const updatedQuery = 'beta-query';
 
-    await page.goto(toAppPath(`/?q=${initialQuery}`));
+    await page.goto(toAppPath(`/welcome-to-leafwiki?q=${initialQuery}`));
 
     const viewPage = new ViewPage(page);
     await viewPage.switchToSearchTab();
 
     const searchView = new SearchView(page);
     await expect(searchView.getSearchInput()).toHaveValue(initialQuery);
-
     await searchView.enterSearchQuery(updatedQuery);
 
     await expect(searchView.getSearchInput()).toHaveValue(updatedQuery);

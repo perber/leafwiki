@@ -44,28 +44,40 @@ export default class TreeView {
   ) {
     await nodeRow.waitFor({ state: 'visible' });
     await nodeRow.scrollIntoViewIfNeeded();
-    await nodeRow.hover();
 
-    const moreActionsButton = nodeRow.locator(
-      'button[data-testid="tree-view-action-button-open-more-actions"]',
-    );
+    // Hover the node's own link so the actions div renders (it's only in the DOM
+    // when the row is hovered or the menu is open).
+    const nodeLink = nodeRow.locator('a[data-testid^="tree-node-link-"]').first();
+    await nodeLink.hover();
+
+    const moreActionsButton = nodeRow
+      .locator('button[data-testid="tree-view-action-button-open-more-actions"]')
+      .first();
     await expect(moreActionsButton).toBeVisible();
+
     const expectedActionButton = this.page.locator(
       `[role="menuitem"][data-testid="${expectedActionTestId}"]`,
     );
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await nodeRow.hover();
+      await nodeLink.hover();
       await moreActionsButton.waitFor({ state: 'visible' });
+      await moreActionsButton.evaluate((button) => {
+        if (!(button instanceof HTMLElement)) {
+          throw new Error('Expected HTMLElement');
+        }
+
+        const trigger = button.closest('[aria-haspopup="menu"]');
+        if (trigger instanceof HTMLElement) {
+          trigger.click();
+          return;
+        }
+
+        button.click();
+      });
 
       try {
-        await moreActionsButton.click({ timeout: 2000 });
-      } catch {
-        await moreActionsButton.click({ force: true });
-      }
-
-      try {
-        await expect(expectedActionButton).toBeVisible({ timeout: 2000 });
+        await expect(expectedActionButton).toBeVisible({ timeout: 3000 });
         return;
       } catch {
         await this.page.keyboard.press('Escape').catch(() => {});
@@ -224,5 +236,24 @@ export default class TreeView {
     await expect(this.treeView().locator('a[data-testid^="tree-node-link-"]')).toHaveCount(
       expectedCount,
     );
+  }
+
+  async getChildTitlesOfParent(parentTitle: string) {
+    await this.ensureSidebarVisible();
+    await this.expandNodeByTitle(parentTitle);
+
+    const nodeRow = this.getNodeRowByTitle(parentTitle);
+    const childContainer = nodeRow.locator(
+      'xpath=following-sibling::div[contains(@class,"tree-node__children")][1]',
+    );
+    const childLinks = childContainer.locator('a[data-testid^="tree-node-link-"]');
+    const count = await childLinks.count();
+    const titles: string[] = [];
+
+    for (let index = 0; index < count; index += 1) {
+      titles.push((await childLinks.nth(index).innerText()).trim());
+    }
+
+    return titles;
   }
 }
