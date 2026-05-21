@@ -217,6 +217,10 @@ func (r *Repository) RunBackup() error {
 		},
 	})
 	if err != nil {
+		// If it's "nothing to commit" (empty tree), that's fine - just skip
+		if strings.Contains(err.Error(), "cannot create empty commit") {
+			return nil
+		}
 		errMsg := fmt.Errorf("failed to commit: %w", err).Error()
 		r.status.SetError(errMsg)
 		return nil // Never propagate
