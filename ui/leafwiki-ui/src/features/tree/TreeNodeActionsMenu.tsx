@@ -154,13 +154,14 @@ export default function TreeNodeActionsMenu({
             <Copy size={18} className="tree-node__action-icon" /> Copy Page
           </DropdownMenuItem>
         )}
-        {nodeKind === NODE_KIND_SECTION && hasChildren && (
+        {hasChildren && (
           <DropdownMenuItem
             className="cursor-pointer"
             data-testid="tree-view-action-button-sort"
             onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: node })}
           >
-            <List size={18} className="tree-node__action-icon" /> Sort Section
+            <List size={18} className="tree-node__action-icon" /> Sort{' '}
+            {nodeKind === NODE_KIND_SECTION ? 'Section' : 'Page'} Children
           </DropdownMenuItem>
         )}
         <DropdownMenuItem
