@@ -79,50 +79,56 @@ export default function BackupSettings() {
   }
 
   return (
-    <div className="settings">
-      <h1 className="settings__title">Backup Settings</h1>
+    <>
+      <div className="settings">
+        <h1 className="settings__title">Backup Settings</h1>
 
-      {isLoading && (
-        <div className="settings__section">
-          <Loader2 className="h-5 w-5 animate-spin" />
-        </div>
-      )}
-
-      {!isLoading && (
-        <div className="settings__section">
-          <h2 className="settings__section-title">Git Backup</h2>
-          <p className="settings__section-description">
-            Automatically pushes changes to the configured remote repository.
-          </p>
-
-          <div className="settings__field">
-            <Label>Status</Label>
-            <span>{enabled ? 'Enabled' : 'Disabled'}</span>
+        {isLoading && (
+          <div className="settings__section">
+            <Loader2 className="h-5 w-5 animate-spin" />
           </div>
+        )}
 
-          {!enabled && (
-            <p className="settings__hint">
-              To enable Git backup, set the environment variable{' '}
-              <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP=true</code>{' '}
-              and configure{' '}
-              <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP_REMOTE</code>.
-            </p>
-          )}
-
-          {enabled && (
-            <>
-              <div className="settings__field">
-                <Label>Last backup</Label>
-                <span>{formatDate(lastBackupAt)}</span>
-              </div>
+        {!isLoading && (
+          <>
+            <div className="settings__section">
+              <h2 className="settings__section-title">Git Backup</h2>
+              <p className="settings__section-description">
+                Automatically pushes changes to the configured remote repository.
+              </p>
 
               <div className="settings__field">
-                <Label>Last error</Label>
-                <span className={lastError ? 'text-destructive' : ''}>
-                  {lastError || '—'}
-                </span>
+                <Label>Status</Label>
+                <span>{enabled ? 'Enabled' : 'Disabled'}</span>
               </div>
 
+              {!enabled && (
+                <p className="settings__hint">
+                  To enable Git backup, set the environment variable{' '}
+                  <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP=true</code>{' '}
+                  and configure{' '}
+                  <code className="px-1 py-0.5 rounded bg-muted text-foreground">LEAFWIKI_GIT_BACKUP_REMOTE</code>.
+                </p>
+              )}
+
+              {enabled && (
+                <>
+                  <div className="settings__field">
+                    <Label>Last backup</Label>
+                    <span>{formatDate(lastBackupAt)}</span>
+                  </div>
+
+                  <div className="settings__field">
+                    <Label>Last error</Label>
+                    <span className={lastError ? 'text-destructive' : ''}>
+                      {lastError || '—'}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {enabled && (
               <div className="settings__actions">
                 <Button
                   onClick={handlePush}
@@ -134,10 +140,10 @@ export default function BackupSettings() {
                   Push now
                 </Button>
               </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
   )
 }
