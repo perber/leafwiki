@@ -264,9 +264,11 @@ func (r *Repository) push(commitHash string) error {
 		}
 	}
 
-	// Push - go-git handles refspec automatically
+	// Push HEAD to the configured remote branch
+	refSpec := config.RefSpec("HEAD:refs/heads/" + r.cfg.Branch)
 	err = remote.Push(&gogit.PushOptions{
-		Auth: auth,
+		Auth:     auth,
+		RefSpecs: []config.RefSpec{refSpec},
 	})
 	if err != nil {
 		slog.Default().Error("git push failed", "error", err, "remote", r.cfg.RemoteURL)
