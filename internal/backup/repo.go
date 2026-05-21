@@ -298,11 +298,13 @@ func (r *Repository) buildSSHAuth() (ssh.AuthMethod, error) {
 		return nil, fmt.Errorf("failed to parse SSH key: %w", err)
 	}
 
-	// Use go-git ssh package's PublicKeys with the signer
-	return &ssh.PublicKeys{
+	// Use InsecureIgnoreHostKey since we don't have a known_hosts file in the container
+	auth := &ssh.PublicKeys{
 		User:   "git",
 		Signer: signer,
-	}, nil
+	}
+	auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
+	return auth, nil
 }
 
 // Status returns a snapshot of the last backup time and any error.
