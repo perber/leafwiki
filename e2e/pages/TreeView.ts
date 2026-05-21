@@ -51,7 +51,7 @@ export default class TreeView {
     );
     await expect(moreActionsButton).toBeVisible();
     const expectedActionButton = this.page.locator(
-      `[role="menu"] [data-testid="${expectedActionTestId}"]`,
+      `[role="menuitem"][data-testid="${expectedActionTestId}"]`,
     );
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -179,7 +179,7 @@ export default class TreeView {
     await this.openMoreActionsMenuForNodeRow(nodeRow, 'tree-view-action-button-sort');
 
     const sortButton = this.page.locator(
-      '[role="menu"] [data-testid="tree-view-action-button-sort"]',
+      '[role="menuitem"][data-testid="tree-view-action-button-sort"]',
     );
     await expect(sortButton).toBeVisible();
     await sortButton.click();
@@ -212,7 +212,9 @@ export default class TreeView {
     const nodeRow = this.getNodeRowByTitle(pageTitle);
     await this.openMoreActionsMenuForNodeRow(nodeRow, 'tree-view-action-button-move');
 
-    const moveButton = this.page.getByTestId('tree-view-action-button-move');
+    const moveButton = this.page.locator(
+      '[role="menuitem"][data-testid="tree-view-action-button-move"]',
+    );
     await expect(moveButton).toBeVisible();
     await moveButton.click();
   }
