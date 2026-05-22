@@ -217,7 +217,7 @@ func (r *Routes) handleRefreshToken(rctx httpinternal.RouterContext) gin.Handler
 	return func(c *gin.Context) {
 		rt, err := rctx.AuthCookies.ReadRefresh(c)
 		if err != nil || rt == "" {
-			respondWithAuthStatusError(c, http.StatusUnauthorized, ErrCodeAuthInvalidRefreshToken, "Missing or invalid refresh token", "missing or invalid refresh token")
+			respondWithAuthStatusError(c, http.StatusUnprocessableEntity, ErrCodeAuthInvalidRefreshToken, "Missing or invalid refresh token", "missing or invalid refresh token")
 			return
 		}
 		out, err := r.refreshToken.Execute(c.Request.Context(), RefreshTokenInput{RefreshToken: rt})

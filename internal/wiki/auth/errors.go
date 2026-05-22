@@ -67,6 +67,8 @@ func respondWithAuthError(c *gin.Context, err error) {
 	}
 
 	switch {
+	case errors.Is(err, coreauth.ErrInvalidToken):
+		respondWithAuthStatusError(c, http.StatusUnprocessableEntity, ErrCodeAuthInvalidRefreshToken, "Missing or invalid refresh token", "missing or invalid refresh token")
 	case errors.Is(err, coreauth.ErrUserInvalidCredentials):
 		respondWithAuthStatusError(c, http.StatusUnauthorized, ErrCodeAuthInvalidCredentials, "Invalid credentials", "invalid credentials")
 	case errors.Is(err, coreauth.ErrUserNotFound):
@@ -88,8 +90,10 @@ func authErrorStatus(code string) int {
 	switch code {
 	case ErrCodeAuthUserNotFound:
 		return http.StatusNotFound
-	case ErrCodeAuthInvalidCredentials, ErrCodeAuthTokenExpired, ErrCodeAuthInvalidRefreshToken:
+	case ErrCodeAuthInvalidCredentials, ErrCodeAuthTokenExpired:
 		return http.StatusUnauthorized
+	case ErrCodeAuthInvalidRefreshToken:
+		return http.StatusUnprocessableEntity
 	case ErrCodeAuthUserAlreadyExists:
 		return http.StatusConflict
 	case ErrCodeAuthInvalidRole, ErrCodeAuthAdminCannotDelete,
