@@ -12,6 +12,7 @@ type FormInputProps = {
   autoComplete?: string
   autoFocus?: boolean
   readOnly?: boolean
+  allowedHotkeys?: string
 }
 
 export function FormInput({
@@ -26,6 +27,7 @@ export function FormInput({
   error,
   type = 'text',
   readOnly = false,
+  allowedHotkeys,
 }: FormInputProps) {
   return (
     <div className="form-input">
@@ -41,6 +43,7 @@ export function FormInput({
         readOnly={readOnly}
         className={error ? 'form-input__input-error' : ''}
         data-testid={testid}
+        data-allow-hotkeys={allowedHotkeys}
       />
       {error && <p className="form-input__error">{error}</p>}
     </div>

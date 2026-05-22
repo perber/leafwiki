@@ -6,6 +6,8 @@ import { useTreeStore } from '@/stores/tree'
 import { useCallback, useState } from 'react'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
+const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
+
 type EditPageMetadataDialogProps = {
   parentId: string
   currentId?: string
@@ -94,6 +96,7 @@ export function EditPageMetadataDialog({
           placeholder={`${itemLabelCapitalized} title`}
           error={fieldErrors.title}
           testid="edit-page-metadata-dialog-title-input"
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
 
         <SlugInputWithSuggestion
@@ -108,6 +111,7 @@ export function EditPageMetadataDialog({
           onLastSlugTitleChange={setLastSlugTitle}
           error={fieldErrors.slug}
           testid="edit-page-metadata-dialog-slug-input"
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
       </div>
 

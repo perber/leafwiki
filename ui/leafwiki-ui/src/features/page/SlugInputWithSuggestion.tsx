@@ -17,6 +17,7 @@ type Props = {
   onSlugLoadingChange?: (loading: boolean) => void
   onLastSlugTitleChange?: (title: string) => void
   error?: string
+  allowedHotkeys?: string
 }
 
 export function SlugInputWithSuggestion({
@@ -31,6 +32,7 @@ export function SlugInputWithSuggestion({
   onSlugLoadingChange,
   onLastSlugTitleChange,
   error,
+  allowedHotkeys,
 }: Props) {
   const [slugTouched, setSlugTouched] = useState(false)
   const debouncedTitle = useDebounce(title, 300)
@@ -84,6 +86,7 @@ export function SlugInputWithSuggestion({
       placeholder="Page slug"
       testid={testid}
       error={error}
+      allowedHotkeys={allowedHotkeys}
     />
   )
 }

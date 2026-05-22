@@ -11,6 +11,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
+const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
+
 type CreatePageByPathDialogProps = {
   initialPath?: string
   readOnlyPath?: boolean
@@ -174,6 +176,7 @@ export function CreatePageByPathDialog({
           }}
           placeholder="Page title"
           error={fieldErrors.title}
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         <FormInput
           testid="create-page-by-path-path-input"
@@ -186,6 +189,7 @@ export function CreatePageByPathDialog({
           }}
           placeholder="Page path"
           error={fieldErrors.path}
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
       </div>
     </BaseDialog>

@@ -11,6 +11,8 @@ import { toast } from 'sonner'
 import { PageSelect } from './PageSelect'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
+const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
+
 type CopyPageSource = Pick<PageNode, 'id' | 'title' | 'kind'>
 
 export function CopyPageDialog({ sourcePage }: { sourcePage: CopyPageSource }) {
@@ -163,6 +165,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: CopyPageSource }) {
         }}
         placeholder={`${itemLabelCapitalized} title`}
         error={fieldErrors.title}
+        allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
       />
       <SlugInputWithSuggestion
         testid="copy-page-dialog-slug-input"
@@ -174,6 +177,7 @@ export function CopyPageDialog({ sourcePage }: { sourcePage: CopyPageSource }) {
         onSlugLoadingChange={setSlugLoading}
         onLastSlugTitleChange={setLastSlugTitle}
         error={fieldErrors.slug}
+        allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
       />
       <PageSelect pageID={targetParentID} onChange={setTargetParentID} />
       <span className="dialog__path">

@@ -6,6 +6,8 @@ import { useUserStore } from '@/stores/users'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 
+const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
+
 type ChangePasswordDialogProps = {
   userId: string
   username: string
@@ -126,6 +128,7 @@ export function ChangePasswordDialog({
           placeholder="New Password"
           autoComplete="new-password"
           error={fieldErrors.password}
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         <FormInput
           label="Confirm Password"
@@ -136,6 +139,7 @@ export function ChangePasswordDialog({
           placeholder="Confirm Password"
           autoComplete="new-password"
           error={fieldErrors.confirm}
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
       </div>
     </BaseDialog>
