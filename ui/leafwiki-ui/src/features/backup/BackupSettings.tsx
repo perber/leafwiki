@@ -60,7 +60,10 @@ export default function BackupSettings() {
   // Stop polling when lastBackupAt advances or an error occurs
   useEffect(() => {
     if (isPolling) {
-      const hasNewBackup = lastBackupAtRef.current !== null && lastBackupAt !== null && lastBackupAtRef.current !== lastBackupAt
+      const hasNewBackup =
+        lastBackupAtRef.current !== null &&
+        lastBackupAt !== null &&
+        lastBackupAtRef.current !== lastBackupAt
       const hasError = lastError !== ''
       if (hasNewBackup || hasError) {
         stopPolling()
@@ -89,7 +92,7 @@ export default function BackupSettings() {
 
         {isLoading && (
           <div className="settings__section">
-            <div className="flex items-center gap-3 text-sm text-muted">
+            <div className="text-muted flex items-center gap-3 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading backup status…
             </div>
@@ -123,9 +126,9 @@ export default function BackupSettings() {
                 <>
                   <div className="settings__preview">
                     <span className="settings__preview-label">Last backup</span>
-                    <span className="text-sm text-interface-text">
+                    <span className="text-interface-text text-sm">
                       {isPolling ? (
-                        <span className="flex items-center gap-2 text-muted">
+                        <span className="text-muted flex items-center gap-2">
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           Waiting for backup to complete…
                         </span>
@@ -138,10 +141,10 @@ export default function BackupSettings() {
                   {lastError && (
                     <div className="settings__preview border-error/20 bg-error/5">
                       <span className="settings__preview-label flex items-center gap-1.5">
-                        <TriangleAlert className="h-3.5 w-3.5 text-error" />
+                        <TriangleAlert className="text-error h-3.5 w-3.5" />
                         Last error
                       </span>
-                      <span className="text-sm text-error">{lastError}</span>
+                      <span className="text-error text-sm">{lastError}</span>
                     </div>
                   )}
                 </>

@@ -1,5 +1,9 @@
 import { create } from 'zustand'
-import { fetchBackupStatus, triggerBackupPush, BackupStatusResponse } from '@/lib/api/backup'
+import {
+  fetchBackupStatus,
+  triggerBackupPush,
+  BackupStatusResponse,
+} from '@/lib/api/backup'
 
 interface BackupState {
   enabled: boolean
