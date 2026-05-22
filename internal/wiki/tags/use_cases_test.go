@@ -26,7 +26,7 @@ func setupUseCases(t *testing.T) (*GetPagesByTagsUseCase, *coretags.TagsService,
 	}
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 
-	svc := coretags.NewTagsService(ts, store)
+	svc := coretags.NewTagsService(store)
 	uc := NewGetPagesByTagsUseCase(svc, ts, nil)
 	return uc, svc, ts
 }

@@ -4,47 +4,18 @@ import (
 	"strings"
 
 	"github.com/perber/wiki/internal/core/markdown"
-	"github.com/perber/wiki/internal/core/tree"
 )
 
 type TagsService struct {
 	store *TagsStore
-	tree  *tree.TreeService
 }
 
-func NewTagsService(treeService *tree.TreeService, store *TagsStore) *TagsService {
-	return &TagsService{store: store, tree: treeService}
+func NewTagsService(store *TagsStore) *TagsService {
+	return &TagsService{store: store}
 }
 
-// IndexAllPages rebuilds the entire tag index from the current tree state.
-func (s *TagsService) IndexAllPages() error {
-	if !s.tree.IsLoaded() {
-		return nil
-	}
-
-	if err := s.store.Clear(); err != nil {
-		return err
-	}
-
-	var ids []string
-	if err := s.tree.WalkNodes(func(id string) error {
-		ids = append(ids, id)
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	for _, id := range ids {
-		raw, err := s.tree.ReadPageRaw(id)
-		if err != nil {
-			return err
-		}
-		if err := s.IndexPageContent(id, raw); err != nil {
-			return err
-		}
-	}
-
-	return nil
+func (s *TagsService) ClearIndex() error {
+	return s.store.Clear()
 }
 
 // IndexPageContent extracts tags and excerpt from rawContent and stores both atomically.

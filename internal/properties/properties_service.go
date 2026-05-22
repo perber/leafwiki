@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/perber/wiki/internal/core/markdown"
-	"github.com/perber/wiki/internal/core/tree"
 )
 
 // reservedKeys are frontmatter keys that must never be stored in the properties index.
@@ -16,44 +15,19 @@ var reservedKeys = map[string]struct{}{
 
 type PropertiesService struct {
 	store *PropertiesStore
-	tree  *tree.TreeService
 }
 
-func NewPropertiesService(treeService *tree.TreeService, store *PropertiesStore) *PropertiesService {
-	return &PropertiesService{store: store, tree: treeService}
+func NewPropertiesService(store *PropertiesStore) *PropertiesService {
+	return &PropertiesService{store: store}
 }
 
-// IndexAllPages rebuilds the entire properties index from the current tree state.
-func (s *PropertiesService) IndexAllPages() error {
-	if !s.tree.IsLoaded() {
-		return nil
-	}
+func (s *PropertiesService) ClearIndex() error {
+	return s.store.Clear()
+}
 
-	if err := s.store.Clear(); err != nil {
-		return err
-	}
-
-	var ids []string
-	if err := s.tree.WalkNodes(func(id string) error {
-		ids = append(ids, id)
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	for _, id := range ids {
-		raw, err := s.tree.ReadPageRaw(id)
-		if err != nil {
-			return err
-		}
-
-		props := ExtractPropertiesFromContent(raw)
-		if err := s.store.SetPropertiesForPage(id, props); err != nil {
-			return err
-		}
-	}
-
-	return nil
+func (s *PropertiesService) IndexPageContent(pageID, rawContent string) error {
+	props := ExtractPropertiesFromContent(rawContent)
+	return s.store.SetPropertiesForPage(pageID, props)
 }
 
 func (s *PropertiesService) SetPropertiesForPage(pageID string, props map[string]PropertyEntry) error {

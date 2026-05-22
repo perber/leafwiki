@@ -118,7 +118,7 @@ func setupTagsService(t *testing.T) (*TagsService, *tree.TreeService) {
 	}
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 
-	return NewTagsService(ts, store), ts
+	return NewTagsService(store), ts
 }
 
 func pageKind() *tree.NodeKind {
@@ -147,15 +147,33 @@ func createPageWithTags(t *testing.T, ts *tree.TreeService, title, slug string, 
 	return *idPtr
 }
 
+func indexAllPages(t *testing.T, svc *TagsService, ts *tree.TreeService) {
+	t.Helper()
+	var ids []string
+	if err := ts.WalkNodes(func(id string) error {
+		ids = append(ids, id)
+		return nil
+	}); err != nil {
+		t.Fatalf("WalkNodes: %v", err)
+	}
+	pages, errs := ts.GetPages(ids)
+	for i, page := range pages {
+		if errs[i] != nil {
+			t.Fatalf("GetPages[%d]: %v", i, errs[i])
+		}
+		if err := svc.IndexPageContent(page.ID, page.RawContent); err != nil {
+			t.Fatalf("IndexPageContent %s: %v", page.ID, err)
+		}
+	}
+}
+
 func TestTagsService_IndexAllPages_BuildsIndex(t *testing.T) {
 	svc, ts := setupTagsService(t)
 
 	id1 := createPageWithTags(t, ts, "Page React", "react-page", []string{"react", "typescript"})
 	id2 := createPageWithTags(t, ts, "Page Go", "go-page", []string{"go"})
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	pageIDs, err := svc.GetPageIDsByTags([]string{"react"})
 	if err != nil {
@@ -179,9 +197,10 @@ func TestTagsService_IndexAllPages_IsIdempotent(t *testing.T) {
 	createPageWithTags(t, ts, "Page A", "page-a", []string{"go"})
 
 	for i := 0; i < 3; i++ {
-		if err := svc.IndexAllPages(); err != nil {
-			t.Fatalf("IndexAllPages (run %d): %v", i, err)
+		if err := svc.ClearIndex(); err != nil {
+			t.Fatalf("ClearIndex (run %d): %v", i, err)
 		}
+		indexAllPages(t, svc, ts)
 	}
 
 	allTags, err := svc.GetAllTags("", 50)
@@ -205,9 +224,7 @@ func TestTagsService_IndexAllPages_PagesWithoutTagsAreSkipped(t *testing.T) {
 		t.Fatalf("UpdateNode: %v", err)
 	}
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	allTags, err := svc.GetAllTags("", 50)
 	if err != nil {
@@ -222,9 +239,7 @@ func TestTagsService_IndexAllPages_NormalizesTagsToLowercase(t *testing.T) {
 	svc, ts := setupTagsService(t)
 	createPageWithTags(t, ts, "Mixed Case", "mixed", []string{"React", "TypeScript"})
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	allTags, err := svc.GetAllTags("", 50)
 	if err != nil {
@@ -250,9 +265,7 @@ func TestTagsService_IndexAllPages_ReadsTagsFromRawFrontmatter(t *testing.T) {
 		t.Fatalf("expected parsed page content to exclude frontmatter tags, got %v", got)
 	}
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	pageIDs, err := svc.GetPageIDsByTags([]string{"react"})
 	if err != nil {
@@ -352,8 +365,12 @@ func TestTagsService_IndexPageContent_NoFrontmatterStoresEmptyTags(t *testing.T)
 func TestTagsService_IndexPageContent_UpdatesExistingEntry(t *testing.T) {
 	svc, _ := setupTagsService(t)
 
-	_ = svc.IndexPageContent("page-1", "---\ntags:\n  - go\n---\n\nFirst version.")
-	_ = svc.IndexPageContent("page-1", "---\ntags:\n  - rust\n---\n\nSecond version.")
+	if err := svc.IndexPageContent("page-1", "---\ntags:\n  - go\n---\n\nFirst version."); err != nil {
+		t.Fatalf("IndexPageContent (first): %v", err)
+	}
+	if err := svc.IndexPageContent("page-1", "---\ntags:\n  - rust\n---\n\nSecond version."); err != nil {
+		t.Fatalf("IndexPageContent (second): %v", err)
+	}
 
 	tags, err := svc.GetPageIDsByTags([]string{"rust"})
 	if err != nil {
@@ -377,16 +394,14 @@ func TestTagsService_IndexAllPages_StoresExcerpts(t *testing.T) {
 
 	pageID := createPageWithTags(t, ts, "Excerpt Page", "excerpt-page", []string{"go"})
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	exc, err := svc.GetExcerptsForPages([]string{pageID})
 	if err != nil {
 		t.Fatalf("GetExcerptsForPages: %v", err)
 	}
 	if exc[pageID] == "" {
-		t.Errorf("expected non-empty excerpt after IndexAllPages")
+		t.Errorf("expected non-empty excerpt after indexing")
 	}
 }
 

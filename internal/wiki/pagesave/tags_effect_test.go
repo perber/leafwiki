@@ -23,7 +23,7 @@ func setupTagsEffectTest(t *testing.T) (*tree.TreeService, *tags.TagsService, *T
 	}
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 
-	svc := tags.NewTagsService(treeSvc, store)
+	svc := tags.NewTagsService(store)
 	effect := NewTagsSideEffect(svc, nil)
 	return treeSvc, svc, effect
 }

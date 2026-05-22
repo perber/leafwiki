@@ -214,7 +214,27 @@ func setupPropertiesService(t *testing.T) (*PropertiesService, *tree.TreeService
 	}
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 
-	return NewPropertiesService(ts, store), ts
+	return NewPropertiesService(store), ts
+}
+
+func indexAllPages(t *testing.T, svc *PropertiesService, ts *tree.TreeService) {
+	t.Helper()
+	var ids []string
+	if err := ts.WalkNodes(func(id string) error {
+		ids = append(ids, id)
+		return nil
+	}); err != nil {
+		t.Fatalf("WalkNodes: %v", err)
+	}
+	pages, errs := ts.GetPages(ids)
+	for i, page := range pages {
+		if errs[i] != nil {
+			t.Fatalf("GetPages[%d]: %v", i, errs[i])
+		}
+		if err := svc.IndexPageContent(page.ID, page.RawContent); err != nil {
+			t.Fatalf("IndexPageContent %s: %v", page.ID, err)
+		}
+	}
 }
 
 func pageKind() *tree.NodeKind {
@@ -240,9 +260,7 @@ func TestPropertiesService_IndexAllPages_BuildsIndex(t *testing.T) {
 	id1 := createPageWithContent(t, ts, "Page A", "page-a", "---\nstatus: draft\n---\n# A")
 	id2 := createPageWithContent(t, ts, "Page B", "page-b", "---\nstatus: published\n---\n# B")
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	ids, err := svc.GetPageIDsByProperty("status", "draft")
 	if err != nil {
@@ -266,9 +284,10 @@ func TestPropertiesService_IndexAllPages_IsIdempotent(t *testing.T) {
 	createPageWithContent(t, ts, "Page A", "page-a", "---\nstatus: draft\n---\n# A")
 
 	for i := 0; i < 3; i++ {
-		if err := svc.IndexAllPages(); err != nil {
-			t.Fatalf("IndexAllPages (run %d): %v", i, err)
+		if err := svc.ClearIndex(); err != nil {
+			t.Fatalf("ClearIndex (run %d): %v", i, err)
 		}
+		indexAllPages(t, svc, ts)
 	}
 
 	keys, err := svc.GetAllPropertyKeys("", 50)
@@ -285,9 +304,7 @@ func TestPropertiesService_IndexAllPages_SkipsReservedKeys(t *testing.T) {
 	createPageWithContent(t, ts, "Page A", "page-a",
 		"---\ntags:\n  - go\ntitle: Custom\nleafwiki_id: abc\nstatus: draft\n---\n# A")
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	keys, err := svc.GetAllPropertyKeys("", 50)
 	if err != nil {
@@ -314,9 +331,7 @@ func TestPropertiesService_IndexAllPages_SkipsListValues(t *testing.T) {
 	createPageWithContent(t, ts, "Page A", "page-a",
 		"---\nkeywords: [go, testing]\nstatus: draft\n---\n# A")
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	keys, err := svc.GetAllPropertyKeys("", 50)
 	if err != nil {
@@ -333,9 +348,7 @@ func TestPropertiesService_IndexAllPages_PagesWithoutPropertiesAreSkipped(t *tes
 	svc, ts := setupPropertiesService(t)
 	createPageWithContent(t, ts, "No Props", "no-props", "# Just content")
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	keys, err := svc.GetAllPropertyKeys("", 50)
 	if err != nil {
@@ -358,9 +371,7 @@ func TestPropertiesService_IndexAllPages_ReadsPropertiesFromRawFrontmatter(t *te
 		t.Fatalf("expected parsed page content to exclude frontmatter properties, got %v", got)
 	}
 
-	if err := svc.IndexAllPages(); err != nil {
-		t.Fatalf("IndexAllPages: %v", err)
-	}
+	indexAllPages(t, svc, ts)
 
 	ids, err := svc.GetPageIDsByProperty("status", "draft")
 	if err != nil {
@@ -368,6 +379,76 @@ func TestPropertiesService_IndexAllPages_ReadsPropertiesFromRawFrontmatter(t *te
 	}
 	if len(ids) != 1 || ids[0] != pageID {
 		t.Fatalf("expected [%s], got %v", pageID, ids)
+	}
+}
+
+// ─── IndexPageContent ─────────────────────────────────────────────────────────
+
+func TestPropertiesService_IndexPageContent_StoresProperties(t *testing.T) {
+	svc, _ := setupPropertiesService(t)
+
+	raw := "---\nstatus: draft\nauthor: alice\n---\n\n# Page"
+	if err := svc.IndexPageContent("page-1", raw); err != nil {
+		t.Fatalf("IndexPageContent: %v", err)
+	}
+
+	keys, err := svc.GetAllPropertyKeys("", 50)
+	if err != nil {
+		t.Fatalf("GetAllPropertyKeys: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Fatalf("expected 2 keys, got %v", keys)
+	}
+
+	ids, err := svc.GetPageIDsByProperty("status", "draft")
+	if err != nil {
+		t.Fatalf("GetPageIDsByProperty: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "page-1" {
+		t.Errorf("expected [page-1], got %v", ids)
+	}
+}
+
+func TestPropertiesService_IndexPageContent_NoFrontmatterStoresNothing(t *testing.T) {
+	svc, _ := setupPropertiesService(t)
+
+	if err := svc.IndexPageContent("page-1", "# Just content"); err != nil {
+		t.Fatalf("IndexPageContent: %v", err)
+	}
+
+	keys, err := svc.GetAllPropertyKeys("", 50)
+	if err != nil {
+		t.Fatalf("GetAllPropertyKeys: %v", err)
+	}
+	if len(keys) != 0 {
+		t.Errorf("expected no keys, got %v", keys)
+	}
+}
+
+func TestPropertiesService_IndexPageContent_UpdatesExistingEntry(t *testing.T) {
+	svc, _ := setupPropertiesService(t)
+
+	if err := svc.IndexPageContent("page-1", "---\nstatus: draft\n---\n"); err != nil {
+		t.Fatalf("IndexPageContent (first): %v", err)
+	}
+	if err := svc.IndexPageContent("page-1", "---\nstatus: published\n---\n"); err != nil {
+		t.Fatalf("IndexPageContent (second): %v", err)
+	}
+
+	ids, err := svc.GetPageIDsByProperty("status", "published")
+	if err != nil {
+		t.Fatalf("GetPageIDsByProperty: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "page-1" {
+		t.Errorf("expected [page-1] for published, got %v", ids)
+	}
+
+	old, err := svc.GetPageIDsByProperty("status", "draft")
+	if err != nil {
+		t.Fatalf("GetPageIDsByProperty: %v", err)
+	}
+	if len(old) != 0 {
+		t.Errorf("old value 'draft' should be gone, got %v", old)
 	}
 }
 
