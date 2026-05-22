@@ -23,7 +23,7 @@ func setupPropertiesEffectTest(t *testing.T) (*tree.TreeService, *properties.Pro
 	}
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 
-	svc := properties.NewPropertiesService(treeSvc, store)
+	svc := properties.NewPropertiesService(store)
 	effect := NewPropertiesSideEffect(svc, nil)
 	return treeSvc, svc, effect
 }

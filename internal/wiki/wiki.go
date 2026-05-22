@@ -96,6 +96,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	if err := w.initPropertiesService(); err != nil {
 		return nil, err
 	}
+	w.bootstrapTagsAndProperties()
 	if err := w.initSearch(); err != nil {
 		return nil, err
 	}
@@ -203,10 +204,7 @@ func (w *Wiki) initTagsService() error {
 	if err != nil {
 		return fmt.Errorf("failed to init tags store: %w", err)
 	}
-	w.tags = tags.NewTagsService(w.tree, tagsStore)
-	if err := w.tags.IndexAllPages(); err != nil {
-		w.log.Warn("failed to index tags on startup", "error", err)
-	}
+	w.tags = tags.NewTagsService(tagsStore)
 	return nil
 }
 
@@ -215,11 +213,42 @@ func (w *Wiki) initPropertiesService() error {
 	if err != nil {
 		return fmt.Errorf("failed to init properties store: %w", err)
 	}
-	w.props = properties.NewPropertiesService(w.tree, propsStore)
-	if err := w.props.IndexAllPages(); err != nil {
-		w.log.Warn("failed to index properties on startup", "error", err)
-	}
+	w.props = properties.NewPropertiesService(propsStore)
 	return nil
+}
+
+// bootstrapTagsAndProperties clears and rebuilds tag and property indexes in a single
+// parallel GetPages pass — avoids two sequential ReadPageRaw loops at startup.
+func (w *Wiki) bootstrapTagsAndProperties() {
+	if err := w.tags.ClearIndex(); err != nil {
+		w.log.Warn("failed to clear tags index before bootstrap", "error", err)
+		return
+	}
+	if err := w.props.ClearIndex(); err != nil {
+		w.log.Warn("failed to clear properties index before bootstrap", "error", err)
+		return
+	}
+	var ids []string
+	if err := w.tree.WalkNodes(func(id string) error {
+		ids = append(ids, id)
+		return nil
+	}); err != nil {
+		w.log.Warn("failed to walk pages for tags/properties bootstrap", "error", err)
+		return
+	}
+	pages, errs := w.tree.GetPages(ids)
+	for i, page := range pages {
+		if errs[i] != nil {
+			w.log.Warn("skipping page during bootstrap", "pageID", ids[i], "error", errs[i])
+			continue
+		}
+		if err := w.tags.IndexPageContent(page.ID, page.RawContent); err != nil {
+			w.log.Warn("failed to index tags", "pageID", page.ID, "error", err)
+		}
+		if err := w.props.IndexPageContent(page.ID, page.RawContent); err != nil {
+			w.log.Warn("failed to index properties", "pageID", page.ID, "error", err)
+		}
+	}
 }
 
 func (w *Wiki) initSearch() error {
