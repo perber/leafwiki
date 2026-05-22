@@ -171,7 +171,6 @@ function applyFavicon(faviconFile: string, version: number) {
     : withBasePath('/favicon.svg')
 
   link.href = `${faviconPath}?v=${version}`
-  link.type = getFaviconMimeType(faviconFile)
 }
 
 function getOrCreateFaviconLink(): HTMLLinkElement {
@@ -187,21 +186,4 @@ function getOrCreateFaviconLink(): HTMLLinkElement {
   link.rel = 'icon'
   document.head.appendChild(link)
   return link
-}
-
-function getFaviconMimeType(faviconFile: string): string {
-  const ext = faviconFile.split('.').pop()?.toLowerCase()
-
-  switch (ext) {
-    case 'png':
-      return 'image/png'
-    case 'gif':
-      return 'image/gif'
-    case 'ico':
-      return 'image/x-icon'
-    case 'webp':
-      return 'image/webp'
-    default:
-      return 'image/svg+xml'
-  }
 }
