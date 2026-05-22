@@ -973,6 +973,27 @@ func (f *NodeStore) ReadPageRaw(entry *PageNode) (string, error) {
 	return string(raw), nil
 }
 
+// ReadPageAndRaw returns both the stripped content and the raw file bytes (including
+// frontmatter) from a single disk read.
+func (f *NodeStore) ReadPageAndRaw(entry *PageNode) (content, raw string, err error) {
+	raw, err = f.ReadPageRaw(entry)
+	if err != nil || raw == "" {
+		return "", raw, err
+	}
+
+	filePath, err := f.contentPathForNodeRead(entry)
+	if err != nil {
+		return "", raw, err
+	}
+
+	mdFile, err := markdown.NewMarkdownFileFromRaw(filePath, raw)
+	if err != nil {
+		return raw, raw, err
+	}
+
+	return mdFile.GetContent(), raw, nil
+}
+
 // ReadPageContent returns the content of a page
 func (f *NodeStore) ReadPageContent(entry *PageNode) (string, error) {
 	raw, err := f.ReadPageRaw(entry)

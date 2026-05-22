@@ -71,8 +71,8 @@ func (a *WikiImportAdapter) orchestrator() *pagesave.PageSaveOrchestrator {
 	return pagesave.NewPageSaveOrchestrator(
 		pagesave.NewSearchIndexSideEffect(a.searchIndex, a.tree, a.log),
 		pagesave.NewLinkIndexSideEffect(a.links, a.log),
-		pagesave.NewTagsSideEffect(a.tags, a.tree, a.log),
-		pagesave.NewPropertiesSideEffect(a.props, a.tree, a.log),
+		pagesave.NewTagsSideEffect(a.tags, a.log),
+		pagesave.NewPropertiesSideEffect(a.props, a.log),
 		pagesave.NewRevisionSideEffect(a.revision, a.log),
 	)
 }

@@ -56,3 +56,23 @@ func TestNewSearchIndexSideEffect_DefaultsLogger(t *testing.T) {
 		t.Fatal("expected slog.Default() logger")
 	}
 }
+
+func TestNewTagsSideEffect_DefaultsLogger(t *testing.T) {
+	effect := NewTagsSideEffect(nil, nil)
+	if effect.log == nil {
+		t.Fatal("expected default logger to be set")
+	}
+	if effect.log != slog.Default() {
+		t.Fatal("expected slog.Default() logger")
+	}
+}
+
+func TestNewPropertiesSideEffect_DefaultsLogger(t *testing.T) {
+	effect := NewPropertiesSideEffect(nil, nil)
+	if effect.log == nil {
+		t.Fatal("expected default logger to be set")
+	}
+	if effect.log != slog.Default() {
+		t.Fatal("expected slog.Default() logger")
+	}
+}

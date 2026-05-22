@@ -886,12 +886,12 @@ func (t *TreeService) GetPages(ids []string) ([]*Page, []error) {
 	for _, tk := range tasks {
 		go func(tk task) {
 			defer wg.Done()
-			content, err := t.store.ReadPageContent(tk.node)
+			content, raw, err := t.store.ReadPageAndRaw(tk.node)
 			mu.Lock()
 			if err != nil {
 				errs[tk.index] = fmt.Errorf("could not get page content: %w", err)
 			} else {
-				pages[tk.index] = &Page{PageNode: tk.node, Content: content}
+				pages[tk.index] = &Page{PageNode: tk.node, Content: content, RawContent: raw}
 			}
 			mu.Unlock()
 		}(tk)
@@ -916,15 +916,15 @@ func (t *TreeService) GetPage(id string) (*Page, error) {
 		return nil, ErrPageNotFound
 	}
 
-	// Get the content of the page
-	content, err := t.store.ReadPageContent(page)
+	content, raw, err := t.store.ReadPageAndRaw(page)
 	if err != nil {
 		return nil, fmt.Errorf("could not get page content: %w", err)
 	}
 
 	return &Page{
-		PageNode: page,
-		Content:  content,
+		PageNode:   page,
+		Content:    content,
+		RawContent: raw,
 	}, nil
 }
 

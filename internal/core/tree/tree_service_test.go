@@ -3229,3 +3229,94 @@ func TestTreeService_VersionUnchecked_BypassesVersionCheck(t *testing.T) {
 		t.Fatalf("expected VersionUnchecked to bypass check on second call, got: %v", err)
 	}
 }
+
+// ─── RawContent ───────────────────────────────────────────────────────────────
+
+func TestTreeService_GetPage_RawContent_ContainsFrontmatterAndBody(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	id, err := svc.CreateNode("system", nil, "Raw Test", "raw-test", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode: %v", err)
+	}
+	body := "Hello raw world"
+	page, err := svc.GetPage(*id)
+	if err != nil {
+		t.Fatalf("GetPage before update: %v", err)
+	}
+	if err := svc.UpdateNode("system", *id, "Raw Test", "raw-test", &body, page.Version(), false); err != nil {
+		t.Fatalf("UpdateNode: %v", err)
+	}
+
+	page, err = svc.GetPage(*id)
+	if err != nil {
+		t.Fatalf("GetPage: %v", err)
+	}
+
+	if page.RawContent == "" {
+		t.Fatal("expected RawContent to be non-empty")
+	}
+	if !strings.Contains(page.RawContent, "---") {
+		t.Errorf("expected RawContent to contain frontmatter delimiter, got: %q", page.RawContent)
+	}
+	if !strings.Contains(page.RawContent, "Hello raw world") {
+		t.Errorf("expected RawContent to contain body text, got: %q", page.RawContent)
+	}
+	if strings.HasPrefix(strings.TrimSpace(page.Content), "---") {
+		t.Errorf("Content must not start with frontmatter, got: %q", page.Content)
+	}
+	if page.Content == page.RawContent {
+		t.Error("Content (stripped) and RawContent (with frontmatter) must differ")
+	}
+}
+
+func TestTreeService_GetPages_RawContent_PopulatedForAll(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	id1, err := svc.CreateNode("system", nil, "Page One", "page-one", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode 1: %v", err)
+	}
+	id2, err := svc.CreateNode("system", nil, "Page Two", "page-two", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode 2: %v", err)
+	}
+
+	pages, errs := svc.GetPages([]string{*id1, *id2})
+	for i, e := range errs {
+		if e != nil {
+			t.Fatalf("GetPages[%d]: %v", i, e)
+		}
+	}
+	for i, p := range pages {
+		if p.RawContent == "" {
+			t.Errorf("GetPages[%d]: expected RawContent to be populated", i)
+		}
+		if !strings.Contains(p.RawContent, "---") {
+			t.Errorf("GetPages[%d]: expected RawContent to contain frontmatter, got: %q", i, p.RawContent)
+		}
+	}
+}
+
+func TestTreeService_GetPage_RawContent_NotSerializedToJSON(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	id, err := svc.CreateNode("system", nil, "JSON Test", "json-test", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode: %v", err)
+	}
+	page, err := svc.GetPage(*id)
+	if err != nil {
+		t.Fatalf("GetPage: %v", err)
+	}
+
+	data, err := json.Marshal(page)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+
+	s := string(data)
+	if strings.Contains(s, "rawContent") || strings.Contains(s, "raw_content") {
+		t.Errorf("RawContent must not appear in JSON output, got: %s", s)
+	}
+}
