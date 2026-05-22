@@ -358,7 +358,7 @@ func main() {
 		if err != nil {
 			fail("git backup init failed: %v", err)
 		}
-		backupScheduler = backup.NewScheduler(backupRepo, time.Duration(gitBackupInterval)*time.Minute)
+		backupScheduler = backup.NewScheduler(backupRepo, &backup.Config{IntervalMinutes: gitBackupInterval})
 		defer backupScheduler.Stop()
 		w.SetBackupRoutes(wikibackup.NewRoutes(backupRepo, backupScheduler, w.AuthService()))
 	}
