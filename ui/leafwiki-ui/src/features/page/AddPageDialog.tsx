@@ -10,6 +10,8 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
+const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
+
 type AddPageDialogProps = {
   parentId: string
   nodeKind?: 'page' | 'section'
@@ -176,6 +178,7 @@ export function AddPageDialog({
           testid="add-page-title-input"
           placeholder={`${itemLabelCapitalized} title`}
           error={fieldErrors.title}
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         <SlugInputWithSuggestion
           title={title}
@@ -187,6 +190,7 @@ export function AddPageDialog({
           onSlugLoadingChange={setSlugLoading}
           onLastSlugTitleChange={setLastSlugTitle}
           error={fieldErrors.slug}
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
       </div>
       <span className="dialog__path" data-testid="add-page-path-display">

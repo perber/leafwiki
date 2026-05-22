@@ -15,6 +15,8 @@ import { useUserStore } from '@/stores/users'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
+
 type UserFormDialogProps = {
   user?: User
 }
@@ -96,6 +98,7 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
           placeholder="username"
           autoComplete="username"
           error={fieldErrors.username}
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         <FormInput
           label="email"
@@ -108,6 +111,7 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
           placeholder="email"
           autoComplete="email"
           error={fieldErrors.email}
+          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         {!isEdit && (
           <FormInput
@@ -122,6 +126,7 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
             autoComplete="new-password"
             error={fieldErrors.password}
             type="password"
+            allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
           />
         )}
         <Select
