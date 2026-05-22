@@ -77,7 +77,7 @@ func TestSearchIndexSideEffect_IndexAllPages_IndexesExistingPages(t *testing.T) 
 }
 
 func TestSearchIndexSideEffect_IndexAllPages_ClearsStaleEntries(t *testing.T) {
-	treeSvc, index, effect := setupSearchTest(t)
+	_, index, effect := setupSearchTest(t)
 
 	// Pre-populate the index with a stale entry not present in the tree.
 	if err := index.IndexPage("stale/path", "stale.md", "stale-id", "Stale Page", tree.NodeKindPage, "stale content ghostpage"); err != nil {
@@ -95,7 +95,6 @@ func TestSearchIndexSideEffect_IndexAllPages_ClearsStaleEntries(t *testing.T) {
 	if result.Count != 0 {
 		t.Errorf("expected stale entry to be cleared, got %d hits", result.Count)
 	}
-	_ = treeSvc
 }
 
 func TestSearchIndexSideEffect_IndexAllPages_EmptyTree(t *testing.T) {
@@ -214,5 +213,119 @@ func TestSearchIndexSideEffect_Apply_Delete_RemovesFromIndex(t *testing.T) {
 	}
 	if after.Count != 0 {
 		t.Errorf("expected page to be removed from index after Delete event, got %d hits", after.Count)
+	}
+}
+
+func TestSearchIndexSideEffect_Apply_Delete_Recursive_RemovesAllPagesFromIndex(t *testing.T) {
+	treeSvc, index, effect := setupSearchTest(t)
+
+	parent := createPageWithContent(t, treeSvc, "Parent Section", "parent", "parent uniqueterm_parent content")
+
+	kind := tree.NodeKindPage
+	child1ID, err := treeSvc.CreateNode("system", &parent.ID, "Child One", "child-one", &kind)
+	if err != nil {
+		t.Fatalf("CreateNode child1: %v", err)
+	}
+	child1, err := treeSvc.GetPage(*child1ID)
+	if err != nil {
+		t.Fatalf("GetPage child1: %v", err)
+	}
+	content1 := "child one uniqueterm_child1 content"
+	if err := treeSvc.UpdateNode("system", child1.ID, child1.Title, child1.Slug, &content1, child1.Version(), false); err != nil {
+		t.Fatalf("UpdateNode child1: %v", err)
+	}
+
+	child2ID, err := treeSvc.CreateNode("system", &parent.ID, "Child Two", "child-two", &kind)
+	if err != nil {
+		t.Fatalf("CreateNode child2: %v", err)
+	}
+	child2, err := treeSvc.GetPage(*child2ID)
+	if err != nil {
+		t.Fatalf("GetPage child2: %v", err)
+	}
+	content2 := "child two uniqueterm_child2 content"
+	if err := treeSvc.UpdateNode("system", child2.ID, child2.Title, child2.Slug, &content2, child2.Version(), false); err != nil {
+		t.Fatalf("UpdateNode child2: %v", err)
+	}
+
+	if err := effect.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages: %v", err)
+	}
+
+	for _, term := range []string{"uniqueterm_parent", "uniqueterm_child1", "uniqueterm_child2"} {
+		r, err := index.Search(term, nil, 0, 10)
+		if err != nil {
+			t.Fatalf("Search(%q) before delete: %v", term, err)
+		}
+		if r.Count == 0 {
+			t.Fatalf("expected %q to be indexed before delete", term)
+		}
+	}
+
+	// Simulate recursive delete: AffectedPages contains the full subtree.
+	child1Final, _ := treeSvc.GetPage(*child1ID)
+	child2Final, _ := treeSvc.GetPage(*child2ID)
+	parentFinal, _ := treeSvc.GetPage(parent.ID)
+	effect.Apply(PageSaveEvent{
+		Operation:     PageOperationDelete,
+		AffectedPages: []*tree.Page{child1Final, child2Final, parentFinal},
+	})
+
+	for _, term := range []string{"uniqueterm_parent", "uniqueterm_child1", "uniqueterm_child2"} {
+		r, err := index.Search(term, nil, 0, 10)
+		if err != nil {
+			t.Fatalf("Search(%q) after delete: %v", term, err)
+		}
+		if r.Count != 0 {
+			t.Errorf("expected %q to be removed after recursive delete, got %d hits", term, r.Count)
+		}
+	}
+}
+
+func TestSearchIndexSideEffect_Apply_Move_PageStillSearchableAtNewPath(t *testing.T) {
+	treeSvc, index, effect := setupSearchTest(t)
+
+	// Create a parent page (will auto-convert to section when child is added).
+	kind := tree.NodeKindPage
+	parentID, err := treeSvc.CreateNode("system", nil, "Target Section", "target", &kind)
+	if err != nil {
+		t.Fatalf("CreateNode parent: %v", err)
+	}
+
+	page := createPageWithContent(t, treeSvc, "Movable Page", "movable", "movable uniqueterm_move content")
+
+	if err := effect.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages: %v", err)
+	}
+
+	// Move the page under the parent section.
+	if err := treeSvc.MoveNode("system", page.ID, *parentID, page.Version()); err != nil {
+		t.Fatalf("MoveNode: %v", err)
+	}
+	moved, err := treeSvc.GetPage(page.ID)
+	if err != nil {
+		t.Fatalf("GetPage after move: %v", err)
+	}
+
+	effect.Apply(PageSaveEvent{
+		Operation:     PageOperationMove,
+		AffectedPages: []*tree.Page{moved},
+	})
+
+	result, err := index.Search("uniqueterm_move", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if result.Count == 0 {
+		t.Fatal("expected page to remain searchable after Move event")
+	}
+	if result.Items[0].PageID != page.ID {
+		t.Errorf("expected pageID %q, got %q", page.ID, result.Items[0].PageID)
+	}
+
+	// Path in index must reflect the new location.
+	wantPath := "target/movable"
+	if result.Items[0].Path != wantPath {
+		t.Errorf("expected path %q after move, got %q", wantPath, result.Items[0].Path)
 	}
 }
