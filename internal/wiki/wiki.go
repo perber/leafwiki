@@ -61,8 +61,8 @@ type Wiki struct {
 	links            *links.LinkService
 	tags             *tags.TagsService
 	props            *properties.PropertiesService
+	backupRoutes     *wikibackup.Routes
 	log              *slog.Logger
-	backupRoutes    *wikibackup.Routes
 }
 
 const SYSTEM_USER_ID = "system"
