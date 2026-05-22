@@ -216,7 +216,6 @@ func (r *Repository) RunBackup() error {
 		errMsg := fmt.Errorf("failed to get worktree: %w", err).Error()
 		slog.Default().Debug("RunBackup: failed to get worktree", "error", errMsg)
 		r.status.SetError(errMsg)
-		r.status.SetSuccess(time.Now())
 		return nil // Never propagate
 	}
 
@@ -246,7 +245,6 @@ func (r *Repository) RunBackup() error {
 			errMsg := fmt.Errorf("failed to stage root dir: %w", err).Error()
 			slog.Default().Debug("RunBackup: failed to stage root dir", "error", errMsg)
 			r.status.SetError(errMsg)
-			r.status.SetSuccess(time.Now())
 			return nil
 		}
 		slog.Default().Debug("RunBackup: staged root dir", "path", rootRel)
@@ -258,7 +256,6 @@ func (r *Repository) RunBackup() error {
 			errMsg := fmt.Errorf("failed to stage assets dir: %w", err).Error()
 			slog.Default().Debug("RunBackup: failed to stage assets dir", "error", errMsg)
 			r.status.SetError(errMsg)
-			r.status.SetSuccess(time.Now())
 			return nil
 		}
 		slog.Default().Debug("RunBackup: staged assets dir", "path", assetsRel)
@@ -272,7 +269,6 @@ func (r *Repository) RunBackup() error {
 		errMsg := fmt.Errorf("failed to get status: %w", err).Error()
 		slog.Default().Debug("RunBackup: failed to get working tree status", "error", errMsg)
 		r.status.SetError(errMsg)
-		r.status.SetSuccess(time.Now())
 		return nil // Never propagate
 	}
 
@@ -315,7 +311,6 @@ func (r *Repository) RunBackup() error {
 		errMsg := fmt.Errorf("failed to commit: %w", err).Error()
 		slog.Default().Debug("RunBackup: commit failed", "error", errMsg)
 		r.status.SetError(errMsg)
-		r.status.SetSuccess(time.Now())
 		return nil // Never propagate
 	}
 	slog.Default().Debug("RunBackup: commit created", "hash", commit.String(), "message", commitMsg)
