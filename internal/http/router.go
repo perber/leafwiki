@@ -27,6 +27,8 @@ var EmbedFrontend = "false"
 // Environment controls gin's run mode ("production" → ReleaseMode).
 var Environment = "development"
 
+const DefaultFaviconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🌿</text></svg>`
+
 // slogWriter forwards gin Info logs to slog.
 type slogWriter struct{ logger *slog.Logger }
 
@@ -175,8 +177,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 			disableClientCache(c)
 			// favicon is served by the branding registrar if a custom one exists;
 			// fall back to the default leaf SVG.
-			svgContent := `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🌿</text></svg>`
-			c.Data(http.StatusOK, "image/svg+xml", []byte(svgContent))
+			c.Data(http.StatusOK, "image/svg+xml", []byte(DefaultFaviconSVG))
 		})
 
 		engine.NoRoute(func(c *gin.Context) {

@@ -68,6 +68,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	// Branding static file server (logos, favicons) — path traversal protected.
 	base.GET("/branding/:filename", r.handleServeBrandingAsset)
+	base.GET("/favicon.ico", r.handleServeCurrentFavicon)
 
 	// Auth-gated branding mutations (admin only).
 	authGroup := base.Group("/api")
@@ -189,17 +190,6 @@ func (r *Routes) handleDeleteFavicon(c *gin.Context) {
 }
 
 func (r *Routes) handleServeBrandingAsset(c *gin.Context) {
-	filename := c.Param("filename")
-
-	// Prevent path traversal
-	if strings.Contains(filename, "..") ||
-		strings.Contains(filename, "/") ||
-		strings.Contains(filename, "\\") ||
-		strings.Contains(filename, "\x00") {
-		c.Status(http.StatusForbidden)
-		return
-	}
-
 	cfg, err := r.brandingService.GetBranding()
 	if err != nil {
 		r.log.Error("failed to get branding constraints", "error", err)
@@ -207,7 +197,50 @@ func (r *Routes) handleServeBrandingAsset(c *gin.Context) {
 		return
 	}
 
-	// Build allowed extension set from both logo and favicon ext lists.
+	cleanPath, status := r.resolveBrandingAssetPath(c.Param("filename"), cfg)
+	if status != http.StatusOK {
+		c.Status(status)
+		return
+	}
+
+	disableClientCache(c)
+	c.File(cleanPath)
+}
+
+func (r *Routes) handleServeCurrentFavicon(c *gin.Context) {
+	cfg, err := r.brandingService.GetBranding()
+	if err != nil {
+		r.log.Error("failed to get branding config", "error", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if cfg.FaviconFile != "" {
+		cleanPath, status := r.resolveBrandingAssetPath(cfg.FaviconFile, cfg)
+		if status == http.StatusOK {
+			disableClientCache(c)
+			c.File(cleanPath)
+			return
+		}
+		if status == http.StatusInternalServerError {
+			c.Status(status)
+			return
+		}
+	}
+
+	disableClientCache(c)
+	c.Data(http.StatusOK, "image/svg+xml", []byte(httpinternal.DefaultFaviconSVG))
+}
+
+func (r *Routes) resolveBrandingAssetPath(filename string, cfg *corebanding.BrandingConfigResponse) (string, int) {
+	// Prevent path traversal or poisoned config values.
+	if strings.Contains(filename, "..") ||
+		strings.Contains(filename, "/") ||
+		strings.Contains(filename, "\\") ||
+		strings.Contains(filename, "\x00") {
+		return "", http.StatusForbidden
+	}
+
 	allowedExts := make(map[string]bool)
 	for _, ext := range cfg.BrandingConstraints.LogoExts {
 		allowedExts[ext] = true
@@ -218,8 +251,7 @@ func (r *Routes) handleServeBrandingAsset(c *gin.Context) {
 
 	ext := strings.ToLower(filepath.Ext(filename))
 	if !allowedExts[ext] {
-		c.Status(http.StatusForbidden)
-		return
+		return "", http.StatusForbidden
 	}
 
 	brandingDir := r.brandingService.GetBrandingAssetsDir()
@@ -229,21 +261,17 @@ func (r *Routes) handleServeBrandingAsset(c *gin.Context) {
 
 	rel, err := filepath.Rel(cleanBrandingDir, cleanPath)
 	if err != nil || strings.HasPrefix(rel, "..") {
-		c.Status(http.StatusForbidden)
-		return
+		return "", http.StatusForbidden
 	}
 
 	if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
-		c.Status(http.StatusNotFound)
-		return
+		return "", http.StatusNotFound
 	} else if err != nil {
 		r.log.Error("error checking branding file", "error", err, "path", cleanPath)
-		c.Status(http.StatusInternalServerError)
-		return
+		return "", http.StatusInternalServerError
 	}
 
-	disableClientCache(c)
-	c.File(cleanPath)
+	return cleanPath, http.StatusOK
 }
 
 func disableClientCache(c *gin.Context) {

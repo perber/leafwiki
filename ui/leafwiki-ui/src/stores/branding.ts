@@ -43,6 +43,7 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     try {
       const config = await brandingAPI.getBranding()
       const assetVersion = Date.now()
+      applyFavicon(config.faviconFile, assetVersion)
       set({
         siteName: config.siteName,
         logoFile: config.logoFile,
@@ -68,6 +69,7 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const updated = await brandingAPI.updateBranding(config)
+      applyFavicon(updated.faviconFile, Date.now())
       set({
         siteName: updated.siteName,
         logoFile: updated.logoFile,
@@ -107,12 +109,11 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     try {
       const result = await brandingAPI.uploadBrandingFavicon(file)
       const assetVersion = Date.now()
+      applyFavicon(result.branding.faviconFile, assetVersion)
       set({
         faviconFile: result.branding.faviconFile,
         faviconVersion: assetVersion,
       })
-      // Refresh favicon in browser
-      refreshFavicon(assetVersion)
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : 'Failed to upload favicon',
@@ -147,12 +148,11 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
     try {
       await brandingAPI.deleteBrandingFavicon()
       const assetVersion = Date.now()
+      applyFavicon('', assetVersion)
       set({
         faviconFile: '',
         faviconVersion: assetVersion,
       })
-      // Refresh favicon in browser
-      refreshFavicon(assetVersion)
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : 'Failed to delete favicon',
@@ -164,12 +164,44 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
   },
 }))
 
-// Helper to refresh favicon in browser
-function refreshFavicon(version: number) {
-  const link = document.querySelector(
+function applyFavicon(faviconFile: string, version: number) {
+  const link = getOrCreateFaviconLink()
+  const faviconPath = faviconFile
+    ? withBasePath(`/branding/${faviconFile}`)
+    : withBasePath('/favicon.svg')
+
+  link.href = `${faviconPath}?v=${version}`
+  link.type = getFaviconMimeType(faviconFile)
+}
+
+function getOrCreateFaviconLink(): HTMLLinkElement {
+  const existing = document.querySelector(
     "link[rel*='icon']",
   ) as HTMLLinkElement | null
-  if (link) {
-    link.href = `${withBasePath('/favicon.svg')}?v=${version}`
+
+  if (existing) {
+    return existing
+  }
+
+  const link = document.createElement('link')
+  link.rel = 'icon'
+  document.head.appendChild(link)
+  return link
+}
+
+function getFaviconMimeType(faviconFile: string): string {
+  const ext = faviconFile.split('.').pop()?.toLowerCase()
+
+  switch (ext) {
+    case 'png':
+      return 'image/png'
+    case 'gif':
+      return 'image/gif'
+    case 'ico':
+      return 'image/x-icon'
+    case 'webp':
+      return 'image/webp'
+    default:
+      return 'image/svg+xml'
   }
 }
