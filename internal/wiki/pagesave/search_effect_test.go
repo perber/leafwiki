@@ -263,9 +263,18 @@ func TestSearchIndexSideEffect_Apply_Delete_Recursive_RemovesAllPagesFromIndex(t
 	}
 
 	// Simulate recursive delete: AffectedPages contains the full subtree.
-	child1Final, _ := treeSvc.GetPage(*child1ID)
-	child2Final, _ := treeSvc.GetPage(*child2ID)
-	parentFinal, _ := treeSvc.GetPage(parent.ID)
+	child1Final, err := treeSvc.GetPage(*child1ID)
+	if err != nil {
+		t.Fatalf("GetPage child1Final: %v", err)
+	}
+	child2Final, err := treeSvc.GetPage(*child2ID)
+	if err != nil {
+		t.Fatalf("GetPage child2Final: %v", err)
+	}
+	parentFinal, err := treeSvc.GetPage(parent.ID)
+	if err != nil {
+		t.Fatalf("GetPage parentFinal: %v", err)
+	}
 	effect.Apply(PageSaveEvent{
 		Operation:     PageOperationDelete,
 		AffectedPages: []*tree.Page{child1Final, child2Final, parentFinal},
