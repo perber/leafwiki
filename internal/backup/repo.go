@@ -27,13 +27,19 @@ type Repository struct {
 // On first init, stages root/ and assets/ and makes an initial commit.
 func Init(cfg Config) (*Repository, error) {
 	repoDir := filepath.Dir(cfg.RootDir)
-	slog.Default().Debug("backup init started", "repoDir", repoDir, "rootDir", cfg.RootDir, "assetsDir", cfg.AssetsDir, "remote", cfg.RemoteURL, "branch", cfg.Branch)
+	slog.Debug("backup init started", "repoDir", repoDir, "rootDir", cfg.RootDir, "assetsDir", cfg.AssetsDir, "remote", cfg.RemoteURL, "branch", cfg.Branch)
 
 	if cfg.RootDir == "" {
 		return nil, fmt.Errorf("RootDir is required")
 	}
 	if cfg.AssetsDir == "" {
 		return nil, fmt.Errorf("AssetsDir is required")
+	}
+	if cfg.AuthorName == "" {
+		return nil, fmt.Errorf("AuthorName is required")
+	}
+	if cfg.AuthorEmail == "" {
+		return nil, fmt.Errorf("AuthorEmail is required")
 	}
 
 	// Ensure parent directory exists
@@ -49,19 +55,19 @@ func Init(cfg Config) (*Repository, error) {
 	// Try to open existing repo
 	repo, err := gogit.PlainOpen(repoDir)
 	if err == nil {
-		slog.Default().Debug("opened existing git repo", "repoDir", repoDir)
+		slog.Debug("opened existing git repo", "repoDir", repoDir)
 		r.repo = repo
 		return r, nil
 	}
 
-	slog.Default().Debug("no existing repo found, initialising new one", "repoDir", repoDir, "openErr", err)
+	slog.Debug("no existing repo found, initialising new one", "repoDir", repoDir, "openErr", err)
 
 	// Initialize new repo
 	repo, err = gogit.PlainInit(repoDir, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init repo: %w", err)
 	}
-	slog.Default().Debug("new git repo initialised", "repoDir", repoDir)
+	slog.Debug("new git repo initialised", "repoDir", repoDir)
 	r.repo = repo
 
 	// Create initial commit with root/ and assets/ if they exist
@@ -74,7 +80,7 @@ func Init(cfg Config) (*Repository, error) {
 
 // makeInitialCommit creates the first commit with root/ and assets/ directories.
 func (r *Repository) makeInitialCommit() error {
-	slog.Default().Debug("makeInitialCommit: starting")
+	slog.Debug("makeInitialCommit: starting")
 
 	wt, err := r.repo.Worktree()
 	if err != nil {
@@ -91,40 +97,54 @@ func (r *Repository) makeInitialCommit() error {
 	if err != nil {
 		return fmt.Errorf("failed to compute relative path for assets: %w", err)
 	}
-	slog.Default().Debug("makeInitialCommit: resolved relative paths", "rootRel", rootRel, "assetsRel", assetsRel)
+	slog.Debug("makeInitialCommit: resolved relative paths", "rootRel", rootRel, "assetsRel", assetsRel)
 
 	// Stage root/ and assets/ directories using relative paths
 	// Track if we actually staged any content (files within directories)
 	stagedFiles := false
+	rootDirMissing := false
+	assetsDirMissing := false
+
 	if _, err := os.Stat(r.cfg.RootDir); err == nil {
-		slog.Default().Debug("makeInitialCommit: staging root dir", "path", rootRel)
+		slog.Debug("makeInitialCommit: staging root dir", "path", rootRel)
 		if _, err := wt.Add(rootRel); err != nil {
 			return fmt.Errorf("failed to stage root dir: %w", err)
 		}
 		// Check if root has any files
-		if hasFiles(r.cfg.RootDir) {
+		if hasFilesFlag, err := hasFiles(r.cfg.RootDir); err == nil && hasFilesFlag {
 			stagedFiles = true
-			slog.Default().Debug("makeInitialCommit: root dir has files, will commit")
+			slog.Debug("makeInitialCommit: root dir has files, will commit")
+		} else if err != nil {
+			slog.Debug("makeInitialCommit: root dir read error, skipping", "path", r.cfg.RootDir, "err", err)
 		} else {
-			slog.Default().Debug("makeInitialCommit: root dir is empty, skipping")
+			slog.Debug("makeInitialCommit: root dir is empty, skipping")
 		}
 	} else {
-		slog.Default().Debug("makeInitialCommit: root dir does not exist, skipping", "path", r.cfg.RootDir, "err", err)
+		rootDirMissing = true
+		slog.Debug("makeInitialCommit: root dir does not exist, skipping", "path", r.cfg.RootDir, "err", err)
 	}
 	if _, err := os.Stat(r.cfg.AssetsDir); err == nil {
-		slog.Default().Debug("makeInitialCommit: staging assets dir", "path", assetsRel)
+		slog.Debug("makeInitialCommit: staging assets dir", "path", assetsRel)
 		if _, err := wt.Add(assetsRel); err != nil {
 			return fmt.Errorf("failed to stage assets dir: %w", err)
 		}
 		// Check if assets has any files
-		if hasFiles(r.cfg.AssetsDir) {
+		if hasFilesFlag, err := hasFiles(r.cfg.AssetsDir); err == nil && hasFilesFlag {
 			stagedFiles = true
-			slog.Default().Debug("makeInitialCommit: assets dir has files, will commit")
+			slog.Debug("makeInitialCommit: assets dir has files, will commit")
+		} else if err != nil {
+			slog.Debug("makeInitialCommit: assets dir read error, skipping", "path", r.cfg.AssetsDir, "err", err)
 		} else {
-			slog.Default().Debug("makeInitialCommit: assets dir is empty, skipping")
+			slog.Debug("makeInitialCommit: assets dir is empty, skipping")
 		}
 	} else {
-		slog.Default().Debug("makeInitialCommit: assets dir does not exist, skipping", "path", r.cfg.AssetsDir, "err", err)
+		assetsDirMissing = true
+		slog.Debug("makeInitialCommit: assets dir does not exist, skipping", "path", r.cfg.AssetsDir, "err", err)
+	}
+
+	// Warn if both directories are missing
+	if rootDirMissing && assetsDirMissing {
+		slog.Warn("makeInitialCommit: both root and assets directories are missing")
 	}
 
 	// If no files were found in root/assets, skip initial commit
@@ -155,39 +175,38 @@ func (r *Repository) makeInitialCommit() error {
 	if err != nil {
 		return fmt.Errorf("failed to commit: %w", err)
 	}
-	slog.Default().Debug("makeInitialCommit: initial commit created", "hash", commit.String())
+	slog.Debug("makeInitialCommit: initial commit created", "hash", commit.String())
 
 	// Push to remote if configured
 	if r.cfg.RemoteURL != "" {
-		slog.Default().Debug("makeInitialCommit: pushing initial commit to remote", "remote", r.cfg.RemoteURL)
-		if err := r.push(commit.String()); err != nil {
-			r.status.SetError(err.Error())
-			slog.Default().Error("initial commit push failed", "error", err, "remote", r.cfg.RemoteURL)
-			// Don't return error - initial commit succeeded but push failed
-		}
+		slog.Debug("makeInitialCommit: scheduling initial commit push to remote (scheduler will push on next cycle)", "remote", r.cfg.RemoteURL)
 	} else {
-		slog.Default().Debug("makeInitialCommit: no remote configured, skipping push")
+		slog.Debug("makeInitialCommit: no remote configured, skipping push")
 	}
 
 	return nil
 }
 
 // hasFiles returns true if the directory contains any files (recursive).
-func hasFiles(dir string) bool {
+// Returns an error if the directory cannot be read.
+func hasFiles(dir string) (bool, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return false
+		slog.Debug("hasFiles: failed to read directory", "dir", dir, "error", err)
+		return false, err
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			return true
+			return true, nil
 		}
 		// Check subdirectory contents recursively
-		if hasFiles(filepath.Join(dir, entry.Name())) {
-			return true
+		if hasFilesRecursive, err := hasFiles(filepath.Join(dir, entry.Name())); hasFilesRecursive {
+			return true, nil
+		} else if err != nil {
+			return false, err
 		}
 	}
-	return false
+	return false, nil
 }
 
 // hasStagedChanges returns true if the status map contains any entry where the
@@ -197,7 +216,7 @@ func hasFiles(dir string) bool {
 func hasStagedChanges(status gogit.Status) bool {
 	for _, fileStatus := range status {
 		switch fileStatus.Staging {
-		case gogit.Added, gogit.Modified, gogit.Deleted, gogit.Renamed, gogit.Copied:
+		case gogit.Added, gogit.Modified, gogit.Deleted, gogit.Renamed:
 			return true
 		}
 	}
@@ -209,18 +228,18 @@ func hasStagedChanges(status gogit.Status) bool {
 // message format: "backup: <RFC3339 timestamp>"
 // Returns nil and skips commit+push if the working tree is clean.
 func (r *Repository) RunBackup() error {
-	slog.Default().Debug("RunBackup: starting backup cycle")
+	slog.Debug("RunBackup: starting backup cycle")
 
 	wt, err := r.repo.Worktree()
 	if err != nil {
 		errMsg := fmt.Errorf("failed to get worktree: %w", err).Error()
-		slog.Default().Debug("RunBackup: failed to get worktree", "error", errMsg)
+		slog.Debug("RunBackup: failed to get worktree", "error", errMsg)
 		r.status.SetError(errMsg)
-		return nil // Never propagate
+		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
 	repoDir := filepath.Dir(r.cfg.RootDir)
-	slog.Default().Debug("RunBackup: resolved repo dir", "repoDir", repoDir)
+	slog.Debug("RunBackup: resolved repo dir", "repoDir", repoDir)
 
 	// Compute relative paths for the two content directories we back up.
 	// Only root/ (wiki pages) and assets/ (uploaded files) are included.
@@ -228,48 +247,58 @@ func (r *Repository) RunBackup() error {
 	// are intentionally excluded — they are application state, not user content.
 	rootRel, err := filepath.Rel(repoDir, r.cfg.RootDir)
 	if err != nil {
-		r.status.SetError(fmt.Errorf("failed to compute relative path for root: %w", err).Error())
-		r.status.SetSuccess(time.Now())
-		return nil
+		errMsg := fmt.Errorf("failed to compute relative path for root: %w", err).Error()
+		r.status.SetError(errMsg)
+		return fmt.Errorf("failed to compute relative path for root: %w", err)
 	}
 	assetsRel, err := filepath.Rel(repoDir, r.cfg.AssetsDir)
 	if err != nil {
-		r.status.SetError(fmt.Errorf("failed to compute relative path for assets: %w", err).Error())
-		r.status.SetSuccess(time.Now())
-		return nil
+		errMsg := fmt.Errorf("failed to compute relative path for assets: %w", err).Error()
+		r.status.SetError(errMsg)
+		return fmt.Errorf("failed to compute relative path for assets: %w", err)
 	}
-	slog.Default().Debug("RunBackup: staging content directories", "rootRel", rootRel, "assetsRel", assetsRel)
+	slog.Debug("RunBackup: staging content directories", "rootRel", rootRel, "assetsRel", assetsRel)
+
+	rootDirMissing := false
+	assetsDirMissing := false
 
 	if _, err := os.Stat(r.cfg.RootDir); err == nil {
 		if _, err := wt.Add(rootRel); err != nil {
 			errMsg := fmt.Errorf("failed to stage root dir: %w", err).Error()
-			slog.Default().Debug("RunBackup: failed to stage root dir", "error", errMsg)
+			slog.Debug("RunBackup: failed to stage root dir", "error", errMsg)
 			r.status.SetError(errMsg)
-			return nil
+			return fmt.Errorf("failed to stage root dir: %w", err)
 		}
-		slog.Default().Debug("RunBackup: staged root dir", "path", rootRel)
+		slog.Debug("RunBackup: staged root dir", "path", rootRel)
 	} else {
-		slog.Default().Debug("RunBackup: root dir not found, skipping", "path", r.cfg.RootDir)
+		rootDirMissing = true
+		slog.Debug("RunBackup: root dir not found, skipping", "path", r.cfg.RootDir)
 	}
 	if _, err := os.Stat(r.cfg.AssetsDir); err == nil {
 		if _, err := wt.Add(assetsRel); err != nil {
 			errMsg := fmt.Errorf("failed to stage assets dir: %w", err).Error()
-			slog.Default().Debug("RunBackup: failed to stage assets dir", "error", errMsg)
+			slog.Debug("RunBackup: failed to stage assets dir", "error", errMsg)
 			r.status.SetError(errMsg)
-			return nil
+			return fmt.Errorf("failed to stage assets dir: %w", err)
 		}
-		slog.Default().Debug("RunBackup: staged assets dir", "path", assetsRel)
+		slog.Debug("RunBackup: staged assets dir", "path", assetsRel)
 	} else {
-		slog.Default().Debug("RunBackup: assets dir not found, skipping", "path", r.cfg.AssetsDir)
+		assetsDirMissing = true
+		slog.Debug("RunBackup: assets dir not found, skipping", "path", r.cfg.AssetsDir)
+	}
+
+	// Warn if both directories are missing
+	if rootDirMissing && assetsDirMissing {
+		slog.Warn("RunBackup: both root and assets directories are missing")
 	}
 
 	// Check working tree status
 	status, err := wt.Status()
 	if err != nil {
 		errMsg := fmt.Errorf("failed to get status: %w", err).Error()
-		slog.Default().Debug("RunBackup: failed to get working tree status", "error", errMsg)
+		slog.Debug("RunBackup: failed to get working tree status", "error", errMsg)
 		r.status.SetError(errMsg)
-		return nil // Never propagate
+		return fmt.Errorf("failed to get status: %w", err)
 	}
 
 	// hasStagedChanges checks only the staging area (index), ignoring untracked files.
@@ -277,10 +306,10 @@ func (r *Repository) RunBackup() error {
 	// root/ and assets/ — which would cause empty commits every cycle. We only care
 	// whether the content we explicitly staged above has changed.
 	staged := hasStagedChanges(status)
-	slog.Default().Debug("RunBackup: working tree status checked", "hasStagedChanges", staged, "totalStatusEntries", len(status))
+	slog.Debug("RunBackup: working tree status checked", "hasStagedChanges", staged, "totalStatusEntries", len(status))
 
 	if !staged {
-		slog.Default().Info("backup skipped - no staged changes in content directories")
+		slog.Info("backup skipped - no staged changes in content directories")
 		r.status.SetSuccess(time.Now())
 		return nil
 	}
@@ -288,13 +317,13 @@ func (r *Repository) RunBackup() error {
 	// Log only the staged files (skip untracked noise from other app directories)
 	for path, fileStatus := range status {
 		if fileStatus.Staging != gogit.Untracked {
-			slog.Default().Debug("RunBackup: staged file", "path", path, "staging", string(fileStatus.Staging), "worktree", string(fileStatus.Worktree))
+			slog.Debug("RunBackup: staged file", "path", path, "staging", string(fileStatus.Staging), "worktree", string(fileStatus.Worktree))
 		}
 	}
 
 	// Commit changes
 	commitMsg := fmt.Sprintf("backup: %s", time.Now().Format(time.RFC3339))
-	slog.Default().Debug("RunBackup: committing changes", "message", commitMsg, "author", r.cfg.AuthorName, "email", r.cfg.AuthorEmail)
+	slog.Debug("RunBackup: committing changes", "message", commitMsg, "author", r.cfg.AuthorName, "email", r.cfg.AuthorEmail)
 	commit, err := wt.Commit(commitMsg, &gogit.CommitOptions{
 		Author: &object.Signature{
 			Name:  r.cfg.AuthorName,
@@ -305,50 +334,50 @@ func (r *Repository) RunBackup() error {
 	if err != nil {
 		// If it's "nothing to commit" (empty tree), that's fine - just skip
 		if strings.Contains(err.Error(), "cannot create empty commit") {
-			slog.Default().Debug("RunBackup: commit skipped - empty tree")
+			slog.Debug("RunBackup: commit skipped - empty tree")
 			return nil
 		}
 		errMsg := fmt.Errorf("failed to commit: %w", err).Error()
-		slog.Default().Debug("RunBackup: commit failed", "error", errMsg)
+		slog.Debug("RunBackup: commit failed", "error", errMsg)
 		r.status.SetError(errMsg)
-		return nil // Never propagate
+		return fmt.Errorf("failed to commit: %w", err)
 	}
-	slog.Default().Debug("RunBackup: commit created", "hash", commit.String(), "message", commitMsg)
+	slog.Debug("RunBackup: commit created", "hash", commit.String(), "message", commitMsg)
 
 	// Push to remote
 	if r.cfg.RemoteURL != "" {
-		slog.Default().Debug("RunBackup: pushing to remote", "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "commit", commit.String())
+		slog.Debug("RunBackup: pushing to remote", "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "commit", commit.String())
 		if err := r.push(commit.String()); err != nil {
-			slog.Default().Debug("RunBackup: push failed", "error", err)
+			slog.Debug("RunBackup: push failed", "error", err)
 			r.status.SetError(err.Error())
-			return nil // Never propagate
+			return fmt.Errorf("push failed: %w", err)
 		}
 	} else {
-		slog.Default().Debug("RunBackup: no remote configured, skipping push")
+		slog.Debug("RunBackup: no remote configured, skipping push")
 	}
 
 	r.status.SetSuccess(time.Now())
-	slog.Default().Info("backup pushed to remote")
+	slog.Info("backup pushed to remote")
 	return nil
 }
 
 // push pushes the given commit hash to the configured remote.
 func (r *Repository) push(commitHash string) error {
-	slog.Default().Debug("push: starting", "commit", commitHash, "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch)
+	slog.Debug("push: starting", "commit", commitHash, "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch)
 
 	// Build SSH auth
-	slog.Default().Debug("push: building SSH auth", "sshKeyPath", r.cfg.SSHKeyPath, "hasInlineKey", r.cfg.SSHKey != "")
+	slog.Debug("push: building SSH auth", "sshKeyPath", r.cfg.SSHKeyPath, "hasInlineKey", r.cfg.SSHKey != "")
 	auth, err := r.buildSSHAuth()
 	if err != nil {
-		slog.Default().Debug("push: SSH auth build failed", "error", err)
+		slog.Debug("push: SSH auth build failed", "error", err)
 		return fmt.Errorf("failed to build SSH auth: %w", err)
 	}
-	slog.Default().Debug("push: SSH auth built successfully")
+	slog.Debug("push: SSH auth built successfully")
 
 	// Get remote - use r.repo directly since we're using the repo instance
 	remote, err := r.repo.Remote("origin")
 	if err != nil {
-		slog.Default().Debug("push: remote 'origin' not found, creating it", "url", r.cfg.RemoteURL)
+		slog.Debug("push: remote 'origin' not found, creating it", "url", r.cfg.RemoteURL)
 		// Remote doesn't exist, create it
 		_, err = r.repo.CreateRemote(&config.RemoteConfig{
 			Name: "origin",
@@ -361,10 +390,10 @@ func (r *Repository) push(commitHash string) error {
 		if err != nil {
 			return fmt.Errorf("failed to get remote: %w", err)
 		}
-		slog.Default().Debug("push: remote 'origin' created", "url", r.cfg.RemoteURL)
+		slog.Debug("push: remote 'origin' created", "url", r.cfg.RemoteURL)
 	} else {
 		remoteURLs := remote.Config().URLs
-		slog.Default().Debug("push: remote 'origin' found", "urls", remoteURLs)
+		slog.Debug("push: remote 'origin' found", "urls", remoteURLs)
 	}
 
 	// Resolve local HEAD to verify what we are about to push.
@@ -372,7 +401,7 @@ func (r *Repository) push(commitHash string) error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve local HEAD: %w", err)
 	}
-	slog.Default().Debug("push: local HEAD resolved", "hash", localHead.Hash().String(), "branch", localHead.Name().Short())
+	slog.Debug("push: local HEAD resolved", "hash", localHead.Hash().String(), "branch", localHead.Name().Short())
 
 	// Fetch the current remote ref so we can accurately detect true up-to-date.
 	// go-git returns ErrAlreadyUpToDate for empty/fresh remotes (no refs yet),
@@ -380,7 +409,7 @@ func (r *Repository) push(commitHash string) error {
 	// Listing first gives us ground truth before we decide whether to push.
 	remoteRefs, fetchErr := remote.List(&gogit.ListOptions{Auth: auth})
 	if fetchErr != nil {
-		slog.Default().Debug("push: could not list remote refs (remote may be empty)", "error", fetchErr)
+		slog.Debug("push: could not list remote refs (remote may be empty)", "error", fetchErr)
 	}
 
 	remoteHead := ""
@@ -391,11 +420,11 @@ func (r *Repository) push(commitHash string) error {
 			break
 		}
 	}
-	slog.Default().Debug("push: remote branch state", "branch", r.cfg.Branch, "remoteHead", remoteHead, "localHead", commitHash)
+	slog.Debug("push: remote branch state", "branch", r.cfg.Branch, "remoteHead", remoteHead, "localHead", commitHash)
 
 	if remoteHead == commitHash {
 		// Remote genuinely already has this exact commit — nothing to do.
-		slog.Default().Info("backup skipped - remote already at current commit", "branch", r.cfg.Branch, "commit", commitHash)
+		slog.Info("backup skipped - remote already at current commit", "branch", r.cfg.Branch, "commit", commitHash)
 		return nil
 	}
 
@@ -407,32 +436,31 @@ func (r *Repository) push(commitHash string) error {
 	// even attempting to send the pack. Removing it forces a clean push.
 	trackingRef := plumbing.NewRemoteReferenceName("origin", r.cfg.Branch)
 	if rmErr := r.repo.Storer.RemoveReference(trackingRef); rmErr != nil && rmErr != plumbing.ErrReferenceNotFound {
-		slog.Default().Debug("push: could not remove stale remote tracking ref", "ref", trackingRef.String(), "error", rmErr)
+		slog.Debug("push: could not remove stale remote tracking ref", "ref", trackingRef.String(), "error", rmErr)
 	} else {
-		slog.Default().Debug("push: cleared remote tracking ref", "ref", trackingRef.String())
+		slog.Debug("push: cleared remote tracking ref", "ref", trackingRef.String())
 	}
 
 	// Use the resolved branch ref explicitly rather than HEAD.
 	// Symbolic HEAD in a force refspec can confuse go-git when the local branch
 	// name differs from the configured remote branch (e.g. local=master, remote=main).
 	localBranchRef := localHead.Name().String() // e.g. refs/heads/master
-	refSpec := config.RefSpec("+" + localBranchRef + ":refs/heads/" + r.cfg.Branch)
-	slog.Default().Debug("push: pushing with force refspec", "refSpec", string(refSpec), "localBranch", localBranchRef, "remoteBranch", r.cfg.Branch)
+	refSpec := config.RefSpec(localBranchRef + ":refs/heads/" + r.cfg.Branch)
+	slog.Debug("push: pushing", "refSpec", string(refSpec), "localBranch", localBranchRef, "remoteBranch", r.cfg.Branch)
 	err = remote.Push(&gogit.PushOptions{
 		Auth:     auth,
 		RefSpecs: []config.RefSpec{refSpec},
-		Force:    true,
 	})
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "already up-to-date") {
 			// Genuine up-to-date: remote caught up between our List call and Push.
-			slog.Default().Info("backup skipped - already up-to-date on " + r.cfg.Branch + " at remote URL: " + r.cfg.RemoteURL)
+			slog.Info("backup skipped - already up-to-date on " + r.cfg.Branch + " at remote URL: " + r.cfg.RemoteURL)
 			return nil
 		}
-		slog.Default().Error("git push failed", "error", err, "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "refSpec", string(refSpec))
+		slog.Error("git push failed", "error", err, "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "refSpec", string(refSpec))
 		return fmt.Errorf("failed to push: %w", err)
 	}
-	slog.Default().Info("git push succeeded", "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "commit", commitHash)
+	slog.Info("git push succeeded", "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "commit", commitHash)
 	return nil
 }
 
@@ -443,36 +471,50 @@ func (r *Repository) buildSSHAuth() (ssh.AuthMethod, error) {
 
 	// Try SSHKey string first
 	if r.cfg.SSHKey != "" {
-		slog.Default().Debug("buildSSHAuth: using inline SSH key")
+		slog.Debug("buildSSHAuth: using inline SSH key")
 		privateKey = []byte(r.cfg.SSHKey)
 	} else if r.cfg.SSHKeyPath != "" {
-		slog.Default().Debug("buildSSHAuth: reading SSH key from file", "path", r.cfg.SSHKeyPath)
+		slog.Debug("buildSSHAuth: reading SSH key from file", "path", r.cfg.SSHKeyPath)
 		privateKey, err = os.ReadFile(r.cfg.SSHKeyPath)
 		if err != nil {
-			slog.Default().Debug("buildSSHAuth: failed to read SSH key file", "path", r.cfg.SSHKeyPath, "error", err)
+			slog.Debug("buildSSHAuth: failed to read SSH key file", "path", r.cfg.SSHKeyPath, "error", err)
 			return nil, fmt.Errorf("failed to read SSH key: %w", err)
 		}
-		slog.Default().Debug("buildSSHAuth: SSH key file read successfully", "path", r.cfg.SSHKeyPath, "size", len(privateKey))
+		slog.Debug("buildSSHAuth: SSH key file read successfully", "path", r.cfg.SSHKeyPath, "size", len(privateKey))
 	} else {
-		slog.Default().Debug("buildSSHAuth: no SSH key configured (neither inline nor path)")
+		slog.Debug("buildSSHAuth: no SSH key configured (neither inline nor path)")
 		return nil, fmt.Errorf("no SSH key provided")
 	}
 
 	// Parse the private key using x/crypto/ssh
 	signer, err := sshcrypto.ParsePrivateKey(privateKey)
 	if err != nil {
-		slog.Default().Error("failed to parse SSH key", "error", err, "path", r.cfg.SSHKeyPath)
+		slog.Error("failed to parse SSH key", "error", err, "path", r.cfg.SSHKeyPath)
 		return nil, fmt.Errorf("failed to parse SSH key: %w", err)
 	}
-	slog.Default().Debug("buildSSHAuth: SSH key parsed successfully", "keyType", signer.PublicKey().Type())
+	slog.Debug("buildSSHAuth: SSH key parsed successfully", "keyType", signer.PublicKey().Type())
 
-	// Use InsecureIgnoreHostKey since we don't have a known_hosts file in the container
 	auth := &ssh.PublicKeys{
 		User:   "git",
 		Signer: signer,
 	}
-	auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
-	slog.Default().Debug("buildSSHAuth: SSH auth configured with InsecureIgnoreHostKey")
+
+	// Use known hosts for MITM protection if provided
+	if r.cfg.SSHKnownHosts != "" {
+		// ParseKnownHosts returns: marker, hosts, pubKey, comment, rest, err
+		_, _, pubKey, _, _, err := sshcrypto.ParseKnownHosts([]byte(r.cfg.SSHKnownHosts))
+		if err != nil {
+			slog.Warn("buildSSHAuth: failed to parse SSHKnownHosts, falling back to insecure mode", "error", err)
+			auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
+		} else {
+			// Use FixedHostKey from x/crypto/ssh for MITM protection
+			auth.HostKeyCallback = sshcrypto.FixedHostKey(pubKey)
+			slog.Debug("buildSSHAuth: SSH auth configured with FixedHostKey")
+		}
+	} else {
+		slog.Warn("buildSSHAuth: no SSHKnownHosts provided, connection will be insecure (no MITM protection)")
+		auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
+	}
 	return auth, nil
 }
 

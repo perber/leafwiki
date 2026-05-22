@@ -332,3 +332,53 @@ func TestInit_RequiresAssetsDir(t *testing.T) {
 		t.Error("expected error for empty AssetsDir")
 	}
 }
+
+func TestInit_RequiresAuthorName(t *testing.T) {
+	tmpDir := t.TempDir()
+	rootDir := filepath.Join(tmpDir, "root")
+	assetsDir := filepath.Join(tmpDir, "assets")
+	err := os.MkdirAll(rootDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create root dir: %v", err)
+	}
+	err = os.MkdirAll(assetsDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create assets dir: %v", err)
+	}
+
+	cfg := Config{
+		RootDir:     rootDir,
+		AssetsDir:   assetsDir,
+		AuthorName:  "",
+		AuthorEmail: "test@example.com",
+	}
+	_, err = Init(cfg)
+	if err == nil {
+		t.Error("expected error for empty AuthorName")
+	}
+}
+
+func TestInit_RequiresAuthorEmail(t *testing.T) {
+	tmpDir := t.TempDir()
+	rootDir := filepath.Join(tmpDir, "root")
+	assetsDir := filepath.Join(tmpDir, "assets")
+	err := os.MkdirAll(rootDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create root dir: %v", err)
+	}
+	err = os.MkdirAll(assetsDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create assets dir: %v", err)
+	}
+
+	cfg := Config{
+		RootDir:     rootDir,
+		AssetsDir:   assetsDir,
+		AuthorName:  "Test Author",
+		AuthorEmail: "",
+	}
+	_, err = Init(cfg)
+	if err == nil {
+		t.Error("expected error for empty AuthorEmail")
+	}
+}
