@@ -22,11 +22,12 @@ func TestScheduler_TriggerNow(t *testing.T) {
 	}
 
 	cfg := Config{
-		RootDir:     rootDir,
-		AssetsDir:   assetsDir,
-		AuthorName:  "Test Author",
-		AuthorEmail: "test@example.com",
-		Branch:      "main",
+		RootDir:       rootDir,
+		AssetsDir:     assetsDir,
+		AuthorName:    "Test Author",
+		AuthorEmail:   "test@example.com",
+		Branch:        "main",
+		IntervalMinutes: 10,
 	}
 
 	repo, err := Init(cfg)
@@ -35,7 +36,7 @@ func TestScheduler_TriggerNow(t *testing.T) {
 	}
 
 	// Create scheduler with a long interval so it won't fire naturally
-	scheduler := NewScheduler(repo, 10*time.Minute)
+	scheduler := NewScheduler(repo, &cfg)
 	defer scheduler.Stop()
 
 	// Add a file to back up so there's something to commit
@@ -43,18 +44,41 @@ func TestScheduler_TriggerNow(t *testing.T) {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	// Give it a moment to process the initial run
-	time.Sleep(100 * time.Millisecond)
+	// Wait for the initial run to complete using a channel
+	timeout := time.After(2 * time.Second)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
 
+	for {
+		select {
+		case <-ticker.C:
+			if !repo.status.LastBackupAt.IsZero() {
+				goto afterInitialRun
+			}
+		case <-timeout:
+			t.Fatal("timeout waiting for initial run")
+		}
+	}
+
+afterInitialRun:
 	// TriggerNow should not block
 	scheduler.TriggerNow()
 
-	// Give it a moment to process
-	time.Sleep(100 * time.Millisecond)
+	// Wait for TriggerNow to be processed
+	timeout2 := time.After(2 * time.Second)
+	ticker2 := time.NewTicker(50 * time.Millisecond)
+	defer ticker2.Stop()
 
-	// Verify that status was updated (backup ran)
-	if repo.status.LastBackupAt.IsZero() {
-		t.Error("expected LastBackupAt to be set after TriggerNow")
+	initialBackup := repo.status.LastBackupAt
+	for {
+		select {
+		case <-ticker2.C:
+			if !repo.status.LastBackupAt.IsZero() && !repo.status.LastBackupAt.Equal(initialBackup) {
+				return // Success
+			}
+		case <-timeout2:
+			t.Fatal("timeout waiting for TriggerNow")
+		}
 	}
 }
 
@@ -73,11 +97,12 @@ func TestScheduler_Stop(t *testing.T) {
 	}
 
 	cfg := Config{
-		RootDir:     rootDir,
-		AssetsDir:   assetsDir,
-		AuthorName:  "Test Author",
-		AuthorEmail: "test@example.com",
-		Branch:      "main",
+		RootDir:       rootDir,
+		AssetsDir:     assetsDir,
+		AuthorName:    "Test Author",
+		AuthorEmail:   "test@example.com",
+		Branch:        "main",
+		IntervalMinutes: 10,
 	}
 
 	repo, err := Init(cfg)
@@ -85,9 +110,9 @@ func TestScheduler_Stop(t *testing.T) {
 		t.Fatalf("Init failed: %v", err)
 	}
 
-	scheduler := NewScheduler(repo, 10*time.Minute)
+	scheduler := NewScheduler(repo, &cfg)
 
-	// Stop should not block
+	// Stop should block until goroutine finishes
 	scheduler.Stop()
 
 	// Verify we can call Stop multiple times safely
@@ -109,11 +134,12 @@ func TestScheduler_RunsOnStart(t *testing.T) {
 	}
 
 	cfg := Config{
-		RootDir:     rootDir,
-		AssetsDir:   assetsDir,
-		AuthorName:  "Test Author",
-		AuthorEmail: "test@example.com",
-		Branch:      "main",
+		RootDir:       rootDir,
+		AssetsDir:     assetsDir,
+		AuthorName:    "Test Author",
+		AuthorEmail:   "test@example.com",
+		Branch:        "main",
+		IntervalMinutes: 600,
 	}
 
 	repo, err := Init(cfg)
@@ -122,7 +148,7 @@ func TestScheduler_RunsOnStart(t *testing.T) {
 	}
 
 	// Create scheduler with very long interval
-	scheduler := NewScheduler(repo, 10*time.Hour)
+	scheduler := NewScheduler(repo, &cfg)
 	defer scheduler.Stop()
 
 	// Add a file to back up so there's something to commit
@@ -130,11 +156,19 @@ func TestScheduler_RunsOnStart(t *testing.T) {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	// Wait a moment for the initial run
-	time.Sleep(100 * time.Millisecond)
+	// Wait for the initial run to complete using a channel
+	timeout := time.After(2 * time.Second)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
 
-	// Verify that LastBackupAt was set (scheduler ran immediately on start)
-	if repo.status.LastBackupAt.IsZero() {
-		t.Error("expected scheduler to run immediately on start")
+	for {
+		select {
+		case <-ticker.C:
+			if !repo.status.LastBackupAt.IsZero() {
+				return // Success
+			}
+		case <-timeout:
+			t.Fatal("timeout waiting for initial run")
+		}
 	}
 }

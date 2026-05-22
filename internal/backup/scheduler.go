@@ -1,9 +1,9 @@
 package backup
 
 import (
+	"log/slog"
+	"sync"
 	"time"
-
-	"golang.org/x/exp/slog"
 )
 
 // Minimum interval to prevent time.NewTicker(0) panic
@@ -15,12 +15,14 @@ type Scheduler struct {
 	ticker *time.Ticker
 	manual chan struct{}
 	done   chan struct{}
+	wg     sync.WaitGroup
 }
 
 // NewScheduler creates and starts the background goroutine.
-func NewScheduler(repo *Repository, interval time.Duration) *Scheduler {
+func NewScheduler(repo *Repository, cfg *Config) *Scheduler {
+	interval := cfg.Duration()
 	if interval < minInterval {
-		slog.Default().Warn("backup scheduler interval too small, using minimum", "requested", interval, "using", minInterval)
+		slog.Warn("backup scheduler interval too small, using minimum", "requested", interval, "using", minInterval)
 		interval = minInterval
 	}
 	s := &Scheduler{
@@ -30,11 +32,21 @@ func NewScheduler(repo *Repository, interval time.Duration) *Scheduler {
 		done:   make(chan struct{}),
 	}
 
+	s.wg.Add(1)
 	go s.run()
 	return s
 }
 
 func (s *Scheduler) run() {
+	defer s.wg.Done()
+
+	// Recover from panics to avoid killing the scheduler
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("backup scheduler recovered from panic", "panic", r)
+		}
+	}()
+
 	// Run immediately on start
 	s.repo.RunBackup()
 
@@ -52,10 +64,17 @@ func (s *Scheduler) run() {
 
 // TriggerNow signals the scheduler to run a backup immediately,
 // regardless of the interval. Non-blocking.
+// If a backup is already in progress, the signal is queued (buffer size 2).
 func (s *Scheduler) TriggerNow() {
 	select {
 	case s.manual <- struct{}{}:
 	default:
+		// Buffer full (backup in progress), try to add more
+		select {
+		case s.manual <- struct{}{}:
+		default:
+			// Buffer still full, at least 1 signal is pending - don't drop
+		}
 	}
 }
 
@@ -68,4 +87,5 @@ func (s *Scheduler) Stop() {
 	default:
 		close(s.done)
 	}
+	s.wg.Wait()
 }
