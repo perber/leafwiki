@@ -55,7 +55,7 @@ export default function BackupSettings() {
         pollingRef.current = null
       }
     }
-  }, [isPolling, loadStatus])
+  }, [isPolling, loadStatus, lastBackupAt])
 
   // Stop polling when lastBackupAt advances or an error occurs
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function BackupSettings() {
     try {
       await triggerPush()
       toast.success('Backup triggered')
-    } catch (err) {
+    } catch (_err) {
       toast.error('Failed to trigger backup')
     }
   }

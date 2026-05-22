@@ -48,14 +48,20 @@ func (s *Scheduler) run() {
 	}()
 
 	// Run immediately on start
-	s.repo.RunBackup()
+	if err := s.repo.RunBackup(); err != nil {
+		slog.Error("backup failed", "error", err)
+	}
 
 	for {
 		select {
 		case <-s.ticker.C:
-			s.repo.RunBackup()
+			if err := s.repo.RunBackup(); err != nil {
+				slog.Error("backup failed", "error", err)
+			}
 		case <-s.manual:
-			s.repo.RunBackup()
+			if err := s.repo.RunBackup(); err != nil {
+				slog.Error("backup failed", "error", err)
+			}
 		case <-s.done:
 			return
 		}
