@@ -2,7 +2,8 @@ package tree
 
 type Page struct {
 	*PageNode
-	Content string `json:"content"`
+	Content    string `json:"content"`
+	RawContent string `json:"-"` // full file including frontmatter; never serialised
 }
 
 type PermalinkTarget struct {

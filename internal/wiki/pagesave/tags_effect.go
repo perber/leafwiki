@@ -9,16 +9,15 @@ import (
 
 // TagsSideEffect updates the tag index after every page mutation.
 type TagsSideEffect struct {
-	svc  *tags.TagsService
-	tree *tree.TreeService
-	log  *slog.Logger
+	svc *tags.TagsService
+	log *slog.Logger
 }
 
-func NewTagsSideEffect(svc *tags.TagsService, treeService *tree.TreeService, log *slog.Logger) *TagsSideEffect {
+func NewTagsSideEffect(svc *tags.TagsService, log *slog.Logger) *TagsSideEffect {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &TagsSideEffect{svc: svc, tree: treeService, log: log}
+	return &TagsSideEffect{svc: svc, log: log}
 }
 
 func (e *TagsSideEffect) Apply(event PageSaveEvent) {
@@ -42,17 +41,7 @@ func (e *TagsSideEffect) Apply(event PageSaveEvent) {
 }
 
 func (e *TagsSideEffect) setTags(p *tree.Page) {
-	content := p.Content
-	if e.tree != nil {
-		raw, err := e.tree.ReadPageRaw(p.ID)
-		if err != nil {
-			e.log.Warn("failed to read raw content for tag indexing", "pageID", p.ID, "error", err)
-		} else {
-			content = raw
-		}
-	}
-
-	if err := e.svc.IndexPageContent(p.ID, content); err != nil {
+	if err := e.svc.IndexPageContent(p.ID, p.RawContent); err != nil {
 		e.log.Warn("failed to index page content", "pageID", p.ID, "error", err)
 	}
 }

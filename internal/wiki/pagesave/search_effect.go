@@ -11,7 +11,7 @@ import (
 // SearchIndexSideEffect updates the search index after every page mutation.
 type SearchIndexSideEffect struct {
 	index *search.SQLiteIndex
-	tree  *tree.TreeService
+	tree  *tree.TreeService // only used by IndexAllPages for the initial walk
 	log   *slog.Logger
 }
 
@@ -71,8 +71,7 @@ func (e *SearchIndexSideEffect) IndexAllPages() error {
 			e.log.Warn("skipping page during search bootstrap", "pageID", ids[i], "error", errs[i])
 			continue
 		}
-		// page.Content is already populated by GetPages — no second disk read needed.
-		e.writeToIndex(page, page.Content)
+		e.writeToIndex(page, page.RawContent)
 	}
 	return nil
 }
@@ -81,18 +80,7 @@ func (e *SearchIndexSideEffect) indexPage(page *tree.Page) {
 	if page == nil {
 		return
 	}
-
-	raw := page.Content
-	if e.tree != nil {
-		loadedRaw, err := e.tree.ReadPageRaw(page.ID)
-		if err != nil {
-			e.log.Warn("failed to read raw content for search indexing", "pageID", page.ID, "error", err)
-		} else {
-			raw = loadedRaw
-		}
-	}
-
-	e.writeToIndex(page, raw)
+	e.writeToIndex(page, page.RawContent)
 }
 
 func (e *SearchIndexSideEffect) writeToIndex(page *tree.Page, content string) {

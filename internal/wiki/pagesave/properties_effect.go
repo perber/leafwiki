@@ -9,16 +9,15 @@ import (
 
 // PropertiesSideEffect updates the properties index after every page mutation.
 type PropertiesSideEffect struct {
-	svc  *properties.PropertiesService
-	tree *tree.TreeService
-	log  *slog.Logger
+	svc *properties.PropertiesService
+	log *slog.Logger
 }
 
-func NewPropertiesSideEffect(svc *properties.PropertiesService, treeService *tree.TreeService, log *slog.Logger) *PropertiesSideEffect {
+func NewPropertiesSideEffect(svc *properties.PropertiesService, log *slog.Logger) *PropertiesSideEffect {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &PropertiesSideEffect{svc: svc, tree: treeService, log: log}
+	return &PropertiesSideEffect{svc: svc, log: log}
 }
 
 func (e *PropertiesSideEffect) Apply(event PageSaveEvent) {
@@ -42,17 +41,7 @@ func (e *PropertiesSideEffect) Apply(event PageSaveEvent) {
 }
 
 func (e *PropertiesSideEffect) setProperties(p *tree.Page) {
-	content := p.Content
-	if e.tree != nil {
-		raw, err := e.tree.ReadPageRaw(p.ID)
-		if err != nil {
-			e.log.Warn("failed to read raw content for properties indexing", "pageID", p.ID, "error", err)
-		} else {
-			content = raw
-		}
-	}
-
-	props := properties.ExtractPropertiesFromContent(content)
+	props := properties.ExtractPropertiesFromContent(p.RawContent)
 	if err := e.svc.SetPropertiesForPage(p.ID, props); err != nil {
 		e.log.Warn("failed to set properties for page", "pageID", p.ID, "error", err)
 	}
