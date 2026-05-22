@@ -7,20 +7,21 @@ import (
 
 type Status struct {
 	mu           sync.RWMutex
-	LastBackupAt *time.Time
+	LastBackupAt time.Time
 	LastError    string
 }
 
 func (s *Status) SetSuccess(t time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.LastBackupAt = &t
+	s.LastBackupAt = t
 	s.LastError = ""
 }
 
 func (s *Status) SetError(err string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.LastBackupAt = time.Time{} // Clear on error
 	s.LastError = err
 }
 
@@ -34,6 +35,6 @@ func (s *Status) Snapshot() StatusSnapshot {
 }
 
 type StatusSnapshot struct {
-	LastBackupAt *time.Time `json:"lastBackupAt,omitempty"`
-	LastError    string     `json:"lastError"`
+	LastBackupAt time.Time `json:"lastBackupAt,omitempty"`
+	LastError    string    `json:"lastError,omitempty"`
 }
