@@ -6,7 +6,6 @@ import (
 	"log"
 	"log/slog"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/perber/wiki/internal/branding"
@@ -56,7 +55,6 @@ type Wiki struct {
 	propertiesRoutes *wikiproperties.Routes
 	brandingRoutes   *wikibranding.Routes
 	importerRoutes   *wikiimporter.Routes
-	searchWatcher    *search.Watcher
 	revision         *revision.Service
 	links            *links.LinkService
 	tags             *tags.TagsService
@@ -65,11 +63,6 @@ type Wiki struct {
 }
 
 const SYSTEM_USER_ID = "system"
-
-func searchRootDir(storageDir string) string {
-	normalized := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
-	return filepath.Join(normalized, "root")
-}
 
 type WikiOptions struct {
 	StorageDir              string        // Path to storage directory
@@ -236,20 +229,16 @@ func (w *Wiki) initSearch() error {
 		return fmt.Errorf("failed to init search index: %w", err)
 	}
 	w.status = search.NewIndexingStatus()
+	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
 	go func() {
-		if err := search.BuildAndRunIndexer(w.tree, w.searchIndex, searchRootDir(w.storageDir), 4, w.status); err != nil {
-			w.log.Warn("indexing failed", "error", err)
+		w.status.Start()
+		if err := searchEffect.IndexAllPages(); err != nil {
+			w.log.Warn("search bootstrap failed", "error", err)
+			w.status.Fail()
+		} else {
+			w.status.Success()
 		}
-	}()
-	w.searchWatcher, err = search.NewWatcher(searchRootDir(w.storageDir), w.tree, w.searchIndex, w.status)
-	if err != nil {
-		w.log.Warn("failed to create file watcher", "error", err)
-		return nil
-	}
-	go func() {
-		if err := w.searchWatcher.Start(); err != nil {
-			w.log.Warn("failed to start file watcher", "error", err)
-		}
+		w.status.Finish()
 	}()
 	return nil
 }
@@ -528,12 +517,6 @@ func (w *Wiki) Close() error {
 	if w.links != nil {
 		if err := w.links.Close(); err != nil {
 			log.Printf("error closing links: %v", err)
-		}
-	}
-
-	if w.searchWatcher != nil {
-		if err := w.searchWatcher.Stop(); err != nil {
-			log.Printf("error stopping search watcher: %v", err)
 		}
 	}
 

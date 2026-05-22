@@ -47,6 +47,36 @@ func (e *SearchIndexSideEffect) Apply(event PageSaveEvent) {
 	}
 }
 
+// IndexAllPages clears the search index and rebuilds it from the current tree state.
+// Call this once at startup; runtime updates are handled via Apply.
+func (e *SearchIndexSideEffect) IndexAllPages() error {
+	if e.index == nil {
+		return nil
+	}
+	if err := e.index.Clear(); err != nil {
+		return err
+	}
+
+	var ids []string
+	if err := e.tree.WalkNodes(func(id string) error {
+		ids = append(ids, id)
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	pages, errs := e.tree.GetPages(ids)
+	for i, page := range pages {
+		if errs[i] != nil {
+			e.log.Warn("skipping page during search bootstrap", "pageID", ids[i], "error", errs[i])
+			continue
+		}
+		// page.Content is already populated by GetPages — no second disk read needed.
+		e.writeToIndex(page, page.Content)
+	}
+	return nil
+}
+
 func (e *SearchIndexSideEffect) indexPage(page *tree.Page) {
 	if page == nil {
 		return
@@ -62,13 +92,16 @@ func (e *SearchIndexSideEffect) indexPage(page *tree.Page) {
 		}
 	}
 
+	e.writeToIndex(page, raw)
+}
+
+func (e *SearchIndexSideEffect) writeToIndex(page *tree.Page, content string) {
 	path := strings.TrimPrefix(page.CalculatePath(), "/")
 	filePath := path
 	if filePath != "" {
 		filePath += ".md"
 	}
-
-	if err := e.index.IndexPage(path, filePath, page.ID, page.Title, page.Kind, raw); err != nil {
+	if err := e.index.IndexPage(path, filePath, page.ID, page.Title, page.Kind, content); err != nil {
 		e.log.Warn("failed to update search index for page", "pageID", page.ID, "error", err)
 	}
 }
