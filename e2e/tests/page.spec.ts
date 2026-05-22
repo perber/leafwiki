@@ -1004,6 +1004,10 @@ test.describe('Authenticated', () => {
 
   test('create-page-with-enter-from-title-input', async ({ page }) => {
     const title = `My New Page Enter ${Date.now()}`;
+    const expectedSlug = title
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w-]/g, '');
 
     const treeView = new TreeView(page);
     const curNodeCount = await treeView.getNumberOfTreeNodes();
@@ -1011,9 +1015,10 @@ test.describe('Authenticated', () => {
 
     const addPageDialog = new AddPageDialog(page);
     await addPageDialog.fillTitle(title);
-    await addPageDialog.submitWithoutRedirectWithEnter();
+    await addPageDialog.submitWithEnter();
 
     await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await expect(page).toHaveURL(new RegExp(`${toAppPath(`/e/${expectedSlug}`)}$`));
   });
 
   test('create-subpage', async ({ page }) => {

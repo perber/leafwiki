@@ -40,7 +40,7 @@ export default class LoginPage {
     await createButton.waitFor({ state: 'detached' });
   }
 
-  async submitWithoutRedirectWithEnter() {
+  async submitWithEnter() {
     const titleInput = await this.getTitleInput();
     await titleInput.waitFor({ state: 'visible' });
     await titleInput.press('Enter');
