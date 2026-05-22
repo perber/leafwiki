@@ -3,10 +3,12 @@ package backup
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 const gitignoreContent = `# LeafWiki runtime files – do not commit
 *.db
+*.db-journal
 *.db-shm
 *.db-wal
 *.tmp
@@ -22,5 +24,8 @@ func EnsureGitignore(repoDir string) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	return os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644)
+	// Respect system umask
+	oldmask := syscall.Umask(0)
+	defer syscall.Umask(oldmask)
+	return os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644&^os.FileMode(oldmask))
 }
