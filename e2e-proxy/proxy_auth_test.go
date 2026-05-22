@@ -151,6 +151,37 @@ func TestProxyAuth_FallbackToJWT(t *testing.T) {
 	assertStatus(t, resp, http.StatusOK)
 }
 
+// TestRefreshToken_NoSession_Returns422 verifies that POST /api/auth/refresh-token
+// without a session cookie returns 422, not 401. A 401 would cause browsers behind a
+// Basic Auth reverse proxy to discard their cached credentials (RFC 9110 §15.5.2).
+func TestRefreshToken_NoSession_Returns422(t *testing.T) {
+	req, err := http.NewRequest(http.MethodPost, proxyURL+"/api/auth/refresh-token", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	body := readBody(t, resp)
+
+	if resp.StatusCode != http.StatusUnprocessableEntity {
+		t.Errorf("want 422, got %d — body: %s", resp.StatusCode, body)
+	}
+
+	var parsed struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(body), &parsed); err != nil {
+		t.Fatalf("response is not valid JSON: %v — body: %s", err, body)
+	}
+	if parsed.Error.Code != "auth_invalid_refresh_token" {
+		t.Errorf("want error code %q, got %q", "auth_invalid_refresh_token", parsed.Error.Code)
+	}
+}
+
 // TestProxyAuth_DirectRemoteUserHeader verifies that a client cannot bypass
 // proxy auth by sending Remote-User directly without going through nginx.
 // Because nginx strips and re-sets the header, a client sending Remote-User
