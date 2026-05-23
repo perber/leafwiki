@@ -3,7 +3,6 @@ package backup
 import (
 	"os"
 	"path/filepath"
-	"syscall"
 )
 
 const gitignoreContent = `# LeafWiki runtime files – do not commit
@@ -13,19 +12,18 @@ const gitignoreContent = `# LeafWiki runtime files – do not commit
 *.db-wal
 *.tmp
 .tmp-*
+.leafwiki/
+schema.json
 `
 
 // EnsureGitignore writes a .gitignore to repoDir if it does not already exist.
 func EnsureGitignore(repoDir string) error {
 	gitignorePath := filepath.Join(repoDir, ".gitignore")
 	if _, err := os.Stat(gitignorePath); err == nil {
-		// File exists, do not overwrite
 		return nil
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	// Respect system umask
-	oldmask := syscall.Umask(0)
-	defer syscall.Umask(oldmask)
-	return os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644&^os.FileMode(oldmask))
+	// os.WriteFile already respects the process umask — no manual umask needed
+	return os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644)
 }
