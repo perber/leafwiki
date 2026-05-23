@@ -310,7 +310,7 @@ func (r *Repository) RunBackup() error {
 
 	if !staged {
 		slog.Info("backup skipped - no staged changes in content directories")
-		r.status.SetSuccess(time.Now())
+		// Don't update LastBackupAt — no actual backup occurred
 		return nil
 	}
 
@@ -356,8 +356,12 @@ func (r *Repository) RunBackup() error {
 		slog.Debug("RunBackup: no remote configured, skipping push")
 	}
 
+	if r.cfg.RemoteURL != "" {
+		slog.Info("backup committed and pushed to remote")
+	} else {
+		slog.Info("backup committed locally (no remote configured)")
+	}
 	r.status.SetSuccess(time.Now())
-	slog.Info("backup pushed to remote")
 	return nil
 }
 
