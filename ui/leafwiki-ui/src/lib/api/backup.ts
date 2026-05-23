@@ -13,7 +13,7 @@ export interface BackupStatusResponse {
 }
 
 export async function fetchBackupStatus(): Promise<BackupStatusResponse> {
-  const res = await fetch(`${API_BASE_URL}${BACKUP_STATUS_URL}`, {
+  const res = await fetchWithAuth(`${API_BASE_URL}${BACKUP_STATUS_URL}`, {
     credentials: 'include',
   })
   if (!res.ok) throw new Error('Failed to fetch backup status')
