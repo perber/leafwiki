@@ -16,8 +16,7 @@ export async function fetchBackupStatus(): Promise<BackupStatusResponse> {
   const res = await fetchWithAuth(`${API_BASE_URL}${BACKUP_STATUS_URL}`, {
     credentials: 'include',
   })
-  if (!res.ok) throw new Error('Failed to fetch backup status')
-  return res.json()
+  return res as BackupStatusResponse
 }
 
 export async function triggerBackupPush(): Promise<void> {
