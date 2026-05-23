@@ -663,7 +663,7 @@
   /* AssetItem Component */
 
   .asset-item {
-    @apply bg-surface hover:bg-surface-alt flex flex-wrap items-start gap-2 rounded-md px-2 py-1 transition sm:flex-nowrap sm:items-center sm:justify-between;
+    @apply bg-surface hover:bg-surface-alt flex cursor-pointer flex-wrap items-start gap-2 rounded-md px-2 py-1 transition sm:flex-nowrap sm:items-center sm:justify-between;
   }
 
   .asset-item__preview-image {
