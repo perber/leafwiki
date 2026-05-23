@@ -62,6 +62,7 @@ func writeUsage(w io.Writer) {
 	--git-backup-branch            Git branch to push to (default: main)
 	--git-backup-ssh-key-path      Path to SSH private key for git backup
 	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
+	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
 	--git-backup-interval          Git backup interval in minutes (default: 60)
 
 	Environment variables:
@@ -96,6 +97,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_GIT_BACKUP_BRANCH
 	LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH
 	LEAFWIKI_GIT_BACKUP_SSH_KEY
+	LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS
 	LEAFWIKI_GIT_BACKUP_INTERVAL
 	`); err != nil {
 		panic(err)
@@ -160,6 +162,7 @@ type cliFlags struct {
 	gitBackupBranch           *string
 	gitBackupSSHKeyPath       *string
 	gitBackupSSHKey           *string
+	gitBackupSSHKnownHosts    *string
 	gitBackupInterval         *int
 }
 
@@ -195,7 +198,8 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupBranch:         fs.String("git-backup-branch", "", "git branch to push to (default: main)"),
 		gitBackupSSHKeyPath:     fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
 		gitBackupSSHKey:         fs.String("git-backup-ssh-key", "", "raw SSH private key for git backup (env var preferred)"),
-		gitBackupInterval:       fs.Int("git-backup-interval", 0, "git backup interval in minutes (default: 60)"),
+		gitBackupSSHKnownHosts: fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
+		gitBackupInterval:      fs.Int("git-backup-interval", 0, "git backup interval in minutes (default: 60)"),
 	}
 }
 
@@ -247,6 +251,7 @@ func main() {
 	gitBackupSSHKeyPath := resolveString("git-backup-ssh-key-path", *flags.gitBackupSSHKeyPath, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH", "")
 	gitBackupSSHKey := resolveString("git-backup-ssh-key", *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
 	gitBackupInterval := resolveInt("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL", 60)
+	gitBackupSSHKnownHosts := resolveString("git-backup-ssh-known-hosts", *flags.gitBackupSSHKnownHosts, visited, "LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS", "")
 	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
 	if err != nil {
 		fail("invalid --trusted-proxy-ips value", "error", err)
@@ -264,9 +269,7 @@ func main() {
 	}
 
 	// Validate git backup configuration
-	if gitBackupEnabled && gitBackupRemote == "" {
-		fail("git-backup-remote is required when git-backup is enabled. Set it using --git-backup-remote or LEAFWIKI_GIT_BACKUP_REMOTE.")
-	}
+	// Note: git-backup-remote is now optional (local-only mode is supported)
 
 	args := flag.Args()
 	if len(args) > 0 {
@@ -353,6 +356,7 @@ func main() {
 			Branch:          gitBackupBranch,
 			SSHKeyPath:      gitBackupSSHKeyPath,
 			SSHKey:          gitBackupSSHKey,
+			SSHKnownHosts:   gitBackupSSHKnownHosts,
 			IntervalMinutes: gitBackupInterval,
 		})
 		if err != nil {
