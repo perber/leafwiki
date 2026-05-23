@@ -70,17 +70,10 @@ func (s *Scheduler) run() {
 
 // TriggerNow signals the scheduler to run a backup immediately,
 // regardless of the interval. Non-blocking.
-// If a backup is already in progress, the signal is queued (buffer size 2).
 func (s *Scheduler) TriggerNow() {
 	select {
 	case s.manual <- struct{}{}:
 	default:
-		// Buffer full (backup in progress), try to add more
-		select {
-		case s.manual <- struct{}{}:
-		default:
-			// Buffer still full, at least 1 signal is pending - don't drop
-		}
 	}
 }
 
