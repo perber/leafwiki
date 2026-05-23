@@ -81,6 +81,8 @@ type RouterOptions struct {
 type FrontendConfig struct {
 	// GetSiteName returns the current site name injected into the HTML.
 	GetSiteName func() string
+	// GetFaviconFile returns the current branding favicon filename for initial HTML rendering.
+	GetFaviconFile func() string
 	// CustomStylesheetPath is the fully-resolved, validated path to a custom CSS file.
 	// Empty string disables custom stylesheet serving.
 	CustomStylesheetPath string
@@ -212,14 +214,18 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 						siteName = name
 					}
 				}
+				faviconFile := ""
+				if frontendCfg.GetFaviconFile != nil {
+					faviconFile = frontendCfg.GetFaviconFile()
+				}
 
 				html := string(data)
 				html = strings.ReplaceAll(html, "{{__SITE_NAME__}}", siteName)
 				html = strings.ReplaceAll(html, "{{__BASE_PATH__}}", opts.BasePath)
+				html = strings.ReplaceAll(html, "{{__FAVICON_HREF__}}", BuildFrontendFaviconHref(opts.BasePath, faviconFile))
 
 				if opts.BasePath != "" {
 					html = strings.ReplaceAll(html, `"/static/`, `"`+opts.BasePath+`/static/`)
-					html = strings.ReplaceAll(html, `"/favicon.svg"`, `"`+opts.BasePath+`/favicon.svg"`)
 				}
 
 				html = injectIntoHead(html, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
@@ -236,6 +242,14 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 
 	return engine
+}
+
+func BuildFrontendFaviconHref(basePath, faviconFile string) string {
+	if faviconFile != "" {
+		return basePath + "/branding/" + faviconFile
+	}
+
+	return basePath + "/favicon.svg"
 }
 
 // NormalizeCustomStylesheetPath resolves and validates a CSS path relative to storageDir.
