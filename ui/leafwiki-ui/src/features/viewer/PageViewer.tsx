@@ -1,11 +1,11 @@
 import Page404 from '@/components/Page404'
 import { formatRelativeTime } from '@/lib/formatDate'
-import { buildHistoryUrl } from '@/lib/routePath'
 import {
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
   DIALOG_PAGE_PERMALINK,
 } from '@/lib/registries'
+import { buildHistoryUrl } from '@/lib/routePath'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import {
   getParentWikiRoutePath,
@@ -18,13 +18,13 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BacklinkInfo } from '../links/LinkInfo'
-import MarkdownPreview from '../preview/MarkdownPreview'
-import { PageMetadata } from './PageMetadata'
 import { extractTocEntries } from '../preview/extractTocEntries'
+import MarkdownPreview from '../preview/MarkdownPreview'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { useProgressbarStore } from '../progressbar/progressbarStore'
 import Breadcrumbs from './Breadcrumbs'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
+import { PageMetadata } from './PageMetadata'
 import { useScrollToHeadline } from './useScrollToHeadline'
 import { useSetPageTitle } from './useSetPageTitle'
 import { useToolbarActions } from './useToolbarActions'
@@ -144,11 +144,17 @@ export default function PageViewer() {
   return (
     <>
       {subheader}
+      {page && !error && (
+        <div className="page-viewer__metadata-bar print:hidden">
+          <div className="page-viewer__metadata-bar-inner">
+            <PageMetadata page={page} />
+          </div>
+        </div>
+      )}
       <div className="page-viewer">
         {page && !error && (
           <div className="page-viewer__body">
             <article className="page-viewer__content">
-              <PageMetadata page={page} />
               <MarkdownPreview content={page.content} path={page.path} />
               <EmptySectionChildrenList page={page} />
             </article>
