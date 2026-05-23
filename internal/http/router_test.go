@@ -3892,6 +3892,46 @@ func TestInjectIntoHead(t *testing.T) {
 	}
 }
 
+func TestBuildFrontendFaviconHref(t *testing.T) {
+	tests := []struct {
+		name        string
+		basePath    string
+		faviconFile string
+		want        string
+	}{
+		{
+			name:     "default favicon without base path",
+			want:     "/favicon.svg",
+			basePath: "",
+		},
+		{
+			name:     "default favicon with base path",
+			basePath: "/wiki",
+			want:     "/wiki/favicon.svg",
+		},
+		{
+			name:        "custom favicon without base path",
+			faviconFile: "favicon.ico",
+			want:        "/branding/favicon.ico",
+		},
+		{
+			name:        "custom favicon with base path",
+			basePath:    "/wiki",
+			faviconFile: "favicon.webp",
+			want:        "/wiki/branding/favicon.webp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := httpinternal.BuildFrontendFaviconHref(tt.basePath, tt.faviconFile)
+			if got != tt.want {
+				t.Fatalf("BuildFrontendFaviconHref(%q, %q) = %q, want %q", tt.basePath, tt.faviconFile, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCustomStylesheetRoute(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

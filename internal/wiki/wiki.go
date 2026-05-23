@@ -462,6 +462,13 @@ func (w *Wiki) FrontendConfig() httpinternal.FrontendConfig {
 			}
 			return cfg.SiteName
 		},
+		GetFaviconFile: func() string {
+			cfg, err := w.branding.GetBranding()
+			if err != nil || cfg == nil {
+				return ""
+			}
+			return cfg.FaviconFile
+		},
 	}
 }
 
