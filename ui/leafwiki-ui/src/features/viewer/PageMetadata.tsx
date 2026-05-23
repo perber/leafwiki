@@ -47,7 +47,13 @@ export function PageMetadata({ page }: Props) {
   }
 
   return (
-    <div className="page-metadata">
+    <div
+      className={
+        hasTags && hasProperties
+          ? 'page-metadata page-metadata--two-col'
+          : 'page-metadata'
+      }
+    >
       {hasTags && (
         <div className="page-metadata__tags">
           <Tag size={13} className="page-metadata__tags-icon" />

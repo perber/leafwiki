@@ -1553,6 +1553,10 @@
     @apply flex w-full items-center justify-end md:w-auto md:shrink-0 md:self-center;
   }
 
+  .page-viewer__metadata-bar-inner {
+    @apply mx-auto w-full max-w-5xl px-8 py-2;
+  }
+
   .page-viewer__body {
     @apply flex min-h-0 flex-1 flex-col gap-8;
   }
@@ -2651,8 +2655,16 @@
 
   /* ─── Page Metadata (tags + properties in PageViewer) ─────────────────────── */
 
-  .page-metadata {
-    @apply mb-4 flex flex-col gap-1.5 pb-3;
+  .page-metadata:not(.page-metadata--two-col) {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .page-metadata--two-col {
+    @apply grid grid-cols-2 items-start gap-x-6;
+  }
+
+  .page-metadata--two-col .page-metadata__properties {
+    @apply items-end;
   }
 
   .page-metadata__tags {
