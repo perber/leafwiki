@@ -310,7 +310,6 @@ func (r *Repository) RunBackup() error {
 
 	if !staged {
 		slog.Info("backup skipped - no staged changes in content directories")
-		// Don't update LastBackupAt — no actual backup occurred
 		return nil
 	}
 
