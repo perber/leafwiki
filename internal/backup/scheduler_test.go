@@ -52,7 +52,7 @@ func TestScheduler_TriggerNow(t *testing.T) {
 	for {
 		select {
 		case <-ticker.C:
-			if !repo.status.LastBackupAt.IsZero() {
+			if !repo.Status().LastBackupAt.IsZero() {
 				goto afterInitialRun
 			}
 		case <-timeout:
@@ -69,11 +69,11 @@ afterInitialRun:
 	ticker2 := time.NewTicker(50 * time.Millisecond)
 	defer ticker2.Stop()
 
-	initialBackup := repo.status.LastBackupAt
+	initialBackup := repo.Status().LastBackupAt
 	for {
 		select {
 		case <-ticker2.C:
-			if !repo.status.LastBackupAt.IsZero() && !repo.status.LastBackupAt.Equal(initialBackup) {
+			if !repo.Status().LastBackupAt.IsZero() && !repo.Status().LastBackupAt.Equal(initialBackup) {
 				return // Success
 			}
 		case <-timeout2:
@@ -164,7 +164,7 @@ func TestScheduler_RunsOnStart(t *testing.T) {
 	for {
 		select {
 		case <-ticker.C:
-			if !repo.status.LastBackupAt.IsZero() {
+			if !repo.Status().LastBackupAt.IsZero() {
 				return // Success
 			}
 		case <-timeout:
