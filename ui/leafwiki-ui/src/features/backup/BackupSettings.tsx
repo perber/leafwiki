@@ -61,7 +61,6 @@ export default function BackupSettings() {
   useEffect(() => {
     if (isPolling) {
       const hasNewBackup =
-        lastBackupAtRef.current !== null &&
         lastBackupAt !== null &&
         lastBackupAtRef.current !== lastBackupAt
       const hasError = lastError !== ''
