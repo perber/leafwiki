@@ -18,7 +18,7 @@ export default class ImporterPage {
 
   async createImportPlan() {
     await this.page.getByRole('button', { name: 'Import from Zip' }).click();
-    await expect(this.page.getByText('Import plan created successfully')).toBeVisible();
+    await expect(this.page.getByText('Import plan created successfully').last()).toBeVisible();
     await expect(this.page.getByRole('heading', { name: 'Import Plan' })).toBeVisible();
   }
 
