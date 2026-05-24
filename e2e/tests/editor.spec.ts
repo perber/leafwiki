@@ -97,13 +97,6 @@ async function updatePageByPath(page: Page, input: { path: string; content: stri
 
 // ─── Panel helpers ────────────────────────────────────────────────────────────
 
-async function openFrontmatterPanel(page: Page) {
-  const trigger = page.locator('.page-frontmatter-panel__trigger');
-  await trigger.waitFor({ state: 'visible' });
-  await trigger.click();
-  await page.locator('[data-testid="page-frontmatter-tag-input"]').waitFor({ state: 'visible' });
-}
-
 async function addTag(page: Page, tag: string) {
   const input = page.locator('[data-testid="page-frontmatter-tag-input"]');
   await input.fill(tag);
@@ -165,7 +158,8 @@ test.describe('Editor', () => {
     await viewPage.goto(`/${slug}`);
     await viewPage.clickEditPageButton();
 
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
 
     // Tags are shown as chips
     await expect(
@@ -206,11 +200,11 @@ test.describe('Editor', () => {
     await viewPage.goto(`/${slug}`);
     await viewPage.clickEditPageButton();
 
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
     await addTag(page, 'release');
     await addProperty(page, 'status', 'draft');
 
-    const editPage = new EditPage(page);
     await editPage.savePage();
     await editPage.closeEditor();
 
@@ -247,11 +241,11 @@ test.describe('Editor', () => {
     await viewPage.goto(`/${slug}`);
     await viewPage.clickEditPageButton();
 
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
     await removeTag(page, 'leafwiki');
     await removeTag(page, 'andere');
 
-    const editPage = new EditPage(page);
     await editPage.savePage();
     await editPage.closeEditor();
 
@@ -292,7 +286,8 @@ test.describe('Editor', () => {
     await viewPage.goto(`/${slug}`);
     await viewPage.clickEditPageButton();
 
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
 
     // Remove the 'initial' tag
     await page
@@ -306,7 +301,6 @@ test.describe('Editor', () => {
     // Update the property value
     await page.locator('[data-testid="page-frontmatter-field-value-0"]').fill('two');
 
-    const editPage = new EditPage(page);
     await editPage.savePage();
     await editPage.closeEditor();
 
@@ -342,11 +336,11 @@ test.describe('Editor', () => {
     const saveButton = page.locator('button[data-testid="save-page-button"]');
     await saveButton.waitFor({ state: 'visible' });
 
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
     await addProperty(page, 'status', 'draft');
     await expect(saveButton).toBeEnabled();
 
-    const editPage = new EditPage(page);
     await editPage.savePage();
     await expect(saveButton).toBeDisabled();
     await editPage.closeEditor();
@@ -384,13 +378,13 @@ test.describe('Editor', () => {
     const saveButton = page.locator('button[data-testid="save-page-button"]');
     await saveButton.waitFor({ state: 'visible' });
 
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
     await expect(page.locator('[data-testid^="page-frontmatter-field-key-"]')).toHaveCount(2);
     await removeProperty(page, 1);
     await removeProperty(page, 0);
     await expect(saveButton).toBeEnabled();
 
-    const editPage = new EditPage(page);
     await editPage.savePage();
     await expect(saveButton).toBeDisabled();
     await editPage.closeEditor();
@@ -460,7 +454,8 @@ test.describe('Editor', () => {
     await saveButton.waitFor({ state: 'visible' });
     await expect(saveButton).toBeDisabled();
 
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
     await addTag(page, 'new-tag');
 
     await expect(saveButton).toBeEnabled();
@@ -515,7 +510,8 @@ test.describe('Editor', () => {
     await viewPage.goto(`/${slug}`);
     await viewPage.clickEditPageButton();
 
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
     // "tags" is a reserved property key — the frontend must reject this before sending the request
     await addProperty(page, 'tags', 'some-value');
 
@@ -544,7 +540,8 @@ test.describe('Editor', () => {
     await viewPage.goto(`/${slug}`);
     await viewPage.clickEditPageButton();
 
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
 
     // Add a field but leave the key empty — only fill in a value
     await page.locator('[data-testid="page-frontmatter-add-field"]').click();

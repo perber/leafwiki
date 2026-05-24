@@ -61,6 +61,15 @@ export default class EditPage {
     await metadataButton.click();
   }
 
+  async openFrontmatterPanel() {
+    const trigger = this.page.locator('.page-frontmatter-panel__trigger');
+    await trigger.waitFor({ state: 'visible' });
+    await trigger.click();
+    await this.page.locator('[data-testid="page-frontmatter-tag-input"]').waitFor({
+      state: 'visible',
+    });
+  }
+
   async uploadAsset(filePath: string) {
     const dropzone = this.page.locator('div[data-testid="asset-upload-dropzone"]');
     const assets = this.page.locator('li[data-testid="asset-item"]');
