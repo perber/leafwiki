@@ -1,5 +1,5 @@
 # Stage 1: Frontend build
-FROM node:26-alpine@sha256:95034e722cecec716c00830160848aab85c7b8180a131bb4f4fed9d5278f0989 AS frontend
+FROM node:26-alpine@sha256:7c6af15abe4e3de859690e7db171d0d711bf37d27528eddfe625b2fe89e097f8 AS frontend
 
 WORKDIR /ui
 ARG APP_VERSION
