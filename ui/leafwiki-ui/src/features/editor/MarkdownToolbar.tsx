@@ -1,11 +1,17 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
-import { DIALOG_ASSET_MANAGER } from '@/lib/registries'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { DIALOG_ASSET_MANAGER, DIALOG_LINK_INSERT } from '@/lib/registries'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useDialogsStore } from '@/stores/dialogs'
 import {
   Bold,
   Code,
+  Code2,
   Eye,
   EyeOff,
   Image,
@@ -61,9 +67,20 @@ export default function MarkdownToolbar({
     }
   }, [onAssetVersionChange])
 
-  const tableMarkdown = `| Header 1 | Header 2 |
-|----------|----------|
-| Cell 1   | Cell 2   |`
+  const [tablePickerOpen, setTablePickerOpen] = useState(false)
+  const [hovered, setHovered] = useState<{ col: number; row: number } | null>(
+    null,
+  )
+
+  const buildTableMarkdown = (cols: number, rows: number): string => {
+    const header =
+      '| ' +
+      Array.from({ length: cols }, (_, i) => `Header ${i + 1}`).join(' | ') +
+      ' |'
+    const divider = '|' + Array(cols).fill('----------').join('|') + '|'
+    const row = '| ' + Array(cols).fill('Cell').join(' | ') + ' |'
+    return [header, divider, ...Array(rows).fill(row)].join('\n')
+  }
 
   return (
     <>
@@ -90,7 +107,7 @@ export default function MarkdownToolbar({
             <Italic className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Strike through" side="top" align="center">
+        <TooltipWrapper label="Strikethrough" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
@@ -100,24 +117,28 @@ export default function MarkdownToolbar({
             <Strikethrough className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Link" side="top" align="center">
+        <TooltipWrapper label="Link (Ctrl+K)" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
             className="markdown-toolbar__button"
-            onClick={() =>
-              editorRef.current?.insertWrappedText(
-                '[',
-                '](https://example.com)',
-              )
-            }
+            onClick={() => {
+              const view = editorRef.current?.editorViewRef.current
+              const selectedText = view
+                ? view.state.doc.sliceString(
+                    view.state.selection.main.from,
+                    view.state.selection.main.to,
+                  )
+                : ''
+              openDialog(DIALOG_LINK_INSERT, { editorRef, selectedText })
+            }}
           >
             <Link className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
         <div className="markdown-toolbar__separator" />
         <TooltipWrapper
-          label="Headline - H1 (Ctrl + Alt + 1)"
+          label="Heading 1 (Ctrl+Alt+1)"
           side="top"
           align="center"
         >
@@ -131,7 +152,7 @@ export default function MarkdownToolbar({
           </Button>
         </TooltipWrapper>
         <TooltipWrapper
-          label="Headline - H2 (Ctrl + Alt + 2)"
+          label="Heading 2 (Ctrl+Alt+2)"
           side="top"
           align="center"
         >
@@ -145,7 +166,7 @@ export default function MarkdownToolbar({
           </Button>
         </TooltipWrapper>
         <TooltipWrapper
-          label="Headline - H3 (Ctrl + Alt + 3)"
+          label="Heading 3 (Ctrl+Alt+3)"
           side="top"
           align="center"
         >
@@ -159,17 +180,68 @@ export default function MarkdownToolbar({
           </Button>
         </TooltipWrapper>
         <div className="markdown-toolbar__separator markdown-toolbar__separator--desktop-only" />
-        <TooltipWrapper label="Table" side="top" align="center">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => editorRef.current?.insertAtCursor(tableMarkdown)}
-            className="markdown-toolbar__button"
+        <DropdownMenu
+          open={tablePickerOpen}
+          onOpenChange={(open) => {
+            setTablePickerOpen(open)
+            if (!open) {
+              setHovered(null)
+            }
+          }}
+        >
+          <TooltipWrapper label="Table" side="top" align="center">
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="markdown-toolbar__button"
+              >
+                <Table className="markdown-toolbar__icon" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipWrapper>
+          <DropdownMenuContent
+            className="p-2"
+            onCloseAutoFocus={(e) => e.preventDefault()}
           >
-            <Table className="markdown-toolbar__icon" />
-          </Button>
-        </TooltipWrapper>
-        <TooltipWrapper label="Codeblock" side="top" align="center">
+            <div className="text-muted-foreground mb-1 text-center text-xs">
+              {hovered ? `${hovered.col} × ${hovered.row}` : 'Select size'}
+            </div>
+            <div
+              className="grid gap-0.5"
+              style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}
+            >
+              {Array.from({ length: 6 }, (_, rowIdx) =>
+                Array.from({ length: 6 }, (_, colIdx) => {
+                  const col = colIdx + 1
+                  const row = rowIdx + 1
+                  const highlighted =
+                    hovered && col <= hovered.col && row <= hovered.row
+                  return (
+                    <button
+                      key={`${col}-${row}`}
+                      type="button"
+                      aria-label={`Insert table ${col} x ${row}`}
+                      className={`h-5 w-5 rounded-sm border transition-colors ${highlighted ? 'bg-primary border-primary' : 'border-border hover:bg-accent bg-transparent'}`}
+                      onFocus={() => setHovered({ col, row })}
+                      onBlur={() => setHovered(null)}
+                      onMouseEnter={() => setHovered({ col, row })}
+                      onMouseLeave={() => setHovered(null)}
+                      onClick={() => {
+                        editorRef.current?.insertAtCursor(
+                          buildTableMarkdown(col, row),
+                        )
+                        setTablePickerOpen(false)
+                        setHovered(null)
+                      }}
+                    />
+                  )
+                }),
+              )}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <TooltipWrapper label="Code Block" side="top" align="center">
           <Button
             variant="ghost"
             size="icon"
@@ -181,7 +253,18 @@ export default function MarkdownToolbar({
             <Code className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Add Image or File" side="top" align="center">
+        <TooltipWrapper label="Inline Code (Ctrl+`)" side="top" align="center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="markdown-toolbar__button"
+            data-testid="format-inline-code-button"
+            onClick={() => editorRef.current?.insertWrappedText('`')}
+          >
+            <Code2 className="markdown-toolbar__icon" />
+          </Button>
+        </TooltipWrapper>
+        <TooltipWrapper label="Image / File" side="top" align="center">
           <Button
             data-testid="open-asset-manager-button"
             variant="ghost"

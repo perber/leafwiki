@@ -1,6 +1,7 @@
 // register sidebar panel items
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
+import { LinkInsertDialog } from '@/features/editor/LinkInsertDialog'
 import { ImagePreviewDialog } from '@/features/imagepreview/ImagePreviewDialog'
 import { RestoreRevisionDialog } from '@/features/history/RestoreRevisionDialog'
 import { PageQuickSwitcherDialog } from '@/features/page-switcher/PageQuickSwitcherDialog'
@@ -75,6 +76,7 @@ export const DIALOG_PAGE_REFACTOR_CONFIRMATION = 'page-refactor-confirmation'
 export const DIALOG_PAGE_PERMALINK = 'page-permalink'
 export const DIALOG_RESTORE_REVISION_CONFIRMATION =
   'restore-revision-confirmation'
+export const DIALOG_LINK_INSERT = 'link-insert'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -266,6 +268,18 @@ dialogRegistry.register({
       <PermalinkDialog
         key={DIALOG_PAGE_PERMALINK}
         {...(props as React.ComponentProps<typeof PermalinkDialog>)}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_LINK_INSERT,
+  render: (props) => {
+    return (
+      <LinkInsertDialog
+        key={DIALOG_LINK_INSERT}
+        {...(props as React.ComponentProps<typeof LinkInsertDialog>)}
       />
     )
   },

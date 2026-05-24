@@ -9,6 +9,48 @@ export function insertWrappedText(
   const selected = view.state.doc.sliceString(from, to)
   const hasSelection = from !== to
 
+  if (hasSelection) {
+    // Case 1: The selection itself IS the formatted block (e.g. user selected "**bold**")
+    if (
+      selected.startsWith(before) &&
+      selected.endsWith(after) &&
+      selected.length > before.length + after.length
+    ) {
+      const unwrapped = selected.slice(
+        before.length,
+        selected.length - after.length,
+      )
+      view.dispatch({
+        changes: { from, to, insert: unwrapped },
+        selection: { anchor: from + unwrapped.length },
+      })
+      view.focus()
+      return
+    }
+
+    // Case 2: Markers are directly outside the selection (e.g. user selected "bold" with ** around it)
+    const docLen = view.state.doc.length
+    const extBefore = view.state.doc.sliceString(
+      Math.max(0, from - before.length),
+      from,
+    )
+    const extAfter = view.state.doc.sliceString(
+      to,
+      Math.min(docLen, to + after.length),
+    )
+    if (extBefore === before && extAfter === after) {
+      view.dispatch({
+        changes: [
+          { from: from - before.length, to: from, insert: '' },
+          { from: to, to: to + after.length, insert: '' },
+        ],
+        selection: { anchor: from - before.length + selected.length },
+      })
+      view.focus()
+      return
+    }
+  }
+
   const insertText = hasSelection
     ? `${before}${selected}${after}`
     : `${before}${after}`

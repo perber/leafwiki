@@ -18,6 +18,8 @@ export interface ToolbarActionsOptions {
   closePage: () => void
   formatBold: () => void
   formatItalic: () => void
+  formatInlineCode: () => void
+  openLinkDialog: () => void
   insertHeading: (level: 1 | 2 | 3) => void
   getEditorView?: () => EditorView | null
 }
@@ -28,6 +30,8 @@ export function useToolbarActions({
   closePage,
   formatBold,
   formatItalic,
+  formatInlineCode,
+  openLinkDialog,
   insertHeading,
   getEditorView,
 }: ToolbarActionsOptions) {
@@ -154,6 +158,20 @@ export function useToolbarActions({
       action: () => insertHeading(3),
     }
 
+    const inlineCodeHotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+Backquote',
+      enabled: true,
+      mode: ['edit'],
+      action: formatInlineCode,
+    }
+
+    const linkHotkey: HotKeyDefinition = {
+      keyCombo: 'Mod+KeyK',
+      enabled: true,
+      mode: ['edit'],
+      action: openLinkDialog,
+    }
+
     registerHotkey(saveHotKey)
     registerHotkey(closeHotkey)
     registerHotkey(boldHotkey)
@@ -161,6 +179,8 @@ export function useToolbarActions({
     registerHotkey(heading1Hotkey)
     registerHotkey(heading2Hotkey)
     registerHotkey(heading3Hotkey)
+    registerHotkey(inlineCodeHotkey)
+    registerHotkey(linkHotkey)
 
     return () => {
       unregisterHotkey(saveHotKey.keyCombo)
@@ -170,6 +190,8 @@ export function useToolbarActions({
       unregisterHotkey(heading1Hotkey.keyCombo)
       unregisterHotkey(heading2Hotkey.keyCombo)
       unregisterHotkey(heading3Hotkey.keyCombo)
+      unregisterHotkey(inlineCodeHotkey.keyCombo)
+      unregisterHotkey(linkHotkey.keyCombo)
     }
   }, [
     appMode,
@@ -179,6 +201,8 @@ export function useToolbarActions({
     closePage,
     formatBold,
     formatItalic,
+    formatInlineCode,
+    openLinkDialog,
     insertHeading,
     getEditorView,
     registerHotkey,

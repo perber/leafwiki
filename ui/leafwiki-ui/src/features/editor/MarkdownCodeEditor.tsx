@@ -107,6 +107,14 @@ export default function MarkdownCodeEditor({
         preventDefault: true,
       },
       {
+        key: 'Mod-`',
+        run: (view: EditorView) => {
+          insertWrappedText(view, '`', '`')
+          return true
+        },
+        preventDefault: true,
+      },
+      {
         key: 'Mod-Alt-1',
         run: (view: EditorView) => {
           insertHeadingAtStart(view, 1)
@@ -182,13 +190,13 @@ export default function MarkdownCodeEditor({
           beforeinput(event) {
             if (
               event.inputType === 'formatItalic' ||
-              event.inputType === 'formatBold'
+              event.inputType === 'formatBold' ||
+              event.inputType === 'formatCode'
             ) {
               event.preventDefault()
             }
           },
         }),
-        EditorView.lineWrapping,
         updateListener,
         EditorView.theme({
           '&': {
@@ -199,15 +207,23 @@ export default function MarkdownCodeEditor({
             color: 'hsl(var(--interface-text)) !important',
           },
           '.cm-editor': { height: '100%' },
-          '.cm-scroller': { height: '100%' },
+          '.cm-scroller': {
+            height: '100%',
+            overflowX: 'auto',
+            overflowY: 'auto',
+          },
           '.cm-content': {
             lineHeight: '1.5',
+            whiteSpace: 'pre',
+            width: 'max-content',
+            minWidth: '100%',
           },
           '.cm-line': {
             lineHeight: '1.5',
             paddingTop: '3px',
             paddingBottom: '3px',
             paddingLeft: '15px',
+            whiteSpace: 'pre',
           },
           '.cm-gutters': {
             lineHeight: '1.5',

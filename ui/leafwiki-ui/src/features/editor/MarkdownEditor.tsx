@@ -33,6 +33,7 @@ export type MarkdownEditorRef = {
   getMarkdown: () => string
   insertWrappedText: (before: string, after?: string) => void
   insertHeading: (level: 1 | 2 | 3) => void
+  replaceSelection: (text: string) => void
   replaceFilenameInMarkdown?: (before: string, after: string) => void
   editorViewRef: React.RefObject<EditorView | null>
   focus: () => void
@@ -186,6 +187,19 @@ const MarkdownEditor = (
       const view = editorViewRef.current
       if (!view) return
       insertWrappedText(view, before, after)
+      const newDoc = view.state.doc.toString()
+      setMarkdown(newDoc)
+      onChange(newDoc)
+      editorViewRef.current?.focus()
+    },
+    replaceSelection: (text: string) => {
+      const view = editorViewRef.current
+      if (!view) return
+      const { from, to } = view.state.selection.main
+      view.dispatch({
+        changes: { from, to, insert: text },
+        selection: { anchor: from + text.length },
+      })
       const newDoc = view.state.doc.toString()
       setMarkdown(newDoc)
       onChange(newDoc)

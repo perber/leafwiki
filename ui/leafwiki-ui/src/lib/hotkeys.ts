@@ -28,6 +28,10 @@ function normalizeEventCode(code: string) {
     return 'Space'
   }
 
+  if (code === 'Backquote') {
+    return 'Backquote'
+  }
+
   if (/^Key[A-Za-z]$/.test(code)) {
     return `Key${code.slice(3).toUpperCase()}`
   }
