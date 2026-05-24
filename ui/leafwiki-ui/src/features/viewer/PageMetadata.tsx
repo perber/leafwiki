@@ -29,6 +29,9 @@ export function PageMetadata({ page }: Props) {
 
   const hasTags = tags.length > 0
   const hasProperties = editableProps.length > 0
+  const metadataClassName = hasProperties
+    ? 'page-metadata page-metadata--two-col'
+    : 'page-metadata'
 
   if (!hasTags && !hasProperties) return null
 
@@ -47,13 +50,7 @@ export function PageMetadata({ page }: Props) {
   }
 
   return (
-    <div
-      className={
-        hasTags && hasProperties
-          ? 'page-metadata page-metadata--two-col'
-          : 'page-metadata'
-      }
-    >
+    <div className={metadataClassName}>
       {hasTags && (
         <div className="page-metadata__tags">
           <Tag size={13} className="page-metadata__tags-icon" />
@@ -73,7 +70,14 @@ export function PageMetadata({ page }: Props) {
       )}
 
       {hasProperties && (
-        <div className="page-metadata__properties">
+        <div
+          className={[
+            'page-metadata__properties',
+            !hasTags ? 'page-metadata__properties--standalone' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <button
             type="button"
             className="page-metadata__props-toggle"
