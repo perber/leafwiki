@@ -9,6 +9,88 @@ export default class EditPage {
     await this.page.keyboard.type(content);
   }
 
+  async pasteHtml(html: string) {
+    await this.page.locator('.cm-editor').click();
+    await this.page.evaluate((clipboardHtml) => {
+      const editorContent = document.querySelector('.cm-content');
+      if (!(editorContent instanceof HTMLElement)) {
+        throw new Error('Missing CodeMirror content element');
+      }
+
+      const data = new DataTransfer();
+      data.setData('text/html', clipboardHtml);
+
+      const event = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: data,
+      });
+
+      editorContent.dispatchEvent(event);
+    }, html);
+  }
+
+  async pasteClipboardData(formats: Record<string, string>) {
+    await this.page.locator('.cm-editor').click();
+    await this.page.evaluate((clipboardFormats) => {
+      const editorContent = document.querySelector('.cm-content');
+      if (!(editorContent instanceof HTMLElement)) {
+        throw new Error('Missing CodeMirror content element');
+      }
+
+      const data = new DataTransfer();
+      for (const [type, value] of Object.entries(clipboardFormats)) {
+        data.setData(type, value);
+      }
+
+      const event = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: data,
+      });
+
+      editorContent.dispatchEvent(event);
+    }, formats);
+  }
+
+  async selectAllText() {
+    await this.page.locator('.cm-editor').click();
+    await this.page.keyboard.press('Control+a');
+  }
+
+  async copySelection() {
+    return this.page.evaluate(() => {
+      const editorContent = document.querySelector('.cm-content');
+      if (!(editorContent instanceof HTMLElement)) {
+        throw new Error('Missing CodeMirror content element');
+      }
+
+      const clipboard = new Map<string, string>();
+      const event = new ClipboardEvent('copy', {
+        bubbles: true,
+        cancelable: true,
+      });
+
+      Object.defineProperty(event, 'clipboardData', {
+        value: {
+          setData(type: string, value: string) {
+            clipboard.set(type, value);
+          },
+          getData(type: string) {
+            return clipboard.get(type) ?? '';
+          },
+        },
+      });
+
+      editorContent.dispatchEvent(event);
+
+      return {
+        plain: clipboard.get('text/plain') ?? '',
+        html: clipboard.get('text/html') ?? '',
+      };
+    });
+  }
+
   async openReplacePanel() {
     const editor = this.page.locator('.cm-editor');
     await editor.click();

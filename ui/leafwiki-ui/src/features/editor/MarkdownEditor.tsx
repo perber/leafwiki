@@ -16,6 +16,12 @@ import {
   useState,
 } from 'react'
 import MarkdownPreview from '../preview/MarkdownPreview'
+import {
+  clipboardHtmlToMarkdown,
+  GOOGLE_DOCS_CLIPBOARD_TYPE,
+  googleDocsClipboardToMarkdown,
+  markdownToClipboardHtml,
+} from './clipboardMarkdown'
 import MarkdownCodeEditor from './MarkdownCodeEditor'
 import MarkdownToolbar from './MarkdownToolbar'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
@@ -53,6 +59,14 @@ const MarkdownEditor = (
   { initialValue = '', onChange, pageId }: Props,
   ref: React.ForwardedRef<MarkdownEditorRef>,
 ) => {
+  const previewClipboardText = (value: string, maxLength: number = 400) => {
+    if (!value) return ''
+
+    return value.length > maxLength
+      ? `${value.slice(0, maxLength)}...`
+      : value
+  }
+
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   const setPreviewRef = useCallback((node: HTMLDivElement | null) => {
@@ -83,6 +97,11 @@ const MarkdownEditor = (
       const { clipboardData } = event
       if (!clipboardData) return
 
+      const clipboardTypes = Array.from(clipboardData.types ?? [])
+      const plainText = clipboardData.getData('text/plain')
+      const html = clipboardData.getData('text/html')
+      const googleDocsRaw = clipboardData.getData(GOOGLE_DOCS_CLIPBOARD_TYPE)
+
       const files: File[] = []
 
       if (clipboardData.files && clipboardData.files.length > 0) {
@@ -98,11 +117,77 @@ const MarkdownEditor = (
         })
       }
 
+      console.info('[LeafWiki paste] clipboard', {
+        types: clipboardTypes,
+        fileCount: files.length,
+        hasPlainText: Boolean(plainText),
+        hasHtml: Boolean(html),
+        hasGoogleDocsCustomType: Boolean(googleDocsRaw),
+        plainTextPreview: previewClipboardText(plainText),
+        htmlPreview: previewClipboardText(html),
+        googleDocsPreview: previewClipboardText(googleDocsRaw),
+      })
+
       if (files.length === 0) {
+        const markdownFromGoogleDocs = googleDocsRaw
+          ? googleDocsClipboardToMarkdown(googleDocsRaw)
+          : ''
+        const markdownFromHtml = html ? clipboardHtmlToMarkdown(html) : ''
+        const markdownFromClipboard = markdownFromGoogleDocs || markdownFromHtml
+
+        if (!markdownFromClipboard) {
+          console.info('[LeafWiki paste] no rich-text conversion applied', {
+            usedPath: 'none',
+          })
+          return
+        }
+
+        console.info('[LeafWiki paste] rich-text conversion applied', {
+          usedPath: markdownFromGoogleDocs ? 'google-docs-custom' : 'text/html',
+          markdownPreview: previewClipboardText(markdownFromClipboard),
+        })
+
+        event.preventDefault()
+        event.stopPropagation()
+
+        const view = editorViewRef.current
+        if (!view) return
+
+        const { from, to } = view.state.selection.main
+        view.dispatch({
+          changes: { from, to, insert: markdownFromClipboard },
+          selection: { anchor: from + markdownFromClipboard.length },
+        })
+
+        const newDoc = view.state.doc.toString()
+        const contextStart = Math.max(0, from - 120)
+        const contextEnd = Math.min(
+          newDoc.length,
+          from + markdownFromClipboard.length + 120,
+        )
+        console.info('[LeafWiki paste] editor updated after rich-text paste', {
+          insertFrom: from,
+          insertTo: to,
+          insertedLength: markdownFromClipboard.length,
+          insertedPreview: previewClipboardText(markdownFromClipboard),
+          insertedContextPreview: previewClipboardText(
+            newDoc.slice(contextStart, contextEnd),
+            1200,
+          ),
+          documentPreview: previewClipboardText(newDoc, 800),
+          selectionAnchor: view.state.selection.main.anchor,
+          selectionHead: view.state.selection.main.head,
+        })
+        setMarkdown(newDoc)
+        onChange(newDoc)
+        editorViewRef.current?.focus()
         return
       }
 
       // We take over the paste event to handle image files
+      console.info('[LeafWiki paste] file upload path selected', {
+        fileNames: files.map((file) => file.name),
+      })
       event.preventDefault()
       event.stopPropagation()
 
@@ -143,6 +228,23 @@ const MarkdownEditor = (
           })
 
           const newDoc = view.state.doc.toString()
+          const contextStart = Math.max(0, from - 120)
+          const contextEnd = Math.min(
+            newDoc.length,
+            from + markdown.length + 120,
+          )
+          console.info('[LeafWiki paste] editor updated after file paste', {
+            insertFrom: from,
+            insertedLength: markdown.length,
+            insertedPreview: previewClipboardText(markdown),
+            insertedContextPreview: previewClipboardText(
+              newDoc.slice(contextStart, contextEnd),
+              1200,
+            ),
+            documentPreview: previewClipboardText(newDoc, 800),
+            selectionAnchor: view.state.selection.main.anchor,
+            selectionHead: view.state.selection.main.head,
+          })
           setMarkdown(newDoc)
           onChange(newDoc)
           editorViewRef.current?.focus()
@@ -154,6 +256,23 @@ const MarkdownEditor = (
     },
     [editorViewRef, maxAssetUploadSizeBytes, onChange, pageId, setMarkdown],
   )
+
+  const handleCopy = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
+    const view = editorViewRef.current
+    if (!view || !event.clipboardData) return
+
+    const { from, to } = view.state.selection.main
+    if (from === to) return
+
+    const selectedMarkdown = view.state.doc.sliceString(from, to)
+    const html = markdownToClipboardHtml(selectedMarkdown)
+
+    event.clipboardData.setData('text/plain', selectedMarkdown)
+    if (html) {
+      event.clipboardData.setData('text/html', html)
+    }
+    event.preventDefault()
+  }, [])
 
   // Set initial markdown value when component mounts
   // This sets the initial value only once
@@ -407,6 +526,7 @@ const MarkdownEditor = (
     <div
       className="markdown-editor"
       key={isMobile ? 'mobile' : 'desktop'}
+      onCopy={handleCopy}
       onPaste={handlePaste}
     >
       {/* Mobile */}

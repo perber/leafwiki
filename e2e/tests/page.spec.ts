@@ -955,6 +955,368 @@ async function expectEscapeClosesSearchPanelButNotEditor(page: import('@playwrig
   await viewPage.goto(`/${slug}`);
 }
 
+async function expectRichHtmlPasteConvertsToMarkdown(
+  page: import('@playwright/test').Page,
+) {
+  const timestamp = Date.now();
+  const slug = `rich-paste-${timestamp}`;
+  const title = `Rich Paste ${timestamp}`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: '',
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.pasteHtml(`
+    <h2>Quarterly Goals</h2>
+    <p><strong>Keep</strong> <em>momentum</em>.</p>
+    <ul>
+      <li>Ship wiki improvements</li>
+      <li>Share updates</li>
+    </ul>
+    <p><img src="/assets/example.png" alt="Roadmap" /></p>
+  `);
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  const content = await viewPage.getContent();
+  test.expect(content).toContain('Quarterly Goals');
+  test.expect(content).toContain('Keep momentum.');
+
+  await expect(
+    page.locator('article h2').filter({ hasText: 'Quarterly Goals' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('article li').filter({ hasText: 'Ship wiki improvements' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('article li').filter({ hasText: 'Share updates' }),
+  ).toBeVisible();
+  await expect(page.locator('article img[alt="Roadmap"]')).toHaveAttribute(
+    'src',
+    /\/assets\/example\.png(?:\?.*)?$/,
+  );
+}
+
+async function expectGoogleDocsPasteConvertsStyledSpansAndLists(
+  page: import('@playwright/test').Page,
+) {
+  const timestamp = Date.now();
+  const slug = `google-docs-paste-${timestamp}`;
+  const title = `Google Docs Paste ${timestamp}`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: '',
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.pasteHtml(`
+    <b id="docs-internal-guid-123" style="font-weight: normal;">
+      <p>
+        <span style="font-weight: 700;">Important</span>
+        <span> update</span>
+      </p>
+      <p>
+        <span>•</span>
+        <span> First bullet</span>
+      </p>
+      <p>
+        <span>•</span>
+        <span> Second bullet</span>
+      </p>
+      <p>
+        <span style="font-style: italic;">Italic note</span>
+      </p>
+    </b>
+  `);
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  await expect(page.locator('article strong')).toContainText('Important');
+  await expect(
+    page.locator('article li').filter({ hasText: 'First bullet' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('article li').filter({ hasText: 'Second bullet' }),
+  ).toBeVisible();
+  await expect(page.locator('article em')).toContainText('Italic note');
+}
+
+async function expectGoogleDocsCustomClipboardFallbackWorks(
+  page: import('@playwright/test').Page,
+) {
+  const timestamp = Date.now();
+  const slug = `google-docs-custom-${timestamp}`;
+  const title = `Google Docs Custom ${timestamp}`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: '',
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.pasteClipboardData({
+    'application/x-vnd.google-docs-document-slice-clip+wrapped': JSON.stringify({
+      resolved: {
+        html: `
+          <b id="docs-internal-guid-456" style="font-weight: normal;">
+            <p><span style="font-weight: 700;">Important</span><span> update</span></p>
+            <p><span>•</span><span> First bullet</span></p>
+            <p><span>•</span><span> Second bullet</span></p>
+            <p><span style="font-style: italic;">Italic note</span></p>
+          </b>
+        `,
+      },
+    }),
+  });
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  await expect(page.locator('article strong')).toContainText('Important');
+  await expect(
+    page.locator('article li').filter({ hasText: 'First bullet' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('article li').filter({ hasText: 'Second bullet' }),
+  ).toBeVisible();
+  await expect(page.locator('article em')).toContainText('Italic note');
+}
+
+async function expectGoogleDocsCustomClipboardPreferredOverHtml(
+  page: import('@playwright/test').Page,
+) {
+  const timestamp = Date.now();
+  const slug = `google-docs-priority-${timestamp}`;
+  const title = `Google Docs Priority ${timestamp}`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: '',
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.pasteClipboardData({
+    'text/html':
+      '<p><a href="https://docs.google.com/document/d/example/edit#heading=h.1">Version 2</a></p>',
+    'application/x-vnd.google-docs-document-slice-clip+wrapped': JSON.stringify({
+      resolved: {
+        html: `
+          <b id="docs-internal-guid-789" style="font-weight: normal;">
+            <p><span style="font-weight: 700;">Version</span><span> 2</span></p>
+          </b>
+        `,
+      },
+    }),
+  });
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  await expect(page.locator('article strong')).toContainText('Version');
+  await expect(page.locator('article a')).toHaveCount(0);
+}
+
+async function expectLeafWikiHeadingAnchorsPasteAsHeadings(
+  page: import('@playwright/test').Page,
+) {
+  const timestamp = Date.now();
+  const slug = `leafwiki-heading-paste-${timestamp}`;
+  const title = `LeafWiki Heading Paste ${timestamp}`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: '',
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.pasteHtml(`
+    <h1 id="leafwiki-documentation" class="anchor" data-line="1">
+      <a class="headline-anchor headline-anchor--full" href="#leafwiki-documentation">
+        LeafWiki Documentation
+        <span><svg></svg></span>
+      </a>
+    </h1>
+    <p>LeafWiki is a lightweight, self-hosted wiki.</p>
+  `);
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  await expect(
+    page.locator('article h1').filter({ hasText: 'LeafWiki Documentation' }),
+  ).toBeVisible();
+  await expect(page.locator('article h1 a')).toHaveAttribute(
+    'href',
+    '#leafwiki-documentation',
+  );
+}
+
+async function expectLeafWikiCodeBlockHtmlPastesAsCodeBlock(
+  page: import('@playwright/test').Page,
+) {
+  const timestamp = Date.now();
+  const slug = `leafwiki-codeblock-paste-${timestamp}`;
+  const title = `LeafWiki Codeblock Paste ${timestamp}`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: '',
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.pasteHtml(`
+    <div class="markdown-code-block">
+      <div class="markdown-code-block__actions">
+        <button type="button" data-testid="markdown-code-copy-button">Copy</button>
+      </div>
+      <pre><code class="language-bash">echo "hello"
+pwd
+</code></pre>
+    </div>
+  `);
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  const codeBlock = page.locator('article pre code');
+  await expect(codeBlock).toContainText('echo "hello"');
+  await expect(codeBlock).toContainText('pwd');
+  await expect(page.locator('article').getByText('Copy')).toHaveCount(0);
+}
+
+async function expectHtmlTablePastesAsMarkdownTable(
+  page: import('@playwright/test').Page,
+) {
+  const timestamp = Date.now();
+  const slug = `html-table-paste-${timestamp}`;
+  const title = `HTML Table Paste ${timestamp}`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: '',
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.pasteHtml(`
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Patrick</td><td>Admin</td></tr>
+        <tr><td>Alex</td><td>Viewer</td></tr>
+      </tbody>
+    </table>
+  `);
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  await expect(page.locator('article table')).toBeVisible();
+  await expect(page.locator('article th').filter({ hasText: 'Name' })).toBeVisible();
+  await expect(page.locator('article td').filter({ hasText: 'Patrick' })).toBeVisible();
+}
+
+async function expectStyledMonospaceSpanPastesAsInlineCode(
+  page: import('@playwright/test').Page,
+) {
+  const timestamp = Date.now();
+  const slug = `inline-code-paste-${timestamp}`;
+  const title = `Inline Code Paste ${timestamp}`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content: '',
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.pasteHtml(`
+    <p>
+      Use
+      <span style="font-family: Menlo, monospace;">leafwiki --help</span>
+      to print the CLI help.
+    </p>
+  `);
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  await expect(page.locator('article code')).toContainText('leafwiki --help');
+}
+
+async function expectMarkdownCopyProvidesHtmlClipboard(
+  page: import('@playwright/test').Page,
+) {
+  const timestamp = Date.now();
+  const slug = `rich-copy-${timestamp}`;
+  const title = `Rich Copy ${timestamp}`;
+  const content = `## Copy Heading
+
+- First item
+- Second item
+
+![Roadmap](/assets/example.png)`;
+
+  await createPageWithContent(page, {
+    title,
+    slug,
+    content,
+  });
+
+  const viewPage = new ViewPage(page);
+  await viewPage.goto(`/${slug}`);
+  await viewPage.clickEditPageButton();
+
+  const editPage = new EditPage(page);
+  await editPage.selectAllText();
+  const clipboard = await editPage.copySelection();
+
+  test.expect(clipboard.plain).toBe(content);
+  test.expect(clipboard.html).toContain('<h2>Copy Heading</h2>');
+  test.expect(clipboard.html).toContain('<li>First item</li>');
+  test.expect(clipboard.html).toContain('<li>Second item</li>');
+  test.expect(clipboard.html).toContain(
+    '<img src="/assets/example.png" alt="Roadmap"/>',
+  );
+}
+
 async function expectOpenedPageMarkedInNavigationDuringEditMode(
   page: import('@playwright/test').Page,
 ) {
@@ -1389,6 +1751,42 @@ for the page edited at ${new Date().toISOString()}
 
   test('escape closes search panel but keeps editor open', async ({ page }) => {
     await expectEscapeClosesSearchPanelButNotEditor(page);
+  });
+
+  test('rich html paste converts basic formatting into markdown', async ({ page }) => {
+    await expectRichHtmlPasteConvertsToMarkdown(page);
+  });
+
+  test('google docs paste converts styled spans and bullets', async ({ page }) => {
+    await expectGoogleDocsPasteConvertsStyledSpansAndLists(page);
+  });
+
+  test('google docs custom clipboard fallback works', async ({ page }) => {
+    await expectGoogleDocsCustomClipboardFallbackWorks(page);
+  });
+
+  test('google docs custom clipboard is preferred over html', async ({ page }) => {
+    await expectGoogleDocsCustomClipboardPreferredOverHtml(page);
+  });
+
+  test('leafwiki heading anchors paste as headings', async ({ page }) => {
+    await expectLeafWikiHeadingAnchorsPasteAsHeadings(page);
+  });
+
+  test('leafwiki code block html pastes as code block', async ({ page }) => {
+    await expectLeafWikiCodeBlockHtmlPastesAsCodeBlock(page);
+  });
+
+  test('html table pastes as markdown table', async ({ page }) => {
+    await expectHtmlTablePastesAsMarkdownTable(page);
+  });
+
+  test('styled monospace span pastes as inline code', async ({ page }) => {
+    await expectStyledMonospaceSpanPastesAsInlineCode(page);
+  });
+
+  test('copying markdown selection exposes html clipboard content', async ({ page }) => {
+    await expectMarkdownCopyProvidesHtmlClipboard(page);
   });
 
   test('headline anchor keeps classic hash navigation for plain headings', async ({ page }) => {
