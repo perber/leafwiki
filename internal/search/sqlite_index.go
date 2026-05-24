@@ -13,7 +13,9 @@ import (
 	"github.com/perber/wiki/internal/core/excerpt"
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
-	"github.com/russross/blackfriday/v2"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
@@ -29,41 +31,42 @@ func searchIndexDatabasePath(storageDir string, filename string) string {
 	return filepath.Join(normalizedStorageDir, filename)
 }
 
-func extractHeadings(markdown string) string {
-	node := blackfriday.New(blackfriday.WithExtensions(
-		blackfriday.CommonExtensions | blackfriday.AutoHeadingIDs,
-	)).Parse([]byte(markdown))
+var headingParser = goldmark.New()
+
+func extractHeadings(src string) string {
+	srcBytes := []byte(src)
+	reader := text.NewReader(srcBytes)
+	doc := headingParser.Parser().Parse(reader)
 
 	var buf bytes.Buffer
 
-	node.Walk(func(n *blackfriday.Node, entering bool) blackfriday.WalkStatus {
-		if !entering || n.Type != blackfriday.Heading {
-			return blackfriday.GoToNext
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		if _, ok := n.(*ast.Heading); !ok {
+			return ast.WalkContinue, nil
 		}
 
 		var headingText bytes.Buffer
-
-		var walk func(c *blackfriday.Node)
-		walk = func(c *blackfriday.Node) {
-			for ; c != nil; c = c.Next {
-				if c.Literal != nil {
-					headingText.Write(c.Literal)
-					headingText.WriteByte(' ')
-				}
-				if c.FirstChild != nil {
-					walk(c.FirstChild)
-				}
+		_ = ast.Walk(n, func(child ast.Node, childEntering bool) (ast.WalkStatus, error) {
+			if !childEntering || child == n {
+				return ast.WalkContinue, nil
 			}
-		}
-		walk(n.FirstChild)
+			if t, ok := child.(*ast.Text); ok {
+				headingText.Write(t.Segment.Value(srcBytes))
+				headingText.WriteByte(' ')
+			}
+			return ast.WalkContinue, nil
+		})
 
-		text := strings.TrimSpace(headingText.String())
-		if text != "" {
-			buf.WriteString(text)
+		headingStr := strings.TrimSpace(headingText.String())
+		if headingStr != "" {
+			buf.WriteString(headingStr)
 			buf.WriteByte('\n')
 		}
 
-		return blackfriday.GoToNext
+		return ast.WalkSkipChildren, nil
 	})
 
 	return excerpt.PlainTextFromMarkdown(buf.String())
