@@ -14,12 +14,37 @@ const importMetadataZipPath = path.resolve(
   '../../internal/importer/fixtures/import-metadata.zip',
 );
 const importMetadataZipFileName = 'import-metadata.zip';
+const importedMetadataPagePath = '/imported-metadata-page';
 
-async function openFrontmatterPanel(page: import('@playwright/test').Page) {
-  const trigger = page.locator('.page-frontmatter-panel__trigger');
-  await trigger.waitFor({ state: 'visible' });
-  await trigger.click();
-  await page.locator('[data-testid="page-frontmatter-tag-input"]').waitFor({ state: 'visible' });
+async function expectViewerPropertyRow(
+  page: import('@playwright/test').Page,
+  key: string,
+  value: string,
+) {
+  const row = page
+    .locator('.page-metadata__prop-row')
+    .filter({
+      has: page.locator('.page-metadata__prop-key', { hasText: key }),
+    })
+    .filter({
+      has: page.locator('.page-metadata__prop-value', { hasText: value }),
+    });
+  await expect(row).toBeVisible();
+}
+
+async function getEditorProperties(page: import('@playwright/test').Page) {
+  const rows = page.locator('.page-frontmatter-panel__field-row');
+  const count = await rows.count();
+  const properties: Record<string, string> = {};
+
+  for (let index = 0; index < count; index += 1) {
+    const row = rows.nth(index);
+    const key = await row.locator('[data-testid^="page-frontmatter-field-key-"]').inputValue();
+    const value = await row.locator('[data-testid^="page-frontmatter-field-value-"]').inputValue();
+    properties[key] = value;
+  }
+
+  return properties;
 }
 
 test.describe('Importer', () => {
@@ -90,7 +115,7 @@ test.describe('Importer', () => {
     await importerPage.executeImportPlan();
 
     const viewPage = new ViewPage(page);
-    await viewPage.goto('/home');
+    await viewPage.goto(importedMetadataPagePath);
 
     await expect(
       page.locator('.page-metadata__tag-chip').filter({ hasText: 'imported-e2e-tag' }),
@@ -103,21 +128,12 @@ test.describe('Importer', () => {
     await propsToggle.waitFor({ state: 'visible' });
     await propsToggle.click();
 
-    await expect(
-      page.locator('.page-metadata__prop-key').filter({ hasText: 'status' }),
-    ).toBeVisible();
-    await expect(
-      page.locator('.page-metadata__prop-value').filter({ hasText: 'published' }),
-    ).toBeVisible();
-    await expect(
-      page.locator('.page-metadata__prop-key').filter({ hasText: 'owner' }),
-    ).toBeVisible();
-    await expect(
-      page.locator('.page-metadata__prop-value').filter({ hasText: 'importer-e2e' }),
-    ).toBeVisible();
+    await expectViewerPropertyRow(page, 'status', 'published');
+    await expectViewerPropertyRow(page, 'owner', 'importer-e2e');
 
     await viewPage.clickEditPageButton();
-    await openFrontmatterPanel(page);
+    const editPage = new EditPage(page);
+    await editPage.openFrontmatterPanel();
 
     await expect(
       page.locator('.page-frontmatter-panel__chip').filter({ hasText: 'imported-e2e-tag' }),
@@ -127,20 +143,14 @@ test.describe('Importer', () => {
     ).toBeVisible();
 
     const keyInputs = page.locator('[data-testid^="page-frontmatter-field-key-"]');
-    const valueInputs = page.locator('[data-testid^="page-frontmatter-field-value-"]');
     await expect(keyInputs).toHaveCount(2);
 
-    const keys = await keyInputs.evaluateAll((els: HTMLInputElement[]) => els.map((e) => e.value));
-    const values = await valueInputs.evaluateAll((els: HTMLInputElement[]) =>
-      els.map((e) => e.value),
-    );
+    const properties = await getEditorProperties(page);
+    expect(properties).toEqual({
+      owner: 'importer-e2e',
+      status: 'published',
+    });
 
-    expect(keys).toContain('status');
-    expect(keys).toContain('owner');
-    expect(values).toContain('published');
-    expect(values).toContain('importer-e2e');
-
-    const editPage = new EditPage(page);
     await editPage.closeEditor();
   });
 });

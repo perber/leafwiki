@@ -6,6 +6,6 @@ status: published
 owner: importer-e2e
 ---
 
-# Home
+# Imported Metadata Page
 
-This imported home page carries metadata for E2E verification.
+This imported page carries metadata for E2E verification.
