@@ -62,6 +62,20 @@ function propertiesChanged(
   return editable.some((f) => String(original[f.key] ?? '') !== f.value)
 }
 
+function buildEditableProperties(
+  fields: EditorFrontmatterField[],
+): Record<string, string> {
+  const properties: Record<string, string> = {}
+
+  for (const field of fields) {
+    if (!field.internal && field.type === 'text' && field.key) {
+      properties[field.key] = field.value
+    }
+  }
+
+  return properties
+}
+
 export const isDirtyState = (s: PageEditorState) => {
   const { page, title, slug, content, tags, frontmatterFields } = s
   if (!page) return false
@@ -127,12 +141,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       throw new Error('Please fix metadata errors before saving.')
     }
 
-    const properties: Record<string, string> = {}
-    for (const field of frontmatterFields) {
-      if (!field.internal && field.type === 'text' && field.key) {
-        properties[field.key] = field.value
-      }
-    }
+    const properties = buildEditableProperties(frontmatterFields)
 
     try {
       useProgressbarStore.getState().setLoading(true)
@@ -189,7 +198,14 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         )
       }
 
-      // only update the page.content to avoid overwriting other fields
+      const nextTags = updatedPage?.tags ?? tags
+      const nextProperties =
+        updatedPage && updatedPage.properties
+          ? updatedPage.properties
+          : properties
+
+      // Keep the local page snapshot canonical after save so metadata-only
+      // updates do not remain dirty when the API omits empty collections.
       set((state) => {
         if (!state.page) return {}
 
@@ -204,10 +220,23 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         state.page.content = updatedPage.content
         state.page.path = updatedPage.path
         state.page.version = updatedPage.version
-        state.page.tags = updatedPage.tags ?? tags
-        state.page.properties = updatedPage.properties ?? properties
+        state.page.tags = nextTags
+        state.page.properties = nextProperties
 
-        return { page: state.page }
+        return {
+          page: state.page,
+          tags: nextTags,
+          frontmatterFields: state.frontmatterFields.map((field) => {
+            if (field.internal || field.type !== 'text') {
+              return field
+            }
+
+            return {
+              ...field,
+              value: nextProperties[field.key] ?? field.value,
+            }
+          }),
+        }
       })
 
       // sync tree: full reload on structural changes, version-only patch otherwise

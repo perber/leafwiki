@@ -2671,6 +2671,10 @@
     @apply items-end;
   }
 
+  .page-metadata--two-col .page-metadata__properties--standalone {
+    @apply col-start-2;
+  }
+
   .page-metadata__tags {
     @apply flex items-center gap-1.5;
   }

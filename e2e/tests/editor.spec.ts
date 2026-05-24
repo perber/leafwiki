@@ -127,6 +127,10 @@ async function addProperty(page: Page, key: string, value: string) {
   await page.locator(`[data-testid="page-frontmatter-field-value-${lastIndex}"]`).fill(value);
 }
 
+async function removeProperty(page: Page, index: number) {
+  await page.locator('.page-frontmatter-panel__field-remove').nth(index).click();
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 test.describe('Editor', () => {
@@ -319,6 +323,99 @@ test.describe('Editor', () => {
     await expect(
       page.locator('.page-metadata__prop-value').filter({ hasText: 'two' }),
     ).toBeVisible();
+  });
+
+  test('editor-saves-properties-without-tags-and-resets-dirty-state', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-properties-only-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: `Editor Properties Only ${stamp}`,
+      slug,
+      content: 'Properties only content.',
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const saveButton = page.locator('button[data-testid="save-page-button"]');
+    await saveButton.waitFor({ state: 'visible' });
+
+    await openFrontmatterPanel(page);
+    await addProperty(page, 'status', 'draft');
+    await expect(saveButton).toBeEnabled();
+
+    const editPage = new EditPage(page);
+    await editPage.savePage();
+    await expect(saveButton).toBeDisabled();
+    await editPage.closeEditor();
+
+    const propsToggle = page.locator('.page-metadata__props-toggle');
+    await propsToggle.waitFor({ state: 'visible' });
+
+    await expect(page.locator('.page-metadata')).toHaveClass(/page-metadata--two-col/);
+    await expect(page.locator('.page-metadata__tag-chip')).toHaveCount(0);
+
+    await propsToggle.click();
+    await expect(
+      page.locator('.page-metadata__prop-key').filter({ hasText: 'status' }),
+    ).toBeVisible();
+    await expect(
+      page.locator('.page-metadata__prop-value').filter({ hasText: 'draft' }),
+    ).toBeVisible();
+  });
+
+  test('editor-removes-all-properties-saves-and-resets-dirty-state', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-remove-properties-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: `Editor Remove Properties ${stamp}`,
+      slug,
+      content: 'Remove properties content.',
+      properties: { status: 'draft', owner: 'alice' },
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const saveButton = page.locator('button[data-testid="save-page-button"]');
+    await saveButton.waitFor({ state: 'visible' });
+
+    await openFrontmatterPanel(page);
+    await expect(page.locator('[data-testid^="page-frontmatter-field-key-"]')).toHaveCount(2);
+    await removeProperty(page, 1);
+    await removeProperty(page, 0);
+    await expect(saveButton).toBeEnabled();
+
+    const editPage = new EditPage(page);
+    await editPage.savePage();
+    await expect(saveButton).toBeDisabled();
+    await editPage.closeEditor();
+
+    await expect(page.locator('.page-metadata')).toHaveCount(0);
+
+    const fetchedProperties = await page.evaluate(
+      async ({ path, csrfScript }) => {
+        const csrfToken = new Function(csrfScript)() as string;
+        const response = await fetch(`/api/pages/by-path?path=${encodeURIComponent(path)}`, {
+          credentials: 'include',
+          headers: { 'X-CSRF-Token': csrfToken },
+        });
+        if (!response.ok) {
+          throw new Error(`load failed: ${response.status}`);
+        }
+        const data = (await response.json()) as {
+          properties?: Record<string, string>;
+        };
+        return data.properties ?? {};
+      },
+      { path: slug, csrfScript: getCsrfScript() },
+    );
+
+    expect(fetchedProperties).toEqual({});
   });
 
   // ── Dirty state ─────────────────────────────────────────────────────────────
