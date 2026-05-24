@@ -23,22 +23,36 @@ jobs:
 
       - name: Check all actions are SHA-pinned
         run: |
-          UNPINNED=$(grep -rn '^\s*uses:' .github/workflows/ \
+          FAILED=0
+          while IFS= read -r match; do
+            [ -z "$match" ] && continue
+            file=$(echo "$match" | cut -d: -f1)
+            line=$(echo "$match" | cut -d: -f2)
+            content=$(echo "$match" | cut -d: -f3-)
+            echo "::error file=${file},line=${line}::Unpinned action: ${content}"
+            FAILED=1
+          done <<< "$(grep -rn '^\s*uses:' .github/workflows/ \
             | grep -v 'uses: \.' \
-            | grep -vE '@[0-9a-f]{40}')
-          if [ -n "$UNPINNED" ]; then
-            echo "::error::Unpinned GitHub Actions found — use SHA hashes instead of tags:"
-            echo "$UNPINNED"
+            | grep -vE '@[0-9a-f]{40}')"
+          if [ "$FAILED" -eq 1 ]; then
+            echo "Fix: replace tags (@v4) with SHA hashes. Run: pinact run"
             exit 1
           fi
           echo "All GitHub Actions are properly SHA-pinned."
 
       - name: Check all Docker base images are digest-pinned
         run: |
-          UNPINNED=$(grep -rn '^FROM ' Dockerfile Dockerfile.builder | grep -v '@sha256:')
-          if [ -n "$UNPINNED" ]; then
-            echo "::error::Unpinned Docker base images found — use @sha256: digests:"
-            echo "$UNPINNED"
+          FAILED=0
+          while IFS= read -r match; do
+            [ -z "$match" ] && continue
+            file=$(echo "$match" | cut -d: -f1)
+            line=$(echo "$match" | cut -d: -f2)
+            content=$(echo "$match" | cut -d: -f3-)
+            echo "::error file=${file},line=${line}::Unpinned Docker image: ${content}"
+            FAILED=1
+          done <<< "$(grep -rn '^FROM ' Dockerfile Dockerfile.builder | grep -v '@sha256:')"
+          if [ "$FAILED" -eq 1 ]; then
+            echo "Fix: add @sha256: digest to each FROM line."
             exit 1
           fi
           echo "All Docker base images are properly digest-pinned."
