@@ -1,7 +1,9 @@
 import Page404 from '@/components/Page404'
 import { mapApiError, asApiLocalizedError } from '@/lib/api/errors'
 import { buildBrowserEditUrl } from '@/lib/routePath'
+import { DIALOG_LINK_INSERT } from '@/lib/registries'
 import { getWikiTargetRoutePath } from '@/lib/wikiPath'
+import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useRef } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
@@ -21,6 +23,7 @@ export default function PageEditor() {
   const navigate = useNavigate()
   const editorRef = useRef<MarkdownEditorRef>(null)
   const skipNavigationGuardRef = useRef(false)
+  const openDialog = useDialogsStore((s) => s.openDialog)
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const savePage = usePageEditorStore((s) => s.savePage)
   const forceOverwrite = usePageEditorStore((s) => s.forceOverwrite)
@@ -143,12 +146,25 @@ export default function PageEditor() {
     }
   }, [navigate])
 
+  const openLinkDialog = useCallback(() => {
+    const view = editorRef.current?.editorViewRef.current
+    const selectedText = view
+      ? view.state.doc.sliceString(
+          view.state.selection.main.from,
+          view.state.selection.main.to,
+        )
+      : ''
+    openDialog(DIALOG_LINK_INSERT, { editorRef, selectedText })
+  }, [editorRef, openDialog])
+
   // register toolbar actions
   useToolbarActions({
     savePage: () => handleSave(),
     closePage: handleClose,
     formatBold: () => editorRef.current?.insertWrappedText('**', '**'),
     formatItalic: () => editorRef.current?.insertWrappedText('_', '_'),
+    formatInlineCode: () => editorRef.current?.insertWrappedText('`', '`'),
+    openLinkDialog,
     insertHeading: (level) => editorRef.current?.insertHeading(level),
     getEditorView: () => editorRef.current?.editorViewRef.current ?? null,
   })
