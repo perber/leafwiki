@@ -1,0 +1,73 @@
+services:
+  dex:
+    image: ghcr.io/dexidp/dex:v2.41.1
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    volumes:
+      - ./dex/config.yaml:/etc/dex/config.yaml:ro
+    ports:
+      - "5556:5556"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5556/healthz"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    networks:
+      - hack-net
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    command:
+      - --provider=oidc
+      # Skip OIDC discovery and wire endpoints manually so we can split:
+      #   browser-facing  → localhost:5556  (exposed port, reachable by the user's browser)
+      #   container-side  → dex:5556        (internal Docker DNS, reachable by oauth2-proxy)
+      - --skip-oidc-discovery
+      - --oidc-issuer-url=http://localhost:5556
+      - --login-url=http://localhost:5556/auth
+      - --redeem-url=http://dex:5556/token
+      - --profile-url=http://dex:5556/userinfo
+      - --oidc-jwks-url=http://dex:5556/keys
+      - --client-id=oauth2-proxy
+      - --client-secret=dev-secret
+      - --cookie-secret=YS1maXhlZC1jb29raWUtc2VjcmV0LWZvci1oYWNrcyE=
+      - --upstream=http://leafwiki:8080
+      - --redirect-url=http://localhost:4180/oauth2/callback
+      - --email-domain=*
+      # Use "name" claim (= username "admin") as user identity; preferred_username is empty in Dex local connector
+      - --oidc-email-claim=name
+      - --prefer-email-to-user=true
+      - --scope=openid email profile
+      - --http-address=0.0.0.0:4180
+      - --cookie-secure=false
+      - --skip-provider-button=true
+    ports:
+      - "4180:4180"
+    depends_on:
+      dex:
+        condition: service_healthy
+    networks:
+      - hack-net
+
+  leafwiki:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    command:
+      - "--jwt-secret=hack-secret"
+      - "--admin-password=admin"
+      - "--allow-insecure=true"
+      - "--enable-http-remote-user=true"
+      - "--http-remote-user-header-name=X-Forwarded-User"
+      - "--trusted-proxy-ips=172.16.0.0/12"
+      - "--http-remote-user-logout-url=http://localhost:4180/oauth2/sign_out"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/config"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks:
+      - hack-net
+
+networks:
+  hack-net:
+    driver: bridge

@@ -1,0 +1,26 @@
+issuer: http://localhost:5556
+
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+staticClients:
+  - id: oauth2-proxy
+    redirectURIs:
+      - http://localhost:4180/oauth2/callback
+    name: LeafWiki Dev
+    secret: dev-secret
+
+enablePasswordDB: true
+
+staticPasswords:
+  # password: "password"  (bcrypt hash below)
+  - email: admin@leafwiki.local
+    hash: "$2a$10$RdSjSuyaSikUkI3dFzTiy.p6pC8knsJPUSHBlF434HOfg5s2nAGzW"
+    username: admin
+    userID: "00000000-0000-0000-0000-000000000001"
+
+  # To add more users: create them in LeafWiki first, then add a matching entry here.
+  # (LeafWiki looks up the username from X-Forwarded-User — user must exist in LeafWiki.)

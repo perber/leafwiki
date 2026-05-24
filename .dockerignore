@@ -1,0 +1,38 @@
+# Node dependencies — installed fresh inside the container
+ui/leafwiki-ui/node_modules/
+e2e/node_modules/
+
+# E2E tests and tooling
+e2e/
+e2e-proxy/
+hacks/
+test-results/
+
+# Pre-built artefacts that the Dockerfile rebuilds from scratch
+dist/
+releases/
+leafwiki
+internal/http/dist/*
+!internal/http/dist/.gitkeep
+
+# Runtime / local data
+data/
+cmd/leafwiki/data/
+
+# Debug binaries dropped by dlv / GoLand
+**/__debug_bin*
+
+# Docs and static assets (not needed by Go compiler or Vite)
+docs/
+assets/
+public/
+
+# Git and CI
+.git/
+.github/
+.claude/
+local/
+
+# Misc
+.env
+*.db
