@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 go build \
 	-o /out/leafwiki ./cmd/leafwiki/main.go
 
 # Step 3: Final image (small)
-FROM alpine:3.23@sha256:4d889c14e7d5a73929ab00be2ef8ff22437e7cbc545931e52554a7b00e123d8b AS final
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS final
 WORKDIR /app
 COPY --from=backend-build /out/leafwiki /app/leafwiki
 
