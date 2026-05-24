@@ -1,0 +1,44 @@
+name: Lint Actions
+
+on:
+  pull_request:
+    branches:
+      - main
+      - release/*
+      - releases/*
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pinact-check:
+    name: Check pinned GitHub Actions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Check all actions are SHA-pinned
+        run: |
+          UNPINNED=$(grep -rn '^\s*uses:' .github/workflows/ \
+            | grep -v 'uses: \.' \
+            | grep -vE '@[0-9a-f]{40}')
+          if [ -n "$UNPINNED" ]; then
+            echo "::error::Unpinned GitHub Actions found — use SHA hashes instead of tags:"
+            echo "$UNPINNED"
+            exit 1
+          fi
+          echo "All GitHub Actions are properly SHA-pinned."
+
+      - name: Check all Docker base images are digest-pinned
+        run: |
+          UNPINNED=$(grep -rn '^FROM ' Dockerfile Dockerfile.builder | grep -v '@sha256:')
+          if [ -n "$UNPINNED" ]; then
+            echo "::error::Unpinned Docker base images found — use @sha256: digests:"
+            echo "$UNPINNED"
+            exit 1
+          fi
+          echo "All Docker base images are properly digest-pinned."

@@ -7,6 +7,9 @@ on:
       - release/*
       - releases/*
 
+permissions:
+  contents: read
+
 jobs:
   lint-frontend:
     runs-on: ubuntu-latest
@@ -17,10 +20,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
 
@@ -34,7 +37,7 @@ jobs:
         run: npm run format:check
 
       - name: Scan dependencies with Trivy
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
         with:
           scan-type: fs
           scan-ref: 'ui/leafwiki-ui'

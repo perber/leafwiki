@@ -1,42 +1,72 @@
 version: 2
 updates:
-  # Backend dependencies
+  # GitHub Actions — supply chain: track action versions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      github-actions:
+        patterns: ["*"]
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore"
+    open-pull-requests-limit: 3
+
+  # Backend (Go)
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    groups:
+      go-dependencies:
+        patterns: ["*"]
     labels:
       - "dependencies"
       - "go"
     commit-message:
       prefix: "chore"
+    open-pull-requests-limit: 3
 
-  # Docker dependencies
+  # Docker base images
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     labels:
       - "dependencies"
+    commit-message:
+      prefix: "chore"
+    open-pull-requests-limit: 3
 
-  # Frontend dependencies
+  # Frontend (npm)
   - package-ecosystem: "npm"
     directory: "/ui/leafwiki-ui"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    groups:
+      npm-dependencies:
+        patterns: ["*"]
     labels:
       - "dependencies"
       - "frontend"
     commit-message:
       prefix: "chore"
+    open-pull-requests-limit: 3
 
-  # End-to-end tests
+  # End-to-end tests (npm)
   - package-ecosystem: "npm"
     directory: "/e2e"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    groups:
+      e2e-dependencies:
+        patterns: ["*"]
     labels:
       - "dependencies"
       - "e2e"
     commit-message:
       prefix: "chore"
+    open-pull-requests-limit: 3
