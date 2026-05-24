@@ -176,6 +176,18 @@ export default function MarkdownCodeEditor({
           ...historyKeymap,
           ...defaultKeymap,
         ]),
+        // Prevent Chrome from applying its own italic/bold formatting via beforeinput
+        // when Ctrl+I / Ctrl+B is pressed. CodeMirror's keymap already handles these.
+        EditorView.domEventHandlers({
+          beforeinput(event) {
+            if (
+              event.inputType === 'formatItalic' ||
+              event.inputType === 'formatBold'
+            ) {
+              event.preventDefault()
+            }
+          },
+        }),
         EditorView.lineWrapping,
         updateListener,
         EditorView.theme({

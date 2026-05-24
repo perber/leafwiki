@@ -74,6 +74,7 @@ export default function MarkdownToolbar({
             size="icon"
             onClick={() => editorRef.current?.insertWrappedText('**')}
             className="markdown-toolbar__button"
+            data-testid="format-bold-button"
           >
             <Bold className="markdown-toolbar__icon" />
           </Button>
@@ -84,6 +85,7 @@ export default function MarkdownToolbar({
             size="icon"
             onClick={() => editorRef.current?.insertWrappedText('_')}
             className="markdown-toolbar__button"
+            data-testid="format-italic-button"
           >
             <Italic className="markdown-toolbar__icon" />
           </Button>

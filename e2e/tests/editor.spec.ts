@@ -557,3 +557,126 @@ test.describe('Editor', () => {
     await expect(page.getByText('Page saved successfully')).not.toBeVisible();
   });
 });
+
+// ─── Formatting ───────────────────────────────────────────────────────────────
+
+test.describe('Editor formatting', () => {
+  test.beforeEach(async ({ page }) => {
+    const loginPage = new LoginPage(page);
+    await loginPage.goto();
+    await loginPage.login(user, password);
+    const viewPage = new ViewPage(page);
+    await viewPage.expectUserLoggedIn();
+  });
+
+  test.afterEach(async ({ page }) => {
+    const viewPage = new ViewPage(page);
+    await viewPage.logout();
+  });
+
+  test('editor-bold-via-keyboard', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-bold-keyboard-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: `Editor Bold Keyboard ${stamp}`,
+      slug,
+      content: '',
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await page.locator('.cm-editor').click();
+    await page.keyboard.press('Control+b');
+    await page.keyboard.type('Bold Text');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await page.locator('article strong').getByText('Bold Text').waitFor({ state: 'visible' });
+  });
+
+  test('editor-italic-via-keyboard', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-italic-keyboard-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: `Editor Italic Keyboard ${stamp}`,
+      slug,
+      content: '',
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await page.locator('.cm-editor').click();
+    await page.keyboard.press('Control+i');
+    await page.keyboard.type('Italic Text');
+    await page.keyboard.press('ArrowRight');
+
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await page.locator('article em').getByText('Italic Text').waitFor({ state: 'visible' });
+  });
+
+  test('editor-bold-via-toolbar-button', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-bold-button-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: `Editor Bold Button ${stamp}`,
+      slug,
+      content: '',
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await page.locator('.cm-editor').click();
+    await page.locator('[data-testid="format-bold-button"]').click();
+    await page.keyboard.type('Bold Text');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await page.locator('article strong').getByText('Bold Text').waitFor({ state: 'visible' });
+  });
+
+  test('editor-italic-via-toolbar-button', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-italic-button-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: `Editor Italic Button ${stamp}`,
+      slug,
+      content: '',
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await page.locator('.cm-editor').click();
+    await page.locator('[data-testid="format-italic-button"]').click();
+    await page.keyboard.type('Italic Text');
+    await page.keyboard.press('ArrowRight');
+
+    await editPage.savePage();
+    await editPage.closeEditor();
+
+    await page.locator('article em').getByText('Italic Text').waitFor({ state: 'visible' });
+  });
+});
