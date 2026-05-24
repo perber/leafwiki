@@ -1,18 +1,18 @@
 # Stage 1: Frontend build
-FROM node:26-alpine AS frontend
+FROM node:26-alpine@sha256:95034e722cecec716c00830160848aab85c7b8180a131bb4f4fed9d5278f0989 AS frontend
 
 WORKDIR /ui
 ARG APP_VERSION
 
 COPY ./ui/leafwiki-ui/package.json ./package.json
 COPY ./ui/leafwiki-ui/package-lock.json ./package-lock.json
-RUN npm install
+RUN npm ci --ignore-scripts
 
 COPY ./ui/leafwiki-ui/ ./
 RUN VITE_API_URL=/ APP_VERSION=${APP_VERSION} npm run build
 
 # Stage 2: Go backend build
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26-alpine@sha256:f44b851aa23dfa219d18db6eab743203245429d355cb619cf96a2ffe2a84ba7a AS builder
 
 ARG GOOS
 ARG GOARCH

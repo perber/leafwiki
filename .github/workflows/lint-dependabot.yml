@@ -1,0 +1,32 @@
+name: Lint Dependabot Config
+
+on:
+  pull_request:
+    branches:
+      - main
+      - release/*
+      - releases/*
+    paths:
+      - '.github/dependabot.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/dependabot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Dependabot Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install check-jsonschema
+        run: pip install check-jsonschema==0.37.2
+
+      - name: Validate dependabot.yml against schema
+        run: check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml
