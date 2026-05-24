@@ -4,12 +4,10 @@ go 1.25.0
 
 require (
 	github.com/dustin/go-humanize v1.0.1
-	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gosimple/slug v1.15.0
 	github.com/microcosm-cc/bluemonday v1.0.27
-	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569
 	github.com/yuin/goldmark v1.8.2
 	golang.org/x/crypto v0.51.0

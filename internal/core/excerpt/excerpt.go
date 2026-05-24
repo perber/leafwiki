@@ -1,15 +1,21 @@
 package excerpt
 
 import (
+	"bytes"
 	"regexp"
 	"strings"
 
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/perber/wiki/internal/core/markdown"
-	"github.com/russross/blackfriday/v2"
+	"github.com/yuin/goldmark"
+	gmhtml "github.com/yuin/goldmark/renderer/html"
 )
 
 const MaxRunes = 180
+
+var mdRenderer = goldmark.New(
+	goldmark.WithRendererOptions(gmhtml.WithUnsafe()),
+)
 
 var (
 	sanitize = bluemonday.StrictPolicy()
@@ -99,8 +105,12 @@ func PlainTextFromMarkdown(body string) string {
 	normalized = strings.ReplaceAll(normalized, "\r", "\n")
 	normalized = fencedCodePattern.ReplaceAllString(normalized, " ")
 	normalized = imagePattern.ReplaceAllString(normalized, "$1")
-	html := blackfriday.Run([]byte(normalized))
-	text := sanitize.Sanitize(string(html))
+	var htmlBuf bytes.Buffer
+	if err := mdRenderer.Convert([]byte(normalized), &htmlBuf); err != nil {
+		htmlBuf.Reset()
+		htmlBuf.Write([]byte(normalized))
+	}
+	text := sanitize.Sanitize(htmlBuf.String())
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	text = strings.ReplaceAll(text, "\r", "\n")
 	text = fencedCodePattern.ReplaceAllString(text, " ")
