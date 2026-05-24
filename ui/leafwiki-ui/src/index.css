@@ -663,7 +663,7 @@
   /* AssetItem Component */
 
   .asset-item {
-    @apply bg-surface hover:bg-surface-alt flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1 transition;
+    @apply bg-surface hover:bg-surface-alt flex cursor-pointer flex-wrap items-start gap-2 rounded-md px-2 py-1 transition sm:flex-nowrap sm:items-center sm:justify-between;
   }
 
   .asset-item__preview-image {
@@ -680,6 +680,10 @@
 
   .asset-item__filename--editing-input {
     @apply border-surface-border text-interface-text w-full border-b bg-transparent text-sm focus:outline-hidden;
+  }
+
+  .asset-item__actions {
+    @apply flex w-full shrink-0 flex-wrap justify-end gap-2 sm:w-auto sm:flex-nowrap;
   }
 
   .asset-item__action-button {
@@ -748,12 +752,12 @@
   }
 
   .asset-manager__tip {
-    @apply text-muted mt-2 text-xs italic;
+    @apply text-muted mt-2 text-xs break-words italic;
   }
 
   /** AssetManager Dialog **/
   .asset-manager-dialog__content {
-    @apply max-w-4xl;
+    @apply max-w-2xl;
   }
 
   /* AssetPreviewTooltip */
@@ -795,7 +799,7 @@
   }
 
   .editor-title-bar {
-    @apply flex flex-1 flex-col items-center;
+    @apply flex flex-1 flex-col items-center justify-center;
   }
 
   .history-title-bar {
@@ -819,7 +823,7 @@
   }
 
   .editor-title-bar__icon {
-    @apply text-muted absolute top-1/2 -right-6 -translate-y-1/2 transition-transform duration-200 ease-in-out;
+    @apply text-muted ml-1 shrink-0 transition-transform duration-200 ease-in-out sm:absolute sm:top-1/2 sm:-right-6 sm:ml-0 sm:-translate-y-1/2;
   }
 
   .editor-title-bar__button:hover .editor-title-bar__icon {
@@ -831,7 +835,7 @@
   }
 
   .editor-title-bar__slug {
-    @apply bg-surface-alt text-interface-text mt-1 inline-block max-w-[15vw] truncate rounded px-2 py-0.5 font-mono text-xs sm:max-w-[40vw];
+    @apply bg-surface-alt text-interface-text mt-0.5 inline-block max-w-[15vw] truncate rounded px-2 py-0.5 font-mono text-xs sm:max-w-[40vw];
   }
 
   .history-title-bar__slug {

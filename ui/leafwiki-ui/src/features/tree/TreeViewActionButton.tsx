@@ -1,25 +1,28 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
+import { ComponentPropsWithoutRef, forwardRef } from 'react'
 
 type TreeViewActionButtonProps = {
-  onClick?: () => void
   actionName: string
   icon: React.ReactNode
   tooltip: string
-}
+} & ComponentPropsWithoutRef<'button'>
 
-export function TreeViewActionButton({
-  onClick,
-  icon,
-  actionName,
-  tooltip,
-}: TreeViewActionButtonProps) {
+export const TreeViewActionButton = forwardRef<
+  HTMLButtonElement,
+  TreeViewActionButtonProps
+>(function TreeViewActionButton(
+  { onClick, icon, actionName, tooltip, type = 'button', ...props },
+  ref,
+) {
   return (
     <div className="group mr-2 flex">
       <TooltipWrapper label={tooltip} side="top" align="start">
         <button
-          type="button"
+          {...props}
+          ref={ref}
+          type={type}
           onClick={(e) => {
-            onClick?.()
+            onClick?.(e)
             e.stopPropagation()
           }}
           className="btn-treeview"
@@ -31,4 +34,4 @@ export function TreeViewActionButton({
       </TooltipWrapper>
     </div>
   )
-}
+})

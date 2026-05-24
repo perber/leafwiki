@@ -170,7 +170,7 @@ export function AssetItem({
       onDoubleClick={handleInsertMarkdown}
       data-testid="asset-item"
     >
-      <div className="flex flex-1 items-center gap-1">
+      <div className="flex min-w-0 flex-1 items-center gap-1">
         {isImage ? (
           <AssetPreviewTooltip url={assetUrl} name={baseName}>
             <img
@@ -199,102 +199,104 @@ export function AssetItem({
         )}
       </div>
 
-      {isEditing ? (
-        <>
-          <Button
-            variant="outline"
-            size="icon"
-            className="asset-item__action-button asset-item__action-button--save"
-            onClick={handleRename}
-            title="Save"
-          >
-            <Check size={16} />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="asset-item__action-button asset-item__action-button--cancel"
-            onClick={() => {
-              setEditingFilename(null)
-              setNewName(baseName.replace(/\.[^/.]+$/, ''))
-            }}
-            title="Cancel"
-          >
-            <X size={16} />
-          </Button>
-        </>
-      ) : (
-        <>
-          {isImage && (
+      <div className="asset-item__actions">
+        {isEditing ? (
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              className="asset-item__action-button asset-item__action-button--save"
+              onClick={handleRename}
+              title="Save"
+            >
+              <Check size={16} />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="asset-item__action-button asset-item__action-button--cancel"
+              onClick={() => {
+                setEditingFilename(null)
+                setNewName(baseName.replace(/\.[^/.]+$/, ''))
+              }}
+              title="Cancel"
+            >
+              <X size={16} />
+            </Button>
+          </>
+        ) : (
+          <>
+            {isImage && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="asset-item__action-button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleInsertLink()
+                }}
+                title="Insert image link"
+                data-testid="asset-insert-link-button"
+              >
+                <Link2 size={16} />
+              </Button>
+            )}
+            {isPlayableMedia && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="asset-item__action-button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleInsertPlayer()
+                }}
+                title={isAudio ? 'Insert audio player' : 'Insert video player'}
+                data-testid="asset-insert-player-button"
+              >
+                <Play size={16} />
+              </Button>
+            )}
             <Button
               variant="outline"
               size="icon"
               className="asset-item__action-button"
               onClick={(e) => {
                 e.stopPropagation()
-                handleInsertLink()
+                handleInsertMarkdown()
               }}
-              title="Insert image link"
-              data-testid="asset-insert-link-button"
+              title={isImage ? 'Insert image' : 'Insert link'}
+              data-testid="asset-insert-default-button"
             >
-              <Link2 size={16} />
+              <FileText size={16} />
             </Button>
-          )}
-          {isPlayableMedia && (
             <Button
               variant="outline"
               size="icon"
               className="asset-item__action-button"
               onClick={(e) => {
                 e.stopPropagation()
-                handleInsertPlayer()
+                setNewName(baseName.replace(/\.[^/.]+$/, ''))
+                setEditingFilename(filename)
               }}
-              title={isAudio ? 'Insert audio player' : 'Insert video player'}
-              data-testid="asset-insert-player-button"
+              title="Rename"
             >
-              <Play size={16} />
+              <Pencil size={16} />
             </Button>
-          )}
-          <Button
-            variant="outline"
-            size="icon"
-            className="asset-item__action-button"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleInsertMarkdown()
-            }}
-            title={isImage ? 'Insert image' : 'Insert link'}
-            data-testid="asset-insert-default-button"
-          >
-            <FileText size={16} />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="asset-item__action-button"
-            onClick={(e) => {
-              e.stopPropagation()
-              setNewName(baseName.replace(/\.[^/.]+$/, ''))
-              setEditingFilename(filename)
-            }}
-            title="Rename"
-          >
-            <Pencil size={16} />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="asset-item__action-button asset-item__action-button--delete"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleDelete()
-            }}
-            title="Delete"
-          >
-            <Trash2 size={16} />
-          </Button>
-        </>
-      )}
+            <Button
+              variant="outline"
+              size="icon"
+              className="asset-item__action-button asset-item__action-button--delete"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDelete()
+              }}
+              title="Delete"
+            >
+              <Trash2 size={16} />
+            </Button>
+          </>
+        )}
+      </div>
     </li>
   )
 }
