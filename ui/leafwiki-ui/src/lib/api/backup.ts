@@ -1,4 +1,3 @@
-import { API_BASE_URL } from '../config'
 import { fetchWithAuth } from './auth'
 
 const BACKUP_STATUS_URL = '/api/admin/backup/status'
@@ -13,7 +12,7 @@ export interface BackupStatusResponse {
 }
 
 export async function fetchBackupStatus(): Promise<BackupStatusResponse> {
-  const res = await fetchWithAuth(`${API_BASE_URL}${BACKUP_STATUS_URL}`, {
+  const res = await fetchWithAuth(BACKUP_STATUS_URL, {
     credentials: 'include',
   })
   return res as BackupStatusResponse

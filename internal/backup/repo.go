@@ -18,17 +18,15 @@ import (
 
 // Repository wraps a git repository with backup-specific state.
 type Repository struct {
-	cfg    Config
-	repo   *gogit.Repository
-	status *Status
+	cfg     Config
+	repoDir string
+	repo    *gogit.Repository
+	status  *Status
 }
 
 // Init opens an existing repo at repoDir or initialises a new one.
 // On first init, stages root/ and assets/ and makes an initial commit.
 func Init(cfg Config) (*Repository, error) {
-	repoDir := filepath.Dir(cfg.RootDir)
-	slog.Debug("backup init started", "repoDir", repoDir, "rootDir", cfg.RootDir, "assetsDir", cfg.AssetsDir, "remote", cfg.RemoteURL, "branch", cfg.Branch)
-
 	if cfg.RootDir == "" {
 		return nil, fmt.Errorf("RootDir is required")
 	}
@@ -42,14 +40,18 @@ func Init(cfg Config) (*Repository, error) {
 		return nil, fmt.Errorf("AuthorEmail is required")
 	}
 
+	repoDir := filepath.Dir(filepath.Clean(cfg.RootDir))
+	slog.Debug("backup init started", "repoDir", repoDir, "rootDir", cfg.RootDir, "assetsDir", cfg.AssetsDir, "remote", cfg.RemoteURL, "branch", cfg.Branch)
+
 	// Ensure parent directory exists
 	if err := os.MkdirAll(repoDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create repo directory: %w", err)
 	}
 
 	r := &Repository{
-		cfg:    cfg,
-		status: &Status{},
+		cfg:     cfg,
+		repoDir: repoDir,
+		status:  &Status{},
 	}
 
 	// Try to open existing repo
@@ -70,6 +72,10 @@ func Init(cfg Config) (*Repository, error) {
 	slog.Debug("new git repo initialised", "repoDir", repoDir)
 	r.repo = repo
 
+	if err := EnsureGitignore(repoDir); err != nil {
+		return nil, fmt.Errorf("failed to write .gitignore: %w", err)
+	}
+
 	// Create initial commit with root/ and assets/ if they exist
 	if err := r.makeInitialCommit(); err != nil {
 		return nil, fmt.Errorf("failed to make initial commit: %w", err)
@@ -88,12 +94,11 @@ func (r *Repository) makeInitialCommit() error {
 	}
 
 	// Compute relative paths from repo root
-	repoDir := filepath.Dir(r.cfg.RootDir)
-	rootRel, err := filepath.Rel(repoDir, r.cfg.RootDir)
+	rootRel, err := filepath.Rel(r.repoDir, r.cfg.RootDir)
 	if err != nil {
 		return fmt.Errorf("failed to compute relative path for root: %w", err)
 	}
-	assetsRel, err := filepath.Rel(repoDir, r.cfg.AssetsDir)
+	assetsRel, err := filepath.Rel(r.repoDir, r.cfg.AssetsDir)
 	if err != nil {
 		return fmt.Errorf("failed to compute relative path for assets: %w", err)
 	}
@@ -150,7 +155,7 @@ func (r *Repository) makeInitialCommit() error {
 	// If no files were found in root/assets, skip initial commit
 	// The first RunBackup will create the commit when there's actual content
 	if !stagedFiles {
-		slog.Default().Debug("makeInitialCommit: no files found in root or assets, skipping initial commit")
+		slog.Debug("makeInitialCommit: no files found in root or assets, skipping initial commit")
 		return nil
 	}
 
@@ -160,10 +165,10 @@ func (r *Repository) makeInitialCommit() error {
 		return err
 	}
 	if status.IsClean() {
-		slog.Default().Debug("makeInitialCommit: working tree is clean after staging, nothing to commit")
+		slog.Debug("makeInitialCommit: working tree is clean after staging, nothing to commit")
 		return nil // Nothing to commit
 	}
-	slog.Default().Debug("makeInitialCommit: staged file count", "count", len(status))
+	slog.Debug("makeInitialCommit: staged file count", "count", len(status))
 
 	commit, err := wt.Commit("Initial commit", &gogit.CommitOptions{
 		Author: &object.Signature{
@@ -238,20 +243,13 @@ func (r *Repository) RunBackup() error {
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	repoDir := filepath.Dir(r.cfg.RootDir)
-	slog.Debug("RunBackup: resolved repo dir", "repoDir", repoDir)
-
-	// Compute relative paths for the two content directories we back up.
-	// Only root/ (wiki pages) and assets/ (uploaded files) are included.
-	// Internal app directories (.leafwiki/, schema.json, search.db-journal, etc.)
-	// are intentionally excluded — they are application state, not user content.
-	rootRel, err := filepath.Rel(repoDir, r.cfg.RootDir)
+	rootRel, err := filepath.Rel(r.repoDir, r.cfg.RootDir)
 	if err != nil {
 		errMsg := fmt.Errorf("failed to compute relative path for root: %w", err).Error()
 		r.status.SetError(errMsg)
 		return fmt.Errorf("failed to compute relative path for root: %w", err)
 	}
-	assetsRel, err := filepath.Rel(repoDir, r.cfg.AssetsDir)
+	assetsRel, err := filepath.Rel(r.repoDir, r.cfg.AssetsDir)
 	if err != nil {
 		errMsg := fmt.Errorf("failed to compute relative path for assets: %w", err).Error()
 		r.status.SetError(errMsg)
@@ -310,6 +308,7 @@ func (r *Repository) RunBackup() error {
 
 	if !staged {
 		slog.Info("backup skipped - no staged changes in content directories")
+		r.status.SetSuccess(time.Now())
 		return nil
 	}
 
@@ -334,6 +333,7 @@ func (r *Repository) RunBackup() error {
 		// If it's "nothing to commit" (empty tree), that's fine - just skip
 		if strings.Contains(err.Error(), "cannot create empty commit") {
 			slog.Debug("RunBackup: commit skipped - empty tree")
+			r.status.SetSuccess(time.Now())
 			return nil
 		}
 		errMsg := fmt.Errorf("failed to commit: %w", err).Error()
@@ -406,31 +406,6 @@ func (r *Repository) push(commitHash string) error {
 	}
 	slog.Debug("push: local HEAD resolved", "hash", localHead.Hash().String(), "branch", localHead.Name().Short())
 
-	// Fetch the current remote ref so we can accurately detect true up-to-date.
-	// go-git returns ErrAlreadyUpToDate for empty/fresh remotes (no refs yet),
-	// which is a false positive — the remote simply has no branch to compare against.
-	// Listing first gives us ground truth before we decide whether to push.
-	remoteRefs, fetchErr := remote.List(&gogit.ListOptions{Auth: auth})
-	if fetchErr != nil {
-		slog.Debug("push: could not list remote refs (remote may be empty)", "error", fetchErr)
-	}
-
-	remoteHead := ""
-	targetRef := "refs/heads/" + r.cfg.Branch
-	for _, ref := range remoteRefs {
-		if ref.Name().String() == targetRef {
-			remoteHead = ref.Hash().String()
-			break
-		}
-	}
-	slog.Debug("push: remote branch state", "branch", r.cfg.Branch, "remoteHead", remoteHead, "localHead", commitHash)
-
-	if remoteHead == commitHash {
-		// Remote genuinely already has this exact commit — nothing to do.
-		slog.Info("backup skipped - remote already at current commit", "branch", r.cfg.Branch, "commit", commitHash)
-		return nil
-	}
-
 	// Delete the local remote-tracking ref before pushing.
 	// go-git compares local HEAD against refs/remotes/origin/<branch> (the cached
 	// tracking ref written by previous pushes). If the remote was reset or recreated
@@ -502,17 +477,30 @@ func (r *Repository) buildSSHAuth() (ssh.AuthMethod, error) {
 		Signer: signer,
 	}
 
-	// Use known hosts for MITM protection if provided
+	// Use known hosts for MITM protection if provided.
+	// NewKnownHostsCallback expects a file path, so we write the raw content to a temp file.
 	if r.cfg.SSHKnownHosts != "" {
-		// ParseKnownHosts returns: marker, hosts, pubKey, comment, rest, err
-		_, _, pubKey, _, _, err := sshcrypto.ParseKnownHosts([]byte(r.cfg.SSHKnownHosts))
-		if err != nil {
-			slog.Warn("buildSSHAuth: failed to parse SSHKnownHosts, falling back to insecure mode", "error", err)
+		tmpFile, tmpErr := os.CreateTemp("", "known_hosts_*")
+		if tmpErr != nil {
+			slog.Warn("buildSSHAuth: failed to create temp file for SSHKnownHosts, falling back to insecure mode", "error", tmpErr)
 			auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
 		} else {
-			// Use FixedHostKey from x/crypto/ssh for MITM protection
-			auth.HostKeyCallback = sshcrypto.FixedHostKey(pubKey)
-			slog.Debug("buildSSHAuth: SSH auth configured with FixedHostKey")
+			defer os.Remove(tmpFile.Name())
+			if _, writeErr := tmpFile.WriteString(r.cfg.SSHKnownHosts); writeErr != nil {
+				tmpFile.Close()
+				slog.Warn("buildSSHAuth: failed to write SSHKnownHosts to temp file, falling back to insecure mode", "error", writeErr)
+				auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
+			} else {
+				tmpFile.Close()
+				knownHostsCallback, err := ssh.NewKnownHostsCallback(tmpFile.Name())
+				if err != nil {
+					slog.Warn("buildSSHAuth: failed to parse SSHKnownHosts, falling back to insecure mode", "error", err)
+					auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
+				} else {
+					auth.HostKeyCallback = knownHostsCallback
+					slog.Debug("buildSSHAuth: SSH auth configured with known hosts callback")
+				}
+			}
 		}
 	} else {
 		slog.Warn("buildSSHAuth: no SSHKnownHosts provided, connection will be insecure (no MITM protection)")

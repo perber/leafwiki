@@ -55,7 +55,7 @@ export default function BackupSettings() {
         pollingRef.current = null
       }
     }
-  }, [isPolling, loadStatus, lastBackupAt])
+  }, [isPolling, loadStatus])
 
   // Stop polling when lastBackupAt advances or an error occurs
   useEffect(() => {

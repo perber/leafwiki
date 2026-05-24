@@ -7,6 +7,24 @@ import (
 	"time"
 )
 
+func waitForBackup(t *testing.T, repo *Repository, timeout time.Duration) time.Time {
+	t.Helper()
+	deadline := time.After(timeout)
+	tick := time.NewTicker(50 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			last := repo.Status().LastBackupAt
+			if last != nil && !last.IsZero() {
+				return *last
+			}
+		case <-deadline:
+			t.Fatal("timeout waiting for backup")
+		}
+	}
+}
+
 func TestScheduler_TriggerNow(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
@@ -35,45 +53,30 @@ func TestScheduler_TriggerNow(t *testing.T) {
 		t.Fatalf("Init failed: %v", err)
 	}
 
-	// Create scheduler with a long interval so it won't fire naturally
-	scheduler := NewScheduler(repo, &cfg)
-	defer scheduler.Stop()
-
-	// Add a file to back up so there's something to commit
+	// Add a file BEFORE starting the scheduler so there's something to back up
 	if err := os.WriteFile(filepath.Join(rootDir, "test.txt"), []byte("content"), 0644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	// Wait for the initial run to complete using a channel
-	timeout := time.After(2 * time.Second)
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
+	// Create scheduler with a long interval so it won't fire naturally
+	scheduler := NewScheduler(repo, cfg.Duration())
+	defer scheduler.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			if !repo.Status().LastBackupAt.IsZero() {
-				goto afterInitialRun
-			}
-		case <-timeout:
-			t.Fatal("timeout waiting for initial run")
-		}
-	}
+	// Wait for the initial run to complete
+	initialBackup := waitForBackup(t, repo, 2*time.Second)
 
-afterInitialRun:
 	// TriggerNow should not block
 	scheduler.TriggerNow()
 
 	// Wait for TriggerNow to be processed
 	timeout2 := time.After(2 * time.Second)
-	ticker2 := time.NewTicker(50 * time.Millisecond)
-	defer ticker2.Stop()
+	tick2 := time.NewTicker(50 * time.Millisecond)
+	defer tick2.Stop()
 
-	initialBackup := repo.Status().LastBackupAt
 	for {
 		select {
-		case <-ticker2.C:
-			if !repo.Status().LastBackupAt.IsZero() && !repo.Status().LastBackupAt.Equal(initialBackup) {
+		case <-tick2.C:
+			if last := repo.Status().LastBackupAt; last != nil && !last.IsZero() && !last.Equal(initialBackup) {
 				return // Success
 			}
 		case <-timeout2:
@@ -110,7 +113,7 @@ func TestScheduler_Stop(t *testing.T) {
 		t.Fatalf("Init failed: %v", err)
 	}
 
-	scheduler := NewScheduler(repo, &cfg)
+	scheduler := NewScheduler(repo, cfg.Duration())
 
 	// Stop should block until goroutine finishes
 	scheduler.Stop()
@@ -147,28 +150,15 @@ func TestScheduler_RunsOnStart(t *testing.T) {
 		t.Fatalf("Init failed: %v", err)
 	}
 
-	// Create scheduler with very long interval
-	scheduler := NewScheduler(repo, &cfg)
-	defer scheduler.Stop()
-
-	// Add a file to back up so there's something to commit
+	// Add a file BEFORE starting the scheduler so there's something to back up
 	if err := os.WriteFile(filepath.Join(rootDir, "test.txt"), []byte("content"), 0644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	// Wait for the initial run to complete using a channel
-	timeout := time.After(2 * time.Second)
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
+	// Create scheduler with very long interval
+	scheduler := NewScheduler(repo, cfg.Duration())
+	defer scheduler.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			if !repo.Status().LastBackupAt.IsZero() {
-				return // Success
-			}
-		case <-timeout:
-			t.Fatal("timeout waiting for initial run")
-		}
-	}
+	// Wait for the initial run to complete
+	waitForBackup(t, repo, 2*time.Second)
 }

@@ -16,11 +16,11 @@ type Scheduler struct {
 	manual chan struct{}
 	done   chan struct{}
 	wg     sync.WaitGroup
+	closeOnce sync.Once
 }
 
 // NewScheduler creates and starts the background goroutine.
-func NewScheduler(repo *Repository, cfg *Config) *Scheduler {
-	interval := cfg.Duration()
+func NewScheduler(repo *Repository, interval time.Duration) *Scheduler {
 	if interval < minInterval {
 		slog.Warn("backup scheduler interval too small, using minimum", "requested", interval, "using", minInterval)
 		interval = minInterval
@@ -31,6 +31,7 @@ func NewScheduler(repo *Repository, cfg *Config) *Scheduler {
 		manual: make(chan struct{}, 1),
 		done:   make(chan struct{}),
 	}
+	s.manual <- struct{}{} // pre-seed: first select fires immediately
 
 	s.wg.Add(1)
 	go s.run()
@@ -40,29 +41,28 @@ func NewScheduler(repo *Repository, cfg *Config) *Scheduler {
 func (s *Scheduler) run() {
 	defer s.wg.Done()
 
-	// Recover from panics to avoid killing the scheduler
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("backup scheduler recovered from panic", "panic", r)
-		}
-	}()
-
-	// Run immediately on start
-	if err := s.repo.RunBackup(); err != nil {
-		slog.Error("backup failed", "error", err)
-	}
-
 	for {
-		select {
-		case <-s.ticker.C:
-			if err := s.repo.RunBackup(); err != nil {
-				slog.Error("backup failed", "error", err)
+		var done bool
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("backup scheduler recovered from panic, will retry on next tick", "panic", r)
+				}
+			}()
+			select {
+			case <-s.ticker.C:
+				if err := s.repo.RunBackup(); err != nil {
+					slog.Error("backup failed", "error", err)
+				}
+			case <-s.manual:
+				if err := s.repo.RunBackup(); err != nil {
+					slog.Error("backup failed", "error", err)
+				}
+			case <-s.done:
+				done = true
 			}
-		case <-s.manual:
-			if err := s.repo.RunBackup(); err != nil {
-				slog.Error("backup failed", "error", err)
-			}
-		case <-s.done:
+		}()
+		if done {
 			return
 		}
 	}
@@ -80,11 +80,8 @@ func (s *Scheduler) TriggerNow() {
 // Stop shuts down the goroutine cleanly.
 func (s *Scheduler) Stop() {
 	s.ticker.Stop()
-	select {
-	case <-s.done:
-		// Already closed
-	default:
+	s.closeOnce.Do(func() {
 		close(s.done)
-	}
+	})
 	s.wg.Wait()
 }

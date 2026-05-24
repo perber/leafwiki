@@ -21,20 +21,24 @@ func (s *Status) SetSuccess(t time.Time) {
 func (s *Status) SetError(err string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.LastBackupAt = time.Time{} // Clear on error
 	s.LastError = err
 }
 
 func (s *Status) Snapshot() StatusSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	var lastBackupAt *time.Time
+	if !s.LastBackupAt.IsZero() {
+		t := s.LastBackupAt
+		lastBackupAt = &t
+	}
 	return StatusSnapshot{
-		LastBackupAt: s.LastBackupAt,
+		LastBackupAt: lastBackupAt,
 		LastError:    s.LastError,
 	}
 }
 
 type StatusSnapshot struct {
-	LastBackupAt time.Time `json:"lastBackupAt,omitempty"`
-	LastError    string    `json:"lastError,omitempty"`
+	LastBackupAt *time.Time `json:"lastBackupAt,omitempty"`
+	LastError    string     `json:"lastError,omitempty"`
 }

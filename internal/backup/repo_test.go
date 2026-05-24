@@ -153,6 +153,9 @@ func TestRunBackup_NothingToCommit(t *testing.T) {
 	if status.LastError != "" {
 		t.Errorf("expected no error, got %s", status.LastError)
 	}
+	if status.LastBackupAt == nil {
+		t.Error("expected LastBackupAt to be set after backup run, got nil")
+	}
 }
 
 func TestRunBackup_StagesAndCommits(t *testing.T) {
