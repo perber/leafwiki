@@ -49,8 +49,8 @@ export default function UserToolbar() {
     )
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     if (httpRemoteUserLogoutUrl) {
       window.location.href = httpRemoteUserLogoutUrl
     } else {

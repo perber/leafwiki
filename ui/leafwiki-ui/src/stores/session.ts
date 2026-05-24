@@ -14,7 +14,7 @@ type SessionState = {
   user: UserInfo | null
   setUser: (user: UserInfo | null) => void
   setRefreshing: (value: boolean) => void
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 export const useSessionStore = create<SessionState>()(
