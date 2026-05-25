@@ -325,6 +325,10 @@ If you are just getting started, the most important options are usually:
 | `--enable-revision`             | Enable revision history / page history                                  | `false`       | v0.9.0            |
 | `--enable-link-refactor`        | Enable link refactoring dialog and rewrite flow                         | `false`       | v0.9.0            |
 | `--max-revision-history`        | Maximum revisions kept per page; `0` means unlimited                    | `100`         | v0.9.0            |
+| `--enable-http-remote-user`     | Enable reverse-proxy authentication via trusted HTTP header             | `false`       | v0.10.0           |
+| `--http-remote-user-header-name`| Header name carrying the username from a trusted proxy                  | `Remote-User` | v0.10.0           |
+| `--trusted-proxy-ips`           | Comma-separated trusted proxy IPs/CIDRs allowed to supply that header   | `""`          | v0.10.0           |
+| `--http-remote-user-logout-url` | Frontend logout redirect URL when reverse-proxy auth is active          | `""`          | v0.10.0           |
 
 
 > When using the official Docker image, `LEAFWIKI_HOST` defaults to `0.0.0.0` if neither a `--host` flag nor `LEAFWIKI_HOST` is provided, as the container entrypoint sets this automatically.
@@ -354,6 +358,10 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_ENABLE_REVISION`             | Enable revision history / page history                                  | `false`    | v0.9.0          |
 | `LEAFWIKI_ENABLE_LINK_REFACTOR`        | Enable link refactoring dialog and rewrite flow                         | `false`    | v0.9.0          |
 | `LEAFWIKI_MAX_REVISION_HISTORY`        | Maximum revisions kept per page; `0` means unlimited                    | `100`      | v0.9.0          |
+| `LEAFWIKI_ENABLE_HTTP_REMOTE_USER`     | Enable reverse-proxy authentication via trusted HTTP header             | `false`    | v0.10.0         |
+| `LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME`| Header name carrying the username from a trusted proxy                  | `Remote-User` | v0.10.0       |
+| `LEAFWIKI_TRUSTED_PROXY_IPS`           | Comma-separated trusted proxy IPs/CIDRs allowed to supply that header   | `""`       | v0.10.0         |
+| `LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL` | Frontend logout redirect URL when reverse-proxy auth is active          | `""`       | v0.10.0         |
 
 
 These environment variables override the default values and are especially useful in containerized or production environments.
@@ -382,6 +390,39 @@ With the example above:
 - Without a base path, it is served as `/custom.css`
 - With `--base-path=/wiki`, it is served as `/wiki/custom.css`
 - The stylesheet endpoint is publicly accessible
+
+### Reverse-Proxy Authentication
+
+Reverse-proxy authentication is available since `v0.10.0`.
+
+Use it when an upstream proxy or auth gateway authenticates the user and forwards the username to LeafWiki in an HTTP header.
+
+The relevant options are:
+
+- `--enable-http-remote-user`
+- `--http-remote-user-header-name`
+- `--trusted-proxy-ips`
+- `--http-remote-user-logout-url`
+
+Important security note:
+
+- LeafWiki only trusts the configured user header when the request originates from a trusted proxy IP or CIDR listed in `--trusted-proxy-ips`
+- Requests from untrusted source IPs do not get authenticated from that header
+- If the trusted proxy sends a username that does not exist in LeafWiki, the request is rejected
+
+Example:
+
+```bash
+./leafwiki \
+  --jwt-secret=yoursecret \
+  --admin-password=yourpassword \
+  --enable-http-remote-user=true \
+  --http-remote-user-header-name=X-Forwarded-User \
+  --trusted-proxy-ips=127.0.0.1,172.18.0.0/16 \
+  --http-remote-user-logout-url=https://auth.example.com/logout
+```
+
+This mode is intended for trusted reverse-proxy setups. Do not enable it without restricting `--trusted-proxy-ips`.
 
 ### Security Overview - Since v0.7.0
 
