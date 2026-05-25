@@ -251,9 +251,6 @@ function shouldRefreshBeforeRequest(
 
 async function clearSessionState(sessionLogout: () => Promise<void>) {
   await sessionLogout()
-  const { setAccessTokenExpiresAt, setUser } = useSessionStore.getState()
-  setAccessTokenExpiresAt(null)
-  setUser(null)
 }
 
 export function ensureRefresh(): Promise<void> {

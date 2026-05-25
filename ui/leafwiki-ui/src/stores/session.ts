@@ -9,11 +9,14 @@ type UserInfo = {
   role: 'admin' | 'editor' | 'viewer'
 }
 
+// Unix timestamp in seconds, matching the backend's use of time.Now().Unix().
+type UnixTimestampSeconds = number
+
 type SessionState = {
   isRefreshing: boolean
-  accessTokenExpiresAt: number | null
+  accessTokenExpiresAt: UnixTimestampSeconds | null
   user: UserInfo | null
-  setAccessTokenExpiresAt: (value: number | null) => void
+  setAccessTokenExpiresAt: (value: UnixTimestampSeconds | null) => void
   setUser: (user: UserInfo | null) => void
   setRefreshing: (value: boolean) => void
   logout: () => Promise<void>
