@@ -123,15 +123,15 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"publicAccess":              opts.PublicAccess,
-			"hideLinkMetadataSection":   opts.HideLinkMetadataSection,
-			"authDisabled":              opts.AuthDisabled,
-			"basePath":                  opts.BasePath,
-			"maxAssetUploadSizeBytes":   opts.MaxAssetUploadSizeBytes,
-			"enableRevision":            opts.EnableRevision,
-			"enableLinkRefactor":        opts.EnableLinkRefactor,
-			"httpRemoteUserEnabled":     opts.HTTPRemoteUser.Enabled,
-			"httpRemoteUserLogoutUrl":   opts.HTTPRemoteUser.LogoutURL,
+			"publicAccess":            opts.PublicAccess,
+			"hideLinkMetadataSection": opts.HideLinkMetadataSection,
+			"authDisabled":            opts.AuthDisabled,
+			"basePath":                opts.BasePath,
+			"maxAssetUploadSizeBytes": opts.MaxAssetUploadSizeBytes,
+			"enableRevision":          opts.EnableRevision,
+			"enableLinkRefactor":      opts.EnableLinkRefactor,
+			"httpRemoteUserEnabled":   opts.HTTPRemoteUser.Enabled,
+			"httpRemoteUserLogoutUrl": opts.HTTPRemoteUser.LogoutURL,
 		})
 	}
 }
@@ -187,7 +187,11 @@ func (r *Routes) handleLogin(rctx httpinternal.RouterContext) gin.HandlerFunc {
 			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": out.Token.User})
+		c.JSON(http.StatusOK, gin.H{
+			"message":              "Login successful",
+			"user":                 out.Token.User,
+			"accessTokenExpiresAt": out.Token.AccessTokenExpiresAt,
+		})
 	}
 }
 
@@ -243,7 +247,11 @@ func (r *Routes) handleRefreshToken(rctx httpinternal.RouterContext) gin.Handler
 			respondWithAuthStatusError(c, http.StatusInternalServerError, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "Token refreshed", "user": out.Token.User})
+		c.JSON(http.StatusOK, gin.H{
+			"message":              "Token refreshed",
+			"user":                 out.Token.User,
+			"accessTokenExpiresAt": out.Token.AccessTokenExpiresAt,
+		})
 	}
 }
 

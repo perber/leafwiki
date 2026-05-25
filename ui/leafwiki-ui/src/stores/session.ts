@@ -11,7 +11,9 @@ type UserInfo = {
 
 type SessionState = {
   isRefreshing: boolean
+  accessTokenExpiresAt: number | null
   user: UserInfo | null
+  setAccessTokenExpiresAt: (value: number | null) => void
   setUser: (user: UserInfo | null) => void
   setRefreshing: (value: boolean) => void
   logout: () => Promise<void>
@@ -22,6 +24,8 @@ export const useSessionStore = create<SessionState>()(
     (set) => ({
       user: null,
       isRefreshing: false,
+      accessTokenExpiresAt: null,
+      setAccessTokenExpiresAt: (value) => set({ accessTokenExpiresAt: value }),
       setRefreshing: (value) => set({ isRefreshing: value }),
       setUser: (user) => set({ user }),
       logout: async () => {
@@ -30,13 +34,14 @@ export const useSessionStore = create<SessionState>()(
         } catch (err) {
           console.warn('Logout failed:', err)
         } finally {
-          set({ user: null })
+          set({ user: null, accessTokenExpiresAt: null })
         }
       },
     }),
     {
       name: 'session-storage',
       partialize: (state) => ({
+        accessTokenExpiresAt: state.accessTokenExpiresAt,
         user: state.user,
       }),
     },

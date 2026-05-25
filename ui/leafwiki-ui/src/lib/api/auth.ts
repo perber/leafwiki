@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config'
 import { ApiLocalizedError, isApiLocalizedErrorResponse } from './errors'
 
 export type AuthResponse = {
+  accessTokenExpiresAt: number
   message: string
   user: {
     id: string
@@ -14,6 +15,7 @@ export type AuthResponse = {
 }
 
 const REFRESH_TIMEOUT_MS = 15000
+const REFRESH_THRESHOLD_SECONDS = 60
 
 export class ApiError extends Error {
   status: number
@@ -83,7 +85,8 @@ export async function login(identifier: string, password: string) {
 
   const data: AuthResponse = await res.json()
 
-  const { setUser } = useSessionStore.getState()
+  const { setAccessTokenExpiresAt, setUser } = useSessionStore.getState()
+  setAccessTokenExpiresAt(data.accessTokenExpiresAt)
   setUser(data.user)
 
   return data
@@ -110,7 +113,9 @@ export async function fetchWithAuth(
 ): Promise<unknown> {
   const store = useSessionStore.getState()
   const sessionLogout = store.logout
-  const authDisabled = useConfigStore.getState().authDisabled
+  const config = useConfigStore.getState()
+  const authDisabled = config.authDisabled
+  const httpRemoteUserEnabled = config.httpRemoteUserEnabled
 
   const headers = new Headers(options.headers || {})
   if (!(options.body instanceof FormData)) {
@@ -143,18 +148,30 @@ export async function fetchWithAuth(
     })
   }
 
+  if (
+    shouldRefreshBeforeRequest(
+      store.user,
+      store.accessTokenExpiresAt,
+      authDisabled,
+      httpRemoteUserEnabled,
+    )
+  ) {
+    try {
+      await ensureRefresh()
+    } catch {
+      await clearSessionState(sessionLogout)
+      throw new Error('Unauthorized')
+    }
+  }
+
   let res = await doFetch()
 
-  if (res.status === 401 && retry && !authDisabled) {
+  if (res.status === 401 && retry && !authDisabled && !httpRemoteUserEnabled) {
     try {
       await ensureRefresh()
       res = await doFetch()
     } catch {
-      if (!authDisabled) {
-        sessionLogout()
-        const { setUser } = useSessionStore.getState()
-        setUser(null)
-      }
+      await clearSessionState(sessionLogout)
       throw new Error('Unauthorized')
     }
   }
@@ -214,6 +231,31 @@ if (typeof globalThis.__leafwikiRefreshPromise === 'undefined') {
   globalThis.__leafwikiRefreshPromise = null
 }
 
+function shouldRefreshBeforeRequest(
+  user: AuthResponse['user'] | null,
+  accessTokenExpiresAt: number | null,
+  authDisabled: boolean,
+  httpRemoteUserEnabled: boolean,
+): boolean {
+  if (authDisabled || httpRemoteUserEnabled || user === null) {
+    return false
+  }
+
+  if (accessTokenExpiresAt === null) {
+    return true
+  }
+
+  const nowInSeconds = Math.floor(Date.now() / 1000)
+  return accessTokenExpiresAt - nowInSeconds <= REFRESH_THRESHOLD_SECONDS
+}
+
+async function clearSessionState(sessionLogout: () => Promise<void>) {
+  await sessionLogout()
+  const { setAccessTokenExpiresAt, setUser } = useSessionStore.getState()
+  setAccessTokenExpiresAt(null)
+  setUser(null)
+}
+
 export function ensureRefresh(): Promise<void> {
   const { authDisabled } = useConfigStore.getState()
   if (authDisabled) {
@@ -247,7 +289,8 @@ async function refreshAccessToken() {
       throw new Error('Refresh failed')
     }
 
-    const data = await res.json()
+    const data: AuthResponse = await res.json()
+    store.setAccessTokenExpiresAt(data.accessTokenExpiresAt)
     store.setUser(data.user)
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {

@@ -29,9 +29,10 @@ func NewAuthService(userService *UserService, sessionStore *SessionStore, secret
 }
 
 type AuthToken struct {
-	Token        string      `json:"token"`
-	RefreshToken string      `json:"refresh_token"`
-	User         *PublicUser `json:"user"`
+	Token                string      `json:"token"`
+	RefreshToken         string      `json:"refresh_token"`
+	AccessTokenExpiresAt int64       `json:"accessTokenExpiresAt"`
+	User                 *PublicUser `json:"user"`
 }
 
 func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
@@ -43,12 +44,12 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	// Clear sensitive information from user object
 	user.Password = "" // Clear password from user object
 
-	accessToken, _, err := a.generateToken(user, a.accessTokenLifetime, "access")
+	accessToken, _, accessTokenExpiresAt, err := a.generateToken(user, a.accessTokenLifetime, "access")
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, refreshJTI, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
+	refreshToken, refreshJTI, _, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
 	if err != nil {
 		return nil, err
 	}
@@ -64,9 +65,10 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	}
 
 	return &AuthToken{
-		Token:        accessToken,
-		RefreshToken: refreshToken,
-		User:         user.ToPublicUser(),
+		Token:                accessToken,
+		RefreshToken:         refreshToken,
+		AccessTokenExpiresAt: accessTokenExpiresAt,
+		User:                 user.ToPublicUser(),
 	}, nil
 }
 
@@ -104,12 +106,12 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 
 	user.Password = "" // Clear password from user object
 
-	newAccessToken, _, err := a.generateToken(user, a.accessTokenLifetime, "access")
+	newAccessToken, _, accessTokenExpiresAt, err := a.generateToken(user, a.accessTokenLifetime, "access")
 	if err != nil {
 		return nil, err
 	}
 
-	newRefreshToken, newRefreshJTI, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
+	newRefreshToken, newRefreshJTI, _, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +136,10 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 	}
 
 	return &AuthToken{
-		Token:        newAccessToken,
-		RefreshToken: newRefreshToken,
-		User:         user.ToPublicUser(),
+		Token:                newAccessToken,
+		RefreshToken:         newRefreshToken,
+		AccessTokenExpiresAt: accessTokenExpiresAt,
+		User:                 user.ToPublicUser(),
 	}, nil
 }
 
@@ -191,13 +194,14 @@ func (a *AuthService) parseClaims(tokenString string) (jwt.MapClaims, error) {
 	return claims, nil
 }
 
-func (a *AuthService) generateToken(user *User, duration time.Duration, typ string) (string, string, error) {
+func (a *AuthService) generateToken(user *User, duration time.Duration, typ string) (string, string, int64, error) {
 	jti := generateJTI()
+	expiresAt := time.Now().Add(duration).Unix()
 	claims := jwt.MapClaims{
 		"sub":   user.ID,
 		"role":  user.Role,
 		"email": user.Email,
-		"exp":   time.Now().Add(duration).Unix(),
+		"exp":   expiresAt,
 		"iat":   time.Now().Unix(),
 		"typ":   typ,
 		"jti":   jti, // Unique identifier for the token
@@ -205,9 +209,9 @@ func (a *AuthService) generateToken(user *User, duration time.Duration, typ stri
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString(a.secretKey)
 	if err != nil {
-		return "", "", err
+		return "", "", 0, err
 	}
-	return signed, jti, nil
+	return signed, jti, expiresAt, nil
 }
 
 func (a *AuthService) ValidateToken(tokenString string) (*User, error) {
