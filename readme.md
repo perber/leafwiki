@@ -326,7 +326,7 @@ If you are just getting started, the most important options are usually:
 | `--enable-link-refactor`        | Enable link refactoring dialog and rewrite flow                         | `false`       | v0.9.0            |
 | `--max-revision-history`        | Maximum revisions kept per page; `0` means unlimited                    | `100`         | v0.9.0            |
 | `--enable-http-remote-user`     | Enable reverse-proxy authentication via trusted HTTP header             | `false`       | v0.10.0           |
-| `--http-remote-user-header-name`| Header name carrying the username from a trusted proxy                  | `Remote-User` | v0.10.0           |
+| `--http-remote-user-header-name` | Header name carrying the username from a trusted proxy                 | `Remote-User` | v0.10.0           |
 | `--trusted-proxy-ips`           | Comma-separated trusted proxy IPs/CIDRs allowed to supply that header   | `""`          | v0.10.0           |
 | `--http-remote-user-logout-url` | Frontend logout redirect URL when reverse-proxy auth is active          | `""`          | v0.10.0           |
 
