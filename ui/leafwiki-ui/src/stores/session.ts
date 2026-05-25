@@ -9,9 +9,14 @@ type UserInfo = {
   role: 'admin' | 'editor' | 'viewer'
 }
 
+// Unix timestamp in seconds, matching the backend's use of time.Now().Unix().
+type UnixTimestampSeconds = number
+
 type SessionState = {
   isRefreshing: boolean
+  accessTokenExpiresAt: UnixTimestampSeconds | null
   user: UserInfo | null
+  setAccessTokenExpiresAt: (value: UnixTimestampSeconds | null) => void
   setUser: (user: UserInfo | null) => void
   setRefreshing: (value: boolean) => void
   logout: () => Promise<void>
@@ -22,6 +27,8 @@ export const useSessionStore = create<SessionState>()(
     (set) => ({
       user: null,
       isRefreshing: false,
+      accessTokenExpiresAt: null,
+      setAccessTokenExpiresAt: (value) => set({ accessTokenExpiresAt: value }),
       setRefreshing: (value) => set({ isRefreshing: value }),
       setUser: (user) => set({ user }),
       logout: async () => {
@@ -30,13 +37,14 @@ export const useSessionStore = create<SessionState>()(
         } catch (err) {
           console.warn('Logout failed:', err)
         } finally {
-          set({ user: null })
+          set({ user: null, accessTokenExpiresAt: null })
         }
       },
     }),
     {
       name: 'session-storage',
       partialize: (state) => ({
+        accessTokenExpiresAt: state.accessTokenExpiresAt,
         user: state.user,
       }),
     },

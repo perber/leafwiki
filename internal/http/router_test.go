@@ -2842,6 +2842,10 @@ func TestAuthRefreshToken(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
+	type authResponse struct {
+		AccessTokenExpiresAt int64 `json:"accessTokenExpiresAt"`
+	}
+
 	// 1) Login
 	loginBody := `{"identifier": "admin", "password": "admin"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
@@ -2851,6 +2855,14 @@ func TestAuthRefreshToken(t *testing.T) {
 
 	if loginRec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK on login, got %d", loginRec.Code)
+	}
+
+	var loginPayload authResponse
+	if err := json.Unmarshal(loginRec.Body.Bytes(), &loginPayload); err != nil {
+		t.Fatalf("Expected valid login JSON response, got error: %v", err)
+	}
+	if loginPayload.AccessTokenExpiresAt <= time.Now().Unix() {
+		t.Fatalf("Expected login response to include a future access token expiry, got %d", loginPayload.AccessTokenExpiresAt)
 	}
 
 	loginRes := loginRec.Result()
@@ -2886,6 +2898,14 @@ func TestAuthRefreshToken(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK on refresh, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var refreshPayload authResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &refreshPayload); err != nil {
+		t.Fatalf("Expected valid refresh JSON response, got error: %v", err)
+	}
+	if refreshPayload.AccessTokenExpiresAt <= time.Now().Unix() {
+		t.Fatalf("Expected refresh response to include a future access token expiry, got %d", refreshPayload.AccessTokenExpiresAt)
 	}
 
 	// optional: check if new cookies are set
