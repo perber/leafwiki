@@ -359,7 +359,7 @@ This is especially useful in containerized or production environments.
 | `LEAFWIKI_ENABLE_LINK_REFACTOR`        | Enable link refactoring dialog and rewrite flow                         | `false`    | v0.9.0          |
 | `LEAFWIKI_MAX_REVISION_HISTORY`        | Maximum revisions kept per page; `0` means unlimited                    | `100`      | v0.9.0          |
 | `LEAFWIKI_ENABLE_HTTP_REMOTE_USER`     | Enable reverse-proxy authentication via trusted HTTP header             | `false`    | v0.10.0         |
-| `LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME`| Header name carrying the username from a trusted proxy                  | `Remote-User` | v0.10.0       |
+| `LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME` | Header name carrying the username from a trusted proxy                  | `Remote-User` | v0.10.0       |
 | `LEAFWIKI_TRUSTED_PROXY_IPS`           | Comma-separated trusted proxy IPs/CIDRs allowed to supply that header   | `""`       | v0.10.0         |
 | `LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL` | Frontend logout redirect URL when reverse-proxy auth is active          | `""`       | v0.10.0         |
 
