@@ -99,7 +99,7 @@ docker run -p 8080:8080 \
     --allow-insecure=true
 ```
 
-`--allow-insecure=true` is required for plain HTTP. Omit it when serving over HTTPS.
+`--allow-insecure=true` is required for plain HTTP. Omit it when serving over HTTPS (make sure your reverse proxy forwards `X-Forwarded-Proto: https`).
 
 **Non-root:**
 
