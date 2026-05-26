@@ -8,7 +8,7 @@ For engineers and self-hosters who want structured, long-lived documentation. No
 
 ![LeafWiki](./assets/preview.png)
 
-If you've looked at Wiki.js or Outline and thought "this is too much to operate for what I need" — this is the alternative.
+If you've looked at Wiki.js or Outline and thought "this is too much to operate for what I need" — this could fit for you.
 
 → Try it without installing: **[demo.leafwiki.com](https://demo.leafwiki.com)** · `Ctrl+E` edit · `Ctrl+S` save · resets hourly  
 → If it fits, [a star](https://github.com/perber/leafwiki) helps others find it.
@@ -360,7 +360,7 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 
 ## Support this project
 
-LeafWiki is maintained in spare time. If it's useful to you:
+f it's useful to you:
 
 - ⭐ **[Star the repo](https://github.com/perber/leafwiki)** — helps others find it
 - 💛 **[Sponsor on GitHub](https://github.com/sponsors/perber)** — supports ongoing maintenance, bug fixes, and new features
