@@ -128,7 +128,7 @@ services:
     environment:
       - LEAFWIKI_JWT_SECRET=yourSecret
       - LEAFWIKI_ADMIN_PASSWORD=yourPassword
-      - LEAFWIKI_ALLOW_INSECURE=true  # For HTTPS deployments, omit this.
+      - LEAFWIKI_ALLOW_INSECURE=true  # Required for plain HTTP. Omit for HTTPS (ensure `X-Forwarded-Proto: https` is forwarded).
     volumes:
       - ${HOME}/leafwiki-data:/app/data
     restart: unless-stopped
