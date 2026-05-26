@@ -130,7 +130,7 @@ services:
       - LEAFWIKI_ADMIN_PASSWORD=yourPassword
       - LEAFWIKI_ALLOW_INSECURE=true  # For HTTPS deployments, omit this.
     volumes:
-      - ~/leafwiki-data:/app/data
+      - ${HOME}/leafwiki-data:/app/data
     restart: unless-stopped
 ```
 
