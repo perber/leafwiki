@@ -61,6 +61,7 @@ LeafWiki is intentionally narrower than those systems. That focus is part of the
 A public demo of LeafWiki is available here:
 
 🌐 **[demo.leafwiki.com](https://demo.leafwiki.com)**  
+🗺️ **[Roadmap](https://leafwiki.com/roadmap)**  
 
 Try: `Ctrl+E` to edit, `Ctrl+S` to save, `Ctrl+Shift+F` to open the search.  
 
