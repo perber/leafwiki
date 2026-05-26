@@ -360,7 +360,7 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 
 ## Support this project
 
-f it's useful to you:
+If it's useful to you:
 
 - ⭐ **[Star the repo](https://github.com/perber/leafwiki)** — helps others find it
 - 💛 **[Sponsor on GitHub](https://github.com/sponsors/perber)** — supports ongoing maintenance, bug fixes, and new features
