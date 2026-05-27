@@ -1,0 +1,3 @@
+[submodule "references/go-sdk"]
+	path = references/go-sdk
+	url = https://github.com/modelcontextprotocol/go-sdk.git
