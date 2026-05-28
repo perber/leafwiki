@@ -1621,6 +1621,200 @@ This paragraph creates a footnote reference.[^leafwiki]
     await test.expect(footnoteContainer).toHaveJSProperty('tagName', 'DIV');
   });
 
+  test('navigating from the sidebar resets page scroll to top', async ({ page }) => {
+    const timestamp = Date.now();
+    const sourceSlug = `scroll-source-${timestamp}`;
+    const targetSlug = `scroll-target-${timestamp}`;
+    const sourceTitle = `Scroll Source ${timestamp}`;
+    const targetTitle = `Scroll Target ${timestamp}`;
+    const longContent = Array.from({ length: 80 }, (_, index) => `Paragraph ${index + 1}`).join(
+      '\n\n',
+    );
+
+    await createPageWithContent(page, {
+      title: sourceTitle,
+      slug: sourceSlug,
+      content: `# ${sourceTitle}\n\n${longContent}`,
+    });
+    await createPageWithContent(page, {
+      title: targetTitle,
+      slug: targetSlug,
+      content: `# ${targetTitle}\n\nTarget page content`,
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${sourceSlug}`);
+
+    const scrollContainer = page.locator('#scroll-container');
+    await scrollContainer.evaluate((element) => {
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('Expected scroll container');
+      }
+      element.scrollTo({ top: 800, behavior: 'auto' });
+    });
+
+    await expect
+      .poll(() =>
+        scrollContainer.evaluate((element) =>
+          element instanceof HTMLElement ? element.scrollTop : -1,
+        ),
+      )
+      .toBeGreaterThan(0);
+
+    const treeView = new TreeView(page);
+    await treeView.clickPageByTitle(targetTitle);
+
+    await expect
+      .poll(() =>
+        scrollContainer.evaluate((element) =>
+          element instanceof HTMLElement ? element.scrollTop : -1,
+        ),
+      )
+      .toBe(0);
+  });
+
+  test('navigating to a previously visited page from the sidebar starts at the top', async ({
+    page,
+  }) => {
+    const timestamp = Date.now();
+    const sourceSlug = `scroll-repeat-source-${timestamp}`;
+    const targetSlug = `scroll-repeat-target-${timestamp}`;
+    const sourceTitle = `Scroll Repeat Source ${timestamp}`;
+    const targetTitle = `Scroll Repeat Target ${timestamp}`;
+    const longContent = Array.from({ length: 80 }, (_, index) => `Paragraph ${index + 1}`).join(
+      '\n\n',
+    );
+
+    await createPageWithContent(page, {
+      title: sourceTitle,
+      slug: sourceSlug,
+      content: `# ${sourceTitle}\n\n${longContent}`,
+    });
+    await createPageWithContent(page, {
+      title: targetTitle,
+      slug: targetSlug,
+      content: `# ${targetTitle}\n\n${longContent}`,
+    });
+
+    const viewPage = new ViewPage(page);
+    const treeView = new TreeView(page);
+
+    await viewPage.goto(`/${sourceSlug}`);
+
+    const scrollContainer = page.locator('#scroll-container');
+    await scrollContainer.evaluate((element) => {
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('Expected scroll container');
+      }
+      element.scrollTo({ top: 900, behavior: 'auto' });
+    });
+
+    await expect
+      .poll(() =>
+        scrollContainer.evaluate((element) =>
+          element instanceof HTMLElement ? element.scrollTop : -1,
+        ),
+      )
+      .toBeGreaterThan(0);
+
+    await treeView.clickPageByTitle(targetTitle);
+
+    await scrollContainer.evaluate((element) => {
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('Expected scroll container');
+      }
+      element.scrollTo({ top: 700, behavior: 'auto' });
+    });
+
+    await expect
+      .poll(() =>
+        scrollContainer.evaluate((element) =>
+          element instanceof HTMLElement ? element.scrollTop : -1,
+        ),
+      )
+      .toBeGreaterThan(0);
+
+    await treeView.clickPageByTitle(sourceTitle);
+
+    await expect
+      .poll(() =>
+        scrollContainer.evaluate((element) =>
+          element instanceof HTMLElement ? element.scrollTop : -1,
+        ),
+      )
+      .toBe(0);
+  });
+
+  test('browser back restores the previous page scroll position', async ({ page }) => {
+    const timestamp = Date.now();
+    const sourceSlug = `scroll-back-source-${timestamp}`;
+    const targetSlug = `scroll-back-target-${timestamp}`;
+    const sourceTitle = `Scroll Back Source ${timestamp}`;
+    const targetTitle = `Scroll Back Target ${timestamp}`;
+    const longContent = Array.from({ length: 80 }, (_, index) => `Paragraph ${index + 1}`).join(
+      '\n\n',
+    );
+
+    await createPageWithContent(page, {
+      title: sourceTitle,
+      slug: sourceSlug,
+      content: `# ${sourceTitle}\n\n${longContent}`,
+    });
+    await createPageWithContent(page, {
+      title: targetTitle,
+      slug: targetSlug,
+      content: `# ${targetTitle}\n\nTarget page content`,
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${sourceSlug}`);
+
+    const scrollContainer = page.locator('#scroll-container');
+    await scrollContainer.evaluate((element) => {
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('Expected scroll container');
+      }
+      element.scrollTo({ top: 850, behavior: 'auto' });
+    });
+
+    await expect
+      .poll(() =>
+        scrollContainer.evaluate((element) =>
+          element instanceof HTMLElement ? element.scrollTop : -1,
+        ),
+      )
+      .toBeGreaterThan(0);
+
+    const previousScrollTop = await scrollContainer.evaluate((element) => {
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('Expected scroll container');
+      }
+      return element.scrollTop;
+    });
+
+    const treeView = new TreeView(page);
+    await treeView.clickPageByTitle(targetTitle);
+
+    await expect
+      .poll(() =>
+        scrollContainer.evaluate((element) =>
+          element instanceof HTMLElement ? element.scrollTop : -1,
+        ),
+      )
+      .toBe(0);
+
+    await page.goBack();
+
+    await expect.poll(() => new URL(page.url()).pathname).toContain(`/${sourceSlug}`);
+    await expect
+      .poll(() =>
+        scrollContainer.evaluate((element) =>
+          element instanceof HTMLElement ? element.scrollTop : -1,
+        ),
+      )
+      .toBe(previousScrollTop);
+  });
+
   test('duplicate footnote references keep distinct backlinks without leaked node attributes', async ({
     page,
   }) => {

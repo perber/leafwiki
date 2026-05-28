@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { deferStateUpdate } from '@/lib/deferState'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { DIALOG_PAGE_QUICK_SWITCHER } from '@/lib/registries'
 import { cn } from '@/lib/utils'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -77,7 +78,7 @@ export function PageQuickSwitcherDialog() {
   const openResult = (path: string) => {
     queueMicrotask(() => {
       openAncestorsForPath(path)
-      navigate(`/${path}`)
+      navigate(`/${path}`, { state: createNavigationVisitState() })
       closeDialog()
     })
   }

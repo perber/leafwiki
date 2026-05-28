@@ -1,4 +1,5 @@
 import { useAppMode } from '@/lib/useAppMode'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { useTreeStore } from '@/stores/tree'
 import { FolderTree } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -48,7 +49,11 @@ export default function Breadcrumbs() {
             {index === breadcrumbs.length - 1 ? (
               <span className="breadcrumbs-nav__current">{crumb.title}</span>
             ) : (
-              <Link to={crumb.path} className="breadcrumbs-nav__link">
+              <Link
+                to={crumb.path}
+                state={createNavigationVisitState()}
+                className="breadcrumbs-nav__link"
+              >
                 {crumb.title}
               </Link>
             )}

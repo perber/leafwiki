@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { buildViewUrl, stripBasePath, withBasePath } from '@/lib/routePath'
 import {
@@ -131,6 +132,7 @@ export function MarkdownLink({
     return (
       <Link
         to={normalizedHref}
+        state={createNavigationVisitState()}
         {...props}
         className={clsx(
           'no-underline hover:underline',

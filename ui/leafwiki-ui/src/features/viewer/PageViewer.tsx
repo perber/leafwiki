@@ -1,6 +1,10 @@
 import Page404 from '@/components/Page404'
 import { formatRelativeTime } from '@/lib/formatDate'
 import {
+  createNavigationVisitState,
+  getNavigationVisitKey,
+} from '@/lib/navigationVisit'
+import {
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
   DIALOG_PAGE_PERMALINK,
@@ -35,7 +39,8 @@ function displayUser(label?: { username: string }) {
 }
 
 export default function PageViewer() {
-  const { pathname } = useLocation()
+  const location = useLocation()
+  const { pathname } = location
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const openNode = useTreeStore((state) => state.openNode)
@@ -54,7 +59,9 @@ export default function PageViewer() {
       navigate(`/e/${page?.path || ''}`)
     }, [page?.path, navigate]),
     showHistory: useCallback(() => {
-      navigate(buildHistoryUrl(page?.path || pathname))
+      navigate(buildHistoryUrl(page?.path || pathname), {
+        state: createNavigationVisitState(),
+      })
     }, [navigate, page?.path, pathname]),
     showPermalink: useCallback(() => {
       if (!page) return
@@ -72,7 +79,7 @@ export default function PageViewer() {
     }, [page, openDialog]),
   }
 
-  useScrollRestoration(pathname, loading)
+  useScrollRestoration(getNavigationVisitKey(location), loading)
   useScrollToHeadline({ content: page?.content || '', isLoading: loading })
   useToolbarActions(actions)
   useSetPageTitle({ page })

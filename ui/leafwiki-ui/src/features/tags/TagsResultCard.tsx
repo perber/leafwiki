@@ -1,4 +1,5 @@
 import { TaggedPage } from '@/lib/api/tags'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { MouseEvent, forwardRef } from 'react'
@@ -58,6 +59,7 @@ const TagsResultCard = forwardRef<HTMLDivElement, TagsResultCardProps>(
       >
         <Link
           to={`/${item.path}`}
+          state={createNavigationVisitState()}
           aria-current={isRouteActive ? 'page' : undefined}
           className="tags-result-card__link"
         >

@@ -11,6 +11,7 @@ import {
   type RevisionSnapshot,
 } from '@/lib/api/revisions'
 import { formatRelativeTime } from '@/lib/formatDate'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildHistoryUrl, withBasePath } from '@/lib/routePath'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useTreeStore } from '@/stores/tree'
@@ -828,7 +829,10 @@ export function PageHistoryContent({
       }
 
       await reloadPageHistory(pageId)
-      navigate(buildHistoryUrl(restoredPage.path), { replace: true })
+      navigate(buildHistoryUrl(restoredPage.path), {
+        replace: true,
+        state: createNavigationVisitState(),
+      })
       toast.success('Revision restored')
     } catch (err) {
       const mapped = mapApiError(err, 'Failed to restore revision')

@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect } from 'react'
 
 const DEFAULT_SCROLL_CONTAINER_ID = 'scroll-container'
+const SCROLL_STORAGE_PREFIX = 'scroll:visit:'
 
 export function useScrollRestoration(
-  pathname: string,
+  restorationKey: string,
   isLoading: boolean,
   containerId: string = DEFAULT_SCROLL_CONTAINER_ID,
 ) {
@@ -15,14 +16,19 @@ export function useScrollRestoration(
     if (isLoading) return
 
     const el = document.getElementById(containerId)
-    const stored = sessionStorage.getItem(`scroll:${pathname}`)
+    const stored = sessionStorage.getItem(
+      `${SCROLL_STORAGE_PREFIX}${restorationKey}`,
+    )
 
-    if (el && stored !== null) {
+    if (el) {
       requestAnimationFrame(() => {
-        el.scrollTo({ top: parseInt(stored, 10), behavior: 'auto' })
+        el.scrollTo({
+          top: stored === null ? 0 : Number.parseInt(stored, 10) || 0,
+          behavior: 'auto',
+        })
       })
     }
-  }, [isLoading, pathname, containerId])
+  }, [containerId, isLoading, restorationKey])
 
   useEffect(() => {
     // if hash is present, do not restore scroll position
@@ -32,8 +38,11 @@ export function useScrollRestoration(
     return () => {
       const el = document.getElementById(containerId)
       if (el) {
-        sessionStorage.setItem(`scroll:${pathname}`, String(el.scrollTop))
+        sessionStorage.setItem(
+          `${SCROLL_STORAGE_PREFIX}${restorationKey}`,
+          String(el.scrollTop),
+        )
       }
     }
-  }, [pathname, containerId])
+  }, [containerId, restorationKey])
 }
