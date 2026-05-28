@@ -213,6 +213,38 @@ async function createPageWithMetadata(
   }, input);
 }
 
+async function scrollMainContentTo(page: import('@playwright/test').Page, top: number) {
+  const scrollContainer = page.locator('#scroll-container');
+  await scrollContainer.evaluate((element, scrollTop) => {
+    if (!(element instanceof HTMLElement)) {
+      throw new Error('Expected scroll container');
+    }
+    element.scrollTo({ top: scrollTop, behavior: 'auto' });
+  }, top);
+}
+
+async function expectMainScrollTop(page: import('@playwright/test').Page, expected: number) {
+  const scrollContainer = page.locator('#scroll-container');
+  await expect
+    .poll(() =>
+      scrollContainer.evaluate((element) =>
+        element instanceof HTMLElement ? element.scrollTop : -1,
+      ),
+    )
+    .toBe(expected);
+}
+
+async function expectMainScrollTopGreaterThanZero(page: import('@playwright/test').Page) {
+  const scrollContainer = page.locator('#scroll-container');
+  await expect
+    .poll(() =>
+      scrollContainer.evaluate((element) =>
+        element instanceof HTMLElement ? element.scrollTop : -1,
+      ),
+    )
+    .toBeGreaterThan(0);
+}
+
 async function createTopLevelNode(
   page: import('@playwright/test').Page,
   input: {
@@ -1813,6 +1845,72 @@ This paragraph creates a footnote reference.[^leafwiki]
         ),
       )
       .toBe(previousScrollTop);
+  });
+
+  test('clicking a backlink in the delete dialog opens the page at the top', async ({ page }) => {
+    const stamp = Date.now();
+    const targetSlug = `delete-scroll-target-${stamp}`;
+    const referrerSlug = `delete-scroll-referrer-${stamp}`;
+    const targetTitle = `Delete Scroll Target ${stamp}`;
+    const referrerTitle = `Delete Scroll Referrer ${stamp}`;
+    const longContent = Array.from({ length: 80 }, (_, index) => `Paragraph ${index + 1}`).join(
+      '\n\n',
+    );
+
+    await createPageWithContent(page, {
+      title: targetTitle,
+      slug: targetSlug,
+      content: `# ${targetTitle}\n\nTarget page`,
+    });
+    await createPageWithContent(page, {
+      title: referrerTitle,
+      slug: referrerSlug,
+      content: `# ${referrerTitle}\n\n[${targetTitle}](/${targetSlug})\n\n${longContent}`,
+    });
+
+    const treeView = new TreeView(page);
+    const viewPage = new ViewPage(page);
+
+    await viewPage.goto(`/${referrerSlug}`);
+    await scrollMainContentTo(page, 900);
+    await expectMainScrollTopGreaterThanZero(page);
+
+    await treeView.clickPageByTitle(targetTitle);
+    await viewPage.clickDeletePageButton();
+
+    const deleteDialog = page.getByTestId('delete-page-dialog-backlinks-list');
+    await expect(deleteDialog).toContainText(referrerTitle);
+    await deleteDialog.getByRole('link', { name: referrerTitle }).click();
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${referrerSlug}`);
+    await expectMainScrollTop(page, 0);
+  });
+
+  test('closing the editor returns to the page at the top', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-close-scroll-${stamp}`;
+    const title = `Editor Close Scroll ${stamp}`;
+    const longContent = Array.from({ length: 80 }, (_, index) => `Paragraph ${index + 1}`).join(
+      '\n\n',
+    );
+
+    await createPageWithContent(page, {
+      title,
+      slug,
+      content: `# ${title}\n\n${longContent}`,
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await scrollMainContentTo(page, 880);
+    await expectMainScrollTopGreaterThanZero(page);
+
+    await viewPage.clickEditPageButton();
+    const editPage = new EditPage(page);
+    await editPage.closeEditor();
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${slug}`);
+    await expectMainScrollTop(page, 0);
   });
 
   test('duplicate footnote references keep distinct backlinks without leaked node attributes', async ({
