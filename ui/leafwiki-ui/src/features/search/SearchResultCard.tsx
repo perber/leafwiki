@@ -1,4 +1,5 @@
 import { SearchResultItem } from '@/lib/api/search'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { forwardRef } from 'react'
@@ -35,6 +36,7 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
       <Link
         ref={ref}
         to={resultUrl}
+        state={createNavigationVisitState()}
         data-testid={`search-result-card-${item.page_id}`}
         aria-current={isRouteActive ? 'page' : undefined}
         onMouseEnter={onMouseEnter}

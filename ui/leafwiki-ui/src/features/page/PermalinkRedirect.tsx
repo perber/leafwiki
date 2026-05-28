@@ -3,9 +3,10 @@ import { getPermalinkTarget } from '@/lib/api/pages'
 import { isPageNotFoundError } from '@/lib/api/errors'
 import { useProgressbarStore } from '@/features/progressbar/progressbarStore'
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 export default function PermalinkRedirect() {
+  const location = useLocation()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const setLoading = useProgressbarStore((s) => s.setLoading)
@@ -29,7 +30,10 @@ export default function PermalinkRedirect() {
         const target = await getPermalinkTarget(id)
         if (!active) return
 
-        navigate(target.path ? `/${target.path}` : '/', { replace: true })
+        navigate(target.path ? `/${target.path}` : '/', {
+          replace: true,
+          state: location.state,
+        })
       } catch (err) {
         if (!active) return
 
@@ -57,7 +61,7 @@ export default function PermalinkRedirect() {
       active = false
       setLoading(false)
     }
-  }, [id, navigate, setLoading])
+  }, [id, location.state, navigate, setLoading])
 
   if (notFound) {
     return <Page404 />

@@ -1,5 +1,6 @@
 import Page404 from '@/components/Page404'
 import { mapApiError, asApiLocalizedError } from '@/lib/api/errors'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildBrowserEditUrl } from '@/lib/routePath'
 import { DIALOG_LINK_INSERT } from '@/lib/registries'
 import { getWikiTargetRoutePath } from '@/lib/wikiPath'
@@ -140,9 +141,11 @@ export default function PageEditor() {
     }
 
     if (currentPage?.path) {
-      navigate(`/${currentPage.path}`)
+      navigate(`/${currentPage.path}`, {
+        state: createNavigationVisitState(),
+      })
     } else {
-      navigate('/')
+      navigate('/', { state: createNavigationVisitState() })
     }
   }, [navigate])
 

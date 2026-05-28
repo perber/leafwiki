@@ -1,6 +1,7 @@
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -37,6 +38,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
     <div className={clsx('flex', 'tree-node__tooltip-parent')}>
       <Link
         to={`/${node.path}`}
+        state={createNavigationVisitState()}
         className="tree-node__link"
         data-testid={`tree-node-link-${node.id}`}
         aria-current={isActive ? 'page' : undefined}

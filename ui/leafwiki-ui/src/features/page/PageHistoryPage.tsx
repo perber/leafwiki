@@ -1,5 +1,9 @@
 import Page404 from '@/components/Page404'
 import { buildViewUrl } from '@/lib/routePath'
+import {
+  createNavigationVisitState,
+  getNavigationVisitKey,
+} from '@/lib/navigationVisit'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import { type HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useTreeStore } from '@/stores/tree'
@@ -15,7 +19,8 @@ import { PageHistoryContent } from '@/features/history/PageHistoryContent'
 import { usePageHistory } from '@/features/history/pageHistory'
 
 export default function PageHistoryPage() {
-  const { pathname } = useLocation()
+  const location = useLocation()
+  const { pathname } = location
   const navigate = useNavigate()
   const openNode = useTreeStore((state) => state.openNode)
   const setToolbarButtons = useToolbarStore((state) => state.setButtons)
@@ -30,10 +35,12 @@ export default function PageHistoryPage() {
   usePageHistory(page?.id ?? null)
 
   const closeHistory = useCallback(() => {
-    navigate(buildViewUrl(page?.path || pathname))
+    navigate(buildViewUrl(page?.path || pathname), {
+      state: createNavigationVisitState(),
+    })
   }, [navigate, page?.path, pathname])
 
-  useScrollRestoration(pathname, loading)
+  useScrollRestoration(getNavigationVisitKey(location), loading)
   useSetPageTitle({ page })
 
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useConfigStore } from '@/stores/config'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { Link2Off, Paperclip } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
@@ -49,7 +50,7 @@ export function BacklinkInfo() {
             <ul>
               {backlinks.map((bl) => (
                 <li key={bl.from_page_id} className="backlinks__item">
-                  <Link to={bl.from_path}>
+                  <Link to={bl.from_path} state={createNavigationVisitState()}>
                     <Paperclip size={16} className="backlinks__icon" />{' '}
                     {bl.from_title}
                   </Link>
@@ -119,7 +120,10 @@ export function BacklinkInfo() {
                         key={bl.from_page_id}
                         className="backlinks__item backlinks__item--broken"
                       >
-                        <Link to={bl.from_path}>
+                        <Link
+                          to={bl.from_path}
+                          state={createNavigationVisitState()}
+                        >
                           <Link2Off size={16} className="backlinks__icon" />{' '}
                           {bl.from_title}
                         </Link>

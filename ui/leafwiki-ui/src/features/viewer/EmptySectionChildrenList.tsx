@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION, Page } from '@/lib/api/pages'
 import { formatRelativeTime } from '@/lib/formatDate'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -70,7 +71,9 @@ export default function EmptySectionChildrenList({
 
               return (
                 <li key={n.id}>
-                  <Link to={`/${n.path}`}>{n.title}</Link>{' '}
+                  <Link to={`/${n.path}`} state={createNavigationVisitState()}>
+                    {n.title}
+                  </Link>{' '}
                   {n.kind === NODE_KIND_SECTION && ' (Section)'}
                   <br />
                   {/* Last edited info */}

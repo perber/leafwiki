@@ -1,4 +1,5 @@
 import { PageRefactorPreview } from '@/lib/api/pages'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildEditUrl, buildHistoryUrl, buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { useTreeStore } from '@/stores/tree'
@@ -68,7 +69,10 @@ export async function refreshAfterPageRefactor({
     nextPath = preview.newPath
     const nextRoutePath = buildRefactorRoutePath(currentPath, preview.newPath)
     if (normalizeRoutePath(currentPath) !== nextRoutePath) {
-      navigate(nextRoutePath, { replace: true })
+      navigate(nextRoutePath, {
+        replace: true,
+        state: createNavigationVisitState(),
+      })
     }
   } else if (currentViewerPage) {
     nextPath = normalizedViewerPath

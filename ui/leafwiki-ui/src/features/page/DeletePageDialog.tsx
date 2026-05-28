@@ -4,6 +4,7 @@ import { fetchLinkStatus, type Backlink } from '@/lib/api/links'
 import { asApiLocalizedError } from '@/lib/api/errors'
 import { deletePage, NODE_KIND_PAGE } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { useViewerStore } from '../viewer/viewer'
 import { DIALOG_DELETE_PAGE_CONFIRMATION } from '@/lib/registries'
 import { useConfigStore } from '@/stores/config'
@@ -83,7 +84,7 @@ export function DeletePageDialog({
     try {
       await deletePage(pageId, deleteRecursive, page?.version ?? '')
       toast.success(`${itemLabelCapitalized} deleted successfully`)
-      navigate(redirectTo)
+      navigate(redirectTo, { state: createNavigationVisitState() })
       reloadTree().catch(console.error)
       return true
     } catch (err) {
@@ -188,7 +189,11 @@ export function DeletePageDialog({
               >
                 {backlinks.map((backlink) => (
                   <li key={backlink.from_page_id}>
-                    <Link className="underline" to={backlink.from_path}>
+                    <Link
+                      className="underline"
+                      to={backlink.from_path}
+                      state={createNavigationVisitState()}
+                    >
                       {backlink.from_title}
                     </Link>
                   </li>
