@@ -2,7 +2,6 @@ package pages
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sort"
 
@@ -82,6 +81,17 @@ func NewPreviewPageRefactorUseCase(
 
 // Execute computes the refactor preview without making changes.
 func (uc *PreviewPageRefactorUseCase) Execute(_ context.Context, in RefactorPreviewInput) (*RefactorPreview, error) {
+	kind, err := ValidateRefactorKind(in.Kind)
+	if err != nil {
+		return nil, err
+	}
+	in.Kind = kind
+	parentID, err := ValidateOptionalParentID(in.NewParentID)
+	if err != nil {
+		return nil, err
+	}
+	in.NewParentID = parentID
+
 	page, err := uc.tree.GetPage(in.PageID)
 	if err != nil {
 		return nil, err
@@ -150,7 +160,7 @@ func (uc *PreviewPageRefactorUseCase) computeTargetPath(page *tree.Page, in Refa
 		return parentPath + "/" + page.Slug, nil
 
 	default:
-		return "", fmt.Errorf("unsupported refactor kind: %s", in.Kind)
+		return "", sharederrors.NewLocalizedError(ErrCodePageInvalidRefactorKind, "Invalid refactor kind", "invalid refactor kind", nil)
 	}
 }
 
@@ -260,21 +270,29 @@ func NewApplyPageRefactorUseCase(
 
 // Execute applies the refactor operation to the page tree.
 func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorApplyInput) (*tree.Page, error) {
+	kind, err := ValidateRefactorKind(in.Kind)
+	if err != nil {
+		return nil, err
+	}
+	in.Kind = kind
+	parentID, err := ValidateOptionalParentID(in.NewParentID)
+	if err != nil {
+		return nil, err
+	}
+	in.NewParentID = parentID
+	in.Version = sanitizeClientVersion(in.Version)
+
 	plan, err := uc.buildApplyPlan(in)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateRefactorVersion(plan.page, in.Version); err != nil {
 		return nil, err
 	}
 
 	snapshots, err := uc.captureSnapshots(plan.page, in)
 	if err != nil {
 		return nil, err
-	}
-
-	if in.RewriteLinks {
-		rules := []links.RewriteRule{{OldPath: plan.oldPath, NewPath: plan.newPath}}
-		if err := uc.rewriteAffectedPages(in.UserID, plan.affectedPageIDs, rules); err != nil {
-			return nil, err
-		}
 	}
 
 	o := pagesave.NewPageSaveOrchestrator(
@@ -297,6 +315,9 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		if err != nil {
 			return nil, err
 		}
+		if err := uc.rewriteIncomingLinks(in, plan); err != nil {
+			return nil, err
+		}
 		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath); err != nil {
 			return nil, err
 		}
@@ -311,14 +332,25 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		if err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, Version: in.Version, ParentID: parentID}); err != nil {
 			return nil, err
 		}
+		if err := uc.rewriteIncomingLinks(in, plan); err != nil {
+			return nil, err
+		}
 		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath); err != nil {
 			return nil, err
 		}
 		return uc.tree.GetPage(in.PageID)
 
 	default:
-		return nil, fmt.Errorf("unsupported refactor kind: %s", in.Kind)
+		return nil, sharederrors.NewLocalizedError(ErrCodePageInvalidRefactorKind, "Invalid refactor kind", "invalid refactor kind", nil)
 	}
+}
+
+func (uc *ApplyPageRefactorUseCase) rewriteIncomingLinks(in RefactorApplyInput, plan *applyRefactorPlan) error {
+	if !in.RewriteLinks {
+		return nil
+	}
+	rules := []links.RewriteRule{{OldPath: plan.oldPath, NewPath: plan.newPath}}
+	return uc.rewriteAffectedPages(in.UserID, plan.affectedPageIDs, rules)
 }
 
 type applyRefactorPlan struct {
@@ -365,6 +397,23 @@ func (uc *ApplyPageRefactorUseCase) buildApplyPlan(in RefactorApplyInput) (*appl
 	}
 
 	return plan, nil
+}
+
+func validateRefactorVersion(page *tree.Page, version string) error {
+	if version == tree.VersionUnchecked {
+		return nil
+	}
+	pageVersion := page.Version()
+	if pageVersion == "" {
+		return nil
+	}
+	if version == "" {
+		return tree.ErrVersionRequired
+	}
+	if pageVersion != version {
+		return tree.ErrVersionConflict
+	}
+	return nil
 }
 
 type pathChangeSnapshot struct {

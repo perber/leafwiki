@@ -100,6 +100,17 @@ start_local() {
 
   local_data_dir="$(mktemp -d /tmp/leafwiki-e2e-data.XXXXXX)"
   server_log="$(mktemp /tmp/leafwiki-e2e-server.XXXXXX.log)"
+  local auth_args=(
+    --jwt-secret=e2e-tests-secret
+    --admin-password=admin
+  )
+
+  if [ "${E2E_ENABLE_MCP_LOCAL:-0}" = "1" ]; then
+    auth_args=(
+      --disable-auth=true
+      --enable-mcp=true
+    )
+  fi
 
   (
     cd "$repo_root"
@@ -110,10 +121,9 @@ start_local() {
       --port "$app_port" \
       --data-dir "$local_data_dir" \
       --allow-insecure=true \
+      "${auth_args[@]}" \
       --enable-revision=true \
-      --enable-link-refactor=true \
-      --jwt-secret=e2e-tests-secret \
-      --admin-password=admin
+      --enable-link-refactor=true
   ) >"$server_log" 2>&1 &
 
   server_pid=$!

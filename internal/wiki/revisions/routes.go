@@ -10,10 +10,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/http/dto"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
+	wikipages "github.com/perber/wiki/internal/wiki/pages"
 )
 
 // Routes is the RouteRegistrar for the revisions domain.
@@ -27,6 +29,7 @@ type Routes struct {
 	checkIntegrity   *CheckIntegrityUseCase
 	userResolver     *coreauth.UserResolver
 	authService      *coreauth.AuthService
+	treeService      *tree.TreeService
 }
 
 // RoutesConfig holds the dependencies required to build a Routes instance.
@@ -40,6 +43,7 @@ type RoutesConfig struct {
 	CheckIntegrity   *CheckIntegrityUseCase
 	UserResolver     *coreauth.UserResolver
 	AuthService      *coreauth.AuthService
+	TreeService      *tree.TreeService
 }
 
 // NewRoutes constructs the revisions RouteRegistrar.
@@ -54,6 +58,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		checkIntegrity:   cfg.CheckIntegrity,
 		userResolver:     cfg.UserResolver,
 		authService:      cfg.AuthService,
+		treeService:      cfg.TreeService,
 	}
 }
 
@@ -89,14 +94,19 @@ func (r *Routes) handleListRevisions(c *gin.Context) {
 		return
 	}
 
-	limit := 50
+	limit := DefaultRevisionListLimit
 	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed <= 0 || parsed > 200 {
+		if err != nil {
 			respondWithRevisionStatusError(c, http.StatusBadRequest, ErrCodeRevisionInvalidLimit, "Revision list limit is invalid", "revision list limit for page %s is invalid", pageID)
 			return
 		}
-		limit = parsed
+		normalized, err := NormalizeRevisionListLimit(&parsed, pageID)
+		if err != nil {
+			respondWithRevisionError(c, err)
+			return
+		}
+		limit = normalized
 	}
 
 	out, err := r.listRevisions.Execute(c.Request.Context(), ListRevisionsInput{
@@ -111,7 +121,7 @@ func (r *Routes) handleListRevisions(c *gin.Context) {
 
 	result := make([]*RevisionResponse, 0, len(out.Revisions))
 	for _, rev := range out.Revisions {
-		result = append(result, toRevisionResponse(rev, r.userResolver))
+		result = append(result, ToRevisionResponse(rev, r.userResolver))
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"revisions":  result,
@@ -120,14 +130,9 @@ func (r *Routes) handleListRevisions(c *gin.Context) {
 }
 
 func (r *Routes) handleGetRevision(c *gin.Context) {
-	pageID := strings.TrimSpace(c.Param("id"))
-	revisionID := strings.TrimSpace(c.Param("revisionId"))
-	if pageID == "" {
-		respondWithRevisionStatusError(c, http.StatusBadRequest, ErrCodeRevisionInvalidPageID, "Page ID is required", "page id is required")
-		return
-	}
-	if revisionID == "" {
-		respondWithRevisionStatusError(c, http.StatusBadRequest, ErrCodeRevisionInvalidRevisionID, "Revision ID is required", "revision id is required")
+	pageID, revisionID, err := ValidateRevisionLookupInput(c.Param("id"), c.Param("revisionId"))
+	if err != nil {
+		respondWithRevisionError(c, err)
 		return
 	}
 
@@ -140,7 +145,7 @@ func (r *Routes) handleGetRevision(c *gin.Context) {
 		respondWithRevisionStatusError(c, http.StatusNotFound, ErrCodeRevisionNotFound, "Revision not found", "revision %s for page %s not found", revisionID, pageID)
 		return
 	}
-	c.JSON(http.StatusOK, toSnapshotResponse(out.Snapshot, r.userResolver))
+	c.JSON(http.StatusOK, ToSnapshotResponse(out.Snapshot, r.userResolver))
 }
 
 func (r *Routes) handleGetLatestRevision(c *gin.Context) {
@@ -159,19 +164,13 @@ func (r *Routes) handleGetLatestRevision(c *gin.Context) {
 		respondWithRevisionStatusError(c, http.StatusNotFound, ErrCodeRevisionNotFound, "Revision not found", "revision for page %s not found", pageID)
 		return
 	}
-	c.JSON(http.StatusOK, toRevisionResponse(out.Revision, r.userResolver))
+	c.JSON(http.StatusOK, ToRevisionResponse(out.Revision, r.userResolver))
 }
 
 func (r *Routes) handleCompareRevisions(c *gin.Context) {
-	pageID := strings.TrimSpace(c.Param("id"))
-	baseRevisionID := strings.TrimSpace(c.Query("base"))
-	targetRevisionID := strings.TrimSpace(c.Query("target"))
-	if pageID == "" {
-		respondWithRevisionStatusError(c, http.StatusBadRequest, ErrCodeRevisionInvalidPageID, "Page ID is required", "page id is required")
-		return
-	}
-	if baseRevisionID == "" || targetRevisionID == "" {
-		respondWithRevisionStatusError(c, http.StatusBadRequest, ErrCodeRevisionCompareInvalidRequest, "Revision compare request is invalid", "revision compare request for page %s is invalid", pageID)
+	pageID, baseRevisionID, targetRevisionID, err := ValidateRevisionCompareInput(c.Param("id"), c.Query("base"), c.Query("target"))
+	if err != nil {
+		respondWithRevisionError(c, err)
 		return
 	}
 
@@ -186,23 +185,13 @@ func (r *Routes) handleCompareRevisions(c *gin.Context) {
 		respondWithRevisionStatusError(c, http.StatusNotFound, ErrCodeRevisionNotFound, "Revision not found", "revision compare resource for page %s not found", pageID)
 		return
 	}
-	c.JSON(http.StatusOK, toComparisonResponse(out.Comparison, r.userResolver))
+	c.JSON(http.StatusOK, ToComparisonResponse(out.Comparison, r.userResolver))
 }
 
 func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
-	pageID := strings.TrimSpace(c.Param("id"))
-	revisionID := strings.TrimSpace(c.Param("revisionId"))
-	assetName := strings.TrimSpace(strings.TrimPrefix(c.Param("name"), "/"))
-	if pageID == "" {
-		respondWithRevisionStatusError(c, http.StatusBadRequest, ErrCodeRevisionInvalidPageID, "Page ID is required", "page id is required")
-		return
-	}
-	if revisionID == "" {
-		respondWithRevisionStatusError(c, http.StatusBadRequest, ErrCodeRevisionInvalidRevisionID, "Revision ID is required", "revision id is required")
-		return
-	}
-	if assetName == "" {
-		respondWithRevisionStatusError(c, http.StatusBadRequest, ErrCodeRevisionPreviewAssetInvalidName, "Revision asset name is invalid", "revision asset name for page %s revision %s is invalid", pageID, revisionID)
+	pageID, revisionID, assetName, err := ValidateRevisionAssetInput(c.Param("id"), c.Param("revisionId"), c.Param("name"))
+	if err != nil {
+		respondWithRevisionError(c, err)
 		return
 	}
 
@@ -220,7 +209,7 @@ func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 
 	f, err := os.Open(out.Asset.Path)
 	if err != nil {
-		respondWithRevisionStatusError(c, http.StatusInternalServerError, ErrCodeRevisionPreviewAssetBlobUnavailable, "Revision asset blob is unavailable", "revision asset blob %s for page %s revision %s is unavailable", assetName, pageID, revisionID)
+		respondWithRevisionError(c, NewRevisionAssetBlobUnavailableError(assetName, pageID, revisionID, err))
 		return
 	}
 	defer func() { _ = f.Close() }()
@@ -231,13 +220,7 @@ func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 		return
 	}
 
-	contentType := out.Asset.Asset.MIMEType
-	if contentType == "" {
-		contentType = mime.TypeByExtension(strings.ToLower(path.Ext(assetName)))
-	}
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
+	contentType := DetectRevisionAssetMIMEType(assetName, out.Asset.Asset.MIMEType)
 	disposition := mime.FormatMediaType("inline", map[string]string{"filename": path.Base(assetName)})
 	if disposition == "" {
 		disposition = "inline"
@@ -271,6 +254,9 @@ func (r *Routes) handleRestoreRevision(c *gin.Context) {
 		respondWithRevisionError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.ToAPIPage(out.Page, r.userResolver))
+	apiPage := dto.ToAPIPage(out.Page, r.userResolver)
+	if r.treeService != nil {
+		wikipages.EnrichPageMetadata(apiPage, r.treeService.ReadPageRaw)
+	}
+	c.JSON(http.StatusOK, apiPage)
 }
-

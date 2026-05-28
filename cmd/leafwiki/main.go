@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -46,6 +47,7 @@ func writeUsage(w io.Writer) {
 	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
 	--enable-revision             Enable the revision / page history feature (default: false)
 	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
+	--enable-mcp                  Enable local MCP Streamable HTTP endpoint (requires --disable-auth and loopback host) (default: false)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
 	--enable-http-remote-user       Enable reverse-proxy authentication via HTTP header (default: false)
 	--http-remote-user-header-name  HTTP header carrying the username from a trusted proxy (default: Remote-User)
@@ -71,6 +73,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_MAX_ASSET_UPLOAD_SIZE
 	LEAFWIKI_ENABLE_REVISION
 	LEAFWIKI_ENABLE_LINK_REFACTOR
+	LEAFWIKI_ENABLE_MCP
 	LEAFWIKI_MAX_REVISION_HISTORY
 	LEAFWIKI_ENABLE_HTTP_REMOTE_USER
 	LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME
@@ -126,11 +129,12 @@ type cliFlags struct {
 	maxAssetUploadSize      *string
 	enableRevision          *bool
 	enableLinkRefactor      *bool
+	enableMCP               *bool
 	maxRevisionHistory      *int
-	enableHTTPRemoteUser      *bool
-	httpRemoteUserHeader      *string
-	trustedProxyIPs           *string
-	httpRemoteUserLogoutURL   *string
+	enableHTTPRemoteUser    *bool
+	httpRemoteUserHeader    *string
+	trustedProxyIPs         *string
+	httpRemoteUserLogoutURL *string
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -152,6 +156,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
 		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
 		enableLinkRefactor:      fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
+		enableMCP:               fs.Bool("enable-mcp", false, "enable local MCP Streamable HTTP endpoint (requires --disable-auth and loopback host)"),
 		maxRevisionHistory:      fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
 		enableHTTPRemoteUser:    fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
 		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
@@ -194,6 +199,7 @@ func main() {
 	)
 	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
 	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
+	enableMCP := resolveBool("enable-mcp", *flags.enableMCP, visited, "LEAFWIKI_ENABLE_MCP")
 	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
 	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
 	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
@@ -229,6 +235,10 @@ func main() {
 	if disableAuth {
 		publicAccess = true
 		slog.Default().Warn("Authentication disabled. Wiki is publicly accessible without authentication.")
+	}
+
+	if err := validateLocalMCPOptions(resolveLocalMCPOptions(flags, visited)); err != nil {
+		fail("Invalid MCP configuration", "error", err)
 	}
 
 	if allowInsecure {
@@ -271,35 +281,41 @@ func main() {
 		}
 	}()
 
-	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            publicAccess,
-		InjectCodeInHeader:      injectCodeInHeader,
-		CustomStylesheet:        customStylesheet,
-		AllowInsecure:           allowInsecure,
-		HideLinkMetadataSection: hideLinkMetadataSection,
-		AccessTokenTimeout:      accessTokenTimeout,
-		RefreshTokenTimeout:     refreshTokenTimeout,
-		AuthDisabled:            disableAuth,
-		BasePath:                basePath,
-		MaxAssetUploadSizeBytes: maxAssetUploadSize,
-		EnableRevision:          enableRevision,
-		EnableLinkRefactor:      enableLinkRefactor,
-		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), buildHTTPRouterOptions(httpRouterOptionsInput{
+		publicAccess:            publicAccess,
+		injectCodeInHeader:      injectCodeInHeader,
+		customStylesheet:        customStylesheet,
+		allowInsecure:           allowInsecure,
+		hideLinkMetadataSection: hideLinkMetadataSection,
+		accessTokenTimeout:      accessTokenTimeout,
+		refreshTokenTimeout:     refreshTokenTimeout,
+		authDisabled:            disableAuth,
+		basePath:                basePath,
+		maxAssetUploadSize:      maxAssetUploadSize,
+		enableRevision:          enableRevision,
+		enableLinkRefactor:      enableLinkRefactor,
+		enableMCP:               enableMCP,
+		host:                    host,
+		httpRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:        enableHTTPRemoteUser,
 			HeaderName:     httpRemoteUserHeader,
 			TrustedProxies: trustedProxies,
 			UserService:    w.UserService(),
 			LogoutURL:      httpRemoteUserLogoutURL,
 		},
-	})
+	}))
 
 	// Start server - combine host and port
-	listenAddr := host + ":" + port
+	listenAddr := buildListenAddress(host, port)
 
 	// Start server
 	if err := router.Run(listenAddr); err != nil {
 		fail("Failed to start server", "error", err)
 	}
+}
+
+func buildListenAddress(host, port string) string {
+	return net.JoinHostPort(host, port)
 }
 
 // CLI > ENV > default(flag)
@@ -391,6 +407,78 @@ func parseDuration(s string) (time.Duration, bool) {
 		return 0, false
 	}
 	return d, true
+}
+
+type localMCPOptions struct {
+	EnableMCP        bool
+	DisableAuth      bool
+	HTTPRemoteUserOn bool
+	Host             string
+}
+
+func resolveLocalMCPOptions(flags *cliFlags, visited map[string]bool) localMCPOptions {
+	return localMCPOptions{
+		EnableMCP:        resolveBool("enable-mcp", *flags.enableMCP, visited, "LEAFWIKI_ENABLE_MCP"),
+		DisableAuth:      resolveBool("disable-auth", *flags.disableAuth, visited, "LEAFWIKI_DISABLE_AUTH"),
+		HTTPRemoteUserOn: resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER"),
+		Host:             resolveString("host", *flags.host, visited, "LEAFWIKI_HOST", "127.0.0.1"),
+	}
+}
+
+func validateLocalMCPOptions(opts localMCPOptions) error {
+	if !opts.EnableMCP {
+		return nil
+	}
+	if !opts.DisableAuth {
+		return fmt.Errorf("--enable-mcp requires --disable-auth")
+	}
+	if opts.HTTPRemoteUserOn {
+		return fmt.Errorf("--enable-mcp cannot be combined with --enable-http-remote-user")
+	}
+	if !httpinternal.IsLoopbackHost(opts.Host) {
+		return fmt.Errorf("--enable-mcp requires a loopback host (localhost, 127.0.0.1, or ::1)")
+	}
+	return nil
+}
+
+type httpRouterOptionsInput struct {
+	publicAccess            bool
+	injectCodeInHeader      string
+	customStylesheet        string
+	allowInsecure           bool
+	hideLinkMetadataSection bool
+	accessTokenTimeout      time.Duration
+	refreshTokenTimeout     time.Duration
+	authDisabled            bool
+	basePath                string
+	maxAssetUploadSize      int64
+	enableRevision          bool
+	enableLinkRefactor      bool
+	enableMCP               bool
+	host                    string
+	mcpToolListPageSize     int
+	httpRemoteUser          httpinternal.HTTPRemoteUserConfig
+}
+
+func buildHTTPRouterOptions(in httpRouterOptionsInput) httpinternal.RouterOptions {
+	return httpinternal.RouterOptions{
+		PublicAccess:            in.publicAccess,
+		InjectCodeInHeader:      in.injectCodeInHeader,
+		CustomStylesheet:        in.customStylesheet,
+		AllowInsecure:           in.allowInsecure,
+		HideLinkMetadataSection: in.hideLinkMetadataSection,
+		AccessTokenTimeout:      in.accessTokenTimeout,
+		RefreshTokenTimeout:     in.refreshTokenTimeout,
+		AuthDisabled:            in.authDisabled,
+		BasePath:                in.basePath,
+		MaxAssetUploadSizeBytes: in.maxAssetUploadSize,
+		EnableRevision:          in.enableRevision,
+		EnableLinkRefactor:      in.enableLinkRefactor,
+		MCPEnabled:              in.enableMCP,
+		MCPBindHost:             in.host,
+		MCPToolListPageSize:     in.mcpToolListPageSize,
+		HTTPRemoteUser:          in.httpRemoteUser,
+	}
 }
 
 // normalizeBasePath normalizes the base path to the form "/mypath" (no trailing slash).

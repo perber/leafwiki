@@ -1272,6 +1272,112 @@ func TestApplyPageRefactorUseCase_RenameRewritesIncomingLinks(t *testing.T) {
 	}
 }
 
+func TestApplyPageRefactorUseCase_StaleVersionDoesNotRewriteIncomingLinks(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+
+	target, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Target", Slug: "target", Kind: pageKind(),
+	})
+	ref, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Ref", Slug: "ref", Kind: pageKind(),
+	})
+	refContent := "[Target](/target)"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: ref.Page.ID, Version: ref.Page.Version(), Title: ref.Page.Title, Slug: ref.Page.Slug, Content: &refContent, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(ref) failed: %v", err)
+	}
+
+	staleVersion := target.Page.Version()
+	newerTargetContent := "newer target content"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: target.Page.ID, Version: staleVersion, Title: target.Page.Title, Slug: target.Page.Slug, Content: &newerTargetContent, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(target) failed: %v", err)
+	}
+
+	_, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+		UserID:  "system",
+		Version: staleVersion,
+		RefactorPreviewInput: pages.RefactorPreviewInput{
+			PageID: target.Page.ID,
+			Kind:   pages.RefactorKindRename,
+			Title:  "Target Renamed",
+			Slug:   "target-renamed",
+		},
+		RewriteLinks: true,
+	})
+	if !errors.Is(err, tree.ErrVersionConflict) {
+		t.Fatalf("ApplyPageRefactor stale version error = %v, want ErrVersionConflict", err)
+	}
+
+	refAfter, err := deps.tree.GetPage(ref.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(ref) failed: %v", err)
+	}
+	if refAfter.Content != refContent {
+		t.Fatalf("stale refactor rewrote incoming link content = %q, want %q", refAfter.Content, refContent)
+	}
+}
+
+func TestApplyPageRefactorUseCase_TargetConflictDoesNotRewriteIncomingLinks(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+
+	target, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Target", Slug: "target", Kind: pageKind(),
+	})
+	if _, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Existing", Slug: "existing", Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("CreatePage(existing) failed: %v", err)
+	}
+	ref, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Ref", Slug: "ref", Kind: pageKind(),
+	})
+	refContent := "[Target](/target)"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: ref.Page.ID, Version: ref.Page.Version(), Title: ref.Page.Title, Slug: ref.Page.Slug, Content: &refContent, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(ref) failed: %v", err)
+	}
+
+	_, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+		UserID:  "system",
+		Version: target.Page.Version(),
+		RefactorPreviewInput: pages.RefactorPreviewInput{
+			PageID: target.Page.ID,
+			Kind:   pages.RefactorKindRename,
+			Title:  "Target",
+			Slug:   "existing",
+		},
+		RewriteLinks: true,
+	})
+	if !errors.Is(err, tree.ErrPageAlreadyExists) {
+		t.Fatalf("ApplyPageRefactor conflict error = %v, want ErrPageAlreadyExists", err)
+	}
+
+	refAfter, err := deps.tree.GetPage(ref.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(ref) failed: %v", err)
+	}
+	if refAfter.Content != refContent {
+		t.Fatalf("conflicting refactor rewrote incoming link content = %q, want %q", refAfter.Content, refContent)
+	}
+	targetAfter, err := deps.tree.GetPage(target.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(target) failed: %v", err)
+	}
+	if targetAfter.CalculatePath() != "/target" {
+		t.Fatalf("conflicting refactor moved target to %q, want /target", targetAfter.CalculatePath())
+	}
+}
+
 func TestPreviewPageRefactorUseCase_UsesEmptyWarningArrays(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())

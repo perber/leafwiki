@@ -55,6 +55,32 @@ func respondWithRevisionStatusError(c *gin.Context, status int, code, message, t
 	})
 }
 
+func NewRevisionNotFoundError(message, template string, args ...string) *sharederrors.LocalizedError {
+	return sharederrors.NewLocalizedError(ErrCodeRevisionNotFound, message, template, nil, args...)
+}
+
+func NewRevisionAssetBlobUnavailableError(assetName, pageID, revisionID string, cause error) *sharederrors.LocalizedError {
+	return sharederrors.NewLocalizedError(
+		ErrCodeRevisionPreviewAssetBlobUnavailable,
+		"Revision asset blob is unavailable",
+		"revision asset blob %s for page %s revision %s is unavailable",
+		cause,
+		assetName,
+		pageID,
+		revisionID,
+	)
+}
+
+func mapRevisionNotFoundError(err error, message, template string, args ...string) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return NewRevisionNotFoundError(message, template, args...)
+	}
+	return err
+}
+
 // respondWithRevisionError is the central error handler for revision endpoints.
 func respondWithRevisionError(c *gin.Context, err error) {
 	if localized, ok := sharederrors.AsLocalizedError(err); ok {
@@ -72,9 +98,10 @@ func respondWithRevisionError(c *gin.Context, err error) {
 
 func revisionErrorStatus(code string) int {
 	switch code {
-	case ErrCodeRevisionRestoreRevisionNotFound, ErrCodeRevisionRestorePageNotFound, ErrCodeRevisionPreviewAssetNotFound:
+	case ErrCodeRevisionNotFound, ErrCodeRevisionRestoreRevisionNotFound, ErrCodeRevisionRestorePageNotFound, ErrCodeRevisionPreviewAssetNotFound:
 		return http.StatusNotFound
-	case ErrCodeRevisionRestoreInvalidPageID, ErrCodeRevisionRestoreInvalidRevision, ErrCodeRevisionPreviewAssetInvalidName:
+	case ErrCodeRevisionInvalidPageID, ErrCodeRevisionInvalidRevisionID, ErrCodeRevisionInvalidLimit, ErrCodeRevisionCompareInvalidRequest,
+		ErrCodeRevisionRestoreInvalidPageID, ErrCodeRevisionRestoreInvalidRevision, ErrCodeRevisionPreviewAssetInvalidName:
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

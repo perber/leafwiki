@@ -63,8 +63,8 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 func (r *Routes) handleSearch(c *gin.Context) {
 	query := c.Query("q")
 	tags := queryTags(c, "tags")
-	if query == "" && len(tags) == 0 {
-		respondWithSearchStatusError(c, http.StatusBadRequest, ErrCodeSearchMissingQuery, "Query parameter 'q' is required", "query parameter q is required")
+	if err := ValidateSearchRequest(query, tags); err != nil {
+		respondWithSearchError(c, err)
 		return
 	}
 

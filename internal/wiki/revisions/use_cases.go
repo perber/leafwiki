@@ -12,7 +12,6 @@ import (
 	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
-
 // ─── DTO types ───────────────────────────────────────────────────────────────
 
 // RevisionResponse is the JSON representation of a revision.
@@ -36,7 +35,6 @@ type RevisionResponse struct {
 	LastAuthorID      string              `json:"lastAuthorId,omitempty"`
 	Summary           string              `json:"summary,omitempty"`
 }
-
 
 // RevisionAssetResponse is the JSON representation of a revision asset.
 type RevisionAssetResponse struct {
@@ -76,7 +74,7 @@ func formatTime(ts time.Time) string {
 	return ts.Format(time.RFC3339)
 }
 
-func toRevisionResponse(rev *revision.Revision, userResolver *coreauth.UserResolver) *RevisionResponse {
+func ToRevisionResponse(rev *revision.Revision, userResolver *coreauth.UserResolver) *RevisionResponse {
 	if rev == nil {
 		return nil
 	}
@@ -106,7 +104,7 @@ func toRevisionResponse(rev *revision.Revision, userResolver *coreauth.UserResol
 	}
 }
 
-func toSnapshotResponse(snapshot *revision.RevisionSnapshot, userResolver *coreauth.UserResolver) *RevisionSnapshotResponse {
+func ToSnapshotResponse(snapshot *revision.RevisionSnapshot, userResolver *coreauth.UserResolver) *RevisionSnapshotResponse {
 	if snapshot == nil {
 		return nil
 	}
@@ -115,13 +113,13 @@ func toSnapshotResponse(snapshot *revision.RevisionSnapshot, userResolver *corea
 		assets = append(assets, RevisionAssetResponse{Name: a.Name, SHA256: a.SHA256, SizeBytes: a.SizeBytes, MIMEType: a.MIMEType})
 	}
 	return &RevisionSnapshotResponse{
-		Revision: toRevisionResponse(snapshot.Revision, userResolver),
+		Revision: ToRevisionResponse(snapshot.Revision, userResolver),
 		Content:  snapshot.Content,
 		Assets:   assets,
 	}
 }
 
-func toComparisonResponse(cmp *revision.RevisionComparison, userResolver *coreauth.UserResolver) *RevisionComparisonResponse {
+func ToComparisonResponse(cmp *revision.RevisionComparison, userResolver *coreauth.UserResolver) *RevisionComparisonResponse {
 	if cmp == nil {
 		return nil
 	}
@@ -130,13 +128,33 @@ func toComparisonResponse(cmp *revision.RevisionComparison, userResolver *coreau
 		changes = append(changes, RevisionAssetDeltaResponse{Name: c.Name, Status: c.Status})
 	}
 	return &RevisionComparisonResponse{
-		Base:           toSnapshotResponse(cmp.Base, userResolver),
-		Target:         toSnapshotResponse(cmp.Target, userResolver),
+		Base:           ToSnapshotResponse(cmp.Base, userResolver),
+		Target:         ToSnapshotResponse(cmp.Target, userResolver),
 		ContentChanged: cmp.ContentChanged,
 		AssetChanges:   changes,
 	}
 }
 
+const (
+	DefaultRevisionListLimit = 50
+	MaxRevisionListLimit     = 200
+)
+
+func NormalizeRevisionListLimit(limit *int, pageID string) (int, error) {
+	if limit == nil {
+		return DefaultRevisionListLimit, nil
+	}
+	if *limit <= 0 || *limit > MaxRevisionListLimit {
+		return 0, sharederrors.NewLocalizedError(
+			ErrCodeRevisionInvalidLimit,
+			"Revision list limit is invalid",
+			"revision list limit for page %s is invalid",
+			nil,
+			pageID,
+		)
+	}
+	return *limit, nil
+}
 
 // ─── ListRevisionsUseCase ────────────────────────────────────────────────────
 
@@ -195,7 +213,7 @@ func (uc *GetRevisionUseCase) Execute(_ context.Context, in GetRevisionInput) (*
 	}
 	snapshot, err := uc.revision.GetRevisionSnapshot(in.PageID, in.RevisionID)
 	if err != nil {
-		return nil, err
+		return nil, mapRevisionNotFoundError(err, "Revision not found", "revision %s for page %s not found", in.RevisionID, in.PageID)
 	}
 	return &GetRevisionOutput{Snapshot: snapshot}, nil
 }
@@ -226,7 +244,7 @@ func (uc *CompareRevisionsUseCase) Execute(_ context.Context, in CompareRevision
 	}
 	comparison, err := uc.revision.CompareRevisionSnapshots(in.PageID, in.BaseRevisionID, in.TargetRevisionID)
 	if err != nil {
-		return nil, err
+		return nil, mapRevisionNotFoundError(err, "Revision not found", "revision compare resource for page %s not found", in.PageID)
 	}
 	return &CompareRevisionsOutput{Comparison: comparison}, nil
 }
@@ -257,7 +275,7 @@ func (uc *GetRevisionAssetUseCase) Execute(_ context.Context, in GetRevisionAsse
 	}
 	asset, err := uc.revision.GetRevisionAsset(in.PageID, in.RevisionID, in.AssetName)
 	if err != nil {
-		return nil, err
+		return nil, mapRevisionNotFoundError(err, "Revision asset not found", "revision asset %s for page %s revision %s not found", in.AssetName, in.PageID, in.RevisionID)
 	}
 	return &GetRevisionAssetOutput{Asset: asset}, nil
 }
@@ -286,7 +304,7 @@ func (uc *GetLatestRevisionUseCase) Execute(_ context.Context, in GetLatestRevis
 	}
 	rev, err := uc.revision.GetLatestRevision(in.PageID)
 	if err != nil {
-		return nil, err
+		return nil, mapRevisionNotFoundError(err, "Revision not found", "revision for page %s not found", in.PageID)
 	}
 	return &GetLatestRevisionOutput{Revision: rev}, nil
 }
@@ -337,7 +355,6 @@ func (uc *RestoreRevisionUseCase) Execute(_ context.Context, in RestoreRevisionI
 	})
 	return &RestoreRevisionOutput{Page: page}, nil
 }
-
 
 // ─── CheckIntegrityUseCase ───────────────────────────────────────────────────
 

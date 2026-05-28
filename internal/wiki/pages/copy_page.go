@@ -58,6 +58,12 @@ func (uc *CopyPageUseCase) Execute(_ context.Context, in CopyPageInput) (*CopyPa
 		return nil, ve
 	}
 
+	targetParentID, err := ValidateOptionalParentID(in.TargetParentID)
+	if err != nil {
+		return nil, err
+	}
+	in.TargetParentID = targetParentID
+
 	page, err := uc.tree.GetPage(in.SourcePageID)
 	if err != nil {
 		return nil, err

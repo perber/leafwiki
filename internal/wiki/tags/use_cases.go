@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/perber/wiki/internal/core/auth"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/http/dto"
 	coretags "github.com/perber/wiki/internal/tags"
@@ -78,6 +79,19 @@ type GetPagesByTagsUseCase struct {
 
 func NewGetPagesByTagsUseCase(svc *coretags.TagsService, treeService *tree.TreeService, userResolver *auth.UserResolver) *GetPagesByTagsUseCase {
 	return &GetPagesByTagsUseCase{svc: svc, treeService: treeService, userResolver: userResolver}
+}
+
+func ValidatePagesByTagsInput(tags []string) ([]string, error) {
+	normalized := normalizeTags(tags)
+	if len(normalized) == 0 {
+		return nil, sharederrors.NewLocalizedError(
+			ErrCodeTagsMissingParam,
+			"Query parameter 'tags' is required",
+			"query parameter tags is required",
+			nil,
+		)
+	}
+	return normalized, nil
 }
 
 func (uc *GetPagesByTagsUseCase) Execute(_ context.Context, in GetPagesByTagsInput) (*GetPagesByTagsOutput, error) {

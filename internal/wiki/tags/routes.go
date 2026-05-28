@@ -85,9 +85,9 @@ func (r *Routes) handleGetTags(c *gin.Context) {
 
 // handleGetPagesByTags handles GET /api/tags/pages?tags=react,typescript
 func (r *Routes) handleGetPagesByTags(c *gin.Context) {
-	tagList := queryTags(c, "tags")
-	if len(tagList) == 0 {
-		respondWithTagsBadRequest(c, ErrCodeTagsMissingParam, "Query parameter 'tags' is required", "query parameter tags is required")
+	tagList, err := ValidatePagesByTagsInput(queryTags(c, "tags"))
+	if err != nil {
+		respondWithTagsError(c, err)
 		return
 	}
 

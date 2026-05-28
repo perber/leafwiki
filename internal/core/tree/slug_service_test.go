@@ -2,6 +2,7 @@ package tree
 
 import (
 	"testing"
+	"time"
 )
 
 func TestGenerateUniqueChildSlug_NoConflict(t *testing.T) {
@@ -72,6 +73,27 @@ func TestGenerateUniqueChildSlug_SpecialCharacters(t *testing.T) {
 
 	if result != "apfel-and-baume" {
 		t.Errorf("Expected 'aepfel-and-baume', got '%s'", result)
+	}
+}
+
+func TestGenerateUniqueChildSlug_EmptyDesiredUsesValidFallback(t *testing.T) {
+	s := NewSlugService()
+	result := make(chan string, 1)
+
+	go func() {
+		result <- s.GenerateUniqueChildSlug(&PageNode{}, "", "   ")
+	}()
+
+	select {
+	case got := <-result:
+		if got != "page" {
+			t.Fatalf("GenerateUniqueChildSlug(empty) = %q, want fallback slug page", got)
+		}
+		if err := s.IsValidSlug(got); err != nil {
+			t.Fatalf("GenerateUniqueChildSlug(empty) returned invalid slug %q: %v", got, err)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("GenerateUniqueChildSlug(empty) did not return; empty normalized slug must not spin forever")
 	}
 }
 

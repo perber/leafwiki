@@ -37,6 +37,9 @@ func NewSlugService() *SlugService {
 // Use this when creating or renaming a page in the actual tree, where sibling collisions matter.
 func (s *SlugService) GenerateUniqueChildSlug(parent *PageNode, currentID, desired string) string {
 	slug := normalizeSlug(desired)
+	if slug == "" {
+		slug = "page"
+	}
 	original := slug
 	i := 1
 

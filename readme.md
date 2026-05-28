@@ -245,6 +245,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--hide-link-metadata-section`   | Hide backlinks and link status panel                                    | `false`       | –       |
 | `--enable-revision`              | Enable revision history                                                 | `false`       | v0.9.0  |
 | `--enable-link-refactor`         | Enable link rewriting on rename/move                                    | `false`       | v0.9.0  |
+| `--enable-mcp`                   | Enable the local-only MCP endpoint; requires disabled auth and loopback | `false`       | v0.11.0 |
 | `--max-revision-history`         | Max revisions per page; `0` = unlimited                                 | `100`         | v0.9.0  |
 | `--enable-http-remote-user`      | Enable reverse-proxy auth via HTTP header                               | `false`       | v0.10.0 |
 | `--http-remote-user-header-name` | Header name carrying the username from the proxy                        | `Remote-User` | v0.10.0 |
@@ -274,6 +275,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_HIDE_LINK_METADATA_SECTION`   | Hide backlinks and link status panel                 | `false`       | –       |
 | `LEAFWIKI_ENABLE_REVISION`              | Revision history                                     | `false`       | v0.9.0  |
 | `LEAFWIKI_ENABLE_LINK_REFACTOR`         | Link rewriting on rename/move                        | `false`       | v0.9.0  |
+| `LEAFWIKI_ENABLE_MCP`                   | Local-only MCP endpoint; requires disabled auth and loopback host | `false`       | v0.11.0 |
 | `LEAFWIKI_MAX_REVISION_HISTORY`         | Max revisions per page; `0` = unlimited              | `100`         | v0.9.0  |
 | `LEAFWIKI_ENABLE_HTTP_REMOTE_USER`      | Reverse-proxy auth via header                        | `false`       | v0.10.0 |
 | `LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME` | Username header from proxy                           | `Remote-User` | v0.10.0 |
@@ -331,6 +333,16 @@ Enabled by default since v0.7.0:
 ```
 
 For most setups, prefer `--public-access` for read-only public access and the viewer role for restricted accounts.
+
+### Local MCP
+
+LeafWiki can expose a local-only MCP Streamable HTTP endpoint for agents and the web UI to work against the same live wiki state. It is disabled by default and only starts with disabled auth on a loopback host:
+
+```bash
+./leafwiki --disable-auth --enable-mcp --host=127.0.0.1
+```
+
+The endpoint is `http://127.0.0.1:8080/mcp`, or `${base-path}/mcp` when `--base-path` is set. See [Local MCP Interface](docs/mcp.md) for the tool surface, safety gates, and parity contract.
 
 ### Operations notes
 
