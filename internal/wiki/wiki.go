@@ -22,6 +22,7 @@ import (
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikiauth "github.com/perber/wiki/internal/wiki/auth"
 	wikibranding "github.com/perber/wiki/internal/wiki/branding"
+	wikihealth "github.com/perber/wiki/internal/wiki/health"
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
@@ -42,7 +43,7 @@ type Wiki struct {
 	branding     *branding.BrandingService
 	searchIndex  *search.SQLiteIndex
 	status       *search.IndexingStatus
-	storageDir   string
+	storageDir string
 
 	// Domain route registrars (populated by NewWiki).
 	pagesRoutes      *wikipages.Routes
@@ -55,6 +56,7 @@ type Wiki struct {
 	propertiesRoutes *wikiproperties.Routes
 	brandingRoutes   *wikibranding.Routes
 	importerRoutes   *wikiimporter.Routes
+	healthRoutes     *wikihealth.Routes
 	revision         *revision.Service
 	links            *links.LinkService
 	tags             *tags.TagsService
@@ -65,15 +67,15 @@ type Wiki struct {
 const SYSTEM_USER_ID = "system"
 
 type WikiOptions struct {
-	StorageDir              string        // Path to storage directory
-	AdminPassword           string        // Initial admin password
-	JWTSecret               string        // JWT secret for authentication
-	AccessTokenTimeout      time.Duration // Access token timeout duration
-	RefreshTokenTimeout     time.Duration // Refresh token timeout duration
-	AuthDisabled            bool          // Whether authentication is disabled
-	EnableRevision          bool          // Whether revision recording/storage is enabled
-	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
-	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
+	StorageDir              string           // Path to storage directory
+	AdminPassword           string           // Initial admin password
+	JWTSecret               string           // JWT secret for authentication
+	AccessTokenTimeout      time.Duration    // Access token timeout duration
+	RefreshTokenTimeout     time.Duration    // Refresh token timeout duration
+	AuthDisabled            bool             // Whether authentication is disabled
+	EnableRevision          bool             // Whether revision recording/storage is enabled
+	MaxRevisionHistory      int              // Max revisions kept per page; 0 = unlimited
+	MaxAssetUploadSizeBytes int64 // Maximum allowed size in bytes for asset/import uploads; 0 = default
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
@@ -292,6 +294,11 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.propertiesRoutes = w.buildPropertiesRoutes()
 	w.brandingRoutes = w.buildBrandingRoutes()
 	w.importerRoutes = w.buildImporterRoutes(options)
+	w.healthRoutes = wikihealth.NewRoutes(wikihealth.RoutesConfig{
+		Index:      w.searchIndex,
+		Status:     w.status,
+		StorageDir: w.storageDir,
+	})
 }
 
 // ─── Domain route builder helpers ────────────────────────────────────────────
@@ -448,6 +455,7 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.propertiesRoutes,
 		w.brandingRoutes,
 		w.importerRoutes,
+		w.healthRoutes,
 	}
 }
 

@@ -31,7 +31,9 @@ type LoginUseCase struct {
 	auth *coreauth.AuthService
 }
 
-func NewLoginUseCase(a *coreauth.AuthService) *LoginUseCase { return &LoginUseCase{auth: a} }
+func NewLoginUseCase(a *coreauth.AuthService) *LoginUseCase {
+	return &LoginUseCase{auth: a}
+}
 
 func (uc *LoginUseCase) Execute(_ context.Context, in LoginInput) (*LoginOutput, error) {
 	if uc.auth == nil {

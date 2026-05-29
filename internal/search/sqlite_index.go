@@ -157,6 +157,12 @@ func (s *SQLiteIndex) Clear() error {
 	})
 }
 
+func (s *SQLiteIndex) Ping() error {
+	return s.withDB(func(db *sql.DB) error {
+		return db.Ping()
+	})
+}
+
 func (s *SQLiteIndex) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
