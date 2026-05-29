@@ -3,7 +3,6 @@ package wiki
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"path/filepath"
 	"time"
@@ -261,6 +260,7 @@ func (w *Wiki) initSearch() error {
 	}
 	w.status = search.NewIndexingStatus()
 	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
+	w.log.Info("search indexing started")
 	go func() {
 		w.status.Start()
 		defer w.status.Finish()
@@ -268,6 +268,7 @@ func (w *Wiki) initSearch() error {
 			w.log.Warn("search bootstrap failed", "error", err)
 			w.status.Fail()
 		} else {
+			w.log.Info("search indexing completed")
 			w.status.Success()
 		}
 	}()
@@ -560,7 +561,7 @@ func (w *Wiki) Close() error {
 
 	if w.links != nil {
 		if err := w.links.Close(); err != nil {
-			log.Printf("error closing links: %v", err)
+			w.log.Error("error closing links", "error", err)
 		}
 	}
 

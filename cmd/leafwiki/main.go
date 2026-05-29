@@ -51,6 +51,7 @@ func writeUsage(w io.Writer) {
 	--http-remote-user-header-name  HTTP header carrying the username from a trusted proxy (default: Remote-User)
 	--trusted-proxy-ips             Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
 	--http-remote-user-logout-url   URL the frontend redirects to after logout in proxy-auth mode (default: "")
+	--disable-request-log           Suppress per-request HTTP access log lines (default: false)
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -76,6 +77,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME
 	LEAFWIKI_TRUSTED_PROXY_IPS
 	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
+	LEAFWIKI_DISABLE_REQUEST_LOG
 	`); err != nil {
 		panic(err)
 	}
@@ -131,6 +133,7 @@ type cliFlags struct {
 	httpRemoteUserHeader      *string
 	trustedProxyIPs           *string
 	httpRemoteUserLogoutURL   *string
+	disableRequestLog         *bool
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -157,6 +160,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
 		trustedProxyIPs:         fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
 		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "URL the frontend redirects to after logout when reverse-proxy auth is active (e.g. https://auth.example.com/logout)"),
+		disableRequestLog:       fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
 	}
 }
 
@@ -199,6 +203,7 @@ func main() {
 	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
 	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
 	httpRemoteUserLogoutURL := resolveString("http-remote-user-logout-url", *flags.httpRemoteUserLogoutURL, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL", "")
+	disableRequestLog := resolveBool("disable-request-log", *flags.disableRequestLog, visited, "LEAFWIKI_DISABLE_REQUEST_LOG")
 	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
 	if err != nil {
 		fail("invalid --trusted-proxy-ips value", "error", err)
@@ -206,6 +211,13 @@ func main() {
 
 	if err := validateHTTPRemoteUserConfig(enableHTTPRemoteUser, trustedProxyIPsRaw); err != nil {
 		fail("Invalid HTTP remote user configuration", "error", err)
+	}
+
+	if enableHTTPRemoteUser {
+		slog.Default().Info("Reverse-proxy authentication enabled",
+			"header", httpRemoteUserHeader,
+			"trusted_proxies", trustedProxyIPsRaw,
+		)
 	}
 
 	args := flag.Args()
@@ -244,6 +256,7 @@ func main() {
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
 			fail("Failed to create data directory", "error", err)
 		}
+		slog.Default().Info("Data directory created", "path", dataDir)
 	}
 
 	if !disableAuth {
@@ -295,12 +308,11 @@ func main() {
 			UserService:    w.UserService(),
 			LogoutURL:      httpRemoteUserLogoutURL,
 		},
+		DisableRequestLog: disableRequestLog,
 	})
 
-	// Start server - combine host and port
 	listenAddr := host + ":" + port
-
-	// Start server
+	slog.Default().Info("Starting LeafWiki", "address", listenAddr, "data_dir", dataDir)
 	if err := router.Run(listenAddr); err != nil {
 		fail("Failed to start server", "error", err)
 	}
