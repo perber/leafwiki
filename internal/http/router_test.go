@@ -610,6 +610,75 @@ func createZipFromDir(t *testing.T, root string) []byte {
 	return body.Bytes()
 }
 
+func TestMeEndpoint_Unauthenticated_Returns200WithNullBody(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for unauthenticated /auth/me, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if body := strings.TrimSpace(rec.Body.String()); body != "null" {
+		t.Errorf("expected null body for unauthenticated request, got %q", body)
+	}
+}
+
+func TestMeEndpoint_Authenticated_ReturnsUser(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/auth/me", nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for authenticated /auth/me, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode /auth/me response: %v", err)
+	}
+	if body["username"] != "admin" {
+		t.Errorf("expected username=admin, got %v", body["username"])
+	}
+	if body["role"] != "admin" {
+		t.Errorf("expected role=admin, got %v", body["role"])
+	}
+}
+
+func TestMeEndpoint_HasNoCacheHeaders(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	for _, name := range []string{"unauthenticated", "authenticated"} {
+		t.Run(name, func(t *testing.T) {
+			var rec *httptest.ResponseRecorder
+			if name == "authenticated" {
+				rec = authenticatedRequest(t, router, http.MethodGet, "/api/auth/me", nil)
+			} else {
+				req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+				rec = httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+			}
+
+			if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {
+				t.Errorf("expected Cache-Control: no-store, got %q", cc)
+			}
+			if p := rec.Header().Get("Pragma"); p != "no-cache" {
+				t.Errorf("expected Pragma: no-cache, got %q", p)
+			}
+			if exp := rec.Header().Get("Expires"); exp == "" {
+				t.Error("expected Expires header to be set")
+			}
+		})
+	}
+}
+
 func TestCreatePageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

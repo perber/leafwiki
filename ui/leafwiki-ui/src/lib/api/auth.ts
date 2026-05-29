@@ -42,14 +42,15 @@ function getCsrfTokenFromCookie(): string | null {
   }
 }
 
-export async function fetchMe(): Promise<AuthResponse['user']> {
+export async function fetchMe(): Promise<AuthResponse['user'] | null> {
   const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
     credentials: 'include',
   })
   if (!res.ok) {
-    throw new Error('Not authenticated')
+    throw new ApiError(`/api/auth/me returned ${res.status}`, res.status)
   }
-  return res.json()
+  const user = await res.json()
+  return user ?? null
 }
 
 export async function login(identifier: string, password: string) {
@@ -283,7 +284,7 @@ async function refreshAccessToken() {
     })
 
     if (!res.ok) {
-      throw new Error('Refresh failed')
+      throw new ApiError('Refresh failed', res.status)
     }
 
     const data: AuthResponse = await res.json()

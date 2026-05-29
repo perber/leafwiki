@@ -263,13 +263,13 @@ func (w *Wiki) initSearch() error {
 	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
 	go func() {
 		w.status.Start()
+		defer w.status.Finish()
 		if err := searchEffect.IndexAllPages(); err != nil {
 			w.log.Warn("search bootstrap failed", "error", err)
 			w.status.Fail()
 		} else {
 			w.status.Success()
 		}
-		w.status.Finish()
 	}()
 	return nil
 }

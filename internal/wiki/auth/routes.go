@@ -80,6 +80,16 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	// Config endpoint also lives here as it issues the CSRF cookie.
 	nonAuth.GET("/config", r.handleConfig(ctx))
 
+	// /auth/me uses optional auth so that unauthenticated callers get 200+null
+	// instead of 401, which would cause browsers behind a Basic Auth reverse
+	// proxy to discard their cached credentials.
+	meGroup := ctx.Base.Group("/api")
+	meGroup.Use(
+		authmw.InjectPublicEditor(opts.AuthDisabled),
+		authmw.OptionalAuth(r.authService, ctx.AuthCookies),
+	)
+	meGroup.GET("/auth/me", r.handleMe)
+
 	authGroup := ctx.Base.Group("/api")
 	authGroup.Use(
 		authmw.InjectPublicEditor(opts.AuthDisabled),
@@ -87,7 +97,6 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
 
-	authGroup.GET("/auth/me", r.handleMe)
 	authGroup.POST("/auth/logout", r.handleLogout(ctx))
 
 	authGroup.POST("/users", authmw.RequireAdmin(opts.AuthDisabled), r.handleCreateUser)
@@ -136,12 +145,18 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 	}
 }
 
-// handleMe returns the currently authenticated user from the Gin context.
-// The user is already resolved and validated by the middleware chain
-// (InjectRemoteUser for proxy auth, RequireAuth for JWT) — no DB lookup needed.
+// handleMe returns the currently authenticated user or null.
+// Uses TryGetUser (not MustGetUser) so unauthenticated callers receive 200+null
+// instead of 401, avoiding the Basic Auth credential-reset issue (RFC 9110 §15.5.2).
+// Cache headers prevent reverse proxies from caching the identity response.
 func (r *Routes) handleMe(c *gin.Context) {
-	user := authmw.MustGetUser(c)
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", time.Unix(0, 0).UTC().Format(http.TimeFormat))
+
+	user := authmw.TryGetUser(c)
 	if user == nil {
+		c.JSON(http.StatusOK, nil)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{

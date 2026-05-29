@@ -580,3 +580,153 @@ func TestRequireAuth_ComprehensiveScenarios(t *testing.T) {
 		})
 	}
 }
+
+func TestOptionalAuth_NoToken_PassesThrough(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
+	router := gin.New()
+	router.Use(authmw.OptionalAuth(nil, authCookies))
+	router.GET("/test", func(c *gin.Context) {
+		_, exists := c.Get("user")
+		if exists {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "unexpected user in context"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"user": nil})
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for no token, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOptionalAuth_ValidToken_SetsUser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	fixture := createTestAuthFixture(t)
+	defer func() {
+		if err := fixture.close(); err != nil {
+			t.Fatalf("close: %v", err)
+		}
+	}()
+
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
+	authToken, err := fixture.auth.Login("admin", "admin")
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+
+	router := gin.New()
+	router.Use(authmw.OptionalAuth(fixture.auth, authCookies))
+	router.GET("/test", func(c *gin.Context) {
+		v, exists := c.Get("user")
+		if !exists {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "user not in context"})
+			return
+		}
+		u, ok := v.(*coreauth.User)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "wrong type"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"username": u.Username})
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.AddCookie(&http.Cookie{Name: "leafwiki_at", Value: authToken.Token})
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if w.Body.String() != `{"username":"admin"}` {
+		t.Errorf("unexpected body: %s", w.Body.String())
+	}
+}
+
+func TestOptionalAuth_InvalidToken_PassesThrough(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	fixture := createTestAuthFixture(t)
+	defer func() {
+		if err := fixture.close(); err != nil {
+			t.Fatalf("close: %v", err)
+		}
+	}()
+
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
+	router := gin.New()
+	router.Use(authmw.OptionalAuth(fixture.auth, authCookies))
+	router.GET("/test", func(c *gin.Context) {
+		_, exists := c.Get("user")
+		if exists {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "unexpected user for invalid token"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"user": nil})
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.AddCookie(&http.Cookie{Name: "leafwiki_at", Value: "invalid-token"})
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for invalid token, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestOptionalAuth_NilAuthService_WithToken_Returns500(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
+	router := gin.New()
+	router.Use(authmw.OptionalAuth(nil, authCookies))
+	router.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.AddCookie(&http.Cookie{Name: "leafwiki_at", Value: "some-token"})
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 for nil authService with token, got %d: %s", w.Code, w.Body.String())
+	}
+	expected := `{"error":"Authentication service unavailable"}`
+	if w.Body.String() != expected {
+		t.Errorf("expected %s, got %s", expected, w.Body.String())
+	}
+}
+
+func TestOptionalAuth_UserAlreadyInContext_ShortCircuits(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
+	injected := &coreauth.User{ID: "proxy-user", Username: "proxy", Role: coreauth.RoleViewer}
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user", injected)
+		c.Next()
+	})
+	router.Use(authmw.OptionalAuth(nil, authCookies))
+	router.GET("/test", func(c *gin.Context) {
+		v, _ := c.Get("user")
+		u := v.(*coreauth.User)
+		c.JSON(http.StatusOK, gin.H{"username": u.Username})
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+	if w.Body.String() != `{"username":"proxy"}` {
+		t.Errorf("unexpected body: %s", w.Body.String())
+	}
+}

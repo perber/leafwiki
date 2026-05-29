@@ -23,3 +23,16 @@ func MustGetUser(c *gin.Context) *auth.User {
 
 	return user
 }
+
+// TryGetUser returns the authenticated user from context, or nil if not set.
+func TryGetUser(c *gin.Context) *auth.User {
+	v, exists := c.Get("user")
+	if !exists {
+		return nil
+	}
+	user, ok := v.(*auth.User)
+	if !ok {
+		return nil
+	}
+	return user
+}
