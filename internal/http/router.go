@@ -131,10 +131,10 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	csrfCookie := security.NewCSRFCookie(opts.AllowInsecure, 3*24*time.Hour)
 
 	engine := gin.New()
-	engine.Use(gin.RecoveryWithWriter(gin.DefaultErrorWriter))
 	if !opts.DisableRequestLog {
 		engine.Use(slogRequestLogger())
 	}
+	engine.Use(gin.RecoveryWithWriter(gin.DefaultErrorWriter))
 	base := engine.Group(opts.BasePath)
 
 	if opts.HTTPRemoteUser.Enabled {
