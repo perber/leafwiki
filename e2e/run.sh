@@ -112,7 +112,7 @@ start_local() {
       --allow-insecure=true \
       --enable-revision=true \
       --enable-link-refactor=true \
-      --jwt-secret=e2e-tests-secret \
+        --jwt-secret=e2e-tests-secret \
       --admin-password=admin
   ) >"$server_log" 2>&1 &
 

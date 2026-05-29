@@ -56,6 +56,20 @@ func (s *IndexingStatus) IsActive() bool {
 	return s.Active
 }
 
+// IsFailed returns true if the last indexing run ended with failures.
+func (s *IndexingStatus) IsFailed() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return !s.Active && s.Failed > 0 && !s.FinishedAt.IsZero()
+}
+
+// IsReady returns true if indexing completed successfully.
+func (s *IndexingStatus) IsReady() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return !s.Active && s.Failed == 0 && !s.FinishedAt.IsZero()
+}
+
 func (s *IndexingStatus) Snapshot() *IndexingStatus {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

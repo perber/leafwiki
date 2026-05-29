@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io"
 
-	coreimporter "github.com/perber/wiki/internal/importer"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	coreimporter "github.com/perber/wiki/internal/importer"
 )
 
 // ─── CreateImportPlanUseCase ─────────────────────────────────────────────────
