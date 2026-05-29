@@ -204,6 +204,10 @@ func main() {
 		fail("invalid --trusted-proxy-ips value", "error", err)
 	}
 
+	if err := validateHTTPRemoteUserConfig(enableHTTPRemoteUser, trustedProxyIPsRaw); err != nil {
+		fail("Invalid HTTP remote user configuration", "error", err)
+	}
+
 	args := flag.Args()
 	if len(args) > 0 {
 		switch args[0] {
@@ -391,6 +395,23 @@ func parseDuration(s string) (time.Duration, bool) {
 		return 0, false
 	}
 	return d, true
+}
+
+func validateHTTPRemoteUserConfig(enabled bool, trustedProxyIPsRaw string) error {
+	if !enabled {
+		return nil
+	}
+	hasTrustedProxy := false
+	for _, entry := range strings.Split(trustedProxyIPsRaw, ",") {
+		if strings.TrimSpace(entry) != "" {
+			hasTrustedProxy = true
+			break
+		}
+	}
+	if !hasTrustedProxy {
+		return fmt.Errorf("--trusted-proxy-ips is required when --enable-http-remote-user is set. Set it using --trusted-proxy-ips or LEAFWIKI_TRUSTED_PROXY_IPS")
+	}
+	return nil
 }
 
 // normalizeBasePath normalizes the base path to the form "/mypath" (no trailing slash).
