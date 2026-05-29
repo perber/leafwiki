@@ -111,6 +111,124 @@ func TestNodeStore_SaveTree_ThenLoadTree_AssignsParents(t *testing.T) {
 	}
 }
 
+func TestNodeStore_CreatePage_RejectsTraversalSlug(t *testing.T) {
+	baseDir := t.TempDir()
+	rootDir := filepath.Join(baseDir, "content")
+	store := NewNodeStoreWithOptions(NodeStoreOptions{DataDir: filepath.Join(baseDir, "data"), RootDir: rootDir})
+	parent := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "outside", Slug: "../outside", Title: "Outside", Kind: NodeKindPage, Parent: parent}
+
+	err := store.CreatePage(parent, entry)
+	if err == nil {
+		t.Fatalf("expected CreatePage to reject traversal slug")
+	}
+	if !errors.Is(err, ErrInvalidOperation) {
+		t.Fatalf("expected ErrInvalidOperation, got %v", err)
+	}
+	mustNotExist(t, filepath.Join(baseDir, "outside.md"))
+}
+
+func TestNodeStore_RenameNode_RejectsTraversalSlug(t *testing.T) {
+	baseDir := t.TempDir()
+	rootDir := filepath.Join(baseDir, "content")
+	store := NewNodeStoreWithOptions(NodeStoreOptions{DataDir: filepath.Join(baseDir, "data"), RootDir: rootDir})
+	parent := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "docs", Slug: "docs", Title: "Docs", Kind: NodeKindPage, Parent: parent}
+	if err := store.CreatePage(parent, entry); err != nil {
+		t.Fatalf("CreatePage failed: %v", err)
+	}
+
+	err := store.RenameNode(entry, "../outside")
+	if err == nil {
+		t.Fatalf("expected RenameNode to reject traversal slug")
+	}
+	if !errors.Is(err, ErrInvalidOperation) {
+		t.Fatalf("expected ErrInvalidOperation, got %v", err)
+	}
+	mustStat(t, filepath.Join(rootDir, "docs.md"))
+	mustNotExist(t, filepath.Join(baseDir, "outside.md"))
+}
+
+func TestNodeStore_UpsertContent_RejectsParentlessNonRootPage(t *testing.T) {
+	baseDir := t.TempDir()
+	rootDir := filepath.Join(baseDir, "content")
+	store := NewNodeStoreWithOptions(NodeStoreOptions{DataDir: filepath.Join(baseDir, "data"), RootDir: rootDir})
+	entry := &PageNode{ID: "loose", Slug: "loose", Title: "Loose", Kind: NodeKindPage}
+
+	err := store.UpsertContent(entry, "# Loose")
+	if err == nil {
+		t.Fatalf("expected UpsertContent to reject parentless non-root page")
+	}
+	if !errors.Is(err, ErrInvalidOperation) {
+		t.Fatalf("expected ErrInvalidOperation, got %v", err)
+	}
+	mustNotExist(t, rootDir+".md")
+}
+
+func TestNodeStore_CreatePage_RejectsSymlinkedParentEscapingRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires privileges on Windows")
+	}
+	baseDir := t.TempDir()
+	rootDir := filepath.Join(baseDir, "content")
+	outsideDir := filepath.Join(baseDir, "outside")
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		t.Fatalf("mkdir root dir: %v", err)
+	}
+	if err := os.MkdirAll(outsideDir, 0o755); err != nil {
+		t.Fatalf("mkdir outside dir: %v", err)
+	}
+	if err := os.Symlink(outsideDir, filepath.Join(rootDir, "docs")); err != nil {
+		t.Fatalf("create symlinked section dir: %v", err)
+	}
+
+	store := NewNodeStoreWithOptions(NodeStoreOptions{DataDir: filepath.Join(baseDir, "data"), RootDir: rootDir})
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	docs := &PageNode{ID: "docs", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	child := &PageNode{ID: "child", Slug: "child", Title: "Child", Kind: NodeKindPage, Parent: docs}
+
+	err := store.CreatePage(docs, child)
+	if err == nil {
+		t.Fatalf("expected CreatePage to reject symlinked parent outside root")
+	}
+	if !errors.Is(err, ErrInvalidOperation) {
+		t.Fatalf("expected ErrInvalidOperation, got %v", err)
+	}
+	mustNotExist(t, filepath.Join(outsideDir, "child.md"))
+}
+
+func TestNodeStore_UpsertContent_RejectsSymlinkedParentEscapingRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires privileges on Windows")
+	}
+	baseDir := t.TempDir()
+	rootDir := filepath.Join(baseDir, "content")
+	outsideDir := filepath.Join(baseDir, "outside")
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		t.Fatalf("mkdir root dir: %v", err)
+	}
+	if err := os.MkdirAll(outsideDir, 0o755); err != nil {
+		t.Fatalf("mkdir outside dir: %v", err)
+	}
+	if err := os.Symlink(outsideDir, filepath.Join(rootDir, "docs")); err != nil {
+		t.Fatalf("create symlinked section dir: %v", err)
+	}
+
+	store := NewNodeStoreWithOptions(NodeStoreOptions{DataDir: filepath.Join(baseDir, "data"), RootDir: rootDir})
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	docs := &PageNode{ID: "docs", Slug: "docs", Title: "Docs", Kind: NodeKindSection, Parent: root}
+	child := &PageNode{ID: "child", Slug: "child", Title: "Child", Kind: NodeKindPage, Parent: docs}
+
+	err := store.UpsertContent(child, "# Child")
+	if err == nil {
+		t.Fatalf("expected UpsertContent to reject symlinked parent outside root")
+	}
+	if !errors.Is(err, ErrInvalidOperation) {
+		t.Fatalf("expected ErrInvalidOperation, got %v", err)
+	}
+	mustNotExist(t, filepath.Join(outsideDir, "child.md"))
+}
+
 func TestNodeStore_SaveChildOrder_Root_WritesOrderFile(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)

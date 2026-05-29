@@ -11,8 +11,8 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/properties"
-	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/tags"
+	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -67,8 +67,10 @@ func integCopyFixtureToTemp(t *testing.T, rel string) string {
 
 func newTestWiki(t *testing.T) *wiki.Wiki {
 	t.Helper()
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
-		StorageDir:          t.TempDir(),
+		Workspace:           wiki.Workspace{ID: "default", DataDir: dataDir, RootDir: rootDir},
 		AdminPassword:       "admin",
 		JWTSecret:           "secretkey",
 		AccessTokenTimeout:  15 * time.Minute,
@@ -120,7 +122,7 @@ func TestImporterService_ExecuteCurrentPlan_WritesPreservedFrontmatterToDisk(t *
 		t.Fatalf("unexpected result: imported=%d skipped=%d", res.ImportedCount, res.SkippedCount)
 	}
 
-	rawBytes, err := os.ReadFile(filepath.Join(w.GetStorageDir(), "root", "imported.md"))
+	rawBytes, err := os.ReadFile(filepath.Join(w.GetRootDir(), "imported.md"))
 	if err != nil {
 		t.Fatalf("ReadFile err: %v", err)
 	}
@@ -426,7 +428,7 @@ func TestImporterService_ExecuteCurrentPlan_ImportsLeafWikiNestedFixture(t *test
 		}
 	}
 
-	rawIntroBytes, err := os.ReadFile(filepath.Join(w.GetStorageDir(), "root", "intro.md"))
+	rawIntroBytes, err := os.ReadFile(filepath.Join(w.GetRootDir(), "intro.md"))
 	if err != nil {
 		t.Fatalf("ReadFile intro err: %v", err)
 	}

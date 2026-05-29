@@ -5,12 +5,14 @@ Short introduction: this file explains how to install Leafwiki on a Raspberry Pi
 ## Project installation
 To begin, you need to install `Leafwiki`. Here is the "quick install" command:
 ```bash
-curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh --arch arm64
+curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh
 ```
 
-Thanks to this command, the Leafwiki service is now installed and should be accessible locally at:
+Choose `arm64` when the installer prompts for the architecture. Thanks to this command, the Leafwiki service is now installed and should be accessible locally at:
 
 http://localhost:8080/
+
+During installation, the data directory stores LeafWiki app state and the root directory stores managed markdown pages. The default root directory is `<data-directory>/root`; set `LEAFWIKI_ROOT_DIR` or answer the installer prompt if you want markdown content in another writable folder. Changing the root directory does not migrate existing markdown pages; move or copy old `<data-directory>/root` content first.
 
 ## Cloudflare
 

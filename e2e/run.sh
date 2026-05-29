@@ -10,7 +10,9 @@ run_mode="${E2E_RUN_MODE:-docker}"
 server_pid=""
 server_log=""
 local_data_dir=""
+local_root_dir=""
 docker_data_volume=""
+docker_root_volume=""
 
 print_runner_diagnostics() {
   echo "--- E2E runtime diagnostics ---"
@@ -69,17 +71,30 @@ start_docker() {
 
   docker_data_volume="wiki-e2e-tests-data-${RANDOM}${RANDOM}"
   docker volume create "$docker_data_volume" >/dev/null
+  local docker_args=(
+    -p "$app_port:8080"
+    --name wiki-e2e-tests
+    -v "$docker_data_volume":/app/data
+  )
+  local server_args=(
+    --allow-insecure=true
+    --enable-revision=true
+    --enable-link-refactor=true
+    --jwt-secret=e2e-tests-secret
+    --admin-password=admin
+  )
+
+  if [ "${E2E_ENABLE_SEPARATE_ROOT_DIR:-0}" = "1" ]; then
+    docker_root_volume="wiki-e2e-tests-root-${RANDOM}${RANDOM}"
+    docker volume create "$docker_root_volume" >/dev/null
+    docker_args+=(-v "$docker_root_volume":/app/root)
+    server_args+=(--root-dir /app/root)
+  fi
 
   docker run -d \
-    -p "$app_port:8080" \
-    --name wiki-e2e-tests \
-    -v "$docker_data_volume":/app/data \
+    "${docker_args[@]}" \
     wiki-e2e-tests \
-    --allow-insecure=true \
-    --enable-revision=true \
-    --enable-link-refactor=true \
-    --jwt-secret=e2e-tests-secret \
-    --admin-password=admin
+    "${server_args[@]}"
 
   echo "✅ Container started on $app_url"
 }
@@ -91,6 +106,9 @@ stop_docker() {
   docker rmi wiki-e2e-tests >/dev/null 2>&1 || true
   if [ -n "$docker_data_volume" ]; then
     docker volume rm "$docker_data_volume" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$docker_root_volume" ]; then
+    docker volume rm "$docker_root_volume" >/dev/null 2>&1 || true
   fi
 }
 
@@ -104,6 +122,12 @@ start_local() {
     --jwt-secret=e2e-tests-secret
     --admin-password=admin
   )
+  local root_args=()
+
+  if [ "${E2E_ENABLE_SEPARATE_ROOT_DIR:-0}" = "1" ]; then
+    local_root_dir="$(mktemp -d /tmp/leafwiki-e2e-root.XXXXXX)"
+    root_args=(--root-dir "$local_root_dir")
+  fi
 
   if [ "${E2E_ENABLE_MCP_LOCAL:-0}" = "1" ] && [ "${E2E_ENABLE_MCP_OAUTH_LOCAL:-0}" = "1" ]; then
     echo "❌ Set only one of E2E_ENABLE_MCP_LOCAL or E2E_ENABLE_MCP_OAUTH_LOCAL."
@@ -131,6 +155,7 @@ start_local() {
       --host 127.0.0.1 \
       --port "$app_port" \
       --data-dir "$local_data_dir" \
+      "${root_args[@]}" \
       --allow-insecure=true \
       "${auth_args[@]}" \
       --enable-revision=true \
@@ -150,6 +175,9 @@ stop_local() {
   if [ -n "$local_data_dir" ] && [ -d "$local_data_dir" ]; then
     rm -rf "$local_data_dir"
   fi
+  if [ -n "$local_root_dir" ] && [ -d "$local_root_dir" ]; then
+    rm -rf "$local_root_dir"
+  fi
 
   if [ -n "$server_log" ] && [ -f "$server_log" ]; then
     rm -f "$server_log"
@@ -162,6 +190,74 @@ stop_runner() {
   else
     stop_local
   fi
+}
+
+run_invalid_root_dir_startup_smoke() {
+  if [ "$run_mode" = "docker" ] || [ "${E2E_ENABLE_SEPARATE_ROOT_DIR:-0}" != "1" ]; then
+    return
+  fi
+
+  echo "Checking invalid root-dir startup failure..."
+  local invalid_dir
+  local invalid_log
+  local invalid_pid
+  invalid_dir="$(mktemp -d /tmp/leafwiki-e2e-invalid-root.XXXXXX)"
+  invalid_log="$(mktemp /tmp/leafwiki-e2e-invalid-root.XXXXXX.log)"
+
+  (
+    cd "$repo_root"
+    go run ./cmd/leafwiki/main.go \
+      --host 127.0.0.1 \
+      --port "$app_port" \
+      --data-dir "$invalid_dir" \
+      --root-dir "$invalid_dir" \
+      --allow-insecure=true \
+      --jwt-secret=e2e-tests-secret \
+      --admin-password=admin
+  ) >"$invalid_log" 2>&1 &
+  invalid_pid=$!
+
+  local exit_code=""
+  for _ in $(seq 1 120); do
+    if ! kill -0 "$invalid_pid" >/dev/null 2>&1; then
+      set +e
+      wait "$invalid_pid"
+      exit_code=$?
+      set -e
+      break
+    fi
+    sleep 0.5
+  done
+
+  if [ -z "$exit_code" ]; then
+    kill "$invalid_pid" >/dev/null 2>&1 || true
+    wait "$invalid_pid" >/dev/null 2>&1 || true
+    echo "❌ Invalid root-dir startup did not fail within 60 seconds."
+    cat "$invalid_log" || true
+    rm -rf "$invalid_dir"
+    rm -f "$invalid_log"
+    exit 1
+  fi
+
+  if [ "$exit_code" -eq 0 ]; then
+    echo "❌ Invalid root-dir startup unexpectedly succeeded."
+    cat "$invalid_log" || true
+    rm -rf "$invalid_dir"
+    rm -f "$invalid_log"
+    exit 1
+  fi
+
+  if ! grep -q "root dir must be different from data dir" "$invalid_log"; then
+    echo "❌ Invalid root-dir startup failed with unexpected output."
+    cat "$invalid_log" || true
+    rm -rf "$invalid_dir"
+    rm -f "$invalid_log"
+    exit 1
+  fi
+
+  rm -rf "$invalid_dir"
+  rm -f "$invalid_log"
+  echo "✅ Invalid root-dir startup failed as expected."
 }
 
 cleanup_runner() {
@@ -181,17 +277,32 @@ run_playwright_tests() {
     cd "$current_dir"
     local reporter="${E2E_PLAYWRIGHT_REPORTER:-line}"
     local workers="${E2E_PLAYWRIGHT_WORKERS:-1}"
+    local assert_root_files="${E2E_ASSERT_SEPARATE_ROOT_FILES:-}"
+    if [ -z "$assert_root_files" ]; then
+      assert_root_files=0
+      if [ "$run_mode" != "docker" ] && [ "${E2E_ENABLE_SEPARATE_ROOT_DIR:-0}" = "1" ]; then
+        assert_root_files=1
+      fi
+    fi
 
     if command -v stdbuf >/dev/null 2>&1; then
       E2E_BASE_URL="$app_url" \
       E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
       E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
+      E2E_ENABLE_SEPARATE_ROOT_DIR="${E2E_ENABLE_SEPARATE_ROOT_DIR:-0}" \
+      E2E_ASSERT_SEPARATE_ROOT_FILES="$assert_root_files" \
+      E2E_DATA_DIR="$local_data_dir" \
+      E2E_ROOT_DIR="$local_root_dir" \
       PLAYWRIGHT_FORCE_TTY=1 \
       stdbuf -oL -eL npx playwright test --workers="$workers" --reporter="$reporter" "$@"
     else
       E2E_BASE_URL="$app_url" \
       E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
       E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin}" \
+      E2E_ENABLE_SEPARATE_ROOT_DIR="${E2E_ENABLE_SEPARATE_ROOT_DIR:-0}" \
+      E2E_ASSERT_SEPARATE_ROOT_FILES="$assert_root_files" \
+      E2E_DATA_DIR="$local_data_dir" \
+      E2E_ROOT_DIR="$local_root_dir" \
       PLAYWRIGHT_FORCE_TTY=1 \
       npx playwright test --workers="$workers" --reporter="$reporter" "$@"
     fi
@@ -234,6 +345,7 @@ fi
 if [ "$run_mode" = "docker" ]; then
   start_docker
 else
+  run_invalid_root_dir_startup_smoke
   start_local
 fi
 trap cleanup_runner EXIT

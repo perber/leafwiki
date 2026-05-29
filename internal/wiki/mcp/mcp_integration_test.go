@@ -578,7 +578,7 @@ func TestLocalMCPProtocol_PageMutationParity(t *testing.T) {
 }
 
 func runLocalMCPProtocolPageMutationParity(t *testing.T) {
-	w, storageDir := newLocalMCPTestWikiWithStorage(t, false)
+	w, _ := newLocalMCPTestWikiWithStorage(t, false)
 	router := newLocalMCPTestRouter(w, httpinternal.RouterOptions{
 		AuthDisabled:            true,
 		PublicAccess:            true,
@@ -733,7 +733,7 @@ func runLocalMCPProtocolPageMutationParity(t *testing.T) {
 	if got := props["status"]; got != "draft" {
 		t.Fatalf("HTTP properties.status after MCP update = %v, want draft", got)
 	}
-	rawMCPMetadata := readPageMarkdownByRoutePath(t, storageDir, "mcp-draft")
+	rawMCPMetadata := readPageMarkdownByRoutePath(t, w.GetRootDir(), "mcp-draft")
 	if !strings.Contains(rawMCPMetadata, "tags:") || !strings.Contains(rawMCPMetadata, "- mcp") || !strings.Contains(rawMCPMetadata, "status: draft") {
 		t.Fatalf("MCP update raw markdown missing metadata frontmatter:\n%s", rawMCPMetadata)
 	}
@@ -759,7 +759,7 @@ func runLocalMCPProtocolPageMutationParity(t *testing.T) {
 	if got := httpMetadataProps["status"]; got != "review" {
 		t.Fatalf("HTTP update properties.status = %v, want review", got)
 	}
-	rawHTTPMetadata := readPageMarkdownByRoutePath(t, storageDir, "http-metadata")
+	rawHTTPMetadata := readPageMarkdownByRoutePath(t, w.GetRootDir(), "http-metadata")
 	if !strings.Contains(rawHTTPMetadata, "tags:") || !strings.Contains(rawHTTPMetadata, "- http") || !strings.Contains(rawHTTPMetadata, "status: review") {
 		t.Fatalf("HTTP update raw markdown missing metadata frontmatter:\n%s", rawHTTPMetadata)
 	}
@@ -2190,9 +2190,10 @@ func newLocalMCPTestWiki(t *testing.T, enableRevision bool) *wiki.Wiki {
 func newLocalMCPTestWikiWithStorage(t *testing.T, enableRevision bool) (*wiki.Wiki, string) {
 	t.Helper()
 
-	storageDir := t.TempDir()
+	storageDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
-		StorageDir:          storageDir,
+		Workspace:           wiki.Workspace{ID: "default", DataDir: storageDir, RootDir: rootDir},
 		AdminPassword:       "admin",
 		JWTSecret:           "secretkey",
 		AccessTokenTimeout:  15 * time.Minute,
@@ -3085,10 +3086,10 @@ func assertChildOrder(t *testing.T, label string, page map[string]any, childIDs 
 	}
 }
 
-func readPageMarkdownByRoutePath(t *testing.T, storageDir, routePath string) string {
+func readPageMarkdownByRoutePath(t *testing.T, rootDir, routePath string) string {
 	t.Helper()
 
-	path := filepath.Join(append([]string{storageDir, "root"}, strings.Split(routePath, "/")...)...) + ".md"
+	path := filepath.Join(append([]string{rootDir}, strings.Split(routePath, "/")...)...) + ".md"
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read markdown page %s: %v", path, err)

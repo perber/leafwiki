@@ -7,6 +7,22 @@ import (
 	"testing"
 )
 
+func TestGenerateRoutePathFromPageNode(t *testing.T) {
+	root := &PageNode{ID: "root", Slug: "root", Title: "root"}
+	docs := &PageNode{ID: "docs", Slug: "docs", Title: "Docs", Parent: root}
+	guide := &PageNode{ID: "guide", Slug: "guide", Title: "Guide", Parent: docs}
+
+	if got := GenerateRoutePathFromPageNode(root); got != "" {
+		t.Fatalf("root route path = %q, want empty", got)
+	}
+	if got := GenerateRoutePathFromPageNode(docs); got != "docs" {
+		t.Fatalf("root child route path = %q, want docs", got)
+	}
+	if got := GenerateRoutePathFromPageNode(guide); got != "docs/guide" {
+		t.Fatalf("nested route path = %q, want docs/guide", got)
+	}
+}
+
 func TestEnsurePageIsFolder_ConvertsFlatFileToFolder(t *testing.T) {
 	tmp := t.TempDir()
 	pagePath := "docs/guide"

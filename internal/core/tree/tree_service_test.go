@@ -32,6 +32,28 @@ func newLoadedService(t *testing.T) (*TreeService, string) {
 	return svc, tmpDir
 }
 
+func newLoadedServiceWithDirs(t *testing.T) (*TreeService, string, string) {
+	t.Helper()
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	if err := saveSchema(dataDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{
+		DataDir: dataDir,
+		RootDir: rootDir,
+	})
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	return svc, dataDir, rootDir
+}
+
 func mustStat(t *testing.T, path string) os.FileInfo {
 	t.Helper()
 	info, err := os.Stat(path)
@@ -100,6 +122,380 @@ func TestTreeService_LoadTree_DefaultRootWhenMissing(t *testing.T) {
 	if tree.Kind != NodeKindSection {
 		t.Fatalf("expected root to be section, got %q", tree.Kind)
 	}
+}
+
+func TestNewTreeServiceWithOptions_UsesSeparateRootDirForContentAndDataDirForSchema(t *testing.T) {
+	svc, dataDir, rootDir := newLoadedServiceWithDirs(t)
+
+	pageID, err := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode page failed: %v", err)
+	}
+	sectionID, err := svc.CreateNode("system", nil, "Section", "section", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode section failed: %v", err)
+	}
+	if _, err := svc.CreateNode("system", sectionID, "Nested", "nested", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode nested failed: %v", err)
+	}
+
+	mustStat(t, filepath.Join(rootDir, "page.md"))
+	mustStat(t, filepath.Join(rootDir, "section", "index.md"))
+	mustStat(t, filepath.Join(rootDir, "section", "nested.md"))
+	mustStat(t, filepath.Join(rootDir, ".order.json"))
+	mustStat(t, filepath.Join(dataDir, "schema.json"))
+	mustNotExist(t, filepath.Join(rootDir, "root"))
+	mustNotExist(t, filepath.Join(dataDir, "root", "page.md"))
+
+	loaded := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	if err := loaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree with explicit root failed: %v", err)
+	}
+	if _, err := loaded.GetPage(*pageID); err != nil {
+		t.Fatalf("loaded page from explicit root: %v", err)
+	}
+}
+
+func TestTreeServiceWithOptions_MigratesLegacyTreeFromDataDirIntoRootDir(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(rootDir, "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy`, 0o644)
+	persistLegacyTreeSnapshot(t, dataDir, &PageNode{
+		ID:       "root",
+		Slug:     "root",
+		Title:    "root",
+		Kind:     NodeKindSection,
+		Children: []*PageNode{{ID: "id-legacy", Slug: "legacy", Title: "Legacy", Kind: NodeKindPage}},
+	})
+	if err := saveSchema(dataDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+
+	mustStat(t, filepath.Join(rootDir, ".order.json"))
+	mustStat(t, filepath.Join(dataDir, "schema.json"))
+	mustNotExist(t, filepath.Join(dataDir, legacyTreeFilename))
+	if _, err := svc.GetPage("id-legacy"); err != nil {
+		t.Fatalf("expected migrated page from root dir: %v", err)
+	}
+}
+
+func TestTreeServiceWithOptions_AllowsLegacySectionWithoutIndexWhenPageContentMoved(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(dataDir, "root", "docs", "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy`, 0o644)
+	mustWriteFile(t, filepath.Join(rootDir, "docs", "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy`, 0o644)
+	persistLegacyTreeSnapshot(t, dataDir, &PageNode{
+		ID:    "root",
+		Slug:  "root",
+		Title: "root",
+		Kind:  NodeKindSection,
+		Children: []*PageNode{{
+			ID:    "id-docs",
+			Slug:  "docs",
+			Title: "Docs",
+			Kind:  NodeKindSection,
+			Children: []*PageNode{{
+				ID:    "id-legacy",
+				Slug:  "legacy",
+				Title: "Legacy",
+				Kind:  NodeKindPage,
+			}},
+		}},
+	})
+	if err := saveSchema(dataDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	if err := svc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if _, err := svc.GetPage("id-legacy"); err != nil {
+		t.Fatalf("expected migrated page from moved section content: %v", err)
+	}
+}
+
+func TestTreeServiceWithOptions_FailsSafelyWhenCurrentSchemaContentStillInDefaultRoot(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(dataDir, "root", "current.md"), `---
+leafwiki_id: id-current
+leafwiki_title: Current
+---
+# Current`, 0o644)
+	if err := saveSchema(dataDir, CurrentSchemaVersion); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	err := svc.LoadTree()
+	if err == nil {
+		t.Fatalf("expected LoadTree to fail safely when current-schema content remains in default root")
+	}
+	if !strings.Contains(err.Error(), "legacy content remains in the default root dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	mustStat(t, filepath.Join(dataDir, "schema.json"))
+	mustStat(t, filepath.Join(dataDir, "root", "current.md"))
+	mustNotExist(t, filepath.Join(rootDir, "current.md"))
+}
+
+func TestTreeServiceWithOptions_FailsSafelyWhenLegacyContentStillInDefaultRoot(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(dataDir, "root", "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy`, 0o644)
+	persistLegacyTreeSnapshot(t, dataDir, &PageNode{
+		ID:       "root",
+		Slug:     "root",
+		Title:    "root",
+		Kind:     NodeKindSection,
+		Children: []*PageNode{{ID: "id-legacy", Slug: "legacy", Title: "Legacy", Kind: NodeKindPage}},
+	})
+	if err := saveSchema(dataDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	err := svc.LoadTree()
+	if err == nil {
+		t.Fatalf("expected LoadTree to fail safely when legacy content remains in the default root")
+	}
+	if !strings.Contains(err.Error(), "legacy content remains in the default root dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	mustStat(t, filepath.Join(dataDir, legacyTreeFilename))
+	mustStat(t, filepath.Join(dataDir, "root", "legacy.md"))
+	mustNotExist(t, filepath.Join(rootDir, "legacy.md"))
+}
+
+func TestTreeServiceWithOptions_FailsSafelyWhenLegacyTreeSnapshotIsCorruptAndDefaultRootHasContent(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(dataDir, "root", "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy`, 0o644)
+	mustWriteFile(t, filepath.Join(dataDir, legacyTreeFilename), "{", 0o644)
+	if err := saveSchema(dataDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	err := svc.LoadTree()
+	if err == nil {
+		t.Fatalf("expected LoadTree to fail safely when corrupt legacy tree has default-root content")
+	}
+	if !strings.Contains(err.Error(), "legacy content remains in the default root dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	mustStat(t, filepath.Join(dataDir, legacyTreeFilename))
+	mustStat(t, filepath.Join(dataDir, "root", "legacy.md"))
+	mustNotExist(t, filepath.Join(rootDir, "legacy.md"))
+}
+
+func TestTreeServiceWithOptions_FailsSafelyWhenConfiguredRootHasUnrelatedContent(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(dataDir, "root", "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy`, 0o644)
+	mustWriteFile(t, filepath.Join(rootDir, "unrelated.md"), "# Unrelated", 0o644)
+	persistLegacyTreeSnapshot(t, dataDir, &PageNode{
+		ID:       "root",
+		Slug:     "root",
+		Title:    "root",
+		Kind:     NodeKindSection,
+		Children: []*PageNode{{ID: "id-legacy", Slug: "legacy", Title: "Legacy", Kind: NodeKindPage}},
+	})
+	if err := saveSchema(dataDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	err := svc.LoadTree()
+	if err == nil {
+		t.Fatalf("expected LoadTree to fail safely when configured root lacks legacy markdown")
+	}
+	if !strings.Contains(err.Error(), "legacy content remains in the default root dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	mustStat(t, filepath.Join(dataDir, legacyTreeFilename))
+	mustStat(t, filepath.Join(dataDir, "root", "legacy.md"))
+	mustStat(t, filepath.Join(rootDir, "unrelated.md"))
+	mustNotExist(t, filepath.Join(rootDir, "legacy.md"))
+}
+
+func TestTreeServiceWithOptions_FailsSafelyWhenLegacyDefaultRootHasExtraFile(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(dataDir, "root", "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy`, 0o644)
+	mustWriteFile(t, filepath.Join(rootDir, "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy`, 0o644)
+	mustWriteFile(t, filepath.Join(dataDir, "root", "orphan.md"), `---
+leafwiki_id: id-orphan
+leafwiki_title: Orphan
+---
+# Orphan`, 0o644)
+	persistLegacyTreeSnapshot(t, dataDir, &PageNode{
+		ID:       "root",
+		Slug:     "root",
+		Title:    "root",
+		Kind:     NodeKindSection,
+		Children: []*PageNode{{ID: "id-legacy", Slug: "legacy", Title: "Legacy", Kind: NodeKindPage}},
+	})
+	if err := saveSchema(dataDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	err := svc.LoadTree()
+	if err == nil {
+		t.Fatalf("expected LoadTree to fail safely when legacy default root has extra content")
+	}
+	if !strings.Contains(err.Error(), "legacy content remains in the default root dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	mustStat(t, filepath.Join(dataDir, legacyTreeFilename))
+	mustStat(t, filepath.Join(dataDir, "root", "legacy.md"))
+	mustStat(t, filepath.Join(dataDir, "root", "orphan.md"))
+	mustStat(t, filepath.Join(rootDir, "legacy.md"))
+	mustNotExist(t, filepath.Join(rootDir, "orphan.md"))
+}
+
+func TestTreeServiceWithOptions_FailsSafelyWhenConfiguredRootHasSamePathDifferentLegacyIdentity(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(dataDir, "root", "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy`, 0o644)
+	mustWriteFile(t, filepath.Join(rootDir, "legacy.md"), `---
+leafwiki_id: id-other
+leafwiki_title: Other
+---
+# Other`, 0o644)
+	persistLegacyTreeSnapshot(t, dataDir, &PageNode{
+		ID:       "root",
+		Slug:     "root",
+		Title:    "root",
+		Kind:     NodeKindSection,
+		Children: []*PageNode{{ID: "id-legacy", Slug: "legacy", Title: "Legacy", Kind: NodeKindPage}},
+	})
+	if err := saveSchema(dataDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	err := svc.LoadTree()
+	if err == nil {
+		t.Fatalf("expected LoadTree to fail safely when configured root has mismatched legacy markdown")
+	}
+	if !strings.Contains(err.Error(), "legacy content remains in the default root dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	mustStat(t, filepath.Join(dataDir, legacyTreeFilename))
+	mustStat(t, filepath.Join(dataDir, "root", "legacy.md"))
+	mustStat(t, filepath.Join(rootDir, "legacy.md"))
+}
+
+func TestTreeServiceWithOptions_FailsSafelyWhenConfiguredRootHasSameIdentityButDifferentContent(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir data dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(dataDir, "root", "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy
+
+new content`, 0o644)
+	mustWriteFile(t, filepath.Join(rootDir, "legacy.md"), `---
+leafwiki_id: id-legacy
+leafwiki_title: Legacy
+---
+# Legacy
+
+old content`, 0o644)
+	persistLegacyTreeSnapshot(t, dataDir, &PageNode{
+		ID:       "root",
+		Slug:     "root",
+		Title:    "root",
+		Kind:     NodeKindSection,
+		Children: []*PageNode{{ID: "id-legacy", Slug: "legacy", Title: "Legacy", Kind: NodeKindPage}},
+	})
+	if err := saveSchema(dataDir, 4); err != nil {
+		t.Fatalf("saveSchema failed: %v", err)
+	}
+
+	svc := NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir, RootDir: rootDir})
+	err := svc.LoadTree()
+	if err == nil {
+		t.Fatalf("expected LoadTree to fail safely when configured root has stale legacy markdown")
+	}
+	if !strings.Contains(err.Error(), "legacy content remains in the default root dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	mustStat(t, filepath.Join(dataDir, legacyTreeFilename))
+	mustStat(t, filepath.Join(dataDir, "root", "legacy.md"))
+	mustStat(t, filepath.Join(rootDir, "legacy.md"))
 }
 
 func TestTreeService_LoadTree_MigratesLegacyTreeOrderIntoOrderFiles(t *testing.T) {
@@ -457,6 +853,19 @@ func TestTreeService_CreateNode_RejectsCaseInsensitiveSlugConflict(t *testing.T)
 	}
 }
 
+func TestTreeService_CreateNode_RejectsTraversalSlug(t *testing.T) {
+	svc, dataDir := newLoadedService(t)
+
+	_, err := svc.CreateNode("system", nil, "Outside", "../outside", ptrKind(NodeKindPage))
+	if err == nil {
+		t.Fatalf("expected CreateNode to reject traversal slug")
+	}
+	if !errors.Is(err, ErrInvalidOperation) {
+		t.Fatalf("expected ErrInvalidOperation, got %v", err)
+	}
+	mustNotExist(t, filepath.Join(dataDir, "outside.md"))
+}
+
 func TestTreeService_CreateNode_PersistsRootOrderFile(t *testing.T) {
 	svc, tmpDir := newLoadedService(t)
 
@@ -633,6 +1042,24 @@ func TestTreeService_UpdateNode_RejectsCaseInsensitiveSlugConflict(t *testing.T)
 	if page.Slug != "Alpha" {
 		t.Fatalf("expected original slug to remain unchanged, got %q", page.Slug)
 	}
+}
+
+func TestTreeService_UpdateNode_RejectsTraversalSlug(t *testing.T) {
+	svc, dataDir := newLoadedService(t)
+	id, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	err = svc.UpdateNode("system", *id, "Docs", "../outside", nil, VersionUnchecked, false)
+	if err == nil {
+		t.Fatalf("expected UpdateNode to reject traversal slug")
+	}
+	if !errors.Is(err, ErrInvalidOperation) {
+		t.Fatalf("expected ErrInvalidOperation, got %v", err)
+	}
+	mustStat(t, filepath.Join(dataDir, "root", "docs.md"))
+	mustNotExist(t, filepath.Join(dataDir, "outside.md"))
 }
 
 /*

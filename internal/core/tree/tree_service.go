@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/treemigration"
 )
@@ -18,7 +19,8 @@ import (
 // TreeService is our main component for handling tree operations
 // We use this service to create pages, delete pages, update pages, etc.
 type TreeService struct {
-	storageDir string
+	dataDir    string
+	rootDir    string
 	tree       *PageNode
 	store      *NodeStore
 	log        *slog.Logger
@@ -31,15 +33,44 @@ type TreeService struct {
 // NewTreeService creates a new TreeService
 const legacyTreeFilename = "tree.json"
 
-func NewTreeService(storageDir string) *TreeService {
+type TreeOptions struct {
+	DataDir string
+	RootDir string
+}
+
+func NewTreeService(dataDir string) *TreeService {
+	return NewTreeServiceWithOptions(TreeOptions{DataDir: dataDir})
+}
+
+func NewTreeServiceWithOptions(options TreeOptions) *TreeService {
+	normalized := normalizeTreeOptions(options)
+
 	return &TreeService{
-		storageDir: storageDir,
+		dataDir:    normalized.DataDir,
+		rootDir:    normalized.RootDir,
 		tree:       nil,
-		store:      NewNodeStore(storageDir),
+		store:      NewNodeStoreWithOptions(NodeStoreOptions{DataDir: normalized.DataDir, RootDir: normalized.RootDir}),
 		log:        slog.Default().With("component", "TreeService"),
 		nodesByID:  make(map[string]*PageNode),
 		childSlugs: make(map[string]map[string]*PageNode),
 	}
+}
+
+func normalizeTreeOptions(options TreeOptions) TreeOptions {
+	dataDir := cleanTreePath(options.DataDir)
+	rootDir := cleanTreePath(options.RootDir)
+	if rootDir == "" {
+		rootDir = filepath.Join(dataDir, "root")
+	}
+	return TreeOptions{DataDir: dataDir, RootDir: rootDir}
+}
+
+func cleanTreePath(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return ""
+	}
+	return filepath.Clean(trimmed)
 }
 
 // LoadTree reconstructs the in-memory tree from the filesystem.
@@ -49,13 +80,16 @@ func (t *TreeService) LoadTree() error {
 	defer t.mu.Unlock()
 
 	t.log.Info("Checking schema version...")
-	schema, err := loadSchema(t.storageDir)
+	schema, err := loadSchema(t.dataDir)
 	if err != nil {
 		t.log.Error("Error loading schema", "error", err)
 		return err
 	}
 
 	if schema.Version == CurrentSchemaVersion {
+		if err := t.ensureCurrentRootDirReady(); err != nil {
+			return err
+		}
 		reconstructed, err := t.store.ReconstructTreeFromFS()
 		if err != nil {
 			return err
@@ -68,19 +102,28 @@ func (t *TreeService) LoadTree() error {
 		return nil
 	}
 
-	legacyTreePath := filepath.Join(t.storageDir, legacyTreeFilename)
+	legacyTreePath := filepath.Join(t.dataDir, legacyTreeFilename)
 	if info, statErr := os.Stat(legacyTreePath); statErr == nil && !info.IsDir() {
-		legacyTree, legacyErr := t.store.LoadTree(legacyTreeFilename)
+		legacyTree, legacyErr := loadLegacyTreeSnapshot(t.dataDir, legacyTreeFilename, t.store.log)
 		if legacyErr != nil {
 			t.log.Warn("Could not load legacy tree, falling back to filesystem reconstruction", "path", legacyTreePath, "error", legacyErr)
+			if err := t.ensureCurrentRootDirReady(); err != nil {
+				return err
+			}
 			t.tree, err = t.store.ReconstructTreeFromFS()
 			if err != nil {
 				return err
 			}
 		} else {
+			if err := t.ensureLegacyRootDirReady(legacyTree); err != nil {
+				return err
+			}
 			t.tree = legacyTree
 		}
 	} else {
+		if err := t.ensureCurrentRootDirReady(); err != nil {
+			return err
+		}
 		t.tree, err = t.store.ReconstructTreeFromFS()
 		if err != nil {
 			return err
@@ -113,6 +156,293 @@ func (t *TreeService) LoadTree() error {
 	}
 
 	return nil
+}
+
+func (t *TreeService) ensureLegacyRootDirReady(legacyTree *PageNode) error {
+	defaultRootDir := filepath.Join(t.dataDir, "root")
+	if sameCleanPath(t.rootDir, defaultRootDir) {
+		return nil
+	}
+
+	defaultHasContent, err := directoryHasEntries(defaultRootDir)
+	if err != nil {
+		return err
+	}
+	if !defaultHasContent {
+		return nil
+	}
+
+	matchesDefaultRoot, err := directoryFileContentMatches(defaultRootDir, t.rootDir)
+	if err != nil {
+		return err
+	}
+	if !matchesDefaultRoot {
+		return fmt.Errorf("legacy content remains in the default root dir %s while configured root dir %s is missing legacy markdown; move or copy content before changing root dir", defaultRootDir, t.rootDir)
+	}
+
+	missingLegacyContent, err := t.configuredRootMissingLegacyContent(legacyTree)
+	if err != nil {
+		return err
+	}
+	if !missingLegacyContent {
+		return nil
+	}
+
+	return fmt.Errorf("legacy content remains in the default root dir %s while configured root dir %s is missing legacy markdown; move or copy content before changing root dir", defaultRootDir, t.rootDir)
+}
+
+func (t *TreeService) ensureCurrentRootDirReady() error {
+	defaultRootDir := filepath.Join(t.dataDir, "root")
+	if sameCleanPath(t.rootDir, defaultRootDir) {
+		return nil
+	}
+
+	defaultHasContent, err := directoryHasEntries(defaultRootDir)
+	if err != nil {
+		return err
+	}
+	if !defaultHasContent {
+		return nil
+	}
+
+	matches, err := directoryFileContentMatches(defaultRootDir, t.rootDir)
+	if err != nil {
+		return err
+	}
+	if matches {
+		return nil
+	}
+
+	return fmt.Errorf("legacy content remains in the default root dir %s while configured root dir %s is missing legacy markdown; move or copy content before changing root dir", defaultRootDir, t.rootDir)
+}
+
+func directoryFileContentMatches(sourceDir string, targetDir string) (bool, error) {
+	sourceFiles, err := collectRelativeFiles(sourceDir)
+	if err != nil {
+		return false, err
+	}
+	if len(sourceFiles) == 0 {
+		return false, nil
+	}
+
+	for _, relPath := range sourceFiles {
+		sourcePath := filepath.Join(sourceDir, relPath)
+		targetPath := filepath.Join(targetDir, relPath)
+		matches, err := filesHaveSameContent(sourcePath, targetPath)
+		if err != nil {
+			return false, err
+		}
+		if !matches {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func collectRelativeFiles(dir string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		relPath, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, relPath)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("collect legacy content files from %s: %w", dir, err)
+	}
+	sort.Strings(files)
+	return files, nil
+}
+
+func filesHaveSameContent(sourcePath string, targetPath string) (bool, error) {
+	sourceData, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return false, fmt.Errorf("read legacy content path %s: %w", sourcePath, err)
+	}
+	targetData, err := os.ReadFile(targetPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("read configured legacy content path %s: %w", targetPath, err)
+	}
+	return string(sourceData) == string(targetData), nil
+}
+
+func (t *TreeService) configuredRootMissingLegacyContent(legacyTree *PageNode) (bool, error) {
+	paths, err := t.expectedLegacyContentPaths(legacyTree)
+	if err != nil {
+		return false, err
+	}
+	if len(paths) == 0 {
+		hasContent, err := directoryHasEntries(t.rootDir)
+		if err != nil {
+			return false, err
+		}
+		return !hasContent, nil
+	}
+
+	checkedLegacyContent := false
+	for _, path := range paths {
+		sourceInfo, err := os.Stat(path.sourcePath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return false, fmt.Errorf("stat legacy content path %s: %w", path.sourcePath, err)
+		}
+		if sourceInfo.IsDir() {
+			continue
+		}
+		checkedLegacyContent = true
+
+		targetInfo, err := os.Stat(path.targetPath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return true, nil
+			}
+			return false, fmt.Errorf("stat configured legacy content path %s: %w", path.targetPath, err)
+		}
+		if targetInfo.IsDir() {
+			return true, nil
+		}
+		matches, err := legacyTargetMatchesNode(path)
+		if err != nil {
+			return false, err
+		}
+		if !matches {
+			return true, nil
+		}
+	}
+
+	if !checkedLegacyContent {
+		hasContent, err := directoryHasEntries(t.rootDir)
+		if err != nil {
+			return false, err
+		}
+		return !hasContent, nil
+	}
+
+	return false, nil
+}
+
+type legacyContentPath struct {
+	sourcePath string
+	targetPath string
+	nodeID     string
+	nodeTitle  string
+}
+
+func legacyTargetMatchesNode(path legacyContentPath) (bool, error) {
+	matches, err := filesHaveSameContent(path.sourcePath, path.targetPath)
+	if err != nil {
+		return false, err
+	}
+	if !matches {
+		return false, nil
+	}
+
+	mdFile, err := markdown.LoadMarkdownFile(path.targetPath)
+	if err != nil {
+		return false, fmt.Errorf("load configured legacy content path %s: %w", path.targetPath, err)
+	}
+	frontmatter := mdFile.GetFrontmatter()
+	return strings.TrimSpace(frontmatter.LeafWikiID) == strings.TrimSpace(path.nodeID) &&
+		strings.TrimSpace(frontmatter.LeafWikiTitle) == strings.TrimSpace(path.nodeTitle), nil
+}
+
+func (t *TreeService) expectedLegacyContentPaths(legacyTree *PageNode) ([]legacyContentPath, error) {
+	var paths []legacyContentPath
+	if err := t.collectLegacyContentPaths(legacyTree, nil, &paths); err != nil {
+		return nil, err
+	}
+	return paths, nil
+}
+
+func (t *TreeService) collectLegacyContentPaths(node *PageNode, parentSegments []string, paths *[]legacyContentPath) error {
+	if node == nil {
+		return nil
+	}
+
+	segments := parentSegments
+	isRoot := node.ID == "root" && len(parentSegments) == 0
+	if !isRoot {
+		slug := strings.TrimSpace(node.Slug)
+		if slug == "" {
+			return fmt.Errorf("legacy tree contains node %q with empty slug", node.ID)
+		}
+		segments = append(append([]string{}, parentSegments...), slug)
+		relPath := filepath.Join(segments...)
+		defaultRootDir := filepath.Join(t.dataDir, "root")
+		switch node.Kind {
+		case NodeKindPage:
+			*paths = append(*paths, legacyContentPath{
+				sourcePath: filepath.Join(defaultRootDir, relPath+".md"),
+				targetPath: filepath.Join(t.rootDir, relPath+".md"),
+				nodeID:     node.ID,
+				nodeTitle:  node.Title,
+			})
+		case NodeKindSection:
+			*paths = append(*paths, legacyContentPath{
+				sourcePath: filepath.Join(defaultRootDir, relPath, "index.md"),
+				targetPath: filepath.Join(t.rootDir, relPath, "index.md"),
+				nodeID:     node.ID,
+				nodeTitle:  node.Title,
+			})
+		case "":
+			*paths = append(*paths, legacyContentPath{
+				sourcePath: filepath.Join(defaultRootDir, relPath+".md"),
+				targetPath: filepath.Join(t.rootDir, relPath+".md"),
+				nodeID:     node.ID,
+				nodeTitle:  node.Title,
+			})
+		default:
+			return fmt.Errorf("legacy tree contains node %q with unknown kind %q", node.ID, node.Kind)
+		}
+	}
+
+	for _, child := range node.Children {
+		if err := t.collectLegacyContentPaths(child, segments, paths); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func directoryHasEntries(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("read directory %s: %w", dir, err)
+	}
+	return len(entries) > 0, nil
+}
+
+func sameCleanPath(a string, b string) bool {
+	absA, errA := filepath.Abs(filepath.Clean(a))
+	absB, errB := filepath.Abs(filepath.Clean(b))
+	if errA == nil && errB == nil {
+		return absA == absB
+	}
+	return filepath.Clean(a) == filepath.Clean(b)
 }
 
 func (t *TreeService) withLockedTree(fn func() error) error {
@@ -166,7 +496,7 @@ func (t *TreeService) reconstructTreeFromFSLocked() error {
 
 	// Reconstructed nodes already carry metadata from frontmatter or safe defaults.
 
-	if err := saveSchema(t.storageDir, CurrentSchemaVersion); err != nil {
+	if err := saveSchema(t.dataDir, CurrentSchemaVersion); err != nil {
 		t.log.Error("Error saving schema after reconstruction", "error", err)
 		t.tree = oldTree
 		t.rebuildIndexesLocked()
@@ -236,6 +566,9 @@ func (t *TreeService) RestoreNode(userID, id string, parentID *string, title, sl
 func (t *TreeService) createNodeLocked(userID string, parentID *string, title string, slug string, kind *NodeKind, opts createNodeOptions) (*createNodeResult, error) {
 	if t.tree == nil {
 		return nil, ErrTreeNotLoaded
+	}
+	if err := validateNodeSlug("CreateNode", slug); err != nil {
+		return nil, err
 	}
 
 	// Decide which kind we create
@@ -604,6 +937,9 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		}
 
 		if err := checkNodeVersion(node, expectedVersion); err != nil {
+			return err
+		}
+		if err := validateNodeSlug("UpdateNode", slug); err != nil {
 			return err
 		}
 
