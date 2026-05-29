@@ -34,17 +34,20 @@ func InjectRemoteUser(cfg RemoteUserConfig) gin.HandlerFunc {
 		}
 
 		if cfg.TrustedProxies == nil || cfg.UserService == nil {
+			slog.Default().Error("reverse proxy auth: misconfigured, TrustedProxies or UserService is nil")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Reverse proxy authentication misconfigured"})
 			return
 		}
 
 		if !cfg.TrustedProxies.IsTrusted(c.Request.RemoteAddr) {
+			slog.Default().Debug("reverse proxy auth: request from untrusted IP, skipping", "remote_addr", c.Request.RemoteAddr)
 			c.Next()
 			return
 		}
 
 		username := strings.TrimSpace(c.GetHeader(cfg.HeaderName))
 		if username == "" {
+			slog.Default().Debug("reverse proxy auth: trusted proxy sent no user header, skipping", "remote_addr", c.Request.RemoteAddr, "header", cfg.HeaderName)
 			// Trusted proxy but no header — let public endpoints work normally;
 			// RequireAuth will reject unauthenticated access to protected routes.
 			c.Next()
@@ -53,7 +56,7 @@ func InjectRemoteUser(cfg RemoteUserConfig) gin.HandlerFunc {
 
 		user, err := cfg.UserService.GetUserByUsername(username)
 		if err != nil {
-			slog.Default().Warn("reverse proxy auth: user not found", "username", username)
+			slog.Default().Warn("reverse proxy auth: user not found", "username", username, "remote_addr", c.Request.RemoteAddr)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "reverse proxy auth: user not found"})
 			return
 		}

@@ -2,7 +2,7 @@ package security
 
 import (
 	"crypto/subtle"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +21,7 @@ func CSRFMiddleware(csrf *CSRFCookie) gin.HandlerFunc {
 
 		cookieToken, err := csrf.Read(c)
 		if err != nil || cookieToken == "" {
-			log.Printf("CSRF token missing or error reading token: %v", err)
+			slog.Default().Warn("CSRF token missing or error reading token", "error", err)
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error": "CSRF token missing",
 			})
@@ -36,7 +36,7 @@ func CSRFMiddleware(csrf *CSRFCookie) gin.HandlerFunc {
 
 		// No token in header/form or no match
 		if headerToken == "" || subtle.ConstantTimeCompare([]byte(headerToken), []byte(cookieToken)) != 1 {
-			log.Printf("CSRF token invalid or does not match cookie")
+			slog.Default().Warn("CSRF token invalid or does not match cookie")
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error": "Invalid CSRF token",
 			})

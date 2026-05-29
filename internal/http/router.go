@@ -29,11 +29,11 @@ var Environment = "development"
 
 const DefaultFaviconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🌿</text></svg>`
 
-// slogWriter forwards gin Info logs to slog.
+// slogWriter forwards gin debug output (e.g. route registration) to slog at Debug level.
 type slogWriter struct{ logger *slog.Logger }
 
 func (sw *slogWriter) Write(p []byte) (n int, err error) {
-	sw.logger.Info(strings.TrimSpace(string(p)))
+	sw.logger.Debug(strings.TrimSpace(string(p)))
 	return len(p), nil
 }
 
@@ -43,6 +43,26 @@ type slogErrorWriter struct{ logger *slog.Logger }
 func (sew *slogErrorWriter) Write(p []byte) (n int, err error) {
 	sew.logger.Error(strings.TrimSpace(string(p)))
 	return len(p), nil
+}
+
+func slogRequestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.Request.URL.Path
+		if raw := c.Request.URL.RawQuery; raw != "" {
+			path += "?" + raw
+		}
+
+		c.Next()
+
+		slog.Default().Info("http request",
+			"method", c.Request.Method,
+			"path", path,
+			"status", c.Writer.Status(),
+			"latency", time.Since(start),
+			"ip", c.ClientIP(),
+		)
+	}
 }
 
 func disableClientCache(c *gin.Context) {
@@ -75,6 +95,7 @@ type RouterOptions struct {
 	EnableRevision          bool                 // Whether the revision / page history feature is enabled
 	EnableLinkRefactor      bool                 // Whether the link refactoring feature is enabled in the frontend
 	HTTPRemoteUser          HTTPRemoteUserConfig // Reverse-proxy authentication via HTTP header
+	DisableRequestLog       bool                 // Whether to suppress per-request access log lines
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.
@@ -109,7 +130,11 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	authCookies := auth_middleware.NewAuthCookies(opts.AllowInsecure, opts.AccessTokenTimeout, opts.RefreshTokenTimeout)
 	csrfCookie := security.NewCSRFCookie(opts.AllowInsecure, 3*24*time.Hour)
 
-	engine := gin.Default()
+	engine := gin.New()
+	if !opts.DisableRequestLog {
+		engine.Use(slogRequestLogger())
+	}
+	engine.Use(gin.RecoveryWithWriter(gin.DefaultErrorWriter))
 	base := engine.Group(opts.BasePath)
 
 	if opts.HTTPRemoteUser.Enabled {
