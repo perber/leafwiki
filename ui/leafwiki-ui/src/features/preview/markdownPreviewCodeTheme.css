@@ -92,6 +92,25 @@
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
+  /* Own block-level spacing (replaces the inner <pre> margins which are
+     now zeroed out below). */
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+/* When a heading precedes a code block, remove the top margin so only
+   the heading's own margin-bottom creates the gap. */
+.page-viewer__content :where(h1, h2, h3, h4, h5, h6) + .markdown-code-block,
+.markdown-editor__preview :where(h1, h2, h3, h4, h5, h6) + .markdown-code-block,
+.page-history__preview-body :where(h1, h2, h3, h4, h5, h6) + .markdown-code-block {
+  margin-top: 0;
+}
+
+.page-viewer__content .markdown-code-block pre,
+.markdown-editor__preview .markdown-code-block pre,
+.page-history__preview-body .markdown-code-block pre {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .page-viewer__content .markdown-code-block__actions,
