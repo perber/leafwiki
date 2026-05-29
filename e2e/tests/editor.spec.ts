@@ -558,6 +558,55 @@ test.describe('Editor', () => {
   });
 });
 
+// ─── Line wrap ───────────────────────────────────────────────────────────────
+
+test.describe('Editor line wrap', () => {
+  test.beforeEach(async ({ page }) => {
+    const loginPage = new LoginPage(page);
+    await loginPage.goto();
+    await loginPage.login(user, password);
+    const viewPage = new ViewPage(page);
+    await viewPage.expectUserLoggedIn();
+  });
+
+  test.afterEach(async ({ page }) => {
+    const viewPage = new ViewPage(page);
+    await viewPage.logout();
+  });
+
+  test('editor-line-wrap-toggle-enables-and-disables-wrapping', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-line-wrap-${stamp}`;
+
+    await createPageWithMetadata(page, {
+      title: `Editor Line Wrap ${stamp}`,
+      slug,
+      content: '',
+    });
+
+    // Reset stored editor settings so the test always starts with the default (lineWrap: true)
+    await page.evaluate(() => localStorage.removeItem('leafwiki-editor-settings'));
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const cmContent = page.locator('.cm-content');
+    await cmContent.waitFor({ state: 'visible' });
+
+    // Default: line wrap is enabled
+    await expect(cmContent).toHaveClass(/cm-lineWrapping/);
+
+    // Disable line wrap
+    await page.locator('[data-testid="toggle-line-wrap-button"]').click();
+    await expect(cmContent).not.toHaveClass(/cm-lineWrapping/);
+
+    // Re-enable line wrap
+    await page.locator('[data-testid="toggle-line-wrap-button"]').click();
+    await expect(cmContent).toHaveClass(/cm-lineWrapping/);
+  });
+});
+
 // ─── Formatting ───────────────────────────────────────────────────────────────
 
 test.describe('Editor formatting', () => {

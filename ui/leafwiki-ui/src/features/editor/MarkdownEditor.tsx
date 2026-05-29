@@ -72,7 +72,11 @@ const MarkdownEditor = (
     (s) => s.maxAssetUploadSizeBytes,
   )
 
-  const { previewVisible: showPreview, togglePreview } = useEditorStore()
+  const {
+    previewVisible: showPreview,
+    togglePreview,
+    lineWrap,
+  } = useEditorStore()
 
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
 
@@ -374,11 +378,18 @@ const MarkdownEditor = (
             onChange={handleEditorChange}
             onCursorLineChange={onCursorLineChange}
             editorViewRef={editorViewRef}
+            lineWrap={lineWrap}
           />
         </>
       )
     },
-    [handleEditorChange, initialValue, onCursorLineChange, renderToolbar],
+    [
+      handleEditorChange,
+      initialValue,
+      lineWrap,
+      onCursorLineChange,
+      renderToolbar,
+    ],
   )
 
   const renderPreview = useCallback((): JSX.Element => {

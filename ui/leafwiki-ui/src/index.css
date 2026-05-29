@@ -523,7 +523,7 @@
   }
 
   .app-layout__sidebar-container {
-    @apply relative z-20 box-border h-full overflow-auto pr-1 max-sm:fixed max-sm:h-[calc(100dvh-55px)];
+    @apply relative z-30 box-border h-full overflow-auto pr-1 max-sm:fixed max-sm:h-[calc(100dvh-55px)];
   }
 
   .app-layout__sidebar-container--flush {
@@ -547,7 +547,7 @@
   }
 
   .app-layout__sidebar-overlay-mobile {
-    @apply fixed inset-0 top-[55px] z-10 bg-black/50 max-sm:h-[calc(100dvh-55px)];
+    @apply fixed inset-0 top-[55px] z-20 bg-black/50 max-sm:h-[calc(100dvh-55px)];
   }
 
   .app-layout__main-content-area {
@@ -909,7 +909,7 @@
 
   /* Preview styling */
   .markdown-editor__preview {
-    @apply prose prose-base dark:prose-invert box-content h-full w-full overflow-auto leading-relaxed;
+    @apply prose prose-base dark:prose-invert box-content h-full w-full overflow-auto leading-relaxed break-words;
   }
 
   .markdown-editor__preview-inner {
@@ -923,6 +923,10 @@
 
   .markdown-toolbar__button {
     @apply text-markdown-toolbar-text hover:text-markdown-toolbar-text/80 hover:bg-markdown-toolbar-border!;
+  }
+
+  .markdown-toolbar__button--active {
+    @apply bg-markdown-toolbar-border text-markdown-toolbar-text;
   }
 
   .markdown-toolbar__button--desktop-only {
@@ -1570,7 +1574,7 @@
   }
 
   .page-viewer__content {
-    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full flex-1 leading-relaxed;
+    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full flex-1 leading-relaxed break-words;
   }
 
   .page-viewer__content :where(h1),
@@ -1971,7 +1975,7 @@
   }
 
   .page-history__preview-body {
-    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full min-w-0 flex-1 px-4 py-5 leading-relaxed;
+    @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full min-w-0 flex-1 px-4 py-5 leading-relaxed break-words;
   }
 
   .page-history__preview-body :where(h1, h2, h3, h4, h5, h6) {
@@ -2051,7 +2055,7 @@
   }
 
   /* Markdown content tweaks */
-  .markdown-editor__preview-container img,
+  .markdown-editor__preview img,
   .page-viewer__content img,
   .page-history__preview-body img {
     height: auto;
@@ -2089,16 +2093,16 @@
     @apply pr-4!;
   }
 
-  .markdown-editor__preview-container .katex-display,
+  .markdown-editor__preview .katex-display,
   .page-viewer__content .katex-display,
   .page-history__preview-body .katex-display {
     @apply max-w-full overflow-x-auto overflow-y-hidden py-1;
   }
 
-  .markdown-editor__preview-container ol ol,
-  .markdown-editor__preview-container ol ul,
-  .markdown-editor__preview-container ul ol,
-  .markdown-editor__preview-container ul ul,
+  .markdown-editor__preview ol ol,
+  .markdown-editor__preview ol ul,
+  .markdown-editor__preview ul ol,
+  .markdown-editor__preview ul ul,
   .page-viewer__content ol ol,
   .page-viewer__content ol ul,
   .page-viewer__content ul ol,
@@ -2110,49 +2114,49 @@
     @apply mt-0 mb-0;
   }
 
-  .markdown-editor__preview-container li::marker,
+  .markdown-editor__preview li::marker,
   .page-viewer__content li::marker,
   .page-history__preview-body li::marker {
     @apply text-page-text;
   }
 
-  .markdown-editor__preview-container ul li,
+  .markdown-editor__preview ul li,
   .page-viewer__content ul li,
   .page-history__preview-body ul li {
     @apply list-disc;
   }
 
-  .markdown-editor__preview-container .markdown-footnotes,
+  .markdown-editor__preview .markdown-footnotes,
   .page-viewer__content .markdown-footnotes {
     @apply border-border/70 relative mt-10 overflow-x-hidden border-t pt-6 text-sm;
   }
 
-  .markdown-editor__preview-container .markdown-footnotes > ol,
+  .markdown-editor__preview .markdown-footnotes > ol,
   .page-viewer__content .markdown-footnotes > ol {
     @apply my-0 pl-6;
   }
 
-  .markdown-editor__preview-container .markdown-footnotes > ol > li,
+  .markdown-editor__preview .markdown-footnotes > ol > li,
   .page-viewer__content .markdown-footnotes > ol > li {
     @apply mb-4 pl-1;
   }
 
-  .markdown-editor__preview-container .markdown-footnotes > ol > li:last-child,
+  .markdown-editor__preview .markdown-footnotes > ol > li:last-child,
   .page-viewer__content .markdown-footnotes > ol > li:last-child {
     @apply mb-0;
   }
 
-  .markdown-editor__preview-container .markdown-footnotes > ol > li > p,
+  .markdown-editor__preview .markdown-footnotes > ol > li > p,
   .page-viewer__content .markdown-footnotes > ol > li > p {
     @apply my-0;
   }
 
-  .markdown-editor__preview-container .markdown-footnotes > ol > li > p + p,
+  .markdown-editor__preview .markdown-footnotes > ol > li > p + p,
   .page-viewer__content .markdown-footnotes > ol > li > p + p {
     @apply mt-3;
   }
 
-  .markdown-editor__preview-container .markdown-footnotes > .sr-only,
+  .markdown-editor__preview .markdown-footnotes > .sr-only,
   .page-viewer__content .markdown-footnotes > .sr-only {
     position: absolute;
     top: 0;
@@ -2167,56 +2171,52 @@
     border: 0;
   }
 
-  .markdown-editor__preview-container a[data-footnote-ref],
+  .markdown-editor__preview a[data-footnote-ref],
   .page-viewer__content a[data-footnote-ref] {
     @apply text-brand font-semibold no-underline;
   }
 
-  .markdown-editor__preview-container a[data-footnote-backref],
+  .markdown-editor__preview a[data-footnote-backref],
   .page-viewer__content a[data-footnote-backref] {
     @apply text-brand ml-1 inline-flex items-center no-underline;
   }
 
-  .markdown-editor__preview-container a[data-footnote-backref] sup,
+  .markdown-editor__preview a[data-footnote-backref] sup,
   .page-viewer__content a[data-footnote-backref] sup {
     @apply ml-0.5 text-[0.7em];
   }
 
-  .markdown-editor__preview-container .markdown-shoutout,
+  .markdown-editor__preview .markdown-shoutout,
   .page-viewer__content .markdown-shoutout,
   .page-history__preview-body .markdown-shoutout {
     @apply border-border/70 bg-surface-alt text-page-text my-6 rounded-lg border px-4 py-3;
   }
 
-  .markdown-editor__preview-container .markdown-shoutout__title,
+  .markdown-editor__preview .markdown-shoutout__title,
   .page-viewer__content .markdown-shoutout__title,
   .page-history__preview-body .markdown-shoutout__title {
     @apply mt-0 mb-2 text-sm font-semibold tracking-[0.08em] uppercase;
   }
 
-  .markdown-editor__preview-container
-    .markdown-shoutout__content
-    > :first-child,
+  .markdown-editor__preview .markdown-shoutout__content > :first-child,
   .page-viewer__content .markdown-shoutout__content > :first-child,
   .page-history__preview-body .markdown-shoutout__content > :first-child {
     @apply mt-0;
   }
 
-  .markdown-editor__preview-container .markdown-shoutout__content > :last-child,
+  .markdown-editor__preview .markdown-shoutout__content > :last-child,
   .page-viewer__content .markdown-shoutout__content > :last-child,
   .page-history__preview-body .markdown-shoutout__content > :last-child {
     @apply mb-0;
   }
 
-  .markdown-editor__preview-container .markdown-shoutout--info,
+  .markdown-editor__preview .markdown-shoutout--info,
   .page-viewer__content .markdown-shoutout--info,
   .page-history__preview-body .markdown-shoutout--info {
     @apply border-brand/30 bg-brand/5;
   }
 
-  .markdown-editor__preview-container
-    .markdown-shoutout--info
-    .markdown-shoutout__title,
+  .markdown-editor__preview .markdown-shoutout--info .markdown-shoutout__title,
   .page-viewer__content .markdown-shoutout--info .markdown-shoutout__title,
   .page-history__preview-body
     .markdown-shoutout--info
@@ -2224,13 +2224,13 @@
     @apply text-brand;
   }
 
-  .markdown-editor__preview-container .markdown-shoutout--success,
+  .markdown-editor__preview .markdown-shoutout--success,
   .page-viewer__content .markdown-shoutout--success,
   .page-history__preview-body .markdown-shoutout--success {
     @apply border-success/30 bg-success/5;
   }
 
-  .markdown-editor__preview-container
+  .markdown-editor__preview
     .markdown-shoutout--success
     .markdown-shoutout__title,
   .page-viewer__content .markdown-shoutout--success .markdown-shoutout__title,
@@ -2240,13 +2240,13 @@
     @apply text-success;
   }
 
-  .markdown-editor__preview-container .markdown-shoutout--warning,
+  .markdown-editor__preview .markdown-shoutout--warning,
   .page-viewer__content .markdown-shoutout--warning,
   .page-history__preview-body .markdown-shoutout--warning {
     @apply border-warning/30 bg-warning/10;
   }
 
-  .markdown-editor__preview-container
+  .markdown-editor__preview
     .markdown-shoutout--warning
     .markdown-shoutout__title,
   .page-viewer__content .markdown-shoutout--warning .markdown-shoutout__title,
@@ -2256,15 +2256,13 @@
     @apply text-warning;
   }
 
-  .markdown-editor__preview-container .markdown-shoutout--error,
+  .markdown-editor__preview .markdown-shoutout--error,
   .page-viewer__content .markdown-shoutout--error,
   .page-history__preview-body .markdown-shoutout--error {
     @apply border-error/30 bg-error/5;
   }
 
-  .markdown-editor__preview-container
-    .markdown-shoutout--error
-    .markdown-shoutout__title,
+  .markdown-editor__preview .markdown-shoutout--error .markdown-shoutout__title,
   .page-viewer__content .markdown-shoutout--error .markdown-shoutout__title,
   .page-history__preview-body
     .markdown-shoutout--error
@@ -2272,19 +2270,19 @@
     @apply text-error;
   }
 
-  .markdown-editor__preview-container .markdown-shoutout--blue,
+  .markdown-editor__preview .markdown-shoutout--blue,
   .page-viewer__content .markdown-shoutout--blue,
   .page-history__preview-body .markdown-shoutout--blue {
     @apply border-blue-500/30 bg-blue-500/10;
   }
 
-  .markdown-editor__preview-container .markdown-shoutout--red,
+  .markdown-editor__preview .markdown-shoutout--red,
   .page-viewer__content .markdown-shoutout--red,
   .page-history__preview-body .markdown-shoutout--red {
     @apply border-red-500/30 bg-red-500/10;
   }
 
-  .markdown-editor__preview-container .markdown-shoutout--green,
+  .markdown-editor__preview .markdown-shoutout--green,
   .page-viewer__content .markdown-shoutout--green,
   .page-history__preview-body .markdown-shoutout--green {
     @apply border-green-500/30 bg-green-500/10;

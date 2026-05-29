@@ -78,7 +78,7 @@ export default function MarkdownCodeBlock(
   }
 
   return (
-    <div className="custom-scrollbar markdown-code-block">
+    <div className="markdown-code-block">
       <div className="markdown-code-block__actions">
         <TooltipWrapper label={copied ? 'Copied' : 'Copy code'}>
           <Button

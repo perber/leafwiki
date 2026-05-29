@@ -13,7 +13,6 @@ import {
   Code,
   Code2,
   Eye,
-  EyeOff,
   Image,
   Italic,
   Link,
@@ -21,8 +20,10 @@ import {
   Strikethrough,
   Table,
   Undo,
+  WrapText,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEditorStore } from '@/stores/editor'
 import { MarkdownEditorRef } from './MarkdownEditor'
 
 type Props = {
@@ -41,6 +42,7 @@ export default function MarkdownToolbar({
   onTogglePreview,
 }: Props) {
   const openDialog = useDialogsStore((state) => state.openDialog)
+  const { lineWrap, toggleLineWrap } = useEditorStore()
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const isRenamingRef = useRef(false)
@@ -305,6 +307,21 @@ export default function MarkdownToolbar({
             <Redo className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
+        <TooltipWrapper
+          label={lineWrap ? 'Disable line wrap' : 'Enable line wrap'}
+          side="top"
+          align="center"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleLineWrap}
+            className={`markdown-toolbar__button${lineWrap ? 'markdown-toolbar__button--active' : ''}`}
+            data-testid="toggle-line-wrap-button"
+          >
+            <WrapText className="markdown-toolbar__icon" />
+          </Button>
+        </TooltipWrapper>
         {!isMobile && (
           <>
             <div className="markdown-toolbar__separator" />
@@ -317,13 +334,9 @@ export default function MarkdownToolbar({
                 variant="ghost"
                 size="icon"
                 onClick={onTogglePreview}
-                className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
+                className={`markdown-toolbar__button markdown-toolbar__button--desktop-only${previewVisible ? 'markdown-toolbar__button--active' : ''}`}
               >
-                {!previewVisible ? (
-                  <Eye className="markdown-toolbar__icon" />
-                ) : (
-                  <EyeOff className="markdown-toolbar__icon" />
-                )}
+                <Eye className="markdown-toolbar__icon" />
               </Button>
             </TooltipWrapper>
           </>
