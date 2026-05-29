@@ -48,10 +48,10 @@ const (
 
 var (
 	toolGetConfig          = ToolDescriptor{Name: ToolGetConfig, Description: "Return local MCP-visible LeafWiki configuration"}
-	toolGetCurrentUser     = ToolDescriptor{Name: ToolGetCurrentUser, Description: "Return the effective disable-auth MCP actor"}
+	toolGetCurrentUser     = ToolDescriptor{Name: ToolGetCurrentUser, Description: "Return the effective MCP user"}
 	toolGetTree            = ToolDescriptor{Name: ToolGetTree, Description: "Return the wiki page tree"}
-	toolGetPage            = ToolDescriptor{Name: ToolGetPage, Description: "Return a page by ID"}
-	toolGetPageByPath      = ToolDescriptor{Name: ToolGetPageByPath, Description: "Return a page by route path"}
+	toolGetPage            = ToolDescriptor{Name: ToolGetPage, Description: "Return a page by ID with link status context"}
+	toolGetPageByPath      = ToolDescriptor{Name: ToolGetPageByPath, Description: "Return a page by route path with link status context"}
 	toolLookupPath         = ToolDescriptor{Name: ToolLookupPath, Description: "Resolve a route path into existing and missing path segments"}
 	toolResolvePermalink   = ToolDescriptor{Name: ToolResolvePermalink, Description: "Resolve a stable page ID to its current route path"}
 	toolSuggestSlug        = ToolDescriptor{Name: ToolSuggestSlug, Description: "Suggest a unique child slug for a title"}

@@ -8,6 +8,7 @@ import (
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/http/dto"
+	wikilinks "github.com/perber/wiki/internal/wiki/links"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 )
 
@@ -28,7 +29,7 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		if err != nil {
 			return pageOutput{}, err
 		}
-		return pageOutput{Page: r.apiPage(out.Page, 0)}, nil
+		return r.pageOutputWithLinkStatus(ctx, out.Page, 0)
 	})
 
 	addTypedTool[pathInput, pageOutput](server, toolGetPageByPath, func(ctx context.Context, in pathInput) (pageOutput, error) {
@@ -44,7 +45,7 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		if out.Page.Kind == tree.NodeKindSection {
 			depth = 1
 		}
-		return pageOutput{Page: r.apiPage(out.Page, depth)}, nil
+		return r.pageOutputWithLinkStatus(ctx, out.Page, depth)
 	})
 
 	addTypedTool[pathInput, lookupPathOutput](server, toolLookupPath, func(ctx context.Context, in pathInput) (lookupPathOutput, error) {
@@ -63,7 +64,7 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		return resolvePermalinkOutput{Target: out.Target}, nil
 	})
 
-	addTypedTool[suggestSlugInput, suggestSlugOutput](server, toolSuggestSlug, func(ctx context.Context, in suggestSlugInput) (suggestSlugOutput, error) {
+	addEditorTool[suggestSlugInput, suggestSlugOutput](r, server, toolSuggestSlug, func(ctx context.Context, _ toolActor, in suggestSlugInput) (suggestSlugOutput, error) {
 		title, err := wikipages.ValidateSuggestSlugTitle(in.Title)
 		if err != nil {
 			return suggestSlugOutput{}, err
@@ -79,13 +80,13 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		return suggestSlugOutput{Slug: out.Slug}, nil
 	})
 
-	addTypedTool[createPageInput, pageOutput](server, toolCreatePage, func(ctx context.Context, in createPageInput) (pageOutput, error) {
+	addEditorTool[createPageInput, pageOutput](r, server, toolCreatePage, func(ctx context.Context, actor toolActor, in createPageInput) (pageOutput, error) {
 		kind, err := wikipages.ValidatePageKind(in.Kind)
 		if err != nil {
 			return pageOutput{}, err
 		}
 		out, err := r.createPage.Execute(ctx, wikipages.CreatePageInput{
-			UserID:   publicEditorID,
+			UserID:   actor.ID,
 			ParentID: in.ParentID,
 			Title:    in.Title,
 			Slug:     in.Slug,
@@ -97,7 +98,7 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		return pageOutput{Page: r.apiPage(out.Page, 0)}, nil
 	})
 
-	addTypedTool[updatePageInput, pageOutput](server, toolUpdatePage, func(ctx context.Context, in updatePageInput) (pageOutput, error) {
+	addEditorTool[updatePageInput, pageOutput](r, server, toolUpdatePage, func(ctx context.Context, actor toolActor, in updatePageInput) (pageOutput, error) {
 		if err := wikipages.ValidatePageMetadataInput(in.Tags, in.Properties); err != nil {
 			return pageOutput{}, err
 		}
@@ -113,7 +114,7 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		}
 		kind := tree.NodeKindPage
 		out, err := r.updatePage.Execute(ctx, wikipages.UpdatePageInput{
-			UserID:     publicEditorID,
+			UserID:     actor.ID,
 			ID:         strings.TrimSpace(in.ID),
 			Version:    strings.TrimSpace(in.Version),
 			Title:      in.Title,
@@ -128,9 +129,9 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		return pageOutput{Page: r.apiPage(out.Page, 0)}, nil
 	})
 
-	addTypedTool[deletePageInput, messageOutput](server, toolDeletePage, func(ctx context.Context, in deletePageInput) (messageOutput, error) {
+	addEditorTool[deletePageInput, messageOutput](r, server, toolDeletePage, func(ctx context.Context, actor toolActor, in deletePageInput) (messageOutput, error) {
 		if err := r.deletePage.Execute(ctx, wikipages.DeletePageInput{
-			UserID:    publicEditorID,
+			UserID:    actor.ID,
 			ID:        strings.TrimSpace(in.ID),
 			Version:   strings.TrimSpace(in.Version),
 			Recursive: in.Recursive,
@@ -140,13 +141,13 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		return messageOutput{Message: "Page deleted"}, nil
 	})
 
-	addTypedTool[movePageInput, messageOutput](server, toolMovePage, func(ctx context.Context, in movePageInput) (messageOutput, error) {
+	addEditorTool[movePageInput, messageOutput](r, server, toolMovePage, func(ctx context.Context, actor toolActor, in movePageInput) (messageOutput, error) {
 		parentID := ""
 		if in.ParentID != nil {
 			parentID = *in.ParentID
 		}
 		if err := r.movePage.Execute(ctx, wikipages.MovePageInput{
-			UserID:   publicEditorID,
+			UserID:   actor.ID,
 			ID:       strings.TrimSpace(in.ID),
 			Version:  strings.TrimSpace(in.Version),
 			ParentID: parentID,
@@ -156,7 +157,7 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		return messageOutput{Message: "Page moved"}, nil
 	})
 
-	addTypedTool[sortPagesInput, messageOutput](server, toolSortPages, func(ctx context.Context, in sortPagesInput) (messageOutput, error) {
+	addEditorTool[sortPagesInput, messageOutput](r, server, toolSortPages, func(ctx context.Context, _ toolActor, in sortPagesInput) (messageOutput, error) {
 		if err := r.sortPages.Execute(ctx, wikipages.SortPagesInput{
 			ParentID:   strings.TrimSpace(in.ParentID),
 			OrderedIDs: in.OrderedIDs,
@@ -166,13 +167,13 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		return messageOutput{Message: "Pages sorted successfully"}, nil
 	})
 
-	addTypedTool[ensurePageInput, pageOutput](server, toolEnsurePage, func(ctx context.Context, in ensurePageInput) (pageOutput, error) {
+	addEditorTool[ensurePageInput, pageOutput](r, server, toolEnsurePage, func(ctx context.Context, actor toolActor, in ensurePageInput) (pageOutput, error) {
 		kind, err := wikipages.ValidatePageKind(in.Kind)
 		if err != nil {
 			return pageOutput{}, err
 		}
 		out, err := r.ensurePath.Execute(ctx, wikipages.EnsurePathInput{
-			UserID:      publicEditorID,
+			UserID:      actor.ID,
 			TargetPath:  strings.TrimSpace(in.Path),
 			TargetTitle: in.Title,
 			Kind:        &kind,
@@ -183,13 +184,13 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		return pageOutput{Page: r.apiPage(out.Page, 0)}, nil
 	})
 
-	addTypedTool[convertPageInput, messageOutput](server, toolConvertPage, func(ctx context.Context, in convertPageInput) (messageOutput, error) {
+	addEditorTool[convertPageInput, messageOutput](r, server, toolConvertPage, func(ctx context.Context, actor toolActor, in convertPageInput) (messageOutput, error) {
 		targetKind, err := wikipages.ValidateConvertTargetKind(in.TargetKind)
 		if err != nil {
 			return messageOutput{}, err
 		}
 		if err := r.convertPage.Execute(ctx, wikipages.ConvertPageInput{
-			UserID:     publicEditorID,
+			UserID:     actor.ID,
 			ID:         strings.TrimSpace(in.ID),
 			Version:    strings.TrimSpace(in.Version),
 			TargetKind: targetKind,
@@ -199,9 +200,9 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		return messageOutput{Message: "Page converted"}, nil
 	})
 
-	addTypedTool[copyPageInput, pageOutput](server, toolCopyPage, func(ctx context.Context, in copyPageInput) (pageOutput, error) {
+	addEditorTool[copyPageInput, pageOutput](r, server, toolCopyPage, func(ctx context.Context, actor toolActor, in copyPageInput) (pageOutput, error) {
 		out, err := r.copyPage.Execute(ctx, wikipages.CopyPageInput{
-			UserID:         publicEditorID,
+			UserID:         actor.ID,
 			SourcePageID:   strings.TrimSpace(in.ID),
 			TargetParentID: in.TargetParentID,
 			Title:          in.Title,
@@ -212,4 +213,12 @@ func (r *Routes) registerPageTools(server *sdkmcp.Server) {
 		}
 		return pageOutput{Page: r.apiPage(out.Page, 0)}, nil
 	})
+}
+
+func (r *Routes) pageOutputWithLinkStatus(ctx context.Context, page *tree.Page, depth int) (pageOutput, error) {
+	out, err := r.linkStatus.Execute(ctx, wikilinks.GetLinkStatusInput{PageID: page.ID})
+	if err != nil {
+		return pageOutput{}, err
+	}
+	return pageOutput{Page: r.apiPage(page, depth), LinkStatus: out.Status}, nil
 }

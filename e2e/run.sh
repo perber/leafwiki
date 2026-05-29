@@ -105,9 +105,20 @@ start_local() {
     --admin-password=admin
   )
 
+  if [ "${E2E_ENABLE_MCP_LOCAL:-0}" = "1" ] && [ "${E2E_ENABLE_MCP_OAUTH_LOCAL:-0}" = "1" ]; then
+    echo "❌ Set only one of E2E_ENABLE_MCP_LOCAL or E2E_ENABLE_MCP_OAUTH_LOCAL."
+    exit 1
+  fi
+
   if [ "${E2E_ENABLE_MCP_LOCAL:-0}" = "1" ]; then
     auth_args=(
       --disable-auth=true
+      --enable-mcp=true
+    )
+  elif [ "${E2E_ENABLE_MCP_OAUTH_LOCAL:-0}" = "1" ]; then
+    auth_args=(
+      --jwt-secret=e2e-tests-secret
+      --admin-password=admin
       --enable-mcp=true
     )
   fi

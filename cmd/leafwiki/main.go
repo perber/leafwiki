@@ -47,7 +47,7 @@ func writeUsage(w io.Writer) {
 	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
 	--enable-revision             Enable the revision / page history feature (default: false)
 	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
-	--enable-mcp                  Enable local MCP Streamable HTTP endpoint (requires --disable-auth and loopback host) (default: false)
+	--enable-mcp                  Enable local MCP Streamable HTTP endpoint (requires loopback host) (default: false)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
 	--enable-http-remote-user       Enable reverse-proxy authentication via HTTP header (default: false)
 	--http-remote-user-header-name  HTTP header carrying the username from a trusted proxy (default: Remote-User)
@@ -156,7 +156,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
 		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
 		enableLinkRefactor:      fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
-		enableMCP:               fs.Bool("enable-mcp", false, "enable local MCP Streamable HTTP endpoint (requires --disable-auth and loopback host)"),
+		enableMCP:               fs.Bool("enable-mcp", false, "enable local MCP Streamable HTTP endpoint (requires loopback host)"),
 		maxRevisionHistory:      fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
 		enableHTTPRemoteUser:    fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
 		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
@@ -428,12 +428,6 @@ func resolveLocalMCPOptions(flags *cliFlags, visited map[string]bool) localMCPOp
 func validateLocalMCPOptions(opts localMCPOptions) error {
 	if !opts.EnableMCP {
 		return nil
-	}
-	if !opts.DisableAuth {
-		return fmt.Errorf("--enable-mcp requires --disable-auth")
-	}
-	if opts.HTTPRemoteUserOn {
-		return fmt.Errorf("--enable-mcp cannot be combined with --enable-http-remote-user")
 	}
 	if !httpinternal.IsLoopbackHost(opts.Host) {
 		return fmt.Errorf("--enable-mcp requires a loopback host (localhost, 127.0.0.1, or ::1)")

@@ -87,7 +87,8 @@ type updatePageInput struct {
 }
 
 type pageOutput struct {
-	Page *dto.Page `json:"page"`
+	Page       *dto.Page `json:"page"`
+	LinkStatus any       `json:"linkStatus,omitempty"`
 }
 
 type deletePageInput struct {

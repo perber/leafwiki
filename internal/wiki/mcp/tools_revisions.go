@@ -109,9 +109,9 @@ func (r *Routes) registerRevisionTools(server *sdkmcp.Server) {
 		}, nil
 	})
 
-	addTypedTool[revisionIDInput, pageOutput](server, toolRestoreRevision, func(ctx context.Context, in revisionIDInput) (pageOutput, error) {
+	addEditorTool[revisionIDInput, pageOutput](r, server, toolRestoreRevision, func(ctx context.Context, actor toolActor, in revisionIDInput) (pageOutput, error) {
 		out, err := r.restoreRev.Execute(ctx, wikirevisions.RestoreRevisionInput{
-			UserID:     publicEditorID,
+			UserID:     actor.ID,
 			PageID:     strings.TrimSpace(firstNonEmpty(in.PageID, in.ID)),
 			RevisionID: strings.TrimSpace(in.RevisionID),
 		})

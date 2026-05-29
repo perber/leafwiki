@@ -27,7 +27,7 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 	}
 }
 
-func TestValidateMCPStartupOptions_RequiresDisabledAuthAndLoopbackHost(t *testing.T) {
+func TestValidateMCPStartupOptions_RequiresLoopbackHost(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -39,9 +39,10 @@ func TestValidateMCPStartupOptions_RequiresDisabledAuthAndLoopbackHost(t *testin
 		wantErr     bool
 	}{
 		{name: "disabled MCP ignores host/auth", enableMCP: false, disableAuth: false, host: "0.0.0.0"},
-		{name: "MCP requires disabled auth", enableMCP: true, disableAuth: false, host: "127.0.0.1", wantErr: true},
+		{name: "MCP allows normal auth on loopback", enableMCP: true, disableAuth: false, host: "127.0.0.1"},
+		{name: "MCP allows legacy disabled auth on loopback", enableMCP: true, disableAuth: true, host: "127.0.0.1"},
 		{name: "MCP rejects wildcard host", enableMCP: true, disableAuth: true, host: "0.0.0.0", wantErr: true},
-		{name: "MCP rejects remote user middleware", enableMCP: true, disableAuth: true, remoteUser: true, host: "127.0.0.1", wantErr: true},
+		{name: "MCP allows remote user middleware on loopback", enableMCP: true, disableAuth: false, remoteUser: true, host: "127.0.0.1"},
 		{name: "MCP allows localhost", enableMCP: true, disableAuth: true, host: "localhost"},
 		{name: "MCP allows IPv4 loopback", enableMCP: true, disableAuth: true, host: "127.0.0.1"},
 		{name: "MCP allows IPv6 loopback", enableMCP: true, disableAuth: true, host: "::1"},
@@ -84,9 +85,9 @@ func TestResolveLocalMCPOptions_UsesFlagEnvPrecedenceBeforeValidation(t *testing
 	}
 }
 
-func TestResolveLocalMCPOptions_EnvRemoteUserCombinationIsRejected(t *testing.T) {
+func TestResolveLocalMCPOptions_EnvRemoteUserCombinationIsAllowed(t *testing.T) {
 	t.Setenv("LEAFWIKI_ENABLE_MCP", "true")
-	t.Setenv("LEAFWIKI_DISABLE_AUTH", "true")
+	t.Setenv("LEAFWIKI_DISABLE_AUTH", "false")
 	t.Setenv("LEAFWIKI_HOST", "127.0.0.1")
 	t.Setenv("LEAFWIKI_ENABLE_HTTP_REMOTE_USER", "true")
 
@@ -94,8 +95,8 @@ func TestResolveLocalMCPOptions_EnvRemoteUserCombinationIsRejected(t *testing.T)
 	if !opts.HTTPRemoteUserOn {
 		t.Fatalf("resolved MCP opts = %#v, want remote-user enabled from env", opts)
 	}
-	if err := validateLocalMCPOptions(opts); err == nil || !strings.Contains(err.Error(), "remote-user") {
-		t.Fatalf("validate env-resolved MCP opts = %v, want remote-user error", err)
+	if err := validateLocalMCPOptions(opts); err != nil {
+		t.Fatalf("validate env-resolved MCP opts with remote-user auth: %v", err)
 	}
 }
 

@@ -8,8 +8,8 @@ import (
 )
 
 func (r *Routes) registerConfigTools(server *sdkmcp.Server, opts httpinternal.RouterOptions) {
-	addTypedTool[emptyInput, currentUserOutput](server, toolGetCurrentUser, func(context.Context, emptyInput) (currentUserOutput, error) {
-		return currentUserOutput{User: publicEditor().ToPublicUser()}, nil
+	addActorTool[emptyInput, currentUserOutput](r, server, toolGetCurrentUser, func(_ context.Context, actor toolActor, _ emptyInput) (currentUserOutput, error) {
+		return currentUserOutput{User: actor.User.ToPublicUser()}, nil
 	})
 
 	addTypedTool[emptyInput, configOutput](server, toolGetConfig, func(context.Context, emptyInput) (configOutput, error) {

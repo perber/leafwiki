@@ -25,6 +25,7 @@ import (
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
 	wikimcp "github.com/perber/wiki/internal/wiki/mcp"
+	wikioauth "github.com/perber/wiki/internal/wiki/oauth"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
@@ -57,10 +58,12 @@ type Wiki struct {
 	brandingRoutes   *wikibranding.Routes
 	importerRoutes   *wikiimporter.Routes
 	mcpRoutes        *wikimcp.Routes
+	oauthRoutes      *wikioauth.Routes
 	revision         *revision.Service
 	links            *links.LinkService
 	tags             *tags.TagsService
 	props            *properties.PropertiesService
+	oauth            *wikioauth.Service
 	log              *slog.Logger
 }
 
@@ -84,6 +87,9 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		log:        slog.Default().With("component", "Wiki"),
 	}
 	if err := w.initAuth(options); err != nil {
+		return nil, err
+	}
+	if err := w.initOAuth(options); err != nil {
 		return nil, err
 	}
 	if err := w.initCoreServices(options); err != nil {
@@ -176,6 +182,20 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 		}
 		w.auth = auth.NewAuthService(w.user, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 	}
+	return nil
+}
+
+func (w *Wiki) initOAuth(options *WikiOptions) error {
+	service, err := wikioauth.NewService(wikioauth.ServiceConfig{
+		AuthService:         w.auth,
+		UserService:         w.user,
+		AccessTokenTimeout:  options.AccessTokenTimeout,
+		RefreshTokenTimeout: options.RefreshTokenTimeout,
+	})
+	if err != nil {
+		return err
+	}
+	w.oauth = service
 	return nil
 }
 
@@ -294,6 +314,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.propertiesRoutes = w.buildPropertiesRoutes()
 	w.brandingRoutes = w.buildBrandingRoutes()
 	w.importerRoutes = w.buildImporterRoutes(options)
+	w.oauthRoutes = wikioauth.NewRoutes(w.oauth)
 	w.mcpRoutes = w.buildMCPRoutes()
 }
 
@@ -475,6 +496,8 @@ func (w *Wiki) buildMCPRoutes() *wikimcp.Routes {
 		GetRevAsset:  wikirevisions.NewGetRevisionAssetUseCase(w.revision),
 		GetLatestRev: wikirevisions.NewGetLatestRevisionUseCase(w.revision),
 		RestoreRev:   wikirevisions.NewRestoreRevisionUseCase(w.revision, w.tree, w.newPageOrchestrator(), w.log),
+		UserService:  w.user,
+		OAuthService: w.oauth,
 	})
 }
 
@@ -493,6 +516,7 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.propertiesRoutes,
 		w.brandingRoutes,
 		w.importerRoutes,
+		w.oauthRoutes,
 		w.mcpRoutes,
 	}
 }

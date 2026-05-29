@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
@@ -31,6 +32,46 @@ func publicEditor() *coreauth.User {
 		Username: publicEditorID,
 		Role:     coreauth.RoleEditor,
 	}
+}
+
+func (r *Routes) actorForRequest(req *sdkmcp.CallToolRequest) (*coreauth.User, error) {
+	if req == nil {
+		return r.actorForMissingTokenInfo()
+	}
+	extra := req.GetExtra()
+	if extra == nil {
+		return r.actorForMissingTokenInfo()
+	}
+	tokenInfo := extra.TokenInfo
+	if tokenInfo == nil {
+		return r.actorForMissingTokenInfo()
+	}
+	if r.userService == nil {
+		return nil, fmt.Errorf("authenticated MCP user service is unavailable")
+	}
+	user, err := r.userService.GetUserByID(tokenInfo.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("authenticated MCP user not found")
+	}
+	return user, nil
+}
+
+func (r *Routes) actorForMissingTokenInfo() (*coreauth.User, error) {
+	if r.authDisabled {
+		return publicEditor(), nil
+	}
+	return nil, fmt.Errorf("authenticated MCP token info missing")
+}
+
+func (r *Routes) editorActorForRequest(req *sdkmcp.CallToolRequest) (*coreauth.User, error) {
+	user, err := r.actorForRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	if user.Role != coreauth.RoleEditor && user.Role != coreauth.RoleAdmin {
+		return nil, fmt.Errorf("editor or admin role required")
+	}
+	return user, nil
 }
 
 func mcpToolError(err error) error {

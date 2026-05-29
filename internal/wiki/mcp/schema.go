@@ -6,9 +6,21 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+	coreauth "github.com/perber/wiki/internal/core/auth"
 )
 
+type toolActor struct {
+	ID   string
+	User *coreauth.User
+}
+
 func addTypedTool[In, Out any](server *sdkmcp.Server, descriptor ToolDescriptor, handler func(context.Context, In) (Out, error)) {
+	addRequestTypedTool(server, descriptor, func(ctx context.Context, _ *sdkmcp.CallToolRequest, in In) (Out, error) {
+		return handler(ctx, in)
+	})
+}
+
+func addRequestTypedTool[In, Out any](server *sdkmcp.Server, descriptor ToolDescriptor, handler func(context.Context, *sdkmcp.CallToolRequest, In) (Out, error)) {
 	tool := &sdkmcp.Tool{
 		Name:         descriptor.Name,
 		Description:  descriptor.Description,
@@ -18,13 +30,35 @@ func addTypedTool[In, Out any](server *sdkmcp.Server, descriptor ToolDescriptor,
 		tool.InputSchema = inputSchema
 	}
 
-	sdkmcp.AddTool[In, Out](server, tool, func(ctx context.Context, _ *sdkmcp.CallToolRequest, in In) (*sdkmcp.CallToolResult, Out, error) {
+	sdkmcp.AddTool[In, Out](server, tool, func(ctx context.Context, req *sdkmcp.CallToolRequest, in In) (*sdkmcp.CallToolResult, Out, error) {
 		var zero Out
-		out, err := handler(ctx, in)
+		out, err := handler(ctx, req, in)
 		if err != nil {
 			return nil, zero, mcpToolError(err)
 		}
 		return nil, out, nil
+	})
+}
+
+func addActorTool[In, Out any](routes *Routes, server *sdkmcp.Server, descriptor ToolDescriptor, handler func(context.Context, toolActor, In) (Out, error)) {
+	addRequestTypedTool(server, descriptor, func(ctx context.Context, req *sdkmcp.CallToolRequest, in In) (Out, error) {
+		var zero Out
+		user, err := routes.actorForRequest(req)
+		if err != nil {
+			return zero, err
+		}
+		return handler(ctx, toolActor{ID: user.ID, User: user}, in)
+	})
+}
+
+func addEditorTool[In, Out any](routes *Routes, server *sdkmcp.Server, descriptor ToolDescriptor, handler func(context.Context, toolActor, In) (Out, error)) {
+	addRequestTypedTool(server, descriptor, func(ctx context.Context, req *sdkmcp.CallToolRequest, in In) (Out, error) {
+		var zero Out
+		user, err := routes.editorActorForRequest(req)
+		if err != nil {
+			return zero, err
+		}
+		return handler(ctx, toolActor{ID: user.ID, User: user}, in)
 	})
 }
 
@@ -128,7 +162,12 @@ func toolOutputSchema(name string) *jsonschema.Schema {
 		})
 	case ToolGetTree:
 		return outputSchema(map[string]*jsonschema.Schema{"tree": objectValueSchema()})
-	case ToolGetPage, ToolGetPageByPath, ToolCreatePage, ToolUpdatePage, ToolEnsurePage, ToolCopyPage, ToolRestoreRevision, ToolApplyRefactor:
+	case ToolGetPage, ToolGetPageByPath:
+		return outputSchema(map[string]*jsonschema.Schema{
+			"page":       objectValueSchema(),
+			"linkStatus": objectValueSchema(),
+		})
+	case ToolCreatePage, ToolUpdatePage, ToolEnsurePage, ToolCopyPage, ToolRestoreRevision, ToolApplyRefactor:
 		return outputSchema(map[string]*jsonschema.Schema{"page": objectValueSchema()})
 	case ToolLookupPath:
 		return outputSchema(map[string]*jsonschema.Schema{"lookup": objectValueSchema()})

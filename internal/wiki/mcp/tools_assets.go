@@ -12,7 +12,7 @@ import (
 )
 
 func (r *Routes) registerAssetTools(server *sdkmcp.Server, opts httpinternal.RouterOptions) {
-	addTypedTool[uploadAssetInput, uploadAssetOutput](server, toolUploadAsset, func(ctx context.Context, in uploadAssetInput) (uploadAssetOutput, error) {
+	addEditorTool[uploadAssetInput, uploadAssetOutput](r, server, toolUploadAsset, func(ctx context.Context, actor toolActor, in uploadAssetInput) (uploadAssetOutput, error) {
 		if base64DecodedSize(in.ContentBase64) > opts.MaxAssetUploadSizeBytes {
 			return uploadAssetOutput{}, wikiassets.NewAssetFileTooLargeError()
 		}
@@ -22,7 +22,7 @@ func (r *Routes) registerAssetTools(server *sdkmcp.Server, opts httpinternal.Rou
 		}
 		file := &memoryMultipartFile{Reader: bytes.NewReader(content)}
 		out, err := r.uploadAsset.Execute(ctx, wikiassets.UploadAssetInput{
-			UserID:   publicEditorID,
+			UserID:   actor.ID,
 			PageID:   strings.TrimSpace(in.PageID),
 			File:     file,
 			Filename: in.Filename,
@@ -57,9 +57,9 @@ func (r *Routes) registerAssetTools(server *sdkmcp.Server, opts httpinternal.Rou
 		return listAssetsOutput{Files: out.Files}, nil
 	})
 
-	addTypedTool[renameAssetInput, renameAssetOutput](server, toolRenameAsset, func(ctx context.Context, in renameAssetInput) (renameAssetOutput, error) {
+	addEditorTool[renameAssetInput, renameAssetOutput](r, server, toolRenameAsset, func(ctx context.Context, actor toolActor, in renameAssetInput) (renameAssetOutput, error) {
 		out, err := r.renameAsset.Execute(ctx, wikiassets.RenameAssetInput{
-			UserID:      publicEditorID,
+			UserID:      actor.ID,
 			PageID:      strings.TrimSpace(in.PageID),
 			OldFilename: in.OldFilename,
 			NewFilename: in.NewFilename,
@@ -70,9 +70,9 @@ func (r *Routes) registerAssetTools(server *sdkmcp.Server, opts httpinternal.Rou
 		return renameAssetOutput{URL: out.URL}, nil
 	})
 
-	addTypedTool[deleteAssetInput, messageOutput](server, toolDeleteAsset, func(ctx context.Context, in deleteAssetInput) (messageOutput, error) {
+	addEditorTool[deleteAssetInput, messageOutput](r, server, toolDeleteAsset, func(ctx context.Context, actor toolActor, in deleteAssetInput) (messageOutput, error) {
 		if err := r.deleteAsset.Execute(ctx, wikiassets.DeleteAssetInput{
-			UserID:   publicEditorID,
+			UserID:   actor.ID,
 			PageID:   strings.TrimSpace(in.PageID),
 			Filename: in.Filename,
 		}); err != nil {

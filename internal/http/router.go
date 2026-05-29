@@ -212,9 +212,15 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 				!strings.HasPrefix(path, "/assets") &&
 				!strings.HasPrefix(path, "/static") &&
 				!strings.HasPrefix(path, "/branding") &&
+				!strings.HasPrefix(path, "/.well-known") &&
 				path != "/mcp" &&
 				!strings.HasPrefix(path, "/mcp/") {
 
+				if path == "/oauth/approve" {
+					disableClientCache(c)
+					c.Header("Content-Security-Policy", "frame-ancestors 'none'")
+					c.Header("X-Frame-Options", "DENY")
+				}
 				c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 				data, err := fs.ReadFile(fsys, "index.html")
 				if err != nil {

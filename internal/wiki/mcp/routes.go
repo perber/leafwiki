@@ -5,12 +5,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	sdkauth "github.com/modelcontextprotocol/go-sdk/auth"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
+	wikioauth "github.com/perber/wiki/internal/wiki/oauth"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
@@ -24,6 +26,9 @@ const defaultToolListPageSize = 100
 type Routes struct {
 	treeService  *tree.TreeService
 	userResolver *coreauth.UserResolver
+	userService  *coreauth.UserService
+	oauthService *wikioauth.Service
+	authDisabled bool
 	createPage   *wikipages.CreatePageUseCase
 	updatePage   *wikipages.UpdatePageUseCase
 	getPage      *wikipages.GetPageUseCase
@@ -62,6 +67,8 @@ type Routes struct {
 type RoutesConfig struct {
 	TreeService  *tree.TreeService
 	UserResolver *coreauth.UserResolver
+	UserService  *coreauth.UserService
+	OAuthService *wikioauth.Service
 	CreatePage   *wikipages.CreatePageUseCase
 	UpdatePage   *wikipages.UpdatePageUseCase
 	GetPage      *wikipages.GetPageUseCase
@@ -101,6 +108,8 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 	return &Routes{
 		treeService:  cfg.TreeService,
 		userResolver: cfg.UserResolver,
+		userService:  cfg.UserService,
+		oauthService: cfg.OAuthService,
 		createPage:   cfg.CreatePage,
 		updatePage:   cfg.UpdatePage,
 		getPage:      cfg.GetPage,
@@ -138,13 +147,16 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 }
 
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
-	// Main startup validation rejects this combination; keep the registrar closed
-	// as a second guard for tests and direct router construction.
-	if !ctx.Opts.MCPEnabled || !ctx.Opts.AuthDisabled || ctx.Opts.HTTPRemoteUser.Enabled || !httpinternal.IsLoopbackHost(ctx.Opts.MCPBindHost) {
+	if !ctx.Opts.MCPEnabled || !httpinternal.IsLoopbackHost(ctx.Opts.MCPBindHost) {
+		return
+	}
+	if !ctx.Opts.AuthDisabled && r.oauthService == nil {
 		return
 	}
 
-	server := r.newServer(ctx.Opts)
+	serverRoutes := *r
+	serverRoutes.authDisabled = ctx.Opts.AuthDisabled
+	server := serverRoutes.newServer(ctx.Opts)
 	handler := sdkmcp.NewStreamableHTTPHandler(func(*http.Request) *sdkmcp.Server {
 		return server
 	}, &sdkmcp.StreamableHTTPOptions{
@@ -154,7 +166,18 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		DisableLocalhostProtection: false,
 	})
 
-	wrapped := gin.WrapH(handler)
+	var httpHandler http.Handler = handler
+	if !ctx.Opts.AuthDisabled {
+		httpHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			authenticated := sdkauth.RequireBearerToken(r.oauthService.VerifyBearerToken, &sdkauth.RequireBearerTokenOptions{
+				ResourceMetadataURL: wikioauth.ProtectedResourceMetadataURL(req, ctx.Opts.BasePath),
+				Scopes:              []string{wikioauth.ScopeMCP},
+			})(handler)
+			authenticated.ServeHTTP(w, req)
+		})
+	}
+
+	wrapped := gin.WrapH(httpHandler)
 	ctx.Base.GET("/mcp", wrapped)
 	ctx.Base.POST("/mcp", wrapped)
 	ctx.Base.DELETE("/mcp", wrapped)

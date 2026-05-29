@@ -4101,6 +4101,42 @@ func TestFaviconRoute_DisablesClientCache(t *testing.T) {
 	}
 }
 
+func TestOAuthApprovalFrontendRoute_HasApprovalSecurityHeaders(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	embedFrontendOrig := httpinternal.EmbedFrontend
+	httpinternal.EmbedFrontend = "true"
+	defer func() {
+		httpinternal.EmbedFrontend = embedFrontendOrig
+	}()
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		MCPEnabled:              true,
+		MCPBindHost:             "127.0.0.1",
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/oauth/approve", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /oauth/approve = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("approval Cache-Control = %q, want no-store", got)
+	}
+	if got := rec.Header().Get("Content-Security-Policy"); !strings.Contains(got, "frame-ancestors 'none'") {
+		t.Fatalf("approval Content-Security-Policy = %q, want frame-ancestors 'none'", got)
+	}
+	if got := rec.Header().Get("X-Frame-Options"); got != "DENY" {
+		t.Fatalf("approval X-Frame-Options = %q, want DENY", got)
+	}
+}
+
 func TestFaviconICORoute_ServesCustomBrandingFavicon(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

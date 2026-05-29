@@ -798,6 +798,51 @@
     @apply w-full;
   }
 
+  /* OAuth Approval */
+  .oauth-approval {
+    @apply border-surface-border bg-surface text-interface-text min-h-screen w-full max-w-md border-r shadow-md sm:w-96;
+  }
+
+  .oauth-approval__form {
+    @apply w-full p-4;
+  }
+
+  .oauth-approval__brand {
+    @apply text-interface-text mb-4 text-xl font-bold;
+  }
+
+  .oauth-approval__title {
+    @apply text-interface-text mb-2 text-lg font-semibold;
+  }
+
+  .oauth-approval__logo-image {
+    @apply inline-block h-10 w-auto max-w-48 object-contain align-middle;
+  }
+
+  .oauth-approval__prompt {
+    @apply mb-4 text-sm leading-6;
+  }
+
+  .oauth-approval__details {
+    @apply border-surface-border bg-background mb-4 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2 rounded border p-3 text-sm;
+  }
+
+  .oauth-approval__details dt {
+    @apply text-interface-text font-semibold;
+  }
+
+  .oauth-approval__details dd {
+    @apply text-muted min-w-0 break-words;
+  }
+
+  .oauth-approval__status {
+    @apply text-muted mb-4 text-sm;
+  }
+
+  .oauth-approval__actions {
+    @apply flex justify-end gap-2;
+  }
+
   .editor-title-bar {
     @apply flex flex-1 flex-col items-center justify-center;
   }

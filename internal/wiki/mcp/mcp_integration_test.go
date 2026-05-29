@@ -23,6 +23,7 @@ import (
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/perber/wiki/internal/core/assets"
 	httpinternal "github.com/perber/wiki/internal/http"
+	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikimcp "github.com/perber/wiki/internal/wiki/mcp"
@@ -278,8 +279,8 @@ var baseToolOutputProperties = map[string][]string{
 	"get_config":            {"publicAccess", "hideLinkMetadataSection", "authDisabled", "basePath", "maxAssetUploadSizeBytes", "enableRevision", "enableLinkRefactor", "httpRemoteUserEnabled", "httpRemoteUserLogoutUrl"},
 	"get_current_user":      {"user"},
 	"get_tree":              {"tree"},
-	"get_page":              {"page"},
-	"get_page_by_path":      {"page"},
+	"get_page":              {"linkStatus", "page"},
+	"get_page_by_path":      {"linkStatus", "page"},
 	"lookup_path":           {"lookup"},
 	"resolve_permalink":     {"target"},
 	"suggest_slug":          {"slug"},
@@ -356,25 +357,48 @@ func TestLocalMCPRegistration_DisabledByDefaultAndToolListMatchesPlan(t *testing
 	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
 		rec := httptest.NewRecorder()
 		authEnabledRouter.ServeHTTP(rec, httptest.NewRequest(method, "/mcp", strings.NewReader("{}")))
-		if rec.Code != http.StatusNotFound {
-			t.Fatalf("%s /mcp with auth enabled = %d, want 404", method, rec.Code)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("%s /mcp with auth enabled = %d, want 401", method, rec.Code)
+		}
+		challenge := rec.Header().Get("WWW-Authenticate")
+		if !strings.Contains(challenge, "Bearer") ||
+			!strings.Contains(challenge, "resource_metadata=\"http://example.com/.well-known/oauth-protected-resource/mcp\"") ||
+			!strings.Contains(challenge, "scope=\"leafwiki:mcp\"") {
+			t.Fatalf("%s /mcp challenge = %q, want OAuth bearer challenge", method, challenge)
 		}
 	}
 
+	rec := httptest.NewRecorder()
+	disabledRouter.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/.well-known/not-real", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET unknown well-known route = %d, want 404: %s", rec.Code, rec.Body.String())
+	}
+	if contentType := rec.Header().Get("Content-Type"); strings.HasPrefix(contentType, "text/html") {
+		t.Fatalf("GET unknown well-known route content-type = %q, want non-HTML 404", contentType)
+	}
+
+	trustedProxies, err := authmw.ParseTrustedProxies("127.0.0.1")
+	if err != nil {
+		t.Fatalf("ParseTrustedProxies failed: %v", err)
+	}
 	remoteUserRouter := newLocalMCPTestRouter(w, httpinternal.RouterOptions{
 		AuthDisabled:            true,
 		PublicAccess:            true,
 		AllowInsecure:           true,
 		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
 		MCPEnabled:              true,
-		HTTPRemoteUser:          httpinternal.HTTPRemoteUserConfig{Enabled: true},
+		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
+			Enabled:        true,
+			HeaderName:     "X-Remote-User",
+			TrustedProxies: trustedProxies,
+			UserService:    w.UserService(),
+		},
 	})
-	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
-		rec := httptest.NewRecorder()
-		remoteUserRouter.ServeHTTP(rec, httptest.NewRequest(method, "/mcp", strings.NewReader("{}")))
-		if rec.Code != http.StatusNotFound {
-			t.Fatalf("%s /mcp with remote-user middleware = %d, want 404", method, rec.Code)
-		}
+	remoteUserSession := connectLocalMCP(t, remoteUserRouter, "/mcp")
+	current := callToolStructured(t, remoteUserSession, "get_current_user", nil)
+	user := nestedMap(t, current, "user")
+	if user["username"] != "public-editor" || user["role"] != "editor" {
+		t.Fatalf("remote-user disabled-auth MCP current user = %#v, want public-editor editor", user)
 	}
 
 	missingHostRouter := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
@@ -1363,7 +1387,7 @@ func runLocalMCPProtocolIndexAndAssetParity(t *testing.T) {
 		"kind":  "page",
 	}), "page")
 	sourceID := stringField(t, source, "id")
-	content := "Tagged source with [Target](/target)"
+	content := "Tagged source with [Target](/target) and [Missing](/missing-target)"
 	callToolStructured(t, session, "update_page", map[string]any{
 		"id":      sourceID,
 		"version": stringField(t, source, "version"),
@@ -1431,6 +1455,26 @@ func runLocalMCPProtocolIndexAndAssetParity(t *testing.T) {
 	if counts["outgoings"] != float64(1) {
 		t.Fatalf("link outgoing count = %v, want 1; target=%s", counts["outgoings"], target["id"])
 	}
+	if counts["broken_outgoings"] != float64(1) {
+		t.Fatalf("broken outgoing count = %v, want 1", counts["broken_outgoings"])
+	}
+
+	targetID := stringField(t, target, "id")
+	targetStandaloneStatus := nestedMap(t, callToolStructured(t, session, "get_link_status", map[string]any{"pageId": targetID}), "status")
+	targetFromGet := callToolStructured(t, session, "get_page", map[string]any{"id": targetID})
+	assertJSONEqual(t, "get_page linkStatus", nestedMap(t, targetFromGet, "linkStatus"), targetStandaloneStatus)
+	if !arrayContainsObjectField(nestedMap(t, targetFromGet, "linkStatus")["backlinks"], "from_page_id", sourceID) {
+		t.Fatalf("get_page linkStatus backlinks = %#v, want backlink from source %s", nestedMap(t, targetFromGet, "linkStatus")["backlinks"], sourceID)
+	}
+
+	targetFromPath := callToolStructured(t, session, "get_page_by_path", map[string]any{"path": "target"})
+	assertJSONEqual(t, "get_page_by_path linkStatus", nestedMap(t, targetFromPath, "linkStatus"), targetStandaloneStatus)
+
+	sourceFromGet := callToolStructured(t, session, "get_page", map[string]any{"id": sourceID})
+	assertJSONEqual(t, "get_page source linkStatus", nestedMap(t, sourceFromGet, "linkStatus"), linkStatus)
+
+	sourceFromPath := callToolStructured(t, session, "get_page_by_path", map[string]any{"path": "source"})
+	assertJSONEqual(t, "get_page_by_path source linkStatus", nestedMap(t, sourceFromPath, "linkStatus"), linkStatus)
 
 	assetContent := []byte("asset content")
 	cssContent := []byte("body { color: rebeccapurple; }\n")

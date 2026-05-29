@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom'
 import LoginForm from '../auth/LoginForm'
+import OAuthApproval from '../auth/OAuthApproval'
 import BrandingSettings from '../branding/BrandingSettings'
 import PageEditor from '../editor/PageEditor'
 import Importer from '../importer/Importer'
@@ -22,6 +23,16 @@ export const createLeafWikiRouter = (
       {
         path: '/login',
         element: authDisabled ? <Navigate to="/" replace /> : <LoginForm />,
+      },
+      {
+        path: '/oauth/approve',
+        element: authDisabled ? (
+          <Navigate to="/" replace />
+        ) : (
+          <AuthWrapper>
+            <OAuthApproval />
+          </AuthWrapper>
+        ),
       },
       {
         path: '/',
