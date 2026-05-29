@@ -21,11 +21,31 @@ import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 import type { InternalLinkCompletion } from './internalLinkCompletion'
 import { internalLinkCompletionSource } from './internalLinkCompletion'
 
+// Extensions toggled via lineWrapCompartment
+const noWrapExtensions = EditorView.theme({
+  '.cm-content': { whiteSpace: 'pre', width: 'max-content' },
+  '.cm-line': { whiteSpace: 'pre' },
+})
+
+// font-size is 13px; 1.5*13 + 3 + 3 = 25.5px — matches "Enter" spacing
+const wrapExtensions = [
+  EditorView.lineWrapping,
+  EditorView.theme({
+    '.cm-content': { lineHeight: 'calc(1.5em + 6px)' },
+    '.cm-line': {
+      lineHeight: 'calc(1.5em + 6px)',
+      paddingTop: '0',
+      paddingBottom: '0',
+    },
+  }),
+]
+
 type MarkdownCodeEditorProps = {
   initialValue: string
   onChange: (value: string) => void
   onCursorLineChange?: (line: number) => void
   editorViewRef: React.RefObject<EditorView | null>
+  lineWrap?: boolean
 }
 
 // CodeMirror uses 80 for the built-in detail slot, so render the path just before it.
@@ -52,6 +72,7 @@ export default function MarkdownCodeEditor({
   editorViewRef,
   onChange,
   onCursorLineChange,
+  lineWrap = true,
 }: MarkdownCodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -60,6 +81,7 @@ export default function MarkdownCodeEditor({
 
   const designMode = useDesignModeStore((state) => state.mode)
   const [themeCompartment] = useState(() => new Compartment())
+  const [lineWrapCompartment] = useState(() => new Compartment())
 
   // Always use the latest onChange function
   useEffect(() => {
@@ -155,6 +177,7 @@ export default function MarkdownCodeEditor({
       doc: initialValue,
       extensions: [
         themeCompartment.of(designMode === 'light' ? githubLight : oneDark),
+        lineWrapCompartment.of(lineWrap ? wrapExtensions : noWrapExtensions),
         markdown(),
         search({
           top: true,
@@ -214,8 +237,6 @@ export default function MarkdownCodeEditor({
           },
           '.cm-content': {
             lineHeight: '1.5',
-            whiteSpace: 'pre',
-            width: 'max-content',
             minWidth: '100%',
           },
           '.cm-line': {
@@ -223,7 +244,6 @@ export default function MarkdownCodeEditor({
             paddingTop: '3px',
             paddingBottom: '3px',
             paddingLeft: '15px',
-            whiteSpace: 'pre',
           },
           '.cm-gutters': {
             lineHeight: '1.5',
@@ -316,6 +336,16 @@ export default function MarkdownCodeEditor({
       ),
     })
   }, [designMode, themeCompartment])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: lineWrapCompartment.reconfigure(
+        lineWrap ? wrapExtensions : noWrapExtensions,
+      ),
+    })
+  }, [lineWrap, lineWrapCompartment])
 
   return <div ref={editorRef} className="markdown-code-editor" />
 }
