@@ -51,6 +51,32 @@ func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
 	}
 }
 
+func TestValidateHTTPRemoteUserConfig(t *testing.T) {
+	tests := []struct {
+		name            string
+		enabled         bool
+		trustedProxyIPs string
+		wantErr         bool
+	}{
+		{"disabled, no IPs", false, "", false},
+		{"disabled, with IPs", false, "127.0.0.1", false},
+		{"enabled, with IPs", true, "127.0.0.1", false},
+		{"enabled, multiple IPs", true, "127.0.0.1,172.18.0.0/16", false},
+		{"enabled, no IPs", true, "", true},
+		{"enabled, whitespace only", true, "   ", true},
+		{"enabled, commas only", true, ",,,", true},
+		{"enabled, commas and whitespace", true, " , , ", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateHTTPRemoteUserConfig(tc.enabled, tc.trustedProxyIPs)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateHTTPRemoteUserConfig(%v, %q) error = %v, wantErr %v", tc.enabled, tc.trustedProxyIPs, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 	fs := flag.NewFlagSet("leafwiki", flag.ContinueOnError)
 	var errOut bytes.Buffer
