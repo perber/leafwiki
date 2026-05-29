@@ -1534,7 +1534,7 @@
   }
 
   .page-viewer {
-    @apply mx-auto flex min-h-full w-full max-w-4xl flex-col px-8 pt-3 pb-0;
+    @apply mx-auto flex min-h-full w-full max-w-5xl flex-col px-8 pt-3 pb-0;
   }
 
   .page-viewer__subheader {
@@ -1571,6 +1571,62 @@
 
   .page-viewer__content {
     @apply prose prose-base text-page-text dark:prose-invert mt-6 max-w-full flex-1 leading-relaxed;
+  }
+
+  .page-viewer__content :where(h1),
+  .markdown-editor__preview :where(h1),
+  .page-history__preview-body :where(h1) {
+    @apply mt-10 mb-3;
+  }
+
+  .page-viewer__content :where(h2),
+  .markdown-editor__preview :where(h2),
+  .page-history__preview-body :where(h2) {
+    @apply mt-10 mb-3;
+  }
+
+  .page-viewer__content :where(h3),
+  .markdown-editor__preview :where(h3),
+  .page-history__preview-body :where(h3) {
+    @apply mt-8 mb-2;
+  }
+
+  .page-viewer__content :where(h4, h5, h6),
+  .markdown-editor__preview :where(h4, h5, h6),
+  .page-history__preview-body :where(h4, h5, h6) {
+    @apply mt-6 mb-2;
+  }
+
+  .page-viewer__content :where(h1, h2, h3, h4, h5, h6):first-child,
+  .markdown-editor__preview :where(h1, h2, h3, h4, h5, h6):first-child,
+  .page-history__preview-body :where(h1, h2, h3, h4, h5, h6):first-child {
+    @apply mt-2;
+  }
+
+  /* Heading directly after heading — tighter spacing */
+  .page-viewer__content :where(h1 + h2, h2 + h3, h3 + h4, h4 + h5, h5 + h6),
+  .markdown-editor__preview :where(h1 + h2, h2 + h3, h3 + h4, h4 + h5, h5 + h6),
+  .page-history__preview-body
+    :where(h1 + h2, h2 + h3, h3 + h4, h4 + h5, h5 + h6) {
+    @apply mt-4;
+  }
+
+  .page-viewer__content :where(p),
+  .markdown-editor__preview :where(p),
+  .page-history__preview-body :where(p) {
+    @apply my-3;
+  }
+
+  .page-viewer__content :where(ul, ol),
+  .markdown-editor__preview :where(ul, ol),
+  .page-history__preview-body :where(ul, ol) {
+    @apply my-3;
+  }
+
+  .page-viewer__content :where(li),
+  .markdown-editor__preview :where(li),
+  .page-history__preview-body :where(li) {
+    @apply my-1;
   }
 
   .page-viewer__metadata {

@@ -92,6 +92,17 @@
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
+  /* Take over block-level spacing from the inner <pre> so that the prose
+     "h2 + *" margin-reset selector targets this wrapper instead. */
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+.page-viewer__content .markdown-code-block pre,
+.markdown-editor__preview .markdown-code-block pre,
+.page-history__preview-body .markdown-code-block pre {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .page-viewer__content .markdown-code-block__actions,
