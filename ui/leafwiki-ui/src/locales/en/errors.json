@@ -1,4 +1,5 @@
 {
+  "account locked": "Too many failed login attempts. Please try again in 15 minutes.",
   "admin user cannot be deleted": "Admin user cannot be deleted",
   "asset %s already exists": "Asset %s already exists",
   "asset %s not found": "Asset %s not found",
