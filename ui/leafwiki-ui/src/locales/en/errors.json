@@ -1,5 +1,6 @@
 {
   "admin user cannot be deleted": "Admin user cannot be deleted",
+  "cannot remove admin role from the last admin user": "Cannot remove the admin role from the last admin. Assign admin to another user first.",
   "asset %s already exists": "Asset %s already exists",
   "asset %s not found": "Asset %s not found",
   "asset extension must not change from %s": "Asset extension must not change from %s",

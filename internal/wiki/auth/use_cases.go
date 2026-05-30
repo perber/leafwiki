@@ -148,11 +148,12 @@ func (uc *CreateUserUseCase) Execute(_ context.Context, in CreateUserInput) (*Cr
 // ─── UpdateUserUseCase ───────────────────────────────────────────────────────
 
 type UpdateUserInput struct {
-	ID       string
-	Username string
-	Email    string
-	Password string
-	Role     string
+	ID              string
+	Username        string
+	Email           string
+	Password        string
+	Role            string
+	RequesterIsAdmin bool
 }
 
 type UpdateUserOutput struct {
@@ -179,14 +180,23 @@ func (uc *UpdateUserUseCase) Execute(_ context.Context, in UpdateUserInput) (*Up
 	} else if !emailRegex.MatchString(in.Email) {
 		ve.Add("email", "Email is not valid")
 	}
-	if !coreauth.IsValidRole(in.Role) {
+	if in.RequesterIsAdmin && !coreauth.IsValidRole(in.Role) {
 		ve.Add("role", "Invalid role")
 	}
 	if ve.HasErrors() {
 		return nil, ve
 	}
 
-	user, err := uc.user.UpdateUser(in.ID, in.Username, in.Email, in.Password, in.Role)
+	role := in.Role
+	if !in.RequesterIsAdmin {
+		existing, err := uc.user.GetUserByID(in.ID)
+		if err != nil {
+			return nil, err
+		}
+		role = existing.Role
+	}
+
+	user, err := uc.user.UpdateUser(in.ID, in.Username, in.Email, in.Password, role)
 	if err != nil {
 		return nil, err
 	}

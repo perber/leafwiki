@@ -283,6 +283,19 @@ func (f *UserStore) GetAllUsers() ([]*User, error) {
 	return users, nil
 }
 
+func (f *UserStore) CountAdminUsers() (int, error) {
+	err := f.Connect()
+	if err != nil {
+		return 0, err
+	}
+	row := f.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role = 'admin';`)
+	var count int
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (f *UserStore) GetUserCount() (int, error) {
 	// Ensure the database is connected
 	err := f.Connect()
