@@ -20,4 +20,4 @@ Instead, send a private report to `security@leafwiki.com` with:
 - reproduction steps or a proof of concept
 - impact assessment, if known
 
-There's no reward for submitting a report, but we will acknowledge bug reporters in release notes. We appreciate your contribution to making LeafWiki more secure.
+There's no reward for submitting a report. With the reporter's consent, we may acknowledge security reporters in release notes. We appreciate your contribution to making LeafWiki more secure.
