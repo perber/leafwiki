@@ -231,6 +231,28 @@ func TestUserStore_UpdateUser(t *testing.T) {
 	}
 }
 
+func TestUserStore_UpdateUser_LastAdminCannotBeDemoted(t *testing.T) {
+	store := setupTestUserStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	admin := &User{
+		ID:       "1",
+		Username: "admin",
+		Password: "password",
+		Email:    "admin@example.com",
+		Role:     RoleAdmin,
+	}
+	if err := store.CreateUser(admin); err != nil {
+		t.Fatalf("Failed to create admin: %v", err)
+	}
+
+	admin.Role = RoleViewer
+	err := store.UpdateUser(admin)
+	if err != ErrLastAdminCannotBeDemoted {
+		t.Fatalf("expected ErrLastAdminCannotBeDemoted, got %v", err)
+	}
+}
+
 func TestUserStore_UpdateUser_EMailAlreadyExists(t *testing.T) {
 	store := setupTestUserStore(t)
 	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)

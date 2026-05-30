@@ -88,6 +88,50 @@ func TestUserService_UpdateUser(t *testing.T) {
 	}
 }
 
+func TestUserService_UpdateUser_EmptyRolePreservesExistingRole(t *testing.T) {
+	service := setupTestUserService(t)
+
+	user, _ := service.CreateUser("bob", "bob@example.com", "initial", RoleEditor)
+
+	updated, err := service.UpdateUser(user.ID, "bobnew", "bobnew@example.com", "", "")
+	if err != nil {
+		t.Fatalf("UpdateUser failed: %v", err)
+	}
+
+	if updated.Username != "bobnew" || updated.Email != "bobnew@example.com" {
+		t.Errorf("Update did not persist profile fields")
+	}
+	if updated.Role != RoleEditor {
+		t.Errorf("expected role %q, got %q", RoleEditor, updated.Role)
+	}
+}
+
+func TestUserService_UpdateUser_LastAdminCannotBeDemoted(t *testing.T) {
+	service := setupTestUserService(t)
+
+	admin, _ := service.CreateUser("admin", "admin@example.com", "pass", RoleAdmin)
+
+	_, err := service.UpdateUser(admin.ID, admin.Username, admin.Email, "", RoleViewer)
+	if err != ErrLastAdminCannotBeDemoted {
+		t.Errorf("expected ErrLastAdminCannotBeDemoted, got: %v", err)
+	}
+}
+
+func TestUserService_UpdateUser_AdminCanBeDemotedWhenAnotherAdminExists(t *testing.T) {
+	service := setupTestUserService(t)
+
+	admin1, _ := service.CreateUser("admin1", "admin1@example.com", "pass", RoleAdmin)
+	_, _ = service.CreateUser("admin2", "admin2@example.com", "pass", RoleAdmin)
+
+	updated, err := service.UpdateUser(admin1.ID, admin1.Username, admin1.Email, "", RoleViewer)
+	if err != nil {
+		t.Fatalf("expected demotion to succeed with two admins, got: %v", err)
+	}
+	if updated.Role != RoleViewer {
+		t.Errorf("expected role %q, got %q", RoleViewer, updated.Role)
+	}
+}
+
 func TestUserService_DeleteUser(t *testing.T) {
 	service := setupTestUserService(t)
 

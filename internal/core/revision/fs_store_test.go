@@ -346,6 +346,46 @@ func TestFSStoreCursorAndFileFilteringHelpers(t *testing.T) {
 	}
 }
 
+func TestFSStoreSaveRevisionRejectsInvalidRevisionID(t *testing.T) {
+	store := NewFSStore(t.TempDir())
+	rev := &Revision{
+		ID:        "x/../../outside",
+		PageID:    "page-1",
+		CreatedAt: time.Now().UTC(),
+		Type:      RevisionTypeContentUpdate,
+		Title:     "Page",
+		Slug:      "page",
+	}
+
+	err := store.SaveRevision(rev)
+	if err == nil {
+		t.Fatalf("expected SaveRevision to fail")
+	}
+	if got := err.Error(); got != "invalid revision id: x/../../outside" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestFSStoreSaveRevisionPrefersPageIDValidationError(t *testing.T) {
+	store := NewFSStore(t.TempDir())
+	rev := &Revision{
+		ID:        "x/../../outside",
+		PageID:    "../page-1",
+		CreatedAt: time.Now().UTC(),
+		Type:      RevisionTypeContentUpdate,
+		Title:     "Page",
+		Slug:      "page",
+	}
+
+	err := store.SaveRevision(rev)
+	if err == nil {
+		t.Fatalf("expected SaveRevision to fail")
+	}
+	if got := err.Error(); got != "invalid page id: ../page-1" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestFSStoreJSONHelpersAndLocalizedNil(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "value.json")
 	payload := map[string]string{"a": "b"}

@@ -150,6 +150,12 @@ func (s *FSStore) SaveRevision(rev *Revision) error {
 	if rev.CreatedAt.IsZero() {
 		return fmt.Errorf("created_at is required")
 	}
+	if err := validateSinglePathComponent("page id", rev.PageID); err != nil {
+		return err
+	}
+	if err := validateSinglePathComponent("revision id", rev.ID); err != nil {
+		return err
+	}
 
 	dst := s.revisionFilePath(rev.PageID, rev.ID, rev.CreatedAt)
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
@@ -454,7 +460,6 @@ func (s *FSStore) CopyAssetBlobToPath(hash string, expectedSize int64, dstPath s
 	return nil
 }
 
-
 func (s *FSStore) DeletePageRevisions(pageID string) error {
 	pageID = strings.TrimSpace(pageID)
 	if pageID == "" {
@@ -503,7 +508,6 @@ func (s *FSStore) AssetManifestExists(hash string) bool {
 func (s *FSStore) assetManifestPath(hash string) string {
 	return filepath.Join(s.baseDir(), "manifests", "assets", "sha256", shardHash(hash), hash+".json")
 }
-
 
 func shardHash(hash string) string {
 	if len(hash) < 2 {
@@ -558,6 +562,20 @@ func cloneAndSortAssetRefs(items []AssetRef) []AssetRef {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func validateSinglePathComponent(label, value string) error {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "." || trimmed == ".." {
+		return fmt.Errorf("invalid %s: %s", label, value)
+	}
+	if filepath.Base(trimmed) != trimmed {
+		return fmt.Errorf("invalid %s: %s", label, value)
+	}
+	if strings.ContainsRune(trimmed, '/') || strings.ContainsRune(trimmed, '\\') {
+		return fmt.Errorf("invalid %s: %s", label, value)
+	}
+	return nil
 }
 
 func (s *FSStore) revisionIndexPath(pageID string) string {
