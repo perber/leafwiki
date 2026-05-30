@@ -3,11 +3,13 @@ package tags
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/perber/wiki/internal/core/shared"
+	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	_ "modernc.org/sqlite"
 )
 
@@ -33,7 +35,20 @@ func NewTagsStore(storageDir string) (*TagsStore, error) {
 	s := &TagsStore{db: db}
 	if err := s.ensureSchema(); err != nil {
 		_ = db.Close()
-		return nil, err
+		if !sqliteutil.IsSQLiteRecoverableError(err) {
+			return nil, err
+		}
+		slog.Default().Warn("tags database corrupt, removing and retrying", "error", err)
+		sqliteutil.RemoveSQLiteFiles(dbPath)
+		db, err = sql.Open("sqlite", dbPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reopen tags database after recovery: %w", err)
+		}
+		s = &TagsStore{db: db}
+		if err = s.ensureSchema(); err != nil {
+			_ = db.Close()
+			return nil, err
+		}
 	}
 	return s, nil
 }

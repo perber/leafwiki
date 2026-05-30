@@ -25,6 +25,7 @@ const (
 	ErrCodeAuthCsrfFailed           = "auth_csrf_failed"
 	ErrCodeAuthInvalidRefreshToken  = "auth_invalid_refresh_token"
 	ErrCodeAuthInvalidRequest       = "auth_invalid_request"
+	ErrCodeAuthAccountLocked        = "auth_account_locked"
 )
 
 // AuthErrorResponse is the structured JSON error body returned by auth endpoints.
@@ -70,6 +71,8 @@ func respondWithAuthError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, coreauth.ErrInvalidToken):
 		respondWithAuthStatusError(c, http.StatusUnprocessableEntity, ErrCodeAuthInvalidRefreshToken, "Missing or invalid refresh token", "missing or invalid refresh token")
+	case errors.Is(err, coreauth.ErrUserAccountLocked):
+		respondWithAuthStatusError(c, http.StatusUnauthorized, ErrCodeAuthAccountLocked, "Account temporarily locked due to too many failed login attempts", "account locked")
 	case errors.Is(err, coreauth.ErrUserInvalidCredentials):
 		respondWithAuthStatusError(c, http.StatusUnauthorized, ErrCodeAuthInvalidCredentials, "Invalid credentials", "invalid credentials")
 	case errors.Is(err, coreauth.ErrUserNotFound):
@@ -103,6 +106,8 @@ func authErrorStatus(code string) int {
 		ErrCodeAuthInvalidPayload, ErrCodeAuthCookieFailed, ErrCodeAuthCsrfFailed,
 		ErrCodeAuthInvalidRequest:
 		return http.StatusBadRequest
+	case ErrCodeAuthAccountLocked:
+		return http.StatusUnauthorized
 	case ErrCodeAuthDisabled, ErrCodeAuthForbidden:
 		return http.StatusForbidden
 	default:

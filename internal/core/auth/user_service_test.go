@@ -105,7 +105,6 @@ func TestUserService_UpdateUser_EmptyRolePreservesExistingRole(t *testing.T) {
 		t.Errorf("expected role %q, got %q", RoleEditor, updated.Role)
 	}
 }
-
 func TestUserService_UpdateUser_LastAdminCannotBeDemoted(t *testing.T) {
 	service := setupTestUserService(t)
 

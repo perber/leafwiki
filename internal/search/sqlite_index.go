@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	"log"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -12,11 +11,12 @@ import (
 
 	"github.com/perber/wiki/internal/core/excerpt"
 	"github.com/perber/wiki/internal/core/markdown"
+	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
-	_ "modernc.org/sqlite" // Import SQLite driver
+	_ "modernc.org/sqlite"
 )
 
 type SQLiteIndex struct {
@@ -108,14 +108,27 @@ func NewSQLiteIndex(storageDir string) (*SQLiteIndex, error) {
 		filename:   "search.db",
 	}
 
-	// Ensure the schema is created
-	// Drops and recreates the pages table
 	if err := s.ensureSchema(); err != nil {
-		return nil, err
+		// Only attempt recovery for genuine SQLite I/O or corruption errors
+		// (SQLITE_IOERR=10, SQLITE_CORRUPT=11, SQLITE_NOTADB=26).
+		// Transient errors like SQLITE_BUSY are returned immediately.
+		if !sqliteutil.IsSQLiteRecoverableError(err) {
+			return nil, err
+		}
+		slog.Default().Warn("search index initialization failed, removing corrupt database and retrying", "error", err)
+		if closeErr := s.Close(); closeErr != nil {
+			slog.Default().Warn("failed to close corrupt search database before recovery", "error", closeErr)
+		}
+		sqliteutil.RemoveSQLiteFiles(searchIndexDatabasePath(s.storageDir, s.filename))
+		if err2 := s.ensureSchema(); err2 != nil {
+			_ = s.Close()
+			return nil, err2
+		}
 	}
 
 	return s, nil
 }
+
 
 func (s *SQLiteIndex) withDB(fn func(db *sql.DB) error) error {
 	s.mu.Lock()
@@ -317,8 +330,6 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 				}
 				r.Rank = 1.0 / (1.0 + bm25Score)
 			}
-
-			log.Printf("pageID=%s title=%q bm25=%f rank=%f", r.PageID, r.Title, bm25Score, r.Rank)
 
 			results = append(results, r)
 		}

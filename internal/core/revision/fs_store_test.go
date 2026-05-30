@@ -381,7 +381,7 @@ func TestFSStoreSaveRevisionPrefersPageIDValidationError(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected SaveRevision to fail")
 	}
-	if got := err.Error(); got != "invalid page id: ../page-1" {
+	if got := err.Error(); got != "page id is required" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -414,6 +414,63 @@ func TestFSStoreJSONHelpersAndLocalizedNil(t *testing.T) {
 	}
 	if localized.Unwrap() != nil {
 		t.Fatalf("nil localized error unwrap should be nil")
+	}
+}
+
+func TestValidateStorageID(t *testing.T) {
+	good := []string{"page-1", "abc123", "some-uuid-here", "a"}
+	for _, id := range good {
+		if err := validateStorageID(id); err != nil {
+			t.Errorf("validateStorageID(%q) unexpected error: %v", id, err)
+		}
+	}
+
+	bad := []string{
+		"",
+		"  ",
+		".",
+		"..",
+		"../other",
+		"../../etc/passwd",
+		"foo/bar",
+		`foo\bar`,
+	}
+	for _, id := range bad {
+		if err := validateStorageID(id); err == nil {
+			t.Errorf("validateStorageID(%q) should have returned an error", id)
+		}
+	}
+}
+
+func TestFSStoreRejectsPathTraversalPageID(t *testing.T) {
+	store := NewFSStore(t.TempDir())
+
+	traversalIDs := []string{
+		"../other",
+		"../../etc/passwd",
+		"..",
+		".",
+		"",
+		"  ",
+		"foo/bar",
+		`foo\bar`,
+	}
+
+	for _, id := range traversalIDs {
+		t.Run(id, func(t *testing.T) {
+			if _, _, err := store.ListRevisionsPage(id, "", 50); err == nil {
+				t.Errorf("ListRevisionsPage(%q) should have failed", id)
+			}
+			if _, err := store.GetLatestRevision(id); err == nil {
+				t.Errorf("GetLatestRevision(%q) should have failed", id)
+			}
+			if _, err := store.GetRevision(id, "rev1"); err == nil {
+				t.Errorf("GetRevision(%q, rev1) should have failed", id)
+			}
+			if err := store.PruneRevisions(id, 5); err == nil {
+				t.Errorf("PruneRevisions(%q) should have failed", id)
+			}
+		})
 	}
 }
 

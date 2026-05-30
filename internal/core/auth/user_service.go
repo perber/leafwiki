@@ -118,6 +118,17 @@ func (s *UserService) UpdateUser(id, username, email, password, role string) (*U
 		return nil, ErrUserInvalidRole
 	}
 
+	// Prevent demoting the last admin
+	if user.HasRole(RoleAdmin) && role != RoleAdmin {
+		count, err := s.store.CountAdminUsers()
+		if err != nil {
+			return nil, err
+		}
+		if count <= 1 {
+			return nil, ErrLastAdminCannotBeDemoted
+		}
+	}
+
 	// Update user fields
 	user.Username = username
 	user.Email = email
@@ -208,6 +219,17 @@ func (s *UserService) GetUserByUsername(username string) (*User, error) {
 	user, err := s.store.GetUserByUsername(username)
 	if err != nil {
 		return nil, ErrUserNotFound
+	}
+	return user, nil
+}
+
+func (s *UserService) GetUserByIdentifier(identifier string) (*User, error) {
+	user, err := s.store.GetUserByUsername(identifier)
+	if err != nil {
+		user, err = s.store.GetUserByEmail(identifier)
+		if err != nil {
+			return nil, ErrUserNotFound
+		}
 	}
 	return user, nil
 }
