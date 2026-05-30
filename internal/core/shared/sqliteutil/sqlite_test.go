@@ -98,6 +98,9 @@ func TestRemoveSQLiteFiles_NoOpWhenMissing(t *testing.T) {
 
 func sqliteErrorWithCode(code int) error {
 	e := &sqlite.Error{}
+	// modernc.org/sqlite does not expose a public constructor for sqlite.Error,
+	// so tests set the private `code` field directly to synthesize specific
+	// result codes.
 	v := reflect.ValueOf(e).Elem().FieldByName("code")
 	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetInt(int64(code))
 	return e
