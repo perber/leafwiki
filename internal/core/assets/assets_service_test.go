@@ -218,6 +218,102 @@ func TestAssetDiskPaths_WindowsPath(t *testing.T) {
 	}
 }
 
+func TestValidateFilename(t *testing.T) {
+	good := []string{"my-image.png", "file.jpg", "a", "foo-bar.webp"}
+	for _, name := range good {
+		if err := validateFilename(name); err != nil {
+			t.Errorf("validateFilename(%q) unexpected error: %v", name, err)
+		}
+	}
+
+	bad := []string{
+		"",
+		".",
+		"..",
+		"../etc/passwd",
+		"../../users.db",
+		"foo/bar.png",
+		`foo\bar.png`,
+	}
+	for _, name := range bad {
+		if err := validateFilename(name); err == nil {
+			t.Errorf("validateFilename(%q) should have returned an error", name)
+		}
+	}
+}
+
+func TestDeleteAsset_PathTraversal(t *testing.T) {
+	tmp := t.TempDir()
+	page := &tree.PageNode{Slug: "test-page", ID: "traversal-delete"}
+	service := NewAssetService(tmp, tree.NewSlugService())
+
+	pageAssetDir := filepath.Join(service.GetAssetsDir(), page.ID)
+	if err := os.MkdirAll(pageAssetDir, 0755); err != nil {
+		t.Fatalf("failed to create asset directory: %v", err)
+	}
+
+	traversalNames := []string{
+		"../../users.db",
+		"../other-page/secret.png",
+		"..",
+		".",
+		"",
+		"foo/bar.png",
+		`foo\bar.png`,
+	}
+	for _, name := range traversalNames {
+		err := service.DeleteAsset(page, name)
+		if err == nil {
+			t.Errorf("DeleteAsset(%q) should have returned an error", name)
+			continue
+		}
+		localized, ok := sharederrors.AsLocalizedError(err)
+		if !ok {
+			t.Errorf("DeleteAsset(%q): expected localized error, got %T: %v", name, err, err)
+			continue
+		}
+		if localized.Code != "asset_invalid_name" {
+			t.Errorf("DeleteAsset(%q): expected asset_invalid_name, got %s", name, localized.Code)
+		}
+	}
+}
+
+func TestRenameAsset_OldFilenamePathTraversal(t *testing.T) {
+	tmp := t.TempDir()
+	page := &tree.PageNode{Slug: "test-page", ID: "traversal-rename"}
+	service := NewAssetService(tmp, tree.NewSlugService())
+
+	pageAssetDir := filepath.Join(service.GetAssetsDir(), page.ID)
+	if err := os.MkdirAll(pageAssetDir, 0755); err != nil {
+		t.Fatalf("failed to create asset directory: %v", err)
+	}
+
+	traversalNames := []string{
+		"../../users.db",
+		"../other-page/secret.png",
+		"..",
+		".",
+		"",
+		"foo/bar.png",
+		`foo\bar.png`,
+	}
+	for _, name := range traversalNames {
+		_, err := service.RenameAsset(page, name, "new-name.png")
+		if err == nil {
+			t.Errorf("RenameAsset(oldFilename=%q) should have returned an error", name)
+			continue
+		}
+		localized, ok := sharederrors.AsLocalizedError(err)
+		if !ok {
+			t.Errorf("RenameAsset(oldFilename=%q): expected localized error, got %T: %v", name, err, err)
+			continue
+		}
+		if localized.Code != "asset_invalid_name" {
+			t.Errorf("RenameAsset(oldFilename=%q): expected asset_invalid_name, got %s", name, localized.Code)
+		}
+	}
+}
+
 func TestAssetPublicPath_UsesForwardSlashes(t *testing.T) {
 	service := NewAssetService(t.TempDir(), tree.NewSlugService())
 	page := &tree.PageNode{ID: "a7b3"}

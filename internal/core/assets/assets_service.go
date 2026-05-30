@@ -37,6 +37,21 @@ func assetFileDiskPath(assetPath string, filename string) string {
 	return filepath.Join(normalizedAssetPath, filename)
 }
 
+// validateFilename checks that a filename cannot escape its target directory.
+// Rejects empty strings, path separators, and dot-only components like "." or "..".
+func validateFilename(filename string) error {
+	if filename == "" {
+		return fmt.Errorf("filename must not be empty")
+	}
+	if strings.ContainsAny(filename, "/\\") {
+		return fmt.Errorf("filename must not contain path separators")
+	}
+	if filename == "." || filename == ".." {
+		return fmt.Errorf("filename must not be a dot component")
+	}
+	return nil
+}
+
 func NewAssetService(storageDir string, slugger *tree.SlugService) *AssetService {
 	// Ensure the storage directory exists
 	if err := os.MkdirAll(storageDir, 0755); err != nil {
@@ -148,6 +163,10 @@ func (s *AssetService) DeleteAsset(page *tree.PageNode, filename string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if err := validateFilename(filename); err != nil {
+		return sharederrors.NewLocalizedError("asset_invalid_name", "Invalid asset name", "invalid asset name %s", nil, filename)
+	}
+
 	assetPath, err := s.getAssetPagePath(page)
 	if err != nil {
 		return sharederrors.NewLocalizedError("asset_not_found", "Asset not found", "asset %s not found", nil, filename)
@@ -190,6 +209,10 @@ func (s *AssetService) DeleteAllAssetsForPage(page *tree.PageNode) error {
 func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := validateFilename(oldFilename); err != nil {
+		return "", sharederrors.NewLocalizedError("asset_invalid_name", "Invalid asset name", "invalid asset name %s", nil, oldFilename)
+	}
 
 	assetPath, err := s.getAssetPagePath(page)
 	if err != nil {
