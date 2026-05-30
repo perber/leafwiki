@@ -27,6 +27,7 @@ import { useConfigStore } from '@/stores/config'
 import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
 import { usePageEditorStore } from './pageEditorStore'
+import { slugifyHeadline } from '../preview/rehypeLineNumber'
 
 export type MarkdownEditorRef = {
   insertAtCursor: (text: string) => void
@@ -53,6 +54,31 @@ const MarkdownEditor = (
   { initialValue = '', onChange, pageId }: Props,
   ref: React.ForwardedRef<MarkdownEditorRef>,
 ) => {
+  const findHeadingTarget = useCallback(
+    (preview: HTMLDivElement, line: number): HTMLElement | null => {
+      const headingByLine = preview.querySelector(
+        `h1[data-line='${line}'], h2[data-line='${line}'], h3[data-line='${line}'], h4[data-line='${line}'], h5[data-line='${line}'], h6[data-line='${line}']`,
+      ) as HTMLElement | null
+      if (headingByLine) return headingByLine
+
+      const lineText = editorViewRef.current?.state.doc.line(line).text ?? ''
+      const headingMatch = lineText.match(/^\s{0,3}(#{1,6})\s+(.*)$/)
+      if (!headingMatch) return null
+
+      const headingText = headingMatch[2].replace(/<[^>]*>/g, ' ').trim()
+      const headingId = slugifyHeadline(headingText)
+      if (!headingId) return null
+
+      const escapedId =
+        typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+          ? CSS.escape(headingId)
+          : headingId
+
+      return preview.querySelector(`#${escapedId}`) as HTMLElement | null
+    },
+    [],
+  )
+
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   const setPreviewRef = useCallback((node: HTMLDivElement | null) => {
@@ -63,6 +89,7 @@ const MarkdownEditor = (
   const path = usePageEditorStore((s) => s.page?.path)
   const editorViewRef = useRef<EditorView | null>(null)
   const rafRef = useRef<number | null>(null)
+  const currentCursorLineRef = useRef<number | null>(null)
   const [assetVersion, setAssetVersion] = useState(() => Date.now()) // Initial version based on current timestamp
 
   const [markdown, setMarkdown] = useState(initialValue)
@@ -292,65 +319,105 @@ const MarkdownEditor = (
     [setAssetVersion],
   )
 
-  const scrollPreviewToLine = (line: number) => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+  const scrollPreviewToLine = useCallback(
+    (line: number, behavior: ScrollBehavior = 'smooth') => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
 
-    rafRef.current = requestAnimationFrame(() => {
-      const preview = previewRef.current
-      if (!preview) return
+      rafRef.current = requestAnimationFrame(() => {
+        const preview = previewRef.current
+        if (!preview) return
 
-      let target = preview.querySelector(
-        `[data-line='${line}']`,
-      ) as HTMLElement | null
+        let target =
+          findHeadingTarget(preview, line) ??
+          (preview.querySelector(`[data-line='${line}']`) as HTMLElement | null)
 
-      if (!target) {
-        for (let i = line - 1; i > 0; i--) {
-          const fallback = preview.querySelector(
-            `[data-line='${i}']`,
-          ) as HTMLElement | null
-          if (fallback) {
-            target = fallback
-            break
+        if (!target) {
+          for (let i = line - 1; i > 0; i--) {
+            const fallback = preview.querySelector(
+              `[data-line='${i}']`,
+            ) as HTMLElement | null
+            if (fallback) {
+              target = fallback
+              break
+            }
           }
         }
-      }
 
-      if (target) {
-        const table = target.closest('table')
-        let offsetTop = 0
-
-        if (table && preview.contains(table)) {
+        if (target) {
+          // Measure relative to the preview viewport instead of relying on
+          // offsetTop, which can be relative to an intermediate offsetParent.
           const previewRect = preview.getBoundingClientRect()
           const targetRect = target.getBoundingClientRect()
-          offsetTop = targetRect.top - previewRect.top + preview.scrollTop
-        } else {
-          offsetTop = target.offsetTop
+          const offsetTop = targetRect.top - previewRect.top + preview.scrollTop
+
+          const targetHeight = target.offsetHeight
+          const containerHeight = preview.clientHeight
+          const maxScrollTop = Math.max(
+            0,
+            preview.scrollHeight - containerHeight,
+          )
+          const desiredScrollTop = Math.max(
+            0,
+            Math.min(
+              maxScrollTop,
+              offsetTop - containerHeight / 2 + targetHeight / 2,
+            ),
+          )
+
+          const threshold = 16
+          const distance = Math.abs(preview.scrollTop - desiredScrollTop)
+
+          if (distance > threshold) {
+            preview.scrollTo({ top: desiredScrollTop, behavior })
+          }
         }
+      })
+    },
+    [findHeadingTarget],
+  )
 
-        const targetHeight = target.offsetHeight
-        const containerHeight = preview.clientHeight
-        const desiredScrollTop =
-          offsetTop - containerHeight / 2 + targetHeight / 2
-
-        const threshold = 16
-        const distance = Math.abs(preview.scrollTop - desiredScrollTop)
-
-        if (distance > threshold) {
-          preview.scrollTo({ top: desiredScrollTop, behavior: 'smooth' })
-        }
-      }
-    })
-  }
-
-  const onCursorLineChange = useCallback((line: number) => {
-    scrollPreviewToLine(line)
-  }, [])
+  const onCursorLineChange = useCallback(
+    (line: number) => {
+      currentCursorLineRef.current = line
+      scrollPreviewToLine(line, 'smooth')
+    },
+    [scrollPreviewToLine],
+  )
 
   useEffect(() => {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!showPreview) return
+    const currentLine = currentCursorLineRef.current
+    if (currentLine == null) return
+
+    scrollPreviewToLine(currentLine, 'auto')
+  }, [assetVersion, debouncedPreview, scrollPreviewToLine, showPreview])
+
+  useEffect(() => {
+    if (!showPreview) return
+
+    const preview = previewRef.current
+    const content = preview?.firstElementChild
+    if (!preview || !content || typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver(() => {
+      const currentLine = currentCursorLineRef.current
+      if (currentLine == null) return
+
+      scrollPreviewToLine(currentLine, 'auto')
+    })
+
+    observer.observe(content)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [assetVersion, debouncedPreview, scrollPreviewToLine, showPreview])
 
   const renderToolbar = useCallback((): JSX.Element => {
     return (

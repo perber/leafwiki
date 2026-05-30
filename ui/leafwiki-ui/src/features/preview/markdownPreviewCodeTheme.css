@@ -102,7 +102,9 @@
    the heading's own margin-bottom creates the gap. */
 .page-viewer__content :where(h1, h2, h3, h4, h5, h6) + .markdown-code-block,
 .markdown-editor__preview :where(h1, h2, h3, h4, h5, h6) + .markdown-code-block,
-.page-history__preview-body :where(h1, h2, h3, h4, h5, h6) + .markdown-code-block {
+.page-history__preview-body
+  :where(h1, h2, h3, h4, h5, h6)
+  + .markdown-code-block {
   margin-top: 0;
 }
 

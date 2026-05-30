@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import test, { Page, expect } from '@playwright/test';
 import EditPage from '../pages/EditPage';
 import LoginPage from '../pages/LoginPage';
@@ -5,6 +7,13 @@ import ViewPage from '../pages/ViewPage';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
 const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
+const currentDir = __dirname;
+const editorPreviewScrollFixturePath = join(
+  currentDir,
+  '..',
+  'assets',
+  'editor-preview-scroll-fixture.md',
+);
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
@@ -122,6 +131,116 @@ async function addProperty(page: Page, key: string, value: string) {
 
 async function removeProperty(page: Page, index: number) {
   await page.locator('.page-frontmatter-panel__field-remove').nth(index).click();
+}
+
+async function clickEditorLineByText(page: Page, text: string) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate((lineText) => {
+          const scroller = document.querySelector('.cm-scroller');
+          if (!(scroller instanceof HTMLElement)) {
+            throw new Error('Missing CodeMirror scroller');
+          }
+
+          const visibleLine = Array.from(scroller.querySelectorAll('.cm-line')).find((element) =>
+            element.textContent?.includes(lineText),
+          );
+          if (visibleLine instanceof HTMLElement) {
+            visibleLine.scrollIntoView({ block: 'center' });
+            return 'found';
+          }
+
+          const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+          if (scroller.scrollTop >= maxScrollTop) {
+            return 'not-found';
+          }
+
+          scroller.scrollTop = Math.min(
+            maxScrollTop,
+            scroller.scrollTop + Math.max(scroller.clientHeight * 0.8, 200),
+          );
+          return 'searching';
+        }, text),
+      { message: `Expected editor line containing "${text}" to become visible` },
+    )
+    .toBe('found');
+
+  const targetLine = page.locator('.cm-line').filter({ hasText: text }).first();
+
+  await targetLine.click();
+}
+
+async function getPreviewScrollTop(page: Page) {
+  return page.locator('#markdown-preview-container').evaluate((element) => {
+    if (!(element instanceof HTMLElement)) {
+      throw new Error('Expected markdown preview container');
+    }
+
+    return element.scrollTop;
+  });
+}
+
+async function expectPreviewHeadingVisible(page: Page, headingText: string) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          ({ text }) => {
+            const preview = document.getElementById('markdown-preview-container');
+            if (!(preview instanceof HTMLElement)) {
+              throw new Error('Expected markdown preview container');
+            }
+
+            const headings = Array.from(preview.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+            const heading = headings.find((element) => element.textContent?.includes(text)) as
+              | HTMLElement
+              | undefined;
+
+            if (!heading) return false;
+
+            const previewRect = preview.getBoundingClientRect();
+            const headingRect = heading.getBoundingClientRect();
+            const top = headingRect.top - previewRect.top;
+            const bottom = headingRect.bottom - previewRect.top;
+            return top >= 0 && bottom <= preview.clientHeight;
+          },
+          { text: headingText },
+        ),
+      { message: `Expected preview heading "${headingText}" to be visible in preview` },
+    )
+    .toBe(true);
+
+  const bounds = await page.evaluate(
+    ({ text }) => {
+      const preview = document.getElementById('markdown-preview-container');
+      if (!(preview instanceof HTMLElement)) {
+        throw new Error('Expected markdown preview container');
+      }
+
+      const headings = Array.from(preview.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+      const heading = headings.find((element) => element.textContent?.includes(text)) as
+        | HTMLElement
+        | undefined;
+
+      if (!heading) {
+        return null;
+      }
+
+      const previewRect = preview.getBoundingClientRect();
+      const headingRect = heading.getBoundingClientRect();
+      return {
+        top: headingRect.top - previewRect.top,
+        bottom: headingRect.bottom - previewRect.top,
+        height: preview.clientHeight,
+      };
+    },
+    { text: headingText },
+  );
+
+  expect(bounds).not.toBeNull();
+  expect(bounds!.top).toBeGreaterThanOrEqual(0);
+  expect(bounds!.bottom).toBeLessThanOrEqual(bounds!.height);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -555,6 +674,102 @@ test.describe('Editor', () => {
 
     // No success toast
     await expect(page.getByText('Page saved successfully')).not.toBeVisible();
+  });
+
+  test('editor-clicking-several-headings-does-not-jump-preview-to-top', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-preview-image-heading-${stamp}`;
+    const editorPreviewScrollFixture = readFileSync(editorPreviewScrollFixturePath, 'utf8');
+    const headingChecks = [
+      {
+        editorLine: '## First Regular Heading',
+        previewHeading: 'First Regular Heading',
+      },
+      {
+        editorLine: '## Second Regular Heading',
+        previewHeading: 'Second Regular Heading',
+      },
+      {
+        editorLine: '## Third Regular Heading',
+        previewHeading: 'Third Regular Heading',
+      },
+      {
+        editorLine: '## Fourth Regular Heading',
+        previewHeading: 'Fourth Regular Heading',
+      },
+      {
+        editorLine: '## Inline Marker Heading One <span',
+        previewHeading: 'Inline Marker Heading One',
+      },
+      {
+        editorLine: '## Inline Marker Heading Two <span',
+        previewHeading: 'Inline Marker Heading Two',
+      },
+      {
+        editorLine: '## Inline Marker Heading Three <span',
+        previewHeading: 'Inline Marker Heading Three',
+      },
+      {
+        editorLine: '## Inline Marker Heading Four <span',
+        previewHeading: 'Inline Marker Heading Four',
+      },
+      {
+        editorLine: '## Inline Marker Heading Five <span',
+        previewHeading: 'Inline Marker Heading Five',
+      },
+      {
+        editorLine: '## Inline Marker Heading Six <span',
+        previewHeading: 'Inline Marker Heading Six',
+      },
+      {
+        editorLine: '## Final Regular Heading',
+        previewHeading: 'Final Regular Heading',
+      },
+      {
+        editorLine: '## Last Inline Marker Heading <span',
+        previewHeading: 'Last Inline Marker Heading',
+      },
+    ];
+
+    await createPageWithMetadata(page, {
+      title: `Editor Preview Image Heading ${stamp}`,
+      slug,
+      content: editorPreviewScrollFixture,
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    await expect(page.locator('#markdown-preview-container')).toContainText(
+      'Last Inline Marker Heading',
+    );
+
+    const observedScrollTops: Array<{ heading: string; scrollTop: number }> = [];
+    let furthestScrollTop = 0;
+
+    for (let index = 0; index < headingChecks.length; index += 1) {
+      const headingCheck = headingChecks[index];
+      await clickEditorLineByText(page, headingCheck.editorLine);
+
+      await expectPreviewHeadingVisible(page, headingCheck.previewHeading);
+
+      const scrollTop = await getPreviewScrollTop(page);
+      furthestScrollTop = Math.max(furthestScrollTop, scrollTop);
+      observedScrollTops.push({
+        heading: headingCheck.previewHeading,
+        scrollTop,
+      });
+
+      if (furthestScrollTop > 300) {
+        expect(
+          scrollTop,
+          `Expected preview not to jump back to top after clicking "${headingCheck.previewHeading}". Observed: ${JSON.stringify(
+            observedScrollTops,
+          )}`,
+        ).toBeGreaterThan(100);
+      }
+    }
   });
 });
 
