@@ -94,8 +94,20 @@ type RouterOptions struct {
 	MaxAssetUploadSizeBytes int64                // Maximum allowed size in bytes for asset uploads
 	EnableRevision          bool                 // Whether the revision / page history feature is enabled
 	EnableLinkRefactor      bool                 // Whether the link refactoring feature is enabled in the frontend
+	MCPEnabled              bool                 // Whether the local MCP endpoint is enabled
+	MCPBindHost             string               // Validated server bind host for local-only MCP
+	MCPToolListPageSize     int                  // MCP feature-list page size; 0 uses the production default
 	HTTPRemoteUser          HTTPRemoteUserConfig // Reverse-proxy authentication via HTTP header
 	DisableRequestLog       bool                 // Whether to suppress per-request access log lines
+}
+
+func IsLoopbackHost(host string) bool {
+	switch strings.TrimSpace(strings.ToLower(host)) {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	default:
+		return false
+	}
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.
@@ -224,8 +236,16 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 				!strings.HasPrefix(path, "/api") &&
 				!strings.HasPrefix(path, "/assets") &&
 				!strings.HasPrefix(path, "/static") &&
-				!strings.HasPrefix(path, "/branding") {
+				!strings.HasPrefix(path, "/branding") &&
+				!strings.HasPrefix(path, "/.well-known") &&
+				path != "/mcp" &&
+				!strings.HasPrefix(path, "/mcp/") {
 
+				if path == "/oauth/approve" {
+					disableClientCache(c)
+					c.Header("Content-Security-Policy", "frame-ancestors 'none'")
+					c.Header("X-Frame-Options", "DENY")
+				}
 				c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 				data, err := fs.ReadFile(fsys, "index.html")
 				if err != nil {

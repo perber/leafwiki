@@ -4,7 +4,11 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"mime"
 	"mime/multipart"
+	"net/http"
+	"path/filepath"
+	"strings"
 
 	coreassets "github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/revision"
@@ -85,6 +89,55 @@ func (uc *ListAssetsUseCase) Execute(_ context.Context, in ListAssetsInput) (*Li
 		return nil, err
 	}
 	return &ListAssetsOutput{Files: files}, nil
+}
+
+// ─── GetAssetUseCase ────────────────────────────────────────────────────────
+
+type GetAssetInput struct {
+	PageID   string
+	Filename string
+}
+
+type GetAssetOutput struct {
+	Filename string
+	MIMEType string
+	Content  []byte
+}
+
+type GetAssetUseCase struct {
+	tree  *tree.TreeService
+	asset *coreassets.AssetService
+}
+
+func NewGetAssetUseCase(t *tree.TreeService, a *coreassets.AssetService) *GetAssetUseCase {
+	return &GetAssetUseCase{tree: t, asset: a}
+}
+
+func (uc *GetAssetUseCase) Execute(_ context.Context, in GetAssetInput) (*GetAssetOutput, error) {
+	page, err := uc.tree.FindPageByID(in.PageID)
+	if err != nil {
+		if errors.Is(err, tree.ErrPageNotFound) {
+			return nil, sharederrors.NewLocalizedError("asset_page_not_found", "Page not found", "page %s not found", err, in.PageID)
+		}
+		return nil, err
+	}
+	filename := strings.TrimSpace(in.Filename)
+	content, err := uc.asset.ReadAssetForPage(page, filename)
+	if err != nil {
+		return nil, err
+	}
+	return &GetAssetOutput{
+		Filename: filename,
+		MIMEType: DetectAssetMIMEType(filename, content),
+		Content:  content,
+	}, nil
+}
+
+func DetectAssetMIMEType(filename string, content []byte) string {
+	if mimeType := mime.TypeByExtension(filepath.Ext(filename)); mimeType != "" {
+		return mimeType
+	}
+	return http.DetectContentType(content)
 }
 
 // ─── RenameAssetUseCase ──────────────────────────────────────────────────────

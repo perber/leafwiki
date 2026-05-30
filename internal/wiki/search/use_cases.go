@@ -32,6 +32,18 @@ type SearchOutput struct {
 	Result *coresearch.SearchResult
 }
 
+func ValidateSearchRequest(query string, tags []string) error {
+	if query == "" && len(normalizeTags(tags)) == 0 {
+		return sharederrors.NewLocalizedError(
+			ErrCodeSearchMissingQuery,
+			"Query parameter 'q' is required",
+			"query parameter q is required",
+			nil,
+		)
+	}
+	return nil
+}
+
 type SearchUseCase struct {
 	index *coresearch.SQLiteIndex
 	tags  *coretags.TagsService

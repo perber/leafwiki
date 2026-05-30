@@ -10,7 +10,7 @@ import {
 import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { Loader2 } from 'lucide-react'
-import { ReactNode, useEffect } from 'react'
+import { ReactNode, useCallback, useEffect } from 'react'
 import { Button } from './ui/button'
 
 // A generic dialog component that can be used as a base for other dialogs.
@@ -83,6 +83,13 @@ export default function BaseDialog({
   const open = useDialogsStore((s) => s.dialogType === dialogType)
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
+  const requestClose = useCallback(() => {
+    const result = onClose()
+    if (result) {
+      closeDialog()
+    }
+    return result
+  }, [closeDialog, onClose])
 
   useEffect(() => {
     // Only register hotkeys when the dialog is open
@@ -96,8 +103,7 @@ export default function BaseDialog({
       mode: ['dialog'],
       action: async () => {
         if (defaultAction === 'cancel') {
-          onClose()
-          closeDialog()
+          requestClose()
           return
         }
 
@@ -123,8 +129,7 @@ export default function BaseDialog({
       enabled: true,
       mode: ['dialog'],
       action: () => {
-        onClose()
-        closeDialog()
+        requestClose()
       },
     }
     registerHotkey(confirmHotkey)
@@ -136,8 +141,8 @@ export default function BaseDialog({
     }
   }, [
     open,
-    onClose,
     onConfirm,
+    requestClose,
     closeDialog,
     dialogType,
     registerHotkey,
@@ -151,8 +156,7 @@ export default function BaseDialog({
       open={open}
       onOpenChange={(isOpen) => {
         if (!isOpen) {
-          onClose()
-          closeDialog()
+          requestClose()
         }
       }}
     >
@@ -173,10 +177,7 @@ export default function BaseDialog({
             <Button
               autoFocus={cancelButton.autoFocus}
               onClick={() => {
-                const result = onClose()
-                if (result) {
-                  closeDialog()
-                }
+                requestClose()
               }}
               disabled={cancelButton.disabled}
               data-testid={

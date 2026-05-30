@@ -12,7 +12,7 @@ export default class EditPage {
   async openReplacePanel() {
     const editor = this.page.locator('.cm-editor');
     await editor.click();
-    await this.page.keyboard.press('Control+h');
+    await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+h' : 'Control+h');
     await this.page.locator('.cm-search input[main-field="true"]').waitFor({ state: 'visible' });
   }
 
@@ -39,6 +39,7 @@ export default class EditPage {
     await saveButton.waitFor({ state: 'visible' });
     await saveButton.click();
     await this.page.getByText('Page saved successfully').last().waitFor({ state: 'visible' });
+    await expect(saveButton).toBeDisabled();
   }
 
   async closeEditor() {

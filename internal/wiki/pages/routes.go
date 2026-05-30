@@ -154,9 +154,9 @@ func (r *Routes) handleGetPage(c *gin.Context) {
 }
 
 func (r *Routes) handleGetByPath(c *gin.Context) {
-	routePath := strings.TrimSpace(c.Query("path"))
-	if routePath == "" {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageMissingPath, "Missing path", "missing path")
+	routePath, err := ValidatePageRoutePath(c.Query("path"))
+	if err != nil {
+		respondWithPageError(c, err)
 		return
 	}
 	out, err := r.findByPath.Execute(c.Request.Context(), FindByPathInput{RoutePath: routePath})
@@ -196,9 +196,9 @@ func (r *Routes) handleResolvePermalink(c *gin.Context) {
 }
 
 func (r *Routes) handleSuggestSlug(c *gin.Context) {
-	title := strings.TrimSpace(c.Query("title"))
-	if title == "" {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageMissingTitle, "Title query param is required", "title query param is required")
+	title, err := ValidateSuggestSlugTitle(c.Query("title"))
+	if err != nil {
+		respondWithPageError(c, err)
 		return
 	}
 	out, err := r.suggestSlug.Execute(c.Request.Context(), SuggestSlugInput{
@@ -211,6 +211,27 @@ func (r *Routes) handleSuggestSlug(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"slug": out.Slug})
+}
+
+func ValidateSuggestSlugTitle(title string) (string, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return "", sharederrors.NewLocalizedError(
+			ErrCodePageMissingTitle,
+			"Title query param is required",
+			"title query param is required",
+			nil,
+		)
+	}
+	if tree.NewSlugService().GenerateValidSlug(title) == "" {
+		return "", sharederrors.NewLocalizedError(
+			ErrCodePageInvalidTitle,
+			"Title must include at least one slug character",
+			"title must include at least one slug character",
+			nil,
+		)
+	}
+	return title, nil
 }
 
 func (r *Routes) handleCreate(c *gin.Context) {
@@ -228,7 +249,11 @@ func (r *Routes) handleCreate(c *gin.Context) {
 	if user == nil {
 		return
 	}
-	kind := kindFromString(req.Kind)
+	kind, err := ValidatePageKind(req.Kind)
+	if err != nil {
+		respondWithPageError(c, err)
+		return
+	}
 	out, err := r.createPage.Execute(c.Request.Context(), CreatePageInput{
 		UserID: user.ID, ParentID: req.ParentID, Title: req.Title, Slug: req.Slug, Kind: &kind,
 	})
@@ -253,7 +278,7 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
-	if err := validatePageMetadataInput(req.Tags, req.Properties); err != nil {
+	if err := ValidatePageMetadataInput(req.Tags, req.Properties); err != nil {
 		respondWithPageError(c, err)
 		return
 	}
@@ -265,7 +290,7 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 	contentToSave := req.Content
 	fromImport := false
 	if req.Content != nil {
-		extraFields := buildExtraFields(req.Tags, req.Properties)
+		extraFields := BuildExtraFields(req.Tags, req.Properties)
 		combined, err := markdown.BuildMarkdownWithExtraFrontmatter(extraFields, *req.Content)
 		if err != nil {
 			respondWithPageStatusError(c, http.StatusInternalServerError, ErrCodePageInternalError, "Failed to build frontmatter", "failed to build frontmatter")
@@ -287,7 +312,7 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 	r.respondPage(c, http.StatusOK, out.Page)
 }
 
-func buildExtraFields(tags []string, properties map[string]string) map[string]interface{} {
+func BuildExtraFields(tags []string, properties map[string]string) map[string]interface{} {
 	extra := make(map[string]interface{}, len(properties)+1)
 	for k, v := range properties {
 		extra[k] = v
@@ -373,7 +398,11 @@ func (r *Routes) handleEnsurePath(c *gin.Context) {
 	if user == nil {
 		return
 	}
-	kind := kindFromString(req.Kind)
+	kind, err := ValidatePageKind(req.Kind)
+	if err != nil {
+		respondWithPageError(c, err)
+		return
+	}
 	out, err := r.ensurePath.Execute(c.Request.Context(), EnsurePathInput{
 		UserID: user.ID, TargetPath: req.Path, TargetTitle: req.Title, Kind: &kind,
 	})
@@ -394,8 +423,9 @@ func (r *Routes) handleConvert(c *gin.Context) {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
 		return
 	}
-	if req.Kind != "page" && req.Kind != "section" {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidTargetKind, "Invalid targetKind", "invalid target kind")
+	targetKind, err := ValidateConvertTargetKind(req.Kind)
+	if err != nil {
+		respondWithPageError(c, err)
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -403,12 +433,24 @@ func (r *Routes) handleConvert(c *gin.Context) {
 		return
 	}
 	if err := r.convertPage.Execute(c.Request.Context(), ConvertPageInput{
-		UserID: user.ID, ID: id, Version: req.Version, TargetKind: tree.NodeKind(req.Kind),
+		UserID: user.ID, ID: id, Version: req.Version, TargetKind: targetKind,
 	}); err != nil {
 		respondWithPageError(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func ValidateConvertTargetKind(kind string) (tree.NodeKind, error) {
+	if kind != string(tree.NodeKindPage) && kind != string(tree.NodeKindSection) {
+		return "", sharederrors.NewLocalizedError(
+			ErrCodePageInvalidTargetKind,
+			"Invalid targetKind",
+			"invalid target kind",
+			nil,
+		)
+	}
+	return tree.NodeKind(kind), nil
 }
 
 func (r *Routes) handleCopy(c *gin.Context) {
@@ -509,105 +551,10 @@ func (r *Routes) respondPageWithDepth(c *gin.Context, status int, page *tree.Pag
 }
 
 func (r *Routes) enrichPageMetadata(page *dto.Page) {
-	if page == nil {
-		return
-	}
-
-	page.Tags = []string{}
-	page.Properties = map[string]string{}
-
-	raw, err := r.treeService.ReadPageRaw(page.ID)
-	if err != nil {
-		return
-	}
-
-	fm, _, has, err := markdown.ParseFrontmatter(raw)
-	if err != nil || !has || len(fm.ExtraFields) == 0 {
-		return
-	}
-
-	tags, properties := extractPageMetadata(fm.ExtraFields)
-	page.Tags = tags
-	page.Properties = properties
+	EnrichPageMetadata(page, r.treeService.ReadPageRaw)
 }
 
-var reservedPropertyKeys = map[string]struct{}{
-	"tags":  {},
-	"title": {},
-}
-
-func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]string) {
-	tags := []string{}
-	properties := map[string]string{}
-
-	for rawKey, value := range fields {
-		key := strings.TrimSpace(rawKey)
-		lower := strings.ToLower(key)
-
-		if lower == "tags" {
-			tags = normalizeMetadataTags(value)
-			continue
-		}
-
-		if _, reserved := reservedPropertyKeys[lower]; reserved {
-			continue
-		}
-		if strings.HasPrefix(lower, "leafwiki_") {
-			continue
-		}
-
-		s, ok := value.(string)
-		if !ok {
-			continue
-		}
-		s = strings.TrimSpace(s)
-		if s == "" || strings.ContainsRune(s, '\n') {
-			continue
-		}
-		properties[key] = s
-	}
-
-	return tags, properties
-}
-
-func normalizeMetadataTags(value interface{}) []string {
-	list, ok := value.([]interface{})
-	if !ok {
-		return []string{}
-	}
-
-	rawTags := make([]string, 0, len(list))
-	for _, item := range list {
-		tag, ok := item.(string)
-		if !ok {
-			continue
-		}
-		rawTags = append(rawTags, tag)
-	}
-
-	return normalizeTagInputs(rawTags)
-}
-
-func normalizeTagInputs(tags []string) []string {
-	seen := make(map[string]struct{}, len(tags))
-	result := make([]string, 0, len(tags))
-
-	for _, tag := range tags {
-		normalized := strings.ToLower(strings.TrimSpace(tag))
-		if normalized == "" {
-			continue
-		}
-		if _, exists := seen[normalized]; exists {
-			continue
-		}
-		seen[normalized] = struct{}{}
-		result = append(result, normalized)
-	}
-
-	return result
-}
-
-func validatePageMetadataInput(tags []string, properties map[string]string) error {
+func ValidatePageMetadataInput(tags []string, properties map[string]string) error {
 	ve := sharederrors.NewValidationErrors()
 	seenTags := map[string]struct{}{}
 
@@ -650,15 +597,4 @@ func validatePageMetadataInput(tags []string, properties map[string]string) erro
 	}
 
 	return nil
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-// kindFromString converts an optional string pointer to a NodeKind.
-// Defaults to NodeKindPage when nil or unrecognized.
-func kindFromString(s *string) tree.NodeKind {
-	if s != nil && *s == string(tree.NodeKindSection) {
-		return tree.NodeKindSection
-	}
-	return tree.NodeKindPage
 }

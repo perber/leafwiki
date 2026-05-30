@@ -333,7 +333,15 @@ func TestNodeStore_ReconstructTreeFromFS_ReturnsErrorOnCaseInsensitiveDuplicateS
 	mustWriteFile(t, filepath.Join(tmp, "root", "abc.md"), "# lower", 0o644)
 	mustWriteFile(t, filepath.Join(tmp, "root", "ABC.md"), "# upper", 0o644)
 
-	_, err := store.ReconstructTreeFromFS()
+	entries, err := os.ReadDir(filepath.Join(tmp, "root"))
+	if err != nil {
+		t.Fatalf("read root dir: %v", err)
+	}
+	if len(entries) < 2 {
+		t.Skip("filesystem does not preserve case-only duplicate filenames")
+	}
+
+	_, err = store.ReconstructTreeFromFS()
 	if err == nil {
 		t.Fatalf("expected duplicate slug error")
 	}

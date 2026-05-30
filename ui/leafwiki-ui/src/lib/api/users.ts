@@ -7,6 +7,24 @@ export type User = {
   role: 'admin' | 'editor' | 'viewer'
 }
 
+export type MCPAPIKey = {
+  id: string
+  userId: string
+  name: string
+  prefix: string
+  last4: string
+  scopes: string[]
+  createdByUserId: string
+  createdAt: string
+  lastUsedAt: string | null
+  revokedAt: string | null
+}
+
+export type MCPAPIKeyCreateResponse = {
+  key: MCPAPIKey
+  secret: string
+}
+
 export async function getUsers(): Promise<User[]> {
   return (await fetchWithAuth('/api/users')) as User[]
 }
@@ -42,6 +60,48 @@ export async function changeOwnPassword(
 
 export async function deleteUser(id: string) {
   return await fetchWithAuth(`/api/users/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function getUserMCPAPIKeys(userId: string): Promise<MCPAPIKey[]> {
+  return (await fetchWithAuth(
+    `/api/users/${userId}/mcp-api-keys`,
+  )) as MCPAPIKey[]
+}
+
+export async function createUserMCPAPIKey(
+  userId: string,
+  name: string,
+): Promise<MCPAPIKeyCreateResponse> {
+  return (await fetchWithAuth(`/api/users/${userId}/mcp-api-keys`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })) as MCPAPIKeyCreateResponse
+}
+
+export async function revokeUserMCPAPIKey(userId: string, keyId: string) {
+  return await fetchWithAuth(`/api/users/${userId}/mcp-api-keys/${keyId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function getOwnMCPAPIKeys(): Promise<MCPAPIKey[]> {
+  return (await fetchWithAuth('/api/users/me/mcp-api-keys')) as MCPAPIKey[]
+}
+
+export async function createOwnMCPAPIKey(
+  name: string,
+  currentPassword: string,
+): Promise<MCPAPIKeyCreateResponse> {
+  return (await fetchWithAuth('/api/users/me/mcp-api-keys', {
+    method: 'POST',
+    body: JSON.stringify({ name, currentPassword }),
+  })) as MCPAPIKeyCreateResponse
+}
+
+export async function revokeOwnMCPAPIKey(keyId: string) {
+  return await fetchWithAuth(`/api/users/me/mcp-api-keys/${keyId}`, {
     method: 'DELETE',
   })
 }

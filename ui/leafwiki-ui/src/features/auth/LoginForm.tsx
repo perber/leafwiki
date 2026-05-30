@@ -2,11 +2,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { login } from '@/lib/api/auth'
 import { mapApiError } from '@/lib/api/errors'
-import { withBasePath } from '@/lib/routePath'
+import { safeOAuthAuthorizeReturnTo, withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
 import { useSessionStore } from '@/stores/session'
-import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 export default function LoginForm() {
@@ -15,13 +15,22 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
 
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const user = useSessionStore((s) => s.user)
   const { siteName, logoFile, logoVersion } = useBrandingStore()
+  const oauthReturnTo = useMemo(
+    () => safeOAuthAuthorizeReturnTo(searchParams.get('returnTo')),
+    [searchParams],
+  )
 
-  // If already logged in, redirect to home
-  if (user) {
-    return <Navigate to="/" replace />
-  }
+  useEffect(() => {
+    if (!user) return
+    if (oauthReturnTo) {
+      window.location.assign(oauthReturnTo)
+      return
+    }
+    navigate('/', { replace: true })
+  }, [navigate, oauthReturnTo, user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,7 +39,10 @@ export default function LoginForm() {
     try {
       // user already set in the store by the login function
       await login(identifier, password)
-      // Redirect to home page after successful login
+      if (oauthReturnTo) {
+        window.location.assign(oauthReturnTo)
+        return
+      }
       navigate('/')
     } catch (err) {
       const mapped = mapApiError(err, 'Login failed')
@@ -38,6 +50,10 @@ export default function LoginForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (user) {
+    return null
   }
 
   return (

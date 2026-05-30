@@ -19,6 +19,7 @@ import TreeView from '@/features/tree/TreeView'
 import { ChangeOwnPasswordDialog } from '@/features/users/ChangeOwnPasswordDialog'
 import { ChangePasswordDialog } from '@/features/users/ChangePasswordDialog'
 import { DeleteUserDialog } from '@/features/users/DeleteUserDialog'
+import { MCPAPIKeysDialog } from '@/features/users/MCPAPIKeysDialog'
 import { UserFormDialog } from '@/features/users/UserFormDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
@@ -69,6 +70,7 @@ export const DIALOG_CHANGE_OWN_PASSWORD = 'change-own-password'
 export const DIALOG_USER_FORM = 'user-form'
 export const DIALOG_CHANGE_USER_PASSWORD = 'change-user-password'
 export const DIALOG_DELETE_USER_CONFIRMATION = 'delete-user-confirmation'
+export const DIALOG_MCP_API_KEYS = 'mcp-api-keys'
 export const DIALOG_UNSAVED_CHANGES = 'unsaved-changes'
 export const DIALOG_IMAGE_PREVIEW = 'image-preview'
 export const DIALOG_PAGE_QUICK_SWITCHER = 'page-quick-switcher'
@@ -212,6 +214,18 @@ dialogRegistry.register({
       <DeleteUserDialog
         key={DIALOG_DELETE_USER_CONFIRMATION}
         {...(props as React.ComponentProps<typeof DeleteUserDialog>)}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_MCP_API_KEYS,
+  render: (props) => {
+    return (
+      <MCPAPIKeysDialog
+        key={DIALOG_MCP_API_KEYS}
+        {...(props as React.ComponentProps<typeof MCPAPIKeysDialog>)}
       />
     )
   },

@@ -24,6 +24,8 @@ import (
 	wikihealth "github.com/perber/wiki/internal/wiki/health"
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
+	wikimcp "github.com/perber/wiki/internal/wiki/mcp"
+	wikioauth "github.com/perber/wiki/internal/wiki/oauth"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
@@ -36,13 +38,14 @@ type Wiki struct {
 	tree         *tree.TreeService
 	slug         *tree.SlugService
 	auth         *auth.AuthService
+	apiKeys      *auth.APIKeyService
 	userResolver *auth.UserResolver
 	user         *auth.UserService
 	asset        *assets.AssetService
 	branding     *branding.BrandingService
 	searchIndex  *search.SQLiteIndex
 	status       *search.IndexingStatus
-	storageDir string
+	storageDir   string
 
 	// Domain route registrars (populated by NewWiki).
 	pagesRoutes      *wikipages.Routes
@@ -56,25 +59,28 @@ type Wiki struct {
 	brandingRoutes   *wikibranding.Routes
 	importerRoutes   *wikiimporter.Routes
 	healthRoutes     *wikihealth.Routes
+	mcpRoutes        *wikimcp.Routes
+	oauthRoutes      *wikioauth.Routes
 	revision         *revision.Service
 	links            *links.LinkService
 	tags             *tags.TagsService
 	props            *properties.PropertiesService
+	oauth            *wikioauth.Service
 	log              *slog.Logger
 }
 
 const SYSTEM_USER_ID = "system"
 
 type WikiOptions struct {
-	StorageDir              string           // Path to storage directory
-	AdminPassword           string           // Initial admin password
-	JWTSecret               string           // JWT secret for authentication
-	AccessTokenTimeout      time.Duration    // Access token timeout duration
-	RefreshTokenTimeout     time.Duration    // Refresh token timeout duration
-	AuthDisabled            bool             // Whether authentication is disabled
-	EnableRevision          bool             // Whether revision recording/storage is enabled
-	MaxRevisionHistory      int              // Max revisions kept per page; 0 = unlimited
-	MaxAssetUploadSizeBytes int64 // Maximum allowed size in bytes for asset/import uploads; 0 = default
+	StorageDir              string        // Path to storage directory
+	AdminPassword           string        // Initial admin password
+	JWTSecret               string        // JWT secret for authentication
+	AccessTokenTimeout      time.Duration // Access token timeout duration
+	RefreshTokenTimeout     time.Duration // Refresh token timeout duration
+	AuthDisabled            bool          // Whether authentication is disabled
+	EnableRevision          bool          // Whether revision recording/storage is enabled
+	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
+	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
@@ -83,6 +89,9 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		log:        slog.Default().With("component", "Wiki"),
 	}
 	if err := w.initAuth(options); err != nil {
+		return nil, err
+	}
+	if err := w.initOAuth(options); err != nil {
 		return nil, err
 	}
 	if err := w.initCoreServices(options); err != nil {
@@ -159,6 +168,11 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 		return err
 	}
 	w.user = auth.NewUserService(store)
+	apiKeyStore, err := auth.NewAPIKeyStore(w.storageDir)
+	if err != nil {
+		return err
+	}
+	w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.user)
 	if !options.AuthDisabled {
 		if err := w.user.InitDefaultAdmin(options.AdminPassword); err != nil {
 			return err
@@ -175,6 +189,20 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 		}
 		w.auth = auth.NewAuthService(w.user, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 	}
+	return nil
+}
+
+func (w *Wiki) initOAuth(options *WikiOptions) error {
+	service, err := wikioauth.NewService(wikioauth.ServiceConfig{
+		AuthService:         w.auth,
+		UserService:         w.user,
+		AccessTokenTimeout:  options.AccessTokenTimeout,
+		RefreshTokenTimeout: options.RefreshTokenTimeout,
+	})
+	if err != nil {
+		return err
+	}
+	w.oauth = service
 	return nil
 }
 
@@ -300,6 +328,8 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 		Status:     w.status,
 		StorageDir: w.storageDir,
 	})
+	w.oauthRoutes = wikioauth.NewRoutes(w.oauth)
+	w.mcpRoutes = w.buildMCPRoutes()
 }
 
 // ─── Domain route builder helpers ────────────────────────────────────────────
@@ -349,6 +379,9 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.user, w.userResolver, w.log),
 		GetUsers:          wikiauth.NewGetUsersUseCase(w.user),
 		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.user),
+		CreateAPIKey:      wikiauth.NewCreateAPIKeyUseCase(w.apiKeys, w.user),
+		ListAPIKeys:       wikiauth.NewListAPIKeysUseCase(w.apiKeys),
+		RevokeAPIKey:      wikiauth.NewRevokeAPIKeyUseCase(w.apiKeys),
 		AuthService:       w.auth,
 	})
 }
@@ -376,6 +409,7 @@ func (w *Wiki) buildRevisionsRoutes() *wikirevisions.Routes {
 		CheckIntegrity:   wikirevisions.NewCheckIntegrityUseCase(w.revision),
 		UserResolver:     w.userResolver,
 		AuthService:      w.auth,
+		TreeService:      w.tree,
 	})
 }
 
@@ -441,6 +475,50 @@ func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 	})
 }
 
+func (w *Wiki) buildMCPRoutes() *wikimcp.Routes {
+	o := w.newPageOrchestrator()
+	return wikimcp.NewRoutes(wikimcp.RoutesConfig{
+		TreeService:  w.tree,
+		UserResolver: w.userResolver,
+		CreatePage:   wikipages.NewCreatePageUseCase(w.tree, w.slug, o, w.log),
+		UpdatePage:   wikipages.NewUpdatePageUseCase(w.tree, w.slug, o, w.log),
+		GetPage:      wikipages.NewGetPageUseCase(w.tree),
+		FindByPath:   wikipages.NewFindByPathUseCase(w.tree),
+		LookupPath:   wikipages.NewLookupPagePathUseCase(w.tree),
+		ResolveLink:  wikipages.NewResolvePermalinkUseCase(w.tree),
+		SuggestSlug:  wikipages.NewSuggestSlugUseCase(w.tree, w.slug),
+		DeletePage:   wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, o, w.log),
+		MovePage:     wikipages.NewMovePageUseCase(w.tree, o, w.log),
+		SortPages:    wikipages.NewSortPagesUseCase(w.tree),
+		EnsurePath:   wikipages.NewEnsurePathUseCase(w.tree, w.slug, o, w.log),
+		ConvertPage:  wikipages.NewConvertPageUseCase(w.tree, w.revision, w.log),
+		CopyPage:     wikipages.NewCopyPageUseCase(w.tree, w.slug, o, w.asset, w.log),
+		PreviewRef:   wikipages.NewPreviewPageRefactorUseCase(w.tree, w.slug, w.links, w.log),
+		ApplyRef:     wikipages.NewApplyPageRefactorUseCase(w.tree, w.slug, w.revision, w.links, w.log),
+		Search:       wikisearch.NewSearchUseCase(w.searchIndex, w.tags, w.tree),
+		SearchStatus: wikisearch.NewGetIndexingStatusUseCase(w.status),
+		GetTags:      wikitags.NewGetTagsUseCase(w.tags),
+		PagesByTags:  wikitags.NewGetPagesByTagsUseCase(w.tags, w.tree, w.userResolver),
+		PropertyKeys: wikiproperties.NewGetPropertyKeysUseCase(w.props),
+		PagesByProp:  wikiproperties.NewGetPagesByPropertyUseCase(w.props, w.tree, w.userResolver),
+		LinkStatus:   wikilinks.NewGetLinkStatusUseCase(w.links, w.tree),
+		UploadAsset:  wikiassets.NewUploadAssetUseCase(w.tree, w.asset, w.revision, w.log),
+		GetAsset:     wikiassets.NewGetAssetUseCase(w.tree, w.asset),
+		GetAssets:    wikiassets.NewListAssetsUseCase(w.tree, w.asset),
+		RenameAsset:  wikiassets.NewRenameAssetUseCase(w.tree, w.asset, w.revision, w.log),
+		DeleteAsset:  wikiassets.NewDeleteAssetUseCase(w.tree, w.asset, w.revision, w.log),
+		ListRevs:     wikirevisions.NewListRevisionsUseCase(w.revision),
+		GetRev:       wikirevisions.NewGetRevisionUseCase(w.revision),
+		CompareRevs:  wikirevisions.NewCompareRevisionsUseCase(w.revision),
+		GetRevAsset:  wikirevisions.NewGetRevisionAssetUseCase(w.revision),
+		GetLatestRev: wikirevisions.NewGetLatestRevisionUseCase(w.revision),
+		RestoreRev:   wikirevisions.NewRestoreRevisionUseCase(w.revision, w.tree, w.newPageOrchestrator(), w.log),
+		UserService:  w.user,
+		APIKeys:      w.apiKeys,
+		OAuthService: w.oauth,
+	})
+}
+
 // ─── Registrars / FrontendConfig ─────────────────────────────────────────────
 
 // Registrars returns all domain route registrars in registration order.
@@ -457,6 +535,8 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.brandingRoutes,
 		w.importerRoutes,
 		w.healthRoutes,
+		w.oauthRoutes,
+		w.mcpRoutes,
 	}
 }
 
@@ -553,10 +633,19 @@ func (w *Wiki) UserService() *auth.UserService {
 	return w.user
 }
 
+func (w *Wiki) APIKeyService() *auth.APIKeyService {
+	return w.apiKeys
+}
+
 func (w *Wiki) Close() error {
 	w.status.Finish()
 	if err := w.user.Close(); err != nil {
 		return err
+	}
+	if w.apiKeys != nil {
+		if err := w.apiKeys.Close(); err != nil {
+			return err
+		}
 	}
 
 	if w.links != nil {

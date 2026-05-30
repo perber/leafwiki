@@ -25,10 +25,10 @@ type CreatePageOutput struct {
 
 // CreatePageUseCase creates a new page in the tree and fires post-save side effects.
 type CreatePageUseCase struct {
-	tree        *tree.TreeService
-	slug        *tree.SlugService
+	tree         *tree.TreeService
+	slug         *tree.SlugService
 	orchestrator *pagesave.PageSaveOrchestrator
-	log         *slog.Logger
+	log          *slog.Logger
 }
 
 // NewCreatePageUseCase constructs a CreatePageUseCase.
@@ -60,6 +60,12 @@ func (uc *CreatePageUseCase) Execute(_ context.Context, in CreatePageInput) (*Cr
 	if ve.HasErrors() {
 		return nil, ve
 	}
+
+	parentID, err := ValidateOptionalParentID(in.ParentID)
+	if err != nil {
+		return nil, err
+	}
+	in.ParentID = parentID
 
 	if in.ParentID != nil && *in.ParentID != "" {
 		if _, err := uc.tree.FindPageByID(*in.ParentID); err != nil {

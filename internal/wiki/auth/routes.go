@@ -29,6 +29,9 @@ type Routes struct {
 	deleteUser        *DeleteUserUseCase
 	getUsers          *GetUsersUseCase
 	getUserByID       *GetUserByIDUseCase
+	createAPIKey      *CreateAPIKeyUseCase
+	listAPIKeys       *ListAPIKeysUseCase
+	revokeAPIKey      *RevokeAPIKeyUseCase
 	authService       *coreauth.AuthService
 }
 
@@ -43,6 +46,9 @@ type RoutesConfig struct {
 	DeleteUser        *DeleteUserUseCase
 	GetUsers          *GetUsersUseCase
 	GetUserByID       *GetUserByIDUseCase
+	CreateAPIKey      *CreateAPIKeyUseCase
+	ListAPIKeys       *ListAPIKeysUseCase
+	RevokeAPIKey      *RevokeAPIKeyUseCase
 	AuthService       *coreauth.AuthService
 }
 
@@ -58,6 +64,9 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		deleteUser:        cfg.DeleteUser,
 		getUsers:          cfg.GetUsers,
 		getUserByID:       cfg.GetUserByID,
+		createAPIKey:      cfg.CreateAPIKey,
+		listAPIKeys:       cfg.ListAPIKeys,
+		revokeAPIKey:      cfg.RevokeAPIKey,
 		authService:       cfg.AuthService,
 	}
 }
@@ -67,6 +76,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
 	loginRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)
+	selfAPIKeyCreateRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)
 
 	nonAuth := ctx.Base.Group("/api")
 	nonAuth.POST("/auth/login", loginRateLimiter, r.handleLogin(ctx))
@@ -101,11 +111,29 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	authGroup.POST("/users", authmw.RequireAdmin(opts.AuthDisabled), r.handleCreateUser)
 	authGroup.GET("/users", authmw.RequireAdmin(opts.AuthDisabled), r.handleGetUsers)
+	authGroup.GET("/users/:id/mcp-api-keys", authmw.RequireAdmin(opts.AuthDisabled), r.handleListUserAPIKeys)
+	authGroup.POST("/users/:id/mcp-api-keys", authmw.RequireAdmin(opts.AuthDisabled), r.handleCreateUserAPIKey)
+	authGroup.DELETE("/users/:id/mcp-api-keys/:keyId", authmw.RequireAdmin(opts.AuthDisabled), r.handleRevokeUserAPIKey)
+	selfAPIKeysGroup := authGroup.Group("/users/me/mcp-api-keys", requireAuthEnabled(opts.AuthDisabled))
+	selfAPIKeysGroup.GET("", r.handleListOwnAPIKeys)
+	selfAPIKeysGroup.POST("", selfAPIKeyCreateRateLimiter, r.handleCreateOwnAPIKey)
+	selfAPIKeysGroup.DELETE("/:keyId", r.handleRevokeOwnAPIKey)
 	authGroup.PUT("/users/:id", authmw.RequireSelfOrAdmin(opts.AuthDisabled), r.handleUpdateUser)
 	authGroup.DELETE("/users/:id", authmw.RequireAdmin(opts.AuthDisabled), r.handleDeleteUser)
 
 	if !opts.AuthDisabled {
 		authGroup.PUT("/users/me/password", r.handleChangeOwnPassword)
+	}
+}
+
+func requireAuthEnabled(authDisabled bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if authDisabled {
+			respondWithAuthError(c, ErrAuthDisabled)
+			c.Abort()
+			return
+		}
+		c.Next()
 	}
 }
 
@@ -149,10 +177,13 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 // Uses TryGetUser (not MustGetUser) so unauthenticated callers receive 200+null
 // instead of 401, avoiding the Basic Auth credential-reset issue (RFC 9110 §15.5.2).
 // Cache headers prevent reverse proxies from caching the identity response.
-func (r *Routes) handleMe(c *gin.Context) {
+func writeNoStoreHeaders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("Pragma", "no-cache")
-	c.Header("Expires", time.Unix(0, 0).UTC().Format(http.TimeFormat))
+	c.Header("Expires", "Thu, 01 Jan 1970 00:00:00 GMT")
+}
+func (r *Routes) handleMe(c *gin.Context) {
+	writeNoStoreHeaders(c)
 
 	user := authmw.TryGetUser(c)
 	if user == nil {
@@ -352,6 +383,105 @@ func (r *Routes) handleChangeOwnPassword(c *gin.Context) {
 	if err := r.changeOwnPassword.Execute(c.Request.Context(), ChangeOwnPasswordInput{
 		UserID: user.ID, OldPassword: req.OldPassword, NewPassword: req.NewPassword,
 	}); err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (r *Routes) handleListUserAPIKeys(c *gin.Context) {
+	out, err := r.listAPIKeys.Execute(c.Request.Context(), ListAPIKeysInput{UserID: c.Param("id")})
+	if err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out.Keys)
+}
+
+func (r *Routes) handleCreateUserAPIKey(c *gin.Context) {
+	user := authmw.MustGetUser(c)
+	if user == nil {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, "Invalid request", "invalid request")
+		return
+	}
+	out, err := r.createAPIKey.Execute(c.Request.Context(), CreateAPIKeyInput{
+		UserID:          c.Param("id"),
+		Name:            req.Name,
+		CreatedByUserID: user.ID,
+	})
+	if err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	writeNoStoreHeaders(c)
+	c.JSON(http.StatusCreated, gin.H{"key": out.Key, "secret": out.Secret})
+}
+
+func (r *Routes) handleRevokeUserAPIKey(c *gin.Context) {
+	if err := r.revokeAPIKey.Execute(c.Request.Context(), RevokeAPIKeyInput{UserID: c.Param("id"), KeyID: c.Param("keyId")}); err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (r *Routes) handleListOwnAPIKeys(c *gin.Context) {
+	user := authmw.MustGetUser(c)
+	if user == nil {
+		return
+	}
+	out, err := r.listAPIKeys.Execute(c.Request.Context(), ListAPIKeysInput{UserID: user.ID})
+	if err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out.Keys)
+}
+
+func (r *Routes) handleCreateOwnAPIKey(c *gin.Context) {
+	user := authmw.MustGetUser(c)
+	if user == nil {
+		return
+	}
+	if authmw.IsRemoteUser(c) {
+		respondWithAuthStatusError(c, http.StatusForbidden, ErrCodeAuthForbidden, "MCP API key self-creation is disabled for HTTP remote-user authentication", "mcp api key self creation disabled for remote user")
+		return
+	}
+	var req struct {
+		Name            string `json:"name"`
+		CurrentPassword string `json:"currentPassword"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, "Invalid request", "invalid request")
+		return
+	}
+	out, err := r.createAPIKey.Execute(c.Request.Context(), CreateAPIKeyInput{
+		UserID:                 user.ID,
+		Name:                   req.Name,
+		CreatedByUserID:        user.ID,
+		CurrentPassword:        req.CurrentPassword,
+		RequireCurrentPassword: true,
+	})
+	if err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	writeNoStoreHeaders(c)
+	c.JSON(http.StatusCreated, gin.H{"key": out.Key, "secret": out.Secret})
+}
+
+func (r *Routes) handleRevokeOwnAPIKey(c *gin.Context) {
+	user := authmw.MustGetUser(c)
+	if user == nil {
+		return
+	}
+	if err := r.revokeAPIKey.Execute(c.Request.Context(), RevokeAPIKeyInput{UserID: user.ID, KeyID: c.Param("keyId")}); err != nil {
 		respondWithAuthError(c, err)
 		return
 	}

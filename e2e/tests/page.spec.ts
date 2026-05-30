@@ -32,8 +32,6 @@ async function dispatchLayoutShortcut(
   },
 ) {
   await page.evaluate((keyboardEventInit) => {
-    const target = document.activeElement instanceof HTMLElement ? document.activeElement : window;
-
     const event = new KeyboardEvent('keydown', {
       key: keyboardEventInit.key,
       code: keyboardEventInit.code,
@@ -44,7 +42,7 @@ async function dispatchLayoutShortcut(
       shiftKey: keyboardEventInit.shiftKey ?? false,
     });
 
-    target.dispatchEvent(event);
+    window.dispatchEvent(event);
   }, eventInit);
 }
 

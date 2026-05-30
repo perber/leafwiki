@@ -7,7 +7,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
+import {
+  DIALOG_CHANGE_OWN_PASSWORD,
+  DIALOG_MCP_API_KEYS,
+} from '@/lib/registries'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
@@ -102,6 +105,17 @@ export default function UserToolbar() {
             onClick={() => openDialog(DIALOG_CHANGE_OWN_PASSWORD)}
           >
             Change Own Password
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() =>
+              openDialog(DIALOG_MCP_API_KEYS, {
+                mode: 'self',
+                selfCreateDisabled: httpRemoteUserEnabled,
+              })
+            }
+          >
+            MCP API Keys
           </DropdownMenuItem>
           {(!httpRemoteUserEnabled || httpRemoteUserLogoutUrl) && (
             <DropdownMenuItem

@@ -48,6 +48,33 @@ export function stripBasePath(pathname: string): string | null {
 }
 
 /**
+ * Accepts only same-origin OAuth authorize return targets for the configured
+ * LeafWiki base path.
+ */
+export function safeOAuthAuthorizeReturnTo(
+  rawReturnTo: string | null | undefined,
+): string | null {
+  if (!rawReturnTo) return null
+
+  let returnTo: URL
+  try {
+    returnTo = new URL(rawReturnTo, window.location.origin)
+  } catch {
+    return null
+  }
+
+  if (returnTo.origin !== window.location.origin) {
+    return null
+  }
+
+  if (stripBasePath(returnTo.pathname) !== '/oauth/authorize') {
+    return null
+  }
+
+  return returnTo.href
+}
+
+/**
  * Builds the internal editor route for a wiki page path.
  *
  * Input may already be a browser pathname or a wiki path. The result is always

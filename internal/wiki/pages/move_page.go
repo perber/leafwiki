@@ -38,6 +38,11 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 		return newPageRootOperationError("move")
 	}
 
+	parentID, err := ValidateMoveParentID(in.ParentID)
+	if err != nil {
+		return err
+	}
+	in.ParentID = parentID
 	in.Version = sanitizeClientVersion(in.Version)
 
 	var subtreeIDs []string
