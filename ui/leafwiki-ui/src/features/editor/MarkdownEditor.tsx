@@ -1,5 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-
 import { useDebounce } from '@/lib/useDebounce'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { historyField, redo, undo } from '@codemirror/commands'

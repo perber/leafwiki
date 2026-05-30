@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 import { DIALOG_IMAGE_PREVIEW } from '@/lib/registries'
 import { withBasePath } from '@/lib/routePath'
 import { useDialogsStore } from '@/stores/dialogs'

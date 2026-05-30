@@ -25,6 +25,19 @@ function resolveAppVersion(): string {
   }
 }
 
+function manualChunks(id: string): string | undefined {
+  const normalizedId = id.replaceAll('\\', '/')
+
+  if (
+    normalizedId.includes('/node_modules/mermaid/') ||
+    normalizedId.includes('/node_modules/dagre-d3-es/')
+  ) {
+    return 'mermaid'
+  }
+
+  return undefined
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   define: {
@@ -47,7 +60,7 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
-      }
+      },
     },
   },
   optimizeDeps: {
@@ -60,9 +73,7 @@ export default defineConfig({
         chunkFileNames: 'static/[name]-[hash].js',
         entryFileNames: 'static/[name]-[hash].js',
         assetFileNames: 'static/[name].[hash][extname]',
-        manualChunks: {
-          mermaid: ['mermaid', 'dagre-d3-es'],
-        },
+        manualChunks,
       },
     },
   },
