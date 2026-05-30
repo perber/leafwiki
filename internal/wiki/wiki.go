@@ -38,6 +38,7 @@ type Wiki struct {
 	tree         *tree.TreeService
 	slug         *tree.SlugService
 	auth         *auth.AuthService
+	apiKeys      *auth.APIKeyService
 	userResolver *auth.UserResolver
 	user         *auth.UserService
 	asset        *assets.AssetService
@@ -166,6 +167,11 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 		return err
 	}
 	w.user = auth.NewUserService(store)
+	apiKeyStore, err := auth.NewAPIKeyStore(w.storageDir)
+	if err != nil {
+		return err
+	}
+	w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.user)
 	if !options.AuthDisabled {
 		if err := w.user.InitDefaultAdmin(options.AdminPassword); err != nil {
 			return err
@@ -365,6 +371,9 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.user, w.userResolver, w.log),
 		GetUsers:          wikiauth.NewGetUsersUseCase(w.user),
 		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.user),
+		CreateAPIKey:      wikiauth.NewCreateAPIKeyUseCase(w.apiKeys, w.user),
+		ListAPIKeys:       wikiauth.NewListAPIKeysUseCase(w.apiKeys),
+		RevokeAPIKey:      wikiauth.NewRevokeAPIKeyUseCase(w.apiKeys),
 		AuthService:       w.auth,
 	})
 }
@@ -497,6 +506,7 @@ func (w *Wiki) buildMCPRoutes() *wikimcp.Routes {
 		GetLatestRev: wikirevisions.NewGetLatestRevisionUseCase(w.revision),
 		RestoreRev:   wikirevisions.NewRestoreRevisionUseCase(w.revision, w.tree, w.newPageOrchestrator(), w.log),
 		UserService:  w.user,
+		APIKeys:      w.apiKeys,
 		OAuthService: w.oauth,
 	})
 }
@@ -614,10 +624,19 @@ func (w *Wiki) UserService() *auth.UserService {
 	return w.user
 }
 
+func (w *Wiki) APIKeyService() *auth.APIKeyService {
+	return w.apiKeys
+}
+
 func (w *Wiki) Close() error {
 	w.status.Finish()
 	if err := w.user.Close(); err != nil {
 		return err
+	}
+	if w.apiKeys != nil {
+		if err := w.apiKeys.Close(); err != nil {
+			return err
+		}
 	}
 
 	if w.links != nil {

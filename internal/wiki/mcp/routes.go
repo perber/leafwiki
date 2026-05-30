@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -27,6 +29,7 @@ type Routes struct {
 	treeService  *tree.TreeService
 	userResolver *coreauth.UserResolver
 	userService  *coreauth.UserService
+	apiKeys      *coreauth.APIKeyService
 	oauthService *wikioauth.Service
 	authDisabled bool
 	createPage   *wikipages.CreatePageUseCase
@@ -68,6 +71,7 @@ type RoutesConfig struct {
 	TreeService  *tree.TreeService
 	UserResolver *coreauth.UserResolver
 	UserService  *coreauth.UserService
+	APIKeys      *coreauth.APIKeyService
 	OAuthService *wikioauth.Service
 	CreatePage   *wikipages.CreatePageUseCase
 	UpdatePage   *wikipages.UpdatePageUseCase
@@ -109,6 +113,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		treeService:  cfg.TreeService,
 		userResolver: cfg.UserResolver,
 		userService:  cfg.UserService,
+		apiKeys:      cfg.APIKeys,
 		oauthService: cfg.OAuthService,
 		createPage:   cfg.CreatePage,
 		updatePage:   cfg.UpdatePage,
@@ -169,7 +174,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	var httpHandler http.Handler = handler
 	if !ctx.Opts.AuthDisabled {
 		httpHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			authenticated := sdkauth.RequireBearerToken(r.oauthService.VerifyBearerToken, &sdkauth.RequireBearerTokenOptions{
+			authenticated := sdkauth.RequireBearerToken(r.verifyBearerToken, &sdkauth.RequireBearerTokenOptions{
 				ResourceMetadataURL: wikioauth.ProtectedResourceMetadataURL(req, ctx.Opts.BasePath),
 				Scopes:              []string{wikioauth.ScopeMCP},
 			})(handler)
@@ -181,6 +186,24 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	ctx.Base.GET("/mcp", wrapped)
 	ctx.Base.POST("/mcp", wrapped)
 	ctx.Base.DELETE("/mcp", wrapped)
+}
+
+func (r *Routes) verifyBearerToken(ctx context.Context, token string, req *http.Request) (*sdkauth.TokenInfo, error) {
+	if coreauth.IsAPIKeyBearer(token) {
+		if r.apiKeys == nil {
+			return nil, fmt.Errorf("%w: api key verifier unavailable", sdkauth.ErrInvalidToken)
+		}
+		verified, err := r.apiKeys.VerifyAPIKey(token)
+		if err != nil {
+			return nil, fmt.Errorf("%w: invalid api key", sdkauth.ErrInvalidToken)
+		}
+		return &sdkauth.TokenInfo{
+			UserID:     verified.User.ID,
+			Scopes:     []string{wikioauth.ScopeMCP},
+			Expiration: time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC),
+		}, nil
+	}
+	return r.oauthService.VerifyBearerToken(ctx, token, req)
 }
 
 func (r *Routes) newServer(opts httpinternal.RouterOptions) *sdkmcp.Server {

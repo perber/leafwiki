@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"regexp"
+	"strings"
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
@@ -15,6 +16,8 @@ import (
 var ErrAuthDisabled = errors.New("authentication is disabled")
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
+
+const maxAPIKeyNameLength = 80
 
 // ─── LoginUseCase ────────────────────────────────────────────────────────────
 
@@ -296,4 +299,95 @@ func (uc *GetUserByIDUseCase) Execute(_ context.Context, in GetUserByIDInput) (*
 		return nil, err
 	}
 	return &GetUserByIDOutput{User: user.ToPublicUser()}, nil
+}
+
+// ─── API Key Use Cases ──────────────────────────────────────────────────────
+
+type CreateAPIKeyInput struct {
+	UserID                 string
+	Name                   string
+	CreatedByUserID        string
+	CurrentPassword        string
+	RequireCurrentPassword bool
+}
+
+type CreateAPIKeyOutput struct {
+	Key    *coreauth.APIKey
+	Secret string
+}
+
+type CreateAPIKeyUseCase struct {
+	apiKeys *coreauth.APIKeyService
+	users   *coreauth.UserService
+}
+
+func NewCreateAPIKeyUseCase(apiKeys *coreauth.APIKeyService, users *coreauth.UserService) *CreateAPIKeyUseCase {
+	return &CreateAPIKeyUseCase{apiKeys: apiKeys, users: users}
+}
+
+func (uc *CreateAPIKeyUseCase) Execute(_ context.Context, in CreateAPIKeyInput) (*CreateAPIKeyOutput, error) {
+	ve := sharederrors.NewValidationErrors()
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		ve.Add("name", "Name must not be empty")
+	} else if len(name) > maxAPIKeyNameLength {
+		ve.Add("name", "Name must be at most 80 characters long")
+	}
+	if in.RequireCurrentPassword {
+		if in.CurrentPassword == "" {
+			ve.Add("currentPassword", "Current password must not be empty")
+		} else if _, err := uc.users.DoesIDAndPasswordMatch(in.UserID, in.CurrentPassword); err != nil {
+			ve.Add("currentPassword", "Current password is incorrect")
+		}
+	}
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
+	out, err := uc.apiKeys.CreateAPIKey(in.UserID, name, in.CreatedByUserID)
+	if err != nil {
+		return nil, err
+	}
+	return &CreateAPIKeyOutput{Key: out.Key, Secret: out.Secret}, nil
+}
+
+type ListAPIKeysInput struct {
+	UserID string
+}
+
+type ListAPIKeysOutput struct {
+	Keys []*coreauth.APIKey
+}
+
+type ListAPIKeysUseCase struct {
+	apiKeys *coreauth.APIKeyService
+}
+
+func NewListAPIKeysUseCase(apiKeys *coreauth.APIKeyService) *ListAPIKeysUseCase {
+	return &ListAPIKeysUseCase{apiKeys: apiKeys}
+}
+
+func (uc *ListAPIKeysUseCase) Execute(_ context.Context, in ListAPIKeysInput) (*ListAPIKeysOutput, error) {
+	keys, err := uc.apiKeys.ListAPIKeys(in.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return &ListAPIKeysOutput{Keys: keys}, nil
+}
+
+type RevokeAPIKeyInput struct {
+	UserID string
+	KeyID  string
+}
+
+type RevokeAPIKeyUseCase struct {
+	apiKeys *coreauth.APIKeyService
+}
+
+func NewRevokeAPIKeyUseCase(apiKeys *coreauth.APIKeyService) *RevokeAPIKeyUseCase {
+	return &RevokeAPIKeyUseCase{apiKeys: apiKeys}
+}
+
+func (uc *RevokeAPIKeyUseCase) Execute(_ context.Context, in RevokeAPIKeyInput) error {
+	return uc.apiKeys.RevokeAPIKey(in.UserID, in.KeyID)
 }

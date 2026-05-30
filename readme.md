@@ -342,7 +342,7 @@ LeafWiki can expose a local-only MCP Streamable HTTP endpoint for agents and the
 ./leafwiki --enable-mcp --host=127.0.0.1 --allow-insecure=true --jwt-secret=<secret> --admin-password=<password>
 ```
 
-The endpoint is `http://127.0.0.1:8080/mcp`, or `${base-path}/mcp` when `--base-path` is set. Plain local HTTP requires `--allow-insecure=true` so login and OAuth cookies work without TLS. Authenticated MCP uses OAuth Authorization Code + PKCE with Dynamic Client Registration for OAuth-capable clients and scope `leafwiki:mcp`. The fixed public client ID `leafwiki-local-mcp` remains available for manual testing and backward compatibility. Authorization requires a logged-in web user and explicit local approval before tokens are issued.
+The endpoint is `http://127.0.0.1:8080/mcp`, or `${base-path}/mcp` when `--base-path` is set. Plain local HTTP requires `--allow-insecure=true` so login and OAuth cookies work without TLS. Authenticated MCP uses OAuth Authorization Code + PKCE with Dynamic Client Registration for OAuth-capable clients and scope `leafwiki:mcp`. The fixed public client ID `leafwiki-local-mcp` remains available for manual testing and backward compatibility. Authorization requires a logged-in web user and explicit local approval before tokens are issued. MCP-only API keys are also available for manual clients that can send `Authorization: Bearer lwk_<id>_<secret>`.
 
 The legacy disabled-auth mode remains available for isolated local workflows:
 
@@ -350,7 +350,7 @@ The legacy disabled-auth mode remains available for isolated local workflows:
 ./leafwiki --disable-auth --enable-mcp --host=127.0.0.1
 ```
 
-See [Local MCP Interface](docs/mcp.md) for OAuth client settings, the tool surface, safety gates, and the parity contract.
+See [Local MCP Interface](docs/mcp.md) for OAuth client settings, API-key behavior, the tool surface, safety gates, and the parity contract.
 
 ### Operations notes
 

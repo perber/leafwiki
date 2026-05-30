@@ -105,8 +105,18 @@ start_local() {
     --admin-password=admin
   )
 
-  if [ "${E2E_ENABLE_MCP_LOCAL:-0}" = "1" ] && [ "${E2E_ENABLE_MCP_OAUTH_LOCAL:-0}" = "1" ]; then
-    echo "❌ Set only one of E2E_ENABLE_MCP_LOCAL or E2E_ENABLE_MCP_OAUTH_LOCAL."
+  local mcp_modes_enabled=0
+  if [ "${E2E_ENABLE_MCP_LOCAL:-0}" = "1" ]; then
+    mcp_modes_enabled=$((mcp_modes_enabled + 1))
+  fi
+  if [ "${E2E_ENABLE_MCP_OAUTH_LOCAL:-0}" = "1" ]; then
+    mcp_modes_enabled=$((mcp_modes_enabled + 1))
+  fi
+  if [ "${E2E_ENABLE_MCP_API_KEYS_LOCAL:-0}" = "1" ]; then
+    mcp_modes_enabled=$((mcp_modes_enabled + 1))
+  fi
+  if [ "$mcp_modes_enabled" -gt 1 ]; then
+    echo "❌ Set only one MCP E2E mode: E2E_ENABLE_MCP_LOCAL, E2E_ENABLE_MCP_OAUTH_LOCAL, or E2E_ENABLE_MCP_API_KEYS_LOCAL."
     exit 1
   fi
 
@@ -116,6 +126,12 @@ start_local() {
       --enable-mcp=true
     )
   elif [ "${E2E_ENABLE_MCP_OAUTH_LOCAL:-0}" = "1" ]; then
+    auth_args=(
+      --jwt-secret=e2e-tests-secret
+      --admin-password=admin
+      --enable-mcp=true
+    )
+  elif [ "${E2E_ENABLE_MCP_API_KEYS_LOCAL:-0}" = "1" ]; then
     auth_args=(
       --jwt-secret=e2e-tests-secret
       --admin-password=admin

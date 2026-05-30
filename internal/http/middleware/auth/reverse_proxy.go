@@ -17,6 +17,11 @@ type RemoteUserConfig struct {
 	UserService    *coreauth.UserService
 }
 
+const (
+	ContextAuthSource    = "authSource"
+	AuthSourceRemoteUser = "remote_user"
+)
+
 // InjectRemoteUser reads a username from a configured HTTP header when the request
 // originates from a trusted proxy IP. On success it stores the resolved user in the
 // Gin context so that RequireAuth can short-circuit JWT validation.
@@ -59,6 +64,12 @@ func InjectRemoteUser(cfg RemoteUserConfig) gin.HandlerFunc {
 		}
 
 		c.Set("user", user)
+		c.Set(ContextAuthSource, AuthSourceRemoteUser)
 		c.Next()
 	}
+}
+
+func IsRemoteUser(c *gin.Context) bool {
+	value, ok := c.Get(ContextAuthSource)
+	return ok && value == AuthSourceRemoteUser
 }

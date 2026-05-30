@@ -6,6 +6,7 @@ import { useSetTitle } from '../viewer/setTitle'
 import { ChangePasswordButton } from './ChangePasswordButton'
 import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
+import { MCPAPIKeysButton } from './MCPAPIKeysButton'
 import { useToolbarActions } from './useToolbarActions'
 
 export default function UserManagement() {
@@ -84,6 +85,7 @@ export default function UserManagement() {
                       </td>
                       <td className="settings__actions-cell">
                         <div className="settings__actions">
+                          <MCPAPIKeysButton user={user} />
                           <CreateEditUserButton user={user} />
                           <ChangePasswordButton user={user} />
                           <DeleteUserButton user={user} />

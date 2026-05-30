@@ -21,13 +21,13 @@ For plain local HTTP, `--allow-insecure=true` is required so LeafWiki can issue 
 
 MCP only starts when `--enable-mcp` is set and the server host is loopback-only: `localhost`, `127.0.0.1`, or `::1`. Do not expose this endpoint through Docker port publishing, a public reverse proxy, or a public network. A trusted reverse proxy may front LeafWiki for local/private use, but the MCP endpoint must still remain loopback/private.
 
-In normal authenticated mode, `/mcp` is protected by OAuth bearer tokens. Missing, invalid, expired, or insufficient-scope tokens are rejected before MCP requests reach tools. MCP requests do not use LeafWiki CSRF middleware, and OAuth tokens are separate from LeafWiki web JWT cookies.
+In normal authenticated mode, `/mcp` accepts bearer tokens from either the OAuth MCP flow or MCP-only API keys. Missing, invalid, expired, revoked, or insufficient-scope credentials are rejected before MCP requests reach tools. MCP requests do not use LeafWiki CSRF middleware, and MCP bearer credentials are separate from LeafWiki web JWT cookies.
 
 OAuth authorization requires a logged-in LeafWiki web user and an explicit browser approval step before an authorization code is issued. This prevents another local process from silently minting MCP tokens by opening the user's browser to a loopback callback. PKCE is still required, but PKCE only protects the code exchange for the requesting client; it is not treated as proof of user intent.
 
 The OAuth token identifies a LeafWiki user. LeafWiki loads the current user on every MCP request, so deleting the user or changing the user role affects existing tokens immediately. Read tools are allowed for any authenticated user; mutation tools require the current role to be `editor` or `admin`.
 
-Logging out of the LeafWiki web UI clears the browser session and CSRF cookies; it does not revoke already-issued MCP OAuth access or refresh tokens. In this MVP, token-backed MCP access ends when the user is removed, the access token expires, the refresh token expires, or the server restarts. Role changes take effect immediately for tool permissions: read tools remain available to authenticated users, while mutation tools require the current role to be `editor` or `admin`.
+Logging out of the LeafWiki web UI clears the browser session and CSRF cookies; it does not revoke already-issued MCP OAuth access or refresh tokens, and it does not revoke MCP API keys. In this MVP, OAuth-backed MCP access ends when the user is removed, the access token expires, the refresh token expires, or the server restarts. API-key-backed MCP access ends when the key is revoked or the user is removed. Role changes take effect immediately for tool permissions: read tools remain available to authenticated users, while mutation tools require the current role to be `editor` or `admin`.
 
 Legacy disabled-auth mode is still available for isolated local workflows:
 
@@ -62,6 +62,24 @@ LeafWiki also publishes OAuth discovery metadata:
 OAuth tokens use in-memory server storage in this MVP. OAuth-capable MCP clients should handle refresh tokens normally, but server restart requires clients to re-authorize. There is no revocation endpoint.
 
 When reverse-proxy remote-user authentication is enabled on a trusted local/private deployment, trusted remote-user requests can use the same OAuth authorize endpoint without a LeafWiki password login. The browser still shows the local approval screen, and the issued MCP token is bound to the resolved LeafWiki user from the trusted header.
+
+## MCP API Keys
+
+OAuth remains the recommended path for OAuth-capable MCP clients because it supports discovery, Dynamic Client Registration, PKCE, refresh tokens, and the browser approval flow. MCP API keys are an advanced/manual option for clients that can send a fixed bearer token.
+
+API keys use the same MCP scope and bearer header:
+
+```text
+Authorization: Bearer lwk_<id>_<secret>
+```
+
+API keys are accepted only by the MCP endpoint. They do not authenticate the normal HTTP API, web cookies, CSRF-protected writes, OAuth token exchange, OAuth metadata, or Dynamic Client Registration.
+
+Admins can create, list, and revoke MCP API keys for any user from User Management. Users can list and revoke their own keys from the account menu. Under password authentication, creating your own key requires the current password. Under trusted HTTP remote-user authentication, self-service creation is disabled in this MVP; existing keys can still be listed and revoked.
+
+The raw key secret is shown once when the key is created. LeafWiki stores only a hash of the full raw key plus metadata such as name, prefix, last four characters, owner, creator, creation time, last-used time, and revocation time. List responses never return the raw secret.
+
+MCP API keys do not expire in this MVP. They inherit the owner's current role on every MCP request, so role downgrades affect existing keys immediately. Revoked keys, deleted-user keys, malformed keys, and wrong-secret keys are rejected with `401` before tools run.
 
 ## Collaboration Model
 
@@ -122,7 +140,7 @@ Only available with `--enable-link-refactor`:
 
 ## Unsupported Operations
 
-MCP intentionally does not expose importer operations, branding operations or branding resources, login, refresh token, logout, password change, user administration, or admin-only settings.
+MCP intentionally does not expose importer operations, branding operations or branding resources, login, refresh token, logout, password change, API-key management, user administration, or admin-only settings.
 
 ## Pagination
 
@@ -156,9 +174,10 @@ npm --prefix e2e run lint
 npm --prefix e2e run format:check
 env E2E_RUN_MODE=local E2E_ENABLE_MCP_OAUTH_LOCAL=1 ./e2e/run.sh --grep "mcp.*oauth|oauth.*mcp"
 env E2E_RUN_MODE=local E2E_ENABLE_MCP_LOCAL=1 ./e2e/run.sh --grep "mcp.*disable auth|disable auth.*mcp"
+env E2E_RUN_MODE=local E2E_ENABLE_MCP_API_KEYS_LOCAL=1 ./e2e/run.sh tests/mcp-api-keys.spec.ts
 ```
 
-Normal local E2E mode remains authenticated. Set `E2E_ENABLE_MCP_OAUTH_LOCAL=1` for authenticated MCP OAuth smoke coverage, or `E2E_ENABLE_MCP_LOCAL=1` for the legacy disabled-auth MCP smoke test.
+Normal local E2E mode remains authenticated. Set `E2E_ENABLE_MCP_OAUTH_LOCAL=1` for authenticated MCP OAuth smoke coverage, `E2E_ENABLE_MCP_API_KEYS_LOCAL=1` for authenticated MCP API-key smoke coverage through the official TypeScript MCP client, or `E2E_ENABLE_MCP_LOCAL=1` for the legacy disabled-auth MCP smoke test.
 
 Implementation references:
 

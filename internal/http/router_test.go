@@ -19,8 +19,10 @@ import (
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
+	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
+	wikiauth "github.com/perber/wiki/internal/wiki/auth"
 )
 
 func pageNodeKind() *tree.NodeKind {
@@ -200,6 +202,32 @@ func authenticatedRequestAs(t *testing.T, router http.Handler, username, passwor
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	return rec
+}
+
+func assertNoStoreHeaders(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store", got)
+	}
+	if got := rec.Header().Get("Pragma"); got != "no-cache" {
+		t.Fatalf("Pragma = %q, want no-cache", got)
+	}
+	if got := rec.Header().Get("Expires"); got != "Thu, 01 Jan 1970 00:00:00 GMT" {
+		t.Fatalf("Expires = %q, want expired header", got)
+	}
+}
+
+func assertAPIKeyNullMetadata(t *testing.T, key map[string]any) {
+	t.Helper()
+	for _, field := range []string{"lastUsedAt", "revokedAt"} {
+		value, ok := key[field]
+		if !ok {
+			t.Fatalf("api key metadata missing %q: %#v", field, key)
+		}
+		if value != nil {
+			t.Fatalf("api key metadata %q = %#v, want null", field, value)
+		}
+	}
 }
 
 type apiPage struct {
@@ -3185,6 +3213,343 @@ func TestChangeOwnPasswordEndpoint(t *testing.T) {
 
 	if newRec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK with new password, got %d - %s", newRec.Code, newRec.Body.String())
+	}
+}
+
+func TestMCPAPIKeys_AdminCreatesListsAndRevokesUserKey(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	createUser := `{"username": "keyuser", "email": "keyuser@example.com", "password": "secretpassword", "role": "editor"}`
+	userRec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createUser))
+	if userRec.Code != http.StatusCreated {
+		t.Fatalf("create user = %d: %s", userRec.Code, userRec.Body.String())
+	}
+	var user map[string]any
+	if err := json.Unmarshal(userRec.Body.Bytes(), &user); err != nil {
+		t.Fatalf("decode user: %v", err)
+	}
+	userID := user["id"].(string)
+
+	createKey := authenticatedRequest(t, router, http.MethodPost, "/api/users/"+userID+"/mcp-api-keys", strings.NewReader(`{"name":"CLI"}`))
+	if createKey.Code != http.StatusCreated {
+		t.Fatalf("create api key = %d: %s", createKey.Code, createKey.Body.String())
+	}
+	assertNoStoreHeaders(t, createKey)
+	var created map[string]any
+	if err := json.Unmarshal(createKey.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created key: %v", err)
+	}
+	secret, _ := created["secret"].(string)
+	if !strings.HasPrefix(secret, "lwk_") {
+		t.Fatalf("secret = %q, want lwk_ prefix", secret)
+	}
+	key := created["key"].(map[string]any)
+	keyID := key["id"].(string)
+	if key["userId"] != userID || key["name"] != "CLI" {
+		t.Fatalf("created key metadata = %#v", key)
+	}
+	assertAPIKeyNullMetadata(t, key)
+
+	listKeys := authenticatedRequest(t, router, http.MethodGet, "/api/users/"+userID+"/mcp-api-keys", nil)
+	if listKeys.Code != http.StatusOK {
+		t.Fatalf("list api keys = %d: %s", listKeys.Code, listKeys.Body.String())
+	}
+	var listed []map[string]any
+	if err := json.Unmarshal(listKeys.Body.Bytes(), &listed); err != nil {
+		t.Fatalf("decode listed keys: %v", err)
+	}
+	if len(listed) != 1 || listed[0]["id"] != keyID {
+		t.Fatalf("listed keys = %#v, want created key", listed)
+	}
+	if _, ok := listed[0]["secret"]; ok {
+		t.Fatalf("list response exposed secret: %#v", listed[0])
+	}
+	if _, ok := listed[0]["secretHash"]; ok {
+		t.Fatalf("list response exposed secretHash: %#v", listed[0])
+	}
+	assertAPIKeyNullMetadata(t, listed[0])
+
+	revoke := authenticatedRequest(t, router, http.MethodDelete, "/api/users/"+userID+"/mcp-api-keys/"+keyID, nil)
+	if revoke.Code != http.StatusNoContent {
+		t.Fatalf("revoke api key = %d: %s", revoke.Code, revoke.Body.String())
+	}
+	listAfterRevoke := authenticatedRequest(t, router, http.MethodGet, "/api/users/"+userID+"/mcp-api-keys", nil)
+	var after []map[string]any
+	if err := json.Unmarshal(listAfterRevoke.Body.Bytes(), &after); err != nil {
+		t.Fatalf("decode keys after revoke: %v", err)
+	}
+	if len(after) != 0 {
+		t.Fatalf("revoked key still listed: %#v", after)
+	}
+}
+
+func TestMCPAPIKeys_RoutePermissionsAndValidation(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	createEditor := `{"username": "editor-key-user", "email": "editor-key-user@example.com", "password": "secretpassword", "role": "editor"}`
+	editorRec := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createEditor))
+	var editor map[string]any
+	if err := json.Unmarshal(editorRec.Body.Bytes(), &editor); err != nil {
+		t.Fatalf("decode editor: %v", err)
+	}
+	editorID := editor["id"].(string)
+
+	invalidName := authenticatedRequest(t, router, http.MethodPost, "/api/users/"+editorID+"/mcp-api-keys", strings.NewReader(`{"name":"   "}`))
+	if invalidName.Code != http.StatusBadRequest {
+		t.Fatalf("invalid name status = %d: %s", invalidName.Code, invalidName.Body.String())
+	}
+	var validation struct {
+		Error  string `json:"error"`
+		Fields []struct {
+			Field   string `json:"field"`
+			Message string `json:"message"`
+		} `json:"fields"`
+	}
+	if err := json.Unmarshal(invalidName.Body.Bytes(), &validation); err != nil {
+		t.Fatalf("decode validation: %v", err)
+	}
+	if validation.Error != "validation_error" || len(validation.Fields) == 0 || validation.Fields[0].Field != "name" {
+		t.Fatalf("validation body = %#v", validation)
+	}
+
+	missingUser := authenticatedRequest(t, router, http.MethodPost, "/api/users/missing/mcp-api-keys", strings.NewReader(`{"name":"CLI"}`))
+	if missingUser.Code != http.StatusNotFound {
+		t.Fatalf("missing user create = %d: %s", missingUser.Code, missingUser.Body.String())
+	}
+
+	emptyList := authenticatedRequest(t, router, http.MethodGet, "/api/users/"+editorID+"/mcp-api-keys", nil)
+	if emptyList.Code != http.StatusOK {
+		t.Fatalf("empty key list = %d: %s", emptyList.Code, emptyList.Body.String())
+	}
+	if strings.TrimSpace(emptyList.Body.String()) != "[]" {
+		t.Fatalf("empty key list body = %q, want []", emptyList.Body.String())
+	}
+
+	asEditor := authenticatedRequestAs(t, router, "editor-key-user", "secretpassword", http.MethodPost, "/api/users/missing/mcp-api-keys", strings.NewReader(`{"name":"CLI"}`))
+	if asEditor.Code != http.StatusForbidden {
+		t.Fatalf("non-admin administer other user = %d: %s", asEditor.Code, asEditor.Body.String())
+	}
+}
+
+func TestMCPAPIKeys_SelfServiceRequiresCurrentPasswordAndIsMCPOnly(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	createEditor := `{"username": "self-key-user", "email": "self-key-user@example.com", "password": "secretpassword", "role": "editor"}`
+	authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createEditor))
+
+	wrongPassword := authenticatedRequestAs(t, router, "self-key-user", "secretpassword", http.MethodPost, "/api/users/me/mcp-api-keys", strings.NewReader(`{"name":"Self","currentPassword":"wrong"}`))
+	if wrongPassword.Code != http.StatusBadRequest {
+		t.Fatalf("wrong current password = %d: %s", wrongPassword.Code, wrongPassword.Body.String())
+	}
+
+	createKey := authenticatedRequestAs(t, router, "self-key-user", "secretpassword", http.MethodPost, "/api/users/me/mcp-api-keys", strings.NewReader(`{"name":"Self","currentPassword":"secretpassword"}`))
+	if createKey.Code != http.StatusCreated {
+		t.Fatalf("self create api key = %d: %s", createKey.Code, createKey.Body.String())
+	}
+	assertNoStoreHeaders(t, createKey)
+	var created map[string]any
+	if err := json.Unmarshal(createKey.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode self-created key: %v", err)
+	}
+	secret := created["secret"].(string)
+	key := created["key"].(map[string]any)
+	keyID := key["id"].(string)
+	assertAPIKeyNullMetadata(t, key)
+
+	list := authenticatedRequestAs(t, router, "self-key-user", "secretpassword", http.MethodGet, "/api/users/me/mcp-api-keys", nil)
+	if list.Code != http.StatusOK {
+		t.Fatalf("self list api keys = %d: %s", list.Code, list.Body.String())
+	}
+	var listed []map[string]any
+	if err := json.Unmarshal(list.Body.Bytes(), &listed); err != nil {
+		t.Fatalf("decode self list: %v", err)
+	}
+	if len(listed) != 1 || listed[0]["id"] != keyID {
+		t.Fatalf("self list = %#v, want own key", listed)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer "+secret)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("api key authenticated normal HTTP API = %d, want 401", rec.Code)
+	}
+
+	revoke := authenticatedRequestAs(t, router, "self-key-user", "secretpassword", http.MethodDelete, "/api/users/me/mcp-api-keys/"+keyID, nil)
+	if revoke.Code != http.StatusNoContent {
+		t.Fatalf("self revoke api key = %d: %s", revoke.Code, revoke.Body.String())
+	}
+}
+
+func TestMCPAPIKeys_SelfCreateRateLimited(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	createEditor := `{"username": "rate-key-user", "email": "rate-key-user@example.com", "password": "secretpassword", "role": "editor"}`
+	authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createEditor))
+
+	for i := 0; i < 10; i++ {
+		rec := authenticatedRequestAs(t, router, "rate-key-user", "secretpassword", http.MethodPost, "/api/users/me/mcp-api-keys", strings.NewReader(`{"name":"Self","currentPassword":"wrong"}`))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("wrong current password attempt %d = %d: %s", i+1, rec.Code, rec.Body.String())
+		}
+	}
+	limited := authenticatedRequestAs(t, router, "rate-key-user", "secretpassword", http.MethodPost, "/api/users/me/mcp-api-keys", strings.NewReader(`{"name":"Self","currentPassword":"wrong"}`))
+	if limited.Code != http.StatusTooManyRequests {
+		t.Fatalf("rate-limited self create = %d: %s", limited.Code, limited.Body.String())
+	}
+}
+
+func TestMCPAPIKeys_RemoteUserSelfCreateDisabled(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	trustedProxies, err := authmw.ParseTrustedProxies("192.0.2.1")
+	if err != nil {
+		t.Fatalf("ParseTrustedProxies failed: %v", err)
+	}
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            false,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
+			Enabled:        true,
+			HeaderName:     "Remote-User",
+			TrustedProxies: trustedProxies,
+			UserService:    w.UserService(),
+		},
+	})
+
+	configReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	configReq.RemoteAddr = "192.0.2.1:1234"
+	configRec := httptest.NewRecorder()
+	router.ServeHTTP(configRec, configReq)
+	if configRec.Code != http.StatusOK {
+		t.Fatalf("remote-user config = %d: %s", configRec.Code, configRec.Body.String())
+	}
+	csrfToken := configRec.Header().Get("X-CSRF-Token")
+	cookies := configRec.Result().Cookies()
+	if csrfToken == "" {
+		for _, cookie := range cookies {
+			if cookie.Name == "leafwiki_csrf" || cookie.Name == "__Host-leafwiki_csrf" {
+				csrfToken = cookie.Value
+				break
+			}
+		}
+	}
+	if csrfToken == "" {
+		t.Fatalf("remote-user config did not issue CSRF token")
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/users/me/mcp-api-keys", nil)
+	listReq.RemoteAddr = "192.0.2.1:1234"
+	listReq.Header.Set("Remote-User", "admin")
+	for _, cookie := range cookies {
+		listReq.AddCookie(cookie)
+	}
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("remote-user self list = %d: %s", listRec.Code, listRec.Body.String())
+	}
+
+	createReq := httptest.NewRequest(http.MethodPost, "/api/users/me/mcp-api-keys", strings.NewReader(`{"name":"Proxy"}`))
+	createReq.RemoteAddr = "192.0.2.1:1234"
+	createReq.Header.Set("Content-Type", "application/json")
+	createReq.Header.Set("X-CSRF-Token", csrfToken)
+	createReq.Header.Set("Remote-User", "admin")
+	for _, cookie := range cookies {
+		createReq.AddCookie(cookie)
+	}
+	createRec := httptest.NewRecorder()
+	router.ServeHTTP(createRec, createReq)
+	if createRec.Code != http.StatusForbidden {
+		t.Fatalf("remote-user self create = %d: %s", createRec.Code, createRec.Body.String())
+	}
+}
+
+func TestMCPAPIKeys_SelfRoutesBlockedWhenAuthDisabled(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		AuthDisabled:            true,
+	})
+
+	configReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	configRec := httptest.NewRecorder()
+	router.ServeHTTP(configRec, configReq)
+	if configRec.Code != http.StatusOK {
+		t.Fatalf("auth-disabled config = %d: %s", configRec.Code, configRec.Body.String())
+	}
+	csrfToken := configRec.Header().Get("X-CSRF-Token")
+	cookies := configRec.Result().Cookies()
+	if csrfToken == "" {
+		for _, cookie := range cookies {
+			if cookie.Name == "leafwiki_csrf" || cookie.Name == "__Host-leafwiki_csrf" {
+				csrfToken = cookie.Value
+				break
+			}
+		}
+	}
+	if csrfToken == "" {
+		t.Fatalf("auth-disabled config did not issue CSRF token")
+	}
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "list", method: http.MethodGet, path: "/api/users/me/mcp-api-keys"},
+		{name: "create", method: http.MethodPost, path: "/api/users/me/mcp-api-keys", body: `{"name":"CLI","currentPassword":"admin"}`},
+		{name: "revoke", method: http.MethodDelete, path: "/api/users/me/mcp-api-keys/some-key"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			if tc.body != "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			if tc.method != http.MethodGet {
+				req.Header.Set("X-CSRF-Token", csrfToken)
+				for _, cookie := range cookies {
+					req.AddCookie(cookie)
+				}
+			}
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("%s auth-disabled self API-key route = %d: %s", tc.method, rec.Code, rec.Body.String())
+			}
+			var authErr wikiauth.AuthErrorResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &authErr); err != nil {
+				t.Fatalf("decode auth-disabled error: %v", err)
+			}
+			if authErr.Error.Code != wikiauth.ErrCodeAuthDisabled {
+				t.Fatalf("error code = %q, want %q; body=%s", authErr.Error.Code, wikiauth.ErrCodeAuthDisabled, rec.Body.String())
+			}
+		})
 	}
 }
 

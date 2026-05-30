@@ -813,6 +813,115 @@ func TestLocalMCPRegistration_AuthEnabledOAuthBearerProtection(t *testing.T) {
 	}
 }
 
+func TestLocalMCPRegistration_AuthEnabledAPIKeyBearerProtection(t *testing.T) {
+	w := newLocalMCPAuthTestWiki(t)
+	router := newLocalMCPTestRouter(w, oauthRouterOptions(""))
+
+	editor, err := w.UserService().CreateUser("api-editor", "api-editor@example.com", "editorpass", coreauth.RoleEditor)
+	if err != nil {
+		t.Fatalf("create api editor user: %v", err)
+	}
+	editorKey, err := w.APIKeyService().CreateAPIKey(editor.ID, "Editor MCP", editor.ID)
+	if err != nil {
+		t.Fatalf("create editor api key: %v", err)
+	}
+	editorSession := connectLocalMCPWithToken(t, router, "/mcp", editorKey.Secret)
+	current := callToolStructured(t, editorSession, "get_current_user", nil)
+	user := nestedMap(t, current, "user")
+	assertStringField(t, user, "username", "api-editor")
+	created := nestedMap(t, callToolStructured(t, editorSession, "create_page", map[string]any{
+		"title": "API Key Editor Page",
+		"slug":  "api-key-editor-page",
+	}), "page")
+	pageID := stringField(t, created, "id")
+	pageVersion := stringField(t, created, "version")
+	_ = callToolStructured(t, editorSession, "update_page", map[string]any{
+		"id":      pageID,
+		"version": pageVersion,
+		"title":   "API Key Editor Page",
+		"slug":    "api-key-editor-page",
+		"content": "updated through api key",
+	})
+
+	viewer, err := w.UserService().CreateUser("api-viewer", "api-viewer@example.com", "viewerpass", coreauth.RoleViewer)
+	if err != nil {
+		t.Fatalf("create api viewer user: %v", err)
+	}
+	viewerKey, err := w.APIKeyService().CreateAPIKey(viewer.ID, "Viewer MCP", viewer.ID)
+	if err != nil {
+		t.Fatalf("create viewer api key: %v", err)
+	}
+	viewerSession := connectLocalMCPWithToken(t, router, "/mcp", viewerKey.Secret)
+	_ = callToolStructured(t, viewerSession, "get_tree", nil)
+	viewerErr := callToolError(t, viewerSession, "create_page", map[string]any{
+		"title": "Viewer API Key Write",
+		"slug":  "viewer-api-key-write",
+	})
+	if !strings.Contains(strings.ToLower(viewerErr), "editor") && !strings.Contains(strings.ToLower(viewerErr), "admin") {
+		t.Fatalf("viewer api key create_page error = %q, want editor/admin permission detail", viewerErr)
+	}
+
+	if err := w.APIKeyService().RevokeAPIKey(editor.ID, editorKey.Key.ID); err != nil {
+		t.Fatalf("revoke editor api key: %v", err)
+	}
+	assertMCPBearerUnauthorized(t, router, "/mcp", editorKey.Secret)
+
+	roleUser, err := w.UserService().CreateUser("api-role-change", "api-role-change@example.com", "editorpass", coreauth.RoleEditor)
+	if err != nil {
+		t.Fatalf("create role-change user: %v", err)
+	}
+	roleKey, err := w.APIKeyService().CreateAPIKey(roleUser.ID, "Role MCP", roleUser.ID)
+	if err != nil {
+		t.Fatalf("create role-change api key: %v", err)
+	}
+	if _, err := w.UserService().UpdateUser(roleUser.ID, roleUser.Username, roleUser.Email, "", coreauth.RoleViewer); err != nil {
+		t.Fatalf("downgrade api key user: %v", err)
+	}
+	downgradedSession := connectLocalMCPWithToken(t, router, "/mcp", roleKey.Secret)
+	downgradedErr := callToolError(t, downgradedSession, "create_page", map[string]any{
+		"title": "Downgraded API Key Write",
+		"slug":  "downgraded-api-key-write",
+	})
+	if !strings.Contains(strings.ToLower(downgradedErr), "editor") && !strings.Contains(strings.ToLower(downgradedErr), "admin") {
+		t.Fatalf("downgraded api key create_page error = %q, want editor/admin permission detail", downgradedErr)
+	}
+
+	deleted, err := w.UserService().CreateUser("api-deleted", "api-deleted@example.com", "editorpass", coreauth.RoleEditor)
+	if err != nil {
+		t.Fatalf("create deleted api key user: %v", err)
+	}
+	deletedKey, err := w.APIKeyService().CreateAPIKey(deleted.ID, "Deleted MCP", deleted.ID)
+	if err != nil {
+		t.Fatalf("create deleted-user api key: %v", err)
+	}
+	if err := w.UserService().DeleteUser(deleted.ID); err != nil {
+		t.Fatalf("delete api key user: %v", err)
+	}
+	assertMCPBearerUnauthorized(t, router, "/mcp", deletedKey.Secret)
+	assertMCPBearerUnauthorized(t, router, "/mcp", "lwk_"+deletedKey.Key.ID+"_wrongsecret")
+}
+
+func TestLocalMCPRegistration_AuthEnabledBasePathAPIKeySession(t *testing.T) {
+	w := newLocalMCPAuthTestWiki(t)
+	router := newLocalMCPTestRouter(w, oauthRouterOptions("/wiki"))
+
+	admin, err := w.UserService().GetUserByUsername("admin")
+	if err != nil {
+		t.Fatalf("get admin user: %v", err)
+	}
+	apiKey, err := w.APIKeyService().CreateAPIKey(admin.ID, "Base Path MCP", admin.ID)
+	if err != nil {
+		t.Fatalf("create base-path api key: %v", err)
+	}
+	session := connectLocalMCPWithToken(t, router, "/wiki/mcp", apiKey.Secret)
+	current := callToolStructured(t, session, "get_current_user", nil)
+	user := nestedMap(t, current, "user")
+	assertStringField(t, user, "username", "admin")
+
+	config := callToolStructured(t, session, "get_config", nil)
+	assertStringField(t, config, "basePath", "/wiki")
+}
+
 func TestLocalMCPRegistration_AuthEnabledBasePathMetadataChallenge(t *testing.T) {
 	w := newLocalMCPAuthTestWiki(t)
 	router := newLocalMCPTestRouter(w, oauthRouterOptions("/wiki"))
@@ -1150,6 +1259,19 @@ func connectLocalMCPWithToken(t *testing.T, handler http.Handler, path, token st
 	}
 	t.Cleanup(func() { session.Close() })
 	return session
+}
+
+func assertMCPBearerUnauthorized(t *testing.T, router http.Handler, path, token string) {
+	t.Helper()
+
+	rec := performRequestWithHeaders(t, router, http.MethodPost, "http://leafwiki.local"+path, nil, strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`), map[string]string{
+		"Authorization": "Bearer " + token,
+		"Content-Type":  "application/json",
+		"Accept":        "application/json, text/event-stream",
+	})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("POST %s with bearer %q = %d, want 401: %s", path, token, rec.Code, rec.Body.String())
+	}
 }
 
 func assertStringField(t *testing.T, got map[string]any, field, want string) {
