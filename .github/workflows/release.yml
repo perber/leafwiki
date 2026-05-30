@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write      # required to create releases and upload assets
   id-token: write     # required for OIDC token (provenance attestation)
   attestations: write # required to write attestation to GitHub
 
