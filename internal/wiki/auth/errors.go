@@ -18,6 +18,7 @@ const (
 	ErrCodeAuthInvalidRole          = "auth_invalid_role"
 	ErrCodeAuthForbidden            = "auth_forbidden"
 	ErrCodeAuthAdminCannotDelete    = "auth_admin_cannot_delete"
+	ErrCodeAuthLastAdminCannotBeDemoted = "auth_last_admin_cannot_be_demoted"
 	ErrCodeAuthInternalError        = "auth_internal_error"
 	ErrCodeAuthInvalidPayload       = "auth_invalid_payload"
 	ErrCodeAuthCookieFailed         = "auth_cookie_failed"
@@ -82,6 +83,8 @@ func respondWithAuthError(c *gin.Context, err error) {
 		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRole, "Invalid role", "invalid role")
 	case errors.Is(err, coreauth.ErrUserAdminCannotBeDeleted):
 		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthAdminCannotDelete, "Admin user cannot be deleted", "admin user cannot be deleted")
+	case errors.Is(err, coreauth.ErrLastAdminCannotBeDemoted):
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthLastAdminCannotBeDemoted, "Cannot remove admin role from the last admin user", "cannot remove admin role from the last admin user")
 	case errors.Is(err, ErrAuthDisabled):
 		respondWithAuthStatusError(c, http.StatusForbidden, ErrCodeAuthDisabled, "Authentication is disabled", "authentication is disabled")
 	default:
@@ -99,7 +102,7 @@ func authErrorStatus(code string) int {
 		return http.StatusUnprocessableEntity
 	case ErrCodeAuthUserAlreadyExists:
 		return http.StatusConflict
-	case ErrCodeAuthInvalidRole, ErrCodeAuthAdminCannotDelete,
+	case ErrCodeAuthInvalidRole, ErrCodeAuthAdminCannotDelete, ErrCodeAuthLastAdminCannotBeDemoted,
 		ErrCodeAuthInvalidPayload, ErrCodeAuthCookieFailed, ErrCodeAuthCsrfFailed,
 		ErrCodeAuthInvalidRequest:
 		return http.StatusBadRequest

@@ -302,11 +302,15 @@ func (r *Routes) handleGetUsers(c *gin.Context) {
 
 func (r *Routes) handleUpdateUser(c *gin.Context) {
 	id := c.Param("id")
+	requester := authmw.MustGetUser(c)
+	if requester == nil {
+		return
+	}
 	var req struct {
 		Username string `json:"username" binding:"required"`
 		Email    string `json:"email" binding:"required"`
 		Password string `json:"password"`
-		Role     string `json:"role" binding:"required"`
+		Role     string `json:"role"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, "Invalid request", "invalid request")
@@ -314,6 +318,7 @@ func (r *Routes) handleUpdateUser(c *gin.Context) {
 	}
 	out, err := r.updateUser.Execute(c.Request.Context(), UpdateUserInput{
 		ID: id, Username: req.Username, Email: req.Email, Password: req.Password, Role: req.Role,
+		RequesterIsAdmin: requester.HasRole(coreauth.RoleAdmin),
 	})
 	if err != nil {
 		respondWithAuthError(c, err)
