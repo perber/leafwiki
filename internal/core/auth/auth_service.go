@@ -4,10 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService struct {
@@ -16,15 +17,25 @@ type AuthService struct {
 	secretKey            []byte
 	accessTokenLifetime  time.Duration
 	refreshTokenLifetime time.Duration
+	attempts             *loginAttemptTracker
+	dummyHash            []byte
 }
 
 func NewAuthService(userService *UserService, sessionStore *SessionStore, secret string, accessTokenTimeout, refreshTokenTimeout time.Duration) *AuthService {
+	if len(secret) < 32 {
+		slog.Warn("JWT secret is too short; a minimum of 32 characters is strongly recommended", "length", len(secret))
+	}
+	// Pre-compute a dummy hash to equalize Login() timing for non-existent users,
+	// preventing username enumeration via response-time differences.
+	dummyHash, _ := bcrypt.GenerateFromPassword([]byte("leafwiki-dummy-password"), bcrypt.DefaultCost)
 	return &AuthService{
 		userService:          userService,
 		sessionStore:         sessionStore,
 		secretKey:            []byte(secret),
 		accessTokenLifetime:  accessTokenTimeout,
 		refreshTokenLifetime: refreshTokenTimeout,
+		attempts:             newLoginAttemptTracker(),
+		dummyHash:            dummyHash,
 	}
 }
 
@@ -36,13 +47,22 @@ type AuthToken struct {
 }
 
 func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
-	user, err := a.userService.GetUserByEmailOrUsernameAndPassword(identifier, password)
+	user, err := a.userService.GetUserByIdentifier(identifier)
 	if err != nil {
+		_ = bcrypt.CompareHashAndPassword(a.dummyHash, []byte(password))
 		return nil, ErrUserInvalidCredentials
 	}
 
-	// Clear sensitive information from user object
-	user.Password = "" // Clear password from user object
+	if !a.attempts.recordAttempt(user.ID) {
+		return nil, ErrUserAccountLocked
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return nil, ErrUserInvalidCredentials
+	}
+
+	a.attempts.reset(user.ID)
+	user.Password = ""
 
 	accessToken, _, accessTokenExpiresAt, err := a.generateToken(user, a.accessTokenLifetime, "access")
 	if err != nil {
@@ -132,7 +152,7 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 	// having two valid tokens temporarily is safer than logging the user out.
 	err = a.sessionStore.RevokeSession(jti)
 	if err != nil {
-		log.Printf("Warning: failed to revoke used refresh token session: %v", err)
+		slog.Warn("failed to revoke used refresh token session", "error", err)
 	}
 
 	return &AuthToken{
@@ -166,12 +186,12 @@ func (a *AuthService) RevokeAllUserSessions(userID string) error {
 	return a.sessionStore.RevokeAllSessionsForUser(userID)
 }
 
-func generateJTI() string {
+func generateJTI() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		return ""
+		return "", err
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
 func (a *AuthService) parseClaims(tokenString string) (jwt.MapClaims, error) {
@@ -195,7 +215,10 @@ func (a *AuthService) parseClaims(tokenString string) (jwt.MapClaims, error) {
 }
 
 func (a *AuthService) generateToken(user *User, duration time.Duration, typ string) (string, string, int64, error) {
-	jti := generateJTI()
+	jti, err := generateJTI()
+	if err != nil {
+		return "", "", 0, err
+	}
 	expiresAt := time.Now().Add(duration).Unix()
 	claims := jwt.MapClaims{
 		"sub":   user.ID,

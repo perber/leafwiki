@@ -207,6 +207,17 @@ func (s *UserService) GetUserByUsername(username string) (*User, error) {
 	return user, nil
 }
 
+func (s *UserService) GetUserByIdentifier(identifier string) (*User, error) {
+	user, err := s.store.GetUserByUsername(identifier)
+	if err != nil {
+		user, err = s.store.GetUserByEmail(identifier)
+		if err != nil {
+			return nil, ErrUserNotFound
+		}
+	}
+	return user, nil
+}
+
 func (s *UserService) GetUserByEmailOrUsernameAndPassword(identifier, password string) (*User, error) {
 	user, err := s.store.GetUserByUsername(identifier)
 	if err != nil {

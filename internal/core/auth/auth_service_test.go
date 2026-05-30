@@ -25,7 +25,7 @@ func setupTestAuthService(t *testing.T) *AuthService {
 		t.Fatal(err)
 	}
 
-	authService := NewAuthService(userService, sessionStore, "mysecretkey", 1*time.Hour, 24*time.Hour*7)
+	authService := NewAuthService(userService, sessionStore, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
 	return authService
 }
 

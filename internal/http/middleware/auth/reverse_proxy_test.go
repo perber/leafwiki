@@ -300,7 +300,7 @@ func TestInjectRemoteUser_WithRequireAuth(t *testing.T) {
 	}
 	cleanupWithErrorCheck(t, "session store", sessionStore.Close)
 
-	authService := coreauth.NewAuthService(f.userService, sessionStore, "secret", 0, 0)
+	authService := coreauth.NewAuthService(f.userService, sessionStore, "test-secret-key-for-unit-tests-1", 0, 0)
 	authCookies := authmw.NewAuthCookies(true, 0, 0)
 
 	cfg := authmw.RemoteUserConfig{

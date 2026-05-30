@@ -1,6 +1,7 @@
 package security
 
 import (
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -53,9 +54,11 @@ func NewRateLimiter(limit int, window time.Duration, resetOnSuccess bool) gin.Ha
 	return func(c *gin.Context) {
 		// perform cleanup based on the current time before processing this request
 		rl.cleanup()
-		// currently we use the clientIP
-		// the rate limiting is not set on every endpoint, so this is acceptable
-		key := c.ClientIP()
+		host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+		if err != nil {
+			host = c.Request.RemoteAddr
+		}
+		key := host
 		now := time.Now()
 		cutoff := now.Add(-rl.window)
 
