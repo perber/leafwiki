@@ -5,11 +5,13 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	_ "modernc.org/sqlite"
 )
 
 type UserStore struct {
+	mu         sync.Mutex
 	storageDir string
 	filename   string
 	db         *sql.DB
@@ -36,11 +38,11 @@ func NewUserStore(storageDir string) (*UserStore, error) {
 }
 
 func (f *UserStore) Connect() error {
-	// Database is already open and connected
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.db != nil {
 		return nil
 	}
-	// Connect to the database
 	db, err := sql.Open("sqlite", databasePath(f.storageDir, f.filename))
 	if err != nil {
 		return err
@@ -72,6 +74,8 @@ func (f *UserStore) ensureSchema() error {
 }
 
 func (f *UserStore) Close() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.db != nil {
 		err := f.db.Close()
 		if err != nil {
@@ -300,78 +304,6 @@ func (f *UserStore) GetUserCount() (int, error) {
 		return 0, err
 	}
 	return count, nil
-}
-
-func (f *UserStore) GetUserByUsernameAndPassword(username, password string) (*User, error) {
-	// Ensure the database is connected
-	err := f.Connect()
-	if err != nil {
-		return nil, err
-	}
-	// Query the user by username and password
-	row := f.db.QueryRow(`
-		SELECT id, username, password, email, role
-		FROM users
-		WHERE username = ? AND password = ?;
-	`, username, password)
-
-	user := &User{}
-	err = row.Scan(&user.ID, &user.Username, &user.Password, &user.Email, &user.Role)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-	return user, nil
-}
-
-func (f *UserStore) GetUserByEmailAndPassword(email, password string) (*User, error) {
-	// Ensure the database is connected
-	err := f.Connect()
-	if err != nil {
-		return nil, err
-	}
-	// Query the user by email and password
-	row := f.db.QueryRow(`
-		SELECT id, username, password, email, role
-		FROM users
-		WHERE email = ? AND password = ?;
-	`, email, password)
-
-	user := &User{}
-	err = row.Scan(&user.ID, &user.Username, &user.Password, &user.Email, &user.Role)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-	return user, nil
-}
-
-func (f *UserStore) GetUserByUsernameOrEmailAndPassword(usernameOrEmail string, password string) (*User, error) {
-	// Ensure the database is connected
-	err := f.Connect()
-	if err != nil {
-		return nil, err
-	}
-	// Query the user by username or email and password
-	row := f.db.QueryRow(`
-		SELECT id, username, password, email, role
-		FROM users
-		WHERE (username = ? OR email = ?) AND password = ?;
-	`, usernameOrEmail, usernameOrEmail, password)
-
-	user := &User{}
-	err = row.Scan(&user.ID, &user.Username, &user.Password, &user.Email, &user.Role)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, ErrUserNotFound
-		}
-		return nil, err
-	}
-	return user, nil
 }
 
 func (f *UserStore) mapConstraintViolationToError(err error) error {
