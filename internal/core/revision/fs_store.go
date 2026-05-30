@@ -150,6 +150,9 @@ func (s *FSStore) SaveRevision(rev *Revision) error {
 	if rev.CreatedAt.IsZero() {
 		return fmt.Errorf("created_at is required")
 	}
+	if err := validateStorageID(rev.ID); err != nil {
+		return fmt.Errorf("invalid revision id: %s", rev.ID)
+	}
 
 	dst := s.revisionFilePath(rev.PageID, rev.ID, rev.CreatedAt)
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
@@ -466,7 +469,6 @@ func (s *FSStore) CopyAssetBlobToPath(hash string, expectedSize int64, dstPath s
 	return nil
 }
 
-
 func (s *FSStore) DeletePageRevisions(pageID string) error {
 	pageID = strings.TrimSpace(pageID)
 	if err := validateStorageID(pageID); err != nil {
@@ -516,7 +518,6 @@ func (s *FSStore) assetManifestPath(hash string) string {
 	return filepath.Join(s.baseDir(), "manifests", "assets", "sha256", shardHash(hash), hash+".json")
 }
 
-
 // validateStorageID checks that an ID is safe to use as a single file path component.
 // Rejects empty strings, path separators, and dot-only segments like "." or "..".
 func validateStorageID(id string) error {
@@ -531,7 +532,6 @@ func validateStorageID(id string) error {
 	}
 	return nil
 }
-
 func shardHash(hash string) string {
 	if len(hash) < 2 {
 		return "00"

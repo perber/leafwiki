@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/perber/wiki/internal/core/shared"
 	"golang.org/x/crypto/bcrypt"
@@ -106,6 +107,10 @@ func (s *UserService) UpdateUser(id, username, email, password, role string) (*U
 	existingUser, err = s.store.GetUserByEmail(email)
 	if err == nil && existingUser.ID != id {
 		return nil, ErrUserAlreadyExists
+	}
+
+	if strings.TrimSpace(role) == "" {
+		role = user.Role
 	}
 
 	// Validate role

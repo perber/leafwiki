@@ -88,6 +88,23 @@ func TestUserService_UpdateUser(t *testing.T) {
 	}
 }
 
+func TestUserService_UpdateUser_EmptyRolePreservesExistingRole(t *testing.T) {
+	service := setupTestUserService(t)
+
+	user, _ := service.CreateUser("bob", "bob@example.com", "initial", RoleEditor)
+
+	updated, err := service.UpdateUser(user.ID, "bobnew", "bobnew@example.com", "", "")
+	if err != nil {
+		t.Fatalf("UpdateUser failed: %v", err)
+	}
+
+	if updated.Username != "bobnew" || updated.Email != "bobnew@example.com" {
+		t.Errorf("Update did not persist profile fields")
+	}
+	if updated.Role != RoleEditor {
+		t.Errorf("expected role %q, got %q", RoleEditor, updated.Role)
+	}
+}
 func TestUserService_UpdateUser_LastAdminCannotBeDemoted(t *testing.T) {
 	service := setupTestUserService(t)
 

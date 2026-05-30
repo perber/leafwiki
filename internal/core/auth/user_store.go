@@ -183,7 +183,7 @@ func (f *UserStore) UpdateUser(user *User) error {
 	}
 
 	// Check if a user with the given ID exists
-	_, err = f.GetUserByID(user.ID)
+	existingUser, err := f.GetUserByID(user.ID)
 	if err != nil {
 		if err == ErrUserNotFound {
 			return ErrUserNotFound
@@ -192,13 +192,25 @@ func (f *UserStore) UpdateUser(user *User) error {
 	}
 
 	// Update the user in the database
-	_, err = f.db.Exec(`
+	result, err := f.db.Exec(`
 		UPDATE users
 		SET username = ?, password = ?, email = ?, role = ?
-		WHERE id = ?;
-	`, user.Username, user.Password, user.Email, user.Role, user.ID)
+		WHERE id = ?
+		  AND NOT (
+			role = ?
+			AND ? != ?
+			AND (SELECT COUNT(*) FROM users WHERE role = ?) <= 1
+		  );
+	`, user.Username, user.Password, user.Email, user.Role, user.ID, RoleAdmin, user.Role, RoleAdmin, RoleAdmin)
 	if err != nil {
 		return f.mapConstraintViolationToError(err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 && existingUser.Role == RoleAdmin && user.Role != RoleAdmin {
+		return ErrLastAdminCannotBeDemoted
 	}
 	return nil
 }

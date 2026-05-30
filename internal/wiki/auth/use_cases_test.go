@@ -15,7 +15,11 @@ func setupUpdateUserUseCase(t *testing.T) (*UpdateUserUseCase, *coreauth.UserSer
 	if err != nil {
 		t.Fatalf("NewUserStore: %v", err)
 	}
-	t.Cleanup(func() { store.Close() })
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("Close: %v", err)
+		}
+	})
 
 	userSvc := coreauth.NewUserService(store)
 	resolver, err := coreauth.NewUserResolver(userSvc)
@@ -47,6 +51,37 @@ func TestUpdateUser_AdminCanChangeRole(t *testing.T) {
 	}
 	if out.User.Role != coreauth.RoleAdmin {
 		t.Errorf("expected role %q, got %q", coreauth.RoleAdmin, out.User.Role)
+	}
+}
+
+// TestUpdateUser_AdminCanUpdateProfileWithoutRole verifies that an admin can
+// update username/email without sending a role and the existing role is kept.
+func TestUpdateUser_AdminCanUpdateProfileWithoutRole(t *testing.T) {
+	uc, svc := setupUpdateUserUseCase(t)
+
+	editor, err := svc.CreateUser("ed", "ed@example.com", "pass", coreauth.RoleEditor)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	out, err := uc.Execute(context.Background(), UpdateUserInput{
+		ID:               editor.ID,
+		Username:         "ed-admin-updated",
+		Email:            "ed-admin-updated@example.com",
+		Role:             "",
+		RequesterIsAdmin: true,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if out.User.Username != "ed-admin-updated" {
+		t.Errorf("expected username %q, got %q", "ed-admin-updated", out.User.Username)
+	}
+	if out.User.Email != "ed-admin-updated@example.com" {
+		t.Errorf("expected email %q, got %q", "ed-admin-updated@example.com", out.User.Email)
+	}
+	if out.User.Role != coreauth.RoleEditor {
+		t.Errorf("expected role %q, got %q", coreauth.RoleEditor, out.User.Role)
 	}
 }
 
