@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
@@ -39,14 +40,26 @@ func NewLinksStore(storageDir string) (*LinksStore, error) {
 		filename:   "links.db",
 	}
 
-	err := s.Connect()
-	if err != nil {
+	if err := s.Connect(); err != nil {
 		return nil, err
 	}
 
-	// Ensure the schema is created
-	if err = s.ensureSchema(); err != nil {
-		return nil, err
+	if err := s.ensureSchema(); err != nil {
+		_ = s.db.Close()
+		s.db = nil
+		if !sqliteutil.IsSQLiteRecoverableError(err) {
+			return nil, err
+		}
+		slog.Default().Warn("links database corrupt, removing and retrying", "error", err)
+		sqliteutil.RemoveSQLiteFiles(linksDatabasePath(s.storageDir, s.filename))
+		if err2 := s.Connect(); err2 != nil {
+			return nil, err2
+		}
+		if err2 := s.ensureSchema(); err2 != nil {
+			_ = s.db.Close()
+			s.db = nil
+			return nil, err2
+		}
 	}
 
 	return s, nil
