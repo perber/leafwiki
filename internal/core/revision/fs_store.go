@@ -144,7 +144,7 @@ func (s *FSStore) SaveRevision(rev *Revision) error {
 	if strings.TrimSpace(rev.ID) == "" {
 		return fmt.Errorf("revision id is required")
 	}
-	if strings.TrimSpace(rev.PageID) == "" {
+	if err := validateStorageID(rev.PageID); err != nil {
 		return fmt.Errorf("page id is required")
 	}
 	if rev.CreatedAt.IsZero() {
@@ -178,6 +178,9 @@ func (s *FSStore) ListRevisions(pageID string) ([]*Revision, error) {
 }
 
 func (s *FSStore) ListRevisionsPage(pageID, cursor string, limit int) ([]*Revision, string, error) {
+	if err := validateStorageID(pageID); err != nil {
+		return nil, "", fmt.Errorf("invalid page ID: %w", err)
+	}
 	names, err := s.revisionFileNames(pageID)
 	if err != nil {
 		return nil, "", err
@@ -224,6 +227,9 @@ func (s *FSStore) ListRevisionsPage(pageID, cursor string, limit int) ([]*Revisi
 }
 
 func (s *FSStore) GetLatestRevision(pageID string) (*Revision, error) {
+	if err := validateStorageID(pageID); err != nil {
+		return nil, fmt.Errorf("invalid page ID: %w", err)
+	}
 	names, err := s.revisionFileNames(pageID)
 	if err != nil {
 		return nil, err
@@ -239,6 +245,9 @@ func (s *FSStore) GetLatestRevision(pageID string) (*Revision, error) {
 }
 
 func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
+	if err := validateStorageID(pageID); err != nil {
+		return nil, fmt.Errorf("invalid page ID: %w", err)
+	}
 	revisionID = strings.TrimSpace(revisionID)
 	if revisionID == "" {
 		return nil, os.ErrNotExist
@@ -281,6 +290,9 @@ func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
 func (s *FSStore) PruneRevisions(pageID string, keepCount int) error {
 	if keepCount <= 0 {
 		return nil
+	}
+	if err := validateStorageID(pageID); err != nil {
+		return fmt.Errorf("invalid page ID: %w", err)
 	}
 	names, err := s.revisionFileNames(pageID)
 	if err != nil || len(names) <= keepCount {
@@ -457,7 +469,7 @@ func (s *FSStore) CopyAssetBlobToPath(hash string, expectedSize int64, dstPath s
 
 func (s *FSStore) DeletePageRevisions(pageID string) error {
 	pageID = strings.TrimSpace(pageID)
-	if pageID == "" {
+	if err := validateStorageID(pageID); err != nil {
 		return nil
 	}
 
@@ -504,6 +516,21 @@ func (s *FSStore) assetManifestPath(hash string) string {
 	return filepath.Join(s.baseDir(), "manifests", "assets", "sha256", shardHash(hash), hash+".json")
 }
 
+
+// validateStorageID checks that an ID is safe to use as a single file path component.
+// Rejects empty strings, path separators, and dot-only segments like "." or "..".
+func validateStorageID(id string) error {
+	if strings.TrimSpace(id) == "" {
+		return fmt.Errorf("id must not be empty")
+	}
+	if strings.ContainsAny(id, "/\\") {
+		return fmt.Errorf("id must not contain path separators")
+	}
+	if id == "." || id == ".." {
+		return fmt.Errorf("id must not be a dot component")
+	}
+	return nil
+}
 
 func shardHash(hash string) string {
 	if len(hash) < 2 {
