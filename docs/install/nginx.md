@@ -11,24 +11,31 @@ Run the installation script:
 ```bash
 curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh
 chmod +x ./install.sh
-sudo ./install.sh --arch arm64 --port 8080 --host 127.0.0.1
+sudo ./install.sh
 ```
 
 Thanks to @Hugo-Galley for providing this installation script!
 
 During installation, you’ll be prompted for:
 
-- **JWT password:** choose a secure secret  
-- **Admin password:** for the LeafWiki admin user  
-- **Public read access (y/N):** enter `y` if you want guests to read without login  
-- **Data directory (default /root/data):** press Enter for default or specify a path  
+- **Architecture (amd64/arm64):** choose the release for your machine
+- **JWT password:** choose a secure secret
+- **Admin password:** for the LeafWiki admin user
+- **Host:** use `127.0.0.1` when nginx is the public entrypoint
+- **Port:** use `8080` to match the nginx example below
+- **Public read access (y/N):** enter `y` if you want guests to read without login
+- **Data directory (default `$PWD/data`):** press Enter for default or specify a path
+- **Root directory (default `<data-directory>/root`):** optional managed markdown directory
+
+Changing the root directory does not migrate existing markdown pages. For an existing install, move or copy the old `<data-directory>/root` content before starting LeafWiki with a new root directory.
 
 When complete, LeafWiki will be running as a systemd service:
 
 ```
 Host: 127.0.0.1
 Port: 8080
-DataDirectory: /root/data
+DataDirectory: <current-directory>/data
+RootDirectory: <current-directory>/data/root
 Status: active
 ```
 
@@ -87,7 +94,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-Now LeafWiki should be accessible at  
+Now LeafWiki should be accessible at
 ➡️ `http://demo.leafwiki.com`
 
 ---
@@ -118,8 +125,8 @@ Follow the prompts:
 
 ## 5. Final nginx Configuration (with HTTPS)
 
-After Certbot runs, your configuration at  
-`/etc/nginx/sites-available/demo.leafwiki.com.conf`  
+After Certbot runs, your configuration at
+`/etc/nginx/sites-available/demo.leafwiki.com.conf`
 should look like this:
 
 ```nginx
@@ -158,14 +165,14 @@ server {
 }
 ```
 
-Now LeafWiki is available securely at:  
+Now LeafWiki is available securely at:
 ➡️ **https://demo.leafwiki.com**
 
 ---
 
 ## 6. Auto-Renew SSL Certificates
 
-Certbot installs a renewal timer automatically.  
+Certbot installs a renewal timer automatically.
 You can test it with:
 
 ```bash
@@ -174,7 +181,7 @@ sudo certbot renew --dry-run
 
 ---
 
-✅ **Result:**  
-- LeafWiki runs locally on port `8080`  
-- nginx proxies requests from your domain  
-- HTTPS is automatically managed by Let’s Encrypt  
+✅ **Result:**
+- LeafWiki runs locally on port `8080`
+- nginx proxies requests from your domain
+- HTTPS is automatically managed by Let’s Encrypt

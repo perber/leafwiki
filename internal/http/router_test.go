@@ -49,6 +49,22 @@ func createWikiTestInstanceWithRevisionFlag(t *testing.T, enableRevision bool) *
 	return w
 }
 
+func createWikiTestInstanceWithWorkspace(t *testing.T, workspace wiki.Workspace) *wiki.Wiki {
+	t.Helper()
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		Workspace:           workspace,
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+		EnableRevision:      true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	return w
+}
+
 func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return createRouterTestInstanceWithMaxAssetUploadSize(w, t, assets.DefaultMaxUploadSizeBytes)
 }
@@ -468,7 +484,7 @@ func getAdminUserIDViaAPI(t *testing.T, router http.Handler) string {
 func writePageMarkdownForTest(t *testing.T, w *wiki.Wiki, page *apiPage, raw string) {
 	t.Helper()
 
-	pagePath := filepath.Join(w.GetStorageDir(), "root", filepath.FromSlash(page.Path)+".md")
+	pagePath := filepath.Join(w.GetRootDir(), filepath.FromSlash(page.Path)+".md")
 	if err := os.WriteFile(pagePath, []byte(raw), 0o644); err != nil {
 		t.Fatalf("WriteFile(page markdown) failed: %v", err)
 	}
@@ -2488,12 +2504,20 @@ func TestUpdatePage_InvalidProperties(t *testing.T) {
 }
 
 func TestGetPageEndpoint(t *testing.T) {
-	w := createWikiTestInstance(t)
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	w := createWikiTestInstanceWithWorkspace(t, wiki.Workspace{ID: "default", DataDir: dataDir, RootDir: rootDir})
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
 	// Create a page
 	page := createPageViaAPI(t, router, "Welcome", "welcome", nil, pageNodeKind())
+	if _, err := os.Stat(filepath.Join(rootDir, "welcome.md")); err != nil {
+		t.Fatalf("expected API-created page in root dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "root", "welcome.md")); !os.IsNotExist(err) {
+		t.Fatalf("expected no API-created page in data dir root, got err=%v", err)
+	}
 	writePageMarkdownForTest(t, w, page, `---
 leafwiki_id: `+page.ID+`
 leafwiki_title: Welcome
@@ -3463,12 +3487,12 @@ func TestMCPAPIKeys_SelfServiceRequiresCurrentPasswordAndIsMCPOnly(t *testing.T)
 		t.Fatalf("self list = %#v, want own key", listed)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
 	req.Header.Set("Authorization", "Bearer "+secret)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("api key authenticated normal HTTP API = %d, want 401", rec.Code)
+		t.Fatalf("api key authenticated protected normal HTTP API = %d, want 401", rec.Code)
 	}
 
 	revoke := authenticatedRequestAs(t, router, "self-key-user", "secretpassword", http.MethodDelete, "/api/users/me/mcp-api-keys/"+keyID, nil)

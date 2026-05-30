@@ -101,6 +101,10 @@ run-e2e-local-fast:
 	@echo "⚡ Starting end-to-end tests (local, skip UI build)..."
 	@E2E_RUN_MODE=local E2E_SKIP_UI_BUILD=1 ./e2e/run.sh $(if $(GREP),--grep "$(GREP)",)
 
+run-e2e-root-dir:
+	@echo "🗂️ Starting root-dir storage boundary E2E smoke..."
+	@E2E_RUN_MODE=local E2E_ENABLE_SEPARATE_ROOT_DIR=1 ./e2e/run.sh --grep "Separate root dir"
+
 help:
 	@echo "Available commands:"
 	@echo "  make build                – Build binary for current system"
@@ -113,8 +117,9 @@ help:
 	@echo "  make run-e2e-local        – Run end-to-end tests via local fast path"
 	@echo "  make run-e2e-local-fast   – Run E2E tests locally, skip UI build (use when dist/ is current)"
 	@echo "                              Optional: GREP=<pattern> to filter tests"
+	@echo "  make run-e2e-root-dir     – Run focused E2E smoke for separate root dir storage"
 	@echo "  make run                  – Run development server"
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-e2e-root-dir run-proxy-e2e

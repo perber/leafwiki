@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -46,6 +47,7 @@ type Wiki struct {
 	searchIndex  *search.SQLiteIndex
 	status       *search.IndexingStatus
 	storageDir   string
+	workspace    Workspace
 
 	// Domain route registrars (populated by NewWiki).
 	pagesRoutes      *wikipages.Routes
@@ -72,6 +74,7 @@ type Wiki struct {
 const SYSTEM_USER_ID = "system"
 
 type WikiOptions struct {
+	Workspace               Workspace
 	StorageDir              string        // Path to storage directory
 	AdminPassword           string        // Initial admin password
 	JWTSecret               string        // JWT secret for authentication
@@ -84,8 +87,16 @@ type WikiOptions struct {
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
+	workspace := resolveWorkspaceOptions(options)
+	if err := ValidateWorkspace(workspace); err != nil {
+		return nil, err
+	}
+	if err := ensureWorkspaceDirs(workspace); err != nil {
+		return nil, err
+	}
 	w := &Wiki{
-		storageDir: options.StorageDir,
+		storageDir: workspace.DataDir,
+		workspace:  workspace,
 		log:        slog.Default().With("component", "Wiki"),
 	}
 	if err := w.initAuth(options); err != nil {
@@ -124,6 +135,23 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	}
 	w.buildRoutes(options)
 	return w, nil
+}
+
+func resolveWorkspaceOptions(options *WikiOptions) Workspace {
+	if options.Workspace.DataDir != "" {
+		return NormalizeWorkspace(options.Workspace)
+	}
+	return DefaultWorkspace(options.StorageDir)
+}
+
+func ensureWorkspaceDirs(workspace Workspace) error {
+	if err := os.MkdirAll(workspace.DataDir, 0o755); err != nil {
+		return fmt.Errorf("create data dir: %w", err)
+	}
+	if err := os.MkdirAll(workspace.RootDir, 0o755); err != nil {
+		return fmt.Errorf("create root dir: %w", err)
+	}
+	return nil
 }
 
 func (w *Wiki) ensureBaselineRevisions() {
@@ -207,7 +235,10 @@ func (w *Wiki) initOAuth(options *WikiOptions) error {
 }
 
 func (w *Wiki) initCoreServices(options *WikiOptions) error {
-	w.tree = tree.NewTreeService(w.storageDir)
+	w.tree = tree.NewTreeServiceWithOptions(tree.TreeOptions{
+		DataDir: w.workspace.DataDir,
+		RootDir: w.workspace.RootDir,
+	})
 	if err := w.tree.LoadTree(); err != nil {
 		return err
 	}
@@ -459,7 +490,10 @@ func (w *Wiki) buildBrandingRoutes() *wikibranding.Routes {
 }
 
 func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
-	importerDir := filepath.Join(options.StorageDir, ".importer")
+	importerDir := filepath.Join(w.storageDir, ".importer")
+	if err := os.MkdirAll(importerDir, 0o755); err != nil {
+		w.log.Warn("failed to create importer state directory", "path", importerDir, "error", err)
+	}
 	adapter := NewWikiImportAdapter(w)
 	planner := coreimporter.NewPlanner(adapter, w.slug)
 	store := coreimporter.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
@@ -627,6 +661,14 @@ For more information, visit the [LeafWiki GitHub repository](https://github.com/
 
 func (w *Wiki) GetStorageDir() string {
 	return w.storageDir
+}
+
+func (w *Wiki) GetRootDir() string {
+	return w.workspace.RootDir
+}
+
+func (w *Wiki) Workspace() Workspace {
+	return w.workspace
 }
 
 func (w *Wiki) UserService() *auth.UserService {

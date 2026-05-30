@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,22 @@ import (
 func createWikiTestInstance(t *testing.T) *Wiki {
 	wikiInstance, err := NewWiki(&WikiOptions{
 		StorageDir:          t.TempDir(),
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+		EnableRevision:      true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	return wikiInstance
+}
+
+func createWikiTestInstanceWithWorkspace(t *testing.T, workspace Workspace) *Wiki {
+	t.Helper()
+	wikiInstance, err := NewWiki(&WikiOptions{
+		Workspace:           workspace,
 		AdminPassword:       "admin",
 		JWTSecret:           "secretkey",
 		AccessTokenTimeout:  15 * time.Minute,
@@ -86,6 +103,178 @@ func TestWiki_DeletePage_Simple(t *testing.T) {
 	deletePageForTest(t, w, "system", page.ID, false)
 	if _, err := w.tree.GetPage(page.ID); err == nil {
 		t.Fatalf("expected deleted page to be gone")
+	}
+}
+
+func TestWiki_DefaultWorkspaceKeepsExistingStorageLayout(t *testing.T) {
+	dataDir := t.TempDir()
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:          dataDir,
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+
+	if got := wikiInstance.GetStorageDir(); got != dataDir {
+		t.Fatalf("GetStorageDir() = %q, want %q", got, dataDir)
+	}
+	if got, want := wikiInstance.GetRootDir(), filepath.Join(dataDir, "root"); got != want {
+		t.Fatalf("GetRootDir() = %q, want %q", got, want)
+	}
+	if got := wikiInstance.Workspace(); got.ID != "default" || got.DataDir != dataDir || got.RootDir != filepath.Join(dataDir, "root") {
+		t.Fatalf("unexpected default workspace: %#v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "root", "welcome-to-leafwiki.md")); err != nil {
+		t.Fatalf("expected welcome page in default root dir: %v", err)
+	}
+}
+
+func TestWiki_ExplicitWorkspaceStoresContentInRootDirAndStateInDataDir(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	rootDir := filepath.Join(t.TempDir(), "content")
+	w := createWikiTestInstanceWithWorkspace(t, Workspace{
+		ID:      "default",
+		DataDir: dataDir,
+		RootDir: rootDir,
+	})
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	if got := w.GetStorageDir(); got != dataDir {
+		t.Fatalf("GetStorageDir() = %q, want %q", got, dataDir)
+	}
+	if got := w.GetRootDir(); got != rootDir {
+		t.Fatalf("GetRootDir() = %q, want %q", got, rootDir)
+	}
+	if _, err := os.Stat(filepath.Join(rootDir, "welcome-to-leafwiki.md")); err != nil {
+		t.Fatalf("expected welcome page in explicit root dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "root", "welcome-to-leafwiki.md")); !os.IsNotExist(err) {
+		t.Fatalf("expected no welcome page in data dir root, got err=%v", err)
+	}
+	for _, rel := range []string{
+		"users.db",
+		"sessions.db",
+		"search.db",
+		"links.db",
+		"tags.db",
+		"properties.db",
+		"assets",
+		".leafwiki",
+		".importer",
+		"branding",
+	} {
+		if _, err := os.Stat(filepath.Join(dataDir, rel)); err != nil {
+			t.Fatalf("expected app state %s in data dir: %v", rel, err)
+		}
+	}
+
+	if err := w.branding.UpdateBranding("Workspace Wiki"); err != nil {
+		t.Fatalf("UpdateBranding failed: %v", err)
+	}
+	logo, err := os.CreateTemp(t.TempDir(), "logo-*.png")
+	if err != nil {
+		t.Fatalf("CreateTemp logo failed: %v", err)
+	}
+	defer func() {
+		if err := logo.Close(); err != nil {
+			t.Fatalf("Close logo failed: %v", err)
+		}
+	}()
+	if _, err := logo.Write([]byte("png")); err != nil {
+		t.Fatalf("Write logo failed: %v", err)
+	}
+	if _, err := logo.Seek(0, 0); err != nil {
+		t.Fatalf("Seek logo failed: %v", err)
+	}
+	if _, err := w.branding.UploadLogo(logo, "logo.png"); err != nil {
+		t.Fatalf("UploadLogo failed: %v", err)
+	}
+	for _, rel := range []string{
+		"branding.json",
+		filepath.Join("branding", "logo.png"),
+	} {
+		if _, err := os.Stat(filepath.Join(dataDir, rel)); err != nil {
+			t.Fatalf("expected branding state %s in data dir: %v", rel, err)
+		}
+		if _, err := os.Stat(filepath.Join(rootDir, rel)); !os.IsNotExist(err) {
+			t.Fatalf("expected no branding state %s in root dir, got err=%v", rel, err)
+		}
+	}
+}
+
+func TestWiki_RejectsWorkspaceWithSameDataAndRootDir(t *testing.T) {
+	dir := t.TempDir()
+
+	_, err := NewWiki(&WikiOptions{
+		Workspace:           Workspace{ID: "default", DataDir: dir, RootDir: filepath.Clean(filepath.Join(dir, "."))},
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err == nil {
+		t.Fatalf("expected same data/root dir to be rejected")
+	}
+	if !strings.Contains(err.Error(), "root dir must be different from data dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWiki_RejectsWorkspaceWhenRootDirContainsDataDir(t *testing.T) {
+	rootDir := filepath.Join(t.TempDir(), "wiki")
+	dataDir := filepath.Join(rootDir, "data")
+
+	_, err := NewWiki(&WikiOptions{
+		Workspace:           Workspace{ID: "default", DataDir: dataDir, RootDir: rootDir},
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err == nil {
+		t.Fatalf("expected root dir containing data dir to be rejected")
+	}
+	if !strings.Contains(err.Error(), "root dir must not contain data dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, statErr := os.Stat(rootDir); !os.IsNotExist(statErr) {
+		t.Fatalf("expected invalid root dir not to be created before startup, got err=%v", statErr)
+	}
+}
+
+func TestWiki_NormalizesWorkspacePathsBeforeInitializingServices(t *testing.T) {
+	baseDir := t.TempDir()
+	dataDir := filepath.Join(baseDir, "data")
+	rootDir := filepath.Join(baseDir, "content")
+
+	w, err := NewWiki(&WikiOptions{
+		Workspace:           Workspace{ID: "default", DataDir: " " + dataDir + string(os.PathSeparator) + "." + " ", RootDir: " " + rootDir + string(os.PathSeparator) + "." + " "},
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("NewWiki failed: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	if got := w.GetStorageDir(); got != dataDir {
+		t.Fatalf("GetStorageDir() = %q, want normalized %q", got, dataDir)
+	}
+	if got := w.GetRootDir(); got != rootDir {
+		t.Fatalf("GetRootDir() = %q, want normalized %q", got, rootDir)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "users.db")); err != nil {
+		t.Fatalf("expected auth state in normalized data dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(rootDir, "welcome-to-leafwiki.md")); err != nil {
+		t.Fatalf("expected content in normalized root dir: %v", err)
 	}
 }
 
@@ -294,7 +483,7 @@ func TestWiki_EnsureBaselineRevisions_SkipsUnreadablePages(t *testing.T) {
 		t.Fatalf("DeletePageData(brokenPage) failed: %v", err)
 	}
 
-	brokenPath := filepath.Join(w.storageDir, "root", "broken.md")
+	brokenPath := filepath.Join(w.GetRootDir(), "broken.md")
 	if err := os.Remove(brokenPath); err != nil {
 		t.Fatalf("Remove(%s) failed: %v", brokenPath, err)
 	}

@@ -168,7 +168,7 @@ func (t *TreeService) migrationDependencies() treemigration.Dependencies {
 		CurrentSchemaVersion: CurrentSchemaVersion,
 		SaveTree:             t.persistLegacyTreeSnapshotLocked,
 		SaveSchema: func(version int) error {
-			return saveSchema(t.storageDir, version)
+			return saveSchema(t.dataDir, version)
 		},
 		IsMissingContentErr: func(err error) bool {
 			return errors.Is(err, os.ErrNotExist) || errors.Is(err, ErrFileNotFound)
@@ -187,7 +187,7 @@ func (t *TreeService) persistLegacyTreeSnapshotLocked() error {
 	}
 	raw = append(raw, byte(10))
 
-	if err := shared.WriteFileAtomic(filepath.Join(t.storageDir, legacyTreeFilename), raw, 0o644); err != nil {
+	if err := shared.WriteFileAtomic(filepath.Join(t.dataDir, legacyTreeFilename), raw, 0o644); err != nil {
 		return fmt.Errorf("write legacy migration snapshot: %w", err)
 	}
 

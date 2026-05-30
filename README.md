@@ -115,6 +115,8 @@ docker run -p 8080:8080 \
 
 The data directory must be writable by the specified user.
 
+If `LEAFWIKI_ROOT_DIR` or `--root-dir` points outside `/app/data`, mount that path as a second writable volume, for example `-v ~/leafwiki-pages:/app/pages -e LEAFWIKI_ROOT_DIR=/app/pages`.
+
 ### Docker Compose
 
 ```yaml
@@ -178,6 +180,8 @@ The server binds to `127.0.0.1:8080` by default. To expose it on the network:
 ```
 
 Default data directory is `./data`. Change with `--data-dir`.
+Managed markdown pages default to `./data/root`. Change with `--root-dir` or `LEAFWIKI_ROOT_DIR`.
+Changing the root directory does not move existing markdown pages. For an existing install, move or copy the old `<data-dir>/root` content before starting LeafWiki with a new root directory.
 
 ### Reset admin password
 
@@ -233,6 +237,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--host`                         | Host/IP the server binds to                                             | `127.0.0.1`   | –       |
 | `--port`                         | Port the server listens on                                              | `8080`        | –       |
 | `--data-dir`                     | Directory where data is stored                                          | `./data`      | –       |
+| `--root-dir`                     | Directory where managed markdown pages and `.order.json` are stored     | `<data-dir>/root` | –    |
 | `--public-access`                | Allow public read-only access                                           | `false`       | –       |
 | `--base-path`                    | URL prefix for reverse proxy setups (e.g. `/wiki`)                      | `""`          | v0.8.2  |
 | `--allow-insecure`               | ⚠️ Enables HTTP for auth cookies (required for plain HTTP)              | `false`       | v0.7.0  |
@@ -261,6 +266,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_HOST`                         | Host/IP address                                      | `127.0.0.1`   | –       |
 | `LEAFWIKI_PORT`                         | Port                                                 | `8080`        | –       |
 | `LEAFWIKI_DATA_DIR`                     | Data directory path                                  | `./data`      | –       |
+| `LEAFWIKI_ROOT_DIR`                     | Managed markdown content directory                   | `<data-dir>/root` | –    |
 | `LEAFWIKI_ADMIN_PASSWORD`               | Initial admin password *(required)*                  | –             | –       |
 | `LEAFWIKI_JWT_SECRET`                   | JWT signing secret *(required)*                      | –             | –       |
 | `LEAFWIKI_PUBLIC_ACCESS`                | Allow public read-only access                        | `false`       | –       |
@@ -356,7 +362,26 @@ See [Local MCP Interface](docs/mcp.md) for OAuth client settings, API-key behavi
 
 - Default bind: `127.0.0.1` (binary) / `0.0.0.0` (Docker image)
 - Default data dir: `./data` (binary) / `/app/data` (container)
+- Default root dir: `<data-dir>/root`
 - Defaults are intentionally conservative — a fresh install does not become network-exposed by accident
+
+### Workspace storage layout
+
+LeafWiki separates app state from managed markdown content:
+
+- `DataDir` stores app state: auth/session/search/link/tag/property SQLite files, assets, revisions, branding, and importer state.
+- `RootDir` stores LeafWiki-managed markdown pages and `.order.json` files.
+- `RootDir` is writable and managed by LeafWiki. It is not a passive arbitrary-folder viewer.
+- `RootDir` must not contain `DataDir` and must not point inside app-state paths such as `assets`, `.leafwiki`, `.importer`, or `branding`.
+- Changing `RootDir` does not migrate existing markdown. Move or copy content from the old `<data-dir>/root` before switching an existing install.
+
+### Root directory E2E smoke
+
+Use the focused root-dir E2E smoke when changing startup, importer, page write, or storage-boundary behavior:
+
+```bash
+E2E_RUN_MODE=local E2E_ENABLE_SEPARATE_ROOT_DIR=1 ./e2e/run.sh --grep "Separate root dir"
+```
 
 ---
 

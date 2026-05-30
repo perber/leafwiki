@@ -37,6 +37,16 @@ func GeneratePathFromPageNode(entry *PageNode) string {
 	return path
 }
 
+func GenerateRoutePathFromPageNode(entry *PageNode) string {
+	if entry == nil || entry.ID == "root" || entry.Parent == nil {
+		return ""
+	}
+	if parentPath := GenerateRoutePathFromPageNode(entry.Parent); parentPath != "" {
+		return parentPath + "/" + entry.Slug
+	}
+	return entry.Slug
+}
+
 func pageDirectoryDiskPath(storageDir string, pagePath string) string {
 	normalizedStorageDir := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
 	normalizedPagePath := filepath.FromSlash(strings.ReplaceAll(pagePath, `\`, `/`))

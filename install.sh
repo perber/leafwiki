@@ -4,13 +4,14 @@ INTERACTIVE=1
 ARCH=""
 PUBLIC_ACCESS="false"
 DATA_DIR="$PWD/data"
+ROOT_DIR=""
 PORT="8080"
 HOST="127.0.0.1"
 VERSION=""
 JWT_SECRET=""
 ADMIN_PASSWORD=""
 ENV_FILE=".env"
-ENV_FILE_PATH="/etc/leafwiki/.env"
+ENV_FILE_PATH="${LEAFWIKI_ENV_FILE_PATH:-/etc/leafwiki/.env}"
 ENABLE_LINK_REFACTORING="false"
 ENABLE_REVISION="false"
 MAX_REVISION_HISTORY="100"
@@ -57,6 +58,92 @@ validate_port(){
         usage
         exit 1
     fi
+}
+
+trim_value(){
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+trim_workspace_dirs(){
+    DATA_DIR="$(trim_value "$DATA_DIR")"
+    ROOT_DIR="$(trim_value "$ROOT_DIR")"
+}
+
+resolve_root_dir(){
+    if [[ -z "$ROOT_DIR" ]]; then
+        ROOT_DIR="$DATA_DIR/root"
+    fi
+}
+
+path_is_descendant() {
+    local parent="$1"
+    local child="$2"
+
+    if [[ "$parent" == "$child" ]]; then
+        return 1
+    fi
+    if [[ "$parent" == "/" ]]; then
+        [[ "$child" == /* ]]
+        return
+    fi
+    [[ "$child/" == "$parent/"* ]]
+}
+
+validate_workspace_dirs(){
+    resolve_root_dir
+
+    if [[ "$(realpath -m "$DATA_DIR")" == "$(realpath -m "$ROOT_DIR")" ]]; then
+        echo "Error: LEAFWIKI_ROOT_DIR must be different from LEAFWIKI_DATA_DIR."
+        exit 1
+    fi
+
+    DATA_DIR_REAL="$(realpath -m "$DATA_DIR")"
+    ROOT_DIR_REAL="$(realpath -m "$ROOT_DIR")"
+    if path_is_descendant "$ROOT_DIR_REAL" "$DATA_DIR_REAL"; then
+        echo "Error: LEAFWIKI_ROOT_DIR must not contain LEAFWIKI_DATA_DIR."
+        exit 1
+    fi
+
+    RESERVED_DATA_DIR_ENTRIES=(
+        "users.db"
+        "sessions.db"
+        "search.db"
+        "links.db"
+        "tags.db"
+        "properties.db"
+        "schema.json"
+        "tree.json"
+        "assets"
+        ".leafwiki"
+        ".importer"
+        "branding"
+        "branding.json"
+    )
+    for entry in "${RESERVED_DATA_DIR_ENTRIES[@]}"; do
+        state_path="$DATA_DIR_REAL/$entry"
+        if [[ "$ROOT_DIR_REAL" == "$state_path" ]] || path_is_descendant "$state_path" "$ROOT_DIR_REAL"; then
+            echo "Error: LEAFWIKI_ROOT_DIR must not be inside app state path $state_path."
+            exit 1
+        fi
+    done
+}
+
+write_interactive_env_file(){
+    mkdir -p "$(dirname "$ENV_FILE_PATH")"
+
+    echo "LEAFWIKI_ARCH=\"$ARCH\"" > "$ENV_FILE_PATH"
+    echo "LEAFWIKI_PUBLIC_ACCESS=\"$PUBLIC_ACCESS\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_DATA_DIR=\"$DATA_DIR\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_ROOT_DIR=\"$ROOT_DIR\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_PORT=\"$PORT\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_HOST=\"$HOST\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_JWT_SECRET=\"$JWT_SECRET\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_ADMIN_PASSWORD=\"$ADMIN_PASSWORD\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_ENABLE_REVISION=\"$ENABLE_REVISION\"" >> "$ENV_FILE_PATH"
+    echo "LEAFWIKI_MAX_REVISION_HISTORY=\"$MAX_REVISION_HISTORY\"" >> "$ENV_FILE_PATH"
 }
 
 validate_requirements_non_interactive(){
@@ -161,6 +248,7 @@ if [[ "$INTERACTIVE" == 0 ]]; then
     ARCH="${LEAFWIKI_ARCH:-$ARCH}"
     PUBLIC_ACCESS="${LEAFWIKI_PUBLIC_ACCESS:-$PUBLIC_ACCESS}"
     DATA_DIR="${LEAFWIKI_DATA_DIR:-$DATA_DIR}"
+    ROOT_DIR="${LEAFWIKI_ROOT_DIR:-$ROOT_DIR}"
     PORT="${LEAFWIKI_PORT:-$PORT}"
     HOST="${LEAFWIKI_HOST:-$HOST}"
     VERSION="${LEAFWIKI_VERSION:-$VERSION}"
@@ -216,6 +304,14 @@ else
         DATA_DIR="$RESPONSE_DATA_DIR"
     fi
 
+    DEFAULT_ROOT_DIR="$DATA_DIR/root"
+    read -p "Where should managed markdown pages be saved? (default: $DEFAULT_ROOT_DIR): " RESPONSE_ROOT_DIR
+    if [[ -n "$RESPONSE_ROOT_DIR" ]]; then
+        ROOT_DIR="$RESPONSE_ROOT_DIR"
+    else
+        ROOT_DIR="$DEFAULT_ROOT_DIR"
+    fi
+
     read -rp "Do you want to enable versioning? (default: n) y/N: " RESPONSE_REVISION
     if [[ $RESPONSE_REVISION == "y" || $RESPONSE_REVISION == "Y" ]]; then
 
@@ -243,18 +339,19 @@ else
     validate_port
     validate_architecture
 
-    mkdir -p "$(dirname "$ENV_FILE_PATH")"
-    
-    echo "LEAFWIKI_ARCH=\"$ARCH\"" > "$ENV_FILE_PATH"
-    echo "LEAFWIKI_PUBLIC_ACCESS=\"$PUBLIC_ACCESS\"" >> "$ENV_FILE_PATH"
-    echo "LEAFWIKI_DATA_DIR=\"$DATA_DIR\"" >> "$ENV_FILE_PATH"
-    echo "LEAFWIKI_PORT=\"$PORT\"" >> "$ENV_FILE_PATH"
-    echo "LEAFWIKI_HOST=\"$HOST\"" >> "$ENV_FILE_PATH"
-    echo "LEAFWIKI_JWT_SECRET=\"$JWT_SECRET\"" >> "$ENV_FILE_PATH"
-    echo "LEAFWIKI_ADMIN_PASSWORD=\"$ADMIN_PASSWORD\"" >> "$ENV_FILE_PATH"
-    echo "LEAFWIKI_ENABLE_REVISION=\"$ENABLE_VERSIONING\"" >> "$ENV_FILE_PATH"
-    echo "LEAFWIKI_MAX_REVISION_HISTORY=\"$MAX_REVISION_HISTORY\"" >> "$ENV_FILE_PATH"
+fi
 
+trim_workspace_dirs
+validate_workspace_dirs
+if [[ "$INTERACTIVE" == 1 ]]; then
+    write_interactive_env_file
+fi
+
+if [[ "${LEAFWIKI_INSTALL_VALIDATE_ONLY:-0}" == "1" ]]; then
+    echo "Validated LeafWiki install configuration"
+    printf "DataDirectory: %s\n" "$DATA_DIR"
+    printf "RootDirectory: %s\n" "$ROOT_DIR"
+    exit 0
 fi
 
 get_version
@@ -262,8 +359,10 @@ get_version
 download_binary
 
 mkdir -p "$DATA_DIR"
+mkdir -p "$ROOT_DIR"
 RUN_USER="${SUDO_USER:-$USER}"
 chown -R "$RUN_USER:$RUN_USER" "$DATA_DIR"
+chown -R "$RUN_USER:$RUN_USER" "$ROOT_DIR"
 echo "[Unit]
 Description=LeafWiki
 After=network.target
@@ -291,6 +390,7 @@ else
     printf "== %-33s ==\n" "Host: $HOST"
     printf "== %-33s ==\n" "Port: $PORT"
     printf "== %-33s ==\n" "DataDirectory: $DATA_DIR"
+    printf "== %-33s ==\n" "RootDirectory: $ROOT_DIR"
     printf "== %-33s ==\n" "Status: $IS_ACTIVE"
     echo "==                                   =="
     echo "======================================="

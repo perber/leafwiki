@@ -22,8 +22,8 @@ func writeUsage(w io.Writer) {
 	if _, err := fmt.Fprintln(w, `LeafWiki – lightweight selfhosted wiki 🌿
 
 	Usage:
-	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
-	leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
+	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>] [--root-dir <DIR>]
+	leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--data-dir <DIR>] [--root-dir <DIR>]
 	leafwiki reset-admin-password
 	leafwiki --help
 
@@ -31,6 +31,7 @@ func writeUsage(w io.Writer) {
 	--host             Host/IP address to bind the server to (default: 127.0.0.1)
 	--port             Port to run the server on (default: 8080)
 	--data-dir         Path to data directory (default: ./data)
+	--root-dir         Path to managed markdown content directory (default: <data-dir>/root)
 	--admin-password   Initial admin password (used only if no admin exists)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
 	--public-access    Allow public access to the wiki only with read access (default: false)
@@ -59,6 +60,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_HOST
 	LEAFWIKI_PORT
 	LEAFWIKI_DATA_DIR
+	LEAFWIKI_ROOT_DIR
 	LEAFWIKI_JWT_SECRET
 	LEAFWIKI_LOG_LEVEL
 	LEAFWIKI_ADMIN_PASSWORD
@@ -117,6 +119,7 @@ type cliFlags struct {
 	host                    *string
 	port                    *string
 	dataDir                 *string
+	rootDir                 *string
 	adminPassword           *string
 	jwtSecret               *string
 	publicAccess            *bool
@@ -145,6 +148,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		host:                    fs.String("host", "", "host/IP address to bind the server to (e.g. 127.0.0.1 or 0.0.0.0)"),
 		port:                    fs.String("port", "", "port to run the server on"),
 		dataDir:                 fs.String("data-dir", "", "path to data directory"),
+		rootDir:                 fs.String("root-dir", "", "path to managed markdown content directory"),
 		adminPassword:           fs.String("admin-password", "", "initial admin password"),
 		jwtSecret:               fs.String("jwt-secret", "", "JWT secret for authentication"),
 		publicAccess:            fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
@@ -185,6 +189,13 @@ func main() {
 	host := resolveString("host", *flags.host, visited, "LEAFWIKI_HOST", "127.0.0.1")
 	port := resolveString("port", *flags.port, visited, "LEAFWIKI_PORT", "8080")
 	dataDir := resolveString("data-dir", *flags.dataDir, visited, "LEAFWIKI_DATA_DIR", "./data")
+	workspace, shouldStartWiki, err := resolveStartupWorkspace(flags, visited, flag.Args())
+	if err != nil {
+		fail("Invalid workspace configuration", "error", err)
+	}
+	if shouldStartWiki {
+		dataDir = workspace.DataDir
+	}
 	adminPassword := resolveString("admin-password", *flags.adminPassword, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
 	jwtSecret := resolveString("jwt-secret", *flags.jwtSecret, visited, "LEAFWIKI_JWT_SECRET", "")
 	injectCodeInHeader := resolveString("inject-code-in-header", *flags.injectCodeInHeader, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
@@ -268,6 +279,11 @@ func main() {
 		}
 		slog.Default().Info("Data directory created", "path", dataDir)
 	}
+	if _, err := os.Stat(workspace.RootDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(workspace.RootDir, 0755); err != nil {
+			fail("Failed to create root directory", "error", err)
+		}
+	}
 
 	if !disableAuth {
 		if jwtSecret == "" {
@@ -280,6 +296,7 @@ func main() {
 	}
 
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		Workspace:           workspace,
 		StorageDir:          dataDir,
 		AdminPassword:       adminPassword,
 		JWTSecret:           jwtSecret,
@@ -346,6 +363,39 @@ func resolveString(flagName, flagVal string, visited map[string]bool, envVar str
 	}
 	// Fall back to provided default when flag wasn't set and no env var is present
 	return def
+}
+
+func resolveWorkspace(flags *cliFlags, visited map[string]bool) (wiki.Workspace, error) {
+	dataDir := resolveString("data-dir", *flags.dataDir, visited, "LEAFWIKI_DATA_DIR", "./data")
+	rootDir := resolveString("root-dir", *flags.rootDir, visited, "LEAFWIKI_ROOT_DIR", "")
+	workspace := wiki.NormalizeWorkspace(wiki.Workspace{
+		ID:      "default",
+		DataDir: dataDir,
+		RootDir: rootDir,
+	})
+	if err := validateWorkspaceDirs(workspace.DataDir, workspace.RootDir); err != nil {
+		return wiki.Workspace{}, err
+	}
+	return workspace, nil
+}
+
+func resolveStartupWorkspace(flags *cliFlags, visited map[string]bool, args []string) (wiki.Workspace, bool, error) {
+	if len(args) > 0 {
+		return wiki.Workspace{}, false, nil
+	}
+	workspace, err := resolveWorkspace(flags, visited)
+	if err != nil {
+		return wiki.Workspace{}, true, err
+	}
+	return workspace, true, nil
+}
+
+func validateWorkspaceDirs(dataDir string, rootDir string) error {
+	return wiki.ValidateWorkspace(wiki.Workspace{
+		ID:      "default",
+		DataDir: dataDir,
+		RootDir: rootDir,
+	})
 }
 
 // CLI > ENV > default(flag)
