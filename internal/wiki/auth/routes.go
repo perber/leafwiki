@@ -113,7 +113,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 func writeAuthCookieError(c *gin.Context, err error, httpsMsg, internalMsg, logMsg string) {
 	if errors.Is(err, utils.ErrHTTPSRequired) {
-		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, httpsMsg, "https required for auth cookies")
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, httpsMsg, "https required for auth cookies use allow insecure")
 		return
 	}
 	slog.Default().Error(logMsg, "error", err)
@@ -196,7 +196,7 @@ func (r *Routes) handleLogin(rctx httpinternal.RouterContext) gin.HandlerFunc {
 			if errors.Is(err, utils.ErrHTTPSRequired) {
 				respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed,
 					"HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-					"https required for auth cookies")
+					"https required for auth cookies use allow insecure")
 				return
 			}
 			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
@@ -256,7 +256,7 @@ func (r *Routes) handleRefreshToken(rctx httpinternal.RouterContext) gin.Handler
 			if errors.Is(err, utils.ErrHTTPSRequired) {
 				respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed,
 					"HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-					"https required for auth cookies")
+					"https required for auth cookies use allow insecure")
 				return
 			}
 			respondWithAuthStatusError(c, http.StatusInternalServerError, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
