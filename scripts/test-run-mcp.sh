@@ -186,6 +186,9 @@ if [[ "${FAKE_STDIO_MODE:-}" == "wait" ]]; then
     sleep 1
   done
 fi
+if [[ -n "${FAKE_STDIO_STDIN_FILE:-}" ]]; then
+  cat > "$FAKE_STDIO_STDIN_FILE"
+fi
 printf 'stdio stdout\n'
 printf 'stdio stderr\n' >&2
 EOF
@@ -202,11 +205,13 @@ PY
 
 stdout_file="$tmp_dir/stdout"
 stderr_file="$tmp_dir/stderr"
+stdio_stdin_file="$tmp_dir/stdio.stdin"
 leafwiki_args_file="$tmp_dir/leafwiki.args"
 stdio_args_file="$tmp_dir/stdio.args"
 
 FAKE_LEAFWIKI_ARGS="$leafwiki_args_file" \
 FAKE_STDIO_ARGS="$stdio_args_file" \
+FAKE_STDIO_STDIN_FILE="$stdio_stdin_file" \
 "$script" \
   --leafwiki-bin "$fake_bin/leafwiki" \
   --mcp-stdio-bin "$fake_bin/leafwiki-mcp-stdio" \
@@ -219,10 +224,12 @@ FAKE_STDIO_ARGS="$stdio_args_file" \
   --api-key lwk_test_secret \
   --server-log "$tmp_dir/server.log" \
   --ready-timeout 5 \
+  <<< '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
   > "$stdout_file" \
   2> "$stderr_file"
 
 [[ "$(cat "$stdout_file")" == "stdio stdout" ]] || fail "stdout was not reserved for stdio proxy: $(cat "$stdout_file")"
+[[ "$(cat "$stdio_stdin_file")" == '{"jsonrpc":"2.0","id":1,"method":"initialize"}' ]] || fail "stdin was not passed to stdio proxy: $(cat "$stdio_stdin_file")"
 assert_contains "$(cat "$stderr_file")" "stdio stderr" "stderr"
 assert_contains "$(cat "$leafwiki_args_file")" "--enable-mcp" "leafwiki args"
 assert_contains "$(cat "$leafwiki_args_file")" "--host" "leafwiki args"

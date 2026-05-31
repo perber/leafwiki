@@ -438,7 +438,9 @@ fi
 if truthy "$disable_request_log"; then
   server_cmd+=(--disable-request-log)
 fi
-server_cmd+=("${server_extra_args[@]}")
+if [[ "${#server_extra_args[@]}" -gt 0 ]]; then
+  server_cmd+=("${server_extra_args[@]}")
+fi
 
 stdio_cmd=("$mcp_stdio_bin" --endpoint "$endpoint")
 if [[ -n "$api_key" ]]; then
@@ -453,7 +455,9 @@ fi
 if [[ -n "$max_frame_size" ]]; then
   stdio_cmd+=(--max-frame-size "$max_frame_size")
 fi
-stdio_cmd+=("${stdio_extra_args[@]}")
+if [[ "${#stdio_extra_args[@]}" -gt 0 ]]; then
+  stdio_cmd+=("${stdio_extra_args[@]}")
+fi
 
 if [[ "$dry_run" -eq 1 ]]; then
   log "Would start LeafWiki and then run leafwiki-mcp-stdio"
@@ -487,7 +491,7 @@ fi
 log "Starting leafwiki-mcp-stdio for $endpoint"
 print_command "${stdio_cmd[@]}"
 set +e
-"${stdio_cmd[@]}" &
+"${stdio_cmd[@]}" <&0 &
 stdio_pid=$!
 wait "$stdio_pid"
 stdio_status=$?
