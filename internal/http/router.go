@@ -2,6 +2,7 @@ package http
 
 import (
 	"embed"
+	"html"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -244,22 +245,20 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 					faviconFile = frontendCfg.GetFaviconFile()
 				}
 
-				html := string(data)
-				html = strings.ReplaceAll(html, "{{__SITE_NAME__}}", siteName)
-				html = strings.ReplaceAll(html, "{{__BASE_PATH__}}", opts.BasePath)
-				html = strings.ReplaceAll(html, "{{__FAVICON_HREF__}}", BuildFrontendFaviconHref(opts.BasePath, faviconFile))
-
+				doc := string(data)
+				doc = strings.ReplaceAll(doc, "{{__SITE_NAME__}}", html.EscapeString(siteName))
+				doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", opts.BasePath)
+				doc = strings.ReplaceAll(doc, "{{__FAVICON_HREF__}}", BuildFrontendFaviconHref(opts.BasePath, faviconFile))
 				if opts.BasePath != "" {
-					html = strings.ReplaceAll(html, `"/static/`, `"`+opts.BasePath+`/static/`)
+					doc = strings.ReplaceAll(doc, `"/static/`, `"`+opts.BasePath+`/static/`)
 				}
 
-				html = injectIntoHead(html, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
+				doc = injectIntoHead(doc, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
 
 				if opts.InjectCodeInHeader != "" {
-					html = injectIntoHead(html, opts.InjectCodeInHeader)
+					doc = injectIntoHead(doc, opts.InjectCodeInHeader)
 				}
-
-				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(doc))
 			} else {
 				c.String(http.StatusNotFound, "Page not found")
 			}
