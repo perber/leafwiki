@@ -356,7 +356,9 @@ The legacy disabled-auth mode remains available for isolated local workflows:
 ./leafwiki --disable-auth --enable-mcp --host=127.0.0.1
 ```
 
-See [Local MCP Interface](docs/mcp.md) for OAuth client settings, API-key behavior, the tool surface, safety gates, and the parity contract.
+For clients that only support spawning a local STDIO MCP process, the optional `leafwiki-mcp-stdio` sidecar bridges STDIO JSON-RPC to the same `/mcp` endpoint. It supports disabled-auth and MCP API-key bearer auth; OAuth-capable clients should use Streamable HTTP directly.
+
+See [Local MCP Interface](docs/mcp.md) for OAuth client settings, API-key behavior, STDIO sidecar setup, the tool surface, safety gates, and the parity contract.
 
 ### Operations notes
 

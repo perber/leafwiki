@@ -18,6 +18,7 @@ ARG GOOS
 ARG GOARCH
 ARG CGO_ENABLED=0
 ARG OUTPUT=leafwiki
+ARG CMD_PATH=./cmd/leafwiki/main.go
 
 ENV GOOS=${GOOS}
 ENV GOARCH=${GOARCH}
@@ -35,4 +36,4 @@ COPY --from=frontend /ui/dist ./internal/http/dist
 
 RUN go build \
   -ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production" \
-  -o /out/${OUTPUT} ./cmd/leafwiki/main.go
+  -o /out/${OUTPUT} ${CMD_PATH}

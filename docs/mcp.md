@@ -81,6 +81,246 @@ The raw key secret is shown once when the key is created. LeafWiki stores only a
 
 MCP API keys do not expire in this MVP. They inherit the owner's current role on every MCP request, so role downgrades affect existing keys immediately. Revoked keys, deleted-user keys, malformed keys, and wrong-secret keys are rejected with `401` before tools run.
 
+## STDIO Sidecar
+
+`leafwiki-mcp-stdio` is an optional client-side bridge for MCP clients that can spawn a STDIO server process but cannot speak Streamable HTTP directly:
+
+```text
+MCP STDIO client <-> leafwiki-mcp-stdio <-> HTTP POST /mcp <-> LeafWiki
+```
+
+The sidecar does not start LeafWiki, read wiki files, register tools, mirror tool schemas, run OAuth, or call `tools/list` on its own. It forwards newline-delimited JSON-RPC frames to the configured `/mcp` endpoint and writes only JSON-RPC response frames to stdout. Diagnostics, startup errors, HTTP failures for notifications, and cleanup warnings are written to stderr. Do not add banners, debug logs, shell prompts, or progress output to stdout when wrapping this binary.
+
+Build locally:
+
+```bash
+make build-sidecar
+```
+
+Or download the matching `leafwiki-mcp-stdio-<version>-<os>-<arch>` release asset. For local macOS installs from this checkout, `./scripts/install-all-macos.sh --install-dir "$HOME/.local/bin"` installs both `leafwiki` and `leafwiki-mcp-stdio` into one directory.
+
+The sidecar does not require LeafWiki to run with `--disable-auth`. If LeafWiki is running with auth enabled, configure the sidecar with an MCP API key. If LeafWiki is running in legacy disabled-auth mode, leave the sidecar API key empty.
+
+Disabled-auth local example:
+
+```bash
+leafwiki --disable-auth --enable-mcp --host 127.0.0.1
+leafwiki-mcp-stdio --endpoint http://127.0.0.1:8080/mcp
+```
+
+API-key example:
+
+```bash
+leafwiki --enable-mcp --host 127.0.0.1 --allow-insecure=true --jwt-secret=<secret> --admin-password=<password>
+LEAFWIKI_MCP_API_KEY=lwk_<id>_<secret> leafwiki-mcp-stdio --endpoint http://127.0.0.1:8080/mcp
+```
+
+Authenticated base-path example:
+
+```bash
+leafwiki --enable-mcp --base-path /wiki --host 127.0.0.1 --allow-insecure=true --jwt-secret=<secret> --admin-password=<password>
+LEAFWIKI_MCP_API_KEY=lwk_<id>_<secret> leafwiki-mcp-stdio --endpoint http://127.0.0.1:8080/wiki/mcp
+```
+
+Supported sidecar configuration uses CLI flags over environment variables over defaults:
+
+| Flag | Environment | Default |
+|---|---|---|
+| `--endpoint` | `LEAFWIKI_MCP_ENDPOINT` | `http://127.0.0.1:8080/mcp` |
+| `--api-key` | `LEAFWIKI_MCP_API_KEY` | empty |
+| `--request-timeout` | `LEAFWIKI_MCP_STDIO_REQUEST_TIMEOUT` | `2m` |
+| `--shutdown-timeout` | `LEAFWIKI_MCP_STDIO_SHUTDOWN_TIMEOUT` | `5s` |
+| `--max-frame-size` | `LEAFWIKI_MCP_STDIO_MAX_FRAME_SIZE` | `128MiB` |
+
+Example MCP client command configuration:
+
+```json
+{
+  "mcpServers": {
+    "leafwiki": {
+      "command": "/usr/local/bin/leafwiki-mcp-stdio",
+      "env": {
+        "LEAFWIKI_MCP_ENDPOINT": "http://127.0.0.1:8080/mcp",
+        "LEAFWIKI_MCP_API_KEY": "lwk_<id>_<secret>"
+      }
+    }
+  }
+}
+```
+
+### Single-command MCP client setup with `run-mcp.sh`
+
+Use `scripts/run-mcp.sh` when an MCP client needs one STDIO command that starts
+LeafWiki and then connects `leafwiki-mcp-stdio` to that same instance. Configure
+the MCP client to spawn the wrapper script, not `leafwiki` directly:
+
+```json
+{
+  "mcpServers": {
+    "leafwiki": {
+      "command": "/Users/<you>/github/leafwiki/scripts/run-mcp.sh",
+      "args": [
+        "--leafwiki-bin", "/Users/<you>/.local/bin/leafwiki",
+        "--mcp-stdio-bin", "/Users/<you>/.local/bin/leafwiki-mcp-stdio",
+        "--data-dir", "/Users/<you>/.local/share/leafwiki",
+        "--root-dir", "/Users/<you>/wiki",
+        "--api-key", "lwk_<id>_<secret>"
+      ]
+    }
+  }
+}
+```
+
+Many MCP clients do not expand shell variables inside JSON config. Use absolute
+paths instead of `$HOME` in `command`, `args`, and `env` values. If you install
+with `./scripts/install-all-macos.sh --install-dir "$HOME/.local/bin"`, the
+wrapper is installed as `/Users/<you>/.local/bin/run-mcp.sh`; use that absolute
+path as `command` unless you know the MCP client inherits a PATH containing the
+install directory.
+
+Each JSON `args` entry is one process argument. Split flags and values into
+separate entries, or use `--flag=value`. Do not pass `"--root-dir ./wiki"` as
+one string.
+
+Default server command shape:
+
+```bash
+leafwiki \
+  --enable-mcp \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --data-dir ./data \
+  --root-dir ./wiki \
+  --jwt-secret p4lyOlQU643BRUc2HBiCrr55L6ygh4pJlVQ8z5LEnfT \
+  --admin-password admin \
+  --allow-insecure \
+  --disable-request-log
+```
+
+Default stdio proxy command shape:
+
+```bash
+leafwiki-mcp-stdio --endpoint http://127.0.0.1:8080/mcp
+```
+
+The wrapper redirects the LeafWiki server's stdout and stderr to `--server-log`,
+writes its own diagnostics to stderr, waits for `/api/health`, and leaves the
+MCP client's stdin/stdout connected to `leafwiki-mcp-stdio`. When the stdio
+proxy exits, the wrapper stops the LeafWiki server process it started. When the
+wrapper receives `SIGINT` or `SIGTERM`, it stops the stdio proxy first and then
+stops the LeafWiki server. `SIGKILL` cannot be trapped, so `kill -9` can still
+bypass cleanup.
+
+Authentication choices:
+
+- Authenticated mode is the default. Pass `--api-key lwk_<id>_<secret>` or set
+  `LEAFWIKI_RUN_MCP_API_KEY`. The admin password is for web login and initial
+  admin setup; it does not authenticate the stdio proxy.
+- Disabled-auth mode is available for isolated local workflows. Pass
+  `--disable-auth` and omit `--api-key`.
+- If you use `--base-path /wiki`, the wrapper computes
+  `http://127.0.0.1:8080/wiki/mcp` and
+  `http://127.0.0.1:8080/wiki/api/health`. Use `--endpoint` and `--health-url`
+  only when you need to override those computed URLs.
+
+Useful local checks before putting the command into an MCP client:
+
+```bash
+./scripts/run-mcp.sh --help
+./scripts/run-mcp.sh --dry-run --root-dir "$PWD/wiki"
+./scripts/run-mcp.sh --dry-run --disable-auth --root-dir "$PWD/wiki"
+./scripts/run-mcp.sh --dry-run --root-dir "$PWD/wiki" --api-key "lwk_<id>_<secret>"
+```
+
+Disabled-auth MCP client example:
+
+```json
+{
+  "mcpServers": {
+    "leafwiki": {
+      "command": "/Users/<you>/github/leafwiki/scripts/run-mcp.sh",
+      "args": [
+        "--disable-auth",
+        "--data-dir", "/Users/<you>/.local/share/leafwiki-dev",
+        "--root-dir", "/Users/<you>/wiki"
+      ]
+    }
+  }
+}
+```
+
+Environment-variable configuration is also supported:
+
+```json
+{
+  "mcpServers": {
+    "leafwiki": {
+      "command": "/Users/<you>/github/leafwiki/scripts/run-mcp.sh",
+      "env": {
+        "LEAFWIKI_RUN_MCP_LEAFWIKI_BIN": "/Users/<you>/.local/bin/leafwiki",
+        "LEAFWIKI_RUN_MCP_STDIO_BIN": "/Users/<you>/.local/bin/leafwiki-mcp-stdio",
+        "LEAFWIKI_RUN_MCP_DATA_DIR": "/Users/<you>/.local/share/leafwiki",
+        "LEAFWIKI_RUN_MCP_ROOT_DIR": "/Users/<you>/wiki",
+        "LEAFWIKI_RUN_MCP_API_KEY": "lwk_<id>_<secret>"
+      }
+    }
+  }
+}
+```
+
+Common wrapper options:
+
+| Option | Environment fallback | Default |
+|---|---|---|
+| `--leafwiki-bin` | `LEAFWIKI_RUN_MCP_LEAFWIKI_BIN`, `LEAFWIKI_BIN` | `leafwiki` |
+| `--mcp-stdio-bin` | `LEAFWIKI_RUN_MCP_STDIO_BIN`, `LEAFWIKI_MCP_STDIO_BIN` | `leafwiki-mcp-stdio` |
+| `--host` | `LEAFWIKI_RUN_MCP_HOST`, `LEAFWIKI_HOST` | `127.0.0.1` |
+| `--port` | `LEAFWIKI_RUN_MCP_PORT`, `LEAFWIKI_PORT` | `8080` |
+| `--scheme` | `LEAFWIKI_RUN_MCP_SCHEME` | `http` |
+| `--base-path` | `LEAFWIKI_RUN_MCP_BASE_PATH`, `LEAFWIKI_BASE_PATH` | empty |
+| `--data-dir` | `LEAFWIKI_RUN_MCP_DATA_DIR`, `LEAFWIKI_DATA_DIR` | `./data` |
+| `--root-dir` | `LEAFWIKI_RUN_MCP_ROOT_DIR`, `LEAFWIKI_ROOT_DIR` | `./wiki` |
+| `--jwt-secret` | `LEAFWIKI_RUN_MCP_JWT_SECRET`, `LEAFWIKI_JWT_SECRET` | local development secret |
+| `--admin-password` | `LEAFWIKI_RUN_MCP_ADMIN_PASSWORD`, `LEAFWIKI_ADMIN_PASSWORD` | `admin` |
+| `--disable-auth` | `LEAFWIKI_RUN_MCP_DISABLE_AUTH`, `LEAFWIKI_DISABLE_AUTH` | false |
+| `--allow-insecure` / `--no-allow-insecure` | `LEAFWIKI_RUN_MCP_ALLOW_INSECURE`, `LEAFWIKI_ALLOW_INSECURE` | true |
+| `--disable-request-log` / `--request-log` | `LEAFWIKI_RUN_MCP_DISABLE_REQUEST_LOG`, `LEAFWIKI_DISABLE_REQUEST_LOG` | true |
+| `--api-key` | `LEAFWIKI_RUN_MCP_API_KEY`, `LEAFWIKI_MCP_API_KEY` | empty |
+| `--endpoint` | `LEAFWIKI_RUN_MCP_ENDPOINT`, `LEAFWIKI_MCP_ENDPOINT` | computed from host, port, and base path |
+| `--health-url` | `LEAFWIKI_RUN_MCP_HEALTH_URL` | computed from host, port, and base path |
+| `--server-log` | `LEAFWIKI_RUN_MCP_SERVER_LOG` | `${TMPDIR:-/tmp}/leafwiki-run-mcp.<pid>.log` |
+| `--ready-timeout` | `LEAFWIKI_RUN_MCP_READY_TIMEOUT` | `30` |
+| `--request-timeout` | `LEAFWIKI_RUN_MCP_REQUEST_TIMEOUT`, `LEAFWIKI_MCP_STDIO_REQUEST_TIMEOUT` | sidecar default |
+| `--shutdown-timeout` | `LEAFWIKI_RUN_MCP_SHUTDOWN_TIMEOUT`, `LEAFWIKI_MCP_STDIO_SHUTDOWN_TIMEOUT` | sidecar default |
+| `--max-frame-size` | `LEAFWIKI_RUN_MCP_MAX_FRAME_SIZE`, `LEAFWIKI_MCP_STDIO_MAX_FRAME_SIZE` | sidecar default |
+
+Use repeated `--server-arg <arg>` for LeafWiki flags that the wrapper does not
+model, and repeated `--stdio-arg <arg>` for extra `leafwiki-mcp-stdio` flags.
+
+Limitations:
+
+- OAuth and Dynamic Client Registration are intentionally not implemented in the sidecar. Use the Streamable HTTP endpoint directly with OAuth-capable clients.
+- SSE responses are intentionally unsupported. The sidecar requests JSON responses and turns upstream `text/event-stream` responses into JSON-RPC errors.
+- Frames are forwarded sequentially in v1.
+- The sidecar is request/response oriented. Server-initiated messages outside direct POST responses are out of scope for v1.
+- Docker server behavior is unchanged.
+
+Troubleshooting:
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Client cannot spawn sidecar | Wrong binary path or missing execute bit | Use an absolute `command` path and `chmod +x` the downloaded asset |
+| `spawn run-mcp.sh ENOENT` | MCP client cannot find `run-mcp.sh` on its PATH | Use an absolute `command`, for example `/Users/<you>/.local/bin/run-mcp.sh` or `/Users/<you>/github/leafwiki/scripts/run-mcp.sh` |
+| `invalid endpoint` on stderr | Bad `--endpoint` / `LEAFWIKI_MCP_ENDPOINT` | Use the full MCP URL, including `/mcp` or `/wiki/mcp` |
+| `argument '--root-dir ./wiki' contains a space` | A JSON arg combined a flag and value into one process argument | Use `"--root-dir", "/absolute/wiki/path"` or `"--root-dir=/absolute/wiki/path"` |
+| Unauthorized during connect | Missing, revoked, malformed, or deleted-user API key | Create a fresh MCP API key for an active editor/admin or use disabled-auth only in isolated local mode |
+| Unauthorized when using `run-mcp.sh` | Authenticated server started, but no sidecar API key was passed | Pass `--api-key`, set `LEAFWIKI_RUN_MCP_API_KEY`, or use `--disable-auth` only for isolated local mode |
+| `run-mcp.sh` exits before the sidecar starts | LeafWiki failed readiness or exited early | Inspect the path printed as `Server log:` or set `--server-log` to a stable location |
+| Viewer key can read but writes fail | Viewer role lacks mutation permission | Use an editor/admin key for write tools |
+| SSE unsupported error | Upstream returned `text/event-stream` | Use LeafWiki's JSON-response `/mcp` endpoint, not an SSE endpoint |
+| Client hangs after server restart | Stored upstream MCP session expired | Restart the MCP client so the sidecar creates a new upstream session |
+| JSON parse errors | Something wrote non-protocol text to stdout | Ensure wrappers and launch scripts write diagnostics to stderr only |
+
 ## Collaboration Model
 
 The web UI and MCP server run in the same LeafWiki process and share the same `*wiki.Wiki` instance. Pages, search indexes, link indexes, tags, properties, assets, revisions, and refactor operations are updated through the same domain use cases used by the HTTP API.
@@ -167,17 +407,22 @@ Asset reads return:
 The local MCP surface is complete only when every defined MCP tool has HTTP/MCP parity coverage or is correctly absent when gated, OAuth coverage passes, and the full project verification passes:
 
 ```bash
+go test ./cmd/leafwiki ./cmd/leafwiki-mcp-stdio ./internal/wiki/mcpstdio ./internal/wiki/mcp ./internal/...
 go test ./...
 npm --prefix ui/leafwiki-ui run build
 npm --prefix ui/leafwiki-ui run lint
 npm --prefix e2e run lint
 npm --prefix e2e run format:check
+env E2E_RUN_MODE=local E2E_ENABLE_MCP_LOCAL=1 E2E_MCP_CLIENT_TRANSPORT=stdio ./e2e/run.sh tests/mcp-stdio-disable-auth.spec.ts
+env E2E_RUN_MODE=local E2E_ENABLE_MCP_LOCAL=1 E2E_BASE_PATH=/wiki E2E_MCP_CLIENT_TRANSPORT=stdio ./e2e/run.sh tests/mcp-stdio-disable-auth.spec.ts --grep "base-path"
+env E2E_RUN_MODE=local E2E_ENABLE_MCP_LOCAL=1 E2E_ENABLE_SEPARATE_ROOT_DIR=1 E2E_MCP_CLIENT_TRANSPORT=stdio ./e2e/run.sh tests/mcp-stdio-disable-auth.spec.ts --grep "mcp stdio sidecar seeds"
+env E2E_RUN_MODE=local E2E_ENABLE_MCP_API_KEYS_LOCAL=1 E2E_MCP_CLIENT_TRANSPORT=stdio ./e2e/run.sh tests/mcp-stdio-api-keys.spec.ts
 env E2E_RUN_MODE=local E2E_ENABLE_MCP_OAUTH_LOCAL=1 ./e2e/run.sh --grep "mcp.*oauth|oauth.*mcp"
 env E2E_RUN_MODE=local E2E_ENABLE_MCP_LOCAL=1 ./e2e/run.sh --grep "mcp.*disable auth|disable auth.*mcp"
 env E2E_RUN_MODE=local E2E_ENABLE_MCP_API_KEYS_LOCAL=1 ./e2e/run.sh tests/mcp-api-keys.spec.ts
 ```
 
-Normal local E2E mode remains authenticated. Set `E2E_ENABLE_MCP_OAUTH_LOCAL=1` for authenticated MCP OAuth smoke coverage, `E2E_ENABLE_MCP_API_KEYS_LOCAL=1` for authenticated MCP API-key smoke coverage through the official TypeScript MCP client, or `E2E_ENABLE_MCP_LOCAL=1` for the legacy disabled-auth MCP smoke test.
+Normal local E2E mode remains authenticated. Set `E2E_ENABLE_MCP_OAUTH_LOCAL=1` for authenticated MCP OAuth smoke coverage, `E2E_ENABLE_MCP_API_KEYS_LOCAL=1` for authenticated MCP API-key smoke coverage through the official TypeScript MCP client, or `E2E_ENABLE_MCP_LOCAL=1` for the legacy disabled-auth MCP smoke test. Add `E2E_MCP_CLIENT_TRANSPORT=stdio` only for the sidecar tests; OAuth remains HTTP-only. Add `E2E_ENABLE_SEPARATE_ROOT_DIR=1` to the STDIO disabled-auth smoke, or run `make run-e2e-root-dir-stdio`, when changing the sidecar or storage-boundary behavior.
 
 Implementation references:
 
