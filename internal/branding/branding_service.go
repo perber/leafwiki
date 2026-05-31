@@ -90,6 +90,13 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 // - \r (carriage return, U+000D)
 // These exceptions allow for normal text formatting while preventing
 // null bytes, vertical tabs, form feeds, and other problematic characters.
+func containsPathTraversal(s string) bool {
+	return strings.Contains(s, "..") ||
+		strings.Contains(s, "/") ||
+		strings.Contains(s, "\\") ||
+		strings.Contains(s, "\x00")
+}
+
 func containsControlCharacters(s string) bool {
 	for _, r := range s {
 		// Disallow control characters except for common whitespace
@@ -156,6 +163,15 @@ func (s *BrandingService) DeleteLogo() error {
 
 	if s.brandingConfig.LogoFile == "" {
 		return nil // No logo to delete
+	}
+
+	if containsPathTraversal(s.brandingConfig.LogoFile) {
+		return sharederrors.NewLocalizedError(
+			"branding_logo_delete_failed",
+			"Failed to delete logo",
+			"invalid logo file path",
+			nil,
+		)
 	}
 
 	logoPath := filepath.Join(s.store.brandingAssetsDir(), s.brandingConfig.LogoFile)
@@ -237,6 +253,15 @@ func (s *BrandingService) DeleteFavicon() error {
 
 	if s.brandingConfig.FaviconFile == "" {
 		return nil // No favicon to delete
+	}
+
+	if containsPathTraversal(s.brandingConfig.FaviconFile) {
+		return sharederrors.NewLocalizedError(
+			"branding_favicon_delete_failed",
+			"Failed to delete favicon",
+			"invalid favicon file path",
+			nil,
+		)
 	}
 
 	faviconPath := filepath.Join(s.store.brandingAssetsDir(), s.brandingConfig.FaviconFile)
