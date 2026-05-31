@@ -37,7 +37,7 @@ jobs:
       - name: Attest release binaries
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
-          subject-path: 'releases/leafwiki-${{ github.ref_name }}-*'
+          subject-path: 'releases/*-${{ github.ref_name }}-*'
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
@@ -87,13 +87,23 @@ jobs:
           files: |
             releases/leafwiki-${{ github.ref_name }}-linux-amd64
             releases/leafwiki-${{ github.ref_name }}-linux-amd64.sha256
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-linux-amd64
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-linux-amd64.sha256
             releases/leafwiki-${{ github.ref_name }}-linux-arm64
             releases/leafwiki-${{ github.ref_name }}-linux-arm64.sha256
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-linux-arm64
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-linux-arm64.sha256
             releases/leafwiki-${{ github.ref_name }}-darwin-amd64
             releases/leafwiki-${{ github.ref_name }}-darwin-amd64.sha256
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-darwin-amd64
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-darwin-amd64.sha256
             releases/leafwiki-${{ github.ref_name }}-darwin-arm64
             releases/leafwiki-${{ github.ref_name }}-darwin-arm64.sha256
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-darwin-arm64
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-darwin-arm64.sha256
             releases/leafwiki-${{ github.ref_name }}-windows-amd64.exe
             releases/leafwiki-${{ github.ref_name }}-windows-amd64.exe.sha256
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-windows-amd64.exe
+            releases/leafwiki-mcp-stdio-${{ github.ref_name }}-windows-amd64.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}

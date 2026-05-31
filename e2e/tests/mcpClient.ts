@@ -1,10 +1,11 @@
+import { spawn } from 'node:child_process';
+
 import type {
   AuthProvider,
   OAuthClientInformationMixed,
   OAuthClientProvider,
   OAuthTokens,
   Client as SDKClient,
-  StreamableHTTPClientTransport as SDKStreamableHTTPTransport,
 } from '@modelcontextprotocol/client';
 
 export type MCPTestClient = {
@@ -16,6 +17,40 @@ export type MCPTestClient = {
 type ConnectMCPClientOptions = {
   accessToken?: string;
   clientName?: string;
+};
+
+type ConnectMCPStdioClientOptions = ConnectMCPClientOptions & {
+  captureStderr?: boolean;
+};
+
+type MCPStdioRawOptions = ConnectMCPClientOptions & {
+  timeoutMs?: number;
+};
+
+type MCPStdioRawError = {
+  code?: number;
+  data?: {
+    status?: number;
+    [key: string]: unknown;
+  };
+  message?: string;
+};
+
+type MCPStdioRawResponse = {
+  error?: MCPStdioRawError;
+  id?: unknown;
+  jsonrpc?: string;
+  result?: unknown;
+};
+
+export type MCPStdioRawResult = {
+  exitCode: number | null;
+  response?: MCPStdioRawResponse;
+  responses: MCPStdioRawResponse[];
+  signal: NodeJS.Signals | null;
+  stderr: string;
+  stdout: string;
+  stdoutLines: string[];
 };
 
 type SDKOAuthFlowOptions = {
@@ -32,6 +67,43 @@ export type MCPTestOAuthFlow = {
 
 async function loadSDKModule(): Promise<typeof import('@modelcontextprotocol/client')> {
   return import('@modelcontextprotocol/client');
+}
+
+function stdioCommand(): string {
+  const command = process.env.E2E_MCP_STDIO_COMMAND;
+  if (!command) {
+    throw new Error('E2E_MCP_STDIO_COMMAND must be set for stdio MCP client tests');
+  }
+  return command;
+}
+
+function leafwikiStdioEnv(
+  endpoint: string,
+  options: ConnectMCPClientOptions,
+): Record<string, string> {
+  const env: Record<string, string> = {
+    LEAFWIKI_MCP_ENDPOINT: endpoint,
+  };
+  if (options.accessToken) {
+    env.LEAFWIKI_MCP_API_KEY = options.accessToken;
+  }
+  return env;
+}
+
+function leafwikiStdioProcessEnv(
+  endpoint: string,
+  options: ConnectMCPClientOptions,
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    LEAFWIKI_MCP_ENDPOINT: endpoint,
+  };
+  if (options.accessToken) {
+    env.LEAFWIKI_MCP_API_KEY = options.accessToken;
+  } else {
+    delete env.LEAFWIKI_MCP_API_KEY;
+  }
+  return env;
 }
 
 export async function connectMCPClient(
@@ -51,7 +123,90 @@ export async function connectMCPClient(
   });
 
   await client.connect(transport);
-  return wrapMCPClient(client, transport);
+  return wrapMCPClient(client, async () => {
+    await transport.terminateSession();
+  });
+}
+
+export async function connectMCPStdioClient(
+  endpoint: string,
+  options: ConnectMCPStdioClientOptions = {},
+): Promise<MCPTestClient> {
+  const { Client, StdioClientTransport } = await loadSDKModule();
+  const env = leafwikiStdioEnv(endpoint, options);
+
+  const client = new Client({
+    name: options.clientName || 'leafwiki-e2e-stdio',
+    version: 'test',
+  });
+  const transport = new StdioClientTransport({
+    command: stdioCommand(),
+    cwd: process.env.E2E_REPO_ROOT,
+    env,
+    stderr: options.captureStderr === false ? 'inherit' : 'pipe',
+  });
+
+  await client.connect(transport);
+  return wrapMCPClient(client);
+}
+
+export async function requestMCPStdioFrame(
+  endpoint: string,
+  frame: Record<string, unknown>,
+  options: MCPStdioRawOptions = {},
+): Promise<MCPStdioRawResult> {
+  const child = spawn(stdioCommand(), [], {
+    cwd: process.env.E2E_REPO_ROOT,
+    env: leafwikiStdioProcessEnv(endpoint, options),
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  let stdout = '';
+  let stderr = '';
+  let timedOut = false;
+  const timeoutMs = options.timeoutMs ?? 5000;
+
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk: string) => {
+    stdout += chunk;
+  });
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk: string) => {
+    stderr += chunk;
+  });
+
+  const close = new Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }>(
+    (resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (exitCode, signal) => {
+        resolve({ exitCode, signal });
+      });
+    },
+  );
+  const timer = setTimeout(() => {
+    timedOut = true;
+    child.kill('SIGTERM');
+  }, timeoutMs);
+
+  child.stdin.end(`${JSON.stringify(frame)}\n`);
+  const closed = await close;
+  clearTimeout(timer);
+  if (timedOut) {
+    throw new Error(`leafwiki-mcp-stdio did not exit within ${timeoutMs}ms; stderr=${stderr}`);
+  }
+
+  const stdoutLines = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+  const responses = stdoutLines.map((line) => JSON.parse(line) as MCPStdioRawResponse);
+  return {
+    ...closed,
+    response: responses[0],
+    responses,
+    stderr,
+    stdout,
+    stdoutLines,
+  };
 }
 
 export async function startMCPClientSDKOAuthFlow(
@@ -116,7 +271,9 @@ export async function startMCPClientSDKOAuthFlow(
             authProvider,
           });
           await authenticatedClient.connect(authenticatedTransport);
-          return wrapMCPClient(authenticatedClient, authenticatedTransport);
+          return wrapMCPClient(authenticatedClient, async () => {
+            await authenticatedTransport.terminateSession();
+          });
         },
       };
     }
@@ -128,7 +285,7 @@ export async function startMCPClientSDKOAuthFlow(
   throw new Error('Expected MCP SDK OAuth flow to require authorization');
 }
 
-function wrapMCPClient(client: SDKClient, transport: SDKStreamableHTTPTransport): MCPTestClient {
+function wrapMCPClient(client: SDKClient, closeTransport?: () => Promise<void>): MCPTestClient {
   return {
     async listTools() {
       const result = await client.listTools();
@@ -148,7 +305,7 @@ function wrapMCPClient(client: SDKClient, transport: SDKStreamableHTTPTransport)
 
     async close() {
       try {
-        await transport.terminateSession();
+        await closeTransport?.();
       } finally {
         await client.close();
       }

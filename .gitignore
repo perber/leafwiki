@@ -13,6 +13,7 @@
 
 # Main binary
 leafwiki
+leafwiki-mcp-stdio
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out

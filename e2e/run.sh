@@ -5,7 +5,12 @@ set -euo pipefail
 current_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$current_dir/.." && pwd)"
 app_port="${E2E_PORT:-8085}"
-app_url="${E2E_BASE_URL:-http://localhost:${app_port}}"
+app_base_path="${E2E_BASE_PATH:-}"
+if [ -n "$app_base_path" ] && [[ "$app_base_path" != /* ]]; then
+  echo "❌ E2E_BASE_PATH must start with / when set."
+  exit 1
+fi
+app_url="${E2E_BASE_URL:-http://localhost:${app_port}${app_base_path}}"
 run_mode="${E2E_RUN_MODE:-docker}"
 server_pid=""
 server_log=""
@@ -13,6 +18,8 @@ local_data_dir=""
 local_root_dir=""
 docker_data_volume=""
 docker_root_volume=""
+mcp_stdio_dir=""
+mcp_stdio_command=""
 
 print_runner_diagnostics() {
   echo "--- E2E runtime diagnostics ---"
@@ -55,6 +62,28 @@ build_frontend_for_local_e2e() {
   mkdir -p "$repo_root/internal/http/dist"
   cp -R "$repo_root/ui/leafwiki-ui/dist/." "$repo_root/internal/http/dist/"
   touch "$repo_root/internal/http/dist/.gitkeep"
+}
+
+prepare_mcp_stdio_sidecar() {
+  if [ "${E2E_MCP_CLIENT_TRANSPORT:-http}" != "stdio" ]; then
+    return
+  fi
+  if [ "$run_mode" != "local" ]; then
+    echo "❌ E2E_MCP_CLIENT_TRANSPORT=stdio requires E2E_RUN_MODE=local."
+    exit 1
+  fi
+  if [ "${E2E_ENABLE_MCP_OAUTH_LOCAL:-0}" = "1" ]; then
+    echo "❌ The MCP STDIO sidecar supports disabled-auth and API-key modes only; keep OAuth E2E on Streamable HTTP."
+    exit 1
+  fi
+
+  mcp_stdio_dir="$(mktemp -d /tmp/leafwiki-mcp-stdio-e2e.XXXXXX)"
+  mcp_stdio_command="$mcp_stdio_dir/leafwiki-mcp-stdio"
+  echo "🔨 Building MCP STDIO sidecar for E2E..."
+  (
+    cd "$repo_root"
+    go build -o "$mcp_stdio_command" ./cmd/leafwiki-mcp-stdio
+  )
 }
 
 start_docker() {
@@ -123,10 +152,14 @@ start_local() {
     --admin-password=admin
   )
   local root_args=()
+  local base_path_args=()
 
   if [ "${E2E_ENABLE_SEPARATE_ROOT_DIR:-0}" = "1" ]; then
     local_root_dir="$(mktemp -d /tmp/leafwiki-e2e-root.XXXXXX)"
     root_args=(--root-dir "$local_root_dir")
+  fi
+  if [ -n "$app_base_path" ]; then
+    base_path_args=(--base-path "$app_base_path")
   fi
 
   local mcp_modes_enabled=0
@@ -172,6 +205,7 @@ start_local() {
       --port "$app_port" \
       --data-dir "$local_data_dir" \
       "${root_args[@]}" \
+      "${base_path_args[@]}" \
       --allow-insecure=true \
       "${auth_args[@]}" \
       --enable-revision=true \
@@ -197,6 +231,12 @@ stop_local() {
 
   if [ -n "$server_log" ] && [ -f "$server_log" ]; then
     rm -f "$server_log"
+  fi
+}
+
+cleanup_mcp_stdio_sidecar() {
+  if [ -n "$mcp_stdio_dir" ] && [ -d "$mcp_stdio_dir" ]; then
+    rm -rf "$mcp_stdio_dir"
   fi
 }
 
@@ -284,6 +324,7 @@ cleanup_runner() {
   fi
 
   stop_runner
+  cleanup_mcp_stdio_sidecar
   exit "$exit_code"
 }
 
@@ -309,6 +350,9 @@ run_playwright_tests() {
       E2E_ASSERT_SEPARATE_ROOT_FILES="$assert_root_files" \
       E2E_DATA_DIR="$local_data_dir" \
       E2E_ROOT_DIR="$local_root_dir" \
+      E2E_REPO_ROOT="$repo_root" \
+      E2E_MCP_CLIENT_TRANSPORT="${E2E_MCP_CLIENT_TRANSPORT:-http}" \
+      E2E_MCP_STDIO_COMMAND="$mcp_stdio_command" \
       PLAYWRIGHT_FORCE_TTY=1 \
       stdbuf -oL -eL npx playwright test --workers="$workers" --reporter="$reporter" "$@"
     else
@@ -319,6 +363,9 @@ run_playwright_tests() {
       E2E_ASSERT_SEPARATE_ROOT_FILES="$assert_root_files" \
       E2E_DATA_DIR="$local_data_dir" \
       E2E_ROOT_DIR="$local_root_dir" \
+      E2E_REPO_ROOT="$repo_root" \
+      E2E_MCP_CLIENT_TRANSPORT="${E2E_MCP_CLIENT_TRANSPORT:-http}" \
+      E2E_MCP_STDIO_COMMAND="$mcp_stdio_command" \
       PLAYWRIGHT_FORCE_TTY=1 \
       npx playwright test --workers="$workers" --reporter="$reporter" "$@"
     fi
@@ -367,4 +414,5 @@ fi
 trap cleanup_runner EXIT
 
 wait_until_reachable
+prepare_mcp_stdio_sidecar
 run_playwright_tests "$@"
