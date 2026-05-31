@@ -55,6 +55,34 @@ test('failed login', async ({ page }) => {
   await loginPage.expectInvalidCredentialsError();
 });
 
+test('config error shows allow-insecure message instead of object text', async ({ page }) => {
+  await page.route('**/api/config', async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: {
+          code: 'auth_cookie_failed',
+          message:
+            'HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.',
+          template: 'https required for auth cookies use allow insecure',
+        },
+      }),
+    });
+  });
+
+  const loginPage = new LoginPage(page);
+  await loginPage.goto();
+
+  await expect(page.getByText(/--allow-insecure/, { exact: false })).toBeVisible();
+  await expect(
+    page.getByText(
+      'HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByText('[object Object]')).toHaveCount(0);
+});
+
 // logout test
 test('logout', async ({ page }) => {
   const loginPage = new LoginPage(page);

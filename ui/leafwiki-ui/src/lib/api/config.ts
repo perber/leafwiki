@@ -1,7 +1,13 @@
+import type { ApiLocalizedErrorResponse } from './errors'
 import { API_BASE_URL } from '../config'
+import {
+  ApiLocalizedError,
+  isApiLocalizedErrorResponse,
+  mapApiError,
+} from './errors'
 
 type ConfigErrorResponse = {
-  error?: string
+  error?: string | ApiLocalizedErrorResponse['error']
   message?: string
 }
 
@@ -31,8 +37,19 @@ export async function getConfig(): Promise<Config> {
       throw new Error(fallbackMessage)
     }
 
-    if (errorBody?.error || errorBody?.message) {
-      throw new Error(errorBody.error || errorBody.message)
+    if (isApiLocalizedErrorResponse(errorBody)) {
+      throw new Error(
+        mapApiError(new ApiLocalizedError(errorBody.error), fallbackMessage)
+          .message,
+      )
+    }
+
+    if (typeof errorBody?.error === 'string') {
+      throw new Error(errorBody.error)
+    }
+
+    if (errorBody?.message) {
+      throw new Error(errorBody.message)
     }
 
     throw new Error(fallbackMessage)
