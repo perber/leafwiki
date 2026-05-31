@@ -316,7 +316,7 @@ export default function MarkdownToolbar({
             variant="ghost"
             size="icon"
             onClick={toggleLineWrap}
-            className={`markdown-toolbar__button${lineWrap ? ' markdown-toolbar__button--active' : ''}`}
+            className={`markdown-toolbar__button${lineWrap ? 'markdown-toolbar__button--active' : ''}`}
             data-testid="toggle-line-wrap-button"
           >
             <WrapText className="markdown-toolbar__icon" />
@@ -334,7 +334,7 @@ export default function MarkdownToolbar({
                 variant="ghost"
                 size="icon"
                 onClick={onTogglePreview}
-                className={`markdown-toolbar__button markdown-toolbar__button--desktop-only${previewVisible ? ' markdown-toolbar__button--active' : ''}`}
+                className={`markdown-toolbar__button markdown-toolbar__button--desktop-only${previewVisible ? 'markdown-toolbar__button--active' : ''}`}
               >
                 <Eye className="markdown-toolbar__icon" />
               </Button>
