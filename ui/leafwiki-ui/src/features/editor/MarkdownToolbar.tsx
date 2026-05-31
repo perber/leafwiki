@@ -6,6 +6,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DIALOG_ASSET_MANAGER, DIALOG_LINK_INSERT } from '@/lib/registries'
+import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useDialogsStore } from '@/stores/dialogs'
 import {
@@ -316,7 +317,9 @@ export default function MarkdownToolbar({
             variant="ghost"
             size="icon"
             onClick={toggleLineWrap}
-            className={`markdown-toolbar__button${lineWrap ? 'markdown-toolbar__button--active' : ''}`}
+            className={cn('markdown-toolbar__button', {
+              'markdown-toolbar__button--active': lineWrap,
+            })}
             data-testid="toggle-line-wrap-button"
           >
             <WrapText className="markdown-toolbar__icon" />
@@ -334,7 +337,12 @@ export default function MarkdownToolbar({
                 variant="ghost"
                 size="icon"
                 onClick={onTogglePreview}
-                className={`markdown-toolbar__button markdown-toolbar__button--desktop-only${previewVisible ? 'markdown-toolbar__button--active' : ''}`}
+                className={cn(
+                  'markdown-toolbar__button markdown-toolbar__button--desktop-only',
+                  {
+                    'markdown-toolbar__button--active': previewVisible,
+                  },
+                )}
               >
                 <Eye className="markdown-toolbar__icon" />
               </Button>

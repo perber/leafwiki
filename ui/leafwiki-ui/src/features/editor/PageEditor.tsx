@@ -14,6 +14,7 @@ import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
 import { PageFrontmatterPanel } from './PageFrontmatterPanel'
 import { usePageEditorStore } from './pageEditorStore'
 import { isDirtyState } from './pageEditorStore'
+import { useAutoSave } from './useAutoSave'
 import useNavigationGuard from './useNavigationGuard'
 import { useToolbarActions } from './useToolbarActions'
 
@@ -44,6 +45,9 @@ export default function PageEditor() {
   const error = usePageEditorStore((s) => s.error)
   const openNode = useTreeStore((s) => s.openNode)
   const dirty = usePageEditorStore(isDirtyState)
+
+  // Auto-save hook — must be called unconditionally
+  useAutoSave()
 
   // Shows Unsaved Changes Dialog when navigating away with dirty state
   useNavigationGuard({

@@ -40,7 +40,7 @@ export interface PageEditorState {
   setFrontmatterErrors: (errors: Record<string, string>) => void
   setError: (error: string | null) => void // set the error message
   setPage: (page: Page | null) => void // set the current page
-  savePage: () => Promise<Page | null | undefined> // save the current page
+  savePage: (options?: { silent?: boolean }) => Promise<Page | null | undefined> // save the current page
   forceOverwrite: () => Promise<Page | null | undefined> // re-fetch server version, then save
   loadPageData: (path: string) => Promise<void> // load page data by path
 }
@@ -88,6 +88,10 @@ export const isDirtyState = (s: PageEditorState) => {
   )
 }
 
+// Module-level mutex: prevents concurrent auto-saves from stacking.
+// Manual saves (silent=false) bypass this so Ctrl+S is never blocked by an in-flight auto-save.
+let isSavingMutex = false
+
 export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   error: null,
   notFound: false,
@@ -128,7 +132,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   setFrontmatterErrors: (frontmatterErrors) => set({ frontmatterErrors }),
   setError: (error) => set({ error }),
   setPage: (page) => set({ page }),
-  savePage: async () => {
+  savePage: async (options?: { silent?: boolean }) => {
     const { page, title, slug, content, tags, frontmatterFields } = get()
     if (!page || !isDirtyState(get())) return
 
@@ -141,10 +145,14 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       throw new Error('Please fix metadata errors before saving.')
     }
 
+    // Only block concurrent auto-saves; manual saves always proceed
+    if (isSavingMutex && options?.silent) return
+    isSavingMutex = true
+
     const properties = buildEditableProperties(frontmatterFields)
 
     try {
-      useProgressbarStore.getState().setLoading(true)
+      if (!options?.silent) useProgressbarStore.getState().setLoading(true)
       set({ frontmatterErrors: {} })
       const titleChanged = page.title !== title
       const slugChanged = page.slug !== slug
@@ -258,7 +266,8 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
 
       return updatedPage
     } finally {
-      useProgressbarStore.getState().setLoading(false)
+      isSavingMutex = false
+      if (!options?.silent) useProgressbarStore.getState().setLoading(false)
     }
   },
   forceOverwrite: async () => {

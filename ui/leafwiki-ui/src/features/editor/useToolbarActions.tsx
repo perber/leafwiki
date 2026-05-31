@@ -7,8 +7,9 @@ import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { closeSearchPanel, searchPanelOpen } from '@codemirror/search'
 import type { EditorView } from '@codemirror/view'
 import { completionStatus } from '@codemirror/autocomplete'
-import { Save, X } from 'lucide-react'
+import { Save, X, Cloud } from 'lucide-react'
 import { useEffect } from 'react'
+import { useEditorStore } from '@/stores/editor'
 import { useToolbarStore } from '../toolbar/toolbarStore'
 import { usePageEditorStore } from './pageEditorStore'
 import { isDirtyState } from './pageEditorStore'
@@ -42,6 +43,8 @@ export function useToolbarActions({
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
   const dirty = usePageEditorStore(isDirtyState)
+  const autoSave = useEditorStore((s) => s.autoSave)
+  const toggleAutoSave = useEditorStore((s) => s.toggleAutoSave)
 
   // useEffect to set toolbar buttons
   useEffect(() => {
@@ -70,8 +73,27 @@ export function useToolbarActions({
         className: 'toolbar-button__save-page',
         action: savePage,
       },
+      {
+        id: 'toggle-auto-save',
+        label: 'Auto-save',
+        hotkey: '',
+        icon: <Cloud size={18} />,
+        variant: 'outline',
+        active: autoSave,
+        className: 'toolbar-button__toggle-auto-save',
+        action: toggleAutoSave,
+      },
     ])
-  }, [appMode, readOnlyMode, setButtons, dirty, savePage, closePage])
+  }, [
+    appMode,
+    readOnlyMode,
+    setButtons,
+    dirty,
+    savePage,
+    closePage,
+    autoSave,
+    toggleAutoSave,
+  ])
 
   // Register hotkeys
   useEffect(() => {

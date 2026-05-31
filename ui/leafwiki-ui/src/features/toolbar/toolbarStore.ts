@@ -12,6 +12,7 @@ export interface ToolbarButton {
   className?: string
   destructive?: boolean
   disabled?: boolean
+  active?: boolean
   action: () => void
 }
 

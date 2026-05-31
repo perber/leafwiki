@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ToolbarButton } from '@/features/toolbar/ToolbarButton'
 import { cn } from '@/lib/utils'
-import { MoreHorizontal } from 'lucide-react'
+import { Check, MoreHorizontal } from 'lucide-react'
 import { useToolbarStore } from './toolbarStore'
 
 const MOBILE_VISIBLE_BUTTONS = 2
@@ -28,6 +28,7 @@ export function Toolbar() {
           onClick={button.action}
           icon={button.icon}
           disabled={button.disabled}
+          active={button.active}
           variant={button.variant}
           className={button.className}
           mobileHidden={index >= MOBILE_VISIBLE_BUTTONS}
@@ -62,6 +63,7 @@ export function Toolbar() {
               >
                 {button.icon}
                 <span>{button.label}</span>
+                {button.active && <Check size={14} className="ml-auto" />}
                 <DropdownMenuShortcut>{button.hotkey}</DropdownMenuShortcut>
               </DropdownMenuItem>
             ))}
