@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>LeafWiki</Name>
+  <Repository>ghcr.io/perber/leafwiki:latest</Repository>
+  <Registry>https://github.com/perber/leafwiki/pkgs/container/leafwiki</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/perber/leafwiki/issues</Support>
+  <GitHub>https://github.com/perber/leafwiki</GitHub>
+  <Project>https://github.com/perber/leafwiki</Project>
+  <Overview>
+    LeafWiki is a self-hosted wiki that runs as a single Go binary with SQLite storage and Markdown pages on disk.
+    No external database required. Supports nested pages, file attachments, full-text search, and role-based access control.
+  </Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/perber/leafwiki/main/unraid/leafwiki.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/perber/leafwiki/main/assets/logo.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DonateText>Support LeafWiki development</DonateText>
+  <DonateLink>https://github.com/sponsors/perber</DonateLink>
+  <Requires/>
+
+  <!-- Required: JWT signing secret. Generate a strong random value, e.g.: openssl rand -hex 32 -->
+  <Config Name="JWT Secret" Target="LEAFWIKI_JWT_SECRET" Default="" Mode="" Description="JWT signing secret — required. Generate with: openssl rand -hex 32" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+
+  <!-- Data directory — persist your wiki pages and uploads here -->
+  <Config Name="Data Directory" Target="/app/data" Default="/mnt/user/appdata/leafwiki" Mode="rw" Description="Path where LeafWiki stores pages, attachments, and the SQLite database." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/leafwiki</Config>
+
+  <!-- Web port -->
+  <Config Name="Web UI Port" Target="8080" Default="8080" Mode="tcp" Description="Port for the LeafWiki web interface." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+
+  <!-- Optional environment variables -->
+  <Config Name="Log Level" Target="LEAFWIKI_LOG_LEVEL" Default="info" Mode="" Description="Log verbosity: debug, info, warn, error." Type="Variable" Display="advanced" Required="false" Mask="false">info</Config>
+  <Config Name="Disable Auth" Target="LEAFWIKI_DISABLE_AUTH" Default="false" Mode="" Description="Set to true to disable authentication. Only use on fully trusted, isolated networks." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+</Container>
