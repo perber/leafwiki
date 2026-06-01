@@ -34,7 +34,7 @@ get_version(){
 
 download_binary(){
     TMP_FILE="/tmp/leafwiki-v${VERSION}-linux-${ARCH}"
-    wget -q -O "$TMP_FILE" "${RELEASE_LINK}releases/download/v${VERSION}/leafwiki-v${VERSION}-linux-${ARCH}" || {
+    wget -O "$TMP_FILE" "${RELEASE_LINK}releases/download/v${VERSION}/leafwiki-v${VERSION}-linux-${ARCH}" || {
         echo "Download failed. Aborting update." >&2
         exit 1
     }
@@ -60,6 +60,7 @@ if [[ $EXIST == "false" ]]; then
     exit 1
 fi
 
+echo "Update in progress..."
 get_version
 download_binary
 
