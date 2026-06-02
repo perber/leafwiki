@@ -15,7 +15,10 @@ export function useAutoSave(): { status: AutoSaveStatus } {
   const [status, setStatus] = useState<AutoSaveStatus>('idle')
   // Incremented when the unsaved-changes dialog is dismissed via Cancel so the
   // debounce effect re-runs and reschedules the auto-save.
-  const [retriggerCount, dispatchRetrigger] = useReducer((c: number) => c + 1, 0)
+  const [retriggerCount, dispatchRetrigger] = useReducer(
+    (c: number) => c + 1,
+    0,
+  )
 
   const autoSave = useEditorStore((s) => s.autoSave)
   const content = usePageEditorStore((s) => s.content)
