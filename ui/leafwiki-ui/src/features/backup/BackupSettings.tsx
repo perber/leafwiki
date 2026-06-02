@@ -25,6 +25,7 @@ export default function BackupSettings() {
     lastError,
     isLoading,
     isPolling,
+    statusError,
     loadStatus,
     triggerPush,
     stopPolling,
@@ -85,8 +86,7 @@ export default function BackupSettings() {
   }
 
   return (
-    <>
-      <div className="settings">
+    <div className="settings">
         <h1 className="settings__title">Backup Settings</h1>
 
         {isLoading && (
@@ -98,9 +98,14 @@ export default function BackupSettings() {
           </div>
         )}
 
+        {statusError && (
+          <div className="settings__section">
+            <p className="text-error text-sm">{statusError}</p>
+          </div>
+        )}
+
         {!isLoading && (
-          <>
-            <div className="settings__section">
+          <div className="settings__section">
               <h2 className="settings__section-title">Git Backup</h2>
               <p className="settings__section-description">
                 Automatically pushes wiki changes to the configured remote Git
@@ -176,9 +181,8 @@ export default function BackupSettings() {
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
-      </div>
-    </>
+    </div>
   )
 }

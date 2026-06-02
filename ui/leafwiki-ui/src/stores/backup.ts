@@ -11,6 +11,7 @@ interface BackupState {
   lastError: string
   isLoading: boolean
   isPolling: boolean
+  statusError: string
   loadStatus: () => Promise<void>
   triggerPush: () => Promise<void>
   startPolling: () => void
@@ -23,6 +24,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
   lastError: '',
   isLoading: false,
   isPolling: false,
+  statusError: '',
 
   loadStatus: async () => {
     set({ isLoading: true })
@@ -35,7 +37,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         isLoading: false,
       })
     } catch {
-      set({ isLoading: false })
+      set({ isLoading: false, statusError: 'Failed to load backup status' })
     }
   },
 

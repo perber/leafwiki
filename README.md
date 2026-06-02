@@ -48,7 +48,6 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - Inject HTML/JS into `<head>` for analytics or custom CSS
 - Branding: logo, favicon, site name
 - Dark mode and mobile-friendly UI
-- Git backup to a remote repository via SSH (scheduled automatic pushes)
 
 **Opt-in via feature flags:**
 - Revision history (`--enable-revision`)
@@ -247,14 +246,6 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--enable-revision`              | Enable revision history                                                 | `false`       | v0.9.0  |
 | `--enable-link-refactor`         | Enable link rewriting on rename/move                                    | `false`       | v0.9.0  |
 | `--max-revision-history`         | Max revisions per page; `0` = unlimited                                 | `100`         | v0.9.0  |
-| `--git-backup`                   | Enable automated git backup to a remote repository                      | `false`       | –       |
-| `--git-backup-remote`            | SSH remote URL for the backup repository (required when enabled)        | `""`          | –       |
-| `--git-backup-branch`            | Git branch to push to                                                   | `main`        | –       |
-| `--git-backup-author-name`       | Git commit author name                                                  | `LeafWiki Backup` | –    |
-| `--git-backup-author-email`      | Git commit author email                                                 | `backup@leafwiki.local` | – |
-| `--git-backup-interval`          | Backup interval in minutes                                              | `60`          | –       |
-| `--git-backup-ssh-key-path`      | Path to SSH private key file                                            | `""`          | –       |
-| `--git-backup-ssh-key`           | Raw SSH private key (PEM)                                               | `""`          | –       |
 | `--enable-http-remote-user`      | Enable reverse-proxy auth via HTTP header                               | `false`       | v0.10.0 |
 | `--http-remote-user-header-name` | Header name carrying the username from the proxy                        | `Remote-User` | v0.10.0 |
 | `--trusted-proxy-ips`            | Trusted proxy IPs/CIDRs for remote-user header                          | `""`          | v0.10.0 |
@@ -285,14 +276,6 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_ENABLE_REVISION`              | Revision history                                     | `false`       | v0.9.0  |
 | `LEAFWIKI_ENABLE_LINK_REFACTOR`         | Link rewriting on rename/move                        | `false`       | v0.9.0  |
 | `LEAFWIKI_MAX_REVISION_HISTORY`         | Max revisions per page; `0` = unlimited              | `100`         | v0.9.0  |
-| `LEAFWIKI_GIT_BACKUP`                   | Enable automated git backup to a remote repository   | `false`       | –       |
-| `LEAFWIKI_GIT_BACKUP_REMOTE`            | SSH remote URL for the backup repository             | `""`          | –       |
-| `LEAFWIKI_GIT_BACKUP_BRANCH`            | Git branch to push to                                | `main`        | –       |
-| `LEAFWIKI_GIT_BACKUP_AUTHOR_NAME`       | Git commit author name                               | `LeafWiki Backup` | –    |
-| `LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL`      | Git commit author email                              | `backup@leafwiki.local` | – |
-| `LEAFWIKI_GIT_BACKUP_INTERVAL`          | Backup interval in minutes                           | `60`          | –       |
-| `LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH`      | Path to SSH private key file                         | `""`          | –       |
-| `LEAFWIKI_GIT_BACKUP_SSH_KEY`           | Raw SSH private key (PEM)                            | `""`          | –       |
 | `LEAFWIKI_ENABLE_HTTP_REMOTE_USER`      | Reverse-proxy auth via header                        | `false`       | v0.10.0 |
 | `LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME` | Username header from proxy                           | `Remote-User` | v0.10.0 |
 | `LEAFWIKI_TRUSTED_PROXY_IPS`            | Trusted proxy IPs/CIDRs                              | `""`          | v0.10.0 |

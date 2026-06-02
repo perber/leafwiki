@@ -59,6 +59,11 @@ func Init(cfg Config) (*Repository, error) {
 	if err == nil {
 		slog.Debug("opened existing git repo", "repoDir", repoDir)
 		r.repo = repo
+		if cfg.RemoteURL != "" {
+			if err := r.reconcileRemote(); err != nil {
+				return nil, err
+			}
+		}
 		return r, nil
 	}
 
@@ -82,6 +87,31 @@ func Init(cfg Config) (*Repository, error) {
 	}
 
 	return r, nil
+}
+
+// reconcileRemote ensures the stored 'origin' remote URL matches cfg.RemoteURL.
+// Called when opening an existing repo so that a changed --git-backup-remote
+// takes effect immediately rather than silently pushing to the old destination.
+func (r *Repository) reconcileRemote() error {
+	remote, err := r.repo.Remote("origin")
+	if err != nil {
+		// Remote doesn't exist yet; push() will create it on first use.
+		return nil
+	}
+	if urls := remote.Config().URLs; len(urls) > 0 && urls[0] == r.cfg.RemoteURL {
+		return nil // already up to date
+	}
+	if err := r.repo.DeleteRemote("origin"); err != nil {
+		return fmt.Errorf("failed to remove stale remote: %w", err)
+	}
+	if _, err := r.repo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{r.cfg.RemoteURL},
+	}); err != nil {
+		return fmt.Errorf("failed to update remote URL: %w", err)
+	}
+	slog.Info("backup: updated 'origin' remote URL", "url", r.cfg.RemoteURL)
+	return nil
 }
 
 // makeInitialCommit creates the first commit with root/ and assets/ directories.
@@ -112,7 +142,7 @@ func (r *Repository) makeInitialCommit() error {
 
 	if _, err := os.Stat(r.cfg.RootDir); err == nil {
 		slog.Debug("makeInitialCommit: staging root dir", "path", rootRel)
-		if _, err := wt.Add(rootRel); err != nil {
+		if _, err := wt.Add(filepath.ToSlash(rootRel)); err != nil {
 			return fmt.Errorf("failed to stage root dir: %w", err)
 		}
 		// Check if root has any files
@@ -130,7 +160,7 @@ func (r *Repository) makeInitialCommit() error {
 	}
 	if _, err := os.Stat(r.cfg.AssetsDir); err == nil {
 		slog.Debug("makeInitialCommit: staging assets dir", "path", assetsRel)
-		if _, err := wt.Add(assetsRel); err != nil {
+		if _, err := wt.Add(filepath.ToSlash(assetsRel)); err != nil {
 			return fmt.Errorf("failed to stage assets dir: %w", err)
 		}
 		// Check if assets has any files
@@ -261,7 +291,7 @@ func (r *Repository) RunBackup() error {
 	assetsDirMissing := false
 
 	if _, err := os.Stat(r.cfg.RootDir); err == nil {
-		if _, err := wt.Add(rootRel); err != nil {
+		if _, err := wt.Add(filepath.ToSlash(rootRel)); err != nil {
 			errMsg := fmt.Errorf("failed to stage root dir: %w", err).Error()
 			slog.Debug("RunBackup: failed to stage root dir", "error", errMsg)
 			r.status.SetError(errMsg)
@@ -273,7 +303,7 @@ func (r *Repository) RunBackup() error {
 		slog.Debug("RunBackup: root dir not found, skipping", "path", r.cfg.RootDir)
 	}
 	if _, err := os.Stat(r.cfg.AssetsDir); err == nil {
-		if _, err := wt.Add(assetsRel); err != nil {
+		if _, err := wt.Add(filepath.ToSlash(assetsRel)); err != nil {
 			errMsg := fmt.Errorf("failed to stage assets dir: %w", err).Error()
 			slog.Debug("RunBackup: failed to stage assets dir", "error", errMsg)
 			r.status.SetError(errMsg)
@@ -351,13 +381,9 @@ func (r *Repository) RunBackup() error {
 			r.status.SetError(err.Error())
 			return fmt.Errorf("push failed: %w", err)
 		}
-	} else {
-		slog.Debug("RunBackup: no remote configured, skipping push")
-	}
-
-	if r.cfg.RemoteURL != "" {
 		slog.Info("backup committed and pushed to remote")
 	} else {
+		slog.Debug("RunBackup: no remote configured, skipping push")
 		slog.Info("backup committed locally (no remote configured)")
 	}
 	r.status.SetSuccess(time.Now())
@@ -477,33 +503,18 @@ func (r *Repository) buildSSHAuth() (ssh.AuthMethod, error) {
 		Signer: signer,
 	}
 
-	// Use known hosts for MITM protection if provided.
-	// NewKnownHostsCallback expects a file path, so we write the raw content to a temp file.
-	if r.cfg.SSHKnownHosts != "" {
-		tmpFile, tmpErr := os.CreateTemp("", "known_hosts_*")
-		if tmpErr != nil {
-			slog.Warn("buildSSHAuth: failed to create temp file for SSHKnownHosts, falling back to insecure mode", "error", tmpErr)
-			auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
-		} else {
-			defer os.Remove(tmpFile.Name())
-			if _, writeErr := tmpFile.WriteString(r.cfg.SSHKnownHosts); writeErr != nil {
-				tmpFile.Close()
-				slog.Warn("buildSSHAuth: failed to write SSHKnownHosts to temp file, falling back to insecure mode", "error", writeErr)
-				auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
-			} else {
-				tmpFile.Close()
-				knownHostsCallback, err := ssh.NewKnownHostsCallback(tmpFile.Name())
-				if err != nil {
-					slog.Warn("buildSSHAuth: failed to parse SSHKnownHosts, falling back to insecure mode", "error", err)
-					auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
-				} else {
-					auth.HostKeyCallback = knownHostsCallback
-					slog.Debug("buildSSHAuth: SSH auth configured with known hosts callback")
-				}
-			}
+	// Use known hosts file for MITM protection if a path was provided.
+	// If a path is configured but unreadable, we return an error rather than
+	// silently downgrading to no host-key verification.
+	if r.cfg.SSHKnownHostsPath != "" {
+		knownHostsCallback, err := ssh.NewKnownHostsCallback(r.cfg.SSHKnownHostsPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load known_hosts file %q: %w", r.cfg.SSHKnownHostsPath, err)
 		}
+		auth.HostKeyCallback = knownHostsCallback
+		slog.Debug("buildSSHAuth: SSH auth configured with known hosts", "path", r.cfg.SSHKnownHostsPath)
 	} else {
-		slog.Warn("buildSSHAuth: no SSHKnownHosts provided, connection will be insecure (no MITM protection)")
+		slog.Warn("buildSSHAuth: no SSHKnownHostsPath provided, connection will be insecure (no MITM protection)")
 		auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
 	}
 	return auth, nil

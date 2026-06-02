@@ -21,5 +21,6 @@ export async function fetchBackupStatus(): Promise<BackupStatusResponse> {
 export async function triggerBackupPush(): Promise<void> {
   await fetchWithAuth(BACKUP_PUSH_URL, {
     method: 'POST',
+    credentials: 'include',
   })
 }

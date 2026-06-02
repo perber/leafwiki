@@ -13,11 +13,11 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/perber/wiki/internal/backup"
-	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
+	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 )
 
 func writeUsage(w io.Writer) {
@@ -63,7 +63,7 @@ func writeUsage(w io.Writer) {
 	--git-backup-ssh-key-path      Path to SSH private key for git backup
 	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
 	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
-	--git-backup-interval          Git backup interval in minutes (default: 60)
+	--git-backup-interval          Git backup interval in minutes; 0 = manual-only, no automatic scheduling (default: 60)
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -150,20 +150,20 @@ type cliFlags struct {
 	enableRevision          *bool
 	enableLinkRefactor      *bool
 	maxRevisionHistory      *int
-	enableHTTPRemoteUser      *bool
-	httpRemoteUserHeader      *string
-	trustedProxyIPs           *string
-	httpRemoteUserLogoutURL   *string
-	disableRequestLog         *bool
-	gitBackup                 *bool
-	gitBackupAuthorName       *string
-	gitBackupAuthorEmail      *string
-	gitBackupRemote           *string
-	gitBackupBranch           *string
-	gitBackupSSHKeyPath       *string
-	gitBackupSSHKey           *string
-	gitBackupSSHKnownHosts    *string
-	gitBackupInterval         *int
+	enableHTTPRemoteUser    *bool
+	httpRemoteUserHeader    *string
+	trustedProxyIPs         *string
+	httpRemoteUserLogoutURL *string
+	disableRequestLog       *bool
+	gitBackup               *bool
+	gitBackupAuthorName     *string
+	gitBackupAuthorEmail    *string
+	gitBackupRemote         *string
+	gitBackupBranch         *string
+	gitBackupSSHKeyPath     *string
+	gitBackupSSHKey         *string
+	gitBackupSSHKnownHosts  *string
+	gitBackupInterval       *int
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -198,8 +198,8 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupBranch:         fs.String("git-backup-branch", "", "git branch to push to (default: main)"),
 		gitBackupSSHKeyPath:     fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
 		gitBackupSSHKey:         fs.String("git-backup-ssh-key", "", "raw SSH private key for git backup (env var preferred)"),
-		gitBackupSSHKnownHosts: fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
-		gitBackupInterval:      fs.Int("git-backup-interval", 0, "git backup interval in minutes (default: 60)"),
+		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
+		gitBackupInterval:       fs.Int("git-backup-interval", 0, "git backup interval in minutes (default: 60)"),
 	}
 }
 
@@ -269,7 +269,10 @@ func main() {
 	}
 
 	// Validate git backup configuration
-	// Note: git-backup-remote is now optional (local-only mode is supported)
+	// Note: git-backup-remote is optional (local-only mode is supported)
+	if gitBackupEnabled && gitBackupRemote != "" && gitBackupSSHKey == "" && gitBackupSSHKeyPath == "" {
+		fail("--git-backup-ssh-key or --git-backup-ssh-key-path is required when --git-backup-remote is set. Use LEAFWIKI_GIT_BACKUP_SSH_KEY or LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH.")
+	}
 
 	args := flag.Args()
 	if len(args) > 0 {
@@ -342,22 +345,24 @@ func main() {
 	// Initialize git backup if enabled
 	var backupScheduler *backup.Scheduler
 	if gitBackupEnabled {
-		repoDir := dataDir
-		if err := backup.EnsureGitignore(repoDir); err != nil {
-			fail("git backup init failed: %v", err)
+		if gitBackupRemote != "" && !strings.HasPrefix(gitBackupRemote, "git@") && !strings.HasPrefix(gitBackupRemote, "ssh://") {
+			fail("--git-backup-remote must be an SSH URL (e.g. git@github.com:user/repo.git or ssh://...)")
+		}
+		if visited["git-backup-ssh-key"] {
+			slog.Warn("SSH private key passed via --git-backup-ssh-key flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_SSH_KEY environment variable")
 		}
 		backupRepo, err := backup.Init(backup.Config{
-			Enabled:         true,
-			RootDir:         filepath.Join(dataDir, "root"),
-			AssetsDir:       filepath.Join(dataDir, "assets"),
-			AuthorName:      gitBackupAuthorName,
-			AuthorEmail:     gitBackupAuthorEmail,
-			RemoteURL:       gitBackupRemote,
-			Branch:          gitBackupBranch,
-			SSHKeyPath:      gitBackupSSHKeyPath,
-			SSHKey:          gitBackupSSHKey,
-			SSHKnownHosts:   gitBackupSSHKnownHosts,
-			IntervalMinutes: gitBackupInterval,
+			Enabled:           true,
+			RootDir:           filepath.Join(dataDir, "root"),
+			AssetsDir:         filepath.Join(dataDir, "assets"),
+			AuthorName:        gitBackupAuthorName,
+			AuthorEmail:       gitBackupAuthorEmail,
+			RemoteURL:         gitBackupRemote,
+			Branch:            gitBackupBranch,
+			SSHKeyPath:        gitBackupSSHKeyPath,
+			SSHKey:            gitBackupSSHKey,
+			SSHKnownHostsPath: gitBackupSSHKnownHosts,
+			IntervalMinutes:   gitBackupInterval,
 		})
 		if err != nil {
 			fail("git backup init failed: %v", err)

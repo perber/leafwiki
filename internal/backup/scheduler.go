@@ -6,32 +6,39 @@ import (
 	"time"
 )
 
-// Minimum interval to prevent time.NewTicker(0) panic
+// minInterval is the smallest allowed non-zero periodic interval.
 const minInterval = 1 * time.Minute
 
 // Scheduler runs periodic git backups.
+// When created with interval == 0 it operates in manual-only mode: no
+// automatic ticker fires, but TriggerNow() and the initial startup run still work.
 type Scheduler struct {
-	repo   *Repository
-	ticker *time.Ticker
-	manual chan struct{}
-	done   chan struct{}
-	wg     sync.WaitGroup
+	repo      *Repository
+	ticker    *time.Ticker // nil in manual-only mode
+	manual    chan struct{}
+	done      chan struct{}
+	wg        sync.WaitGroup
 	closeOnce sync.Once
 }
 
 // NewScheduler creates and starts the background goroutine.
+// Pass interval == 0 to disable automatic periodic backups (manual-only mode).
 func NewScheduler(repo *Repository, interval time.Duration) *Scheduler {
-	if interval < minInterval {
-		slog.Warn("backup scheduler interval too small, using minimum", "requested", interval, "using", minInterval)
-		interval = minInterval
-	}
 	s := &Scheduler{
 		repo:   repo,
-		ticker: time.NewTicker(interval),
 		manual: make(chan struct{}, 1),
 		done:   make(chan struct{}),
 	}
-	s.manual <- struct{}{} // pre-seed: first select fires immediately
+
+	if interval > 0 {
+		if interval < minInterval {
+			slog.Warn("backup scheduler interval too small, using minimum", "requested", interval, "using", minInterval)
+			interval = minInterval
+		}
+		s.ticker = time.NewTicker(interval)
+	}
+
+	s.manual <- struct{}{} // pre-seed: fires an immediate run on startup
 
 	s.wg.Add(1)
 	go s.run()
@@ -40,6 +47,12 @@ func NewScheduler(repo *Repository, interval time.Duration) *Scheduler {
 
 func (s *Scheduler) run() {
 	defer s.wg.Done()
+
+	// A nil channel blocks forever, so tickerC is never selected in manual-only mode.
+	var tickerC <-chan time.Time
+	if s.ticker != nil {
+		tickerC = s.ticker.C
+	}
 
 	for {
 		var done bool
@@ -50,7 +63,7 @@ func (s *Scheduler) run() {
 				}
 			}()
 			select {
-			case <-s.ticker.C:
+			case <-tickerC:
 				if err := s.repo.RunBackup(); err != nil {
 					slog.Error("backup failed", "error", err)
 				}
@@ -79,7 +92,9 @@ func (s *Scheduler) TriggerNow() {
 
 // Stop shuts down the goroutine cleanly.
 func (s *Scheduler) Stop() {
-	s.ticker.Stop()
+	if s.ticker != nil {
+		s.ticker.Stop()
+	}
 	s.closeOnce.Do(func() {
 		close(s.done)
 	})

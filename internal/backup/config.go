@@ -12,7 +12,7 @@ type Config struct {
 	Branch         string   // remote branch to push to, default "main"
 	SSHKeyPath     string   // path to private key file (optional if SSHKey set)
 	SSHKey         string   // raw PEM private key (env var preferred)
-	SSHKnownHosts  string   // known_hosts content for MITM protection (optional)
+	SSHKnownHostsPath string // path to known_hosts file for MITM protection (optional)
 	IntervalMinutes int     // how often to run the scheduled backup, default 60
 }
 
