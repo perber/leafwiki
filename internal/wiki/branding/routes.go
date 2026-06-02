@@ -232,12 +232,18 @@ func (r *Routes) handleServeCurrentFavicon(c *gin.Context) {
 	c.Data(http.StatusOK, "image/svg+xml", []byte(httpinternal.DefaultFaviconSVG))
 }
 
-func (r *Routes) resolveBrandingAssetPath(filename string, cfg *corebanding.BrandingConfigResponse) (string, int) {
-	// Prevent path traversal or poisoned config values.
-	if strings.Contains(filename, "..") ||
+func containsInvalidBrandingAssetPath(filename string) bool {
+	return strings.Contains(filename, "..") ||
 		strings.Contains(filename, "/") ||
 		strings.Contains(filename, "\\") ||
-		strings.Contains(filename, "\x00") {
+		filepath.IsAbs(filename) ||
+		filepath.VolumeName(filename) != "" ||
+		strings.Contains(filename, "\x00")
+}
+
+func (r *Routes) resolveBrandingAssetPath(filename string, cfg *corebanding.BrandingConfigResponse) (string, int) {
+	// Prevent path traversal or poisoned config values.
+	if containsInvalidBrandingAssetPath(filename) {
 		return "", http.StatusForbidden
 	}
 

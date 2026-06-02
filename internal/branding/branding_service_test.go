@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -176,6 +177,42 @@ func TestBrandingService_DeleteLogo_FileMissingStillClearsConfig(t *testing.T) {
 	}
 }
 
+func TestBrandingService_DeleteLogo_InvalidPath_ReturnsErrorAndDoesNotDeleteExternalFile(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+	externalFile := filepath.Join(t.TempDir(), "logo.png")
+	if err := os.WriteFile(externalFile, []byte("logo"), 0644); err != nil {
+		t.Fatalf("seed external logo file: %v", err)
+	}
+
+	svc.mu.Lock()
+	svc.brandingConfig.LogoFile = externalFile
+	if err := svc.store.Save(svc.brandingConfig); err != nil {
+		svc.mu.Unlock()
+		t.Fatalf("store.Save() error: %v", err)
+	}
+	svc.mu.Unlock()
+
+	err := svc.DeleteLogo()
+	if err == nil {
+		t.Fatalf("expected DeleteLogo() to fail for invalid path")
+	}
+	if _, ok := err.(*errors.LocalizedError); !ok {
+		t.Fatalf("expected LocalizedError, got %T", err)
+	}
+	if _, err := os.Stat(externalFile); err != nil {
+		t.Fatalf("expected external logo file to remain, stat error: %v", err)
+	}
+
+	store := NewBrandingStore(svc.store.storageDir)
+	cfg, err := store.Load()
+	if err != nil {
+		t.Fatalf("store.Load() error: %v", err)
+	}
+	if cfg.LogoFile != externalFile {
+		t.Fatalf("expected LogoFile to remain unchanged, got %q", cfg.LogoFile)
+	}
+}
+
 func TestBrandingService_DeleteFavicon_FileMissingStillClearsConfig(t *testing.T) {
 	svc, dir := newTestBrandingService(t)
 
@@ -198,6 +235,52 @@ func TestBrandingService_DeleteFavicon_FileMissingStillClearsConfig(t *testing.T
 	}
 	if cfg.FaviconFile != "" {
 		t.Fatalf("expected FaviconFile cleared even if file missing, got %q", cfg.FaviconFile)
+	}
+}
+
+func TestBrandingService_DeleteFavicon_InvalidPath_ReturnsErrorAndDoesNotDeleteExternalFile(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+	externalFile := filepath.Join(t.TempDir(), "favicon.ico")
+	if err := os.WriteFile(externalFile, []byte("fav"), 0644); err != nil {
+		t.Fatalf("seed external favicon file: %v", err)
+	}
+
+	svc.mu.Lock()
+	svc.brandingConfig.FaviconFile = externalFile
+	if err := svc.store.Save(svc.brandingConfig); err != nil {
+		svc.mu.Unlock()
+		t.Fatalf("store.Save() error: %v", err)
+	}
+	svc.mu.Unlock()
+
+	err := svc.DeleteFavicon()
+	if err == nil {
+		t.Fatalf("expected DeleteFavicon() to fail for invalid path")
+	}
+	if _, ok := err.(*errors.LocalizedError); !ok {
+		t.Fatalf("expected LocalizedError, got %T", err)
+	}
+	if _, err := os.Stat(externalFile); err != nil {
+		t.Fatalf("expected external favicon file to remain, stat error: %v", err)
+	}
+
+	store := NewBrandingStore(svc.store.storageDir)
+	cfg, err := store.Load()
+	if err != nil {
+		t.Fatalf("store.Load() error: %v", err)
+	}
+	if cfg.FaviconFile != externalFile {
+		t.Fatalf("expected FaviconFile to remain unchanged, got %q", cfg.FaviconFile)
+	}
+}
+
+func TestContainsPathTraversal_RejectsWindowsVolumePath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("filepath volume paths are only recognized on Windows")
+	}
+
+	if !containsPathTraversal("C:logo.png") {
+		t.Fatalf("expected Windows volume path to be rejected")
 	}
 }
 

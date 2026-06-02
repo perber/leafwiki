@@ -82,6 +82,15 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 	return nil
 }
 
+func containsPathTraversal(s string) bool {
+	return strings.Contains(s, "..") ||
+		strings.Contains(s, "/") ||
+		strings.Contains(s, "\\") ||
+		filepath.IsAbs(s) ||
+		filepath.VolumeName(s) != "" ||
+		strings.Contains(s, "\x00")
+}
+
 // containsControlCharacters checks if a string contains control characters
 // that could break UI layout or cause display issues.
 // Blocks all control characters (unicode.IsControl) except common whitespace:
@@ -156,6 +165,15 @@ func (s *BrandingService) DeleteLogo() error {
 
 	if s.brandingConfig.LogoFile == "" {
 		return nil // No logo to delete
+	}
+
+	if containsPathTraversal(s.brandingConfig.LogoFile) {
+		return sharederrors.NewLocalizedError(
+			"branding_logo_delete_failed",
+			"Failed to delete logo",
+			"invalid logo file path",
+			nil,
+		)
 	}
 
 	logoPath := filepath.Join(s.store.brandingAssetsDir(), s.brandingConfig.LogoFile)
@@ -237,6 +255,15 @@ func (s *BrandingService) DeleteFavicon() error {
 
 	if s.brandingConfig.FaviconFile == "" {
 		return nil // No favicon to delete
+	}
+
+	if containsPathTraversal(s.brandingConfig.FaviconFile) {
+		return sharederrors.NewLocalizedError(
+			"branding_favicon_delete_failed",
+			"Failed to delete favicon",
+			"invalid favicon file path",
+			nil,
+		)
 	}
 
 	faviconPath := filepath.Join(s.store.brandingAssetsDir(), s.brandingConfig.FaviconFile)
