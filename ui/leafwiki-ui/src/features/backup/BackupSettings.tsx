@@ -56,14 +56,13 @@ export default function BackupSettings() {
         pollingRef.current = null
       }
     }
-  }, [isPolling, loadStatus])
+  }, [isPolling, lastBackupAt, loadStatus])
 
   // Stop polling when lastBackupAt advances or an error occurs
   useEffect(() => {
     if (isPolling) {
       const hasNewBackup =
-        lastBackupAt !== null &&
-        lastBackupAtRef.current !== lastBackupAt
+        lastBackupAt !== null && lastBackupAtRef.current !== lastBackupAt
       const hasError = lastError !== ''
       if (hasNewBackup || hasError) {
         stopPolling()
@@ -87,102 +86,103 @@ export default function BackupSettings() {
 
   return (
     <div className="settings">
-        <h1 className="settings__title">Backup Settings</h1>
+      <h1 className="settings__title">Backup Settings</h1>
 
-        {isLoading && (
-          <div className="settings__section">
-            <div className="text-muted flex items-center gap-3 text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading backup status…
-            </div>
+      {isLoading && (
+        <div className="settings__section">
+          <div className="text-muted flex items-center gap-3 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading backup status…
           </div>
-        )}
+        </div>
+      )}
 
-        {statusError && (
+      {statusError && (
+        <div className="settings__section">
+          <p className="text-error text-sm">{statusError}</p>
+        </div>
+      )}
+
+      {!isLoading && (
+        <>
           <div className="settings__section">
-            <p className="text-error text-sm">{statusError}</p>
-          </div>
-        )}
+            <h2 className="settings__section-title">Git Backup</h2>
+            <p className="settings__section-description">
+              Automatically pushes wiki changes to the configured remote Git
+              repository. Configure the target repository and credentials in
+              your server settings.
+            </p>
 
-        {!isLoading && (
-          <div className="settings__section">
-              <h2 className="settings__section-title">Git Backup</h2>
-              <p className="settings__section-description">
-                Automatically pushes wiki changes to the configured remote Git
-                repository. Configure the target repository and credentials in
-                your server settings.
-              </p>
-
-              <div className="settings__preview">
-                <span className="settings__preview-label">Status</span>
-                {enabled ? (
-                  <span className="settings__pill settings__pill-success text-success font-medium">
-                    Enabled
-                  </span>
-                ) : (
-                  <span className="settings__role-pill settings__role-pill--default">
-                    Disabled
-                  </span>
-                )}
-              </div>
-
-              {enabled && (
-                <>
-                  <div className="settings__preview">
-                    <span className="settings__preview-label">Last backup</span>
-                    <span className="text-interface-text text-sm">
-                      {isPolling ? (
-                        <span className="text-muted flex items-center gap-2">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Waiting for backup to complete…
-                        </span>
-                      ) : (
-                        formatDate(lastBackupAt)
-                      )}
-                    </span>
-                  </div>
-
-                  {lastError && (
-                    <div className="settings__preview border-error/20 bg-error/5">
-                      <span className="settings__preview-label flex items-center gap-1.5">
-                        <TriangleAlert className="text-error h-3.5 w-3.5" />
-                        Last error
-                      </span>
-                      <span className="text-error text-sm">{lastError}</span>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {!enabled && (
-                <p className="settings__hint">
-                  Git backup is not enabled. To enable it, configure a remote
-                  repository in your server environment settings.
-                </p>
+            <div className="settings__preview">
+              <span className="settings__preview-label">Status</span>
+              {enabled ? (
+                <span className="settings__pill settings__pill-success text-success font-medium">
+                  Enabled
+                </span>
+              ) : (
+                <span className="settings__role-pill settings__role-pill--default">
+                  Disabled
+                </span>
               )}
             </div>
 
             {enabled && (
-              <div className="settings__section">
-                <h2 className="settings__section-title">Manual Backup</h2>
-                <p className="settings__section-description">
-                  Trigger an immediate push of all current wiki content to the
-                  remote repository without waiting for the next scheduled sync.
-                </p>
-                <div className="settings__actions">
-                  <Button onClick={handlePush} disabled={isPolling}>
+              <>
+                <div className="settings__preview">
+                  <span className="settings__preview-label">Last backup</span>
+                  <span className="text-interface-text text-sm">
                     {isPolling ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <span className="text-muted flex items-center gap-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Waiting for backup to complete…
+                      </span>
                     ) : (
-                      <CloudUpload className="mr-2 h-4 w-4" />
+                      formatDate(lastBackupAt)
                     )}
-                    {isPolling ? 'Pushing…' : 'Push now'}
-                  </Button>
+                  </span>
                 </div>
-              </div>
+
+                {lastError && (
+                  <div className="settings__preview border-error/20 bg-error/5">
+                    <span className="settings__preview-label flex items-center gap-1.5">
+                      <TriangleAlert className="text-error h-3.5 w-3.5" />
+                      Last error
+                    </span>
+                    <span className="text-error text-sm">{lastError}</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!enabled && (
+              <p className="settings__hint">
+                Git backup is not enabled. To enable it, configure a remote
+                repository in your server environment settings.
+              </p>
             )}
           </div>
-        )}
+
+          {enabled && (
+            <div className="settings__section">
+              <h2 className="settings__section-title">Manual Backup</h2>
+              <p className="settings__section-description">
+                Trigger an immediate push of all current wiki content to the
+                remote repository without waiting for the next scheduled sync.
+              </p>
+              <div className="settings__actions">
+                <Button onClick={handlePush} disabled={isPolling}>
+                  {isPolling ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CloudUpload className="mr-2 h-4 w-4" />
+                  )}
+                  {isPolling ? 'Pushing…' : 'Push now'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
