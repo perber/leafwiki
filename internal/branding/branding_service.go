@@ -82,7 +82,9 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 	return nil
 }
 
-func containsPathTraversal(s string) bool {
+// ContainsUnsafePath reports whether s is an unsafe path component:
+// contains path separators, null bytes, is absolute, or references a Windows volume.
+func ContainsUnsafePath(s string) bool {
 	return strings.Contains(s, "..") ||
 		strings.Contains(s, "/") ||
 		strings.Contains(s, "\\") ||
@@ -90,6 +92,9 @@ func containsPathTraversal(s string) bool {
 		filepath.VolumeName(s) != "" ||
 		strings.Contains(s, "\x00")
 }
+
+// containsPathTraversal is the unexported alias used within this package.
+func containsPathTraversal(s string) bool { return ContainsUnsafePath(s) }
 
 // containsControlCharacters checks if a string contains control characters
 // that could break UI layout or cause display issues.

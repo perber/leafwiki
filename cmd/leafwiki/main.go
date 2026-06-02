@@ -7,14 +7,17 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/perber/wiki/internal/backup"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
+	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 )
 
 func writeUsage(w io.Writer) {
@@ -52,6 +55,15 @@ func writeUsage(w io.Writer) {
 	--trusted-proxy-ips             Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
 	--http-remote-user-logout-url   URL the frontend redirects to after logout in proxy-auth mode (default: "")
 	--disable-request-log           Suppress per-request HTTP access log lines (default: false)
+	--git-backup                   Enable git backup to a remote repository (default: false)
+	--git-backup-author-name       Git commit author name for backups (default: LeafWiki Backup)
+	--git-backup-author-email      Git commit author email for backups (default: backup@leafwiki.local)
+	--git-backup-remote            Git remote URL (SSH) for backups (required when git-backup is enabled)
+	--git-backup-branch            Git branch to push to (default: main)
+	--git-backup-ssh-key-path      Path to SSH private key for git backup
+	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
+	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
+	--git-backup-interval          Git backup interval in minutes; 0 = manual-only, no automatic scheduling (default: 60)
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -78,6 +90,15 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_TRUSTED_PROXY_IPS
 	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
 	LEAFWIKI_DISABLE_REQUEST_LOG
+	LEAFWIKI_GIT_BACKUP
+	LEAFWIKI_GIT_BACKUP_AUTHOR_NAME
+	LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL
+	LEAFWIKI_GIT_BACKUP_REMOTE
+	LEAFWIKI_GIT_BACKUP_BRANCH
+	LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH
+	LEAFWIKI_GIT_BACKUP_SSH_KEY
+	LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS
+	LEAFWIKI_GIT_BACKUP_INTERVAL
 	`); err != nil {
 		panic(err)
 	}
@@ -134,6 +155,15 @@ type cliFlags struct {
 	trustedProxyIPs         *string
 	httpRemoteUserLogoutURL *string
 	disableRequestLog       *bool
+	gitBackup               *bool
+	gitBackupAuthorName     *string
+	gitBackupAuthorEmail    *string
+	gitBackupRemote         *string
+	gitBackupBranch         *string
+	gitBackupSSHKeyPath     *string
+	gitBackupSSHKey         *string
+	gitBackupSSHKnownHosts  *string
+	gitBackupInterval       *int
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -161,6 +191,15 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		trustedProxyIPs:         fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
 		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "URL the frontend redirects to after logout when reverse-proxy auth is active (e.g. https://auth.example.com/logout)"),
 		disableRequestLog:       fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
+		gitBackup:               fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
+		gitBackupAuthorName:     fs.String("git-backup-author-name", "", "git commit author name for backups (default: LeafWiki Backup)"),
+		gitBackupAuthorEmail:    fs.String("git-backup-author-email", "", "git commit author email for backups (default: backup@leafwiki.local)"),
+		gitBackupRemote:         fs.String("git-backup-remote", "", "git remote URL (SSH) for backups (required when git-backup is enabled)"),
+		gitBackupBranch:         fs.String("git-backup-branch", "", "git branch to push to (default: main)"),
+		gitBackupSSHKeyPath:     fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
+		gitBackupSSHKey:         fs.String("git-backup-ssh-key", "", "raw SSH private key for git backup (env var preferred)"),
+		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
+		gitBackupInterval:       fs.Int("git-backup-interval", 0, "git backup interval in minutes (default: 60)"),
 	}
 }
 
@@ -204,6 +243,15 @@ func main() {
 	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
 	httpRemoteUserLogoutURL := resolveString("http-remote-user-logout-url", *flags.httpRemoteUserLogoutURL, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL", "")
 	disableRequestLog := resolveBool("disable-request-log", *flags.disableRequestLog, visited, "LEAFWIKI_DISABLE_REQUEST_LOG")
+	gitBackupEnabled := resolveBool("git-backup", *flags.gitBackup, visited, "LEAFWIKI_GIT_BACKUP")
+	gitBackupAuthorName := resolveString("git-backup-author-name", *flags.gitBackupAuthorName, visited, "LEAFWIKI_GIT_BACKUP_AUTHOR_NAME", "LeafWiki Backup")
+	gitBackupAuthorEmail := resolveString("git-backup-author-email", *flags.gitBackupAuthorEmail, visited, "LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL", "backup@leafwiki.local")
+	gitBackupRemote := resolveString("git-backup-remote", *flags.gitBackupRemote, visited, "LEAFWIKI_GIT_BACKUP_REMOTE", "")
+	gitBackupBranch := resolveString("git-backup-branch", *flags.gitBackupBranch, visited, "LEAFWIKI_GIT_BACKUP_BRANCH", "main")
+	gitBackupSSHKeyPath := resolveString("git-backup-ssh-key-path", *flags.gitBackupSSHKeyPath, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH", "")
+	gitBackupSSHKey := resolveString("git-backup-ssh-key", *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
+	gitBackupInterval := resolveInt("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL", 60)
+	gitBackupSSHKnownHosts := resolveString("git-backup-ssh-known-hosts", *flags.gitBackupSSHKnownHosts, visited, "LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS", "")
 	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
 	if err != nil {
 		fail("invalid --trusted-proxy-ips value", "error", err)
@@ -218,6 +266,12 @@ func main() {
 			"header", httpRemoteUserHeader,
 			"trusted_proxies", trustedProxyIPsRaw,
 		)
+	}
+
+	// Validate git backup configuration
+	// Note: git-backup-remote is optional (local-only mode is supported)
+	if gitBackupEnabled && gitBackupRemote != "" && gitBackupSSHKey == "" && gitBackupSSHKeyPath == "" {
+		fail("--git-backup-ssh-key or --git-backup-ssh-key-path is required when --git-backup-remote is set. Use LEAFWIKI_GIT_BACKUP_SSH_KEY or LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH.")
 	}
 
 	args := flag.Args()
@@ -287,6 +341,36 @@ func main() {
 			slog.Default().Error("Failed to close Wiki", "error", err)
 		}
 	}()
+
+	// Initialize git backup if enabled
+	var backupScheduler *backup.Scheduler
+	if gitBackupEnabled {
+		if gitBackupRemote != "" && !strings.HasPrefix(gitBackupRemote, "git@") && !strings.HasPrefix(gitBackupRemote, "ssh://") {
+			fail("--git-backup-remote must be an SSH URL (e.g. git@github.com:user/repo.git or ssh://...)")
+		}
+		if visited["git-backup-ssh-key"] {
+			slog.Warn("SSH private key passed via --git-backup-ssh-key flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_SSH_KEY environment variable")
+		}
+		backupRepo, err := backup.Init(backup.Config{
+			Enabled:           true,
+			RootDir:           filepath.Join(dataDir, "root"),
+			AssetsDir:         filepath.Join(dataDir, "assets"),
+			AuthorName:        gitBackupAuthorName,
+			AuthorEmail:       gitBackupAuthorEmail,
+			RemoteURL:         gitBackupRemote,
+			Branch:            gitBackupBranch,
+			SSHKeyPath:        gitBackupSSHKeyPath,
+			SSHKey:            gitBackupSSHKey,
+			SSHKnownHostsPath: gitBackupSSHKnownHosts,
+			IntervalMinutes:   gitBackupInterval,
+		})
+		if err != nil {
+			fail("git backup init failed: %v", err)
+		}
+		backupScheduler = backup.NewScheduler(backupRepo, time.Duration(gitBackupInterval)*time.Minute)
+		defer backupScheduler.Stop()
+		w.SetBackupRoutes(wikibackup.NewRoutes(backupRepo, backupScheduler, w.AuthService()))
+	}
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccess,
