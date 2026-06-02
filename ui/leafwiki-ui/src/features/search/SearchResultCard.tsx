@@ -31,12 +31,13 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
     const isEditorActive = currentEditorPageId === item.page_id
     const isActive = isRouteActive || isEditorActive || isSelected
     const kindLabel = item.kind === 'section' ? 'Section' : 'Page'
+    const searchQuery = new URLSearchParams(location.search).get('q') || undefined
 
     return (
       <Link
         ref={ref}
         to={resultUrl}
-        state={createNavigationVisitState()}
+        state={createNavigationVisitState({ leafwikiSearchQuery: searchQuery })}
         data-testid={`search-result-card-${item.page_id}`}
         aria-current={isRouteActive ? 'page' : undefined}
         onMouseEnter={onMouseEnter}

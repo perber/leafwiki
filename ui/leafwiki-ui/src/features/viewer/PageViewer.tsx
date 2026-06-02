@@ -30,6 +30,7 @@ import Breadcrumbs from './Breadcrumbs'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
 import { PageMetadata } from './PageMetadata'
 import { useScrollToHeadline } from './useScrollToHeadline'
+import { useScrollToSearchTerm } from './useScrollToSearchTerm'
 import { useSetPageTitle } from './useSetPageTitle'
 import { useToolbarActions } from './useToolbarActions'
 import { useViewerStore } from './viewer'
@@ -81,6 +82,7 @@ export default function PageViewer() {
 
   useScrollRestoration(getNavigationVisitKey(location), loading)
   useScrollToHeadline({ content: page?.content || '', isLoading: loading })
+  useScrollToSearchTerm({ content: page?.content || '', isLoading: loading })
   useToolbarActions(actions)
   useSetPageTitle({ page })
 

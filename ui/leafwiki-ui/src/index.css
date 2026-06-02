@@ -1389,6 +1389,10 @@
     @apply text-muted text-xs;
   }
 
+  .search-highlight {
+    @apply rounded-xs bg-yellow-300/70 dark:bg-yellow-400/30;
+  }
+
   .tags-result-card__link {
     @apply block text-inherit no-underline;
   }
