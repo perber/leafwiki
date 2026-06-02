@@ -17,10 +17,19 @@ export function DialogManager() {
   const [renderProps, setRenderProps] = useState(dialogProps)
 
   useEffect(() => {
+    // When opening (or updating props for) a dialog, render it immediately.
     if (dialogType !== null) {
       setRenderType(dialogType)
       setRenderProps(dialogProps)
+      return
     }
+    // When closing, keep the dialog mounted briefly so Radix UI Presence can
+    // play the exit animation, then unmount to avoid retaining dialog state.
+    const timeoutId = setTimeout(() => {
+      setRenderType(null)
+      setRenderProps(null)
+    }, 200)
+    return () => clearTimeout(timeoutId)
   }, [dialogType, dialogProps])
 
   return (
