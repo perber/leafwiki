@@ -35,7 +35,7 @@ func writeUsage(w io.Writer) {
 	--public-access    Allow public access to the wiki only with read access (default: false)
 	--allow-insecure   Allow insecure HTTP connections (default: false)                      
 	--access-token-timeout  Access token timeout duration (e.g. 24h, 15m) (default: 15m)
-	--refresh-token-timeout Refresh token timeout duration (e.g. 168h, 7d) (default: 7d)
+	--refresh-token-timeout Refresh token timeout duration (e.g. 168h) (default: 168h)
 	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
 	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
 	--custom-stylesheet      Path to a .css file inside the data dir, served publicly as /custom.css
@@ -129,11 +129,11 @@ type cliFlags struct {
 	enableRevision          *bool
 	enableLinkRefactor      *bool
 	maxRevisionHistory      *int
-	enableHTTPRemoteUser      *bool
-	httpRemoteUserHeader      *string
-	trustedProxyIPs           *string
-	httpRemoteUserLogoutURL   *string
-	disableRequestLog         *bool
+	enableHTTPRemoteUser    *bool
+	httpRemoteUserHeader    *string
+	trustedProxyIPs         *string
+	httpRemoteUserLogoutURL *string
+	disableRequestLog       *bool
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -150,7 +150,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		disableAuth:             fs.Bool("disable-auth", false, "disable authentication completely (default: false) (WARNING: only use in trusted networks!)"),
 		hideLinkMetadataSection: fs.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)"),
 		accessTokenTimeout:      fs.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)"),
-		refreshTokenTimeout:     fs.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h, 7d) (default: 7d)"),
+		refreshTokenTimeout:     fs.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h) (default: 168h)"),
 		basePath:                fs.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)"),
 		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
 		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
