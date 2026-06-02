@@ -3298,6 +3298,87 @@ func TestTreeService_GetPages_RawContent_PopulatedForAll(t *testing.T) {
 	}
 }
 
+// ─── FindPagesByTitle ─────────────────────────────────────────────────────────
+
+func TestFindPagesByTitle_SingleMatch(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	id, err := svc.CreateNode("system", nil, "My Page", "my-page", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode: %v", err)
+	}
+
+	results := svc.FindPagesByTitle("My Page")
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].ID != *id {
+		t.Errorf("unexpected ID: got %q, want %q", results[0].ID, *id)
+	}
+}
+
+func TestFindPagesByTitle_CaseInsensitive(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	_, err := svc.CreateNode("system", nil, "My Page", "my-page", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode: %v", err)
+	}
+
+	for _, variant := range []string{"my page", "MY PAGE", "My PAGE", "  My Page  "} {
+		results := svc.FindPagesByTitle(variant)
+		if len(results) != 1 {
+			t.Errorf("title %q: expected 1 result, got %d", variant, len(results))
+		}
+	}
+}
+
+func TestFindPagesByTitle_MultipleMatches(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	parentID, err := svc.CreateNode("system", nil, "Parent", "parent", ptrKind(NodeKindSection))
+	if err != nil {
+		t.Fatalf("CreateNode parent: %v", err)
+	}
+
+	_, err = svc.CreateNode("system", nil, "Notes", "notes-root", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode root notes: %v", err)
+	}
+	_, err = svc.CreateNode("system", parentID, "Notes", "notes-child", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode child notes: %v", err)
+	}
+
+	results := svc.FindPagesByTitle("Notes")
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
+func TestFindPagesByTitle_NoMatch(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	_, err := svc.CreateNode("system", nil, "Existing Page", "existing-page", ptrKind(NodeKindPage))
+	if err != nil {
+		t.Fatalf("CreateNode: %v", err)
+	}
+
+	results := svc.FindPagesByTitle("Nonexistent")
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results, got %d", len(results))
+	}
+}
+
+func TestFindPagesByTitle_EmptyTitle(t *testing.T) {
+	svc, _ := newLoadedService(t)
+
+	results := svc.FindPagesByTitle("")
+	if results != nil {
+		t.Fatalf("expected nil for empty title, got %v", results)
+	}
+}
+
 func TestTreeService_GetPage_RawContent_NotSerializedToJSON(t *testing.T) {
 	svc, _ := newLoadedService(t)
 

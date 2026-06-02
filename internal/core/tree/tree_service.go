@@ -375,6 +375,31 @@ func (t *TreeService) rollbackCreatedNodeLocked(parent *PageNode, entry *PageNod
 	return nil
 }
 
+// FindPagesByTitle returns all nodes whose title matches the given string
+// (case-insensitive). The returned slice is ordered depth-first. Returns an
+// empty slice when the tree is not loaded or no node matches.
+func (t *TreeService) FindPagesByTitle(title string) []*PageNode {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	if t.tree == nil {
+		return nil
+	}
+
+	lowerTitle := strings.ToLower(strings.TrimSpace(title))
+	if lowerTitle == "" {
+		return nil
+	}
+
+	var results []*PageNode
+	for _, node := range t.nodesByID {
+		if strings.ToLower(node.Title) == lowerTitle {
+			results = append(results, node)
+		}
+	}
+	return results
+}
+
 // FindPageByID finds a page in the tree by its ID.
 func (t *TreeService) FindPageByID(id string) (*PageNode, error) {
 	var result *PageNode

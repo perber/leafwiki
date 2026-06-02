@@ -27,6 +27,7 @@ type Routes struct {
 	copyPage         *CopyPageUseCase
 	getPage          *GetPageUseCase
 	findByPath       *FindByPathUseCase
+	findByTitle      *FindByTitleUseCase
 	lookupPath       *LookupPagePathUseCase
 	resolvePermalink *ResolvePermalinkUseCase
 	sortPages        *SortPagesUseCase
@@ -49,6 +50,7 @@ type RoutesConfig struct {
 	CopyPage         *CopyPageUseCase
 	GetPage          *GetPageUseCase
 	FindByPath       *FindByPathUseCase
+	FindByTitle      *FindByTitleUseCase
 	LookupPath       *LookupPagePathUseCase
 	ResolvePermalink *ResolvePermalinkUseCase
 	SortPages        *SortPagesUseCase
@@ -72,6 +74,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		copyPage:         cfg.CopyPage,
 		getPage:          cfg.GetPage,
 		findByPath:       cfg.FindByPath,
+		findByTitle:      cfg.FindByTitle,
 		lookupPath:       cfg.LookupPath,
 		resolvePermalink: cfg.ResolvePermalink,
 		sortPages:        cfg.SortPages,
@@ -92,6 +95,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		pub := ctx.Base.Group("/api")
 		pub.GET("/tree", r.handleGetTree)
 		pub.GET("/pages/by-path", r.handleGetByPath)
+		pub.GET("/pages/by-title", r.handleFindByTitle)
 		pub.GET("/pages/lookup", r.handleLookupPath)
 		pub.GET("/pages/permalink/:id", r.handleResolvePermalink)
 		pub.GET("/pages/:id", r.handleGetPage)
@@ -109,6 +113,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		authGroup.GET("/pages/:id", r.handleGetPage)
 		authGroup.GET("/pages/lookup", r.handleLookupPath)
 		authGroup.GET("/pages/by-path", r.handleGetByPath)
+		authGroup.GET("/pages/by-title", r.handleFindByTitle)
 		authGroup.GET("/pages/permalink/:id", r.handleResolvePermalink)
 	}
 
@@ -169,6 +174,16 @@ func (r *Routes) handleGetByPath(c *gin.Context) {
 		depth = 1
 	}
 	r.respondPageWithDepth(c, http.StatusOK, out.Page, depth)
+}
+
+func (r *Routes) handleFindByTitle(c *gin.Context) {
+	title := strings.TrimSpace(c.Query("title"))
+	if title == "" {
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageMissingTitle, "Missing title query parameter", "missing title")
+		return
+	}
+	out := r.findByTitle.Execute(c.Request.Context(), title)
+	c.JSON(http.StatusOK, out)
 }
 
 func (r *Routes) handleLookupPath(c *gin.Context) {
