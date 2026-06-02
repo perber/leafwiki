@@ -2,6 +2,7 @@ package links
 
 import (
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/perber/wiki/internal/core/tree"
@@ -9,6 +10,10 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 )
+
+// wikiLinkRe matches [[Target]] and [[Target|Alias]] syntax.
+// Capture group 1 is the target (title or path hint).
+var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|#\n]+?)(?:\|[^\]\n]+?)?\]\]`)
 
 type TargetLink struct {
 	TargetPageID   string
@@ -61,6 +66,96 @@ func extractLinksFromMarkdown(content string) []string {
 	}
 
 	return links
+}
+
+// extractWikiLinksFromMarkdown returns all target strings from [[Target]] and
+// [[Target|Alias]] syntax found in content. The returned strings are the raw
+// target values (may be a title or a "Folder/Title" path hint).
+func extractWikiLinksFromMarkdown(content string) []string {
+	matches := wikiLinkRe.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(matches))
+	targets := make([]string, 0, len(matches))
+	for _, m := range matches {
+		target := strings.TrimSpace(m[1])
+		if target == "" {
+			continue
+		}
+		if _, dup := seen[target]; dup {
+			continue
+		}
+		seen[target] = struct{}{}
+		targets = append(targets, target)
+	}
+	return targets
+}
+
+// resolveWikiLinkTargets resolves [[Title]] and [[Folder/Title]] targets.
+//
+// Targets that contain "/" are treated as path hints: the components are used
+// to find a page whose CalculatePath() ends with the joined slugified segments.
+// A single title target is resolved via FindPagesByTitle:
+//   - exactly one match  → resolved link
+//   - zero or N matches  → broken link stored with the raw [[Target]] as ToPath
+func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []TargetLink {
+	if !treeService.IsLoaded() || len(targets) == 0 {
+		return nil
+	}
+
+	var result []TargetLink
+	for _, target := range targets {
+		if strings.Contains(target, "/") {
+			// Path hint: treat as a direct route path lookup.
+			// Callers write [[Folder/Title]] meaning the page lives at that
+			// relative path; strip leading slash just in case.
+			routePath := strings.TrimPrefix(target, "/")
+			page, err := treeService.FindPageByRoutePath(routePath)
+			if err != nil || page == nil {
+				result = append(result, TargetLink{
+					Broken:         true,
+					TargetPagePath: "[[" + target + "]]",
+				})
+			} else {
+				result = append(result, TargetLink{
+					TargetPageID:   page.ID,
+					TargetPagePath: "/" + page.CalculatePath(),
+					Broken:         false,
+				})
+			}
+			continue
+		}
+
+		// Title-based lookup.
+		pages := treeService.FindPagesByTitle(target)
+		if len(pages) == 1 {
+			result = append(result, TargetLink{
+				TargetPageID:   pages[0].ID,
+				TargetPagePath: "/" + pages[0].CalculatePath(),
+				Broken:         false,
+			})
+		} else {
+			// 0 matches (not found) or N>1 (ambiguous) → broken.
+			result = append(result, TargetLink{
+				Broken:         true,
+				TargetPagePath: "[[" + target + "]]",
+			})
+		}
+	}
+	return result
+}
+
+// collectTargetsFromContent extracts and resolves all link targets from a page's
+// content — both standard Markdown links and [[Title]] wiki-link syntax.
+func collectTargetsFromContent(treeService *tree.TreeService, pagePath string, content string) []TargetLink {
+	mdLinks := extractLinksFromMarkdown(content)
+	mdTargets := resolveTargetLinks(treeService, pagePath, mdLinks)
+
+	wikiTargets := extractWikiLinksFromMarkdown(content)
+	wikiResolved := resolveWikiLinkTargets(treeService, wikiTargets)
+
+	return append(mdTargets, wikiResolved...)
 }
 
 // normalizeWikiPath normalizes a wiki path:

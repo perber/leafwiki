@@ -1237,3 +1237,127 @@ func TestLinkService_UpdateLinksAndHealForPages_ReindexesOutgoingForSourcePages(
 		t.Fatalf("new backlink FromPageID = %q, want %q", newBacklinks.Backlinks[0].FromPageID, sourceID)
 	}
 }
+
+// ─── extractWikiLinksFromMarkdown ────────────────────────────────────────────
+
+func TestExtractWikiLinksFromMarkdown_BasicSyntax(t *testing.T) {
+	md := `
+See [[Project Plan]] for details.
+Also check [[Meeting Notes|our last meeting]].
+And [[Folder/SubPage]] path hint.
+Normal [link](/docs/page) stays untouched.
+`
+	got := extractWikiLinksFromMarkdown(md)
+	want := []string{"Project Plan", "Meeting Notes", "Folder/SubPage"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d wiki links, got %d: %v", len(want), len(got), got)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("got[%d] = %q, want %q", i, got[i], w)
+		}
+	}
+}
+
+func TestExtractWikiLinksFromMarkdown_DeduplicatesTargets(t *testing.T) {
+	md := `[[Notes]] and [[Notes]] again and [[Notes|different alias]].`
+	got := extractWikiLinksFromMarkdown(md)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 deduplicated entry, got %d: %v", len(got), got)
+	}
+	if got[0] != "Notes" {
+		t.Errorf("got %q, want %q", got[0], "Notes")
+	}
+}
+
+func TestExtractWikiLinksFromMarkdown_Empty(t *testing.T) {
+	got := extractWikiLinksFromMarkdown("No wiki links here.")
+	if len(got) != 0 {
+		t.Fatalf("expected empty slice, got %v", got)
+	}
+}
+
+// ─── resolveWikiLinkTargets ──────────────────────────────────────────────────
+
+func TestResolveWikiLinkTargets_SingleTitleMatch(t *testing.T) {
+	ts, page1ID, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"Page 1"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 target, got %d: %v", len(targets), targets)
+	}
+	if targets[0].TargetPageID != page1ID {
+		t.Errorf("TargetPageID = %q, want %q", targets[0].TargetPageID, page1ID)
+	}
+	if targets[0].Broken {
+		t.Errorf("expected resolved link, got broken")
+	}
+}
+
+func TestResolveWikiLinkTargets_NoMatch_ReturnsBroken(t *testing.T) {
+	ts, _, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"Nonexistent Page"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link for unmatched title")
+	}
+}
+
+func TestResolveWikiLinkTargets_AmbiguousTitle_ReturnsBroken(t *testing.T) {
+	storageDir := t.TempDir()
+	ts := tree.NewTreeService(storageDir)
+	if err := ts.LoadTree(); err != nil {
+		t.Fatalf("LoadTree: %v", err)
+	}
+
+	sectionID, err := ts.CreateNode("system", nil, "Docs", "docs", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode section: %v", err)
+	}
+	_, err = ts.CreateNode("system", nil, "Notes", "notes-root", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode notes-root: %v", err)
+	}
+	_, err = ts.CreateNode("system", sectionID, "Notes", "notes-child", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode notes-child: %v", err)
+	}
+
+	targets := resolveWikiLinkTargets(ts, []string{"Notes"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link for ambiguous title")
+	}
+}
+
+func TestResolveWikiLinkTargets_PathHint_Resolved(t *testing.T) {
+	ts, page1ID, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"docs/page1"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if targets[0].TargetPageID != page1ID {
+		t.Errorf("TargetPageID = %q, want %q", targets[0].TargetPageID, page1ID)
+	}
+	if targets[0].Broken {
+		t.Errorf("expected resolved path hint, got broken")
+	}
+}
+
+func TestResolveWikiLinkTargets_PathHint_BrokenWhenNotFound(t *testing.T) {
+	ts, _, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"docs/nonexistent"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link for missing path hint")
+	}
+}

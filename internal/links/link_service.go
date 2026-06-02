@@ -40,8 +40,7 @@ func (b *LinkService) IndexAllPages() error {
 		if errs[i] != nil {
 			return errs[i]
 		}
-		links := extractLinksFromMarkdown(page.Content)
-		targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
+		targets := collectTargetsFromContent(b.treeService, page.CalculatePath(), page.Content)
 		if err := b.store.AddLinks(page.ID, page.Title, targets); err != nil {
 			return err
 		}
@@ -150,16 +149,8 @@ func (b *LinkService) GetLinkStatusForPage(pageID string, pagePath string) (*Lin
 }
 
 func (b *LinkService) UpdateLinksForPage(page *tree.Page, content string) error {
-	links := extractLinksFromMarkdown(content)
-
-	targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
-
-	err := b.store.AddLinks(page.ID, page.Title, targets)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	targets := collectTargetsFromContent(b.treeService, page.CalculatePath(), content)
+	return b.store.AddLinks(page.ID, page.Title, targets)
 }
 
 func (b *LinkService) UpdateLinksAndHealForPages(pages []*tree.Page) error {
@@ -169,8 +160,7 @@ func (b *LinkService) UpdateLinksAndHealForPages(pages []*tree.Page) error {
 			continue
 		}
 		pagePath := normalizeWikiPath(page.CalculatePath())
-		links := extractLinksFromMarkdown(page.Content)
-		targets := resolveTargetLinks(b.treeService, pagePath, links)
+		targets := collectTargetsFromContent(b.treeService, pagePath, page.Content)
 		updates = append(updates, PageLinkUpdate{
 			FromPageID: page.ID,
 			FromTitle:  page.Title,
