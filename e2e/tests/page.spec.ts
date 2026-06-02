@@ -2092,6 +2092,42 @@ for the page edited at ${new Date().toISOString()}
     test.expect(String((navError as Error)?.message ?? '')).toMatch(/ERR_ABORTED/);
   });
 
+  test('leave anyway closes the editor and leaves the page once', async ({ page }) => {
+    const title = `Page Leave Anyway ${Date.now()}`;
+    const newContent = `Unsaved content for leave anyway ${new Date().toISOString()}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await treeView.clickPageByTitle(title);
+
+    const viewPage = new ViewPage(page);
+    test.expect(await viewPage.getTitle()).toBe(title);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent(newContent);
+
+    const closeButton = page.locator('button[data-testid="close-editor-button"]');
+    const unsavedDialog = page.locator('[data-testid="unsaved-changes-dialog-button-confirm"]');
+
+    await closeButton.click();
+    await expect(unsavedDialog).toBeVisible();
+    await expect(unsavedDialog).toHaveCount(1);
+
+    await editPage.clickLeaveAnyway();
+
+    await expect(page.locator('.cm-editor')).toBeHidden();
+    await expect(page.locator('article > h1')).toHaveText(title);
+    await expect(unsavedDialog).toBeHidden();
+  });
+
   test('create-page-with-mermaid', async ({ page }) => {
     const title = `Page With Mermaid ${Date.now()}`;
     const mermaidContent = `\`\`\`mermaid

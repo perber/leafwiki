@@ -5,7 +5,7 @@
 
 import { DIALOG_UNSAVED_CHANGES } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useBlocker } from 'react-router-dom'
 import { useExternalUnloadBlocker } from './useExternalUnloadBlocker'
 
@@ -18,7 +18,11 @@ export default function useNavigationGuard({
   when,
   onNavigate,
 }: UseNavigationGuardProps) {
+  const allowNextNavigationRef = useRef(false)
   const shouldBlock = useCallback(() => {
+    if (allowNextNavigationRef.current) {
+      return false
+    }
     return typeof when === 'function' ? when() : when
   }, [when])
   const blocker = useBlocker(shouldBlock)
@@ -30,6 +34,10 @@ export default function useNavigationGuard({
   // onCancel resets the navigation blocker
   // so the user stays on the current page
   const onCancel = useCallback(() => {
+    if (allowNextNavigationRef.current) {
+      return
+    }
+    allowNextNavigationRef.current = false
     if (blocker.state === 'blocked' && blocker.reset) {
       blocker.reset()
     }
@@ -42,24 +50,40 @@ export default function useNavigationGuard({
 
     if (blocker.state !== 'blocked') return
 
+    allowNextNavigationRef.current = true
+    closeDialog()
+
     if (blocker.proceed) {
       blocker.proceed()
     }
     onNavigate()
-  }, [blocker, onNavigate])
+  }, [blocker, closeDialog, onNavigate])
 
   // Close the dialog if navigation is unblocked and there is no nextPath
   useEffect(() => {
     if (blocker.state === 'unblocked') {
+      allowNextNavigationRef.current = false
       closeDialog()
     }
   }, [blocker.state, closeDialog])
+
+  useEffect(() => {
+    return () => {
+      allowNextNavigationRef.current = false
+      const dialogsState = useDialogsStore.getState()
+      if (dialogsState.dialogType === DIALOG_UNSAVED_CHANGES) {
+        dialogsState.closeDialog()
+      }
+    }
+  }, [])
 
   // Open the dialog when there is a blocked navigation
   useEffect(() => {
     if (!blocker.location) return
 
-    if (blocker.state === 'proceeding') return
+    if (blocker.state !== 'blocked') return
+
+    if (allowNextNavigationRef.current) return
 
     openDialog(DIALOG_UNSAVED_CHANGES, {
       onConfirm,
