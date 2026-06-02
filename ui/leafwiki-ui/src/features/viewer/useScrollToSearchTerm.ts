@@ -1,16 +1,8 @@
-import { useEffect } from 'react'
+import { getNavigationVisitKey } from '@/lib/navigationVisit'
+import { waitUntilHeightStabilizes } from '@/lib/scrollToHeadline'
+import { getNavigationSearchQuery } from '@/lib/searchNavigationState'
+import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-
-const SEARCH_QUERY_STATE_KEY = 'leafwikiSearchQuery'
-
-export function getNavigationSearchQuery(state: unknown): string | undefined {
-  if (typeof state === 'object' && state !== null) {
-    const s = state as Record<string, unknown>
-    const q = s[SEARCH_QUERY_STATE_KEY]
-    if (typeof q === 'string' && q.length > 0) return q
-  }
-  return undefined
-}
 
 function cleanupHighlights(root: Element) {
   root.querySelectorAll('mark.search-highlight').forEach((el) => {
@@ -64,21 +56,27 @@ type Options = {
 export function useScrollToSearchTerm({ content, isLoading }: Options) {
   const location = useLocation()
   const searchQuery = getNavigationSearchQuery(location.state)
+  const visitKey = getNavigationVisitKey(location)
+  const highlightedRef = useRef(new Set<string>())
 
   useEffect(() => {
     if (isLoading || !content || !searchQuery || location.hash) return
 
+    const highlightKey = `${visitKey}:${searchQuery}`
+    if (highlightedRef.current.has(highlightKey)) return
+
     const scrollContainer = document.getElementById('scroll-container')
     if (!scrollContainer) return
 
-    const timeout = setTimeout(() => {
+    const cancel = waitUntilHeightStabilizes(scrollContainer, () => {
       highlightAndScroll(searchQuery)
-    }, 500)
+      highlightedRef.current.add(highlightKey)
+    })
 
     return () => {
-      clearTimeout(timeout)
+      cancel()
       const contentEl = document.querySelector('.page-viewer__content')
       if (contentEl) cleanupHighlights(contentEl)
     }
-  }, [content, isLoading, searchQuery, location.hash])
+  }, [content, isLoading, searchQuery, location.hash, visitKey])
 }
