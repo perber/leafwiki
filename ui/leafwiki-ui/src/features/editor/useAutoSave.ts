@@ -77,44 +77,38 @@ export function useAutoSave(): { status: AutoSaveStatus } {
       isSavingRef.current = false
       updateStatus('idle')
     }
-    // updateStatus only wraps stable setters (useState) — safe to omit
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSave])
 
   // When page identity changes (navigation to a different page): reset everything
   const pageId = page?.id
+  const pageVersion = page?.version
   useEffect(() => {
     clearDebounce()
     isSavingRef.current = false
     generationRef.current++ // invalidate any in-flight save callback
     updateStatus('idle')
-    lastPageVersionRef.current = page?.version
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageId])
+    lastPageVersionRef.current = pageVersion
+  }, [pageId, pageVersion])
 
   // Detect manual save after a paused conflict: page.version advances
   useEffect(() => {
     if (
       statusRef.current === 'paused' &&
-      page?.version !== undefined &&
-      page.version !== lastPageVersionRef.current
+      pageVersion !== undefined &&
+      pageVersion !== lastPageVersionRef.current
     ) {
-      lastPageVersionRef.current = page.version
+      lastPageVersionRef.current = pageVersion
       updateStatus('idle')
-    } else if (page?.version !== undefined) {
-      lastPageVersionRef.current = page.version
+    } else if (pageVersion !== undefined) {
+      lastPageVersionRef.current = pageVersion
     }
-    // updateStatus only wraps stable setters (useState) — safe to omit
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.version])
+  }, [pageVersion])
 
   // Also clear 'paused' when the editor becomes clean (user reverted all changes)
   useEffect(() => {
     if (statusRef.current === 'paused' && !dirty) {
       updateStatus('idle')
     }
-    // updateStatus only wraps stable setters (useState) — safe to omit
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dirty])
 
   // Main debounce effect: watch content, tags, frontmatterFields.
