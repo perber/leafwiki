@@ -4,11 +4,15 @@ export default class DeletePageDialog {
   constructor(private page: Page) {}
 
   async dialogTextVisible() {
-    return this.page
-      .getByText(
-        /Are you sure you want to delete this (page|section)\? This action cannot be undone\./,
-      )
-      .isVisible();
+    const confirmButtons = this.page.getByTestId(
+      'delete-page-dialog-button-confirm',
+    );
+    const count = await confirmButtons.count();
+    if (count === 0) {
+      return false;
+    }
+
+    return confirmButtons.last().isVisible();
   }
 
   async checkboxRecursiveDelete() {
