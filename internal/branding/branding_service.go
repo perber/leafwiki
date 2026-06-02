@@ -82,6 +82,15 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 	return nil
 }
 
+func containsPathTraversal(s string) bool {
+	return strings.Contains(s, "..") ||
+		strings.Contains(s, "/") ||
+		strings.Contains(s, "\\") ||
+		filepath.IsAbs(s) ||
+		filepath.VolumeName(s) != "" ||
+		strings.Contains(s, "\x00")
+}
+
 // containsControlCharacters checks if a string contains control characters
 // that could break UI layout or cause display issues.
 // Blocks all control characters (unicode.IsControl) except common whitespace:
@@ -90,13 +99,6 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 // - \r (carriage return, U+000D)
 // These exceptions allow for normal text formatting while preventing
 // null bytes, vertical tabs, form feeds, and other problematic characters.
-func containsPathTraversal(s string) bool {
-	return strings.Contains(s, "..") ||
-		strings.Contains(s, "/") ||
-		strings.Contains(s, "\\") ||
-		strings.Contains(s, "\x00")
-}
-
 func containsControlCharacters(s string) bool {
 	for _, r := range s {
 		// Disallow control characters except for common whitespace
