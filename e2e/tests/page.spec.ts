@@ -2794,13 +2794,13 @@ Paragraph outside the list.
     await viewPage.clickDeletePageButton();
 
     const deletePageDialog = new DeletePageDialog(page);
-    test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.waitForVisible();
     await deletePageDialog.expectNoBacklinksVisible();
     await deletePageDialog.abortDeletion();
     await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
 
     await viewPage.clickDeletePageButton();
-    test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.waitForVisible();
     await deletePageDialog.expectNoBacklinksVisible();
     await deletePageDialog.confirmDeletion();
     await treeView.expectNumberOfTreeNodes(curNodeCount);
@@ -2838,7 +2838,7 @@ Paragraph outside the list.
     await viewPage.clickDeletePageMenuItem();
 
     const deletePageDialog = new DeletePageDialog(page);
-    test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.waitForVisible();
     await deletePageDialog.confirmDeletion();
     await page.getByText('Page deleted successfully').waitFor({ state: 'visible' });
     // After a successful delete the app performs a SPA navigation to the parent page.
@@ -2881,7 +2881,7 @@ Paragraph outside the list.
     await viewPage.clickDeletePageButton();
 
     const deletePageDialog = new DeletePageDialog(page);
-    test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.waitForVisible();
     await deletePageDialog.expectBacklinksWarningVisible();
     await deletePageDialog.expectBacklinkTitle(referrerTitle);
     await deletePageDialog.abortDeletion();
@@ -2912,7 +2912,7 @@ Paragraph outside the list.
     await viewPage.clickDeletePageButton();
 
     const deletePageDialog = new DeletePageDialog(page);
-    test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.waitForVisible();
     // Attempt delete without the recursive flag — the API rejects this because
     // the page has children. Use tryConfirmDeletion() so we wait for the API
     // response without blocking on the dialog button to detach (it won't,
@@ -2920,12 +2920,12 @@ Paragraph outside the list.
     await deletePageDialog.tryConfirmDeletion();
 
     // The dialog stays open, because we need to confirm nested deletion
-    test.expect(await deletePageDialog.dialogTextVisible()).toBeTruthy();
+    await deletePageDialog.waitForVisible();
 
     await deletePageDialog.confirmNestedDeletion();
     await treeView.expectNumberOfTreeNodes(curNodeCount);
     // Dialog should be closed now
-    test.expect(await deletePageDialog.dialogTextVisible()).toBeFalsy();
+    await deletePageDialog.waitForHidden();
   });
 
   // disable this test cases, because it is flaky
@@ -3318,8 +3318,8 @@ Paragraph outside the list.
     await deleteButton.click({ force: true });
 
     const deletePageDialog = new DeletePageDialog(page);
-    test.expect(await deletePageDialog.dialogTextVisible()).toBeFalsy();
     await page.getByText(warningText).waitFor({ state: 'visible' });
+    await deletePageDialog.waitForHidden();
     test.expect(await page.locator('.cm-editor').isVisible()).toBeTruthy();
   });
 

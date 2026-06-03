@@ -3,12 +3,22 @@ import { expect, Page } from '@playwright/test';
 export default class DeletePageDialog {
   constructor(private page: Page) {}
 
+  dialogText() {
+    return this.page.getByText(
+      /Are you sure you want to delete this (page|section)\? This action cannot be undone\./,
+    );
+  }
+
   async dialogTextVisible() {
-    return this.page
-      .getByText(
-        /Are you sure you want to delete this (page|section)\? This action cannot be undone\./,
-      )
-      .isVisible();
+    return this.dialogText().isVisible();
+  }
+
+  async waitForVisible() {
+    await this.dialogText().waitFor({ state: 'visible' });
+  }
+
+  async waitForHidden() {
+    await this.dialogText().waitFor({ state: 'hidden' });
   }
 
   async checkboxRecursiveDelete() {
