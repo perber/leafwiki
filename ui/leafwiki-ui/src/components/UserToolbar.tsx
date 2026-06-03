@@ -11,10 +11,12 @@ import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
+import { Heart } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { RoleGuard } from './RoleGuard'
 
 export default function UserToolbar() {
+  const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
   const navigate = useNavigate()
@@ -118,6 +120,21 @@ export default function UserToolbar() {
               Logout
             </DropdownMenuItem>
           )}
+          <RoleGuard roles={['admin', 'editor']}>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-muted-foreground max-w-56 px-2 pb-1 text-xs leading-relaxed font-normal whitespace-normal">
+              Support ongoing development.
+            </DropdownMenuLabel>
+            <DropdownMenuItem
+              className="bg-primary text-primary-foreground focus:bg-primary/90 focus:text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground cursor-pointer justify-center gap-2 rounded-md py-2 font-medium shadow-sm"
+              onClick={() =>
+                window.open(supportPageUrl, '_blank', 'noopener,noreferrer')
+              }
+            >
+              <Heart className="size-4 fill-current" />
+              <span>Support LeafWiki</span>
+            </DropdownMenuItem>
+          </RoleGuard>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
