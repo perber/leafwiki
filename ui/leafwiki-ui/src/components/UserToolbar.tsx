@@ -126,13 +126,17 @@ export default function UserToolbar() {
               Support ongoing development.
             </DropdownMenuLabel>
             <DropdownMenuItem
+              asChild
               className="bg-primary text-primary-foreground focus:bg-primary/90 focus:text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground cursor-pointer justify-center gap-2 rounded-md py-2 font-medium shadow-sm"
-              onClick={() =>
-                window.open(supportPageUrl, '_blank', 'noopener,noreferrer')
-              }
             >
-              <Heart className="size-4 fill-current" />
-              <span>Support LeafWiki</span>
+              <a
+                href={supportPageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Heart className="size-4 fill-current" />
+                <span>Support LeafWiki</span>
+              </a>
             </DropdownMenuItem>
           </RoleGuard>
         </DropdownMenuContent>
