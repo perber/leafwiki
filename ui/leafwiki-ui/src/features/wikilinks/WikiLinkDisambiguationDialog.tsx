@@ -12,6 +12,7 @@ import { DIALOG_WIKILINK_DISAMBIGUATION } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { File, FolderTree } from 'lucide-react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 type WikiLinkDisambiguationDialogProps = {
@@ -26,10 +27,16 @@ export function WikiLinkDisambiguationDialog({
   const isOpen = useDialogsStore(
     (s) => s.dialogType === DIALOG_WIKILINK_DISAMBIGUATION,
   )
-  const matches: PageNode[] = useTreeStore((s) =>
-    title ? s.getPagesByTitle(title) : [],
-  )
+  const byId = useTreeStore((s) => s.byId)
   const openAncestorsForPath = useTreeStore((s) => s.openAncestorsForPath)
+  const matches: PageNode[] = useMemo(() => {
+    if (!title) return []
+
+    const lower = title.toLowerCase()
+    return Object.values(byId ?? {}).filter(
+      (page) => page.title.toLowerCase() === lower,
+    )
+  }, [byId, title])
 
   const handleSelect = (path: string) => {
     openAncestorsForPath(path)
@@ -44,7 +51,10 @@ export function WikiLinkDisambiguationDialog({
         if (!open) queueMicrotask(() => closeDialog())
       }}
     >
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent
+        className="sm:max-w-lg"
+        data-testid="wikilink-disambiguation-dialog"
+      >
         <DialogHeader>
           <DialogTitle>
             {i18next.t('wikiLinkDisambiguation.title', { ns: 'editor' })}
@@ -65,6 +75,7 @@ export function WikiLinkDisambiguationDialog({
                 <button
                   type="button"
                   onClick={() => handleSelect(page.path)}
+                  data-testid={`wikilink-disambiguation-option-${page.id}`}
                   className="hover:bg-accent flex w-full items-start gap-3 rounded-md px-3 py-2 text-left"
                 >
                   <Icon className="mt-0.5 h-4 w-4 shrink-0" />
