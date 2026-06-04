@@ -15,6 +15,7 @@ import { create } from 'zustand'
 import { useLinkStatusStore } from '../links/linkstatus_store'
 import { confirmPageRefactor } from '../page/pageRefactorDialogState'
 import { useProgressbarStore } from '../progressbar/progressbarStore'
+import { useViewerStore } from '../viewer/viewer'
 import {
   EditorFrontmatterField,
   validateEditorFrontmatterMetadata,
@@ -254,6 +255,15 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         useTreeStore
           .getState()
           .patchNodeVersion(updatedPage.id, updatedPage.version)
+      }
+
+      const viewerPage = useViewerStore.getState().page
+      if (viewerPage?.id && viewerPage.id === updatedPage?.id && updatedPage) {
+        useViewerStore.setState({
+          page: updatedPage,
+          notFound: false,
+          error: null,
+        })
       }
 
       // reload backlinks

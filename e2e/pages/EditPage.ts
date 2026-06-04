@@ -134,4 +134,18 @@ export default class EditPage {
     await this.page.keyboard.press('Escape');
     await this.page.locator('div[role="dialog"]').waitFor({ state: 'hidden' });
   }
+
+  async waitForAutocompleteDropdown() {
+    await this.page.locator('.cm-tooltip-autocomplete').waitFor({ state: 'visible' });
+  }
+
+  async selectAutocompleteOption(label: string) {
+    await this.page
+      .locator('.cm-tooltip-autocomplete .cm-completionLabel', { hasText: label })
+      .click();
+  }
+
+  async getEditorContent(): Promise<string> {
+    return this.page.locator('.cm-content').innerText();
+  }
 }

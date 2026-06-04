@@ -15,12 +15,14 @@ const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
 
 type CreatePageByPathDialogProps = {
   initialPath?: string
+  initialTitle?: string
   readOnlyPath?: boolean
   forwardToEditMode?: boolean
 }
 
 export function CreatePageByPathDialog({
   initialPath,
+  initialTitle,
   readOnlyPath,
   forwardToEditMode,
 }: CreatePageByPathDialogProps) {
@@ -28,9 +30,10 @@ export function CreatePageByPathDialog({
   const navigate = useNavigate()
 
   // read the last segment from the initial path as title
-  const initialTitle = initialPath?.split('/').pop() || 'unknown'
+  const defaultTitle =
+    initialTitle || initialPath?.split('/').pop() || 'unknown'
 
-  const [title, setTitle] = useState(initialTitle)
+  const [title, setTitle] = useState(defaultTitle)
   const [path, setPath] = useState(initialPath || '')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [lookup, setLookup] = useState<PathLookupResult | null>(null)

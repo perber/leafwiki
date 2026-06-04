@@ -19,7 +19,10 @@ import { useEffect, useRef, useState } from 'react'
 import { useDesignModeStore } from '../designtoggle/designmode'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 import type { InternalLinkCompletion } from './internalLinkCompletion'
-import { internalLinkCompletionSource } from './internalLinkCompletion'
+import {
+  internalLinkCompletionSource,
+  wikiLinkCompletionSource,
+} from './internalLinkCompletion'
 
 // Extensions toggled via lineWrapCompartment
 const noWrapExtensions = EditorView.theme({
@@ -183,7 +186,7 @@ export default function MarkdownCodeEditor({
           top: true,
         }),
         autocompletion({
-          override: [internalLinkCompletionSource],
+          override: [internalLinkCompletionSource, wikiLinkCompletionSource],
           icons: false,
           optionClass: () => 'cm-internal-link-option',
           addToOptions: [
