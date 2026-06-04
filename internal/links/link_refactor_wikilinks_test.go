@@ -26,16 +26,20 @@ func TestRewriteWikiLinks_TitleRename(t *testing.T) {
 
 func TestRewriteWikiLinks_TitleRenameCaseInsensitive(t *testing.T) {
 	engine := NewMarkdownRefactorEngine()
-	content := "See [[project plan]] here."
 
-	result := engine.RewriteWikiLinks(content, []RewriteRule{{
-		OldTitle: "Project Plan",
-		NewTitle: "Project Overview",
-	}})
-
-	want := "See [[Project Overview]] here."
-	if result.Content != want {
-		t.Errorf("got %q, want %q", result.Content, want)
+	cases := []struct{ input, want string }{
+		{"See [[project plan]] here.", "See [[Project Overview]] here."},
+		{"See [[ project plan ]] here.", "See [[Project Overview]] here."},
+		{"See [[ Project Plan  ]] here.", "See [[Project Overview]] here."},
+	}
+	for _, tc := range cases {
+		result := engine.RewriteWikiLinks(tc.input, []RewriteRule{{
+			OldTitle: "Project Plan",
+			NewTitle: "Project Overview",
+		}})
+		if result.Content != tc.want {
+			t.Errorf("input %q: got %q, want %q", tc.input, result.Content, tc.want)
+		}
 	}
 }
 
@@ -59,18 +63,18 @@ func TestRewriteWikiLinks_PathHintRewrite(t *testing.T) {
 
 func TestRewriteWikiLinks_SkipsCodeBlocks(t *testing.T) {
 	engine := NewMarkdownRefactorEngine()
-	content := "```\n[[Old Title]]\n```\n\n[[Old Title]] outside"
+	content := "`[[Old Title]]` inline\n\n```\n[[Old Title]]\n```\n\n[[Old Title]] outside"
 
 	result := engine.RewriteWikiLinks(content, []RewriteRule{
 		{OldTitle: "Old Title", NewTitle: "New Title"},
 	})
 
-	want := "```\n[[Old Title]]\n```\n\n[[New Title]] outside"
+	want := "`[[Old Title]]` inline\n\n```\n[[Old Title]]\n```\n\n[[New Title]] outside"
 	if result.Content != want {
 		t.Errorf("got %q, want %q", result.Content, want)
 	}
 	if result.Count() != 1 {
-		t.Errorf("expected 1 replacement (outside code block), got %d", result.Count())
+		t.Errorf("expected 1 replacement (outside code), got %d", result.Count())
 	}
 }
 
@@ -102,8 +106,9 @@ func TestRewriteWikiLinks_EmptyRulesNoOp(t *testing.T) {
 // ─── FindWikiLinksForPath ────────────────────────────────────────────────────
 
 func TestFindWikiLinksForPath_FindsPathHint(t *testing.T) {
+	engine := NewMarkdownRefactorEngine()
 	content := "See [[docs/intro]] for details."
-	found := FindWikiLinksForPath(content, "/docs/intro", "Intro")
+	found := engine.FindWikiLinksForPath(content, "/docs/intro", "Intro")
 	if len(found) == 0 {
 		t.Fatal("expected to find path hint [[docs/intro]]")
 	}
@@ -113,8 +118,9 @@ func TestFindWikiLinksForPath_FindsPathHint(t *testing.T) {
 }
 
 func TestFindWikiLinksForPath_FindsTitleLink(t *testing.T) {
+	engine := NewMarkdownRefactorEngine()
 	content := "See [[Project Plan]] for details."
-	found := FindWikiLinksForPath(content, "/docs/project-plan", "Project Plan")
+	found := engine.FindWikiLinksForPath(content, "/docs/project-plan", "Project Plan")
 	if len(found) == 0 {
 		t.Fatal("expected to find title link [[Project Plan]]")
 	}
@@ -124,23 +130,45 @@ func TestFindWikiLinksForPath_FindsTitleLink(t *testing.T) {
 }
 
 func TestFindWikiLinksForPath_TitleMatchCaseInsensitive(t *testing.T) {
+	engine := NewMarkdownRefactorEngine()
 	content := "See [[project plan]] for details."
-	found := FindWikiLinksForPath(content, "/docs/project-plan", "Project Plan")
+	found := engine.FindWikiLinksForPath(content, "/docs/project-plan", "Project Plan")
 	if len(found) == 0 {
 		t.Fatal("expected case-insensitive title match")
 	}
 }
 
+func TestFindWikiLinksForPath_SkipsCodeBlocks(t *testing.T) {
+	engine := NewMarkdownRefactorEngine()
+	// Fenced code block: no occurrence outside code → nothing reported.
+	fenced := "```\n[[Project Plan]]\n```"
+	if found := engine.FindWikiLinksForPath(fenced, "/docs/project-plan", "Project Plan"); len(found) != 0 {
+		t.Errorf("fenced block: expected no match, got %v", found)
+	}
+	// Inline code: also excluded.
+	inline := "`[[Project Plan]]`"
+	if found := engine.FindWikiLinksForPath(inline, "/docs/project-plan", "Project Plan"); len(found) != 0 {
+		t.Errorf("inline code: expected no match, got %v", found)
+	}
+	// Outside code: should be found.
+	outside := "See [[Project Plan]] here."
+	if found := engine.FindWikiLinksForPath(outside, "/docs/project-plan", "Project Plan"); len(found) == 0 {
+		t.Errorf("outside code: expected match, got none")
+	}
+}
+
 func TestFindWikiLinksForPath_EmptyContentReturnsNil(t *testing.T) {
-	found := FindWikiLinksForPath("", "/docs/intro", "Intro")
+	engine := NewMarkdownRefactorEngine()
+	found := engine.FindWikiLinksForPath("", "/docs/intro", "Intro")
 	if len(found) != 0 {
 		t.Errorf("expected nil for empty content, got %v", found)
 	}
 }
 
 func TestFindWikiLinksForPath_NoMatchReturnsEmpty(t *testing.T) {
+	engine := NewMarkdownRefactorEngine()
 	content := "No wiki links here, just [regular](/links)."
-	found := FindWikiLinksForPath(content, "/docs/intro", "Intro")
+	found := engine.FindWikiLinksForPath(content, "/docs/intro", "Intro")
 	if len(found) != 0 {
 		t.Errorf("expected no matches, got %v", found)
 	}

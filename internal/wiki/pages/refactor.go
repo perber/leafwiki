@@ -210,7 +210,7 @@ func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle
 		// Replace raw route paths in matchedPaths with their wiki-link syntax
 		// when the page content uses [[Title]] or [[path/hint]] instead of
 		// a standard markdown link.
-		wikiLinks := links.FindWikiLinksForPath(sourcePage.Content, oldPath, pageTitle)
+		wikiLinks := engine.FindWikiLinksForPath(sourcePage.Content, oldPath, pageTitle)
 		for _, wl := range wikiLinks {
 			if !containsString(item.MatchedPaths, wl) {
 				item.MatchedPaths = append(item.MatchedPaths, wl)

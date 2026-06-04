@@ -76,7 +76,9 @@ func (e *MarkdownRefactorEngine) RewriteWikiLinks(content string, rules []Rewrit
 	for _, rule := range rules {
 		if rule.OldTitle != "" && rule.OldTitle != rule.NewTitle {
 			rewrites = append(rewrites, wikiRewrite{
-				re:        regexp.MustCompile(`(?i)\[\[` + regexp.QuoteMeta(rule.OldTitle) + `(\|[^\]\n]*)?\]\]`),
+				// \s* inside [[...]] mirrors the TrimSpace done by the extractor,
+				// so [[ Project Plan ]] is rewritten just like [[Project Plan]].
+				re:        regexp.MustCompile(`(?i)\[\[\s*` + regexp.QuoteMeta(rule.OldTitle) + `\s*(\|[^\]\n]*)?\]\]`),
 				newTarget: rule.NewTitle,
 			})
 		}
@@ -84,7 +86,7 @@ func (e *MarkdownRefactorEngine) RewriteWikiLinks(content string, rules []Rewrit
 		newHint := strings.TrimPrefix(normalizeWikiPath(rule.NewPath), "/")
 		if oldHint != "" && oldHint != newHint {
 			rewrites = append(rewrites, wikiRewrite{
-				re:        regexp.MustCompile(`\[\[` + regexp.QuoteMeta(oldHint) + `(\|[^\]\n]*)?\]\]`),
+				re:        regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(oldHint) + `\s*(\|[^\]\n]*)?\]\]`),
 				newTarget: newHint,
 			})
 		}
@@ -130,22 +132,36 @@ func (e *MarkdownRefactorEngine) RewriteWikiLinks(content string, rules []Rewrit
 
 // FindWikiLinksForPath returns the wiki-link texts (e.g. "[[Project Plan]]")
 // found in content that reference the given path via title or path hint.
-// Used by the refactor preview to show wiki-links in the affected-pages list.
-func FindWikiLinksForPath(content, oldPath, pageTitle string) []string {
+// Only occurrences outside fenced code blocks and inline code are reported,
+// matching the same exclusion logic used by RewriteWikiLinks so preview and
+// apply agree on which links would actually be rewritten.
+func (e *MarkdownRefactorEngine) FindWikiLinksForPath(content, oldPath, pageTitle string) []string {
 	if content == "" {
 		return nil
 	}
+
+	_, excludedRanges := e.collectCandidatesAndExcludedRanges(content)
+
+	match := func(re *regexp.Regexp) bool {
+		for _, m := range re.FindAllStringIndex(content, -1) {
+			if !isExcludedOffset(m[0], excludedRanges) {
+				return true
+			}
+		}
+		return false
+	}
+
 	var found []string
 	oldHint := strings.TrimPrefix(normalizeWikiPath(oldPath), "/")
 	if oldHint != "" {
-		re := regexp.MustCompile(`\[\[` + regexp.QuoteMeta(oldHint) + `(?:\|[^\]\n]*)?\]\]`)
-		if re.MatchString(content) {
+		re := regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(oldHint) + `\s*(?:\|[^\]\n]*)?\]\]`)
+		if match(re) {
 			found = append(found, "[["+oldHint+"]]")
 		}
 	}
 	if pageTitle != "" {
-		re := regexp.MustCompile(`(?i)\[\[` + regexp.QuoteMeta(pageTitle) + `(?:\|[^\]\n]*)?\]\]`)
-		if re.MatchString(content) {
+		re := regexp.MustCompile(`(?i)\[\[\s*` + regexp.QuoteMeta(pageTitle) + `\s*(?:\|[^\]\n]*)?\]\]`)
+		if match(re) {
 			found = append(found, "[["+pageTitle+"]]")
 		}
 	}
