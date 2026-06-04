@@ -2,11 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { useTreeStore } from './tree'
 import type { PageNode } from '@/lib/api/pages'
 
-const makeNode = (
-  id: string,
-  title: string,
-  path: string,
-): PageNode => ({
+const makeNode = (id: string, title: string, path: string): PageNode => ({
   id,
   title,
   slug: path.split('/').pop() ?? path,

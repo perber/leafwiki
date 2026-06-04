@@ -20,19 +20,28 @@ describe('preprocessWikilinks', () => {
   describe('single match', () => {
     it('replaces [[Title]] with a resolved markdown link', () => {
       const docs = page('1', 'docs/intro', 'Intro')
-      const result = preprocessWikilinks('See [[Intro]] here.', singleMatch(docs))
+      const result = preprocessWikilinks(
+        'See [[Intro]] here.',
+        singleMatch(docs),
+      )
       expect(result).toBe('See [Intro](/docs/intro) here.')
     })
 
     it('uses the alias as display text for [[Title|Alias]]', () => {
       const docs = page('1', 'docs/intro', 'Intro')
-      const result = preprocessWikilinks('[[Intro|our intro]]', singleMatch(docs))
+      const result = preprocessWikilinks(
+        '[[Intro|our intro]]',
+        singleMatch(docs),
+      )
       expect(result).toBe('[our intro](/docs/intro)')
     })
 
     it('trims whitespace from target and alias', () => {
       const docs = page('1', 'docs/intro', 'Intro')
-      const result = preprocessWikilinks('[[ Intro | our intro ]]', singleMatch(docs))
+      const result = preprocessWikilinks(
+        '[[ Intro | our intro ]]',
+        singleMatch(docs),
+      )
       expect(result).toBe('[our intro](/docs/intro)')
     })
   })
@@ -84,13 +93,19 @@ describe('preprocessWikilinks', () => {
   describe('code block protection', () => {
     it('does not convert [[Title]] inside fenced code blocks', () => {
       const content = '```\nSee [[Intro]] for details\n```'
-      const result = preprocessWikilinks(content, singleMatch(page('1', 'intro', 'Intro')))
+      const result = preprocessWikilinks(
+        content,
+        singleMatch(page('1', 'intro', 'Intro')),
+      )
       expect(result).toBe(content)
     })
 
     it('does not convert [[Title]] inside inline code', () => {
       const content = 'Use `[[Title]]` syntax.'
-      const result = preprocessWikilinks(content, singleMatch(page('1', 'title', 'Title')))
+      const result = preprocessWikilinks(
+        content,
+        singleMatch(page('1', 'title', 'Title')),
+      )
       expect(result).toBe(content)
     })
 
@@ -98,7 +113,9 @@ describe('preprocessWikilinks', () => {
       const intro = page('1', 'docs/intro', 'Intro')
       const content = 'See [[Intro]].\n\n```\n[[Intro]] example\n```'
       const result = preprocessWikilinks(content, singleMatch(intro))
-      expect(result).toBe('See [Intro](/docs/intro).\n\n```\n[[Intro]] example\n```')
+      expect(result).toBe(
+        'See [Intro](/docs/intro).\n\n```\n[[Intro]] example\n```',
+      )
     })
 
     it('handles multiple code spans and wiki-links interleaved', () => {
