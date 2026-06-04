@@ -1,6 +1,7 @@
 // register sidebar panel items
 import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
 import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
+import { WikiLinkDisambiguationDialog } from '@/features/wikilinks/WikiLinkDisambiguationDialog'
 import { LinkInsertDialog } from '@/features/editor/LinkInsertDialog'
 import { ImagePreviewDialog } from '@/features/imagepreview/ImagePreviewDialog'
 import { RestoreRevisionDialog } from '@/features/history/RestoreRevisionDialog'
@@ -77,6 +78,7 @@ export const DIALOG_PAGE_PERMALINK = 'page-permalink'
 export const DIALOG_RESTORE_REVISION_CONFIRMATION =
   'restore-revision-confirmation'
 export const DIALOG_LINK_INSERT = 'link-insert'
+export const DIALOG_WIKILINK_DISAMBIGUATION = 'wikilink-disambiguation'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -295,6 +297,20 @@ dialogRegistry.register({
       <RestoreRevisionDialog
         key={`${DIALOG_RESTORE_REVISION_CONFIRMATION}-${typedProps.revision.id}`}
         {...typedProps}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_WIKILINK_DISAMBIGUATION,
+  render: (props) => {
+    return (
+      <WikiLinkDisambiguationDialog
+        key={DIALOG_WIKILINK_DISAMBIGUATION}
+        {...(props as React.ComponentProps<
+          typeof WikiLinkDisambiguationDialog
+        >)}
       />
     )
   },

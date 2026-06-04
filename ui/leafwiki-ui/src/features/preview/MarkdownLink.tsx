@@ -2,19 +2,31 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
-import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
+import {
+  DIALOG_CREATE_PAGE_BY_PATH,
+  DIALOG_WIKILINK_DISAMBIGUATION,
+} from '@/lib/registries'
 import { buildViewUrl, stripBasePath, withBasePath } from '@/lib/routePath'
 import {
   normalizeWikiRoutePath,
   resolveWikiLinkPath,
   toWikiLookupPath,
 } from '@/lib/wikiPath'
+import { suggestSlug } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
 import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { AnchorHTMLAttributes, ReactNode } from 'react'
+
+function safeDecodeURIComponent(s: string): string {
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return s
+  }
+}
 
 interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string
@@ -40,6 +52,48 @@ export function MarkdownLink({
 
   if (href === undefined) {
     return <>{children}</>
+  }
+
+  if (href.startsWith('wikilink-ambiguous:')) {
+    const title = safeDecodeURIComponent(
+      href.slice('wikilink-ambiguous:'.length),
+    )
+    return (
+      <Button
+        variant="link"
+        onClick={() => openDialog(DIALOG_WIKILINK_DISAMBIGUATION, { title })}
+        className="text-warning hover:text-warning/80 m-0 p-0 text-base no-underline hover:no-underline"
+      >
+        {children}
+      </Button>
+    )
+  }
+
+  if (href.startsWith('wikilink-notfound:')) {
+    const title = safeDecodeURIComponent(
+      href.slice('wikilink-notfound:'.length),
+    )
+    if (user) {
+      return (
+        <Button
+          variant="link"
+          onClick={async () => {
+            // Ask the server for a valid slug so the create-page dialog
+            // receives a proper path instead of the raw title (which may
+            // contain spaces or special characters).
+            const slug = await suggestSlug('', title).catch(() => '')
+            openDialog(DIALOG_CREATE_PAGE_BY_PATH, {
+              initialPath: slug || title,
+              forwardToEditMode: !editMode,
+            })
+          }}
+          className="text-error hover:text-error/80 m-0 p-0 text-base no-underline hover:no-underline"
+        >
+          {children}
+        </Button>
+      )
+    }
+    return <span className="text-error cursor-default">{children}</span>
   }
 
   const isInternal =

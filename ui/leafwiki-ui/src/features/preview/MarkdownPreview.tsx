@@ -1,5 +1,6 @@
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { withBasePath } from '@/lib/routePath'
+import { useTreeStore } from '@/stores/tree'
 import {
   AnchorHTMLAttributes,
   AudioHTMLAttributes,
@@ -38,6 +39,7 @@ import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
 import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
+import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 import 'katex/dist/katex.min.css'
@@ -45,6 +47,14 @@ import 'katex/dist/katex.min.css'
 const schema = {
   ...defaultSchema,
   clobberPrefix: '',
+  protocols: {
+    ...defaultSchema.protocols,
+    href: [
+      ...(defaultSchema.protocols?.href ?? []),
+      'wikilink-notfound',
+      'wikilink-ambiguous',
+    ],
+  },
   tagNames: [...(defaultSchema.tagNames || []), 'audio', 'video'],
   attributes: {
     ...defaultSchema.attributes,
@@ -239,6 +249,7 @@ export default function MarkdownPreview({
   tocClickable = true,
   onStickyTocChange,
 }: Props) {
+  const treeById = useTreeStore((s) => s.byId)
   const designMode = useDesignModeStore((state) => state.mode)
   const prefersLight = useSyncExternalStore(
     (onStoreChange) => {
@@ -544,8 +555,18 @@ export default function MarkdownPreview({
   )
 
   const normalizedContent = useMemo(
-    () => normalizeMarkdownListIndentation(normalizeMarkdownShoutouts(content)),
-    [content],
+    () =>
+      normalizeMarkdownListIndentation(
+        normalizeMarkdownShoutouts(
+          preprocessWikilinks(content, (title) => {
+            const lower = title.toLowerCase()
+            return Object.values(treeById).filter(
+              (n) => n.title.toLowerCase() === lower,
+            )
+          }),
+        ),
+      ),
+    [content, treeById],
   )
 
   const tocEntries = useMemo(
