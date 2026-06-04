@@ -25,10 +25,10 @@ export function WikiLinkDisambiguationDialog({
   const isOpen = useDialogsStore(
     (s) => s.dialogType === DIALOG_WIKILINK_DISAMBIGUATION,
   )
-  const getPagesByTitle = useTreeStore((s) => s.getPagesByTitle)
+  const matches: PageNode[] = useTreeStore((s) =>
+    title ? s.getPagesByTitle(title) : [],
+  )
   const openAncestorsForPath = useTreeStore((s) => s.openAncestorsForPath)
-
-  const matches: PageNode[] = title ? getPagesByTitle(title) : []
 
   const handleSelect = (path: string) => {
     openAncestorsForPath(path)

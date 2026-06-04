@@ -17,6 +17,14 @@ import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { AnchorHTMLAttributes, ReactNode } from 'react'
 
+function safeDecodeURIComponent(s: string): string {
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return s
+  }
+}
+
 interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string
   children?: ReactNode
@@ -44,7 +52,7 @@ export function MarkdownLink({
   }
 
   if (href.startsWith('wikilink-ambiguous:')) {
-    const title = decodeURIComponent(href.slice('wikilink-ambiguous:'.length))
+    const title = safeDecodeURIComponent(href.slice('wikilink-ambiguous:'.length))
     return (
       <Button
         variant="link"
@@ -57,7 +65,7 @@ export function MarkdownLink({
   }
 
   if (href.startsWith('wikilink-notfound:')) {
-    const title = decodeURIComponent(href.slice('wikilink-notfound:'.length))
+    const title = safeDecodeURIComponent(href.slice('wikilink-notfound:'.length))
     if (user) {
       return (
         <Button
