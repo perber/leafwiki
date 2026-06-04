@@ -9,6 +9,7 @@ import {
   resolveWikiLinkPath,
   toWikiLookupPath,
 } from '@/lib/wikiPath'
+import { suggestSlug } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
@@ -61,12 +62,16 @@ export function MarkdownLink({
       return (
         <Button
           variant="link"
-          onClick={() =>
+          onClick={async () => {
+            // Ask the server for a valid slug so the create-page dialog
+            // receives a proper path instead of the raw title (which may
+            // contain spaces or special characters).
+            const slug = await suggestSlug('', title).catch(() => '')
             openDialog(DIALOG_CREATE_PAGE_BY_PATH, {
-              initialPath: title,
+              initialPath: slug || title,
               forwardToEditMode: !editMode,
             })
-          }
+          }}
           className="text-error hover:text-error/80 m-0 p-0 text-base no-underline hover:no-underline"
         >
           {children}
