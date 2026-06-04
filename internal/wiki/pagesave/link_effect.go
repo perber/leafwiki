@@ -47,6 +47,13 @@ func (e *LinkIndexSideEffect) Apply(event PageSaveEvent) {
 				e.healExact(event.After)
 			}
 		}
+		// Heal broken [[Title]] sentinels that match the page's (possibly new) title.
+		// Covers both slug-change renames and title-only updates.
+		if event.After != nil {
+			if err := e.svc.HealWikiLinksForPage(event.After); err != nil {
+				e.log.Warn("failed to heal wiki links for page", "pageID", event.After.ID, "error", err)
+			}
+		}
 
 	case PageOperationMove:
 		e.markBrokenForOldPath(event.OldPath)
