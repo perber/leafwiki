@@ -1,12 +1,20 @@
-import { describe, it, expect } from 'vitest'
+import { CompletionContext } from '@codemirror/autocomplete'
+import { EditorState } from '@codemirror/state'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   hasSuppressedExternalPrefix,
   buildMarkdownLinkOptions,
   buildWikiLinkOptions,
+  wikiLinkCompletionSource,
 } from './internalLinkCompletion'
 import type { FlatPageSearchItem } from '@/lib/pageSearch'
+import { useTreeStore } from '@/stores/tree'
 
-const item = (title: string, path: string, breadcrumb?: string): FlatPageSearchItem => ({
+const item = (
+  title: string,
+  path: string,
+  breadcrumb?: string,
+): FlatPageSearchItem => ({
   id: path,
   title,
   path,
@@ -48,14 +56,38 @@ describe('hasSuppressedExternalPrefix', () => {
     expect(hasSuppressedExternalPrefix('')).toBe(false)
   })
 
-  it('does not suppress mailto as a plain word without colon', () => {
+  it('suppresses mailto as a plain word without colon', () => {
     expect(hasSuppressedExternalPrefix('mailto')).toBe(true)
+  })
+})
+
+describe('wikiLinkCompletionSource', () => {
+  beforeEach(() => {
+    useTreeStore.setState({ flatPages: [] })
+  })
+
+  it('replaces a single trailing closing bracket', () => {
+    useTreeStore.setState({
+      flatPages: [item('Target Page', 'docs/target-page')],
+    })
+
+    const doc = '[[Target]'
+    const state = EditorState.create({ doc })
+    const context = new CompletionContext(state, doc.length - 1, true)
+    const result = wikiLinkCompletionSource(context)
+
+    expect(result).not.toBeNull()
+    expect(result?.from).toBe(2)
+    expect(result?.to).toBe(doc.length)
+    expect(result?.options[0]?.apply).toBe('Target Page]]')
   })
 })
 
 describe('buildMarkdownLinkOptions', () => {
   it('maps items to completion options with path-based apply', () => {
-    const options = buildMarkdownLinkOptions([item('Intro', 'docs/intro', 'Docs / Intro')])
+    const options = buildMarkdownLinkOptions([
+      item('Intro', 'docs/intro', 'Docs / Intro'),
+    ])
     expect(options).toHaveLength(1)
     expect(options[0].label).toBe('Intro')
     expect(options[0].displayLabel).toBe('Intro')
@@ -77,7 +109,9 @@ describe('buildMarkdownLinkOptions', () => {
 
 describe('buildWikiLinkOptions', () => {
   it('maps items to completion options with title-based apply closing ]]', () => {
-    const options = buildWikiLinkOptions([item('Intro', 'docs/intro', 'Docs / Intro')])
+    const options = buildWikiLinkOptions([
+      item('Intro', 'docs/intro', 'Docs / Intro'),
+    ])
     expect(options).toHaveLength(1)
     expect(options[0].label).toBe('Intro')
     expect(options[0].displayLabel).toBe('Intro')

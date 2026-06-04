@@ -56,8 +56,8 @@ function getWikiLinkRange(context: CompletionContext) {
   if (!match) return null
 
   const typedQuery = match[1] ?? ''
-  // Include ]] after cursor in the range so they get replaced on completion
-  const suffix = afterCursor.match(/^[^\]\n]*(\]\])?/)?.[0] ?? ''
+  // Include ] / ]] after cursor in the range so they get replaced on completion
+  const suffix = afterCursor.match(/^[^\]\n]*(\]{1,2})?/)?.[0] ?? ''
 
   return {
     from: pos - typedQuery.length,

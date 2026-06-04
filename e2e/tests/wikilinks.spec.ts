@@ -18,10 +18,7 @@ function getCsrfScript(): string {
   `;
 }
 
-async function createPage(
-  page: Page,
-  input: { title: string; slug: string; content?: string },
-) {
+async function createPage(page: Page, input: { title: string; slug: string; content?: string }) {
   await page.evaluate(
     async ({ title, slug, content, csrfScript }) => {
       const csrfToken = new Function(csrfScript)() as string;
@@ -34,13 +31,20 @@ async function createPage(
       });
       if (!createRes.ok) throw new Error(`create failed: ${createRes.status}`);
 
-      if (content) {
+      if (content !== undefined) {
         const created = (await createRes.json()) as { id: string; version: string };
         const updateRes = await fetch(`/api/pages/${created.id}`, {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-          body: JSON.stringify({ version: created.version, title, slug, content, tags: [], properties: {} }),
+          body: JSON.stringify({
+            version: created.version,
+            title,
+            slug,
+            content,
+            tags: [],
+            properties: {},
+          }),
         });
         if (!updateRes.ok) throw new Error(`update failed: ${updateRes.status}`);
       }
