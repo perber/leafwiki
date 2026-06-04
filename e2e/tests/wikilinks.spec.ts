@@ -192,4 +192,37 @@ test.describe('WikiLink autocomplete', () => {
     await expect(page.locator('article > h1')).toHaveText(missingTitle);
     await expect(page.locator('article a', { hasText: missingTitle })).toBeVisible();
   });
+
+  test('ambiguous-wikilink-opens-disambiguation-dialog', async ({ page }) => {
+    const stamp = Date.now();
+    const duplicateTitle = `Ambiguous WikiLink Target ${stamp}`;
+    const firstSlug = `wikilink-ambiguous-first-${stamp}`;
+    const secondSlug = `wikilink-ambiguous-second-${stamp}`;
+    const editorSlug = `wikilink-ambiguous-editor-${stamp}`;
+
+    await createPage(page, { title: duplicateTitle, slug: firstSlug });
+    await createPage(page, { title: duplicateTitle, slug: secondSlug });
+    await createPage(page, {
+      title: `WikiLink Ambiguous Editor ${stamp}`,
+      slug: editorSlug,
+      content: `[[${duplicateTitle}]]`,
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${editorSlug}`);
+
+    const ambiguousLinkButton = page.getByRole('button', { name: duplicateTitle });
+    await expect(ambiguousLinkButton).toBeVisible();
+    await ambiguousLinkButton.click();
+
+    const dialog = page.getByTestId('wikilink-disambiguation-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(`/${firstSlug}`)).toBeVisible();
+    await expect(dialog.getByText(`/${secondSlug}`)).toBeVisible();
+
+    await dialog.getByText(`/${firstSlug}`).click();
+
+    await expect(page).toHaveURL(new RegExp(`/${firstSlug}$`));
+    await expect(page.locator('article > h1')).toHaveText(duplicateTitle);
+  });
 });

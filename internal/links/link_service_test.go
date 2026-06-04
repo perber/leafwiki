@@ -574,6 +574,36 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 
 }
 
+func TestToOutgoingResult_WikilinkSentinelDisplaysPlainTitle(t *testing.T) {
+	ts, page1ID, _ := setupTreeForLinksTest(t)
+
+	outgoings := []Outgoing{{
+		FromPageID: page1ID,
+		ToPath:     wikilinkSentinel("Kafka"),
+		Broken:     true,
+		FromTitle:  "Page 1",
+	}}
+
+	result := toOutgoingLinkResult(ts, outgoings)
+	if result == nil {
+		t.Fatalf("expected non-nil result")
+	}
+	if result.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d", result.Count)
+	}
+
+	item := result.Outgoings[0]
+	if item.ToPath != "Kafka" {
+		t.Errorf("ToPath = %q, want %q", item.ToPath, "Kafka")
+	}
+	if item.ToPath == "[[Kafka]]" {
+		t.Errorf("ToPath = %q, should not include wiki-link brackets", item.ToPath)
+	}
+	if !item.Broken {
+		t.Errorf("Broken = %v, want %v", item.Broken, true)
+	}
+}
+
 func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 

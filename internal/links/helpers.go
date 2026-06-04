@@ -341,7 +341,7 @@ func toOutgoingLinkResult(tree *tree.TreeService, outgoings []Outgoing) *Outgoin
 func toOutgoingResultItem(tree *tree.TreeService, outgoing Outgoing) OutgoingResultItem {
 	displayPath := outgoing.ToPath
 	if IsWikilinkSentinel(outgoing.ToPath) {
-		displayPath = "[[" + WikilinkTitleFromSentinel(outgoing.ToPath) + "]]"
+		displayPath = WikilinkTitleFromSentinel(outgoing.ToPath)
 	}
 	item := OutgoingResultItem{
 		ToPageID:   outgoing.ToPageID,
