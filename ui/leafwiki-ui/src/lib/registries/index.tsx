@@ -308,7 +308,9 @@ dialogRegistry.register({
     return (
       <WikiLinkDisambiguationDialog
         key={DIALOG_WIKILINK_DISAMBIGUATION}
-        {...(props as React.ComponentProps<typeof WikiLinkDisambiguationDialog>)}
+        {...(props as React.ComponentProps<
+          typeof WikiLinkDisambiguationDialog
+        >)}
       />
     )
   },

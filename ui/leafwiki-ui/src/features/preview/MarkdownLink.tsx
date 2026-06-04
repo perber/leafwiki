@@ -2,7 +2,10 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
-import { DIALOG_CREATE_PAGE_BY_PATH, DIALOG_WIKILINK_DISAMBIGUATION } from '@/lib/registries'
+import {
+  DIALOG_CREATE_PAGE_BY_PATH,
+  DIALOG_WIKILINK_DISAMBIGUATION,
+} from '@/lib/registries'
 import { buildViewUrl, stripBasePath, withBasePath } from '@/lib/routePath'
 import {
   normalizeWikiRoutePath,
@@ -52,7 +55,9 @@ export function MarkdownLink({
   }
 
   if (href.startsWith('wikilink-ambiguous:')) {
-    const title = safeDecodeURIComponent(href.slice('wikilink-ambiguous:'.length))
+    const title = safeDecodeURIComponent(
+      href.slice('wikilink-ambiguous:'.length),
+    )
     return (
       <Button
         variant="link"
@@ -65,7 +70,9 @@ export function MarkdownLink({
   }
 
   if (href.startsWith('wikilink-notfound:')) {
-    const title = safeDecodeURIComponent(href.slice('wikilink-notfound:'.length))
+    const title = safeDecodeURIComponent(
+      href.slice('wikilink-notfound:'.length),
+    )
     if (user) {
       return (
         <Button
@@ -86,9 +93,7 @@ export function MarkdownLink({
         </Button>
       )
     }
-    return (
-      <span className="text-error cursor-default">{children}</span>
-    )
+    return <span className="text-error cursor-default">{children}</span>
   }
 
   const isInternal =
