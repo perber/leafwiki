@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/core/shared/htmlutil"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/http/dto"
 	coresearch "github.com/perber/wiki/internal/search"
@@ -105,7 +106,7 @@ func (uc *SearchUseCase) searchByTags(pageIDs []string, offset, limit int) (*Sea
 
 		items = append(items, coresearch.SearchResultItem{
 			PageID:  node.ID,
-			Title:   node.Title,
+			Title:   htmlutil.EscapeText(node.Title),
 			Path:    dto.BuildPathFromNode(node),
 			Kind:    string(node.Kind),
 			Rank:    1,

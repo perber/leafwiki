@@ -203,6 +203,129 @@ func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
 	}
 }
 
+func TestSQLiteIndex_Search_EscapesTitleForContentOnlyMatch(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	maliciousTitle := `<img src=x onerror="alert(1)">`
+	err = index.IndexPage(
+		"docs/malicious",
+		"docs/malicious.md",
+		"malicious1",
+		maliciousTitle,
+		tree.NodeKindPage,
+		"This page contains the search keyword in content only.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index malicious page: %v", err)
+	}
+
+	result, err := index.Search("keyword", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 result item, got %d", len(result.Items))
+	}
+
+	if got := result.Items[0].Title; strings.Contains(got, "<img") {
+		t.Fatalf("expected title to escape raw HTML, got %q", got)
+	}
+
+	if got := result.Items[0].Title; !strings.Contains(got, "&lt;img src=x onerror=&#34;alert(1)&#34;&gt;") {
+		t.Fatalf("expected escaped title, got %q", got)
+	}
+}
+
+func TestSQLiteIndex_Search_PreservesBoldHighlightsWhileEscapingTitle(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	maliciousTitle := `<script>alert(1)</script> Search`
+	err = index.IndexPage(
+		"docs/highlighted",
+		"docs/highlighted.md",
+		"highlighted1",
+		maliciousTitle,
+		tree.NodeKindPage,
+		"Body content without additional matches.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index highlighted page: %v", err)
+	}
+
+	result, err := index.Search("search", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 result item, got %d", len(result.Items))
+	}
+
+	got := result.Items[0].Title
+	if strings.Contains(got, "<script>") {
+		t.Fatalf("expected title to escape script tag, got %q", got)
+	}
+	if !strings.Contains(got, "&lt;script&gt;alert(1)&lt;/script&gt;") {
+		t.Fatalf("expected escaped script tag in title, got %q", got)
+	}
+	if !strings.Contains(got, "<b>Search</b>") {
+		t.Fatalf("expected preserved bold highlight, got %q", got)
+	}
+}
+
+func TestSQLiteIndex_Search_EscapesTitleForFilteredResultsWithoutQuery(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	maliciousTitle := `<svg onload=alert(1)>`
+	err = index.IndexPage(
+		"docs/tagged",
+		"docs/tagged.md",
+		"tagged1",
+		maliciousTitle,
+		tree.NodeKindPage,
+		"Plain content.",
+	)
+	if err != nil {
+		t.Fatalf("failed to index tagged page: %v", err)
+	}
+
+	result, err := index.Search("", []string{"tagged1"}, 0, 10)
+	if err != nil {
+		t.Fatalf("filtered search failed: %v", err)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("expected 1 result item, got %d", len(result.Items))
+	}
+
+	got := result.Items[0].Title
+	if strings.Contains(got, "<svg") {
+		t.Fatalf("expected filtered result title to escape raw HTML, got %q", got)
+	}
+	if got != "&lt;svg onload=alert(1)&gt;" {
+		t.Fatalf("expected escaped filtered title, got %q", got)
+	}
+}
+
 func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 	tmpDir := t.TempDir()
 
