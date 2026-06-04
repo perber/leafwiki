@@ -13,7 +13,7 @@ export type InternalLinkCompletion = Completion & {
   path: string
 }
 
-function hasSuppressedExternalPrefix(value: string) {
+export function hasSuppressedExternalPrefix(value: string) {
   const normalizedValue = value.trimStart().toLowerCase()
 
   return SUPPRESSED_EXTERNAL_PREFIXES.some((prefix) => {
@@ -46,7 +46,27 @@ function getLinkTargetRange(context: CompletionContext) {
   }
 }
 
-function buildCompletionOptions(
+function getWikiLinkRange(context: CompletionContext) {
+  const { state, pos } = context
+  const line = state.doc.lineAt(pos)
+  const beforeCursor = line.text.slice(0, pos - line.from)
+  const afterCursor = line.text.slice(pos - line.from)
+  const match = beforeCursor.match(/\[\[([^\]\n]*)$/)
+
+  if (!match) return null
+
+  const typedQuery = match[1] ?? ''
+  // Include ]] after cursor in the range so they get replaced on completion
+  const suffix = afterCursor.match(/^[^\]\n]*(\]\])?/)?.[0] ?? ''
+
+  return {
+    from: pos - typedQuery.length,
+    to: pos + suffix.length,
+    query: typedQuery,
+  }
+}
+
+export function buildMarkdownLinkOptions(
   items: FlatPageSearchItem[],
 ): InternalLinkCompletion[] {
   return items.map((item) => ({
@@ -55,6 +75,19 @@ function buildCompletionOptions(
     info: item.breadcrumb,
     type: 'text',
     apply: `/${item.path}`,
+    path: item.path,
+  }))
+}
+
+export function buildWikiLinkOptions(
+  items: FlatPageSearchItem[],
+): InternalLinkCompletion[] {
+  return items.map((item) => ({
+    label: item.title,
+    displayLabel: item.title,
+    info: item.breadcrumb,
+    type: 'text',
+    apply: `${item.title}]]`,
     path: item.path,
   }))
 }
@@ -81,7 +114,27 @@ export function internalLinkCompletionSource(
   return {
     from: range.from,
     to: range.to,
-    options: buildCompletionOptions(matches),
+    options: buildMarkdownLinkOptions(matches),
+    filter: false,
+  }
+}
+
+export function wikiLinkCompletionSource(
+  context: CompletionContext,
+): CompletionResult | null {
+  const range = getWikiLinkRange(context)
+  if (!range) return null
+
+  const items = useTreeStore.getState().flatPages
+  if (items.length === 0) return null
+
+  const matches = searchFlatPageSearchItems(items, range.query, MAX_RESULTS)
+  if (matches.length === 0) return null
+
+  return {
+    from: range.from,
+    to: range.to,
+    options: buildWikiLinkOptions(matches),
     filter: false,
   }
 }

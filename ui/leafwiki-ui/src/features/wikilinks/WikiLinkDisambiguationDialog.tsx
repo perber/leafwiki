@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import i18next from '@/lib/i18n'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { PageNode } from '@/lib/api/pages'
 import { DIALOG_WIKILINK_DISAMBIGUATION } from '@/lib/registries'
@@ -45,10 +46,14 @@ export function WikiLinkDisambiguationDialog({
     >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Multiple pages found</DialogTitle>
+          <DialogTitle>
+            {i18next.t('wikiLinkDisambiguation.title', { ns: 'editor' })}
+          </DialogTitle>
           <DialogDescription>
-            Several pages match <strong>[[{title}]]</strong>. Choose which one
-            you meant.
+            {i18next.t('wikiLinkDisambiguation.description', {
+              ns: 'editor',
+              title,
+            })}
           </DialogDescription>
         </DialogHeader>
 

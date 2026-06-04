@@ -1,4 +1,5 @@
 import i18next from 'i18next'
+import enEditor from '../locales/en/editor.json'
 import enErrors from '../locales/en/errors.json'
 
 i18next.init({
@@ -7,6 +8,7 @@ i18next.init({
   resources: {
     en: {
       errors: enErrors,
+      editor: enEditor,
     },
   },
   interpolation: {
