@@ -5,6 +5,7 @@ import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { forwardRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { usePageEditorStore } from '../editor/pageEditorStore'
+import HighlightedSearchTitle from './HighlightedSearchTitle'
 
 type SearchResultCardProps = {
   item: SearchResultItem
@@ -48,12 +49,12 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
         <div
           className="search-result-card__title"
           data-testid={`search-result-card-title-${item.page_id}`}
-          dangerouslySetInnerHTML={{ __html: item.title }}
-        />
-        <div
-          className="search-result-card__excerpt"
-          dangerouslySetInnerHTML={{ __html: item.excerpt }}
-        />
+        >
+          <HighlightedSearchTitle text={item.title} />
+        </div>
+        <div className="search-result-card__excerpt">
+          <HighlightedSearchTitle text={item.excerpt} />
+        </div>
         <div className="search-result-card__meta">
           <span className="search-result-card__badge">{kindLabel}</span>
         </div>

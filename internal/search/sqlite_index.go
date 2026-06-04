@@ -11,6 +11,7 @@ import (
 
 	"github.com/perber/wiki/internal/core/excerpt"
 	"github.com/perber/wiki/internal/core/markdown"
+	"github.com/perber/wiki/internal/core/shared/htmlutil"
 	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/yuin/goldmark"
@@ -128,7 +129,6 @@ func NewSQLiteIndex(storageDir string) (*SQLiteIndex, error) {
 
 	return s, nil
 }
-
 
 func (s *SQLiteIndex) withDB(fn func(db *sql.DB) error) error {
 	s.mu.Lock()
@@ -317,6 +317,7 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 			if err := rows.Scan(&r.PageID, &r.Path, &r.Kind, &r.Title, &r.Excerpt, &content, &bm25Score); err != nil {
 				return err
 			}
+			r.Title = sanitizeSearchTitle(r.Title)
 			if strings.TrimSpace(r.Excerpt) == "" {
 				r.Excerpt = excerpt.FromBody(content)
 			}
@@ -415,9 +416,17 @@ func buildSearchWhereClause(query string, ftsQuery string, pageIDs []string) (st
 
 func searchTitleExpr(hasQuery bool) string {
 	if hasQuery {
-		return "highlight(pages, 4, '<b>', '</b>')"
+		return "highlight(pages, 4, char(2), char(3))"
 	}
 	return "title"
+}
+
+func sanitizeSearchTitle(title string) string {
+	return htmlutil.EscapeTextWithAllowedMarkers(
+		title,
+		htmlutil.AllowedMarker{Marker: "\u0002", HTML: "<b>"},
+		htmlutil.AllowedMarker{Marker: "\u0003", HTML: "</b>"},
+	)
 }
 
 func searchExcerptExpr(hasQuery bool) string {
