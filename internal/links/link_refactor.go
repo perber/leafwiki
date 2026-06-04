@@ -2,6 +2,7 @@ package links
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -53,6 +54,118 @@ func (r RewriteResult) Count() int {
 func RewriteMarkdownLinks(content string, currentPath string, rules []RewriteRule) (string, int) {
 	result := NewMarkdownRefactorEngine().Rewrite(content, currentPath, rules)
 	return result.Content, result.Count()
+}
+
+// RewriteWikiLinks rewrites [[Title]] and [[Folder/Path]] wiki-link syntax
+// according to the provided rules, respecting code blocks and inline code.
+//
+// For each rule:
+//   - OldTitle → NewTitle rewrites [[OldTitle]] and [[OldTitle|Alias]]
+//   - OldPath  → NewPath  rewrites [[old/path]] and [[old/path|Alias]] path hints
+func (e *MarkdownRefactorEngine) RewriteWikiLinks(content string, rules []RewriteRule) RewriteResult {
+	if content == "" {
+		return RewriteResult{Content: content}
+	}
+
+	type wikiRewrite struct {
+		re        *regexp.Regexp
+		newTarget string
+	}
+
+	var rewrites []wikiRewrite
+	for _, rule := range rules {
+		if rule.OldTitle != "" && rule.OldTitle != rule.NewTitle {
+			rewrites = append(rewrites, wikiRewrite{
+				// \s* inside [[...]] mirrors the TrimSpace done by the extractor,
+				// so [[ Project Plan ]] is rewritten just like [[Project Plan]].
+				re:        regexp.MustCompile(`(?i)\[\[\s*` + regexp.QuoteMeta(rule.OldTitle) + `\s*(\|[^\]\n]*)?\]\]`),
+				newTarget: rule.NewTitle,
+			})
+		}
+		oldHint := strings.TrimPrefix(normalizeWikiPath(rule.OldPath), "/")
+		newHint := strings.TrimPrefix(normalizeWikiPath(rule.NewPath), "/")
+		if oldHint != "" && oldHint != newHint {
+			rewrites = append(rewrites, wikiRewrite{
+				re:        regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(oldHint) + `\s*(\|[^\]\n]*)?\]\]`),
+				newTarget: newHint,
+			})
+		}
+	}
+
+	if len(rewrites) == 0 {
+		return RewriteResult{Content: content}
+	}
+
+	_, excludedRanges := e.collectCandidatesAndExcludedRanges(content)
+
+	var replacements []RewriteReplacement
+	for _, rw := range rewrites {
+		for _, m := range rw.re.FindAllStringSubmatchIndex(content, -1) {
+			if isExcludedOffset(m[0], excludedRanges) {
+				continue
+			}
+			var newValue string
+			if m[2] >= 0 {
+				newValue = "[[" + rw.newTarget + content[m[2]:m[3]] + "]]"
+			} else {
+				newValue = "[[" + rw.newTarget + "]]"
+			}
+			replacements = append(replacements, RewriteReplacement{
+				Start: m[0], End: m[1], NewValue: newValue,
+			})
+		}
+	}
+
+	if len(replacements) == 0 {
+		return RewriteResult{Content: content}
+	}
+
+	sort.Slice(replacements, func(i, j int) bool {
+		return replacements[i].Start < replacements[j].Start
+	})
+
+	return RewriteResult{
+		Content:      applyReplacements(content, replacements),
+		Replacements: replacements,
+	}
+}
+
+// FindWikiLinksForPath returns the wiki-link texts (e.g. "[[Project Plan]]")
+// found in content that reference the given path via title or path hint.
+// Only occurrences outside fenced code blocks and inline code are reported,
+// matching the same exclusion logic used by RewriteWikiLinks so preview and
+// apply agree on which links would actually be rewritten.
+func (e *MarkdownRefactorEngine) FindWikiLinksForPath(content, oldPath, pageTitle string) []string {
+	if content == "" {
+		return nil
+	}
+
+	_, excludedRanges := e.collectCandidatesAndExcludedRanges(content)
+
+	match := func(re *regexp.Regexp) bool {
+		for _, m := range re.FindAllStringIndex(content, -1) {
+			if !isExcludedOffset(m[0], excludedRanges) {
+				return true
+			}
+		}
+		return false
+	}
+
+	var found []string
+	oldHint := strings.TrimPrefix(normalizeWikiPath(oldPath), "/")
+	if oldHint != "" {
+		re := regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(oldHint) + `\s*(?:\|[^\]\n]*)?\]\]`)
+		if match(re) {
+			found = append(found, "[["+oldHint+"]]")
+		}
+	}
+	if pageTitle != "" {
+		re := regexp.MustCompile(`(?i)\[\[\s*` + regexp.QuoteMeta(pageTitle) + `\s*(?:\|[^\]\n]*)?\]\]`)
+		if match(re) {
+			found = append(found, "[["+pageTitle+"]]")
+		}
+	}
+	return found
 }
 
 func (e *MarkdownRefactorEngine) RewriteRelativeLinksForPathChange(content string, oldCurrentPath string, newCurrentPath string, rules []RewriteRule) RewriteResult {

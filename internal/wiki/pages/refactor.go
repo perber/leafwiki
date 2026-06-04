@@ -94,7 +94,7 @@ func (uc *PreviewPageRefactorUseCase) Execute(_ context.Context, in RefactorPrev
 	}
 
 	excludeIDs := subtreeIDSet(page.PageNode)
-	affectedPages, matchedLinks, err := uc.getAffectedPages(oldPath, excludeIDs)
+	affectedPages, matchedLinks, err := uc.getAffectedPages(oldPath, page.Title, excludeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (uc *PreviewPageRefactorUseCase) resolveParentPath(parentID string) (string
 	return parent.CalculatePath(), nil
 }
 
-func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, excludeIDs map[string]struct{}) ([]RefactorAffectedPage, int, error) {
+func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle string, excludeIDs map[string]struct{}) ([]RefactorAffectedPage, int, error) {
 	if uc.links == nil {
 		return nil, 0, nil
 	}
@@ -206,6 +206,19 @@ func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, excludeID
 		if err != nil {
 			return nil, 0, err
 		}
+
+		// Replace raw route paths in matchedPaths with their wiki-link syntax
+		// when the page content uses [[Title]] or [[path/hint]] instead of
+		// a standard markdown link.
+		wikiLinks := engine.FindWikiLinksForPath(sourcePage.Content, oldPath, pageTitle)
+		for _, wl := range wikiLinks {
+			if !containsString(item.MatchedPaths, wl) {
+				item.MatchedPaths = append(item.MatchedPaths, wl)
+			}
+			// Remove the raw route path entry that the wiki-link replaces.
+			item.MatchedPaths = removeString(item.MatchedPaths, oldPath)
+		}
+
 		rules := []links.RewriteRule{{OldPath: oldPath, NewPath: oldPath}}
 		result := engine.Rewrite(sourcePage.Content, sourcePage.CalculatePath(), rules)
 		for _, w := range result.Warnings {
@@ -271,8 +284,12 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 	}
 
 	if in.RewriteLinks {
-		rules := []links.RewriteRule{{OldPath: plan.oldPath, NewPath: plan.newPath}}
-		if err := uc.rewriteAffectedPages(in.UserID, plan.affectedPageIDs, rules); err != nil {
+		rule := links.RewriteRule{OldPath: plan.oldPath, NewPath: plan.newPath}
+		if in.Kind == RefactorKindRename && in.Title != plan.page.Title {
+			rule.OldTitle = plan.page.Title
+			rule.NewTitle = in.Title
+		}
+		if err := uc.rewriteAffectedPages(in.UserID, plan.affectedPageIDs, []links.RewriteRule{rule}); err != nil {
 			return nil, err
 		}
 	}
@@ -413,12 +430,14 @@ func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected
 		if !ok {
 			continue
 		}
-		result := engine.Rewrite(page.Content, page.CalculatePath(), rules)
-		if result.Count() == 0 || result.Content == page.Content {
+		mdResult := engine.Rewrite(page.Content, page.CalculatePath(), rules)
+		wikiResult := engine.RewriteWikiLinks(mdResult.Content, rules)
+		newContent := wikiResult.Content
+		if mdResult.Count() == 0 && wikiResult.Count() == 0 || newContent == page.Content {
 			continue
 		}
-		items = append(items, pending{page: page, content: result.Content})
-		bulk = append(bulk, tree.BulkContentUpdate{ID: page.ID, Content: result.Content})
+		items = append(items, pending{page: page, content: newContent})
+		bulk = append(bulk, tree.BulkContentUpdate{ID: page.ID, Content: newContent})
 	}
 
 	if len(bulk) == 0 {
@@ -548,6 +567,16 @@ func containsString(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func removeString(values []string, target string) []string {
+	out := values[:0]
+	for _, v := range values {
+		if v != target {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func ensureStrings(values []string) []string {

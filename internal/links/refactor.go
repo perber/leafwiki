@@ -8,6 +8,8 @@ type RefactorLinkMatch struct {
 }
 
 type RewriteRule struct {
-	OldPath string
-	NewPath string
+	OldPath  string
+	NewPath  string
+	OldTitle string // optional: rewrite [[OldTitle]] wiki-links (rename only)
+	NewTitle string
 }
