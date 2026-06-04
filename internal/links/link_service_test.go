@@ -1,6 +1,7 @@
 package links
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
@@ -1235,5 +1236,313 @@ func TestLinkService_UpdateLinksAndHealForPages_ReindexesOutgoingForSourcePages(
 	}
 	if newBacklinks.Backlinks[0].FromPageID != sourceID {
 		t.Fatalf("new backlink FromPageID = %q, want %q", newBacklinks.Backlinks[0].FromPageID, sourceID)
+	}
+}
+
+// ─── extractWikiLinksFromMarkdown ────────────────────────────────────────────
+
+func TestExtractWikiLinksFromMarkdown_BasicSyntax(t *testing.T) {
+	md := `
+See [[Project Plan]] for details.
+Also check [[Meeting Notes|our last meeting]].
+And [[Folder/SubPage]] path hint.
+Normal [link](/docs/page) stays untouched.
+`
+	got := extractWikiLinksFromMarkdown(md)
+	want := []string{"Project Plan", "Meeting Notes", "Folder/SubPage"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d wiki links, got %d: %v", len(want), len(got), got)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("got[%d] = %q, want %q", i, got[i], w)
+		}
+	}
+}
+
+func TestExtractWikiLinksFromMarkdown_DeduplicatesTargets(t *testing.T) {
+	md := `[[Notes]] and [[Notes]] again and [[Notes|different alias]].`
+	got := extractWikiLinksFromMarkdown(md)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 deduplicated entry, got %d: %v", len(got), got)
+	}
+	if got[0] != "Notes" {
+		t.Errorf("got %q, want %q", got[0], "Notes")
+	}
+}
+
+func TestExtractWikiLinksFromMarkdown_Empty(t *testing.T) {
+	got := extractWikiLinksFromMarkdown("No wiki links here.")
+	if len(got) != 0 {
+		t.Fatalf("expected empty slice, got %v", got)
+	}
+}
+
+// ─── resolveWikiLinkTargets ──────────────────────────────────────────────────
+
+func TestResolveWikiLinkTargets_SingleTitleMatch(t *testing.T) {
+	ts, page1ID, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"Page 1"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 target, got %d: %v", len(targets), targets)
+	}
+	if targets[0].TargetPageID != page1ID {
+		t.Errorf("TargetPageID = %q, want %q", targets[0].TargetPageID, page1ID)
+	}
+	if targets[0].Broken {
+		t.Errorf("expected resolved link, got broken")
+	}
+}
+
+func TestResolveWikiLinkTargets_NoMatch_ReturnsBroken(t *testing.T) {
+	ts, _, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"Nonexistent Page"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link for unmatched title")
+	}
+}
+
+func TestResolveWikiLinkTargets_AmbiguousTitle_ReturnsBroken(t *testing.T) {
+	storageDir := t.TempDir()
+	ts := tree.NewTreeService(storageDir)
+	if err := ts.LoadTree(); err != nil {
+		t.Fatalf("LoadTree: %v", err)
+	}
+
+	sectionID, err := ts.CreateNode("system", nil, "Docs", "docs", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode section: %v", err)
+	}
+	_, err = ts.CreateNode("system", nil, "Notes", "notes-root", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode notes-root: %v", err)
+	}
+	_, err = ts.CreateNode("system", sectionID, "Notes", "notes-child", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode notes-child: %v", err)
+	}
+
+	targets := resolveWikiLinkTargets(ts, []string{"Notes"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link for ambiguous title")
+	}
+}
+
+func TestResolveWikiLinkTargets_PathHint_Resolved(t *testing.T) {
+	ts, page1ID, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"docs/page1"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if targets[0].TargetPageID != page1ID {
+		t.Errorf("TargetPageID = %q, want %q", targets[0].TargetPageID, page1ID)
+	}
+	if targets[0].Broken {
+		t.Errorf("expected resolved path hint, got broken")
+	}
+}
+
+func TestResolveWikiLinkTargets_PathHint_BrokenWhenNotFound(t *testing.T) {
+	ts, _, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"docs/nonexistent"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link for missing path hint")
+	}
+}
+
+func TestResolveWikiLinkTargets_BrokenSentinelFormat(t *testing.T) {
+	ts, _, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"Nonexistent Page"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link")
+	}
+	want := wikilinkSentinel("Nonexistent Page")
+	if targets[0].TargetPagePath != want {
+		t.Errorf("TargetPagePath = %q, want %q", targets[0].TargetPagePath, want)
+	}
+}
+
+func TestResolveWikiLinkTargets_SlashTitleFallback(t *testing.T) {
+	storageDir := t.TempDir()
+	ts := tree.NewTreeService(storageDir)
+	if err := ts.LoadTree(); err != nil {
+		t.Fatalf("LoadTree: %v", err)
+	}
+	idPtr, err := ts.CreateNode("system", nil, "C/C++ Guide", "c-cpp-guide", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode: %v", err)
+	}
+
+	// "C/C++ Guide" contains "/" so it tries path lookup first,
+	// then falls back to title lookup.
+	targets := resolveWikiLinkTargets(ts, []string{"C/C++ Guide"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if targets[0].Broken {
+		t.Errorf("expected resolved link via title fallback, got broken")
+	}
+	if targets[0].TargetPageID != *idPtr {
+		t.Errorf("TargetPageID = %q, want %q", targets[0].TargetPageID, *idPtr)
+	}
+}
+
+// ─── HealWikiLinksForPage ────────────────────────────────────────────────────
+
+func TestLinkService_HealWikiLinksForPage_HealsAfterPageCreation(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	// Page A contains [[Target Page]] which does not exist yet.
+	pageAIDPtr, err := ts.CreateNode("system", nil, "Page A", "page-a", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode page-a: %v", err)
+	}
+	pageA, err := ts.GetPage(*pageAIDPtr)
+	if err != nil {
+		t.Fatalf("GetPage page-a: %v", err)
+	}
+	if err := svc.UpdateLinksForPage(pageA, "See [[Target Page]] for details."); err != nil {
+		t.Fatalf("UpdateLinksForPage: %v", err)
+	}
+
+	// Outgoing should be broken (target doesn't exist yet).
+	out, err := svc.GetOutgoingLinksForPage(*pageAIDPtr)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage: %v", err)
+	}
+	if out.Count != 1 || !out.Outgoings[0].Broken {
+		t.Fatalf("expected 1 broken outgoing, got %+v", out)
+	}
+
+	// Create the target page.
+	targetIDPtr, err := ts.CreateNode("system", nil, "Target Page", "target-page", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode target-page: %v", err)
+	}
+	targetPage, err := ts.GetPage(*targetIDPtr)
+	if err != nil {
+		t.Fatalf("GetPage target-page: %v", err)
+	}
+
+	// Healing via HealWikiLinksForPage.
+	if err := svc.HealWikiLinksForPage(targetPage); err != nil {
+		t.Fatalf("HealWikiLinksForPage: %v", err)
+	}
+
+	// Outgoing should now be resolved.
+	out2, err := svc.GetOutgoingLinksForPage(*pageAIDPtr)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage after heal: %v", err)
+	}
+	if out2.Count != 1 || out2.Outgoings[0].Broken {
+		t.Fatalf("expected 1 resolved outgoing after heal, got %+v", out2)
+	}
+	if out2.Outgoings[0].ToPageID != *targetIDPtr {
+		t.Errorf("ToPageID = %q, want %q", out2.Outgoings[0].ToPageID, *targetIDPtr)
+	}
+}
+
+// Fix 2: HealWikiLinksForTitle uses COLLATE NOCASE, so [[notes]] heals
+// when a page titled "Notes" is created.
+func TestLinkService_HealWikiLinksForPage_CaseInsensitive(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	pageAIDPtr, err := ts.CreateNode("system", nil, "Page A", "page-a", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode page-a: %v", err)
+	}
+	pageA, err := ts.GetPage(*pageAIDPtr)
+	if err != nil {
+		t.Fatalf("GetPage: %v", err)
+	}
+	// lowercase wiki-link
+	if err := svc.UpdateLinksForPage(pageA, "See [[notes]] here."); err != nil {
+		t.Fatalf("UpdateLinksForPage: %v", err)
+	}
+
+	// Create a page with mixed-case title "Notes"
+	targetIDPtr, err := ts.CreateNode("system", nil, "Notes", "notes", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode notes: %v", err)
+	}
+	targetPage, err := ts.GetPage(*targetIDPtr)
+	if err != nil {
+		t.Fatalf("GetPage notes: %v", err)
+	}
+
+	if err := svc.HealWikiLinksForPage(targetPage); err != nil {
+		t.Fatalf("HealWikiLinksForPage: %v", err)
+	}
+
+	out, err := svc.GetOutgoingLinksForPage(*pageAIDPtr)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage: %v", err)
+	}
+	if out.Count != 1 || out.Outgoings[0].Broken {
+		t.Fatalf("expected [[notes]] to be healed by page titled 'Notes', got %+v", out)
+	}
+}
+
+// Fix 3: Sentinel paths are skipped in rewriteResolvedTargets so they are
+// not mangled into "/wikilink:..." route paths during rename refactors.
+func TestRewriteResolvedTargets_SkipsWikilinkSentinels(t *testing.T) {
+	ts, page1ID, _ := setupTreeForLinksTest(t)
+
+	page1, err := ts.GetPage(page1ID)
+	if err != nil {
+		t.Fatalf("GetPage: %v", err)
+	}
+
+	outgoings := []Outgoing{
+		{FromPageID: page1ID, ToPath: wikilinkSentinel("Missing Page"), Broken: true},
+		{FromPageID: page1ID, ToPath: "/docs/page1", Broken: false, ToPageID: page1ID},
+	}
+	rules := []RewriteRule{{OldPath: "/docs", NewPath: "/archive"}}
+
+	result := rewriteResolvedTargets(page1.CalculatePath(), outgoings, rules, ts)
+
+	// Only the real path link should be in the result; sentinel is skipped.
+	for _, r := range result {
+		if strings.HasPrefix(r.TargetPagePath, "wikilink:") || strings.HasPrefix(r.TargetPagePath, "/wikilink:") {
+			t.Errorf("sentinel path must not appear in rewrite result, got %q", r.TargetPagePath)
+		}
+	}
+}
+
+// Fix 4: Broken path hints (e.g. [[docs/nonexistent]]) are stored as normal
+// broken route paths so HealLinksForExactPath heals them when the page appears.
+func TestResolveWikiLinkTargets_PathHint_BrokenStoresAsRoutePath(t *testing.T) {
+	ts, _, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"docs/nonexistent"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link")
+	}
+	if IsWikilinkSentinel(targets[0].TargetPagePath) {
+		t.Errorf("path hint must not be stored as sentinel, got %q", targets[0].TargetPagePath)
+	}
+	want := "/docs/nonexistent"
+	if targets[0].TargetPagePath != want {
+		t.Errorf("TargetPagePath = %q, want %q", targets[0].TargetPagePath, want)
 	}
 }

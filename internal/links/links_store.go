@@ -568,6 +568,22 @@ func (s *LinksStore) HealLinksForPath(toPath string, pageID string) error {
 	return err
 }
 
+// HealWikiLinksForTitle heals broken wiki-link sentinel records whose to_path
+// is "wikilink:<title>" using a case-insensitive match, mirroring the
+// case-insensitive title resolution in FindPagesByTitle.
+func (s *LinksStore) HealWikiLinksForTitle(title string, pageID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		UPDATE links
+		SET to_page_id = ?, broken = 0
+		WHERE to_path COLLATE NOCASE = ? AND broken = 1
+	`, pageID, wikilinkSentinelPrefix+title)
+
+	return err
+}
+
 func (s *LinksStore) Clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

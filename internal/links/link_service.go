@@ -40,8 +40,7 @@ func (b *LinkService) IndexAllPages() error {
 		if errs[i] != nil {
 			return errs[i]
 		}
-		links := extractLinksFromMarkdown(page.Content)
-		targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
+		targets := collectTargetsFromContent(b.treeService, page.CalculatePath(), page.Content)
 		if err := b.store.AddLinks(page.ID, page.Title, targets); err != nil {
 			return err
 		}
@@ -150,16 +149,8 @@ func (b *LinkService) GetLinkStatusForPage(pageID string, pagePath string) (*Lin
 }
 
 func (b *LinkService) UpdateLinksForPage(page *tree.Page, content string) error {
-	links := extractLinksFromMarkdown(content)
-
-	targets := resolveTargetLinks(b.treeService, page.CalculatePath(), links)
-
-	err := b.store.AddLinks(page.ID, page.Title, targets)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	targets := collectTargetsFromContent(b.treeService, page.CalculatePath(), content)
+	return b.store.AddLinks(page.ID, page.Title, targets)
 }
 
 func (b *LinkService) UpdateLinksAndHealForPages(pages []*tree.Page) error {
@@ -169,8 +160,7 @@ func (b *LinkService) UpdateLinksAndHealForPages(pages []*tree.Page) error {
 			continue
 		}
 		pagePath := normalizeWikiPath(page.CalculatePath())
-		links := extractLinksFromMarkdown(page.Content)
-		targets := resolveTargetLinks(b.treeService, pagePath, links)
+		targets := collectTargetsFromContent(b.treeService, pagePath, page.Content)
 		updates = append(updates, PageLinkUpdate{
 			FromPageID: page.ID,
 			FromTitle:  page.Title,
@@ -213,6 +203,13 @@ func (b *LinkService) HealLinksForExactPath(page *tree.Page) error {
 	return b.store.HealLinksForPath(toPath, page.ID)
 }
 
+// HealWikiLinksForPage heals broken [[Title]] sentinel records that target
+// this page's title. Called after page creation or restore so that wiki-links
+// written before the target page existed are automatically resolved.
+func (b *LinkService) HealWikiLinksForPage(page *tree.Page) error {
+	return b.store.HealWikiLinksForTitle(page.Title, page.ID)
+}
+
 func (b *LinkService) Close() error {
 	if b.store == nil {
 		return nil
@@ -238,6 +235,11 @@ func rewriteResolvedTargets(currentPath string, outgoings []Outgoing, rules []Re
 
 	paths := make([]string, 0, len(outgoings))
 	for _, outgoing := range outgoings {
+		if IsWikilinkSentinel(outgoing.ToPath) {
+			// Title-based wiki-link sentinels are resolved by title, not path.
+			// Skip path rewriting — they are healed separately by HealWikiLinksForPage.
+			continue
+		}
 		targetPath := normalizeWikiPath(outgoing.ToPath)
 		if rewritten, ok := applyRewriteRules(targetPath, rules); ok {
 			targetPath = rewritten

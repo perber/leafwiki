@@ -87,6 +87,9 @@ func (e *LinkIndexSideEffect) healExact(p *tree.Page) {
 	if err := e.svc.HealLinksForExactPath(p); err != nil {
 		e.log.Warn("failed to heal links for page", "pageID", p.ID, "error", err)
 	}
+	if err := e.svc.HealWikiLinksForPage(p); err != nil {
+		e.log.Warn("failed to heal wiki links for page", "pageID", p.ID, "error", err)
+	}
 }
 
 func (e *LinkIndexSideEffect) updateAndHeal(p *tree.Page) {

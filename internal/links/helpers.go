@@ -2,6 +2,7 @@ package links
 
 import (
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/perber/wiki/internal/core/tree"
@@ -9,6 +10,30 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 )
+
+// wikiLinkRe matches [[Target]] and [[Target|Alias]] syntax.
+// Capture group 1 is the target (title or path hint).
+var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|#\n]+?)(?:\|[^\]\n]+?)?\]\]`)
+
+// wikilinkSentinelPrefix is the to_path prefix used for broken wiki-link
+// records in the link store. It must never collide with real wiki route paths
+// (whose segments match ^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$).
+const wikilinkSentinelPrefix = "wikilink:"
+
+func wikilinkSentinel(target string) string {
+	return wikilinkSentinelPrefix + target
+}
+
+// IsWikilinkSentinel reports whether a to_path value is a wiki-link sentinel
+// (i.e. stored as "wikilink:Title" rather than a real route path).
+func IsWikilinkSentinel(toPath string) bool {
+	return strings.HasPrefix(toPath, wikilinkSentinelPrefix)
+}
+
+// WikilinkTitleFromSentinel extracts the title from a sentinel path.
+func WikilinkTitleFromSentinel(toPath string) string {
+	return strings.TrimPrefix(toPath, wikilinkSentinelPrefix)
+}
 
 type TargetLink struct {
 	TargetPageID   string
@@ -61,6 +86,107 @@ func extractLinksFromMarkdown(content string) []string {
 	}
 
 	return links
+}
+
+// extractWikiLinksFromMarkdown returns all target strings from [[Target]] and
+// [[Target|Alias]] syntax found in content. The returned strings are the raw
+// target values (may be a title or a "Folder/Title" path hint).
+func extractWikiLinksFromMarkdown(content string) []string {
+	matches := wikiLinkRe.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(matches))
+	targets := make([]string, 0, len(matches))
+	for _, m := range matches {
+		target := strings.TrimSpace(m[1])
+		if target == "" {
+			continue
+		}
+		if _, dup := seen[target]; dup {
+			continue
+		}
+		seen[target] = struct{}{}
+		targets = append(targets, target)
+	}
+	return targets
+}
+
+// resolveWikiLinkTargets resolves [[Title]] and [[Folder/Title]] targets.
+//
+// Targets containing "/" are first tried as direct route-path lookups
+// ([[Folder/Title]] → /folder/title). If the path lookup fails, the target
+// is retried as a full title (handles titles like "C/C++"). A single title
+// match resolves the link; zero or N>1 matches produce a broken sentinel
+// stored as "wikilink:<target>" so the healing infrastructure can later
+// find and fix the record when a matching page is created.
+func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []TargetLink {
+	if !treeService.IsLoaded() || len(targets) == 0 {
+		return nil
+	}
+
+	var result []TargetLink
+	for _, target := range targets {
+		if strings.Contains(target, "/") {
+			routePath := strings.TrimPrefix(target, "/")
+			page, err := treeService.FindPageByRoutePath(routePath)
+			if err == nil && page != nil {
+				result = append(result, TargetLink{
+					TargetPageID:   page.ID,
+					TargetPagePath: "/" + page.CalculatePath(),
+					Broken:         false,
+				})
+				continue
+			}
+			// Path lookup failed — fall through to title lookup so that
+			// titles containing "/" (e.g. "C/C++") can still be resolved.
+			pages := treeService.FindPagesByTitle(target)
+			if len(pages) == 1 {
+				result = append(result, TargetLink{
+					TargetPageID:   pages[0].ID,
+					TargetPagePath: "/" + pages[0].CalculatePath(),
+					Broken:         false,
+				})
+				continue
+			}
+			// Store as a normal broken route path so HealLinksForExactPath
+			// can heal it when the page is later created at that path.
+			result = append(result, TargetLink{
+				Broken:         true,
+				TargetPagePath: "/" + routePath,
+			})
+			continue
+		}
+
+		// Pure title-based lookup.
+		pages := treeService.FindPagesByTitle(target)
+		if len(pages) == 1 {
+			result = append(result, TargetLink{
+				TargetPageID:   pages[0].ID,
+				TargetPagePath: "/" + pages[0].CalculatePath(),
+				Broken:         false,
+			})
+		} else {
+			// 0 matches (not found) or N>1 (ambiguous) → broken sentinel.
+			result = append(result, TargetLink{
+				Broken:         true,
+				TargetPagePath: wikilinkSentinel(target),
+			})
+		}
+	}
+	return result
+}
+
+// collectTargetsFromContent extracts and resolves all link targets from a page's
+// content — both standard Markdown links and [[Title]] wiki-link syntax.
+func collectTargetsFromContent(treeService *tree.TreeService, pagePath string, content string) []TargetLink {
+	mdLinks := extractLinksFromMarkdown(content)
+	mdTargets := resolveTargetLinks(treeService, pagePath, mdLinks)
+
+	wikiTargets := extractWikiLinksFromMarkdown(content)
+	wikiResolved := resolveWikiLinkTargets(treeService, wikiTargets)
+
+	return append(mdTargets, wikiResolved...)
 }
 
 // normalizeWikiPath normalizes a wiki path:
@@ -213,9 +339,13 @@ func toOutgoingLinkResult(tree *tree.TreeService, outgoings []Outgoing) *Outgoin
 }
 
 func toOutgoingResultItem(tree *tree.TreeService, outgoing Outgoing) OutgoingResultItem {
+	displayPath := outgoing.ToPath
+	if IsWikilinkSentinel(outgoing.ToPath) {
+		displayPath = "[[" + WikilinkTitleFromSentinel(outgoing.ToPath) + "]]"
+	}
 	item := OutgoingResultItem{
 		ToPageID:   outgoing.ToPageID,
-		ToPath:     outgoing.ToPath,
+		ToPath:     displayPath,
 		Broken:     outgoing.Broken,
 		FromPageID: outgoing.FromPageID,
 	}
