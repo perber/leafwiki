@@ -56,6 +56,14 @@ export default class EditPage {
     await this.page.waitForLoadState('networkidle');
   }
 
+  async clickUnsavedChangesCancel() {
+    const cancelButton = this.page.locator(
+      'button[data-testid="unsaved-changes-dialog-button-cancel"]',
+    );
+    await cancelButton.waitFor({ state: 'visible' });
+    await cancelButton.click();
+  }
+
   async openAssetManager() {
     const assetManagerButton = this.page.locator('button[data-testid="open-asset-manager-button"]');
     await assetManagerButton.click();
