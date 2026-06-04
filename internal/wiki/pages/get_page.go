@@ -128,6 +128,48 @@ func (uc *ResolvePermalinkUseCase) Execute(_ context.Context, in ResolvePermalin
 	return &ResolvePermalinkOutput{Target: target}, nil
 }
 
+// ─── FindByTitle ─────────────────────────────────────────────────────────────
+
+// WikiLinkMatch is a lightweight page descriptor returned by the by-title API.
+type WikiLinkMatch struct {
+	ID    string          `json:"id"`
+	Title string          `json:"title"`
+	Path  string          `json:"path"`
+	Kind  tree.NodeKind   `json:"kind"`
+}
+
+// FindByTitleOutput is the output of FindByTitleUseCase.
+type FindByTitleOutput struct {
+	Matches []WikiLinkMatch `json:"matches"`
+	Count   int             `json:"count"`
+}
+
+// FindByTitleUseCase finds all pages whose title matches a given string
+// (case-insensitive).
+type FindByTitleUseCase struct {
+	tree *tree.TreeService
+}
+
+// NewFindByTitleUseCase constructs a FindByTitleUseCase.
+func NewFindByTitleUseCase(t *tree.TreeService) *FindByTitleUseCase {
+	return &FindByTitleUseCase{tree: t}
+}
+
+// Execute searches the tree for all pages matching the given title.
+func (uc *FindByTitleUseCase) Execute(_ context.Context, title string) *FindByTitleOutput {
+	nodes := uc.tree.FindPagesByTitle(title)
+	matches := make([]WikiLinkMatch, 0, len(nodes))
+	for _, n := range nodes {
+		matches = append(matches, WikiLinkMatch{
+			ID:    n.ID,
+			Title: n.Title,
+			Path:  n.CalculatePath(),
+			Kind:  n.Kind,
+		})
+	}
+	return &FindByTitleOutput{Matches: matches, Count: len(matches)}
+}
+
 // ─── SortPages ──────────────────────────────────────────────────────────────
 
 // SortPagesInput is the input for SortPagesUseCase.
