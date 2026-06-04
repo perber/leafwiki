@@ -1,5 +1,6 @@
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { withBasePath } from '@/lib/routePath'
+import { useTreeStore } from '@/stores/tree'
 import {
   AnchorHTMLAttributes,
   AudioHTMLAttributes,
@@ -38,6 +39,7 @@ import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
 import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
+import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 import 'katex/dist/katex.min.css'
@@ -239,6 +241,8 @@ export default function MarkdownPreview({
   tocClickable = true,
   onStickyTocChange,
 }: Props) {
+  const getPagesByTitle = useTreeStore((s) => s.getPagesByTitle)
+  const treeById = useTreeStore((s) => s.byId)
   const designMode = useDesignModeStore((state) => state.mode)
   const prefersLight = useSyncExternalStore(
     (onStoreChange) => {
@@ -544,8 +548,15 @@ export default function MarkdownPreview({
   )
 
   const normalizedContent = useMemo(
-    () => normalizeMarkdownListIndentation(normalizeMarkdownShoutouts(content)),
-    [content],
+    () =>
+      normalizeMarkdownListIndentation(
+        normalizeMarkdownShoutouts(
+          preprocessWikilinks(content, getPagesByTitle),
+        ),
+      ),
+    // treeById is included so wiki-links re-resolve when the tree reloads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [content, getPagesByTitle, treeById],
   )
 
   const tocEntries = useMemo(

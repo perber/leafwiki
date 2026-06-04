@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
-import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
+import { DIALOG_CREATE_PAGE_BY_PATH, DIALOG_WIKILINK_DISAMBIGUATION } from '@/lib/registries'
 import { buildViewUrl, stripBasePath, withBasePath } from '@/lib/routePath'
 import {
   normalizeWikiRoutePath,
@@ -40,6 +40,42 @@ export function MarkdownLink({
 
   if (href === undefined) {
     return <>{children}</>
+  }
+
+  if (href.startsWith('wikilink-ambiguous:')) {
+    const title = decodeURIComponent(href.slice('wikilink-ambiguous:'.length))
+    return (
+      <Button
+        variant="link"
+        onClick={() => openDialog(DIALOG_WIKILINK_DISAMBIGUATION, { title })}
+        className="text-warning hover:text-warning/80 m-0 p-0 text-base no-underline hover:no-underline"
+      >
+        {children}
+      </Button>
+    )
+  }
+
+  if (href.startsWith('wikilink-notfound:')) {
+    const title = decodeURIComponent(href.slice('wikilink-notfound:'.length))
+    if (user) {
+      return (
+        <Button
+          variant="link"
+          onClick={() =>
+            openDialog(DIALOG_CREATE_PAGE_BY_PATH, {
+              initialPath: title,
+              forwardToEditMode: !editMode,
+            })
+          }
+          className="text-error hover:text-error/80 m-0 p-0 text-base no-underline hover:no-underline"
+        >
+          {children}
+        </Button>
+      )
+    }
+    return (
+      <span className="text-error cursor-default">{children}</span>
+    )
   }
 
   const isInternal =

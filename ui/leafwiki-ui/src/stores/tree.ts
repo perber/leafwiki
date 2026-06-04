@@ -62,6 +62,7 @@ type TreeStore = {
   isNodeOpen: (id: string) => boolean
   getPageById: (id: string) => PageNode | null
   getPageByPath: (path: string) => PageNode | null
+  getPagesByTitle: (title: string) => PageNode[]
   getPathById: (id: string) => string | null
   getAncestors: (id: string) => string[]
   openAncestorsForPath: (path: string) => void
@@ -133,6 +134,12 @@ export const useTreeStore = create<TreeStore>()(
 
       getPageByPath: (path: string) => get().byPath?.[path] ?? null,
       getPageById: (id: string) => get().byId?.[id] ?? null,
+      getPagesByTitle: (title: string) => {
+        const lower = title.toLowerCase()
+        return Object.values(get().byId ?? {}).filter(
+          (n) => n.title.toLowerCase() === lower,
+        )
+      },
       getPathById: (id: string) => get().byId?.[id]?.path ?? null,
 
       getAncestors: (id: string) => {
