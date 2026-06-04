@@ -2,6 +2,7 @@ package links
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -53,6 +54,102 @@ func (r RewriteResult) Count() int {
 func RewriteMarkdownLinks(content string, currentPath string, rules []RewriteRule) (string, int) {
 	result := NewMarkdownRefactorEngine().Rewrite(content, currentPath, rules)
 	return result.Content, result.Count()
+}
+
+// RewriteWikiLinks rewrites [[Title]] and [[Folder/Path]] wiki-link syntax
+// according to the provided rules, respecting code blocks and inline code.
+//
+// For each rule:
+//   - OldTitle → NewTitle rewrites [[OldTitle]] and [[OldTitle|Alias]]
+//   - OldPath  → NewPath  rewrites [[old/path]] and [[old/path|Alias]] path hints
+func (e *MarkdownRefactorEngine) RewriteWikiLinks(content string, rules []RewriteRule) RewriteResult {
+	if content == "" {
+		return RewriteResult{Content: content}
+	}
+
+	type wikiRewrite struct {
+		re        *regexp.Regexp
+		newTarget string
+	}
+
+	var rewrites []wikiRewrite
+	for _, rule := range rules {
+		if rule.OldTitle != "" && rule.OldTitle != rule.NewTitle {
+			rewrites = append(rewrites, wikiRewrite{
+				re:        regexp.MustCompile(`(?i)\[\[` + regexp.QuoteMeta(rule.OldTitle) + `(\|[^\]\n]*)?\]\]`),
+				newTarget: rule.NewTitle,
+			})
+		}
+		oldHint := strings.TrimPrefix(normalizeWikiPath(rule.OldPath), "/")
+		newHint := strings.TrimPrefix(normalizeWikiPath(rule.NewPath), "/")
+		if oldHint != "" && oldHint != newHint {
+			rewrites = append(rewrites, wikiRewrite{
+				re:        regexp.MustCompile(`\[\[` + regexp.QuoteMeta(oldHint) + `(\|[^\]\n]*)?\]\]`),
+				newTarget: newHint,
+			})
+		}
+	}
+
+	if len(rewrites) == 0 {
+		return RewriteResult{Content: content}
+	}
+
+	_, excludedRanges := e.collectCandidatesAndExcludedRanges(content)
+
+	var replacements []RewriteReplacement
+	for _, rw := range rewrites {
+		for _, m := range rw.re.FindAllStringSubmatchIndex(content, -1) {
+			if isExcludedOffset(m[0], excludedRanges) {
+				continue
+			}
+			var newValue string
+			if m[2] >= 0 {
+				newValue = "[[" + rw.newTarget + content[m[2]:m[3]] + "]]"
+			} else {
+				newValue = "[[" + rw.newTarget + "]]"
+			}
+			replacements = append(replacements, RewriteReplacement{
+				Start: m[0], End: m[1], NewValue: newValue,
+			})
+		}
+	}
+
+	if len(replacements) == 0 {
+		return RewriteResult{Content: content}
+	}
+
+	sort.Slice(replacements, func(i, j int) bool {
+		return replacements[i].Start < replacements[j].Start
+	})
+
+	return RewriteResult{
+		Content:      applyReplacements(content, replacements),
+		Replacements: replacements,
+	}
+}
+
+// FindWikiLinksForPath returns the wiki-link texts (e.g. "[[Project Plan]]")
+// found in content that reference the given path via title or path hint.
+// Used by the refactor preview to show wiki-links in the affected-pages list.
+func FindWikiLinksForPath(content, oldPath, pageTitle string) []string {
+	if content == "" {
+		return nil
+	}
+	var found []string
+	oldHint := strings.TrimPrefix(normalizeWikiPath(oldPath), "/")
+	if oldHint != "" {
+		re := regexp.MustCompile(`\[\[` + regexp.QuoteMeta(oldHint) + `(?:\|[^\]\n]*)?\]\]`)
+		if re.MatchString(content) {
+			found = append(found, "[["+oldHint+"]]")
+		}
+	}
+	if pageTitle != "" {
+		re := regexp.MustCompile(`(?i)\[\[` + regexp.QuoteMeta(pageTitle) + `(?:\|[^\]\n]*)?\]\]`)
+		if re.MatchString(content) {
+			found = append(found, "[["+pageTitle+"]]")
+		}
+	}
+	return found
 }
 
 func (e *MarkdownRefactorEngine) RewriteRelativeLinksForPathChange(content string, oldCurrentPath string, newCurrentPath string, rules []RewriteRule) RewriteResult {
