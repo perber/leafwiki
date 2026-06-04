@@ -2128,6 +2128,68 @@ for the page edited at ${new Date().toISOString()}
     await expect(unsavedDialog).toBeHidden();
   });
 
+  test('canceling unsaved changes keeps editor open without reopening dialog', async ({ page }) => {
+    const title = `Page Cancel Unsaved Changes ${Date.now()}`;
+    const newContent = `Unsaved content for cancel ${new Date().toISOString()}`;
+
+    const treeView = new TreeView(page);
+    const curNodeCount = await treeView.getNumberOfTreeNodes();
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+
+    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
+    await treeView.clickPageByTitle(title);
+
+    const viewPage = new ViewPage(page);
+    test.expect(await viewPage.getTitle()).toBe(title);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.writeContent(newContent);
+
+    const closeButton = page.locator('button[data-testid="close-editor-button"]');
+    const unsavedDialog = page.locator('[data-testid="unsaved-changes-dialog-button-confirm"]');
+
+    await closeButton.click();
+    await expect(unsavedDialog).toBeVisible();
+    await expect(unsavedDialog).toHaveCount(1);
+
+    await editPage.clickUnsavedChangesCancel();
+
+    await editPage.expectEditorStillOpen();
+    await expect(unsavedDialog).toBeHidden();
+
+    const dialogReopened = await page.evaluate(async () => {
+      const selector = '[data-testid="unsaved-changes-dialog-button-confirm"]';
+      const isVisible = (element: Element | null) => {
+        if (!(element instanceof HTMLElement)) return false;
+        const style = window.getComputedStyle(element);
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.opacity !== '0' &&
+          element.getClientRects().length > 0
+        );
+      };
+
+      const deadline = performance.now() + 500;
+      while (performance.now() < deadline) {
+        if (isVisible(document.querySelector(selector))) {
+          return true;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 25));
+      }
+      return false;
+    });
+
+    test.expect(dialogReopened).toBe(false);
+    await expect(unsavedDialog).toHaveCount(0);
+    await editPage.expectEditorStillOpen();
+  });
+
   test('create-page-with-mermaid', async ({ page }) => {
     const title = `Page With Mermaid ${Date.now()}`;
     const mermaidContent = `\`\`\`mermaid

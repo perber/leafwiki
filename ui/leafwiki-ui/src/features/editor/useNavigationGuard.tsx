@@ -19,6 +19,7 @@ export default function useNavigationGuard({
   onNavigate,
 }: UseNavigationGuardProps) {
   const allowNextNavigationRef = useRef(false)
+  const suppressNextDialogRef = useRef(false)
   const shouldBlock = useCallback(() => {
     if (allowNextNavigationRef.current) {
       return false
@@ -38,6 +39,7 @@ export default function useNavigationGuard({
       return
     }
     allowNextNavigationRef.current = false
+    suppressNextDialogRef.current = true
     if (blocker.state === 'blocked' && blocker.reset) {
       blocker.reset()
     }
@@ -63,13 +65,15 @@ export default function useNavigationGuard({
   useEffect(() => {
     if (blocker.state === 'unblocked') {
       allowNextNavigationRef.current = false
+      suppressNextDialogRef.current = false
       closeDialog()
     }
-  }, [blocker.state, closeDialog])
+  }, [blocker.location, blocker.state, closeDialog])
 
   useEffect(() => {
     return () => {
       allowNextNavigationRef.current = false
+      suppressNextDialogRef.current = false
       const dialogsState = useDialogsStore.getState()
       if (dialogsState.dialogType === DIALOG_UNSAVED_CHANGES) {
         dialogsState.closeDialog()
@@ -84,6 +88,8 @@ export default function useNavigationGuard({
     if (blocker.state !== 'blocked') return
 
     if (allowNextNavigationRef.current) return
+
+    if (suppressNextDialogRef.current) return
 
     openDialog(DIALOG_UNSAVED_CHANGES, {
       onConfirm,
