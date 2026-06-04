@@ -1,4 +1,5 @@
 import test, { Page, expect } from '@playwright/test';
+import CreatePageByPathDialog from '../pages/CreatePageByPathDialog';
 import EditPage from '../pages/EditPage';
 import LoginPage from '../pages/LoginPage';
 import ViewPage from '../pages/ViewPage';
@@ -102,7 +103,7 @@ test.describe('WikiLink autocomplete', () => {
     await viewPage.clickEditPageButton();
 
     const editPage = new EditPage(page);
-    await editPage.writeContent(`[[FilterableWikiPage`);
+    await editPage.writeContent('[[FilterableWikiPage');
 
     await editPage.waitForAutocompleteDropdown();
 
@@ -125,7 +126,7 @@ test.describe('WikiLink autocomplete', () => {
     await viewPage.clickEditPageButton();
 
     const editPage = new EditPage(page);
-    await editPage.writeContent(`[[InsertTargetPage`);
+    await editPage.writeContent('[[InsertTargetPage');
 
     await editPage.waitForAutocompleteDropdown();
     await editPage.selectAutocompleteOption(targetTitle);
@@ -150,7 +151,7 @@ test.describe('WikiLink autocomplete', () => {
     await viewPage.clickEditPageButton();
 
     const editPage = new EditPage(page);
-    await editPage.writeContent(`[[PreviewLinkTarget`);
+    await editPage.writeContent('[[PreviewLinkTarget');
 
     await editPage.waitForAutocompleteDropdown();
     await editPage.selectAutocompleteOption(targetTitle);
@@ -159,8 +160,36 @@ test.describe('WikiLink autocomplete', () => {
     await editPage.closeEditor();
 
     // WikiLink should render as a hyperlink in the page view
-    await expect(
-      page.locator('#markdown-preview-container a', { hasText: targetTitle }),
-    ).toBeVisible();
+    await expect(page.locator('article a', { hasText: targetTitle })).toBeVisible();
+  });
+
+  test('missing-wikilink-can-create-page-from-preview', async ({ page }) => {
+    const stamp = Date.now();
+    const editorSlug = `wikilink-missing-editor-${stamp}`;
+    const missingTitle = `Missing WikiLink Target ${stamp}`;
+
+    await createPage(page, {
+      title: `WikiLink Missing Editor ${stamp}`,
+      slug: editorSlug,
+      content: `[[${missingTitle}]]`,
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${editorSlug}`);
+
+    const missingLinkButton = page.getByRole('button', { name: missingTitle });
+    await expect(missingLinkButton).toBeVisible();
+    await missingLinkButton.click();
+
+    await expect(page.getByTestId('create-page-by-path-title-input')).toHaveValue(missingTitle);
+
+    const createPageByPathDialog = new CreatePageByPathDialog(page);
+    await createPageByPathDialog.clickCreate();
+
+    const editPage = new EditPage(page);
+    await editPage.closeEditor();
+
+    await expect(page.locator('article > h1')).toHaveText(missingTitle);
+    await expect(page.locator('article a', { hasText: missingTitle })).toBeVisible();
   });
 });

@@ -21,7 +21,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
@@ -92,6 +92,10 @@ type MarkdownPreviewErrorBoundaryState = {
 
 const CLOBBER_PREFIX = ''
 const FOOTNOTE_TARGET_PREFIX = '#user-content-fn'
+const WIKILINK_PROTOCOLS = [
+  'wikilink-notfound:',
+  'wikilink-ambiguous:',
+] as const
 
 type MarkdownNodeProp = {
   node?: unknown
@@ -214,6 +218,14 @@ function normalizeFootnoteHref(href?: string) {
   }
 
   return `#${CLOBBER_PREFIX}${href.slice(1)}`
+}
+
+function transformMarkdownUrl(url: string) {
+  if (WIKILINK_PROTOCOLS.some((protocol) => url.startsWith(protocol))) {
+    return url
+  }
+
+  return defaultUrlTransform(url)
 }
 
 function isPlainListParagraph(
@@ -608,6 +620,7 @@ export default function MarkdownPreview({
             rehypeHighlight,
           ]}
           components={components}
+          urlTransform={transformMarkdownUrl}
         >
           {normalizedContent}
         </ReactMarkdown>

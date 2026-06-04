@@ -84,6 +84,7 @@ export function MarkdownLink({
             const slug = await suggestSlug('', title).catch(() => '')
             openDialog(DIALOG_CREATE_PAGE_BY_PATH, {
               initialPath: slug || title,
+              initialTitle: title,
               forwardToEditMode: !editMode,
             })
           }}
