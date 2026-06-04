@@ -149,9 +149,11 @@ func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []T
 				})
 				continue
 			}
+			// Store as a normal broken route path so HealLinksForExactPath
+			// can heal it when the page is later created at that path.
 			result = append(result, TargetLink{
 				Broken:         true,
-				TargetPagePath: wikilinkSentinel(target),
+				TargetPagePath: "/" + routePath,
 			})
 			continue
 		}

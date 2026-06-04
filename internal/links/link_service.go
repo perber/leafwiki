@@ -235,6 +235,11 @@ func rewriteResolvedTargets(currentPath string, outgoings []Outgoing, rules []Re
 
 	paths := make([]string, 0, len(outgoings))
 	for _, outgoing := range outgoings {
+		if IsWikilinkSentinel(outgoing.ToPath) {
+			// Title-based wiki-link sentinels are resolved by title, not path.
+			// Skip path rewriting — they are healed separately by HealWikiLinksForPage.
+			continue
+		}
 		targetPath := normalizeWikiPath(outgoing.ToPath)
 		if rewritten, ok := applyRewriteRules(targetPath, rules); ok {
 			targetPath = rewritten

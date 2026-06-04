@@ -47,13 +47,6 @@ func (e *LinkIndexSideEffect) Apply(event PageSaveEvent) {
 				e.healExact(event.After)
 			}
 		}
-		// Heal broken [[Title]] sentinels that match the page's (possibly new) title.
-		// Covers both slug-change renames and title-only updates.
-		if event.After != nil {
-			if err := e.svc.HealWikiLinksForPage(event.After); err != nil {
-				e.log.Warn("failed to heal wiki links for page", "pageID", event.After.ID, "error", err)
-			}
-		}
 
 	case PageOperationMove:
 		e.markBrokenForOldPath(event.OldPath)
@@ -94,6 +87,9 @@ func (e *LinkIndexSideEffect) healExact(p *tree.Page) {
 	if err := e.svc.HealLinksForExactPath(p); err != nil {
 		e.log.Warn("failed to heal links for page", "pageID", p.ID, "error", err)
 	}
+	if err := e.svc.HealWikiLinksForPage(p); err != nil {
+		e.log.Warn("failed to heal wiki links for page", "pageID", p.ID, "error", err)
+	}
 }
 
 func (e *LinkIndexSideEffect) updateAndHeal(p *tree.Page) {
@@ -104,10 +100,6 @@ func (e *LinkIndexSideEffect) updateAndHeal(p *tree.Page) {
 		e.log.Warn("failed to update links for page", "pageID", p.ID, "error", err)
 	}
 	e.healExact(p)
-	// Heal any broken [[Title]] wiki-link sentinels that point to this page's title.
-	if err := e.svc.HealWikiLinksForPage(p); err != nil {
-		e.log.Warn("failed to heal wiki links for page", "pageID", p.ID, "error", err)
-	}
 }
 
 func (e *LinkIndexSideEffect) markBrokenForOldPath(oldPath string) {
