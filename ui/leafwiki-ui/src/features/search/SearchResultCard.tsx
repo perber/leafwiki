@@ -1,6 +1,7 @@
 import { SearchResultItem } from '@/lib/api/search'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildViewUrl } from '@/lib/routePath'
+import { SEARCH_QUERY_STATE_KEY } from '@/lib/searchNavigationState'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { forwardRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
@@ -32,12 +33,13 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
     const isEditorActive = currentEditorPageId === item.page_id
     const isActive = isRouteActive || isEditorActive || isSelected
     const kindLabel = item.kind === 'section' ? 'Section' : 'Page'
+    const searchQuery = new URLSearchParams(location.search).get('q') || undefined
 
     return (
       <Link
         ref={ref}
         to={resultUrl}
-        state={createNavigationVisitState()}
+        state={createNavigationVisitState({ [SEARCH_QUERY_STATE_KEY]: searchQuery })}
         data-testid={`search-result-card-${item.page_id}`}
         aria-current={isRouteActive ? 'page' : undefined}
         onMouseEnter={onMouseEnter}
