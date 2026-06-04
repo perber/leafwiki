@@ -8,6 +8,10 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+    ignore:
+      - dependency-name: "actions/checkout"
+        update-types:
+          - "version-update:semver-major"
     labels:
       - "dependencies"
       - "github-actions"
