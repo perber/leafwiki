@@ -97,6 +97,10 @@ func (e *LinkIndexSideEffect) updateAndHeal(p *tree.Page) {
 		e.log.Warn("failed to update links for page", "pageID", p.ID, "error", err)
 	}
 	e.healExact(p)
+	// Heal any broken [[Title]] wiki-link sentinels that point to this page's title.
+	if err := e.svc.HealWikiLinksForPage(p); err != nil {
+		e.log.Warn("failed to heal wiki links for page", "pageID", p.ID, "error", err)
+	}
 }
 
 func (e *LinkIndexSideEffect) markBrokenForOldPath(oldPath string) {

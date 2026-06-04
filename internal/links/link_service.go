@@ -203,6 +203,13 @@ func (b *LinkService) HealLinksForExactPath(page *tree.Page) error {
 	return b.store.HealLinksForPath(toPath, page.ID)
 }
 
+// HealWikiLinksForPage heals broken [[Title]] sentinel records that target
+// this page's title. Called after page creation or restore so that wiki-links
+// written before the target page existed are automatically resolved.
+func (b *LinkService) HealWikiLinksForPage(page *tree.Page) error {
+	return b.store.HealWikiLinksForTitle(page.Title, page.ID)
+}
+
 func (b *LinkService) Close() error {
 	if b.store == nil {
 		return nil

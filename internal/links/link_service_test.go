@@ -1361,3 +1361,99 @@ func TestResolveWikiLinkTargets_PathHint_BrokenWhenNotFound(t *testing.T) {
 		t.Errorf("expected broken link for missing path hint")
 	}
 }
+
+func TestResolveWikiLinkTargets_BrokenSentinelFormat(t *testing.T) {
+	ts, _, _ := setupTreeForLinksTest(t)
+
+	targets := resolveWikiLinkTargets(ts, []string{"Nonexistent Page"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link")
+	}
+	want := wikilinkSentinel("Nonexistent Page")
+	if targets[0].TargetPagePath != want {
+		t.Errorf("TargetPagePath = %q, want %q", targets[0].TargetPagePath, want)
+	}
+}
+
+func TestResolveWikiLinkTargets_SlashTitleFallback(t *testing.T) {
+	storageDir := t.TempDir()
+	ts := tree.NewTreeService(storageDir)
+	if err := ts.LoadTree(); err != nil {
+		t.Fatalf("LoadTree: %v", err)
+	}
+	idPtr, err := ts.CreateNode("system", nil, "C/C++ Guide", "c-cpp-guide", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode: %v", err)
+	}
+
+	// "C/C++ Guide" contains "/" so it tries path lookup first,
+	// then falls back to title lookup.
+	targets := resolveWikiLinkTargets(ts, []string{"C/C++ Guide"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if targets[0].Broken {
+		t.Errorf("expected resolved link via title fallback, got broken")
+	}
+	if targets[0].TargetPageID != *idPtr {
+		t.Errorf("TargetPageID = %q, want %q", targets[0].TargetPageID, *idPtr)
+	}
+}
+
+// ─── HealWikiLinksForPage ────────────────────────────────────────────────────
+
+func TestLinkService_HealWikiLinksForPage_HealsAfterPageCreation(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	// Page A contains [[Target Page]] which does not exist yet.
+	pageAIDPtr, err := ts.CreateNode("system", nil, "Page A", "page-a", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode page-a: %v", err)
+	}
+	pageA, err := ts.GetPage(*pageAIDPtr)
+	if err != nil {
+		t.Fatalf("GetPage page-a: %v", err)
+	}
+	if err := svc.UpdateLinksForPage(pageA, "See [[Target Page]] for details."); err != nil {
+		t.Fatalf("UpdateLinksForPage: %v", err)
+	}
+
+	// Outgoing should be broken (target doesn't exist yet).
+	out, err := svc.GetOutgoingLinksForPage(*pageAIDPtr)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage: %v", err)
+	}
+	if out.Count != 1 || !out.Outgoings[0].Broken {
+		t.Fatalf("expected 1 broken outgoing, got %+v", out)
+	}
+
+	// Create the target page.
+	targetIDPtr, err := ts.CreateNode("system", nil, "Target Page", "target-page", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode target-page: %v", err)
+	}
+	targetPage, err := ts.GetPage(*targetIDPtr)
+	if err != nil {
+		t.Fatalf("GetPage target-page: %v", err)
+	}
+
+	// Healing via HealWikiLinksForPage.
+	if err := svc.HealWikiLinksForPage(targetPage); err != nil {
+		t.Fatalf("HealWikiLinksForPage: %v", err)
+	}
+
+	// Outgoing should now be resolved.
+	out2, err := svc.GetOutgoingLinksForPage(*pageAIDPtr)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage after heal: %v", err)
+	}
+	if out2.Count != 1 || out2.Outgoings[0].Broken {
+		t.Fatalf("expected 1 resolved outgoing after heal, got %+v", out2)
+	}
+	if out2.Outgoings[0].ToPageID != *targetIDPtr {
+		t.Errorf("ToPageID = %q, want %q", out2.Outgoings[0].ToPageID, *targetIDPtr)
+	}
+}
