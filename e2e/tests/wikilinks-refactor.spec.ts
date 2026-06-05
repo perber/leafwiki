@@ -298,10 +298,10 @@ test.describe('WikiLink [[Title]] refactoring and link status', () => {
 
     await editPage.closeEditor();
 
-    // After rewrite, the ref page content must use the new title.
-    await viewPage.goto(`/${refSlug}`);
-    await expect(page.locator('article')).toContainText(`[[${newTitle}]]`);
-    await expect(page.locator('article')).not.toContainText(`[[${targetTitle}]]`);
+    // After rewrite, the stored ref page content must use the new title.
+    const refContent = await getPageContent(page, refSlug);
+    expect(refContent).toContain(`[[${newTitle}]]`);
+    expect(refContent).not.toContain(`[[${targetTitle}]]`);
   });
 
   // ── Move: path-hint wikilink appears in refactor dialog ───────────────────
