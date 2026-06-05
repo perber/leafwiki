@@ -40,12 +40,12 @@ func (e *LinkIndexSideEffect) Apply(event PageSaveEvent) {
 			// (wikilink:OldTitle, broken=0) are not reached by the path-prefix
 			// query above. Break them by page ID, then re-heal if another page
 			// now exclusively holds the old title.
-			if event.TitleChanged && event.Before != nil {
-				if err := e.svc.MarkIncomingLinksBrokenForPage(event.Before.ID); err != nil {
-					e.log.Warn("failed to mark incoming links broken for renamed page", "pageID", event.Before.ID, "error", err)
+			if event.TitleChanged && event.After != nil {
+				if err := e.svc.MarkIncomingLinksBrokenForPage(event.After.ID); err != nil {
+					e.log.Warn("failed to mark incoming links broken for renamed page", "pageID", event.After.ID, "error", err)
 				}
-				if err := e.svc.HealWikiLinksForTitleIfUnambiguous(event.Before.Title); err != nil {
-					e.log.Warn("failed to heal wiki links for old title", "title", event.Before.Title, "error", err)
+				if err := e.svc.HealWikiLinksForTitleIfUnambiguous(event.OldTitle); err != nil {
+					e.log.Warn("failed to heal wiki links for old title", "title", event.OldTitle, "error", err)
 				}
 			}
 			for _, p := range event.AffectedPages {

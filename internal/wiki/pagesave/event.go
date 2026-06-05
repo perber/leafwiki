@@ -27,9 +27,11 @@ type PageSaveEvent struct {
 	SlugChanged    bool
 	TitleChanged   bool
 
-	// OldPath is the path of Before before the mutation (CalculatePath on a live node
+	// OldPath is the path of the page before the mutation (CalculatePath on a live node
 	// returns the new path after UpdateNode/MoveNode mutates the tree in place).
 	OldPath string
+	// OldTitle is the title before an update/rename; empty for other operations.
+	OldTitle string
 
 	// AffectedPages contains every page touched by the operation (e.g. a moved/deleted subtree).
 	// For single-page operations it holds the one affected page.
