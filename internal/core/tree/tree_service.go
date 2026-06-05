@@ -18,12 +18,13 @@ import (
 // TreeService is our main component for handling tree operations
 // We use this service to create pages, delete pages, update pages, etc.
 type TreeService struct {
-	storageDir string
-	tree       *PageNode
-	store      *NodeStore
-	log        *slog.Logger
-	nodesByID  map[string]*PageNode
-	childSlugs map[string]map[string]*PageNode
+	storageDir   string
+	tree         *PageNode
+	store        *NodeStore
+	log          *slog.Logger
+	nodesByID    map[string]*PageNode
+	nodesByTitle map[string][]*PageNode
+	childSlugs   map[string]map[string]*PageNode
 
 	mu sync.RWMutex
 }
@@ -33,12 +34,13 @@ const legacyTreeFilename = "tree.json"
 
 func NewTreeService(storageDir string) *TreeService {
 	return &TreeService{
-		storageDir: storageDir,
-		tree:       nil,
-		store:      NewNodeStore(storageDir),
-		log:        slog.Default().With("component", "TreeService"),
-		nodesByID:  make(map[string]*PageNode),
-		childSlugs: make(map[string]map[string]*PageNode),
+		storageDir:   storageDir,
+		tree:         nil,
+		store:        NewNodeStore(storageDir),
+		log:          slog.Default().With("component", "TreeService"),
+		nodesByID:    make(map[string]*PageNode),
+		nodesByTitle: make(map[string][]*PageNode),
+		childSlugs:   make(map[string]map[string]*PageNode),
 	}
 }
 
@@ -392,18 +394,11 @@ func (t *TreeService) FindPagesByTitle(title string) []*PageNode {
 		return nil
 	}
 
-	var results []*PageNode
-	var walk func(*PageNode)
-	walk = func(node *PageNode) {
-		if node.ID != "root" && strings.EqualFold(node.Title, title) {
-			results = append(results, node)
-		}
-		for _, child := range node.Children {
-			walk(child)
-		}
+	nodes := t.nodesByTitle[strings.ToLower(title)]
+	if len(nodes) == 0 {
+		return nil
 	}
-	walk(t.tree)
-	return results
+	return nodes
 }
 
 // FindPageByID finds a page in the tree by its ID.
@@ -438,6 +433,7 @@ func (t *TreeService) getNodeByIDLocked(id string) *PageNode {
 
 func (t *TreeService) rebuildIndexesLocked() {
 	t.nodesByID = make(map[string]*PageNode)
+	t.nodesByTitle = make(map[string][]*PageNode)
 	t.childSlugs = make(map[string]map[string]*PageNode)
 
 	if t.tree == nil {
@@ -452,6 +448,7 @@ func (t *TreeService) rebuildIndexesLocked() {
 
 		if node.ID != "" && node.ID != "root" {
 			t.nodesByID[node.ID] = node
+			t.addTitleIndexForNodeLocked(node)
 		}
 		t.rebuildChildSlugIndexForParentLocked(node)
 
@@ -478,6 +475,33 @@ func (t *TreeService) rebuildChildSlugIndexForParentLocked(parent *PageNode) {
 	t.childSlugs[parent.ID] = index
 }
 
+func (t *TreeService) addTitleIndexForNodeLocked(node *PageNode) {
+	if node == nil || node.Title == "" {
+		return
+	}
+	key := strings.ToLower(node.Title)
+	t.nodesByTitle[key] = append(t.nodesByTitle[key], node)
+}
+
+func (t *TreeService) removeTitleIndexForNodeLocked(node *PageNode) {
+	if node == nil || node.Title == "" {
+		return
+	}
+	key := strings.ToLower(node.Title)
+	nodes := t.nodesByTitle[key]
+	filtered := nodes[:0]
+	for _, n := range nodes {
+		if n.ID != node.ID {
+			filtered = append(filtered, n)
+		}
+	}
+	if len(filtered) == 0 {
+		delete(t.nodesByTitle, key)
+	} else {
+		t.nodesByTitle[key] = filtered
+	}
+}
+
 func (t *TreeService) indexNodeLocked(node *PageNode) {
 	if node == nil {
 		return
@@ -485,6 +509,7 @@ func (t *TreeService) indexNodeLocked(node *PageNode) {
 
 	if node.ID != "" && node.ID != "root" {
 		t.nodesByID[node.ID] = node
+		t.addTitleIndexForNodeLocked(node)
 	}
 	t.rebuildChildSlugIndexForParentLocked(node)
 	if node.Parent != nil {
@@ -505,6 +530,7 @@ func (t *TreeService) removeNodeIndexLocked(node *PageNode) {
 
 		delete(t.nodesByID, current.ID)
 		delete(t.childSlugs, current.ID)
+		t.removeTitleIndexForNodeLocked(current)
 
 		for _, child := range current.Children {
 			walk(child)
@@ -673,7 +699,9 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		}
 
 		// Update title in tree
+		t.removeTitleIndexForNodeLocked(node)
 		node.Title = title
+		t.addTitleIndexForNodeLocked(node)
 
 		// Update metadata
 		node.Metadata.UpdatedAt = time.Now().UTC()
