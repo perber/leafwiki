@@ -515,6 +515,39 @@ func (s *LinksStore) GetRefactorSourcePageIDsForPrefix(oldPrefix string) ([]stri
 	return pageIDs, nil
 }
 
+func (s *LinksStore) GetRefactorSourcePageIDsForWikiLinkTitle(title string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query(`
+		SELECT DISTINCT from_page_id
+		FROM links
+		WHERE LOWER(to_path) = ?
+	`, strings.ToLower(wikilinkSentinelPrefix+title))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			slog.Default().Error("could not close rows", "error", err)
+		}
+	}()
+
+	var pageIDs []string
+	for rows.Next() {
+		var pageID string
+		if err := rows.Scan(&pageID); err != nil {
+			return nil, err
+		}
+		pageIDs = append(pageIDs, pageID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return pageIDs, nil
+}
+
 func (s *LinksStore) GetBrokenIncomingForPath(toPath string) ([]Backlink, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

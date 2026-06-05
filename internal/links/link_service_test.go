@@ -1703,3 +1703,69 @@ func TestLinkService_AmbiguousWikiLinksAreNotBrokenInSourceStatus(t *testing.T) 
 		t.Fatalf("ToPath = %q, want %q", status.Outgoings[0].ToPath, "Kafka")
 	}
 }
+
+// ─── HealWikiLinksForPage ambiguity guard ─────────────────────────────────────
+
+// Gap 3: when N>1 pages share a title, HealWikiLinksForPage must not heal
+// broken [[Title]] sentinels, because the link is still ambiguous.
+func TestLinkService_HealWikiLinksForPage_DoesNotHealWhenAmbiguous(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	// Two "Kafka" pages already exist.
+	kafka1IDPtr, err := ts.CreateNode("system", nil, "Kafka", "kafka1", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode kafka1: %v", err)
+	}
+	kafka2IDPtr, err := ts.CreateNode("system", nil, "Kafka", "kafka2", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode kafka2: %v", err)
+	}
+	_ = kafka1IDPtr
+
+	// Source page writes [[Kafka]] while two matches exist → sentinel broken=1.
+	sourceIDPtr, err := ts.CreateNode("system", nil, "Source", "source", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode source: %v", err)
+	}
+	sourcePage, err := ts.GetPage(*sourceIDPtr)
+	if err != nil {
+		t.Fatalf("GetPage source: %v", err)
+	}
+	if err := svc.UpdateLinksForPage(sourcePage, "See [[Kafka]]."); err != nil {
+		t.Fatalf("UpdateLinksForPage: %v", err)
+	}
+
+	out, err := svc.GetOutgoingLinksForPage(*sourceIDPtr)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage: %v", err)
+	}
+	if out.Count != 1 || !out.Outgoings[0].Broken {
+		t.Fatalf("precondition: expected [[Kafka]] to be a broken sentinel with 2 pages, got %+v", out)
+	}
+
+	// Create a third "Kafka" page and call HealWikiLinksForPage for it.
+	// The sentinel must stay broken because 3 pages share the title.
+	kafka3IDPtr, err := ts.CreateNode("system", nil, "Kafka", "kafka3", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode kafka3: %v", err)
+	}
+	kafka3, err := ts.GetPage(*kafka3IDPtr)
+	if err != nil {
+		t.Fatalf("GetPage kafka3: %v", err)
+	}
+	_ = kafka2IDPtr
+	if err := svc.HealWikiLinksForPage(kafka3); err != nil {
+		t.Fatalf("HealWikiLinksForPage: %v", err)
+	}
+
+	out, err = svc.GetOutgoingLinksForPage(*sourceIDPtr)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage after heal attempt: %v", err)
+	}
+	if out.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d", out.Count)
+	}
+	if !out.Outgoings[0].Broken {
+		t.Fatalf("[[Kafka]] should remain broken/ambiguous after 3rd Kafka page created, but was healed to %q", out.Outgoings[0].ToPath)
+	}
+}

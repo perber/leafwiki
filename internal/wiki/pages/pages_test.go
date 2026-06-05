@@ -1326,8 +1326,11 @@ func TestApplyPageRefactorUseCase_RenameRewritesTitleBasedWikiLinks(t *testing.T
 	if outgoing.Count != 1 {
 		t.Fatalf("expected 1 outgoing, got %d", outgoing.Count)
 	}
-	if outgoing.Outgoings[0].ToPath != "/target-renamed" {
-		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "/target-renamed")
+	if outgoing.Outgoings[0].ToPath != "Target Renamed" {
+		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "Target Renamed")
+	}
+	if outgoing.Outgoings[0].ToPageID != updated.ID {
+		t.Fatalf("ToPageID = %q, want %q", outgoing.Outgoings[0].ToPageID, updated.ID)
 	}
 	if outgoing.Outgoings[0].Broken {
 		t.Fatalf("expected rewritten wikilink to remain valid")
@@ -1561,8 +1564,8 @@ func TestApplyPageRefactorUseCase_Move_LeavesTitleBasedWikiLinksUnchanged(t *tes
 	if outgoing.Outgoings[0].ToPageID != target.Page.ID {
 		t.Fatalf("ToPageID = %q, want %q", outgoing.Outgoings[0].ToPageID, target.Page.ID)
 	}
-	if outgoing.Outgoings[0].ToPath != "/archive/target" {
-		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "/archive/target")
+	if outgoing.Outgoings[0].ToPath != "Target" {
+		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "Target")
 	}
 	if outgoing.Outgoings[0].Broken {
 		t.Fatalf("expected title-based wikilink to remain valid after move")
@@ -1856,6 +1859,232 @@ func TestDeletePageUseCase_Recursive_RemovesOutgoingForSubtree_AndBreaksIncoming
 	got := outC.Outgoings[0]
 	if got.ToPath != "/docs/b" || !got.Broken || got.ToPageID != "" {
 		t.Fatalf("unexpected outgoing after recursive delete: %#v", got)
+	}
+}
+
+// Gap 1: deleting one of two same-title pages should heal [[Title]] sentinels
+// that are now unambiguous (exactly one page with that title remains).
+func TestDeletePageUseCase_SingleDelete_HealsSentinelWhenDuplicateTitleRemoved(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.assets, deps.orchestrator(), slog.Default())
+
+	// Two pages share the title "Kafka".
+	kafka1, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Kafka", Slug: "kafka1", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage kafka1: %v", err)
+	}
+	kafka2, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Kafka", Slug: "kafka2", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage kafka2: %v", err)
+	}
+
+	// Source page writes [[Kafka]] while two matches exist → sentinel broken=1.
+	source, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Source", Slug: "source", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage source: %v", err)
+	}
+	content := "See [[Kafka]]."
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: source.Page.ID, Version: source.Page.Version(),
+		Title: source.Page.Title, Slug: source.Page.Slug, Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage source: %v", err)
+	}
+
+	// Precondition: [[Kafka]] is a broken sentinel (ambiguous).
+	out, err := deps.links.GetOutgoingLinksForPage(source.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage: %v", err)
+	}
+	if out.Count != 1 || !out.Outgoings[0].Broken {
+		t.Fatalf("precondition: expected broken sentinel, got %+v", out)
+	}
+
+	// Delete kafka1 → only kafka2 remains → sentinel should be healed.
+	if err := deleteUC.Execute(context.Background(), pages.DeletePageInput{
+		UserID: "system", ID: kafka1.Page.ID, Version: kafka1.Page.Version(), Recursive: false,
+	}); err != nil {
+		t.Fatalf("DeletePage kafka1: %v", err)
+	}
+
+	out, err = deps.links.GetOutgoingLinksForPage(source.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage after delete: %v", err)
+	}
+	if out.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d", out.Count)
+	}
+	if out.Outgoings[0].Broken {
+		t.Fatalf("[[Kafka]] should be healed to kafka2 after kafka1 deleted, but is still broken")
+	}
+	if out.Outgoings[0].ToPageID != kafka2.Page.ID {
+		t.Fatalf("ToPageID = %q, want kafka2 %q", out.Outgoings[0].ToPageID, kafka2.Page.ID)
+	}
+}
+
+// Gap 1 (recursive): deleting a subtree that contains one of two same-title pages
+// should heal [[Title]] sentinels for titles that are now unambiguous.
+func TestDeletePageUseCase_Recursive_HealsSentinelWhenDuplicateTitleRemoved(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.assets, deps.orchestrator(), slog.Default())
+
+	// kafka1 lives inside a section that we will delete recursively.
+	section, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Section", Slug: "section", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage section: %v", err)
+	}
+	kafka1, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &section.Page.ID, Title: "Kafka", Slug: "kafka1", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage kafka1: %v", err)
+	}
+	_ = kafka1
+	kafka2, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Kafka", Slug: "kafka2", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage kafka2: %v", err)
+	}
+
+	source, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Source", Slug: "source", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage source: %v", err)
+	}
+	content := "See [[Kafka]]."
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: source.Page.ID, Version: source.Page.Version(),
+		Title: source.Page.Title, Slug: source.Page.Slug, Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage source: %v", err)
+	}
+
+	out, err := deps.links.GetOutgoingLinksForPage(source.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage: %v", err)
+	}
+	if out.Count != 1 || !out.Outgoings[0].Broken {
+		t.Fatalf("precondition: expected broken sentinel, got %+v", out)
+	}
+
+	// Delete the whole section (contains kafka1) → kafka2 remains → sentinel healed.
+	sectionPage, err := deps.tree.GetPage(section.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage section: %v", err)
+	}
+	if err := deleteUC.Execute(context.Background(), pages.DeletePageInput{
+		UserID: "system", ID: sectionPage.ID, Version: sectionPage.Version(), Recursive: true,
+	}); err != nil {
+		t.Fatalf("DeletePage section (recursive): %v", err)
+	}
+
+	out, err = deps.links.GetOutgoingLinksForPage(source.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage after recursive delete: %v", err)
+	}
+	if out.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d", out.Count)
+	}
+	if out.Outgoings[0].Broken {
+		t.Fatalf("[[Kafka]] should be healed to kafka2 after section deleted, but is still broken")
+	}
+	if out.Outgoings[0].ToPageID != kafka2.Page.ID {
+		t.Fatalf("ToPageID = %q, want kafka2 %q", out.Outgoings[0].ToPageID, kafka2.Page.ID)
+	}
+}
+
+// Gap 1 (recursive, healed sentinel): when a recursive delete removes the only
+// page a [[Title]] sentinel was healed to, the link must be marked broken.
+// MarkLinksBrokenForPrefix misses healed sentinels because their to_path is
+// "wikilink:X", not the route path — MarkIncomingLinksBrokenForPage must also
+// run for each page in the subtree.
+//
+// Critical setup: [[Kafka]] must be written BEFORE the kafka page exists so it
+// is stored as a broken sentinel (to_path="wikilink:Kafka"). Only then does
+// healing via HealWikiLinksForPage produce a healed sentinel (broken=0,
+// to_page_id=kafka1, to_path="wikilink:Kafka").
+func TestDeletePageUseCase_Recursive_MarksHealedWikiLinkSentinelBroken(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	deleteUC := pages.NewDeletePageUseCase(deps.tree, deps.revision, deps.assets, deps.orchestrator(), slog.Default())
+
+	// Step 1: source writes [[Kafka]] before any Kafka page exists → broken sentinel.
+	source, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Source", Slug: "source", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage source: %v", err)
+	}
+	content := "See [[Kafka]]."
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: source.Page.ID, Version: source.Page.Version(),
+		Title: source.Page.Title, Slug: source.Page.Slug, Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage source: %v", err)
+	}
+
+	// Step 2: create kafka1 inside a section → HealWikiLinksForPage heals the sentinel
+	// to broken=0, to_page_id=kafka1, to_path="wikilink:Kafka" (not the route path).
+	section, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Section", Slug: "section", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage section: %v", err)
+	}
+	_, err = createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &section.Page.ID, Title: "Kafka", Slug: "kafka1", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("CreatePage kafka1: %v", err)
+	}
+
+	// Precondition: sentinel is healed (broken=0, to_path="wikilink:Kafka").
+	out, err := deps.links.GetOutgoingLinksForPage(source.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage: %v", err)
+	}
+	if out.Count != 1 || out.Outgoings[0].Broken {
+		t.Fatalf("precondition: expected healed sentinel, got %+v", out)
+	}
+
+	// Step 3: delete the whole section recursively.
+	// MarkLinksBrokenForPrefix('/section') will NOT match to_path="wikilink:Kafka".
+	// Without also calling MarkIncomingLinksBrokenForPage(kafka1.ID) the sentinel
+	// stays broken=0 pointing at the now-deleted kafka1.
+	sectionPage, err := deps.tree.GetPage(section.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage section: %v", err)
+	}
+	if err := deleteUC.Execute(context.Background(), pages.DeletePageInput{
+		UserID: "system", ID: sectionPage.ID, Version: sectionPage.Version(), Recursive: true,
+	}); err != nil {
+		t.Fatalf("DeletePage section (recursive): %v", err)
+	}
+
+	out, err = deps.links.GetOutgoingLinksForPage(source.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinksForPage after recursive delete: %v", err)
+	}
+	if out.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d", out.Count)
+	}
+	if !out.Outgoings[0].Broken {
+		t.Fatalf("[[Kafka]] should be broken after kafka1 recursively deleted, but is still resolved to %q", out.Outgoings[0].ToPageID)
 	}
 }
 
