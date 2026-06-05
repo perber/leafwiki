@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test, { Page, expect } from '@playwright/test';
+import { getCsrfScript } from '../helpers/api';
 import EditPage from '../pages/EditPage';
 import LoginPage from '../pages/LoginPage';
 import ViewPage from '../pages/ViewPage';
@@ -16,16 +17,6 @@ const editorPreviewScrollFixturePath = join(
 );
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
-
-function getCsrfScript(): string {
-  return `
-    const hostMatch =
-      document.cookie.match(/(?:^|;\\s*)__Host-leafwiki_csrf=([^;]+)/) ??
-      document.cookie.match(/(?:^|;\\s*)leafwiki_csrf=([^;]+)/);
-    if (!hostMatch) throw new Error('Missing CSRF token cookie');
-    try { return decodeURIComponent(hostMatch[1]); } catch { return hostMatch[1]; }
-  `;
-}
 
 async function createPageWithMetadata(
   page: Page,
