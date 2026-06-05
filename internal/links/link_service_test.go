@@ -1576,3 +1576,130 @@ func TestResolveWikiLinkTargets_PathHint_BrokenStoresAsRoutePath(t *testing.T) {
 		t.Errorf("TargetPagePath = %q, want %q", targets[0].TargetPagePath, want)
 	}
 }
+
+func TestLinkService_AmbiguousWikiLinksAppearAsBacklinksForAllMatchingPages(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	sourceIDPtr, err := ts.CreateNode("system", nil, "Source", "source", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode source failed: %v", err)
+	}
+	sourceID := *sourceIDPtr
+
+	firstKafkaIDPtr, err := ts.CreateNode("system", nil, "Kafka", "kafka", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode kafka failed: %v", err)
+	}
+	firstKafkaID := *firstKafkaIDPtr
+
+	sectionIDPtr, err := ts.CreateNode("system", nil, "Docs", "docs", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode docs failed: %v", err)
+	}
+	sectionID := *sectionIDPtr
+
+	secondKafkaIDPtr, err := ts.CreateNode("system", &sectionID, "Kafka", "kafka", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode docs/kafka failed: %v", err)
+	}
+	secondKafkaID := *secondKafkaIDPtr
+
+	sourcePage, err := ts.GetPage(sourceID)
+	if err != nil {
+		t.Fatalf("GetPage source failed: %v", err)
+	}
+	if err := svc.UpdateLinksForPage(sourcePage, "See [[Kafka]] for details."); err != nil {
+		t.Fatalf("UpdateLinksForPage failed: %v", err)
+	}
+
+	firstBacklinks, err := svc.GetBacklinksForPage(firstKafkaID)
+	if err != nil {
+		t.Fatalf("GetBacklinksForPage(first Kafka) failed: %v", err)
+	}
+	if firstBacklinks.Count != 1 {
+		t.Fatalf("expected 1 backlink for first Kafka, got %d: %#v", firstBacklinks.Count, firstBacklinks.Backlinks)
+	}
+	if firstBacklinks.Backlinks[0].FromPageID != sourceID {
+		t.Fatalf("first backlink FromPageID = %q, want %q", firstBacklinks.Backlinks[0].FromPageID, sourceID)
+	}
+	if firstBacklinks.Backlinks[0].ToPageID != firstKafkaID {
+		t.Fatalf("first backlink ToPageID = %q, want %q", firstBacklinks.Backlinks[0].ToPageID, firstKafkaID)
+	}
+	if firstBacklinks.Backlinks[0].Broken {
+		t.Fatalf("first backlink should not be marked broken")
+	}
+
+	secondBacklinks, err := svc.GetBacklinksForPage(secondKafkaID)
+	if err != nil {
+		t.Fatalf("GetBacklinksForPage(second Kafka) failed: %v", err)
+	}
+	if secondBacklinks.Count != 1 {
+		t.Fatalf("expected 1 backlink for second Kafka, got %d: %#v", secondBacklinks.Count, secondBacklinks.Backlinks)
+	}
+	if secondBacklinks.Backlinks[0].FromPageID != sourceID {
+		t.Fatalf("second backlink FromPageID = %q, want %q", secondBacklinks.Backlinks[0].FromPageID, sourceID)
+	}
+	if secondBacklinks.Backlinks[0].ToPageID != secondKafkaID {
+		t.Fatalf("second backlink ToPageID = %q, want %q", secondBacklinks.Backlinks[0].ToPageID, secondKafkaID)
+	}
+	if secondBacklinks.Backlinks[0].Broken {
+		t.Fatalf("second backlink should not be marked broken")
+	}
+}
+
+func TestLinkService_AmbiguousWikiLinksAreNotBrokenInSourceStatus(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	sourceIDPtr, err := ts.CreateNode("system", nil, "Source", "source", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode source failed: %v", err)
+	}
+	sourceID := *sourceIDPtr
+
+	_, err = ts.CreateNode("system", nil, "Kafka", "kafka", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode kafka failed: %v", err)
+	}
+
+	sectionIDPtr, err := ts.CreateNode("system", nil, "Docs", "docs", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode docs failed: %v", err)
+	}
+	sectionID := *sectionIDPtr
+
+	_, err = ts.CreateNode("system", &sectionID, "Kafka", "kafka", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode docs/kafka failed: %v", err)
+	}
+
+	sourcePage, err := ts.GetPage(sourceID)
+	if err != nil {
+		t.Fatalf("GetPage source failed: %v", err)
+	}
+	if err := svc.UpdateLinksForPage(sourcePage, "See [[Kafka]] for details."); err != nil {
+		t.Fatalf("UpdateLinksForPage failed: %v", err)
+	}
+
+	status, err := svc.GetLinkStatusForPage(sourceID, "/source")
+	if err != nil {
+		t.Fatalf("GetLinkStatusForPage failed: %v", err)
+	}
+	if status.Counts.Outgoings != 1 {
+		t.Fatalf("expected 1 outgoing, got %d: %#v", status.Counts.Outgoings, status)
+	}
+	if status.Counts.BrokenOutgoings != 0 {
+		t.Fatalf("expected 0 broken outgoings for ambiguous wikilink, got %d: %#v", status.Counts.BrokenOutgoings, status.BrokenOutgoings)
+	}
+	if len(status.BrokenOutgoings) != 0 {
+		t.Fatalf("expected no broken outgoings, got %#v", status.BrokenOutgoings)
+	}
+	if len(status.Outgoings) != 1 {
+		t.Fatalf("expected 1 outgoing entry, got %#v", status.Outgoings)
+	}
+	if status.Outgoings[0].Broken {
+		t.Fatalf("ambiguous wikilink outgoing should not be marked broken in status")
+	}
+	if status.Outgoings[0].ToPath != "Kafka" {
+		t.Fatalf("ToPath = %q, want %q", status.Outgoings[0].ToPath, "Kafka")
+	}
+}

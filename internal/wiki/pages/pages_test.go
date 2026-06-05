@@ -1272,6 +1272,68 @@ func TestApplyPageRefactorUseCase_RenameRewritesIncomingLinks(t *testing.T) {
 	}
 }
 
+func TestApplyPageRefactorUseCase_RenameRewritesTitleBasedWikiLinks(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+
+	target, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Target", Slug: "target", Kind: pageKind(),
+	})
+	ref, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Ref", Slug: "ref", Kind: pageKind(),
+	})
+	content := "[[Target]] and [[Target|Alias]]"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: ref.Page.ID, Version: ref.Page.Version(), Title: ref.Page.Title, Slug: ref.Page.Slug, Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage failed: %v", err)
+	}
+
+	updated, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+		UserID:  "system",
+		Version: target.Page.Version(),
+		RefactorPreviewInput: pages.RefactorPreviewInput{
+			PageID:  target.Page.ID,
+			Kind:    pages.RefactorKindRename,
+			Title:   "Target Renamed",
+			Slug:    "target-renamed",
+			Content: &target.Page.Content,
+		},
+		RewriteLinks: true,
+	})
+	if err != nil {
+		t.Fatalf("ApplyPageRefactor failed: %v", err)
+	}
+	if updated.CalculatePath() != "/target-renamed" {
+		t.Fatalf("updated path mismatch: %q", updated.CalculatePath())
+	}
+
+	refPage, err := deps.tree.GetPage(ref.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(ref) failed: %v", err)
+	}
+	wantContent := "[[Target Renamed]] and [[Target Renamed|Alias]]"
+	if refPage.Content != wantContent {
+		t.Fatalf("ref content = %q, want %q", refPage.Content, wantContent)
+	}
+
+	outgoing, err := deps.links.GetOutgoingLinksForPage(ref.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks failed: %v", err)
+	}
+	if outgoing.Count != 1 {
+		t.Fatalf("expected 1 outgoing, got %d", outgoing.Count)
+	}
+	if outgoing.Outgoings[0].ToPath != "/target-renamed" {
+		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "/target-renamed")
+	}
+	if outgoing.Outgoings[0].Broken {
+		t.Fatalf("expected rewritten wikilink to remain valid")
+	}
+}
+
 func TestPreviewPageRefactorUseCase_UsesEmptyWarningArrays(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
@@ -1435,6 +1497,145 @@ func TestApplyPageRefactorUseCase_Move_RewritesRelativeOutgoingLinksInMovedPage(
 	}
 	if afterMovedRevision.Type != revision.RevisionTypeContentUpdate {
 		t.Fatalf("expected moved page latest revision type %q, got %q", revision.RevisionTypeContentUpdate, afterMovedRevision.Type)
+	}
+}
+
+func TestApplyPageRefactorUseCase_Move_LeavesTitleBasedWikiLinksUnchanged(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+
+	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Docs", Slug: "docs", Kind: pageKind(),
+	})
+	target, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &docs.Page.ID, Title: "Target", Slug: "target", Kind: pageKind(),
+	})
+	ref, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Ref", Slug: "ref", Kind: pageKind(),
+	})
+	archive, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Archive", Slug: "archive", Kind: pageKind(),
+	})
+
+	content := "[[Target]]"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: ref.Page.ID, Version: ref.Page.Version(), Title: ref.Page.Title, Slug: ref.Page.Slug, Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(ref) failed: %v", err)
+	}
+
+	updated, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+		UserID:  "system",
+		Version: target.Page.Version(),
+		RefactorPreviewInput: pages.RefactorPreviewInput{
+			PageID:      target.Page.ID,
+			Kind:        pages.RefactorKindMove,
+			NewParentID: &archive.Page.ID,
+		},
+		RewriteLinks: true,
+	})
+	if err != nil {
+		t.Fatalf("ApplyPageRefactor(move) failed: %v", err)
+	}
+	if updated.CalculatePath() != "/archive/target" {
+		t.Fatalf("updated path = %q, want %q", updated.CalculatePath(), "/archive/target")
+	}
+
+	refPage, err := deps.tree.GetPage(ref.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(ref) failed: %v", err)
+	}
+	if refPage.Content != "[[Target]]" {
+		t.Fatalf("ref content = %q, want %q", refPage.Content, "[[Target]]")
+	}
+
+	outgoing, err := deps.links.GetOutgoingLinksForPage(ref.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(ref) failed: %v", err)
+	}
+	if outgoing.Count != 1 {
+		t.Fatalf("expected 1 outgoing link, got %d", outgoing.Count)
+	}
+	if outgoing.Outgoings[0].ToPageID != target.Page.ID {
+		t.Fatalf("ToPageID = %q, want %q", outgoing.Outgoings[0].ToPageID, target.Page.ID)
+	}
+	if outgoing.Outgoings[0].ToPath != "/archive/target" {
+		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "/archive/target")
+	}
+	if outgoing.Outgoings[0].Broken {
+		t.Fatalf("expected title-based wikilink to remain valid after move")
+	}
+}
+
+func TestApplyPageRefactorUseCase_Move_RewritesPathHintWikiLinks(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+
+	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Docs", Slug: "docs", Kind: pageKind(),
+	})
+	target, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &docs.Page.ID, Title: "Target", Slug: "target", Kind: pageKind(),
+	})
+	ref, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Ref", Slug: "ref", Kind: pageKind(),
+	})
+	archive, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Archive", Slug: "archive", Kind: pageKind(),
+	})
+
+	content := "[[docs/target]] and [[docs/target|Alias]]"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: ref.Page.ID, Version: ref.Page.Version(), Title: ref.Page.Title, Slug: ref.Page.Slug, Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(ref) failed: %v", err)
+	}
+
+	updated, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+		UserID:  "system",
+		Version: target.Page.Version(),
+		RefactorPreviewInput: pages.RefactorPreviewInput{
+			PageID:      target.Page.ID,
+			Kind:        pages.RefactorKindMove,
+			NewParentID: &archive.Page.ID,
+		},
+		RewriteLinks: true,
+	})
+	if err != nil {
+		t.Fatalf("ApplyPageRefactor(move) failed: %v", err)
+	}
+	if updated.CalculatePath() != "/archive/target" {
+		t.Fatalf("updated path = %q, want %q", updated.CalculatePath(), "/archive/target")
+	}
+
+	refPage, err := deps.tree.GetPage(ref.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(ref) failed: %v", err)
+	}
+	wantContent := "[[archive/target]] and [[archive/target|Alias]]"
+	if refPage.Content != wantContent {
+		t.Fatalf("ref content = %q, want %q", refPage.Content, wantContent)
+	}
+
+	outgoing, err := deps.links.GetOutgoingLinksForPage(ref.Page.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks(ref) failed: %v", err)
+	}
+	if outgoing.Count != 1 {
+		t.Fatalf("expected 1 outgoing link, got %d", outgoing.Count)
+	}
+	if outgoing.Outgoings[0].ToPageID != target.Page.ID {
+		t.Fatalf("ToPageID = %q, want %q", outgoing.Outgoings[0].ToPageID, target.Page.ID)
+	}
+	if outgoing.Outgoings[0].ToPath != "/archive/target" {
+		t.Fatalf("ToPath = %q, want %q", outgoing.Outgoings[0].ToPath, "/archive/target")
+	}
+	if outgoing.Outgoings[0].Broken {
+		t.Fatalf("expected path-hint wikilink to remain valid after move")
 	}
 }
 
