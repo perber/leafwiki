@@ -271,6 +271,15 @@ test.describe('WikiLink [[Title]] refactoring and link status', () => {
     await metaDialog.fillSlug(newSlug);
     await metaDialog.submit();
 
+    // Auto-save skips slug changes — trigger a manual save.
+    // Wait until the toolbar reflects the metadata change so the manual save
+    // click actually starts the refactor flow.
+    const saveButton = page.locator('button[data-testid="save-page-button"]');
+    await expect(saveButton).toBeEnabled();
+    // Click the button without awaiting completion: the refactor dialog appears
+    // mid-save and must be confirmed before the save promise resolves.
+    await saveButton.click();
+
     // Slug changed → refactor preview dialog must appear.
     const movePageDialog = new MovePageDialog(page);
     await movePageDialog.expectRefactorDialogVisible();
@@ -283,6 +292,10 @@ test.describe('WikiLink [[Title]] refactoring and link status', () => {
     ).toContainText(`[[${targetTitle}]]`);
 
     await movePageDialog.confirmRefactorDialog();
+
+    // Wait for the save to complete after the dialog is confirmed.
+    await page.getByText('Page saved successfully').last().waitFor({ state: 'visible' });
+
     await editPage.closeEditor();
 
     // After rewrite, the ref page content must use the new title.
