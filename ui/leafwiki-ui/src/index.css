@@ -918,7 +918,7 @@
 
   /* Markdown Editor Toolbar */
   .markdown-toolbar {
-    @apply border-markdown-toolbar-border bg-markdown-toolbar sticky top-0 z-10 flex min-h-12 flex-wrap items-center gap-1.5 border-b pr-2 pl-2 shadow-xs;
+    @apply border-markdown-toolbar-border bg-markdown-toolbar sticky top-0 z-10 flex min-h-12 flex-wrap items-center gap-1.5 border-b pr-2 pl-2 shadow-xs max-sm:gap-1 max-sm:px-1;
   }
 
   .markdown-toolbar__button {
@@ -934,7 +934,7 @@
   }
 
   .markdown-toolbar__separator {
-    @apply bg-surface-border/60 mx-1 h-5 w-px self-center;
+    @apply bg-surface-border/60 mx-1 h-5 w-px self-center max-sm:mx-0;
   }
 
   .markdown-toolbar__separator--desktop-only {
@@ -1558,7 +1558,7 @@
   }
 
   .page-viewer__toc-button {
-    @apply flex w-full items-center justify-end md:w-auto md:shrink-0 md:self-center;
+    @apply flex w-auto items-center self-start md:shrink-0 md:justify-end md:self-center;
   }
 
   .page-viewer__metadata-bar-inner {

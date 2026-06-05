@@ -94,7 +94,12 @@ export default function TreeView() {
           <>
             <TreeViewActionButton
               actionName="add"
-              icon={<FilePlus className="tree-view__action-icon" size={18} />}
+              icon={
+                <FilePlus
+                  className="tree-view__action-icon text-brand/70!"
+                  size={18}
+                />
+              }
               tooltip="Create new page"
               onClick={() =>
                 openDialog(DIALOG_ADD_PAGE, {
@@ -105,7 +110,12 @@ export default function TreeView() {
             />
             <TreeViewActionButton
               actionName="add-section"
-              icon={<FolderPlus className="tree-view__action-icon" size={18} />}
+              icon={
+                <FolderPlus
+                  className="tree-view__action-icon text-brand/70!"
+                  size={18}
+                />
+              }
               tooltip="Create new section"
               onClick={() =>
                 openDialog(DIALOG_ADD_PAGE, {
