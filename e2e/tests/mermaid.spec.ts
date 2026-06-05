@@ -71,64 +71,74 @@ test.describe('Mermaid rendering', () => {
     await expect(page.locator('article')).not.toContainText('Unable to render Mermaid diagram');
   });
 
-  // Regression for #1131: <img> in a flowchart node must render as SVG.
+  // Regression for #1131: <img> in a flowchart node must render as SVG for
+  // both single-quoted and double-quoted src attributes.
   // Previously DOMParser (image/svg+xml) choked on the HTML void element and
   // injected a raw XML parseerror into the DOM instead of rendering the diagram.
-  test('mermaid-flowchart-with-img-node-renders-svg', async ({ page }) => {
-    const s = Date.now();
-    // Single quotes inside the src attribute — the correct Mermaid syntax
-    // for HTML in node labels (double-quote wrapping confuses the parser).
-    const content = [
-      '```mermaid',
-      'flowchart TD',
-      "  A[Christmas <img src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==' />] -->|Get money| B(Go shopping)",
-      '  B --> C{Done?}',
-      '  C -->|Yes| D[Laptop]',
-      '  C -->|No| E[Phone]',
-      '```',
-    ].join('\n');
+  for (const [label, imgTag] of [
+    [
+      'singlequote',
+      "<img src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==' />",
+    ],
+    [
+      'doublequote',
+      '<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />',
+    ],
+  ] as const) {
+    test(`mermaid-flowchart-with-img-${label}-node-renders-svg`, async ({ page }) => {
+      const s = Date.now();
+      const content = [
+        '```mermaid',
+        'flowchart TD',
+        `  A[Christmas ${imgTag}] -->|Get money| B(Go shopping)`,
+        '  B --> C{Done?}',
+        '  C -->|Yes| D[Laptop]',
+        '  C -->|No| E[Phone]',
+        '```',
+      ].join('\n');
 
-    await createPage(page, {
-      title: `Mermaid Img ${s}`,
-      slug: `mermaid-img-${s}`,
-      content,
+      await createPage(page, {
+        title: `Mermaid Img ${label} ${s}`,
+        slug: `mermaid-img-${label}-${s}`,
+        content,
+      });
+
+      const pageErrors: string[] = [];
+      page.on('pageerror', (err) => pageErrors.push(err.message));
+
+      await new ViewPage(page).goto(`/mermaid-img-${label}-${s}`);
+
+      // Wait until either the SVG renders or the error UI is shown.
+      await expect
+        .poll(
+          async () => {
+            const svgVisible = await page
+              .locator('article svg')
+              .first()
+              .isVisible()
+              .catch(() => false);
+            const errorUiVisible = await page
+              .getByText('Unable to render Mermaid diagram.')
+              .isVisible()
+              .catch(() => false);
+            return svgVisible || errorUiVisible;
+          },
+          { timeout: 15000 },
+        )
+        .toBe(true);
+
+      // No error of any kind must appear.
+      await expect(page.locator('article')).not.toContainText('Unable to render Mermaid diagram.', {
+        timeout: 1000,
+      });
+      await expect(page.locator('article')).not.toContainText('Opening and ending tag mismatch', {
+        timeout: 1000,
+      });
+
+      // The diagram must render as SVG.
+      await expect(page.locator('article svg').first()).toBeVisible({ timeout: 10000 });
+
+      expect(pageErrors, `unexpected page errors: ${pageErrors.join('; ')}`).toHaveLength(0);
     });
-
-    const pageErrors: string[] = [];
-    page.on('pageerror', (err) => pageErrors.push(err.message));
-
-    await new ViewPage(page).goto(`/mermaid-img-${s}`);
-
-    // Wait until either the SVG renders or the error UI is shown.
-    await expect
-      .poll(
-        async () => {
-          const svgVisible = await page
-            .locator('article svg')
-            .first()
-            .isVisible()
-            .catch(() => false);
-          const errorUiVisible = await page
-            .getByText('Unable to render Mermaid diagram.')
-            .isVisible()
-            .catch(() => false);
-          return svgVisible || errorUiVisible;
-        },
-        { timeout: 15000 },
-      )
-      .toBe(true);
-
-    // No error of any kind must appear.
-    await expect(page.locator('article')).not.toContainText('Unable to render Mermaid diagram.', {
-      timeout: 1000,
-    });
-    await expect(page.locator('article')).not.toContainText('Opening and ending tag mismatch', {
-      timeout: 1000,
-    });
-
-    // The diagram must render as SVG with the image visible inside the node.
-    await expect(page.locator('article svg').first()).toBeVisible({ timeout: 10000 });
-
-    expect(pageErrors, `unexpected page errors: ${pageErrors.join('; ')}`).toHaveLength(0);
-  });
+  }
 });
