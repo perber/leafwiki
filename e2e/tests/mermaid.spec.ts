@@ -81,7 +81,7 @@ test.describe('Mermaid rendering', () => {
     const content = [
       '```mermaid',
       'flowchart TD',
-      "  A[Christmas <img src='https://img.shields.io/badge/test-ok-blue' />] -->|Get money| B(Go shopping)",
+      "  A[Christmas <img src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==' />] -->|Get money| B(Go shopping)",
       '  B --> C{Done?}',
       '  C -->|Yes| D[Laptop]',
       '  C -->|No| E[Phone]',
@@ -99,8 +99,24 @@ test.describe('Mermaid rendering', () => {
 
     await new ViewPage(page).goto(`/mermaid-img-${s}`);
 
-    // Give the renderer time to attempt rendering.
-    await page.waitForTimeout(3000);
+    // Wait until either the SVG renders or the error UI is shown.
+    await expect
+      .poll(
+        async () => {
+          const svgVisible = await page
+            .locator('article svg')
+            .first()
+            .isVisible()
+            .catch(() => false);
+          const errorUiVisible = await page
+            .getByText('Unable to render Mermaid diagram.')
+            .isVisible()
+            .catch(() => false);
+          return svgVisible || errorUiVisible;
+        },
+        { timeout: 15000 },
+      )
+      .toBe(true);
 
     // No error of any kind must appear.
     await expect(page.locator('article')).not.toContainText('Unable to render Mermaid diagram.', {

@@ -117,9 +117,12 @@ export function useMermaidInjector({
         // image/svg+xml so that HTML void elements such as <img> inside
         // <foreignObject> nodes do not cause a parseerror element to be
         // injected into the DOM (raw XML error visible to the user).
-        const wrapper = document.createElement('div')
-        wrapper.innerHTML = svg
-        const newSvg = wrapper.querySelector('svg') as SVGSVGElement | null
+        // Use <template> to keep the fragment inert (no side-effect fetches).
+        const template = document.createElement('template')
+        template.innerHTML = svg
+        const newSvg = template.content.querySelector(
+          'svg',
+        ) as SVGSVGElement | null
         if (!newSvg) throw new Error('No SVG element in Mermaid output')
         newSvg.setAttribute('width', '100%')
         newSvg.removeAttribute('height')
