@@ -95,6 +95,7 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 		UserID:         in.UserID,
 		After:          after,
 		OldPath:        oldPath,
+		OldTitle:       oldTitle,
 		ContentChanged: contentChanged,
 		SlugChanged:    slugChanged,
 		TitleChanged:   titleChanged,

@@ -144,7 +144,7 @@ func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []T
 			if len(pages) == 1 {
 				result = append(result, TargetLink{
 					TargetPageID:   pages[0].ID,
-					TargetPagePath: normalizeWikiPath(pages[0].CalculatePath()),
+					TargetPagePath: wikilinkSentinel(target),
 					Broken:         false,
 				})
 				continue
@@ -163,7 +163,7 @@ func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []T
 		if len(pages) == 1 {
 			result = append(result, TargetLink{
 				TargetPageID:   pages[0].ID,
-				TargetPagePath: normalizeWikiPath(pages[0].CalculatePath()),
+				TargetPagePath: wikilinkSentinel(target),
 				Broken:         false,
 			})
 		} else {

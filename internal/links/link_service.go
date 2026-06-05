@@ -83,6 +83,10 @@ func (b *LinkService) GetRefactorSourcePageIDsForPrefix(oldPrefix string) ([]str
 	return b.store.GetRefactorSourcePageIDsForPrefix(oldPrefix)
 }
 
+func (b *LinkService) GetRefactorSourcePageIDsForWikiLinkTitle(title string) ([]string, error) {
+	return b.store.GetRefactorSourcePageIDsForWikiLinkTitle(title)
+}
+
 func (b *LinkService) UpdateRewrittenLinksAndHealForPages(pages []*tree.Page, rules []RewriteRule) error {
 	outgoingByPageID, err := b.store.GetOutgoingLinksForPages(pageIDsForPages(pages))
 	if err != nil {
@@ -287,10 +291,29 @@ func (b *LinkService) HealLinksForExactPath(page *tree.Page) error {
 }
 
 // HealWikiLinksForPage heals broken [[Title]] sentinel records that target
-// this page's title. Called after page creation or restore so that wiki-links
-// written before the target page existed are automatically resolved.
+// this page's title, but only when exactly one page with that title exists.
+// If the title is shared by multiple pages the link is ambiguous and must
+// remain as a broken sentinel.
 func (b *LinkService) HealWikiLinksForPage(page *tree.Page) error {
+	if len(b.treeService.FindPagesByTitle(page.Title)) != 1 {
+		return nil
+	}
 	return b.store.HealWikiLinksForTitle(page.Title, page.ID)
+}
+
+// HealWikiLinksForTitleIfUnambiguous heals broken [[Title]] sentinels when
+// exactly one page with that title now exists. Called after a page is deleted
+// so that formerly ambiguous wikilinks become resolved if only one candidate
+// remains.
+func (b *LinkService) HealWikiLinksForTitleIfUnambiguous(title string) error {
+	if title == "" {
+		return nil
+	}
+	matches := b.treeService.FindPagesByTitle(title)
+	if len(matches) != 1 {
+		return nil
+	}
+	return b.store.HealWikiLinksForTitle(title, matches[0].ID)
 }
 
 func (b *LinkService) Close() error {

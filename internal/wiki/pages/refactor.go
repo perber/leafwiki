@@ -94,7 +94,13 @@ func (uc *PreviewPageRefactorUseCase) Execute(_ context.Context, in RefactorPrev
 	}
 
 	excludeIDs := subtreeIDSet(page.PageNode)
-	affectedPages, matchedLinks, err := uc.getAffectedPages(oldPath, page.Title, excludeIDs)
+	// For renames that change the title, also surface pages that reference the
+	// old title via [[OldTitle]] wiki-link sentinels.
+	sentinelTitle := ""
+	if in.Kind == RefactorKindRename && in.Title != page.Title {
+		sentinelTitle = page.Title
+	}
+	affectedPages, matchedLinks, err := uc.getAffectedPages(oldPath, page.Title, excludeIDs, sentinelTitle)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +171,7 @@ func (uc *PreviewPageRefactorUseCase) resolveParentPath(parentID string) (string
 	return parent.CalculatePath(), nil
 }
 
-func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle string, excludeIDs map[string]struct{}) ([]RefactorAffectedPage, int, error) {
+func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle string, excludeIDs map[string]struct{}, sentinelTitle string) ([]RefactorAffectedPage, int, error) {
 	if uc.links == nil {
 		return nil, 0, nil
 	}
@@ -197,6 +203,39 @@ func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle
 			item.MatchedPaths = append(item.MatchedPaths, match.ToPath)
 		}
 		totalMatches++
+	}
+
+	// For title-changing renames, also include pages that reference the old
+	// title via [[OldTitle]] wiki-link sentinels (not matched by path prefix).
+	if sentinelTitle != "" {
+		sentinelIDs, err := uc.links.GetRefactorSourcePageIDsForWikiLinkTitle(sentinelTitle)
+		if err != nil {
+			return nil, 0, err
+		}
+		wikiLinkSyntax := "[[" + sentinelTitle + "]]"
+		for _, id := range sentinelIDs {
+			if _, excluded := excludeIDs[id]; excluded {
+				continue
+			}
+			if _, already := grouped[id]; already {
+				// Already found via path-prefix query; wiki-link annotation
+				// is handled in the items loop below.
+				continue
+			}
+			fromPath := ""
+			fromTitle := ""
+			if p, err := uc.tree.GetPage(id); err == nil && p != nil {
+				fromPath = p.CalculatePath()
+				fromTitle = p.Title
+			}
+			grouped[id] = &RefactorAffectedPage{
+				FromPageID:   id,
+				FromTitle:    fromTitle,
+				FromPath:     fromPath,
+				MatchedPaths: []string{wikiLinkSyntax},
+			}
+			totalMatches++
+		}
 	}
 
 	engine := links.NewMarkdownRefactorEngine()
@@ -389,6 +428,24 @@ func (uc *ApplyPageRefactorUseCase) buildApplyPlan(in RefactorApplyInput) (*appl
 			continue
 		}
 		plan.affectedPageIDs = append(plan.affectedPageIDs, pageID)
+	}
+
+	// For renames that change the title, also find pages that reference the old
+	// title via a sentinel (wikilink:OldTitle). These are stored as sentinels and
+	// are not found by the prefix-based lookup above.
+	if in.Kind == RefactorKindRename && in.Title != plan.page.Title {
+		sentinelIDs, err := uc.links.GetRefactorSourcePageIDsForWikiLinkTitle(plan.page.Title)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range sentinelIDs {
+			if _, excluded := excludeIDs[id]; excluded {
+				continue
+			}
+			if !containsString(plan.affectedPageIDs, id) {
+				plan.affectedPageIDs = append(plan.affectedPageIDs, id)
+			}
+		}
 	}
 
 	return plan, nil
