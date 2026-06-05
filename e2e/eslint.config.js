@@ -23,7 +23,7 @@ module.exports = tseslint.config(
     rules: {
       'prettier/prettier': ['error'],
 
-      'quotes': ['error', 'single'],
+      'quotes': ['error', 'single', { 'avoidEscape': true }],
       'semi': ['error', 'always'],
       'no-console': 'off',
       'no-var': 'off',

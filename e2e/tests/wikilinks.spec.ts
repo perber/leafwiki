@@ -1,4 +1,5 @@
-import test, { Page, expect } from '@playwright/test';
+import test, { expect } from '@playwright/test';
+import { createPage } from '../helpers/api';
 import CreatePageByPathDialog from '../pages/CreatePageByPathDialog';
 import EditPage from '../pages/EditPage';
 import LoginPage from '../pages/LoginPage';
@@ -6,53 +7,6 @@ import ViewPage from '../pages/ViewPage';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
 const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
-
-// ─── API helpers ─────────────────────────────────────────────────────────────
-
-function getCsrfScript(): string {
-  return `
-    const hostMatch =
-      document.cookie.match(/(?:^|;\\s*)__Host-leafwiki_csrf=([^;]+)/) ??
-      document.cookie.match(/(?:^|;\\s*)leafwiki_csrf=([^;]+)/);
-    if (!hostMatch) throw new Error('Missing CSRF token cookie');
-    try { return decodeURIComponent(hostMatch[1]); } catch { return hostMatch[1]; }
-  `;
-}
-
-async function createPage(page: Page, input: { title: string; slug: string; content?: string }) {
-  await page.evaluate(
-    async ({ title, slug, content, csrfScript }) => {
-      const csrfToken = new Function(csrfScript)() as string;
-
-      const createRes = await fetch('/api/pages', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ parentId: null, title, slug, kind: 'page' }),
-      });
-      if (!createRes.ok) throw new Error(`create failed: ${createRes.status}`);
-
-      if (content !== undefined) {
-        const created = (await createRes.json()) as { id: string; version: string };
-        const updateRes = await fetch(`/api/pages/${created.id}`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-          body: JSON.stringify({
-            version: created.version,
-            title,
-            slug,
-            content,
-            tags: [],
-            properties: {},
-          }),
-        });
-        if (!updateRes.ok) throw new Error(`update failed: ${updateRes.status}`);
-      }
-    },
-    { ...input, csrfScript: getCsrfScript() },
-  );
-}
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
