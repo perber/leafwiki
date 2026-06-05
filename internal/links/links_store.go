@@ -99,6 +99,7 @@ func (s *LinksStore) ensureSchema() error {
 		CREATE INDEX IF NOT EXISTS idx_links_to_path    ON links(to_path);
 		CREATE INDEX IF NOT EXISTS idx_links_to_path_from_page_id ON links(to_path, from_page_id);
 		CREATE INDEX IF NOT EXISTS idx_links_broken     ON links(broken);
+		CREATE INDEX IF NOT EXISTS idx_links_to_path_lower ON links(LOWER(to_path));
 	`)
 	return err
 }
@@ -578,8 +579,8 @@ func (s *LinksStore) HealWikiLinksForTitle(title string, pageID string) error {
 	_, err := s.db.Exec(`
 		UPDATE links
 		SET to_page_id = ?, broken = 0
-		WHERE to_path COLLATE NOCASE = ? AND broken = 1
-	`, pageID, wikilinkSentinelPrefix+title)
+		WHERE LOWER(to_path) = ? AND broken = 1
+	`, pageID, strings.ToLower(wikilinkSentinelPrefix+title))
 
 	return err
 }
