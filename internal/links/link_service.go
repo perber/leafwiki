@@ -54,7 +54,19 @@ func (b *LinkService) ClearLinks() error {
 }
 
 func (b *LinkService) GetBacklinksForPage(pageID string) (*BacklinkResult, error) {
+	pageTitle := ""
+	if page, err := b.treeService.GetPage(pageID); err == nil {
+		pageTitle = page.Title
+	}
+
 	backlinks, err := b.store.GetBacklinksForPage(pageID)
+	if err != nil {
+		return nil, err
+	}
+	backlinks, err = b.mergeAmbiguousWikiLinksIntoBacklinks(pageID, pageTitle, backlinks)
+	if err != nil {
+		return nil, err
+	}
 	return toBacklinkResult(b.treeService, backlinks), err
 }
 
@@ -101,9 +113,17 @@ func (b *LinkService) UpdateRewrittenLinksAndHealForPages(pages []*tree.Page, ru
 
 func (b *LinkService) GetLinkStatusForPage(pageID string, pagePath string) (*LinkStatusResult, error) {
 	pagePath = normalizeWikiPath(pagePath)
+	page, err := b.treeService.GetPage(pageID)
+	if err != nil {
+		return nil, err
+	}
 
 	// 1) Valid inbound backlinks
 	validBacklinks, err := b.store.GetBacklinksForPage(pageID)
+	if err != nil {
+		return nil, err
+	}
+	validBacklinks, err = b.mergeAmbiguousWikiLinksIntoBacklinks(pageID, page.Title, validBacklinks)
 	if err != nil {
 		return nil, err
 	}
@@ -121,16 +141,20 @@ func (b *LinkService) GetLinkStatusForPage(pageID string, pagePath string) (*Lin
 	if err != nil {
 		return nil, err
 	}
-	outgoingResult := toOutgoingLinkResult(b.treeService, outgoings)
-
 	// Split outgoing in broken/non-broken
-	okOut := make([]OutgoingResultItem, 0, len(outgoingResult.Outgoings))
+	okOut := make([]OutgoingResultItem, 0, len(outgoings))
 	brokenOut := make([]OutgoingResultItem, 0)
-	for _, it := range outgoingResult.Outgoings {
-		if it.Broken {
-			brokenOut = append(brokenOut, it)
+	for _, outgoing := range outgoings {
+		item := toOutgoingResultItem(b.treeService, outgoing)
+		if outgoing.Broken && b.isAmbiguousWikilinkOutgoing(outgoing) {
+			item.Broken = false
+			okOut = append(okOut, item)
+			continue
+		}
+		if item.Broken {
+			brokenOut = append(brokenOut, item)
 		} else {
-			okOut = append(okOut, it)
+			okOut = append(okOut, item)
 		}
 	}
 
@@ -146,6 +170,65 @@ func (b *LinkService) GetLinkStatusForPage(pageID string, pagePath string) (*Lin
 			BrokenOutgoings: len(brokenOut),
 		},
 	}, nil
+}
+
+func (b *LinkService) mergeAmbiguousWikiLinksIntoBacklinks(pageID string, pageTitle string, backlinks []Backlink) ([]Backlink, error) {
+	if pageTitle == "" {
+		return backlinks, nil
+	}
+
+	matches := b.treeService.FindPagesByTitle(pageTitle)
+	if len(matches) <= 1 {
+		return backlinks, nil
+	}
+
+	isMatchingPage := false
+	for _, match := range matches {
+		if match != nil && match.ID == pageID {
+			isMatchingPage = true
+			break
+		}
+	}
+	if !isMatchingPage {
+		return backlinks, nil
+	}
+
+	ambiguousRefs, err := b.store.GetBrokenIncomingForPath(wikilinkSentinel(pageTitle))
+	if err != nil {
+		return nil, err
+	}
+	if len(ambiguousRefs) == 0 {
+		return backlinks, nil
+	}
+
+	seen := make(map[string]struct{}, len(backlinks))
+	merged := make([]Backlink, 0, len(backlinks)+len(ambiguousRefs))
+	for _, backlink := range backlinks {
+		key := backlink.FromPageID + "\x00" + backlink.ToPageID
+		seen[key] = struct{}{}
+		merged = append(merged, backlink)
+	}
+
+	for _, backlink := range ambiguousRefs {
+		backlink.ToPageID = pageID
+		backlink.Broken = false
+		key := backlink.FromPageID + "\x00" + backlink.ToPageID
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, backlink)
+	}
+
+	return merged, nil
+}
+
+func (b *LinkService) isAmbiguousWikilinkOutgoing(outgoing Outgoing) bool {
+	if !outgoing.Broken || !IsWikilinkSentinel(outgoing.ToPath) {
+		return false
+	}
+
+	return len(b.treeService.FindPagesByTitle(WikilinkTitleFromSentinel(outgoing.ToPath))) > 1
 }
 
 func (b *LinkService) UpdateLinksForPage(page *tree.Page, content string) error {

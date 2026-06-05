@@ -317,6 +317,11 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath); err != nil {
 			return nil, err
 		}
+		if in.RewriteLinks {
+			if err := uc.refreshAffectedPageLinks(plan.affectedPageIDs); err != nil {
+				return nil, err
+			}
+		}
 		return uc.tree.GetPage(updated.Page.ID)
 
 	case RefactorKindMove:
@@ -330,6 +335,11 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		}
 		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath); err != nil {
 			return nil, err
+		}
+		if in.RewriteLinks {
+			if err := uc.refreshAffectedPageLinks(plan.affectedPageIDs); err != nil {
+				return nil, err
+			}
 		}
 		return uc.tree.GetPage(in.PageID)
 
@@ -478,6 +488,28 @@ func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected
 		}
 	}
 	return nil
+}
+
+func (uc *ApplyPageRefactorUseCase) refreshAffectedPageLinks(pageIDs []string) error {
+	if uc.links == nil || len(pageIDs) == 0 {
+		return nil
+	}
+
+	pagesByID := uc.loadPagesByID(pageIDs, "failed to get page for link refresh, skipping")
+	currentPages := make([]*tree.Page, 0, len(pageIDs))
+	for _, pageID := range pageIDs {
+		page, ok := pagesByID[pageID]
+		if !ok {
+			continue
+		}
+		currentPages = append(currentPages, page)
+	}
+
+	if len(currentPages) == 0 {
+		return nil
+	}
+
+	return uc.links.UpdateLinksAndHealForPages(currentPages)
 }
 
 func (uc *ApplyPageRefactorUseCase) rewritePathChangedSubtree(userID string, snapshots []pathChangeSnapshot, oldPath, newPath string) error {
