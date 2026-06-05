@@ -51,19 +51,19 @@ export function useToolbarActions({
         action: editPage,
       },
       {
-        id: 'print-page',
-        label: `Print ${itemLabel}`,
-        hotkey: 'Ctrl+P',
-        icon: <Printer size={18} />,
-        action: printPage,
-      },
-      {
         id: 'page-permalink',
         label: `Share ${itemLabel}`,
         hotkey: 'Ctrl+Shift+L',
         icon: <Link2 size={18} />,
         variant: 'outline',
         action: showPermalink,
+      },
+      {
+        id: 'print-page',
+        label: `Print ${itemLabel}`,
+        hotkey: 'Ctrl+P',
+        icon: <Printer size={18} />,
+        action: printPage,
       },
       {
         id: 'copy-page',

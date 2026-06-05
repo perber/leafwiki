@@ -11,15 +11,16 @@ import { cn } from '@/lib/utils'
 import { Check, MoreHorizontal } from 'lucide-react'
 import { useToolbarStore } from './toolbarStore'
 
-const MOBILE_VISIBLE_BUTTONS = 2
+const VISIBLE_BUTTONS = 2
 
 export function Toolbar() {
   const buttons = useToolbarStore((state) => state.buttons)
-  const overflowButtons = buttons.slice(MOBILE_VISIBLE_BUTTONS)
+  const visibleButtons = buttons.slice(0, VISIBLE_BUTTONS)
+  const overflowButtons = buttons.slice(VISIBLE_BUTTONS)
 
   return (
     <div className="flex items-center gap-1">
-      {buttons.map((button, index) => (
+      {visibleButtons.map((button) => (
         <ToolbarButton
           key={button.id}
           testId={`${button.id}-button`}
@@ -31,7 +32,6 @@ export function Toolbar() {
           active={button.active}
           variant={button.variant}
           className={button.className}
-          mobileHidden={index >= MOBILE_VISIBLE_BUTTONS}
         />
       ))}
 
@@ -42,14 +42,14 @@ export function Toolbar() {
               type="button"
               variant="outline"
               size="icon"
-              className="h-8 w-8 shadow-xs md:hidden"
+              className="h-8 w-8 shadow-xs"
               aria-label="More actions"
               data-testid="toolbar-overflow-button"
             >
               <MoreHorizontal size={18} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52 md:hidden">
+          <DropdownMenuContent align="end" className="w-52">
             {overflowButtons.map((button) => (
               <DropdownMenuItem
                 key={button.id}

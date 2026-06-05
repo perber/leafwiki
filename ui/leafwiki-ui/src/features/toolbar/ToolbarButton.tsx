@@ -12,7 +12,6 @@ export type ToolbarButtonProps = {
   active?: boolean
   icon: React.ReactNode
   className?: string
-  mobileHidden?: boolean
 }
 
 export function ToolbarButton({
@@ -25,13 +24,11 @@ export function ToolbarButton({
   icon,
   variant = 'outline',
   className,
-  mobileHidden = false,
 }: ToolbarButtonProps) {
   const combinedClassName = cn(
     'h-8 w-8 shadow-xs',
     active &&
       'bg-primary/15 border-primary text-primary hover:bg-primary/20 hover:text-primary',
-    mobileHidden && 'hidden md:inline-flex',
     className,
   )
 
