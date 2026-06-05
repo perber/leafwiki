@@ -100,7 +100,15 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
             <div className={clsx('tree-node__actions', treeActionButtonStyle)}>
               <TreeViewActionButton
                 actionName="add"
-                icon={<FilePlus size={18} className="tree-node__action-icon" />}
+                icon={
+                  <FilePlus
+                    size={18}
+                    className={clsx(
+                      'tree-node__action-icon',
+                      isMobile && 'text-brand/70!',
+                    )}
+                  />
+                }
                 tooltip="Create new page"
                 onClick={() =>
                   openDialog(DIALOG_ADD_PAGE, { parentId: node.id })

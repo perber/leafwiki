@@ -434,7 +434,7 @@
   }
 
   .history-sidebar__item {
-    @apply w-full rounded-none px-4 py-3;
+    @apply min-h-[48px] w-full rounded-none px-4 py-3;
   }
 
   .history-sidebar__item:hover {
@@ -483,7 +483,7 @@
   }
 
   .app-layout__sidebar-toggle-button {
-    @apply relative z-20 h-5 w-5 p-2;
+    @apply relative z-20 h-5 w-5 p-2 max-sm:h-8 max-sm:w-8;
   }
 
   .app-layout__logo-n-title {
@@ -511,7 +511,7 @@
   }
 
   .app-layout__editor-toolbar-container {
-    @apply flex min-h-full items-center gap-4;
+    @apply flex min-h-full items-center gap-4 max-sm:gap-2;
   }
 
   .app-layout__header-spacer {
@@ -572,7 +572,7 @@
 
   /** Base Dialog Styles **/
   .base-dialog__footer {
-    @apply mt-6 flex justify-end gap-2;
+    @apply mt-6 flex justify-end gap-2 max-sm:flex-col-reverse max-sm:[&>button]:w-full;
   }
 
   /* Form Input Styles */
@@ -633,7 +633,7 @@
   }
 
   .user-toolbar__avatar {
-    @apply h-5 w-5;
+    @apply h-5 w-5 max-sm:h-7 max-sm:w-7;
   }
 
   .user-toolbar__avatar > span {
@@ -775,7 +775,7 @@
 
   /* Login Form*/
   .login {
-    @apply border-surface-border bg-surface text-interface-text h-screen w-96 border-r shadow-md;
+    @apply border-surface-border bg-surface text-interface-text mx-auto w-full max-w-sm pt-8 shadow-md sm:mx-0 sm:h-screen sm:w-96 sm:max-w-none sm:border-r sm:pt-0;
   }
 
   .login__form {
@@ -811,7 +811,7 @@
   }
 
   .editor-title-bar__title {
-    @apply inline-block max-w-[15vw] truncate sm:max-w-[40vw];
+    @apply inline-block max-w-[15vw] truncate max-sm:max-w-[35vw] sm:max-w-[40vw];
   }
 
   .history-title-bar__mode {
@@ -858,7 +858,7 @@
   }
 
   .markdown-editor__tabs {
-    @apply border-surface-border text-interface-text mb-2 flex border-b text-sm;
+    @apply border-markdown-toolbar-border bg-markdown-toolbar text-interface-text flex border-b text-sm;
   }
 
   .markdown-editor__tab-button {
@@ -1538,7 +1538,7 @@
   }
 
   .page-viewer {
-    @apply mx-auto flex min-h-full w-full max-w-5xl flex-col px-8 pt-3 pb-0;
+    @apply mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 pt-3 pb-0 sm:px-8;
   }
 
   .page-viewer__subheader {
@@ -1546,7 +1546,7 @@
   }
 
   .page-viewer__subheader-inner {
-    @apply mx-auto flex w-full max-w-5xl flex-col gap-2 px-8 pt-0.75 pb-1.25 md:h-full md:flex-row md:items-center md:justify-between md:gap-4 md:py-0;
+    @apply mx-auto flex w-full max-w-5xl flex-col gap-2 px-4 pt-0.75 pb-1.25 sm:px-8 md:h-full md:flex-row md:items-center md:justify-between md:gap-4 md:py-0;
   }
 
   .page-viewer__subheader-main {
@@ -1562,7 +1562,7 @@
   }
 
   .page-viewer__metadata-bar-inner {
-    @apply mx-auto w-full max-w-5xl px-8 py-2;
+    @apply mx-auto w-full max-w-5xl px-4 py-2 sm:px-8;
   }
 
   .page-viewer__body {
@@ -1717,7 +1717,7 @@
   }
 
   .page-history__actions {
-    @apply flex flex-wrap gap-2 lg:justify-end;
+    @apply flex flex-wrap gap-2 max-sm:flex-col lg:justify-end;
   }
 
   .page-history__tabs {
@@ -1916,7 +1916,7 @@
   }
 
   .page-history__diff-line {
-    @apply border-surface-border grid grid-cols-[3rem_3rem_1.25rem_minmax(0,1fr)] border-b font-mono text-xs leading-5;
+    @apply border-surface-border grid grid-cols-[3rem_3rem_1.25rem_minmax(0,1fr)] border-b font-mono text-xs leading-5 max-sm:grid-cols-[2rem_2rem_1rem_minmax(0,1fr)] max-sm:text-[10px];
   }
 
   .page-history__diff-line:last-child {
@@ -2337,7 +2337,7 @@
   }
 
   .tree-node__main {
-    @apply flex w-full flex-1 items-center gap-2 pl-4;
+    @apply flex w-full flex-1 items-center gap-2.5 pl-4;
   }
 
   .tree-node__toggle {
@@ -2361,7 +2361,7 @@
   }
 
   .tree-node__link {
-    @apply w-full py-1;
+    @apply w-full py-2;
   }
 
   .tree-node__title {
@@ -2427,7 +2427,7 @@
   }
 
   .settings {
-    @apply mx-auto w-full max-w-4xl px-8 pt-8 pb-4;
+    @apply mx-auto w-full max-w-4xl px-4 pt-4 pb-4 sm:px-8 sm:pt-8;
   }
 
   .settings__title {
@@ -3021,6 +3021,7 @@
   html,
   body {
     @apply bg-page-bg text-page-text font-sans;
+    touch-action: manipulation;
   }
 
   /* Scrollbars */
