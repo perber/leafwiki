@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DIALOG_ASSET_MANAGER, DIALOG_LINK_INSERT } from '@/lib/registries'
@@ -17,6 +19,7 @@ import {
   Image,
   Italic,
   Link,
+  MoreHorizontal,
   Redo,
   Strikethrough,
   Table,
@@ -61,9 +64,6 @@ export default function MarkdownToolbar({
     return () => clearInterval(interval)
   }, [editorRef])
 
-  // Update asset version when modal opens
-  // This is to ensure that the preview updates when assets are changed
-  // Otherwise the preview might show stale assets (e.g., images) - Caching Issue
   const assetChangedHandler = useCallback(() => {
     if (onAssetVersionChange) {
       onAssetVersionChange(Date.now() || 0)
@@ -110,16 +110,18 @@ export default function MarkdownToolbar({
             <Italic className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Strikethrough" side="top" align="center">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => editorRef.current?.insertWrappedText('~~')}
-            className="markdown-toolbar__button"
-          >
-            <Strikethrough className="markdown-toolbar__icon" />
-          </Button>
-        </TooltipWrapper>
+        {!isMobile && (
+          <TooltipWrapper label="Strikethrough" side="top" align="center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => editorRef.current?.insertWrappedText('~~')}
+              className="markdown-toolbar__button"
+            >
+              <Strikethrough className="markdown-toolbar__icon" />
+            </Button>
+          </TooltipWrapper>
+        )}
         <TooltipWrapper label="Link (Ctrl+K)" side="top" align="center">
           <Button
             variant="ghost"
@@ -140,110 +142,112 @@ export default function MarkdownToolbar({
           </Button>
         </TooltipWrapper>
         <div className="markdown-toolbar__separator" />
-        <TooltipWrapper
-          label="Heading 1 (Ctrl+Alt+1)"
-          side="top"
-          align="center"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
-            onClick={() => editorRef.current?.insertHeading(1)}
-          >
-            H1
-          </Button>
-        </TooltipWrapper>
-        <TooltipWrapper
-          label="Heading 2 (Ctrl+Alt+2)"
-          side="top"
-          align="center"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
-            onClick={() => editorRef.current?.insertHeading(2)}
-          >
-            H2
-          </Button>
-        </TooltipWrapper>
-        <TooltipWrapper
-          label="Heading 3 (Ctrl+Alt+3)"
-          side="top"
-          align="center"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="markdown-toolbar__button markdown-toolbar__button--desktop-only"
-            onClick={() => editorRef.current?.insertHeading(3)}
-          >
-            H3
-          </Button>
-        </TooltipWrapper>
-        <div className="markdown-toolbar__separator markdown-toolbar__separator--desktop-only" />
-        <DropdownMenu
-          open={tablePickerOpen}
-          onOpenChange={(open) => {
-            setTablePickerOpen(open)
-            if (!open) {
-              setHovered(null)
-            }
-          }}
-        >
-          <TooltipWrapper label="Table" side="top" align="center">
-            <DropdownMenuTrigger asChild>
+        {!isMobile && (
+          <>
+            <TooltipWrapper
+              label="Heading 1 (Ctrl+Alt+1)"
+              side="top"
+              align="center"
+            >
               <Button
                 variant="ghost"
                 size="icon"
                 className="markdown-toolbar__button"
+                onClick={() => editorRef.current?.insertHeading(1)}
               >
-                <Table className="markdown-toolbar__icon" />
+                H1
               </Button>
-            </DropdownMenuTrigger>
-          </TooltipWrapper>
-          <DropdownMenuContent
-            className="p-2"
-            onCloseAutoFocus={(e) => e.preventDefault()}
-          >
-            <div className="text-muted-foreground mb-1 text-center text-xs">
-              {hovered ? `${hovered.col} × ${hovered.row}` : 'Select size'}
-            </div>
-            <div
-              className="grid gap-0.5"
-              style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}
+            </TooltipWrapper>
+            <TooltipWrapper
+              label="Heading 2 (Ctrl+Alt+2)"
+              side="top"
+              align="center"
             >
-              {Array.from({ length: 6 }, (_, rowIdx) =>
-                Array.from({ length: 6 }, (_, colIdx) => {
-                  const col = colIdx + 1
-                  const row = rowIdx + 1
-                  const highlighted =
-                    hovered && col <= hovered.col && row <= hovered.row
-                  return (
-                    <button
-                      key={`${col}-${row}`}
-                      type="button"
-                      aria-label={`Insert table ${col} x ${row}`}
-                      className={`h-5 w-5 rounded-sm border transition-colors ${highlighted ? 'bg-primary border-primary' : 'border-border hover:bg-accent bg-transparent'}`}
-                      onFocus={() => setHovered({ col, row })}
-                      onBlur={() => setHovered(null)}
-                      onMouseEnter={() => setHovered({ col, row })}
-                      onMouseLeave={() => setHovered(null)}
-                      onClick={() => {
-                        editorRef.current?.insertAtCursor(
-                          buildTableMarkdown(col, row),
-                        )
-                        setTablePickerOpen(false)
-                        setHovered(null)
-                      }}
-                    />
-                  )
-                }),
-              )}
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="markdown-toolbar__button"
+                onClick={() => editorRef.current?.insertHeading(2)}
+              >
+                H2
+              </Button>
+            </TooltipWrapper>
+            <TooltipWrapper
+              label="Heading 3 (Ctrl+Alt+3)"
+              side="top"
+              align="center"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="markdown-toolbar__button"
+                onClick={() => editorRef.current?.insertHeading(3)}
+              >
+                H3
+              </Button>
+            </TooltipWrapper>
+            <div className="markdown-toolbar__separator" />
+            <DropdownMenu
+              open={tablePickerOpen}
+              onOpenChange={(open) => {
+                setTablePickerOpen(open)
+                if (!open) setHovered(null)
+              }}
+            >
+              <TooltipWrapper label="Table" side="top" align="center">
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="markdown-toolbar__button"
+                  >
+                    <Table className="markdown-toolbar__icon" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipWrapper>
+              <DropdownMenuContent
+                className="p-2"
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
+                <div className="text-muted-foreground mb-1 text-center text-xs">
+                  {hovered ? `${hovered.col} × ${hovered.row}` : 'Select size'}
+                </div>
+                <div
+                  className="grid gap-0.5"
+                  style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}
+                >
+                  {Array.from({ length: 6 }, (_, rowIdx) =>
+                    Array.from({ length: 6 }, (_, colIdx) => {
+                      const col = colIdx + 1
+                      const row = rowIdx + 1
+                      const highlighted =
+                        hovered && col <= hovered.col && row <= hovered.row
+                      return (
+                        <button
+                          key={`${col}-${row}`}
+                          type="button"
+                          aria-label={`Insert table ${col} x ${row}`}
+                          className={`h-5 w-5 rounded-sm border transition-colors ${highlighted ? 'bg-primary border-primary' : 'border-border hover:bg-accent bg-transparent'}`}
+                          onFocus={() => setHovered({ col, row })}
+                          onBlur={() => setHovered(null)}
+                          onMouseEnter={() => setHovered({ col, row })}
+                          onMouseLeave={() => setHovered(null)}
+                          onClick={() => {
+                            editorRef.current?.insertAtCursor(
+                              buildTableMarkdown(col, row),
+                            )
+                            setTablePickerOpen(false)
+                            setHovered(null)
+                          }}
+                        />
+                      )
+                    }),
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
         <TooltipWrapper label="Code Block" side="top" align="center">
           <Button
             variant="ghost"
@@ -285,7 +289,7 @@ export default function MarkdownToolbar({
             <Image className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <div className="markdown-toolbar__separator" />
+        <div className="markdown-toolbar__separator max-sm:hidden" />
         <TooltipWrapper label="Undo" side="top" align="center">
           <Button
             variant="ghost"
@@ -308,23 +312,83 @@ export default function MarkdownToolbar({
             <Redo className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper
-          label={lineWrap ? 'Disable line wrap' : 'Enable line wrap'}
-          side="top"
-          align="center"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleLineWrap}
-            className={cn('markdown-toolbar__button', {
-              'markdown-toolbar__button--active': lineWrap,
-            })}
-            data-testid="toggle-line-wrap-button"
+        {!isMobile && (
+          <TooltipWrapper
+            label={lineWrap ? 'Disable line wrap' : 'Enable line wrap'}
+            side="top"
+            align="center"
           >
-            <WrapText className="markdown-toolbar__icon" />
-          </Button>
-        </TooltipWrapper>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleLineWrap}
+              className={cn('markdown-toolbar__button', {
+                'markdown-toolbar__button--active': lineWrap,
+              })}
+              data-testid="toggle-line-wrap-button"
+            >
+              <WrapText className="markdown-toolbar__icon" />
+            </Button>
+          </TooltipWrapper>
+        )}
+        {isMobile && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="markdown-toolbar__button"
+                aria-label="More formatting options"
+              >
+                <MoreHorizontal className="markdown-toolbar__icon" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+              <DropdownMenuItem
+                onSelect={() => editorRef.current?.insertWrappedText('~~')}
+              >
+                <Strikethrough size={14} />
+                Strikethrough
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => editorRef.current?.insertHeading(1)}
+              >
+                <span className="w-4 text-center text-xs font-bold">H1</span>
+                Heading 1
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => editorRef.current?.insertHeading(2)}
+              >
+                <span className="w-4 text-center text-xs font-bold">H2</span>
+                Heading 2
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => editorRef.current?.insertHeading(3)}
+              >
+                <span className="w-4 text-center text-xs font-bold">H3</span>
+                Heading 3
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() =>
+                  editorRef.current?.insertAtCursor(buildTableMarkdown(3, 3))
+                }
+              >
+                <Table size={14} />
+                Insert Table (3×3)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={toggleLineWrap}>
+                <WrapText size={14} />
+                {lineWrap ? 'Disable' : 'Enable'} line wrap
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         {!isMobile && (
           <>
             <div className="markdown-toolbar__separator" />
