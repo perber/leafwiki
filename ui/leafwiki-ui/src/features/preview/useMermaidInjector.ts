@@ -8,7 +8,7 @@ function ensureMermaidInitialized(theme: 'default' | 'dark') {
 
   mermaid.initialize({
     startOnLoad: false,
-    securityLevel: 'strict',
+    securityLevel: 'antiscript',
     theme,
     deterministicIds: true,
     deterministicIDSeed: 'leafwiki',

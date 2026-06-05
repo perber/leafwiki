@@ -71,18 +71,17 @@ test.describe('Mermaid rendering', () => {
     await expect(page.locator('article')).not.toContainText('Unable to render Mermaid diagram');
   });
 
-  // Reproduces the bug reported in #1131: a flowchart node with an <img> tag
-  // causes the DOMParser (image/svg+xml) to fail and insert a raw XML
-  // parseerror element into the DOM instead of showing the error UI.
-  //
-  // Expected behaviour: either SVG renders (img stripped by security level)
-  // or the "Unable to render" error UI is shown — but NEVER raw XML error text.
-  test('mermaid-flowchart-with-img-node-does-not-show-xml-parse-error', async ({ page }) => {
+  // Regression for #1131: <img> in a flowchart node must render as SVG.
+  // Previously DOMParser (image/svg+xml) choked on the HTML void element and
+  // injected a raw XML parseerror into the DOM instead of rendering the diagram.
+  test('mermaid-flowchart-with-img-node-renders-svg', async ({ page }) => {
     const s = Date.now();
+    // Single quotes inside the src attribute — the correct Mermaid syntax
+    // for HTML in node labels (double-quote wrapping confuses the parser).
     const content = [
       '```mermaid',
       'flowchart TD',
-      '  A["Christmas <img src=\\"https://img.shields.io/badge/test-ok-blue\\" />"] -->|Get money| B(Go shopping)',
+      "  A[Christmas <img src='https://img.shields.io/badge/test-ok-blue' />] -->|Get money| B(Go shopping)",
       '  B --> C{Done?}',
       '  C -->|Yes| D[Laptop]',
       '  C -->|No| E[Phone]',
@@ -103,36 +102,17 @@ test.describe('Mermaid rendering', () => {
     // Give the renderer time to attempt rendering.
     await page.waitForTimeout(3000);
 
-    // The raw XML parser error must never appear in the page — this is the bug.
+    // No error of any kind must appear.
+    await expect(page.locator('article')).not.toContainText('Unable to render Mermaid diagram.', {
+      timeout: 1000,
+    });
     await expect(page.locator('article')).not.toContainText('Opening and ending tag mismatch', {
       timeout: 1000,
     });
-    await expect(page.locator('article')).not.toContainText(
-      'This page contains the following errors',
-      { timeout: 1000 },
-    );
 
-    // Outcome must be one of: SVG rendered, or the proper error UI shown.
-    const svgVisible = await page
-      .locator('article svg')
-      .first()
-      .isVisible()
-      .catch(() => false);
-    const errorUiVisible = await page
-      .getByText('Unable to render Mermaid diagram.')
-      .isVisible()
-      .catch(() => false);
+    // The diagram must render as SVG with the image visible inside the node.
+    await expect(page.locator('article svg').first()).toBeVisible({ timeout: 10000 });
 
-    expect(
-      svgVisible || errorUiVisible,
-      `Expected SVG or error UI, got neither. Page errors: ${pageErrors.join('; ')}`,
-    ).toBe(true);
-
-    // Record which outcome occurred so it's visible in the test report.
-    if (svgVisible) {
-      console.log('✓ Mermaid rendered SVG (img stripped by security level)');
-    } else {
-      console.log('✓ Mermaid showed error UI (img caused parse failure — fix needed)');
-    }
+    expect(pageErrors, `unexpected page errors: ${pageErrors.join('; ')}`).toHaveLength(0);
   });
 });
