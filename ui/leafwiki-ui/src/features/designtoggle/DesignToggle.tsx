@@ -2,11 +2,17 @@ import { Moon, Sun } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { useDesignModeStore } from './designmode'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
+import { useAppMode } from '@/lib/useAppMode'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 export default function DesignToggle() {
   const mode = useDesignModeStore((s) => s.mode)
   const setMode = useDesignModeStore((s) => s.setMode)
   const label = mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+  const isMobile = useIsMobile()
+  const appMode = useAppMode()
+
+  if (isMobile && appMode === 'edit') return null
 
   return (
     <TooltipWrapper label={label} align="center">
