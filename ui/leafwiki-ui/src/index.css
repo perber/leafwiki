@@ -835,7 +835,7 @@
   }
 
   .editor-title-bar__slug {
-    @apply bg-surface-alt text-interface-text mt-0.5 inline-block max-w-[15vw] truncate rounded px-2 py-0.5 font-mono text-xs sm:max-w-[40vw];
+    @apply bg-surface-alt text-interface-text mt-0.5 inline-block max-w-[15vw] truncate rounded px-2 py-0.5 font-mono text-xs max-sm:hidden sm:max-w-[40vw];
   }
 
   .history-title-bar__slug {

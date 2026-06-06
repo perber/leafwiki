@@ -10,6 +10,7 @@ import { completionStatus } from '@codemirror/autocomplete'
 import { Save, X, Cloud } from 'lucide-react'
 import { useEffect } from 'react'
 import { useEditorStore } from '@/stores/editor'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { useToolbarStore } from '../toolbar/toolbarStore'
 import { usePageEditorStore } from './pageEditorStore'
 import { isDirtyState } from './pageEditorStore'
@@ -39,6 +40,7 @@ export function useToolbarActions({
   const setButtons = useToolbarStore((state) => state.setButtons)
   const appMode = useAppMode()
   const readOnlyMode = useIsReadOnly()
+  const isMobile = useIsMobile()
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
@@ -53,14 +55,14 @@ export function useToolbarActions({
       return
     }
 
-    setButtons([
+    const buttons = [
       {
         id: 'close-editor',
         label: 'Close Editor',
         hotkey: 'Esc',
         icon: <X size={18} />,
         action: closePage,
-        variant: 'destructive',
+        variant: 'destructive' as const,
         className: 'toolbar-button__close-editor',
       },
       {
@@ -68,25 +70,31 @@ export function useToolbarActions({
         label: 'Save Page',
         hotkey: 'Ctrl+S',
         icon: <Save size={18} />,
-        variant: 'default',
+        variant: 'default' as const,
         disabled: !dirty,
         className: 'toolbar-button__save-page',
         action: savePage,
       },
-      {
+    ]
+
+    if (!isMobile) {
+      buttons.push({
         id: 'toggle-auto-save',
         label: 'Auto-save',
         hotkey: '',
         icon: <Cloud size={18} />,
-        variant: 'outline',
+        variant: 'outline' as const,
         active: autoSave,
         className: 'toolbar-button__toggle-auto-save',
         action: toggleAutoSave,
-      },
-    ])
+      })
+    }
+
+    setButtons(buttons)
   }, [
     appMode,
     readOnlyMode,
+    isMobile,
     setButtons,
     dirty,
     savePage,
