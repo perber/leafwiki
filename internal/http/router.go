@@ -18,7 +18,7 @@ import (
 	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
-//go:embed dist/**
+//go:embed dist
 var frontend embed.FS
 
 // EmbedFrontend is a flag to enable or disable embedding the frontend.
