@@ -11,7 +11,7 @@ import { Save, X, Cloud } from 'lucide-react'
 import { useEffect } from 'react'
 import { useEditorStore } from '@/stores/editor'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { useToolbarStore } from '../toolbar/toolbarStore'
+import { type ToolbarButton, useToolbarStore } from '../toolbar/toolbarStore'
 import { usePageEditorStore } from './pageEditorStore'
 import { isDirtyState } from './pageEditorStore'
 
@@ -55,14 +55,14 @@ export function useToolbarActions({
       return
     }
 
-    const buttons = [
+    const buttons: ToolbarButton[] = [
       {
         id: 'close-editor',
         label: 'Close Editor',
         hotkey: 'Esc',
         icon: <X size={18} />,
         action: closePage,
-        variant: 'destructive' as const,
+        variant: 'destructive',
         className: 'toolbar-button__close-editor',
       },
       {
@@ -70,7 +70,7 @@ export function useToolbarActions({
         label: 'Save Page',
         hotkey: 'Ctrl+S',
         icon: <Save size={18} />,
-        variant: 'default' as const,
+        variant: 'default',
         disabled: !dirty,
         className: 'toolbar-button__save-page',
         action: savePage,
@@ -83,7 +83,7 @@ export function useToolbarActions({
         label: 'Auto-save',
         hotkey: '',
         icon: <Cloud size={18} />,
-        variant: 'outline' as const,
+        variant: 'outline',
         active: autoSave,
         className: 'toolbar-button__toggle-auto-save',
         action: toggleAutoSave,
