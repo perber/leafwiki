@@ -82,7 +82,6 @@ export function BacklinkInfo() {
               </span>
             </div>
 
-
             {loading ? (
               <p className="backlinks__empty">{t('backlinks.loading')}</p>
             ) : brokenIncoming.length + brokenOutgoings.length === 0 ? (
