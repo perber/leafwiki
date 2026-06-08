@@ -36,9 +36,18 @@ export default class EditPage {
 
   async savePage() {
     const saveButton = this.page.locator('button[data-testid="save-page-button"]');
+    const dirtyIndicator = this.page.locator('.editor-title-bar__dirty-indicator');
     await saveButton.waitFor({ state: 'visible' });
-    await saveButton.click();
-    await this.page.getByText('Page saved successfully').last().waitFor({ state: 'visible' });
+
+    try {
+      await expect(saveButton).toBeEnabled({ timeout: 3000 });
+      await saveButton.click();
+      await this.page.getByText('Page saved successfully').last().waitFor({ state: 'visible' });
+      return;
+    } catch {
+      await expect(saveButton).toBeDisabled();
+      await expect(dirtyIndicator).toHaveCount(0, { timeout: 5000 });
+    }
   }
 
   async closeEditor() {
