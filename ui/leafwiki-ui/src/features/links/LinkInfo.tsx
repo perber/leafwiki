@@ -45,6 +45,10 @@ export function BacklinkInfo() {
   return (
     <div className="backlinks__pane">
       <div className="backlinks__content">
+        {error && !loading ? (
+          <p className="page-viewer__error">Error: {error}</p>
+        ) : null}
+
         <div className="backlinks__group">
           <div className="backlinks__group-title">
             {t('backlinks.referencedBy')}{' '}
@@ -69,7 +73,7 @@ export function BacklinkInfo() {
           )}
         </div>
 
-        {!isReadOnly && (
+        {!isReadOnly && !error && (
           <div className="backlinks__group">
             <div className="backlinks__group-title">
               {t('backlinks.brokenLinks')}{' '}
@@ -78,9 +82,6 @@ export function BacklinkInfo() {
               </span>
             </div>
 
-            {error && !loading ? (
-              <p className="page-viewer__error">Error: {error}</p>
-            ) : null}
 
             {loading ? (
               <p className="backlinks__empty">{t('backlinks.loading')}</p>
