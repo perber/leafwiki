@@ -152,7 +152,7 @@ export default function PageViewer() {
     <>
       {subheader}
       {page && !error && (
-        <div className="page-viewer__metadata-bar print:hidden">
+        <div className="page-viewer__metadata-bar hidden sm:block print:hidden">
           <div className="page-viewer__metadata-bar-inner">
             <PageMetadata page={page} />
           </div>

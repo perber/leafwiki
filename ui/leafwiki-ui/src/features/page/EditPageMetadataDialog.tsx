@@ -1,6 +1,7 @@
 import { NODE_KIND_PAGE, type Page } from '@/lib/api/pages'
 import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
+import i18next from '@/lib/i18n'
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useState } from 'react'
@@ -33,7 +34,9 @@ export function EditPageMetadataDialog({
   const [slug, setSlug] = useState(propSlug)
   const [slugTouched, setSlugTouched] = useState(false)
   const [slugLoading, setSlugLoading] = useState(false)
-  const [lastSlugTitle, setLastSlugTitle] = useState('')
+  // In edit mode (currentId set) the slug is already known — initialise to the
+  // current title so the save button is enabled immediately.
+  const [lastSlugTitle, setLastSlugTitle] = useState(currentId ? propTitle : '')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const isSaveDisabled =
@@ -55,7 +58,7 @@ export function EditPageMetadataDialog({
     setTitle(propTitle)
     setSlug(propSlug)
     setSlugTouched(false)
-    setLastSlugTitle('')
+    setLastSlugTitle(currentId ? propTitle : '')
     setFieldErrors({})
   }
 
@@ -75,10 +78,18 @@ export function EditPageMetadataDialog({
         }
         return false
       }}
-      cancelButton={{ label: 'Cancel', variant: 'outline', autoFocus: false }}
+      cancelButton={{
+        label: i18next.t('editPageMetadataDialog.cancelButton', {
+          ns: 'editor',
+        }),
+        variant: 'outline',
+        autoFocus: false,
+      }}
       buttons={[
         {
-          label: 'Change',
+          label: i18next.t('editPageMetadataDialog.saveButton', {
+            ns: 'editor',
+          }),
           actionType: 'confirm',
           disabled: isSaveDisabled,
           variant: 'default',
@@ -90,7 +101,9 @@ export function EditPageMetadataDialog({
       <div className="page-dialog__fields">
         <FormInput
           autoFocus
-          label="Title"
+          label={i18next.t('editPageMetadataDialog.titleLabel', {
+            ns: 'editor',
+          })}
           value={title}
           onChange={handleTitleChange}
           placeholder={`${itemLabelCapitalized} title`}
@@ -104,6 +117,7 @@ export function EditPageMetadataDialog({
           slug={slug}
           currentId={currentId}
           parentId={parentId}
+          initialTitle={propTitle}
           enableSlugSuggestion={true}
           onSlugChange={handleSlugChange}
           onSlugTouchedChange={setSlugTouched}
@@ -119,7 +133,8 @@ export function EditPageMetadataDialog({
         className="dialog__path"
         data-testid="edit-page-metadata-dialog-path-display"
       >
-        Path: {parentPath !== '' && `${parentPath}/`}
+        {i18next.t('editPageMetadataDialog.pathPrefix', { ns: 'editor' })}{' '}
+        {parentPath !== '' && `${parentPath}/`}
         {slug && `${slug}`}
       </span>
     </BaseDialog>

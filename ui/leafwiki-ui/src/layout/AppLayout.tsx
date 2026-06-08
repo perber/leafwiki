@@ -272,7 +272,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Overlay for mobile sidebar */}
         {isMobile && sidebarVisible && (
-          <div className="app-layout__sidebar-overlay-mobile" />
+          <div
+            className="app-layout__sidebar-overlay-mobile"
+            onClick={() => setSidebarVisible(false)}
+            aria-hidden="true"
+          />
         )}
         <div className="app-layout__main-column">
           <div id="app-subheader-root" className="app-layout__subheader-root" />

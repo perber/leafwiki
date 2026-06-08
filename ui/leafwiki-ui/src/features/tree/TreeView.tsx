@@ -1,3 +1,9 @@
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE, DIALOG_SORT_PAGES } from '@/lib/registries'
@@ -13,6 +19,7 @@ import {
   FilePlus,
   FolderPlus,
   List,
+  MoreHorizontal,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -126,28 +133,45 @@ export default function TreeView() {
             />
           </>
         )}
-        <>
-          <TreeViewActionButton
-            actionName="expand-all"
-            icon={<ChevronsDown className="tree-view__action-icon" size={18} />}
-            tooltip="Expand all"
-            onClick={expandAll}
-          />
-          <TreeViewActionButton
-            actionName="collapse-all"
-            icon={<ChevronsUp className="tree-view__action-icon" size={18} />}
-            tooltip="Collapse all"
-            onClick={collapseAll}
-          />
-        </>
-        {!readOnlyMode && tree && (
-          <TreeViewActionButton
-            actionName="sort"
-            icon={<List className="tree-view__action-icon" size={18} />}
-            tooltip="Sort pages"
-            onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: tree })}
-          />
-        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <TreeViewActionButton
+              actionName="tree-overflow"
+              icon={
+                <MoreHorizontal className="tree-view__action-icon" size={18} />
+              }
+              tooltip="More actions"
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-44">
+            <DropdownMenuItem
+              className="cursor-pointer gap-2"
+              onClick={expandAll}
+              data-testid="tree-view-action-button-expand-all"
+            >
+              <ChevronsDown size={15} />
+              Expand all
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer gap-2"
+              onClick={collapseAll}
+              data-testid="tree-view-action-button-collapse-all"
+            >
+              <ChevronsUp size={15} />
+              Collapse all
+            </DropdownMenuItem>
+            {!readOnlyMode && tree && (
+              <DropdownMenuItem
+                className="cursor-pointer gap-2"
+                onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: tree })}
+                data-testid="tree-view-action-button-sort"
+              >
+                <List size={15} />
+                Sort pages
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="tree-view__nodes">
         {tree?.children?.map((node) => (

@@ -78,6 +78,14 @@ export const createLeafWikiRouter = (
         ),
       },
       {
+        path: '/settings',
+        element: isReadOnlyViewer ? (
+          <Navigate to="/" replace />
+        ) : (
+          <Navigate to="/settings/branding" replace />
+        ),
+      },
+      {
         path: '/e/*',
         element: isReadOnlyViewer ? (
           <Navigate to="/" />

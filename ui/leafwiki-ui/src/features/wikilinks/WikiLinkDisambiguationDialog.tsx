@@ -60,9 +60,12 @@ export function WikiLinkDisambiguationDialog({
             {i18next.t('wikiLinkDisambiguation.title', { ns: 'editor' })}
           </DialogTitle>
           <DialogDescription>
-            {i18next.t('wikiLinkDisambiguation.description', {
+            {i18next.t('wikiLinkDisambiguation.descriptionPrefix', {
               ns: 'editor',
-              title,
+            })}{' '}
+            <strong>{title}</strong>
+            {i18next.t('wikiLinkDisambiguation.descriptionSuffix', {
+              ns: 'editor',
             })}
           </DialogDescription>
         </DialogHeader>

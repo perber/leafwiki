@@ -1371,6 +1371,68 @@ func TestPreviewPageRefactorUseCase_UsesEmptyWarningArrays(t *testing.T) {
 	}
 }
 
+func TestPreviewPageRefactorUseCase_Rename_ExcludesAmbiguousSentinelPagesFromPreview(t *testing.T) {
+	// Scenario: two pages share the title "Grafana" ("grafana" and "grafana-1").
+	// A third page has [[Grafana]] in its content — this is an ambiguous sentinel
+	// (broken) because both pages match the title. When we rename "grafana" to
+	// something else, the [[Grafana]] sentinel must NOT appear in the refactor
+	// preview, because:
+	//   a) it is ambiguous and cannot be auto-updated
+	//   b) after the rename only one "Grafana" page remains, so
+	//      HealWikiLinksForTitleIfUnambiguous will resolve it automatically.
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	previewUC := pages.NewPreviewPageRefactorUseCase(deps.tree, deps.slug, deps.links, slog.Default())
+
+	grafana1, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Grafana", Slug: "grafana", Kind: pageKind(),
+	})
+	_, _ = createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Grafana", Slug: "grafana-1", Kind: pageKind(),
+	})
+	ref, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Ref", Slug: "ref", Kind: pageKind(),
+	})
+
+	// Store [[Grafana]] sentinel (ambiguous because both pages share the title).
+	content := "[[Grafana]]"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID:  "system",
+		ID:      ref.Page.ID,
+		Version: ref.Page.Version(),
+		Title:   ref.Page.Title,
+		Slug:    ref.Page.Slug,
+		Content: &content,
+		Kind:    pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(ref) failed: %v", err)
+	}
+
+	preview, err := previewUC.Execute(context.Background(), pages.RefactorPreviewInput{
+		PageID: grafana1.Page.ID,
+		Kind:   pages.RefactorKindRename,
+		Title:  "Prometheus",
+		Slug:   "prometheus",
+	})
+	if err != nil {
+		t.Fatalf("PreviewPageRefactor failed: %v", err)
+	}
+
+	if preview.Counts.AffectedPages != 0 {
+		t.Fatalf(
+			"expected 0 affected pages for ambiguous sentinel rename, got %d (pages: %v)",
+			preview.Counts.AffectedPages,
+			preview.AffectedPages,
+		)
+	}
+	for _, ap := range preview.AffectedPages {
+		if ap.FromPageID == ref.Page.ID {
+			t.Fatalf("ambiguous sentinel page %q must not appear in refactor preview", ref.Page.ID)
+		}
+	}
+}
+
 func TestPreviewPageRefactorUseCase_Move_ExcludesMovedSubtreeFromOptionalAffectedPages(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())

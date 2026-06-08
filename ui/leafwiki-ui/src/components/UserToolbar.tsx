@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
+import { useBackupStore } from '@/stores/backup'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
@@ -22,6 +23,7 @@ export default function UserToolbar() {
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const authDisabled = useConfigStore((s) => s.authDisabled)
+  const backupEnabled = useBackupStore((s) => s.enabled)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
   const httpRemoteUserLogoutUrl = useConfigStore(
     (s) => s.httpRemoteUserLogoutUrl,
@@ -93,12 +95,14 @@ export default function UserToolbar() {
             >
               Import
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => navigate('/settings/backup')}
-            >
-              Backup Settings
-            </DropdownMenuItem>
+            {backupEnabled && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => navigate('/settings/backup')}
+              >
+                Backup Settings
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
           </RoleGuard>
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
@@ -120,21 +124,18 @@ export default function UserToolbar() {
               Logout
             </DropdownMenuItem>
           )}
-          <RoleGuard roles={['admin', 'editor']}>
+          <RoleGuard roles={['admin']}>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-muted-foreground max-w-56 px-2 pb-1 text-xs leading-relaxed font-normal whitespace-normal">
-              Support ongoing development.
-            </DropdownMenuLabel>
             <DropdownMenuItem
               asChild
-              className="bg-primary text-primary-foreground focus:bg-primary/90 focus:text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground cursor-pointer justify-center gap-2 rounded-md py-2 font-medium shadow-sm"
+              className="text-muted-foreground hover:text-foreground cursor-pointer gap-2"
             >
               <a
                 href={supportPageUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Heart className="size-4 fill-current" />
+                <Heart className="size-3.5 shrink-0" />
                 <span>Support LeafWiki</span>
               </a>
             </DropdownMenuItem>
