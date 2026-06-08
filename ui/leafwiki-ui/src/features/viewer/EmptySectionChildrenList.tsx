@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION, Page } from '@/lib/api/pages'
+import i18next from '@/lib/i18n'
 import { formatRelativeTime } from '@/lib/formatDate'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
@@ -8,6 +9,9 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { FilePlus, FolderPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
+
+const t = (key: string, opts?: Record<string, unknown>) =>
+  i18next.t(key, { ...opts, ns: 'viewer' })
 
 type EmptySectionChildrenListProps = {
   page: Page
@@ -53,14 +57,18 @@ export default function EmptySectionChildrenList({
           className="child-list__section"
         >
           <h2 className="child-list__section-title mb-1">
-            Overview of the section '{page.title}'
+            {t('section.overviewTitle', { title: page.title })}
           </h2>
           <p className="text-muted mb-4 text-sm">
-            This page is the default overview of the section and lists its pages
-            and sections.
-            <br />
-            When editing this page, you can define a custom start page for the
-            section.
+            {isReadOnly ? (
+              t('section.overviewDescriptionReadOnly')
+            ) : (
+              <>
+                {t('section.overviewDescriptionBase')}
+                <br />
+                {t('section.overviewDescriptionEditorHint')}
+              </>
+            )}
           </p>
           <ul>
             {node.children?.map((n) => {
@@ -101,7 +109,7 @@ export default function EmptySectionChildrenList({
                 size="sm"
               >
                 <FilePlus size={16} />
-                Add Page
+                {t('section.addPage')}
               </Button>
             </div>
           )}
@@ -115,11 +123,12 @@ export default function EmptySectionChildrenList({
         >
           <div>
             <h2 className="child-list__section-title mb-1 grow">
-              This section is empty.
+              {t('section.emptyTitle')}
             </h2>
             <p className="text-muted text-sm">
-              The section <b>{page.title}</b> does not contain any pages or
-              sections yet. Start by adding a new page or create a new section.
+              {isReadOnly
+                ? t('section.emptyDescriptionReadOnly', { title: page.title })
+                : t('section.emptyDescriptionEditor', { title: page.title })}
             </p>
           </div>
           {!isReadOnly && (
@@ -135,7 +144,7 @@ export default function EmptySectionChildrenList({
                 size="sm"
               >
                 <FilePlus size={16} />
-                Add Page
+                {t('section.addPage')}
               </Button>
               <Button
                 onClick={() =>
@@ -149,7 +158,7 @@ export default function EmptySectionChildrenList({
                 className="ml-2"
               >
                 <FolderPlus size={16} />
-                Add Section
+                {t('section.addSection')}
               </Button>
             </div>
           )}
