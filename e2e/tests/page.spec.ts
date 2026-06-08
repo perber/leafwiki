@@ -2571,8 +2571,9 @@ Paragraph outside the list.
 
   test('not-found-for-reserved-slug-hides-create-page-cta', async ({ page }) => {
     const notfoundPage = new NotFoundPage(page);
+    const reservedChildPath = '/welcome-to-leafwiki/settings';
 
-    await notfoundPage.goto('/settings');
+    await notfoundPage.goto(reservedChildPath);
 
     await notfoundPage.expectVisible();
     await notfoundPage.expectCreatePageButtonHidden();
