@@ -9,5 +9,17 @@
     "emptyDescriptionReadOnly": "The section {{title}} does not contain any pages or sections yet.",
     "addPage": "Add Page",
     "addSection": "Add Section"
+  },
+  "markdownPreview": {
+    "renderError": "This page contains Markdown that could not be rendered safely."
+  },
+  "backlinks": {
+    "referencedBy": "Referenced by",
+    "loading": "Loading…",
+    "noReferences": "No pages reference this page.",
+    "brokenLinks": "Broken links",
+    "noBrokenLinks": "No broken links.",
+    "brokenOutgoingsTitle": "This page links to missing targets",
+    "brokenIncomingTitle": "Pages linking to an old path"
   }
 }
