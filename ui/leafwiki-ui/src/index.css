@@ -547,7 +547,7 @@
   }
 
   .app-layout__sidebar-overlay-mobile {
-    @apply fixed inset-0 top-[55px] z-20 cursor-pointer bg-black/50 max-sm:h-[calc(100dvh-55px)];
+    @apply fixed inset-0 top-[55px] z-20 cursor-pointer border-0 bg-black/50 p-0 max-sm:h-[calc(100dvh-55px)];
   }
 
   .app-layout__main-content-area {
