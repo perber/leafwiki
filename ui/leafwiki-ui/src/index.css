@@ -547,7 +547,7 @@
   }
 
   .app-layout__sidebar-overlay-mobile {
-    @apply fixed inset-0 top-[55px] z-20 bg-black/50 max-sm:h-[calc(100dvh-55px)];
+    @apply fixed inset-0 top-[55px] z-20 cursor-pointer bg-black/50 max-sm:h-[calc(100dvh-55px)];
   }
 
   .app-layout__main-content-area {
@@ -595,7 +595,7 @@
   /** Page 404 **/
 
   .page404-shell {
-    @apply mx-auto w-full max-w-4xl px-8 pt-8;
+    @apply mx-auto w-full max-w-4xl px-4 pt-6 sm:px-8 sm:pt-8;
   }
 
   .page404 {
@@ -1538,7 +1538,7 @@
   }
 
   .page-viewer {
-    @apply mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 pt-3 pb-0 sm:px-8;
+    @apply mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 pt-3 pb-0 sm:px-8;
   }
 
   .page-viewer__subheader {
@@ -2428,6 +2428,18 @@
 
   .settings {
     @apply mx-auto w-full max-w-4xl px-4 pt-4 pb-4 sm:px-8 sm:pt-8;
+  }
+
+  .settings-nav {
+    @apply border-surface-border mb-6 flex flex-wrap gap-1 border-b pb-3;
+  }
+
+  .settings-nav__link {
+    @apply text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm no-underline transition-colors;
+  }
+
+  .settings-nav__link--active {
+    @apply bg-accent text-foreground font-medium;
   }
 
   .settings__title {

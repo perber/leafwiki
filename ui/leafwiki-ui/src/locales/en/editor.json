@@ -1,6 +1,17 @@
 {
   "wikiLinkDisambiguation": {
     "title": "Multiple pages found",
-    "description": "Several pages match [[{{title}}]]. Choose which one you meant."
+    "descriptionPrefix": "Several pages match",
+    "descriptionSuffix": ". Choose which one you meant."
+  },
+  "slugInput": {
+    "label": "Slug",
+    "placeholder": "Page slug"
+  },
+  "editPageMetadataDialog": {
+    "titleLabel": "Title",
+    "pathPrefix": "Path:",
+    "cancelButton": "Cancel",
+    "saveButton": "Change"
   }
 }

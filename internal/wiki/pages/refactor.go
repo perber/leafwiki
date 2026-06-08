@@ -208,33 +208,42 @@ func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle
 	// For title-changing renames, also include pages that reference the old
 	// title via [[OldTitle]] wiki-link sentinels (not matched by path prefix).
 	if sentinelTitle != "" {
-		sentinelIDs, err := uc.links.GetRefactorSourcePageIDsForWikiLinkTitle(sentinelTitle)
-		if err != nil {
-			return nil, 0, err
-		}
-		wikiLinkSyntax := "[[" + sentinelTitle + "]]"
-		for _, id := range sentinelIDs {
-			if _, excluded := excludeIDs[id]; excluded {
-				continue
+		// If multiple pages share the old title the [[OldTitle]] sentinel is
+		// ambiguous. After the rename the title will belong to fewer pages and
+		// HealWikiLinksForTitleIfUnambiguous will resolve the sentinel
+		// automatically. Showing these links in the refactor preview would be
+		// misleading — skip them.
+		if len(uc.tree.FindPagesByTitle(sentinelTitle)) > 1 {
+			// ambiguous — skip sentinel-based references
+		} else {
+			sentinelIDs, err := uc.links.GetRefactorSourcePageIDsForWikiLinkTitle(sentinelTitle)
+			if err != nil {
+				return nil, 0, err
 			}
-			if _, already := grouped[id]; already {
-				// Already found via path-prefix query; wiki-link annotation
-				// is handled in the items loop below.
-				continue
+			wikiLinkSyntax := "[[" + sentinelTitle + "]]"
+			for _, id := range sentinelIDs {
+				if _, excluded := excludeIDs[id]; excluded {
+					continue
+				}
+				if _, already := grouped[id]; already {
+					// Already found via path-prefix query; wiki-link annotation
+					// is handled in the items loop below.
+					continue
+				}
+				fromPath := ""
+				fromTitle := ""
+				if p, err := uc.tree.GetPage(id); err == nil && p != nil {
+					fromPath = p.CalculatePath()
+					fromTitle = p.Title
+				}
+				grouped[id] = &RefactorAffectedPage{
+					FromPageID:   id,
+					FromTitle:    fromTitle,
+					FromPath:     fromPath,
+					MatchedPaths: []string{wikiLinkSyntax},
+				}
+				totalMatches++
 			}
-			fromPath := ""
-			fromTitle := ""
-			if p, err := uc.tree.GetPage(id); err == nil && p != nil {
-				fromPath = p.CalculatePath()
-				fromTitle = p.Title
-			}
-			grouped[id] = &RefactorAffectedPage{
-				FromPageID:   id,
-				FromTitle:    fromTitle,
-				FromPath:     fromPath,
-				MatchedPaths: []string{wikiLinkSyntax},
-			}
-			totalMatches++
 		}
 	}
 

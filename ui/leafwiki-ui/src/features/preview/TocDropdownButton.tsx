@@ -40,7 +40,10 @@ export function TocDropdownButton({ entries, clickable = true }: Props) {
           <ChevronDown size={12} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-w-96 min-w-48">
+      <DropdownMenuContent
+        align="start"
+        className="max-h-[70vh] max-w-96 min-w-48 overflow-y-auto"
+      >
         {entries.map((entry) =>
           clickable ? (
             <DropdownMenuItem
