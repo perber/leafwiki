@@ -1,6 +1,7 @@
 import i18next from 'i18next'
 import enEditor from '../locales/en/editor.json'
 import enErrors from '../locales/en/errors.json'
+import enViewer from '../locales/en/viewer.json'
 
 i18next.init({
   lng: 'en',
@@ -9,6 +10,7 @@ i18next.init({
     en: {
       errors: enErrors,
       editor: enEditor,
+      viewer: enViewer,
     },
   },
   interpolation: {

@@ -1,0 +1,13 @@
+{
+  "section": {
+    "overviewTitle": "Overview of '{{title}}'",
+    "overviewDescriptionBase": "This page is the default overview of the section and lists its pages and sections.",
+    "overviewDescriptionEditorHint": "When editing this page, you can define a custom start page for the section.",
+    "overviewDescriptionReadOnly": "This page is an auto-generated overview of the section.",
+    "emptyTitle": "This section is empty.",
+    "emptyDescriptionEditor": "The section {{title}} does not contain any pages or sections yet. Start by adding a new page or create a new section.",
+    "emptyDescriptionReadOnly": "The section {{title}} does not contain any pages or sections yet.",
+    "addPage": "Add Page",
+    "addSection": "Add Section"
+  }
+}
