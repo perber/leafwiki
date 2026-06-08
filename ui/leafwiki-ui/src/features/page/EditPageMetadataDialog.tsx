@@ -36,7 +36,8 @@ export function EditPageMetadataDialog({
   const [slugLoading, setSlugLoading] = useState(false)
   // In edit mode (currentId set) the slug is already known — initialise to the
   // current title so the save button is enabled immediately.
-  const [lastSlugTitle, setLastSlugTitle] = useState(currentId ? propTitle : '')
+  const initialLastSlugTitle = currentId ? propTitle : ''
+  const [lastSlugTitle, setLastSlugTitle] = useState(initialLastSlugTitle)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const isSaveDisabled =
@@ -58,7 +59,7 @@ export function EditPageMetadataDialog({
     setTitle(propTitle)
     setSlug(propSlug)
     setSlugTouched(false)
-    setLastSlugTitle(currentId ? propTitle : '')
+    setLastSlugTitle(initialLastSlugTitle)
     setFieldErrors({})
   }
 

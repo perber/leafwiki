@@ -213,9 +213,7 @@ func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle
 		// HealWikiLinksForTitleIfUnambiguous will resolve the sentinel
 		// automatically. Showing these links in the refactor preview would be
 		// misleading — skip them.
-		if len(uc.tree.FindPagesByTitle(sentinelTitle)) > 1 {
-			// ambiguous — skip sentinel-based references
-		} else {
+		if len(uc.tree.FindPagesByTitle(sentinelTitle)) <= 1 {
 			sentinelIDs, err := uc.links.GetRefactorSourcePageIDsForWikiLinkTitle(sentinelTitle)
 			if err != nil {
 				return nil, 0, err
@@ -443,16 +441,22 @@ func (uc *ApplyPageRefactorUseCase) buildApplyPlan(in RefactorApplyInput) (*appl
 	// title via a sentinel (wikilink:OldTitle). These are stored as sentinels and
 	// are not found by the prefix-based lookup above.
 	if in.Kind == RefactorKindRename && in.Title != plan.page.Title {
-		sentinelIDs, err := uc.links.GetRefactorSourcePageIDsForWikiLinkTitle(plan.page.Title)
-		if err != nil {
-			return nil, err
-		}
-		for _, id := range sentinelIDs {
-			if _, excluded := excludeIDs[id]; excluded {
-				continue
+		// If multiple pages share the old title the sentinel is ambiguous.
+		// HealWikiLinksForTitleIfUnambiguous resolves it automatically after the
+		// rename — including them here would silently rewrite links the user
+		// never approved (preview showed 0 affected pages for this case).
+		if len(uc.tree.FindPagesByTitle(plan.page.Title)) <= 1 {
+			sentinelIDs, err := uc.links.GetRefactorSourcePageIDsForWikiLinkTitle(plan.page.Title)
+			if err != nil {
+				return nil, err
 			}
-			if !containsString(plan.affectedPageIDs, id) {
-				plan.affectedPageIDs = append(plan.affectedPageIDs, id)
+			for _, id := range sentinelIDs {
+				if _, excluded := excludeIDs[id]; excluded {
+					continue
+				}
+				if !containsString(plan.affectedPageIDs, id) {
+					plan.affectedPageIDs = append(plan.affectedPageIDs, id)
+				}
 			}
 		}
 	}
