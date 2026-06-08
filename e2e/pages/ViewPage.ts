@@ -162,7 +162,22 @@ export default class ViewPage {
 
   async clickDeletePageButton() {
     const deleteButton = this.page.locator('button[data-testid="delete-page-button"]');
-    await deleteButton.click();
+    const overflowButton = this.page.getByTestId('toolbar-overflow-button');
+
+    await expect
+      .poll(async () => {
+        const deleteVisible = await deleteButton.isVisible().catch(() => false);
+        const overflowVisible = await overflowButton.isVisible().catch(() => false);
+        return deleteVisible || overflowVisible;
+      })
+      .toBe(true);
+
+    if (await deleteButton.isVisible().catch(() => false)) {
+      await this.activateControl(deleteButton);
+      return;
+    }
+
+    await this.clickDeletePageMenuItem();
   }
 
   async clickCopyPageButton() {
