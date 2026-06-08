@@ -32,7 +32,6 @@ import {
   FileText,
   History,
   Loader2,
-  PanelLeftOpen,
 } from 'lucide-react'
 import { useLinkStatusStore } from '../links/linkstatus_store'
 import { AssetPreviewTooltip } from '../assets/AssetPreviewTooltip'
@@ -1044,6 +1043,36 @@ export function PageHistoryContent({
 
   return (
     <div className="page-history" data-testid={`${testidPrefix}-content`}>
+      {isMobile && (
+        <div className="markdown-editor__tabs" role="tablist">
+          {(
+            [
+              { id: 'list', label: 'Revisions', icon: <History size={16} /> },
+              { id: 'detail', label: 'Details', icon: <FileText size={16} /> },
+            ] as const
+          ).map((tab) => {
+            const active =
+              tab.id === 'list' ? mobileListVisible : !mobileListVisible
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setMobileListVisible(tab.id === 'list')}
+                className={
+                  active
+                    ? 'markdown-editor__tab-button markdown-editor__tab-button--active'
+                    : 'markdown-editor__tab-button markdown-editor__tab-button--inactive'
+                }
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
       <div className="page-history__workspace">
         {(mobileListVisible || !isMobile) && (
           <>
@@ -1057,16 +1086,6 @@ export function PageHistoryContent({
                   <History className="h-4 w-4" />
                   Revision History
                 </div>
-                {isMobile && selectedRevision ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setMobileListVisible(false)}
-                  >
-                    Show details
-                  </Button>
-                ) : null}
               </div>
               <div className="page-history__list-scroll custom-scrollbar">
                 {renderRevisionList()}
@@ -1143,17 +1162,6 @@ export function PageHistoryContent({
             </div>
 
             <div className="page-history__actions">
-              {isMobile ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setMobileListVisible((current) => !current)}
-                  data-testid={`${testidPrefix}-toggle-list`}
-                >
-                  <PanelLeftOpen className="h-4 w-4" />
-                  Show revisions
-                </Button>
-              ) : null}
               <Button
                 variant="default"
                 disabled={
