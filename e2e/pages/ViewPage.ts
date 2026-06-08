@@ -182,7 +182,22 @@ export default class ViewPage {
 
   async clickCopyPageButton() {
     const copyButton = this.page.locator('button[data-testid="copy-page-button"]');
-    await copyButton.click();
+    const overflowButton = this.page.getByTestId('toolbar-overflow-button');
+
+    await expect
+      .poll(async () => {
+        const copyVisible = await copyButton.isVisible().catch(() => false);
+        const overflowVisible = await overflowButton.isVisible().catch(() => false);
+        return copyVisible || overflowVisible;
+      })
+      .toBe(true);
+
+    if (await copyButton.isVisible().catch(() => false)) {
+      await this.activateControl(copyButton);
+      return;
+    }
+
+    await this.clickCopyPageMenuItem();
   }
 
   async clickPermalinkButton() {
