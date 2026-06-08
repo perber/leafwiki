@@ -10,8 +10,8 @@ import { useTreeStore } from '@/stores/tree'
 import { FilePlus, FolderPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-const t = (key: string, opts?: object) =>
-  i18next.t(key, { ns: 'viewer', ...opts })
+const t = (key: string, opts?: Record<string, unknown>) =>
+  i18next.t(key, { ...opts, ns: 'viewer' })
 
 type EmptySectionChildrenListProps = {
   page: Page
