@@ -272,10 +272,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Overlay for mobile sidebar */}
         {isMobile && sidebarVisible && (
-          <div
+          <button
+            type="button"
             className="app-layout__sidebar-overlay-mobile"
             onClick={() => setSidebarVisible(false)}
-            aria-hidden="true"
+            aria-label="Close sidebar"
           />
         )}
         <div className="app-layout__main-column">
