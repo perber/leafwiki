@@ -49,6 +49,7 @@ export default function PageViewer() {
   const notFound = useViewerStore((s) => s.notFound)
   const page = useViewerStore((s) => s.page)
   const loadPageData = useViewerStore((s) => s.loadPageData)
+  const clearViewer = useViewerStore((s) => s.clear)
 
   const actions = {
     pageKind: page?.kind,
@@ -56,8 +57,9 @@ export default function PageViewer() {
       window.print()
     }, []),
     editPage: useCallback(() => {
+      clearViewer()
       navigate(`/e/${page?.path || ''}`)
-    }, [page?.path, navigate]),
+    }, [page?.path, navigate, clearViewer]),
     showHistory: useCallback(() => {
       navigate(buildHistoryUrl(page?.path || pathname), {
         state: createNavigationVisitState(),
