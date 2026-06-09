@@ -36,6 +36,9 @@ func NewFSStore(storageDir string, logger *slog.Logger) *FSStore {
 }
 
 func (s *FSStore) SaveContentBlob(pageID string, content []byte) (string, error) {
+	if err := validateStorageID(pageID); err != nil {
+		return "", fmt.Errorf("invalid page ID: %w", err)
+	}
 	hash := sha256HexBytes(content)
 	dst := s.contentBlobPath(pageID, hash)
 
@@ -297,12 +300,15 @@ func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
 // UpdateRevision overwrites an existing revision file in-place (used for coalescing).
 // The revision ID and filename are unchanged; only the JSON content is replaced.
 func (s *FSStore) UpdateRevision(rev *Revision) error {
+	if err := validateStorageID(rev.PageID); err != nil {
+		return fmt.Errorf("invalid page ID: %w", err)
+	}
 	index, err := s.loadRevisionIndex(rev.PageID)
 	if err != nil {
 		return err
 	}
-	filename := strings.TrimSpace(index[rev.ID])
-	if filename == "" {
+	filename := filepath.Base(strings.TrimSpace(index[rev.ID]))
+	if filename == "" || filename == "." {
 		return fmt.Errorf("revision %s not found in index for page %s", rev.ID, rev.PageID)
 	}
 	dst := filepath.Join(s.revisionsPageDir(rev.PageID), filename)
@@ -378,6 +384,9 @@ func (s *FSStore) revisionFileNames(pageID string) ([]string, error) {
 }
 
 func (s *FSStore) ReadContentBlob(pageID, hash string) ([]byte, error) {
+	if err := validateStorageID(pageID); err != nil {
+		return nil, fmt.Errorf("invalid page ID: %w", err)
+	}
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
 		return []byte{}, nil
@@ -397,6 +406,9 @@ func (s *FSStore) ReadContentBlob(pageID, hash string) ([]byte, error) {
 // The caller is responsible for closing the returned ReadCloser.
 // Use this instead of ReadContentBlob when you don't need the full content in memory.
 func (s *FSStore) OpenContentBlob(pageID, hash string) (io.ReadCloser, error) {
+	if err := validateStorageID(pageID); err != nil {
+		return nil, fmt.Errorf("invalid page ID: %w", err)
+	}
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
 		return io.NopCloser(strings.NewReader("")), nil
@@ -415,6 +427,9 @@ func (s *FSStore) OpenContentBlob(pageID, hash string) (io.ReadCloser, error) {
 // DeleteContentBlobIfUnreferenced deletes the content blob for the given hash if no
 // revision of pageID still references it. Errors are non-fatal — callers should log them.
 func (s *FSStore) DeleteContentBlobIfUnreferenced(pageID, hash string) error {
+	if err := validateStorageID(pageID); err != nil {
+		return fmt.Errorf("invalid page ID: %w", err)
+	}
 	names, err := s.revisionFileNames(pageID)
 	if err != nil {
 		return err
