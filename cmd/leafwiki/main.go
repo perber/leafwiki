@@ -165,8 +165,8 @@ type cliFlags struct {
 	gitBackupSSHKeyPath     *string
 	gitBackupSSHKey         *string
 	gitBackupSSHKnownHosts  *string
-	gitBackupInterval      *time.Duration
-	revisionCoalesceWindow *time.Duration
+	gitBackupInterval       *time.Duration
+	revisionCoalesceWindow  *time.Duration
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -202,8 +202,8 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupSSHKeyPath:     fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
 		gitBackupSSHKey:         fs.String("git-backup-ssh-key", "", "raw SSH private key for git backup (env var preferred)"),
 		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
-		gitBackupInterval:      fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
-		revisionCoalesceWindow: fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
+		gitBackupInterval:       fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
+		revisionCoalesceWindow:  fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
 	}
 }
 
