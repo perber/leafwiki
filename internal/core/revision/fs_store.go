@@ -307,9 +307,26 @@ func (s *FSStore) UpdateRevision(rev *Revision) error {
 	if err != nil {
 		return err
 	}
-	filename := filepath.Base(strings.TrimSpace(index[rev.ID]))
+	id := strings.TrimSpace(rev.ID)
+	filename := filepath.Base(strings.TrimSpace(index[id]))
 	if filename == "" || filename == "." {
-		return fmt.Errorf("revision %s not found in index for page %s", rev.ID, rev.PageID)
+		// Index missing entry (e.g. crash between SaveRevision write and index flush).
+		// Fall back to directory scan, same as GetRevision.
+		names, err := s.revisionFileNames(rev.PageID)
+		if err != nil {
+			return err
+		}
+		for _, name := range names {
+			if strings.HasSuffix(name, "_"+id+".json") {
+				filename = name
+				index[id] = name
+				_ = s.saveRevisionIndex(rev.PageID, index)
+				break
+			}
+		}
+	}
+	if filename == "" || filename == "." {
+		return fmt.Errorf("revision %s not found for page %s", rev.ID, rev.PageID)
 	}
 	dst := filepath.Join(s.revisionsPageDir(rev.PageID), filename)
 	return writeJSONAtomic(dst, rev)

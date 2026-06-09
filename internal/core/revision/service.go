@@ -154,6 +154,10 @@ func (s *Service) RecordContentUpdates(pages []*tree.Page, authorID, summary str
 // This method hashes the current assets and only writes a new revision when
 // content or the asset manifest actually changed.
 func (s *Service) RecordAssetChange(pageID, authorID, summary string) (*Revision, bool, error) {
+	mu := s.pageWriteLock(pageID)
+	mu.Lock()
+	defer mu.Unlock()
+
 	prev, err := s.store.GetLatestRevision(pageID)
 	if err != nil {
 		return nil, false, err
@@ -204,6 +208,10 @@ func (s *Service) RecordAssetChange(pageID, authorID, summary string) (*Revision
 }
 
 func (s *Service) RecordStructureChange(pageID, authorID, summary string) (*Revision, bool, error) {
+	mu := s.pageWriteLock(pageID)
+	mu.Lock()
+	defer mu.Unlock()
+
 	prev, err := s.store.GetLatestRevision(pageID)
 	if err != nil {
 		return nil, false, err
@@ -541,6 +549,10 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		)
 	}
 
+	mu := s.pageWriteLock(pageID)
+	mu.Lock()
+	defer mu.Unlock()
+
 	rev, err := s.store.GetRevision(pageID, revisionID)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -721,11 +733,14 @@ func (s *Service) pageWriteLock(pageID string) *sync.Mutex {
 }
 
 func (s *Service) shouldCoalesce(prev *Revision, authorID string) bool {
-	return s.coalesceWindow > 0 &&
-		prev != nil &&
-		prev.Type == RevisionTypeContentUpdate &&
+	if s.coalesceWindow <= 0 || prev == nil {
+		return false
+	}
+	elapsed := time.Since(prev.CreatedAt)
+	return prev.Type == RevisionTypeContentUpdate &&
 		prev.AuthorID == strings.TrimSpace(authorID) &&
-		time.Since(prev.CreatedAt) <= s.coalesceWindow
+		elapsed >= 0 &&
+		elapsed <= s.coalesceWindow
 }
 
 func (s *Service) recordContentUpdateForPage(page *tree.Page, authorID, summary string) (*Revision, bool, error) {
