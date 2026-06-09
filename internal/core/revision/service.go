@@ -761,7 +761,6 @@ func (s *Service) recordContentUpdateForPage(page *tree.Page, authorID, summary 
 		prev.PageUpdatedAt = state.PageUpdatedAt
 		prev.LastAuthorID = state.LastAuthorID
 		prev.Summary = summary
-		prev.CreatedAt = time.Now().UTC()
 		if err := s.store.UpdateRevision(prev); err != nil {
 			return nil, false, err
 		}
