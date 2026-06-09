@@ -1,8 +1,5 @@
 import i18next from '@/lib/i18n'
 import { SearchResultItem } from '@/lib/api/search'
-
-const t = (key: string, opts?: object) =>
-  i18next.t(key, { ...opts, ns: 'search' })
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
@@ -10,6 +7,9 @@ import { forwardRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { usePageEditorStore } from '../editor/pageEditorStore'
 import HighlightedSearchTitle from './HighlightedSearchTitle'
+
+const t = (key: string, opts?: Record<string, unknown>) =>
+  i18next.t(key, { ...opts, ns: 'search' })
 
 type SearchResultCardProps = {
   item: SearchResultItem

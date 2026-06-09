@@ -30,7 +30,7 @@ type SearchProps = {
   active?: boolean
 }
 
-const t = (key: string, opts?: object) =>
+const t = (key: string, opts?: Record<string, unknown>) =>
   i18next.t(key, { ...opts, ns: 'search' })
 
 export default function Search({ active = false }: SearchProps) {
