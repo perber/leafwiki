@@ -547,3 +547,119 @@ func TestFSStoreGetRevisionUsesAndBackfillsIndex(t *testing.T) {
 		t.Fatalf("expected revision index backfill for %q, got %#v", rev.ID, index)
 	}
 }
+
+func TestFSStoreUpdateRevision(t *testing.T) {
+	store := NewFSStore(t.TempDir(), nil)
+	created := time.Date(2026, 3, 26, 12, 0, 0, 0, time.UTC)
+	rev := &Revision{
+		ID: "rev-1", PageID: "page-1", CreatedAt: created,
+		Type: RevisionTypeContentUpdate, Title: "Original", Slug: "original",
+	}
+	if err := store.SaveRevision(rev); err != nil {
+		t.Fatalf("SaveRevision failed: %v", err)
+	}
+
+	rev.Title = "Updated"
+	rev.Slug = "updated"
+	if err := store.UpdateRevision(rev); err != nil {
+		t.Fatalf("UpdateRevision failed: %v", err)
+	}
+
+	loaded, err := store.GetRevision("page-1", "rev-1")
+	if err != nil {
+		t.Fatalf("GetRevision after update failed: %v", err)
+	}
+	if loaded.Title != "Updated" || loaded.Slug != "updated" {
+		t.Fatalf("expected updated fields, got title=%q slug=%q", loaded.Title, loaded.Slug)
+	}
+	if loaded.ID != "rev-1" || loaded.PageID != "page-1" {
+		t.Fatalf("expected stable ID and PageID after update, got %#v", loaded)
+	}
+}
+
+func TestFSStoreUpdateRevision_RejectsInvalidPageID(t *testing.T) {
+	store := NewFSStore(t.TempDir(), nil)
+	rev := &Revision{ID: "rev-1", PageID: "../evil", Type: RevisionTypeContentUpdate}
+	if err := store.UpdateRevision(rev); err == nil {
+		t.Fatalf("expected UpdateRevision to reject path-traversal page ID")
+	}
+}
+
+func TestFSStoreUpdateRevision_UnknownRevisionReturnsError(t *testing.T) {
+	store := NewFSStore(t.TempDir(), nil)
+	rev := &Revision{ID: "nonexistent", PageID: "page-1", Type: RevisionTypeContentUpdate}
+	if err := store.UpdateRevision(rev); err == nil {
+		t.Fatalf("expected UpdateRevision to fail for unknown revision ID")
+	}
+}
+
+func TestFSStoreDeleteContentBlobIfUnreferenced_DeletesScopedBlob(t *testing.T) {
+	store := NewFSStore(t.TempDir(), nil)
+	pageID := "page-1"
+
+	hash, err := store.SaveContentBlob(pageID, []byte("orphaned content"))
+	if err != nil {
+		t.Fatalf("SaveContentBlob failed: %v", err)
+	}
+	blobPath := store.contentBlobPath(pageID, hash)
+	if _, err := os.Stat(blobPath); os.IsNotExist(err) {
+		t.Fatalf("expected blob to exist before deletion at %s", blobPath)
+	}
+
+	if err := store.DeleteContentBlobIfUnreferenced(pageID, hash); err != nil {
+		t.Fatalf("DeleteContentBlobIfUnreferenced failed: %v", err)
+	}
+	if _, err := os.Stat(blobPath); !os.IsNotExist(err) {
+		t.Fatalf("expected orphaned scoped blob to be deleted, stat err=%v", err)
+	}
+}
+
+func TestFSStoreDeleteContentBlobIfUnreferenced_KeepsBlobWhenReferenced(t *testing.T) {
+	store := NewFSStore(t.TempDir(), nil)
+	pageID := "page-1"
+	created := time.Date(2026, 3, 26, 12, 0, 0, 0, time.UTC)
+
+	hash, err := store.SaveContentBlob(pageID, []byte("referenced content"))
+	if err != nil {
+		t.Fatalf("SaveContentBlob failed: %v", err)
+	}
+
+	rev := &Revision{
+		ID: "rev-ref", PageID: pageID, CreatedAt: created,
+		Type: RevisionTypeContentUpdate, Title: "Page", Slug: "page",
+		ContentHash: hash,
+	}
+	if err := store.SaveRevision(rev); err != nil {
+		t.Fatalf("SaveRevision failed: %v", err)
+	}
+
+	if err := store.DeleteContentBlobIfUnreferenced(pageID, hash); err != nil {
+		t.Fatalf("DeleteContentBlobIfUnreferenced failed: %v", err)
+	}
+	blobPath := store.contentBlobPath(pageID, hash)
+	if _, err := os.Stat(blobPath); os.IsNotExist(err) {
+		t.Fatalf("expected blob to be kept when still referenced by a revision")
+	}
+}
+
+func TestFSStoreDeleteContentBlobIfUnreferenced_DoesNotDeleteLegacyBlob(t *testing.T) {
+	store := NewFSStore(t.TempDir(), nil)
+	pageID := "page-1"
+
+	content := []byte("legacy content")
+	hash := sha256HexBytes(content)
+	legacyPath := store.contentBlobPathLegacy(hash)
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll legacy blob dir failed: %v", err)
+	}
+	if err := os.WriteFile(legacyPath, content, 0o644); err != nil {
+		t.Fatalf("WriteFile legacy blob failed: %v", err)
+	}
+
+	if err := store.DeleteContentBlobIfUnreferenced(pageID, hash); err != nil {
+		t.Fatalf("DeleteContentBlobIfUnreferenced failed: %v", err)
+	}
+	if _, err := os.Stat(legacyPath); os.IsNotExist(err) {
+		t.Fatalf("expected legacy blob to be preserved — legacy path is global and must never be deleted per-page")
+	}
+}
