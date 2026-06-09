@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,19 +18,26 @@ import (
 
 type FSStore struct {
 	storageDir string
+	log        *slog.Logger
 }
 
 type revisionIndex map[string]string
 
 const revisionIndexFileName = "_index.json"
 
-func NewFSStore(storageDir string) *FSStore {
-	return &FSStore{storageDir: storageDir}
+func NewFSStore(storageDir string, logger *slog.Logger) *FSStore {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &FSStore{
+		storageDir: storageDir,
+		log:        logger.With("component", "FSStore"),
+	}
 }
 
-func (s *FSStore) SaveContentBlob(content []byte) (string, error) {
+func (s *FSStore) SaveContentBlob(pageID string, content []byte) (string, error) {
 	hash := sha256HexBytes(content)
-	dst := s.contentBlobPath(hash)
+	dst := s.contentBlobPath(pageID, hash)
 
 	if fileExists(dst) {
 		return hash, nil
@@ -286,6 +294,21 @@ func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
 	return nil, os.ErrNotExist
 }
 
+// UpdateRevision overwrites an existing revision file in-place (used for coalescing).
+// The revision ID and filename are unchanged; only the JSON content is replaced.
+func (s *FSStore) UpdateRevision(rev *Revision) error {
+	index, err := s.loadRevisionIndex(rev.PageID)
+	if err != nil {
+		return err
+	}
+	filename := strings.TrimSpace(index[rev.ID])
+	if filename == "" {
+		return fmt.Errorf("revision %s not found in index for page %s", rev.ID, rev.PageID)
+	}
+	dst := filepath.Join(s.revisionsPageDir(rev.PageID), filename)
+	return writeJSONAtomic(dst, rev)
+}
+
 // PruneRevisions removes the oldest revision files beyond keepCount for the given page.
 // Files are sorted newest-first, so names[keepCount:] are the oldest ones.
 // Content blobs and asset manifests are NOT deleted — they are content-addressed and
@@ -354,13 +377,16 @@ func (s *FSStore) revisionFileNames(pageID string) ([]string, error) {
 	return names, nil
 }
 
-func (s *FSStore) ReadContentBlob(hash string) ([]byte, error) {
+func (s *FSStore) ReadContentBlob(pageID, hash string) ([]byte, error) {
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
 		return []byte{}, nil
 	}
-
-	raw, err := os.ReadFile(s.contentBlobPath(hash))
+	if raw, err := os.ReadFile(s.contentBlobPath(pageID, hash)); err == nil {
+		return raw, nil
+	}
+	s.log.Debug("content blob not found at scoped path, falling back to legacy", "pageID", pageID, "hash", hash)
+	raw, err := os.ReadFile(s.contentBlobPathLegacy(hash))
 	if err != nil {
 		return nil, fmt.Errorf("read content blob: %w", err)
 	}
@@ -370,16 +396,48 @@ func (s *FSStore) ReadContentBlob(hash string) ([]byte, error) {
 // OpenContentBlob returns a streaming reader for the content blob.
 // The caller is responsible for closing the returned ReadCloser.
 // Use this instead of ReadContentBlob when you don't need the full content in memory.
-func (s *FSStore) OpenContentBlob(hash string) (io.ReadCloser, error) {
+func (s *FSStore) OpenContentBlob(pageID, hash string) (io.ReadCloser, error) {
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
 		return io.NopCloser(strings.NewReader("")), nil
 	}
-	f, err := os.Open(s.contentBlobPath(hash))
+	if f, err := os.Open(s.contentBlobPath(pageID, hash)); err == nil {
+		return f, nil
+	}
+	s.log.Debug("content blob not found at scoped path, falling back to legacy", "pageID", pageID, "hash", hash)
+	f, err := os.Open(s.contentBlobPathLegacy(hash))
 	if err != nil {
 		return nil, fmt.Errorf("open content blob: %w", err)
 	}
 	return f, nil
+}
+
+// DeleteContentBlobIfUnreferenced deletes the content blob for the given hash if no
+// revision of pageID still references it. Errors are non-fatal — callers should log them.
+func (s *FSStore) DeleteContentBlobIfUnreferenced(pageID, hash string) error {
+	names, err := s.revisionFileNames(pageID)
+	if err != nil {
+		return err
+	}
+	dir := s.revisionsPageDir(pageID)
+	for _, name := range names {
+		var rev Revision
+		if err := readJSON(filepath.Join(dir, name), &rev); err != nil {
+			return err
+		}
+		if rev.ContentHash == hash {
+			return nil
+		}
+	}
+	for _, p := range []string{s.contentBlobPath(pageID, hash), s.contentBlobPathLegacy(hash)} {
+		if err := os.Remove(p); err == nil {
+			s.log.Debug("deleted orphaned content blob", "pageID", pageID, "hash", hash, "path", p)
+			return nil
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("delete orphaned content blob: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *FSStore) LoadAssetManifest(hash string) ([]AssetRef, error) {
@@ -498,7 +556,11 @@ func (s *FSStore) revisionFilePath(pageID, revisionID string, createdAt time.Tim
 	return filepath.Join(s.revisionsPageDir(pageID), filename)
 }
 
-func (s *FSStore) contentBlobPath(hash string) string {
+func (s *FSStore) contentBlobPath(pageID, hash string) string {
+	return filepath.Join(s.baseDir(), "blobs", "content", pageID, "sha256", shardHash(hash), hash)
+}
+
+func (s *FSStore) contentBlobPathLegacy(hash string) string {
 	return filepath.Join(s.baseDir(), "blobs", "content", "sha256", shardHash(hash), hash)
 }
 

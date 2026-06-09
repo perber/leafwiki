@@ -76,7 +76,8 @@ type WikiOptions struct {
 	AuthDisabled            bool             // Whether authentication is disabled
 	EnableRevision          bool             // Whether revision recording/storage is enabled
 	MaxRevisionHistory      int              // Max revisions kept per page; 0 = unlimited
-	MaxAssetUploadSizeBytes int64 // Maximum allowed size in bytes for asset/import uploads; 0 = default
+	MaxAssetUploadSizeBytes    int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
+	RevisionCoalesceWindow     time.Duration // Window for coalescing rapid successive saves; 0 = disabled
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
@@ -112,7 +113,10 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	}
 	if options.EnableRevision {
 		w.revision = revision.NewService(w.storageDir, w.tree, w.log,
-			revision.ServiceOptions{MaxRevisions: options.MaxRevisionHistory})
+			revision.ServiceOptions{
+				MaxRevisions:   options.MaxRevisionHistory,
+				CoalesceWindow: options.RevisionCoalesceWindow,
+			})
 		w.ensureBaselineRevisions()
 	}
 	w.buildRoutes(options)
