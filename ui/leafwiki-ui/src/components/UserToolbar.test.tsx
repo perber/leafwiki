@@ -62,7 +62,7 @@ describe('UserToolbar', () => {
     })
     expect(screen.getByText('Available keyboard shortcuts')).toBeInTheDocument()
     expect(screen.getByText('Go to page')).toBeInTheDocument()
-    expect(screen.getByText('?')).toBeInTheDocument()
+    expect(screen.getByText('Ctrl+/')).toBeInTheDocument()
   })
 
   it('opens the shortcuts dialog via the keyboard shortcut', async () => {
@@ -74,7 +74,7 @@ describe('UserToolbar', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.keyDown(window, { key: '?', shiftKey: true })
+    fireEvent.keyDown(window, { key: '/', code: 'Slash', ctrlKey: true })
 
     await waitFor(() => {
       expect(screen.getByTestId('shortcuts-help-dialog')).toBeInTheDocument()
