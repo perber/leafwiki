@@ -1312,6 +1312,50 @@ func TestRecordContentUpdate_NoCoalesceForNonContentRevision(t *testing.T) {
 	}
 }
 
+func TestRecordContentUpdate_ConcurrentSavesNoOrphanedBlobs(t *testing.T) {
+	service, treeService, _ := newRevisionTestServiceWithWindow(t, time.Hour)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "initial")
+
+	if _, _, err := service.RecordContentUpdate(pageID, "alice", "first"); err != nil {
+		t.Fatalf("first RecordContentUpdate failed: %v", err)
+	}
+
+	// Update content sequentially before spawning goroutines — concurrent
+	// UpdateNode calls on the same page would race inside the tree service.
+	content := "updated content"
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	const goroutines = 10
+	errc := make(chan error, goroutines)
+	for range goroutines {
+		go func() {
+			_, _, err := service.RecordContentUpdate(pageID, "alice", "concurrent")
+			errc <- err
+		}()
+	}
+	for range goroutines {
+		if err := <-errc; err != nil {
+			t.Errorf("goroutine error: %v", err)
+		}
+	}
+
+	revisions, err := service.ListRevisions(pageID)
+	if err != nil {
+		t.Fatalf("ListRevisions failed: %v", err)
+	}
+	if len(revisions) == 0 {
+		t.Fatalf("expected at least one revision")
+	}
+	for _, rev := range revisions {
+		blobPath := service.store.contentBlobPath(pageID, rev.ContentHash)
+		if _, err := os.Stat(blobPath); os.IsNotExist(err) {
+			t.Errorf("revision %s has orphaned content blob at %s", rev.ID, blobPath)
+		}
+	}
+}
+
 func TestRecordContentUpdate_CoalescingGCsOldScopedBlob(t *testing.T) {
 	service, treeService, _ := newRevisionTestServiceWithWindow(t, time.Hour)
 	pageID := createRevisionTestPage(t, treeService, "Page", "page", "version one")
