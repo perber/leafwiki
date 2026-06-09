@@ -1,10 +1,11 @@
 import { DialogManager } from '@/components/DialogManager'
+import { HotKeyHandler } from '@/components/HotKeyHandler'
 import UserToolbar from '@/components/UserToolbar'
 import { useBackupStore } from '@/stores/backup'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -61,5 +62,22 @@ describe('UserToolbar', () => {
     })
     expect(screen.getByText('Available keyboard shortcuts')).toBeInTheDocument()
     expect(screen.getByText('Go to page')).toBeInTheDocument()
+    expect(screen.getByText('?')).toBeInTheDocument()
+  })
+
+  it('opens the shortcuts dialog via the keyboard shortcut', async () => {
+    render(
+      <MemoryRouter>
+        <UserToolbar />
+        <HotKeyHandler />
+        <DialogManager />
+      </MemoryRouter>,
+    )
+
+    fireEvent.keyDown(window, { key: '?', shiftKey: true })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('shortcuts-help-dialog')).toBeInTheDocument()
+    })
   })
 })

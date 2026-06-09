@@ -2,7 +2,7 @@ import BaseDialog from '@/components/BaseDialog'
 import i18next from '@/lib/i18n'
 import {
   getShortcutDisplayLabel,
-  getVisibleShortcutsForMode,
+  getVisibleShortcutsForModes,
 } from '@/lib/shortcuts/shortcutCatalog'
 import { useAppMode } from '@/lib/useAppMode'
 import { DIALOG_SHORTCUTS_HELP } from '@/lib/registries'
@@ -13,7 +13,7 @@ const isMacOS =
 
 export function ShortcutsDialog() {
   const appMode = useAppMode()
-  const shortcuts = getVisibleShortcutsForMode(appMode)
+  const shortcuts = getVisibleShortcutsForModes([appMode, 'dialog'])
 
   return (
     <BaseDialog
@@ -38,6 +38,9 @@ export function ShortcutsDialog() {
             ns: 'viewer',
             mode: i18next.t(`shortcutsHelp.modes.${appMode}`, { ns: 'viewer' }),
           })}
+        </p>
+        <p className="text-muted-foreground text-sm">
+          {i18next.t('shortcutsHelp.dialogHint', { ns: 'viewer' })}
         </p>
         <div className="rounded-md border">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 p-4">

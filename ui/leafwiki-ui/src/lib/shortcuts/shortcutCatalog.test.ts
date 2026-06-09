@@ -4,6 +4,7 @@ import {
   getShortcutDefinition,
   getShortcutDisplayLabel,
   getVisibleShortcutsForMode,
+  getVisibleShortcutsForModes,
   shortcutDefinitions,
 } from './shortcutCatalog'
 
@@ -33,6 +34,7 @@ describe('shortcutCatalog', () => {
       'viewer.page.permalink',
       'sidebar.explorer.open',
       'sidebar.search.open',
+      'shortcuts.help.open',
     ])
 
     expect(getVisibleShortcutsForMode('edit').map((item) => item.id)).toEqual([
@@ -47,6 +49,7 @@ describe('shortcutCatalog', () => {
       'editor.page.save',
       'sidebar.explorer.open',
       'sidebar.search.open',
+      'shortcuts.help.open',
     ])
 
     expect(
@@ -55,10 +58,14 @@ describe('shortcutCatalog', () => {
       'history.page.close',
       'sidebar.explorer.open',
       'sidebar.search.open',
+      'shortcuts.help.open',
     ])
   })
 
   it('includes the remaining viewer and editor shortcuts in the catalog', () => {
+    expect(getShortcutDefinition('shortcuts.help.open').keyCombo).toBe(
+      'Shift+?',
+    )
     expect(getShortcutDefinition('viewer.page.edit').keyCombo).toBe('Mod+KeyE')
     expect(getShortcutDefinition('viewer.page.history').keyCombo).toBe(
       'Mod+KeyH',
@@ -104,5 +111,18 @@ describe('shortcutCatalog', () => {
     expect(getShortcutDefinition('dialog.confirm').keyCombo).toBe('Enter')
     expect(getShortcutDefinition('asset.rename.confirm').keyCombo).toBe('Enter')
     expect(getShortcutDefinition('asset.rename.cancel').keyCombo).toBe('Escape')
+  })
+
+  it('can merge page-mode and dialog shortcuts without duplicates', () => {
+    expect(
+      getVisibleShortcutsForModes(['history', 'dialog']).map((item) => item.id),
+    ).toEqual([
+      'history.page.close',
+      'dialog.close',
+      'dialog.confirm',
+      'sidebar.explorer.open',
+      'sidebar.search.open',
+      'shortcuts.help.open',
+    ])
   })
 })

@@ -23,6 +23,8 @@ describe('ShortcutsDialog', () => {
     expect(screen.getByText('Go to page')).toBeInTheDocument()
     expect(screen.getByText('Open explorer')).toBeInTheDocument()
     expect(screen.getByText('Open search')).toBeInTheDocument()
+    expect(screen.getByText('Close dialog')).toBeInTheDocument()
+    expect(screen.getByText('Dialog default action')).toBeInTheDocument()
     expect(screen.queryByText('Save page')).not.toBeInTheDocument()
     expect(screen.queryByText('Back to page')).not.toBeInTheDocument()
   })
@@ -37,6 +39,7 @@ describe('ShortcutsDialog', () => {
     expect(screen.getByText('Save page')).toBeInTheDocument()
     expect(screen.getByText('Close editor')).toBeInTheDocument()
     expect(screen.getByText('Open explorer')).toBeInTheDocument()
+    expect(screen.getByText('Close dialog')).toBeInTheDocument()
     expect(screen.queryByText('Go to page')).not.toBeInTheDocument()
   })
 
@@ -47,8 +50,14 @@ describe('ShortcutsDialog', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByText('Available in history mode')).toBeInTheDocument()
+    expect(screen.getByText('Current page mode: history')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Dialog shortcuts are also included while this dialog is open.',
+      ),
+    ).toBeInTheDocument()
     expect(screen.getByText('Back to page')).toBeInTheDocument()
+    expect(screen.getByText('Dialog default action')).toBeInTheDocument()
     expect(screen.queryByText('Save page')).not.toBeInTheDocument()
   })
 })

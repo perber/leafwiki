@@ -5,6 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import i18next from '@/lib/i18n'
@@ -12,13 +13,27 @@ import {
   DIALOG_CHANGE_OWN_PASSWORD,
   DIALOG_SHORTCUTS_HELP,
 } from '@/lib/registries'
+import {
+  createHotkeyDefinition,
+  getShortcutDisplayLabel,
+} from '@/lib/shortcuts/shortcutCatalog'
 import { useBackupStore } from '@/stores/backup'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSessionStore } from '@/stores/session'
 import { Heart } from 'lucide-react'
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RoleGuard } from './RoleGuard'
+
+const isMacOS =
+  typeof navigator !== 'undefined' &&
+  /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
+  'shortcuts.help.open',
+  isMacOS,
+)
 
 export default function UserToolbar() {
   const supportPageUrl = 'https://leafwiki.com/support/'
@@ -29,9 +44,24 @@ export default function UserToolbar() {
   const authDisabled = useConfigStore((s) => s.authDisabled)
   const backupEnabled = useBackupStore((s) => s.enabled)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
+  const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
+  const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)
   const httpRemoteUserLogoutUrl = useConfigStore(
     (s) => s.httpRemoteUserLogoutUrl,
   )
+
+  useEffect(() => {
+    if (!user || authDisabled) {
+      return
+    }
+
+    const hotkey = createHotkeyDefinition('shortcuts.help.open', () =>
+      openDialog(DIALOG_SHORTCUTS_HELP),
+    )
+
+    registerHotkey(hotkey)
+    return () => unregisterHotkey(hotkey.keyCombo)
+  }, [authDisabled, openDialog, registerHotkey, unregisterHotkey, user])
 
   if (!user && !authDisabled) {
     // renders the login
@@ -118,6 +148,9 @@ export default function UserToolbar() {
             onClick={() => openDialog(DIALOG_SHORTCUTS_HELP)}
           >
             {i18next.t('shortcutsHelp.menuItem', { ns: 'viewer' })}
+            <DropdownMenuShortcut>
+              {shortcutsDialogHotkeyLabel}
+            </DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer"
