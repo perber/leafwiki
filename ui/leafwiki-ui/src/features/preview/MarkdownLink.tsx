@@ -62,7 +62,7 @@ export function MarkdownLink({
       <Button
         variant="link"
         onClick={() => openDialog(DIALOG_WIKILINK_DISAMBIGUATION, { title })}
-        className="text-warning hover:text-warning/80 m-0 p-0 text-base no-underline hover:no-underline"
+        className="text-brand hover:text-brand-dark m-0 p-0 text-base no-underline hover:no-underline"
       >
         {children}
       </Button>
