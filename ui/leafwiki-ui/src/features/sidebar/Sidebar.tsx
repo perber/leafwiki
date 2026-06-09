@@ -8,7 +8,9 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { JSX, useEffect, useMemo } from 'react'
 
 const registeredItems = panelItemRegistry.getAllItems()
-const sidebarShortcutIds: Partial<Record<string, 'sidebar.explorer.open' | 'sidebar.search.open'>> = {
+const sidebarShortcutIds: Partial<
+  Record<string, 'sidebar.explorer.open' | 'sidebar.search.open'>
+> = {
   tree: 'sidebar.explorer.open',
   search: 'sidebar.search.open',
 }

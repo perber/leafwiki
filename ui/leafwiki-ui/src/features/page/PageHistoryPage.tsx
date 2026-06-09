@@ -83,7 +83,13 @@ export default function PageHistoryPage() {
       setToolbarButtons([])
       unregisterHotkey(closeHotkey.keyCombo)
     }
-  }, [closeHistory, isMacOS, registerHotkey, setToolbarButtons, unregisterHotkey])
+  }, [
+    closeHistory,
+    isMacOS,
+    registerHotkey,
+    setToolbarButtons,
+    unregisterHotkey,
+  ])
 
   const renderError = () => {
     if (!loading && notFound) {

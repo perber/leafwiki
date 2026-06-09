@@ -49,13 +49,13 @@ describe('shortcutCatalog', () => {
       'sidebar.search.open',
     ])
 
-    expect(getVisibleShortcutsForMode('history').map((item) => item.id)).toEqual(
-      [
-        'history.page.close',
-        'sidebar.explorer.open',
-        'sidebar.search.open',
-      ],
-    )
+    expect(
+      getVisibleShortcutsForMode('history').map((item) => item.id),
+    ).toEqual([
+      'history.page.close',
+      'sidebar.explorer.open',
+      'sidebar.search.open',
+    ])
   })
 
   it('includes the remaining viewer and editor shortcuts in the catalog', () => {

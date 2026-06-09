@@ -279,7 +279,9 @@ export function getShortcutDefinition(id: ShortcutId): ShortcutDefinition {
   return definition
 }
 
-export function getVisibleShortcutsForMode(mode: AppMode): ShortcutDefinition[] {
+export function getVisibleShortcutsForMode(
+  mode: AppMode,
+): ShortcutDefinition[] {
   return shortcutDefinitions
     .filter((definition) => definition.modes.includes(mode))
     .sort((left, right) => {
