@@ -36,6 +36,7 @@ type Service struct {
 	coalesceWindow     time.Duration
 	log                *slog.Logger
 	assetManifestCache sync.Map // pageID → assetManifestEntry
+	pageLocks          sync.Map // pageID → *sync.Mutex
 }
 
 type ServiceOptions struct {
@@ -714,6 +715,11 @@ func (s *Service) revisionStateFromPage(page *tree.Page) *RevisionState {
 	}
 }
 
+func (s *Service) pageWriteLock(pageID string) *sync.Mutex {
+	v, _ := s.pageLocks.LoadOrStore(pageID, &sync.Mutex{})
+	return v.(*sync.Mutex)
+}
+
 func (s *Service) shouldCoalesce(prev *Revision, authorID string) bool {
 	return s.coalesceWindow > 0 &&
 		prev != nil &&
@@ -723,6 +729,10 @@ func (s *Service) shouldCoalesce(prev *Revision, authorID string) bool {
 }
 
 func (s *Service) recordContentUpdateForPage(page *tree.Page, authorID, summary string) (*Revision, bool, error) {
+	mu := s.pageWriteLock(page.ID)
+	mu.Lock()
+	defer mu.Unlock()
+
 	prev, err := s.store.GetLatestRevision(page.ID)
 	if err != nil {
 		return nil, false, err
