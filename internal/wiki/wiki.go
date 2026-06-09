@@ -20,6 +20,7 @@ import (
 	"github.com/perber/wiki/internal/tags"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikiauth "github.com/perber/wiki/internal/wiki/auth"
+	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 	wikibranding "github.com/perber/wiki/internal/wiki/branding"
 	wikihealth "github.com/perber/wiki/internal/wiki/health"
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
@@ -30,7 +31,6 @@ import (
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
 	wikitags "github.com/perber/wiki/internal/wiki/tags"
-	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 )
 
 type Wiki struct {
@@ -43,7 +43,7 @@ type Wiki struct {
 	branding     *branding.BrandingService
 	searchIndex  *search.SQLiteIndex
 	status       *search.IndexingStatus
-	storageDir string
+	storageDir   string
 
 	// Domain route registrars (populated by NewWiki).
 	pagesRoutes      *wikipages.Routes
@@ -68,16 +68,16 @@ type Wiki struct {
 const SYSTEM_USER_ID = "system"
 
 type WikiOptions struct {
-	StorageDir              string           // Path to storage directory
-	AdminPassword           string           // Initial admin password
-	JWTSecret               string           // JWT secret for authentication
-	AccessTokenTimeout      time.Duration    // Access token timeout duration
-	RefreshTokenTimeout     time.Duration    // Refresh token timeout duration
-	AuthDisabled            bool             // Whether authentication is disabled
-	EnableRevision          bool             // Whether revision recording/storage is enabled
-	MaxRevisionHistory      int              // Max revisions kept per page; 0 = unlimited
-	MaxAssetUploadSizeBytes    int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
-	RevisionCoalesceWindow     time.Duration // Window for coalescing rapid successive saves; 0 = disabled
+	StorageDir              string        // Path to storage directory
+	AdminPassword           string        // Initial admin password
+	JWTSecret               string        // JWT secret for authentication
+	AccessTokenTimeout      time.Duration // Access token timeout duration
+	RefreshTokenTimeout     time.Duration // Refresh token timeout duration
+	AuthDisabled            bool          // Whether authentication is disabled
+	EnableRevision          bool          // Whether revision recording/storage is enabled
+	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
+	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
+	RevisionCoalesceWindow  time.Duration // Window for coalescing rapid successive saves; 0 = disabled
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
