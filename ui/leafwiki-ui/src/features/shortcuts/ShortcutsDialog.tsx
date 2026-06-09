@@ -1,27 +1,20 @@
 import BaseDialog from '@/components/BaseDialog'
 import i18next from '@/lib/i18n'
+import {
+  getShortcutDisplayLabel,
+  getVisibleShortcutsForMode,
+} from '@/lib/shortcuts/shortcutCatalog'
+import { useAppMode } from '@/lib/useAppMode'
 import { DIALOG_SHORTCUTS_HELP } from '@/lib/registries'
 
-const shortcutRows = [
-  {
-    actionKey: 'shortcutsHelp.items.goToPage.action',
-    keys: ['Cmd+Option+P', 'Ctrl+Alt+P'],
-  },
-  {
-    actionKey: 'shortcutsHelp.items.openExplorer.action',
-    keys: ['Mod+Shift+E'],
-  },
-  {
-    actionKey: 'shortcutsHelp.items.openSearch.action',
-    keys: ['Mod+Shift+F'],
-  },
-  {
-    actionKey: 'shortcutsHelp.items.closeDialog.action',
-    keys: ['Esc'],
-  },
-] as const
+const isMacOS =
+  typeof navigator !== 'undefined' &&
+  /Mac|iPhone|iPad|iPod/.test(navigator.platform)
 
 export function ShortcutsDialog() {
+  const appMode = useAppMode()
+  const shortcuts = getVisibleShortcutsForMode(appMode)
+
   return (
     <BaseDialog
       dialogType={DIALOG_SHORTCUTS_HELP}
@@ -40,15 +33,21 @@ export function ShortcutsDialog() {
       onConfirm={async () => true}
     >
       <div className="space-y-3 pt-2" data-testid="shortcuts-help-dialog">
+        <p className="text-muted-foreground text-sm font-medium">
+          {i18next.t('shortcutsHelp.currentMode', {
+            ns: 'viewer',
+            mode: i18next.t(`shortcutsHelp.modes.${appMode}`, { ns: 'viewer' }),
+          })}
+        </p>
         <div className="rounded-md border">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 p-4">
-            {shortcutRows.map((row) => (
-              <div key={row.actionKey} className="contents">
+            {shortcuts.map((shortcut) => (
+              <div key={shortcut.id} className="contents">
                 <span className="text-sm">
-                  {i18next.t(row.actionKey, { ns: 'viewer' })}
+                  {i18next.t(shortcut.labelKey, { ns: 'viewer' })}
                 </span>
                 <span className="text-muted-foreground text-right text-sm font-medium whitespace-nowrap">
-                  {row.keys.join(' / ')}
+                  {getShortcutDisplayLabel(shortcut.id, isMacOS)}
                 </span>
               </div>
             ))}

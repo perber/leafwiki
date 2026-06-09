@@ -26,10 +26,43 @@
     "menuItem": "Keyboard Shortcuts",
     "title": "Available keyboard shortcuts",
     "description": "A quick overview of the shortcuts that are currently available in LeafWiki.",
+    "currentMode": "Available in {{mode}} mode",
     "closeButton": "Close",
+    "categories": {
+      "navigation": "Navigation",
+      "editing": "Editing",
+      "viewing": "Viewing",
+      "dialogs": "Dialogs"
+    },
+    "modes": {
+      "view": "view",
+      "edit": "edit",
+      "history": "history",
+      "settings": "settings",
+      "user-management": "user management",
+      "dialog": "dialog"
+    },
     "items": {
       "goToPage": {
         "action": "Go to page"
+      },
+      "editPage": {
+        "action": "Edit page"
+      },
+      "sharePage": {
+        "action": "Share page"
+      },
+      "printPage": {
+        "action": "Print page"
+      },
+      "copyPage": {
+        "action": "Copy page"
+      },
+      "deletePage": {
+        "action": "Delete page"
+      },
+      "pageHistory": {
+        "action": "Page history"
       },
       "openExplorer": {
         "action": "Open explorer"
@@ -37,8 +70,47 @@
       "openSearch": {
         "action": "Open search"
       },
+      "savePage": {
+        "action": "Save page"
+      },
+      "closeEditor": {
+        "action": "Close editor"
+      },
+      "formatBold": {
+        "action": "Format bold"
+      },
+      "formatItalic": {
+        "action": "Format italic"
+      },
+      "insertHeadingOne": {
+        "action": "Insert heading 1"
+      },
+      "insertHeadingTwo": {
+        "action": "Insert heading 2"
+      },
+      "insertHeadingThree": {
+        "action": "Insert heading 3"
+      },
+      "formatInlineCode": {
+        "action": "Format inline code"
+      },
+      "insertLink": {
+        "action": "Insert link"
+      },
+      "backToPage": {
+        "action": "Back to page"
+      },
       "closeDialog": {
         "action": "Close dialog"
+      },
+      "confirmDialog": {
+        "action": "Confirm dialog"
+      },
+      "confirmRename": {
+        "action": "Confirm rename"
+      },
+      "cancelRename": {
+        "action": "Cancel rename"
       }
     }
   }

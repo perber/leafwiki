@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { DIALOG_ASSET_MANAGER } from '@/lib/registries'
+import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useEffect } from 'react'
@@ -33,16 +34,14 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
       isRenamingRef.current = false
     }
 
-    const cancelHotkey: HotKeyDefinition = {
-      keyCombo: 'Escape',
-      enabled: true,
-      mode: ['dialog'],
-      action: () => {
+    const cancelHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'dialog.close',
+      () => {
         if (open) {
           closeDialog()
         }
       },
-    }
+    )
 
     registerHotkey(cancelHotkey)
     return () => {

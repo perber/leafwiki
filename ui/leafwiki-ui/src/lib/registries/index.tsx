@@ -24,6 +24,7 @@ import { DeleteUserDialog } from '@/features/users/DeleteUserDialog'
 import { UserFormDialog } from '@/features/users/UserFormDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
+import { getShortcutDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { FolderTree, Search as SearchIcon } from 'lucide-react'
 
 export const panelItemRegistry = new PanelItemRegistry()
@@ -37,7 +38,7 @@ export const SIDEBAR_SEARCH_PANEL_ID = 'search'
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
   label: 'Explorer',
-  hotkey: 'Mod+Shift+KeyE',
+  hotkey: getShortcutDefinition('sidebar.explorer.open').keyCombo,
   modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <FolderTree size={16} />,
   render: () => {
@@ -48,7 +49,7 @@ panelItemRegistry.register({
 panelItemRegistry.register({
   id: SIDEBAR_SEARCH_PANEL_ID,
   label: 'Search',
-  hotkey: 'Mod+Shift+KeyF',
+  hotkey: getShortcutDefinition('sidebar.search.open').keyCombo,
   modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <SearchIcon size={16} />,
   render: (props: unknown) => {

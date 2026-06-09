@@ -1,15 +1,22 @@
 import { Button } from '@/components/ui/button'
 import { DIALOG_PAGE_QUICK_SWITCHER } from '@/lib/registries'
+import {
+  createHotkeyDefinition,
+  getShortcutDisplayLabel,
+} from '@/lib/shortcuts/shortcutCatalog'
 import { useAppMode } from '@/lib/useAppMode'
 import { useDialogsStore } from '@/stores/dialogs'
-import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
+import { useHotKeysStore } from '@/stores/hotkeys'
 import { FileSearch } from 'lucide-react'
 import { useEffect } from 'react'
 
 const isMacOS =
   typeof navigator !== 'undefined' &&
   /Mac|iPhone|iPad|iPod/.test(navigator.platform)
-const quickSwitcherHotkeyLabel = isMacOS ? 'Cmd+Option+P' : 'Ctrl+Alt+P'
+const quickSwitcherHotkeyLabel = getShortcutDisplayLabel(
+  'page.quickSwitcher.open',
+  isMacOS,
+)
 
 export function PageQuickSwitcherTrigger() {
   const appMode = useAppMode()
@@ -18,12 +25,9 @@ export function PageQuickSwitcherTrigger() {
   const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)
 
   useEffect(() => {
-    const hotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+Alt+KeyP',
-      enabled: true,
-      mode: ['view'],
-      action: () => openDialog(DIALOG_PAGE_QUICK_SWITCHER),
-    }
+    const hotkey = createHotkeyDefinition('page.quickSwitcher.open', () =>
+      openDialog(DIALOG_PAGE_QUICK_SWITCHER),
+    )
 
     registerHotkey(hotkey)
     return () => unregisterHotkey(hotkey.keyCombo)

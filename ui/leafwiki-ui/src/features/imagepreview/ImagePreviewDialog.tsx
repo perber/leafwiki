@@ -5,6 +5,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { DIALOG_IMAGE_PREVIEW } from '@/lib/registries'
+import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useEffect, useMemo, useState } from 'react'
@@ -25,14 +26,12 @@ export function ImagePreviewDialog({ src, alt }: Props) {
     if (!open) {
       return
     }
-    const cancelHotkey: HotKeyDefinition = {
-      keyCombo: 'Escape',
-      enabled: true,
-      mode: ['dialog'],
-      action: () => {
+    const cancelHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'dialog.close',
+      () => {
         closeDialog()
       },
-    }
+    )
 
     setNatural(null)
     registerHotkey(cancelHotkey)

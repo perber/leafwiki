@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { Loader2 } from 'lucide-react'
@@ -90,11 +91,9 @@ export default function BaseDialog({
       return
     }
 
-    const confirmHotkey: HotKeyDefinition = {
-      keyCombo: 'Enter',
-      enabled: true,
-      mode: ['dialog'],
-      action: async () => {
+    const confirmHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'dialog.confirm',
+      async () => {
         if (defaultAction === 'cancel') {
           onClose()
           closeDialog()
@@ -117,16 +116,14 @@ export default function BaseDialog({
           closeDialog()
         }
       },
-    }
-    const cancelHotkey: HotKeyDefinition = {
-      keyCombo: 'Escape',
-      enabled: true,
-      mode: ['dialog'],
-      action: () => {
+    )
+    const cancelHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'dialog.close',
+      () => {
         onClose()
         closeDialog()
       },
-    }
+    )
     registerHotkey(confirmHotkey)
     registerHotkey(cancelHotkey)
 
