@@ -63,7 +63,7 @@ func writeUsage(w io.Writer) {
 	--git-backup-ssh-key-path      Path to SSH private key for git backup
 	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
 	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
-	--git-backup-interval          Git backup interval in minutes; 0 = manual-only, no automatic scheduling (default: 60)
+	--git-backup-interval          Git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -163,7 +163,7 @@ type cliFlags struct {
 	gitBackupSSHKeyPath     *string
 	gitBackupSSHKey         *string
 	gitBackupSSHKnownHosts  *string
-	gitBackupInterval       *int
+	gitBackupInterval       *time.Duration
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -199,7 +199,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupSSHKeyPath:     fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
 		gitBackupSSHKey:         fs.String("git-backup-ssh-key", "", "raw SSH private key for git backup (env var preferred)"),
 		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
-		gitBackupInterval:       fs.Int("git-backup-interval", 0, "git backup interval in minutes (default: 60)"),
+		gitBackupInterval:       fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
 	}
 }
 
@@ -250,7 +250,7 @@ func main() {
 	gitBackupBranch := resolveString("git-backup-branch", *flags.gitBackupBranch, visited, "LEAFWIKI_GIT_BACKUP_BRANCH", "main")
 	gitBackupSSHKeyPath := resolveString("git-backup-ssh-key-path", *flags.gitBackupSSHKeyPath, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH", "")
 	gitBackupSSHKey := resolveString("git-backup-ssh-key", *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
-	gitBackupInterval := resolveInt("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL", 60)
+	gitBackupInterval := resolveDuration("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL")
 	gitBackupSSHKnownHosts := resolveString("git-backup-ssh-known-hosts", *flags.gitBackupSSHKnownHosts, visited, "LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS", "")
 	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
 	if err != nil {
@@ -362,12 +362,12 @@ func main() {
 			SSHKeyPath:        gitBackupSSHKeyPath,
 			SSHKey:            gitBackupSSHKey,
 			SSHKnownHostsPath: gitBackupSSHKnownHosts,
-			IntervalMinutes:   gitBackupInterval,
+			Interval:          gitBackupInterval,
 		})
 		if err != nil {
 			fail("git backup init failed: %v", err)
 		}
-		backupScheduler = backup.NewScheduler(backupRepo, time.Duration(gitBackupInterval)*time.Minute)
+		backupScheduler = backup.NewScheduler(backupRepo)
 		defer backupScheduler.Stop()
 		w.SetBackupRoutes(wikibackup.NewRoutes(backupRepo, backupScheduler, w.AuthService()))
 	}

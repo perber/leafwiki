@@ -22,8 +22,16 @@ type Scheduler struct {
 }
 
 // NewScheduler creates and starts the background goroutine.
-// Pass interval == 0 to disable automatic periodic backups (manual-only mode).
-func NewScheduler(repo *Repository, interval time.Duration) *Scheduler {
+// The interval is taken from repo.cfg.Interval; 0 = manual-only mode.
+func NewScheduler(repo *Repository) *Scheduler {
+	interval := repo.cfg.Interval
+
+	if interval < 0 {
+		slog.Warn("backup scheduler interval is negative, switching to manual-only mode", "requested", interval)
+		interval = 0
+		repo.cfg.Interval = 0
+	}
+
 	s := &Scheduler{
 		repo:   repo,
 		manual: make(chan struct{}, 1),
@@ -34,6 +42,7 @@ func NewScheduler(repo *Repository, interval time.Duration) *Scheduler {
 		if interval < minInterval {
 			slog.Warn("backup scheduler interval too small, using minimum", "requested", interval, "using", minInterval)
 			interval = minInterval
+			repo.cfg.Interval = minInterval
 		}
 		s.ticker = time.NewTicker(interval)
 	}

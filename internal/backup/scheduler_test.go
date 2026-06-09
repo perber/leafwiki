@@ -40,12 +40,12 @@ func TestScheduler_TriggerNow(t *testing.T) {
 	}
 
 	cfg := Config{
-		RootDir:       rootDir,
-		AssetsDir:     assetsDir,
-		AuthorName:    "Test Author",
-		AuthorEmail:   "test@example.com",
-		Branch:        "main",
-		IntervalMinutes: 10,
+		RootDir:     rootDir,
+		AssetsDir:   assetsDir,
+		AuthorName:  "Test Author",
+		AuthorEmail: "test@example.com",
+		Branch:      "main",
+		Interval:    10 * time.Minute,
 	}
 
 	repo, err := Init(cfg)
@@ -59,7 +59,7 @@ func TestScheduler_TriggerNow(t *testing.T) {
 	}
 
 	// Create scheduler with a long interval so it won't fire naturally
-	scheduler := NewScheduler(repo, cfg.Duration())
+	scheduler := NewScheduler(repo)
 	defer scheduler.Stop()
 
 	// Wait for the initial run to complete
@@ -100,12 +100,12 @@ func TestScheduler_Stop(t *testing.T) {
 	}
 
 	cfg := Config{
-		RootDir:       rootDir,
-		AssetsDir:     assetsDir,
-		AuthorName:    "Test Author",
-		AuthorEmail:   "test@example.com",
-		Branch:        "main",
-		IntervalMinutes: 10,
+		RootDir:     rootDir,
+		AssetsDir:   assetsDir,
+		AuthorName:  "Test Author",
+		AuthorEmail: "test@example.com",
+		Branch:      "main",
+		Interval:    10 * time.Minute,
 	}
 
 	repo, err := Init(cfg)
@@ -113,7 +113,7 @@ func TestScheduler_Stop(t *testing.T) {
 		t.Fatalf("Init failed: %v", err)
 	}
 
-	scheduler := NewScheduler(repo, cfg.Duration())
+	scheduler := NewScheduler(repo)
 
 	// Stop should block until goroutine finishes
 	scheduler.Stop()
@@ -137,12 +137,12 @@ func TestScheduler_RunsOnStart(t *testing.T) {
 	}
 
 	cfg := Config{
-		RootDir:       rootDir,
-		AssetsDir:     assetsDir,
-		AuthorName:    "Test Author",
-		AuthorEmail:   "test@example.com",
-		Branch:        "main",
-		IntervalMinutes: 600,
+		RootDir:     rootDir,
+		AssetsDir:   assetsDir,
+		AuthorName:  "Test Author",
+		AuthorEmail: "test@example.com",
+		Branch:      "main",
+		Interval:    600 * time.Minute,
 	}
 
 	repo, err := Init(cfg)
@@ -156,7 +156,7 @@ func TestScheduler_RunsOnStart(t *testing.T) {
 	}
 
 	// Create scheduler with very long interval
-	scheduler := NewScheduler(repo, cfg.Duration())
+	scheduler := NewScheduler(repo)
 	defer scheduler.Stop()
 
 	// Wait for the initial run to complete
