@@ -1,0 +1,32 @@
+{
+  "input": {
+    "placeholder": "Search...",
+    "clearButton": "Clear"
+  },
+  "tags": {
+    "accordionTitle": "All Tags",
+    "available_one": "{{count}} tag available",
+    "available_other": "{{count}} tags available",
+    "selected_one": "{{count}} selected tag",
+    "selected_other": "{{count}} selected tags",
+    "loading": "Loading tags…",
+    "error": "Failed to load tags.",
+    "clearFilter": "Clear tag filter"
+  },
+  "results": {
+    "loading": "Loading results...",
+    "noResults": "No results found.",
+    "resultSummary_one": "Found <bold>{{count}}</bold> result for",
+    "resultSummary_other": "Found <bold>{{count}}</bold> results for",
+    "filterQuery": "\"{{query}}\"",
+    "filterQueryWithTags_one": "\"{{query}}\" with {{count}} tag",
+    "filterQueryWithTags_other": "\"{{query}}\" with {{count}} tags",
+    "filterTagged": "tagged \"{{tag}}\"",
+    "filterTaggedWith_one": "tagged with {{count}} tag",
+    "filterTaggedWith_other": "tagged with {{count}} tags"
+  },
+  "resultCard": {
+    "kindPage": "Page",
+    "kindSection": "Section"
+  }
+}

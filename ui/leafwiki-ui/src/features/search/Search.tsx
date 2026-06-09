@@ -1,3 +1,5 @@
+import i18next from '@/lib/i18n'
+import { Trans } from 'react-i18next'
 import { ListView, ListViewList, ListViewStatus } from '@/components/ListView'
 import { Pagination } from '@/components/Pagination'
 import {
@@ -28,6 +30,9 @@ type SearchProps = {
   active?: boolean
 }
 
+const t = (key: string, opts?: object) =>
+  i18next.t(key, { ...opts, ns: 'search' })
+
 export default function Search({ active = false }: SearchProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -46,7 +51,6 @@ export default function Search({ active = false }: SearchProps) {
   const [page, setPage] = useState(0)
   const [activeIndex, setActiveIndex] = useState(0)
   const [availableTags, setAvailableTags] = useState<TagCount[]>([])
-  const [loadingAvailableTags, setLoadingAvailableTags] = useState(true)
   const [availableTagsError, setAvailableTagsError] = useState(false)
   const [facetTags, setFacetTags] = useState<SearchTagFacet[]>([])
   const searchInputRef = useRef<HTMLInputElement | null>(null)
@@ -72,19 +76,22 @@ export default function Search({ active = false }: SearchProps) {
   const visibleTags = isIdleMode ? availableTags : facetTags
   const availableTagsLabel =
     activeTags.length === 0
-      ? `${visibleTags.length} tag${visibleTags.length === 1 ? '' : 's'} available`
-      : `${activeTags.length} selected tag${activeTags.length === 1 ? '' : 's'}`
+      ? t('tags.available', { count: visibleTags.length })
+      : t('tags.selected', { count: activeTags.length })
   const activeFilterLabel = useMemo(() => {
     if (activeQueryLabel && activeTags.length > 0) {
-      return `"${activeQueryLabel}" with ${activeTags.length} tag${activeTags.length === 1 ? '' : 's'}`
+      return t('results.filterQueryWithTags', {
+        query: activeQueryLabel,
+        count: activeTags.length,
+      })
     }
     if (activeQueryLabel) {
-      return `"${activeQueryLabel}"`
+      return t('results.filterQuery', { query: activeQueryLabel })
     }
     if (activeTags.length === 1) {
-      return `tagged "${activeTags[0]}"`
+      return t('results.filterTagged', { tag: activeTags[0] })
     }
-    return `tagged with ${activeTags.length} tags`
+    return t('results.filterTaggedWith', { count: activeTags.length })
   }, [activeQueryLabel, activeTags])
 
   const invalidatePendingRequests = () => {
@@ -173,11 +180,6 @@ export default function Search({ active = false }: SearchProps) {
         if (cancelled) return
         setAvailableTags([])
         setAvailableTagsError(true)
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingAvailableTags(false)
-        }
       })
 
     return () => {
@@ -279,7 +281,7 @@ export default function Search({ active = false }: SearchProps) {
           ref={searchInputRef}
           autoFocus
           type="text"
-          placeholder="Search..."
+          placeholder={t('input.placeholder')}
           value={inputQuery}
           data-testid="search-input"
           onChange={(e) => {
@@ -342,7 +344,7 @@ export default function Search({ active = false }: SearchProps) {
           <button
             onClick={clearSearch}
             className="search__clear-button"
-            title="Clear"
+            title={t('input.clearButton')}
             data-testid="search-clear-button"
           >
             <X size={16} />
@@ -350,9 +352,7 @@ export default function Search({ active = false }: SearchProps) {
         )}
       </div>
 
-      {(visibleTags.length > 0 ||
-        loadingAvailableTags ||
-        availableTagsError) && (
+      {(visibleTags.length > 0 || availableTagsError) && (
         <Accordion
           type="single"
           collapsible
@@ -367,20 +367,20 @@ export default function Search({ active = false }: SearchProps) {
               className="browse-tags__accordion-trigger"
               data-testid="search-tags-accordion-trigger"
             >
-              <span className="browse-tags__accordion-title">All Tags</span>
+              <span className="browse-tags__accordion-title">
+                {t('tags.accordionTitle')}
+              </span>
               <span className="browse-tags__accordion-summary">
                 {availableTagsLabel}
               </span>
             </AccordionTrigger>
             <AccordionContent className="browse-tags__accordion-content">
-              {loadingAvailableTags ? (
-                <p className="browse-tags__accordion-empty">Loading tags…</p>
-              ) : availableTagsError ? (
+              {availableTagsError ? (
                 <p
                   className="browse-tags__accordion-empty"
                   data-testid="tags-available-error"
                 >
-                  Failed to load tags.
+                  {t('tags.error')}
                 </p>
               ) : (
                 <div
@@ -420,10 +420,15 @@ export default function Search({ active = false }: SearchProps) {
             <ListViewStatus className="search__result-summary">
               <span className="browse-results__summary">
                 <span className="browse-results__summary-count">
-                  Found <strong>{totalCount}</strong>
+                  <Trans
+                    i18nKey="results.resultSummary"
+                    count={totalCount}
+                    ns="search"
+                    components={{ bold: <strong /> }}
+                  />
                 </span>
                 <span className="browse-results__summary-text">
-                  {` result${totalCount !== 1 ? 's' : ''} for `}
+                  {' '}
                   <strong>{activeFilterLabel}</strong>
                 </span>
               </span>
@@ -433,7 +438,7 @@ export default function Search({ active = false }: SearchProps) {
                 type="button"
                 className="browse-results__clear"
                 onClick={clearActiveTags}
-                title="Clear tag filter"
+                title={t('tags.clearFilter')}
                 data-testid="search-tags-clear-button"
               >
                 <X size={12} />
@@ -449,7 +454,7 @@ export default function Search({ active = false }: SearchProps) {
             contentClassName="search__content"
           >
             <ListViewStatus className="search__result-summary">
-              Loading results...
+              {t('results.loading')}
             </ListViewStatus>
           </ListView>
         )}
@@ -461,7 +466,7 @@ export default function Search({ active = false }: SearchProps) {
             contentClassName="search__content"
           >
             <ListViewStatus className="search__result-summary">
-              No results found.
+              {t('results.noResults')}
             </ListViewStatus>
           </ListView>
         )}
