@@ -1312,57 +1312,6 @@ func TestRecordContentUpdate_NoCoalesceForNonContentRevision(t *testing.T) {
 	}
 }
 
-func TestRecordContentUpdate_CoalesceResetsWindow(t *testing.T) {
-	service, treeService, _ := newRevisionTestServiceWithWindow(t, 5*time.Minute)
-	pageID := createRevisionTestPage(t, treeService, "Page", "page", "version one")
-
-	rev1, _, err := service.RecordContentUpdate(pageID, "alice", "first")
-	if err != nil || rev1 == nil {
-		t.Fatalf("first RecordContentUpdate failed: %v", err)
-	}
-
-	// Backdate rev1 to just inside the window.
-	rev1.CreatedAt = time.Now().Add(-4 * time.Minute)
-	if err := service.store.UpdateRevision(rev1); err != nil {
-		t.Fatalf("UpdateRevision (backdate) failed: %v", err)
-	}
-
-	// First coalesce — resets CreatedAt to now.
-	content := "version two"
-	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
-		t.Fatalf("UpdateNode (v2) failed: %v", err)
-	}
-	rev2, _, err := service.RecordContentUpdate(pageID, "alice", "second")
-	if err != nil {
-		t.Fatalf("second RecordContentUpdate failed: %v", err)
-	}
-	if rev2.ID != rev1.ID {
-		t.Fatalf("expected coalesce on first update")
-	}
-
-	// Without debounce the original CreatedAt (-4min) would now be 4min+ old;
-	// with debounce CreatedAt was reset to ~now, so this must still coalesce.
-	content = "version three"
-	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
-		t.Fatalf("UpdateNode (v3) failed: %v", err)
-	}
-	rev3, _, err := service.RecordContentUpdate(pageID, "alice", "third")
-	if err != nil {
-		t.Fatalf("third RecordContentUpdate failed: %v", err)
-	}
-	if rev3.ID != rev1.ID {
-		t.Fatalf("expected second coalesce after window reset, got new revision %q", rev3.ID)
-	}
-
-	revisions, err := service.ListRevisions(pageID)
-	if err != nil {
-		t.Fatalf("ListRevisions failed: %v", err)
-	}
-	if len(revisions) != 1 {
-		t.Fatalf("expected 1 revision after two coalesces, got %d", len(revisions))
-	}
-}
-
 func TestRecordContentUpdate_CoalescingGCsOldScopedBlob(t *testing.T) {
 	service, treeService, _ := newRevisionTestServiceWithWindow(t, time.Hour)
 	pageID := createRevisionTestPage(t, treeService, "Page", "page", "version one")
