@@ -1,13 +1,19 @@
 import ScrollableContainer from '@/components/ScrollableContainer'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { panelItemRegistry } from '@/lib/registries'
-import { PanelItem } from '@/lib/registries/panelItemRegistry'
+import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useAppMode } from '@/lib/useAppMode'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSidebarStore } from '@/stores/sidebar'
 import { JSX, useEffect, useMemo } from 'react'
 
 const registeredItems = panelItemRegistry.getAllItems()
+const sidebarShortcutIds: Partial<
+  Record<string, 'sidebar.explorer.open' | 'sidebar.search.open'>
+> = {
+  tree: 'sidebar.explorer.open',
+  search: 'sidebar.search.open',
+}
 
 export default function Sidebar() {
   const appMode = useAppMode()
@@ -63,14 +69,10 @@ export default function Sidebar() {
     () =>
       items
         .map((item) => {
-          const hotkey = (item as PanelItem).hotkey as string | undefined
-          if (!hotkey) return null
-          return {
-            keyCombo: hotkey,
-            enabled: true,
-            action: actions.get(item.id)!,
-            mode: item.modes ?? ['view', 'edit', 'history'],
-          }
+          const shortcutId = sidebarShortcutIds[item.id]
+          if (!shortcutId) return null
+
+          return createHotkeyDefinition(shortcutId, actions.get(item.id)!)
         })
         .filter(Boolean) as {
         keyCombo: string

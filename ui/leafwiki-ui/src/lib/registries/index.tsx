@@ -15,6 +15,7 @@ import { MovePageDialog } from '@/features/page/MovePageDialog'
 import PermalinkDialog from '@/features/page/PermalinkDialog'
 import { PageRefactorDialog } from '@/features/page/PageRefactorDialog'
 import { SortPagesDialog } from '@/features/page/SortPagesDialog'
+import { ShortcutsDialog } from '@/features/shortcuts/ShortcutsDialog'
 import Search from '@/features/search/Search'
 import TreeView from '@/features/tree/TreeView'
 import { ChangeOwnPasswordDialog } from '@/features/users/ChangeOwnPasswordDialog'
@@ -23,6 +24,7 @@ import { DeleteUserDialog } from '@/features/users/DeleteUserDialog'
 import { UserFormDialog } from '@/features/users/UserFormDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
+import { getShortcutDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { FolderTree, Search as SearchIcon } from 'lucide-react'
 
 export const panelItemRegistry = new PanelItemRegistry()
@@ -36,7 +38,7 @@ export const SIDEBAR_SEARCH_PANEL_ID = 'search'
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
   label: 'Explorer',
-  hotkey: 'Mod+Shift+KeyE',
+  hotkey: getShortcutDefinition('sidebar.explorer.open').keyCombo,
   modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <FolderTree size={16} />,
   render: () => {
@@ -47,7 +49,7 @@ panelItemRegistry.register({
 panelItemRegistry.register({
   id: SIDEBAR_SEARCH_PANEL_ID,
   label: 'Search',
-  hotkey: 'Mod+Shift+KeyF',
+  hotkey: getShortcutDefinition('sidebar.search.open').keyCombo,
   modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <SearchIcon size={16} />,
   render: (props: unknown) => {
@@ -79,6 +81,7 @@ export const DIALOG_RESTORE_REVISION_CONFIRMATION =
   'restore-revision-confirmation'
 export const DIALOG_LINK_INSERT = 'link-insert'
 export const DIALOG_WIKILINK_DISAMBIGUATION = 'wikilink-disambiguation'
+export const DIALOG_SHORTCUTS_HELP = 'shortcuts-help'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -247,6 +250,13 @@ dialogRegistry.register({
   type: DIALOG_PAGE_QUICK_SWITCHER,
   render: () => {
     return <PageQuickSwitcherDialog key={DIALOG_PAGE_QUICK_SWITCHER} />
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_SHORTCUTS_HELP,
+  render: () => {
+    return <ShortcutsDialog key={DIALOG_SHORTCUTS_HELP} />
   },
 })
 

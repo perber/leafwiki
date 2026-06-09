@@ -1,6 +1,10 @@
 import Page404 from '@/components/Page404'
 import { buildViewUrl } from '@/lib/routePath'
 import {
+  createHotkeyDefinition,
+  getShortcutDisplayLabel,
+} from '@/lib/shortcuts/shortcutCatalog'
+import {
   createNavigationVisitState,
   getNavigationVisitKey,
 } from '@/lib/navigationVisit'
@@ -31,6 +35,9 @@ export default function PageHistoryPage() {
   const notFound = useViewerStore((s) => s.notFound)
   const page = useViewerStore((s) => s.page)
   const loadPageData = useViewerStore((s) => s.loadPageData)
+  const isMacOS =
+    typeof navigator !== 'undefined' &&
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform)
 
   usePageHistory(page?.id ?? null)
 
@@ -58,19 +65,17 @@ export default function PageHistoryPage() {
       {
         id: 'close-history',
         label: 'Back to Page',
-        hotkey: 'Esc',
+        hotkey: getShortcutDisplayLabel('history.page.close', isMacOS),
         icon: <ArrowLeft size={18} />,
         action: closeHistory,
         variant: 'outline',
       },
     ])
 
-    const closeHotkey: HotKeyDefinition = {
-      keyCombo: 'Escape',
-      enabled: true,
-      mode: ['history'],
-      action: closeHistory,
-    }
+    const closeHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'history.page.close',
+      closeHistory,
+    )
 
     registerHotkey(closeHotkey)
 
@@ -78,7 +83,13 @@ export default function PageHistoryPage() {
       setToolbarButtons([])
       unregisterHotkey(closeHotkey.keyCombo)
     }
-  }, [closeHistory, registerHotkey, setToolbarButtons, unregisterHotkey])
+  }, [
+    closeHistory,
+    isMacOS,
+    registerHotkey,
+    setToolbarButtons,
+    unregisterHotkey,
+  ])
 
   const renderError = () => {
     if (!loading && notFound) {

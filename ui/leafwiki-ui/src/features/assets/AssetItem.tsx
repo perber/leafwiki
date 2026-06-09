@@ -7,6 +7,7 @@ import {
   VIDEO_EXTENSIONS,
 } from '@/lib/config'
 import { withBasePath } from '@/lib/routePath'
+import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { Check, FileText, Link2, Pencil, Play, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -132,22 +133,18 @@ export function AssetItem({
   useEffect(() => {
     if (!isEditing) return
 
-    const enterHotkey: HotKeyDefinition = {
-      keyCombo: 'Enter',
-      enabled: true,
-      mode: ['dialog'],
-      action: handleRename,
-    }
+    const enterHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'asset.rename.confirm',
+      handleRename,
+    )
 
-    const escapeHotkey: HotKeyDefinition = {
-      keyCombo: 'Escape',
-      enabled: true,
-      mode: ['dialog'],
-      action: () => {
+    const escapeHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'asset.rename.cancel',
+      () => {
         setEditingFilename(null)
         setNewName(baseName.replace(/\.[^/.]+$/, ''))
       },
-    }
+    )
     registerHotkey(enterHotkey)
     registerHotkey(escapeHotkey)
 

@@ -1,5 +1,9 @@
 // Hook to provide toolbar actions for the page viewer
 
+import {
+  createHotkeyDefinition,
+  getShortcutDisplayLabel,
+} from '@/lib/shortcuts/shortcutCatalog'
 import { useAppMode } from '@/lib/useAppMode'
 import { isHotkeyAllowedOnElement } from '@/lib/hotkeys'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
@@ -47,6 +51,9 @@ export function useToolbarActions({
   const dirty = usePageEditorStore(isDirtyState)
   const autoSave = useEditorStore((s) => s.autoSave)
   const toggleAutoSave = useEditorStore((s) => s.toggleAutoSave)
+  const isMacOS =
+    typeof navigator !== 'undefined' &&
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform)
 
   // useEffect to set toolbar buttons
   useEffect(() => {
@@ -59,7 +66,7 @@ export function useToolbarActions({
       {
         id: 'close-editor',
         label: 'Close Editor',
-        hotkey: 'Esc',
+        hotkey: getShortcutDisplayLabel('editor.page.close', isMacOS),
         icon: <X size={18} />,
         action: closePage,
         variant: 'destructive',
@@ -68,7 +75,7 @@ export function useToolbarActions({
       {
         id: 'save-page',
         label: 'Save Page',
-        hotkey: 'Ctrl+S',
+        hotkey: getShortcutDisplayLabel('editor.page.save', isMacOS),
         icon: <Save size={18} />,
         variant: 'default',
         disabled: !dirty,
@@ -101,6 +108,7 @@ export function useToolbarActions({
     closePage,
     autoSave,
     toggleAutoSave,
+    isMacOS,
   ])
 
   // Register hotkeys
@@ -126,19 +134,14 @@ export function useToolbarActions({
       )
     }
 
-    const saveHotKey: HotKeyDefinition = {
-      keyCombo: 'Mod+KeyS',
-      enabled: true,
-      mode: ['edit'],
-      action: savePage,
-    }
+    const saveHotKey: HotKeyDefinition = createHotkeyDefinition(
+      'editor.page.save',
+      savePage,
+    )
 
-    const closeHotkey: HotKeyDefinition = {
-      keyCombo: 'Escape',
-      enabled: true,
-      mode: ['edit'],
-      shouldHandle: editorCloseShouldHandle,
-      action: () => {
+    const closeHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'editor.page.close',
+      () => {
         const view = getEditorView?.()
         if (view && completionStatus(view.state) !== null) {
           return
@@ -151,56 +154,43 @@ export function useToolbarActions({
 
         closePage()
       },
-    }
+      { shouldHandle: editorCloseShouldHandle },
+    )
 
-    const boldHotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+KeyB',
-      enabled: true,
-      mode: ['edit'],
-      action: formatBold,
-    }
+    const boldHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'editor.format.bold',
+      formatBold,
+    )
 
-    const italicHotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+KeyI',
-      enabled: true,
-      mode: ['edit'],
-      action: formatItalic,
-    }
+    const italicHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'editor.format.italic',
+      formatItalic,
+    )
 
-    const heading1Hotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+Alt+Digit1',
-      enabled: true,
-      mode: ['edit'],
-      action: () => insertHeading(1),
-    }
+    const heading1Hotkey: HotKeyDefinition = createHotkeyDefinition(
+      'editor.heading.one',
+      () => insertHeading(1),
+    )
 
-    const heading2Hotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+Alt+Digit2',
-      enabled: true,
-      mode: ['edit'],
-      action: () => insertHeading(2),
-    }
+    const heading2Hotkey: HotKeyDefinition = createHotkeyDefinition(
+      'editor.heading.two',
+      () => insertHeading(2),
+    )
 
-    const heading3Hotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+Alt+Digit3',
-      enabled: true,
-      mode: ['edit'],
-      action: () => insertHeading(3),
-    }
+    const heading3Hotkey: HotKeyDefinition = createHotkeyDefinition(
+      'editor.heading.three',
+      () => insertHeading(3),
+    )
 
-    const inlineCodeHotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+Backquote',
-      enabled: true,
-      mode: ['edit'],
-      action: formatInlineCode,
-    }
+    const inlineCodeHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'editor.format.inlineCode',
+      formatInlineCode,
+    )
 
-    const linkHotkey: HotKeyDefinition = {
-      keyCombo: 'Mod+KeyK',
-      enabled: true,
-      mode: ['edit'],
-      action: openLinkDialog,
-    }
+    const linkHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'editor.link.insert',
+      openLinkDialog,
+    )
 
     registerHotkey(saveHotKey)
     registerHotkey(closeHotkey)
@@ -238,5 +228,6 @@ export function useToolbarActions({
     registerHotkey,
     unregisterHotkey,
     dirty,
+    isMacOS,
   ])
 }

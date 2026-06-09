@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { deferStateUpdate } from '@/lib/deferState'
 import { searchFlatPageSearchItems } from '@/lib/pageSearch'
 import { DIALOG_LINK_INSERT } from '@/lib/registries'
+import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useTreeStore } from '@/stores/tree'
@@ -91,14 +92,12 @@ export function LinkInsertDialog({
   }
 
   useEffect(() => {
-    const cancelHotkey: HotKeyDefinition = {
-      keyCombo: 'Escape',
-      enabled: true,
-      mode: ['dialog'],
-      action: () => {
+    const cancelHotkey: HotKeyDefinition = createHotkeyDefinition(
+      'dialog.close',
+      () => {
         if (open) closeDialog()
       },
-    }
+    )
     registerHotkey(cancelHotkey)
     return () => unregisterHotkey(cancelHotkey.keyCombo)
   }, [open, closeDialog, registerHotkey, unregisterHotkey])
