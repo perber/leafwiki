@@ -21,5 +21,25 @@
     "noBrokenLinks": "No broken links.",
     "brokenOutgoingsTitle": "This page links to missing targets",
     "brokenIncomingTitle": "Pages linking to an old path"
+  },
+  "shortcutsHelp": {
+    "menuItem": "Keyboard Shortcuts",
+    "title": "Available keyboard shortcuts",
+    "description": "A quick overview of the shortcuts that are currently available in LeafWiki.",
+    "closeButton": "Close",
+    "items": {
+      "goToPage": {
+        "action": "Go to page"
+      },
+      "openExplorer": {
+        "action": "Open explorer"
+      },
+      "openSearch": {
+        "action": "Open search"
+      },
+      "closeDialog": {
+        "action": "Close dialog"
+      }
+    }
   }
 }

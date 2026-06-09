@@ -7,7 +7,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
+import i18next from '@/lib/i18n'
+import {
+  DIALOG_CHANGE_OWN_PASSWORD,
+  DIALOG_SHORTCUTS_HELP,
+} from '@/lib/registries'
 import { useBackupStore } from '@/stores/backup'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -109,6 +113,12 @@ export default function UserToolbar() {
             Version {__APP_VERSION__}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => openDialog(DIALOG_SHORTCUTS_HELP)}
+          >
+            {i18next.t('shortcutsHelp.menuItem', { ns: 'viewer' })}
+          </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={() => openDialog(DIALOG_CHANGE_OWN_PASSWORD)}

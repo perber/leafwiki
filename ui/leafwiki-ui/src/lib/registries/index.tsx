@@ -15,6 +15,7 @@ import { MovePageDialog } from '@/features/page/MovePageDialog'
 import PermalinkDialog from '@/features/page/PermalinkDialog'
 import { PageRefactorDialog } from '@/features/page/PageRefactorDialog'
 import { SortPagesDialog } from '@/features/page/SortPagesDialog'
+import { ShortcutsDialog } from '@/features/shortcuts/ShortcutsDialog'
 import Search from '@/features/search/Search'
 import TreeView from '@/features/tree/TreeView'
 import { ChangeOwnPasswordDialog } from '@/features/users/ChangeOwnPasswordDialog'
@@ -79,6 +80,7 @@ export const DIALOG_RESTORE_REVISION_CONFIRMATION =
   'restore-revision-confirmation'
 export const DIALOG_LINK_INSERT = 'link-insert'
 export const DIALOG_WIKILINK_DISAMBIGUATION = 'wikilink-disambiguation'
+export const DIALOG_SHORTCUTS_HELP = 'shortcuts-help'
 
 dialogRegistry.register({
   type: DIALOG_ADD_PAGE,
@@ -247,6 +249,13 @@ dialogRegistry.register({
   type: DIALOG_PAGE_QUICK_SWITCHER,
   render: () => {
     return <PageQuickSwitcherDialog key={DIALOG_PAGE_QUICK_SWITCHER} />
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_SHORTCUTS_HELP,
+  render: () => {
+    return <ShortcutsDialog key={DIALOG_SHORTCUTS_HELP} />
   },
 })
 
