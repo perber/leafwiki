@@ -391,10 +391,13 @@ func (s *FSStore) ReadContentBlob(pageID, hash string) ([]byte, error) {
 	if hash == "" {
 		return []byte{}, nil
 	}
-	if raw, err := os.ReadFile(s.contentBlobPath(pageID, hash)); err == nil {
+	scopedPath := s.contentBlobPath(pageID, hash)
+	if raw, err := os.ReadFile(scopedPath); err == nil {
 		return raw, nil
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("read content blob: %w", err)
 	}
-	s.log.Debug("content blob not found at scoped path, falling back to legacy", "pageID", pageID, "hash", hash)
+	s.log.Debug("content blob not found at scoped path, falling back to legacy", "pageID", pageID, "hash", hash, "path", scopedPath)
 	raw, err := os.ReadFile(s.contentBlobPathLegacy(hash))
 	if err != nil {
 		return nil, fmt.Errorf("read content blob: %w", err)
@@ -413,10 +416,13 @@ func (s *FSStore) OpenContentBlob(pageID, hash string) (io.ReadCloser, error) {
 	if hash == "" {
 		return io.NopCloser(strings.NewReader("")), nil
 	}
-	if f, err := os.Open(s.contentBlobPath(pageID, hash)); err == nil {
+	scopedPath := s.contentBlobPath(pageID, hash)
+	if f, err := os.Open(scopedPath); err == nil {
 		return f, nil
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("open content blob: %w", err)
 	}
-	s.log.Debug("content blob not found at scoped path, falling back to legacy", "pageID", pageID, "hash", hash)
+	s.log.Debug("content blob not found at scoped path, falling back to legacy", "pageID", pageID, "hash", hash, "path", scopedPath)
 	f, err := os.Open(s.contentBlobPathLegacy(hash))
 	if err != nil {
 		return nil, fmt.Errorf("open content blob: %w", err)
@@ -444,13 +450,12 @@ func (s *FSStore) DeleteContentBlobIfUnreferenced(pageID, hash string) error {
 			return nil
 		}
 	}
-	for _, p := range []string{s.contentBlobPath(pageID, hash), s.contentBlobPathLegacy(hash)} {
-		if err := os.Remove(p); err == nil {
-			s.log.Debug("deleted orphaned content blob", "pageID", pageID, "hash", hash, "path", p)
-			return nil
-		} else if !os.IsNotExist(err) {
-			return fmt.Errorf("delete orphaned content blob: %w", err)
-		}
+	p := s.contentBlobPath(pageID, hash)
+	if err := os.Remove(p); err == nil {
+		s.log.Debug("deleted orphaned content blob", "pageID", pageID, "hash", hash, "path", p)
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("delete orphaned content blob: %w", err)
 	}
 	return nil
 }
