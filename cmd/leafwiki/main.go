@@ -50,6 +50,7 @@ func writeUsage(w io.Writer) {
 	--enable-revision             Enable the revision / page history feature (default: false)
 	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
+	--revision-coalesce-window    Window for coalescing rapid successive saves by the same author (e.g. 5m, 0 = disabled) (default: 5m)
 	--enable-http-remote-user       Enable reverse-proxy authentication via HTTP header (default: false)
 	--http-remote-user-header-name  HTTP header carrying the username from a trusted proxy (default: Remote-User)
 	--trusted-proxy-ips             Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
@@ -85,6 +86,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_ENABLE_REVISION
 	LEAFWIKI_ENABLE_LINK_REFACTOR
 	LEAFWIKI_MAX_REVISION_HISTORY
+	LEAFWIKI_REVISION_COALESCE_WINDOW
 	LEAFWIKI_ENABLE_HTTP_REMOTE_USER
 	LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME
 	LEAFWIKI_TRUSTED_PROXY_IPS
@@ -163,7 +165,8 @@ type cliFlags struct {
 	gitBackupSSHKeyPath     *string
 	gitBackupSSHKey         *string
 	gitBackupSSHKnownHosts  *string
-	gitBackupInterval       *time.Duration
+	gitBackupInterval      *time.Duration
+	revisionCoalesceWindow *time.Duration
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -199,7 +202,8 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupSSHKeyPath:     fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
 		gitBackupSSHKey:         fs.String("git-backup-ssh-key", "", "raw SSH private key for git backup (env var preferred)"),
 		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
-		gitBackupInterval:       fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
+		gitBackupInterval:      fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
+		revisionCoalesceWindow: fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
 	}
 }
 
@@ -238,6 +242,7 @@ func main() {
 	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
 	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
 	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
+	revisionCoalesceWindow := resolveDuration("revision-coalesce-window", *flags.revisionCoalesceWindow, visited, "LEAFWIKI_REVISION_COALESCE_WINDOW")
 	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
 	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
 	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
@@ -324,14 +329,15 @@ func main() {
 	}
 
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
-		StorageDir:          dataDir,
-		AdminPassword:       adminPassword,
-		JWTSecret:           jwtSecret,
-		AccessTokenTimeout:  accessTokenTimeout,
-		RefreshTokenTimeout: refreshTokenTimeout,
-		AuthDisabled:        disableAuth,
-		EnableRevision:      enableRevision,
-		MaxRevisionHistory:  maxRevisionHistory,
+		StorageDir:             dataDir,
+		AdminPassword:          adminPassword,
+		JWTSecret:              jwtSecret,
+		AccessTokenTimeout:     accessTokenTimeout,
+		RefreshTokenTimeout:    refreshTokenTimeout,
+		AuthDisabled:           disableAuth,
+		EnableRevision:         enableRevision,
+		MaxRevisionHistory:     maxRevisionHistory,
+		RevisionCoalesceWindow: revisionCoalesceWindow,
 	})
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)

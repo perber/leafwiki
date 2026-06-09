@@ -33,12 +33,14 @@ type Service struct {
 	pages              *tree.TreeService
 	store              *FSStore
 	maxRevisions       int // 0 = unlimited
+	coalesceWindow     time.Duration
 	log                *slog.Logger
 	assetManifestCache sync.Map // pageID → assetManifestEntry
 }
 
 type ServiceOptions struct {
-	MaxRevisions int // Maximum revisions to keep per page; 0 = unlimited
+	MaxRevisions   int           // Maximum revisions to keep per page; 0 = unlimited
+	CoalesceWindow time.Duration // Window for coalescing rapid successive saves; 0 = disabled
 }
 
 func NewService(storageDir string, pages *tree.TreeService, logger *slog.Logger, opts ...ServiceOptions) *Service {
@@ -47,17 +49,20 @@ func NewService(storageDir string, pages *tree.TreeService, logger *slog.Logger,
 	}
 
 	var maxRevisions int
+	var coalesceWindow time.Duration
 	if len(opts) > 0 {
 		maxRevisions = opts[0].MaxRevisions
+		coalesceWindow = opts[0].CoalesceWindow
 	}
 
-	store := NewFSStore(storageDir)
+	store := NewFSStore(storageDir, logger)
 	return &Service{
-		storageDir:   storageDir,
-		pages:        pages,
-		store:        store,
-		maxRevisions: maxRevisions,
-		log:          logger.With("component", "RevisionService"),
+		storageDir:     storageDir,
+		pages:          pages,
+		store:          store,
+		maxRevisions:   maxRevisions,
+		coalesceWindow: coalesceWindow,
+		log:            logger.With("component", "RevisionService"),
 	}
 }
 
@@ -164,7 +169,7 @@ func (s *Service) RecordAssetChange(pageID, authorID, summary string) (*Revision
 		return prev, false, nil
 	}
 
-	contentHash, err := s.store.SaveContentBlob([]byte(state.Content))
+	contentHash, err := s.store.SaveContentBlob(pageID, []byte(state.Content))
 	if err != nil {
 		return nil, false, err
 	}
@@ -213,7 +218,7 @@ func (s *Service) RecordStructureChange(pageID, authorID, summary string) (*Revi
 		return nil, false, err
 	}
 
-	contentHash, err := s.store.SaveContentBlob([]byte(state.Content))
+	contentHash, err := s.store.SaveContentBlob(pageID, []byte(state.Content))
 	if err != nil {
 		return nil, false, err
 	}
@@ -287,7 +292,7 @@ func (s *Service) GetRevisionSnapshot(pageID, revisionID string) (*RevisionSnaps
 		return nil, err
 	}
 
-	content, err := s.store.ReadContentBlob(rev.ContentHash)
+	content, err := s.store.ReadContentBlob(rev.PageID, rev.ContentHash)
 	if err != nil {
 		return nil, sharederrors.NewLocalizedError(
 			"revision_preview_content_unavailable",
@@ -455,9 +460,9 @@ func (s *Service) CheckRevisionIntegrity(pageID string) ([]RevisionIntegrityIssu
 			continue
 		}
 		if strings.TrimSpace(rev.ContentHash) != "" {
-			rc, err := s.store.OpenContentBlob(rev.ContentHash)
+			rc, err := s.store.OpenContentBlob(rev.PageID, rev.ContentHash)
 			if err != nil {
-				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "missing_content_blob", Message: "Revision content blob is missing or unreadable", Path: s.store.contentBlobPath(rev.ContentHash)})
+				issues = append(issues, RevisionIntegrityIssue{PageID: rev.PageID, RevisionID: rev.ID, Code: "missing_content_blob", Message: "Revision content blob is missing or unreadable", Path: s.store.contentBlobPath(rev.PageID, rev.ContentHash)})
 			} else {
 				_ = rc.Close()
 			}
@@ -556,7 +561,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		)
 	}
 
-	content, err := s.store.ReadContentBlob(rev.ContentHash)
+	content, err := s.store.ReadContentBlob(pageID, rev.ContentHash)
 	if err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_content_missing",
@@ -709,6 +714,14 @@ func (s *Service) revisionStateFromPage(page *tree.Page) *RevisionState {
 	}
 }
 
+func (s *Service) shouldCoalesce(prev *Revision, authorID string) bool {
+	return s.coalesceWindow > 0 &&
+		prev != nil &&
+		prev.Type == RevisionTypeContentUpdate &&
+		prev.AuthorID == strings.TrimSpace(authorID) &&
+		time.Since(prev.CreatedAt) <= s.coalesceWindow
+}
+
 func (s *Service) recordContentUpdateForPage(page *tree.Page, authorID, summary string) (*Revision, bool, error) {
 	prev, err := s.store.GetLatestRevision(page.ID)
 	if err != nil {
@@ -724,12 +737,47 @@ func (s *Service) recordContentUpdateForPage(page *tree.Page, authorID, summary 
 		return prev, false, nil
 	}
 
+	if s.shouldCoalesce(prev, authorID) {
+		s.log.Debug("coalescing revision", "pageID", page.ID, "revisionID", prev.ID, "authorID", authorID)
+		oldHash := prev.ContentHash
+		contentHash, err := s.store.SaveContentBlob(page.ID, []byte(state.Content))
+		if err != nil {
+			return nil, false, err
+		}
+		if contentHash != state.ContentHash {
+			return nil, false, fmt.Errorf("content hash mismatch: computed=%s saved=%s", state.ContentHash, contentHash)
+		}
+		assetManifestHash, err := s.resolveAssetManifestHash(page.ID, prev)
+		if err != nil {
+			return nil, false, err
+		}
+		prev.ContentHash = contentHash
+		prev.AssetManifestHash = assetManifestHash
+		prev.ExtraFrontmatter = state.ExtraFrontmatter
+		prev.ExtraFrontmatterHash = state.ExtraFrontmatterHash
+		prev.Title = state.Title
+		prev.Slug = state.Slug
+		prev.Path = state.Path
+		prev.PageUpdatedAt = state.PageUpdatedAt
+		prev.LastAuthorID = state.LastAuthorID
+		prev.Summary = summary
+		if err := s.store.UpdateRevision(prev); err != nil {
+			return nil, false, err
+		}
+		if oldHash != contentHash {
+			if err := s.store.DeleteContentBlobIfUnreferenced(page.ID, oldHash); err != nil {
+				s.log.Warn("failed to gc orphaned content blob", "pageID", page.ID, "hash", oldHash, "error", err)
+			}
+		}
+		return prev, true, nil
+	}
+
 	assetManifestHash, err := s.resolveAssetManifestHash(page.ID, prev)
 	if err != nil {
 		return nil, false, err
 	}
 
-	contentHash, err := s.store.SaveContentBlob([]byte(state.Content))
+	contentHash, err := s.store.SaveContentBlob(page.ID, []byte(state.Content))
 	if err != nil {
 		return nil, false, err
 	}
@@ -971,7 +1019,7 @@ func (s *Service) recordRestoreRevision(pageID, authorID string) error {
 		return err
 	}
 
-	contentHash, err := s.store.SaveContentBlob([]byte(state.Content))
+	contentHash, err := s.store.SaveContentBlob(pageID, []byte(state.Content))
 	if err != nil {
 		return err
 	}

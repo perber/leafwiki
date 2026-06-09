@@ -2620,7 +2620,7 @@ func TestCheckIntegrityUseCase_Passthrough(t *testing.T) {
 	if err != nil || rev == nil {
 		t.Fatalf("GetLatestRevision failed: %#v %v", rev, err)
 	}
-	contentBlobPath := filepath.Join(deps.storageDir, ".leafwiki", "blobs", "content", "sha256", rev.ContentHash[:2], rev.ContentHash)
+	contentBlobPath := filepath.Join(deps.storageDir, ".leafwiki", "blobs", "content", pageOut.Page.ID, "sha256", rev.ContentHash[:2], rev.ContentHash)
 	if err := os.Remove(contentBlobPath); err != nil {
 		t.Fatalf("Remove content blob failed: %v", err)
 	}

@@ -445,7 +445,7 @@ func TestRestoreAssetsHashAndSizeMismatch(t *testing.T) {
 		t.Fatalf("expected restored asset hash mismatch")
 	}
 
-	hash2, err := service.store.SaveContentBlob([]byte("size-ok"))
+	hash2, err := service.store.SaveContentBlob("test-page", []byte("size-ok"))
 	if err != nil {
 		t.Fatalf("SaveContentBlob second failed: %v", err)
 	}
@@ -834,7 +834,7 @@ func TestRestoreRevision_LegacyRevisionPreservesCurrentCustomFrontmatter(t *test
 	}
 
 	state := service.revisionStateFromPage(page)
-	contentHash, err := service.store.SaveContentBlob([]byte("Legacy body"))
+	contentHash, err := service.store.SaveContentBlob(pageID, []byte("Legacy body"))
 	if err != nil {
 		t.Fatalf("SaveContentBlob failed: %v", err)
 	}
@@ -894,7 +894,7 @@ func TestRestoreRevision_LegacyBodyThatLooksLikeFrontmatterStaysBody(t *testing.
 
 	legacyBody := "---\ntitle: not frontmatter\n---\nBody content"
 	state := service.revisionStateFromPage(page)
-	contentHash, err := service.store.SaveContentBlob([]byte(legacyBody))
+	contentHash, err := service.store.SaveContentBlob(pageID, []byte(legacyBody))
 	if err != nil {
 		t.Fatalf("SaveContentBlob failed: %v", err)
 	}
@@ -999,7 +999,7 @@ func TestCheckRevisionIntegrityReportsBrokenArtifacts(t *testing.T) {
 	if err != nil || len(revs1) == 0 {
 		t.Fatalf("ListRevisions page1 failed: %#v %v", revs1, err)
 	}
-	if err := os.Remove(service.store.contentBlobPath(revs1[0].ContentHash)); err != nil {
+	if err := os.Remove(service.store.contentBlobPath(pageID1, revs1[0].ContentHash)); err != nil {
 		t.Fatalf("Remove content blob failed: %v", err)
 	}
 	issues1, err := service.CheckRevisionIntegrity(pageID1)
