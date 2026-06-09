@@ -4,6 +4,7 @@ import {
   getShortcutDefinition,
   getShortcutDisplayLabel,
   getVisibleShortcutsForMode,
+  getVisibleShortcutsForModes,
   shortcutDefinitions,
 } from './shortcutCatalog'
 
@@ -33,6 +34,7 @@ describe('shortcutCatalog', () => {
       'viewer.page.permalink',
       'sidebar.explorer.open',
       'sidebar.search.open',
+      'shortcuts.help.open',
     ])
 
     expect(getVisibleShortcutsForMode('edit').map((item) => item.id)).toEqual([
@@ -47,6 +49,7 @@ describe('shortcutCatalog', () => {
       'editor.page.save',
       'sidebar.explorer.open',
       'sidebar.search.open',
+      'shortcuts.help.open',
     ])
 
     expect(
@@ -55,10 +58,14 @@ describe('shortcutCatalog', () => {
       'history.page.close',
       'sidebar.explorer.open',
       'sidebar.search.open',
+      'shortcuts.help.open',
     ])
   })
 
   it('includes the remaining viewer and editor shortcuts in the catalog', () => {
+    expect(getShortcutDefinition('shortcuts.help.open').keyCombo).toBe(
+      'Mod+Slash',
+    )
     expect(getShortcutDefinition('viewer.page.edit').keyCombo).toBe('Mod+KeyE')
     expect(getShortcutDefinition('viewer.page.history').keyCombo).toBe(
       'Mod+KeyH',
@@ -81,6 +88,8 @@ describe('shortcutCatalog', () => {
     expect(getShortcutDisplayLabel('sidebar.explorer.open', false)).toBe(
       'Ctrl+Shift+E',
     )
+    expect(getShortcutDisplayLabel('shortcuts.help.open', false)).toBe('Ctrl+/')
+    expect(getShortcutDisplayLabel('shortcuts.help.open', true)).toBe('Cmd+/')
     expect(getShortcutDisplayLabel('viewer.page.delete', false)).toBe(
       'Ctrl+Delete',
     )
@@ -104,5 +113,18 @@ describe('shortcutCatalog', () => {
     expect(getShortcutDefinition('dialog.confirm').keyCombo).toBe('Enter')
     expect(getShortcutDefinition('asset.rename.confirm').keyCombo).toBe('Enter')
     expect(getShortcutDefinition('asset.rename.cancel').keyCombo).toBe('Escape')
+  })
+
+  it('can merge page-mode and dialog shortcuts without duplicates', () => {
+    expect(
+      getVisibleShortcutsForModes(['history', 'dialog']).map((item) => item.id),
+    ).toEqual([
+      'history.page.close',
+      'dialog.close',
+      'dialog.confirm',
+      'sidebar.explorer.open',
+      'sidebar.search.open',
+      'shortcuts.help.open',
+    ])
   })
 })

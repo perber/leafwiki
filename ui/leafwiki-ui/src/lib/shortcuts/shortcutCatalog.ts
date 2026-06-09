@@ -5,6 +5,7 @@ import { HotKeyDefinition } from '@/stores/hotkeys'
 export type ShortcutId =
   | 'dialog.close'
   | 'dialog.confirm'
+  | 'shortcuts.help.open'
   | 'page.quickSwitcher.open'
   | 'sidebar.explorer.open'
   | 'sidebar.search.open'
@@ -36,6 +37,7 @@ export type ShortcutDefinition = {
   macDisplayLabel?: string
   modes: AppMode[]
   customizable: boolean
+  showInShortcutsDialog?: boolean
 }
 
 export const shortcutDefinitions: ShortcutDefinition[] = [
@@ -56,6 +58,16 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     defaultDisplayLabel: 'Enter',
     modes: ['dialog'],
     customizable: false,
+  },
+  {
+    id: 'shortcuts.help.open',
+    labelKey: 'shortcutsHelp.items.openShortcutsHelp.action',
+    categoryKey: 'shortcutsHelp.categories.navigation',
+    keyCombo: 'Mod+Slash',
+    defaultDisplayLabel: 'Ctrl+/',
+    macDisplayLabel: 'Cmd+/',
+    modes: ['view', 'edit', 'history', 'settings', 'user-management'],
+    customizable: true,
   },
   {
     id: 'page.quickSwitcher.open',
@@ -253,6 +265,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     defaultDisplayLabel: 'Enter',
     modes: ['dialog'],
     customizable: false,
+    showInShortcutsDialog: false,
   },
   {
     id: 'asset.rename.cancel',
@@ -262,6 +275,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     defaultDisplayLabel: 'Esc',
     modes: ['dialog'],
     customizable: false,
+    showInShortcutsDialog: false,
   },
 ]
 
@@ -283,7 +297,11 @@ export function getVisibleShortcutsForMode(
   mode: AppMode,
 ): ShortcutDefinition[] {
   return shortcutDefinitions
-    .filter((definition) => definition.modes.includes(mode))
+    .filter(
+      (definition) =>
+        definition.modes.includes(mode) &&
+        definition.showInShortcutsDialog !== false,
+    )
     .sort((left, right) => {
       if (left.modes.length !== right.modes.length) {
         return left.modes.length - right.modes.length
@@ -291,6 +309,26 @@ export function getVisibleShortcutsForMode(
 
       return left.labelKey.localeCompare(right.labelKey)
     })
+}
+
+export function getVisibleShortcutsForModes(
+  modes: AppMode[],
+): ShortcutDefinition[] {
+  const definitionsById = new Map<ShortcutId, ShortcutDefinition>()
+
+  Array.from(new Set(modes)).forEach((mode) => {
+    getVisibleShortcutsForMode(mode).forEach((definition) => {
+      definitionsById.set(definition.id, definition)
+    })
+  })
+
+  return Array.from(definitionsById.values()).sort((left, right) => {
+    if (left.modes.length !== right.modes.length) {
+      return left.modes.length - right.modes.length
+    }
+
+    return left.labelKey.localeCompare(right.labelKey)
+  })
 }
 
 export function getShortcutDisplayLabel(id: ShortcutId, isMacOS: boolean) {

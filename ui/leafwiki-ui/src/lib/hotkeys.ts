@@ -32,6 +32,10 @@ function normalizeEventCode(code: string) {
     return 'Backquote'
   }
 
+  if (code === 'Slash') {
+    return 'Slash'
+  }
+
   if (/^Key[A-Za-z]$/.test(code)) {
     return `Key${code.slice(3).toUpperCase()}`
   }

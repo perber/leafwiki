@@ -25,8 +25,9 @@
   "shortcutsHelp": {
     "menuItem": "Keyboard Shortcuts",
     "title": "Available keyboard shortcuts",
-    "description": "A quick overview of the shortcuts that are currently available in LeafWiki.",
-    "currentMode": "Available in {{mode}} mode",
+    "description": "A quick overview of shortcuts for the current page mode.",
+    "currentMode": "Current page mode: {{mode}}",
+    "dialogHint": "Dialog shortcuts are also included while this dialog is open.",
     "closeButton": "Close",
     "categories": {
       "navigation": "Navigation",
@@ -45,6 +46,9 @@
     "items": {
       "goToPage": {
         "action": "Go to page"
+      },
+      "openShortcutsHelp": {
+        "action": "Open keyboard shortcuts"
       },
       "editPage": {
         "action": "Edit page"
@@ -104,7 +108,7 @@
         "action": "Close dialog"
       },
       "confirmDialog": {
-        "action": "Confirm dialog"
+        "action": "Dialog default action"
       },
       "confirmRename": {
         "action": "Confirm rename"
