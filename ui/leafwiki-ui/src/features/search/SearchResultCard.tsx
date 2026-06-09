@@ -1,3 +1,4 @@
+import i18next from '@/lib/i18n'
 import { SearchResultItem } from '@/lib/api/search'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildViewUrl } from '@/lib/routePath'
@@ -6,6 +7,9 @@ import { forwardRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { usePageEditorStore } from '../editor/pageEditorStore'
 import HighlightedSearchTitle from './HighlightedSearchTitle'
+
+const t = (key: string, opts?: Record<string, unknown>) =>
+  i18next.t(key, { ...opts, ns: 'search' })
 
 type SearchResultCardProps = {
   item: SearchResultItem
@@ -31,7 +35,10 @@ const SearchResultCard = forwardRef<HTMLAnchorElement, SearchResultCardProps>(
     const isRouteActive = currentViewPath === resultPath
     const isEditorActive = currentEditorPageId === item.page_id
     const isActive = isRouteActive || isEditorActive || isSelected
-    const kindLabel = item.kind === 'section' ? 'Section' : 'Page'
+    const kindLabel =
+      item.kind === 'section'
+        ? t('resultCard.kindSection')
+        : t('resultCard.kindPage')
 
     return (
       <Link
