@@ -122,6 +122,57 @@ func TestScheduler_Stop(t *testing.T) {
 	scheduler.Stop()
 }
 
+func makeRepo(t *testing.T, interval time.Duration) *Repository {
+	t.Helper()
+	tmpDir := t.TempDir()
+	rootDir := filepath.Join(tmpDir, "root")
+	assetsDir := filepath.Join(tmpDir, "assets")
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("failed to create root dir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("failed to create assets dir: %v", err)
+	}
+	repo, err := Init(Config{
+		RootDir:     rootDir,
+		AssetsDir:   assetsDir,
+		AuthorName:  "Test Author",
+		AuthorEmail: "test@example.com",
+		Branch:      "main",
+		Interval:    interval,
+	})
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	return repo
+}
+
+func TestScheduler_NegativeInterval_ManualOnly(t *testing.T) {
+	repo := makeRepo(t, -5*time.Minute)
+	scheduler := NewScheduler(repo)
+	defer scheduler.Stop()
+
+	if repo.cfg.Interval != 0 {
+		t.Errorf("expected cfg.Interval to be clamped to 0, got %v", repo.cfg.Interval)
+	}
+	if scheduler.ticker != nil {
+		t.Error("expected no ticker in manual-only mode")
+	}
+}
+
+func TestScheduler_SubMinuteInterval_ClampedToMinimum(t *testing.T) {
+	repo := makeRepo(t, 10*time.Second)
+	scheduler := NewScheduler(repo)
+	defer scheduler.Stop()
+
+	if repo.cfg.Interval != minInterval {
+		t.Errorf("expected cfg.Interval to be clamped to %v, got %v", minInterval, repo.cfg.Interval)
+	}
+	if scheduler.ticker == nil {
+		t.Error("expected ticker to be running at minimum interval")
+	}
+}
+
 func TestScheduler_RunsOnStart(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
