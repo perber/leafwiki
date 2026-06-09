@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/perber/wiki/internal/core/markdown"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
@@ -22,6 +23,17 @@ func newRevisionTestService(t *testing.T) (*Service, *tree.TreeService, string) 
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	return NewService(storageDir, treeService, logger), treeService, storageDir
+}
+
+func newRevisionTestServiceWithWindow(t *testing.T, window time.Duration) (*Service, *tree.TreeService, string) {
+	t.Helper()
+	storageDir := t.TempDir()
+	treeService := tree.NewTreeService(storageDir)
+	if err := treeService.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	return NewService(storageDir, treeService, logger, ServiceOptions{CoalesceWindow: window}), treeService, storageDir
 }
 
 func createRevisionTestPage(t *testing.T, treeService *tree.TreeService, title, slug, content string) string {
@@ -1134,5 +1146,203 @@ func TestGetRevisionAssetReturnsNotFoundForMissingManifestEntry(t *testing.T) {
 	}
 	if localized.Code != "revision_preview_asset_not_found" {
 		t.Fatalf("localized.Code = %q", localized.Code)
+	}
+}
+
+func TestRecordContentUpdate_CoalescesWithinWindow(t *testing.T) {
+	service, treeService, _ := newRevisionTestServiceWithWindow(t, time.Hour)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "version one")
+
+	rev1, created, err := service.RecordContentUpdate(pageID, "alice", "first")
+	if err != nil || !created || rev1 == nil {
+		t.Fatalf("first RecordContentUpdate failed: created=%v err=%v", created, err)
+	}
+
+	content := "version two"
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	rev2, created, err := service.RecordContentUpdate(pageID, "alice", "second")
+	if err != nil {
+		t.Fatalf("second RecordContentUpdate (coalesce) failed: %v", err)
+	}
+	if !created {
+		t.Fatalf("expected coalesced update to return created=true")
+	}
+	if rev2.ID != rev1.ID {
+		t.Fatalf("expected same revision ID after coalesce: got %q want %q", rev2.ID, rev1.ID)
+	}
+
+	revisions, err := service.ListRevisions(pageID)
+	if err != nil {
+		t.Fatalf("ListRevisions failed: %v", err)
+	}
+	if len(revisions) != 1 {
+		t.Fatalf("expected 1 revision after coalesce, got %d", len(revisions))
+	}
+	if revisions[0].ContentHash == rev1.ContentHash {
+		t.Fatalf("expected content hash to be updated after coalesce")
+	}
+}
+
+func TestRecordContentUpdate_NoCoalesceWhenDisabled(t *testing.T) {
+	service, treeService, _ := newRevisionTestServiceWithWindow(t, 0)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "version one")
+
+	rev1, created, err := service.RecordContentUpdate(pageID, "alice", "first")
+	if err != nil || !created || rev1 == nil {
+		t.Fatalf("first RecordContentUpdate failed: created=%v err=%v", created, err)
+	}
+
+	content := "version two"
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	rev2, created, err := service.RecordContentUpdate(pageID, "alice", "second")
+	if err != nil || !created {
+		t.Fatalf("second RecordContentUpdate failed: created=%v err=%v", created, err)
+	}
+	if rev2.ID == rev1.ID {
+		t.Fatalf("expected new revision when coalescing is disabled")
+	}
+
+	revisions, err := service.ListRevisions(pageID)
+	if err != nil {
+		t.Fatalf("ListRevisions failed: %v", err)
+	}
+	if len(revisions) != 2 {
+		t.Fatalf("expected 2 revisions when coalescing is disabled, got %d", len(revisions))
+	}
+}
+
+func TestRecordContentUpdate_NoCoalesceDifferentAuthor(t *testing.T) {
+	service, treeService, _ := newRevisionTestServiceWithWindow(t, time.Hour)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "version one")
+
+	rev1, created, err := service.RecordContentUpdate(pageID, "alice", "alice's edit")
+	if err != nil || !created || rev1 == nil {
+		t.Fatalf("first RecordContentUpdate failed: %v", err)
+	}
+
+	content := "version two"
+	if err := treeService.UpdateNode("bob", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	rev2, created, err := service.RecordContentUpdate(pageID, "bob", "bob's edit")
+	if err != nil || !created {
+		t.Fatalf("second RecordContentUpdate failed: created=%v err=%v", created, err)
+	}
+	if rev2.ID == rev1.ID {
+		t.Fatalf("expected new revision for different author")
+	}
+
+	revisions, err := service.ListRevisions(pageID)
+	if err != nil {
+		t.Fatalf("ListRevisions failed: %v", err)
+	}
+	if len(revisions) != 2 {
+		t.Fatalf("expected 2 revisions for different authors, got %d", len(revisions))
+	}
+}
+
+func TestRecordContentUpdate_NoCoalesceAfterWindowExpired(t *testing.T) {
+	service, treeService, _ := newRevisionTestServiceWithWindow(t, 5*time.Minute)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "version one")
+
+	rev1, _, err := service.RecordContentUpdate(pageID, "alice", "first")
+	if err != nil || rev1 == nil {
+		t.Fatalf("first RecordContentUpdate failed: %v", err)
+	}
+
+	// Backdate the revision so it falls outside the coalesce window.
+	rev1.CreatedAt = time.Now().Add(-10 * time.Minute)
+	if err := service.store.UpdateRevision(rev1); err != nil {
+		t.Fatalf("UpdateRevision (backdate) failed: %v", err)
+	}
+
+	content := "version two"
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	rev2, created, err := service.RecordContentUpdate(pageID, "alice", "after window")
+	if err != nil || !created {
+		t.Fatalf("second RecordContentUpdate failed: created=%v err=%v", created, err)
+	}
+	if rev2.ID == rev1.ID {
+		t.Fatalf("expected new revision after window expired")
+	}
+
+	revisions, err := service.ListRevisions(pageID)
+	if err != nil {
+		t.Fatalf("ListRevisions failed: %v", err)
+	}
+	if len(revisions) != 2 {
+		t.Fatalf("expected 2 revisions after window expired, got %d", len(revisions))
+	}
+}
+
+func TestRecordContentUpdate_NoCoalesceForNonContentRevision(t *testing.T) {
+	service, treeService, _ := newRevisionTestServiceWithWindow(t, time.Hour)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "version one")
+
+	structureRev, created, err := service.RecordStructureChange(pageID, "alice", "structure")
+	if err != nil || !created || structureRev == nil {
+		t.Fatalf("RecordStructureChange failed: created=%v err=%v", created, err)
+	}
+
+	// Change content so the noop check does not fire.
+	content := "version two"
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	rev, created, err := service.RecordContentUpdate(pageID, "alice", "content")
+	if err != nil || !created {
+		t.Fatalf("RecordContentUpdate failed: created=%v err=%v", created, err)
+	}
+	if rev.ID == structureRev.ID {
+		t.Fatalf("expected new content revision, not a coalesce with structure revision")
+	}
+	if rev.Type != RevisionTypeContentUpdate {
+		t.Fatalf("expected content update type, got %v", rev.Type)
+	}
+}
+
+func TestRecordContentUpdate_CoalescingGCsOldScopedBlob(t *testing.T) {
+	service, treeService, _ := newRevisionTestServiceWithWindow(t, time.Hour)
+	pageID := createRevisionTestPage(t, treeService, "Page", "page", "version one")
+
+	rev1, _, err := service.RecordContentUpdate(pageID, "alice", "first")
+	if err != nil || rev1 == nil {
+		t.Fatalf("first RecordContentUpdate failed: %v", err)
+	}
+	oldBlobPath := service.store.contentBlobPath(pageID, rev1.ContentHash)
+	if _, err := os.Stat(oldBlobPath); os.IsNotExist(err) {
+		t.Fatalf("expected old blob to exist at %s", oldBlobPath)
+	}
+
+	content := "version two"
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+		t.Fatalf("UpdateNode failed: %v", err)
+	}
+
+	rev2, _, err := service.RecordContentUpdate(pageID, "alice", "second")
+	if err != nil {
+		t.Fatalf("second RecordContentUpdate (coalesce) failed: %v", err)
+	}
+	if rev2.ContentHash == rev1.ContentHash {
+		t.Fatalf("expected content hash to change after coalesce")
+	}
+
+	if _, err := os.Stat(oldBlobPath); !os.IsNotExist(err) {
+		t.Fatalf("expected old scoped blob to be GC'd after coalescing, stat err=%v", err)
+	}
+	newBlobPath := service.store.contentBlobPath(pageID, rev2.ContentHash)
+	if _, err := os.Stat(newBlobPath); os.IsNotExist(err) {
+		t.Fatalf("expected new scoped blob to exist at %s", newBlobPath)
 	}
 }
