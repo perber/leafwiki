@@ -443,14 +443,18 @@ export default function MarkdownToolbar({
               <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem
                 checked={lineWrap}
-                onCheckedChange={toggleLineWrap}
+                onCheckedChange={(checked) => {
+                  if (checked !== lineWrap) toggleLineWrap()
+                }}
               >
                 {t('toolbar.lineWrap')}
               </DropdownMenuCheckboxItem>
               <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem
                 checked={autoSave}
-                onCheckedChange={toggleAutoSave}
+                onCheckedChange={(checked) => {
+                  if (checked !== autoSave) toggleAutoSave()
+                }}
               >
                 {t('toolbar.autoSave')}
                 {autoSaveStatus === 'paused' && (
