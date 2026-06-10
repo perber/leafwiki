@@ -83,7 +83,6 @@ endif
 		--target final \
 		--build-arg APP_VERSION=$(VERSION) \
 		--tag ghcr.io/$(REPO_OWNER)/leafwiki:$(VERSION) \
-		--tag ghcr.io/$(REPO_OWNER)/leafwiki:latest \
 		--annotation "index:org.opencontainers.image.title=LeafWiki" \
 		--annotation "index:org.opencontainers.image.description=LeafWiki – A fast wiki for people who think in folders, not feeds" \
 		--sbom=true \
