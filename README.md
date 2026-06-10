@@ -31,11 +31,12 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - Runs on Linux, macOS, Windows, Raspberry Pi (x86_64 and ARM64)
 - Reverse-proxy friendly with `--base-path`
 - Reverse-proxy authentication via trusted HTTP header (v0.10+)
-- Public read-only mode with authenticated editing
+- Three access modes: fully internal, public read with login-only editing, or open editing without login (see [Operating Modes](#operating-modes))
 - Roles: admin, editor, viewer
 
 **Core functionality:**
 - Tree navigation — explicit hierarchy, not flat note feeds
+- Manual page ordering — sort order is explicit, not driven by filename (see [Sorting Pages](#sorting-pages))
 - Full-text search across titles and content, with tag-based filtering
 - Tags on pages — searchable and filterable across the wiki
 - Backlinks and link status per page (incoming, outgoing, broken links)
@@ -184,6 +185,42 @@ Default data directory is `./data`. Change with `--data-dir`.
 ```bash
 ./leafwiki reset-admin-password
 ```
+
+---
+
+## Operating Modes
+
+LeafWiki supports three access modes. Pick the one that matches your environment:
+
+### 1. Internal wiki — login required (default)
+
+All access requires authentication. Nobody can read or edit without a valid account. This is the default behavior when no access flags are set.
+
+```bash
+./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword
+```
+
+Use this for team-internal wikis or homelab setups where content should stay private.
+
+### 2. Public read, login required for editing
+
+Anyone can browse the wiki without logging in. Only authenticated users with an editor or admin role can make changes.
+
+```bash
+./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --public-access=true
+```
+
+Use this for open documentation or project wikis where readers don't need accounts, but you still want to control who can edit.
+
+### 3. No login — everyone can read and edit (`--disable-auth`)
+
+Authentication is completely disabled. Anyone who can reach the server can read and edit all pages.
+
+```bash
+./leafwiki --disable-auth --host=127.0.0.1
+```
+
+> ⚠️ Only use this on trusted internal networks or local setups. Never expose a `--disable-auth` instance to the public internet.
 
 ---
 
@@ -357,6 +394,28 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 
 `Ctrl+V` / `Cmd+V` for pasting images and files works in the editor.  
 `Esc` closes modals, dialogs, and edit mode.
+
+---
+
+## Sorting Pages
+
+Page order in LeafWiki is **explicit and manual** — it does not follow filename or alphabetical order automatically. By default, pages appear in the order they were created.
+
+LeafWiki is not a file browser. The tree reflects the structure you define, and the order you set is the order your readers see.
+
+To reorder the pages inside a section or under a parent page:
+
+1. Hover over the section or page in the sidebar tree to reveal the action buttons
+2. Click the **⋮** (more actions) button
+3. Select **Sort Section Children** or **Sort Page Children**
+
+![Sort context menu](./assets/sort-context-menu.png)
+
+The sort dialog lets you drag items into position, use the ↑ ↓ arrow buttons, or jump to alphabetical order with **A → Z** / **Z → A**. Click **Save** to apply.
+
+![Sort dialog](./assets/sort-dialog.png)
+
+> Sorting is per level — the order of a section's direct children is independent of deeper nested items.
 
 ---
 
