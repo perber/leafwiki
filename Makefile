@@ -74,7 +74,10 @@ docker-build-publish:
 ifndef REPO_OWNER
 	$(error REPO_OWNER is not set. Usage: make docker-build-publish VERSION=vX.Y.Z REPO_OWNER=your_github_username)
 endif
+	docker buildx inspect leafwiki-builder >/dev/null 2>&1 || \
+		docker buildx create --name leafwiki-builder --driver docker-container --bootstrap
 	docker buildx build \
+		--builder leafwiki-builder \
 		--platform linux/amd64,linux/arm64 \
 		--file Dockerfile \
 		--target final \
