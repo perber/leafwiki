@@ -217,7 +217,7 @@ Use this for open documentation or project wikis where readers don't need accoun
 Authentication is completely disabled. Anyone who can reach the server can read and edit all pages.
 
 ```bash
-./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --disable-auth=true --host=127.0.0.1
+./leafwiki --disable-auth --host=127.0.0.1
 ```
 
 > ⚠️ Only use this on trusted internal networks or local setups. Never expose a `--disable-auth` instance to the public internet.
