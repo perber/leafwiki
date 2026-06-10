@@ -1,23 +1,38 @@
-import mermaid, { RenderResult } from 'mermaid'
 import { useEffect, useRef } from 'react'
+
+type MermaidDefault = (typeof import('mermaid'))['default']
+
+let mermaidPromise: Promise<MermaidDefault> | null = null
+
+function loadMermaid(): Promise<MermaidDefault> {
+  if (!mermaidPromise) {
+    mermaidPromise = import('mermaid').then((m) => m.default)
+  }
+  return mermaidPromise
+}
 
 let initializedTheme: 'default' | 'dark' | null = null
 
-function ensureMermaidInitialized(theme: 'default' | 'dark') {
-  if (initializedTheme === theme) return
+async function ensureMermaidInitialized(
+  theme: 'default' | 'dark',
+): Promise<MermaidDefault> {
+  const mermaid = await loadMermaid()
 
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'antiscript',
-    theme,
-    deterministicIds: true,
-    deterministicIDSeed: 'leafwiki',
-  })
-  mermaid.setParseErrorHandler((err) => {
-    console.warn('Mermaid parse error:', err)
-  })
+  if (initializedTheme !== theme) {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'antiscript',
+      theme,
+      deterministicIds: true,
+      deterministicIDSeed: 'leafwiki',
+    })
+    mermaid.setParseErrorHandler((err) => {
+      console.warn('Mermaid parse error:', err)
+    })
+    initializedTheme = theme
+  }
 
-  initializedTheme = theme
+  return mermaid
 }
 
 export type MermaidInjectorOps = {
@@ -61,8 +76,6 @@ export function useMermaidInjector({
   const lastThemeRef = useRef<'default' | 'dark' | null>(null)
 
   useEffect(() => {
-    ensureMermaidInitialized(theme)
-
     if (lastThemeRef.current !== theme) {
       lastHashRef.current = null
       lastThemeRef.current = theme
@@ -104,8 +117,9 @@ export function useMermaidInjector({
         return
       }
       try {
+        const mermaid = await ensureMermaidInitialized(theme)
         await mermaid.parse(normalizedCode)
-        const { svg }: RenderResult = await mermaid.render(
+        const { svg } = await mermaid.render(
           `mermaid-${codeHash}-${dataLine || '0'}`,
           normalizedCode,
           sandbox,

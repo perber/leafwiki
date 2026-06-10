@@ -29,13 +29,6 @@ function manualChunks(id: string): string | undefined {
   const normalizedId = id.replaceAll('\\', '/')
 
   if (
-    normalizedId.includes('/node_modules/mermaid/') ||
-    normalizedId.includes('/node_modules/dagre-d3-es/')
-  ) {
-    return 'mermaid'
-  }
-
-  if (
     normalizedId.includes('/node_modules/@codemirror/') ||
     normalizedId.includes('/node_modules/@lezer/') ||
     normalizedId.includes('/node_modules/@fsegurai/')
