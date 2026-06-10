@@ -134,7 +134,11 @@ export function PageRefactorDialog({
                         className="page-refactor-dialog__affected-page-matches"
                         data-testid="page-refactor-dialog-affected-page-matches"
                       >
-                        {matchedPaths.map((p) => p.replace(/^\[\[/, '').replace(/\]\]$/, '')).join(', ')}
+                        {matchedPaths
+                          .map((p) =>
+                            p.replace(/^\[\[/, '').replace(/\]\]$/, ''),
+                          )
+                          .join(', ')}
                       </div>
                       {pageWarnings.length > 0 && (
                         <div
