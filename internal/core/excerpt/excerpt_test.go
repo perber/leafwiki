@@ -170,7 +170,7 @@ func TestNormalizeMarkdownBody_IgnoresCodeFences(t *testing.T) {
 	}
 }
 
-func TestFromContent_StripsWikiLinks(t *testing.T) {
+func TestPlainTextFromMarkdown_StripsWikiLinks(t *testing.T) {
 	cases := []struct {
 		name string
 		body string
