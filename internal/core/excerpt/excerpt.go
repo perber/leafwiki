@@ -20,11 +20,14 @@ var mdRenderer = goldmark.New(
 var (
 	sanitize = bluemonday.StrictPolicy()
 
-	fencedCodePattern = regexp.MustCompile("(?s)```.*?```")
-	imagePattern      = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`)
-	linkPattern       = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
-	htmlPattern       = regexp.MustCompile(`<[^>]+>`)
-	linePrefixPattern = regexp.MustCompile(`(?m)^\s{0,3}(#{1,6}\s*|[-*+]\s+|\d+\.\s+|>\s?)`)
+	fencedCodePattern    = regexp.MustCompile("(?s)```.*?```")
+	imagePattern         = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`)
+	linkPattern          = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
+	htmlPattern          = regexp.MustCompile(`<[^>]+>`)
+	linePrefixPattern    = regexp.MustCompile(`(?m)^\s{0,3}(#{1,6}\s*|[-*+]\s+|\d+\.\s+|>\s?)`)
+	wikiImagePattern     = regexp.MustCompile(`!\[\[[^\]]*\]\]`)
+	wikiLinkAliasPattern = regexp.MustCompile(`\[\[[^\]|]+\|([^\]]+)\]\]`)
+	wikiLinkPattern      = regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 
 	shoutoutOpenPattern  = regexp.MustCompile(`^ {0,3}:::\s*(?P<type>[A-Za-z][\w-]*)\s*$`)
 	shoutoutClosePattern = regexp.MustCompile(`^ {0,3}:::\s*$`)
@@ -105,6 +108,9 @@ func PlainTextFromMarkdown(body string) string {
 	normalized = strings.ReplaceAll(normalized, "\r", "\n")
 	normalized = fencedCodePattern.ReplaceAllString(normalized, " ")
 	normalized = imagePattern.ReplaceAllString(normalized, "$1")
+	normalized = wikiImagePattern.ReplaceAllString(normalized, "")
+	normalized = wikiLinkAliasPattern.ReplaceAllString(normalized, "$1")
+	normalized = wikiLinkPattern.ReplaceAllString(normalized, "$1")
 	var htmlBuf bytes.Buffer
 	if err := mdRenderer.Convert([]byte(normalized), &htmlBuf); err != nil {
 		htmlBuf.Reset()
