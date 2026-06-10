@@ -286,10 +286,10 @@ test.describe('WikiLink [[Title]] refactoring and link status', () => {
     await movePageDialog.expectAffectedPagesCount(1);
     await movePageDialog.expectAffectedPageTitle(refTitle);
 
-    // The matched-path column must show [[Title]] syntax, not a raw path.
+    // The matched-path column must show the title, not raw [[Title]] wiki-link syntax.
     await expect(
       page.locator('[data-testid="page-refactor-dialog-affected-page-matches"]'),
-    ).toContainText(`[[${targetTitle}]]`);
+    ).toContainText(targetTitle);
 
     await movePageDialog.confirmRefactorDialog();
 

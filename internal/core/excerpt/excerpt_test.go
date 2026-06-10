@@ -170,6 +170,26 @@ func TestNormalizeMarkdownBody_IgnoresCodeFences(t *testing.T) {
 	}
 }
 
+func TestFromContent_StripsWikiLinks(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{"plain wikilink", "See [[Some Page]] for details.", "See Some Page for details."},
+		{"aliased wikilink", "See [[Some Page|this page]] for details.", "See this page for details."},
+		{"image embed", "![[image.png]] Some text.", "Some text."},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := PlainTextFromMarkdown(tc.body)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestFromBody_StripsHTMLAndMarkdown(t *testing.T) {
 	body := "<p><strong>Bold</strong> [link](https://example.com)</p>"
 	got := FromBody(body)
