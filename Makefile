@@ -56,7 +56,20 @@ $(PLATFORMS):
 	 tar -czf $(RELEASE_DIR)/$$OUTPUT.tar.gz -C $(RELEASE_DIR) $$OUTPUT ; \
 	 echo "📦 Compressed: zip and tar.gz"
 
-# Final production Docker image
+# Local Docker image (amd64 only, no push, no :latest)
+docker-build-local:
+ifndef TAG
+	$(error TAG is not set. Usage: make docker-build-local TAG=v0.11.0-dev [REPO=ghcr.io/you/leafwiki])
+endif
+	docker buildx build \
+		--platform linux/amd64 \
+		--file Dockerfile \
+		--target final \
+		--build-arg APP_VERSION=$(TAG) \
+		--tag $(if $(REPO),$(REPO):$(TAG),leafwiki:$(TAG)) \
+		--load .
+
+# Final production Docker image (multi-arch, push to registry)
 docker-build-publish:
 ifndef REPO_OWNER
 	$(error REPO_OWNER is not set. Usage: make docker-build-publish VERSION=vX.Y.Z REPO_OWNER=your_github_username)
@@ -114,7 +127,8 @@ help:
 	@echo "  make run-e2e-local-fast   – Run E2E tests locally, skip UI build (use when dist/ is current)"
 	@echo "                              Optional: GREP=<pattern> to filter tests"
 	@echo "  make run                  – Run development server"
+	@echo "  make docker-build-local   – Build amd64 image locally (TAG=vX.Y.Z required, no push)"
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build run clean test bench fmt lint help docker-build-local docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
