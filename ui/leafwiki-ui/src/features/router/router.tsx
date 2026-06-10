@@ -1,16 +1,18 @@
+import { lazy } from 'react'
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom'
-import BackupSettings from '../backup/BackupSettings'
-import LoginForm from '../auth/LoginForm'
-import BrandingSettings from '../branding/BrandingSettings'
-import PageEditor from '../editor/PageEditor'
-import Importer from '../importer/Importer'
-import PageHistoryPage from '../page/PageHistoryPage'
-import PermalinkRedirect from '../page/PermalinkRedirect'
-import RootRedirect from '../page/RootRedirect'
-import UserManagement from '../users/UserManagement'
-import PageViewer from '../viewer/PageViewer'
 import AuthWrapper from './RouterAuthWrapper'
 import ReadOnlyWrapper from './RouterReadOnlyWrapper'
+
+const BackupSettings = lazy(() => import('../backup/BackupSettings'))
+const LoginForm = lazy(() => import('../auth/LoginForm'))
+const BrandingSettings = lazy(() => import('../branding/BrandingSettings'))
+const PageEditor = lazy(() => import('../editor/PageEditor'))
+const Importer = lazy(() => import('../importer/Importer'))
+const PageHistoryPage = lazy(() => import('../page/PageHistoryPage'))
+const PermalinkRedirect = lazy(() => import('../page/PermalinkRedirect'))
+const RootRedirect = lazy(() => import('../page/RootRedirect'))
+const UserManagement = lazy(() => import('../users/UserManagement'))
+const PageViewer = lazy(() => import('../viewer/PageViewer'))
 
 export const createLeafWikiRouter = (
   isReadOnlyViewer: boolean,

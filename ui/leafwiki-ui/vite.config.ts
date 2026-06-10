@@ -35,6 +35,14 @@ function manualChunks(id: string): string | undefined {
     return 'mermaid'
   }
 
+  if (
+    normalizedId.includes('/node_modules/@codemirror/') ||
+    normalizedId.includes('/node_modules/@lezer/') ||
+    normalizedId.includes('/node_modules/@fsegurai/')
+  ) {
+    return 'codemirror'
+  }
+
   return undefined
 }
 

@@ -4,7 +4,7 @@ import { BASE_PATH } from '@/lib/config'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useSessionStore } from '@/stores/session'
 import useApplyDesignMode from '@/useApplyDesignMode'
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { toast, Toaster } from 'sonner'
 import './App.css'
@@ -65,7 +65,9 @@ function App() {
     <>
       <Toaster richColors position="bottom-right" />
       {configHasLoaded && !(isRefreshing && !authDisabled) ? (
-        <RouterProvider router={router} />
+        <Suspense>
+          <RouterProvider router={router} />
+        </Suspense>
       ) : null}
     </>
   )
