@@ -4,7 +4,7 @@ import { createGzip } from 'zlib'
 import { execSync } from 'child_process'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, type ConfigEnv, type Plugin } from 'vite'
 
 const packageJson = JSON.parse(
   fs.readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
@@ -67,7 +67,11 @@ function gzipStaticPlugin(): Plugin {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }: ConfigEnv) => ({
+  // Use relative base for production so dynamic-import preload paths resolve
+  // correctly when the app is served under a sub-path (e.g. /wiki/).
+  // The dev server keeps '/' so HMR and the proxy rules work without change.
+  base: command === 'build' ? './' : '/',
   define: {
     __APP_VERSION__: JSON.stringify(resolveAppVersion()),
   },
@@ -110,4 +114,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-})
+}))
