@@ -1,8 +1,10 @@
 import fs from 'fs'
+import { pipeline } from 'stream/promises'
+import { createGzip } from 'zlib'
 import { execSync } from 'child_process'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 
 const packageJson = JSON.parse(
   fs.readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
@@ -39,12 +41,37 @@ function manualChunks(id: string): string | undefined {
   return undefined
 }
 
+function gzipStaticPlugin(): Plugin {
+  return {
+    name: 'gzip-static',
+    apply: 'build',
+    async closeBundle() {
+      const staticDir = path.join(__dirname, 'dist', 'static')
+      if (!fs.existsSync(staticDir)) return
+
+      const files = fs.readdirSync(staticDir).filter((f) => /\.(js|css)$/.test(f))
+
+      await Promise.all(
+        files.map(async (file) => {
+          const src = path.join(staticDir, file)
+          if (fs.statSync(src).size < 1024) return
+          await pipeline(
+            fs.createReadStream(src),
+            createGzip({ level: 9 }),
+            fs.createWriteStream(src + '.gz'),
+          )
+        }),
+      )
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(resolveAppVersion()),
   },
-  plugins: [react()],
+  plugins: [react(), gzipStaticPlugin()],
   server: {
     proxy: {
       '/assets': {
