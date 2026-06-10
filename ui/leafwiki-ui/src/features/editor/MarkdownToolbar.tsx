@@ -2,6 +2,7 @@ import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -27,6 +28,7 @@ import {
   WrapText,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useEditorStore } from '@/stores/editor'
 import { MarkdownEditorRef } from './MarkdownEditor'
 
@@ -45,8 +47,13 @@ export default function MarkdownToolbar({
   previewVisible,
   onTogglePreview,
 }: Props) {
+  const { t } = useTranslation('editor')
   const openDialog = useDialogsStore((state) => state.openDialog)
-  const { lineWrap, toggleLineWrap } = useEditorStore()
+  const lineWrap = useEditorStore((s) => s.lineWrap)
+  const toggleLineWrap = useEditorStore((s) => s.toggleLineWrap)
+  const autoSave = useEditorStore((s) => s.autoSave)
+  const toggleAutoSave = useEditorStore((s) => s.toggleAutoSave)
+  const autoSaveStatus = useEditorStore((s) => s.autoSaveStatus)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const isRenamingRef = useRef(false)
@@ -88,7 +95,11 @@ export default function MarkdownToolbar({
   return (
     <>
       <div className="markdown-toolbar">
-        <TooltipWrapper label="Bold (Ctrl+B)" side="top" align="center">
+        <TooltipWrapper
+          label={t('toolbar.boldTooltip')}
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -99,7 +110,11 @@ export default function MarkdownToolbar({
             <Bold className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Italic (Ctrl+I)" side="top" align="center">
+        <TooltipWrapper
+          label={t('toolbar.italicTooltip')}
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -111,7 +126,11 @@ export default function MarkdownToolbar({
           </Button>
         </TooltipWrapper>
         {!isMobile && (
-          <TooltipWrapper label="Strikethrough" side="top" align="center">
+          <TooltipWrapper
+            label={t('toolbar.strikethroughTooltip')}
+            side="top"
+            align="center"
+          >
             <Button
               variant="ghost"
               size="icon"
@@ -122,7 +141,11 @@ export default function MarkdownToolbar({
             </Button>
           </TooltipWrapper>
         )}
-        <TooltipWrapper label="Link (Ctrl+K)" side="top" align="center">
+        <TooltipWrapper
+          label={t('toolbar.linkTooltip')}
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -145,7 +168,7 @@ export default function MarkdownToolbar({
         {!isMobile && (
           <>
             <TooltipWrapper
-              label="Heading 1 (Ctrl+Alt+1)"
+              label={t('toolbar.heading1Tooltip')}
               side="top"
               align="center"
             >
@@ -159,7 +182,7 @@ export default function MarkdownToolbar({
               </Button>
             </TooltipWrapper>
             <TooltipWrapper
-              label="Heading 2 (Ctrl+Alt+2)"
+              label={t('toolbar.heading2Tooltip')}
               side="top"
               align="center"
             >
@@ -173,7 +196,7 @@ export default function MarkdownToolbar({
               </Button>
             </TooltipWrapper>
             <TooltipWrapper
-              label="Heading 3 (Ctrl+Alt+3)"
+              label={t('toolbar.heading3Tooltip')}
               side="top"
               align="center"
             >
@@ -194,7 +217,11 @@ export default function MarkdownToolbar({
                 if (!open) setHovered(null)
               }}
             >
-              <TooltipWrapper label="Table" side="top" align="center">
+              <TooltipWrapper
+                label={t('toolbar.tableTooltip')}
+                side="top"
+                align="center"
+              >
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
@@ -210,7 +237,12 @@ export default function MarkdownToolbar({
                 onCloseAutoFocus={(e) => e.preventDefault()}
               >
                 <div className="text-muted-foreground mb-1 text-center text-xs">
-                  {hovered ? `${hovered.col} × ${hovered.row}` : 'Select size'}
+                  {hovered
+                    ? t('toolbar.tableSizeLabel', {
+                        col: hovered.col,
+                        row: hovered.row,
+                      })
+                    : t('toolbar.tableSizeSelect')}
                 </div>
                 <div
                   className="grid gap-0.5"
@@ -226,7 +258,10 @@ export default function MarkdownToolbar({
                         <button
                           key={`${col}-${row}`}
                           type="button"
-                          aria-label={`Insert table ${col} x ${row}`}
+                          aria-label={t('toolbar.tableInsertAriaLabel', {
+                            col,
+                            row,
+                          })}
                           className={`h-5 w-5 rounded-sm border transition-colors ${highlighted ? 'bg-primary border-primary' : 'border-border hover:bg-accent bg-transparent'}`}
                           onFocus={() => setHovered({ col, row })}
                           onBlur={() => setHovered(null)}
@@ -248,7 +283,11 @@ export default function MarkdownToolbar({
             </DropdownMenu>
           </>
         )}
-        <TooltipWrapper label="Code Block" side="top" align="center">
+        <TooltipWrapper
+          label={t('toolbar.codeBlockTooltip')}
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -260,7 +299,11 @@ export default function MarkdownToolbar({
             <Code className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Inline Code (Ctrl+`)" side="top" align="center">
+        <TooltipWrapper
+          label={t('toolbar.inlineCodeTooltip')}
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -271,7 +314,11 @@ export default function MarkdownToolbar({
             <Code2 className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Image / File" side="top" align="center">
+        <TooltipWrapper
+          label={t('toolbar.imageTooltip')}
+          side="top"
+          align="center"
+        >
           <Button
             data-testid="open-asset-manager-button"
             variant="ghost"
@@ -290,7 +337,11 @@ export default function MarkdownToolbar({
           </Button>
         </TooltipWrapper>
         <div className="markdown-toolbar__separator max-sm:hidden" />
-        <TooltipWrapper label="Undo" side="top" align="center">
+        <TooltipWrapper
+          label={t('toolbar.undoTooltip')}
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -301,7 +352,11 @@ export default function MarkdownToolbar({
             <Undo className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <TooltipWrapper label="Redo" side="top" align="center">
+        <TooltipWrapper
+          label={t('toolbar.redoTooltip')}
+          side="top"
+          align="center"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -314,7 +369,11 @@ export default function MarkdownToolbar({
         </TooltipWrapper>
         {!isMobile && (
           <TooltipWrapper
-            label={lineWrap ? 'Disable line wrap' : 'Enable line wrap'}
+            label={t(
+              lineWrap
+                ? 'toolbar.lineWrapDisableTooltip'
+                : 'toolbar.lineWrapEnableTooltip',
+            )}
             side="top"
             align="center"
           >
@@ -338,7 +397,7 @@ export default function MarkdownToolbar({
                 variant="ghost"
                 size="icon"
                 className="markdown-toolbar__button"
-                aria-label="More formatting options"
+                aria-label={t('toolbar.moreOptionsAriaLabel')}
               >
                 <MoreHorizontal className="markdown-toolbar__icon" />
               </Button>
@@ -351,26 +410,26 @@ export default function MarkdownToolbar({
                 onSelect={() => editorRef.current?.insertWrappedText('~~')}
               >
                 <Strikethrough size={14} />
-                Strikethrough
+                {t('toolbar.strikethrough')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={() => editorRef.current?.insertHeading(1)}
               >
                 <span className="w-4 text-center text-xs font-bold">H1</span>
-                Heading 1
+                {t('toolbar.heading1')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => editorRef.current?.insertHeading(2)}
               >
                 <span className="w-4 text-center text-xs font-bold">H2</span>
-                Heading 2
+                {t('toolbar.heading2')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => editorRef.current?.insertHeading(3)}
               >
                 <span className="w-4 text-center text-xs font-bold">H3</span>
-                Heading 3
+                {t('toolbar.heading3')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -379,13 +438,27 @@ export default function MarkdownToolbar({
                 }
               >
                 <Table size={14} />
-                Insert Table (3×3)
+                {t('toolbar.insertTable')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={toggleLineWrap}>
-                <WrapText size={14} />
-                {lineWrap ? 'Disable' : 'Enable'} line wrap
-              </DropdownMenuItem>
+              <DropdownMenuCheckboxItem
+                checked={lineWrap}
+                onCheckedChange={toggleLineWrap}
+              >
+                {t('toolbar.lineWrap')}
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={autoSave}
+                onCheckedChange={toggleAutoSave}
+              >
+                {t('toolbar.autoSave')}
+                {autoSaveStatus === 'paused' && (
+                  <span className="text-muted-foreground ml-auto text-xs">
+                    {t('toolbar.autoSavePaused')}
+                  </span>
+                )}
+              </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -393,7 +466,11 @@ export default function MarkdownToolbar({
           <>
             <div className="markdown-toolbar__separator" />
             <TooltipWrapper
-              label={previewVisible ? 'Hide preview' : 'Show preview'}
+              label={t(
+                previewVisible
+                  ? 'toolbar.hidePreviewTooltip'
+                  : 'toolbar.showPreviewTooltip',
+              )}
               side="top"
               align="center"
             >

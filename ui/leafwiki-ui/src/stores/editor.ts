@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+export type AutoSaveStatus = 'idle' | 'saving' | 'paused'
+
 type EditorStore = {
   previewVisible: boolean
   setPreviewVisible: (visible: boolean) => void
@@ -9,6 +11,8 @@ type EditorStore = {
   toggleLineWrap: () => void
   autoSave: boolean
   toggleAutoSave: () => void
+  autoSaveStatus: AutoSaveStatus
+  setAutoSaveStatus: (status: AutoSaveStatus) => void
 }
 
 export const useEditorStore = create<EditorStore>()(
@@ -21,9 +25,11 @@ export const useEditorStore = create<EditorStore>()(
       toggleLineWrap: () => set({ lineWrap: !get().lineWrap }),
       autoSave: true,
       toggleAutoSave: () => set({ autoSave: !get().autoSave }),
+      autoSaveStatus: 'idle',
+      setAutoSaveStatus: (status) => set({ autoSaveStatus: status }),
     }),
     {
-      name: 'leafwiki-editor-settings', // localStorage-Key
+      name: 'leafwiki-editor-settings',
       partialize: (state) => ({
         previewVisible: state.previewVisible,
         lineWrap: state.lineWrap,

@@ -13,5 +13,41 @@
     "pathPrefix": "Path:",
     "cancelButton": "Cancel",
     "saveButton": "Change"
+  },
+  "toolbar": {
+    "boldTooltip": "Bold (Ctrl+B)",
+    "italicTooltip": "Italic (Ctrl+I)",
+    "strikethroughTooltip": "Strikethrough",
+    "linkTooltip": "Link (Ctrl+K)",
+    "heading1Tooltip": "Heading 1 (Ctrl+Alt+1)",
+    "heading2Tooltip": "Heading 2 (Ctrl+Alt+2)",
+    "heading3Tooltip": "Heading 3 (Ctrl+Alt+3)",
+    "tableTooltip": "Table",
+    "tableSizeSelect": "Select size",
+    "tableSizeLabel": "{{col}} × {{row}}",
+    "tableInsertAriaLabel": "Insert table {{col}} x {{row}}",
+    "codeBlockTooltip": "Code Block",
+    "inlineCodeTooltip": "Inline Code (Ctrl+`)",
+    "imageTooltip": "Image / File",
+    "undoTooltip": "Undo",
+    "redoTooltip": "Redo",
+    "lineWrapEnableTooltip": "Enable line wrap",
+    "lineWrapDisableTooltip": "Disable line wrap",
+    "moreOptionsAriaLabel": "More formatting options",
+    "showPreviewTooltip": "Show preview",
+    "hidePreviewTooltip": "Hide preview",
+    "strikethrough": "Strikethrough",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "insertTable": "Insert Table (3×3)",
+    "lineWrap": "Line wrap",
+    "autoSave": "Auto-save",
+    "autoSavePaused": "paused"
+  },
+  "autoSave": {
+    "savedToast": "Saved",
+    "versionConflictToast": "Auto-save paused — page was changed by another user. Save manually to continue.",
+    "errorFallback": "Auto-save failed"
   }
 }

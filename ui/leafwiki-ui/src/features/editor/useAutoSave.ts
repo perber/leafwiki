@@ -1,18 +1,20 @@
 import { asApiLocalizedError, mapApiError } from '@/lib/api/errors'
 import { useDialogsStore } from '@/stores/dialogs'
-import { useEditorStore } from '@/stores/editor'
+import { useEditorStore, type AutoSaveStatus } from '@/stores/editor'
 import { useEffect, useReducer, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { DIALOG_UNSAVED_CHANGES } from '@/lib/registries'
 import { validateEditorFrontmatterMetadata } from './frontmatter'
 import { isDirtyState, usePageEditorStore } from './pageEditorStore'
 
-export type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'paused'
-
 const DEBOUNCE_MS = 2000
 
 export function useAutoSave(): { status: AutoSaveStatus } {
+  // status is kept in local useState (not just the store) because the main debounce
+  // effect depends on it to reschedule after a save completes.
   const [status, setStatus] = useState<AutoSaveStatus>('idle')
+  const { t } = useTranslation('editor')
   // Incremented when the unsaved-changes dialog is dismissed via Cancel so the
   // debounce effect re-runs and reschedules the auto-save.
   const [retriggerCount, dispatchRetrigger] = useReducer(
@@ -39,6 +41,7 @@ export function useAutoSave(): { status: AutoSaveStatus } {
   const updateStatus = (next: AutoSaveStatus) => {
     statusRef.current = next
     setStatus(next)
+    useEditorStore.getState().setAutoSaveStatus(next)
   }
 
   const clearDebounce = () => {
@@ -177,7 +180,7 @@ export function useAutoSave(): { status: AutoSaveStatus } {
 
         isSavingRef.current = false
         updateStatus('idle')
-        toast.success('Saved', { duration: 2000 })
+        toast.success(t('autoSave.savedToast'), { duration: 2000 })
       } catch (err) {
         if (generationRef.current !== generation) return
 
@@ -185,18 +188,13 @@ export function useAutoSave(): { status: AutoSaveStatus } {
         const localized = asApiLocalizedError(err)
         if (localized?.code === 'page_version_conflict') {
           updateStatus('paused')
-          toast(
-            'Auto-save paused — page was changed by another user. Save manually to continue.',
-            {
-              duration: 6000,
-            },
-          )
+          toast(t('autoSave.versionConflictToast'), { duration: 6000 })
         } else {
           updateStatus('idle')
           // Skip toast for validation errors — they are already shown inline via frontmatterErrors
           const currentErrors = usePageEditorStore.getState().frontmatterErrors
           if (Object.keys(currentErrors).length === 0) {
-            const mapped = mapApiError(err, 'Auto-save failed')
+            const mapped = mapApiError(err, t('autoSave.errorFallback'))
             toast.error(mapped.message, { duration: 4000 })
           }
         }
@@ -230,6 +228,7 @@ export function useAutoSave(): { status: AutoSaveStatus } {
       generationRef.current++
       isSavingRef.current = false
       clearDebounce()
+      useEditorStore.getState().setAutoSaveStatus('idle')
     }
   }, [])
 
