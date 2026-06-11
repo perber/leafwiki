@@ -426,6 +426,16 @@ If it's useful to you:
 - ⭐ **[Star the repo](https://github.com/perber/leafwiki)** — helps others find it
 - 💛 **[Sponsor on GitHub](https://github.com/sponsors/perber)** — supports ongoing maintenance, bug fixes, and new features
 
+## Star History
+
+<a href="https://www.star-history.com/perber/leafwiki#history">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=perber/leafwiki&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=perber/leafwiki&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=perber/leafwiki&type=Date" />
+ </picture>
+</a>
+
 ---
 
 ## Contributing
