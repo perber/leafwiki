@@ -52,6 +52,7 @@ func (s *PropertiesService) GetPropertiesForPages(pageIDs []string) (map[string]
 
 // ExtractPropertiesFromContent parses frontmatter and returns scalar properties.
 // Skips: reserved keys (tags, title, leafwiki_*), lists, nil values.
+// Nested YAML maps are flattened using dot notation (e.g. a.b: value).
 func ExtractPropertiesFromContent(content string) map[string]PropertyEntry {
 	fm, _, has, err := markdown.ParseFrontmatter(content)
 	if err != nil || !has || len(fm.ExtraFields) == 0 {
@@ -64,17 +65,48 @@ func ExtractPropertiesFromContent(content string) map[string]PropertyEntry {
 		if isReservedKey(key) {
 			continue
 		}
-		entry, ok := toPropertyEntry(value)
-		if !ok {
-			continue
-		}
-		result[key] = entry
+		extractFlatEntry(key, value, result)
 	}
 
 	if len(result) == 0 {
 		return nil
 	}
 	return result
+}
+
+const maxNestedPropertyDepth = 20
+
+// extractFlatEntry walks a potentially-nested value and stores all scalar leaves
+// under dot-joined keys (e.g. {"a": {"b": "v"}} → "a.b" = "v").
+// depth guards against unbounded recursion from crafted deeply-nested YAML.
+func extractFlatEntry(prefix string, value interface{}, result map[string]PropertyEntry) {
+	extractFlatEntryDepth(prefix, value, result, 0)
+}
+
+func extractFlatEntryDepth(prefix string, value interface{}, result map[string]PropertyEntry, depth int) {
+	if depth > maxNestedPropertyDepth {
+		return
+	}
+	switch v := value.(type) {
+	case string:
+		entry, ok := toPropertyEntry(v)
+		if ok {
+			result[prefix] = entry
+		}
+	case map[string]interface{}:
+		for childKey, childValue := range v {
+			childKey = strings.TrimSpace(childKey)
+			if childKey == "" {
+				continue
+			}
+			// Skip child segments that use the system-reserved prefix so that
+			// e.g. {"meta": {"leafwiki_id": "x"}} cannot pollute the index.
+			if strings.HasPrefix(strings.ToLower(childKey), "leafwiki_") {
+				continue
+			}
+			extractFlatEntryDepth(prefix+"."+childKey, childValue, result, depth+1)
+		}
+	}
 }
 
 func isReservedKey(key string) bool {

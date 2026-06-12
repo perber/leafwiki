@@ -238,6 +238,183 @@ function appendBlock(target: string[], header: string, bodyLines: string[]) {
   target.push(...bodyLines)
 }
 
+// Tries to parse indented lines as nested key-value pairs, returning fields
+// with dot-joined keys (e.g. "parent.child"). Returns null if the block
+// contains anything that cannot be expressed as key-value pairs.
+function tryParseNestedMap(
+  lines: string[],
+  baseIndent: number,
+  parentKey: string,
+): EditorFrontmatterField[] | null {
+  const fields: EditorFrontmatterField[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.trim() === '') {
+      i++
+      continue
+    }
+
+    const lineIndent = line.search(/\S/)
+    if (lineIndent !== baseIndent) return null
+
+    const strippedLine = line.slice(baseIndent)
+    const keyMatch = strippedLine.match(FRONTMATTER_KEY_PATTERN)
+    if (!keyMatch) return null
+
+    const [, rawKey, rawValue] = keyMatch
+    const key = normalizeFieldKey(rawKey)
+    const trimmedValue = rawValue.trim()
+    const fullKey = parentKey ? `${parentKey}.${key}` : key
+
+    if (trimmedValue !== '') {
+      const inlineList = parseInlineList(trimmedValue)
+      if (inlineList !== null) {
+        fields.push({
+          key: fullKey,
+          type: 'list',
+          value: inlineList.join('\n'),
+          internal: isInternalFieldKey(fullKey),
+        })
+      } else {
+        const normalizedValue = normalizeFieldValue(trimmedValue)
+        fields.push({
+          key: fullKey,
+          type: detectFieldType(normalizedValue),
+          value: normalizedValue,
+          internal: isInternalFieldKey(fullKey),
+        })
+      }
+      i++
+      continue
+    }
+
+    // Empty value — collect all deeper-indented child lines
+    const childLines: string[] = []
+    let j = i + 1
+    while (j < lines.length) {
+      const nextLine = lines[j]
+      if (nextLine.trim() === '') {
+        j++
+        continue
+      }
+      const nextIndent = nextLine.search(/\S/)
+      if (nextIndent <= baseIndent) break
+      childLines.push(nextLine)
+      j++
+    }
+
+    if (childLines.length === 0) {
+      i++
+      continue
+    }
+
+    const firstChild = childLines.find((l) => l.trim() !== '')
+    const childIndent = firstChild ? firstChild.search(/\S/) : baseIndent + 2
+
+    // Try as list first, then as nested map
+    const listItems: string[] = []
+    let isList = true
+    for (const cl of childLines) {
+      if (cl.trim() === '') continue
+      const listItem = cl.match(/^\s*-\s*(.+?)\s*$/)
+      if (!listItem) {
+        isList = false
+        break
+      }
+      listItems.push(listItem[1])
+    }
+
+    if (isList && listItems.length > 0) {
+      fields.push({
+        key: fullKey,
+        type: 'list',
+        value: listItems.join('\n'),
+        internal: isInternalFieldKey(fullKey),
+      })
+    } else {
+      const nestedFields = tryParseNestedMap(childLines, childIndent, fullKey)
+      if (nestedFields === null) {
+        // This child block cannot be expressed as key-value pairs.
+        // Abort the whole parent block so the caller can fall back to
+        // unsupportedRaw — otherwise partial siblings would be silently lost.
+        return null
+      }
+      fields.push(...nestedFields)
+    }
+
+    i = j
+  }
+
+  return fields
+}
+
+// ─── Field tree for nested YAML serialization ─────────────────────────────────
+
+type FieldTreeNode = {
+  field?: EditorFrontmatterField
+  children: Map<string, FieldTreeNode>
+}
+
+// addToFieldTree returns false when inserting would cause a YAML-illegal
+// conflict (a key being both a scalar and a mapping at the same path).
+function addToFieldTree(
+  tree: Map<string, FieldTreeNode>,
+  parts: string[],
+  field: EditorFrontmatterField,
+): boolean {
+  const [head, ...rest] = parts
+  if (!head) return false
+
+  if (!tree.has(head)) {
+    tree.set(head, { children: new Map() })
+  }
+  const node = tree.get(head)!
+
+  if (rest.length === 0) {
+    if (node.children.size > 0) return false // would conflict with existing children
+    node.field = field
+    return true
+  }
+
+  if (node.field !== undefined) return false // would conflict with existing scalar
+  return addToFieldTree(node.children, rest, field)
+}
+
+function serializeFieldNode(
+  key: string,
+  node: FieldTreeNode,
+  indent: number,
+): string {
+  const prefix = '  '.repeat(indent)
+  const formattedKey = formatFieldKey(key)
+
+  if (node.children.size > 0) {
+    const childLines: string[] = []
+    for (const [childKey, childNode] of node.children) {
+      childLines.push(serializeFieldNode(childKey, childNode, indent + 1))
+    }
+    return `${prefix}${formattedKey}:\n${childLines.join('\n')}`
+  }
+
+  const field = node.field!
+  if (field.type === 'list') {
+    const items = normalizeListValue(field.value).split('\n').filter(Boolean)
+    if (items.length === 0) return `${prefix}${formattedKey}: []`
+    return [
+      `${prefix}${formattedKey}:`,
+      ...items.map((item) => `${prefix}  - ${item}`),
+    ].join('\n')
+  }
+
+  const trimmedValue = field.value.trim()
+  if (needsYamlQuoting(trimmedValue)) {
+    return `${prefix}${formattedKey}: "${trimmedValue}"`
+  }
+  return `${prefix}${formattedKey}: ${trimmedValue}`
+}
+
 export function parseEditorFrontmatter(
   frontmatter?: string | null,
 ): ParsedEditorFrontmatter {
@@ -353,7 +530,14 @@ export function parseEditorFrontmatter(
         internal: isInternalFieldKey(key),
       })
     } else {
-      appendBlock(unsupportedLines, line, collected)
+      const firstChild = collected.find((l) => l.trim() !== '')
+      const nestedIndent = firstChild ? firstChild.search(/\S/) : 2
+      const nestedFields = tryParseNestedMap(collected, nestedIndent, key)
+      if (nestedFields !== null) {
+        fields.push(...nestedFields)
+      } else {
+        appendBlock(unsupportedLines, line, collected)
+      }
     }
 
     index = nextIndex - 1
@@ -364,30 +548,6 @@ export function parseEditorFrontmatter(
     fields: normalizeEditorFrontmatterFields(fields),
     unsupportedRaw: unsupportedLines.join('\n').trim(),
   }
-}
-
-function buildFieldBlock(field: EditorFrontmatterField) {
-  const key = normalizeFieldKey(field.key)
-  if (!key) return ''
-  const formattedKey = formatFieldKey(key)
-
-  if (field.type === 'list') {
-    const items = normalizeListValue(field.value).split('\n').filter(Boolean)
-
-    if (items.length === 0) {
-      return `${formattedKey}: []`
-    }
-
-    return [formattedKey + ':', ...items.map((item) => `  - ${item}`)].join(
-      '\n',
-    )
-  }
-
-  const trimmedValue = field.value.trim()
-  if (needsYamlQuoting(trimmedValue)) {
-    return `${formattedKey}: "${trimmedValue}"`
-  }
-  return `${formattedKey}: ${trimmedValue}`
 }
 
 export function buildEditorFrontmatter({
@@ -406,10 +566,35 @@ export function buildEditorFrontmatter({
     )
   }
 
+  // Build a tree so that dot-notation keys (e.g. "a.b" and "a.c") are grouped
+  // under a single parent block instead of emitting duplicate YAML keys.
+  // Fields that cannot be nested without conflict (e.g. "a" alongside "a.b")
+  // are serialized as flat literal YAML keys instead.
+  const fieldTree = new Map<string, FieldTreeNode>()
+  const flatFallbacks: EditorFrontmatterField[] = []
+
   for (const field of normalizedFields) {
-    const block = buildFieldBlock(field)
-    if (block) {
-      parts.push(block)
+    const key = normalizeFieldKey(field.key)
+    if (!key) continue
+    // Filter empty segments — handles trailing/leading/consecutive dots.
+    const parts = key.split('.').filter(Boolean)
+    if (parts.length === 0) continue
+    if (!addToFieldTree(fieldTree, parts, field)) {
+      flatFallbacks.push({ ...field, key })
+    }
+  }
+
+  for (const [key, node] of fieldTree) {
+    parts.push(serializeFieldNode(key, node, 0))
+  }
+
+  for (const field of flatFallbacks) {
+    const formattedKey = formatFieldKey(field.key)
+    const trimmedValue = field.value.trim()
+    if (needsYamlQuoting(trimmedValue)) {
+      parts.push(`${formattedKey}: "${trimmedValue}"`)
+    } else {
+      parts.push(`${formattedKey}: ${trimmedValue}`)
     }
   }
 

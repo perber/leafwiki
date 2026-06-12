@@ -1,6 +1,8 @@
 package properties
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
@@ -194,6 +196,92 @@ func TestExtractPropertiesFromContent_OnlyNonStringValuesReturnsNil(t *testing.T
 	got := ExtractPropertiesFromContent(content)
 	if got != nil {
 		t.Errorf("expected nil when all values are non-string, got %v", got)
+	}
+}
+
+// ─── Nested map (dot-notation) extraction ────────────────────────────────────
+
+func TestExtractPropertiesFromContent_NestedMapOneLevelDeep(t *testing.T) {
+	content := "---\na:\n  b: value\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "a.b", PropertyEntry{Value: "value", Type: "text"})
+	if _, ok := got["a"]; ok {
+		t.Error("intermediate key 'a' must not appear as a property")
+	}
+}
+
+func TestExtractPropertiesFromContent_NestedMapTwoLevelsDeep(t *testing.T) {
+	content := "---\na:\n  b:\n    c: deep\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "a.b.c", PropertyEntry{Value: "deep", Type: "text"})
+}
+
+func TestExtractPropertiesFromContent_NestedMapMultipleChildren(t *testing.T) {
+	content := "---\na:\n  b: val1\n  c: val2\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 properties, got %d: %v", len(got), got)
+	}
+	assertEntry(t, got, "a.b", PropertyEntry{Value: "val1", Type: "text"})
+	assertEntry(t, got, "a.c", PropertyEntry{Value: "val2", Type: "text"})
+}
+
+func TestExtractPropertiesFromContent_MixedFlatAndNestedKeys(t *testing.T) {
+	content := "---\nstatus: draft\na:\n  b: nested\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 properties, got %d: %v", len(got), got)
+	}
+	assertEntry(t, got, "status", PropertyEntry{Value: "draft", Type: "text"})
+	assertEntry(t, got, "a.b", PropertyEntry{Value: "nested", Type: "text"})
+}
+
+func TestExtractPropertiesFromContent_NestedMapSkipsNonStringLeaves(t *testing.T) {
+	content := "---\na:\n  b: 42\n  c: value\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if _, ok := got["a.b"]; ok {
+		t.Error("nested integer value must not be stored as a property")
+	}
+	assertEntry(t, got, "a.c", PropertyEntry{Value: "value", Type: "text"})
+}
+
+func TestExtractPropertiesFromContent_NestedMapSkipsEmptyStringLeaves(t *testing.T) {
+	content := "---\na:\n  b: \"\"\n  c: value\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if _, ok := got["a.b"]; ok {
+		t.Error("nested empty string must not be stored as a property")
+	}
+	assertEntry(t, got, "a.c", PropertyEntry{Value: "value", Type: "text"})
+}
+
+func TestExtractPropertiesFromContent_NestedMapSkipsLeafwikiChildSegment(t *testing.T) {
+	// A nested child key that starts with leafwiki_ must not be indexed even
+	// when the top-level key is a normal user key.
+	content := "---\nmeta:\n  leafwiki_id: spoofed\n  status: active\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if _, ok := got["meta.leafwiki_id"]; ok {
+		t.Error("nested leafwiki_ child segment must not be stored as a property")
+	}
+	assertEntry(t, got, "meta.status", PropertyEntry{Value: "active", Type: "text"})
+}
+
+func TestExtractPropertiesFromContent_NestedMapDepthLimitNotPanics(t *testing.T) {
+	// Build YAML that is deeper than maxNestedPropertyDepth. extractFlatEntry
+	// must return without crashing or producing an unboundedly long key.
+	depth := maxNestedPropertyDepth + 5
+	yaml := "---\n"
+	indent := ""
+	for i := range depth {
+		yaml += indent + "k" + strconv.Itoa(i) + ":\n"
+		indent += "  "
+	}
+	yaml += indent + "leaf: value\n---\n"
+
+	got := ExtractPropertiesFromContent(yaml)
+	for key := range got {
+		if len(strings.Split(key, ".")) > maxNestedPropertyDepth+1 {
+			t.Errorf("key %q exceeds max depth", key)
+		}
 	}
 }
 
