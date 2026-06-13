@@ -57,7 +57,7 @@ func TestWriteStreamAtomic_WritesToTargetFile(t *testing.T) {
 	tmp := t.TempDir()
 	target := filepath.Join(tmp, "asset.bin")
 
-	if err := WriteStreamAtomic(target, bytes.NewBufferString("hello stream"), 1024); err != nil {
+	if err := WriteStreamAtomic(target, bytes.NewBufferString("hello stream"), 1024, 0o644); err != nil {
 		t.Fatalf("WriteStreamAtomic err: %v", err)
 	}
 
@@ -67,5 +67,13 @@ func TestWriteStreamAtomic_WritesToTargetFile(t *testing.T) {
 	}
 	if string(raw) != "hello stream" {
 		t.Fatalf("content = %q", string(raw))
+	}
+
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("Stat err: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o644 {
+		t.Fatalf("permissions = %04o, want 0644", got)
 	}
 }

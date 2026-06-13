@@ -122,7 +122,7 @@ func CopyWithLimit(dst io.Writer, src io.Reader, max int64) error {
 	return nil
 }
 
-func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64) error {
+func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64, perm os.FileMode) error {
 	dir := atomicWriteDir(targetPath)
 
 	out, err := os.CreateTemp(dir, ".tmp-*")
@@ -149,6 +149,17 @@ func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64) error {
 			_ = os.Remove(tmp)
 		}
 	}()
+
+	if perm != 0 {
+		if err := out.Chmod(perm); err != nil {
+			chmodErr := fmt.Errorf("chmod temp file: %w", err)
+			if closeErr := out.Close(); closeErr != nil {
+				slog.Default().Error("failed to close temp file", "operation", "chmod", "error", closeErr)
+			}
+			out = nil
+			return chmodErr
+		}
+	}
 
 	if err := CopyWithLimit(out, src, maxBytes); err != nil {
 		return err

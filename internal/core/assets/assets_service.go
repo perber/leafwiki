@@ -122,7 +122,7 @@ func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File
 	finalFilename := s.slugger.GenerateUniqueFilename(existing, originalFilename)
 	fullPath := assetFileDiskPath(uploadPath, finalFilename)
 
-	if err := shared.WriteStreamAtomic(fullPath, file, maxBytes); err != nil {
+	if err := shared.WriteStreamAtomic(fullPath, file, maxBytes, 0o644); err != nil {
 		if errors.Is(err, shared.ErrFileTooLarge) {
 			return "", sharederrors.NewLocalizedError("asset_file_too_large", "File is too large", "file is too large", err)
 		}
