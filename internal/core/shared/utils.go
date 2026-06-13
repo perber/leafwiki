@@ -150,17 +150,6 @@ func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64, perm os
 		}
 	}()
 
-	if perm != 0 {
-		if err := out.Chmod(perm); err != nil {
-			chmodErr := fmt.Errorf("chmod temp file: %w", err)
-			if closeErr := out.Close(); closeErr != nil {
-				slog.Default().Error("failed to close temp file", "operation", "chmod", "error", closeErr)
-			}
-			out = nil
-			return chmodErr
-		}
-	}
-
 	if err := CopyWithLimit(out, src, maxBytes); err != nil {
 		return err
 	}
@@ -169,6 +158,14 @@ func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64, perm os
 	if err := out.Sync(); err != nil {
 		return err
 	}
+
+	// Chmod after writing so partial content is never world-readable.
+	if perm != 0 {
+		if err := out.Chmod(perm); err != nil {
+			return fmt.Errorf("chmod temp file: %w", err)
+		}
+	}
+
 	if err := out.Close(); err != nil {
 		return err
 	}

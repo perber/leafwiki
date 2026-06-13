@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -73,7 +74,9 @@ func TestWriteStreamAtomic_WritesToTargetFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Stat err: %v", err)
 	}
-	if got := info.Mode().Perm(); got != 0o644 {
-		t.Fatalf("permissions = %04o, want 0644", got)
+	if runtime.GOOS != "windows" {
+		if got := info.Mode().Perm(); got != 0o644 {
+			t.Fatalf("permissions = %04o, want 0644", got)
+		}
 	}
 }
