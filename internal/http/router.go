@@ -246,13 +246,14 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 				}
 
 				doc := string(data)
+				escapedBasePath := html.EscapeString(opts.BasePath)
 				doc = strings.ReplaceAll(doc, "{{__SITE_NAME__}}", html.EscapeString(siteName))
-				doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", opts.BasePath)
-				doc = strings.ReplaceAll(doc, "{{__FAVICON_HREF__}}", BuildFrontendFaviconHref(opts.BasePath, faviconFile))
+				doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", escapedBasePath)
+				doc = strings.ReplaceAll(doc, "{{__FAVICON_HREF__}}", html.EscapeString(BuildFrontendFaviconHref(opts.BasePath, faviconFile)))
 				// Rewrite Vite's relative "./static/" asset references to absolute paths
 				// so they resolve correctly when index.html is served for deep SPA routes.
 				// Lazy chunks still use import.meta.url for their own path resolution.
-				doc = strings.ReplaceAll(doc, `"./static/`, `"`+opts.BasePath+`/static/`)
+				doc = strings.ReplaceAll(doc, `"./static/`, `"`+escapedBasePath+`/static/`)
 
 				doc = injectIntoHead(doc, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
 

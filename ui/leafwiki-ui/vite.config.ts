@@ -42,8 +42,9 @@ function manualChunks(id: string): string | undefined {
 // https://vite.dev/config/
 export default defineConfig(({ command }: ConfigEnv) => ({
   // Relative base so asset paths in the built HTML are ./static/... instead of /static/...
-  // Combined with <base href="{basePath}/"> injected by Go, lazy chunks and preloads
-  // resolve correctly under any sub-path without server-side string patching.
+  // Go rewrites these references to absolute paths at serve time so they resolve correctly
+  // when index.html is served for deep SPA routes. Lazy chunks resolve via import.meta.url
+  // and therefore work correctly under any sub-path without further server-side patching.
   base: command === 'build' ? './' : '/',
   define: {
     __APP_VERSION__: JSON.stringify(resolveAppVersion()),
