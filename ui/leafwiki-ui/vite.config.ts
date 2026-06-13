@@ -2,7 +2,7 @@ import fs from 'fs'
 import { execSync } from 'child_process'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import { defineConfig } from 'vite'
+import { defineConfig, type ConfigEnv } from 'vite'
 
 const packageJson = JSON.parse(
   fs.readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
@@ -40,7 +40,11 @@ function manualChunks(id: string): string | undefined {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }: ConfigEnv) => ({
+  // Relative base so asset paths in the built HTML are ./static/... instead of /static/...
+  // Combined with <base href="{basePath}/"> injected by Go, lazy chunks and preloads
+  // resolve correctly under any sub-path without server-side string patching.
+  base: command === 'build' ? './' : '/',
   define: {
     __APP_VERSION__: JSON.stringify(resolveAppVersion()),
   },
@@ -83,4 +87,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-})
+}))
