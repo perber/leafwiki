@@ -425,6 +425,7 @@ If it's useful to you:
 
 - ⭐ **[Star the repo](https://github.com/perber/leafwiki)** — helps others find it
 - 💛 **[Sponsor on GitHub](https://github.com/sponsors/perber)** — supports ongoing maintenance, bug fixes, and new features
+- ☁️ **[Join the hosted waitlist](https://leafwiki.com/hosted)** — don't want to run a server? a hosted version is in the works
 
 ---
 
