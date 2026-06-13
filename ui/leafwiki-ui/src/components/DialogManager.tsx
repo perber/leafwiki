@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
 import { dialogRegistry } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -33,11 +33,11 @@ export function DialogManager() {
   }, [dialogType, dialogProps, renderType])
 
   return (
-    <>
+    <Suspense fallback={null}>
       {dialogs.map((dialog) => {
         if (dialog.type !== renderType) return null
         return dialog.render({ ...renderProps })
       })}
-    </>
+    </Suspense>
   )
 }

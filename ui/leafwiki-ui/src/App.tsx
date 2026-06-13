@@ -4,7 +4,8 @@ import { BASE_PATH } from '@/lib/config'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useSessionStore } from '@/stores/session'
 import useApplyDesignMode from '@/useApplyDesignMode'
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Loader2 } from 'lucide-react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { toast, Toaster } from 'sonner'
 import './App.css'
@@ -65,7 +66,15 @@ function App() {
     <>
       <Toaster richColors position="bottom-right" />
       {configHasLoaded && !(isRefreshing && !authDisabled) ? (
-        <RouterProvider router={router} />
+        <Suspense
+          fallback={
+            <div className="flex h-screen items-center justify-center">
+              <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+            </div>
+          }
+        >
+          <RouterProvider router={router} />
+        </Suspense>
       ) : null}
     </>
   )

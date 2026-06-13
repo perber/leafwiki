@@ -1,14 +1,16 @@
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom'
-import BackupSettings from '../backup/BackupSettings'
-import LoginForm from '../auth/LoginForm'
-import BrandingSettings from '../branding/BrandingSettings'
-import PageEditor from '../editor/PageEditor'
-import Importer from '../importer/Importer'
-import PageHistoryPage from '../page/PageHistoryPage'
-import PermalinkRedirect from '../page/PermalinkRedirect'
-import RootRedirect from '../page/RootRedirect'
-import UserManagement from '../users/UserManagement'
-import PageViewer from '../viewer/PageViewer'
+import {
+  BackupSettings,
+  BrandingSettings,
+  Importer,
+  LoginForm,
+  PageEditor,
+  PageHistoryPage,
+  PageViewer,
+  PermalinkRedirect,
+  RootRedirect,
+  UserManagement,
+} from './lazy-routes'
 import AuthWrapper from './RouterAuthWrapper'
 import ReadOnlyWrapper from './RouterReadOnlyWrapper'
 

@@ -5,7 +5,7 @@ import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useAppMode } from '@/lib/useAppMode'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSidebarStore } from '@/stores/sidebar'
-import { JSX, useEffect, useMemo } from 'react'
+import { JSX, Suspense, useEffect, useMemo } from 'react'
 
 const registeredItems = panelItemRegistry.getAllItems()
 const sidebarShortcutIds: Partial<
@@ -134,7 +134,9 @@ export default function Sidebar() {
         <div className={`sidebar__content`}>
           {items.map((item) => (
             <ScrollableContainer key={item.id} hidden={sidebarMode !== item.id}>
-              {item.render({ active: sidebarMode === item.id })}
+              <Suspense fallback={null}>
+                {item.render({ active: sidebarMode === item.id })}
+              </Suspense>
             </ScrollableContainer>
           ))}
         </div>

@@ -1,31 +1,32 @@
-// register sidebar panel items
-import { UnsavedChangesDialog } from '@/components/UnsavedChangesDialog'
-import { AssetManagerDialog } from '@/features/assets/AssetManagerDialog'
-import { WikiLinkDisambiguationDialog } from '@/features/wikilinks/WikiLinkDisambiguationDialog'
-import { LinkInsertDialog } from '@/features/editor/LinkInsertDialog'
-import { ImagePreviewDialog } from '@/features/imagepreview/ImagePreviewDialog'
-import { RestoreRevisionDialog } from '@/features/history/RestoreRevisionDialog'
-import { PageQuickSwitcherDialog } from '@/features/page-switcher/PageQuickSwitcherDialog'
-import { AddPageDialog } from '@/features/page/AddPageDialog'
-import { CopyPageDialog } from '@/features/page/CopyPageDialog'
-import { CreatePageByPathDialog } from '@/features/page/CreatePageByPathDialog'
-import { DeletePageDialog } from '@/features/page/DeletePageDialog'
-import { EditPageMetadataDialog } from '@/features/page/EditPageMetadataDialog'
-import { MovePageDialog } from '@/features/page/MovePageDialog'
-import PermalinkDialog from '@/features/page/PermalinkDialog'
-import { PageRefactorDialog } from '@/features/page/PageRefactorDialog'
-import { SortPagesDialog } from '@/features/page/SortPagesDialog'
-import { ShortcutsDialog } from '@/features/shortcuts/ShortcutsDialog'
-import Search from '@/features/search/Search'
 import TreeView from '@/features/tree/TreeView'
-import { ChangeOwnPasswordDialog } from '@/features/users/ChangeOwnPasswordDialog'
-import { ChangePasswordDialog } from '@/features/users/ChangePasswordDialog'
-import { DeleteUserDialog } from '@/features/users/DeleteUserDialog'
-import { UserFormDialog } from '@/features/users/UserFormDialog'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
 import { getShortcutDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { FolderTree, Search as SearchIcon } from 'lucide-react'
+import {
+  AddPageDialog,
+  AssetManagerDialog,
+  ChangeOwnPasswordDialog,
+  ChangePasswordDialog,
+  CopyPageDialog,
+  CreatePageByPathDialog,
+  DeletePageDialog,
+  DeleteUserDialog,
+  EditPageMetadataDialog,
+  ImagePreviewDialog,
+  LinkInsertDialog,
+  MovePageDialog,
+  PageQuickSwitcherDialog,
+  PageRefactorDialog,
+  PermalinkDialog,
+  RestoreRevisionDialog,
+  Search,
+  ShortcutsDialog,
+  SortPagesDialog,
+  UnsavedChangesDialog,
+  UserFormDialog,
+  WikiLinkDisambiguationDialog,
+} from './lazy-dialogs'
 
 export const panelItemRegistry = new PanelItemRegistry()
 export const dialogRegistry = new DialogRegistry()
