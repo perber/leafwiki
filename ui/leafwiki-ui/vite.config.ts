@@ -2,7 +2,7 @@ import fs from 'fs'
 import { execSync } from 'child_process'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import { defineConfig, type ConfigEnv } from 'vite'
+import { defineConfig } from 'vite'
 
 const packageJson = JSON.parse(
   fs.readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
@@ -40,11 +40,7 @@ function manualChunks(id: string): string | undefined {
 }
 
 // https://vite.dev/config/
-export default defineConfig(({ command }: ConfigEnv) => ({
-  // Use relative base for production so dynamic-import preload paths resolve
-  // correctly when the app is served under a sub-path (e.g. /wiki/).
-  // The dev server keeps '/' so HMR and the proxy rules work without change.
-  base: command === 'build' ? './' : '/',
+export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(resolveAppVersion()),
   },
@@ -87,4 +83,4 @@ export default defineConfig(({ command }: ConfigEnv) => ({
       '@': path.resolve(__dirname, './src'),
     },
   },
-}))
+})

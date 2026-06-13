@@ -249,6 +249,9 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 				doc = strings.ReplaceAll(doc, "{{__SITE_NAME__}}", html.EscapeString(siteName))
 				doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", opts.BasePath)
 				doc = strings.ReplaceAll(doc, "{{__FAVICON_HREF__}}", BuildFrontendFaviconHref(opts.BasePath, faviconFile))
+				if opts.BasePath != "" {
+					doc = strings.ReplaceAll(doc, `"/static/`, `"`+opts.BasePath+`/static/`)
+				}
 
 				doc = injectIntoHead(doc, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
 
