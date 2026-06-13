@@ -3,7 +3,6 @@ package http
 import (
 	"embed"
 	"html"
-	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -71,62 +70,6 @@ func disableClientCache(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("Pragma", "no-cache")
 	c.Header("Expires", time.Unix(0, 0).UTC().Format(http.TimeFormat))
-}
-
-var staticMIMETypes = map[string]string{
-	".js":    "application/javascript; charset=utf-8",
-	".mjs":   "application/javascript; charset=utf-8",
-	".css":   "text/css; charset=utf-8",
-	".svg":   "image/svg+xml",
-	".woff2": "font/woff2",
-	".woff":  "font/woff",
-	".ttf":   "font/ttf",
-	".json":  "application/json",
-	".png":   "image/png",
-	".jpg":   "image/jpeg",
-	".jpeg":  "image/jpeg",
-	".ico":   "image/x-icon",
-}
-
-func staticContentType(name string) string {
-	if ct, ok := staticMIMETypes[strings.ToLower(filepath.Ext(name))]; ok {
-		return ct
-	}
-	return "application/octet-stream"
-}
-
-// serveStaticWithGzip serves the pre-compressed .gz variant of a static file
-// when the client advertises gzip support and a .gz file exists in the FS.
-// Falls back to the standard file server otherwise.
-func serveStaticWithGzip(staticFS fs.FS) gin.HandlerFunc {
-	fallback := http.FileServer(http.FS(staticFS))
-	return func(c *gin.Context) {
-		filePath := strings.TrimPrefix(c.Param("filepath"), "/")
-		if filePath == "" {
-			c.Status(http.StatusNotFound)
-			return
-		}
-
-		if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
-			f, err := staticFS.Open(filePath + ".gz")
-			if err == nil {
-				defer f.Close()
-				if stat, err := f.Stat(); err == nil {
-					if rs, ok := f.(io.ReadSeeker); ok {
-						c.Header("Content-Type", staticContentType(filePath))
-						c.Header("Content-Encoding", "gzip")
-						c.Header("Vary", "Accept-Encoding")
-						http.ServeContent(c.Writer, c.Request, filePath, stat.ModTime(), rs)
-						return
-					}
-				}
-			}
-		}
-
-		c.Header("Vary", "Accept-Encoding")
-		c.Request.URL.Path = "/" + filePath
-		fallback.ServeHTTP(c.Writer, c.Request)
-	}
 }
 
 // HTTPRemoteUserConfig configures reverse-proxy-based authentication.
@@ -256,7 +199,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 			panic("failed to create sub FS: " + err.Error())
 		}
 
-		base.GET("/static/*filepath", serveStaticWithGzip(staticFS))
+		base.StaticFS("/static", http.FS(staticFS))
 
 		base.GET("/favicon.svg", func(c *gin.Context) {
 			disableClientCache(c)
