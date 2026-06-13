@@ -65,7 +65,9 @@ export const MovePageDialog = lazy(() =>
     default: m.MovePageDialog,
   })),
 )
-export const PermalinkDialog = lazy(() => import('@/features/page/PermalinkDialog'))
+export const PermalinkDialog = lazy(
+  () => import('@/features/page/PermalinkDialog'),
+)
 export const PageRefactorDialog = lazy(() =>
   import('@/features/page/PageRefactorDialog').then((m) => ({
     default: m.PageRefactorDialog,
