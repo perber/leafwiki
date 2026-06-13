@@ -1,18 +1,18 @@
-import { lazy } from 'react'
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom'
+import {
+  BackupSettings,
+  BrandingSettings,
+  Importer,
+  LoginForm,
+  PageEditor,
+  PageHistoryPage,
+  PageViewer,
+  PermalinkRedirect,
+  RootRedirect,
+  UserManagement,
+} from './lazy-routes'
 import AuthWrapper from './RouterAuthWrapper'
 import ReadOnlyWrapper from './RouterReadOnlyWrapper'
-
-const BackupSettings = lazy(() => import('../backup/BackupSettings'))
-const LoginForm = lazy(() => import('../auth/LoginForm'))
-const BrandingSettings = lazy(() => import('../branding/BrandingSettings'))
-const PageEditor = lazy(() => import('../editor/PageEditor'))
-const Importer = lazy(() => import('../importer/Importer'))
-const PageHistoryPage = lazy(() => import('../page/PageHistoryPage'))
-const PermalinkRedirect = lazy(() => import('../page/PermalinkRedirect'))
-const RootRedirect = lazy(() => import('../page/RootRedirect'))
-const UserManagement = lazy(() => import('../users/UserManagement'))
-const PageViewer = lazy(() => import('../viewer/PageViewer'))
 
 export const createLeafWikiRouter = (
   isReadOnlyViewer: boolean,

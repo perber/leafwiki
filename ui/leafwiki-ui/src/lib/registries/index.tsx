@@ -3,110 +3,30 @@ import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
 import { getShortcutDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { FolderTree, Search as SearchIcon } from 'lucide-react'
-import { lazy } from 'react'
-
-const UnsavedChangesDialog = lazy(() =>
-  import('@/components/UnsavedChangesDialog').then((m) => ({
-    default: m.UnsavedChangesDialog,
-  })),
-)
-const AssetManagerDialog = lazy(() =>
-  import('@/features/assets/AssetManagerDialog').then((m) => ({
-    default: m.AssetManagerDialog,
-  })),
-)
-const WikiLinkDisambiguationDialog = lazy(() =>
-  import('@/features/wikilinks/WikiLinkDisambiguationDialog').then((m) => ({
-    default: m.WikiLinkDisambiguationDialog,
-  })),
-)
-const LinkInsertDialog = lazy(() =>
-  import('@/features/editor/LinkInsertDialog').then((m) => ({
-    default: m.LinkInsertDialog,
-  })),
-)
-const ImagePreviewDialog = lazy(() =>
-  import('@/features/imagepreview/ImagePreviewDialog').then((m) => ({
-    default: m.ImagePreviewDialog,
-  })),
-)
-const RestoreRevisionDialog = lazy(() =>
-  import('@/features/history/RestoreRevisionDialog').then((m) => ({
-    default: m.RestoreRevisionDialog,
-  })),
-)
-const PageQuickSwitcherDialog = lazy(() =>
-  import('@/features/page-switcher/PageQuickSwitcherDialog').then((m) => ({
-    default: m.PageQuickSwitcherDialog,
-  })),
-)
-const AddPageDialog = lazy(() =>
-  import('@/features/page/AddPageDialog').then((m) => ({
-    default: m.AddPageDialog,
-  })),
-)
-const CopyPageDialog = lazy(() =>
-  import('@/features/page/CopyPageDialog').then((m) => ({
-    default: m.CopyPageDialog,
-  })),
-)
-const CreatePageByPathDialog = lazy(() =>
-  import('@/features/page/CreatePageByPathDialog').then((m) => ({
-    default: m.CreatePageByPathDialog,
-  })),
-)
-const DeletePageDialog = lazy(() =>
-  import('@/features/page/DeletePageDialog').then((m) => ({
-    default: m.DeletePageDialog,
-  })),
-)
-const EditPageMetadataDialog = lazy(() =>
-  import('@/features/page/EditPageMetadataDialog').then((m) => ({
-    default: m.EditPageMetadataDialog,
-  })),
-)
-const MovePageDialog = lazy(() =>
-  import('@/features/page/MovePageDialog').then((m) => ({
-    default: m.MovePageDialog,
-  })),
-)
-const PermalinkDialog = lazy(() => import('@/features/page/PermalinkDialog'))
-const PageRefactorDialog = lazy(() =>
-  import('@/features/page/PageRefactorDialog').then((m) => ({
-    default: m.PageRefactorDialog,
-  })),
-)
-const SortPagesDialog = lazy(() =>
-  import('@/features/page/SortPagesDialog').then((m) => ({
-    default: m.SortPagesDialog,
-  })),
-)
-const ShortcutsDialog = lazy(() =>
-  import('@/features/shortcuts/ShortcutsDialog').then((m) => ({
-    default: m.ShortcutsDialog,
-  })),
-)
-const Search = lazy(() => import('@/features/search/Search'))
-const ChangeOwnPasswordDialog = lazy(() =>
-  import('@/features/users/ChangeOwnPasswordDialog').then((m) => ({
-    default: m.ChangeOwnPasswordDialog,
-  })),
-)
-const ChangePasswordDialog = lazy(() =>
-  import('@/features/users/ChangePasswordDialog').then((m) => ({
-    default: m.ChangePasswordDialog,
-  })),
-)
-const DeleteUserDialog = lazy(() =>
-  import('@/features/users/DeleteUserDialog').then((m) => ({
-    default: m.DeleteUserDialog,
-  })),
-)
-const UserFormDialog = lazy(() =>
-  import('@/features/users/UserFormDialog').then((m) => ({
-    default: m.UserFormDialog,
-  })),
-)
+import {
+  AddPageDialog,
+  AssetManagerDialog,
+  ChangeOwnPasswordDialog,
+  ChangePasswordDialog,
+  CopyPageDialog,
+  CreatePageByPathDialog,
+  DeletePageDialog,
+  DeleteUserDialog,
+  EditPageMetadataDialog,
+  ImagePreviewDialog,
+  LinkInsertDialog,
+  MovePageDialog,
+  PageQuickSwitcherDialog,
+  PageRefactorDialog,
+  PermalinkDialog,
+  RestoreRevisionDialog,
+  Search,
+  ShortcutsDialog,
+  SortPagesDialog,
+  UnsavedChangesDialog,
+  UserFormDialog,
+  WikiLinkDisambiguationDialog,
+} from './lazy-dialogs'
 
 export const panelItemRegistry = new PanelItemRegistry()
 export const dialogRegistry = new DialogRegistry()
