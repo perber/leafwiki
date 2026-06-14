@@ -122,7 +122,7 @@ func CopyWithLimit(dst io.Writer, src io.Reader, max int64) error {
 	return nil
 }
 
-func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64) error {
+func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64, perm os.FileMode) error {
 	dir := atomicWriteDir(targetPath)
 
 	out, err := os.CreateTemp(dir, ".tmp-*")
@@ -158,6 +158,14 @@ func WriteStreamAtomic(targetPath string, src io.Reader, maxBytes int64) error {
 	if err := out.Sync(); err != nil {
 		return err
 	}
+
+	// Chmod after writing so partial content is never world-readable.
+	if perm != 0 {
+		if err := out.Chmod(perm); err != nil {
+			return fmt.Errorf("chmod temp file: %w", err)
+		}
+	}
+
 	if err := out.Close(); err != nil {
 		return err
 	}

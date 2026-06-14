@@ -137,7 +137,7 @@ func (s *BrandingService) UploadLogo(file multipart.File, filename string) (stri
 	targetPath := filepath.Join(assetsDir, "logo"+ext)
 
 	// Write new logo atomically first
-	if err := shared.WriteStreamAtomic(targetPath, file, s.brandingConfig.BrandingConstraints.MaxLogoSize); err != nil {
+	if err := shared.WriteStreamAtomic(targetPath, file, s.brandingConfig.BrandingConstraints.MaxLogoSize, 0o644); err != nil {
 		return "", sharederrors.NewLocalizedError(
 			"branding_logo_upload_failed",
 			"Failed to save logo file",
@@ -227,7 +227,7 @@ func (s *BrandingService) UploadFavicon(file multipart.File, filename string) (s
 	targetPath := filepath.Join(assetsDir, "favicon"+ext)
 
 	// Write new favicon atomically first
-	if err := shared.WriteStreamAtomic(targetPath, file, s.brandingConfig.BrandingConstraints.MaxFaviconSize); err != nil {
+	if err := shared.WriteStreamAtomic(targetPath, file, s.brandingConfig.BrandingConstraints.MaxFaviconSize, 0o644); err != nil {
 		return "", sharederrors.NewLocalizedError(
 			"branding_favicon_upload_failed",
 			"Failed to save favicon file",
