@@ -373,7 +373,8 @@ function addToFieldTree(
   const node = tree.get(head)!
 
   if (rest.length === 0) {
-    if (node.children.size > 0) return false // would conflict with existing children
+    // Conflict: node is already a parent, or an identical-path field was already inserted.
+    if (node.children.size > 0 || node.field !== undefined) return false
     node.field = field
     return true
   }
@@ -590,11 +591,24 @@ export function buildEditorFrontmatter({
 
   for (const field of flatFallbacks) {
     const formattedKey = formatFieldKey(field.key)
-    const trimmedValue = field.value.trim()
-    if (needsYamlQuoting(trimmedValue)) {
-      parts.push(`${formattedKey}: "${trimmedValue}"`)
+    if (field.type === 'list') {
+      const items = normalizeListValue(field.value).split('\n').filter(Boolean)
+      if (items.length === 0) {
+        parts.push(`${formattedKey}: []`)
+      } else {
+        parts.push(
+          [`${formattedKey}:`, ...items.map((item) => `  - ${item}`)].join(
+            '\n',
+          ),
+        )
+      }
     } else {
-      parts.push(`${formattedKey}: ${trimmedValue}`)
+      const trimmedValue = field.value.trim()
+      if (needsYamlQuoting(trimmedValue)) {
+        parts.push(`${formattedKey}: "${trimmedValue}"`)
+      } else {
+        parts.push(`${formattedKey}: ${trimmedValue}`)
+      }
     }
   }
 

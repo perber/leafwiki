@@ -41,10 +41,8 @@ describe('parseEditorFrontmatter – nested maps', () => {
     expect(result.fields).toHaveLength(2)
   })
 
-  it('preserves block with unsupported nested content in unsupportedRaw', () => {
-    // A nested block that cannot be expressed as key-value pairs
+  it('parses a block list under a key as a list field (not unsupportedRaw)', () => {
     const result = parseEditorFrontmatter('a:\n  - item1\n  - item2')
-    // List under 'a' is parsed as a list field, not unsupported
     expect(result.fields[0]).toMatchObject({ key: 'a', type: 'list' })
     expect(result.unsupportedRaw).toBe('')
   })
