@@ -584,14 +584,16 @@ func flattenMetadataEntry(prefix string, value interface{}, properties map[strin
 }
 
 func flattenMetadataEntryDepth(prefix string, value interface{}, properties map[string]string, depth int) {
-	if depth > maxFlattenDepth {
+	if depth >= maxFlattenDepth {
 		return
 	}
 	switch v := value.(type) {
 	case string:
 		s := strings.TrimSpace(v)
 		if s != "" && !strings.ContainsRune(s, '\n') {
-			properties[prefix] = s
+			if _, exists := properties[prefix]; !exists {
+				properties[prefix] = s
+			}
 		}
 	case map[string]interface{}:
 		for childKey, childValue := range v {

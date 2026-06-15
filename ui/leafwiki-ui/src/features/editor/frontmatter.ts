@@ -1,6 +1,7 @@
 const TAGS_KEY_PATTERN = /^tags\s*:\s*(.*)$/
 const FRONTMATTER_KEY_PATTERN = /^([^:\n][^:\n]*?)\s*:\s*(.*)$/
 const INTERNAL_FIELD_PREFIX = 'leafwiki_'
+const MAX_FRONTMATTER_NESTING_DEPTH = 20
 
 export type EditorFrontmatterFieldType = 'text' | 'number' | 'boolean' | 'list'
 
@@ -245,7 +246,9 @@ function tryParseNestedMap(
   lines: string[],
   baseIndent: number,
   parentKey: string,
+  depth = 0,
 ): EditorFrontmatterField[] | null {
+  if (depth >= MAX_FRONTMATTER_NESTING_DEPTH) return null
   const fields: EditorFrontmatterField[] = []
   let i = 0
 
@@ -310,8 +313,7 @@ function tryParseNestedMap(
       continue
     }
 
-    const firstChild = childLines.find((l) => l.trim() !== '')
-    const childIndent = firstChild ? firstChild.search(/\S/) : baseIndent + 2
+    const childIndent = childLines[0].search(/\S/)
 
     // Try as list first, then as nested map
     const listItems: string[] = []
@@ -334,7 +336,12 @@ function tryParseNestedMap(
         internal: isInternalFieldKey(fullKey),
       })
     } else {
-      const nestedFields = tryParseNestedMap(childLines, childIndent, fullKey)
+      const nestedFields = tryParseNestedMap(
+        childLines,
+        childIndent,
+        fullKey,
+        depth + 1,
+      )
       if (nestedFields === null) {
         // This child block cannot be expressed as key-value pairs.
         // Abort the whole parent block so the caller can fall back to
@@ -363,7 +370,9 @@ function addToFieldTree(
   tree: Map<string, FieldTreeNode>,
   parts: string[],
   field: EditorFrontmatterField,
+  depth = 0,
 ): boolean {
+  if (depth >= MAX_FRONTMATTER_NESTING_DEPTH) return false
   const [head, ...rest] = parts
   if (!head) return false
 
@@ -380,7 +389,28 @@ function addToFieldTree(
   }
 
   if (node.field !== undefined) return false // would conflict with existing scalar
-  return addToFieldTree(node.children, rest, field)
+  return addToFieldTree(node.children, rest, field, depth + 1)
+}
+
+function serializeLeafField(
+  formattedKey: string,
+  field: EditorFrontmatterField,
+  indent: number,
+): string {
+  const prefix = '  '.repeat(indent)
+  if (field.type === 'list') {
+    const items = normalizeListValue(field.value).split('\n').filter(Boolean)
+    if (items.length === 0) return `${prefix}${formattedKey}: []`
+    return [
+      `${prefix}${formattedKey}:`,
+      ...items.map((item) => `${prefix}  - ${item}`),
+    ].join('\n')
+  }
+  const trimmedValue = field.value.trim()
+  if (needsYamlQuoting(trimmedValue)) {
+    return `${prefix}${formattedKey}: "${trimmedValue}"`
+  }
+  return `${prefix}${formattedKey}: ${trimmedValue}`
 }
 
 function serializeFieldNode(
@@ -394,26 +424,15 @@ function serializeFieldNode(
   if (node.children.size > 0) {
     const childLines: string[] = []
     for (const [childKey, childNode] of node.children) {
-      childLines.push(serializeFieldNode(childKey, childNode, indent + 1))
+      const serialized = serializeFieldNode(childKey, childNode, indent + 1)
+      if (serialized) childLines.push(serialized)
     }
+    if (childLines.length === 0) return ''
     return `${prefix}${formattedKey}:\n${childLines.join('\n')}`
   }
 
-  const field = node.field!
-  if (field.type === 'list') {
-    const items = normalizeListValue(field.value).split('\n').filter(Boolean)
-    if (items.length === 0) return `${prefix}${formattedKey}: []`
-    return [
-      `${prefix}${formattedKey}:`,
-      ...items.map((item) => `${prefix}  - ${item}`),
-    ].join('\n')
-  }
-
-  const trimmedValue = field.value.trim()
-  if (needsYamlQuoting(trimmedValue)) {
-    return `${prefix}${formattedKey}: "${trimmedValue}"`
-  }
-  return `${prefix}${formattedKey}: ${trimmedValue}`
+  if (!node.field) return ''
+  return serializeLeafField(formattedKey, node.field, indent)
 }
 
 export function parseEditorFrontmatter(
@@ -586,30 +605,12 @@ export function buildEditorFrontmatter({
   }
 
   for (const [key, node] of fieldTree) {
-    parts.push(serializeFieldNode(key, node, 0))
+    const serialized = serializeFieldNode(key, node, 0)
+    if (serialized) parts.push(serialized)
   }
 
   for (const field of flatFallbacks) {
-    const formattedKey = formatFieldKey(field.key)
-    if (field.type === 'list') {
-      const items = normalizeListValue(field.value).split('\n').filter(Boolean)
-      if (items.length === 0) {
-        parts.push(`${formattedKey}: []`)
-      } else {
-        parts.push(
-          [`${formattedKey}:`, ...items.map((item) => `  - ${item}`)].join(
-            '\n',
-          ),
-        )
-      }
-    } else {
-      const trimmedValue = field.value.trim()
-      if (needsYamlQuoting(trimmedValue)) {
-        parts.push(`${formattedKey}: "${trimmedValue}"`)
-      } else {
-        parts.push(`${formattedKey}: ${trimmedValue}`)
-      }
-    }
+    parts.push(serializeLeafField(formatFieldKey(field.key), field, 0))
   }
 
   if (trimmedUnsupportedRaw) {
