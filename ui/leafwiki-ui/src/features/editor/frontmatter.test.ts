@@ -150,8 +150,12 @@ describe('buildEditorFrontmatter – conflict and edge cases', () => {
       ],
       unsupportedRaw: '',
     })
-    // The list field "a" conflicts with mapping "a.b" — falls back to block list
+    // a.b goes into the field tree → nested under a:
+    expect(result).toContain('  b: val')
+    // a (list) conflicts with the mapping node and falls back to a flat block list
     expect(result).toContain('a:\n  - item1\n  - item2')
+    // both a: blocks are present (unavoidable key conflict in this edge case)
+    expect(result.split('\n').filter((l) => l === 'a:')).toHaveLength(2)
   })
 })
 
