@@ -141,21 +141,39 @@ describe('buildEditorFrontmatter – conflict and edge cases', () => {
     expect(result).toBe('a: value')
   })
 
-  it('list field in conflict fallback is serialized as block list', () => {
+  it('list "a" wins tree slot over nested "a.b" regardless of input order', () => {
+    // Shallow keys are sorted first before tree insertion, so "a" (1 segment)
+    // always claims the tree slot and "a.b" falls back to a flat literal key —
+    // no duplicate "a:" blocks in the YAML output.
     const result = buildEditorFrontmatter({
       tags: [],
       fields: [
-        { key: 'a.b', value: 'val', type: 'text' },
-        { key: 'a', value: 'item1\nitem2', type: 'list' },
+        { key: 'a.b', value: 'val', type: 'text' }, // deeper — comes first in input
+        { key: 'a', value: 'item1\nitem2', type: 'list' }, // shallower — wins tree
       ],
       unsupportedRaw: '',
     })
-    // a.b goes into the field tree → nested under a:
-    expect(result).toContain('  b: val')
-    // a (list) conflicts with the mapping node and falls back to a flat block list
-    expect(result).toContain('a:\n  - item1\n  - item2')
-    // both a: blocks are present (unavoidable key conflict in this edge case)
-    expect(result.split('\n').filter((l) => l === 'a:')).toHaveLength(2)
+    expect(result).toContain('a:\n  - item1\n  - item2') // list wins tree slot
+    expect(result).toContain('a.b: val') // nested path falls back to flat literal
+    expect(result.split('\n').filter((l) => l === 'a:')).toHaveLength(1) // no duplicate keys
+  })
+
+  it('conflict resolution is order-independent', () => {
+    const fields = [
+      { key: 'a', value: 'scalar', type: 'text' as const },
+      { key: 'a.b', value: 'nested', type: 'text' as const },
+    ]
+    const result1 = buildEditorFrontmatter({
+      tags: [],
+      fields,
+      unsupportedRaw: '',
+    })
+    const result2 = buildEditorFrontmatter({
+      tags: [],
+      fields: [...fields].reverse(),
+      unsupportedRaw: '',
+    })
+    expect(result1).toBe(result2)
   })
 })
 

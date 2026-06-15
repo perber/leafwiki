@@ -593,7 +593,17 @@ export function buildEditorFrontmatter({
   const fieldTree = new Map<string, FieldTreeNode>()
   const flatFallbacks: EditorFrontmatterField[] = []
 
-  for (const field of normalizedFields) {
+  // Sort shallower keys first so that a scalar/list at "a" always claims the
+  // tree slot before a nested "a.b" can turn "a" into a mapping node.
+  // This makes conflict resolution order-independent and prevents duplicate
+  // YAML mapping keys (e.g. two "a:" blocks) in the output.
+  const sortedFields = [...normalizedFields].sort(
+    (a, b) =>
+      a.key.split('.').filter(Boolean).length -
+      b.key.split('.').filter(Boolean).length,
+  )
+
+  for (const field of sortedFields) {
     const key = normalizeFieldKey(field.key)
     if (!key) continue
     // Filter empty segments — handles trailing/leading/consecutive dots.
