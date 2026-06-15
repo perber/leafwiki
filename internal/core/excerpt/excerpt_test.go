@@ -179,6 +179,8 @@ func TestPlainTextFromMarkdown_StripsWikiLinks(t *testing.T) {
 		{"plain wikilink", "See [[Some Page]] for details.", "See Some Page for details."},
 		{"aliased wikilink", "See [[Some Page|this page]] for details.", "See this page for details."},
 		{"image embed", "![[image.png]] Some text.", "Some text."},
+		{"path-hinted wikilink shows last segment", "See [[reference/endpoints]] for details.", "See endpoints for details."},
+		{"path-hinted aliased wikilink shows alias", "See [[reference/endpoints|API]] for details.", "See API for details."},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -49,13 +49,43 @@ func TestContentTransformer_TransformContent_TableDriven(t *testing.T) {
 			name:       "wiki link",
 			sourcePath: "docs/current.md",
 			content:    "[[Note]]",
-			want:       "[Note](/note)",
+			want:       "[[Note]]",
 		},
 		{
 			name:       "wiki link alias",
 			sourcePath: "docs/current.md",
 			content:    "[[Note|Alias]]",
-			want:       "[Alias](/note)",
+			want:       "[[Note|Alias]]",
+		},
+		{
+			name:       "wiki link path hint normalized to route path",
+			sourcePath: "docs/current.md",
+			content:    "[[foo/bar]]",
+			want:       "[[foo/bar]]",
+		},
+		{
+			name:       "wiki link path hint with alias normalized to route path",
+			sourcePath: "docs/current.md",
+			content:    "[[foo/bar|My Bar]]",
+			want:       "[[foo/bar|My Bar]]",
+		},
+		{
+			name:       "unresolved wiki link path hint is slugified",
+			sourcePath: "docs/current.md",
+			content:    "[[Unknown/Page]]",
+			want:       "[[unknown/page]]",
+		},
+		{
+			name:       "unresolved wiki link path hint with spaces is slugified",
+			sourcePath: "docs/current.md",
+			content:    "[[Research/Climate Change]]",
+			want:       "[[research/climate-change]]",
+		},
+		{
+			name:       "page embed drops embed marker (no transclusion support)",
+			sourcePath: "docs/current.md",
+			content:    "![[Note]]",
+			want:       "[[Note]]",
 		},
 		{
 			name:       "wiki link anchor",
@@ -76,10 +106,10 @@ func TestContentTransformer_TransformContent_TableDriven(t *testing.T) {
 			want:       "[Note](/note#^block-id)",
 		},
 		{
-			name:       "unresolved wiki link falls back to dead markdown link",
+			name:       "unresolved wiki link stays as wikilink",
 			sourcePath: "docs/current.md",
 			content:    "[[Missing Note]]",
-			want:       "[Missing Note](/missing-note)",
+			want:       "[[Missing Note]]",
 		},
 		{
 			name:       "asset embed",

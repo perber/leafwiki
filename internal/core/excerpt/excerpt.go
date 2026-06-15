@@ -110,7 +110,17 @@ func PlainTextFromMarkdown(body string) string {
 	normalized = imagePattern.ReplaceAllString(normalized, "$1")
 	normalized = wikiImagePattern.ReplaceAllString(normalized, " ")
 	normalized = wikiLinkAliasPattern.ReplaceAllString(normalized, "$1")
-	normalized = wikiLinkPattern.ReplaceAllString(normalized, "$1")
+	normalized = wikiLinkPattern.ReplaceAllStringFunc(normalized, func(m string) string {
+		subs := wikiLinkPattern.FindStringSubmatch(m)
+		if len(subs) < 2 {
+			return ""
+		}
+		target := subs[1]
+		if idx := strings.LastIndex(target, "/"); idx >= 0 {
+			return target[idx+1:]
+		}
+		return target
+	})
 	var htmlBuf bytes.Buffer
 	if err := mdRenderer.Convert([]byte(normalized), &htmlBuf); err != nil {
 		htmlBuf.Reset()

@@ -182,37 +182,77 @@ func (t *contentTransformer) rewriteWikiLinks(
 		inner := strings.TrimSpace(content[next+startOffset : end])
 		targetPart, label := splitWikiLink(inner)
 		targetPart = normalizeImportedHref(targetPart)
+		_, anchorSuffix := splitURLSuffix(targetPart)
 		href, isAsset, err := t.resolveDestination(userID, sourcePath, page, targetPart, wiki)
 		if err != nil {
 			return "", err
 		}
-		if href == "" {
-			fallbackHref, ok := t.fallbackWikiPageHref(sourcePath, targetPart)
-			if !ok {
-				out.WriteString(content[next : end+2])
-				i = end + 2
-				continue
+
+		if isAsset {
+			if label == "" {
+				label = defaultWikiLinkLabel(targetPart)
 			}
-			href = fallbackHref
-		}
-
-		if label == "" {
-			label = defaultWikiLinkLabel(targetPart)
-		}
-
-		if shouldRenderWikiLinkAsImage(isImage, isAsset, targetPart) {
-			out.WriteString("![")
-			out.WriteString(label)
-			out.WriteString("](")
-			out.WriteString(href)
-			out.WriteByte(')')
-		} else {
+			if shouldRenderWikiLinkAsImage(isImage, targetPart) {
+				out.WriteByte('!')
+			}
 			out.WriteString("[")
 			out.WriteString(label)
 			out.WriteString("](")
 			out.WriteString(href)
 			out.WriteByte(')')
+			i = end + 2
+			continue
 		}
+
+		// Native WikiLinks don't support anchors — convert anchor links to Markdown.
+		if anchorSuffix != "" {
+			if href == "" {
+				fallbackHref, ok := t.fallbackWikiPageHref(sourcePath, targetPart)
+				if !ok {
+					out.WriteString(content[next : end+2])
+					i = end + 2
+					continue
+				}
+				href = fallbackHref
+			}
+			if label == "" {
+				label = defaultWikiLinkLabel(targetPart)
+			}
+			out.WriteString("[")
+			out.WriteString(label)
+			out.WriteString("](")
+			out.WriteString(href)
+			out.WriteByte(')')
+			i = end + 2
+			continue
+		}
+
+		// Plain page WikiLink (no anchor, no asset): keep as [[...]] so LeafWiki's
+		// native title-based resolution handles it — rename-aware and self-healing.
+		//
+		// Path-hinted links ([[Folder/Page]]) use the plan's resolved slug path so the
+		// refactoring engine's path-hint regex matches exactly on rename. Unresolved
+		// path-hinted links are slugified so the link indexer and heal mechanism can
+		// match them when the target page is later created.
+		// Obsidian page-embeds (![[Page]]) are kept as plain [[...]] because LeafWiki
+		// has no page-transclusion support.
+		target := targetPart
+		if strings.Contains(targetPart, "/") {
+			if href != "" {
+				target = strings.TrimPrefix(href, "/")
+			} else if slugged, ok := t.normalizeWikiHrefToRoutePath(targetPart); ok {
+				target = slugged
+			}
+		}
+		out.WriteString("[[")
+		if label != "" {
+			out.WriteString(target)
+			out.WriteByte('|')
+			out.WriteString(label)
+		} else {
+			out.WriteString(target)
+		}
+		out.WriteString("]]")
 		i = end + 2
 	}
 
@@ -666,14 +706,8 @@ func defaultWikiLinkLabel(target string) string {
 	return base
 }
 
-func shouldRenderWikiLinkAsImage(isEmbed bool, resolvedAsset bool, target string) bool {
-	if isEmbed {
-		return true
-	}
-	if !resolvedAsset {
-		return false
-	}
-	return isImageAssetTarget(target)
+func shouldRenderWikiLinkAsImage(isEmbed bool, target string) bool {
+	return isEmbed || isImageAssetTarget(target)
 }
 
 func isImageAssetTarget(target string) bool {
