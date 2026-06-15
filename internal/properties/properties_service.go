@@ -84,14 +84,16 @@ func extractFlatEntry(prefix string, value interface{}, result map[string]Proper
 }
 
 func extractFlatEntryDepth(prefix string, value interface{}, result map[string]PropertyEntry, depth int) {
-	if depth > maxNestedPropertyDepth {
+	if depth >= maxNestedPropertyDepth {
 		return
 	}
 	switch v := value.(type) {
 	case string:
-		entry, ok := toPropertyEntry(v)
-		if ok {
-			result[prefix] = entry
+		if _, exists := result[prefix]; !exists {
+			entry, ok := toPropertyEntry(v)
+			if ok {
+				result[prefix] = entry
+			}
 		}
 	case map[string]interface{}:
 		for childKey, childValue := range v {

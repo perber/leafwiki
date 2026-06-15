@@ -115,6 +115,68 @@ describe('buildEditorFrontmatter – nested YAML output', () => {
   })
 })
 
+// ─── Conflict and edge-case tests ────────────────────────────────────────────
+
+describe('buildEditorFrontmatter – conflict and edge cases', () => {
+  it('conflict: scalar "a" + nested "a.b" — nested falls back to flat literal key', () => {
+    const result = buildEditorFrontmatter({
+      tags: [],
+      fields: [
+        { key: 'a', value: 'scalar', type: 'text' },
+        { key: 'a.b', value: 'nested', type: 'text' },
+      ],
+      unsupportedRaw: '',
+    })
+    // "a" stays as a scalar; "a.b" is serialized as a literal flat key
+    expect(result).toContain('a: scalar')
+    expect(result).toContain('a.b: nested')
+  })
+
+  it('trailing-dot key "a." is treated as key "a" without crashing', () => {
+    const result = buildEditorFrontmatter({
+      tags: [],
+      fields: [{ key: 'a.', value: 'value', type: 'text' }],
+      unsupportedRaw: '',
+    })
+    expect(result).toBe('a: value')
+  })
+
+  it('list "a" wins tree slot over nested "a.b" regardless of input order', () => {
+    // Shallow keys are sorted first before tree insertion, so "a" (1 segment)
+    // always claims the tree slot and "a.b" falls back to a flat literal key —
+    // no duplicate "a:" blocks in the YAML output.
+    const result = buildEditorFrontmatter({
+      tags: [],
+      fields: [
+        { key: 'a.b', value: 'val', type: 'text' }, // deeper — comes first in input
+        { key: 'a', value: 'item1\nitem2', type: 'list' }, // shallower — wins tree
+      ],
+      unsupportedRaw: '',
+    })
+    expect(result).toContain('a:\n  - item1\n  - item2') // list wins tree slot
+    expect(result).toContain('a.b: val') // nested path falls back to flat literal
+    expect(result.split('\n').filter((l) => l === 'a:')).toHaveLength(1) // no duplicate keys
+  })
+
+  it('conflict resolution is order-independent', () => {
+    const fields = [
+      { key: 'a', value: 'scalar', type: 'text' as const },
+      { key: 'a.b', value: 'nested', type: 'text' as const },
+    ]
+    const result1 = buildEditorFrontmatter({
+      tags: [],
+      fields,
+      unsupportedRaw: '',
+    })
+    const result2 = buildEditorFrontmatter({
+      tags: [],
+      fields: [...fields].reverse(),
+      unsupportedRaw: '',
+    })
+    expect(result1).toBe(result2)
+  })
+})
+
 // ─── Round-trip tests ─────────────────────────────────────────────────────────
 
 describe('round-trip: parse → build → parse', () => {
@@ -154,5 +216,17 @@ describe('round-trip: parse → build → parse', () => {
     const built = buildEditorFrontmatter(original)
     const parsed = parseEditorFrontmatter(built)
     expect(parsed.fields[0]).toMatchObject({ key: 'a.b.c', value: 'deep' })
+  })
+
+  it('round-trips a boolean-value nested field with YAML quoting', () => {
+    const original = {
+      tags: [],
+      fields: [{ key: 'a.b', value: 'true', type: 'boolean' as const }],
+      unsupportedRaw: '',
+    }
+    const built = buildEditorFrontmatter(original)
+    expect(built).toContain('  b: "true"')
+    const parsed = parseEditorFrontmatter(built)
+    expect(parsed.fields[0]).toMatchObject({ key: 'a.b', value: 'true' })
   })
 })
