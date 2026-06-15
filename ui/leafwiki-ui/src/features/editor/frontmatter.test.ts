@@ -115,6 +115,46 @@ describe('buildEditorFrontmatter – nested YAML output', () => {
   })
 })
 
+// ─── Conflict and edge-case tests ────────────────────────────────────────────
+
+describe('buildEditorFrontmatter – conflict and edge cases', () => {
+  it('conflict: scalar "a" + nested "a.b" — nested falls back to flat literal key', () => {
+    const result = buildEditorFrontmatter({
+      tags: [],
+      fields: [
+        { key: 'a', value: 'scalar', type: 'text' },
+        { key: 'a.b', value: 'nested', type: 'text' },
+      ],
+      unsupportedRaw: '',
+    })
+    // "a" stays as a scalar; "a.b" is serialized as a literal flat key
+    expect(result).toContain('a: scalar')
+    expect(result).toContain('a.b: nested')
+  })
+
+  it('trailing-dot key "a." is treated as key "a" without crashing', () => {
+    const result = buildEditorFrontmatter({
+      tags: [],
+      fields: [{ key: 'a.', value: 'value', type: 'text' }],
+      unsupportedRaw: '',
+    })
+    expect(result).toBe('a: value')
+  })
+
+  it('list field in conflict fallback is serialized as block list', () => {
+    const result = buildEditorFrontmatter({
+      tags: [],
+      fields: [
+        { key: 'a.b', value: 'val', type: 'text' },
+        { key: 'a', value: 'item1\nitem2', type: 'list' },
+      ],
+      unsupportedRaw: '',
+    })
+    // The list field "a" conflicts with mapping "a.b" — falls back to block list
+    expect(result).toContain('a:\n  - item1\n  - item2')
+  })
+})
+
 // ─── Round-trip tests ─────────────────────────────────────────────────────────
 
 describe('round-trip: parse → build → parse', () => {
@@ -154,5 +194,17 @@ describe('round-trip: parse → build → parse', () => {
     const built = buildEditorFrontmatter(original)
     const parsed = parseEditorFrontmatter(built)
     expect(parsed.fields[0]).toMatchObject({ key: 'a.b.c', value: 'deep' })
+  })
+
+  it('round-trips a boolean-value nested field with YAML quoting', () => {
+    const original = {
+      tags: [],
+      fields: [{ key: 'a.b', value: 'true', type: 'boolean' as const }],
+      unsupportedRaw: '',
+    }
+    const built = buildEditorFrontmatter(original)
+    expect(built).toContain('  b: "true"')
+    const parsed = parseEditorFrontmatter(built)
+    expect(parsed.fields[0]).toMatchObject({ key: 'a.b', value: 'true' })
   })
 })
