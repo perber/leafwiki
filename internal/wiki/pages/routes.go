@@ -571,19 +571,43 @@ func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]st
 			continue
 		}
 
-		s, ok := value.(string)
-		if !ok {
-			continue
-		}
-		s = strings.TrimSpace(s)
-		if s == "" || strings.ContainsRune(s, '\n') {
-			continue
-		}
-		properties[key] = s
+		flattenMetadataEntry(key, value, properties)
 	}
 
 	return tags, properties
 }
+
+// flattenMetadataEntry recursively flattens nested YAML maps into dot-notation
+// keys (e.g. {"a": {"b": "v"}} → properties["a.b"] = "v").
+func flattenMetadataEntry(prefix string, value interface{}, properties map[string]string) {
+	flattenMetadataEntryDepth(prefix, value, properties, 0)
+}
+
+func flattenMetadataEntryDepth(prefix string, value interface{}, properties map[string]string, depth int) {
+	if depth > maxFlattenDepth {
+		return
+	}
+	switch v := value.(type) {
+	case string:
+		s := strings.TrimSpace(v)
+		if s != "" && !strings.ContainsRune(s, '\n') {
+			properties[prefix] = s
+		}
+	case map[string]interface{}:
+		for childKey, childValue := range v {
+			childKey = strings.TrimSpace(childKey)
+			if childKey == "" {
+				continue
+			}
+			if strings.HasPrefix(strings.ToLower(childKey), "leafwiki_") {
+				continue
+			}
+			flattenMetadataEntryDepth(prefix+"."+childKey, childValue, properties, depth+1)
+		}
+	}
+}
+
+const maxFlattenDepth = 20
 
 func normalizeMetadataTags(value interface{}) []string {
 	list, ok := value.([]interface{})
