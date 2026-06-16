@@ -11,7 +11,8 @@
     "addSection": "Add Section"
   },
   "markdownPreview": {
-    "renderError": "This page contains Markdown that could not be rendered safely."
+    "renderError": "This page contains Markdown that could not be rendered safely.",
+    "brokenLinkTooltip": "This page doesn't exist yet."
   },
   "backlinks": {
     "referencedBy": "Referenced by",

@@ -2,9 +2,7 @@ import { Button } from '@/components/ui/button'
 import { lookupPath } from '@/lib/api/pages'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
-import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
-import { useSessionStore } from '@/stores/session'
 import { useEffect, useState } from 'react'
 
 type Page404Props = {
@@ -16,8 +14,6 @@ export default function Page404({
   targetPath,
   allowCreate = false,
 }: Page404Props) {
-  const user = useSessionStore((s) => s.user)
-  const authDisabled = useConfigStore((s) => s.authDisabled)
   const readOnlyMode = useIsReadOnly()
   const openDialog = useDialogsStore((s) => s.openDialog)
   const [lookupState, setLookupState] = useState<{
@@ -64,7 +60,6 @@ export default function Page404({
     allowCreate &&
     lookupState.path === targetPath &&
     lookupState.canCreate &&
-    (user || authDisabled) &&
     !readOnlyMode
 
   return (

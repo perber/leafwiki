@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import {
   DIALOG_CREATE_PAGE_BY_PATH,
@@ -14,11 +15,25 @@ import {
 } from '@/lib/wikiPath'
 import { suggestSlug } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
+import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
-import { useSessionStore } from '@/stores/session'
 import { useTreeStore } from '@/stores/tree'
-import clsx from 'clsx'
 import { AnchorHTMLAttributes, ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+
+function BrokenLinkTooltip({
+  children,
+  label,
+}: {
+  children: ReactNode
+  label: string
+}) {
+  return (
+    <TooltipWrapper label={label}>
+      <span className="text-error cursor-default">{children}</span>
+    </TooltipWrapper>
+  )
+}
 
 function safeDecodeURIComponent(s: string): string {
   try {
@@ -44,11 +59,12 @@ export function MarkdownLink({
   ...props
 }: MarkdownLinkProps) {
   void node
+  const { t } = useTranslation('viewer')
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
-  const user = useSessionStore((s) => s.user)
 
   const editMode = useAppMode() === 'edit'
+  const readOnly = useIsReadOnly()
 
   if (href === undefined) {
     return <>{children}</>
@@ -73,7 +89,7 @@ export function MarkdownLink({
     const title = safeDecodeURIComponent(
       href.slice('wikilink-notfound:'.length),
     )
-    if (user) {
+    if (!readOnly) {
       return (
         <Button
           variant="link"
@@ -94,7 +110,11 @@ export function MarkdownLink({
         </Button>
       )
     }
-    return <span className="text-error cursor-default">{children}</span>
+    return (
+      <BrokenLinkTooltip label={t('markdownPreview.brokenLinkTooltip')}>
+        {children}
+      </BrokenLinkTooltip>
+    )
   }
 
   const isInternal =
@@ -103,7 +123,7 @@ export function MarkdownLink({
     !href.startsWith('mailto:') &&
     !href.startsWith('#')
 
-  const handleOpenCreatePageDialog = (path: string, editMode: boolean) => {
+  const handleOpenCreatePageDialog = (path: string) => {
     openDialog(DIALOG_CREATE_PAGE_BY_PATH, {
       initialPath: path,
       readOnlyPath: true,
@@ -170,12 +190,12 @@ export function MarkdownLink({
     // Check if the page exists
     const page = getPageByPath(normalizedTargetPath)
     const pageExists = !!page
-    if (!pageExists && user) {
+    if (!pageExists && !readOnly) {
       return (
         <Button
           variant="link"
           onClick={() => {
-            handleOpenCreatePageDialog(normalizedTargetPath, editMode)
+            handleOpenCreatePageDialog(normalizedTargetPath)
           }}
           className="text-error hover:text-error/80 m-0 p-0 text-base no-underline hover:no-underline"
         >
@@ -184,15 +204,20 @@ export function MarkdownLink({
       )
     }
 
+    if (!pageExists) {
+      return (
+        <BrokenLinkTooltip label={t('markdownPreview.brokenLinkTooltip')}>
+          {children}
+        </BrokenLinkTooltip>
+      )
+    }
+
     return (
       <Link
         to={normalizedHref}
         state={createNavigationVisitState()}
         {...props}
-        className={clsx(
-          'no-underline hover:underline',
-          !user && !pageExists && 'text-error',
-        )}
+        className="no-underline hover:underline"
       >
         {children}
       </Link>
