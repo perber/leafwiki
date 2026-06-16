@@ -138,6 +138,7 @@ func TestFindWikiLinksForPath_TitleMatchCaseInsensitive(t *testing.T) {
 	}
 }
 
+
 func TestFindWikiLinksForPath_SkipsCodeBlocks(t *testing.T) {
 	engine := NewMarkdownRefactorEngine()
 	// Fenced code block: no occurrence outside code → nothing reported.
@@ -171,5 +172,53 @@ func TestFindWikiLinksForPath_NoMatchReturnsEmpty(t *testing.T) {
 	found := engine.FindWikiLinksForPath(content, "/docs/intro", "Intro")
 	if len(found) != 0 {
 		t.Errorf("expected no matches, got %v", found)
+	}
+}
+
+// TestRewriteWikiLinks_TitleEqualsPathHint reproduces the "slice bounds out of
+// range" panic that occurs when OldTitle equals the normalised OldPath hint
+// (e.g. title="intro", path="/intro" → hint="intro"). Both the title rewrite
+// and the path-hint rewrite match the same byte range, producing overlapping
+// RewriteReplacements; without skipping the redundant path-hint rewrite (or
+// otherwise deduplicating overlaps), applyReplacements panics.
+func TestRewriteWikiLinks_TitleEqualsPathHint(t *testing.T) {
+	engine := NewMarkdownRefactorEngine()
+	content := "See [[intro]] and [[intro|Start]] here."
+
+	result := engine.RewriteWikiLinks(content, []RewriteRule{{
+		OldPath:  "/intro",
+		NewPath:  "/introduction",
+		OldTitle: "intro",
+		NewTitle: "Introduction",
+	}})
+
+	want := "See [[Introduction]] and [[Introduction|Start]] here."
+	if result.Content != want {
+		t.Errorf("got %q, want %q", result.Content, want)
+	}
+	if result.Count() != 2 {
+		t.Errorf("expected 2 replacements, got %d", result.Count())
+	}
+}
+
+func TestRewriteWikiLinks_PathOnlyMoveWithSameTitle(t *testing.T) {
+	engine := NewMarkdownRefactorEngine()
+	// Page is moved but NOT renamed: OldTitle == NewTitle.
+	// titleCoversHint must not suppress the path-hint rewrite in this case.
+	content := "See [[intro]] and [[intro|Alias]] here."
+
+	result := engine.RewriteWikiLinks(content, []RewriteRule{{
+		OldPath:  "/intro",
+		NewPath:  "/docs/intro",
+		OldTitle: "intro",
+		NewTitle: "intro",
+	}})
+
+	want := "See [[docs/intro]] and [[docs/intro|Alias]] here."
+	if result.Content != want {
+		t.Errorf("got %q, want %q", result.Content, want)
+	}
+	if result.Count() != 2 {
+		t.Errorf("expected 2 replacements, got %d", result.Count())
 	}
 }

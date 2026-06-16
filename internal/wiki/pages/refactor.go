@@ -495,6 +495,9 @@ func (uc *ApplyPageRefactorUseCase) captureSnapshots(page *tree.Page, in Refacto
 
 func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affectedPageIDs []string, rules []links.RewriteRule) error {
 	engine := links.NewMarkdownRefactorEngine()
+	compiledWikiRewrites := links.CompileWikiLinkRewrites(rules)
+
+	uc.log.Debug("rewriting wiki-links in affected pages", "pages", len(affectedPageIDs), "rules", len(rules))
 
 	type pending struct {
 		page    *tree.Page
@@ -511,7 +514,7 @@ func (uc *ApplyPageRefactorUseCase) rewriteAffectedPages(userID string, affected
 			continue
 		}
 		mdResult := engine.Rewrite(page.Content, page.CalculatePath(), rules)
-		wikiResult := engine.RewriteWikiLinks(mdResult.Content, rules)
+		wikiResult := engine.RewriteWikiLinksPrecompiled(mdResult.Content, compiledWikiRewrites)
 		newContent := wikiResult.Content
 		if mdResult.Count() == 0 && wikiResult.Count() == 0 || newContent == page.Content {
 			continue
