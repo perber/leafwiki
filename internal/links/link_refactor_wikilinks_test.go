@@ -177,9 +177,10 @@ func TestFindWikiLinksForPath_NoMatchReturnsEmpty(t *testing.T) {
 
 // TestRewriteWikiLinks_TitleEqualsPathHint reproduces the "slice bounds out of
 // range" panic that occurs when OldTitle equals the normalised OldPath hint
-// (e.g. title="intro", path="/intro" → hint="intro").  Both the title rewrite
-	// and the path-hint rewrite match the same byte range, producing overlapping
-	// RewriteReplacements; without skipping the redundant path-hint rewrite (or otherwise deduplicating overlaps), applyReplacements panics.
+// (e.g. title="intro", path="/intro" → hint="intro"). Both the title rewrite
+// and the path-hint rewrite match the same byte range, producing overlapping
+// RewriteReplacements; without skipping the redundant path-hint rewrite (or
+// otherwise deduplicating overlaps), applyReplacements panics.
 func TestRewriteWikiLinks_TitleEqualsPathHint(t *testing.T) {
 	engine := NewMarkdownRefactorEngine()
 	content := "See [[intro]] and [[intro|Start]] here."
