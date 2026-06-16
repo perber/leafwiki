@@ -56,26 +56,25 @@ func RewriteMarkdownLinks(content string, currentPath string, rules []RewriteRul
 	return result.Content, result.Count()
 }
 
-// RewriteWikiLinks rewrites [[Title]] and [[Folder/Path]] wiki-link syntax
-// according to the provided rules, respecting code blocks and inline code.
-//
-// For each rule:
-//   - OldTitle → NewTitle rewrites [[OldTitle]] and [[OldTitle|Alias]]
-//   - OldPath  → NewPath  rewrites [[old/path]] and [[old/path|Alias]] path hints
-func (e *MarkdownRefactorEngine) RewriteWikiLinks(content string, rules []RewriteRule) RewriteResult {
-	if content == "" {
-		return RewriteResult{Content: content}
-	}
+// wikiRewrite pairs a compiled regex with the replacement target.
+type wikiRewrite struct {
+	re        *regexp.Regexp
+	newTarget string
+}
 
-	type wikiRewrite struct {
-		re        *regexp.Regexp
-		newTarget string
-	}
+// CompiledWikiLinkRewrites holds pre-compiled regexes built from a []RewriteRule.
+// Use CompileWikiLinkRewrites once and pass the result to RewriteWikiLinksPrecompiled
+// to avoid recompiling the same patterns for every page in a bulk rename.
+type CompiledWikiLinkRewrites struct {
+	rewrites []wikiRewrite
+}
 
-	var rewrites []wikiRewrite
+// CompileWikiLinkRewrites pre-compiles the regex patterns for the given rules.
+func CompileWikiLinkRewrites(rules []RewriteRule) CompiledWikiLinkRewrites {
+	var rw []wikiRewrite
 	for _, rule := range rules {
 		if rule.OldTitle != "" && rule.OldTitle != rule.NewTitle {
-			rewrites = append(rewrites, wikiRewrite{
+			rw = append(rw, wikiRewrite{
 				// \s* inside [[...]] mirrors the TrimSpace done by the extractor,
 				// so [[ Project Plan ]] is rewritten just like [[Project Plan]].
 				re:        regexp.MustCompile(`(?i)\[\[\s*` + regexp.QuoteMeta(rule.OldTitle) + `\s*(\|[^\]\n]*)?\]\]`),
@@ -85,21 +84,39 @@ func (e *MarkdownRefactorEngine) RewriteWikiLinks(content string, rules []Rewrit
 		oldHint := strings.TrimPrefix(normalizeWikiPath(rule.OldPath), "/")
 		newHint := strings.TrimPrefix(normalizeWikiPath(rule.NewPath), "/")
 		if oldHint != "" && oldHint != newHint {
-			rewrites = append(rewrites, wikiRewrite{
+			rw = append(rw, wikiRewrite{
 				re:        regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(oldHint) + `\s*(\|[^\]\n]*)?\]\]`),
 				newTarget: newHint,
 			})
 		}
 	}
+	return CompiledWikiLinkRewrites{rewrites: rw}
+}
 
-	if len(rewrites) == 0 {
+// RewriteWikiLinks rewrites [[Title]] and [[Folder/Path]] wiki-link syntax
+// according to the provided rules, respecting code blocks and inline code.
+//
+// For each rule:
+//   - OldTitle → NewTitle rewrites [[OldTitle]] and [[OldTitle|Alias]]
+//   - OldPath  → NewPath  rewrites [[old/path]] and [[old/path|Alias]] path hints
+func (e *MarkdownRefactorEngine) RewriteWikiLinks(content string, rules []RewriteRule) RewriteResult {
+	return e.RewriteWikiLinksPrecompiled(content, CompileWikiLinkRewrites(rules))
+}
+
+// RewriteWikiLinksPrecompiled is like RewriteWikiLinks but accepts pre-compiled
+// rewrites so the caller can compile once and apply to many pages.
+func (e *MarkdownRefactorEngine) RewriteWikiLinksPrecompiled(content string, compiled CompiledWikiLinkRewrites) RewriteResult {
+	if content == "" {
+		return RewriteResult{Content: content}
+	}
+	if len(compiled.rewrites) == 0 {
 		return RewriteResult{Content: content}
 	}
 
-	_, excludedRanges := e.collectCandidatesAndExcludedRanges(content)
+	excludedRanges := e.collectExcludedRanges(content)
 
 	var replacements []RewriteReplacement
-	for _, rw := range rewrites {
+	for _, rw := range compiled.rewrites {
 		for _, m := range rw.re.FindAllStringSubmatchIndex(content, -1) {
 			if isExcludedOffset(m[0], excludedRanges) {
 				continue
@@ -120,9 +137,21 @@ func (e *MarkdownRefactorEngine) RewriteWikiLinks(content string, rules []Rewrit
 		return RewriteResult{Content: content}
 	}
 
-	sort.Slice(replacements, func(i, j int) bool {
+	sort.SliceStable(replacements, func(i, j int) bool {
 		return replacements[i].Start < replacements[j].Start
 	})
+
+	// Remove overlapping entries: the title rewrite and path-hint rewrite can both
+	// match the same byte range when OldTitle == normalized OldPath hint.
+	i := 0
+	for _, r := range replacements {
+		if i > 0 && r.Start < replacements[i-1].End {
+			continue
+		}
+		replacements[i] = r
+		i++
+	}
+	replacements = replacements[:i]
 
 	return RewriteResult{
 		Content:      applyReplacements(content, replacements),
@@ -140,7 +169,7 @@ func (e *MarkdownRefactorEngine) FindWikiLinksForPath(content, oldPath, pageTitl
 		return nil
 	}
 
-	_, excludedRanges := e.collectCandidatesAndExcludedRanges(content)
+	excludedRanges := e.collectExcludedRanges(content)
 
 	match := func(re *regexp.Regexp) bool {
 		for _, m := range re.FindAllStringIndex(content, -1) {
@@ -218,6 +247,11 @@ func (e *MarkdownRefactorEngine) Rewrite(content string, currentPath string, rul
 		Replacements: replacements,
 		Warnings:     warnings,
 	}
+}
+
+func (e *MarkdownRefactorEngine) collectExcludedRanges(content string) []textRange {
+	_, excluded := e.collectCandidatesAndExcludedRanges(content)
+	return excluded
 }
 
 func (e *MarkdownRefactorEngine) collectCandidatesAndExcludedRanges(content string) ([]rewriteCandidate, []textRange) {
@@ -584,6 +618,9 @@ func applyReplacements(content string, replacements []RewriteReplacement) string
 	var builder strings.Builder
 	last := 0
 	for _, replacement := range replacements {
+		if replacement.Start < last {
+			continue
+		}
 		builder.WriteString(content[last:replacement.Start])
 		builder.WriteString(replacement.NewValue)
 		last = replacement.End
