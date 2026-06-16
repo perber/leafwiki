@@ -49,7 +49,7 @@ export function Toolbar() {
               <MoreHorizontal size={18} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-60">
             {overflowButtons.map((button) => (
               <DropdownMenuItem
                 key={button.id}
