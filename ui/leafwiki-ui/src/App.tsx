@@ -1,3 +1,4 @@
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { createLeafWikiRouter } from '@/features/router/router'
 import { useBootstrapAuth } from '@/lib/bootstrapAuth'
 import { BASE_PATH } from '@/lib/config'
@@ -66,15 +67,17 @@ function App() {
     <>
       <Toaster richColors position="bottom-right" />
       {configHasLoaded && !(isRefreshing && !authDisabled) ? (
-        <Suspense
-          fallback={
-            <div className="flex h-screen items-center justify-center">
-              <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-            </div>
-          }
-        >
-          <RouterProvider router={router} />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense
+            fallback={
+              <div className="flex h-screen items-center justify-center">
+                <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+              </div>
+            }
+          >
+            <RouterProvider router={router} />
+          </Suspense>
+        </ErrorBoundary>
       ) : null}
     </>
   )
