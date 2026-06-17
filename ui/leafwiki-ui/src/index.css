@@ -648,10 +648,6 @@
     @apply text-error text-sm;
   }
 
-  .user-toolbar__login-button {
-    @apply bg-brand hover:bg-brand-dark rounded px-3 py-2 text-sm text-white;
-  }
-
   .user-toolbar__menu-item {
     @apply text-interface-text hover:bg-surface-alt cursor-pointer;
   }
