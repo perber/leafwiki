@@ -81,6 +81,25 @@ describe('UserToolbar', () => {
     })
   })
 
+  it('opens the shortcuts dialog via keyboard shortcut in no-auth mode', async () => {
+    useConfigStore.setState({ authDisabled: true })
+    useSessionStore.setState({ user: null })
+
+    render(
+      <MemoryRouter>
+        <UserToolbar />
+        <HotKeyHandler />
+        <DialogManager />
+      </MemoryRouter>,
+    )
+
+    fireEvent.keyDown(window, { key: '/', code: 'Slash', ctrlKey: true })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('shortcuts-help-dialog')).toBeInTheDocument()
+    })
+  })
+
   describe('viewer role', () => {
     beforeEach(() => {
       useSessionStore.setState({

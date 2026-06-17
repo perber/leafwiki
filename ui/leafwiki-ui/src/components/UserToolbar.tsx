@@ -53,7 +53,7 @@ export default function UserToolbar() {
   )
 
   useEffect(() => {
-    if (!user || authDisabled || readOnly) {
+    if (!authDisabled && (!user || readOnly)) {
       return
     }
 
