@@ -151,8 +151,8 @@ export default function UserToolbar() {
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
             Version {__APP_VERSION__}
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
           <RoleGuard roles={['admin', 'editor']}>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => openDialog(DIALOG_SHORTCUTS_HELP)}
