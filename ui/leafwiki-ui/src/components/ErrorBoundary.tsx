@@ -15,8 +15,8 @@ type State = {
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { error }
+  static getDerivedStateFromError(error: unknown): State {
+    return { error: error instanceof Error ? error : new Error(String(error)) }
   }
 
   componentDidUpdate(prevProps: Props) {
