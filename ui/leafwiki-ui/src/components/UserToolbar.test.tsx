@@ -80,4 +80,50 @@ describe('UserToolbar', () => {
       expect(screen.getByTestId('shortcuts-help-dialog')).toBeInTheDocument()
     })
   })
+
+  describe('viewer role', () => {
+    beforeEach(() => {
+      useSessionStore.setState({
+        user: {
+          id: 'user-2',
+          username: 'bob',
+          email: 'bob@example.com',
+          role: 'viewer',
+        },
+      })
+    })
+
+    it('does not show the keyboard shortcuts menu item for viewer role', async () => {
+      const user = userEvent.setup()
+
+      render(
+        <MemoryRouter>
+          <UserToolbar />
+        </MemoryRouter>,
+      )
+
+      const avatar = screen.getByTestId('user-toolbar-avatar')
+      const trigger = avatar.closest('button')
+      await user.click(trigger as HTMLButtonElement)
+
+      expect(screen.queryByText('Keyboard Shortcuts')).not.toBeInTheDocument()
+    })
+
+    it('does not open the shortcuts dialog via keyboard shortcut for viewer role', async () => {
+      render(
+        <MemoryRouter>
+          <UserToolbar />
+          <HotKeyHandler />
+          <DialogManager />
+        </MemoryRouter>,
+      )
+
+      fireEvent.keyDown(window, { key: '/', code: 'Slash', ctrlKey: true })
+
+      await new Promise((r) => setTimeout(r, 100))
+      expect(
+        screen.queryByTestId('shortcuts-help-dialog'),
+      ).not.toBeInTheDocument()
+    })
+  })
 })
