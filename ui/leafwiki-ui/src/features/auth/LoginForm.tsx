@@ -35,7 +35,7 @@ export default function LoginForm() {
       // Redirect to home page after successful login
       navigate('/')
     } catch (err) {
-      const mapped = mapApiError(err, 'Login failed')
+      const mapped = mapApiError(err, t('login.errorFallback'))
       toast.error(mapped.message)
     } finally {
       setLoading(false)
@@ -44,7 +44,7 @@ export default function LoginForm() {
 
   return (
     <>
-      <title>Login - {siteName}</title>
+      <title>{t('login.pageTitle', { siteName })}</title>
       <div className="login">
         <form onSubmit={handleSubmit} className="login__form">
           <h1 className="login__title">
