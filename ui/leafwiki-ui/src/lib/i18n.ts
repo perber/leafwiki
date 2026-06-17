@@ -1,5 +1,6 @@
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
+import enAuth from '../locales/en/auth.json'
 import enEditor from '../locales/en/editor.json'
 import enErrors from '../locales/en/errors.json'
 import enSearch from '../locales/en/search.json'
@@ -10,6 +11,7 @@ i18next.use(initReactI18next).init({
   fallbackLng: 'en',
   resources: {
     en: {
+      auth: enAuth,
       errors: enErrors,
       editor: enEditor,
       search: enSearch,

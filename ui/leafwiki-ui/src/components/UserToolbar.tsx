@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +14,7 @@ import {
   DIALOG_CHANGE_OWN_PASSWORD,
   DIALOG_SHORTCUTS_HELP,
 } from '@/lib/registries'
+import { useTranslation } from 'react-i18next'
 import {
   createHotkeyDefinition,
   getShortcutDisplayLabel,
@@ -37,6 +39,7 @@ const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
 )
 
 export default function UserToolbar() {
+  const { t } = useTranslation('auth')
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
@@ -73,17 +76,11 @@ export default function UserToolbar() {
   ])
 
   if (!user && !authDisabled) {
-    // renders the login
     return (
       <div className="user-toolbar">
-        <span className="user-toolbar__not-logged-in">Not logged in</span>
-        <button
-          type="button"
-          className="user-toolbar__login-button"
-          onClick={() => navigate('/login')}
-        >
-          Login
-        </button>
+        <Button size="sm" onClick={() => navigate('/login')}>
+          {t('login.loginButton')}
+        </Button>
       </div>
     )
   }
@@ -91,7 +88,9 @@ export default function UserToolbar() {
   if (authDisabled) {
     return (
       <div className="user-toolbar">
-        <span className="user-toolbar__not-logged-in">Public editor</span>
+        <span className="user-toolbar__not-logged-in">
+          {t('login.publicEditor')}
+        </span>
       </div>
     )
   }
