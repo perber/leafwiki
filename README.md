@@ -169,6 +169,12 @@ sudo ./install.sh --non-interactive --env-file ./.env
 - [Install with nginx on Ubuntu](docs/install/nginx.md)
 - [Install on a Raspberry Pi](docs/install/raspberry.md)
 
+### Nix
+
+```bash
+nix run github:perber/leafwiki -- --jwt-secret=yoursecret --admin-password=yourpassword --allow-insecure=true
+```
+
 ### Binary
 
 ```bash
