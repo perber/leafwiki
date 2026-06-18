@@ -64,6 +64,11 @@
           inherit leafwiki ui;
         };
 
+        apps = {
+          default = flake-utils.lib.mkApp { drv = leafwiki; };
+          leafwiki = flake-utils.lib.mkApp { drv = leafwiki; };
+        };
+
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             # Go toolchain
@@ -73,7 +78,7 @@
             golangci-lint
             # Node / frontend
             nodejs
-            nodePackages.typescript-language-server
+            typescript-language-server
             # Utilities
             git
             gnumake
