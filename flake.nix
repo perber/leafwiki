@@ -1,5 +1,5 @@
 {
-  description = "LeafWiki – a fast wiki for people who think in folders, not feeds";
+  description = "LeafWiki - a fast wiki for people who think in folders, not feeds";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
