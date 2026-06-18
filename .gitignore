@@ -53,3 +53,4 @@ internal/http/dist/*
 !internal/http/dist/.gitkeep
 
 result
+.direnv
