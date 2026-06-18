@@ -14,9 +14,13 @@ If you've looked at Wiki.js or Outline and thought "this is too much to operate 
 → If it fits, [a star](https://github.com/perber/leafwiki) helps others find it.
 
 ```bash
+# Docker
 docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   ghcr.io/perber/leafwiki:latest \
   --jwt-secret=yoursecret --admin-password=yourpassword --allow-insecure=true
+
+# Nix
+nix run github:perber/leafwiki -- --help
 ```
 
 → [All install options](#install) (Docker Compose, Linux installer, binary)
