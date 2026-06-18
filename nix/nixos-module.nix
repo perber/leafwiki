@@ -2,7 +2,12 @@
 # Secret files are loaded via systemd LoadCredential so they never appear
 # in the Nix store or the unit file.
 self:
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.services.leafwiki;
   leafwikiPkg = self.packages.${pkgs.stdenv.hostPlatform.system}.leafwiki;
@@ -28,7 +33,8 @@ in
       default = "leafwiki";
       description = "Group under which leafwiki runs.";
     };
-  } // common.options;
+  }
+  // common.options;
 
   config = lib.mkIf cfg.enable {
     users.users.${cfg.user} = {
@@ -37,7 +43,7 @@ in
       home = cfg.dataDir;
       createHome = true;
     };
-    users.groups.${cfg.group} = {};
+    users.groups.${cfg.group} = { };
 
     systemd.services.leafwiki = {
       description = "LeafWiki";
@@ -53,13 +59,14 @@ in
         ExecStart =
           let
             authArgs =
-              if cfg.disableAuth
-              then [ "--disable-auth" ]
-              else [
-                # LoadCredential exposes secrets under $CREDENTIALS_DIRECTORY
-                ''--jwt-secret=$(cat "$CREDENTIALS_DIRECTORY/jwt-secret")''
-                ''--admin-password=$(cat "$CREDENTIALS_DIRECTORY/admin-password")''
-              ];
+              if cfg.disableAuth then
+                [ "--disable-auth" ]
+              else
+                [
+                  # LoadCredential exposes secrets under $CREDENTIALS_DIRECTORY
+                  ''--jwt-secret=$(cat "$CREDENTIALS_DIRECTORY/jwt-secret")''
+                  ''--admin-password=$(cat "$CREDENTIALS_DIRECTORY/admin-password")''
+                ];
           in
           common.mkExecStart cfg authArgs;
 

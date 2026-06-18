@@ -4,7 +4,12 @@
 #   - defaultPkg  – the resolved leafwiki package for the current system
 #   - dataDirType – the mkOption type for dataDir (path vs. str differs)
 #   - dataDirDefault – the default value for dataDir
-{ lib, defaultPkg, dataDirType, dataDirDefault }:
+{
+  lib,
+  defaultPkg,
+  dataDirType,
+  dataDirDefault,
+}:
 {
   # ---- shared option declarations -----------------------------------------
   options = {
@@ -52,7 +57,7 @@
 
     extraArgs = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      default = [];
+      default = [ ];
       description = "Additional CLI arguments passed to leafwiki.";
     };
   };
@@ -62,11 +67,16 @@
   # Build the ExecStart string. The authArgs differ slightly between the NixOS
   # module (reads from $CREDENTIALS_DIRECTORY) and Home Manager (reads the file
   # path directly), so the caller supplies them.
-  mkExecStart = cfg: authArgs:
-    lib.escapeShellArgs ([
-      "${cfg.package}/bin/leafwiki"
-      "--host=${cfg.host}"
-      "--port=${toString cfg.port}"
-      "--data-dir=${cfg.dataDir}"
-    ] ++ authArgs ++ cfg.extraArgs);
+  mkExecStart =
+    cfg: authArgs:
+    lib.escapeShellArgs (
+      [
+        "${cfg.package}/bin/leafwiki"
+        "--host=${cfg.host}"
+        "--port=${toString cfg.port}"
+        "--data-dir=${cfg.dataDir}"
+      ]
+      ++ authArgs
+      ++ cfg.extraArgs
+    );
 }
