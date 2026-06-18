@@ -201,6 +201,7 @@ In your `flake.nix`:
             # host    = "0.0.0.0";
             # port    = 8080;
             # dataDir = "/var/lib/leafwiki";
+            # disableAuth = true; # insecure - only for local dev instances!
           };
         }
       ];
@@ -210,15 +211,6 @@ In your `flake.nix`:
 ```
 
 Secrets are loaded from files at service start using systemd `LoadCredential`, so they never appear in the Nix store or the unit file.
-
-For public wikis with no login:
-
-```nix
-services.leafwiki = {
-  enable = true;
-  disableAuth = true;
-};
-```
 
 #### Add to a Home Manager configuration
 
