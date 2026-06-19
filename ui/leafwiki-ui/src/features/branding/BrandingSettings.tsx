@@ -12,6 +12,7 @@ import {
   UploadIcon,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useSetTitle } from '../viewer/setTitle'
 import { useToolbarActions } from './useToolbarActions'
@@ -36,9 +37,11 @@ export default function BrandingSettings() {
     deleteFavicon,
   } = useBrandingStore()
 
+  const { t } = useTranslation('branding')
+
   // reset toolbar actions on mount
   useToolbarActions()
-  useSetTitle({ title: 'Branding Settings' })
+  useSetTitle({ title: t('pageTitle') })
 
   const [localSiteName, setLocalSiteName] = useState(siteName)
   const [saving, setSaving] = useState(false)
@@ -57,18 +60,18 @@ export default function BrandingSettings() {
   const handleLogoDelete = async () => {
     try {
       await deleteLogo()
-      toast.success('Logo deleted successfully')
+      toast.success(t('toast.logoDeleted'))
     } catch (err) {
-      toast.error(mapApiError(err, 'Failed to delete logo').message)
+      toast.error(mapApiError(err, t('toast.logoDeleteFailed')).message)
     }
   }
 
   const handleFaviconDelete = async () => {
     try {
       await deleteFavicon()
-      toast.success('Favicon deleted successfully')
+      toast.success(t('toast.faviconDeleted'))
     } catch (err) {
-      toast.error(mapApiError(err, 'Failed to delete favicon').message)
+      toast.error(mapApiError(err, t('toast.faviconDeleteFailed')).message)
     }
   }
 
@@ -78,9 +81,9 @@ export default function BrandingSettings() {
       await updateBranding({
         siteName: localSiteName,
       })
-      toast.success('Branding settings saved')
+      toast.success(t('toast.brandingSaved'))
     } catch (err) {
-      toast.error(mapApiError(err, 'Failed to save branding settings').message)
+      toast.error(mapApiError(err, t('toast.brandingSaveFailed')).message)
     } finally {
       setSaving(false)
     }
@@ -92,9 +95,9 @@ export default function BrandingSettings() {
 
     try {
       await uploadLogo(file)
-      toast.success('Logo uploaded successfully')
+      toast.success(t('toast.logoUploaded'))
     } catch (err) {
-      toast.error(mapApiError(err, 'Failed to upload logo').message)
+      toast.error(mapApiError(err, t('toast.logoUploadFailed')).message)
     }
   }
 
@@ -106,45 +109,47 @@ export default function BrandingSettings() {
 
     try {
       await uploadFavicon(file)
-      toast.success('Favicon uploaded successfully')
+      toast.success(t('toast.faviconUploaded'))
     } catch (err) {
-      toast.error(mapApiError(err, 'Failed to upload favicon').message)
+      toast.error(mapApiError(err, t('toast.faviconUploadFailed')).message)
     }
   }
 
   return (
     <>
       <div className="settings">
-        <h1 className="settings__title">Branding Settings</h1>
+        <h1 className="settings__title">{t('pageTitle')}</h1>
         <div className="settings__section">
-          <h2 className="settings__section-title">Site Name</h2>
+          <h2 className="settings__section-title">{t('siteName.title')}</h2>
           <p className="settings__section-description">
-            The name displayed in the header, page titles, and login screen.
+            {t('siteName.description')}
           </p>
           <div className="settings__field">
-            <Label htmlFor="siteName">Site Name</Label>
+            <Label htmlFor="siteName">{t('siteName.label')}</Label>
             <Input
               id="siteName"
               value={localSiteName}
               onChange={(e) => setLocalSiteName(e.target.value)}
-              placeholder="LeafWiki"
+              placeholder={t('siteName.placeholder')}
             />
           </div>
         </div>
 
         <div className="settings__section">
-          <h2 className="settings__section-title">Logo</h2>
+          <h2 className="settings__section-title">{t('logo.title')}</h2>
           <p className="settings__section-description">
-            The logo displayed in the header next to the site name.
+            {t('logo.description')}
           </p>
 
           <div className="settings__preview">
-            <span className="settings__preview-label">Current Logo:</span>
+            <span className="settings__preview-label">
+              {t('logo.currentLabel')}
+            </span>
             {logoFile ? (
               <>
                 <img
                   src={`${withBasePath(`/branding/${logoFile}`)}?v=${logoVersion}`}
-                  alt="Logo"
+                  alt={t('logo.title')}
                   className="settings__preview-image"
                 />
                 <Button
@@ -158,13 +163,13 @@ export default function BrandingSettings() {
               </>
             ) : (
               <span className="settings__preview-placeholder">
-                No logo uploaded
+                {t('logo.noLogo')}
               </span>
             )}
           </div>
 
           <div className="settings__field">
-            <Label>Upload Logo</Label>{' '}
+            <Label>{t('logo.uploadLabel')}</Label>{' '}
             <input
               type="file"
               ref={logoInputRef}
@@ -178,29 +183,33 @@ export default function BrandingSettings() {
               disabled={isLoading}
             >
               <UploadIcon className="mr-2 h-4 w-4" />
-              Upload Image
+              {t('logo.uploadButton')}
             </Button>
             <p className="settings__hint">
-              Accepts {logoExts.map((ext) => ext.toUpperCase()).join(', ')}, max
-              size {(maxLogoSize / (1024 * 1024)).toFixed(1)} MB
+              {t('logo.hint', {
+                exts: logoExts.map((ext) => ext.toUpperCase()).join(', '),
+                size: (maxLogoSize / (1024 * 1024)).toFixed(1),
+              })}
             </p>
           </div>
         </div>
 
         <div className="settings__section">
-          <h2 className="settings__section-title">Favicon</h2>
+          <h2 className="settings__section-title">{t('favicon.title')}</h2>
           <p className="settings__section-description">
-            The icon displayed in the browser tab.
+            {t('favicon.description')}
           </p>
 
           <div className="settings__preview">
-            <span className="settings__preview-label">Current Favicon:</span>
+            <span className="settings__preview-label">
+              {t('favicon.currentLabel')}
+            </span>
             {faviconFile ? (
               <>
                 {' '}
                 <img
                   src={`${withBasePath(`/branding/${faviconFile}`)}?v=${faviconVersion}`}
-                  alt="Favicon"
+                  alt={t('favicon.title')}
                   className="settings__preview-favicon"
                 />
                 <Button
@@ -214,13 +223,13 @@ export default function BrandingSettings() {
               </>
             ) : (
               <span className="settings__preview-placeholder">
-                Using default favicon
+                {t('favicon.noFavicon')}
               </span>
             )}
           </div>
 
           <div className="settings__field">
-            <Label>Upload Favicon</Label>
+            <Label>{t('favicon.uploadLabel')}</Label>
             <input
               type="file"
               ref={faviconInputRef}
@@ -234,11 +243,13 @@ export default function BrandingSettings() {
               disabled={isLoading}
             >
               <ImageIcon className="mr-2 h-4 w-4" />
-              Upload Favicon
+              {t('favicon.uploadButton')}
             </Button>
             <p className="settings__hint">
-              Accepts {faviconExts.map((ext) => ext.toUpperCase()).join(', ')},
-              max size {(maxFaviconSize / (1024 * 1024)).toFixed(1)} MB
+              {t('favicon.hint', {
+                exts: faviconExts.map((ext) => ext.toUpperCase()).join(', '),
+                size: (maxFaviconSize / (1024 * 1024)).toFixed(1),
+              })}
             </p>
           </div>
         </div>
@@ -250,7 +261,7 @@ export default function BrandingSettings() {
             ) : (
               <SaveIcon className="mr-2 h-4 w-4" />
             )}
-            Save Settings
+            {t('save')}
           </Button>
         </div>
       </div>
