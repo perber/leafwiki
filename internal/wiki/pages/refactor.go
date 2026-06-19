@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 
 	"github.com/perber/wiki/internal/core/revision"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
@@ -607,12 +608,23 @@ func (uc *ApplyPageRefactorUseCase) rewritePathChangedSubtree(userID string, sna
 		if !ok {
 			continue
 		}
-		result := engine.RewriteRelativeLinksForPathChange(snap.Content, snap.OldPath, current.CalculatePath(), rules)
-		if (result.Count() == 0 && snap.Content == current.Content) || result.Content == current.Content {
+		currentPath := current.CalculatePath()
+		// First, fix relative links whose base path changed because the page moved.
+		relResult := engine.RewriteRelativeLinksForPathChange(snap.Content, snap.OldPath, currentPath, rules)
+		// Then, fix absolute links within the moved subtree (e.g. /old/sub → /new/sub).
+		// RewriteRelativeLinksForPathChange skips absolute links, so they need a
+		// second pass. Using the new current path is safe here: relative links were
+		// already corrected in the first pass and will not match the old-path rules.
+		// Skip pass 2 when the content cannot contain any matching absolute links.
+		finalContent := relResult.Content
+		if strings.Contains(relResult.Content, oldPath) {
+			finalContent = engine.Rewrite(relResult.Content, currentPath, rules).Content
+		}
+		if finalContent == current.Content {
 			continue
 		}
-		items = append(items, pending{page: current, content: result.Content})
-		bulk = append(bulk, tree.BulkContentUpdate{ID: current.ID, Content: result.Content})
+		items = append(items, pending{page: current, content: finalContent})
+		bulk = append(bulk, tree.BulkContentUpdate{ID: current.ID, Content: finalContent})
 	}
 
 	if len(bulk) == 0 {
