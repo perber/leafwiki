@@ -554,7 +554,7 @@ func TestExecutor_Create_WikiLinkResolvesUniqueNestedPathSuffix(t *testing.T) {
 	}
 }
 
-func TestExecutor_Create_UnresolvedWikiLinkFallsBackToDeadMarkdownLink(t *testing.T) {
+func TestExecutor_Create_UnresolvedWikiLinkStaysAsWikiLink(t *testing.T) {
 	tmp := t.TempDir()
 	writeTmp(t, tmp, "Home.md", strings.Join([]string{
 		"# Home",

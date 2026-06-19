@@ -154,6 +154,18 @@ func TestContentTransformer_TransformContent_TableDriven(t *testing.T) {
 			want:       "[CDN](//example.com/assets/note.md)",
 		},
 		{
+			name:       "wiki link https url stays unchanged",
+			sourcePath: "docs/current.md",
+			content:    "[[https://example.com/page]]",
+			want:       "[[https://example.com/page]]",
+		},
+		{
+			name:       "wiki link scheme-relative url stays unchanged",
+			sourcePath: "docs/current.md",
+			content:    "[[//cdn.example.com/asset]]",
+			want:       "[[//cdn.example.com/asset]]",
+		},
+		{
 			name:       "inline code stays unchanged",
 			sourcePath: "docs/current.md",
 			content:    "`[[Note]]`",
