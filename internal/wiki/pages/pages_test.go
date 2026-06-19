@@ -2957,7 +2957,6 @@ func TestApplyPageRefactorUseCase_Move_RewritesLinksInSubPages(t *testing.T) {
 		UserID: "system", Title: "Archive", Slug: "archive", Kind: pageKind(),
 	})
 	_ = guide
-	_ = archive
 
 	// /docs/sub has a relative link to /guide: ../../guide
 	subContent := "[To Guide](../../guide)"
