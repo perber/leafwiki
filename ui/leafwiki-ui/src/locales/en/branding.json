@@ -1,0 +1,40 @@
+{
+  "pageTitle": "Branding Settings",
+  "siteName": {
+    "title": "Site Name",
+    "description": "The name displayed in the header, page titles, and login screen.",
+    "label": "Site Name",
+    "placeholder": "LeafWiki"
+  },
+  "logo": {
+    "title": "Logo",
+    "description": "The logo displayed in the header next to the site name.",
+    "currentLabel": "Current Logo:",
+    "noLogo": "No logo uploaded",
+    "uploadLabel": "Upload Logo",
+    "uploadButton": "Upload Image",
+    "hint": "Accepts {{exts}}, max size {{size}} MB"
+  },
+  "favicon": {
+    "title": "Favicon",
+    "description": "The icon displayed in the browser tab.",
+    "currentLabel": "Current Favicon:",
+    "noFavicon": "Using default favicon",
+    "uploadLabel": "Upload Favicon",
+    "uploadButton": "Upload Favicon",
+    "hint": "Accepts {{exts}}, max size {{size}} MB"
+  },
+  "save": "Save Settings",
+  "toast": {
+    "logoDeleted": "Logo deleted successfully",
+    "logoDeleteFailed": "Failed to delete logo",
+    "faviconDeleted": "Favicon deleted successfully",
+    "faviconDeleteFailed": "Failed to delete favicon",
+    "brandingSaved": "Branding settings saved",
+    "brandingSaveFailed": "Failed to save branding settings",
+    "logoUploaded": "Logo uploaded successfully",
+    "logoUploadFailed": "Failed to upload logo",
+    "faviconUploaded": "Favicon uploaded successfully",
+    "faviconUploadFailed": "Failed to upload favicon"
+  }
+}

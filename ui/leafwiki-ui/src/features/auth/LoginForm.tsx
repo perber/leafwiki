@@ -6,10 +6,12 @@ import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
 import { useSessionStore } from '@/stores/session'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 export default function LoginForm() {
+  const { t } = useTranslation('auth')
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,7 +35,7 @@ export default function LoginForm() {
       // Redirect to home page after successful login
       navigate('/')
     } catch (err) {
-      const mapped = mapApiError(err, 'Login failed')
+      const mapped = mapApiError(err, t('login.errorFallback'))
       toast.error(mapped.message)
     } finally {
       setLoading(false)
@@ -42,7 +44,7 @@ export default function LoginForm() {
 
   return (
     <>
-      <title>Login - {siteName}</title>
+      <title>{t('login.pageTitle', { siteName })}</title>
       <div className="login">
         <form onSubmit={handleSubmit} className="login__form">
           <h1 className="login__title">
@@ -61,7 +63,7 @@ export default function LoginForm() {
           <div className="login__field">
             <Input
               type="text"
-              placeholder="Username or Email"
+              placeholder={t('login.identifierPlaceholder')}
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               required
@@ -75,7 +77,7 @@ export default function LoginForm() {
           <div className="login__field">
             <Input
               type="password"
-              placeholder="Password"
+              placeholder={t('login.passwordPlaceholder')}
               name="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -92,7 +94,7 @@ export default function LoginForm() {
             disabled={loading}
             data-testid="login-submit"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? t('login.submitting') : t('login.submit')}
           </Button>
         </form>
       </div>

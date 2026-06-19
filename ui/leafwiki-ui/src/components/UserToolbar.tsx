@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,10 +14,12 @@ import {
   DIALOG_CHANGE_OWN_PASSWORD,
   DIALOG_SHORTCUTS_HELP,
 } from '@/lib/registries'
+import { useTranslation } from 'react-i18next'
 import {
   createHotkeyDefinition,
   getShortcutDisplayLabel,
 } from '@/lib/shortcuts/shortcutCatalog'
+import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useBackupStore } from '@/stores/backup'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -36,12 +39,14 @@ const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
 )
 
 export default function UserToolbar() {
+  const { t } = useTranslation('auth')
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const authDisabled = useConfigStore((s) => s.authDisabled)
+  const readOnly = useIsReadOnly()
   const backupEnabled = useBackupStore((s) => s.enabled)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
@@ -51,7 +56,7 @@ export default function UserToolbar() {
   )
 
   useEffect(() => {
-    if (!user || authDisabled) {
+    if (!authDisabled && (!user || readOnly)) {
       return
     }
 
@@ -61,20 +66,21 @@ export default function UserToolbar() {
 
     registerHotkey(hotkey)
     return () => unregisterHotkey(hotkey.keyCombo)
-  }, [authDisabled, openDialog, registerHotkey, unregisterHotkey, user])
+  }, [
+    authDisabled,
+    openDialog,
+    readOnly,
+    registerHotkey,
+    unregisterHotkey,
+    user,
+  ])
 
   if (!user && !authDisabled) {
-    // renders the login
     return (
       <div className="user-toolbar">
-        <span className="user-toolbar__not-logged-in">Not logged in</span>
-        <button
-          type="button"
-          className="user-toolbar__login-button"
-          onClick={() => navigate('/login')}
-        >
-          Login
-        </button>
+        <Button size="sm" onClick={() => navigate('/login')}>
+          {t('login.loginButton')}
+        </Button>
       </div>
     )
   }
@@ -82,7 +88,9 @@ export default function UserToolbar() {
   if (authDisabled) {
     return (
       <div className="user-toolbar">
-        <span className="user-toolbar__not-logged-in">Public editor</span>
+        <span className="user-toolbar__not-logged-in">
+          {t('login.publicEditor')}
+        </span>
       </div>
     )
   }
@@ -142,16 +150,18 @@ export default function UserToolbar() {
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
             Version {__APP_VERSION__}
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={() => openDialog(DIALOG_SHORTCUTS_HELP)}
-          >
-            {i18next.t('shortcutsHelp.menuItem', { ns: 'viewer' })}
-            <DropdownMenuShortcut>
-              {shortcutsDialogHotkeyLabel}
-            </DropdownMenuShortcut>
-          </DropdownMenuItem>
+          <RoleGuard roles={['admin', 'editor']}>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => openDialog(DIALOG_SHORTCUTS_HELP)}
+            >
+              {i18next.t('shortcutsHelp.menuItem', { ns: 'viewer' })}
+              <DropdownMenuShortcut>
+                {shortcutsDialogHotkeyLabel}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+          </RoleGuard>
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={() => openDialog(DIALOG_CHANGE_OWN_PASSWORD)}

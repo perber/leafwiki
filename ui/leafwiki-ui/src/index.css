@@ -471,7 +471,7 @@
 
   /* App Layout */
   .app-layout__header {
-    @apply bg-surface fixed z-20 h-[55px] w-full border-b p-4;
+    @apply bg-surface fixed z-20 h-[55px] w-full overflow-hidden border-b p-4;
   }
 
   .app-layout__header-inner {
@@ -487,7 +487,7 @@
   }
 
   .app-layout__logo-n-title {
-    @apply mr-6 ml-6 flex min-h-full items-center gap-2;
+    @apply mr-6 ml-6 flex min-h-full min-w-0 shrink items-center gap-2 max-sm:mr-2 max-sm:ml-2;
   }
 
   .app-layout__logo-n-title h2 {
@@ -499,7 +499,7 @@
   }
 
   .app-layout__logo-image {
-    @apply inline-block h-16 w-auto max-w-32 shrink-0 object-contain align-middle;
+    @apply inline-block h-auto max-h-9 w-auto max-w-32 object-contain align-middle max-sm:max-w-24;
   }
 
   .app-layout__logo-emoji {
@@ -646,10 +646,6 @@
 
   .user-toolbar__not-logged-in {
     @apply text-error text-sm;
-  }
-
-  .user-toolbar__login-button {
-    @apply bg-brand hover:bg-brand-dark rounded px-3 py-2 text-sm text-white;
   }
 
   .user-toolbar__menu-item {
