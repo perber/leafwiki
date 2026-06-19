@@ -293,6 +293,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     return get().savePage()
   },
   loadPageData: async (path: string) => {
+    useProgressbarStore.getState().setLoading(true)
     set({
       error: null,
       notFound: false,
@@ -300,7 +301,6 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
       initialPage: null,
       frontmatterErrors: {},
     })
-    useProgressbarStore.getState().setLoading(true)
     try {
       const page = await getPageByPath(path)
       const fields: EditorFrontmatterField[] = Object.entries(
