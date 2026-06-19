@@ -471,7 +471,7 @@
 
   /* App Layout */
   .app-layout__header {
-    @apply bg-surface fixed z-20 h-[55px] w-full border-b p-4;
+    @apply bg-surface fixed z-20 h-[55px] w-full overflow-hidden border-b p-4;
   }
 
   .app-layout__header-inner {
@@ -499,7 +499,7 @@
   }
 
   .app-layout__logo-image {
-    @apply inline-block h-16 w-auto max-w-32 shrink-0 object-contain align-middle;
+    @apply inline-block h-auto max-h-9 w-auto max-w-32 shrink-0 object-contain align-middle;
   }
 
   .app-layout__logo-emoji {
