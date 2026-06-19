@@ -11,4 +11,4 @@ export const PageHistoryPage = lazy(() => import('../page/PageHistoryPage'))
 export const PermalinkRedirect = lazy(() => import('../page/PermalinkRedirect'))
 export const RootRedirect = lazy(() => import('../page/RootRedirect'))
 export const UserManagement = lazy(() => import('../users/UserManagement'))
-export const PageViewer = lazy(() => import('../viewer/PageViewer'))
+export { default as PageViewer } from '../viewer/PageViewer'
