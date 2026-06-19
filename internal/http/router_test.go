@@ -1427,8 +1427,8 @@ func TestImportExecuteEndpoint_WithZipUpload_ImportsPagesLinksAndAssets(t *testi
 		"[Relative MD](/reference/endpoints)",
 		"[Absolute MD](/reference/endpoints)",
 		"[Container](/guides)",
-		"[Endpoints](/reference/endpoints)",
-		"[API Alias](/reference/endpoints)",
+		"[[reference/endpoints]]",
+		"[[reference/endpoints|API Alias]]",
 		"![Relative Image](/assets/" + setupPage.ID + "/logo.png)",
 		"[Manual](/assets/" + setupPage.ID + "/manual.pdf)",
 	} {
