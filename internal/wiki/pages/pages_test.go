@@ -2894,7 +2894,6 @@ func TestApplyPageRefactorUseCase_Move_RewritesAbsoluteLinksInSubPagesPointingWi
 		UserID: "system", Title: "Archive", Slug: "archive", Kind: pageKind(),
 	})
 	_ = sibling
-	_ = archive
 
 	// /docs/sub has an absolute link to /docs/sibling (another sub-page in the same section)
 	subContent := "[To Sibling](/docs/sibling)"
