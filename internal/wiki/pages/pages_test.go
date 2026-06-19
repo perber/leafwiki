@@ -2834,7 +2834,6 @@ func TestApplyPageRefactorUseCase_Move_LeavesIntraSubtreeRelativeLinksUnchanged(
 		UserID: "system", Title: "Archive", Slug: "archive", Kind: pageKind(),
 	})
 	_ = sibling
-	_ = archive
 
 	// /docs/sub has a relative link to its sibling: ../sibling → /docs/sibling
 	// After the move both pages travel together so the relative path must stay ../sibling.
