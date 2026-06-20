@@ -2809,3 +2809,210 @@ func TestUpdatePageUseCase_TitleOnlyWithUnchangedContentCreatesStructureRevision
 		t.Fatalf("latest revision title = %q", afterLatest.Title)
 	}
 }
+
+func TestApplyPageRefactorUseCase_Move_LeavesIntraSubtreeRelativeLinksUnchanged(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+
+	// Structure:
+	//   /docs          (section to be moved)
+	//   /docs/sub      (sub-page with relative link to /docs/sibling)
+	//   /docs/sibling  (another sub-page in the same section)
+	//   /archive       (target parent)
+	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Docs", Slug: "docs", Kind: pageKind(),
+	})
+	sub, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &docs.Page.ID, Title: "Sub", Slug: "sub", Kind: pageKind(),
+	})
+	sibling, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &docs.Page.ID, Title: "Sibling", Slug: "sibling", Kind: pageKind(),
+	})
+	archive, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Archive", Slug: "archive", Kind: pageKind(),
+	})
+	_ = sibling
+
+	// /docs/sub has a relative link to its sibling: ../sibling → /docs/sibling
+	// After the move both pages travel together so the relative path must stay ../sibling.
+	subContent := "[To Sibling](../sibling)"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: sub.Page.ID, Version: sub.Page.Version(),
+		Title: sub.Page.Title, Slug: sub.Page.Slug, Content: &subContent, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(sub) failed: %v", err)
+	}
+
+	_, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+		UserID:  "system",
+		Version: docs.Page.Version(),
+		RefactorPreviewInput: pages.RefactorPreviewInput{
+			PageID:      docs.Page.ID,
+			Kind:        pages.RefactorKindMove,
+			NewParentID: &archive.Page.ID,
+		},
+		RewriteLinks: true,
+	})
+	if err != nil {
+		t.Fatalf("ApplyPageRefactor(move section) failed: %v", err)
+	}
+
+	movedSub, err := deps.tree.GetPage(sub.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(sub) failed: %v", err)
+	}
+	// The relative link ../sibling must be unchanged: both pages moved together.
+	if movedSub.Content != "[To Sibling](../sibling)" {
+		t.Fatalf("intra-subtree relative link changed unexpectedly: got %q, want %q",
+			movedSub.Content, "[To Sibling](../sibling)")
+	}
+}
+
+func TestApplyPageRefactorUseCase_Move_RewritesAbsoluteLinksInSubPagesPointingWithinSection(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+
+	// Structure:
+	//   /docs             (section to be moved)
+	//   /docs/sub         (sub-page with absolute links into the same section)
+	//   /docs/sibling     (another sub-page in the same section)
+	//   /archive          (target parent)
+	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Docs", Slug: "docs", Kind: pageKind(),
+	})
+	sub, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &docs.Page.ID, Title: "Sub", Slug: "sub", Kind: pageKind(),
+	})
+	sibling, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &docs.Page.ID, Title: "Sibling", Slug: "sibling", Kind: pageKind(),
+	})
+	archive, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Archive", Slug: "archive", Kind: pageKind(),
+	})
+	_ = sibling
+
+	// /docs/sub has an absolute link to /docs/sibling (another sub-page in the same section)
+	subContent := "[To Sibling](/docs/sibling)"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: sub.Page.ID, Version: sub.Page.Version(),
+		Title: sub.Page.Title, Slug: sub.Page.Slug, Content: &subContent, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(sub) failed: %v", err)
+	}
+
+	// Move /docs under /archive → /archive/docs, sub-pages become /archive/docs/sub and /archive/docs/sibling
+	_, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+		UserID:  "system",
+		Version: docs.Page.Version(),
+		RefactorPreviewInput: pages.RefactorPreviewInput{
+			PageID:      docs.Page.ID,
+			Kind:        pages.RefactorKindMove,
+			NewParentID: &archive.Page.ID,
+		},
+		RewriteLinks: true,
+	})
+	if err != nil {
+		t.Fatalf("ApplyPageRefactor(move section) failed: %v", err)
+	}
+
+	movedSub, err := deps.tree.GetPage(sub.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(sub) failed: %v", err)
+	}
+	// Absolute link /docs/sibling → /archive/docs/sibling
+	if movedSub.Content != "[To Sibling](/archive/docs/sibling)" {
+		t.Fatalf("sub-page content = %q, want %q", movedSub.Content, "[To Sibling](/archive/docs/sibling)")
+	}
+}
+
+func TestApplyPageRefactorUseCase_Move_RewritesLinksInSubPages(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default())
+
+	// Structure:
+	//   /docs          (section to be moved)
+	//   /docs/sub      (sub-page with a relative link to /guide)
+	//   /guide         (external page)
+	//   /linker        (external page linking to the sub-page)
+	//   /archive       (target parent)
+	docs, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Docs", Slug: "docs", Kind: pageKind(),
+	})
+	sub, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &docs.Page.ID, Title: "Sub", Slug: "sub", Kind: pageKind(),
+	})
+	guide, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Guide", Slug: "guide", Kind: pageKind(),
+	})
+	linker, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Linker", Slug: "linker", Kind: pageKind(),
+	})
+	archive, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Archive", Slug: "archive", Kind: pageKind(),
+	})
+	_ = guide
+
+	// /docs/sub has a relative link to /guide: ../../guide
+	subContent := "[To Guide](../../guide)"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: sub.Page.ID, Version: sub.Page.Version(),
+		Title: sub.Page.Title, Slug: sub.Page.Slug, Content: &subContent, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(sub) failed: %v", err)
+	}
+
+	// /linker has an absolute link to /docs/sub
+	linkerContent := "[To Sub](/docs/sub)"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "system", ID: linker.Page.ID, Version: linker.Page.Version(),
+		Title: linker.Page.Title, Slug: linker.Page.Slug, Content: &linkerContent, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("UpdatePage(linker) failed: %v", err)
+	}
+
+	// Move /docs under /archive → becomes /archive/docs, sub-page becomes /archive/docs/sub
+	_, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+		UserID:  "system",
+		Version: docs.Page.Version(),
+		RefactorPreviewInput: pages.RefactorPreviewInput{
+			PageID:      docs.Page.ID,
+			Kind:        pages.RefactorKindMove,
+			NewParentID: &archive.Page.ID,
+		},
+		RewriteLinks: true,
+	})
+	if err != nil {
+		t.Fatalf("ApplyPageRefactor(move section) failed: %v", err)
+	}
+
+	// Sub-page should now be at /archive/docs/sub
+	movedSub, err := deps.tree.GetPage(sub.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(sub) failed: %v", err)
+	}
+	if movedSub.CalculatePath() != "/archive/docs/sub" {
+		t.Fatalf("sub-page path = %q, want /archive/docs/sub", movedSub.CalculatePath())
+	}
+
+	// The relative link in the sub-page should be updated:
+	// from ../../guide (resolves to /guide from /docs/sub)
+	// to ../../../guide (resolves to /guide from /archive/docs/sub)
+	if movedSub.Content != "[To Guide](../../../guide)" {
+		t.Fatalf("sub-page content = %q, want %q", movedSub.Content, "[To Guide](../../../guide)")
+	}
+
+	// The linker's absolute link to the sub-page should be updated
+	updatedLinker, err := deps.tree.GetPage(linker.Page.ID)
+	if err != nil {
+		t.Fatalf("GetPage(linker) failed: %v", err)
+	}
+	if updatedLinker.Content != "[To Sub](/archive/docs/sub)" {
+		t.Fatalf("linker content = %q, want %q", updatedLinker.Content, "[To Sub](/archive/docs/sub)")
+	}
+}
