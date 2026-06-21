@@ -156,7 +156,7 @@ export function validateEditorFrontmatterMetadata(
     }
 
     const lowerKey = trimmedKey.toLocaleLowerCase()
-    if (lowerKey === 'tags' || lowerKey === 'title') {
+    if (lowerKey === 'tags') {
       errors[keyField] = 'Property key is reserved.'
       return
     }

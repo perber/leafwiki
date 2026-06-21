@@ -18,6 +18,8 @@ type UpdatePageInput struct {
 	Slug       string
 	Content    *string
 	Kind       *tree.NodeKind
+	Tags       []string
+	Properties map[string]string
 	FromImport bool
 }
 
@@ -78,7 +80,7 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*Up
 		}
 	}
 
-	if err = uc.tree.UpdateNode(in.UserID, in.ID, in.Title, in.Slug, in.Content, in.Version, in.FromImport); err != nil {
+	if err = uc.tree.UpdateNode(in.UserID, in.ID, in.Title, in.Slug, in.Content, in.Version, in.Tags, in.Properties, in.FromImport); err != nil {
 		return nil, err
 	}
 

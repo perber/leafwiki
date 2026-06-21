@@ -106,10 +106,11 @@ func TestExtractPropertiesFromContent_SkipsTagsKeyCaseInsensitive(t *testing.T) 
 }
 
 func TestExtractPropertiesFromContent_SkipsTitleKey(t *testing.T) {
+	// Only "title" present (no leafwiki_title): alias case, must be skipped.
 	content := "---\ntitle: My Page\nstatus: draft\n---\n"
 	got := ExtractPropertiesFromContent(content)
 	if _, ok := got["title"]; ok {
-		t.Error("'title' must not be stored as a property")
+		t.Error("'title' without leafwiki_title must not be stored as a property (alias case)")
 	}
 }
 
@@ -118,6 +119,24 @@ func TestExtractPropertiesFromContent_SkipsTitleKeyCaseInsensitive(t *testing.T)
 	got := ExtractPropertiesFromContent(content)
 	if _, ok := got["Title"]; ok {
 		t.Error("'Title' (mixed case) must not be stored as a property")
+	}
+}
+
+func TestExtractPropertiesFromContent_IndexesTitleWhenLeafwikiTitleAlsoPresent(t *testing.T) {
+	// Both "title" and "leafwiki_title" present: "title" is a user-defined
+	// custom property and must be indexed.
+	content := "---\ntitle: My Custom Title\nleafwiki_title: My Title\nstatus: draft\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "title", PropertyEntry{Value: "My Custom Title", Type: "text"})
+	assertEntry(t, got, "status", PropertyEntry{Value: "draft", Type: "text"})
+}
+
+func TestExtractPropertiesFromContent_SkipsTitleWhenOnlyTitlePresent(t *testing.T) {
+	// Alias case: leafwiki_title is absent, title is the page-title alias.
+	content := "---\ntitle: My Page\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if _, ok := got["title"]; ok {
+		t.Error("'title' without leafwiki_title must not be indexed")
 	}
 }
 
@@ -336,7 +355,7 @@ func createPageWithContent(t *testing.T, ts *tree.TreeService, title, slug, cont
 	if err != nil {
 		t.Fatalf("CreateNode %q: %v", slug, err)
 	}
-	if err := ts.UpdateNode("system", *idPtr, title, slug, &content, tree.VersionUnchecked, true); err != nil {
+	if err := ts.UpdateNode("system", *idPtr, title, slug, &content, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode %q: %v", slug, err)
 	}
 	return *idPtr
@@ -387,10 +406,15 @@ func TestPropertiesService_IndexAllPages_IsIdempotent(t *testing.T) {
 	}
 }
 
-func TestPropertiesService_IndexAllPages_SkipsReservedKeys(t *testing.T) {
+func TestPropertiesService_IndexAllPages_SkipsSystemKeys(t *testing.T) {
+	// System keys: "tags" and any "leafwiki_*" prefix must never be indexed.
+	// Note: "title" is no longer a system key — when leafwiki_title is present
+	// (which the tree service always writes), "title" is a user-defined custom
+	// property and WILL appear in the index. See the unit tests for
+	// ExtractPropertiesFromContent for the alias-case behaviour.
 	svc, ts := setupPropertiesService(t)
 	createPageWithContent(t, ts, "Page A", "page-a",
-		"---\ntags:\n  - go\ntitle: Custom\nleafwiki_id: abc\nstatus: draft\n---\n# A")
+		"---\ntags:\n  - go\nleafwiki_id: abc\nstatus: draft\n---\n# A")
 
 	indexAllPages(t, svc, ts)
 
@@ -400,13 +424,11 @@ func TestPropertiesService_IndexAllPages_SkipsReservedKeys(t *testing.T) {
 	}
 
 	for _, kc := range keys {
-		switch kc.Key {
-		case "tags", "title":
-			t.Errorf("reserved key %q must not be indexed", kc.Key)
-		default:
-			if len(kc.Key) >= 9 && kc.Key[:9] == "leafwiki_" {
-				t.Errorf("reserved prefix key %q must not be indexed", kc.Key)
-			}
+		if kc.Key == "tags" {
+			t.Errorf("system key %q must not be indexed", kc.Key)
+		}
+		if len(kc.Key) >= 9 && kc.Key[:9] == "leafwiki_" {
+			t.Errorf("reserved prefix key %q must not be indexed", kc.Key)
 		}
 	}
 	if len(keys) != 1 || keys[0].Key != "status" {

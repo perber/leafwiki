@@ -6,12 +6,6 @@ import (
 	"github.com/perber/wiki/internal/core/markdown"
 )
 
-// reservedKeys are frontmatter keys that must never be stored in the properties index.
-// Any key starting with "leafwiki_" is also reserved (checked separately).
-var reservedKeys = map[string]struct{}{
-	"tags":  {},
-	"title": {},
-}
 
 type PropertiesService struct {
 	store *PropertiesStore
@@ -51,7 +45,10 @@ func (s *PropertiesService) GetPropertiesForPages(pageIDs []string) (map[string]
 }
 
 // ExtractPropertiesFromContent parses frontmatter and returns scalar properties.
-// Skips: reserved keys (tags, title, leafwiki_*), lists, nil values.
+// Skips system keys (tags, leafwiki_*), lists, and nil values.
+// "title" is skipped when it is used as a page-title alias (no leafwiki_title
+// present); when leafwiki_title is explicit it is a user-defined property and
+// is included.
 // Nested YAML maps are flattened using dot notation (e.g. a.b: value).
 func ExtractPropertiesFromContent(content string) map[string]PropertyEntry {
 	fm, _, has, err := markdown.ParseFrontmatter(content)
@@ -62,7 +59,12 @@ func ExtractPropertiesFromContent(content string) map[string]PropertyEntry {
 	result := make(map[string]PropertyEntry)
 	for rawKey, value := range fm.ExtraFields {
 		key := strings.TrimSpace(rawKey)
-		if isReservedKey(key) {
+		if markdown.IsSystemKey(key) {
+			continue
+		}
+		// "title" without an explicit leafwiki_title is the page-title alias
+		// and must not be indexed as a custom property.
+		if strings.ToLower(key) == "title" && !fm.HasLeafWikiTitle {
 			continue
 		}
 		extractFlatEntry(key, value, result)
@@ -111,13 +113,6 @@ func extractFlatEntryDepth(prefix string, value interface{}, result map[string]P
 	}
 }
 
-func isReservedKey(key string) bool {
-	lower := strings.ToLower(key)
-	if _, ok := reservedKeys[lower]; ok {
-		return true
-	}
-	return strings.HasPrefix(lower, "leafwiki_")
-}
 
 func toPropertyEntry(value interface{}) (PropertyEntry, bool) {
 	s, ok := value.(string)

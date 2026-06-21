@@ -157,14 +157,15 @@ func TestParseFrontmatter(t *testing.T) {
 			name:  "valid frontmatter with title only",
 			input: "---\nleafwiki_title: My Title\n---\n# Title\nContent",
 			wantFM: Frontmatter{
-				LeafWikiTitle: "My Title",
+				LeafWikiTitle:    "My Title",
+				HasLeafWikiTitle: true,
 			},
 			wantBody: "# Title\nContent",
 			wantHas:  true,
 			wantErr:  false,
 		},
 		{
-			name:  "title alias is mapped and preserved",
+			name:  "title alias is mapped and preserved, HasLeafWikiTitle stays false",
 			input: "---\ntitle: My Title\n---\n# Title\nContent",
 			wantFM: Frontmatter{
 				LeafWikiTitle: "My Title",
@@ -177,11 +178,26 @@ func TestParseFrontmatter(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:  "both title and leafwiki_title: HasLeafWikiTitle true, title preserved in ExtraFields",
+			input: "---\ntitle: My Custom Title\nleafwiki_title: My Title\n---\n# Title\nContent",
+			wantFM: Frontmatter{
+				LeafWikiTitle:    "My Title",
+				HasLeafWikiTitle: true,
+				ExtraFields: map[string]interface{}{
+					"title": "My Custom Title",
+				},
+			},
+			wantBody: "# Title\nContent",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
 			name:  "valid frontmatter with both ID and title",
 			input: "---\nleafwiki_id: abc123\nleafwiki_title: My Title\n---\n# Title\nContent",
 			wantFM: Frontmatter{
-				LeafWikiID:    "abc123",
-				LeafWikiTitle: "My Title",
+				LeafWikiID:       "abc123",
+				LeafWikiTitle:    "My Title",
+				HasLeafWikiTitle: true,
 			},
 			wantBody: "# Title\nContent",
 			wantHas:  true,
@@ -260,8 +276,9 @@ func TestParseFrontmatter(t *testing.T) {
 			name:  "frontmatter with whitespace in values",
 			input: "---\nleafwiki_id: \"  abc123  \"\nleafwiki_title: \"  My Title  \"\n---\nBody",
 			wantFM: Frontmatter{
-				LeafWikiID:    "abc123",
-				LeafWikiTitle: "  My Title  ",
+				LeafWikiID:       "abc123",
+				LeafWikiTitle:    "  My Title  ",
+				HasLeafWikiTitle: true,
 			},
 			wantBody: "Body",
 			wantHas:  true,
@@ -560,6 +577,7 @@ func TestFrontmatter_MetadataRoundtripRFC3339(t *testing.T) {
 	input := Frontmatter{
 		LeafWikiID:           "abc123",
 		LeafWikiTitle:        "My Title",
+		HasLeafWikiTitle:     true,
 		LeafWikiCreatedAt:    createdAt,
 		LeafWikiUpdatedAt:    updatedAt,
 		LeafWikiCreatorID:    "alice",

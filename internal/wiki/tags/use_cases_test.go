@@ -46,7 +46,7 @@ func createAndIndexPage(t *testing.T, ts *tree.TreeService, svc *coretags.TagsSe
 	}
 	fm += "---\n\n" + body
 
-	if err := ts.UpdateNode("system", *idPtr, title, slug, &fm, tree.VersionUnchecked, true); err != nil {
+	if err := ts.UpdateNode("system", *idPtr, title, slug, &fm, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode %q: %v", slug, err)
 	}
 

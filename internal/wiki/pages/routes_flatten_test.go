@@ -90,6 +90,60 @@ func TestFlattenMetadataEntry_SkipsEmptyChildKey(t *testing.T) {
 	}
 }
 
+// ─── extractPageMetadata ─────────────────────────────────────────────────────
+
+func TestExtractPageMetadata_SkipsTagsAlways(t *testing.T) {
+	fields := map[string]interface{}{
+		"tags":   []interface{}{"go", "react"},
+		"status": "draft",
+	}
+	tags, props := extractPageMetadata(fields, false)
+	if len(tags) != 2 {
+		t.Errorf("expected 2 tags, got %v", tags)
+	}
+	if _, ok := props["tags"]; ok {
+		t.Error("tags must not appear in properties")
+	}
+	if props["status"] != "draft" {
+		t.Errorf("expected status=draft, got %q", props["status"])
+	}
+}
+
+func TestExtractPageMetadata_SkipsTitleWhenNoLeafwikiTitle(t *testing.T) {
+	// Alias case: "title" is the page-title alias, not a custom property.
+	fields := map[string]interface{}{
+		"title":  "My Page",
+		"status": "draft",
+	}
+	_, props := extractPageMetadata(fields, false)
+	if _, ok := props["title"]; ok {
+		t.Error("title without leafwiki_title must not appear in properties")
+	}
+}
+
+func TestExtractPageMetadata_IncludesTitleWhenLeafwikiTitlePresent(t *testing.T) {
+	// Custom property case: both "title" and "leafwiki_title" exist in the file.
+	fields := map[string]interface{}{
+		"title":  "My Custom Title",
+		"status": "draft",
+	}
+	_, props := extractPageMetadata(fields, true)
+	if props["title"] != "My Custom Title" {
+		t.Errorf("title with leafwiki_title must appear in properties, got %q", props["title"])
+	}
+}
+
+func TestExtractPageMetadata_SkipsLeafwikiPrefixAlways(t *testing.T) {
+	fields := map[string]interface{}{
+		"leafwiki_id": "abc",
+		"status":      "draft",
+	}
+	_, props := extractPageMetadata(fields, true)
+	if _, ok := props["leafwiki_id"]; ok {
+		t.Error("leafwiki_ keys must never appear in properties")
+	}
+}
+
 func TestFlattenMetadataEntry_DepthLimitDoesNotPanic(t *testing.T) {
 	// Build a map nested maxFlattenDepth+5 levels deep
 	inner := map[string]interface{}{"leaf": "value"}

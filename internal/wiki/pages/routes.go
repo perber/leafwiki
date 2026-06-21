@@ -277,43 +277,25 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 		return
 	}
 
-	contentToSave := req.Content
-	fromImport := false
-	if req.Content != nil {
-		extraFields := buildExtraFields(req.Tags, req.Properties)
-		combined, err := markdown.BuildMarkdownWithExtraFrontmatter(extraFields, *req.Content)
-		if err != nil {
-			respondWithPageStatusError(c, http.StatusInternalServerError, ErrCodePageInternalError, "Failed to build frontmatter", "failed to build frontmatter")
-			return
-		}
-		contentToSave = &combined
-		fromImport = true
+	// Normalize tags to lowercase so the on-disk file is always consistent with
+	// what the search index stores. Preserve nil so callers can distinguish
+	// "no tags field" (nil → preserve existing) from "empty tags" (non-nil).
+	normalizedTags := req.Tags
+	if req.Tags != nil {
+		normalizedTags = normalizeTagInputs(req.Tags)
 	}
 
 	kind := tree.NodeKindPage
 	out, err := r.updatePage.Execute(c.Request.Context(), UpdatePageInput{
 		UserID: user.ID, ID: id, Version: req.Version, Title: req.Title, Slug: req.Slug,
-		Content: contentToSave, Kind: &kind, FromImport: fromImport,
+		Content: req.Content, Kind: &kind,
+		Tags: normalizedTags, Properties: req.Properties,
 	})
 	if err != nil {
 		respondWithPageError(c, err)
 		return
 	}
 	r.respondPage(c, http.StatusOK, out.Page)
-}
-
-func buildExtraFields(tags []string, properties map[string]string) map[string]interface{} {
-	extra := make(map[string]interface{}, len(properties)+1)
-	for k, v := range properties {
-		extra[k] = v
-	}
-	normalizedTags := normalizeTagInputs(tags)
-	list := make([]interface{}, len(normalizedTags))
-	for i, t := range normalizedTags {
-		list[i] = t
-	}
-	extra["tags"] = list
-	return extra
 }
 
 func (r *Routes) handleDelete(c *gin.Context) {
@@ -541,17 +523,16 @@ func (r *Routes) enrichPageMetadata(page *dto.Page) {
 		return
 	}
 
-	tags, properties := extractPageMetadata(fm.ExtraFields)
+	tags, properties := extractPageMetadata(fm.ExtraFields, fm.HasLeafWikiTitle)
 	page.Tags = tags
 	page.Properties = properties
 }
 
-var reservedPropertyKeys = map[string]struct{}{
-	"tags":  {},
-	"title": {},
-}
-
-func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]string) {
+// extractPageMetadata extracts tags and user-defined properties from ExtraFields.
+// hasLeafWikiTitle must be true when leafwiki_title was explicitly present in
+// the file; in that case a coexisting "title" key is a custom property and is
+// included. When false, "title" is the legacy page-title alias and is skipped.
+func extractPageMetadata(fields map[string]interface{}, hasLeafWikiTitle bool) ([]string, map[string]string) {
 	tags := []string{}
 	properties := map[string]string{}
 
@@ -563,11 +544,10 @@ func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]st
 			tags = normalizeMetadataTags(value)
 			continue
 		}
-
-		if _, reserved := reservedPropertyKeys[lower]; reserved {
+		if markdown.IsSystemKey(key) {
 			continue
 		}
-		if strings.HasPrefix(lower, "leafwiki_") {
+		if lower == "title" && !hasLeafWikiTitle {
 			continue
 		}
 
@@ -681,7 +661,7 @@ func validatePageMetadataInput(tags []string, properties map[string]string) erro
 			ve.Add(field, "Property key must not contain leading or trailing whitespace")
 		case strings.HasPrefix(strings.ToLower(key), "leafwiki_"):
 			ve.Add(field, "Property key uses a reserved prefix")
-		case strings.ToLower(key) == "tags" || strings.ToLower(key) == "title":
+		case strings.ToLower(key) == "tags":
 			ve.Add(field, "Property key is reserved")
 		}
 	}

@@ -230,3 +230,54 @@ describe('round-trip: parse → build → parse', () => {
     expect(parsed.fields[0]).toMatchObject({ key: 'a.b', value: 'true' })
   })
 })
+
+// ─── validateEditorFrontmatterMetadata ───────────────────────────────────────
+
+import { validateEditorFrontmatterMetadata } from './frontmatter'
+import type { EditorFrontmatterField } from './frontmatter'
+
+function field(key: string, value = 'v'): EditorFrontmatterField {
+  return { key, value, type: 'text' }
+}
+
+describe('validateEditorFrontmatterMetadata – reserved keys', () => {
+  it('rejects the "tags" key', () => {
+    const errors = validateEditorFrontmatterMetadata([], [field('tags')])
+    expect(errors['properties.0.key']).toMatch(/reserved/i)
+  })
+
+  it('rejects "Tags" (case-insensitive)', () => {
+    const errors = validateEditorFrontmatterMetadata([], [field('Tags')])
+    expect(errors['properties.0.key']).toMatch(/reserved/i)
+  })
+
+  it('rejects leafwiki_ prefix', () => {
+    const errors = validateEditorFrontmatterMetadata([], [field('leafwiki_id')])
+    expect(errors['properties.0.key']).toMatch(/reserved/i)
+  })
+
+  it('allows "title" as a custom property key', () => {
+    // "title" may coexist with leafwiki_title and must not be rejected.
+    const errors = validateEditorFrontmatterMetadata(
+      [],
+      [field('title', 'My Custom Title')],
+    )
+    expect(errors['properties.0.key']).toBeUndefined()
+  })
+
+  it('allows "Title" (case-insensitive) as a custom property key', () => {
+    const errors = validateEditorFrontmatterMetadata(
+      [],
+      [field('Title', 'My Custom Title')],
+    )
+    expect(errors['properties.0.key']).toBeUndefined()
+  })
+
+  it('accepts a normal custom key', () => {
+    const errors = validateEditorFrontmatterMetadata(
+      [],
+      [field('status', 'draft')],
+    )
+    expect(Object.keys(errors)).toHaveLength(0)
+  })
+})
