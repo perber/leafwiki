@@ -21,6 +21,7 @@ var (
 	sanitize = bluemonday.StrictPolicy()
 
 	fencedCodePattern    = regexp.MustCompile("(?s)```.*?```")
+	mermaidCodePattern   = regexp.MustCompile("(?s)```mermaid.*?```")
 	imagePattern         = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`)
 	linkPattern          = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
 	htmlPattern          = regexp.MustCompile(`<[^>]+>`)
@@ -156,6 +157,10 @@ func plainText(body string, includeCode bool) string {
 	normalized = strings.ReplaceAll(normalized, "\r", "\n")
 	if !includeCode {
 		normalized = fencedCodePattern.ReplaceAllString(normalized, " ")
+	} else {
+		// Mermaid diagram blocks contain structural syntax tokens (graph TD, -->, classDef)
+		// that are not meaningful search terms, so strip them even in search mode.
+		normalized = mermaidCodePattern.ReplaceAllString(normalized, " ")
 	}
 	normalized = applyInlinePatternsOutsideFences(normalized)
 	var htmlBuf bytes.Buffer

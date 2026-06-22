@@ -244,6 +244,25 @@ func TestPlainTextForSearch_MixedCodeAndProsePatterns(t *testing.T) {
 	}
 }
 
+func TestPlainTextForSearch_ExcludesMermaidBlocks(t *testing.T) {
+	body := "Some prose.\n\n```mermaid\ngraph TD\n    A[Login] --> B{Auth ok?}\n```\n\nMore prose."
+	got := PlainTextForSearch(body)
+	if strings.Contains(got, "graph") || strings.Contains(got, "-->") {
+		t.Errorf("mermaid diagram syntax should not be in search index, got %q", got)
+	}
+	if !strings.Contains(got, "Some prose.") || !strings.Contains(got, "More prose.") {
+		t.Errorf("surrounding prose should still be indexed, got %q", got)
+	}
+}
+
+func TestPlainTextFromMarkdown_ExcludesMermaidBlocks(t *testing.T) {
+	body := "Some prose.\n\n```mermaid\ngraph TD\n    A[Login] --> B{Auth ok?}\n```\n\nMore prose."
+	got := PlainTextFromMarkdown(body)
+	if strings.Contains(got, "graph") || strings.Contains(got, "-->") {
+		t.Errorf("mermaid diagram syntax should not appear in display excerpt, got %q", got)
+	}
+}
+
 // Bug 1: fencePattern requires "^ {0,3}" (literal spaces), so "> ```go" (block-quote prefix)
 // doesn't match and fences inside block-quotes are invisible to applyInlinePatternsOutsideFences.
 func TestPlainTextForSearch_WikiImageInBlockQuotedCodeBlock(t *testing.T) {
