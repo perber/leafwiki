@@ -584,6 +584,43 @@ func TestSQLiteIndex_IndexPage_StripsMarkdownFormattingFromIndexedContent(t *tes
 	}
 }
 
+func TestSQLiteIndex_Search_FindsTermsInsideCodeBlocks(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	content := strings.Join([]string{
+		"# Example Test Page with a code block.",
+		"",
+		"```bash",
+		"# Fetch IP and store it in a variable",
+		"MY_IP=$(curl -sL api.ipify.org)",
+		"",
+		"# Get extra details in json format",
+		`curl -sL "ipapi.co/${MY_IP}/json/"`,
+		"```",
+	}, "\n")
+
+	err = index.IndexPage("docs/code-example", "docs/code-example.md", "code1", "Example Test Page with a code block.", tree.NodeKindPage, content)
+	if err != nil {
+		t.Fatalf("IndexPage failed: %v", err)
+	}
+
+	for _, term := range []string{"curl", "Fetch"} {
+		result, err := index.Search(term, nil, 0, 10)
+		if err != nil {
+			t.Fatalf("search for %q failed: %v", term, err)
+		}
+		if result.Count != 1 || len(result.Items) == 0 || result.Items[0].PageID != "code1" {
+			t.Errorf("expected to find page via code block term %q, got count=%d", term, result.Count)
+		}
+	}
+}
+
 func TestExtractHeadings_SingleH1(t *testing.T) {
 	got := extractHeadings("# Hello World")
 	if !strings.Contains(got, "Hello World") {

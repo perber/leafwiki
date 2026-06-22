@@ -199,7 +199,7 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 	// Headings extracted from the Markdown
 	headings := extractHeadings(content)
 
-	sanitizedBody := excerpt.PlainTextFromMarkdown(content)
+	sanitizedBody := excerpt.PlainTextForSearch(content)
 
 	return s.withDB(func(db *sql.DB) error {
 		_, err := db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
