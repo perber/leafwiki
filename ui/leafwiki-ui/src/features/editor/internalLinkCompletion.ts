@@ -56,8 +56,9 @@ function getWikiLinkRange(context: CompletionContext) {
   if (!match) return null
 
   const typedQuery = match[1] ?? ''
-  // Include ] / ]] after cursor in the range so they get replaced on completion
-  const suffix = afterCursor.match(/^[^\]\n]*(\]{1,2})?/)?.[0] ?? ''
+  // Only replace text to the right when we're already inside a wikilink that
+  // closes later on the same line; otherwise preserve trailing line content.
+  const suffix = afterCursor.match(/^[^\]\n]*\]{1,2}/)?.[0] ?? ''
 
   return {
     from: pos - typedQuery.length,
