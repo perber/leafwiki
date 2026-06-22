@@ -81,6 +81,25 @@ describe('wikiLinkCompletionSource', () => {
     expect(result?.to).toBe(doc.length)
     expect(result?.options[0]?.apply).toBe('Target Page]]')
   })
+
+  it('does not replace text after the cursor on the same line', () => {
+    useTreeStore.setState({
+      flatPages: [item('Target Page', 'docs/target-page')],
+    })
+
+    const doc = 'Before [[Target after text'
+    const cursorPos = 'Before [[Target'.length
+    const state = EditorState.create({ doc })
+    const context = new CompletionContext(state, cursorPos, true)
+    const result = wikiLinkCompletionSource(context)
+
+    expect(result).not.toBeNull()
+    expect(result?.from).toBe('Before [['.length)
+    expect(result?.to).toBe(cursorPos)
+
+    const applied = `${doc.slice(0, result!.from)}${String(result!.options[0]!.apply)}${doc.slice(result!.to)}`
+    expect(applied).toBe('Before [[Target Page]] after text')
+  })
 })
 
 describe('buildMarkdownLinkOptions', () => {
