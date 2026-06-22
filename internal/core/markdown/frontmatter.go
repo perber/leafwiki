@@ -27,11 +27,6 @@ type Frontmatter struct {
 	LeafWikiCreatorID    string                 `yaml:"leafwiki_creator_id,omitempty" json:"creatorId,omitempty"`
 	LeafWikiLastAuthorID string                 `yaml:"leafwiki_last_author_id,omitempty" json:"lastAuthorId,omitempty"`
 	ExtraFields          map[string]interface{} `yaml:"-" json:"-"`
-	// HasLeafWikiTitle is true when leafwiki_title was explicitly present in the
-	// YAML. When false, LeafWikiTitle was populated via the legacy "title" alias.
-	// Callers use this to decide whether a "title" ExtraField is a user-defined
-	// custom property (true) or a pass-through alias that must not be surfaced (false).
-	HasLeafWikiTitle bool `yaml:"-" json:"-"`
 }
 
 var unquotedTemplatePlaceholderLine = regexp.MustCompile(`^(\s*[^:\n]+:\s*)(\{\{[^}\n]+\}\})(\s*(?:#.*)?)$`)
@@ -59,7 +54,6 @@ func parseFrontmatterYAML(yamlPart string) (Frontmatter, error) {
 
 	if value, ok := raw["leafwiki_title"]; ok {
 		fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(valueToString(value))
-		fm.HasLeafWikiTitle = true
 	} else if value, ok := raw["title"]; ok {
 		fm.LeafWikiTitle = fm.stripSingleAndDoubleQuotes(valueToString(value))
 	}

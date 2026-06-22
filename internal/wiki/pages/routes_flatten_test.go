@@ -97,7 +97,7 @@ func TestExtractPageMetadata_SkipsTagsAlways(t *testing.T) {
 		"tags":   []interface{}{"go", "react"},
 		"status": "draft",
 	}
-	tags, props := extractPageMetadata(fields, false)
+	tags, props := extractPageMetadata(fields)
 	if len(tags) != 2 {
 		t.Errorf("expected 2 tags, got %v", tags)
 	}
@@ -109,27 +109,16 @@ func TestExtractPageMetadata_SkipsTagsAlways(t *testing.T) {
 	}
 }
 
-func TestExtractPageMetadata_SkipsTitleWhenNoLeafwikiTitle(t *testing.T) {
-	// Alias case: "title" is the page-title alias, not a custom property.
-	fields := map[string]interface{}{
-		"title":  "My Page",
-		"status": "draft",
-	}
-	_, props := extractPageMetadata(fields, false)
-	if _, ok := props["title"]; ok {
-		t.Error("title without leafwiki_title must not appear in properties")
-	}
-}
-
-func TestExtractPageMetadata_IncludesTitleWhenLeafwikiTitlePresent(t *testing.T) {
-	// Custom property case: both "title" and "leafwiki_title" exist in the file.
+func TestExtractPageMetadata_TitleInExtraFieldsIsAlwaysCustomProperty(t *testing.T) {
+	// "title" always lands in ExtraFields and is always treated as a custom
+	// property by extractPageMetadata.
 	fields := map[string]interface{}{
 		"title":  "My Custom Title",
 		"status": "draft",
 	}
-	_, props := extractPageMetadata(fields, true)
+	_, props := extractPageMetadata(fields)
 	if props["title"] != "My Custom Title" {
-		t.Errorf("title with leafwiki_title must appear in properties, got %q", props["title"])
+		t.Errorf("title in ExtraFields must appear in properties, got %q", props["title"])
 	}
 }
 
@@ -138,7 +127,7 @@ func TestExtractPageMetadata_SkipsLeafwikiPrefixAlways(t *testing.T) {
 		"leafwiki_id": "abc",
 		"status":      "draft",
 	}
-	_, props := extractPageMetadata(fields, true)
+	_, props := extractPageMetadata(fields)
 	if _, ok := props["leafwiki_id"]; ok {
 		t.Error("leafwiki_ keys must never appear in properties")
 	}

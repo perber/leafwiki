@@ -105,38 +105,39 @@ func TestExtractPropertiesFromContent_SkipsTagsKeyCaseInsensitive(t *testing.T) 
 	}
 }
 
-func TestExtractPropertiesFromContent_SkipsTitleKey(t *testing.T) {
-	// Only "title" present (no leafwiki_title): alias case, must be skipped.
+func TestExtractPropertiesFromContent_IndexesTitleAlone(t *testing.T) {
+	// "title" is always a custom property — it lands in ExtraFields and is indexed
+	// regardless of whether leafwiki_title is also present.
 	content := "---\ntitle: My Page\nstatus: draft\n---\n"
 	got := ExtractPropertiesFromContent(content)
-	if _, ok := got["title"]; ok {
-		t.Error("'title' without leafwiki_title must not be stored as a property (alias case)")
+	if _, ok := got["title"]; !ok {
+		t.Error("'title' must be indexed as a custom property")
 	}
 }
 
-func TestExtractPropertiesFromContent_SkipsTitleKeyCaseInsensitive(t *testing.T) {
+func TestExtractPropertiesFromContent_IndexesMixedCaseTitleAsCustomProperty(t *testing.T) {
+	// YAML is case-sensitive: "Title" ≠ "title". Both are custom properties.
 	content := "---\nTitle: My Page\nstatus: draft\n---\n"
 	got := ExtractPropertiesFromContent(content)
-	if _, ok := got["Title"]; ok {
-		t.Error("'Title' (mixed case) must not be stored as a property")
+	if _, ok := got["Title"]; !ok {
+		t.Error("'Title' (mixed case) is a custom property and must be indexed")
 	}
 }
 
 func TestExtractPropertiesFromContent_IndexesTitleWhenLeafwikiTitleAlsoPresent(t *testing.T) {
-	// Both "title" and "leafwiki_title" present: "title" is a user-defined
-	// custom property and must be indexed.
+	// Both "title" and "leafwiki_title" present: "title" is a custom property.
 	content := "---\ntitle: My Custom Title\nleafwiki_title: My Title\nstatus: draft\n---\n"
 	got := ExtractPropertiesFromContent(content)
 	assertEntry(t, got, "title", PropertyEntry{Value: "My Custom Title", Type: "text"})
 	assertEntry(t, got, "status", PropertyEntry{Value: "draft", Type: "text"})
 }
 
-func TestExtractPropertiesFromContent_SkipsTitleWhenOnlyTitlePresent(t *testing.T) {
-	// Alias case: leafwiki_title is absent, title is the page-title alias.
+func TestExtractPropertiesFromContent_IndexesTitleAloneAsCustomProperty(t *testing.T) {
+	// "title" alone is always a custom property — no leafwiki_title required.
 	content := "---\ntitle: My Page\n---\n"
 	got := ExtractPropertiesFromContent(content)
-	if _, ok := got["title"]; ok {
-		t.Error("'title' without leafwiki_title must not be indexed")
+	if _, ok := got["title"]; !ok {
+		t.Error("'title' must be indexed as a custom property")
 	}
 }
 
@@ -203,7 +204,7 @@ func TestExtractPropertiesFromContent_EmptyContentReturnsNil(t *testing.T) {
 }
 
 func TestExtractPropertiesFromContent_OnlyReservedKeysReturnsNil(t *testing.T) {
-	content := "---\ntags:\n  - go\ntitle: My Page\nleafwiki_id: abc\n---\n"
+	content := "---\ntags:\n  - go\nleafwiki_id: abc\n---\n"
 	got := ExtractPropertiesFromContent(content)
 	if got != nil {
 		t.Errorf("expected nil when all keys are reserved, got %v", got)
@@ -408,10 +409,7 @@ func TestPropertiesService_IndexAllPages_IsIdempotent(t *testing.T) {
 
 func TestPropertiesService_IndexAllPages_SkipsSystemKeys(t *testing.T) {
 	// System keys: "tags" and any "leafwiki_*" prefix must never be indexed.
-	// Note: "title" is no longer a system key — when leafwiki_title is present
-	// (which the tree service always writes), "title" is a user-defined custom
-	// property and WILL appear in the index. See the unit tests for
-	// ExtractPropertiesFromContent for the alias-case behaviour.
+	// "title" is always a custom property and will appear in the index when set.
 	svc, ts := setupPropertiesService(t)
 	createPageWithContent(t, ts, "Page A", "page-a",
 		"---\ntags:\n  - go\nleafwiki_id: abc\nstatus: draft\n---\n# A")

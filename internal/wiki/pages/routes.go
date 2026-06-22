@@ -523,16 +523,12 @@ func (r *Routes) enrichPageMetadata(page *dto.Page) {
 		return
 	}
 
-	tags, properties := extractPageMetadata(fm.ExtraFields, fm.HasLeafWikiTitle)
+	tags, properties := extractPageMetadata(fm.ExtraFields)
 	page.Tags = tags
 	page.Properties = properties
 }
 
-// extractPageMetadata extracts tags and user-defined properties from ExtraFields.
-// hasLeafWikiTitle must be true when leafwiki_title was explicitly present in
-// the file; in that case a coexisting "title" key is a custom property and is
-// included. When false, "title" is the legacy page-title alias and is skipped.
-func extractPageMetadata(fields map[string]interface{}, hasLeafWikiTitle bool) ([]string, map[string]string) {
+func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]string) {
 	tags := []string{}
 	properties := map[string]string{}
 
@@ -545,9 +541,6 @@ func extractPageMetadata(fields map[string]interface{}, hasLeafWikiTitle bool) (
 			continue
 		}
 		if markdown.IsSystemKey(key) {
-			continue
-		}
-		if lower == "title" && !hasLeafWikiTitle {
 			continue
 		}
 
@@ -659,9 +652,7 @@ func validatePageMetadataInput(tags []string, properties map[string]string) erro
 			ve.Add(field, "Property key must not be empty")
 		case key != rawKey:
 			ve.Add(field, "Property key must not contain leading or trailing whitespace")
-		case strings.HasPrefix(strings.ToLower(key), "leafwiki_"):
-			ve.Add(field, "Property key uses a reserved prefix")
-		case strings.ToLower(key) == "tags":
+		case markdown.IsSystemKey(key):
 			ve.Add(field, "Property key is reserved")
 		}
 	}

@@ -2454,8 +2454,8 @@ func TestUpdatePage_InvalidProperties(t *testing.T) {
 		gotFields[field.Field] = field.Message
 	}
 
-	if gotFields["properties.leafwiki_hidden"] != "Property key uses a reserved prefix" {
-		t.Fatalf("expected reserved prefix validation error, got %#v", gotFields)
+	if gotFields["properties.leafwiki_hidden"] != "Property key is reserved" {
+		t.Fatalf("expected reserved key validation error, got %#v", gotFields)
 	}
 }
 

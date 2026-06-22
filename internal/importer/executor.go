@@ -85,7 +85,8 @@ func (e *Executor) WithResumeState(startIndex int, initialResult *ExecutionResul
 }
 
 func buildImportedContent(mdFile *markdown.MarkdownFile) (string, error) {
-	return markdown.BuildMarkdownWithExtraFrontmatter(mdFile.GetFrontmatter().ExtraFields, mdFile.GetContent())
+	fm := mdFile.GetFrontmatter()
+	return markdown.BuildMarkdownWithExtraFrontmatter(fm.ExtraFields, mdFile.GetContent())
 }
 
 // Execute runs the import based on the provided plan

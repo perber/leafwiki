@@ -46,9 +46,6 @@ func (s *PropertiesService) GetPropertiesForPages(pageIDs []string) (map[string]
 
 // ExtractPropertiesFromContent parses frontmatter and returns scalar properties.
 // Skips system keys (tags, leafwiki_*), lists, and nil values.
-// "title" is skipped when it is used as a page-title alias (no leafwiki_title
-// present); when leafwiki_title is explicit it is a user-defined property and
-// is included.
 // Nested YAML maps are flattened using dot notation (e.g. a.b: value).
 func ExtractPropertiesFromContent(content string) map[string]PropertyEntry {
 	fm, _, has, err := markdown.ParseFrontmatter(content)
@@ -60,11 +57,6 @@ func ExtractPropertiesFromContent(content string) map[string]PropertyEntry {
 	for rawKey, value := range fm.ExtraFields {
 		key := strings.TrimSpace(rawKey)
 		if markdown.IsSystemKey(key) {
-			continue
-		}
-		// "title" without an explicit leafwiki_title is the page-title alias
-		// and must not be indexed as a custom property.
-		if strings.ToLower(key) == "title" && !fm.HasLeafWikiTitle {
 			continue
 		}
 		extractFlatEntry(key, value, result)

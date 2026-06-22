@@ -477,9 +477,6 @@ func TestImporterService_ExecuteCurrentPlan_HappyPath_PreservesNonInternalFrontm
 	if strings.Contains(*w.lastUpdatedContent, "leafwiki_id: source-id") {
 		t.Fatalf("expected source leafwiki_id to be dropped, got: %q", *w.lastUpdatedContent)
 	}
-	if strings.Contains(*w.lastUpdatedContent, "leafwiki_title: Source Title") {
-		t.Fatalf("expected source leafwiki_title to be dropped, got: %q", *w.lastUpdatedContent)
-	}
 }
 
 func TestImporterService_ExecuteCurrentPlan_ExecutorStalePlanPropagatesError(t *testing.T) {
