@@ -47,6 +47,17 @@ func TestFromContent_StripsFencedCode(t *testing.T) {
 	}
 }
 
+func TestPlainTextForSearch_IncludesCodeBlockContent(t *testing.T) {
+	body := "Before.\n\n```go\nfunc main() {}\n```\n\nAfter."
+	got := PlainTextForSearch(body)
+	if !strings.Contains(got, "func main") {
+		t.Errorf("search text should contain fenced code content, got %q", got)
+	}
+	if !strings.Contains(got, "Before.") || !strings.Contains(got, "After.") {
+		t.Errorf("search text should contain surrounding text, got %q", got)
+	}
+}
+
 func TestFromContent_StripsMarkdownHeadings(t *testing.T) {
 	raw := "---\ntitle: T\n---\n\n# Heading One\n\nSome body text."
 	got := FromContent(raw)
@@ -189,6 +200,71 @@ func TestPlainTextFromMarkdown_StripsWikiLinks(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestPlainTextForSearch_WikiLinkAliasInCodeBlockPreservesPageName(t *testing.T) {
+	body := "```\n[[SomePage|Display Text]]\n```"
+	got := PlainTextForSearch(body)
+	if !strings.Contains(got, "SomePage") {
+		t.Errorf("page name inside code block should be searchable, got %q", got)
+	}
+	if !strings.Contains(got, "Display") {
+		t.Errorf("alias text inside code block should be searchable, got %q", got)
+	}
+}
+
+func TestPlainTextForSearch_WikiImageInCodeBlockPreservesFilename(t *testing.T) {
+	body := "```\n![[screenshot.png]]\n```"
+	got := PlainTextForSearch(body)
+	if !strings.Contains(got, "screenshot.png") {
+		t.Errorf("image filename inside code block should be searchable, got %q", got)
+	}
+}
+
+func TestPlainTextForSearch_InlinePatternsProseMayRunNormally(t *testing.T) {
+	body := "See [[ProseLink|prose alias]] and ![[icon.png]] outside code."
+	got := PlainTextForSearch(body)
+	if !strings.Contains(got, "prose alias") {
+		t.Errorf("wiki link alias outside code block should be extracted, got %q", got)
+	}
+	if strings.Contains(got, "ProseLink") {
+		t.Errorf("wiki link page name outside code block should not appear verbatim, got %q", got)
+	}
+}
+
+func TestPlainTextForSearch_MixedCodeAndProsePatterns(t *testing.T) {
+	body := "See [[ProseLink|prose]] for info.\n\n```\n[[CodePage|code alias]]\n```"
+	got := PlainTextForSearch(body)
+	if !strings.Contains(got, "prose") {
+		t.Errorf("prose wiki link alias should be extracted, got %q", got)
+	}
+	if !strings.Contains(got, "CodePage") {
+		t.Errorf("page name inside code block should be searchable, got %q", got)
+	}
+}
+
+// Bug 1: fencePattern requires "^ {0,3}" (literal spaces), so "> ```go" (block-quote prefix)
+// doesn't match and fences inside block-quotes are invisible to applyInlinePatternsOutsideFences.
+func TestPlainTextForSearch_WikiImageInBlockQuotedCodeBlock(t *testing.T) {
+	body := "> ```\n> ![[screenshot.png]]\n> ```"
+	got := PlainTextForSearch(body)
+	if !strings.Contains(got, "screenshot.png") {
+		t.Errorf("image filename in block-quoted code should be searchable, got %q", got)
+	}
+}
+
+// Bug 2: the fence-OPENING line is processed by inline patterns because fence==nil
+// at the time of the if-check (nextFence is computed first but not yet assigned).
+func TestApplyInlinePatternsOutsideFences_FenceOpenLineNotProcessed(t *testing.T) {
+	input := "```![[img.png]]\ncurl\n```"
+	got := applyInlinePatternsOutsideFences(input)
+	lines := strings.Split(got, "\n")
+	if lines[0] != "```![[img.png]]" {
+		t.Errorf("fence-open line should not be processed by patterns, got %q", lines[0])
+	}
+	if lines[1] != "curl" {
+		t.Errorf("code content should be preserved verbatim, got %q", lines[1])
 	}
 }
 
