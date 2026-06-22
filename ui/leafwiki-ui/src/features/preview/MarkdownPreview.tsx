@@ -24,6 +24,7 @@ import {
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
+import { common } from 'lowlight'
 import dockerfile from 'highlight.js/lib/languages/dockerfile'
 import http from 'highlight.js/lib/languages/http'
 import nginx from 'highlight.js/lib/languages/nginx'
@@ -624,7 +625,16 @@ export default function MarkdownPreview({
             [rehypeSanitize, schema],
             [
               rehypeHighlight,
-              { languages: { dockerfile, http, nginx, nix, protobuf } },
+              {
+                languages: {
+                  ...common,
+                  dockerfile,
+                  http,
+                  nginx,
+                  nix,
+                  protobuf,
+                },
+              },
             ],
           ]}
           components={components}
