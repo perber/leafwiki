@@ -1,6 +1,14 @@
-import { CompletionContext } from '@codemirror/autocomplete'
+import {
+  CompletionContext,
+  autocompletion,
+  completionStatus,
+  type Completion,
+  currentCompletions,
+  startCompletion,
+} from '@codemirror/autocomplete'
 import { EditorState } from '@codemirror/state'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { EditorView } from '@codemirror/view'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   hasSuppressedExternalPrefix,
   buildMarkdownLinkOptions,
@@ -25,6 +33,24 @@ const item = (
   normalizedPath: path.toLowerCase().trim(),
   normalizedBreadcrumb: (breadcrumb ?? title).toLowerCase().trim(),
 })
+
+function expectCompletionApply(
+  completion: Completion | undefined,
+): (
+  view: EditorView,
+  completion: Completion,
+  from: number,
+  to: number,
+) => void {
+  expect(completion).toBeTruthy()
+  expect(typeof completion?.apply).toBe('function')
+  return completion!.apply as (
+    view: EditorView,
+    completion: Completion,
+    from: number,
+    to: number,
+  ) => void
+}
 
 describe('hasSuppressedExternalPrefix', () => {
   it('suppresses http', () => {
@@ -79,7 +105,7 @@ describe('wikiLinkCompletionSource', () => {
     expect(result).not.toBeNull()
     expect(result?.from).toBe(2)
     expect(result?.to).toBe(doc.length)
-    expect(result?.options[0]?.apply).toBe('Target Page]]')
+    expect(result?.options[0]?.apply).toEqual(expect.any(Function))
   })
 
   it('does not replace text after the cursor on the same line', () => {
@@ -94,11 +120,208 @@ describe('wikiLinkCompletionSource', () => {
     const result = wikiLinkCompletionSource(context)
 
     expect(result).not.toBeNull()
-    expect(result?.from).toBe('Before [['.length)
-    expect(result?.to).toBe(cursorPos)
+    const completionResult = result!
+    expect(completionResult.from).toBe('Before [['.length)
+    expect(completionResult.to).toBe(cursorPos)
 
-    const applied = `${doc.slice(0, result!.from)}${String(result!.options[0]!.apply)}${doc.slice(result!.to)}`
-    expect(applied).toBe('Before [[Target Page]] after text')
+    const parent = document.createElement('div')
+    document.body.appendChild(parent)
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        selection: { anchor: cursorPos },
+      }),
+      parent,
+    })
+
+    try {
+      const apply = expectCompletionApply(completionResult.options[0])
+      apply(
+        view,
+        completionResult.options[0]!,
+        completionResult.from,
+        completionResult.to!,
+      )
+      expect(view.state.doc.toString()).toBe(
+        'Before [[Target Page]] after text',
+      )
+    } finally {
+      view.destroy()
+      parent.remove()
+    }
+  })
+
+  it('does not replace an adjacent wikilink later on the same line', () => {
+    useTreeStore.setState({
+      flatPages: [item('Target Page', 'docs/target-page')],
+    })
+
+    const doc = 'Before [[Target and [[Existing]]'
+    const cursorPos = 'Before [[Target'.length
+    const state = EditorState.create({ doc })
+    const context = new CompletionContext(state, cursorPos, true)
+    const result = wikiLinkCompletionSource(context)
+
+    expect(result).not.toBeNull()
+    const completionResult = result!
+    expect(completionResult.from).toBe('Before [['.length)
+    expect(completionResult.to).toBe(cursorPos)
+
+    const parent = document.createElement('div')
+    document.body.appendChild(parent)
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        selection: { anchor: cursorPos },
+      }),
+      parent,
+    })
+
+    try {
+      const apply = expectCompletionApply(completionResult.options[0])
+      apply(
+        view,
+        completionResult.options[0]!,
+        completionResult.from,
+        completionResult.to!,
+      )
+      expect(view.state.doc.toString()).toBe(
+        'Before [[Target Page]] and [[Existing]]',
+      )
+    } finally {
+      view.destroy()
+      parent.remove()
+    }
+  })
+
+  it('does not replace an adjacent markdown link later on the same line', () => {
+    useTreeStore.setState({
+      flatPages: [item('Target Page', 'docs/target-page')],
+    })
+
+    const doc = 'Before [[Target and [Existing](/docs/existing)'
+    const cursorPos = 'Before [[Target'.length
+    const state = EditorState.create({ doc })
+    const context = new CompletionContext(state, cursorPos, true)
+    const result = wikiLinkCompletionSource(context)
+
+    expect(result).not.toBeNull()
+    const completionResult = result!
+    expect(completionResult.from).toBe('Before [['.length)
+    expect(completionResult.to).toBe(cursorPos)
+
+    const parent = document.createElement('div')
+    document.body.appendChild(parent)
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        selection: { anchor: cursorPos },
+      }),
+      parent,
+    })
+
+    try {
+      const apply = expectCompletionApply(completionResult.options[0])
+      apply(
+        view,
+        completionResult.options[0]!,
+        completionResult.from,
+        completionResult.to!,
+      )
+      expect(view.state.doc.toString()).toBe(
+        'Before [[Target Page]] and [Existing](/docs/existing)',
+      )
+    } finally {
+      view.destroy()
+      parent.remove()
+    }
+  })
+
+  it('does not consume until a later closing wikilink on the same line', () => {
+    useTreeStore.setState({
+      flatPages: [item('Target Page', 'docs/target-page')],
+    })
+
+    const doc = '[[Hello]] asdf [[Target more text [[Hello]]'
+    const cursorPos = '[[Hello]] asdf [[Target'.length
+    const state = EditorState.create({ doc })
+    const context = new CompletionContext(state, cursorPos, true)
+    const result = wikiLinkCompletionSource(context)
+
+    expect(result).not.toBeNull()
+    const completionResult = result!
+    expect(completionResult.from).toBe('[[Hello]] asdf [['.length)
+    expect(completionResult.to).toBe(cursorPos)
+
+    const parent = document.createElement('div')
+    document.body.appendChild(parent)
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        selection: { anchor: cursorPos },
+      }),
+      parent,
+    })
+
+    try {
+      const apply = expectCompletionApply(completionResult.options[0])
+      apply(
+        view,
+        completionResult.options[0]!,
+        completionResult.from,
+        completionResult.to!,
+      )
+      expect(view.state.doc.toString()).toBe(
+        '[[Hello]] asdf [[Target Page]] more text [[Hello]]',
+      )
+    } finally {
+      view.destroy()
+      parent.remove()
+    }
+  })
+
+  it('applies completion without replacing later text in the editor', async () => {
+    useTreeStore.setState({
+      flatPages: [item('Target Page', 'docs/target-page')],
+    })
+
+    const parent = document.createElement('div')
+    document.body.appendChild(parent)
+
+    const doc = '[[Hello]] asdf [[Target more text [[Hello]]'
+    const cursorPos = '[[Hello]] asdf [[Target'.length
+
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        selection: { anchor: cursorPos },
+        extensions: [
+          autocompletion({
+            override: [wikiLinkCompletionSource],
+          }),
+        ],
+      }),
+      parent,
+    })
+
+    try {
+      expect(startCompletion(view)).toBe(true)
+
+      await vi.waitFor(() => {
+        expect(completionStatus(view.state)).toBe('active')
+        expect(currentCompletions(view.state).length).toBeGreaterThan(0)
+      })
+
+      const completion = currentCompletions(view.state)[0]
+      const apply = expectCompletionApply(completion)
+      apply(view, completion!, cursorPos - 'Target'.length, cursorPos)
+      expect(view.state.doc.toString()).toBe(
+        '[[Hello]] asdf [[Target Page]] more text [[Hello]]',
+      )
+    } finally {
+      view.destroy()
+      parent.remove()
+    }
   })
 })
 
@@ -127,21 +350,39 @@ describe('buildMarkdownLinkOptions', () => {
 })
 
 describe('buildWikiLinkOptions', () => {
-  it('maps items to completion options with title-based apply closing ]]', () => {
+  it('maps items to completion options with title-based apply handler', () => {
     const options = buildWikiLinkOptions([
       item('Intro', 'docs/intro', 'Docs / Intro'),
     ])
     expect(options).toHaveLength(1)
     expect(options[0].label).toBe('Intro')
     expect(options[0].displayLabel).toBe('Intro')
-    expect(options[0].apply).toBe('Intro]]')
+    expect(options[0].apply).toEqual(expect.any(Function))
     expect(options[0].info).toBe('Docs / Intro')
     expect(options[0].path).toBe('docs/intro')
   })
 
-  it('uses the page title (not path) in apply', () => {
+  it('uses the page title (not path) when applied', () => {
     const options = buildWikiLinkOptions([item('My Page', 'folder/my-page')])
-    expect(options[0].apply).toBe('My Page]]')
+    const parent = document.createElement('div')
+    document.body.appendChild(parent)
+
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: '[[My',
+        selection: { anchor: '[[My'.length },
+      }),
+      parent,
+    })
+
+    try {
+      const apply = expectCompletionApply(options[0])
+      apply(view, options[0], 2, '[[My'.length)
+      expect(view.state.doc.toString()).toBe('[[My Page]]')
+    } finally {
+      view.destroy()
+      parent.remove()
+    }
   })
 
   it('returns one option per item', () => {
@@ -150,6 +391,6 @@ describe('buildWikiLinkOptions', () => {
       item('Page B', 'b'),
     ])
     expect(options).toHaveLength(2)
-    expect(options.map((o) => o.apply)).toEqual(['Page A]]', 'Page B]]'])
+    expect(options.map((o) => typeof o.apply)).toEqual(['function', 'function'])
   })
 })
