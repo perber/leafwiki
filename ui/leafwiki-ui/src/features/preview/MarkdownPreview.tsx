@@ -24,6 +24,11 @@ import {
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
+import dockerfile from 'highlight.js/lib/languages/dockerfile'
+import http from 'highlight.js/lib/languages/http'
+import nginx from 'highlight.js/lib/languages/nginx'
+import nix from 'highlight.js/lib/languages/nix'
+import protobuf from 'highlight.js/lib/languages/protobuf'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
@@ -617,7 +622,10 @@ export default function MarkdownPreview({
             rehypeWhitelistStyles,
             [rehypeKatex, { output: 'html', strict: 'ignore' }],
             [rehypeSanitize, schema],
-            rehypeHighlight,
+            [
+              rehypeHighlight,
+              { languages: { dockerfile, http, nginx, nix, protobuf } },
+            ],
           ]}
           components={components}
           urlTransform={transformMarkdownUrl}
