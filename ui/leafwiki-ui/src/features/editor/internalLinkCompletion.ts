@@ -3,6 +3,9 @@ import type {
   CompletionContext,
   CompletionResult,
 } from '@codemirror/autocomplete'
+import { pickedCompletion } from '@codemirror/autocomplete'
+import type { EditorState } from '@codemirror/state'
+import type { EditorView } from '@codemirror/view'
 import { FlatPageSearchItem, searchFlatPageSearchItems } from '@/lib/pageSearch'
 import { useTreeStore } from '@/stores/tree'
 
@@ -46,8 +49,7 @@ function getLinkTargetRange(context: CompletionContext) {
   }
 }
 
-function getWikiLinkRange(context: CompletionContext) {
-  const { state, pos } = context
+function getWikiLinkRangeForPosition(state: EditorState, pos: number) {
   const line = state.doc.lineAt(pos)
   const beforeCursor = line.text.slice(0, pos - line.from)
   const afterCursor = line.text.slice(pos - line.from)
@@ -57,14 +59,18 @@ function getWikiLinkRange(context: CompletionContext) {
 
   const typedQuery = match[1] ?? ''
   // Only replace text to the right when we're already inside a wikilink that
-  // closes later on the same line; otherwise preserve trailing line content.
-  const suffix = afterCursor.match(/^[^\]\n]*\]{1,2}/)?.[0] ?? ''
+  // closes later on the same line, and stop before any new link syntax starts.
+  const suffix = afterCursor.match(/^[^[\]\n]*\]{1,2}/)?.[0] ?? ''
 
   return {
     from: pos - typedQuery.length,
     to: pos + suffix.length,
     query: typedQuery,
   }
+}
+
+function getWikiLinkRange(context: CompletionContext) {
+  return getWikiLinkRangeForPosition(context.state, context.pos)
 }
 
 export function buildMarkdownLinkOptions(
@@ -88,7 +94,19 @@ export function buildWikiLinkOptions(
     displayLabel: item.title,
     info: item.breadcrumb,
     type: 'text',
-    apply: `${item.title}]]`,
+    apply: (view: EditorView, completion, from: number, to: number) => {
+      const cursorPos = view.state.selection.main.head
+      const range = getWikiLinkRangeForPosition(view.state, cursorPos)
+      const safeFrom = range?.from ?? from
+      const safeTo = range?.to ?? to
+      const insert = `${item.title}]]`
+
+      view.dispatch({
+        changes: { from: safeFrom, to: safeTo, insert },
+        selection: { anchor: safeFrom + insert.length },
+        annotations: pickedCompletion.of(completion),
+      })
+    },
     path: item.path,
   }))
 }
