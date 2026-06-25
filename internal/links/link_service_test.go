@@ -1336,6 +1336,19 @@ func TestExtractWikiLinksFromMarkdown_IgnoresIndentedCodeBlock(t *testing.T) {
 	}
 }
 
+func TestExtractWikiLinksFromMarkdown_IgnoresBashConditionalsOutsideCodeBlocks(t *testing.T) {
+	cases := []string{
+		`if [[ -n "$computed_hash" && -n "$src_hash" ]]; then`,
+		`if [[ "$src_hash" == sha256-* ]]; then`,
+	}
+	for _, content := range cases {
+		got := extractWikiLinksFromMarkdown(content)
+		if len(got) != 0 {
+			t.Errorf("input %q: expected no wiki links, got %v", content, got)
+		}
+	}
+}
+
 func TestExtractWikiLinksFromMarkdown_Empty(t *testing.T) {
 	got := extractWikiLinksFromMarkdown("No wiki links here.")
 	if len(got) != 0 {

@@ -36,10 +36,10 @@ describe('preprocessWikilinks', () => {
       expect(result).toBe('[our intro](/docs/intro)')
     })
 
-    it('trims whitespace from target and alias', () => {
+    it('trims trailing whitespace from target and alias', () => {
       const docs = page('1', 'docs/intro', 'Intro')
       const result = preprocessWikilinks(
-        '[[ Intro | our intro ]]',
+        '[[Intro |our intro ]]',
         singleMatch(docs),
       )
       expect(result).toBe('[our intro](/docs/intro)')
@@ -139,6 +139,29 @@ describe('preprocessWikilinks', () => {
       preprocessWikilinks('[[Notes]] and [[notes]]', getPagesByTitle)
       // cache key is lowercased, so both resolve from the same cache entry
       expect(getPagesByTitle).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // Regression for #1200: bash [[ ... ]] conditionals must not be treated as wikilinks
+  describe('bash double-bracket conditionals', () => {
+    it('does not treat [[ ]] in bash conditionals as a wikilink', () => {
+      const content = 'if [[ -n "$computed_hash" && -n "$src_hash" ]]; then'
+      const result = preprocessWikilinks(content, noMatch)
+      expect(result).toBe(content)
+    })
+
+    it('does not treat [[ ]] with == operator as a wikilink', () => {
+      const content = 'if [[ "$src_hash" == sha256-* ]]; then'
+      const result = preprocessWikilinks(content, noMatch)
+      expect(result).toBe(content)
+    })
+
+    // [[ <space>Title ]] is intentionally not supported — leading whitespace after [[
+    // is the distinguishing marker of bash conditionals and is therefore rejected.
+    it('does not treat [[ Title ]] with leading space as a wikilink', () => {
+      const content = '[[ Intro ]]'
+      const result = preprocessWikilinks(content, noMatch)
+      expect(result).toBe(content)
     })
   })
 

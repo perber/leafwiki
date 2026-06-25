@@ -13,7 +13,9 @@ import (
 
 // wikiLinkRe matches [[Target]] and [[Target|Alias]] syntax.
 // Capture group 1 is the target (title or path hint).
-var wikiLinkRe = regexp.MustCompile(`\[\[([^\]|#\n]+?)(?:\|[^\]\n]+?)?\]\]`)
+// \S as first character rejects bash-style [[ -n ... ]] conditionals (which always
+// start with a space after [[) without affecting real wiki-link titles.
+var wikiLinkRe = regexp.MustCompile(`\[\[(\S[^\]|#\n]*?)(?:\|[^\]\n]+?)?\]\]`)
 
 // wikilinkSentinelPrefix is the to_path prefix used for broken wiki-link
 // records in the link store. It must never collide with real wiki route paths

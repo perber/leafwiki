@@ -1,6 +1,6 @@
 import { PageNode } from '@/lib/api/pages'
 
-const WIKILINK_RE = /\[\[([^\]|#\n]+?)(?:\|([^\]\n]+?))?\]\]/g
+const WIKILINK_RE = /\[\[(\S[^\]|#\n]*?)(?:\|([^\]\n]+?))?\]\]/g
 
 // Splits content into alternating [text, code, text, code, ...] segments.
 // The capture group keeps the code spans in the result array at odd indices.
