@@ -11,7 +11,6 @@ For engineers and self-hosters who want structured, long-lived documentation. No
 If you've looked at Wiki.js or Outline and thought "this is too much to operate for what I need" — this could fit for you.
 
 → Try it without installing: **[demo.leafwiki.com](https://demo.leafwiki.com)** · `Ctrl+E` edit · `Ctrl+S` save · resets hourly  
-→ Prefer not to self-host? **[LeafWiki Hosted](https://leafwiki.com/hosted)** is launching autumn 2026 — join the waitlist.  
 → If it fits, [a star](https://github.com/perber/leafwiki) helps others find it.
 
 ```bash
@@ -426,7 +425,8 @@ If it's useful to you:
 
 - ⭐ **[Star the repo](https://github.com/perber/leafwiki)** — helps others find it
 - 💛 **[Sponsor on GitHub](https://leafwiki.com/support)** — supports ongoing maintenance, bug fixes, and new features
-- ☁️ **[Join the hosted waitlist](https://leafwiki.com/hosted)** — don't want to run a server? a hosted version is in the works
+
+Need help deploying LeafWiki for your team? [Business support & setup →](https://leafwiki.com/support/)
 
 ---
 
