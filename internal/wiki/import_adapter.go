@@ -95,7 +95,7 @@ func (a *WikiImportAdapter) UpdatePage(userID, id, title, slug string, content *
 	}
 	out, err := wikipages.NewUpdatePageUseCase(a.tree, a.slug, a.orchestrator(), a.log).Execute(
 		context.Background(),
-		wikipages.UpdatePageInput{UserID: userID, ID: id, Version: current.Version(), Title: title, Slug: slug, Content: content, Kind: kind, FromImport: true},
+		wikipages.UpdatePageInput{UserID: userID, ID: id, Version: current.Version(), Title: title, Slug: slug, Content: content, Kind: kind, PreserveFrontmatter: true},
 	)
 	if err != nil {
 		return nil, err

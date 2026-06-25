@@ -607,7 +607,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		)
 	}
 
-	restoredContent, restoreFromImport, err := buildRestoredRawContent(rev.ExtraFrontmatter, string(content))
+	restoredContent, restorePreserveFrontmatter, err := buildRestoredRawContent(rev.ExtraFrontmatter, string(content))
 	if err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
@@ -617,7 +617,7 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 			pageID,
 		)
 	}
-	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent, tree.VersionUnchecked, nil, nil, restoreFromImport); err != nil {
+	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent, tree.VersionUnchecked, nil, nil, restorePreserveFrontmatter); err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
 			"Failed to restore page",
@@ -628,13 +628,13 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	}
 
 	if err := s.restoreAssets(pageID, assets); err != nil {
-		restoreRollbackContent, rollbackFromImport, buildErr := buildRestoredRawContent(beforeState.ExtraFrontmatter, beforeState.Content)
+		restoreRollbackContent, rollbackPreserveFrontmatter, buildErr := buildRestoredRawContent(beforeState.ExtraFrontmatter, beforeState.Content)
 		if buildErr != nil {
 			s.log.Warn("failed to rebuild rollback content", "pageID", pageID, "error", buildErr)
 			restoreRollbackContent = beforeState.Content
-			rollbackFromImport = false
+			rollbackPreserveFrontmatter = false
 		}
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, nil, nil, rollbackFromImport); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, nil, nil, rollbackPreserveFrontmatter); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
@@ -650,13 +650,13 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	}
 
 	if err := s.recordRestoreRevision(pageID, authorID); err != nil {
-		restoreRollbackContent, rollbackFromImport, buildErr := buildRestoredRawContent(beforeState.ExtraFrontmatter, beforeState.Content)
+		restoreRollbackContent, rollbackPreserveFrontmatter, buildErr := buildRestoredRawContent(beforeState.ExtraFrontmatter, beforeState.Content)
 		if buildErr != nil {
 			s.log.Warn("failed to rebuild rollback content", "pageID", pageID, "error", buildErr)
 			restoreRollbackContent = beforeState.Content
-			rollbackFromImport = false
+			rollbackPreserveFrontmatter = false
 		}
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, nil, nil, rollbackFromImport); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, nil, nil, rollbackPreserveFrontmatter); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {

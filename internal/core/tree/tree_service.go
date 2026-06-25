@@ -651,10 +651,10 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool, expec
 // tags and properties are used for UI-originated edits: when either is non-nil
 // the content is treated as a plain body string and the provided structured
 // metadata is written alongside it via UpsertContentAndMetadata.
-// When fromImport is true the content is treated as raw markdown with
+// When preserveFrontmatter is true the content is treated as raw markdown with
 // embedded frontmatter (UpsertContentPreservingFrontmatter).
 // When both are absent, content is a plain body update (UpsertContent).
-func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, expectedVersion string, tags []string, properties map[string]string, fromImport bool) error {
+func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, expectedVersion string, tags []string, properties map[string]string, preserveFrontmatter bool) error {
 	return t.withLockedTree(func() error {
 		if t.tree == nil {
 			return ErrTreeNotLoaded
@@ -682,9 +682,9 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		if content != nil {
 			t.log.Info("updating node content", "nodeID", node.ID)
 			var upsertErr error
-			// Priority: fromImport wins over tags/properties; callers must not set both.
+			// Priority: preserveFrontmatter wins over tags/properties; callers must not set both.
 			switch {
-			case fromImport:
+			case preserveFrontmatter:
 				upsertErr = t.store.UpsertContentPreservingFrontmatter(node, *content)
 			case tags != nil || properties != nil:
 				upsertErr = t.store.UpsertContentAndMetadata(node, *content, tags, properties)
