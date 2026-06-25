@@ -155,6 +155,14 @@ describe('preprocessWikilinks', () => {
       const result = preprocessWikilinks(content, noMatch)
       expect(result).toBe(content)
     })
+
+    // [[ <space>Title ]] is intentionally not supported — leading whitespace after [[
+    // is the distinguishing marker of bash conditionals and is therefore rejected.
+    it('does not treat [[ Title ]] with leading space as a wikilink', () => {
+      const content = '[[ Intro ]]'
+      const result = preprocessWikilinks(content, noMatch)
+      expect(result).toBe(content)
+    })
   })
 
   describe('edge cases', () => {
