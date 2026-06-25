@@ -616,7 +616,12 @@ export default function MarkdownPreview({
     <MarkdownPreviewErrorBoundary resetKey={`${path ?? ''}:${content}`}>
       <>
         <ReactMarkdown
-          remarkPlugins={[remarkMath, remarkGfm]}
+          // singleDollarTextMath disabled: $var in bash/code prose would be parsed
+          // as math delimiters and conflict with wikilink preprocessing. Use $$...$$ for math.
+          remarkPlugins={[
+            [remarkMath, { singleDollarTextMath: false }],
+            remarkGfm,
+          ]}
           rehypePlugins={[
             rehypeRaw,
             rehypeLineNumber,
