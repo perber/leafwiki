@@ -1301,6 +1301,41 @@ func TestExtractWikiLinksFromMarkdown_DeduplicatesTargets(t *testing.T) {
 	}
 }
 
+func TestExtractWikiLinksFromMarkdown_IgnoresFencedCodeBlock(t *testing.T) {
+	md := "```bash\nif [[ -n \"$computed_hash\" && -n \"$src_hash\" ]]; then\n  [[ \"$src_hash\" == sha256-* ]]\nfi\n```\n"
+
+	got := extractWikiLinksFromMarkdown(md)
+	if len(got) != 0 {
+		t.Fatalf("expected no wiki links from fenced code block, got %v", got)
+	}
+}
+
+func TestExtractWikiLinksFromMarkdown_IgnoresInlineCode(t *testing.T) {
+	got := extractWikiLinksFromMarkdown("`[[ -n $x ]]`")
+	if len(got) != 0 {
+		t.Fatalf("expected no wiki links from inline code, got %v", got)
+	}
+}
+
+func TestExtractWikiLinksFromMarkdown_MixedRealAndCodeBlock(t *testing.T) {
+	md := "See [[Real Page]].\n\n```\n[[ -z \"$x\" ]]\n```\n"
+
+	got := extractWikiLinksFromMarkdown(md)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 wiki link, got %d: %v", len(got), got)
+	}
+	if got[0] != "Real Page" {
+		t.Errorf("got %q, want %q", got[0], "Real Page")
+	}
+}
+
+func TestExtractWikiLinksFromMarkdown_IgnoresIndentedCodeBlock(t *testing.T) {
+	got := extractWikiLinksFromMarkdown("    [[ Something ]]\n")
+	if len(got) != 0 {
+		t.Fatalf("expected no wiki links from indented code block, got %v", got)
+	}
+}
+
 func TestExtractWikiLinksFromMarkdown_Empty(t *testing.T) {
 	got := extractWikiLinksFromMarkdown("No wiki links here.")
 	if len(got) != 0 {
