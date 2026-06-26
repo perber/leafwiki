@@ -170,7 +170,9 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
           title,
           slug,
         })
-        const rewriteLinks = await confirmPageRefactor(preview)
+        const rewriteLinks = await confirmPageRefactor(preview, {
+          allowSkipRewrite: true,
+        })
         if (rewriteLinks === null) {
           return null
         }
