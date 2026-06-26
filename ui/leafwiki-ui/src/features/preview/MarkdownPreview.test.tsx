@@ -18,9 +18,13 @@ describe('MarkdownPreview syntax highlighting', () => {
     }))
   })
 
-  it('highlights shell and powershell code fences', () => {
-    const content = `\`\`\`shell
+  it('highlights bash, shell session, and powershell code fences', () => {
+    const content = `\`\`\`bash
 echo "$HOME"
+\`\`\`
+
+\`\`\`shell
+$ echo "$HOME"
 \`\`\`
 
 \`\`\`powershell
@@ -32,8 +36,13 @@ if (Test-Path $path) {
 
     const { container } = render(<MarkdownPreview content={content} />)
 
+    const bashCodeBlock = container.querySelector('code.language-bash.hljs')
+    expect(bashCodeBlock).not.toBeNull()
+    expect(bashCodeBlock?.querySelector('.hljs-variable')).not.toBeNull()
+
     const shellCodeBlock = container.querySelector('code.language-shell.hljs')
     expect(shellCodeBlock).not.toBeNull()
+    expect(shellCodeBlock?.querySelector('.hljs-meta')).not.toBeNull()
     expect(shellCodeBlock?.querySelector('.hljs-variable')).not.toBeNull()
 
     const powershellCodeBlock = container.querySelector(
