@@ -2284,6 +2284,12 @@
     @apply border-green-500/30 bg-green-500/10;
   }
 
+  .markdown-editor__preview .markdown-shoutout--orange,
+  .page-viewer__content .markdown-shoutout--orange,
+  .page-history__preview-body .markdown-shoutout--orange {
+    @apply border-orange-500/30 bg-orange-500/10;
+  }
+
   .tree-view {
     @apply w-full;
   }
