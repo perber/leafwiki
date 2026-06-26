@@ -55,7 +55,7 @@ func createTaggedPage(t *testing.T, treeSvc *tree.TreeService, title, slug strin
 	}
 	content += "---\n\n# Page body"
 
-	if err := treeSvc.UpdateNode("system", *idPtr, title, slug, &content, tree.VersionUnchecked, true); err != nil {
+	if err := treeSvc.UpdateNode("system", *idPtr, title, slug, &content, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode %q: %v", slug, err)
 	}
 

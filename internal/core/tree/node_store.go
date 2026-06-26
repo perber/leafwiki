@@ -700,6 +700,91 @@ func (f *NodeStore) UpsertContentPreservingFrontmatter(entry *PageNode, content 
 	return nil
 }
 
+// UpsertContentAndMetadata is the UI-edit path: it replaces the body and the
+// editor-visible frontmatter (tags and string-typed properties) while keeping
+// system-managed frontmatter (leafwiki_*) and non-string pass-through fields
+// (booleans, numbers, non-tag lists) intact.
+//
+// Ownership rules for ExtraFields:
+//   - String-valued keys are editor-owned: only keys present in properties
+//     survive; keys absent from properties are removed.
+//   - Non-string, non-map values (bool, int, float64, []interface{}) are
+//     always preserved — the editor cannot represent them, so it cannot
+//     intentionally delete them.
+//   - Nested maps (map[string]interface{}) are not preserved; their string
+//     leaves round-trip through the editor as dot-notation property keys.
+//   - Tags: when tags is non-nil the existing tags are replaced; when tags is
+//     nil the existing tags in the file are left unchanged.
+func (f *NodeStore) UpsertContentAndMetadata(
+	entry *PageNode,
+	body string,
+	tags []string,
+	properties map[string]string,
+) error {
+	if entry == nil {
+		return &InvalidOpError{Op: "UpsertContentAndMetadata", Reason: "an entry is required"}
+	}
+
+	filePath, err := f.contentPathForNodeWrite(entry)
+	if err != nil {
+		return err
+	}
+
+	mdFile := markdown.NewMarkdownFile(filePath, "", markdown.Frontmatter{})
+	if fileExists(filePath) {
+		mdFile, err = markdown.LoadMarkdownFile(filePath)
+		if err != nil {
+			return fmt.Errorf("could not load markdown file: %w", err)
+		}
+	}
+
+	mdFile.SetContent(body)
+
+	existing := mdFile.GetFrontmatter().ExtraFields
+	extra := make(map[string]interface{}, len(properties)+len(existing)+1)
+
+	// Preserve non-string, non-map ExtraFields (bool, int, float64, non-tag
+	// lists). The editor cannot represent these types and never sends them back,
+	// so they must survive an edit unchanged.
+	for k, v := range existing {
+		if k == "tags" {
+			continue // handled separately below
+		}
+		switch v.(type) {
+		case string, map[string]interface{}:
+			// string: editor-owned, replaced by incoming properties
+			// map: nested YAML — string leaves round-trip via dot-notation keys
+		default:
+			extra[k] = v
+		}
+	}
+
+	// String properties from the editor replace every editor-owned string key.
+	for k, v := range properties {
+		extra[k] = v
+	}
+
+	// Tags: replace when the caller sends an explicit list; preserve otherwise.
+	if tags != nil {
+		tagList := make([]interface{}, len(tags))
+		for i, t := range tags {
+			tagList[i] = t
+		}
+		extra["tags"] = tagList
+	} else if existingTags, ok := existing["tags"]; ok {
+		extra["tags"] = existingTags
+	}
+
+	mdFile.SetExtraFields(extra)
+
+	f.syncManagedFrontmatter(mdFile, entry)
+	if err := mdFile.WriteToFile(); err != nil {
+		return fmt.Errorf("could not write markdown file: %w", err)
+	}
+
+	return nil
+}
+
 // MoveNode moves a page to a other node
 func (f *NodeStore) MoveNode(entry *PageNode, parentEntry *PageNode) error {
 	if entry == nil {

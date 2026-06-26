@@ -150,9 +150,6 @@ func TestExecutor_Create_HappyPath_PreservesNonInternalFrontmatter(t *testing.T)
 	if strings.Contains(*w.lastUpdatedContent, "leafwiki_id: source-id") {
 		t.Fatalf("expected source leafwiki_id to be dropped, got: %q", *w.lastUpdatedContent)
 	}
-	if strings.Contains(*w.lastUpdatedContent, "leafwiki_title: Source Title") {
-		t.Fatalf("expected source leafwiki_title to be dropped, got: %q", *w.lastUpdatedContent)
-	}
 
 	if res.TreeHashBefore != "h1" {
 		t.Fatalf("TreeHashBefore = %q", res.TreeHashBefore)

@@ -105,19 +105,39 @@ func TestExtractPropertiesFromContent_SkipsTagsKeyCaseInsensitive(t *testing.T) 
 	}
 }
 
-func TestExtractPropertiesFromContent_SkipsTitleKey(t *testing.T) {
+func TestExtractPropertiesFromContent_IndexesTitleAlone(t *testing.T) {
+	// "title" is always a custom property — it lands in ExtraFields and is indexed
+	// regardless of whether leafwiki_title is also present.
 	content := "---\ntitle: My Page\nstatus: draft\n---\n"
 	got := ExtractPropertiesFromContent(content)
-	if _, ok := got["title"]; ok {
-		t.Error("'title' must not be stored as a property")
+	if _, ok := got["title"]; !ok {
+		t.Error("'title' must be indexed as a custom property")
 	}
 }
 
-func TestExtractPropertiesFromContent_SkipsTitleKeyCaseInsensitive(t *testing.T) {
+func TestExtractPropertiesFromContent_IndexesMixedCaseTitleAsCustomProperty(t *testing.T) {
+	// YAML is case-sensitive: "Title" ≠ "title". Both are custom properties.
 	content := "---\nTitle: My Page\nstatus: draft\n---\n"
 	got := ExtractPropertiesFromContent(content)
-	if _, ok := got["Title"]; ok {
-		t.Error("'Title' (mixed case) must not be stored as a property")
+	if _, ok := got["Title"]; !ok {
+		t.Error("'Title' (mixed case) is a custom property and must be indexed")
+	}
+}
+
+func TestExtractPropertiesFromContent_IndexesTitleWhenLeafwikiTitleAlsoPresent(t *testing.T) {
+	// Both "title" and "leafwiki_title" present: "title" is a custom property.
+	content := "---\ntitle: My Custom Title\nleafwiki_title: My Title\nstatus: draft\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "title", PropertyEntry{Value: "My Custom Title", Type: "text"})
+	assertEntry(t, got, "status", PropertyEntry{Value: "draft", Type: "text"})
+}
+
+func TestExtractPropertiesFromContent_IndexesTitleAloneAsCustomProperty(t *testing.T) {
+	// "title" alone is always a custom property — no leafwiki_title required.
+	content := "---\ntitle: My Page\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if _, ok := got["title"]; !ok {
+		t.Error("'title' must be indexed as a custom property")
 	}
 }
 
@@ -184,7 +204,7 @@ func TestExtractPropertiesFromContent_EmptyContentReturnsNil(t *testing.T) {
 }
 
 func TestExtractPropertiesFromContent_OnlyReservedKeysReturnsNil(t *testing.T) {
-	content := "---\ntags:\n  - go\ntitle: My Page\nleafwiki_id: abc\n---\n"
+	content := "---\ntags:\n  - go\nleafwiki_id: abc\n---\n"
 	got := ExtractPropertiesFromContent(content)
 	if got != nil {
 		t.Errorf("expected nil when all keys are reserved, got %v", got)
@@ -336,7 +356,7 @@ func createPageWithContent(t *testing.T, ts *tree.TreeService, title, slug, cont
 	if err != nil {
 		t.Fatalf("CreateNode %q: %v", slug, err)
 	}
-	if err := ts.UpdateNode("system", *idPtr, title, slug, &content, tree.VersionUnchecked, true); err != nil {
+	if err := ts.UpdateNode("system", *idPtr, title, slug, &content, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode %q: %v", slug, err)
 	}
 	return *idPtr
@@ -387,10 +407,12 @@ func TestPropertiesService_IndexAllPages_IsIdempotent(t *testing.T) {
 	}
 }
 
-func TestPropertiesService_IndexAllPages_SkipsReservedKeys(t *testing.T) {
+func TestPropertiesService_IndexAllPages_SkipsSystemKeys(t *testing.T) {
+	// System keys: "tags" and any "leafwiki_*" prefix must never be indexed.
+	// "title" is always a custom property and will appear in the index when set.
 	svc, ts := setupPropertiesService(t)
 	createPageWithContent(t, ts, "Page A", "page-a",
-		"---\ntags:\n  - go\ntitle: Custom\nleafwiki_id: abc\nstatus: draft\n---\n# A")
+		"---\ntags:\n  - go\nleafwiki_id: abc\nstatus: draft\n---\n# A")
 
 	indexAllPages(t, svc, ts)
 
@@ -400,13 +422,11 @@ func TestPropertiesService_IndexAllPages_SkipsReservedKeys(t *testing.T) {
 	}
 
 	for _, kc := range keys {
-		switch kc.Key {
-		case "tags", "title":
-			t.Errorf("reserved key %q must not be indexed", kc.Key)
-		default:
-			if len(kc.Key) >= 9 && kc.Key[:9] == "leafwiki_" {
-				t.Errorf("reserved prefix key %q must not be indexed", kc.Key)
-			}
+		if kc.Key == "tags" {
+			t.Errorf("system key %q must not be indexed", kc.Key)
+		}
+		if len(kc.Key) >= 9 && kc.Key[:9] == "leafwiki_" {
+			t.Errorf("reserved prefix key %q must not be indexed", kc.Key)
 		}
 	}
 	if len(keys) != 1 || keys[0].Key != "status" {

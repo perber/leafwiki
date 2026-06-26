@@ -66,7 +66,7 @@ func TestPropertiesSideEffect_Apply_Update_ReindexesProperties(t *testing.T) {
 	effect.Apply(PageSaveEvent{Operation: PageOperationCreate, After: page})
 
 	newRaw := "---\nstatus: published\n---\n\nUpdated."
-	if err := treeSvc.UpdateNode("system", page.ID, "Update Props", "update-props", &newRaw, tree.VersionUnchecked, true); err != nil {
+	if err := treeSvc.UpdateNode("system", page.ID, "Update Props", "update-props", &newRaw, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode: %v", err)
 	}
 	updated, err := treeSvc.GetPage(page.ID)

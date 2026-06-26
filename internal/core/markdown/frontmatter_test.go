@@ -154,7 +154,7 @@ func TestParseFrontmatter(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:  "valid frontmatter with title only",
+			name:  "valid frontmatter with leafwiki_title only",
 			input: "---\nleafwiki_title: My Title\n---\n# Title\nContent",
 			wantFM: Frontmatter{
 				LeafWikiTitle: "My Title",
@@ -164,12 +164,25 @@ func TestParseFrontmatter(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:  "title alias is mapped and preserved",
+			name:  "title as page-title alias: preserved in ExtraFields",
 			input: "---\ntitle: My Title\n---\n# Title\nContent",
 			wantFM: Frontmatter{
 				LeafWikiTitle: "My Title",
 				ExtraFields: map[string]interface{}{
 					"title": "My Title",
+				},
+			},
+			wantBody: "# Title\nContent",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
+			name:  "both title and leafwiki_title: title preserved as custom property in ExtraFields",
+			input: "---\ntitle: My Custom Title\nleafwiki_title: My Title\n---\n# Title\nContent",
+			wantFM: Frontmatter{
+				LeafWikiTitle: "My Title",
+				ExtraFields: map[string]interface{}{
+					"title": "My Custom Title",
 				},
 			},
 			wantBody: "# Title\nContent",

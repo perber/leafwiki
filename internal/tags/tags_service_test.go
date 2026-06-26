@@ -140,7 +140,7 @@ func createPageWithTags(t *testing.T, ts *tree.TreeService, title, slug string, 
 	}
 	fm += "---\n\n# " + title
 
-	if err := ts.UpdateNode("system", *idPtr, title, slug, &fm, tree.VersionUnchecked, true); err != nil {
+	if err := ts.UpdateNode("system", *idPtr, title, slug, &fm, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode %q: %v", slug, err)
 	}
 
@@ -220,7 +220,7 @@ func TestTagsService_IndexAllPages_PagesWithoutTagsAreSkipped(t *testing.T) {
 		t.Fatalf("CreateNode: %v", err)
 	}
 	content := "# No Tags Page\n\nNo frontmatter."
-	if err := ts.UpdateNode("system", *idPtr, "No Tags Page", "no-tags", &content, tree.VersionUnchecked, false); err != nil {
+	if err := ts.UpdateNode("system", *idPtr, "No Tags Page", "no-tags", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode: %v", err)
 	}
 

@@ -43,7 +43,7 @@ func createRevisionTestPage(t *testing.T, treeService *tree.TreeService, title, 
 	if err != nil {
 		t.Fatalf("CreateNode failed: %v", err)
 	}
-	if err := treeService.UpdateNode("tester", *id, title, slug, &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("tester", *id, title, slug, &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 	return *id
@@ -534,7 +534,7 @@ func TestRecordContentAndAssetUpdatesWithoutAssets(t *testing.T) {
 	}
 
 	content := "hello-2"
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode content failed: %v", err)
 	}
 	assetRev3, created, err := service.RecordAssetChange(pageID, "tester", "asset after content")
@@ -546,7 +546,7 @@ func TestRecordContentAndAssetUpdatesWithoutAssets(t *testing.T) {
 	}
 
 	content = "hello-3"
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode second content failed: %v", err)
 	}
 	contentRev, created, err := service.RecordContentUpdate(pageID, "tester", "content")
@@ -579,7 +579,7 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	pageID := *pageIDPtr
 
 	originalContent := "first version"
-	if err := treeService.UpdateNode("tester", pageID, "Original", "original", &originalContent, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Original", "original", &originalContent, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode(original) failed: %v", err)
 	}
 	writeLiveAsset(t, storageDir, pageID, "old.txt", "old-asset")
@@ -592,7 +592,7 @@ func TestRestoreRevisionRehydratesLivePageState(t *testing.T) {
 	}
 
 	changedContent := "second version"
-	if err := treeService.UpdateNode("tester", pageID, "Changed", "changed", &changedContent, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Changed", "changed", &changedContent, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode(changed) failed: %v", err)
 	}
 	if err := treeService.MoveNode("tester", pageID, *archiveID, tree.VersionUnchecked); err != nil {
@@ -659,7 +659,7 @@ func TestRecordContentUpdate_CapturesHistoricalCustomFrontmatter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildMarkdownWithExtraFrontmatter(first) failed: %v", err)
 	}
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &firstRaw, tree.VersionUnchecked, true); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &firstRaw, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode(first raw) failed: %v", err)
 	}
 
@@ -681,7 +681,7 @@ func TestRecordContentUpdate_CapturesHistoricalCustomFrontmatter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildMarkdownWithExtraFrontmatter(second) failed: %v", err)
 	}
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &secondRaw, tree.VersionUnchecked, true); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &secondRaw, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode(second raw) failed: %v", err)
 	}
 
@@ -721,7 +721,7 @@ func TestRestoreRevision_RestoresHistoricalCustomFrontmatterAndKeepsManagedField
 	if err != nil {
 		t.Fatalf("BuildMarkdownWithExtraFrontmatter(first) failed: %v", err)
 	}
-	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &firstRaw, tree.VersionUnchecked, true); err != nil {
+	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &firstRaw, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode(first raw) failed: %v", err)
 	}
 	firstRev, created, err := service.RecordContentUpdate(pageID, "creator", "first")
@@ -739,7 +739,7 @@ func TestRestoreRevision_RestoresHistoricalCustomFrontmatterAndKeepsManagedField
 	if err != nil {
 		t.Fatalf("BuildMarkdownWithExtraFrontmatter(second) failed: %v", err)
 	}
-	if err := treeService.UpdateNode("editor", pageID, "Changed", "page", &secondRaw, tree.VersionUnchecked, true); err != nil {
+	if err := treeService.UpdateNode("editor", pageID, "Changed", "page", &secondRaw, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode(second raw) failed: %v", err)
 	}
 	if _, _, err := service.RecordContentUpdate(pageID, "editor", "second"); err != nil {
@@ -836,7 +836,7 @@ func TestRestoreRevision_LegacyRevisionPreservesCurrentCustomFrontmatter(t *test
 	if err != nil {
 		t.Fatalf("BuildMarkdownWithExtraFrontmatter(initial) failed: %v", err)
 	}
-	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &initialRaw, tree.VersionUnchecked, true); err != nil {
+	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &initialRaw, tree.VersionUnchecked, nil, nil, true); err != nil {
 		t.Fatalf("UpdateNode(initial raw) failed: %v", err)
 	}
 
@@ -895,7 +895,7 @@ func TestRestoreRevision_LegacyBodyThatLooksLikeFrontmatterStaysBody(t *testing.
 	pageID := *pageIDPtr
 
 	initialContent := "Current body"
-	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &initialContent, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("creator", pageID, "Page", "page", &initialContent, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode(initial content) failed: %v", err)
 	}
 
@@ -967,7 +967,7 @@ func TestRecordContentAndStructureRebuildMissingPreviousManifest(t *testing.T) {
 	}
 
 	content := "hello-updated"
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 	contentRev, created, err := service.RecordContentUpdate(pageID, "tester", "content")
@@ -1072,7 +1072,7 @@ func TestCompareRevisionSnapshots(t *testing.T) {
 	}
 
 	content := "two"
-	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("tester", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 	writeLiveAsset(t, storageDir, pageID, "b.txt", "asset-b")
@@ -1159,7 +1159,7 @@ func TestRecordContentUpdate_CoalescesWithinWindow(t *testing.T) {
 	}
 
 	content := "version two"
-	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -1196,7 +1196,7 @@ func TestRecordContentUpdate_NoCoalesceWhenDisabled(t *testing.T) {
 	}
 
 	content := "version two"
-	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -1227,7 +1227,7 @@ func TestRecordContentUpdate_NoCoalesceDifferentAuthor(t *testing.T) {
 	}
 
 	content := "version two"
-	if err := treeService.UpdateNode("bob", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("bob", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -1264,7 +1264,7 @@ func TestRecordContentUpdate_NoCoalesceAfterWindowExpired(t *testing.T) {
 	}
 
 	content := "version two"
-	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -1296,7 +1296,7 @@ func TestRecordContentUpdate_NoCoalesceForNonContentRevision(t *testing.T) {
 
 	// Change content so the noop check does not fire.
 	content := "version two"
-	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -1323,7 +1323,7 @@ func TestRecordContentUpdate_ConcurrentSavesNoOrphanedBlobs(t *testing.T) {
 	// Update content sequentially before spawning goroutines — concurrent
 	// UpdateNode calls on the same page would race inside the tree service.
 	content := "updated content"
-	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -1370,7 +1370,7 @@ func TestRecordContentUpdate_CoalescingGCsOldScopedBlob(t *testing.T) {
 	}
 
 	content := "version two"
-	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, false); err != nil {
+	if err := treeService.UpdateNode("alice", pageID, "Page", "page", &content, tree.VersionUnchecked, nil, nil, false); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 

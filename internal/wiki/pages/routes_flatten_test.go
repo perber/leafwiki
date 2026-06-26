@@ -90,6 +90,49 @@ func TestFlattenMetadataEntry_SkipsEmptyChildKey(t *testing.T) {
 	}
 }
 
+// ─── extractPageMetadata ─────────────────────────────────────────────────────
+
+func TestExtractPageMetadata_SkipsTagsAlways(t *testing.T) {
+	fields := map[string]interface{}{
+		"tags":   []interface{}{"go", "react"},
+		"status": "draft",
+	}
+	tags, props := extractPageMetadata(fields)
+	if len(tags) != 2 {
+		t.Errorf("expected 2 tags, got %v", tags)
+	}
+	if _, ok := props["tags"]; ok {
+		t.Error("tags must not appear in properties")
+	}
+	if props["status"] != "draft" {
+		t.Errorf("expected status=draft, got %q", props["status"])
+	}
+}
+
+func TestExtractPageMetadata_TitleInExtraFieldsIsAlwaysCustomProperty(t *testing.T) {
+	// "title" always lands in ExtraFields and is always treated as a custom
+	// property by extractPageMetadata.
+	fields := map[string]interface{}{
+		"title":  "My Custom Title",
+		"status": "draft",
+	}
+	_, props := extractPageMetadata(fields)
+	if props["title"] != "My Custom Title" {
+		t.Errorf("title in ExtraFields must appear in properties, got %q", props["title"])
+	}
+}
+
+func TestExtractPageMetadata_SkipsLeafwikiPrefixAlways(t *testing.T) {
+	fields := map[string]interface{}{
+		"leafwiki_id": "abc",
+		"status":      "draft",
+	}
+	_, props := extractPageMetadata(fields)
+	if _, ok := props["leafwiki_id"]; ok {
+		t.Error("leafwiki_ keys must never appear in properties")
+	}
+}
+
 func TestFlattenMetadataEntry_DepthLimitDoesNotPanic(t *testing.T) {
 	// Build a map nested maxFlattenDepth+5 levels deep
 	inner := map[string]interface{}{"leaf": "value"}

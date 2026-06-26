@@ -115,6 +115,10 @@ func (mf *MarkdownFile) SetContent(content string) {
 	mf.content = content
 }
 
+func (mf *MarkdownFile) SetExtraFields(fields map[string]interface{}) {
+	mf.fm.ExtraFields = fields
+}
+
 func (mf *MarkdownFile) SetRawContentPreservingManagedFrontmatter(raw string) error {
 	incomingFM, body, has, err := ParseFrontmatter(raw)
 	if err != nil {
