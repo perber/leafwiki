@@ -46,7 +46,7 @@ export default function MaintenanceSettings() {
         <p className="settings__section-description">
           {t('filesystemSync.description')}
         </p>
-        <div className="settings__actions">
+        <div className="settings__actions mb-4">
           <Button onClick={handleResync} disabled={isLoading}>
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
