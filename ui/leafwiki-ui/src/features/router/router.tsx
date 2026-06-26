@@ -4,6 +4,7 @@ import {
   BrandingSettings,
   Importer,
   LoginForm,
+  MaintenanceSettings,
   PageEditor,
   PageHistoryPage,
   PageViewer,
@@ -76,6 +77,16 @@ export const createLeafWikiRouter = (
         ) : (
           <AuthWrapper>
             <Importer />
+          </AuthWrapper>
+        ),
+      },
+      {
+        path: '/settings/maintenance',
+        element: isReadOnlyViewer ? (
+          <Navigate to="/" />
+        ) : (
+          <AuthWrapper>
+            <MaintenanceSettings />
           </AuthWrapper>
         ),
       },

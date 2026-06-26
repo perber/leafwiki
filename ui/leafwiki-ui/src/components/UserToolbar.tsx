@@ -145,6 +145,12 @@ export default function UserToolbar() {
                 Backup Settings
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => navigate('/settings/maintenance')}
+            >
+              Maintenance
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
           </RoleGuard>
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
