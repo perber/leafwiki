@@ -8,6 +8,14 @@
   },
   "toast": {
     "success": "Filesystem sync completed",
-    "error": "Filesystem sync failed"
+    "error": "Filesystem sync failed",
+    "alreadyRunning": "Sync already in progress"
+  },
+  "progress": {
+    "label": "Current Phase",
+    "tree": "Rebuilding page tree",
+    "links": "Indexing links",
+    "tags": "Rebuilding tags & properties",
+    "search": "Indexing search"
   }
 }

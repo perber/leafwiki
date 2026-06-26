@@ -72,6 +72,8 @@
   "revision request failed": "Revision request failed",
   "revision resource not found": "Revision resource not found",
   "revision %s for page %s not found": "Revision %s for page %s not found",
+  "a sync is already in progress": "A sync is already in progress",
+  "resync request failed": "Resync request failed",
   "search is currently unavailable": "Search is currently unavailable",
   "title query param is required": "Title query parameter is required",
   "tree not loaded": "Tree not loaded",

@@ -65,7 +65,11 @@ type Wiki struct {
 	props            *properties.PropertiesService
 	backupRoutes     *wikibackup.Routes
 	resyncRoutes     *wikiresync.Routes
+	resyncJob        *wikiresync.ResyncJob
 	reloadMu         sync.Mutex
+	reloadWG         sync.WaitGroup
+	shutdownCtx      context.Context
+	shutdownCancel   context.CancelFunc
 	log              *slog.Logger
 }
 
@@ -85,9 +89,13 @@ type WikiOptions struct {
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	w := &Wiki{
-		storageDir: options.StorageDir,
-		log:        slog.Default().With("component", "Wiki"),
+		storageDir:     options.StorageDir,
+		log:            slog.Default().With("component", "Wiki"),
+		resyncJob:      wikiresync.NewResyncJob(),
+		shutdownCtx:    shutdownCtx,
+		shutdownCancel: shutdownCancel,
 	}
 	if err := w.initAuth(options); err != nil {
 		return nil, err
@@ -271,10 +279,12 @@ func (w *Wiki) initSearch() error {
 	w.status = search.NewIndexingStatus()
 	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
 	w.log.Info("search indexing started")
+	w.reloadWG.Add(1)
 	go func() {
+		defer w.reloadWG.Done()
 		w.status.Start()
 		defer w.status.Finish()
-		if err := searchEffect.IndexAllPages(); err != nil {
+		if err := searchEffect.IndexAllPagesContext(w.shutdownCtx); err != nil {
 			w.log.Warn("search bootstrap failed", "error", err)
 			w.status.Fail()
 		} else {
@@ -310,7 +320,11 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 		Status:     w.status,
 		StorageDir: w.storageDir,
 	})
-	w.resyncRoutes = wikiresync.NewRoutes(w.ReloadFromFS, w.auth)
+	w.resyncRoutes = wikiresync.NewRoutes(
+		wikiresync.NewTriggerResyncUseCase(w.resyncJob, w.launchReloadWithProgress),
+		wikiresync.NewGetResyncStatusUseCase(w.resyncJob),
+		w.auth,
+	)
 }
 
 // ─── Domain route builder helpers ────────────────────────────────────────────
@@ -623,6 +637,89 @@ func (w *Wiki) ReloadFromFSContext(ctx context.Context) error {
 	return nil
 }
 
+// launchReloadWithProgress adds to reloadWG and starts reloadWithProgress in a goroutine.
+// The caller is responsible for having already called resyncJob.Start().
+func (w *Wiki) launchReloadWithProgress() {
+	w.reloadWG.Add(1)
+	go func() {
+		defer w.reloadWG.Done()
+		w.reloadWithProgress(w.shutdownCtx)
+	}()
+}
+
+// reloadWithProgress runs the filesystem reload while updating resyncJob phases.
+// Must only be called via launchReloadWithProgress (which tracks the WG).
+func (w *Wiki) reloadWithProgress(ctx context.Context) {
+	job := w.resyncJob
+
+	// Catch panics so a bug in any phase always releases the job and mutex.
+	defer func() {
+		if r := recover(); r != nil {
+			w.log.Error("panic during filesystem reload", "panic", r)
+			job.Finish(fmt.Errorf("panic during reload: %v", r))
+		}
+	}()
+
+	w.reloadMu.Lock()
+	defer w.reloadMu.Unlock()
+
+	w.log.Info("filesystem reload started (async)")
+
+	job.SetPhase(wikiresync.PhaseTree)
+	if err := w.tree.ReconstructTreeFromFSContext(ctx); err != nil {
+		job.Finish(fmt.Errorf("tree reconstruction failed: %w", err))
+		return
+	}
+
+	if ctx.Err() != nil {
+		job.Finish(ctx.Err())
+		return
+	}
+
+	job.SetPhase(wikiresync.PhaseLinks)
+	if err := w.links.IndexAllPagesContext(ctx); err != nil {
+		if ctx.Err() != nil {
+			job.Finish(ctx.Err())
+			return
+		}
+		w.log.Warn("link re-index failed during reload", "error", err)
+	}
+
+	if ctx.Err() != nil {
+		job.Finish(ctx.Err())
+		return
+	}
+
+	job.SetPhase(wikiresync.PhaseTags)
+	w.bootstrapTagsAndProperties()
+
+	job.SetPhase(wikiresync.PhaseSearch)
+	w.status.Start()
+	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
+	if err := searchEffect.IndexAllPagesContext(ctx); err != nil {
+		w.log.Warn("search re-index failed during reload", "error", err)
+		w.status.Fail()
+		w.status.Finish()
+		job.Finish(fmt.Errorf("search re-index failed: %w", err))
+		return
+	}
+	w.status.Success()
+	w.status.Finish()
+
+	w.log.Info("filesystem reload completed (async)")
+	job.Finish(nil)
+}
+
+// TriggerResyncAsync starts a background filesystem reload if none is already running.
+// Used by the signal handler so SIGUSR1/SIGHUP also goes through the shared ResyncJob.
+func (w *Wiki) TriggerResyncAsync() {
+	if !w.resyncJob.Start() {
+		w.log.Info("resync already running, signal ignored")
+		return
+	}
+	w.launchReloadWithProgress()
+}
+
 // ─── Service getters (test infrastructure) ───────────────────────────────────
 
 func (w *Wiki) GetStorageDir() string {
@@ -634,6 +731,8 @@ func (w *Wiki) UserService() *auth.UserService {
 }
 
 func (w *Wiki) Close() error {
+	w.shutdownCancel()  // signal in-flight reloads to abort
+	w.reloadWG.Wait()   // drain goroutines before closing stores
 	w.status.Finish()
 	if w.auth != nil {
 		// When auth is enabled, AuthService owns both the session store and user store.

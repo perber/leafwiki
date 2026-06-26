@@ -281,7 +281,7 @@ func TestServeWithLifecycle_GracefulShutdownWaitsForInFlightRequest(t *testing.T
 
 	runErr := make(chan error, 1)
 	go func() {
-		runErr <- serveWithLifecycle(server, listener, nil, func(context.Context) error { return nil }, reloadSignals, shutdownSignals)
+		runErr <- serveWithLifecycle(server, listener, nil, func() {}, reloadSignals, shutdownSignals)
 	}()
 
 	respCh := make(chan *http.Response, 1)
@@ -366,10 +366,9 @@ func TestServeWithLifecycle_ReloadSignalTriggersCallbackWithoutStoppingServer(t 
 
 	runErr := make(chan error, 1)
 	go func() {
-		runErr <- serveWithLifecycle(server, listener, nil, func(context.Context) error {
+		runErr <- serveWithLifecycle(server, listener, nil, func() {
 			reloadCalls.Add(1)
 			reloadDone <- struct{}{}
-			return nil
 		}, reloadSignals, shutdownSignals)
 	}()
 
@@ -441,7 +440,7 @@ func TestServeWithLifecycle_ShutdownTimeoutStillRunsCleanup(t *testing.T) {
 			case cleanupCalled <- struct{}{}:
 			default:
 			}
-		}, func(context.Context) error { return nil }, reloadSignals, shutdownSignals)
+		}, func() {}, reloadSignals, shutdownSignals)
 	}()
 
 	go func() {
@@ -481,9 +480,10 @@ func TestServeWithLifecycle_ShutdownTimeoutStillRunsCleanup(t *testing.T) {
 	}
 }
 
-func TestServeWithLifecycle_ShutdownCancelsInFlightReload(t *testing.T) {
+func TestServeWithLifecycle_ShutdownDoesNotWaitForInFlightReload(t *testing.T) {
 	reloadStarted := make(chan struct{})
-	reloadCanceled := make(chan struct{})
+	releaseReload := make(chan struct{})
+	reloadFinished := make(chan struct{})
 
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -500,11 +500,12 @@ func TestServeWithLifecycle_ShutdownCancelsInFlightReload(t *testing.T) {
 	shutdownSignals := make(chan os.Signal, 1)
 	runErr := make(chan error, 1)
 	go func() {
-		runErr <- serveWithLifecycle(server, listener, nil, func(ctx context.Context) error {
+		runErr <- serveWithLifecycle(server, listener, nil, func() {
 			close(reloadStarted)
-			<-ctx.Done()
-			close(reloadCanceled)
-			return ctx.Err()
+			go func() {
+				<-releaseReload
+				close(reloadFinished)
+			}()
 		}, reloadSignals, shutdownSignals)
 	}()
 
@@ -519,17 +520,19 @@ func TestServeWithLifecycle_ShutdownCancelsInFlightReload(t *testing.T) {
 	shutdownSignals <- testSignal("shutdown")
 
 	select {
-	case <-reloadCanceled:
-	case <-time.After(2 * time.Second):
-		t.Fatal("reload was not canceled by shutdown")
-	}
-
-	select {
 	case err := <-runErr:
 		if err != nil {
 			t.Fatalf("expected clean shutdown, got %v", err)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("server did not stop after canceling reload")
+		t.Fatal("server did not stop while reload was still running")
+	}
+
+	close(releaseReload)
+
+	select {
+	case <-reloadFinished:
+	case <-time.After(2 * time.Second):
+		t.Fatal("reload did not finish after release")
 	}
 }

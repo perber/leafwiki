@@ -10,16 +10,18 @@ import (
 	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
-// Routes is the RouteRegistrar for the filesystem resync admin endpoint.
+// Routes is the RouteRegistrar for the filesystem resync admin endpoints.
 type Routes struct {
-	trigger     func() error
+	triggerUC   *TriggerResyncUseCase
+	statusUC    *GetResyncStatusUseCase
 	authService *coreauth.AuthService
 }
 
 // NewRoutes constructs the resync RouteRegistrar.
-func NewRoutes(trigger func() error, authService *coreauth.AuthService) *Routes {
+func NewRoutes(triggerUC *TriggerResyncUseCase, statusUC *GetResyncStatusUseCase, authService *coreauth.AuthService) *Routes {
 	return &Routes{
-		trigger:     trigger,
+		triggerUC:   triggerUC,
+		statusUC:    statusUC,
 		authService: authService,
 	}
 }
@@ -39,13 +41,21 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	adminGroup.Use(authmw.RequireAdmin(opts.AuthDisabled))
 
 	adminGroup.POST("/resync", r.handleTriggerResync)
+	adminGroup.GET("/resync/status", r.handleResyncStatus)
 }
 
-// handleTriggerResync blocks until the filesystem reload completes, then returns 200.
+// handleTriggerResync starts a background resync and returns 202 immediately.
+// Returns 409 if a resync is already running.
 func (r *Routes) handleTriggerResync(c *gin.Context) {
-	if err := r.trigger(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := r.triggerUC.Execute(c.Request.Context()); err != nil {
+		respondWithResyncError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true})
+	c.JSON(http.StatusAccepted, gin.H{"ok": true})
+}
+
+// handleResyncStatus returns the current resync job state for client polling.
+func (r *Routes) handleResyncStatus(c *gin.Context) {
+	out := r.statusUC.Execute(c.Request.Context())
+	c.JSON(http.StatusOK, out.Status)
 }

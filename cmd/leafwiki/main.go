@@ -436,7 +436,7 @@ func main() {
 	signal.Notify(shutdownSignals, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(shutdownSignals)
 
-	if err := runServer(router, host, port, unixSocket, dataDir, w.ReloadFromFSContext, reloadSignals, shutdownSignals); err != nil {
+	if err := runServer(router, host, port, unixSocket, dataDir, w.TriggerResyncAsync, reloadSignals, shutdownSignals); err != nil {
 		slog.Default().Error("Failed to start server", "error", err)
 		exitCode = 1
 		return
@@ -446,7 +446,7 @@ func main() {
 func runServer(
 	router *gin.Engine,
 	host, port, unixSocket, dataDir string,
-	reload func(context.Context) error,
+	reload func(),
 	reloadSignals, shutdownSignals <-chan os.Signal,
 ) error {
 	server := &http.Server{
@@ -638,12 +638,12 @@ func validateListenConfig(unixSocket string, visited map[string]bool) error {
 }
 
 // serveWithLifecycle runs the HTTP server while handling live reload signals and
-// graceful shutdown signals. Reloads are serialized by the reload callback itself.
+// graceful shutdown signals. reload is non-blocking (fires a goroutine internally).
 func serveWithLifecycle(
 	server *http.Server,
 	listener net.Listener,
 	cleanup func(),
-	reload func(context.Context) error,
+	reload func(),
 	reloadSignals, shutdownSignals <-chan os.Signal,
 ) error {
 	serveErrCh := make(chan error, 1)
@@ -657,7 +657,6 @@ func serveWithLifecycle(
 
 	stopReloads := make(chan struct{})
 	var shuttingDown atomic.Bool
-	reloadCtx, cancelReload := context.WithCancel(context.Background())
 	var reloadWG sync.WaitGroup
 	reloadWG.Add(1)
 	go func() {
@@ -674,19 +673,12 @@ func serveWithLifecycle(
 					return
 				}
 				slog.Default().Info("reload signal received: reloading from filesystem", "signal", sig.String())
-				if err := reload(reloadCtx); err != nil {
-					if errors.Is(err, context.Canceled) {
-						slog.Default().Info("filesystem reload canceled")
-						return
-					}
-					slog.Default().Error("filesystem reload failed", "error", err)
-				}
+				reload()
 			}
 		}
 	}()
 
 	stopReloader := sync.OnceFunc(func() {
-		cancelReload()
 		close(stopReloads)
 	})
 	defer stopReloader()
