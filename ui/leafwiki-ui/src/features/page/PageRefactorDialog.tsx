@@ -7,11 +7,13 @@ import { useRef, useState } from 'react'
 
 export type PageRefactorDialogProps = {
   preview: PageRefactorPreview
+  allowSkipRewrite?: boolean
   onResolve: (rewriteLinks: boolean | null) => void
 }
 
 export function PageRefactorDialog({
   preview,
+  allowSkipRewrite = false,
   onResolve,
 }: PageRefactorDialogProps) {
   const previewWarnings = preview.warnings ?? []
@@ -41,6 +43,10 @@ export function PageRefactorDialog({
           resolveOnce(rewriteLinks)
           return true
         }
+        if (type === 'save-without-rewrite') {
+          resolveOnce(false)
+          return true
+        }
         return false
       }}
       defaultAction="cancel"
@@ -51,6 +57,15 @@ export function PageRefactorDialog({
         autoFocus: false,
       }}
       buttons={[
+        ...(allowSkipRewrite
+          ? [
+              {
+                label: 'Save without updating links',
+                actionType: 'save-without-rewrite',
+                variant: 'secondary' as const,
+              },
+            ]
+          : []),
         {
           label: 'Continue',
           actionType: 'confirm',
