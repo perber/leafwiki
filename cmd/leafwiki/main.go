@@ -721,7 +721,6 @@ func serveWithLifecycle(
 
 			if cleanup != nil {
 				cleanup()
-				cleanup = nil
 			}
 
 			waitForReloader()
