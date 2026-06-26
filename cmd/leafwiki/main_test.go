@@ -2,13 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"flag"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestWriteUsage_UsesLongFlags(t *testing.T) {
@@ -244,5 +250,280 @@ func TestListenOnUnixSocket_WindowsReturnsHelpfulError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "not supported on windows") {
 		t.Fatalf("expected windows support error, got %v", err)
+	}
+}
+
+type testSignal string
+
+func (s testSignal) String() string { return string(s) }
+func (testSignal) Signal()          {}
+
+func TestServeWithLifecycle_GracefulShutdownWaitsForInFlightRequest(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			close(started)
+			<-release
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		}),
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+
+	reloadSignals := make(chan os.Signal)
+	shutdownSignals := make(chan os.Signal, 1)
+
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- serveWithLifecycle(server, listener, nil, func(context.Context) error { return nil }, reloadSignals, shutdownSignals)
+	}()
+
+	respCh := make(chan *http.Response, 1)
+	reqErrCh := make(chan error, 1)
+	go func() {
+		resp, err := http.Get("http://" + listener.Addr().String())
+		if err != nil {
+			reqErrCh <- err
+			return
+		}
+		respCh <- resp
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request did not reach handler")
+	}
+
+	shutdownSignals <- testSignal("shutdown")
+
+	select {
+	case err := <-runErr:
+		t.Fatalf("server exited before request completed: %v", err)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(release)
+
+	var resp *http.Response
+	select {
+	case err := <-reqErrCh:
+		t.Fatalf("request failed: %v", err)
+	case resp = <-respCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request did not complete")
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("reading response failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+	if string(body) != "ok" {
+		t.Fatalf("expected body ok, got %q", string(body))
+	}
+
+	select {
+	case err := <-runErr:
+		if err != nil {
+			t.Fatalf("expected clean shutdown, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("server did not exit after request completed")
+	}
+}
+
+func TestServeWithLifecycle_ReloadSignalTriggersCallbackWithoutStoppingServer(t *testing.T) {
+	var reloadCalls atomic.Int32
+
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+
+	reloadDone := make(chan struct{}, 1)
+	reloadSignals := make(chan os.Signal, 1)
+	shutdownSignals := make(chan os.Signal, 1)
+
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- serveWithLifecycle(server, listener, nil, func(context.Context) error {
+			reloadCalls.Add(1)
+			reloadDone <- struct{}{}
+			return nil
+		}, reloadSignals, shutdownSignals)
+	}()
+
+	reloadSignals <- testSignal("reload")
+
+	select {
+	case <-reloadDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("reload callback was not triggered")
+	}
+
+	resp, err := http.Get("http://" + listener.Addr().String())
+	if err != nil {
+		t.Fatalf("request after reload failed: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d", resp.StatusCode)
+	}
+
+	if reloadCalls.Load() != 1 {
+		t.Fatalf("expected one reload call, got %d", reloadCalls.Load())
+	}
+
+	shutdownSignals <- testSignal("shutdown")
+
+	select {
+	case err := <-runErr:
+		if err != nil {
+			t.Fatalf("expected clean shutdown, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("server did not stop after shutdown signal")
+	}
+}
+
+func TestServeWithLifecycle_ShutdownTimeoutStillRunsCleanup(t *testing.T) {
+	previousTimeout := gracefulShutdownTimeout
+	gracefulShutdownTimeout = 50 * time.Millisecond
+	t.Cleanup(func() {
+		gracefulShutdownTimeout = previousTimeout
+	})
+
+	started := make(chan struct{})
+	handlerCanceled := make(chan struct{}, 1)
+	cleanupCalled := make(chan struct{}, 1)
+
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			close(started)
+			<-r.Context().Done()
+			handlerCanceled <- struct{}{}
+		}),
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+
+	reloadSignals := make(chan os.Signal)
+	shutdownSignals := make(chan os.Signal, 1)
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- serveWithLifecycle(server, listener, func() {
+			select {
+			case cleanupCalled <- struct{}{}:
+			default:
+			}
+		}, func(context.Context) error { return nil }, reloadSignals, shutdownSignals)
+	}()
+
+	go func() {
+		resp, err := http.Get("http://" + listener.Addr().String())
+		if err == nil && resp != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request did not reach handler")
+	}
+
+	shutdownSignals <- testSignal("shutdown")
+
+	select {
+	case err := <-runErr:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected context deadline exceeded, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("server did not exit after shutdown timeout")
+	}
+
+	select {
+	case <-cleanupCalled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("cleanup was not called on shutdown timeout")
+	}
+
+	select {
+	case <-handlerCanceled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("handler was not canceled after shutdown timeout")
+	}
+}
+
+func TestServeWithLifecycle_ShutdownCancelsInFlightReload(t *testing.T) {
+	reloadStarted := make(chan struct{})
+	reloadCanceled := make(chan struct{})
+
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+
+	reloadSignals := make(chan os.Signal, 1)
+	shutdownSignals := make(chan os.Signal, 1)
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- serveWithLifecycle(server, listener, nil, func(ctx context.Context) error {
+			close(reloadStarted)
+			<-ctx.Done()
+			close(reloadCanceled)
+			return ctx.Err()
+		}, reloadSignals, shutdownSignals)
+	}()
+
+	reloadSignals <- testSignal("reload")
+
+	select {
+	case <-reloadStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("reload did not start")
+	}
+
+	shutdownSignals <- testSignal("shutdown")
+
+	select {
+	case <-reloadCanceled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("reload was not canceled by shutdown")
+	}
+
+	select {
+	case err := <-runErr:
+		if err != nil {
+			t.Fatalf("expected clean shutdown, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("server did not stop after canceling reload")
 	}
 }

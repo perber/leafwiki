@@ -1,17 +1,22 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
 	"math"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -140,6 +145,8 @@ func fail(msg string, args ...any) {
 	os.Exit(1)
 }
 
+var gracefulShutdownTimeout = 10 * time.Second
+
 type cliFlags struct {
 	host                    *string
 	port                    *string
@@ -218,6 +225,13 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 
 func main() {
 	setupLogger()
+	exitCode := 0
+	defer func() {
+		if exitCode != 0 {
+			os.Exit(exitCode)
+		}
+	}()
+
 	flag.Usage = func() {
 		writeUsage(flag.CommandLine.Output())
 	}
@@ -414,28 +428,51 @@ func main() {
 		DisableRequestLog: disableRequestLog,
 	})
 
-	go runSignalHandler(w)
+	reloadSignals := make(chan os.Signal, 1)
+	signal.Notify(reloadSignals, syscall.SIGUSR1, syscall.SIGHUP)
+	defer signal.Stop(reloadSignals)
 
-	if err := runServer(router, host, port, unixSocket, dataDir); err != nil {
-		fail("Failed to start server", "error", err)
+	shutdownSignals := make(chan os.Signal, 1)
+	signal.Notify(shutdownSignals, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(shutdownSignals)
+
+	if err := runServer(router, host, port, unixSocket, dataDir, w.ReloadFromFSContext, reloadSignals, shutdownSignals); err != nil {
+		slog.Default().Error("Failed to start server", "error", err)
+		exitCode = 1
+		return
 	}
 }
 
-func runServer(router *gin.Engine, host, port, unixSocket, dataDir string) error {
+func runServer(
+	router *gin.Engine,
+	host, port, unixSocket, dataDir string,
+	reload func(context.Context) error,
+	reloadSignals, shutdownSignals <-chan os.Signal,
+) error {
+	server := &http.Server{
+		Handler: router.Handler(),
+	}
+
 	if unixSocket == "" {
 		listenAddr := host + ":" + port
 		slog.Default().Info("Starting LeafWiki", "address", listenAddr, "data_dir", dataDir)
-		return router.Run(listenAddr)
+		listener, err := net.Listen("tcp", listenAddr)
+		if err != nil {
+			return err
+		}
+		return serveWithLifecycle(server, listener, nil, reload, reloadSignals, shutdownSignals)
 	}
 
 	listener, err := listenOnUnixSocket(unixSocket)
 	if err != nil {
 		return err
 	}
-	defer func() {
+
+	cleanup := func() {
 		_ = listener.Close()
 		_ = os.Remove(unixSocket)
-	}()
+	}
+	defer cleanup()
 
 	slog.Default().Info(
 		"Starting LeafWiki",
@@ -444,7 +481,7 @@ func runServer(router *gin.Engine, host, port, unixSocket, dataDir string) error
 		"host_port_overridden", true,
 	)
 
-	return router.RunListener(listener)
+	return serveWithLifecycle(server, listener, cleanup, reload, reloadSignals, shutdownSignals)
 }
 
 func listenOnUnixSocket(socketPath string) (net.Listener, error) {
@@ -600,16 +637,99 @@ func validateListenConfig(unixSocket string, visited map[string]bool) error {
 	return nil
 }
 
-// runSignalHandler listens for SIGUSR1/SIGHUP and triggers a live filesystem reload.
-// ReloadFromFS blocks until all indexes are rebuilt, so signals are processed
-// one at a time and a burst of signals coalesces into at most two reloads.
-func runSignalHandler(w *wiki.Wiki) {
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGUSR1, syscall.SIGHUP)
-	for range ch {
-		slog.Default().Info("reload signal received: reloading from filesystem")
-		if err := w.ReloadFromFS(); err != nil {
-			slog.Default().Error("filesystem reload failed", "error", err)
+// serveWithLifecycle runs the HTTP server while handling live reload signals and
+// graceful shutdown signals. Reloads are serialized by the reload callback itself.
+func serveWithLifecycle(
+	server *http.Server,
+	listener net.Listener,
+	cleanup func(),
+	reload func(context.Context) error,
+	reloadSignals, shutdownSignals <-chan os.Signal,
+) error {
+	serveErrCh := make(chan error, 1)
+	go func() {
+		err := server.Serve(listener)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		serveErrCh <- err
+	}()
+
+	stopReloads := make(chan struct{})
+	var shuttingDown atomic.Bool
+	reloadCtx, cancelReload := context.WithCancel(context.Background())
+	var reloadWG sync.WaitGroup
+	reloadWG.Add(1)
+	go func() {
+		defer reloadWG.Done()
+		for {
+			select {
+			case <-stopReloads:
+				return
+			case sig, ok := <-reloadSignals:
+				if !ok {
+					return
+				}
+				if shuttingDown.Load() {
+					return
+				}
+				slog.Default().Info("reload signal received: reloading from filesystem", "signal", sig.String())
+				if err := reload(reloadCtx); err != nil {
+					if errors.Is(err, context.Canceled) {
+						slog.Default().Info("filesystem reload canceled")
+						return
+					}
+					slog.Default().Error("filesystem reload failed", "error", err)
+				}
+			}
+		}
+	}()
+
+	stopReloader := sync.OnceFunc(func() {
+		cancelReload()
+		close(stopReloads)
+	})
+	defer stopReloader()
+
+	waitForReloader := sync.OnceFunc(func() {
+		reloadWG.Wait()
+	})
+	defer waitForReloader()
+
+	for {
+		select {
+		case err := <-serveErrCh:
+			return err
+		case sig, ok := <-shutdownSignals:
+			if !ok {
+				shutdownSignals = nil
+				continue
+			}
+
+			slog.Default().Info("shutdown signal received: shutting down server", "signal", sig.String())
+			shuttingDown.Store(true)
+			stopReloader()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+			err := server.Shutdown(shutdownCtx)
+			cancel()
+			if err != nil {
+				closeErr := server.Close()
+				if closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
+					err = errors.Join(err, closeErr)
+				}
+			}
+
+			if cleanup != nil {
+				cleanup()
+				cleanup = nil
+			}
+
+			waitForReloader()
+			serveErr := <-serveErrCh
+			if err != nil {
+				return err
+			}
+			return serveErr
 		}
 	}
 }

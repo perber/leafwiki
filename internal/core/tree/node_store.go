@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -237,6 +238,10 @@ func (f *NodeStore) LoadTree(filename string) (*PageNode, error) {
 }
 
 func (f *NodeStore) ReconstructTreeFromFS() (*PageNode, error) {
+	return f.ReconstructTreeFromFSContext(context.Background())
+}
+
+func (f *NodeStore) ReconstructTreeFromFSContext(ctx context.Context) (*PageNode, error) {
 	reconstructNow := time.Now().UTC()
 	rootDir := filepath.Join(f.storageDir, "root")
 	root := &PageNode{
@@ -264,13 +269,21 @@ func (f *NodeStore) ReconstructTreeFromFS() (*PageNode, error) {
 		return nil, fmt.Errorf("root path %s is not a directory", rootDir)
 	}
 
-	if err := f.reconstructTreeRecursive(rootDir, root, reconstructNow, seenIDs); err != nil {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	if err := f.reconstructTreeRecursive(ctx, rootDir, root, reconstructNow, seenIDs); err != nil {
 		return nil, fmt.Errorf("reconstruct tree from fs: %w", err)
 	}
 
 	return root, nil
 }
-func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNode, reconstructNow time.Time, seenIDs map[string]string) error {
+func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath string, parent *PageNode, reconstructNow time.Time, seenIDs map[string]string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	entries, err := os.ReadDir(currentPath)
 	if err != nil {
 		return fmt.Errorf("read dir %s: %w", currentPath, err)
@@ -288,6 +301,10 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 	})
 
 	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		name := entry.Name()
 
 		// optional: skip hidden stuff
@@ -363,7 +380,7 @@ func (f *NodeStore) reconstructTreeRecursive(currentPath string, parent *PageNod
 				}
 			}
 
-			if err := f.reconstructTreeRecursive(filepath.Join(currentPath, name), child, reconstructNow, seenIDs); err != nil {
+			if err := f.reconstructTreeRecursive(ctx, filepath.Join(currentPath, name), child, reconstructNow, seenIDs); err != nil {
 				return err
 			}
 			continue
