@@ -13,7 +13,9 @@
             "args": [
                 "--jwt-secret=secretkey",
                 "--admin-password=anewpassword",
-                "--allow-insecure=true"
+                "--allow-insecure=true",
+                "--enable-revision=true",
+                "--enable-link-refactor=true"
             ],
         },
         {
@@ -24,7 +26,9 @@
             "program": "${workspaceFolder}/cmd/leafwiki/main.go",
             "args": [
                 "--allow-insecure=true",
-                "--disable-auth=true"
+                "--disable-auth=true",
+                "--enable-revision=true",
+                "--enable-link-refactor=true"
             ],
         },
         {
@@ -37,7 +41,9 @@
                 "--jwt-secret=secretkey",
                 "--public-access=true",
                 "--allow-insecure=true",
-                "--admin-password=anewpassword"
+                "--admin-password=anewpassword",
+                "--enable-revision=true",
+                "--enable-link-refactor=true"
             ],
         },
         // admin reset
