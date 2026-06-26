@@ -1,6 +1,17 @@
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
+import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
 import { withBasePath } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
+import bash from 'highlight.js/lib/languages/bash'
+import dockerfile from 'highlight.js/lib/languages/dockerfile'
+import http from 'highlight.js/lib/languages/http'
+import nginx from 'highlight.js/lib/languages/nginx'
+import nix from 'highlight.js/lib/languages/nix'
+import powershell from 'highlight.js/lib/languages/powershell'
+import protobuf from 'highlight.js/lib/languages/protobuf'
+import shell from 'highlight.js/lib/languages/shell'
+import 'katex/dist/katex.min.css'
+import { common } from 'lowlight'
 import {
   AnchorHTMLAttributes,
   AudioHTMLAttributes,
@@ -24,19 +35,12 @@ import {
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
-import { common } from 'lowlight'
-import dockerfile from 'highlight.js/lib/languages/dockerfile'
-import http from 'highlight.js/lib/languages/http'
-import nginx from 'highlight.js/lib/languages/nginx'
-import nix from 'highlight.js/lib/languages/nix'
-import protobuf from 'highlight.js/lib/languages/protobuf'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { extractTocEntries } from './extractTocEntries'
-import { TocDropdownButton } from './TocDropdownButton'
 import Headline from './Headline'
 import MarkdownCodeBlock from './MarkdownCodeBlock'
 import { MarkdownImage } from './MarkdownImage'
@@ -45,10 +49,9 @@ import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
 import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
-import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
-import 'katex/dist/katex.min.css'
+import { TocDropdownButton } from './TocDropdownButton'
 
 const schema = {
   ...defaultSchema,
@@ -633,11 +636,14 @@ export default function MarkdownPreview({
               {
                 languages: {
                   ...common,
+                  bash,
                   dockerfile,
                   http,
                   nginx,
                   nix,
+                  powershell,
                   protobuf,
+                  shell,
                 },
               },
             ],
