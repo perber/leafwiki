@@ -319,7 +319,11 @@ func TestServeWithLifecycle_GracefulShutdownWaitsForInFlightRequest(t *testing.T
 	case <-time.After(2 * time.Second):
 		t.Fatal("request did not complete")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("closing response body failed: %v", err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -381,7 +385,9 @@ func TestServeWithLifecycle_ReloadSignalTriggersCallbackWithoutStoppingServer(t 
 	if err != nil {
 		t.Fatalf("request after reload failed: %v", err)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Fatalf("closing response body failed: %v", err)
+	}
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d", resp.StatusCode)
 	}
@@ -441,7 +447,7 @@ func TestServeWithLifecycle_ShutdownTimeoutStillRunsCleanup(t *testing.T) {
 	go func() {
 		resp, err := http.Get("http://" + listener.Addr().String())
 		if err == nil && resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}()
 
