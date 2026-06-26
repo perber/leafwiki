@@ -564,6 +564,40 @@ For more information, visit the [LeafWiki GitHub repository](https://github.com/
 	return nil
 }
 
+// ReloadFromFS reruns the startup-time filesystem reconciliation without
+// restarting the process. It blocks until all indexes are rebuilt, so the
+// signal handler naturally serializes back-to-back reload requests.
+//
+// What is reloaded: page tree, link index, tag/property indexes, search index.
+// What is NOT reloaded: assets (served directly from disk), auth/users
+// (SQLite-based), revisions (stored per-page, no re-baseline).
+func (w *Wiki) ReloadFromFS() error {
+	w.log.Info("filesystem reload started")
+
+	if err := w.tree.ReconstructTreeFromFS(); err != nil {
+		return fmt.Errorf("tree reconstruction failed: %w", err)
+	}
+
+	if err := w.links.IndexAllPages(); err != nil {
+		w.log.Warn("link re-index failed during reload", "error", err)
+	}
+
+	w.bootstrapTagsAndProperties()
+
+	w.status.Start()
+	defer w.status.Finish()
+	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
+	if err := searchEffect.IndexAllPages(); err != nil {
+		w.log.Warn("search re-index failed during reload", "error", err)
+		w.status.Fail()
+		return nil
+	}
+
+	w.status.Success()
+	w.log.Info("filesystem reload completed")
+	return nil
+}
+
 // ─── Service getters (test infrastructure) ───────────────────────────────────
 
 func (w *Wiki) GetStorageDir() string {
