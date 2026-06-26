@@ -8,9 +8,11 @@ import (
 	"math"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -412,6 +414,8 @@ func main() {
 		DisableRequestLog: disableRequestLog,
 	})
 
+	go runSignalHandler(w)
+
 	if err := runServer(router, host, port, unixSocket, dataDir); err != nil {
 		fail("Failed to start server", "error", err)
 	}
@@ -594,6 +598,20 @@ func validateListenConfig(unixSocket string, visited map[string]bool) error {
 		return fmt.Errorf("--unix-socket cannot be used together with --host or --port")
 	}
 	return nil
+}
+
+// runSignalHandler listens for SIGUSR1/SIGHUP and triggers a live filesystem reload.
+// ReloadFromFS blocks until all indexes are rebuilt, so signals are processed
+// one at a time and a burst of signals coalesces into at most two reloads.
+func runSignalHandler(w *wiki.Wiki) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGUSR1, syscall.SIGHUP)
+	for range ch {
+		slog.Default().Info("reload signal received: reloading from filesystem")
+		if err := w.ReloadFromFS(); err != nil {
+			slog.Default().Error("filesystem reload failed", "error", err)
+		}
+	}
 }
 
 // normalizeBasePath normalizes the base path to the form "/mypath" (no trailing slash).

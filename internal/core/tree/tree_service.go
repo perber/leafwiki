@@ -141,40 +141,31 @@ func (t *TreeService) TreeHash() string {
 	return hash
 }
 
-// ReconstructTreeFromFS reconstructs the tree from the filesystem
+// ReconstructTreeFromFS reconstructs the tree from the filesystem.
+// The slow FS scan runs without holding the write lock so readers can
+// continue serving the current tree concurrently. The lock is acquired
+// only for the fast in-memory swap and index rebuild.
 func (t *TreeService) ReconstructTreeFromFS() error {
-	return t.withLockedTree(t.reconstructTreeFromFSLocked)
-}
-
-func (t *TreeService) reconstructTreeFromFSLocked() error {
-	// Reconstruct the tree from the filesystem
-	// This is a more complex operation and may involve reading the filesystem structure
 	newTree, err := t.store.ReconstructTreeFromFS()
 	if err != nil {
 		t.log.Error("Error reconstructing tree from filesystem", "error", err)
 		return err
 	}
-
-	// Defensive check to protect against unexpected nil returns from ReconstructTreeFromFS
 	if newTree == nil {
 		return fmt.Errorf("internal error: ReconstructTreeFromFS returned nil tree")
 	}
 
-	// Save the old tree in case we need to revert
-	// Note: oldTree may be nil if this is the first reconstruction (which is expected)
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	oldTree := t.tree
 	t.tree = newTree
 	t.rebuildIndexesLocked()
-
-	// Reconstructed nodes already carry metadata from frontmatter or safe defaults.
-
 	if err := saveSchema(t.storageDir, CurrentSchemaVersion); err != nil {
 		t.log.Error("Error saving schema after reconstruction", "error", err)
 		t.tree = oldTree
 		t.rebuildIndexesLocked()
 		return err
 	}
-
 	return nil
 }
 

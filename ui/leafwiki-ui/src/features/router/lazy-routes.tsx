@@ -7,6 +7,9 @@ export const BrandingSettings = lazy(
 )
 export const PageEditor = lazy(() => import('../editor/PageEditor'))
 export const Importer = lazy(() => import('../importer/Importer'))
+export const MaintenanceSettings = lazy(
+  () => import('../maintenance/MaintenanceSettings'),
+)
 export const PageHistoryPage = lazy(() => import('../page/PageHistoryPage'))
 export const PermalinkRedirect = lazy(() => import('../page/PermalinkRedirect'))
 export const RootRedirect = lazy(() => import('../page/RootRedirect'))

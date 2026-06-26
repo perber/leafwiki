@@ -1,0 +1,13 @@
+{
+  "pageTitle": "Maintenance",
+  "filesystemSync": {
+    "title": "Filesystem Sync",
+    "description": "Reload all pages from the filesystem into the wiki index. Use this after adding or modifying Markdown files directly in the storage directory.",
+    "button": "Sync now",
+    "buttonLoading": "Syncing…"
+  },
+  "toast": {
+    "success": "Filesystem sync completed",
+    "error": "Filesystem sync failed"
+  }
+}

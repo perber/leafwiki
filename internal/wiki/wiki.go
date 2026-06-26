@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/perber/wiki/internal/branding"
@@ -23,6 +24,7 @@ import (
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 	wikibranding "github.com/perber/wiki/internal/wiki/branding"
 	wikihealth "github.com/perber/wiki/internal/wiki/health"
+	wikiresync "github.com/perber/wiki/internal/wiki/resync"
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
@@ -62,6 +64,8 @@ type Wiki struct {
 	tags             *tags.TagsService
 	props            *properties.PropertiesService
 	backupRoutes     *wikibackup.Routes
+	resyncRoutes     *wikiresync.Routes
+	reloadMu         sync.Mutex
 	log              *slog.Logger
 }
 
@@ -306,6 +310,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 		Status:     w.status,
 		StorageDir: w.storageDir,
 	})
+	w.resyncRoutes = wikiresync.NewRoutes(w.ReloadFromFS, w.auth)
 }
 
 // ─── Domain route builder helpers ────────────────────────────────────────────
@@ -464,6 +469,7 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.brandingRoutes,
 		w.importerRoutes,
 		w.healthRoutes,
+		w.resyncRoutes,
 	}
 	if w.backupRoutes != nil {
 		registrars = append(registrars, w.backupRoutes)
@@ -561,6 +567,43 @@ For more information, visit the [LeafWiki GitHub repository](https://github.com/
 		return err
 	}
 
+	return nil
+}
+
+// ReloadFromFS reruns the startup-time filesystem reconciliation without
+// restarting the process. It serializes concurrent callers (signal handler +
+// HTTP endpoint) so indexes are never rebuilt from two goroutines at once.
+//
+// What is reloaded: page tree, link index, tag/property indexes, search index.
+// What is NOT reloaded: assets (served directly from disk), auth/users
+// (SQLite-based), revisions (stored per-page, no re-baseline).
+func (w *Wiki) ReloadFromFS() error {
+	w.reloadMu.Lock()
+	defer w.reloadMu.Unlock()
+
+	w.log.Info("filesystem reload started")
+
+	if err := w.tree.ReconstructTreeFromFS(); err != nil {
+		return fmt.Errorf("tree reconstruction failed: %w", err)
+	}
+
+	if err := w.links.IndexAllPages(); err != nil {
+		w.log.Warn("link re-index failed during reload", "error", err)
+	}
+
+	w.bootstrapTagsAndProperties()
+
+	w.status.Start()
+	defer w.status.Finish()
+	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
+	if err := searchEffect.IndexAllPages(); err != nil {
+		w.log.Warn("search re-index failed during reload", "error", err)
+		w.status.Fail()
+		return fmt.Errorf("search re-index failed: %w", err)
+	}
+
+	w.status.Success()
+	w.log.Info("filesystem reload completed")
 	return nil
 }
 

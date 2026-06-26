@@ -4,6 +4,7 @@ import enAuth from '../locales/en/auth.json'
 import enBranding from '../locales/en/branding.json'
 import enEditor from '../locales/en/editor.json'
 import enErrors from '../locales/en/errors.json'
+import enMaintenance from '../locales/en/maintenance.json'
 import enSearch from '../locales/en/search.json'
 import enViewer from '../locales/en/viewer.json'
 
@@ -16,6 +17,7 @@ i18next.use(initReactI18next).init({
       branding: enBranding,
       errors: enErrors,
       editor: enEditor,
+      maintenance: enMaintenance,
       search: enSearch,
       viewer: enViewer,
     },
