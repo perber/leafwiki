@@ -1,6 +1,8 @@
 package links
 
 import (
+	"context"
+
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -19,8 +21,16 @@ func NewLinkService(storageDir string, treeService *tree.TreeService, store *Lin
 }
 
 func (b *LinkService) IndexAllPages() error {
+	return b.IndexAllPagesContext(context.Background())
+}
+
+func (b *LinkService) IndexAllPagesContext(ctx context.Context) error {
 	if !b.treeService.IsLoaded() {
 		return nil
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	if err := b.store.Clear(); err != nil {
@@ -29,6 +39,9 @@ func (b *LinkService) IndexAllPages() error {
 
 	var ids []string
 	if err := b.treeService.WalkNodes(func(id string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		ids = append(ids, id)
 		return nil
 	}); err != nil {
@@ -37,6 +50,9 @@ func (b *LinkService) IndexAllPages() error {
 
 	pages, errs := b.treeService.GetPages(ids)
 	for i, page := range pages {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if errs[i] != nil {
 			return errs[i]
 		}

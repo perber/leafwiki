@@ -39,6 +39,24 @@ func NewAuthService(userService *UserService, sessionStore *SessionStore, secret
 	}
 }
 
+func (a *AuthService) Close() error {
+	var errs []error
+
+	if a.sessionStore != nil {
+		if err := a.sessionStore.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if a.userService != nil {
+		if err := a.userService.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
 type AuthToken struct {
 	Token                string      `json:"token"`
 	RefreshToken         string      `json:"refresh_token"`

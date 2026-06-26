@@ -24,12 +24,12 @@ import (
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 	wikibranding "github.com/perber/wiki/internal/wiki/branding"
 	wikihealth "github.com/perber/wiki/internal/wiki/health"
-	wikiresync "github.com/perber/wiki/internal/wiki/resync"
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
+	wikiresync "github.com/perber/wiki/internal/wiki/resync"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
 	wikitags "github.com/perber/wiki/internal/wiki/tags"
@@ -578,17 +578,33 @@ For more information, visit the [LeafWiki GitHub repository](https://github.com/
 // What is NOT reloaded: assets (served directly from disk), auth/users
 // (SQLite-based), revisions (stored per-page, no re-baseline).
 func (w *Wiki) ReloadFromFS() error {
+	return w.ReloadFromFSContext(context.Background())
+}
+
+func (w *Wiki) ReloadFromFSContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	w.reloadMu.Lock()
 	defer w.reloadMu.Unlock()
 
 	w.log.Info("filesystem reload started")
 
-	if err := w.tree.ReconstructTreeFromFS(); err != nil {
+	if err := w.tree.ReconstructTreeFromFSContext(ctx); err != nil {
 		return fmt.Errorf("tree reconstruction failed: %w", err)
 	}
 
-	if err := w.links.IndexAllPages(); err != nil {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if err := w.links.IndexAllPagesContext(ctx); err != nil {
 		w.log.Warn("link re-index failed during reload", "error", err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	w.bootstrapTagsAndProperties()
@@ -596,7 +612,7 @@ func (w *Wiki) ReloadFromFS() error {
 	w.status.Start()
 	defer w.status.Finish()
 	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
-	if err := searchEffect.IndexAllPages(); err != nil {
+	if err := searchEffect.IndexAllPagesContext(ctx); err != nil {
 		w.log.Warn("search re-index failed during reload", "error", err)
 		w.status.Fail()
 		return fmt.Errorf("search re-index failed: %w", err)
@@ -619,8 +635,15 @@ func (w *Wiki) UserService() *auth.UserService {
 
 func (w *Wiki) Close() error {
 	w.status.Finish()
-	if err := w.user.Close(); err != nil {
-		return err
+	if w.auth != nil {
+		// When auth is enabled, AuthService owns both the session store and user store.
+		if err := w.auth.Close(); err != nil {
+			return err
+		}
+	} else if w.user != nil {
+		if err := w.user.Close(); err != nil {
+			return err
+		}
 	}
 
 	if w.links != nil {

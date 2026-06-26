@@ -1,6 +1,7 @@
 package tree
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -146,13 +147,25 @@ func (t *TreeService) TreeHash() string {
 // continue serving the current tree concurrently. The lock is acquired
 // only for the fast in-memory swap and index rebuild.
 func (t *TreeService) ReconstructTreeFromFS() error {
-	newTree, err := t.store.ReconstructTreeFromFS()
+	return t.ReconstructTreeFromFSContext(context.Background())
+}
+
+func (t *TreeService) ReconstructTreeFromFSContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	newTree, err := t.store.ReconstructTreeFromFSContext(ctx)
 	if err != nil {
 		t.log.Error("Error reconstructing tree from filesystem", "error", err)
 		return err
 	}
 	if newTree == nil {
 		return fmt.Errorf("internal error: ReconstructTreeFromFS returned nil tree")
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	t.mu.Lock()

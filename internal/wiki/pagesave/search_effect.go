@@ -1,6 +1,7 @@
 package pagesave
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 
@@ -50,8 +51,15 @@ func (e *SearchIndexSideEffect) Apply(event PageSaveEvent) {
 // IndexAllPages clears the search index and rebuilds it from the current tree state.
 // Call this once at startup; runtime updates are handled via Apply.
 func (e *SearchIndexSideEffect) IndexAllPages() error {
+	return e.IndexAllPagesContext(context.Background())
+}
+
+func (e *SearchIndexSideEffect) IndexAllPagesContext(ctx context.Context) error {
 	if e.index == nil {
 		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if err := e.index.Clear(); err != nil {
 		return err
@@ -59,6 +67,9 @@ func (e *SearchIndexSideEffect) IndexAllPages() error {
 
 	var ids []string
 	if err := e.tree.WalkNodes(func(id string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		ids = append(ids, id)
 		return nil
 	}); err != nil {
@@ -67,6 +78,9 @@ func (e *SearchIndexSideEffect) IndexAllPages() error {
 
 	pages, errs := e.tree.GetPages(ids)
 	for i, page := range pages {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if errs[i] != nil {
 			e.log.Warn("skipping page during search bootstrap", "pageID", ids[i], "error", errs[i])
 			continue

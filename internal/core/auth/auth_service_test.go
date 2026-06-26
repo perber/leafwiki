@@ -219,3 +219,31 @@ func TestAuthService_RevokeAllUserSessions_MultipleUsers(t *testing.T) {
 		t.Fatalf("Second user's refresh token should still work: %v", err)
 	}
 }
+
+func TestAuthService_Close_ClosesSessionAndUserStores(t *testing.T) {
+	authService := setupTestAuthService(t)
+
+	if authService.sessionStore == nil {
+		t.Fatal("expected session store to be initialized")
+	}
+	if authService.sessionStore.db == nil {
+		t.Fatal("expected session store db to be initialized")
+	}
+	if authService.userService == nil || authService.userService.store == nil {
+		t.Fatal("expected user service store to be initialized")
+	}
+	if authService.userService.store.db == nil {
+		t.Fatal("expected user store db to be initialized")
+	}
+
+	if err := authService.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	if authService.sessionStore.db != nil {
+		t.Fatal("expected session store db to be closed")
+	}
+	if authService.userService.store.db != nil {
+		t.Fatal("expected user store db to be closed")
+	}
+}
