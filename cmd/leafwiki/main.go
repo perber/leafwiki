@@ -6,12 +6,15 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/backup"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -24,14 +27,15 @@ func writeUsage(w io.Writer) {
 	if _, err := fmt.Fprintln(w, `LeafWiki – lightweight selfhosted wiki 🌿
 
 	Usage:
-	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
-	leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--data-dir <DIR>]
+	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--unix-socket <PATH>] [--data-dir <DIR>]
+	leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--unix-socket <PATH>] [--data-dir <DIR>]
 	leafwiki reset-admin-password
 	leafwiki --help
 
 	Options:
 	--host             Host/IP address to bind the server to (default: 127.0.0.1)
 	--port             Port to run the server on (default: 8080)
+	--unix-socket      Path to a unix domain socket to listen on (overrides --host and --port)
 	--data-dir         Path to data directory (default: ./data)
 	--admin-password   Initial admin password (used only if no admin exists)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
@@ -69,6 +73,7 @@ func writeUsage(w io.Writer) {
 	Environment variables:
 	LEAFWIKI_HOST
 	LEAFWIKI_PORT
+	LEAFWIKI_UNIX_SOCKET
 	LEAFWIKI_DATA_DIR
 	LEAFWIKI_JWT_SECRET
 	LEAFWIKI_LOG_LEVEL
@@ -136,6 +141,7 @@ func fail(msg string, args ...any) {
 type cliFlags struct {
 	host                    *string
 	port                    *string
+	unixSocket              *string
 	dataDir                 *string
 	adminPassword           *string
 	jwtSecret               *string
@@ -173,6 +179,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 	return &cliFlags{
 		host:                    fs.String("host", "", "host/IP address to bind the server to (e.g. 127.0.0.1 or 0.0.0.0)"),
 		port:                    fs.String("port", "", "port to run the server on"),
+		unixSocket:              fs.String("unix-socket", "", "path to a unix domain socket to listen on; overrides --host and --port"),
 		dataDir:                 fs.String("data-dir", "", "path to data directory"),
 		adminPassword:           fs.String("admin-password", "", "initial admin password"),
 		jwtSecret:               fs.String("jwt-secret", "", "JWT secret for authentication"),
@@ -222,6 +229,7 @@ func main() {
 
 	host := resolveString("host", *flags.host, visited, "LEAFWIKI_HOST", "127.0.0.1")
 	port := resolveString("port", *flags.port, visited, "LEAFWIKI_PORT", "8080")
+	unixSocket := resolveString("unix-socket", *flags.unixSocket, visited, "LEAFWIKI_UNIX_SOCKET", "")
 	dataDir := resolveString("data-dir", *flags.dataDir, visited, "LEAFWIKI_DATA_DIR", "./data")
 	adminPassword := resolveString("admin-password", *flags.adminPassword, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
 	jwtSecret := resolveString("jwt-secret", *flags.jwtSecret, visited, "LEAFWIKI_JWT_SECRET", "")
@@ -260,6 +268,9 @@ func main() {
 	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
 	if err != nil {
 		fail("invalid --trusted-proxy-ips value", "error", err)
+	}
+	if err := validateListenConfig(unixSocket, visited); err != nil {
+		fail("Invalid listen configuration", "error", err)
 	}
 
 	if err := validateHTTPRemoteUserConfig(enableHTTPRemoteUser, trustedProxyIPsRaw); err != nil {
@@ -401,11 +412,70 @@ func main() {
 		DisableRequestLog: disableRequestLog,
 	})
 
-	listenAddr := host + ":" + port
-	slog.Default().Info("Starting LeafWiki", "address", listenAddr, "data_dir", dataDir)
-	if err := router.Run(listenAddr); err != nil {
+	if err := runServer(router, host, port, unixSocket, dataDir); err != nil {
 		fail("Failed to start server", "error", err)
 	}
+}
+
+func runServer(router *gin.Engine, host, port, unixSocket, dataDir string) error {
+	if unixSocket == "" {
+		listenAddr := host + ":" + port
+		slog.Default().Info("Starting LeafWiki", "address", listenAddr, "data_dir", dataDir)
+		return router.Run(listenAddr)
+	}
+
+	listener, err := listenOnUnixSocket(unixSocket)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = listener.Close()
+		_ = os.Remove(unixSocket)
+	}()
+
+	slog.Default().Info(
+		"Starting LeafWiki",
+		"unix_socket", unixSocket,
+		"data_dir", dataDir,
+		"host_port_overridden", true,
+	)
+
+	return router.RunListener(listener)
+}
+
+func listenOnUnixSocket(socketPath string) (net.Listener, error) {
+	if runtime.GOOS == "windows" {
+		return nil, fmt.Errorf("unix sockets are not supported on windows")
+	}
+	if err := removeStaleUnixSocket(socketPath); err != nil {
+		return nil, err
+	}
+
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(socketPath, 0660); err != nil {
+		_ = listener.Close()
+		_ = os.Remove(socketPath)
+		return nil, err
+	}
+
+	return listener, nil
+}
+
+func removeStaleUnixSocket(socketPath string) error {
+	info, err := os.Lstat(socketPath)
+	if err == nil {
+		if info.Mode()&os.ModeSocket == 0 {
+			return fmt.Errorf("unix socket path already exists and is not a socket: %s", socketPath)
+		}
+		return os.Remove(socketPath)
+	}
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
 }
 
 // CLI > ENV > default(flag)
@@ -512,6 +582,16 @@ func validateHTTPRemoteUserConfig(enabled bool, trustedProxyIPsRaw string) error
 	}
 	if !hasTrustedProxy {
 		return fmt.Errorf("--trusted-proxy-ips is required when --enable-http-remote-user is set. Set it using --trusted-proxy-ips or LEAFWIKI_TRUSTED_PROXY_IPS")
+	}
+	return nil
+}
+
+func validateListenConfig(unixSocket string, visited map[string]bool) error {
+	if unixSocket == "" {
+		return nil
+	}
+	if visited["host"] || visited["port"] {
+		return fmt.Errorf("--unix-socket cannot be used together with --host or --port")
 	}
 	return nil
 }
