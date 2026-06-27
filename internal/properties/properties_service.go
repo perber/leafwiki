@@ -1,7 +1,10 @@
 package properties
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/perber/wiki/internal/core/markdown"
 )
@@ -84,10 +87,32 @@ func extractFlatEntryDepth(prefix string, value interface{}, result map[string]P
 	switch v := value.(type) {
 	case string:
 		if _, exists := result[prefix]; !exists {
-			entry, ok := toPropertyEntry(v)
-			if ok {
+			if entry, ok := scalarToPropertyEntry(v); ok {
 				result[prefix] = entry
 			}
+		}
+	case int:
+		result[prefix] = PropertyEntry{Value: strconv.Itoa(v), Type: "number"}
+	case int64:
+		result[prefix] = PropertyEntry{Value: strconv.FormatInt(v, 10), Type: "number"}
+	case float64:
+		result[prefix] = PropertyEntry{Value: strconv.FormatFloat(v, 'f', -1, 64), Type: "number"}
+	case bool:
+		val := "false"
+		if v {
+			val = "true"
+		}
+		result[prefix] = PropertyEntry{Value: val, Type: "boolean"}
+	case time.Time:
+		v = v.UTC()
+		if v.Hour() == 0 && v.Minute() == 0 && v.Second() == 0 && v.Nanosecond() == 0 {
+			result[prefix] = PropertyEntry{Value: v.Format("2006-01-02"), Type: "date"}
+		} else {
+			result[prefix] = PropertyEntry{Value: v.Format(time.RFC3339), Type: "datetime"}
+		}
+	case []interface{}:
+		for i, item := range v {
+			extractFlatEntryDepth(fmt.Sprintf("%s.%d", prefix, i), item, result, depth+1)
 		}
 	case map[string]interface{}:
 		for childKey, childValue := range v {
@@ -95,8 +120,6 @@ func extractFlatEntryDepth(prefix string, value interface{}, result map[string]P
 			if childKey == "" {
 				continue
 			}
-			// Skip child segments that use the system-reserved prefix so that
-			// e.g. {"meta": {"leafwiki_id": "x"}} cannot pollute the index.
 			if strings.HasPrefix(strings.ToLower(childKey), "leafwiki_") {
 				continue
 			}
@@ -105,12 +128,7 @@ func extractFlatEntryDepth(prefix string, value interface{}, result map[string]P
 	}
 }
 
-
-func toPropertyEntry(value interface{}) (PropertyEntry, bool) {
-	s, ok := value.(string)
-	if !ok {
-		return PropertyEntry{}, false
-	}
+func scalarToPropertyEntry(s string) (PropertyEntry, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" || strings.ContainsRune(s, '\n') {
 		return PropertyEntry{}, false

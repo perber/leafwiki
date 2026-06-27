@@ -1719,9 +1719,9 @@ func TestUpdatePageEndpoint_WritesTagsAndStringProperties(t *testing.T) {
 		"slug":    "updated-title",
 		"content": "# Updated Content",
 		"tags":    []string{"React", "TypeScript"},
-		"properties": map[string]string{
-			"status": "published",
-			"author": "alice",
+		"properties": map[string]interface{}{
+			"status": map[string]interface{}{"type": "text", "value": "published"},
+			"author": map[string]interface{}{"type": "text", "value": "alice"},
 		},
 	}
 	body, _ := json.Marshal(payload)
@@ -1747,11 +1747,13 @@ func TestUpdatePageEndpoint_WritesTagsAndStringProperties(t *testing.T) {
 	if fetched.Tags[0] != "react" || fetched.Tags[1] != "typescript" {
 		t.Fatalf("expected lowercase normalized tags, got %#v", fetched.Tags)
 	}
-	if fetched.Properties["status"] != "published" {
-		t.Fatalf("expected status=published, got %#v", fetched.Properties)
+	statusMV, _ := fetched.Properties["status"].(map[string]interface{})
+	if statusMV["value"] != "published" {
+		t.Fatalf("expected status.value=published, got %#v", fetched.Properties["status"])
 	}
-	if fetched.Properties["author"] != "alice" {
-		t.Fatalf("expected author=alice, got %#v", fetched.Properties)
+	authorMV, _ := fetched.Properties["author"].(map[string]interface{})
+	if authorMV["value"] != "alice" {
+		t.Fatalf("expected author.value=alice, got %#v", fetched.Properties["author"])
 	}
 }
 
@@ -2423,8 +2425,8 @@ func TestUpdatePage_InvalidProperties(t *testing.T) {
 		"title":   "Updated Title",
 		"slug":    "updated-title",
 		"content": "Updated content",
-		"properties": map[string]string{
-			"leafwiki_hidden": "forbidden",
+		"properties": map[string]interface{}{
+			"leafwiki_hidden": map[string]interface{}{"type": "text", "value": "forbidden"},
 		},
 	}
 	body, _ := json.Marshal(payload)
@@ -2511,19 +2513,26 @@ Body
 		t.Fatalf("Expected tags in response, got %#v", resp["tags"])
 	}
 
-	// Only string scalar properties are returned; numbers, booleans, and lists are excluded.
+	// All typed properties are returned, including numbers, booleans, and lists.
 	propertiesValue, ok := resp["properties"].(map[string]interface{})
 	if !ok {
 		t.Fatalf("Expected properties map in response, got %#v", resp["properties"])
 	}
-	if _, exists := propertiesValue["priority"]; exists {
-		t.Fatalf("Numeric property must not be returned, got %#v", propertiesValue)
+	priorityMV, _ := propertiesValue["priority"].(map[string]interface{})
+	if priorityMV["type"] != "number" || priorityMV["value"] != "2" {
+		t.Fatalf("Expected priority={type:number,value:2}, got %#v", propertiesValue["priority"])
 	}
-	if _, exists := propertiesValue["published"]; exists {
-		t.Fatalf("Boolean property must not be returned, got %#v", propertiesValue)
+	publishedMV, _ := propertiesValue["published"].(map[string]interface{})
+	if publishedMV["type"] != "boolean" || publishedMV["value"] != "true" {
+		t.Fatalf("Expected published={type:boolean,value:true}, got %#v", propertiesValue["published"])
 	}
-	if _, exists := propertiesValue["owners"]; exists {
-		t.Fatalf("List property must not be returned, got %#v", propertiesValue)
+	ownersMV, _ := propertiesValue["owners"].(map[string]interface{})
+	if ownersMV["type"] != "list" {
+		t.Fatalf("Expected owners to have type=list, got %#v", propertiesValue["owners"])
+	}
+	ownerItems, _ := ownersMV["items"].([]interface{})
+	if len(ownerItems) != 2 {
+		t.Fatalf("Expected 2 owners items, got %#v", ownersMV["items"])
 	}
 }
 

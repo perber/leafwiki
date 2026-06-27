@@ -38,32 +38,39 @@ type Node struct {
 // Page is the HTTP representation of a full page (node + content).
 type Page struct {
 	*Node
-	Content    string            `json:"content"`
-	Path       string            `json:"path"`
-	Tags       []string          `json:"tags"`
-	Properties map[string]string `json:"properties"`
+	Content    string                        `json:"content"`
+	Tags       []string                      `json:"tags"`
+	Properties map[string]tree.MetadataValue `json:"properties"`
 }
 
 // ToAPIPage converts a tree.Page to its HTTP representation.
 func ToAPIPage(p *tree.Page, userResolver *auth.UserResolver) *Page {
-	return &Page{
-		Node:       ToAPINode(p.PageNode, "", userResolver),
-		Content:    p.Content,
-		Path:       BuildPathFromNode(p.PageNode),
-		Tags:       []string{},
-		Properties: map[string]string{},
+	node := ToAPINode(p.PageNode, "", userResolver)
+	node.Path = BuildPathFromNode(p.PageNode)
+	tags := p.Tags
+	if tags == nil {
+		tags = []string{}
 	}
+	props := p.Properties
+	if props == nil {
+		props = map[string]tree.MetadataValue{}
+	}
+	return &Page{Node: node, Content: p.Content, Tags: tags, Properties: props}
 }
 
 // ToAPIPageWithDepth converts a tree.Page with a depth-limited node tree.
 func ToAPIPageWithDepth(p *tree.Page, userResolver *auth.UserResolver, depth int) *Page {
-	return &Page{
-		Node:       ToAPINodeWithDepth(p.PageNode, "", userResolver, depth),
-		Content:    p.Content,
-		Path:       BuildPathFromNode(p.PageNode),
-		Tags:       []string{},
-		Properties: map[string]string{},
+	node := ToAPINodeWithDepth(p.PageNode, "", userResolver, depth)
+	node.Path = BuildPathFromNode(p.PageNode)
+	tags := p.Tags
+	if tags == nil {
+		tags = []string{}
 	}
+	props := p.Properties
+	if props == nil {
+		props = map[string]tree.MetadataValue{}
+	}
+	return &Page{Node: node, Content: p.Content, Tags: tags, Properties: props}
 }
 
 // BuildPathFromNode builds the slash-separated path string from a node.

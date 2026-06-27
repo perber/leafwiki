@@ -29,27 +29,19 @@ func TestExtractPropertiesFromContent_MultipleStringValues(t *testing.T) {
 	assertEntry(t, got, "environment", PropertyEntry{Value: "staging", Type: "text"})
 }
 
-func TestExtractPropertiesFromContent_SkipsNumberValues(t *testing.T) {
+func TestExtractPropertiesFromContent_IndexesNumberValues(t *testing.T) {
 	content := "---\nscore: 42\nrating: 4.5\nstatus: draft\n---\n"
 	got := ExtractPropertiesFromContent(content)
-	if _, ok := got["score"]; ok {
-		t.Error("integer value must not be stored as a property")
-	}
-	if _, ok := got["rating"]; ok {
-		t.Error("float value must not be stored as a property")
-	}
+	assertEntry(t, got, "score", PropertyEntry{Value: "42", Type: "number"})
+	assertEntry(t, got, "rating", PropertyEntry{Value: "4.5", Type: "number"})
 	assertEntry(t, got, "status", PropertyEntry{Value: "draft", Type: "text"})
 }
 
-func TestExtractPropertiesFromContent_SkipsBooleanValues(t *testing.T) {
+func TestExtractPropertiesFromContent_IndexesBooleanValues(t *testing.T) {
 	content := "---\nfeatured: true\narchived: false\nstatus: draft\n---\n"
 	got := ExtractPropertiesFromContent(content)
-	if _, ok := got["featured"]; ok {
-		t.Error("boolean true must not be stored as a property")
-	}
-	if _, ok := got["archived"]; ok {
-		t.Error("boolean false must not be stored as a property")
-	}
+	assertEntry(t, got, "featured", PropertyEntry{Value: "true", Type: "boolean"})
+	assertEntry(t, got, "archived", PropertyEntry{Value: "false", Type: "boolean"})
 	assertEntry(t, got, "status", PropertyEntry{Value: "draft", Type: "text"})
 }
 
@@ -211,12 +203,12 @@ func TestExtractPropertiesFromContent_OnlyReservedKeysReturnsNil(t *testing.T) {
 	}
 }
 
-func TestExtractPropertiesFromContent_OnlyNonStringValuesReturnsNil(t *testing.T) {
+func TestExtractPropertiesFromContent_IndexesNonStringScalars(t *testing.T) {
 	content := "---\nscore: 42\nfeatured: true\nrating: 4.5\n---\n"
 	got := ExtractPropertiesFromContent(content)
-	if got != nil {
-		t.Errorf("expected nil when all values are non-string, got %v", got)
-	}
+	assertEntry(t, got, "score", PropertyEntry{Value: "42", Type: "number"})
+	assertEntry(t, got, "featured", PropertyEntry{Value: "true", Type: "boolean"})
+	assertEntry(t, got, "rating", PropertyEntry{Value: "4.5", Type: "number"})
 }
 
 // ─── Nested map (dot-notation) extraction ────────────────────────────────────
@@ -256,12 +248,10 @@ func TestExtractPropertiesFromContent_MixedFlatAndNestedKeys(t *testing.T) {
 	assertEntry(t, got, "a.b", PropertyEntry{Value: "nested", Type: "text"})
 }
 
-func TestExtractPropertiesFromContent_NestedMapSkipsNonStringLeaves(t *testing.T) {
+func TestExtractPropertiesFromContent_NestedMapIndexesNonStringLeaves(t *testing.T) {
 	content := "---\na:\n  b: 42\n  c: value\n---\n"
 	got := ExtractPropertiesFromContent(content)
-	if _, ok := got["a.b"]; ok {
-		t.Error("nested integer value must not be stored as a property")
-	}
+	assertEntry(t, got, "a.b", PropertyEntry{Value: "42", Type: "number"})
 	assertEntry(t, got, "a.c", PropertyEntry{Value: "value", Type: "text"})
 }
 
@@ -558,6 +548,83 @@ func TestPropertiesService_IndexPageContent_UpdatesExistingEntry(t *testing.T) {
 	if len(old) != 0 {
 		t.Errorf("old value 'draft' should be gone, got %v", old)
 	}
+}
+
+// ─── Typed leaf indexing (number, boolean, date, datetime) ───────────────────
+
+func TestExtractPropertiesFromContent_IndexesNumberLeaf(t *testing.T) {
+	content := "---\ncount: 42\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "count", PropertyEntry{Value: "42", Type: "number"})
+}
+
+func TestExtractPropertiesFromContent_IndexesFloatLeaf(t *testing.T) {
+	content := "---\nrating: 4.5\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "rating", PropertyEntry{Value: "4.5", Type: "number"})
+}
+
+func TestExtractPropertiesFromContent_IndexesBooleanLeaf(t *testing.T) {
+	content := "---\nfeatured: true\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "featured", PropertyEntry{Value: "true", Type: "boolean"})
+}
+
+func TestExtractPropertiesFromContent_IndexesBooleanFalseLeaf(t *testing.T) {
+	content := "---\narchived: false\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "archived", PropertyEntry{Value: "false", Type: "boolean"})
+}
+
+func TestExtractPropertiesFromContent_IndexesDateLeaf(t *testing.T) {
+	// Dates in YAML are parsed as time.Time by yaml.v3
+	content := "---\ncreated: 2024-01-15\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if e, ok := got["created"]; !ok {
+		t.Fatal("expected 'created' in index")
+	} else if e.Type != "date" {
+		t.Errorf("expected type 'date', got %q", e.Type)
+	}
+}
+
+func TestExtractPropertiesFromContent_IndexesDateTimeLeaf(t *testing.T) {
+	content := "---\nupdated: 2024-01-15T12:30:00Z\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if e, ok := got["updated"]; !ok {
+		t.Fatal("expected 'updated' in index")
+	} else if e.Type != "datetime" {
+		t.Errorf("expected type 'datetime', got %q", e.Type)
+	}
+}
+
+func TestExtractPropertiesFromContent_IndexesNestedObjectLeaf(t *testing.T) {
+	content := "---\nmeta:\n  author: alice\n  count: 5\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "meta.author", PropertyEntry{Value: "alice", Type: "text"})
+	assertEntry(t, got, "meta.count", PropertyEntry{Value: "5", Type: "number"})
+}
+
+func TestExtractPropertiesFromContent_IndexesScalarArrayEntries(t *testing.T) {
+	content := "---\nscores:\n  - 10\n  - 20\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "scores.0", PropertyEntry{Value: "10", Type: "number"})
+	assertEntry(t, got, "scores.1", PropertyEntry{Value: "20", Type: "number"})
+}
+
+func TestExtractPropertiesFromContent_IndexesNestedArrayObjectLeaves(t *testing.T) {
+	content := "---\nauthors:\n  - name: alice\n    role: editor\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	assertEntry(t, got, "authors.0.name", PropertyEntry{Value: "alice", Type: "text"})
+	assertEntry(t, got, "authors.0.role", PropertyEntry{Value: "editor", Type: "text"})
+}
+
+func TestExtractPropertiesFromContent_SkipsSystemKeysInsideObjects(t *testing.T) {
+	content := "---\nmeta:\n  leafwiki_id: spoofed\n  status: active\n---\n"
+	got := ExtractPropertiesFromContent(content)
+	if _, ok := got["meta.leafwiki_id"]; ok {
+		t.Error("nested leafwiki_ key must not be indexed")
+	}
+	assertEntry(t, got, "meta.status", PropertyEntry{Value: "active", Type: "text"})
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
