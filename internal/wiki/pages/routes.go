@@ -257,12 +257,12 @@ func (r *Routes) handleCreate(c *gin.Context) {
 func (r *Routes) handleUpdate(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
 	var req struct {
-		Version    string            `json:"version" binding:"required"`
-		Title      string            `json:"title" binding:"required"`
-		Slug       string            `json:"slug" binding:"required"`
-		Content    *string           `json:"content"`
-		Tags       []string          `json:"tags"`
-		Properties map[string]string `json:"properties"`
+		Version    string                       `json:"version" binding:"required"`
+		Title      string                       `json:"title" binding:"required"`
+		Slug       string                       `json:"slug" binding:"required"`
+		Content    *string                      `json:"content"`
+		Tags       []string                     `json:"tags"`
+		Properties map[string]tree.MetadataValue `json:"properties"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
@@ -494,112 +494,15 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 }
 
 func (r *Routes) respondPage(c *gin.Context, status int, page *tree.Page) {
-	apiPage := dto.ToAPIPage(page, r.userResolver)
-	r.enrichPageMetadata(apiPage)
-	c.JSON(status, apiPage)
+	c.JSON(status, dto.ToAPIPage(page, r.userResolver))
 }
 
 func (r *Routes) respondPageWithDepth(c *gin.Context, status int, page *tree.Page, depth int) {
-	apiPage := dto.ToAPIPageWithDepth(page, r.userResolver, depth)
-	r.enrichPageMetadata(apiPage)
-	c.JSON(status, apiPage)
+	c.JSON(status, dto.ToAPIPageWithDepth(page, r.userResolver, depth))
 }
 
-func (r *Routes) enrichPageMetadata(page *dto.Page) {
-	if page == nil {
-		return
-	}
-
-	page.Tags = []string{}
-	page.Properties = map[string]string{}
-
-	raw, err := r.treeService.ReadPageRaw(page.ID)
-	if err != nil {
-		return
-	}
-
-	fm, _, has, err := markdown.ParseFrontmatter(raw)
-	if err != nil || !has || len(fm.ExtraFields) == 0 {
-		return
-	}
-
-	tags, properties := extractPageMetadata(fm.ExtraFields)
-	page.Tags = tags
-	page.Properties = properties
-}
-
-func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]string) {
-	tags := []string{}
-	properties := map[string]string{}
-
-	for rawKey, value := range fields {
-		key := strings.TrimSpace(rawKey)
-		lower := strings.ToLower(key)
-
-		if lower == "tags" {
-			tags = normalizeMetadataTags(value)
-			continue
-		}
-		if markdown.IsSystemKey(key) {
-			continue
-		}
-
-		flattenMetadataEntry(key, value, properties)
-	}
-
-	return tags, properties
-}
-
-// flattenMetadataEntry recursively flattens nested YAML maps into dot-notation
-// keys (e.g. {"a": {"b": "v"}} → properties["a.b"] = "v").
-func flattenMetadataEntry(prefix string, value interface{}, properties map[string]string) {
-	flattenMetadataEntryDepth(prefix, value, properties, 0)
-}
-
-func flattenMetadataEntryDepth(prefix string, value interface{}, properties map[string]string, depth int) {
-	if depth >= maxFlattenDepth {
-		return
-	}
-	switch v := value.(type) {
-	case string:
-		s := strings.TrimSpace(v)
-		if s != "" && !strings.ContainsRune(s, '\n') {
-			if _, exists := properties[prefix]; !exists {
-				properties[prefix] = s
-			}
-		}
-	case map[string]interface{}:
-		for childKey, childValue := range v {
-			childKey = strings.TrimSpace(childKey)
-			if childKey == "" {
-				continue
-			}
-			if strings.HasPrefix(strings.ToLower(childKey), "leafwiki_") {
-				continue
-			}
-			flattenMetadataEntryDepth(prefix+"."+childKey, childValue, properties, depth+1)
-		}
-	}
-}
-
-const maxFlattenDepth = 20
-
-func normalizeMetadataTags(value interface{}) []string {
-	list, ok := value.([]interface{})
-	if !ok {
-		return []string{}
-	}
-
-	rawTags := make([]string, 0, len(list))
-	for _, item := range list {
-		tag, ok := item.(string)
-		if !ok {
-			continue
-		}
-		rawTags = append(rawTags, tag)
-	}
-
-	return normalizeTagInputs(rawTags)
+func extractPageMetadata(fields map[string]interface{}) ([]string, map[string]tree.MetadataValue) {
+	return tree.ParseFrontmatterFields(fields)
 }
 
 func normalizeTagInputs(tags []string) []string {
@@ -621,7 +524,7 @@ func normalizeTagInputs(tags []string) []string {
 	return result
 }
 
-func validatePageMetadataInput(tags []string, properties map[string]string) error {
+func validatePageMetadataInput(tags []string, properties map[string]tree.MetadataValue) error {
 	ve := sharederrors.NewValidationErrors()
 	seenTags := map[string]struct{}{}
 
@@ -644,17 +547,24 @@ func validatePageMetadataInput(tags []string, properties map[string]string) erro
 		seenTags[key] = struct{}{}
 	}
 
-	for rawKey := range properties {
+	for rawKey, value := range properties {
 		key := strings.TrimSpace(rawKey)
 		field := "properties." + rawKey
 		switch {
 		case key == "":
 			ve.Add(field, "Property key must not be empty")
+			continue
 		case key != rawKey:
 			ve.Add(field, "Property key must not contain leading or trailing whitespace")
+			continue
+		case strings.ToLower(key) == "tags":
+			ve.Add(field, "Property key is reserved")
+			continue
 		case markdown.IsSystemKey(key):
 			ve.Add(field, "Property key is reserved")
+			continue
 		}
+		validateMetadataValue(field, value, ve)
 	}
 
 	if ve.HasErrors() {
@@ -662,6 +572,62 @@ func validatePageMetadataInput(tags []string, properties map[string]string) erro
 	}
 
 	return nil
+}
+
+func validateMetadataValue(field string, v tree.MetadataValue, ve *sharederrors.ValidationErrors) {
+	if !tree.IsValidMetadataType(v.Type) {
+		ve.Add(field, "Invalid property type: "+v.Type)
+		return
+	}
+
+	hasValue := v.Value != ""
+	hasItems := len(v.Items) > 0
+	hasFields := len(v.Fields) > 0
+
+	switch v.Type {
+	case tree.MetadataTypeList:
+		if v.Items == nil {
+			ve.Add(field, "List property must have items")
+			return
+		}
+		if hasFields {
+			ve.Add(field, "List property must not have fields")
+			return
+		}
+		if hasValue {
+			ve.Add(field, "List property must not have a scalar value")
+			return
+		}
+		for i, item := range v.Items {
+			validateMetadataValue(field+"["+strconv.Itoa(i)+"]", item, ve)
+		}
+
+	case tree.MetadataTypeObject:
+		if v.Fields == nil {
+			ve.Add(field, "Object property must have fields")
+			return
+		}
+		if hasItems {
+			ve.Add(field, "Object property must not have items")
+			return
+		}
+		if hasValue {
+			ve.Add(field, "Object property must not have a scalar value")
+			return
+		}
+		for k, fv := range v.Fields {
+			validateMetadataValue(field+"."+k, fv, ve)
+		}
+
+	default:
+		// Scalar types: must not mix with items or fields.
+		if hasItems {
+			ve.Add(field, "Scalar property must not have items")
+		}
+		if hasFields {
+			ve.Add(field, "Scalar property must not have fields")
+		}
+	}
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

@@ -2,144 +2,180 @@ package pages
 
 import (
 	"testing"
+
+	"github.com/perber/wiki/internal/core/tree"
 )
-
-func TestFlattenMetadataEntry_FlatString(t *testing.T) {
-	result := map[string]string{}
-	flattenMetadataEntry("key", "value", result)
-	if result["key"] != "value" {
-		t.Errorf("expected result[key] = value, got %q", result["key"])
-	}
-}
-
-func TestFlattenMetadataEntry_NestedOneLevel(t *testing.T) {
-	result := map[string]string{}
-	flattenMetadataEntry("a", map[string]interface{}{"b": "val"}, result)
-	if result["a.b"] != "val" {
-		t.Errorf("expected result[a.b] = val, got %q", result["a.b"])
-	}
-}
-
-func TestFlattenMetadataEntry_NestedTwoLevels(t *testing.T) {
-	result := map[string]string{}
-	flattenMetadataEntry("a", map[string]interface{}{
-		"b": map[string]interface{}{"c": "deep"},
-	}, result)
-	if result["a.b.c"] != "deep" {
-		t.Errorf("expected result[a.b.c] = deep, got %q", result["a.b.c"])
-	}
-}
-
-func TestFlattenMetadataEntry_SkipsEmptyStringValue(t *testing.T) {
-	result := map[string]string{}
-	flattenMetadataEntry("key", "", result)
-	if _, ok := result["key"]; ok {
-		t.Error("expected empty string to be skipped")
-	}
-}
-
-func TestFlattenMetadataEntry_SkipsWhitespaceOnlyValue(t *testing.T) {
-	result := map[string]string{}
-	flattenMetadataEntry("key", "   ", result)
-	if _, ok := result["key"]; ok {
-		t.Error("expected whitespace-only string to be skipped")
-	}
-}
-
-func TestFlattenMetadataEntry_SkipsValueWithNewline(t *testing.T) {
-	result := map[string]string{}
-	flattenMetadataEntry("key", "line1\nline2", result)
-	if _, ok := result["key"]; ok {
-		t.Error("expected multiline string to be skipped")
-	}
-}
-
-func TestFlattenMetadataEntry_SkipsNonStringLeaf(t *testing.T) {
-	result := map[string]string{}
-	flattenMetadataEntry("key", 42, result)
-	if _, ok := result["key"]; ok {
-		t.Error("expected non-string leaf to be skipped")
-	}
-}
-
-func TestFlattenMetadataEntry_SkipsLeafwikiChildSegment(t *testing.T) {
-	result := map[string]string{}
-	flattenMetadataEntry("meta", map[string]interface{}{
-		"leafwiki_id": "secret",
-		"visible":     "yes",
-	}, result)
-	if _, ok := result["meta.leafwiki_id"]; ok {
-		t.Error("expected leafwiki_ child segment to be skipped")
-	}
-	if result["meta.visible"] != "yes" {
-		t.Errorf("expected meta.visible = yes, got %q", result["meta.visible"])
-	}
-}
-
-func TestFlattenMetadataEntry_SkipsEmptyChildKey(t *testing.T) {
-	result := map[string]string{}
-	flattenMetadataEntry("a", map[string]interface{}{
-		"":  "empty-key-value",
-		"b": "ok",
-	}, result)
-	if _, ok := result["a."]; ok {
-		t.Error("expected empty child key to be skipped")
-	}
-	if result["a.b"] != "ok" {
-		t.Errorf("expected a.b = ok, got %q", result["a.b"])
-	}
-}
 
 // ─── extractPageMetadata ─────────────────────────────────────────────────────
 
-func TestExtractPageMetadata_SkipsTagsAlways(t *testing.T) {
+func TestExtractPageMetadata_ReturnsTypedScalarProperties(t *testing.T) {
 	fields := map[string]interface{}{
-		"tags":   []interface{}{"go", "react"},
 		"status": "draft",
+		"count":  42,
+		"active": true,
+	}
+	_, props := extractPageMetadata(fields)
+
+	if props["status"].Type != tree.MetadataTypeText || props["status"].Value != "draft" {
+		t.Errorf("status wrong: %+v", props["status"])
+	}
+	if props["count"].Type != tree.MetadataTypeNumber || props["count"].Value != "42" {
+		t.Errorf("count wrong: %+v", props["count"])
+	}
+	if props["active"].Type != tree.MetadataTypeBoolean || props["active"].Value != "true" {
+		t.Errorf("active wrong: %+v", props["active"])
+	}
+}
+
+func TestExtractPageMetadata_ReturnsNestedObjectTree(t *testing.T) {
+	fields := map[string]interface{}{
+		"meta": map[string]interface{}{
+			"author": "alice",
+		},
+	}
+	_, props := extractPageMetadata(fields)
+
+	mv, ok := props["meta"]
+	if !ok {
+		t.Fatal("expected 'meta' in properties")
+	}
+	if mv.Type != tree.MetadataTypeObject {
+		t.Errorf("expected object type, got %q", mv.Type)
+	}
+	if mv.Fields["author"].Value != "alice" {
+		t.Errorf("expected author=alice, got %+v", mv.Fields["author"])
+	}
+}
+
+func TestExtractPageMetadata_ReturnsMixedListTree(t *testing.T) {
+	fields := map[string]interface{}{
+		"items": []interface{}{"a", 1},
+	}
+	_, props := extractPageMetadata(fields)
+
+	mv, ok := props["items"]
+	if !ok {
+		t.Fatal("expected 'items' in properties")
+	}
+	if mv.Type != tree.MetadataTypeList {
+		t.Errorf("expected list type, got %q", mv.Type)
+	}
+	if len(mv.Items) != 2 {
+		t.Errorf("expected 2 items, got %d", len(mv.Items))
+	}
+}
+
+func TestExtractPageMetadata_SkipsTagsAndSystemKeys(t *testing.T) {
+	fields := map[string]interface{}{
+		"tags":        []interface{}{"go", "react"},
+		"leafwiki_id": "abc",
+		"status":      "draft",
 	}
 	tags, props := extractPageMetadata(fields)
+
 	if len(tags) != 2 {
 		t.Errorf("expected 2 tags, got %v", tags)
 	}
 	if _, ok := props["tags"]; ok {
 		t.Error("tags must not appear in properties")
 	}
-	if props["status"] != "draft" {
-		t.Errorf("expected status=draft, got %q", props["status"])
+	if _, ok := props["leafwiki_id"]; ok {
+		t.Error("leafwiki_ key must not appear in properties")
+	}
+	if props["status"].Value != "draft" {
+		t.Errorf("expected status=draft, got %+v", props["status"])
 	}
 }
 
-func TestExtractPageMetadata_TitleInExtraFieldsIsAlwaysCustomProperty(t *testing.T) {
-	// "title" always lands in ExtraFields and is always treated as a custom
-	// property by extractPageMetadata.
+func TestExtractPageMetadata_TitleInExtraFieldsIsCustomProperty(t *testing.T) {
 	fields := map[string]interface{}{
 		"title":  "My Custom Title",
 		"status": "draft",
 	}
 	_, props := extractPageMetadata(fields)
-	if props["title"] != "My Custom Title" {
-		t.Errorf("title in ExtraFields must appear in properties, got %q", props["title"])
+	if props["title"].Value != "My Custom Title" {
+		t.Errorf("title must appear in properties, got %+v", props["title"])
 	}
 }
 
-func TestExtractPageMetadata_SkipsLeafwikiPrefixAlways(t *testing.T) {
-	fields := map[string]interface{}{
-		"leafwiki_id": "abc",
-		"status":      "draft",
+// ─── validatePageMetadataInput ───────────────────────────────────────────────
+
+func TestValidatePageMetadataInput_RejectsReservedRootKey(t *testing.T) {
+	props := map[string]tree.MetadataValue{
+		"tags": {Type: tree.MetadataTypeText, Value: "x"},
 	}
-	_, props := extractPageMetadata(fields)
-	if _, ok := props["leafwiki_id"]; ok {
-		t.Error("leafwiki_ keys must never appear in properties")
+	err := validatePageMetadataInput(nil, props)
+	if err == nil {
+		t.Fatal("expected validation error for reserved key 'tags'")
 	}
 }
 
-func TestFlattenMetadataEntry_DepthLimitDoesNotPanic(t *testing.T) {
-	// Build a map nested maxFlattenDepth+5 levels deep
-	inner := map[string]interface{}{"leaf": "value"}
-	for i := 0; i < maxFlattenDepth+5; i++ {
-		inner = map[string]interface{}{"child": inner}
+func TestValidatePageMetadataInput_RejectsLeafwikiKey(t *testing.T) {
+	props := map[string]tree.MetadataValue{
+		"leafwiki_id": {Type: tree.MetadataTypeText, Value: "x"},
 	}
-	result := map[string]string{}
-	// Must not panic; depth guard terminates recursion before stack overflow
-	flattenMetadataEntry("root", inner, result)
+	err := validatePageMetadataInput(nil, props)
+	if err == nil {
+		t.Fatal("expected validation error for leafwiki_ key")
+	}
+}
+
+func TestValidatePageMetadataInput_RejectsUnknownType(t *testing.T) {
+	props := map[string]tree.MetadataValue{
+		"status": {Type: "unknown-type", Value: "x"},
+	}
+	err := validatePageMetadataInput(nil, props)
+	if err == nil {
+		t.Fatal("expected validation error for unknown type")
+	}
+}
+
+func TestValidatePageMetadataInput_RejectsListWithoutItems(t *testing.T) {
+	props := map[string]tree.MetadataValue{
+		"items": {Type: tree.MetadataTypeList, Items: nil},
+	}
+	err := validatePageMetadataInput(nil, props)
+	if err == nil {
+		t.Fatal("expected validation error for list without items")
+	}
+}
+
+func TestValidatePageMetadataInput_RejectsObjectWithoutFields(t *testing.T) {
+	props := map[string]tree.MetadataValue{
+		"meta": {Type: tree.MetadataTypeObject, Fields: nil},
+	}
+	err := validatePageMetadataInput(nil, props)
+	if err == nil {
+		t.Fatal("expected validation error for object without fields")
+	}
+}
+
+func TestValidatePageMetadataInput_RejectsScalarWithItems(t *testing.T) {
+	props := map[string]tree.MetadataValue{
+		"x": {
+			Type:  tree.MetadataTypeText,
+			Value: "hi",
+			Items: []tree.MetadataValue{{Type: tree.MetadataTypeText, Value: "a"}},
+		},
+	}
+	err := validatePageMetadataInput(nil, props)
+	if err == nil {
+		t.Fatal("expected validation error for scalar with items")
+	}
+}
+
+func TestValidatePageMetadataInput_AcceptsValidTypedProperties(t *testing.T) {
+	props := map[string]tree.MetadataValue{
+		"text":   {Type: tree.MetadataTypeText, Value: "hello"},
+		"num":    {Type: tree.MetadataTypeNumber, Value: "42"},
+		"flag":   {Type: tree.MetadataTypeBoolean, Value: "true"},
+		"dt":     {Type: tree.MetadataTypeDate, Value: "2024-01-15"},
+		"ts":     {Type: tree.MetadataTypeDatetime, Value: "2024-01-15T12:00:00Z"},
+		"nil":    {Type: tree.MetadataTypeNull},
+		"list":   {Type: tree.MetadataTypeList, Items: []tree.MetadataValue{{Type: tree.MetadataTypeText, Value: "a"}}},
+		"object": {Type: tree.MetadataTypeObject, Fields: map[string]tree.MetadataValue{"k": {Type: tree.MetadataTypeText, Value: "v"}}},
+	}
+	if err := validatePageMetadataInput(nil, props); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
 }
