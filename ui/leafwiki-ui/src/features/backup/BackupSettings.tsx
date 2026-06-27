@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { CloudUpload, Loader2, TriangleAlert } from 'lucide-react'
+import { CloudUpload, GitMerge, Loader2, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useBackupStore } from '@/stores/backup'
@@ -23,6 +23,8 @@ export default function BackupSettings() {
     enabled,
     lastBackupAt,
     lastError,
+    needsIntervention,
+    conflictDetails,
     isLoading,
     isPolling,
     statusError,
@@ -142,13 +144,39 @@ export default function BackupSettings() {
                   </span>
                 </div>
 
-                {lastError && (
+                {lastError && !needsIntervention && (
                   <div className="settings__preview border-error/20 bg-error/5">
                     <span className="settings__preview-label flex items-center gap-1.5">
                       <TriangleAlert className="text-error h-3.5 w-3.5" />
                       Last error
                     </span>
                     <span className="text-error text-sm">{lastError}</span>
+                  </div>
+                )}
+
+                {needsIntervention && (
+                  <div className="settings__preview border-warning/20 bg-warning/5">
+                    <span className="settings__preview-label flex items-center gap-1.5">
+                      <GitMerge className="text-warning h-3.5 w-3.5" />
+                      Manual intervention required
+                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-warning text-sm font-medium">
+                        The remote repository has diverged and cannot be
+                        fast-forward merged.
+                      </span>
+                      <span className="text-muted text-xs">
+                        {conflictDetails}
+                      </span>
+                      <span className="text-muted text-xs">
+                        Resolve by running{' '}
+                        <code className="bg-muted/30 rounded px-1">
+                          git reset --hard origin/{'{branch}'}
+                        </code>{' '}
+                        inside the backup repository on the server, then trigger
+                        a new backup.
+                      </span>
+                    </div>
                   </div>
                 )}
               </>
@@ -170,7 +198,10 @@ export default function BackupSettings() {
                 remote repository without waiting for the next scheduled sync.
               </p>
               <div className="settings__actions">
-                <Button onClick={handlePush} disabled={isPolling}>
+                <Button
+                  onClick={handlePush}
+                  disabled={isPolling || needsIntervention}
+                >
                   {isPolling ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (

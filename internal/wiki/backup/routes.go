@@ -38,6 +38,12 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
 
+	// Lightweight alert endpoint — any authenticated user (editors + admins).
+	// Exposes only needsIntervention bool; no sensitive config or credentials.
+	// When authDisabled=true, InjectPublicEditor synthesises a user, so this
+	// endpoint is effectively public — intentional, as it reveals no secrets.
+	authGroup.GET("/backup/alert", r.handleGetBackupAlert)
+
 	// Admin-only backup endpoints
 	adminGroup := authGroup.Group("/admin")
 	adminGroup.Use(authmw.RequireAdmin(opts.AuthDisabled))
@@ -58,10 +64,20 @@ func (r *Routes) handleGetBackupStatus(c *gin.Context) {
 	})
 }
 
+// handleGetBackupAlert returns only needsIntervention — accessible to any
+// authenticated user so the header indicator can show for editors too.
+func (r *Routes) handleGetBackupAlert(c *gin.Context) {
+	if r.scheduler == nil || r.repo == nil {
+		c.JSON(http.StatusOK, gin.H{"needsIntervention": false})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"needsIntervention": r.repo.Status().NeedsIntervention})
+}
+
 // handleTriggerBackup triggers an immediate backup and returns 202 Accepted.
 func (r *Routes) handleTriggerBackup(c *gin.Context) {
 	if r.scheduler == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "backup not enabled"})
+		respondWithBackupStatusError(c, http.StatusServiceUnavailable, ErrCodeBackupNotEnabled, "Backup is not enabled", "backup not enabled")
 		return
 	}
 	r.scheduler.TriggerNow()

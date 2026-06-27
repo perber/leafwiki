@@ -20,7 +20,6 @@ import {
   getShortcutDisplayLabel,
 } from '@/lib/shortcuts/shortcutCatalog'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
-import { useBackupStore } from '@/stores/backup'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useHotKeysStore } from '@/stores/hotkeys'
@@ -47,7 +46,7 @@ export default function UserToolbar() {
   const openDialog = useDialogsStore((state) => state.openDialog)
   const authDisabled = useConfigStore((s) => s.authDisabled)
   const readOnly = useIsReadOnly()
-  const backupEnabled = useBackupStore((s) => s.enabled)
+  const backupEnabled = useConfigStore((s) => s.gitBackupEnabled)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
   const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)

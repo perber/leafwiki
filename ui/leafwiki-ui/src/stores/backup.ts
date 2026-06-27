@@ -9,6 +9,8 @@ interface BackupState {
   enabled: boolean
   lastBackupAt: string | null
   lastError: string
+  needsIntervention: boolean
+  conflictDetails: string
   isLoading: boolean
   isPolling: boolean
   statusError: string
@@ -22,6 +24,8 @@ export const useBackupStore = create<BackupState>((set, get) => ({
   enabled: false,
   lastBackupAt: null,
   lastError: '',
+  needsIntervention: false,
+  conflictDetails: '',
   isLoading: false,
   isPolling: false,
   statusError: '',
@@ -34,6 +38,8 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         enabled: data.enabled,
         lastBackupAt: data.status?.lastBackupAt ?? null,
         lastError: data.status?.lastError ?? '',
+        needsIntervention: data.status?.needsIntervention ?? false,
+        conflictDetails: data.status?.conflictDetails ?? '',
         isLoading: false,
       })
     } catch {

@@ -3,6 +3,7 @@ import { HotKeyHandler } from '@/components/HotKeyHandler'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import UserToolbar from '@/components/UserToolbar'
+import { BackupWarningIndicator } from '@/features/backup/BackupWarningIndicator'
 import DesignToggle from '@/features/designtoggle/DesignToggle'
 import { EditorTitleBar } from '@/features/editor/EditorTitleBar'
 import { PageQuickSwitcherTrigger } from '@/features/page-switcher/PageQuickSwitcherTrigger'
@@ -222,6 +223,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <PageQuickSwitcherTrigger />
             <DesignToggle />
             <Toolbar />
+            <BackupWarningIndicator />
             <UserToolbar />
           </div>
         </div>

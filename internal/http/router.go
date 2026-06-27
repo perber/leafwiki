@@ -95,6 +95,7 @@ type RouterOptions struct {
 	MaxAssetUploadSizeBytes int64                // Maximum allowed size in bytes for asset uploads
 	EnableRevision          bool                 // Whether the revision / page history feature is enabled
 	EnableLinkRefactor      bool                 // Whether the link refactoring feature is enabled in the frontend
+	GitBackupEnabled        bool                 // Whether git backup is enabled (surfaced to admin UI via /api/config)
 	HTTPRemoteUser          HTTPRemoteUserConfig // Reverse-proxy authentication via HTTP header
 	DisableRequestLog       bool                 // Whether to suppress per-request access log lines
 }
