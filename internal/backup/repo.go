@@ -559,12 +559,10 @@ func (r *Repository) pullBeforeBackup(wt *gogit.Worktree) error {
 	case errors.Is(pullErr, gogit.ErrNonFastForwardUpdate):
 		// The remote has commits that cannot be fast-forwarded onto local history.
 		// The local backup repo is authoritative (it holds all wiki commits), so the
-		// correct recovery is to overwrite the remote — not to reset local.
-		// Options: enable --git-backup-force-push, or manually:
+		// correct recovery is to overwrite the remote manually:
 		//   git -C <repoDir> push --force origin HEAD:<branch>
 		msg := "remote has diverged from local backup history; " +
-			"enable --git-backup-force-push to auto-resolve, or manually run: " +
-			"git -C " + r.repoDir + " push --force origin HEAD:" + r.cfg.Branch
+			"to recover, run: git -C " + r.repoDir + " push --force origin HEAD:" + r.cfg.Branch
 		slog.Error("pullBeforeBackup: "+msg, "remote", r.cfg.RemoteURL)
 		r.status.SetNeedsIntervention(msg)
 		return fmt.Errorf("%s", msg)
@@ -654,7 +652,6 @@ func (r *Repository) push(commitHash string) error {
 	err = remote.PushContext(pushCtx, &gogit.PushOptions{
 		Auth:     auth,
 		RefSpecs: []config.RefSpec{refSpec},
-		Force:    r.cfg.ForcePush,
 	})
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "already up-to-date") {

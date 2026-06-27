@@ -14,5 +14,4 @@ type Config struct {
 	SSHKey            string        // raw PEM private key (env var preferred)
 	SSHKnownHostsPath string        // path to known_hosts file for MITM protection (optional)
 	Interval          time.Duration // how often to run the scheduled backup; 0 = manual-only
-	ForcePush         bool          // force-push to remote (overwrites diverged history; use only with a dedicated backup repo)
 }
