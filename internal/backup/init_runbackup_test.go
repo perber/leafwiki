@@ -17,8 +17,12 @@ func TestInit_EmptyRootDir_NoInitialCommit(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
 
 	cfg := Config{
 		RootDir:     rootDir,
@@ -44,9 +48,15 @@ func TestInit_OnlyAssetsDirHasFiles_InitialCommitCreated(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
-	os.WriteFile(filepath.Join(assetsDir, "img.png"), []byte("data"), 0644)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(assetsDir, "img.png"), []byte("data"), 0644); err != nil {
+		t.Fatalf("WriteFile img.png: %v", err)
+	}
 
 	cfg := Config{
 		RootDir:     rootDir,
@@ -76,9 +86,15 @@ func TestInit_Idempotent(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
-	os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# P\n"), 0644)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# P\n"), 0644); err != nil {
+		t.Fatalf("WriteFile page.md: %v", err)
+	}
 
 	cfg := Config{RootDir: rootDir, AssetsDir: assetsDir, AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main"}
 
@@ -135,16 +151,26 @@ func TestRunBackup_DeletedFile_IsCommitted(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
-	os.WriteFile(filepath.Join(rootDir, "delete-me.md"), []byte("bye\n"), 0644)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(rootDir, "delete-me.md"), []byte("bye\n"), 0644); err != nil {
+		t.Fatalf("WriteFile delete-me.md: %v", err)
+	}
 
 	cfg := Config{RootDir: rootDir, AssetsDir: assetsDir, AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main"}
 	repo, _ := Init(cfg)
-	repo.RunBackup() // commit the file first
+	if err := repo.RunBackup(); err != nil { // commit the file first
+		t.Fatalf("initial RunBackup failed: %v", err)
+	}
 
 	// Now delete the file and run backup again
-	os.Remove(filepath.Join(rootDir, "delete-me.md"))
+	if err := os.Remove(filepath.Join(rootDir, "delete-me.md")); err != nil {
+		t.Fatalf("Remove delete-me.md: %v", err)
+	}
 	if err := repo.RunBackup(); err != nil {
 		t.Fatalf("RunBackup after deletion failed: %v", err)
 	}
@@ -162,13 +188,21 @@ func TestRunBackup_SecondRunWithoutChanges_SameHeadHash(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
-	os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# P\n"), 0644)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# P\n"), 0644); err != nil {
+		t.Fatalf("WriteFile page.md: %v", err)
+	}
 
 	cfg := Config{RootDir: rootDir, AssetsDir: assetsDir, AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main"}
 	repo, _ := Init(cfg)
-	repo.RunBackup()
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("initial RunBackup failed: %v", err)
+	}
 
 	r, _ := gogit.PlainOpen(tmpDir)
 	head1, _ := r.Head()
@@ -187,15 +221,23 @@ func TestRunBackup_CommitMessageFormat(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
 
 	cfg := Config{RootDir: rootDir, AssetsDir: assetsDir, AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main"}
 	repo, _ := Init(cfg)
 
 	before := time.Now().Truncate(time.Second)
-	os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# P\n"), 0644)
-	repo.RunBackup()
+	if err := os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# P\n"), 0644); err != nil {
+		t.Fatalf("WriteFile page.md: %v", err)
+	}
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup failed: %v", err)
+	}
 	after := time.Now().Add(time.Second)
 
 	r, _ := gogit.PlainOpen(tmpDir)

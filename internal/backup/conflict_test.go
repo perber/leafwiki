@@ -77,9 +77,15 @@ func TestConflict_FirstPush_NoError(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
-	os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# Page\n"), 0644)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# Page\n"), 0644); err != nil {
+		t.Fatalf("WriteFile page.md: %v", err)
+	}
 
 	cfg := Config{
 		RootDir:     rootDir,
@@ -140,7 +146,9 @@ func TestConflict_RemoteAheadPlusLocalChanges(t *testing.T) {
 	commitToRemote(t, bareDir, "root/from-remote.md", "remote content\n")
 
 	// Local has a new file too (different name, no conflict)
-	os.WriteFile(filepath.Join(rootDir, "local-new.md"), []byte("local new\n"), 0644)
+	if err := os.WriteFile(filepath.Join(rootDir, "local-new.md"), []byte("local new\n"), 0644); err != nil {
+		t.Fatalf("WriteFile local-new.md: %v", err)
+	}
 
 	if err := repo.RunBackup(); err != nil {
 		t.Fatalf("expected RunBackup to succeed, got: %v", err)

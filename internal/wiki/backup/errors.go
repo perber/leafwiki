@@ -1,11 +1,6 @@
 package wikibackup
 
-import (
-	"net/http"
-
-	"github.com/gin-gonic/gin"
-	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
-)
+import "github.com/gin-gonic/gin"
 
 const (
 	ErrCodeBackupNotEnabled  = "backup_not_enabled"
@@ -34,21 +29,4 @@ func respondWithBackupStatusError(c *gin.Context, status int, code, message, tem
 			Args:     append([]string(nil), args...),
 		},
 	})
-}
-
-func respondWithBackupError(c *gin.Context, err error) {
-	if loc, ok := sharederrors.AsLocalizedError(err); ok {
-		respondWithBackupStatusError(c, backupErrorStatus(loc.Code), loc.Code, loc.Message, loc.Template, loc.Args...)
-		return
-	}
-	respondWithBackupStatusError(c, http.StatusInternalServerError, ErrCodeBackupInternalError, "Backup request failed", "backup request failed")
-}
-
-func backupErrorStatus(code string) int {
-	switch code {
-	case ErrCodeBackupNotEnabled:
-		return http.StatusServiceUnavailable
-	default:
-		return http.StatusInternalServerError
-	}
 }
