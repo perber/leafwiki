@@ -260,14 +260,20 @@ func TestRunBackup_StatusLastBackupAtSet(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
 
 	cfg := Config{RootDir: rootDir, AssetsDir: assetsDir, AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main"}
 	repo, _ := Init(cfg)
 
 	before := time.Now().Add(-time.Second)
-	repo.RunBackup()
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup failed: %v", err)
+	}
 
 	snap := repo.Status()
 	if snap.LastBackupAt == nil {
@@ -285,13 +291,19 @@ func TestRunBackup_AssetsFileCommitted(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
 
 	cfg := Config{RootDir: rootDir, AssetsDir: assetsDir, AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main"}
 	repo, _ := Init(cfg)
 
-	os.WriteFile(filepath.Join(assetsDir, "img.png"), []byte("imgdata"), 0644)
+	if err := os.WriteFile(filepath.Join(assetsDir, "img.png"), []byte("imgdata"), 0644); err != nil {
+		t.Fatalf("WriteFile img.png: %v", err)
+	}
 	if err := repo.RunBackup(); err != nil {
 		t.Fatalf("RunBackup failed: %v", err)
 	}
@@ -309,17 +321,27 @@ func TestRunBackup_UntrackedFileOutsideDirs_NotCommitted(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
 
 	// File sits in tmpDir itself (the repo root), outside root/ and assets/
-	os.WriteFile(filepath.Join(tmpDir, "app.db"), []byte("database"), 0644)
+	if err := os.WriteFile(filepath.Join(tmpDir, "app.db"), []byte("database"), 0644); err != nil {
+		t.Fatalf("WriteFile app.db: %v", err)
+	}
 
 	cfg := Config{RootDir: rootDir, AssetsDir: assetsDir, AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main"}
 	repo, _ := Init(cfg)
 
-	os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# P\n"), 0644)
-	repo.RunBackup()
+	if err := os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# P\n"), 0644); err != nil {
+		t.Fatalf("WriteFile page.md: %v", err)
+	}
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup failed: %v", err)
+	}
 
 	r, _ := gogit.PlainOpen(tmpDir)
 	head, _ := r.Head()

@@ -11,8 +11,12 @@ func baseRepo(t *testing.T) *Repository {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	os.MkdirAll(rootDir, 0755)
-	os.MkdirAll(assetsDir, 0755)
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		t.Fatalf("MkdirAll rootDir: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatalf("MkdirAll assetsDir: %v", err)
+	}
 	cfg := Config{
 		RootDir:     rootDir,
 		AssetsDir:   assetsDir,
