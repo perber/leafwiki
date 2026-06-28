@@ -30,7 +30,7 @@ export function DialogManager() {
       setRenderProps(null)
     }, 200)
     return () => clearTimeout(timeoutId)
-  }, [dialogType, dialogProps, renderType])
+  }, [dialogType, dialogProps])
 
   return (
     <Suspense fallback={null}>
