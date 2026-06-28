@@ -106,7 +106,6 @@ export function AddPageDialog({
       reloadTree,
       parentPath,
       navigate,
-      resetForm,
       itemLabel,
       itemLabelCapitalized,
     ],
