@@ -113,6 +113,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_GIT_BACKUP_SSH_KEY
 	LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS
 	LEAFWIKI_GIT_BACKUP_INTERVAL
+	LEAFWIKI_GIT_BACKUP_FORCE_PUSH
 	`); err != nil {
 		panic(err)
 	}
@@ -418,6 +419,7 @@ func main() {
 		MaxAssetUploadSizeBytes: maxAssetUploadSize,
 		EnableRevision:          enableRevision,
 		EnableLinkRefactor:      enableLinkRefactor,
+		GitBackupEnabled:        gitBackupEnabled,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:        enableHTTPRemoteUser,
 			HeaderName:     httpRemoteUserHeader,
