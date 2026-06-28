@@ -7,8 +7,29 @@ import { useBrandingStore } from '@/stores/branding'
 import { useSessionStore } from '@/stores/session'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+
+function getRedirectTo(state: unknown): string | null {
+  if (!state || typeof state !== 'object') {
+    return null
+  }
+
+  const redirectTo = (state as { redirectTo?: unknown }).redirectTo
+  if (typeof redirectTo !== 'string' || !redirectTo.startsWith('/')) {
+    return null
+  }
+
+  if (
+    redirectTo === '/login' ||
+    redirectTo.startsWith('/login?') ||
+    redirectTo.startsWith('/login#')
+  ) {
+    return null
+  }
+
+  return redirectTo
+}
 
 export default function LoginForm() {
   const { t } = useTranslation('auth')
@@ -16,13 +37,15 @@ export default function LoginForm() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const location = useLocation()
   const navigate = useNavigate()
   const user = useSessionStore((s) => s.user)
   const { siteName, logoFile, logoVersion } = useBrandingStore()
+  const redirectTo = getRedirectTo(location.state)
 
   // If already logged in, redirect to home
   if (user) {
-    return <Navigate to="/" replace />
+    return <Navigate to={redirectTo || '/'} replace />
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,8 +55,8 @@ export default function LoginForm() {
     try {
       // user already set in the store by the login function
       await login(identifier, password)
-      // Redirect to home page after successful login
-      navigate('/')
+      // Restore the originally requested page after successful login.
+      navigate(redirectTo || '/', { replace: true })
     } catch (err) {
       const mapped = mapApiError(err, t('login.errorFallback'))
       toast.error(mapped.message)
