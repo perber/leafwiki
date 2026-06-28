@@ -38,10 +38,6 @@ type Repository struct {
 	looseObjsSinceGC int           // loose objects created since last gc
 	lastPushedHash   plumbing.Hash  // hash of the last commit successfully pushed; zero = never pushed
 
-	// OnRemoteChanges is called (in the scheduler goroutine) after a pull that
-	// brought in new commits from the remote. Wire it to wiki.TriggerResyncAsync
-	// so the SQLite index is updated automatically after a remote push.
-	OnRemoteChanges func()
 }
 
 // Init opens an existing repo at repoDir or initialises a new one.
@@ -596,9 +592,6 @@ func (r *Repository) pullBeforeBackup(wt *gogit.Worktree) error {
 			r.lastPushedHash = head.Hash()
 		} else {
 			slog.Info("pullBeforeBackup: pulled remote changes")
-		}
-		if r.OnRemoteChanges != nil {
-			r.OnRemoteChanges()
 		}
 		return nil
 
