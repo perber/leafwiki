@@ -87,7 +87,6 @@ export function AddPageDialog({
           const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
           navigate(buildEditUrl(fullPath))
         }
-        resetForm()
         return true
       } catch (err: unknown) {
         console.warn(err)
@@ -107,7 +106,6 @@ export function AddPageDialog({
       reloadTree,
       parentPath,
       navigate,
-      resetForm,
       itemLabel,
       itemLabelCapitalized,
     ],
