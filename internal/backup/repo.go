@@ -55,7 +55,7 @@ func Init(cfg Config) (*Repository, error) {
 	}
 
 	repoDir := filepath.Dir(filepath.Clean(cfg.RootDir))
-	slog.Debug("backup init started", "repoDir", repoDir, "rootDir", cfg.RootDir, "assetsDir", cfg.AssetsDir, "remote", cfg.RemoteURL, "branch", cfg.Branch)
+	slog.Info("backup: initializing", "repoDir", repoDir, "remote", cfg.RemoteURL, "branch", cfg.Branch, "interval", cfg.Interval)
 
 	// Ensure parent directory exists
 	if err := os.MkdirAll(repoDir, 0755); err != nil {
@@ -426,10 +426,8 @@ func (r *Repository) RunBackup() error {
 			r.status.SetError(err.Error())
 			return fmt.Errorf("push failed: %w", err)
 		}
-		slog.Info("backup committed and pushed to remote")
 	} else {
-		slog.Debug("RunBackup: no remote configured, skipping push")
-		slog.Info("backup committed locally (no remote configured)")
+		slog.Info("backup: committed locally (no remote configured)", "commit", commit.String())
 	}
 	r.status.SetSuccess(time.Now())
 	return nil
@@ -655,14 +653,13 @@ func (r *Repository) push(commitHash string) error {
 	})
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "already up-to-date") {
-			// Genuine up-to-date: remote caught up between our List call and Push.
-			slog.Info("backup skipped - already up-to-date on " + r.cfg.Branch + " at remote URL: " + r.cfg.RemoteURL)
+			slog.Debug("push: remote already up-to-date", "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch)
 			return nil
 		}
 		slog.Error("git push failed", "error", err, "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "refSpec", string(refSpec))
 		return fmt.Errorf("failed to push: %w", err)
 	}
-	slog.Info("git push succeeded", "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "commit", commitHash)
+	slog.Info("backup: pushed to remote", "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "commit", commitHash)
 	return nil
 }
 
@@ -701,21 +698,45 @@ func (r *Repository) buildSSHAuth() (ssh.AuthMethod, error) {
 		Signer: signer,
 	}
 
-	// Use known hosts file for MITM protection if a path was provided.
-	// If a path is configured but unreadable, we return an error rather than
-	// silently downgrading to no host-key verification.
+	// Use known hosts file for MITM protection.
+	// Priority: explicit config path → ~/.ssh/known_hosts → InsecureIgnoreHostKey (warn).
+	// If the configured path is unreadable we fail hard rather than silently downgrading.
 	if r.cfg.SSHKnownHostsPath != "" {
-		knownHostsCallback, err := ssh.NewKnownHostsCallback(r.cfg.SSHKnownHostsPath)
+		cb, err := ssh.NewKnownHostsCallback(r.cfg.SSHKnownHostsPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load known_hosts file %q: %w", r.cfg.SSHKnownHostsPath, err)
 		}
-		auth.HostKeyCallback = knownHostsCallback
-		slog.Debug("buildSSHAuth: SSH auth configured with known hosts", "path", r.cfg.SSHKnownHostsPath)
+		auth.HostKeyCallback = cb
+		slog.Debug("buildSSHAuth: using configured known_hosts", "path", r.cfg.SSHKnownHostsPath)
+	} else if defaultPath, ok := defaultKnownHostsPath(); ok {
+		cb, err := ssh.NewKnownHostsCallback(defaultPath)
+		if err != nil {
+			slog.Warn("buildSSHAuth: default known_hosts found but could not be loaded; SSH host key verification disabled (MITM risk)",
+				"path", defaultPath, "error", err)
+			auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
+		} else {
+			auth.HostKeyCallback = cb
+			slog.Info("buildSSHAuth: using default known_hosts for SSH host key verification", "path", defaultPath)
+		}
 	} else {
-		slog.Warn("buildSSHAuth: no SSHKnownHostsPath provided, connection will be insecure (no MITM protection)")
+		slog.Warn("buildSSHAuth: no known_hosts file configured or found at ~/.ssh/known_hosts; SSH connections will not verify host keys (MITM risk) — set --git-backup-ssh-known-hosts to fix")
 		auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
 	}
 	return auth, nil
+}
+
+// defaultKnownHostsPath returns the path to the user's default known_hosts file
+// and whether it actually exists on disk.
+func defaultKnownHostsPath() (string, bool) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", false
+	}
+	p := filepath.Join(home, ".ssh", "known_hosts")
+	if _, err := os.Stat(p); err != nil {
+		return "", false
+	}
+	return p, true
 }
 
 // Status returns a snapshot of the last backup time and any error.
