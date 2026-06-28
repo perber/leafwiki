@@ -31,11 +31,12 @@ const networkTimeout = 2 * time.Minute
 
 // Repository wraps a git repository with backup-specific state.
 type Repository struct {
-	cfg            Config
-	repoDir        string
-	repo           *gogit.Repository
-	status         *Status
-	looseObjsSinceGC int // loose objects created since last gc
+	cfg              Config
+	repoDir          string
+	repo             *gogit.Repository
+	status           *Status
+	looseObjsSinceGC int          // loose objects created since last gc
+	lastPushedHash   plumbing.Hash // hash of the last commit successfully pushed; zero = never pushed
 }
 
 // Init opens an existing repo at repoDir or initialises a new one.
@@ -367,14 +368,18 @@ func (r *Repository) RunBackup() error {
 
 	if !staged {
 		slog.Info("backup skipped - no staged changes in content directories")
-		// Still push if a remote is configured: the initial commit created by Init()
-		// is committed locally but never pushed (the scheduler defers it). Without
-		// this, existing wiki content is never synced to the remote on first run.
+		// Push only if there are genuinely unpushed local commits (e.g. the initial
+		// commit from Init() that was never pushed yet). After a successful pull or
+		// push, lastPushedHash equals local HEAD so this is a no-op — prevents the
+		// spurious non-fast-forward push errors when the remote advances between cycles.
 		if r.cfg.RemoteURL != "" {
-			slog.Debug("RunBackup: no staged changes but remote configured - pushing any unpushed commits")
-			if err := r.push(""); err != nil {
-				r.status.SetError(err.Error())
-				return fmt.Errorf("push failed: %w", err)
+			localHead, err := r.repo.Head()
+			if err == nil && localHead.Hash() != r.lastPushedHash {
+				slog.Debug("RunBackup: pushing unpushed local commit", "commit", localHead.Hash().String())
+				if err := r.push(localHead.Hash().String()); err != nil {
+					r.status.SetError(err.Error())
+					return fmt.Errorf("push failed: %w", err)
+				}
 			}
 		}
 		r.status.SetSuccess(time.Now())
@@ -539,6 +544,8 @@ func (r *Repository) pullBeforeBackup(wt *gogit.Worktree) error {
 	case pullErr == nil:
 		if head, err := r.repo.Head(); err == nil {
 			slog.Info("pullBeforeBackup: pulled remote changes", "head", head.Hash().String())
+			// Remote is now at this HEAD — no push needed until we make new local commits.
+			r.lastPushedHash = head.Hash()
 		} else {
 			slog.Info("pullBeforeBackup: pulled remote changes")
 		}
@@ -654,11 +661,13 @@ func (r *Repository) push(commitHash string) error {
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "already up-to-date") {
 			slog.Debug("push: remote already up-to-date", "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch)
+			r.lastPushedHash = localHead.Hash()
 			return nil
 		}
 		slog.Error("git push failed", "error", err, "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "refSpec", string(refSpec))
 		return fmt.Errorf("failed to push: %w", err)
 	}
+	r.lastPushedHash = localHead.Hash()
 	slog.Info("backup: pushed to remote", "remote", r.cfg.RemoteURL, "branch", r.cfg.Branch, "commit", commitHash)
 	return nil
 }
