@@ -401,6 +401,7 @@ func main() {
 		if err != nil {
 			fail("git backup init failed: %v", err)
 		}
+		backupRepo.OnRemoteChanges = w.TriggerResyncAsync
 		backupScheduler = backup.NewScheduler(backupRepo)
 		defer backupScheduler.Stop()
 		w.SetBackupRoutes(wikibackup.NewRoutes(backupRepo, backupScheduler, w.AuthService()))
