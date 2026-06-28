@@ -74,6 +74,9 @@ func Init(cfg Config) (*Repository, error) {
 	if err == nil {
 		slog.Debug("opened existing git repo", "repoDir", repoDir)
 		r.repo = repo
+		if err := r.migrateBranchName(); err != nil {
+			return nil, err
+		}
 		if cfg.RemoteURL != "" {
 			if err := r.reconcileRemote(); err != nil {
 				return nil, err
@@ -89,12 +92,16 @@ func Init(cfg Config) (*Repository, error) {
 
 	slog.Debug("no existing repo found, initialising new one", "repoDir", repoDir, "openErr", err)
 
-	// Initialize new repo
-	repo, err = gogit.PlainInit(repoDir, false)
+	// Initialize new repo with the configured branch name so local and remote
+	// branch names always match — go-git's PlainInit defaults to "master".
+	targetBranch := plumbing.NewBranchReferenceName(cfg.Branch)
+	repo, err = gogit.PlainInitWithOptions(repoDir, &gogit.PlainInitOptions{
+		InitOptions: gogit.InitOptions{DefaultBranch: targetBranch},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to init repo: %w", err)
 	}
-	slog.Debug("new git repo initialised", "repoDir", repoDir)
+	slog.Debug("new git repo initialised", "repoDir", repoDir, "branch", cfg.Branch)
 	r.repo = repo
 
 	if err := EnsureGitignore(repoDir); err != nil {
@@ -131,6 +138,42 @@ func (r *Repository) reconcileRemote() error {
 		return fmt.Errorf("failed to update remote URL: %w", err)
 	}
 	slog.Info("backup: updated 'origin' remote URL", "url", r.cfg.RemoteURL)
+	return nil
+}
+
+// migrateBranchName renames the local branch to cfg.Branch when the repo was
+// previously initialised with a different default (e.g. go-git's "master").
+// This fixes the refSpec mismatch (refs/heads/master:refs/heads/main) that
+// caused every pull to return nil instead of NoErrAlreadyUpToDate, and
+// non-fast-forward push failures when the remote advanced between cycles.
+func (r *Repository) migrateBranchName() error {
+	head, err := r.repo.Head()
+	if err != nil {
+		// Empty repo or detached HEAD — nothing to rename yet.
+		return nil
+	}
+	if !head.Name().IsBranch() {
+		return nil
+	}
+	current := head.Name().Short()
+	if current == r.cfg.Branch {
+		return nil // already on the right branch
+	}
+	target := plumbing.NewBranchReferenceName(r.cfg.Branch)
+
+	// Create target branch ref pointing at the same commit.
+	if err := r.repo.Storer.SetReference(plumbing.NewHashReference(target, head.Hash())); err != nil {
+		return fmt.Errorf("migrateBranchName: failed to create %s ref: %w", r.cfg.Branch, err)
+	}
+	// Repoint HEAD to the new branch.
+	if err := r.repo.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, target)); err != nil {
+		return fmt.Errorf("migrateBranchName: failed to update HEAD: %w", err)
+	}
+	// Remove old branch ref.
+	if err := r.repo.Storer.RemoveReference(head.Name()); err != nil {
+		slog.Warn("migrateBranchName: could not remove old branch ref", "branch", current, "error", err)
+	}
+	slog.Info("backup: renamed local branch", "from", current, "to", r.cfg.Branch)
 	return nil
 }
 
