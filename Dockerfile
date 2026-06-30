@@ -17,7 +17,7 @@ COPY . .
 COPY --from=frontend-build /app/dist ./internal/http/dist
 RUN CGO_ENABLED=0 go build \
 	-ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X github.com/perber/wiki/internal/wiki/auth.DisableRefreshTokenRateLimit=${DISABLE_REFRESH_TOKEN_RATE_LIMIT}" \
-	-o /out/leafwiki ./cmd/leafwiki/main.go
+	-o /out/leafwiki ./cmd/leafwiki
 
 # Step 3: Final image (small)
 FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS final

@@ -430,7 +430,7 @@ func main() {
 	})
 
 	reloadSignals := make(chan os.Signal, 1)
-	signal.Notify(reloadSignals, syscall.SIGUSR1, syscall.SIGHUP)
+	notifyReloadSignals(reloadSignals)
 	defer signal.Stop(reloadSignals)
 
 	shutdownSignals := make(chan os.Signal, 1)
