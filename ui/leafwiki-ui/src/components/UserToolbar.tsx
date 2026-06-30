@@ -38,7 +38,7 @@ const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
 )
 
 export default function UserToolbar() {
-  const { t } = useTranslation('auth')
+  const { t } = useTranslation(['auth', 'backup'])
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
@@ -141,7 +141,7 @@ export default function UserToolbar() {
                 className="cursor-pointer"
                 onClick={() => navigate('/settings/backup')}
               >
-                Backup Settings
+                {t('menuLabel', { ns: 'backup' })}
               </DropdownMenuItem>
             )}
             <DropdownMenuItem

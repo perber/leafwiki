@@ -50,6 +50,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	adminGroup.GET("/backup/status", r.handleGetBackupStatus)
 	adminGroup.POST("/backup/push", r.handleTriggerBackup)
+	adminGroup.POST("/backup/force-push", r.handleForcePush)
 }
 
 // handleGetBackupStatus returns the current backup status.
@@ -64,14 +65,20 @@ func (r *Routes) handleGetBackupStatus(c *gin.Context) {
 	})
 }
 
-// handleGetBackupAlert returns only needsIntervention — accessible to any
-// authenticated user so the header indicator can show for editors too.
+// handleGetBackupAlert returns a lightweight status for the header indicator —
+// accessible to any authenticated user (editors + admins). Exposes no sensitive
+// config or credentials. hasError covers both transient failures and
+// NeedsIntervention so the indicator appears for any backup problem.
 func (r *Routes) handleGetBackupAlert(c *gin.Context) {
 	if r.scheduler == nil || r.repo == nil {
-		c.JSON(http.StatusOK, gin.H{"needsIntervention": false})
+		c.JSON(http.StatusOK, gin.H{"needsIntervention": false, "hasError": false})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"needsIntervention": r.repo.Status().NeedsIntervention})
+	s := r.repo.Status()
+	c.JSON(http.StatusOK, gin.H{
+		"needsIntervention": s.NeedsIntervention,
+		"hasError":          s.LastError != "",
+	})
 }
 
 // handleTriggerBackup triggers an immediate backup and returns 202 Accepted.
@@ -82,4 +89,18 @@ func (r *Routes) handleTriggerBackup(c *gin.Context) {
 	}
 	r.scheduler.TriggerNow()
 	c.JSON(http.StatusAccepted, gin.H{"triggered": true})
+}
+
+// handleForcePush force-pushes the local backup history to the remote,
+// overwriting any diverged remote state. Used to resolve NeedsIntervention.
+func (r *Routes) handleForcePush(c *gin.Context) {
+	if r.scheduler == nil || r.repo == nil {
+		respondWithBackupStatusError(c, http.StatusServiceUnavailable, ErrCodeBackupNotEnabled, "Backup is not enabled", "backup not enabled")
+		return
+	}
+	if err := r.repo.ForcePush(); err != nil {
+		respondWithBackupStatusError(c, http.StatusInternalServerError, ErrCodeBackupInternalError, err.Error(), "backup internal error")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
