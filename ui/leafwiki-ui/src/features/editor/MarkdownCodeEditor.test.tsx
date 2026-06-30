@@ -92,7 +92,9 @@ describe('MarkdownCodeEditor – resetKey controls reinitialization', () => {
       />,
     )
     expect(createSpy).toHaveBeenCalledTimes(1)
-    expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ doc: 'hello' }))
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ doc: 'hello' }),
+    )
   })
 
   it('does NOT reinitialize when initialValue changes (user is typing)', () => {
@@ -161,6 +163,8 @@ describe('MarkdownCodeEditor – resetKey controls reinitialization', () => {
     })
 
     expect(createSpy).toHaveBeenCalledTimes(1)
-    expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ doc: 'page B content' }))
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ doc: 'page B content' }),
+    )
   })
 })
