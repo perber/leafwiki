@@ -10,8 +10,12 @@ const createSpy = vi.fn(() => ({ doc: '', extensions: [] }))
 vi.mock('@codemirror/state', () => ({
   EditorState: { create: (args: unknown) => createSpy(args) },
   Compartment: class {
-    of() { return {} }
-    reconfigure() { return {} }
+    of() {
+      return {}
+    }
+    reconfigure() {
+      return {}
+    }
   },
 }))
 

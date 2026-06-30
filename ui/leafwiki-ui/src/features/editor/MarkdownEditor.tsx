@@ -476,10 +476,7 @@ const MarkdownEditor = (
   }, [assetVersion, debouncedPreview, setPreviewRef, path])
 
   return (
-    <div
-      className="markdown-editor"
-      onPaste={handlePaste}
-    >
+    <div className="markdown-editor" onPaste={handlePaste}>
       {/* Mobile */}
       {isMobile && (
         <div className="markdown-editor__mobile">

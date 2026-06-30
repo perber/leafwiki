@@ -146,9 +146,15 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
     mountSpy.mockClear()
 
     // Simulate several keystrokes
-    act(() => { capturedOnChange?.('o') })
-    act(() => { capturedOnChange?.('or') })
-    act(() => { capturedOnChange?.('ori') })
+    act(() => {
+      capturedOnChange?.('o')
+    })
+    act(() => {
+      capturedOnChange?.('or')
+    })
+    act(() => {
+      capturedOnChange?.('ori')
+    })
 
     // MarkdownCodeEditor must not have remounted
     expect(mountSpy).not.toHaveBeenCalled()
