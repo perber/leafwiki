@@ -52,4 +52,26 @@ if (Test-Path $path) {
     expect(powershellCodeBlock?.querySelector('.hljs-keyword')).not.toBeNull()
     expect(powershellCodeBlock?.querySelector('.hljs-variable')).not.toBeNull()
   })
+
+  it('renders external images from markdown image syntax', () => {
+    const { container } = render(
+      <MarkdownPreview content="![Remote diagram](https://example.com/diagram.png)" />,
+    )
+
+    const image = container.querySelector('img')
+    expect(image).not.toBeNull()
+    expect(image?.getAttribute('src')).toBe('https://example.com/diagram.png')
+    expect(image?.getAttribute('alt')).toBe('Remote diagram')
+  })
+
+  it('renders external images from sanitized inline html', () => {
+    const { container } = render(
+      <MarkdownPreview content='<img src="https://example.com/banner.png" alt="Remote banner" />' />,
+    )
+
+    const image = container.querySelector('img')
+    expect(image).not.toBeNull()
+    expect(image?.getAttribute('src')).toBe('https://example.com/banner.png')
+    expect(image?.getAttribute('alt')).toBe('Remote banner')
+  })
 })
