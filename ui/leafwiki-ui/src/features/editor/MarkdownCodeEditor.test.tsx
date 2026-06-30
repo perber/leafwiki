@@ -5,10 +5,10 @@ import type { EditorView as EditorViewType } from '@codemirror/view'
 
 // Mock CodeMirror — we only care about counting EditorState.create calls,
 // which is the proxy for "did CodeMirror reinitialize?"
-const createSpy = vi.fn<[unknown], object>()
+const createSpy = vi.fn()
 
 vi.mock('@codemirror/state', () => ({
-  EditorState: { create: (args: unknown) => createSpy(args) },
+  EditorState: { create: (args: unknown) => createSpy(args as never) },
   Compartment: class {
     of() {
       return {}
@@ -92,7 +92,7 @@ describe('MarkdownCodeEditor – resetKey controls reinitialization', () => {
       />,
     )
     expect(createSpy).toHaveBeenCalledTimes(1)
-    expect(createSpy.mock.calls[0]?.[0]).toMatchObject({ doc: 'hello' })
+    expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ doc: 'hello' }))
   })
 
   it('does NOT reinitialize when initialValue changes (user is typing)', () => {
@@ -161,6 +161,6 @@ describe('MarkdownCodeEditor – resetKey controls reinitialization', () => {
     })
 
     expect(createSpy).toHaveBeenCalledTimes(1)
-    expect(createSpy.mock.calls[0][0]).toMatchObject({ doc: 'page B content' })
+    expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ doc: 'page B content' }))
   })
 })
