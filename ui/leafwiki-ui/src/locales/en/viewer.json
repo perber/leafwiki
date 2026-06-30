@@ -1,4 +1,9 @@
 {
+  "layout": {
+    "toggleSidebar": "Toggle sidebar",
+    "resizeSidebar": "Resize sidebar",
+    "closeSidebar": "Close sidebar"
+  },
   "section": {
     "overviewTitle": "Overview of '{{title}}'",
     "overviewDescriptionBase": "This page is the default overview of the section and lists its pages and sections.",
