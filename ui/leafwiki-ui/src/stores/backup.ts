@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import {
   fetchBackupStatus,
   triggerBackupPush,
+  triggerForcePush,
   BackupStatusResponse,
 } from '@/lib/api/backup'
 
@@ -13,9 +14,11 @@ interface BackupState {
   conflictDetails: string
   isLoading: boolean
   isPolling: boolean
+  pollingFromAt: string | null
   statusError: string
   loadStatus: () => Promise<void>
   triggerPush: () => Promise<void>
+  forcePush: () => Promise<void>
   startPolling: () => void
   stopPolling: () => void
 }
@@ -28,10 +31,13 @@ export const useBackupStore = create<BackupState>((set, get) => ({
   conflictDetails: '',
   isLoading: false,
   isPolling: false,
+  pollingFromAt: null,
   statusError: '',
 
   loadStatus: async () => {
-    set({ isLoading: true })
+    if (!get().isPolling) {
+      set({ isLoading: true })
+    }
     try {
       const data: BackupStatusResponse = await fetchBackupStatus()
       set({
@@ -41,6 +47,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         needsIntervention: data.status?.needsIntervention ?? false,
         conflictDetails: data.status?.conflictDetails ?? '',
         isLoading: false,
+        statusError: '',
       })
     } catch {
       set({ isLoading: false, statusError: 'Failed to load backup status' })
@@ -52,11 +59,16 @@ export const useBackupStore = create<BackupState>((set, get) => ({
     get().startPolling()
   },
 
+  forcePush: async () => {
+    await triggerForcePush()
+    await get().loadStatus()
+  },
+
   startPolling: () => {
-    set({ isPolling: true })
+    set({ isPolling: true, pollingFromAt: get().lastBackupAt })
   },
 
   stopPolling: () => {
-    set({ isPolling: false })
+    set({ isPolling: false, pollingFromAt: null })
   },
 }))

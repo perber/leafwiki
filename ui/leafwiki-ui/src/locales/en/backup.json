@@ -1,0 +1,39 @@
+{
+  "pageTitle": "Git Content Backup",
+  "pageDescription": "Back up wiki page content to a Git repository. This covers content only and does not include full system restore.",
+  "sectionTitle": "Git Content Backup",
+  "sectionDescription": "Automatically pushes wiki changes to the configured remote Git repository. Configure the target repository and credentials in your server settings.",
+  "statusLabel": "Status",
+  "statusEnabled": "Enabled",
+  "statusDisabled": "Disabled",
+  "lastBackupLabel": "Last backup",
+  "never": "Never",
+  "loading": "Loading…",
+  "waitingForBackup": "Waiting for backup to complete…",
+  "lastErrorLabel": "Last error",
+  "conflictTitle": "Conflict — remote diverged",
+  "conflictDescription": "The remote repository has diverged from the local backup history and cannot be fast-forward merged.",
+  "conflictWarning": "Clicking Force Push overwrites the remote with the current local backup history. Your wiki content is never lost.",
+  "forcePushButton": "Force Push",
+  "hintDisabled": "Git backup is not enabled. To enable it, configure a remote repository in your server environment settings.",
+  "manualSectionTitle": "Manual Backup",
+  "manualSectionDescription": "Trigger an immediate push of all current wiki content to the remote repository without waiting for the next scheduled sync.",
+  "pushNow": "Push now",
+  "pushing": "Pushing…",
+  "menuLabel": "Git Content Backup",
+  "warningAriaLabel": "Backup warning",
+  "tooltip": {
+    "adminConflict": "Git backup conflict — manual action required. Click to open backup settings.",
+    "adminFailure": "Last git backup failed. Click to open backup settings.",
+    "editorConflict": "Git backup conflict — contact an administrator.",
+    "editorFailure": "Last git backup failed — contact an administrator."
+  },
+  "toast": {
+    "backupFailed": "Backup failed: {{message}}",
+    "backupCompleted": "Backup completed successfully",
+    "backupTriggered": "Backup triggered",
+    "backupTriggerFailed": "Failed to trigger backup",
+    "forcePushSuccess": "Force push successful — conflict resolved",
+    "forcePushFailed": "Force push failed"
+  }
+}
