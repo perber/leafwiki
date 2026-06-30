@@ -15,7 +15,7 @@ import { Compartment, EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, keymap } from '@codemirror/view'
 import { githubLight } from '@fsegurai/codemirror-theme-github-light'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useDesignModeStore } from '../designtoggle/designmode'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 import type { InternalLinkCompletion } from './internalLinkCompletion'
@@ -45,6 +45,7 @@ const wrapExtensions = [
 
 type MarkdownCodeEditorProps = {
   initialValue: string
+  resetKey: string
   onChange: (value: string) => void
   onCursorLineChange?: (line: number) => void
   editorViewRef: React.RefObject<EditorView | null>
@@ -72,6 +73,7 @@ function openReplacePanel(view: EditorView) {
 
 export default function MarkdownCodeEditor({
   initialValue,
+  resetKey,
   editorViewRef,
   onChange,
   onCursorLineChange,
@@ -81,6 +83,12 @@ export default function MarkdownCodeEditor({
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
   const valueRef = useRef(initialValue)
+  // Always tracks the latest initialValue so the setup effect can read it
+  // without having it in the dependency array (which would reinitialize on every keystroke).
+  const initialValueRef = useRef(initialValue)
+  useLayoutEffect(() => {
+    initialValueRef.current = initialValue
+  })
 
   const designMode = useDesignModeStore((state) => state.mode)
   const [themeCompartment] = useState(() => new Compartment())
@@ -177,7 +185,7 @@ export default function MarkdownCodeEditor({
     ]
 
     const state = EditorState.create({
-      doc: initialValue,
+      doc: initialValueRef.current,
       extensions: [
         themeCompartment.of(designMode === 'light' ? githubLight : oneDark),
         lineWrapCompartment.of(lineWrap ? wrapExtensions : noWrapExtensions),
@@ -328,7 +336,7 @@ export default function MarkdownCodeEditor({
       editorViewRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialValue, onCursorLineChange, editorViewRef, themeCompartment])
+  }, [resetKey, onCursorLineChange, editorViewRef, themeCompartment])
 
   useEffect(() => {
     const view = viewRef.current

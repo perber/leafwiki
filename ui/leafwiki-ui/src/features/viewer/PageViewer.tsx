@@ -25,7 +25,6 @@ import { BacklinkInfo } from '../links/LinkInfo'
 import { extractTocEntries } from '../preview/extractTocEntries'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
-import { useProgressbarStore } from '../progressbar/progressbarStore'
 import Breadcrumbs from './Breadcrumbs'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
 import { PageMetadata } from './PageMetadata'
@@ -44,7 +43,7 @@ export default function PageViewer() {
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const openNode = useTreeStore((state) => state.openNode)
-  const loading = useProgressbarStore((s) => s.loading)
+  const loading = useViewerStore((s) => s.isLoading)
   const error = useViewerStore((s) => s.error)
   const notFound = useViewerStore((s) => s.notFound)
   const page = useViewerStore((s) => s.page)
