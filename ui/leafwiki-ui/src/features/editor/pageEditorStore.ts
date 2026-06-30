@@ -30,6 +30,7 @@ export interface PageEditorState {
   frontmatterUnsupported: string
   frontmatterErrors: Record<string, string>
   error: string | null // error message, if any
+  isLoading: boolean
   notFound: boolean
   page: Page | null // current page being edited
   initialPage: Page | null // initial page data when loaded
@@ -93,8 +94,11 @@ export const isDirtyState = (s: PageEditorState) => {
 // Manual saves (silent=false) bypass this so Ctrl+S is never blocked by an in-flight auto-save.
 let isSavingMutex = false
 
+let loadController: AbortController | null = null
+
 export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   error: null,
+  isLoading: false,
   notFound: false,
   page: null,
   title: '',
@@ -295,16 +299,21 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     return get().savePage()
   },
   loadPageData: async (path: string) => {
+    loadController?.abort()
+    loadController = new AbortController()
+    const { signal } = loadController
+
     useProgressbarStore.getState().setLoading(true)
     set({
       error: null,
+      isLoading: true,
       notFound: false,
       page: null,
       initialPage: null,
       frontmatterErrors: {},
     })
     try {
-      const page = await getPageByPath(path)
+      const page = await getPageByPath(path, signal)
       const fields: EditorFrontmatterField[] = Object.entries(
         page.properties ?? {},
       ).map(([key, value]) => ({
@@ -324,6 +333,8 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         frontmatterUnsupported: '',
       })
     } catch (err) {
+      if (signal.aborted) return
+
       if (isPageNotFoundError(err)) {
         set({
           error: null,
@@ -338,7 +349,10 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         notFound: false,
       })
     } finally {
-      useProgressbarStore.getState().setLoading(false)
+      if (!signal.aborted) {
+        set({ isLoading: false })
+        useProgressbarStore.getState().setLoading(false)
+      }
     }
   },
 }))

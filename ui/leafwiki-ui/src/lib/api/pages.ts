@@ -90,9 +90,10 @@ export async function suggestSlug(
   return typedData.slug
 }
 
-export async function getPageByPath(path: string): Promise<Page> {
+export async function getPageByPath(path: string, signal?: AbortSignal): Promise<Page> {
   return (await fetchWithAuth(
     `/api/pages/by-path?path=${encodeURIComponent(path)}`,
+    { signal },
   )) as Page
 }
 

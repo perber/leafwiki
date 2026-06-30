@@ -8,6 +8,7 @@ import { useProgressbarStore } from '../progressbar/progressbarStore'
 
 interface ViewerState {
   error: string | null
+  isLoading: boolean
   notFound: boolean
   page: Page | null
   setError: (error: string | null) => void
@@ -15,19 +16,32 @@ interface ViewerState {
   loadPageData: (path: string) => Promise<void>
 }
 
+let loadController: AbortController | null = null
+
 export const useViewerStore = create<ViewerState>((set) => ({
   error: null,
+  isLoading: false,
   notFound: false,
   page: null,
   setError: (error) => set({ error }),
-  clear: () => set({ error: null, notFound: false, page: null }),
+  clear: () => {
+    loadController?.abort()
+    loadController = null
+    set({ error: null, isLoading: false, notFound: false, page: null })
+  },
   loadPageData: async (path: string) => {
+    loadController?.abort()
+    loadController = new AbortController()
+    const { signal } = loadController
+
     useProgressbarStore.getState().setLoading(true)
-    set({ error: null, notFound: false })
+    set({ error: null, isLoading: true, notFound: false })
     try {
-      const page = await getPageByPath(path)
+      const page = await getPageByPath(path, signal)
       set({ page, notFound: false })
     } catch (err) {
+      if (signal.aborted) return
+
       if (isPageNotFoundError(err)) {
         set({ error: null, notFound: true, page: null })
       } else if (err instanceof Error) {
@@ -36,7 +50,10 @@ export const useViewerStore = create<ViewerState>((set) => ({
         set({ error: 'An unknown error occurred', notFound: false })
       }
     } finally {
-      useProgressbarStore.getState().setLoading(false)
+      if (!signal.aborted) {
+        set({ isLoading: false })
+        useProgressbarStore.getState().setLoading(false)
+      }
     }
   },
 }))

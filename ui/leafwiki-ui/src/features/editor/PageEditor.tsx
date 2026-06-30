@@ -9,7 +9,6 @@ import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useRef } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { useProgressbarStore } from '../progressbar/progressbarStore'
 import MarkdownEditor, { MarkdownEditorRef } from './MarkdownEditor'
 import { PageFrontmatterPanel } from './PageFrontmatterPanel'
 import { usePageEditorStore } from './pageEditorStore'
@@ -41,7 +40,6 @@ export default function PageEditor() {
   )
   const frontmatterErrors = usePageEditorStore((s) => s.frontmatterErrors)
   const notFound = usePageEditorStore((s) => s.notFound)
-  const loading = useProgressbarStore((s) => s.loading)
   const error = usePageEditorStore((s) => s.error)
   const openNode = useTreeStore((s) => s.openNode)
   const dirty = usePageEditorStore(isDirtyState)
@@ -189,9 +187,6 @@ export default function PageEditor() {
   }
 
   if (error) return <p className="page-editor__error">Error: {error}</p>
-
-  if (!initialPage && !loading)
-    return <Page404 targetPath={getWikiTargetRoutePath(pathname)} />
 
   return (
     <>

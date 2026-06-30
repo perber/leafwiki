@@ -91,6 +91,10 @@ const MarkdownEditor = (
   const [assetVersion, setAssetVersion] = useState(() => Date.now()) // Initial version based on current timestamp
 
   const [markdown, setMarkdown] = useState(initialValue)
+  // Tracks the latest markdown without triggering re-creation of renderEditor.
+  // Read by renderEditor so MarkdownCodeEditor gets the current content on remount.
+  const markdownRef = useRef(markdown)
+  markdownRef.current = markdown
   const debouncedPreview = useDebounce(markdown, 100)
   const isMobile = useIsMobile()
   const maxAssetUploadSizeBytes = useConfigStore(
@@ -184,10 +188,8 @@ const MarkdownEditor = (
     [editorViewRef, maxAssetUploadSizeBytes, onChange, pageId, setMarkdown],
   )
 
-  // Set initial markdown value when component mounts
-  // This sets the initial value only once
   useEffect(() => {
-    setMarkdown((prev) => (prev === '' ? initialValue : prev))
+    setMarkdown(initialValue)
   }, [initialValue])
 
   const handleEditorChange = useCallback(
@@ -439,7 +441,8 @@ const MarkdownEditor = (
         <>
           {toolbar && renderToolbar()}
           <MarkdownCodeEditor
-            initialValue={initialValue}
+            initialValue={markdownRef.current}
+            resetKey={pageId}
             onChange={handleEditorChange}
             onCursorLineChange={onCursorLineChange}
             editorViewRef={editorViewRef}
@@ -450,7 +453,7 @@ const MarkdownEditor = (
     },
     [
       handleEditorChange,
-      initialValue,
+      pageId,
       lineWrap,
       onCursorLineChange,
       renderToolbar,
@@ -475,14 +478,9 @@ const MarkdownEditor = (
     )
   }, [assetVersion, debouncedPreview, setPreviewRef, path])
 
-  // TODO: Known Issues:
-  // * When we resize the window, the preview does not update immediately.
-  // * I will leave the issue open for now. (You can validate this by resizing the window in the edit mode)
-
   return (
     <div
       className="markdown-editor"
-      key={isMobile ? 'mobile' : 'desktop'}
       onPaste={handlePaste}
     >
       {/* Mobile */}
