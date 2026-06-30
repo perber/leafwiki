@@ -63,6 +63,7 @@ const schema = {
       'wikilink-notfound',
       'wikilink-ambiguous',
     ],
+    src: [...(defaultSchema.protocols?.src ?? []), 'http', 'https'],
   },
   tagNames: [...(defaultSchema.tagNames || []), 'audio', 'video'],
   attributes: {
