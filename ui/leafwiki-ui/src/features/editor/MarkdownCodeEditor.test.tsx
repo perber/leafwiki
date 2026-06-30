@@ -5,7 +5,7 @@ import type { EditorView as EditorViewType } from '@codemirror/view'
 
 // Mock CodeMirror — we only care about counting EditorState.create calls,
 // which is the proxy for "did CodeMirror reinitialize?"
-const createSpy = vi.fn((_: unknown) => ({ doc: '', extensions: [] }))
+const createSpy = vi.fn<[unknown], object>()
 
 vi.mock('@codemirror/state', () => ({
   EditorState: { create: (args: unknown) => createSpy(args) },
