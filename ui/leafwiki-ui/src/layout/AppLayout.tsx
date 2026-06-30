@@ -22,11 +22,13 @@ import {
 } from '@/stores/sidebar'
 import { MenuIcon } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 export const MOBILE_SIDEBAR_WIDTH = 320
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation('viewer')
   const appMode = useAppMode()
   const [isEditor, setIsEditor] = useState(appMode === 'edit')
 
@@ -191,7 +193,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               variant={'outline'}
               className="app-layout__sidebar-toggle-button"
               onClick={() => setSidebarVisible(!sidebarVisible)}
-              aria-label="Toggle Sidebar"
+              aria-label={t('layout.toggleSidebar')}
               aria-expanded={sidebarVisible}
               data-testid="sidebar-toggle-button"
             >
@@ -256,7 +258,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               }}
               role="separator"
               aria-orientation="vertical"
-              aria-label="Resize sidebar"
+              aria-label={t('layout.resizeSidebar')}
               data-testid="sidebar-resize-handle"
             >
               <div
@@ -278,7 +280,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             type="button"
             className="app-layout__sidebar-overlay-mobile"
             onClick={() => setSidebarVisible(false)}
-            aria-label="Close sidebar"
+            aria-label={t('layout.closeSidebar')}
           />
         )}
         <div className="app-layout__main-column">
