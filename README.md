@@ -355,6 +355,18 @@ Available since v0.10.0. Use when an upstream proxy authenticates users and forw
 - If the forwarded username doesn't exist in LeafWiki, the request is rejected
 - Do not enable without configuring `--trusted-proxy-ips`
 
+This works with any SSO/auth proxy that forwards the authenticated username as an HTTP header:
+
+| Solution | Header to use |
+|---|---|
+| [Authelia](https://www.authelia.com/) | `Remote-User` (default) |
+| [Authentik](https://goauthentik.io/) | `X-authentik-username` |
+| [Traefik ForwardAuth](https://doc.traefik.io/traefik/middlewares/http/forwardauth/) | depends on your auth service |
+| [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) | `X-Forwarded-User` |
+| Nginx `auth_request` | custom, set via `proxy_set_header` |
+
+Users must exist in LeafWiki before the proxy can authenticate them — the proxy handles login, LeafWiki handles authorization.
+
 ### Unix Socket (v0.11.3)
 
 Use `--unix-socket` when LeafWiki should listen on a local unix domain socket instead of TCP.
