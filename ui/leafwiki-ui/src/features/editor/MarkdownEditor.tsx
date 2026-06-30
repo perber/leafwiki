@@ -91,10 +91,6 @@ const MarkdownEditor = (
   const [assetVersion, setAssetVersion] = useState(() => Date.now()) // Initial version based on current timestamp
 
   const [markdown, setMarkdown] = useState(initialValue)
-  // Tracks the latest markdown without triggering re-creation of renderEditor.
-  // Read by renderEditor so MarkdownCodeEditor gets the current content on remount.
-  const markdownRef = useRef(markdown)
-  markdownRef.current = markdown
   const debouncedPreview = useDebounce(markdown, 100)
   const isMobile = useIsMobile()
   const maxAssetUploadSizeBytes = useConfigStore(
@@ -441,7 +437,7 @@ const MarkdownEditor = (
         <>
           {toolbar && renderToolbar()}
           <MarkdownCodeEditor
-            initialValue={markdownRef.current}
+            initialValue={markdown}
             resetKey={pageId}
             onChange={handleEditorChange}
             onCursorLineChange={onCursorLineChange}
@@ -453,6 +449,7 @@ const MarkdownEditor = (
     },
     [
       handleEditorChange,
+      markdown,
       pageId,
       lineWrap,
       onCursorLineChange,

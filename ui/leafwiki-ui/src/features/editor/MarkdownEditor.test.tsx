@@ -1,5 +1,5 @@
 import { act, render } from '@testing-library/react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MarkdownEditor from './MarkdownEditor'
 
@@ -9,7 +9,7 @@ const mountSpy = vi.fn()
 let capturedOnChange: ((val: string) => void) | null = null
 
 vi.mock('./MarkdownCodeEditor', () => ({
-  default: ({
+  default: function MockMarkdownCodeEditor({
     initialValue,
     onChange,
   }: {
@@ -19,10 +19,11 @@ vi.mock('./MarkdownCodeEditor', () => ({
     onCursorLineChange?: (line: number) => void
     editorViewRef: React.RefObject<unknown>
     lineWrap?: boolean
-  }) => {
+  }) {
+    const initialValueAtMount = useRef(initialValue)
     useEffect(() => {
-      mountSpy(initialValue)
-    }, []) // intentionally empty — tracks mount only, not re-renders
+      mountSpy(initialValueAtMount.current)
+    }, [])
 
     capturedOnChange = onChange
     return <div data-testid="code-editor" data-initial-value={initialValue} />

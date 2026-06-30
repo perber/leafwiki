@@ -15,7 +15,7 @@ import { Compartment, EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, keymap } from '@codemirror/view'
 import { githubLight } from '@fsegurai/codemirror-theme-github-light'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useDesignModeStore } from '../designtoggle/designmode'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 import type { InternalLinkCompletion } from './internalLinkCompletion'
@@ -86,7 +86,9 @@ export default function MarkdownCodeEditor({
   // Always tracks the latest initialValue so the setup effect can read it
   // without having it in the dependency array (which would reinitialize on every keystroke).
   const initialValueRef = useRef(initialValue)
-  initialValueRef.current = initialValue
+  useLayoutEffect(() => {
+    initialValueRef.current = initialValue
+  })
 
   const designMode = useDesignModeStore((state) => state.mode)
   const [themeCompartment] = useState(() => new Compartment())
