@@ -1207,11 +1207,15 @@
   }
 
   .page-dialog__title-row {
-    @apply relative;
+    @apply flex items-end gap-1;
+  }
+
+  .page-dialog__title-row > .form-input {
+    @apply flex-1;
   }
 
   .page-dialog__date-btn {
-    @apply text-muted absolute top-0 right-0 h-6 w-6 opacity-50 hover:opacity-100;
+    @apply text-muted mb-0 h-9 w-9 flex-shrink-0 opacity-40 hover:opacity-100;
   }
 
   .dialog__path {
