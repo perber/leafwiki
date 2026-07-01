@@ -1,10 +1,13 @@
 import BaseDialog, { BaseDialogConfirmButton } from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
+import { Button } from '@/components/ui/button'
 import { createPage, NODE_KIND_PAGE } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
+import i18next from '@/lib/i18n'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
 import { buildEditUrl } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
+import { CalendarDays } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -165,19 +168,35 @@ export function AddPageDialog({
       buttons={buttons}
     >
       <div className="page-dialog__fields">
-        <FormInput
-          autoFocus={true}
-          label="Title"
-          value={title}
-          onChange={(val) => {
-            handleTitleChange(val)
-            setFieldErrors((prev) => ({ ...prev, title: '' }))
-          }}
-          testid="add-page-title-input"
-          placeholder={`${itemLabelCapitalized} title`}
-          error={fieldErrors.title}
-          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
-        />
+        <div className="page-dialog__title-row">
+          <FormInput
+            autoFocus={true}
+            label="Title"
+            value={title}
+            onChange={(val) => {
+              handleTitleChange(val)
+              setFieldErrors((prev) => ({ ...prev, title: '' }))
+            }}
+            testid="add-page-title-input"
+            placeholder={`${itemLabelCapitalized} title`}
+            error={fieldErrors.title}
+            allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="page-dialog__date-btn"
+            title={i18next.t('addPageDialog.dateTitleTooltip', {
+              ns: 'editor',
+            })}
+            onClick={() =>
+              handleTitleChange(new Date().toISOString().slice(0, 10))
+            }
+          >
+            <CalendarDays size={15} />
+          </Button>
+        </div>
         <SlugInputWithSuggestion
           title={title}
           slug={slug}

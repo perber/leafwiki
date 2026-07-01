@@ -1,9 +1,11 @@
 import { NODE_KIND_PAGE, type Page } from '@/lib/api/pages'
 import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
+import { Button } from '@/components/ui/button'
 import i18next from '@/lib/i18n'
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
 import { useTreeStore } from '@/stores/tree'
+import { CalendarDays } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
@@ -100,18 +102,34 @@ export function EditPageMetadataDialog({
       testidPrefix="edit-page-metadata-dialog"
     >
       <div className="page-dialog__fields">
-        <FormInput
-          autoFocus
-          label={i18next.t('editPageMetadataDialog.titleLabel', {
-            ns: 'editor',
-          })}
-          value={title}
-          onChange={handleTitleChange}
-          placeholder={`${itemLabelCapitalized} title`}
-          error={fieldErrors.title}
-          testid="edit-page-metadata-dialog-title-input"
-          allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
-        />
+        <div className="page-dialog__title-row">
+          <FormInput
+            autoFocus
+            label={i18next.t('editPageMetadataDialog.titleLabel', {
+              ns: 'editor',
+            })}
+            value={title}
+            onChange={handleTitleChange}
+            placeholder={`${itemLabelCapitalized} title`}
+            error={fieldErrors.title}
+            testid="edit-page-metadata-dialog-title-input"
+            allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="page-dialog__date-btn"
+            title={i18next.t('editPageMetadataDialog.dateTitleTooltip', {
+              ns: 'editor',
+            })}
+            onClick={() =>
+              handleTitleChange(new Date().toISOString().slice(0, 10))
+            }
+          >
+            <CalendarDays size={15} />
+          </Button>
+        </div>
 
         <SlugInputWithSuggestion
           title={title}

@@ -1206,6 +1206,14 @@
     @apply space-y-4;
   }
 
+  .page-dialog__title-row {
+    @apply relative;
+  }
+
+  .page-dialog__date-btn {
+    @apply text-muted absolute top-0 right-0 h-6 w-6 opacity-50 hover:opacity-100;
+  }
+
   .dialog__path {
     @apply text-muted font-mono text-xs;
   }

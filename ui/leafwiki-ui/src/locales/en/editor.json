@@ -8,11 +8,15 @@
     "label": "Slug",
     "placeholder": "Page slug"
   },
+  "addPageDialog": {
+    "dateTitleTooltip": "Set title to today's date"
+  },
   "editPageMetadataDialog": {
     "titleLabel": "Title",
     "pathPrefix": "Path:",
     "cancelButton": "Cancel",
-    "saveButton": "Change"
+    "saveButton": "Change",
+    "dateTitleTooltip": "Set title to today's date"
   },
   "toolbar": {
     "boldTooltip": "Bold (Ctrl+B)",
