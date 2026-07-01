@@ -24,6 +24,7 @@ import {
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { usePageEditorStore } from '../editor/pageEditorStore'
+import { PinnedSection } from './PinnedSection'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
@@ -173,6 +174,7 @@ export default function TreeView() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <PinnedSection />
       <div className="tree-view__nodes">
         {tree?.children?.map((node) => (
           <TreeNode key={node.id} node={node} />

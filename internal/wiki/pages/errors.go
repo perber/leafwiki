@@ -97,6 +97,8 @@ func respondWithPageError(c *gin.Context, err error) {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageCannotMoveToSelf, "Page cannot be moved to itself", "page cannot be moved to itself")
 	case errors.Is(err, tree.ErrConvertNotAllowed):
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageConvertNotAllowed, "Convert operation not allowed", "convert not allowed")
+	case errors.Is(err, tree.ErrInvalidOperation):
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, err.Error(), "invalid operation")
 	case errors.Is(err, tree.ErrVersionConflict):
 		respondWithPageStatusError(c, http.StatusConflict, ErrCodePageVersionConflict, "Page was changed by another request", "page was changed by another request")
 	case errors.Is(err, tree.ErrVersionRequired):

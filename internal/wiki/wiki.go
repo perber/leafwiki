@@ -359,6 +359,7 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 		SuggestSlug:      wikipages.NewSuggestSlugUseCase(w.tree, w.slug),
 		PreviewRefactor:  wikipages.NewPreviewPageRefactorUseCase(w.tree, w.slug, w.links, w.log),
 		ApplyRefactor:    wikipages.NewApplyPageRefactorUseCase(w.tree, w.slug, w.revision, w.links, w.log),
+		PinPage:          wikipages.NewPinPageUseCase(w.tree, w.log),
 		UserResolver:     w.userResolver,
 		AuthService:      w.auth,
 	})

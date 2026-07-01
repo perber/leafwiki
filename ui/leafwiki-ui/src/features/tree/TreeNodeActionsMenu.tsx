@@ -10,6 +10,7 @@ import {
   NODE_KIND_PAGE,
   NODE_KIND_SECTION,
   PageNode,
+  pinPage,
 } from '@/lib/api/pages'
 import { asApiLocalizedError, mapApiError } from '@/lib/api/errors'
 import {
@@ -32,10 +33,13 @@ import {
   MoreVertical,
   Move,
   Pencil,
+  Pin,
+  PinOff,
   Repeat2,
   Trash,
 } from 'lucide-react'
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { usePageEditorStore } from '../editor/pageEditorStore'
@@ -49,6 +53,7 @@ export type TreeNodeActionsMenuProps = {
 export default function TreeNodeActionsMenu({
   node,
 }: TreeNodeActionsMenuProps) {
+  const { t } = useTranslation('viewer')
   const { id: nodeId, kind: nodeKind, children, version: nodeVersion } = node
   const currentEditorPageId = usePageEditorStore((state) => state.page?.id)
   const openDialog = useDialogsStore((state) => state.openDialog)
@@ -90,6 +95,17 @@ export default function TreeNodeActionsMenu({
         }
       })
   }, [nodeId, nodeKind, nodeVersion, reloadTree])
+
+  const handleTogglePin = useCallback(() => {
+    pinPage(nodeId, nodeVersion, !node.pinned)
+      .then(() => {
+        reloadTree()
+        toast.success(
+          node.pinned ? t('pinned.unpinSuccess') : t('pinned.pinSuccess'),
+        )
+      })
+      .catch(() => toast.error(t('pinned.pinError')))
+  }, [nodeId, nodeVersion, node.pinned, reloadTree, t])
 
   const getCurrentRoutePath = useCallback(() => {
     if (typeof window === 'undefined') {
@@ -181,6 +197,24 @@ export default function TreeNodeActionsMenu({
             Page
           </DropdownMenuItem>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="cursor-pointer"
+          data-testid="tree-view-action-button-pin"
+          onClick={handleTogglePin}
+        >
+          {node.pinned ? (
+            <>
+              <PinOff size={18} className="tree-node__action-icon" />{' '}
+              {t('pinned.unpinPage')}
+            </>
+          ) : (
+            <>
+              <Pin size={18} className="tree-node__action-icon" />{' '}
+              {t('pinned.pinPage')}
+            </>
+          )}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-error cursor-pointer"

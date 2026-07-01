@@ -9,8 +9,18 @@ import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useConfigStore } from '@/stores/config'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
-import { Copy, History, Link2, Pencil, Printer, Trash2 } from 'lucide-react'
+import {
+  Copy,
+  History,
+  Link2,
+  Pencil,
+  Pin,
+  PinOff,
+  Printer,
+  Trash2,
+} from 'lucide-react'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { type ToolbarButton, useToolbarStore } from '../toolbar/toolbarStore'
 
 export interface ToolbarActionsOptions {
@@ -21,6 +31,8 @@ export interface ToolbarActionsOptions {
   showPermalink: () => void
   deletePage: () => void
   copyPage: () => void
+  isPinned: boolean
+  onPinToggle: () => void
 }
 
 export function useToolbarActions({
@@ -31,7 +43,10 @@ export function useToolbarActions({
   showPermalink,
   deletePage,
   copyPage,
+  isPinned,
+  onPinToggle,
 }: ToolbarActionsOptions) {
+  const { t } = useTranslation('viewer')
   const setButtons = useToolbarStore((state) => state.setButtons)
   const appMode = useAppMode()
   const readOnlyMode = useIsReadOnly()
@@ -79,6 +94,14 @@ export function useToolbarActions({
         icon: <Copy size={18} />,
         variant: 'outline',
         action: copyPage,
+      },
+      {
+        id: 'pin-page',
+        label: isPinned ? t('pinned.unpinPage') : t('pinned.pinPage'),
+        hotkey: '',
+        icon: isPinned ? <PinOff size={18} /> : <Pin size={18} />,
+        variant: 'outline',
+        action: onPinToggle,
       },
       {
         id: 'delete-page',
@@ -165,9 +188,12 @@ export function useToolbarActions({
     printPage,
     showHistory,
     showPermalink,
+    isPinned,
+    onPinToggle,
     registerHotkey,
     unregisterHotkey,
     itemLabel,
     isMacOS,
+    t,
   ])
 }

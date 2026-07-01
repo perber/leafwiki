@@ -10,6 +10,7 @@ import {
   DIALOG_PAGE_PERMALINK,
 } from '@/lib/registries'
 import { buildHistoryUrl } from '@/lib/routePath'
+import { pinPage } from '@/lib/api/pages'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
 import {
   getParentWikiRoutePath,
@@ -19,6 +20,8 @@ import {
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BacklinkInfo } from '../links/LinkInfo'
@@ -38,17 +41,22 @@ function displayUser(label?: { username: string }) {
 }
 
 export default function PageViewer() {
+  const { t } = useTranslation('viewer')
   const location = useLocation()
   const { pathname } = location
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const openNode = useTreeStore((state) => state.openNode)
+  const reloadTree = useTreeStore((state) => state.reloadTree)
   const loading = useViewerStore((s) => s.isLoading)
   const error = useViewerStore((s) => s.error)
   const notFound = useViewerStore((s) => s.notFound)
   const page = useViewerStore((s) => s.page)
   const loadPageData = useViewerStore((s) => s.loadPageData)
   const clearViewer = useViewerStore((s) => s.clear)
+  const isPinned = useTreeStore((s) =>
+    page ? (s.byId[page.id]?.pinned ?? false) : false,
+  )
 
   const actions = {
     pageKind: page?.kind,
@@ -58,12 +66,12 @@ export default function PageViewer() {
     editPage: useCallback(() => {
       clearViewer()
       navigate(`/e/${page?.path || ''}`)
-    }, [page?.path, navigate, clearViewer]),
+    }, [page, navigate, clearViewer]),
     showHistory: useCallback(() => {
       navigate(buildHistoryUrl(page?.path || pathname), {
         state: createNavigationVisitState(),
       })
-    }, [navigate, page?.path, pathname]),
+    }, [navigate, page, pathname]),
     showPermalink: useCallback(() => {
       if (!page) return
       openDialog(DIALOG_PAGE_PERMALINK, { page })
@@ -78,6 +86,18 @@ export default function PageViewer() {
       if (!page) return
       openDialog(DIALOG_COPY_PAGE, { sourcePage: page })
     }, [page, openDialog]),
+    isPinned,
+    onPinToggle: useCallback(() => {
+      if (!page) return
+      pinPage(page.id, page.version, !isPinned)
+        .then(() => {
+          reloadTree()
+          toast.success(
+            isPinned ? t('pinned.unpinSuccess') : t('pinned.pinSuccess'),
+          )
+        })
+        .catch(() => toast.error(t('pinned.pinError')))
+    }, [page, isPinned, reloadTree, t]),
   }
 
   useScrollRestoration(getNavigationVisitKey(location), loading)

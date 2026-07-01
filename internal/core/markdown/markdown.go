@@ -162,3 +162,7 @@ func (mf *MarkdownFile) SetLeafWikiMetadata(createdAt string, updatedAt string, 
 	mf.fm.LeafWikiCreatorID = strings.TrimSpace(creatorID)
 	mf.fm.LeafWikiLastAuthorID = strings.TrimSpace(lastAuthorID)
 }
+
+func (mf *MarkdownFile) SetLeafWikiPinned(pinned bool) {
+	mf.fm.LeafWikiPinned = pinned
+}

@@ -33,6 +33,7 @@ type Node struct {
 	Kind     tree.NodeKind `json:"kind"`
 	Children []*Node       `json:"children"`
 	Metadata NodeMetadata  `json:"metadata"`
+	Pinned   bool          `json:"pinned,omitempty"`
 }
 
 // Page is the HTTP representation of a full page (node + content).
@@ -101,6 +102,7 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 		Version:  node.Version(),
 		Position: node.Position,
 		Kind:     node.Kind,
+		Pinned:   node.Pinned,
 		Metadata: NodeMetadata{
 			CreatedAt:    node.Metadata.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:    node.Metadata.UpdatedAt.Format(time.RFC3339),
