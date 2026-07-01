@@ -592,7 +592,10 @@ func TestNodeStore_UpsertContentAndMetadata_UpdatesProperties(t *testing.T) {
 	path := filepath.Join(tmp, "root", "p.md")
 	mustWriteFile(t, path, "---\nleafwiki_id: p1\nleafwiki_title: My Page\nstatus: draft\n---\n# old\n", 0o644)
 
-	props := map[string]string{"status": "published", "author": "alice"}
+	props := map[string]MetadataValue{
+		"status": {Type: MetadataTypeText, Value: "published"},
+		"author": {Type: MetadataTypeText, Value: "alice"},
+	}
 	if err := store.UpsertContentAndMetadata(page, "# updated", nil, props); err != nil {
 		t.Fatalf("UpsertContentAndMetadata: %v", err)
 	}
@@ -623,8 +626,11 @@ func TestNodeStore_UpsertContentAndMetadata_TitleAsCustomPropertyRoundtrips(t *t
 	path := filepath.Join(tmp, "root", "p.md")
 	mustWriteFile(t, path, "---\nleafwiki_id: p1\nleafwiki_title: My Page\ntitle: My Custom Title\nstatus: draft\n---\n# old\n", 0o644)
 
-	// The editor sends title back in properties (because Phase 1 makes it visible).
-	props := map[string]string{"title": "My Custom Title", "status": "published"}
+	// The editor sends title back in properties (because it's visible as a typed value).
+	props := map[string]MetadataValue{
+		"title":  {Type: MetadataTypeText, Value: "My Custom Title"},
+		"status": {Type: MetadataTypeText, Value: "published"},
+	}
 	if err := store.UpsertContentAndMetadata(page, "# edited", nil, props); err != nil {
 		t.Fatalf("UpsertContentAndMetadata: %v", err)
 	}
@@ -654,7 +660,7 @@ func TestNodeStore_UpsertContentAndMetadata_UnsentFieldsAreDropped(t *testing.T)
 	mustWriteFile(t, path, "---\nleafwiki_id: p1\nleafwiki_title: My Page\nstatus: draft\npermalink: /my-page\n---\n# body\n", 0o644)
 
 	// User saves without "permalink" — it was deleted in the editor.
-	if err := store.UpsertContentAndMetadata(page, "# body", nil, map[string]string{"status": "draft"}); err != nil {
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, map[string]MetadataValue{"status": {Type: MetadataTypeText, Value: "draft"}}); err != nil {
 		t.Fatalf("UpsertContentAndMetadata: %v", err)
 	}
 
@@ -680,7 +686,7 @@ func TestNodeStore_UpsertContentAndMetadata_RemovedPropertyDoesNotPersist(t *tes
 	mustWriteFile(t, path, "---\nleafwiki_id: p1\nleafwiki_title: My Page\nstatus: draft\nauthor: alice\n---\n# body\n", 0o644)
 
 	// User removed "author"; only "status" is sent back.
-	if err := store.UpsertContentAndMetadata(page, "# body", nil, map[string]string{"status": "draft"}); err != nil {
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, map[string]MetadataValue{"status": {Type: MetadataTypeText, Value: "draft"}}); err != nil {
 		t.Fatalf("UpsertContentAndMetadata: %v", err)
 	}
 
@@ -707,7 +713,7 @@ func TestNodeStore_UpsertContentAndMetadata_NilTagsPreservesExistingTags(t *test
 	mustWriteFile(t, path, "---\nleafwiki_id: p1\nleafwiki_title: My Page\ntags:\n  - go\n  - wiki\nstatus: draft\n---\n# body\n", 0o644)
 
 	// Save with properties only — no tags field (nil means "leave unchanged").
-	if err := store.UpsertContentAndMetadata(page, "# body", nil, map[string]string{"status": "published"}); err != nil {
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, map[string]MetadataValue{"status": {Type: MetadataTypeText, Value: "published"}}); err != nil {
 		t.Fatalf("UpsertContentAndMetadata: %v", err)
 	}
 
@@ -722,9 +728,9 @@ func TestNodeStore_UpsertContentAndMetadata_NilTagsPreservesExistingTags(t *test
 	}
 }
 
-func TestNodeStore_UpsertContentAndMetadata_NonStringFieldsPreserved(t *testing.T) {
-	// Regression: bool, int, and non-tag list ExtraFields must survive an edit
-	// because the editor cannot represent them and never sends them back.
+func TestNodeStore_UpsertContentAndMetadata_TypedPropertiesReplaceAll(t *testing.T) {
+	// The editor now sends ALL properties with full type info.
+	// Only the keys present in the request survive; absent keys are removed.
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
@@ -732,10 +738,15 @@ func TestNodeStore_UpsertContentAndMetadata_NonStringFieldsPreserved(t *testing.
 	page := &PageNode{ID: "p1", Slug: "p", Title: "My Page", Kind: NodeKindPage, Parent: root}
 
 	path := filepath.Join(tmp, "root", "p.md")
-	mustWriteFile(t, path, "---\nleafwiki_id: p1\nleafwiki_title: My Page\npublished: true\npriority: 42\naliases:\n  - /old-path\nstatus: draft\n---\n# body\n", 0o644)
+	mustWriteFile(t, path, "---\nleafwiki_id: p1\nleafwiki_title: My Page\npublished: true\npriority: 42\nstatus: draft\n---\n# body\n", 0o644)
 
-	// Editor only sends back the string property; non-string fields are absent.
-	if err := store.UpsertContentAndMetadata(page, "# body", nil, map[string]string{"status": "published"}); err != nil {
+	// Editor sends back all properties it wants to keep, with types.
+	props := map[string]MetadataValue{
+		"published": {Type: MetadataTypeBoolean, Value: "true"},
+		"priority":  {Type: MetadataTypeNumber, Value: "42"},
+		"status":    {Type: MetadataTypeText, Value: "published"},
+	}
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, props); err != nil {
 		t.Fatalf("UpsertContentAndMetadata: %v", err)
 	}
 
@@ -745,17 +756,10 @@ func TestNodeStore_UpsertContentAndMetadata_NonStringFieldsPreserved(t *testing.
 		t.Fatalf("ParseFrontmatter: %v", err)
 	}
 	if fm.ExtraFields["published"] != true {
-		t.Fatalf("bool field published must be preserved, got %v", fm.ExtraFields["published"])
-	}
-	if fm.ExtraFields["priority"] != 42 {
-		t.Fatalf("int field priority must be preserved, got %v", fm.ExtraFields["priority"])
-	}
-	aliases, _ := fm.ExtraFields["aliases"].([]interface{})
-	if len(aliases) != 1 {
-		t.Fatalf("list field aliases must be preserved, got %v", fm.ExtraFields["aliases"])
+		t.Fatalf("bool published must round-trip, got %v", fm.ExtraFields["published"])
 	}
 	if fm.ExtraFields["status"] != "published" {
-		t.Fatalf("string property must be updated, got %v", fm.ExtraFields["status"])
+		t.Fatalf("string status must be updated, got %v", fm.ExtraFields["status"])
 	}
 }
 
@@ -1612,4 +1616,259 @@ func mustRead(t *testing.T, path string) []byte {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return b
+}
+
+// ─── UpsertContentAndMetadata: typed MetadataValue properties ────────────────
+
+func newPageFixture(t *testing.T, tmp string) (*NodeStore, *PageNode, string) {
+	t.Helper()
+	store := NewNodeStore(tmp)
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "My Page", Kind: NodeKindPage, Parent: root}
+	path := filepath.Join(tmp, "root", "p.md")
+	mustWriteFile(t, path, "---\nleafwiki_id: p1\nleafwiki_title: My Page\n---\n# old\n", 0o644)
+	return store, page, path
+}
+
+func TestNodeStore_UpsertContentAndMetadata_WritesNumberProperty(t *testing.T) {
+	tmp := t.TempDir()
+	store, page, path := newPageFixture(t, tmp)
+
+	props := map[string]MetadataValue{
+		"count": {Type: MetadataTypeNumber, Value: "42"},
+	}
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, props); err != nil {
+		t.Fatalf("UpsertContentAndMetadata: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	fm, _, _, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	// YAML round-trip: numbers are stored as int (not int64 from yaml.v3)
+	v, ok := fm.ExtraFields["count"]
+	if !ok {
+		t.Fatal("expected count in frontmatter")
+	}
+	switch n := v.(type) {
+	case int:
+		if n != 42 {
+			t.Errorf("expected 42, got %d", n)
+		}
+	case int64:
+		if n != 42 {
+			t.Errorf("expected 42, got %d", n)
+		}
+	default:
+		t.Errorf("expected numeric type, got %T(%v)", v, v)
+	}
+}
+
+func TestNodeStore_UpsertContentAndMetadata_WritesBooleanProperty(t *testing.T) {
+	tmp := t.TempDir()
+	store, page, path := newPageFixture(t, tmp)
+
+	props := map[string]MetadataValue{
+		"active": {Type: MetadataTypeBoolean, Value: "true"},
+	}
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, props); err != nil {
+		t.Fatalf("UpsertContentAndMetadata: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	fm, _, _, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if fm.ExtraFields["active"] != true {
+		t.Errorf("expected active=true, got %v (%T)", fm.ExtraFields["active"], fm.ExtraFields["active"])
+	}
+}
+
+func TestNodeStore_UpsertContentAndMetadata_WritesDateProperty(t *testing.T) {
+	tmp := t.TempDir()
+	store, page, path := newPageFixture(t, tmp)
+
+	props := map[string]MetadataValue{
+		"created": {Type: MetadataTypeDate, Value: "2024-01-15"},
+	}
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, props); err != nil {
+		t.Fatalf("UpsertContentAndMetadata: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	fm, _, _, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	// After YAML round-trip, a quoted date string stays a string.
+	// The stored value must contain the date.
+	v := fm.ExtraFields["created"]
+	if v == nil {
+		t.Fatal("expected created in frontmatter")
+	}
+	// Verify round-trip: convert back to MetadataValue and check type.
+	mv, err := YamlValueToMetadataValue(v)
+	if err != nil {
+		t.Fatalf("YamlValueToMetadataValue: %v", err)
+	}
+	if mv.Type != MetadataTypeDate && mv.Type != MetadataTypeDatetime {
+		t.Errorf("expected date or datetime type after round-trip, got %q", mv.Type)
+	}
+}
+
+func TestNodeStore_UpsertContentAndMetadata_WritesDateTimeProperty(t *testing.T) {
+	tmp := t.TempDir()
+	store, page, path := newPageFixture(t, tmp)
+
+	props := map[string]MetadataValue{
+		"updated": {Type: MetadataTypeDatetime, Value: "2024-01-15T12:30:00Z"},
+	}
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, props); err != nil {
+		t.Fatalf("UpsertContentAndMetadata: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	fm, _, _, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	v := fm.ExtraFields["updated"]
+	if v == nil {
+		t.Fatal("expected updated in frontmatter")
+	}
+	mv, err := YamlValueToMetadataValue(v)
+	if err != nil {
+		t.Fatalf("YamlValueToMetadataValue: %v", err)
+	}
+	if mv.Type != MetadataTypeDatetime {
+		t.Errorf("expected datetime type after round-trip, got %q", mv.Type)
+	}
+}
+
+func TestNodeStore_UpsertContentAndMetadata_WritesNullProperty(t *testing.T) {
+	tmp := t.TempDir()
+	store, page, path := newPageFixture(t, tmp)
+
+	props := map[string]MetadataValue{
+		"archivedAt": {Type: MetadataTypeNull},
+	}
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, props); err != nil {
+		t.Fatalf("UpsertContentAndMetadata: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	fm, _, _, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if v, ok := fm.ExtraFields["archivedAt"]; !ok || v != nil {
+		t.Errorf("expected archivedAt=null, got %v (exists=%v)", v, ok)
+	}
+}
+
+func TestNodeStore_UpsertContentAndMetadata_WritesNestedObject(t *testing.T) {
+	tmp := t.TempDir()
+	store, page, path := newPageFixture(t, tmp)
+
+	props := map[string]MetadataValue{
+		"meta": {
+			Type: MetadataTypeObject,
+			Fields: map[string]MetadataValue{
+				"author": {Type: MetadataTypeText, Value: "alice"},
+			},
+		},
+	}
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, props); err != nil {
+		t.Fatalf("UpsertContentAndMetadata: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	fm, _, _, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	meta, ok := fm.ExtraFields["meta"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected meta to be map, got %T: %v", fm.ExtraFields["meta"], fm.ExtraFields["meta"])
+	}
+	if meta["author"] != "alice" {
+		t.Errorf("expected meta.author=alice, got %v", meta["author"])
+	}
+}
+
+func TestNodeStore_UpsertContentAndMetadata_WritesNestedMixedList(t *testing.T) {
+	tmp := t.TempDir()
+	store, page, path := newPageFixture(t, tmp)
+
+	props := map[string]MetadataValue{
+		"items": {
+			Type: MetadataTypeList,
+			Items: []MetadataValue{
+				{Type: MetadataTypeText, Value: "hello"},
+				{Type: MetadataTypeNumber, Value: "7"},
+				{Type: MetadataTypeObject, Fields: map[string]MetadataValue{
+					"k": {Type: MetadataTypeText, Value: "v"},
+				}},
+			},
+		},
+	}
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, props); err != nil {
+		t.Fatalf("UpsertContentAndMetadata: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	fm, _, _, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	list, ok := fm.ExtraFields["items"].([]interface{})
+	if !ok {
+		t.Fatalf("expected items to be list, got %T: %v", fm.ExtraFields["items"], fm.ExtraFields["items"])
+	}
+	if len(list) != 3 {
+		t.Errorf("expected 3 items, got %d", len(list))
+	}
+}
+
+func TestNodeStore_UpsertContentAndMetadata_RemovesUnsentEditorOwnedTree(t *testing.T) {
+	tmp := t.TempDir()
+	store, page, path := newPageFixture(t, tmp)
+
+	// File initially has a meta subtree.
+	mustWriteFile(t, path, "---\nleafwiki_id: p1\nleafwiki_title: My Page\nmeta:\n  author: alice\nstatus: draft\n---\n# old\n", 0o644)
+
+	// Properties request omits meta — it must be removed.
+	props := map[string]MetadataValue{
+		"status": {Type: MetadataTypeText, Value: "published"},
+	}
+	if err := store.UpsertContentAndMetadata(page, "# body", nil, props); err != nil {
+		t.Fatalf("UpsertContentAndMetadata: %v", err)
+	}
+
+	raw := string(mustRead(t, path))
+	fm, _, _, err := markdown.ParseFrontmatter(raw)
+	if err != nil {
+		t.Fatalf("ParseFrontmatter: %v", err)
+	}
+	if _, ok := fm.ExtraFields["meta"]; ok {
+		t.Error("meta subtree must be removed when not present in properties request")
+	}
+	if fm.ExtraFields["status"] != "published" {
+		t.Errorf("expected status=published, got %v", fm.ExtraFields["status"])
+	}
+}
+
+func TestNodeStore_UpsertContentAndMetadata_InvalidNumberReturnsError(t *testing.T) {
+	tmp := t.TempDir()
+	store, page, _ := newPageFixture(t, tmp)
+
+	props := map[string]MetadataValue{
+		"count": {Type: MetadataTypeNumber, Value: "not-a-number"},
+	}
+	err := store.UpsertContentAndMetadata(page, "# body", nil, props)
+	if err == nil {
+		t.Fatal("expected error for invalid number, got nil")
+	}
 }

@@ -718,25 +718,20 @@ func (f *NodeStore) UpsertContentPreservingFrontmatter(entry *PageNode, content 
 }
 
 // UpsertContentAndMetadata is the UI-edit path: it replaces the body and the
-// editor-visible frontmatter (tags and string-typed properties) while keeping
-// system-managed frontmatter (leafwiki_*) and non-string pass-through fields
-// (booleans, numbers, non-tag lists) intact.
+// editor-visible frontmatter (tags and typed properties) while keeping
+// system-managed frontmatter (leafwiki_*) intact.
 //
 // Ownership rules for ExtraFields:
-//   - String-valued keys are editor-owned: only keys present in properties
-//     survive; keys absent from properties are removed.
-//   - Non-string, non-map values (bool, int, float64, []interface{}) are
-//     always preserved — the editor cannot represent them, so it cannot
-//     intentionally delete them.
-//   - Nested maps (map[string]interface{}) are not preserved; their string
-//     leaves round-trip through the editor as dot-notation property keys.
+//   - All non-system, non-tags ExtraFields are editor-owned: only keys present
+//     in properties survive; keys absent from properties are removed.
 //   - Tags: when tags is non-nil the existing tags are replaced; when tags is
 //     nil the existing tags in the file are left unchanged.
+//   - For PreserveFrontmatter use UpsertContentPreservingFrontmatter instead.
 func (f *NodeStore) UpsertContentAndMetadata(
 	entry *PageNode,
 	body string,
 	tags []string,
-	properties map[string]string,
+	properties map[string]MetadataValue,
 ) error {
 	if entry == nil {
 		return &InvalidOpError{Op: "UpsertContentAndMetadata", Reason: "an entry is required"}
@@ -758,27 +753,16 @@ func (f *NodeStore) UpsertContentAndMetadata(
 	mdFile.SetContent(body)
 
 	existing := mdFile.GetFrontmatter().ExtraFields
-	extra := make(map[string]interface{}, len(properties)+len(existing)+1)
+	extra := make(map[string]interface{}, len(properties)+1)
 
-	// Preserve non-string, non-map ExtraFields (bool, int, float64, non-tag
-	// lists). The editor cannot represent these types and never sends them back,
-	// so they must survive an edit unchanged.
-	for k, v := range existing {
-		if k == "tags" {
-			continue // handled separately below
-		}
-		switch v.(type) {
-		case string, map[string]interface{}:
-			// string: editor-owned, replaced by incoming properties
-			// map: nested YAML — string leaves round-trip via dot-notation keys
-		default:
-			extra[k] = v
-		}
-	}
-
-	// String properties from the editor replace every editor-owned string key.
+	// Write typed properties. All editor-owned keys are replaced; keys absent
+	// from the request are dropped.
 	for k, v := range properties {
-		extra[k] = v
+		yamlVal, err := metadataValueToYAML(v)
+		if err != nil {
+			return fmt.Errorf("convert property %q: %w", k, err)
+		}
+		extra[k] = yamlVal
 	}
 
 	// Tags: replace when the caller sends an explicit list; preserve otherwise.
