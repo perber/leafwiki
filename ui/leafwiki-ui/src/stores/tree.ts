@@ -56,6 +56,7 @@ type TreeStore = {
   collapseAll: () => void
   reloadTree: () => Promise<void>
   patchNodeVersion: (id: string, version: string) => void
+  setPinnedLocally: (id: string, pinned: boolean, version: string) => void
   toggleNode: (id: string) => void
   openNode: (id: string) => void
   closeNode: (id: string) => void
@@ -188,6 +189,23 @@ export const useTreeStore = create<TreeStore>()(
         set({
           byId: { ...byId, [id]: updatedNode },
           byPath: node.path ? { ...byPath, [node.path]: updatedNode } : byPath,
+        })
+      },
+
+      setPinnedLocally: (id: string, pinned: boolean, version: string) => {
+        const byId = get().byId
+        const byPath = get().byPath
+        const node = byId?.[id]
+        if (!node) return
+        const updatedNode = { ...node, pinned, version }
+        const updatedById = { ...byId, [id]: updatedNode }
+        const pinnedPages = Object.values(updatedById)
+          .filter((n) => n.pinned === true)
+          .sort((a, b) => a.title.localeCompare(b.title))
+        set({
+          byId: updatedById,
+          byPath: node.path ? { ...byPath, [node.path]: updatedNode } : byPath,
+          pinnedPages,
         })
       },
 

@@ -96,16 +96,19 @@ export default function TreeNodeActionsMenu({
       })
   }, [nodeId, nodeKind, nodeVersion, reloadTree])
 
+  const setPinnedLocally = useTreeStore((s) => s.setPinnedLocally)
+
   const handleTogglePin = useCallback(() => {
-    pinPage(nodeId, nodeVersion, !node.pinned)
-      .then(() => {
-        reloadTree()
+    const newPinned = !node.pinned
+    pinPage(nodeId, nodeVersion, newPinned)
+      .then((updated) => {
+        setPinnedLocally(nodeId, newPinned, updated.version)
         toast.success(
           node.pinned ? t('pinned.unpinSuccess') : t('pinned.pinSuccess'),
         )
       })
       .catch(() => toast.error(t('pinned.pinError')))
-  }, [nodeId, nodeVersion, node.pinned, reloadTree, t])
+  }, [nodeId, nodeVersion, node.pinned, setPinnedLocally, t])
 
   const getCurrentRoutePath = useCallback(() => {
     if (typeof window === 'undefined') {

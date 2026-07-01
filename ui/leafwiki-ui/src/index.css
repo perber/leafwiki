@@ -2295,7 +2295,7 @@
   }
 
   .tree-view__toolbar {
-    @apply mb-2 flex;
+    @apply mb-2 ml-1 flex;
   }
 
   .tree-view__status {
@@ -2322,6 +2322,10 @@
     @apply mb-1 w-full;
   }
 
+  .tree-view__section-header {
+    @apply text-muted flex items-center gap-1 px-1 py-0.5 text-xs font-medium tracking-wide uppercase select-none;
+  }
+
   .tree-view__pinned-header {
     @apply text-muted flex items-center gap-1 px-1 py-0.5 text-xs font-medium tracking-wide uppercase select-none;
   }
@@ -2331,7 +2335,7 @@
   }
 
   .tree-view__pinned-item {
-    @apply text-interface-text relative flex items-center rounded px-1 py-0.5 text-sm;
+    @apply text-interface-text relative flex items-center text-sm;
   }
 
   .tree-view__pinned-item--active {
@@ -2343,7 +2347,7 @@
   }
 
   .tree-view__pinned-item-link {
-    @apply flex min-w-0 flex-1 items-center gap-1.5 truncate no-underline;
+    @apply flex min-w-0 flex-1 items-center gap-1.5 truncate px-1 py-2 no-underline;
     color: inherit;
   }
 

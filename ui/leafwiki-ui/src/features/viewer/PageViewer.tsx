@@ -47,7 +47,7 @@ export default function PageViewer() {
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const openNode = useTreeStore((state) => state.openNode)
-  const reloadTree = useTreeStore((state) => state.reloadTree)
+  const setPinnedLocally = useTreeStore((s) => s.setPinnedLocally)
   const loading = useViewerStore((s) => s.isLoading)
   const error = useViewerStore((s) => s.error)
   const notFound = useViewerStore((s) => s.notFound)
@@ -89,15 +89,16 @@ export default function PageViewer() {
     isPinned,
     onPinToggle: useCallback(() => {
       if (!page) return
-      pinPage(page.id, page.version, !isPinned)
-        .then(() => {
-          reloadTree()
+      const newPinned = !isPinned
+      pinPage(page.id, page.version, newPinned)
+        .then((updated) => {
+          setPinnedLocally(page.id, newPinned, updated.version)
           toast.success(
             isPinned ? t('pinned.unpinSuccess') : t('pinned.pinSuccess'),
           )
         })
         .catch(() => toast.error(t('pinned.pinError')))
-    }, [page, isPinned, reloadTree, t]),
+    }, [page, isPinned, setPinnedLocally, t]),
   }
 
   useScrollRestoration(getNavigationVisitKey(location), loading)

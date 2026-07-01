@@ -30,6 +30,7 @@
   },
   "pinned": {
     "sectionTitle": "Pinned",
+    "pagesSectionTitle": "Pages",
     "pinPage": "Pin",
     "unpinPage": "Unpin",
     "pinSuccess": "Page pinned",

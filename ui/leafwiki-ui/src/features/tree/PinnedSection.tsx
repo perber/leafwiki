@@ -8,14 +8,14 @@ import { PinnedPageItem } from './PinnedPageItem'
 export function PinnedSection() {
   const { t } = useTranslation('viewer')
   const pinnedPages = useTreeStore((s) => s.pinnedPages)
-  const reloadTree = useTreeStore((s) => s.reloadTree)
+  const setPinnedLocally = useTreeStore((s) => s.setPinnedLocally)
 
   if (pinnedPages.length === 0) return null
 
   const handleUnpin = async (id: string, version: string) => {
     try {
-      await pinPage(id, version, false)
-      await reloadTree()
+      const updated = await pinPage(id, version, false)
+      setPinnedLocally(id, false, updated.version)
       toast.success(t('pinned.unpinSuccess'))
     } catch {
       toast.error(t('pinned.pinError'))
