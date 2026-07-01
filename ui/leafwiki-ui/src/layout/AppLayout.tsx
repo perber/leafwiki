@@ -164,14 +164,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     liveSidebarWidthRef.current = sidebarWidth
   }, [sidebarWidth])
 
-  let mainContainerStyle = !isEditor
-    ? 'custom-scrollbar app-layout__main-content-area-viewer'
+  const mainContainerStyle = !isEditor
+    ? 'app-layout__main-content-area-viewer'
     : 'app-layout__main-content-area-editor'
-
-  // If on mobile and sidebar is visible, hide overflow to prevent double scrollbars
-  if (isMobile && sidebarVisible) {
-    mainContainerStyle += ' overflow-hidden'
-  }
 
   const effectiveSidebarWidth = !sidebarVisible
     ? 0
@@ -285,13 +280,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
         <div className="app-layout__main-column">
           <div id="app-subheader-root" className="app-layout__subheader-root" />
-          {/* Main content area */}
-          <main
-            className={`${mainContainerStyle} app-layout__main-content-area`}
+          <div
             id="scroll-container"
+            className={`app-layout__content-row custom-scrollbar${isMobile && sidebarVisible ? 'overflow-hidden' : ''}`}
           >
-            {children}
-          </main>
+            {/* Main content area */}
+            <main
+              className={`${mainContainerStyle} app-layout__main-content-area`}
+            >
+              {children}
+            </main>
+            <div id="app-toc-pane-root" className="app-layout__toc-pane" />
+          </div>
         </div>
       </div>
     </TooltipProvider>

@@ -28,6 +28,8 @@ import { BacklinkInfo } from '../links/LinkInfo'
 import { extractTocEntries } from '../preview/extractTocEntries'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
+import { TocSidePanel } from '../preview/TocSidePanel'
+import { useTocScrollSpy } from '../preview/useTocScrollSpy'
 import Breadcrumbs from './Breadcrumbs'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
 import { PageMetadata } from './PageMetadata'
@@ -133,11 +135,15 @@ export default function PageViewer() {
     [page],
   )
 
+  const showTocButton = tocEntries.length > 3
+  // Single scroll spy for both the dropdown and the side panel.
+  const tocActiveId = useTocScrollSpy(showTocButton ? tocEntries : [])
+
   const editorName = displayUser(page?.metadata?.lastAuthor)
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
   const showUpdated = updatedRelative
-  const showTocButton = tocEntries.length > 3
   const subheaderRoot = document.getElementById('app-subheader-root')
+  const tocPaneRoot = document.getElementById('app-toc-pane-root')
 
   const subheader =
     page && !error && subheaderRoot
@@ -161,7 +167,11 @@ export default function PageViewer() {
               </div>
               {showTocButton && (
                 <div className="page-viewer__toc-button">
-                  <TocDropdownButton entries={tocEntries} clickable />
+                  <TocDropdownButton
+                    entries={tocEntries}
+                    clickable
+                    activeId={tocActiveId}
+                  />
                 </div>
               )}
             </div>
@@ -170,9 +180,18 @@ export default function PageViewer() {
         )
       : null
 
+  const tocPane =
+    showTocButton && page && !error && tocPaneRoot
+      ? createPortal(
+          <TocSidePanel entries={tocEntries} activeId={tocActiveId} />,
+          tocPaneRoot,
+        )
+      : null
+
   return (
     <>
       {subheader}
+      {tocPane}
       {page && !error && (
         <div className="page-viewer__metadata-bar hidden sm:block print:hidden">
           <div className="page-viewer__metadata-bar-inner">

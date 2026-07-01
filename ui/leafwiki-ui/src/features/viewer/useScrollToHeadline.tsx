@@ -14,6 +14,7 @@ export function useScrollToHeadline({
   const { hash } = useLocation()
   useEffect(() => {
     if (isLoading || !content || !hash) return
-    scrollToHeadlineHash(hash)
+    const cancel = scrollToHeadlineHash(hash)
+    return cancel
   }, [content, isLoading, hash])
 }
