@@ -2295,7 +2295,7 @@
   }
 
   .tree-view__toolbar {
-    @apply mb-2 flex;
+    @apply mb-2 ml-1 flex;
   }
 
   .tree-view__status {
@@ -2316,6 +2316,53 @@
 
   .tree-view__nodes {
     @apply w-full;
+  }
+
+  .tree-view__pinned {
+    @apply mb-1 w-full;
+  }
+
+  .tree-view__section-header {
+    @apply text-muted flex items-center gap-1 px-1 py-0.5 text-xs font-medium tracking-wide uppercase select-none;
+  }
+
+  .tree-view__pinned-header {
+    @apply text-muted flex items-center gap-1 px-1 py-0.5 text-xs font-medium tracking-wide uppercase select-none;
+  }
+
+  .tree-view__pinned-divider {
+    @apply bg-surface-border mt-1 mb-2 h-px w-full;
+  }
+
+  .tree-view__pinned-item {
+    @apply text-interface-text relative flex items-center text-sm;
+  }
+
+  .tree-view__pinned-item--active {
+    @apply text-brand;
+  }
+
+  .tree-view__pinned-item:not(.tree-view__pinned-item--active):hover {
+    @apply bg-tree-node-hover;
+  }
+
+  .tree-view__pinned-item-link {
+    @apply flex min-w-0 flex-1 items-center gap-1.5 truncate px-1 py-2 no-underline;
+    color: inherit;
+  }
+
+  .tree-view__pinned-item-icon {
+    @apply shrink-0 opacity-60;
+  }
+
+  .tree-view__pinned-item-title {
+    @apply truncate;
+  }
+
+  .tree-view__pinned-item-unpin {
+    @apply text-muted hover:text-interface-text ml-auto shrink-0 cursor-pointer rounded p-0.5 opacity-70 hover:opacity-100;
+    background: none;
+    border: none;
   }
 
   .tree-node {

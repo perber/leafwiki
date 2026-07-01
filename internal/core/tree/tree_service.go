@@ -1464,6 +1464,33 @@ func (t *TreeService) rollbackMovedNodeLocked(node *PageNode, oldParent *PageNod
 	return rollbackErr
 }
 
+// SetPinned updates the leafwiki_pinned frontmatter field and in-memory Pinned flag.
+func (t *TreeService) SetPinned(id string, version string, pinned bool) (*Page, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tree == nil {
+		return nil, ErrTreeNotLoaded
+	}
+
+	node := t.getNodeByIDLocked(id)
+	if node == nil {
+		return nil, ErrPageNotFound
+	}
+
+	if err := checkNodeVersion(node, version); err != nil {
+		return nil, err
+	}
+
+	content, err := t.store.SetPinnedFrontmatter(node, pinned)
+	if err != nil {
+		return nil, fmt.Errorf("set pinned: %w", err)
+	}
+
+	node.Pinned = pinned
+	return &Page{PageNode: node, Content: content}, nil
+}
+
 func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()

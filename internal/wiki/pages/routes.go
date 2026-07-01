@@ -35,6 +35,7 @@ type Routes struct {
 	suggestSlug      *SuggestSlugUseCase
 	previewRefactor  *PreviewPageRefactorUseCase
 	applyRefactor    *ApplyPageRefactorUseCase
+	pinPage          *PinPageUseCase
 	userResolver     *coreauth.UserResolver
 	authService      *coreauth.AuthService
 }
@@ -58,6 +59,7 @@ type RoutesConfig struct {
 	SuggestSlug      *SuggestSlugUseCase
 	PreviewRefactor  *PreviewPageRefactorUseCase
 	ApplyRefactor    *ApplyPageRefactorUseCase
+	PinPage          *PinPageUseCase
 	UserResolver     *coreauth.UserResolver
 	AuthService      *coreauth.AuthService
 }
@@ -82,6 +84,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		suggestSlug:      cfg.SuggestSlug,
 		previewRefactor:  cfg.PreviewRefactor,
 		applyRefactor:    cfg.ApplyRefactor,
+		pinPage:          cfg.PinPage,
 		userResolver:     cfg.UserResolver,
 		authService:      cfg.AuthService,
 	}
@@ -123,6 +126,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	authGroup.DELETE("/pages/:id", authmw.RequireEditorOrAdmin(), r.handleDelete)
 	authGroup.PUT("/pages/:id/move", authmw.RequireEditorOrAdmin(), r.handleMove)
 	authGroup.PUT("/pages/:id/sort", authmw.RequireEditorOrAdmin(), r.handleSort)
+	authGroup.PUT("/pages/:id/pin", authmw.RequireEditorOrAdmin(), r.handlePin)
 	authGroup.POST("/pages/ensure", authmw.RequireEditorOrAdmin(), r.handleEnsurePath)
 	authGroup.POST("/pages/convert/:id", authmw.RequireEditorOrAdmin(), r.handleConvert)
 	authGroup.POST("/pages/copy/:id", authmw.RequireEditorOrAdmin(), r.handleCopy)
@@ -354,6 +358,28 @@ func (r *Routes) handleSort(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Pages sorted successfully"})
+}
+
+func (r *Routes) handlePin(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	var req struct {
+		Version string `json:"version" binding:"required"`
+		Pinned  bool   `json:"pinned"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		return
+	}
+	out, err := r.pinPage.Execute(c.Request.Context(), PinPageInput{
+		ID:      id,
+		Version: req.Version,
+		Pinned:  req.Pinned,
+	})
+	if err != nil {
+		respondWithPageError(c, err)
+		return
+	}
+	r.respondPage(c, http.StatusOK, out.Page)
 }
 
 func (r *Routes) handleEnsurePath(c *gin.Context) {

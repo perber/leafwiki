@@ -51,10 +51,12 @@ type TreeStore = {
   loading: boolean
   error: string | null
   activeNodeId: string | null
+  pinnedPages: PageNode[]
   expandAll: () => void
   collapseAll: () => void
   reloadTree: () => Promise<void>
   patchNodeVersion: (id: string, version: string) => void
+  setPinnedLocally: (id: string, pinned: boolean, version: string) => void
   toggleNode: (id: string) => void
   openNode: (id: string) => void
   closeNode: (id: string) => void
@@ -79,6 +81,7 @@ export const useTreeStore = create<TreeStore>()(
       loading: false,
       error: null,
       activeNodeId: null,
+      pinnedPages: [],
       openNodeIds: [],
       openNodeIdSet: {},
       byPath: {},
@@ -189,6 +192,23 @@ export const useTreeStore = create<TreeStore>()(
         })
       },
 
+      setPinnedLocally: (id: string, pinned: boolean, version: string) => {
+        const byId = get().byId
+        const byPath = get().byPath
+        const node = byId?.[id]
+        if (!node) return
+        const updatedNode = { ...node, pinned, version }
+        const updatedById = { ...byId, [id]: updatedNode }
+        const pinnedPages = Object.values(updatedById)
+          .filter((n) => n.pinned === true)
+          .sort((a, b) => a.title.localeCompare(b.title))
+        set({
+          byId: updatedById,
+          byPath: node.path ? { ...byPath, [node.path]: updatedNode } : byPath,
+          pinnedPages,
+        })
+      },
+
       reloadTree: async () => {
         set({ loading: true, error: null })
 
@@ -198,11 +218,15 @@ export const useTreeStore = create<TreeStore>()(
           const { byPath, byId } = buildIndexes(tree)
           const flatPages = buildFlatPageSearchItems(tree)
           const persistedOpen = get().openNodeIds
+          const pinnedPages = Object.values(byId)
+            .filter((n) => n.pinned === true)
+            .sort((a, b) => a.title.localeCompare(b.title))
           set({
             tree,
             byPath,
             byId,
             flatPages,
+            pinnedPages,
             openNodeIdSet: toSetRecord(persistedOpen),
           })
           // FIXME: a better error handling is required here

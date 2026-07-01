@@ -28,6 +28,15 @@
     "brokenOutgoingsTitle": "This page links to missing targets",
     "brokenIncomingTitle": "Pages linking to an old path"
   },
+  "pinned": {
+    "sectionTitle": "Pinned",
+    "pagesSectionTitle": "Pages",
+    "pinPage": "Pin",
+    "unpinPage": "Unpin",
+    "pinSuccess": "Page pinned",
+    "unpinSuccess": "Page unpinned",
+    "pinError": "Failed to update pin status"
+  },
   "shortcutsHelp": {
     "menuItem": "Keyboard Shortcuts",
     "title": "Available keyboard shortcuts",

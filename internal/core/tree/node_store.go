@@ -329,6 +329,7 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 			indexPath := filepath.Join(currentPath, name, "index.md")
 			var sectionMdFile *markdown.MarkdownFile
 			needsWriteback := false
+			sectionPinned := false
 			if fileExists(indexPath) {
 				mdFile, err := markdown.LoadMarkdownFile(indexPath)
 				if err != nil {
@@ -349,6 +350,7 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 						sectionMdFile = mdFile
 						needsWriteback = true
 					}
+					sectionPinned = fm.LeafWikiPinned
 				}
 			}
 
@@ -361,6 +363,7 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 				Children: []*PageNode{},
 				Kind:     NodeKindSection,
 				Metadata: metadata,
+				Pinned:   sectionPinned,
 			}
 			if err := ensureUniqueReconstructedSlug(seenSlugs, child.Slug, filepath.Join(currentPath, name)); err != nil {
 				return err
@@ -430,6 +433,7 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 			Children: nil,
 			Kind:     NodeKindPage,
 			Metadata: metadata,
+			Pinned:   fm.LeafWikiPinned,
 		}
 		if err := ensureUniqueReconstructedSlug(seenSlugs, child.Slug, filePath); err != nil {
 			return err
@@ -1357,4 +1361,37 @@ func (f *NodeStore) ConvertNode(entry *PageNode, target NodeKind) error {
 	default:
 		return &InvalidOpError{Op: "ConvertNode", Reason: fmt.Sprintf("unknown target kind: %q", target)}
 	}
+}
+
+// SetPinnedFrontmatter updates the leafwiki_pinned flag in the page file on disk.
+// Returns the body content (without frontmatter) for use in the caller.
+func (f *NodeStore) SetPinnedFrontmatter(entry *PageNode, pinned bool) (string, error) {
+	if entry == nil {
+		return "", &InvalidOpError{Op: "SetPinnedFrontmatter", Reason: "an entry is required"}
+	}
+
+	filePath, err := f.contentPathForNodeRead(entry)
+	if err != nil {
+		return "", err
+	}
+
+	if !fileExists(filePath) {
+		if entry.Kind == NodeKindPage || entry.Kind == "" {
+			return "", &DriftError{NodeID: entry.ID, Kind: entry.Kind, Path: filePath, Reason: "expected page file missing"}
+		}
+		return "", &InvalidOpError{Op: "SetPinnedFrontmatter", Reason: "section has no index file and cannot be pinned"}
+	}
+
+	mdFile, err := markdown.LoadMarkdownFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("load markdown file: %w", err)
+	}
+
+	mdFile.SetLeafWikiPinned(pinned)
+
+	if err := mdFile.WriteToFile(); err != nil {
+		return "", fmt.Errorf("write markdown file: %w", err)
+	}
+
+	return mdFile.GetContent(), nil
 }

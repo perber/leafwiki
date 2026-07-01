@@ -27,6 +27,7 @@ export type PageNode = {
   parentId?: string | null
   children: PageNode[] | null
   kind: 'page' | 'section'
+  pinned?: boolean
   metadata?: PageMetadata // optional metadata, because older API responses may not have it
 }
 
@@ -234,6 +235,18 @@ export async function applyPageRefactor(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })) as Page | null
+}
+
+export async function pinPage(
+  id: string,
+  version: string,
+  pinned: boolean,
+): Promise<Page> {
+  return (await fetchWithAuth(`/api/pages/${id}/pin`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ version, pinned }),
+  })) as Page
 }
 
 export async function sortPages(parentId: string, orderedIDs: string[]) {

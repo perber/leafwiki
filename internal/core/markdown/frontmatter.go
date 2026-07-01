@@ -26,6 +26,7 @@ type Frontmatter struct {
 	LeafWikiUpdatedAt    string                 `yaml:"leafwiki_updated_at,omitempty" json:"updatedAt,omitempty"`
 	LeafWikiCreatorID    string                 `yaml:"leafwiki_creator_id,omitempty" json:"creatorId,omitempty"`
 	LeafWikiLastAuthorID string                 `yaml:"leafwiki_last_author_id,omitempty" json:"lastAuthorId,omitempty"`
+	LeafWikiPinned       bool                   `yaml:"leafwiki_pinned,omitempty" json:"pinned,omitempty"`
 	ExtraFields          map[string]interface{} `yaml:"-" json:"-"`
 }
 
@@ -69,10 +70,15 @@ func parseFrontmatterYAML(yamlPart string) (Frontmatter, error) {
 	if value, ok := raw["leafwiki_last_author_id"]; ok {
 		fm.LeafWikiLastAuthorID = fm.stripSingleAndDoubleQuotes(strings.TrimSpace(valueToString(value)))
 	}
+	if value, ok := raw["leafwiki_pinned"]; ok {
+		if b, ok := value.(bool); ok {
+			fm.LeafWikiPinned = b
+		}
+	}
 
 	for key, value := range raw {
 		switch key {
-		case "leafwiki_id", "leafwiki_title", "leafwiki_created_at", "leafwiki_updated_at", "leafwiki_creator_id", "leafwiki_last_author_id":
+		case "leafwiki_id", "leafwiki_title", "leafwiki_created_at", "leafwiki_updated_at", "leafwiki_creator_id", "leafwiki_last_author_id", "leafwiki_pinned":
 			continue
 		default:
 			fm.ExtraFields[key] = value
@@ -330,6 +336,12 @@ func BuildMarkdownWithFrontmatter(fm Frontmatter, body string) (string, error) {
 		mapping.Content = append(mapping.Content,
 			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_last_author_id"},
 			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: strings.TrimSpace(fm.LeafWikiLastAuthorID)},
+		)
+	}
+	if fm.LeafWikiPinned {
+		mapping.Content = append(mapping.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "leafwiki_pinned"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"},
 		)
 	}
 
