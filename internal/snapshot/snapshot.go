@@ -43,7 +43,7 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	usersDBCopy := filepath.Join(tmpDir, "users.db")
 	if err := vacuumUsersDB(ctx, cfg.UsersDBPath, usersDBCopy); err != nil {
@@ -70,12 +70,20 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 	return id, nil
 }
 
+// vacuumBusyTimeout bounds how long VACUUM INTO waits for a writer to
+// release its lock before failing with SQLITE_BUSY. users.db has no WAL
+// mode or busy_timeout configured elsewhere, so without this a snapshot
+// taken while an admin action (e.g. user create/update) is mid-write would
+// fail immediately instead of just waiting the write out.
+const vacuumBusyTimeout = 5 * time.Second
+
 func vacuumUsersDB(ctx context.Context, srcPath, dstPath string) error {
-	db, err := sql.Open("sqlite", srcPath)
+	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(%d)", srcPath, vacuumBusyTimeout.Milliseconds())
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return fmt.Errorf("failed to open users database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if _, err := db.ExecContext(ctx, "VACUUM INTO ?", dstPath); err != nil {
 		return fmt.Errorf("failed to vacuum into %s: %w", dstPath, err)
@@ -88,7 +96,7 @@ func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time
 	if err != nil {
 		return fmt.Errorf("failed to create zip file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	w := zip.NewWriter(f)
 
@@ -163,7 +171,7 @@ func addFileToZip(w *zip.Writer, srcFile, name string) error {
 		}
 		return fmt.Errorf("failed to open %s: %w", srcFile, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	zw, err := w.Create(name)
 	if err != nil {

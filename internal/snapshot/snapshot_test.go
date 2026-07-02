@@ -115,6 +115,45 @@ func TestCreateSnapshot_ContainsExpectedFiles(t *testing.T) {
 	}
 }
 
+func TestVacuumUsersDB_WaitsForBusyWriter(t *testing.T) {
+	base := t.TempDir()
+	srcPath := filepath.Join(base, "users.db")
+	createTestUsersDB(t, srcPath)
+
+	// _txlock=exclusive makes Begin() issue "BEGIN EXCLUSIVE", grabbing the
+	// database lock immediately instead of lazily on first write.
+	holderDB, err := sql.Open("sqlite", srcPath+"?_txlock=exclusive")
+	if err != nil {
+		t.Fatalf("failed to open holder connection: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(holderDB.Close, t)
+
+	tx, err := holderDB.Begin()
+	if err != nil {
+		t.Fatalf("failed to begin exclusive transaction: %v", err)
+	}
+
+	committed := make(chan struct{})
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		if err := tx.Commit(); err != nil {
+			t.Errorf("failed to commit holder transaction: %v", err)
+		}
+		close(committed)
+	}()
+
+	dstPath := filepath.Join(base, "users-copy.db")
+	if err := vacuumUsersDB(context.Background(), srcPath, dstPath); err != nil {
+		t.Fatalf("vacuumUsersDB failed while a writer briefly held the database: %v", err)
+	}
+
+	<-committed
+
+	if _, err := os.Stat(dstPath); err != nil {
+		t.Fatalf("expected vacuum output at %s: %v", dstPath, err)
+	}
+}
+
 func TestManager_ErrAlreadyRunning(t *testing.T) {
 	cfg := newTestConfig(t)
 	m := NewManager(cfg)
