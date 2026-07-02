@@ -37,6 +37,10 @@
     "unpinSuccess": "Page unpinned",
     "pinError": "Failed to update pin status"
   },
+  "toc": {
+    "title": "Table of contents",
+    "onThisPage": "On this page"
+  },
   "shortcutsHelp": {
     "menuItem": "Keyboard Shortcuts",
     "title": "Available keyboard shortcuts",
