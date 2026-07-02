@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/test_utils"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
@@ -122,9 +123,7 @@ func TestManager_ErrAlreadyRunning(t *testing.T) {
 		t.Fatalf("first TriggerSnapshot failed: %v", err)
 	}
 
-	if err := m.TriggerSnapshot(); err != ErrAlreadyRunning {
-		t.Fatalf("second TriggerSnapshot error = %v, want ErrAlreadyRunning", err)
-	}
+	assertLocalizedErrorCode(t, m.TriggerSnapshot(), "snapshot_already_running")
 
 	waitForSnapshotDone(t, m)
 }
@@ -195,9 +194,7 @@ func TestManager_Delete_NotFound(t *testing.T) {
 	m := NewManager(Config{BackupsDir: backupsDir})
 
 	err := m.Delete("snapshot-20260101-000000")
-	if err != ErrNotFound {
-		t.Fatalf("Delete error = %v, want ErrNotFound", err)
-	}
+	assertLocalizedErrorCode(t, err, "snapshot_not_found")
 }
 
 func TestManager_Delete_RemovesFiles(t *testing.T) {
@@ -228,8 +225,17 @@ func TestManager_Delete_InvalidID(t *testing.T) {
 	m := NewManager(Config{BackupsDir: backupsDir})
 
 	for _, id := range []string{"../etc/passwd", "not-a-snapshot", "snapshot-../evil"} {
-		if err := m.Delete(id); err != ErrInvalidID {
-			t.Errorf("Delete(%q) error = %v, want ErrInvalidID", id, err)
-		}
+		assertLocalizedErrorCode(t, m.Delete(id), "snapshot_invalid_id")
+	}
+}
+
+func assertLocalizedErrorCode(t *testing.T, err error, wantCode string) {
+	t.Helper()
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok {
+		t.Fatalf("expected localized error, got %T (%v)", err, err)
+	}
+	if localized.Code != wantCode {
+		t.Fatalf("localized error code = %q, want %q", localized.Code, wantCode)
 	}
 }

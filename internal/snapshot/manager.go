@@ -3,19 +3,23 @@ package snapshot
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
-var (
-	ErrAlreadyRunning = errors.New("snapshot already in progress")
-	ErrNotFound       = errors.New("snapshot not found")
-	ErrInvalidID      = errors.New("invalid snapshot id")
+// ErrAlreadyRunning is returned by TriggerSnapshot when a snapshot is
+// already in progress. It carries no dynamic arguments, so it is a fixed
+// package-level LocalizedError, matching wikiresync.ErrResyncAlreadyRunning.
+var ErrAlreadyRunning = sharederrors.NewLocalizedError(
+	"snapshot_already_running",
+	"A snapshot is already in progress",
+	"a snapshot is already in progress",
+	nil,
 )
 
 type SnapshotEntry struct {
@@ -63,7 +67,12 @@ func (m *Manager) List() ([]SnapshotEntry, error) {
 		if os.IsNotExist(err) {
 			return []SnapshotEntry{}, nil
 		}
-		return nil, fmt.Errorf("failed to read backups directory: %w", err)
+		return nil, sharederrors.NewLocalizedError(
+			"snapshot_list_failed",
+			"Failed to list snapshots",
+			"failed to list snapshots",
+			err,
+		)
 	}
 
 	entries := make([]SnapshotEntry, 0, len(dirEntries))
@@ -73,11 +82,23 @@ func (m *Manager) List() ([]SnapshotEntry, error) {
 		}
 		data, err := os.ReadFile(filepath.Join(m.cfg.BackupsDir, de.Name()))
 		if err != nil {
-			return nil, fmt.Errorf("failed to read %s: %w", de.Name(), err)
+			return nil, sharederrors.NewLocalizedError(
+				"snapshot_list_failed",
+				"Failed to list snapshots",
+				"failed to read snapshot metadata %s",
+				err,
+				de.Name(),
+			)
 		}
 		var entry SnapshotEntry
 		if err := json.Unmarshal(data, &entry); err != nil {
-			return nil, fmt.Errorf("failed to parse %s: %w", de.Name(), err)
+			return nil, sharederrors.NewLocalizedError(
+				"snapshot_list_failed",
+				"Failed to list snapshots",
+				"failed to parse snapshot metadata %s",
+				err,
+				de.Name(),
+			)
 		}
 		entries = append(entries, entry)
 	}
@@ -102,13 +123,31 @@ func (m *Manager) Delete(id string) error {
 	jsonErr := os.Remove(jsonPath)
 
 	if os.IsNotExist(zipErr) && os.IsNotExist(jsonErr) {
-		return ErrNotFound
+		return sharederrors.NewLocalizedError(
+			"snapshot_not_found",
+			"Snapshot not found",
+			"snapshot %s not found",
+			nil,
+			id,
+		)
 	}
 	if zipErr != nil && !os.IsNotExist(zipErr) {
-		return fmt.Errorf("failed to delete %s: %w", zipPath, zipErr)
+		return sharederrors.NewLocalizedError(
+			"snapshot_delete_failed",
+			"Failed to delete snapshot",
+			"failed to delete snapshot %s",
+			zipErr,
+			id,
+		)
 	}
 	if jsonErr != nil && !os.IsNotExist(jsonErr) {
-		return fmt.Errorf("failed to delete %s: %w", jsonPath, jsonErr)
+		return sharederrors.NewLocalizedError(
+			"snapshot_delete_failed",
+			"Failed to delete snapshot",
+			"failed to delete snapshot %s",
+			jsonErr,
+			id,
+		)
 	}
 	return nil
 }
@@ -120,7 +159,13 @@ func (m *Manager) BackupsDir() string {
 
 func validateSnapshotID(id string) error {
 	if !strings.HasPrefix(id, "snapshot-") || strings.ContainsAny(id, "/\\") || strings.Contains(id, "..") {
-		return ErrInvalidID
+		return sharederrors.NewLocalizedError(
+			"snapshot_invalid_id",
+			"Invalid snapshot id",
+			"invalid snapshot id %s",
+			nil,
+			id,
+		)
 	}
 	return nil
 }
