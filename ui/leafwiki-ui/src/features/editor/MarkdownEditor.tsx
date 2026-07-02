@@ -26,6 +26,7 @@ import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
 import { usePageEditorStore } from './pageEditorStore'
 import { slugifyHeadline } from '../preview/rehypeLineNumber'
+import { htmlToMarkdown } from './htmlToMarkdown'
 
 export type MarkdownEditorRef = {
   insertAtCursor: (text: string) => void
@@ -40,6 +41,8 @@ export type MarkdownEditorRef = {
   redo: () => void
   canUndo: () => boolean
   canRedo: () => boolean
+  pasteRich: () => Promise<void>
+  pastePlain: () => Promise<void>
 }
 
 type Props = {
@@ -306,6 +309,66 @@ const MarkdownEditor = (
       if (view) {
         redo(view)
       }
+    },
+    pasteRich: async () => {
+      if (!editorViewRef.current) return
+      let md: string | null = null
+      try {
+        if (typeof navigator.clipboard.read === 'function') {
+          const items = await navigator.clipboard.read()
+          for (const item of items) {
+            if (item.types.includes('text/html')) {
+              const blob = await item.getType('text/html')
+              md = htmlToMarkdown(await blob.text()) || null
+              break
+            }
+          }
+        }
+      } catch {
+        // clipboard-read permission denied or API unavailable — fall through to readText
+      }
+      if (!md) {
+        try {
+          md = (await navigator.clipboard.readText()) || null
+        } catch {
+          return
+        }
+      }
+      if (!md) return
+      // Re-read after awaits: editor may have been destroyed during async clipboard ops
+      const view = editorViewRef.current
+      if (!view) return
+      const sel = view.state.selection.main
+      view.dispatch({
+        changes: { from: sel.from, to: sel.to, insert: md },
+        selection: { anchor: sel.from + md.length },
+      })
+      const newDoc = view.state.doc.toString()
+      setMarkdown(newDoc)
+      onChange(newDoc)
+      view.focus()
+    },
+    pastePlain: async () => {
+      if (!editorViewRef.current) return
+      let text: string
+      try {
+        text = await navigator.clipboard.readText()
+      } catch {
+        return
+      }
+      if (!text) return
+      // Re-read after await: editor may have been destroyed while clipboard was read
+      const view = editorViewRef.current
+      if (!view) return
+      const sel = view.state.selection.main
+      view.dispatch({
+        changes: { from: sel.from, to: sel.to, insert: text },
+        selection: { anchor: sel.from + text.length },
+      })
+      const newDoc = view.state.doc.toString()
+      setMarkdown(newDoc)
+      onChange(newDoc)
+      view.focus()
     },
   }))
 

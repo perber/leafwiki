@@ -23,13 +23,14 @@ import {
 import { MenuIcon } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 export const MOBILE_SIDEBAR_WIDTH = 320
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation('viewer')
   const appMode = useAppMode()
+  const { pathname } = useLocation()
   const [isEditor, setIsEditor] = useState(appMode === 'edit')
 
   // store resize handler in onMouseMove, onMouseUp in useRef
@@ -290,7 +291,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             className={`${mainContainerStyle} app-layout__main-content-area`}
             id="scroll-container"
           >
-            {children}
+            <div key={pathname} className="app-layout__page-transition">
+              {children}
+            </div>
           </main>
         </div>
       </div>

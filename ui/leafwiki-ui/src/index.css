@@ -554,6 +554,25 @@
     @apply flex flex-1 flex-col items-stretch transition-all duration-200;
   }
 
+  .app-layout__page-transition {
+    display: flex;
+    flex: 1 1 0%;
+    flex-direction: column;
+    min-height: 0;
+    animation: page-enter 130ms ease-out both;
+  }
+
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   .app-layout__main-column {
     @apply flex min-w-0 flex-1 flex-col;
   }

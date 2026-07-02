@@ -3,6 +3,7 @@ import {
   closeCompletion,
   completionStatus,
 } from '@codemirror/autocomplete'
+import { htmlToMarkdown } from './htmlToMarkdown'
 import {
   defaultKeymap,
   history,
@@ -172,6 +173,24 @@ export default function MarkdownCodeEditor({
         preventDefault: true,
       },
       {
+        key: 'Shift-Mod-v',
+        run: (view: EditorView) => {
+          navigator.clipboard
+            .readText()
+            .then((text) => {
+              if (!text) return
+              const sel = view.state.selection.main
+              view.dispatch({
+                changes: { from: sel.from, to: sel.to, insert: text },
+                selection: { anchor: sel.from + text.length },
+              })
+            })
+            .catch(() => {})
+          return true
+        },
+        preventDefault: true,
+      },
+      {
         key: 'Escape',
         run: (view: EditorView) => {
           if (completionStatus(view.state) === null) {
@@ -229,6 +248,36 @@ export default function MarkdownCodeEditor({
             ) {
               event.preventDefault()
             }
+          },
+          paste(event, view) {
+            const { clipboardData } = event
+            if (!clipboardData) return false
+
+            // Files are handled by the outer React onPaste handler (asset upload)
+            const hasFiles =
+              clipboardData.files.length > 0 ||
+              Array.from(clipboardData.items).some(
+                (item) => item.kind === 'file',
+              )
+            if (hasFiles) return false
+
+            if (clipboardData.types.includes('text/html')) {
+              const html = clipboardData.getData('text/html')
+              if (html) {
+                const md = htmlToMarkdown(html)
+                if (md) {
+                  event.preventDefault()
+                  const sel = view.state.selection.main
+                  view.dispatch({
+                    changes: { from: sel.from, to: sel.to, insert: md },
+                    selection: { anchor: sel.from + md.length },
+                  })
+                  return true
+                }
+              }
+            }
+
+            return false
           },
         }),
         updateListener,
