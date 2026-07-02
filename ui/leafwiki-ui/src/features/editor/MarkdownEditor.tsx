@@ -16,7 +16,11 @@ import {
 import MarkdownPreview from '../preview/MarkdownPreview'
 import MarkdownCodeEditor from './MarkdownCodeEditor'
 import MarkdownToolbar from './MarkdownToolbar'
-import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
+import {
+  insertHeadingAtStart,
+  insertWrappedText,
+  replaceFilenameInText,
+} from './editorCommands'
 
 import { uploadAsset, UploadAssetResponse } from '@/lib/api/assets'
 import { mapApiError } from '@/lib/api/errors'
@@ -246,12 +250,7 @@ const MarkdownEditor = (
       if (!view) return
       const docText = view.state.doc.toString()
 
-      // Just replace the filename.
-      // The path remains unchanged, but the filename has to start with '/'
-      const regex = new RegExp(`(!?\\[.*?\\]\\(.*?/?)/${before}(\\))`, 'g')
-
-      const newFilename = after.startsWith('/') ? after.slice(1) : after
-      const updatedText = docText.replace(regex, `$1/${newFilename}$2`)
+      const updatedText = replaceFilenameInText(docText, before, after)
 
       // Replace the entire document content
       view.dispatch({
