@@ -10,8 +10,12 @@ For engineers and self-hosters who want structured, long-lived documentation. No
 
 If you've looked at Wiki.js or Outline and thought "this is too much to operate for what I need" — this could fit for you.
 
+> "I've been using Wiki.js up until some months ago but it was too much effort to manage assets, sidebar tree, links… here it's just 'create page in sidebar → upload assets per page → done'"  
+> — Sergio N., hardware parts wiki
+
 → Try it without installing: **[demo.leafwiki.com](https://demo.leafwiki.com)** · `Ctrl+E` edit · `Ctrl+S` save · resets hourly  
-→ If it fits, [a star](https://github.com/perber/leafwiki) helps others find it.
+→ If it fits, [a star](https://github.com/perber/leafwiki) helps others find it.  
+→ Need help getting set up? [Setup support available →](https://leafwiki.com/support/)
 
 ```bash
 docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
@@ -523,6 +527,14 @@ If it's useful to you:
 - 💛 **[Sponsor on GitHub](https://leafwiki.com/support)** — supports ongoing maintenance, bug fixes, and new features
 
 Need help deploying LeafWiki for your team? [Business support & setup →](https://leafwiki.com/support/)
+
+---
+
+## Further reading
+
+- [A beer, a Go binary, and a wiki](https://leafwiki.com/blog/a-beer-a-go-binary-and-a-wiki/) — how LeafWiki started
+- [Obsidian is not a team wiki](https://leafwiki.com/blog/obsidian-is-not-a-team-wiki/) — why browser access matters
+- [I built a boring wiki on purpose](https://leafwiki.com/blog/i-built-a-boring-wiki-on-purpose/) — the architecture decisions behind LeafWiki
 
 ---
 
