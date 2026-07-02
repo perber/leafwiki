@@ -217,6 +217,35 @@ export function useAutoSave(): { status: AutoSaveStatus } {
     retriggerCount,
   ])
 
+  // Fires the unmount-time save and surfaces failures the same way the
+  // debounce path does — a bare .catch(() => {}) here would silently drop
+  // version-conflict/network errors despite this flush existing specifically
+  // so edits aren't lost. Also retries once if pageEditorStore's savePage
+  // silently no-oped (returns undefined) because its module-level save mutex
+  // was held by a concurrent manual save — otherwise the flush can believe it
+  // saved when it actually did nothing.
+  const flushSave = async () => {
+    try {
+      const result = await usePageEditorStore
+        .getState()
+        .savePage({ silent: true })
+      if (result === undefined && isDirtyState(usePageEditorStore.getState())) {
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        if (isDirtyState(usePageEditorStore.getState())) {
+          await usePageEditorStore.getState().savePage({ silent: true })
+        }
+      }
+    } catch (err) {
+      const localized = asApiLocalizedError(err)
+      if (localized?.code === 'page_version_conflict') {
+        toast(t('autoSave.versionConflictToast'), { duration: 6000 })
+      } else {
+        const mapped = mapApiError(err, t('autoSave.errorFallback'))
+        toast.error(mapped.message, { duration: 4000 })
+      }
+    }
+  }
+
   // Cleanup on unmount: invalidate any in-flight save so its continuation doesn't
   // call setStatus after the component is gone. isSavingRef is also reset so a
   // remounted instance starts clean. If a debounce was pending (content changed
@@ -255,10 +284,13 @@ export function useAutoSave(): { status: AutoSaveStatus } {
           pageEditorState.page?.slug === pageEditorState.slug &&
           Object.keys(validationErrors).length === 0
         ) {
-          pageEditorState.savePage({ silent: true }).catch(() => {})
+          flushSave()
         }
       }
     }
+    // flushSave has no dependency on props/state that would go stale between
+    // renders (it always reads fresh store state via getState()).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return { status }

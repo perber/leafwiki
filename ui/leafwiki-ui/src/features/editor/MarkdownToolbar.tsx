@@ -348,6 +348,7 @@ export default function MarkdownToolbar({
             variant="ghost"
             size="icon"
             className="markdown-toolbar__button"
+            data-testid="paste-rich-button"
             onClick={() => editorRef.current?.pasteRich()}
           >
             <ClipboardType className="markdown-toolbar__icon" />
@@ -362,6 +363,7 @@ export default function MarkdownToolbar({
             variant="ghost"
             size="icon"
             className="markdown-toolbar__button"
+            data-testid="paste-plain-button"
             onClick={() => editorRef.current?.pastePlain()}
           >
             <ClipboardPaste className="markdown-toolbar__icon" />

@@ -211,6 +211,81 @@ describe('htmlToMarkdown', () => {
     })
   })
 
+  describe('Google Docs clipboard', () => {
+    it('strips the Google Docs <b font-weight:normal> wrapper', () => {
+      const html =
+        '<b style="font-weight:normal;" id="docs-internal-guid-abc123"><p>Hello world</p></b>'
+      expect(htmlToMarkdown(html)).toBe('Hello world')
+    })
+
+    it('preserves actual bold inside Google Docs wrapper', () => {
+      const html =
+        '<b style="font-weight:normal;" id="docs-internal-guid-abc123"><p>Hello <b>bold</b> world</p></b>'
+      expect(htmlToMarkdown(html)).toBe('Hello **bold** world')
+    })
+
+    it('treats font-weight:400 the same as normal', () => {
+      const html = '<b style="font-weight:400;">Just a wrapper</b>'
+      expect(htmlToMarkdown(html)).toBe('Just a wrapper')
+    })
+
+    it('unwraps Google Docs redirect links', () => {
+      const html =
+        '<a href="https://www.google.com/url?q=https%3A%2F%2Fexample.com&sa=D&source=docs">Example</a>'
+      expect(htmlToMarkdown(html)).toBe('[Example](https://example.com)')
+    })
+
+    it('leaves non-Google links unchanged', () => {
+      const html = '<a href="https://example.com">Example</a>'
+      expect(htmlToMarkdown(html)).toBe('[Example](https://example.com)')
+    })
+
+    it('strips list prefix from headings wrapped in ol/li with list-style-type:none', () => {
+      const html = `<b style="font-weight:normal;" id="docs-internal-guid-abc">
+        <ol><li dir="ltr" style="list-style-type:none;font-size:20pt;font-weight:700;">
+          <p dir="ltr"><span style="font-size:20pt;font-weight:700;">My Heading</span></p>
+        </li></ol>
+      </b>`
+      // No "1. " prefix — list-style-type:none marks this as a structural wrapper, not a real list
+      expect(htmlToMarkdown(html)).toBe('My Heading')
+    })
+
+    it('converts h1 inside ol/li with list-style-type:none without list prefix', () => {
+      const html = `<ol><li style="list-style-type:none;"><h1>Section Title</h1></li></ol>`
+      expect(htmlToMarkdown(html)).toBe('# Section Title')
+    })
+  })
+
+  describe('Microsoft Word / Outlook clipboard', () => {
+    it('removes <o:p> tags', () => {
+      expect(htmlToMarkdown('<p>Hello<o:p></o:p></p>')).toBe('Hello')
+    })
+
+    it('removes <o:p> with attributes', () => {
+      expect(htmlToMarkdown('<p>Hello<o:p class="x"></o:p></p>')).toBe('Hello')
+    })
+  })
+
+  describe('non-breaking spaces', () => {
+    it('converts &nbsp; to regular space', () => {
+      expect(htmlToMarkdown('<p>Hello&nbsp;world</p>')).toBe('Hello world')
+    })
+
+    it('converts multiple &nbsp; to regular spaces', () => {
+      expect(htmlToMarkdown('<p>a&nbsp;&nbsp;b</p>')).toBe('a  b')
+    })
+
+    it('preserves &nbsp; inside fenced code blocks instead of converting it', () => {
+      const html = '<pre><code>a&nbsp;&nbsp;b</code></pre>'
+      expect(htmlToMarkdown(html)).toBe('```\na  b\n```')
+    })
+
+    it('preserves &nbsp; inside inline code instead of converting it', () => {
+      const html = '<p><code>a&nbsp;b</code></p>'
+      expect(htmlToMarkdown(html)).toBe('`a b`')
+    })
+  })
+
   describe('mixed content (Word/OneNote-like)', () => {
     it('converts a document with heading, paragraph, and list', () => {
       const html = `

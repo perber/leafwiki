@@ -44,6 +44,7 @@
     "pastePlainTooltip": "Paste without formatting (Ctrl+Shift+V)",
     "pasteRich": "Paste with formatting",
     "pastePlain": "Paste without formatting",
+    "pasteClipboardError": "Could not read clipboard contents",
     "strikethrough": "Strikethrough",
     "heading1": "Heading 1",
     "heading2": "Heading 2",
