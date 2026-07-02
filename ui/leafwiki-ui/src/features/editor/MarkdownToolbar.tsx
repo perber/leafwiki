@@ -14,6 +14,8 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useDialogsStore } from '@/stores/dialogs'
 import {
   Bold,
+  ClipboardPaste,
+  ClipboardType,
   Code,
   Code2,
   Eye,
@@ -336,6 +338,35 @@ export default function MarkdownToolbar({
             <Image className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
+        <div className="markdown-toolbar__separator" />
+        <TooltipWrapper
+          label={t('toolbar.pasteRichTooltip')}
+          side="top"
+          align="center"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="markdown-toolbar__button"
+            onClick={() => editorRef.current?.pasteRich()}
+          >
+            <ClipboardType className="markdown-toolbar__icon" />
+          </Button>
+        </TooltipWrapper>
+        <TooltipWrapper
+          label={t('toolbar.pastePlainTooltip')}
+          side="top"
+          align="center"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="markdown-toolbar__button"
+            onClick={() => editorRef.current?.pastePlain()}
+          >
+            <ClipboardPaste className="markdown-toolbar__icon" />
+          </Button>
+        </TooltipWrapper>
         <div className="markdown-toolbar__separator max-sm:hidden" />
         <TooltipWrapper
           label={t('toolbar.undoTooltip')}
@@ -439,6 +470,17 @@ export default function MarkdownToolbar({
               >
                 <Table size={14} />
                 {t('toolbar.insertTable')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => editorRef.current?.pasteRich()}>
+                <ClipboardType size={14} />
+                {t('toolbar.pasteRich')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => editorRef.current?.pastePlain()}
+              >
+                <ClipboardPaste size={14} />
+                {t('toolbar.pastePlain')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem

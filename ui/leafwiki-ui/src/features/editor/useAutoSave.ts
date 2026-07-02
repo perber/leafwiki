@@ -219,9 +219,16 @@ export function useAutoSave(): { status: AutoSaveStatus } {
 
   // Cleanup on unmount: invalidate any in-flight save so its continuation doesn't
   // call setStatus after the component is gone. isSavingRef is also reset so a
-  // remounted instance starts clean.
+  // remounted instance starts clean. If a debounce was pending (content changed
+  // but the 2-second timer hadn't fired yet), flush it immediately so edits made
+  // just before navigation are not lost.
   useEffect(() => {
     return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const hadPendingTimer = debounceTimerRef.current !== null
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const wasAlreadySaving = isSavingRef.current
+
       // ESLint warns about ref.current in cleanup assuming a stale read — here we
       // intentionally write (increment) at unmount time, which is exactly correct.
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -229,6 +236,28 @@ export function useAutoSave(): { status: AutoSaveStatus } {
       isSavingRef.current = false
       clearDebounce()
       useEditorStore.getState().setAutoSaveStatus('idle')
+
+      // Flush: fire the pending save immediately so edits aren't silently dropped
+      if (
+        hadPendingTimer &&
+        !wasAlreadySaving &&
+        statusRef.current !== 'paused'
+      ) {
+        const editorState = useEditorStore.getState()
+        const pageEditorState = usePageEditorStore.getState()
+        const validationErrors = validateEditorFrontmatterMetadata(
+          pageEditorState.tags,
+          pageEditorState.frontmatterFields,
+        )
+        if (
+          editorState.autoSave &&
+          isDirtyState(pageEditorState) &&
+          pageEditorState.page?.slug === pageEditorState.slug &&
+          Object.keys(validationErrors).length === 0
+        ) {
+          pageEditorState.savePage({ silent: true }).catch(() => {})
+        }
+      }
     }
   }, [])
 
