@@ -82,7 +82,7 @@ func newTestWiki(t *testing.T) *wiki.Wiki {
 
 func newTestImporterService(t *testing.T, w *wiki.Wiki) *importer.ImporterService {
 	t.Helper()
-	planner := importer.NewPlanner(wiki.NewWikiImportAdapter(w), tree.NewSlugService())
+	planner := importer.NewPlanner(wiki.NewWikiImportAdapter(w), tree.NewSlugService(), "")
 	importerDir := filepath.Join(w.GetStorageDir(), ".importer")
 	return importer.NewImporterService(
 		planner,
