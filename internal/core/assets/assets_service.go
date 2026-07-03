@@ -15,16 +15,37 @@ import (
 	"github.com/perber/wiki/internal/core/shared"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+
+	"github.com/perber/wiki/internal/core/ignore"
 )
 
 const DefaultMaxUploadSizeBytes int64 = 50 * 1024 * 1024
 
 type AssetService struct {
-	assetsDir string
-	slugger   *tree.SlugService
-	log       *slog.Logger
+	assetsDir   string
+	storageDir  string
+	slugger     *tree.SlugService
+	log         *slog.Logger
+	ignoreFile  *ignore.IgnoreFile
 
 	mu sync.RWMutex
+}
+
+// SetIgnoreFile sets the ignore file for filtering asset operations.
+func (s *AssetService) SetIgnoreFile(ignoreFile *ignore.IgnoreFile) {
+	s.ignoreFile = ignoreFile
+}
+
+// isPageIgnored checks if the page's path is ignored by .leafwikiignore.
+func (s *AssetService) isPageIgnored(page *tree.PageNode) bool {
+	if s.ignoreFile == nil || page == nil {
+		return false
+	}
+	relPath := filepath.ToSlash(tree.GeneratePathFromPageNode(page))
+	// Strip the "root/" prefix since ignore patterns are relative to the wiki root.
+	relPath = strings.TrimPrefix(relPath, "root/")
+	reIsDir := page.Kind == tree.NodeKindSection
+	return s.ignoreFile.Matches(relPath, reIsDir)
 }
 
 func assetPageDiskPath(assetsDir string, pageID string) string {
@@ -64,9 +85,10 @@ func NewAssetService(storageDir string, slugger *tree.SlugService) *AssetService
 	}
 
 	return &AssetService{
-		assetsDir: assetsDir,
-		slugger:   slugger,
-		log:       slog.Default().With("component", "AssetService"),
+		assetsDir:  assetsDir,
+		storageDir: storageDir,
+		slugger:    slugger,
+		log:        slog.Default().With("component", "AssetService"),
 	}
 }
 
@@ -106,6 +128,11 @@ func (s *AssetService) buildPublicPath(page *tree.PageNode, filename string) str
 func (s *AssetService) SaveAssetForPage(page *tree.PageNode, file multipart.File, originalFilename string, maxBytes int64) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Guard against ignored pages
+	if s.isPageIgnored(page) {
+		return "", sharederrors.NewLocalizedError("asset_upload_failed", "Failed to upload asset", "page is excluded by .leafwikiignore", nil)
+	}
 
 	uploadPath, err := s.ensureAssetPagePathExists(page)
 	if err != nil {
@@ -163,6 +190,11 @@ func (s *AssetService) DeleteAsset(page *tree.PageNode, filename string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Guard against ignored pages
+	if s.isPageIgnored(page) {
+		return sharederrors.NewLocalizedError("asset_delete_failed", "Failed to delete asset", "page is excluded by .leafwikiignore", nil)
+	}
+
 	if err := validateFilename(filename); err != nil {
 		return sharederrors.NewLocalizedError("asset_invalid_name", "Invalid asset name", "invalid asset name %s", nil, filename)
 	}
@@ -194,6 +226,11 @@ func (s *AssetService) DeleteAllAssetsForPage(page *tree.PageNode) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Guard against ignored pages
+	if s.isPageIgnored(page) {
+		return nil // silently skip — no assets to delete for an ignored page anyway
+	}
+
 	assetDir, err := s.getAssetPagePath(page)
 	if err != nil {
 		// no assets dir -> nothing to delete
@@ -209,6 +246,11 @@ func (s *AssetService) DeleteAllAssetsForPage(page *tree.PageNode) error {
 func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Guard against ignored pages
+	if s.isPageIgnored(page) {
+		return "", sharederrors.NewLocalizedError("asset_rename_failed", "Failed to rename asset", "page is excluded by .leafwikiignore", nil)
+	}
 
 	if err := validateFilename(oldFilename); err != nil {
 		return "", sharederrors.NewLocalizedError("asset_invalid_name", "Invalid asset name", "invalid asset name %s", nil, oldFilename)
@@ -258,6 +300,11 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 func (s *AssetService) CopyAllAssets(sourcePage *tree.PageNode, targetPage *tree.PageNode) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Guard against ignored pages
+	if s.isPageIgnored(sourcePage) || s.isPageIgnored(targetPage) {
+		return nil // silently skip
+	}
 
 	sourceAssetPath, err := s.getAssetPagePath(sourcePage)
 	if err != nil {

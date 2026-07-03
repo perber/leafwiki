@@ -11,6 +11,7 @@ import (
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -203,6 +204,12 @@ func (w *Wiki) initCoreServices(options *WikiOptions) error {
 	}
 	w.slug = tree.NewSlugService()
 	w.asset = assets.NewAssetService(w.storageDir, w.slug)
+
+	// Thread .leafwikiignore into the asset service
+	rootDir := filepath.Join(w.storageDir, "root")
+	ignoreFile, _ := ignore.LoadFromDir(rootDir)
+	w.asset.SetIgnoreFile(ignoreFile)
+
 	return nil
 }
 
@@ -455,6 +462,12 @@ func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 	importerDir := filepath.Join(options.StorageDir, ".importer")
 	adapter := NewWikiImportAdapter(w)
 	planner := coreimporter.NewPlanner(adapter, w.slug)
+
+	// Thread .leafwikiignore into the planner for filtering.
+	rootDir := filepath.Join(options.StorageDir, "root")
+	ignoreFile, _ := ignore.LoadFromDir(rootDir)
+	planner.SetIgnoreFile(ignoreFile)
+
 	store := coreimporter.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
 	svc := coreimporter.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), options.MaxAssetUploadSizeBytes)
 	return wikiimporter.NewRoutes(wikiimporter.RoutesConfig{
