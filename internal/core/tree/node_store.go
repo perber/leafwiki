@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 )
@@ -62,6 +63,12 @@ type NodeStore struct {
 	storageDir string
 	log        *slog.Logger
 	slugger    *SlugService
+	ignoreFile *ignore.IgnoreFile
+}
+
+// SetIgnoreFile sets the ignore file to use for filtering.
+func (f *NodeStore) SetIgnoreFile(ignoreFile *ignore.IgnoreFile) {
+	f.ignoreFile = ignoreFile
 }
 
 const (
@@ -324,6 +331,14 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 		// optional: skip hidden stuff
 		if strings.HasPrefix(name, ".") {
 			continue
+		}
+
+		// Check .leafwikiignore
+		if f.ignoreFile != nil {
+			relPath, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), filepath.Join(currentPath, name))
+			if relPath != "" && f.ignoreFile.Matches(filepath.ToSlash(relPath), entry.IsDir()) {
+				continue
+			}
 		}
 
 		// defaults
@@ -601,6 +616,13 @@ func (f *NodeStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 
 	// Destination paths
 	destBase := filepath.Join(parentDir, newEntry.Slug)
+
+	// Guard against ignored paths
+	rel, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), destBase)
+	if f.isPathIgnored(rel, false) {
+		return &InvalidOpError{Op: "CreatePage", Reason: "target path matches .leafwikiignore"}
+	}
+
 	destFile := destBase + ".md"
 	destDir := destBase
 
@@ -618,7 +640,7 @@ func (f *NodeStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 	return nil
 }
 
-// CreateSection creates a new section (folder) under the given parent entry.
+// CreateSection creates a new section (folder) under the given paren
 func (f *NodeStore) CreateSection(parentEntry *PageNode, newEntry *PageNode) error {
 	if parentEntry == nil {
 		return &InvalidOpError{Op: "CreateSection", Reason: errParentEntryRequired}
@@ -651,6 +673,13 @@ func (f *NodeStore) CreateSection(parentEntry *PageNode, newEntry *PageNode) err
 
 	// Destination base paths
 	destBase := filepath.Join(parentDir, newEntry.Slug)
+
+	// Guard against ignored paths
+	rel, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), destBase)
+	if f.isPathIgnored(rel, true) {
+		return &InvalidOpError{Op: "CreateSection", Reason: "target path matches .leafwikiignore"}
+	}
+
 	destFile := destBase + ".md"
 	destDir := destBase
 
@@ -857,6 +886,13 @@ func (f *NodeStore) MoveNode(entry *PageNode, parentEntry *PageNode) error {
 
 	// Destination base path (same slug, under new parent)
 	destBase := filepath.Join(parentDir, entry.Slug)
+
+	// Guard against ignored paths
+	rel, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), destBase)
+	if f.isPathIgnored(rel, entry.Kind == NodeKindSection) {
+		return &InvalidOpError{Op: "MoveNode", Reason: "target path matches .leafwikiignore"}
+	}
+
 	destFile := destBase + ".md"
 	destDir := destBase
 
@@ -1010,6 +1046,12 @@ func (f *NodeStore) RenameNode(entry *PageNode, newSlug string) error {
 
 	// new base path: same parent dir, last segment replaced
 	newBase := filepath.Join(filepath.Dir(oldBase), newSlug)
+
+	// Guard against ignored paths
+	rel, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), newBase)
+	if f.isPathIgnored(rel, entry.Kind == NodeKindSection) {
+		return &InvalidOpError{Op: "RenameNode", Reason: "target path matches .leafwikiignore"}
+	}
 
 	// destination collision checks
 	if fileExists(newBase+".md") || fileExists(newBase) {
@@ -1167,6 +1209,14 @@ func (f *NodeStore) SyncFrontmatterIfExists(entry *PageNode) error {
 		return fmt.Errorf("write markdown file: %w", err)
 	}
 	return nil
+}
+
+// isPathIgnored checks if a relative path matches the ignore file.
+func (f *NodeStore) isPathIgnored(relPath string, isDir bool) bool {
+	if f.ignoreFile == nil || relPath == "" {
+		return false
+	}
+	return f.ignoreFile.Matches(filepath.ToSlash(relPath), isDir)
 }
 
 func (f *NodeStore) dirPathForNode(entry *PageNode) (string, error) {

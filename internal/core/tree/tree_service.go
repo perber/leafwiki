@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/treemigration"
 )
@@ -39,10 +40,15 @@ const (
 )
 
 func NewTreeService(storageDir string) *TreeService {
+	store := NewNodeStore(storageDir)
+	rootDir := filepath.Join(storageDir, "root")
+	ignoreFile, _ := ignore.LoadFromDir(rootDir)
+	store.SetIgnoreFile(ignoreFile)
+
 	return &TreeService{
 		storageDir:   storageDir,
 		tree:         nil,
-		store:        NewNodeStore(storageDir),
+		store:        store,
 		log:          slog.Default().With("component", "TreeService"),
 		nodesByID:    make(map[string]*PageNode),
 		nodesByTitle: make(map[string][]*PageNode),
