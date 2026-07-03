@@ -92,7 +92,7 @@ func (f *fakeWiki) UploadAsset(userID, pageID string, file multipart.File, filen
 }
 
 func newPlannerWithFake(w *fakeWiki) *Planner {
-	return NewPlanner(w, tree.NewSlugService())
+	return NewPlanner(w, tree.NewSlugService(), "")
 }
 
 func TestPlanner_CreatePlan_CreateNewPage_NonIndex(t *testing.T) {
@@ -632,27 +632,24 @@ title: Guides
 
 func TestPlanner_CreatePlan_SkipsIgnoredPaths(t *testing.T) {
 	tmp := t.TempDir()
-	// Create source files
-	os.MkdirAll(filepath.Join(tmp, "drafts"), 0o755)
-	test_utils.WriteFile(t, tmp, "readme.md", "# Readme")
-	test_utils.WriteFile(t, tmp, "drafts/note.md", "# Draft Note")
+	// Create source files under root/ to match production structure
+	os.MkdirAll(filepath.Join(tmp, "root", "drafts"), 0o755)
+	test_utils.WriteFile(t, tmp, "root/readme.md", "# Readme")
+	test_utils.WriteFile(t, tmp, "root/drafts/note.md", "# Draft Note")
 
-	// Create .leafwikiignore and load it
-	mustWriteLeafwikiIgnore(t, tmp, "drafts/")
-	ig, err := ignore.LoadFromDir(tmp)
-	if err != nil {
-		t.Fatalf("LoadFromDir: %v", err)
-	}
+	// Create .leafwikiignore inside root/
+	mustWriteLeafwikiIgnore(t, filepath.Join(tmp, "root"), "drafts/")
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
 
 	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
-	p := newPlannerWithFake(wiki)
-	p.SetIgnoreFile(ig)
+	p := NewPlanner(wiki, tree.NewSlugService(), tmp)
+	p.SetIgnoreCache(cache)
 
 	res, err := p.CreatePlan([]ImportMDFile{
 		{SourcePath: "readme.md"},
 		{SourcePath: "drafts/note.md"},
 	}, PlanOptions{
-		SourceBasePath: tmp,
+		SourceBasePath: filepath.Join(tmp, "root"),
 		TargetBasePath: "",
 	})
 	if err != nil {
@@ -669,27 +666,24 @@ func TestPlanner_CreatePlan_SkipsIgnoredPaths(t *testing.T) {
 
 func TestPlanner_CreatePlan_IncludesNonIgnoredPaths(t *testing.T) {
 	tmp := t.TempDir()
-	// Create source files - none should be ignored
-	os.MkdirAll(filepath.Join(tmp, "notes"), 0o755)
-	test_utils.WriteFile(t, tmp, "readme.md", "# Readme")
-	test_utils.WriteFile(t, tmp, "notes/note.md", "# Note")
+	// Create source files under root/ to match production structure
+	os.MkdirAll(filepath.Join(tmp, "root", "notes"), 0o755)
+	test_utils.WriteFile(t, tmp, "root/readme.md", "# Readme")
+	test_utils.WriteFile(t, tmp, "root/notes/note.md", "# Note")
 
 	// Create .leafwikiignore that doesn't match any of our files
-	mustWriteLeafwikiIgnore(t, tmp, "*.log")
-	ig, err := ignore.LoadFromDir(tmp)
-	if err != nil {
-		t.Fatalf("LoadFromDir: %v", err)
-	}
+	mustWriteLeafwikiIgnore(t, filepath.Join(tmp, "root"), "*.log")
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
 
 	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
-	p := newPlannerWithFake(wiki)
-	p.SetIgnoreFile(ig)
+	p := NewPlanner(wiki, tree.NewSlugService(), tmp)
+	p.SetIgnoreCache(cache)
 
 	res, err := p.CreatePlan([]ImportMDFile{
 		{SourcePath: "readme.md"},
 		{SourcePath: "notes/note.md"},
 	}, PlanOptions{
-		SourceBasePath: tmp,
+		SourceBasePath: filepath.Join(tmp, "root"),
 		TargetBasePath: "",
 	})
 	if err != nil {

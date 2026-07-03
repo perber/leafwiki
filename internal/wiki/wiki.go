@@ -468,12 +468,12 @@ func (w *Wiki) buildBrandingRoutes() *wikibranding.Routes {
 func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 	importerDir := filepath.Join(options.StorageDir, ".importer")
 	adapter := NewWikiImportAdapter(w)
-	planner := coreimporter.NewPlanner(adapter, w.slug)
+	planner := coreimporter.NewPlanner(adapter, w.slug, options.StorageDir)
 
 	// Thread .leafwikiignore into the planner for filtering.
 	rootDir := filepath.Join(options.StorageDir, "root")
-	ignoreFile, _ := ignore.LoadFromDir(rootDir)
-	planner.SetIgnoreFile(ignoreFile)
+	plannerCache := ignore.NewCache(rootDir)
+	planner.SetIgnoreCache(plannerCache)
 
 	store := coreimporter.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
 	svc := coreimporter.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), options.MaxAssetUploadSizeBytes)
