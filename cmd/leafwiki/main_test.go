@@ -178,7 +178,9 @@ func TestRemoveStaleUnixSocket_RemovesExistingSocket(t *testing.T) {
 	}
 	dir := t.TempDir()
 	socketPath := filepath.Join(dir, "leafwiki.sock")
-
+	if len(socketPath) >= 100 {
+		t.Skipf("socket path too long (%d chars) for this platform", len(socketPath))
+	}
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
 		t.Fatalf("listen unix: %v", err)
@@ -218,7 +220,9 @@ func TestListenOnUnixSocket_CreatesSocketWithExpectedPermissions(t *testing.T) {
 	}
 	dir := t.TempDir()
 	socketPath := filepath.Join(dir, "leafwiki.sock")
-
+	if len(socketPath) >= 100 {
+		t.Skipf("socket path too long (%d chars) for this platform", len(socketPath))
+	}
 	listener, err := listenOnUnixSocket(socketPath)
 	if err != nil {
 		t.Fatalf("listenOnUnixSocket() error = %v", err)
