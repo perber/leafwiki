@@ -213,8 +213,8 @@ func (w *Wiki) initCoreServices(options *WikiOptions) error {
 
 	// Thread .leafwikiignore into the asset service
 	rootDir := filepath.Join(w.storageDir, "root")
-	ignoreFile, _ := ignore.LoadFromDir(rootDir)
-	w.asset.SetIgnoreFile(ignoreFile)
+	assetCache := ignore.NewCache(rootDir)
+	w.asset.SetIgnoreCache(assetCache)
 
 	return nil
 }

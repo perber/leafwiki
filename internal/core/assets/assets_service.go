@@ -32,26 +32,39 @@ type AssetService struct {
 	storageDir  string
 	slugger     *tree.SlugService
 	log         *slog.Logger
-	ignoreFile  *ignore.IgnoreFile
+	ignoreCache *ignore.Cache
 
 	mu sync.RWMutex
 }
 
-// SetIgnoreFile sets the ignore file for filtering asset operations.
-func (s *AssetService) SetIgnoreFile(ignoreFile *ignore.IgnoreFile) {
-	s.ignoreFile = ignoreFile
+// SetIgnoreCache sets the ignore cache for multi-level ignore resolution.
+func (s *AssetService) SetIgnoreCache(ignoreCache *ignore.Cache) {
+	s.ignoreCache = ignoreCache
+}
+
+// getIgnoreForDir returns the compiled ignore rules for the given directory,
+// delegating to the shared cache. Returns nil if no rules apply.
+func (s *AssetService) getIgnoreForDir(dir string) *ignore.IgnoreFile {
+	if s.ignoreCache == nil {
+		return nil
+	}
+	return s.ignoreCache.Get(dir)
 }
 
 // isPageIgnored checks if the page's path is ignored by .leafwikiignore.
 func (s *AssetService) isPageIgnored(page *tree.PageNode) bool {
-	if s.ignoreFile == nil || page == nil {
+	if page == nil {
 		return false
 	}
 	relPath := filepath.ToSlash(tree.GeneratePathFromPageNode(page))
-	// Strip the "root/" prefix since ignore patterns are relative to the wiki root.
 	relPath = strings.TrimPrefix(relPath, "root/")
-	reIsDir := page.Kind == tree.NodeKindSection
-	return s.ignoreFile.Matches(relPath, reIsDir)
+	dir := filepath.Join(s.storageDir, "root", filepath.Dir(relPath))
+	ig := s.getIgnoreForDir(dir)
+	if ig == nil {
+		return false
+	}
+	isDir := page.Kind == tree.NodeKindSection
+	return ig.Matches(relPath, isDir)
 }
 
 func assetPageDiskPath(assetsDir string, pageID string) string {
