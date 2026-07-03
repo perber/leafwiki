@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	gitignore "github.com/sabhiram/go-gitignore"
 )
@@ -62,6 +63,84 @@ func countPatterns(lines []string) int {
 		count++
 	}
 	return count
+}
+
+// Cache provides lazy, cached ignore file resolution for any directory
+// under a given root. Thread-safe.
+type Cache struct {
+	root string
+	mu   sync.RWMutex
+	data map[string]*IgnoreFile
+}
+
+// NewCache creates a cache rooted at rootDir (typically storageDir/root).
+func NewCache(rootDir string) *Cache {
+	return &Cache{
+		root: rootDir,
+		data: make(map[string]*IgnoreFile),
+	}
+}
+
+// Get returns the compiled ignore rules for dir, accumulating patterns
+// from every .leafwikiignore between root and dir. Returns nil if no
+// .leafwikiignore exists in any ancestor.
+func (c *Cache) Get(dir string) *IgnoreFile {
+	c.mu.RLock()
+	if cached, ok := c.data[dir]; ok {
+		c.mu.RUnlock()
+		return cached
+	}
+	c.mu.RUnlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Double-check after acquiring write lock
+	if cached, ok := c.data[dir]; ok {
+		return cached
+	}
+
+	// Collect ancestor directories root-first
+	var ancestors []string
+	for d := dir; ; d = filepath.Dir(d) {
+		ancestors = append(ancestors, d)
+		if d == c.root {
+			break
+		}
+		// Safety: if we somehow go above root (e.g. dir not under root),
+		// stop to avoid infinite loop.
+		parent := filepath.Dir(d)
+		if parent == d {
+			break
+		}
+	}
+
+	// Reverse so we process root → target
+	var allLines []string
+	for i := len(ancestors) - 1; i >= 0; i-- {
+		ignorePath := filepath.Join(ancestors[i], IgnoreFilename)
+		if data, err := os.ReadFile(ignorePath); err == nil {
+			allLines = append(allLines, strings.Split(string(data), "\n")...)
+		}
+	}
+
+	if len(allLines) == 0 {
+		c.data[dir] = nil
+		return nil
+	}
+
+	compiled := CompileLines(allLines)
+	c.data[dir] = compiled
+	return compiled
+}
+
+// CompileLines compiles the given lines into an IgnoreFile.
+// Used by Cache to combine patterns from multiple .leafwikiignore files.
+func CompileLines(lines []string) *IgnoreFile {
+	return &IgnoreFile{
+		matcher:      gitignore.CompileIgnoreLines(lines...),
+		patternCount: countPatterns(lines),
+	}
 }
 
 // PatternCount returns the number of non-comment, non-blank patterns loaded.
