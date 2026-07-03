@@ -41,10 +41,6 @@ const (
 
 func NewTreeService(storageDir string) *TreeService {
 	store := NewNodeStore(storageDir)
-	// Wire a local cache for single-root .leafwikiignore support.
-	// Phase 5 replaces this with a shared cache from initCoreServices.
-	rootDir := filepath.Join(storageDir, "root")
-	store.SetIgnoreCache(ignore.NewCache(rootDir))
 
 	return &TreeService{
 		storageDir:   storageDir,
@@ -55,6 +51,11 @@ func NewTreeService(storageDir string) *TreeService {
 		nodesByTitle: make(map[string][]*PageNode),
 		childSlugs:   make(map[string]map[string]*PageNode),
 	}
+}
+
+// SetIgnoreCache sets the ignore cache for multi-level ignore resolution.
+func (t *TreeService) SetIgnoreCache(ignoreCache *ignore.Cache) {
+	t.store.SetIgnoreCache(ignoreCache)
 }
 
 // LoadTree reconstructs the in-memory tree from the filesystem.
