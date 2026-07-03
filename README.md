@@ -497,7 +497,7 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 
 LeafWiki indexes every `.md` file it finds on disk. If you have files or directories you want to keep on disk but exclude from the wiki (draft pages, archive sections, private notes, imported markdown being organized), create a `.leafwikiignore` file at the root of your wiki's data directory.
 
-**Location:** `/path/to/data-dir/.leafwikiignore`
+**Location:** Anywhere under `root/`. A `.leafwikiignore` at the wiki root applies to the entire wiki; per-directory files apply to their directory and its children.
 
 **Syntax:** Standard gitignore-style patterns:
 
@@ -526,9 +526,27 @@ drafts/
 ```
 
 **Notes:**
-- Changes to `.leafwikiignore` require a restart to take effect.
+- Changes to any `.leafwikiignore` require a restart to take effect.
 - Ignored files are hidden completely — remove the ignore pattern to see them again.
-- The file must be a single `.leafwikiignore` at the wiki root; per-directory ignore files are not supported in this version.
+- Per-directory ignore files are supported: any directory under `root/` may contain its own `.leafwikiignore`. Patterns accumulate from root to leaf, and child patterns can negate parent patterns with `!`.
+
+**Multi-level example:**
+
+```gitignore
+# root/.leafwikiignore — applies everywhere
+*.md
+
+# root/docs/.leafwikiignore — un-ignore specific files under docs/
+!important.md
+
+# root/docs/archive/.leafwikiignore — re-ignore files under archive/
+*.md
+```
+
+In this example:
+- All `.md` files are ignored by default (root rule).
+- `docs/important.md` is un-ignored (child negation).
+- `docs/archive/` is re-ignored (grandchild re-applies the restriction).
 
 ---
 
