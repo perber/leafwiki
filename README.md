@@ -545,6 +545,45 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 
 ---
 
+## .leafwikiignore — Ignore Files
+
+LeafWiki indexes every `.md` file it finds on disk. If you have files or directories you want to keep on disk but exclude from the wiki (draft pages, archive sections, private notes, imported markdown being organized), create a `.leafwikiignore` file at the root of your wiki's data directory.
+
+**Location:** `/path/to/data-dir/.leafwikiignore`
+
+**Syntax:** Standard gitignore-style patterns:
+
+| Pattern | Meaning |
+|---------|---------|
+| `#` | Comment |
+| `*` | Matches anything except `/` |
+| `?` | Matches any single char except `/` |
+| `**` | Matches zero or more directories |
+| Trailing `/` | Directory-only match |
+| Leading `/` | Anchored to wiki root |
+| `!` prefix | Negation (un-ignore) |
+
+**Examples:**
+
+```gitignore
+# Exclude all log files
+*.log
+
+# Exclude entire directory
+drafts/
+
+# Exclude everything except important.md
+*.md
+!important.md
+```
+
+**Notes:**
+- Changes to `.leafwikiignore` require a restart to take effect.
+- Ignored files are hidden completely — remove the ignore pattern to see them again.
+- The file must be a single `.leafwikiignore` at the wiki root; per-directory ignore files are not supported in this version.
+
+---
+
 ## Sorting Pages
 
 Page order in LeafWiki is **explicit and manual** — it does not follow filename or alphabetical order automatically. By default, pages appear in the order they were created.
