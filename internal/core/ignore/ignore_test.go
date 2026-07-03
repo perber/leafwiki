@@ -168,6 +168,211 @@ func TestPatternCount(t *testing.T) {
 	})
 }
 
+// --- Task 1.1: CompileLines ---
+
+func TestCompileLines(t *testing.T) {
+	ig := CompileLines([]string{"*.md", "!important.md"})
+	if ig == nil {
+		t.Fatal("expected non-nil IgnoreFile")
+	}
+	if !ig.Matches("readme.md", false) {
+		t.Fatal("expected *.md to match readme.md")
+	}
+	if ig.Matches("important.md", false) {
+		t.Fatal("expected !important.md to un-ignore important.md")
+	}
+	if ig.Matches("notes.txt", false) {
+		t.Fatal("expected no pattern to match notes.txt")
+	}
+	if ig.PatternCount() != 2 {
+		t.Fatalf("expected 2 patterns, got %d", ig.PatternCount())
+	}
+}
+
+// --- Task 1.2: Cache — empty root returns nil ---
+
+func TestCache_NoIgnoreFiles_ReturnsNil(t *testing.T) {
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "root")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("mkdir root: %v", err)
+	}
+	subdir := filepath.Join(root, "docs")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatalf("mkdir subdir: %v", err)
+	}
+
+	c := NewCache(root)
+	ig := c.Get(subdir)
+	if ig != nil {
+		t.Fatalf("expected nil, got %v", ig)
+	}
+
+	// Root itself also returns nil
+	ig = c.Get(root)
+	if ig != nil {
+		t.Fatalf("expected nil for root, got %v", ig)
+	}
+}
+
+// --- Task 1.3: Cache — root-only ignore file ---
+
+func TestCache_RootOnly(t *testing.T) {
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "root")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("mkdir root: %v", err)
+	}
+	subdir := filepath.Join(root, "docs")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatalf("mkdir subdir: %v", err)
+	}
+
+	// Write .leafwikiignore at root only
+	if err := os.WriteFile(filepath.Join(root, IgnoreFilename), []byte("*.log"), 0o644); err != nil {
+		t.Fatalf("write root .leafwikiignore: %v", err)
+	}
+
+	c := NewCache(root)
+
+	// Get for subdir should return matcher with root patterns
+	ig := c.Get(subdir)
+	if ig == nil {
+		t.Fatal("expected non-nil IgnoreFile")
+	}
+	if !ig.Matches("debug.log", false) {
+		t.Fatal("expected *.log to match debug.log")
+	}
+	if ig.Matches("notes.md", false) {
+		t.Fatal("expected *.log to NOT match notes.md")
+	}
+	if ig.PatternCount() != 1 {
+		t.Fatalf("expected 1 pattern, got %d", ig.PatternCount())
+	}
+
+	// Root also gets its own patterns
+	ig = c.Get(root)
+	if ig == nil {
+		t.Fatal("expected non-nil for root")
+	}
+}
+
+// --- Task 1.4: Cache — multi-level accumulation ---
+
+func TestCache_MultiLevel(t *testing.T) {
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "root")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("mkdir root: %v", err)
+	}
+	subdir := filepath.Join(root, "docs")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatalf("mkdir subdir: %v", err)
+	}
+
+	// Root: ignore all .md files. Subdir: un-ignore important.md
+	if err := os.WriteFile(filepath.Join(root, IgnoreFilename), []byte("*.md"), 0o644); err != nil {
+		t.Fatalf("write root .leafwikiignore: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(subdir, IgnoreFilename), []byte("!important.md"), 0o644); err != nil {
+		t.Fatalf("write docs .leafwikiignore: %v", err)
+	}
+
+	c := NewCache(root)
+
+	// Get for subdir should have both patterns: root *.md + docs !important.md
+	ig := c.Get(subdir)
+	if ig == nil {
+		t.Fatal("expected non-nil IgnoreFile")
+	}
+	// Root *.md still matches non-important md files in subdir
+	if !ig.Matches("docs/readme.md", false) {
+		t.Fatal("expected *.md to match docs/readme.md")
+	}
+	// Negation in subdir un-ignores important.md
+	if ig.Matches("docs/important.md", false) {
+		t.Fatal("expected !important.md to un-ignore docs/important.md")
+	}
+	// Root-only patterns still apply for non-md files? No, *.md is the only pattern
+	if ig.Matches("docs/notes.txt", false) {
+		t.Fatal("expected no pattern to match docs/notes.txt")
+	}
+}
+
+// --- Task 1.5: Cache — child-only ignore ---
+
+func TestCache_ChildOnly(t *testing.T) {
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "root")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("mkdir root: %v", err)
+	}
+	subdir := filepath.Join(root, "docs")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatalf("mkdir subdir: %v", err)
+	}
+
+	// Only write .leafwikiignore in child, not in root
+	if err := os.WriteFile(filepath.Join(subdir, IgnoreFilename), []byte("*.log"), 0o644); err != nil {
+		t.Fatalf("write docs .leafwikiignore: %v", err)
+	}
+
+	c := NewCache(root)
+
+	// Root has no .leafwikiignore → nil
+	ig := c.Get(root)
+	if ig != nil {
+		t.Fatalf("expected nil for root, got %v", ig)
+	}
+
+	// Subdir has its own patterns
+	ig = c.Get(subdir)
+	if ig == nil {
+		t.Fatal("expected non-nil for subdir")
+	}
+	if !ig.Matches("docs/debug.log", false) {
+		t.Fatal("expected *.log to match docs/debug.log")
+	}
+	if ig.Matches("docs/notes.md", false) {
+		t.Fatal("expected *.log to NOT match docs/notes.md")
+	}
+}
+
+// --- Task 1.6: Cache — caching works ---
+
+func TestCache_Caching(t *testing.T) {
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "root")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("mkdir root: %v", err)
+	}
+	subdir := filepath.Join(root, "docs")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatalf("mkdir subdir: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, IgnoreFilename), []byte("*.log"), 0o644); err != nil {
+		t.Fatalf("write root .leafwikiignore: %v", err)
+	}
+
+	c := NewCache(root)
+
+	// First call computes and caches
+	ig1 := c.Get(subdir)
+	if ig1 == nil {
+		t.Fatal("expected non-nil on first call")
+	}
+
+	// Second call returns cached result (pointer equality)
+	ig2 := c.Get(subdir)
+	if ig2 == nil {
+		t.Fatal("expected non-nil on second call")
+	}
+	if ig1 != ig2 {
+		t.Fatal("expected pointer equality, got different objects")
+	}
+}
+
 // --- Error cases ---
 
 func TestLoadFromDir_ErrorOnDirectory(t *testing.T) {
