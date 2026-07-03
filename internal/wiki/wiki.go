@@ -67,6 +67,7 @@ type Wiki struct {
 	backupRoutes     *wikibackup.Routes
 	resyncRoutes     *wikiresync.Routes
 	resyncJob        *wikiresync.ResyncJob
+	ignoreCache      *ignore.Cache
 	reloadMu         sync.Mutex
 	reloadWG         sync.WaitGroup
 	shutdownCtx      context.Context
@@ -198,17 +199,18 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 }
 
 func (w *Wiki) initCoreServices(options *WikiOptions) error {
+	// Create a shared ignore cache for multi-level .leafwikiignore resolution.
+	rootDir := filepath.Join(w.storageDir, "root")
+	w.ignoreCache = ignore.NewCache(rootDir)
+
 	w.tree = tree.NewTreeService(w.storageDir)
+	w.tree.SetIgnoreCache(w.ignoreCache)
 	if err := w.tree.LoadTree(); err != nil {
 		return err
 	}
 	w.slug = tree.NewSlugService()
 	w.asset = assets.NewAssetService(w.storageDir, w.slug)
-
-	// Thread .leafwikiignore into the asset service
-	rootDir := filepath.Join(w.storageDir, "root")
-	assetCache := ignore.NewCache(rootDir)
-	w.asset.SetIgnoreCache(assetCache)
+	w.asset.SetIgnoreCache(w.ignoreCache)
 
 	return nil
 }
@@ -462,11 +464,7 @@ func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 	importerDir := filepath.Join(options.StorageDir, ".importer")
 	adapter := NewWikiImportAdapter(w)
 	planner := coreimporter.NewPlanner(adapter, w.slug, options.StorageDir)
-
-	// Thread .leafwikiignore into the planner for filtering.
-	rootDir := filepath.Join(options.StorageDir, "root")
-	plannerCache := ignore.NewCache(rootDir)
-	planner.SetIgnoreCache(plannerCache)
+	planner.SetIgnoreCache(w.ignoreCache)
 
 	store := coreimporter.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
 	svc := coreimporter.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), options.MaxAssetUploadSizeBytes)
