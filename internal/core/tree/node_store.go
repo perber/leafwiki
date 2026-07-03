@@ -60,15 +60,15 @@ type ResolvedNode struct {
 }
 
 type NodeStore struct {
-	storageDir string
-	log        *slog.Logger
-	slugger    *SlugService
-	ignoreFile *ignore.IgnoreFile
+	storageDir  string
+	log         *slog.Logger
+	slugger     *SlugService
+	ignoreCache *ignore.Cache
 }
 
-// SetIgnoreFile sets the ignore file to use for filtering.
-func (f *NodeStore) SetIgnoreFile(ignoreFile *ignore.IgnoreFile) {
-	f.ignoreFile = ignoreFile
+// SetIgnoreCache sets the ignore cache to use for multi-level ignore resolution.
+func (f *NodeStore) SetIgnoreCache(ignoreCache *ignore.Cache) {
+	f.ignoreCache = ignoreCache
 }
 
 const reconstructSystemUserID = "system"
@@ -319,13 +319,13 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 			continue
 		}
 
-		// Check .leafwikiignore
-		if f.ignoreFile != nil {
-			relPath, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), filepath.Join(currentPath, name))
-			if relPath != "" && f.ignoreFile.Matches(filepath.ToSlash(relPath), entry.IsDir()) {
-				continue
-			}
+			// Check .leafwikiignore
+	if ig := f.getIgnoreForDir(currentPath); ig != nil {
+		relPath, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), filepath.Join(currentPath, name))
+		if relPath != "" && ig.Matches(filepath.ToSlash(relPath), entry.IsDir()) {
+			continue
 		}
+	}
 
 		// defaults
 		title := name
@@ -1197,12 +1197,29 @@ func (f *NodeStore) SyncFrontmatterIfExists(entry *PageNode) error {
 	return nil
 }
 
-// isPathIgnored checks if a relative path matches the ignore file.
+// getIgnoreForDir returns the compiled ignore rules for the given directory,
+// delegating to the shared cache. Returns nil if no rules apply.
+func (f *NodeStore) getIgnoreForDir(dir string) *ignore.IgnoreFile {
+	if f.ignoreCache == nil {
+		return nil
+	}
+	return f.ignoreCache.Get(dir)
+}
+
+// isPathIgnored checks if a relative path matches the ignore rules
+// governed by the nearest .leafwikiignore file.
 func (f *NodeStore) isPathIgnored(relPath string, isDir bool) bool {
-	if f.ignoreFile == nil || relPath == "" {
+	if relPath == "" {
 		return false
 	}
-	return f.ignoreFile.Matches(filepath.ToSlash(relPath), isDir)
+	// Resolve the absolute path to find the enclosing directory
+	absPath := filepath.Join(f.storageDir, "root", relPath)
+	dir := filepath.Dir(absPath)
+	ig := f.getIgnoreForDir(dir)
+	if ig == nil {
+		return false
+	}
+	return ig.Matches(filepath.ToSlash(relPath), isDir)
 }
 
 func (f *NodeStore) dirPathForNode(entry *PageNode) (string, error) {

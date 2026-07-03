@@ -1621,17 +1621,15 @@ func TestNodeStore_CreatePage_RejectsIgnoredPath(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	mustWriteFile(t, filepath.Join(tmp, ".leafwikiignore"), "drafts", 0o644)
-	ig, err := ignore.LoadFromDir(tmp)
-	if err != nil {
-		t.Fatalf("LoadFromDir: %v", err)
-	}
-	store.SetIgnoreFile(ig)
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "drafts", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
 
 	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
 	entry := &PageNode{ID: "p1", Slug: "drafts", Title: "Drafts", Kind: NodeKindPage, Parent: root}
 
-	err = store.CreatePage(root, entry)
+	err := store.CreatePage(root, entry)
 	if err == nil {
 		t.Fatal("expected error for ignored path")
 	}
@@ -1648,17 +1646,15 @@ func TestNodeStore_CreateSection_RejectsIgnoredPath(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	mustWriteFile(t, filepath.Join(tmp, ".leafwikiignore"), "archive", 0o644)
-	ig, err := ignore.LoadFromDir(tmp)
-	if err != nil {
-		t.Fatalf("LoadFromDir: %v", err)
-	}
-	store.SetIgnoreFile(ig)
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "archive", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
 
 	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
 	entry := &PageNode{ID: "s1", Slug: "archive", Title: "Archive", Kind: NodeKindSection, Parent: root}
 
-	err = store.CreateSection(root, entry)
+	err := store.CreateSection(root, entry)
 	if err == nil {
 		t.Fatal("expected error for ignored path")
 	}
@@ -1675,12 +1671,10 @@ func TestNodeStore_MoveNode_RejectsIgnoredDestination(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	mustWriteFile(t, filepath.Join(tmp, ".leafwikiignore"), "archive/", 0o644)
-	ig, err := ignore.LoadFromDir(tmp)
-	if err != nil {
-		t.Fatalf("LoadFromDir: %v", err)
-	}
-	store.SetIgnoreFile(ig)
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "archive/", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
 
 	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
 	sec := &PageNode{ID: "s", Slug: "s", Title: "S", Kind: NodeKindSection, Parent: root}
@@ -1694,7 +1688,7 @@ func TestNodeStore_MoveNode_RejectsIgnoredDestination(t *testing.T) {
 	mustWriteFile(t, filepath.Join(tmp, "root", "archive", "index.md"), "# Archive", 0o644)
 	archiveSection := &PageNode{ID: "s2", Slug: "archive", Title: "Archive", Kind: NodeKindSection, Parent: root}
 
-	err = store.MoveNode(page, archiveSection)
+	err := store.MoveNode(page, archiveSection)
 	if err == nil {
 		t.Fatal("expected error for ignored destination")
 	}
@@ -1711,18 +1705,16 @@ func TestNodeStore_RenameNode_RejectsIgnoredSlug(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	mustWriteFile(t, filepath.Join(tmp, ".leafwikiignore"), "*.tmp", 0o644)
-	ig, err := ignore.LoadFromDir(tmp)
-	if err != nil {
-		t.Fatalf("LoadFromDir: %v", err)
-	}
-	store.SetIgnoreFile(ig)
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "*.tmp", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
 
 	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
 	page := &PageNode{ID: "p1", Slug: "notes", Title: "Notes", Kind: NodeKindPage, Parent: root}
 	mustWriteFile(t, filepath.Join(tmp, "root", "notes.md"), "# Notes", 0o644)
 
-	err = store.RenameNode(page, "notes.tmp")
+	err := store.RenameNode(page, "notes.tmp")
 	if err == nil {
 		t.Fatal("expected error for ignored slug")
 	}
@@ -1739,17 +1731,15 @@ func TestNodeStore_CreatePage_PassesThroughNonIgnoredPath(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	mustWriteFile(t, filepath.Join(tmp, ".leafwikiignore"), "*.log", 0o644)
-	ig, err := ignore.LoadFromDir(tmp)
-	if err != nil {
-		t.Fatalf("LoadFromDir: %v", err)
-	}
-	store.SetIgnoreFile(ig)
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "*.log", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
 
 	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
 	entry := &PageNode{ID: "p1", Slug: "readme", Title: "Readme", Kind: NodeKindPage, Parent: root}
 
-	err = store.CreatePage(root, entry)
+	err := store.CreatePage(root, entry)
 	if err != nil {
 		t.Fatalf("expected no error for non-ignored path, got %v", err)
 	}
