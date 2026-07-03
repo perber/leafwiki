@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
@@ -626,5 +627,84 @@ title: Guides
 	}
 	if it.TargetPath != "docs/guides" {
 		t.Fatalf("TargetPath = %q (want docs/guides)", it.TargetPath)
+	}
+}
+
+func TestPlanner_CreatePlan_SkipsIgnoredPaths(t *testing.T) {
+	tmp := t.TempDir()
+	// Create source files
+	os.MkdirAll(filepath.Join(tmp, "drafts"), 0o755)
+	test_utils.WriteFile(t, tmp, "readme.md", "# Readme")
+	test_utils.WriteFile(t, tmp, "drafts/note.md", "# Draft Note")
+
+	// Create .leafwikiignore and load it
+	mustWriteLeafwikiIgnore(t, tmp, "drafts/")
+	ig, err := ignore.LoadFromDir(tmp)
+	if err != nil {
+		t.Fatalf("LoadFromDir: %v", err)
+	}
+
+	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
+	p := newPlannerWithFake(wiki)
+	p.SetIgnoreFile(ig)
+
+	res, err := p.CreatePlan([]ImportMDFile{
+		{SourcePath: "readme.md"},
+		{SourcePath: "drafts/note.md"},
+	}, PlanOptions{
+		SourceBasePath: tmp,
+		TargetBasePath: "",
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan err: %v", err)
+	}
+
+	if len(res.Items) != 1 {
+		t.Fatalf("expected 1 plan item, got %d", len(res.Items))
+	}
+	if res.Items[0].TargetPath != "readme" {
+		t.Fatalf("expected only readme, got %q", res.Items[0].TargetPath)
+	}
+}
+
+func TestPlanner_CreatePlan_IncludesNonIgnoredPaths(t *testing.T) {
+	tmp := t.TempDir()
+	// Create source files - none should be ignored
+	os.MkdirAll(filepath.Join(tmp, "notes"), 0o755)
+	test_utils.WriteFile(t, tmp, "readme.md", "# Readme")
+	test_utils.WriteFile(t, tmp, "notes/note.md", "# Note")
+
+	// Create .leafwikiignore that doesn't match any of our files
+	mustWriteLeafwikiIgnore(t, tmp, "*.log")
+	ig, err := ignore.LoadFromDir(tmp)
+	if err != nil {
+		t.Fatalf("LoadFromDir: %v", err)
+	}
+
+	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
+	p := newPlannerWithFake(wiki)
+	p.SetIgnoreFile(ig)
+
+	res, err := p.CreatePlan([]ImportMDFile{
+		{SourcePath: "readme.md"},
+		{SourcePath: "notes/note.md"},
+	}, PlanOptions{
+		SourceBasePath: tmp,
+		TargetBasePath: "",
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan err: %v", err)
+	}
+
+	if len(res.Items) != 2 {
+		t.Fatalf("expected 2 plan items, got %d", len(res.Items))
+	}
+}
+
+// mustWriteLeafwikiIgnore writes a .leafwikiignore file to dir with the given content.
+func mustWriteLeafwikiIgnore(t *testing.T, dir, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, ".leafwikiignore"), []byte(content), 0o644); err != nil {
+		t.Fatalf("write .leafwikiignore: %v", err)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/tree"
@@ -58,9 +59,10 @@ type PlanResult struct {
 
 // Planner is responsible for creating an import plan
 type Planner struct {
-	log     *slog.Logger
-	wiki    ImporterWiki
-	slugger *tree.SlugService
+	log        *slog.Logger
+	wiki       ImporterWiki
+	slugger    *tree.SlugService
+	ignoreFile *ignore.IgnoreFile
 }
 
 // NewPlanner creates a new Planner
@@ -70,6 +72,11 @@ func NewPlanner(wiki ImporterWiki, slugger *tree.SlugService) *Planner {
 		wiki:    wiki,
 		slugger: slugger,
 	}
+}
+
+// SetIgnoreFile sets the ignore file for filtering import targets.
+func (p *Planner) SetIgnoreFile(ignoreFile *ignore.IgnoreFile) {
+	p.ignoreFile = ignoreFile
 }
 
 // CreatePlan creates an import plan based on the provided entries and options
@@ -91,6 +98,16 @@ func (p *Planner) CreatePlan(entries []ImportMDFile, options PlanOptions) (*Plan
 			p.log.Warn("could not import resource", "source_path", entry.SourcePath, "error", err)
 			result.Errors = append(result.Errors, err.Error())
 			continue
+		}
+
+		// Skip entries targeting ignored paths
+		if p.ignoreFile != nil {
+			targetRel := filepath.ToSlash(resEntry.TargetPath)
+			isDir := resEntry.Kind == tree.NodeKindSection
+			if p.ignoreFile.Matches(targetRel, isDir) {
+				p.log.Debug("skipping import entry matching .leafwikiignore", "target", targetRel, "source", entry.SourcePath)
+				continue
+			}
 		}
 
 		result.Items = append(result.Items, *resEntry)
