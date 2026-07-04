@@ -725,7 +725,7 @@
 
   /* AssetManager Component */
   .asset-manager {
-    @apply text-interface-text space-y-3 text-sm;
+    @apply text-interface-text min-w-0 space-y-3 text-sm;
   }
 
   .asset-manager__title {
