@@ -39,4 +39,13 @@ describe('replaceFilenameInText', () => {
       ].join('\n'),
     )
   })
+
+  it('does not match across multiple links on the same line', () => {
+    const doc =
+      '![foo.png](/assets/foo.png) and ![old-name.png](/assets/old-name.png)'
+    const result = replaceFilenameInText(doc, 'old-name.png', 'new-name.png')
+    expect(result).toBe(
+      '![foo.png](/assets/foo.png) and ![new-name.png](/assets/new-name.png)',
+    )
+  })
 })

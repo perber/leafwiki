@@ -79,7 +79,7 @@ export function replaceFilenameInText(
 ) {
   const newFilename = after.startsWith('/') ? after.slice(1) : after
   const regex = new RegExp(
-    `(!?\\[)(.*?)(\\]\\(.*?\\/?)\\/${escapeRegExp(before)}(\\))`,
+    `(!?\\[)([^\\]]*?)(\\]\\((?:(?!\\]\\().)*?\\/?)\\/${escapeRegExp(before)}(\\))`,
     'g',
   )
 
