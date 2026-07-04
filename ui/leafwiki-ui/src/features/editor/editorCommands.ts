@@ -65,6 +65,33 @@ export function insertWrappedText(
   view.focus()
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Replaces a filename in markdown link/image targets (`[text](.../old)` -> `[text](.../new)`).
+// Also updates the link/alt text itself when it exactly matches the old filename, since
+// inserted assets default to using the filename as their alt/link text.
+export function replaceFilenameInText(
+  docText: string,
+  before: string,
+  after: string,
+) {
+  const newFilename = after.startsWith('/') ? after.slice(1) : after
+  const regex = new RegExp(
+    `(!?\\[)([^\\]]*?)(\\]\\((?:(?!\\]\\().)*?\\/?)\\/${escapeRegExp(before)}(\\))`,
+    'g',
+  )
+
+  return docText.replace(
+    regex,
+    (_match, bracket, altText, pathPrefix, closeParen) => {
+      const newAltText = altText === before ? newFilename : altText
+      return `${bracket}${newAltText}${pathPrefix}/${newFilename}${closeParen}`
+    },
+  )
+}
+
 // Inserts a heading of the specified level (1, 2, or 3) at the current line at the start position
 export function insertHeadingAtStart(view: EditorView, level: 1 | 2 | 3) {
   const { from } = view.state.selection.main
