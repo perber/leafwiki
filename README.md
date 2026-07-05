@@ -88,6 +88,10 @@ LeafWiki is intentionally narrower than those systems. That focus is part of the
 
 ---
 
+**Prefer not to run your own server?** Free hosted beta — 10 spots, starting September 2026. [Get a beta spot →](https://leafwiki.com/hosted/#waitlist) and help shape the hosted version.
+
+---
+
 ## Install
 
 ### Docker
@@ -520,7 +524,8 @@ The sort dialog lets you drag items into position, use the ↑ ↓ arrow buttons
 If it's useful to you:
 
 - ⭐ **[Star the repo](https://github.com/perber/leafwiki)** — helps others find it
-- 💛 **[Sponsor on GitHub](https://leafwiki.com/support)** — supports ongoing maintenance, bug fixes, and new features
+- 💛 **[Sponsor on GitHub](https://leafwiki.com/support)** — supports ongoing maintenance, bug fixes, and new features  
+- 🚀 **[Don't want to self-host? Get a free beta spot](https://leafwiki.com/hosted/#waitlist)** — 10 spots, hosted beta starting September 2026, help shape the hosted version
 
 Need help deploying LeafWiki for your team? [Business support & setup →](https://leafwiki.com/support/)
 
