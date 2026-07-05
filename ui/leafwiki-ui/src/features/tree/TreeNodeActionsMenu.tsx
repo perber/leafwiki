@@ -6,17 +6,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  applyPageRefactor,
   convertPage,
+  getPageByPath,
   NODE_KIND_PAGE,
   NODE_KIND_SECTION,
-  PageNode,
   pinPage,
+  previewPageRefactor,
 } from '@/lib/api/pages'
+import type { Page, PageNode } from '@/lib/api/pages'
 import { asApiLocalizedError, mapApiError } from '@/lib/api/errors'
 import {
   DIALOG_ADD_PAGE,
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
+  DIALOG_EDIT_PAGE_METADATA,
   DIALOG_MOVE_PAGE,
   DIALOG_SORT_PAGES,
 } from '@/lib/registries'
@@ -43,6 +47,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { usePageEditorStore } from '../editor/pageEditorStore'
+import { confirmPageRefactor } from '../page/pageRefactorDialogState'
 import { TreeViewActionButton } from './TreeViewActionButton'
 import { useTreeNodeActionsMenusStore } from './treeNodeActionsMenus'
 
@@ -98,6 +103,13 @@ export default function TreeNodeActionsMenu({
 
   const setPinnedLocally = useTreeStore((s) => s.setPinnedLocally)
 
+  const getCurrentRoutePath = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return '/'
+    }
+    return window.location.pathname
+  }, [])
+
   const handleTogglePin = useCallback(() => {
     const newPinned = !node.pinned
     pinPage(nodeId, nodeVersion, newPinned)
@@ -110,12 +122,96 @@ export default function TreeNodeActionsMenu({
       .catch(() => toast.error(t('pinned.pinError')))
   }, [nodeId, nodeVersion, node.pinned, setPinnedLocally, t])
 
-  const getCurrentRoutePath = useCallback(() => {
-    if (typeof window === 'undefined') {
-      return '/'
-    }
-    return window.location.pathname
-  }, [])
+  const handleRenamePage = useCallback(
+    async (title: string, slug: string) => {
+      if (currentEditorPageId === nodeId) {
+        toast.warning(
+          `This ${nodeKind === NODE_KIND_PAGE ? 'page' : 'section'} is currently being edited. Please use the editor title bar to rename it.`,
+        )
+        return
+      }
+
+      try {
+        const page = await getPageByPath(node.path)
+        const titleChanged = page.title !== title
+        const slugChanged = page.slug !== slug
+
+        if (!titleChanged && !slugChanged) {
+          return
+        }
+
+        const preview = await previewPageRefactor(page.id, {
+          kind: 'rename',
+          title,
+          slug,
+        })
+        const rewriteLinks = await confirmPageRefactor(preview, {
+          allowSkipRewrite: true,
+        })
+
+        if (rewriteLinks === null) {
+          return
+        }
+
+        const updatedPage: Page | null = await applyPageRefactor(page.id, {
+          kind: 'rename',
+          version: page.version,
+          title,
+          slug,
+          content: page.content,
+          rewriteLinks,
+        })
+
+        await reloadTree()
+
+        const viewerPage = useViewerStore.getState().page
+        if (viewerPage?.id === nodeId && updatedPage) {
+          useViewerStore.setState({
+            page: {
+              ...viewerPage,
+              ...updatedPage,
+              tags: updatedPage.tags ?? page.tags ?? [],
+              properties: updatedPage.properties ?? page.properties ?? {},
+            },
+            notFound: false,
+            error: null,
+          })
+        }
+
+        const currentRoutePath = getCurrentRoutePath()
+        const currentRouterPath =
+          stripBasePath(currentRoutePath) ?? currentRoutePath
+        if (currentRouterPath === `/${node.path}` && updatedPage?.path) {
+          navigate(`/${updatedPage.path}`)
+        }
+
+        toast.success(
+          `${nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'} renamed successfully`,
+        )
+      } catch (err) {
+        const localized = asApiLocalizedError(err)
+        if (localized?.code === 'page_version_conflict') {
+          await reloadTree()
+          toast.error(
+            'This page was modified by another user. Please try again.',
+          )
+          return
+        }
+
+        const mapped = mapApiError(err, 'Failed to rename page')
+        toast.error(mapped.message)
+      }
+    },
+    [
+      currentEditorPageId,
+      getCurrentRoutePath,
+      navigate,
+      node.path,
+      nodeId,
+      nodeKind,
+      reloadTree,
+    ],
+  )
 
   return (
     <DropdownMenu
@@ -161,6 +257,23 @@ export default function TreeNodeActionsMenu({
           }}
         >
           <Pencil size={18} className="tree-node__action-icon" /> Edit{' '}
+          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          data-testid="tree-view-action-button-rename"
+          onClick={() => {
+            openDialog(DIALOG_EDIT_PAGE_METADATA, {
+              parentId: node.parentId ?? '',
+              currentId: node.id,
+              itemKind: node.kind,
+              title: node.title,
+              slug: node.slug,
+              onChange: handleRenamePage,
+            })
+          }}
+        >
+          <Pencil size={18} className="tree-node__action-icon" /> Rename{' '}
           {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_PAGE && (
