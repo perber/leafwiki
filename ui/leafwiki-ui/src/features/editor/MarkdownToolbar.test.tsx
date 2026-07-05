@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MarkdownToolbar from './MarkdownToolbar'
+import type { MarkdownEditorRef } from './MarkdownEditor'
 
 let mockIsMobile = false
 
@@ -49,25 +50,30 @@ vi.mock('@/stores/editor', () => ({
 }))
 
 describe('MarkdownToolbar paste controls', () => {
-  const editorRef = {
+  const pasteRichMock = vi.fn()
+  const pastePlainMock = vi.fn()
+  const editorRef: RefObject<MarkdownEditorRef> = {
     current: {
       canUndo: () => false,
       canRedo: () => false,
+      getMarkdown: () => '',
       insertWrappedText: vi.fn(),
       insertHeading: vi.fn(),
       insertAtCursor: vi.fn(),
-      pasteRich: vi.fn(),
-      pastePlain: vi.fn(),
+      replaceSelection: vi.fn(),
+      pasteRich: pasteRichMock,
+      pastePlain: pastePlainMock,
+      focus: vi.fn(),
       undo: vi.fn(),
       redo: vi.fn(),
       editorViewRef: { current: null },
     },
-  } as const
+  }
 
   beforeEach(() => {
     mockIsMobile = false
-    editorRef.current.pasteRich.mockClear()
-    editorRef.current.pastePlain.mockClear()
+    pasteRichMock.mockClear()
+    pastePlainMock.mockClear()
   })
 
   it('shows paste buttons directly on desktop', () => {
