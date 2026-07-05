@@ -54,6 +54,19 @@ describe('uploadInlineDataUriImages', () => {
     expect(uploadAssetMock).not.toHaveBeenCalled()
   })
 
+  it('drops a non-image data URI instead of uploading it', async () => {
+    const markdown = '![not image](data:text/plain;base64,SGVsbG8=)'
+
+    const result = await uploadInlineDataUriImages(
+      markdown,
+      'page-1',
+      1_000_000,
+    )
+
+    expect(result).toBe('not image')
+    expect(uploadAssetMock).not.toHaveBeenCalled()
+  })
+
   it('drops the image (keeps alt text) when the upload fails', async () => {
     uploadAssetMock.mockRejectedValue(new Error('network error'))
     const markdown = `![broken](data:image/png;base64,${TINY_PNG_BASE64})`

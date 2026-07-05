@@ -338,37 +338,41 @@ export default function MarkdownToolbar({
             <Image className="markdown-toolbar__icon" />
           </Button>
         </TooltipWrapper>
-        <div className="markdown-toolbar__separator" />
-        <TooltipWrapper
-          label={t('toolbar.pasteRichTooltip')}
-          side="top"
-          align="center"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="markdown-toolbar__button"
-            data-testid="paste-rich-button"
-            onClick={() => editorRef.current?.pasteRich()}
-          >
-            <ClipboardType className="markdown-toolbar__icon" />
-          </Button>
-        </TooltipWrapper>
-        <TooltipWrapper
-          label={t('toolbar.pastePlainTooltip')}
-          side="top"
-          align="center"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="markdown-toolbar__button"
-            data-testid="paste-plain-button"
-            onClick={() => editorRef.current?.pastePlain()}
-          >
-            <ClipboardPaste className="markdown-toolbar__icon" />
-          </Button>
-        </TooltipWrapper>
+        {!isMobile && (
+          <>
+            <div className="markdown-toolbar__separator" />
+            <TooltipWrapper
+              label={t('toolbar.pasteRichTooltip')}
+              side="top"
+              align="center"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="markdown-toolbar__button"
+                data-testid="paste-rich-button"
+                onClick={() => editorRef.current?.pasteRich()}
+              >
+                <ClipboardType className="markdown-toolbar__icon" />
+              </Button>
+            </TooltipWrapper>
+            <TooltipWrapper
+              label={t('toolbar.pastePlainTooltip')}
+              side="top"
+              align="center"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="markdown-toolbar__button"
+                data-testid="paste-plain-button"
+                onClick={() => editorRef.current?.pastePlain()}
+              >
+                <ClipboardPaste className="markdown-toolbar__icon" />
+              </Button>
+            </TooltipWrapper>
+          </>
+        )}
         <div className="markdown-toolbar__separator max-sm:hidden" />
         <TooltipWrapper
           label={t('toolbar.undoTooltip')}

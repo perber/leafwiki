@@ -5,6 +5,11 @@ import { uploadAsset } from '@/lib/api/assets'
 const DATA_URI_IMAGE_RE =
   /!\[([^\]]*)\]\(data:([a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)\)/g
 
+function estimateBase64DecodedSize(base64: string): number {
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return Math.floor((base64.length * 3) / 4) - padding
+}
+
 function dataUriToFile(mimeType: string, base64: string, name: string): File {
   const byteString = atob(base64)
   const bytes = new Uint8Array(byteString.length)
@@ -37,6 +42,14 @@ export async function uploadInlineDataUriImages(
     const [fullMatch, alt, mimeType, base64] = match
     index += 1
     try {
+      if (!mimeType.startsWith('image/')) {
+        result = result.replace(fullMatch, alt)
+        continue
+      }
+      if (estimateBase64DecodedSize(base64) > maxAssetUploadSizeBytes) {
+        result = result.replace(fullMatch, alt)
+        continue
+      }
       const ext = mimeType.split('/')[1]?.split('+')[0] || 'png'
       const file = dataUriToFile(
         mimeType,

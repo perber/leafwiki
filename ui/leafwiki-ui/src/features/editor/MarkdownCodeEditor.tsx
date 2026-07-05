@@ -284,6 +284,7 @@ export default function MarkdownCodeEditor({
                 if (md) {
                   event.preventDefault()
                   const sel = view.state.selection.main
+                  const pageId = resetKey
                   // Pasted HTML can embed images as inline base64 data URIs
                   // (Word/Outlook, some web pages) with no separate file
                   // clipboard item, so `hasFiles` above wouldn't catch them.
@@ -291,7 +292,7 @@ export default function MarkdownCodeEditor({
                   // base64 payload into the document.
                   uploadInlineDataUriImages(
                     md,
-                    resetKey,
+                    pageId,
                     maxAssetUploadSizeBytesRef.current,
                   ).then((withUploadedImages) => {
                     if (!view.dom.isConnected) return

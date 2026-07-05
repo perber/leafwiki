@@ -253,9 +253,7 @@ export function useAutoSave(): { status: AutoSaveStatus } {
   // just before navigation are not lost.
   useEffect(() => {
     return () => {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       const hadPendingTimer = debounceTimerRef.current !== null
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       const wasAlreadySaving = isSavingRef.current
 
       // ESLint warns about ref.current in cleanup assuming a stale read — here we
