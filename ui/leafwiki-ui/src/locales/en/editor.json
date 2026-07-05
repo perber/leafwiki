@@ -38,6 +38,8 @@
     "lineWrapEnableTooltip": "Enable line wrap",
     "lineWrapDisableTooltip": "Disable line wrap",
     "moreOptionsAriaLabel": "More formatting options",
+    "previewSplitTooltip": "Use side-by-side preview layout",
+    "previewStackedTooltip": "Use stacked preview layout",
     "showPreviewTooltip": "Show preview",
     "hidePreviewTooltip": "Hide preview",
     "pasteRichTooltip": "Paste with formatting (Ctrl+V)",

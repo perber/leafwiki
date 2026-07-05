@@ -18,11 +18,13 @@ import {
   ClipboardType,
   Code,
   Code2,
+  Columns2,
   Eye,
   Image,
   Italic,
   Link,
   MoreHorizontal,
+  Rows2,
   Redo,
   Strikethrough,
   Table,
@@ -39,7 +41,9 @@ type Props = {
   onAssetVersionChange?: (version: number) => void
   pageId: string
   previewVisible: boolean
+  previewStacked: boolean
   onTogglePreview: () => void
+  onTogglePreviewLayout: () => void
 }
 
 export default function MarkdownToolbar({
@@ -47,7 +51,9 @@ export default function MarkdownToolbar({
   onAssetVersionChange,
   pageId,
   previewVisible,
+  previewStacked,
   onTogglePreview,
+  onTogglePreviewLayout,
 }: Props) {
   const { t } = useTranslation('editor')
   const openDialog = useDialogsStore((state) => state.openDialog)
@@ -517,6 +523,33 @@ export default function MarkdownToolbar({
         {!isMobile && (
           <>
             <div className="markdown-toolbar__separator" />
+            <TooltipWrapper
+              label={t(
+                previewStacked
+                  ? 'toolbar.previewSplitTooltip'
+                  : 'toolbar.previewStackedTooltip',
+              )}
+              side="top"
+              align="center"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onTogglePreviewLayout}
+                className={cn(
+                  'markdown-toolbar__button markdown-toolbar__button--desktop-only',
+                  {
+                    'markdown-toolbar__button--active': previewStacked,
+                  },
+                )}
+              >
+                {previewStacked ? (
+                  <Columns2 className="markdown-toolbar__icon" />
+                ) : (
+                  <Rows2 className="markdown-toolbar__icon" />
+                )}
+              </Button>
+            </TooltipWrapper>
             <TooltipWrapper
               label={t(
                 previewVisible

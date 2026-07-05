@@ -82,7 +82,9 @@ describe('MarkdownToolbar paste controls', () => {
         editorRef={editorRef}
         pageId="page-1"
         previewVisible={false}
+        previewStacked={false}
         onTogglePreview={vi.fn()}
+        onTogglePreviewLayout={vi.fn()}
       />,
     )
 
@@ -98,7 +100,9 @@ describe('MarkdownToolbar paste controls', () => {
         editorRef={editorRef}
         pageId="page-1"
         previewVisible={false}
+        previewStacked={false}
         onTogglePreview={vi.fn()}
+        onTogglePreviewLayout={vi.fn()}
       />,
     )
 
