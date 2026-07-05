@@ -551,7 +551,7 @@
   }
 
   .app-layout__main-content-area {
-    @apply flex flex-1 flex-col items-stretch transition-all duration-200;
+    @apply flex min-w-0 flex-1 flex-col items-stretch transition-all duration-200;
   }
 
   .app-layout__main-column {
@@ -581,8 +581,6 @@
       align-self: flex-start;
       width: 16rem;
       flex-shrink: 0;
-      max-height: 100dvh;
-      overflow-y: auto;
       padding-top: 1.5rem;
     }
   }
@@ -2355,7 +2353,7 @@
   }
 
   .tree-view__toolbar {
-    @apply mb-2 ml-1 flex;
+    @apply mt-1 mb-2 ml-1 flex;
   }
 
   .tree-view__status {
