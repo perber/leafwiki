@@ -35,12 +35,7 @@ export type BaseDialogProps = {
 export type BaseDialogCancelButton = {
   label?: string
   variant?:
-    | 'default'
-    | 'destructive'
-    | 'outline'
-    | 'ghost'
-    | 'link'
-    | 'secondary'
+    'default' | 'destructive' | 'outline' | 'ghost' | 'link' | 'secondary'
   disabled?: boolean
   autoFocus?: boolean
 }
@@ -48,12 +43,7 @@ export type BaseDialogCancelButton = {
 export type BaseDialogConfirmButton = {
   label: string
   variant?:
-    | 'default'
-    | 'destructive'
-    | 'outline'
-    | 'ghost'
-    | 'link'
-    | 'secondary'
+    'default' | 'destructive' | 'outline' | 'ghost' | 'link' | 'secondary'
   loading?: boolean
   disabled?: boolean
   autoFocus?: boolean

@@ -57,8 +57,7 @@ export function HotKeyHandler() {
       }
 
       const registeredKeys = registeredHotkeys[comboString] as
-        | HotKeyDefinition[]
-        | undefined
+        HotKeyDefinition[] | undefined
 
       if (!registeredKeys || registeredKeys.length === 0) {
         return

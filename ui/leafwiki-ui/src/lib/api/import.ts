@@ -17,11 +17,7 @@ export type ImportPlan = {
 }
 
 export type ImportExecutionStatus =
-  | 'planned'
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'canceled'
+  'planned' | 'running' | 'completed' | 'failed' | 'canceled'
 
 export type ImportPlanItem = {
   source_path: string
