@@ -19,6 +19,7 @@ export default function Sidebar() {
   const appMode = useAppMode()
   const sidebarMode = useSidebarStore((state) => state.sidebarMode)
   const setSidebarMode = useSidebarStore((state) => state.setSidebarMode)
+  const setSidebarVisible = useSidebarStore((state) => state.setSidebarVisible)
 
   const items = useMemo(
     () =>
@@ -59,10 +60,13 @@ export default function Sidebar() {
   const actions = useMemo(() => {
     const actionMap = new Map<string, () => void>()
     items.forEach((item) => {
-      actionMap.set(item.id, () => setSidebarMode(item.id))
+      actionMap.set(item.id, () => {
+        setSidebarVisible(true)
+        setSidebarMode(item.id)
+      })
     })
     return actionMap
-  }, [items, setSidebarMode])
+  }, [items, setSidebarMode, setSidebarVisible])
 
   // Memoize hotkey definitions using the stable actions
   const hotKeyDefs = useMemo(
