@@ -98,6 +98,7 @@ type RouterOptions struct {
 	GitBackupEnabled        bool                 // Whether git backup is enabled (surfaced to admin UI via /api/config)
 	HTTPRemoteUser          HTTPRemoteUserConfig // Reverse-proxy authentication via HTTP header
 	DisableRequestLog       bool                 // Whether to suppress per-request access log lines
+	UserManagementURL       string               // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.

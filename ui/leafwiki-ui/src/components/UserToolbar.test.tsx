@@ -1,13 +1,14 @@
 import { DialogManager } from '@/components/DialogManager'
 import { HotKeyHandler } from '@/components/HotKeyHandler'
 import UserToolbar from '@/components/UserToolbar'
+import * as authAPI from '@/lib/api/auth'
 import { useBackupStore } from '@/stores/backup'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('UserToolbar', () => {
@@ -26,6 +27,7 @@ describe('UserToolbar', () => {
       authDisabled: false,
       httpRemoteUserEnabled: false,
       httpRemoteUserLogoutUrl: '',
+      userManagementUrl: '',
     })
     useBackupStore.setState({ enabled: false })
     useSessionStore.setState({
@@ -143,6 +145,136 @@ describe('UserToolbar', () => {
       expect(
         screen.queryByTestId('shortcuts-help-dialog'),
       ).not.toBeInTheDocument()
+    })
+  })
+
+  describe('logout redirect', () => {
+    const renderWithLoginRoute = () =>
+      render(
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<UserToolbar />} />
+            <Route
+              path="/login"
+              element={<div data-testid="login-form-sentinel">LOGIN</div>}
+            />
+          </Routes>
+        </MemoryRouter>,
+      )
+
+    let originalLocation: Location
+
+    beforeEach(() => {
+      originalLocation = window.location
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...originalLocation, href: '' },
+      })
+    })
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation,
+      })
+    })
+
+    it('redirects straight to the logout URL without rendering the local login screen', async () => {
+      const user = userEvent.setup()
+      const logoutSpy = vi.spyOn(authAPI, 'logout').mockResolvedValue()
+      useConfigStore.setState({
+        httpRemoteUserLogoutUrl: 'https://control-plane.example.com/logout',
+      })
+
+      renderWithLoginRoute()
+
+      const avatar = screen.getByTestId('user-toolbar-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+      await user.click(screen.getByTestId('user-toolbar-logout'))
+
+      expect(logoutSpy).toHaveBeenCalled()
+      expect(window.location.href).toBe(
+        'https://control-plane.example.com/logout',
+      )
+      expect(
+        screen.queryByTestId('login-form-sentinel'),
+      ).not.toBeInTheDocument()
+    })
+
+    it('falls back to the local /login route when no logout URL is configured', async () => {
+      const user = userEvent.setup()
+      useConfigStore.setState({ httpRemoteUserLogoutUrl: '' })
+
+      renderWithLoginRoute()
+
+      const avatar = screen.getByTestId('user-toolbar-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+      await user.click(screen.getByTestId('user-toolbar-logout'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('login-form-sentinel')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('user management link', () => {
+    beforeEach(() => {
+      useSessionStore.setState({
+        user: {
+          id: 'admin-1',
+          username: 'admin',
+          email: 'admin@example.com',
+          role: 'admin',
+        },
+      })
+    })
+
+    it('renders User Management as an external link when userManagementUrl is set', async () => {
+      const user = userEvent.setup()
+      useConfigStore.setState({
+        userManagementUrl: 'https://control-plane.example.com/users',
+      })
+
+      render(
+        <MemoryRouter>
+          <UserToolbar />
+        </MemoryRouter>,
+      )
+
+      const avatar = screen.getByTestId('user-toolbar-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+
+      const link = screen.getByText('User Management').closest('a')
+      expect(link).toHaveAttribute(
+        'href',
+        'https://control-plane.example.com/users',
+      )
+      expect(link).toHaveAttribute('target', '_blank')
+    })
+
+    it('navigates to the local /users route when userManagementUrl is not set', async () => {
+      const user = userEvent.setup()
+      useConfigStore.setState({ userManagementUrl: '' })
+
+      render(
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<UserToolbar />} />
+            <Route
+              path="/users"
+              element={<div data-testid="users-page-sentinel">USERS</div>}
+            />
+          </Routes>
+        </MemoryRouter>,
+      )
+
+      const avatar = screen.getByTestId('user-toolbar-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+      await user.click(screen.getByText('User Management'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('users-page-sentinel')).toBeInTheDocument()
+      })
     })
   })
 })

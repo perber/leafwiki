@@ -9,6 +9,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import * as authAPI from '@/lib/api/auth'
 import i18next from '@/lib/i18n'
 import {
   DIALOG_CHANGE_OWN_PASSWORD,
@@ -53,6 +54,7 @@ export default function UserToolbar() {
   const httpRemoteUserLogoutUrl = useConfigStore(
     (s) => s.httpRemoteUserLogoutUrl,
   )
+  const userManagementUrl = useConfigStore((s) => s.userManagementUrl)
 
   useEffect(() => {
     if (!authDisabled && (!user || readOnly)) {
@@ -95,12 +97,16 @@ export default function UserToolbar() {
   }
 
   const handleLogout = async () => {
-    await logout()
     if (httpRemoteUserLogoutUrl) {
+      // Redirect immediately instead of clearing local session state first —
+      // clearing it here would flash the local login screen before the
+      // browser navigates away (see plans/logout-flash-and-external-user-management.md).
+      authAPI.logout().catch(() => {})
       window.location.href = httpRemoteUserLogoutUrl
-    } else {
-      navigate('/login')
+      return
     }
+    await logout()
+    navigate('/login')
   }
 
   return (
@@ -118,12 +124,24 @@ export default function UserToolbar() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <RoleGuard roles={['admin']}>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => navigate('/users')}
-            >
-              User Management
-            </DropdownMenuItem>
+            {userManagementUrl ? (
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <a
+                  href={userManagementUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t('userMenu.userManagement')}
+                </a>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => navigate('/users')}
+              >
+                {t('userMenu.userManagement')}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => navigate('/settings/branding')}

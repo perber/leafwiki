@@ -142,6 +142,7 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			"gitBackupEnabled":        opts.GitBackupEnabled,
 			"httpRemoteUserEnabled":   opts.HTTPRemoteUser.Enabled,
 			"httpRemoteUserLogoutUrl": opts.HTTPRemoteUser.LogoutURL,
+			"userManagementUrl":       opts.UserManagementURL,
 		})
 	}
 }

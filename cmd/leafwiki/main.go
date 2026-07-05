@@ -66,6 +66,8 @@ func writeUsage(w io.Writer) {
 	--http-remote-user-header-name  HTTP header carrying the username from a trusted proxy (default: Remote-User)
 	--trusted-proxy-ips             Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
 	--http-remote-user-logout-url   URL the frontend redirects to after logout in proxy-auth mode (default: "")
+	--user-management-url           URL to an external user-management page; when set, the built-in
+	                                 User Management UI is replaced with a link to this URL (default: "")
 	--disable-request-log           Suppress per-request HTTP access log lines (default: false)
 	--git-backup                   Enable git backup to a remote repository (default: false)
 	--git-backup-author-name       Git commit author name for backups (default: LeafWiki Backup)
@@ -103,6 +105,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME
 	LEAFWIKI_TRUSTED_PROXY_IPS
 	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
+	LEAFWIKI_USER_MANAGEMENT_URL
 	LEAFWIKI_DISABLE_REQUEST_LOG
 	LEAFWIKI_GIT_BACKUP
 	LEAFWIKI_GIT_BACKUP_AUTHOR_NAME
@@ -171,6 +174,7 @@ type cliFlags struct {
 	httpRemoteUserHeader    *string
 	trustedProxyIPs         *string
 	httpRemoteUserLogoutURL *string
+	userManagementURL       *string
 	disableRequestLog       *bool
 	gitBackup               *bool
 	gitBackupAuthorName     *string
@@ -209,6 +213,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
 		trustedProxyIPs:         fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
 		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "URL the frontend redirects to after logout when reverse-proxy auth is active (e.g. https://auth.example.com/logout)"),
+		userManagementURL:       fs.String("user-management-url", "", "URL to an external user-management page; when set, the built-in User Management UI is replaced with a link to this URL"),
 		disableRequestLog:       fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
 		gitBackup:               fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
 		gitBackupAuthorName:     fs.String("git-backup-author-name", "", "git commit author name for backups (default: LeafWiki Backup)"),
@@ -271,6 +276,7 @@ func main() {
 	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
 	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
 	httpRemoteUserLogoutURL := resolveString("http-remote-user-logout-url", *flags.httpRemoteUserLogoutURL, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL", "")
+	userManagementURL := resolveString("user-management-url", *flags.userManagementURL, visited, "LEAFWIKI_USER_MANAGEMENT_URL", "")
 	disableRequestLog := resolveBool("disable-request-log", *flags.disableRequestLog, visited, "LEAFWIKI_DISABLE_REQUEST_LOG")
 	gitBackupEnabled := resolveBool("git-backup", *flags.gitBackup, visited, "LEAFWIKI_GIT_BACKUP")
 	gitBackupAuthorName := resolveString("git-backup-author-name", *flags.gitBackupAuthorName, visited, "LEAFWIKI_GIT_BACKUP_AUTHOR_NAME", "LeafWiki Backup")
@@ -427,6 +433,7 @@ func main() {
 			LogoutURL:      httpRemoteUserLogoutURL,
 		},
 		DisableRequestLog: disableRequestLog,
+		UserManagementURL: userManagementURL,
 	})
 
 	reloadSignals := make(chan os.Signal, 1)
