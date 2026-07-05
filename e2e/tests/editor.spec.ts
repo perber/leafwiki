@@ -185,8 +185,7 @@ async function expectPreviewHeadingVisible(page: Page, headingText: string) {
 
             const headings = Array.from(preview.querySelectorAll('h1, h2, h3, h4, h5, h6'));
             const heading = headings.find((element) => element.textContent?.includes(text)) as
-              | HTMLElement
-              | undefined;
+              HTMLElement | undefined;
 
             if (!heading) return false;
 
@@ -211,8 +210,7 @@ async function expectPreviewHeadingVisible(page: Page, headingText: string) {
 
       const headings = Array.from(preview.querySelectorAll('h1, h2, h3, h4, h5, h6'));
       const heading = headings.find((element) => element.textContent?.includes(text)) as
-        | HTMLElement
-        | undefined;
+        HTMLElement | undefined;
 
       if (!heading) {
         return null;
