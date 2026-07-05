@@ -21,6 +21,7 @@ export type Config = {
   gitBackupEnabled: boolean
   httpRemoteUserEnabled: boolean
   httpRemoteUserLogoutUrl: string
+  userManagementUrl: string
 }
 
 export async function getConfig(): Promise<Config> {

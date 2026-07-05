@@ -19,6 +19,7 @@ export const createLeafWikiRouter = (
   isReadOnlyViewer: boolean,
   authDisabled: boolean,
   enableRevision: boolean,
+  userManagementUrl: string,
   basename?: string,
 ) =>
   createBrowserRouter(
@@ -42,7 +43,7 @@ export const createLeafWikiRouter = (
       {
         path: '/users',
         element:
-          isReadOnlyViewer || authDisabled ? (
+          isReadOnlyViewer || authDisabled || userManagementUrl ? (
             <Navigate to="/" />
           ) : (
             <AuthWrapper>

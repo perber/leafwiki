@@ -926,6 +926,81 @@ func TestConfigEndpoint_IncludesEnableLinkRefactor(t *testing.T) {
 	}
 }
 
+func TestConfigEndpoint_IncludesUserManagementUrl(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		UserManagementURL:       "https://control-plane.example.com/users",
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	got, ok := resp["userManagementUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected userManagementUrl in config response, got %v", resp)
+	}
+
+	if got != "https://control-plane.example.com/users" {
+		t.Fatalf("Expected userManagementUrl=%q, got %q", "https://control-plane.example.com/users", got)
+	}
+}
+
+func TestConfigEndpoint_UserManagementUrlDefaultsToEmpty(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	got, ok := resp["userManagementUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected userManagementUrl in config response, got %v", resp)
+	}
+
+	if got != "" {
+		t.Fatalf("Expected userManagementUrl to default to empty string, got %q", got)
+	}
+}
+
 func TestRefactorPreviewEndpoint_UsesFrontendJSONShape(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

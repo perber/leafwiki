@@ -12,6 +12,7 @@ type ConfigStore = {
   gitBackupEnabled: boolean
   httpRemoteUserEnabled: boolean
   httpRemoteUserLogoutUrl: string
+  userManagementUrl: string
   error: string | null
   loading: boolean
   hasLoaded: boolean
@@ -28,6 +29,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   gitBackupEnabled: false,
   httpRemoteUserEnabled: false,
   httpRemoteUserLogoutUrl: '',
+  userManagementUrl: '',
   error: null,
   loading: false,
   hasLoaded: false,
@@ -52,6 +54,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         gitBackupEnabled: config.gitBackupEnabled ?? false,
         httpRemoteUserEnabled: config.httpRemoteUserEnabled ?? false,
         httpRemoteUserLogoutUrl: config.httpRemoteUserLogoutUrl ?? '',
+        userManagementUrl: config.userManagementUrl ?? '',
         error: null,
         hasLoaded: true,
       })
