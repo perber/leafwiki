@@ -13,10 +13,15 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import MarkdownCodeEditor from './MarkdownCodeEditor'
 import MarkdownToolbar from './MarkdownToolbar'
-import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
+import {
+  insertHeadingAtStart,
+  insertWrappedText,
+  replaceFilenameInText,
+} from './editorCommands'
 
 import { uploadAsset, UploadAssetResponse } from '@/lib/api/assets'
 import { mapApiError } from '@/lib/api/errors'
@@ -26,6 +31,8 @@ import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
 import { usePageEditorStore } from './pageEditorStore'
 import { slugifyHeadline } from '../preview/rehypeLineNumber'
+import { htmlToMarkdown } from './htmlToMarkdown'
+import { uploadInlineDataUriImages } from './pasteImageUpload'
 
 export type MarkdownEditorRef = {
   insertAtCursor: (text: string) => void
@@ -40,6 +47,8 @@ export type MarkdownEditorRef = {
   redo: () => void
   canUndo: () => boolean
   canRedo: () => boolean
+  pasteRich: () => Promise<void>
+  pastePlain: () => Promise<void>
 }
 
 type Props = {
@@ -77,6 +86,7 @@ const MarkdownEditor = (
     [],
   )
 
+  const { t } = useTranslation('editor')
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   const setPreviewRef = useCallback((node: HTMLDivElement | null) => {
@@ -246,12 +256,7 @@ const MarkdownEditor = (
       if (!view) return
       const docText = view.state.doc.toString()
 
-      // Just replace the filename.
-      // The path remains unchanged, but the filename has to start with '/'
-      const regex = new RegExp(`(!?\\[.*?\\]\\(.*?/?)/${before}(\\))`, 'g')
-
-      const newFilename = after.startsWith('/') ? after.slice(1) : after
-      const updatedText = docText.replace(regex, `$1/${newFilename}$2`)
+      const updatedText = replaceFilenameInText(docText, before, after)
 
       // Replace the entire document content
       view.dispatch({
@@ -306,6 +311,89 @@ const MarkdownEditor = (
       if (view) {
         redo(view)
       }
+    },
+    pasteRich: async () => {
+      const startView = editorViewRef.current
+      if (!startView) return
+      let md: string | null = null
+      try {
+        if (typeof navigator.clipboard.read === 'function') {
+          const items = await navigator.clipboard.read()
+          for (const item of items) {
+            if (item.types.includes('text/html')) {
+              const blob = await item.getType('text/html')
+              md = htmlToMarkdown(await blob.text()) || null
+              break
+            }
+          }
+          // Reuse the same clipboard read for the plain-text fallback instead
+          // of issuing a second navigator.clipboard call, which can trigger a
+          // second permission prompt for the same paste action.
+          if (!md) {
+            for (const item of items) {
+              if (item.types.includes('text/plain')) {
+                const blob = await item.getType('text/plain')
+                md = (await blob.text()) || null
+                break
+              }
+            }
+          }
+        }
+      } catch {
+        // clipboard-read permission denied or API unavailable — fall through to readText
+      }
+      if (!md) {
+        try {
+          md = (await navigator.clipboard.readText()) || null
+        } catch {
+          toast.error(t('toolbar.pasteClipboardError'))
+          return
+        }
+      }
+      if (!md) return
+      md = await uploadInlineDataUriImages(md, pageId, maxAssetUploadSizeBytes)
+      // Re-read after awaits: the editor may have been destroyed, or replaced
+      // by a different page's editor (navigation during the async clipboard
+      // read), while this was pending — only proceed if it's still the same
+      // live view the paste was initiated on.
+      const view = editorViewRef.current
+      if (!view || view !== startView) return
+      const sel = view.state.selection.main
+      view.dispatch({
+        changes: { from: sel.from, to: sel.to, insert: md },
+        selection: { anchor: sel.from + md.length },
+      })
+      const newDoc = view.state.doc.toString()
+      setMarkdown(newDoc)
+      onChange(newDoc)
+      view.focus()
+    },
+    pastePlain: async () => {
+      const startView = editorViewRef.current
+      if (!startView) return
+      let text: string
+      try {
+        text = await navigator.clipboard.readText()
+      } catch {
+        toast.error(t('toolbar.pasteClipboardError'))
+        return
+      }
+      if (!text) return
+      // Re-read after await: the editor may have been destroyed, or replaced
+      // by a different page's editor (navigation during the async clipboard
+      // read), while this was pending — only proceed if it's still the same
+      // live view the paste was initiated on.
+      const view = editorViewRef.current
+      if (!view || view !== startView) return
+      const sel = view.state.selection.main
+      view.dispatch({
+        changes: { from: sel.from, to: sel.to, insert: text },
+        selection: { anchor: sel.from + text.length },
+      })
+      const newDoc = view.state.doc.toString()
+      setMarkdown(newDoc)
+      onChange(newDoc)
+      view.focus()
     },
   }))
 

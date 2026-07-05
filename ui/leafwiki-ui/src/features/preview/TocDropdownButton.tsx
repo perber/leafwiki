@@ -8,11 +8,14 @@ import {
 import { scrollToHeadlineHash } from '@/lib/scrollToHeadline'
 import { cn } from '@/lib/utils'
 import { ChevronDown } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { TocEntry } from './extractTocEntries'
+import { useTocScrollSpy } from './useTocScrollSpy'
 
 type Props = {
   entries: TocEntry[]
   clickable?: boolean
+  activeId?: string | null
 }
 
 function getTocEntryClassName(level: number) {
@@ -31,12 +34,24 @@ function getTocEntryClassName(level: number) {
   return 'pl-12 text-sm'
 }
 
-export function TocDropdownButton({ entries, clickable = true }: Props) {
+export function TocDropdownButton({
+  entries,
+  clickable = true,
+  activeId: externalActiveId,
+}: Props) {
+  const { t } = useTranslation('viewer')
+  // When the parent provides activeId, skip internal scroll spy (no duplicate listener).
+  const internalActiveId = useTocScrollSpy(
+    externalActiveId !== undefined ? [] : entries,
+  )
+  const activeId =
+    externalActiveId !== undefined ? externalActiveId : internalActiveId
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          On this page
+          {t('toc.onThisPage')}
           <ChevronDown size={12} />
         </Button>
       </DropdownMenuTrigger>
@@ -44,31 +59,27 @@ export function TocDropdownButton({ entries, clickable = true }: Props) {
         align="start"
         className="max-h-[70vh] max-w-96 min-w-48 overflow-y-auto"
       >
-        {entries.map((entry) =>
-          clickable ? (
-            <DropdownMenuItem
-              key={entry.id}
-              className={cn(
-                'cursor-pointer',
-                getTocEntryClassName(entry.level),
-              )}
-              onSelect={() => {
-                scrollToHeadlineHash(`#${encodeURIComponent(entry.id)}`, {
-                  waitForStableLayout: false,
-                })
-              }}
-            >
-              {entry.text}
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem
-              key={entry.id}
-              className={getTocEntryClassName(entry.level)}
-            >
-              {entry.text}
-            </DropdownMenuItem>
-          ),
-        )}
+        {entries.map((entry) => (
+          <DropdownMenuItem
+            key={entry.id}
+            className={cn(
+              getTocEntryClassName(entry.level),
+              activeId === entry.id && 'text-brand',
+              clickable && 'cursor-pointer',
+            )}
+            onSelect={
+              clickable
+                ? () => {
+                    scrollToHeadlineHash(`#${encodeURIComponent(entry.id)}`, {
+                      waitForStableLayout: false,
+                    })
+                  }
+                : undefined
+            }
+          >
+            {entry.text}
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )

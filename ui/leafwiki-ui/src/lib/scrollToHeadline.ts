@@ -9,11 +9,13 @@ export function scrollToHeadlineHash(
     behavior = 'smooth',
     waitForStableLayout = true,
   }: ScrollToHeadlineOptions = {},
-) {
+): () => void {
   const contentContainer = document.getElementById(
     'scroll-container',
   ) as HTMLElement | null
-  if (!contentContainer) return
+  if (!contentContainer) return () => {}
+
+  let cancelled = false
 
   function waitUntilHeightStabilizes(
     element: HTMLElement,
@@ -50,6 +52,8 @@ export function scrollToHeadlineHash(
   }
 
   const scrollToTarget = () => {
+    if (cancelled) return
+
     const rawHeadlineId = hash.substring(1)
     let headlineId = rawHeadlineId
 
@@ -64,13 +68,17 @@ export function scrollToHeadlineHash(
       console.warn(`Headline with id "${headlineId}" not found.`)
       return
     }
+    history.replaceState(null, '', hash)
     headlineElement.scrollIntoView({ behavior, block: 'start' })
   }
 
   if (waitForStableLayout) {
     waitUntilHeightStabilizes(contentContainer, scrollToTarget)
-    return
+  } else {
+    scrollToTarget()
   }
 
-  scrollToTarget()
+  return () => {
+    cancelled = true
+  }
 }

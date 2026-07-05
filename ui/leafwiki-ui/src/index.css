@@ -551,19 +551,42 @@
   }
 
   .app-layout__main-content-area {
-    @apply flex flex-1 flex-col items-stretch transition-all duration-200;
+    @apply flex min-w-0 flex-1 flex-col items-stretch transition-all duration-200;
   }
 
   .app-layout__main-column {
-    @apply flex min-w-0 flex-1 flex-col;
+    @apply flex min-w-0 flex-1 flex-col overflow-hidden;
+  }
+
+  /* scroll container: flex row with toc pane — scrollbar at far right edge */
+  .app-layout__content-row {
+    @apply flex min-h-0 flex-1 overflow-y-auto;
   }
 
   .app-layout__subheader-root:empty {
     display: none;
   }
 
+  /* TOC right pane — hidden by default and when empty (no portal content) */
+  .app-layout__toc-pane {
+    display: none;
+  }
+
+  @media (min-width: 1280px) {
+    .app-layout__toc-pane:not(:empty) {
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      width: 16rem;
+      flex-shrink: 0;
+      padding-top: 1.5rem;
+    }
+  }
+
   .app-layout__main-content-area-viewer {
-    @apply border-surface-border overflow-auto;
+    @apply border-surface-border;
   }
 
   .app-layout__main-content-area-editor {
@@ -700,7 +723,7 @@
 
   /* AssetManager Component */
   .asset-manager {
-    @apply text-interface-text space-y-3 text-sm;
+    @apply text-interface-text min-w-0 space-y-3 text-sm;
   }
 
   .asset-manager__title {
@@ -1566,7 +1589,7 @@
   }
 
   .page-viewer__toc-button {
-    @apply flex w-auto items-center self-start md:shrink-0 md:justify-end md:self-center;
+    @apply flex w-auto items-center self-start md:shrink-0 md:justify-end md:self-center xl:hidden;
   }
 
   .page-viewer__metadata-bar-inner {
@@ -1575,6 +1598,29 @@
 
   .page-viewer__body {
     @apply flex min-h-0 flex-1 flex-col gap-8;
+  }
+
+  /* TOC panel renders inside app-layout__toc-pane (right pane portal) */
+  .page-viewer__toc-panel {
+    @apply w-full;
+  }
+
+  .page-viewer__toc-panel-inner {
+    @apply border-surface-border border-l pb-4 pl-3;
+  }
+
+  .page-viewer__toc-panel-title {
+    @apply text-interface-text mb-2 text-xs font-semibold tracking-wide uppercase;
+  }
+
+  .page-viewer__toc-panel-entry {
+    @apply text-interface-text/70 hover:text-interface-text block w-full cursor-pointer py-0.5 text-left text-sm leading-snug transition-colors;
+    background: none;
+    border: none;
+  }
+
+  .page-viewer__toc-panel-entry--active {
+    @apply text-brand font-medium;
   }
 
   .page-viewer__error {
@@ -2307,7 +2353,7 @@
   }
 
   .tree-view__toolbar {
-    @apply mb-2 ml-1 flex;
+    @apply mt-1 mb-2 ml-1 flex;
   }
 
   .tree-view__status {
@@ -3190,6 +3236,7 @@
     article,
     #root,
     .app-layout__content-wrapper,
+    .app-layout__content-row,
     .page-viewer,
     .page-viewer__content {
       background: #fff !important;
