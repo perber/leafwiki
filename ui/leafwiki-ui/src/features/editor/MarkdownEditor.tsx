@@ -109,7 +109,9 @@ const MarkdownEditor = (
 
   const {
     previewVisible: showPreview,
+    previewStacked,
     togglePreview,
+    togglePreviewLayout,
     lineWrap,
   } = useEditorStore()
 
@@ -513,11 +515,21 @@ const MarkdownEditor = (
         editorRef={ref as React.RefObject<MarkdownEditorRef>}
         pageId={pageId}
         onTogglePreview={togglePreview}
+        onTogglePreviewLayout={togglePreviewLayout}
         previewVisible={showPreview}
+        previewStacked={previewStacked}
         onAssetVersionChange={onAssetVersionChange}
       />
     )
-  }, [onAssetVersionChange, pageId, ref, showPreview, togglePreview])
+  }, [
+    onAssetVersionChange,
+    pageId,
+    ref,
+    showPreview,
+    previewStacked,
+    togglePreview,
+    togglePreviewLayout,
+  ])
 
   const renderEditor = useCallback(
     (toolbar: boolean = true): JSX.Element => {
@@ -619,11 +631,19 @@ const MarkdownEditor = (
       {!isMobile && (
         <div className="flex h-full w-full flex-col">
           {renderToolbar()}
-          <div className="flex w-full flex-1 overflow-hidden">
+          <div
+            className={
+              previewStacked && showPreview
+                ? 'markdown-editor__stacked-layout'
+                : 'flex w-full flex-1 overflow-hidden'
+            }
+          >
             <div
               className={
                 showPreview
-                  ? 'custom-scrollbar markdown-editor__editor-pane markdown-editor__editor-pane--half'
+                  ? previewStacked
+                    ? 'custom-scrollbar markdown-editor__editor-pane markdown-editor__editor-pane--stacked'
+                    : 'custom-scrollbar markdown-editor__editor-pane markdown-editor__editor-pane--half'
                   : 'custom-scrollbar markdown-editor__editor-pane markdown-editor__editor-pane--full'
               }
             >
@@ -633,11 +653,21 @@ const MarkdownEditor = (
             {showPreview && (
               <>
                 <div
-                  className="markdown-editor__divider"
+                  className={
+                    previewStacked
+                      ? 'markdown-editor__divider--stacked'
+                      : 'markdown-editor__divider'
+                  }
                   id="editor-preview-divider"
                 ></div>
 
-                <div className="markdown-editor__preview-container">
+                <div
+                  className={
+                    previewStacked
+                      ? 'markdown-editor__preview-container markdown-editor__preview-container--stacked'
+                      : 'markdown-editor__preview-container'
+                  }
+                >
                   {renderPreview()}
                 </div>
               </>

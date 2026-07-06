@@ -7,6 +7,10 @@ import MarkdownEditor from './MarkdownEditor'
 // We use useEffect([]) so this only fires on mount, not on re-renders.
 const mountSpy = vi.fn()
 let capturedOnChange: ((val: string) => void) | null = null
+let mockEditorState = {
+  previewVisible: false,
+  previewStacked: false,
+}
 
 vi.mock('./MarkdownCodeEditor', () => ({
   default: function MockMarkdownCodeEditor({
@@ -49,8 +53,10 @@ vi.mock('@/stores/config', () => ({
 
 vi.mock('@/stores/editor', () => ({
   useEditorStore: () => ({
-    previewVisible: false,
+    previewVisible: mockEditorState.previewVisible,
     togglePreview: vi.fn(),
+    previewStacked: mockEditorState.previewStacked,
+    togglePreviewLayout: vi.fn(),
     lineWrap: true,
   }),
 }))
@@ -95,6 +101,11 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
     mountSpy.mockClear()
     capturedOnChange = null
     mockIsMobile = false
+    mockEditorState = {
+      ...mockEditorState,
+      previewVisible: false,
+      previewStacked: false,
+    }
   })
 
   it('passes edited content (not original initialValue) to MarkdownCodeEditor on remount', async () => {
@@ -158,5 +169,29 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
 
     // MarkdownCodeEditor must not have remounted
     expect(mountSpy).not.toHaveBeenCalled()
+  })
+
+  it('renders stacked desktop layout classes when preview is stacked', () => {
+    mockEditorState = {
+      ...mockEditorState,
+      previewVisible: true,
+      previewStacked: true,
+    }
+
+    const { container } = render(
+      <MarkdownEditor
+        initialValue="original content"
+        pageId="page-1"
+        onChange={vi.fn()}
+      />,
+    )
+
+    const layout = container.querySelector('.markdown-editor__stacked-layout')
+    const divider = container.querySelector(
+      '.markdown-editor__divider--stacked',
+    )
+
+    expect(layout).not.toBeNull()
+    expect(divider).not.toBeNull()
   })
 })

@@ -918,12 +918,28 @@
     @apply w-full;
   }
 
+  .markdown-editor__editor-pane--stacked {
+    @apply h-1/2 w-full;
+  }
+
+  .markdown-editor__stacked-layout {
+    @apply flex w-full flex-1 flex-col overflow-hidden;
+  }
+
   .markdown-editor__divider {
     @apply bg-surface-border h-full w-1;
   }
 
+  .markdown-editor__divider--stacked {
+    @apply bg-surface-border h-1 w-full;
+  }
+
   .markdown-editor__preview-container {
     @apply w-1/2 max-w-none flex-1;
+  }
+
+  .markdown-editor__preview-container--stacked {
+    @apply h-1/2 w-full max-w-none;
   }
 
   /* Preview styling */
