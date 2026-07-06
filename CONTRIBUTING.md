@@ -23,6 +23,32 @@ If you're unsure whether something is worth contributing — **open an issue and
 
 ---
 
+## Issues vs. Discussions
+
+LeafWiki uses both **GitHub Issues** and **GitHub Discussions** — they serve different purposes:
+
+- **Discussions** are for anything that isn't clearly scoped yet: ideas, "what if we...", questions about usage, architecture debates, or feature proposals that need back-and-forth before they're actionable.
+- **Issues** are for concrete, actionable work: confirmed bugs, and features/changes that are clearly scoped and ready to be implemented.
+
+If you're unsure whether your idea is ready to be an issue, **start a discussion first**. A maintainer will turn it into an issue once the scope and approach are clear. This avoids issues sitting around with unresolved design questions that end up being implemented in conflicting ways.
+
+---
+
+## Picking up an issue
+
+Issues labeled **`good first issue`** or **`help wanted`** are ready to go — feel free to open a PR directly, no need to ask first.
+
+For everything else, please don't jump straight to a PR without working through it first:
+
+1. **Comment on the issue** that you'd like to work on it.
+2. If anything about the scope or approach is unclear, **ask in the issue** before writing code. Don't guess and let the PR "answer" the open question — that usually leads to rework or a rejected PR.
+3. Wait for a maintainer to confirm the issue is ready to be picked up. This also avoids two people working on the same issue at the same time.
+4. Once confirmed, open your PR and reference the issue (see [Pull request guidelines](#pull-request-guidelines)).
+
+This applies to anything beyond trivial fixes (typos, obvious one-line bugs, docs). For those, feel free to open a PR directly.
+
+---
+
 ## Project principles
 
 LeafWiki intentionally follows a small set of design principles.
@@ -87,9 +113,9 @@ If you change the e2e tests, please also run `npm run format` in the `e2e` direc
 
 To keep reviews efficient, please follow these guidelines:
 
+- **Every PR must reference an existing issue** (e.g. `Fixes #123`). PRs without a linked issue — or that weren't discussed on the issue first — may be closed and asked to go through the [issue process](#picking-up-an-issue) instead.
 - Keep pull requests **small and focused**
 - Clearly **describe the change**
-- Reference related **issues**
 - Avoid unrelated formatting changes
 - Update documentation if necessary
 
