@@ -24,8 +24,7 @@ export const useEditorStore = create<EditorStore>()(
       setPreviewVisible: (visible) => set({ previewVisible: visible }),
       togglePreview: () => set({ previewVisible: !get().previewVisible }),
       previewStacked: false,
-      togglePreviewLayout: () =>
-        set({ previewStacked: !get().previewStacked }),
+      togglePreviewLayout: () => set({ previewStacked: !get().previewStacked }),
       lineWrap: true,
       toggleLineWrap: () => set({ lineWrap: !get().lineWrap }),
       autoSave: true,

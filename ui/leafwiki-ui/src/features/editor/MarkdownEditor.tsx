@@ -654,7 +654,9 @@ const MarkdownEditor = (
               <>
                 <div
                   className={
-                    previewStacked ? 'markdown-editor__divider--stacked' : 'markdown-editor__divider'
+                    previewStacked
+                      ? 'markdown-editor__divider--stacked'
+                      : 'markdown-editor__divider'
                   }
                   id="editor-preview-divider"
                 ></div>

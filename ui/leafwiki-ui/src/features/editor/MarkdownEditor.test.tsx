@@ -101,7 +101,11 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
     mountSpy.mockClear()
     capturedOnChange = null
     mockIsMobile = false
-    mockEditorState = { ...mockEditorState, previewVisible: false, previewStacked: false }
+    mockEditorState = {
+      ...mockEditorState,
+      previewVisible: false,
+      previewStacked: false,
+    }
   })
 
   it('passes edited content (not original initialValue) to MarkdownCodeEditor on remount', async () => {
@@ -183,7 +187,9 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
     )
 
     const layout = container.querySelector('.markdown-editor__stacked-layout')
-    const divider = container.querySelector('.markdown-editor__divider--stacked')
+    const divider = container.querySelector(
+      '.markdown-editor__divider--stacked',
+    )
 
     expect(layout).not.toBeNull()
     expect(divider).not.toBeNull()
