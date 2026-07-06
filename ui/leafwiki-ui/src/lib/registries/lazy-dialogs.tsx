@@ -65,6 +65,11 @@ export const MovePageDialog = lazy(() =>
     default: m.MovePageDialog,
   })),
 )
+export const RenamePageDialog = lazy(() =>
+  import('@/features/page/RenamePageDialog').then((m) => ({
+    default: m.RenamePageDialog,
+  })),
+)
 export const PermalinkDialog = lazy(
   () => import('@/features/page/PermalinkDialog'),
 )

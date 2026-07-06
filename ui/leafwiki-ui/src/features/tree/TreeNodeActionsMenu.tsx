@@ -18,6 +18,7 @@ import {
   DIALOG_COPY_PAGE,
   DIALOG_DELETE_PAGE_CONFIRMATION,
   DIALOG_MOVE_PAGE,
+  DIALOG_RENAME_PAGE,
   DIALOG_SORT_PAGES,
 } from '@/lib/registries'
 import { stripBasePath } from '@/lib/routePath'
@@ -161,6 +162,25 @@ export default function TreeNodeActionsMenu({
           }}
         >
           <Pencil size={18} className="tree-node__action-icon" /> Edit{' '}
+          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onClick={() =>
+            openDialog(DIALOG_RENAME_PAGE, {
+              page: {
+                id: nodeId,
+                kind: nodeKind,
+                title: node.title,
+                slug: node.slug,
+                path: node.path,
+                version: nodeVersion,
+                parentId: node.parentId,
+              },
+            })
+          }
+        >
+          <Pencil size={18} className="tree-node__action-icon" /> Rename{' '}
           {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_PAGE && (

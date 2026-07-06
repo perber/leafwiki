@@ -16,6 +16,7 @@ import {
   ImagePreviewDialog,
   LinkInsertDialog,
   MovePageDialog,
+  RenamePageDialog,
   PageQuickSwitcherDialog,
   PageRefactorDialog,
   PermalinkDialog,
@@ -64,6 +65,7 @@ panelItemRegistry.register({
 export const DIALOG_ADD_PAGE = 'add-page'
 export const DIALOG_SORT_PAGES = 'sort-pages'
 export const DIALOG_MOVE_PAGE = 'move-page'
+export const DIALOG_RENAME_PAGE = 'rename-page'
 export const DIALOG_CREATE_PAGE_BY_PATH = 'create-page-by-path'
 export const DIALOG_COPY_PAGE = 'copy-page'
 export const DIALOG_EDIT_PAGE_METADATA = 'edit-page-metadata'
@@ -115,6 +117,18 @@ dialogRegistry.register({
       <MovePageDialog
         key={DIALOG_MOVE_PAGE}
         {...(props as React.ComponentProps<typeof MovePageDialog>)}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_RENAME_PAGE,
+  render: (props) => {
+    return (
+      <RenamePageDialog
+        key={DIALOG_RENAME_PAGE}
+        {...(props as React.ComponentProps<typeof RenamePageDialog>)}
       />
     )
   },
