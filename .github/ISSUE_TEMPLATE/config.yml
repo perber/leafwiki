@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ideas & Questions
+    url: https://github.com/perber/leafwiki/discussions
+    about: Not sure if it's a bug or a clearly scoped feature yet? Start a discussion first — see CONTRIBUTING.md.
