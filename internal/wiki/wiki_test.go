@@ -189,6 +189,29 @@ func TestWiki_AuthDisabled_Initialization(t *testing.T) {
 	}
 }
 
+// TestWiki_AuthDisabled_APIKeysUnavailable guards against the exact
+// regression a code review caught: API-key auth must not remain active when
+// --disable-auth is set, or a key created before a later restart with
+// --disable-auth could keep authenticating (and narrowing/blocking)
+// requests in a mode where auth is supposed to be irrelevant.
+func TestWiki_AuthDisabled_APIKeysUnavailable(t *testing.T) {
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:   t.TempDir(),
+		AuthDisabled: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance with AuthDisabled: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+
+	if wikiInstance.apiKeys != nil {
+		t.Error("Expected api key service to be nil when AuthDisabled is true")
+	}
+	if wikiInstance.APIKeyService() != nil {
+		t.Error("Expected APIKeyService() to be nil when AuthDisabled is true")
+	}
+}
+
 func TestWiki_AuthDisabled_LoginUnavailable(t *testing.T) {
 	// Create a wiki instance with AuthDisabled set to true
 	wikiInstance, err := NewWiki(&WikiOptions{

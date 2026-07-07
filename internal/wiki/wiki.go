@@ -190,18 +190,27 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 		return err
 	}
 
-	apiKeyStore, err := auth.NewAPIKeyStore(w.storageDir)
-	if err != nil {
-		return err
-	}
-	w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.user)
-
 	if !options.AuthDisabled {
 		sessionStore, err := auth.NewSessionStore(w.storageDir)
 		if err != nil {
 			return err
 		}
 		w.auth = auth.NewAuthService(w.user, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+
+		// API keys are only meaningful when authentication is meaningful:
+		// key management is admin-only and RequireAdmin already hard-blocks
+		// admin operations when auth is disabled, so no key can be created
+		// in that mode anyway. Keeping construction inside this block (like
+		// sessionStore/w.auth) means w.APIKeyService() is nil when
+		// AuthDisabled, which in turn keeps the Bearer middleware from being
+		// registered at all — a key created before a later --disable-auth
+		// restart must not keep authenticating (and narrowing/blocking)
+		// requests in a mode where auth is supposed to be irrelevant.
+		apiKeyStore, err := auth.NewAPIKeyStore(w.storageDir)
+		if err != nil {
+			return err
+		}
+		w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.user)
 	}
 	return nil
 }
