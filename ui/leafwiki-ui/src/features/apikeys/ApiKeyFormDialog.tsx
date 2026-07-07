@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { ApiKeyRole, CreateApiKeyResult } from '@/lib/api/apikeys'
+import type { CreateApiKeyResult } from '@/lib/api/apikeys'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_API_KEY_FORM } from '@/lib/registries'
 import { useApiKeyStore } from '@/stores/apikeys'
@@ -19,16 +19,20 @@ import { toast } from 'sonner'
 const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
 
 // expiresAt holds a plain "YYYY-MM-DD" from the date input; the backend
-// expects RFC3339, so a bare date is normalized to midnight UTC on submit.
+// expects RFC3339. Normalize to the END of the selected day (23:59:59 UTC),
+// not the start — the backend rejects a non-future expiry, and midnight UTC
+// of "today" is already in the past the instant the key is created in every
+// timezone at or west of UTC, making the most natural choice (picking today)
+// always fail. End-of-day keeps "today" valid for the rest of the day
+// everywhere.
 function toExpiresAtRFC3339(dateOnly: string): string | undefined {
   if (!dateOnly) return undefined
-  return `${dateOnly}T00:00:00Z`
+  return `${dateOnly}T23:59:59Z`
 }
 
 export function ApiKeyFormDialog() {
   const [name, setName] = useState('')
   const [userId, setUserId] = useState('')
-  const [role, setRole] = useState<ApiKeyRole>('viewer')
   const [expiresAt, setExpiresAt] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
@@ -45,7 +49,13 @@ export function ApiKeyFormDialog() {
       const created = await createApiKey({
         name,
         userId,
-        role,
+        // Role is intentionally omitted — the create dialog only mints
+        // viewer-scoped keys for now (see Select removal below); the
+        // backend defaults to viewer when role is absent. Editor/admin
+        // roles are accepted by the API for future/direct use, but every
+        // Bearer-authenticated write is currently blocked by CSRF
+        // regardless of role, so offering them here would suggest a
+        // capability the backend can't yet honor.
         expiresAt: toExpiresAtRFC3339(expiresAt),
       })
       toast.success('API key created successfully')
@@ -152,28 +162,6 @@ export function ApiKeyFormDialog() {
               ))}
             </SelectContent>
           </Select>
-          <Select
-            value={role}
-            onValueChange={(val) => {
-              setRole(val as ApiKeyRole)
-              setFieldErrors((prev) => ({ ...prev, role: '' }))
-            }}
-          >
-            <SelectTrigger data-testid="api-key-role-select">
-              <SelectValue placeholder="Select a role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem key="viewer" value="viewer">
-                Viewer
-              </SelectItem>
-              <SelectItem key="editor" value="editor">
-                Editor
-              </SelectItem>
-              <SelectItem key="admin" value="admin">
-                Admin
-              </SelectItem>
-            </SelectContent>
-          </Select>
           <FormInput
             label="expires at (optional)"
             name="expiresAt"
@@ -184,7 +172,11 @@ export function ApiKeyFormDialog() {
               setFieldErrors((prev) => ({ ...prev, expiresAt: '' }))
             }}
             error={fieldErrors.expiresAt}
+            testid="api-key-expires-at"
           />
+          <p className="text-muted text-sm">
+            New keys are viewer (read-only) for now.
+          </p>
         </div>
       )}
     </BaseDialog>
