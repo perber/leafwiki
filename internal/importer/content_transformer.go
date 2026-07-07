@@ -12,6 +12,8 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 )
 
+const indexFilename = "index.md"
+
 type importTarget struct {
 	targetPath string
 	kind       tree.NodeKind
@@ -456,15 +458,15 @@ func buildSourceCandidates(sourcePath string, href string) []string {
 	trimmed := strings.TrimSuffix(base, "/")
 
 	if strings.HasSuffix(raw, "/") {
-		candidates = append(candidates, path.Join(trimmed, "index.md"))
+		candidates = append(candidates, path.Join(trimmed, indexFilename))
 	}
 
 	ext := strings.ToLower(path.Ext(trimmed))
 	switch ext {
 	case ".md":
-		candidates = append(candidates, path.Join(strings.TrimSuffix(trimmed, ".md"), "index.md"))
+		candidates = append(candidates, path.Join(strings.TrimSuffix(trimmed, ".md"), indexFilename))
 	case "":
-		candidates = append(candidates, trimmed+".md", path.Join(trimmed, "index.md"))
+		candidates = append(candidates, trimmed+".md", path.Join(trimmed, indexFilename))
 	}
 
 	return uniqueStrings(candidates)

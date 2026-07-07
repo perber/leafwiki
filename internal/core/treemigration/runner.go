@@ -13,6 +13,7 @@ import (
 const (
 	NodeKindPage    = "page"
 	NodeKindSection = "section"
+	logErrorAddingFrontmatter = "Error adding frontmatter to child node"
 )
 
 type Metadata struct {
@@ -237,7 +238,7 @@ func migrateToV2(deps Dependencies) error {
 
 	for _, child := range deps.Root.Children() {
 		if err := addFrontmatter(deps, child); err != nil {
-			deps.Log.Error("Error adding frontmatter to child node", "nodeID", child.ID(), "error", err)
+			deps.Log.Error(logErrorAddingFrontmatter, "nodeID", child.ID(), "error", err)
 			return err
 		}
 	}
@@ -290,7 +291,7 @@ func addFrontmatter(deps Dependencies, node Node) error {
 			deps.Log.Warn("Page file does not exist, skipping frontmatter addition", "nodeID", node.ID())
 			for _, child := range node.Children() {
 				if err := addFrontmatter(deps, child); err != nil {
-					deps.Log.Error("Error adding frontmatter to child node", "nodeID", child.ID(), "error", err)
+					deps.Log.Error(logErrorAddingFrontmatter, "nodeID", child.ID(), "error", err)
 					return err
 				}
 			}
@@ -339,7 +340,7 @@ func addFrontmatter(deps Dependencies, node Node) error {
 
 	for _, child := range node.Children() {
 		if err := addFrontmatter(deps, child); err != nil {
-			deps.Log.Error("Error adding frontmatter to child node", "nodeID", child.ID(), "error", err)
+			deps.Log.Error(logErrorAddingFrontmatter, "nodeID", child.ID(), "error", err)
 			return err
 		}
 	}

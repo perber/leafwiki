@@ -30,8 +30,13 @@ type TreeService struct {
 	mu sync.RWMutex
 }
 
-// NewTreeService creates a new TreeService
-const legacyTreeFilename = "tree.json"
+const (
+	legacyTreeFilename                     = "tree.json"
+	errNilTreeReconstructed                = "internal error: tree reconstruction returned nil tree"
+	errPersistChildOrderFailed             = "could not persist child order: %w"
+	errGetPageContentFailed                = "could not get page content: %w"
+	errRollbackMovedNodeFailed             = "rollback moved node: %w"
+)
 
 func NewTreeService(storageDir string) *TreeService {
 	return &TreeService{
@@ -64,7 +69,7 @@ func (t *TreeService) LoadTree() error {
 			return err
 		}
 		if reconstructed == nil {
-			return fmt.Errorf("internal error: tree reconstruction returned nil tree")
+			return fmt.Errorf(errNilTreeReconstructed)
 		}
 		t.tree = reconstructed
 		t.rebuildIndexesLocked()
@@ -91,7 +96,7 @@ func (t *TreeService) LoadTree() error {
 	}
 
 	if t.tree == nil {
-		return fmt.Errorf("internal error: tree reconstruction returned nil tree")
+		return fmt.Errorf(errNilTreeReconstructed)
 	}
 
 	t.log.Info("Migrating schema", "fromVersion", schema.Version, "toVersion", CurrentSchemaVersion)
@@ -105,7 +110,7 @@ func (t *TreeService) LoadTree() error {
 		return err
 	}
 	if reconstructed == nil {
-		return fmt.Errorf("internal error: tree reconstruction returned nil tree")
+		return fmt.Errorf(errNilTreeReconstructed)
 	}
 
 	t.tree = reconstructed
@@ -328,9 +333,9 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 	if err := t.store.SaveChildOrder(parent); err != nil {
 		rollbackErr := t.rollbackCreatedNodeLocked(parent, entry, parentWasConverted)
 		if rollbackErr != nil {
-			return nil, errors.Join(fmt.Errorf("could not persist child order: %w", err), fmt.Errorf("rollback created node: %w", rollbackErr))
+			return nil, errors.Join(fmt.Errorf(errPersistChildOrderFailed, err), fmt.Errorf("rollback created node: %w", rollbackErr))
 		}
-		return nil, fmt.Errorf("could not persist child order: %w", err)
+		return nil, fmt.Errorf(errPersistChildOrderFailed, err)
 	}
 	return &createNodeResult{
 		id:                 entry.ID,
@@ -644,7 +649,7 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool, expec
 
 		t.reindexPositions(parent)
 		if err := t.store.SaveChildOrder(parent); err != nil {
-			return fmt.Errorf("could not persist child order: %w", err)
+			return fmt.Errorf(errPersistChildOrderFailed, err)
 		}
 		return nil
 	})
@@ -962,7 +967,7 @@ func (t *TreeService) GetPages(ids []string) ([]*Page, []error) {
 			content, raw, err := t.store.ReadPageAndRaw(tk.node)
 			mu.Lock()
 			if err != nil {
-				errs[tk.index] = fmt.Errorf("could not get page content: %w", err)
+				errs[tk.index] = fmt.Errorf(errGetPageContentFailed, err)
 			} else {
 				pages[tk.index] = &Page{PageNode: tk.node, Content: content, RawContent: raw}
 			}
@@ -991,7 +996,7 @@ func (t *TreeService) GetPage(id string) (*Page, error) {
 
 	content, raw, err := t.store.ReadPageAndRaw(page)
 	if err != nil {
-		return nil, fmt.Errorf("could not get page content: %w", err)
+		return nil, fmt.Errorf(errGetPageContentFailed, err)
 	}
 
 	return &Page{
@@ -1076,7 +1081,7 @@ func (t *TreeService) FindPageByRoutePath(routePath string) (*Page, error) {
 
 	content, err := t.store.ReadPageContent(node)
 	if err != nil {
-		return nil, fmt.Errorf("could not get page content: %w", err)
+		return nil, fmt.Errorf(errGetPageContentFailed, err)
 	}
 
 	return &Page{
@@ -1364,7 +1369,7 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string, expect
 	if err := t.store.SaveChildOrder(oldParent); err != nil {
 		rollbackErr := t.rollbackMovedNodeLocked(node, oldParent, newParent, previousOldChildren, previousOldPositions, previousNewChildren, previousNewPositions, previousPosition, previousMetadata, newParentWasConverted)
 		if rollbackErr != nil {
-			return errors.Join(fmt.Errorf("could not persist source child order: %w", err), fmt.Errorf("rollback moved node: %w", rollbackErr))
+			return errors.Join(fmt.Errorf("could not persist source child order: %w", err), fmt.Errorf(errRollbackMovedNodeFailed, rollbackErr))
 		}
 		return fmt.Errorf("could not persist source child order: %w", err)
 	}
@@ -1372,7 +1377,7 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string, expect
 		if err := t.store.SaveChildOrder(newParent); err != nil {
 			rollbackErr := t.rollbackMovedNodeLocked(node, oldParent, newParent, previousOldChildren, previousOldPositions, previousNewChildren, previousNewPositions, previousPosition, previousMetadata, newParentWasConverted)
 			if rollbackErr != nil {
-				return errors.Join(fmt.Errorf("could not persist destination child order: %w", err), fmt.Errorf("rollback moved node: %w", rollbackErr))
+				return errors.Join(fmt.Errorf("could not persist destination child order: %w", err), fmt.Errorf(errRollbackMovedNodeFailed, rollbackErr))
 			}
 			return fmt.Errorf("could not persist destination child order: %w", err)
 		}
@@ -1381,7 +1386,7 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string, expect
 	if err := t.store.SyncFrontmatterIfExists(node); err != nil {
 		rollbackErr := t.rollbackMovedNodeLocked(node, oldParent, newParent, previousOldChildren, previousOldPositions, previousNewChildren, previousNewPositions, previousPosition, previousMetadata, newParentWasConverted)
 		if rollbackErr != nil {
-			return errors.Join(fmt.Errorf("could not sync moved node frontmatter: %w", err), fmt.Errorf("rollback moved node: %w", rollbackErr))
+			return errors.Join(fmt.Errorf("could not sync moved node frontmatter: %w", err), fmt.Errorf(errRollbackMovedNodeFailed, rollbackErr))
 		}
 		return fmt.Errorf("could not sync moved node frontmatter: %w", err)
 	}
@@ -1564,7 +1569,7 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 				child.Position = pos
 			}
 		}
-		return fmt.Errorf("could not persist child order: %w", err)
+		return fmt.Errorf(errPersistChildOrderFailed, err)
 	}
 
 	return nil

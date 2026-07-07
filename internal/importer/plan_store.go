@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const errWrapFmt = "%w: %v"
+
 var ErrNoPlan = errors.New("no plan available")
 var ErrImportExecutionRunning = errors.New("import execution already running")
 var ErrImportCanceled = errors.New("import execution canceled")
@@ -50,7 +52,7 @@ func NewPlanStore(stateFile ...string) *PlanStore {
 	if len(stateFile) > 0 {
 		ps.stateFile = stateFile[0]
 		if err := ps.load(); err != nil {
-			ps.stateErr = fmt.Errorf("%w: %v", ErrImportStateUnavailable, err)
+			ps.stateErr = fmt.Errorf(errWrapFmt, ErrImportStateUnavailable, err)
 		}
 	}
 	return ps
@@ -64,7 +66,7 @@ func (ps *PlanStore) Set(sp *StoredPlan) error {
 	}
 	ps.plan = sp
 	if err := ps.persistLocked(); err != nil {
-		ps.stateErr = fmt.Errorf("%w: %v", ErrImportStateUnavailable, err)
+		ps.stateErr = fmt.Errorf(errWrapFmt, ErrImportStateUnavailable, err)
 		return ps.stateErr
 	}
 	return nil
@@ -91,7 +93,7 @@ func (ps *PlanStore) Clear() (*StoredPlan, error) {
 	old := ps.plan
 	ps.plan = nil
 	if err := ps.persistLocked(); err != nil {
-		ps.stateErr = fmt.Errorf("%w: %v", ErrImportStateUnavailable, err)
+		ps.stateErr = fmt.Errorf(errWrapFmt, ErrImportStateUnavailable, err)
 		return old, ps.stateErr
 	}
 	return old, nil
@@ -128,7 +130,7 @@ func (ps *PlanStore) TryStartExecution(userID string) (*StoredPlan, bool, error)
 		StartedAt:      &now,
 	}
 	if err := ps.persistLocked(); err != nil {
-		ps.stateErr = fmt.Errorf("%w: %v", ErrImportStateUnavailable, err)
+		ps.stateErr = fmt.Errorf(errWrapFmt, ErrImportStateUnavailable, err)
 		return nil, false, ps.stateErr
 	}
 
@@ -158,7 +160,7 @@ func (ps *PlanStore) FinishExecution(planID string, result *ExecutionResult, exe
 			ps.plan.ExecutionStatus = ExecutionStatusCanceled
 			ps.plan.ExecutionError = nil
 			if err := ps.persistLocked(); err != nil {
-				ps.stateErr = fmt.Errorf("%w: %v", ErrImportStateUnavailable, err)
+				ps.stateErr = fmt.Errorf(errWrapFmt, ErrImportStateUnavailable, err)
 				return ps.stateErr
 			}
 			return nil
@@ -167,7 +169,7 @@ func (ps *PlanStore) FinishExecution(planID string, result *ExecutionResult, exe
 		ps.plan.ExecutionStatus = ExecutionStatusFailed
 		ps.plan.ExecutionError = &errMsg
 		if err := ps.persistLocked(); err != nil {
-			ps.stateErr = fmt.Errorf("%w: %v", ErrImportStateUnavailable, err)
+			ps.stateErr = fmt.Errorf(errWrapFmt, ErrImportStateUnavailable, err)
 			return ps.stateErr
 		}
 		return nil
@@ -180,7 +182,7 @@ func (ps *PlanStore) FinishExecution(planID string, result *ExecutionResult, exe
 	ps.plan.ProcessedItems = ps.plan.TotalItems
 	ps.plan.CurrentItemSourcePath = nil
 	if err := ps.persistLocked(); err != nil {
-		ps.stateErr = fmt.Errorf("%w: %v", ErrImportStateUnavailable, err)
+		ps.stateErr = fmt.Errorf(errWrapFmt, ErrImportStateUnavailable, err)
 		return ps.stateErr
 	}
 	return nil
@@ -210,7 +212,7 @@ func (ps *PlanStore) UpdateExecutionProgress(planID string, progress ExecutionPr
 		ps.plan.ExecutionResult = cloneExecutionResult(partialResult)
 	}
 	if err := ps.persistLocked(); err != nil {
-		ps.stateErr = fmt.Errorf("%w: %v", ErrImportStateUnavailable, err)
+		ps.stateErr = fmt.Errorf(errWrapFmt, ErrImportStateUnavailable, err)
 		return ps.stateErr
 	}
 	return nil
@@ -235,7 +237,7 @@ func (ps *PlanStore) RequestCancel() (*StoredPlan, bool, error) {
 
 	ps.plan.CancelRequested = true
 	if err := ps.persistLocked(); err != nil {
-		ps.stateErr = fmt.Errorf("%w: %v", ErrImportStateUnavailable, err)
+		ps.stateErr = fmt.Errorf(errWrapFmt, ErrImportStateUnavailable, err)
 		return nil, false, ps.stateErr
 	}
 	return cloneStoredPlan(ps.plan), true, nil

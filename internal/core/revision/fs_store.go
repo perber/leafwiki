@@ -23,7 +23,11 @@ type FSStore struct {
 
 type revisionIndex map[string]string
 
-const revisionIndexFileName = "_index.json"
+const (
+	revisionIndexFileName = "_index.json"
+	errInvalidPageID      = "invalid page ID: %w"
+	errReadRevisionFailed = "read revision %s: %w"
+)
 
 func NewFSStore(storageDir string, logger *slog.Logger) *FSStore {
 	if logger == nil {
@@ -37,7 +41,7 @@ func NewFSStore(storageDir string, logger *slog.Logger) *FSStore {
 
 func (s *FSStore) SaveContentBlob(pageID string, content []byte) (string, error) {
 	if err := validateStorageID(pageID); err != nil {
-		return "", fmt.Errorf("invalid page ID: %w", err)
+		return "", fmt.Errorf(errInvalidPageID, err)
 	}
 	hash := sha256HexBytes(content)
 	dst := s.contentBlobPath(pageID, hash)
@@ -193,7 +197,7 @@ func (s *FSStore) ListRevisions(pageID string) ([]*Revision, error) {
 
 func (s *FSStore) ListRevisionsPage(pageID, cursor string, limit int) ([]*Revision, string, error) {
 	if err := validateStorageID(pageID); err != nil {
-		return nil, "", fmt.Errorf("invalid page ID: %w", err)
+		return nil, "", fmt.Errorf(errInvalidPageID, err)
 	}
 	names, err := s.revisionFileNames(pageID)
 	if err != nil {
@@ -228,7 +232,7 @@ func (s *FSStore) ListRevisionsPage(pageID, cursor string, limit int) ([]*Revisi
 	for _, name := range names[start:end] {
 		var rev Revision
 		if err := readJSON(filepath.Join(dir, name), &rev); err != nil {
-			return nil, "", fmt.Errorf("read revision %s: %w", name, err)
+			return nil, "", fmt.Errorf(errReadRevisionFailed, name, err)
 		}
 		revisions = append(revisions, &rev)
 	}
@@ -242,7 +246,7 @@ func (s *FSStore) ListRevisionsPage(pageID, cursor string, limit int) ([]*Revisi
 
 func (s *FSStore) GetLatestRevision(pageID string) (*Revision, error) {
 	if err := validateStorageID(pageID); err != nil {
-		return nil, fmt.Errorf("invalid page ID: %w", err)
+		return nil, fmt.Errorf(errInvalidPageID, err)
 	}
 	names, err := s.revisionFileNames(pageID)
 	if err != nil {
@@ -260,7 +264,7 @@ func (s *FSStore) GetLatestRevision(pageID string) (*Revision, error) {
 
 func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
 	if err := validateStorageID(pageID); err != nil {
-		return nil, fmt.Errorf("invalid page ID: %w", err)
+		return nil, fmt.Errorf(errInvalidPageID, err)
 	}
 	revisionID = strings.TrimSpace(revisionID)
 	if revisionID == "" {
@@ -274,7 +278,7 @@ func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
 	if name := strings.TrimSpace(index[revisionID]); name != "" {
 		var rev Revision
 		if err := readJSON(filepath.Join(s.revisionsPageDir(pageID), name), &rev); err != nil {
-			return nil, fmt.Errorf("read revision %s: %w", name, err)
+			return nil, fmt.Errorf(errReadRevisionFailed, name, err)
 		}
 		return &rev, nil
 	}
@@ -287,7 +291,7 @@ func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
 		if strings.HasSuffix(name, "_"+revisionID+".json") {
 			var rev Revision
 			if err := readJSON(filepath.Join(s.revisionsPageDir(pageID), name), &rev); err != nil {
-				return nil, fmt.Errorf("read revision %s: %w", name, err)
+				return nil, fmt.Errorf(errReadRevisionFailed, name, err)
 			}
 			index[revisionID] = name
 			_ = s.saveRevisionIndex(pageID, index)
@@ -301,7 +305,7 @@ func (s *FSStore) GetRevision(pageID, revisionID string) (*Revision, error) {
 // The revision ID and filename are unchanged; only the JSON content is replaced.
 func (s *FSStore) UpdateRevision(rev *Revision) error {
 	if err := validateStorageID(rev.PageID); err != nil {
-		return fmt.Errorf("invalid page ID: %w", err)
+		return fmt.Errorf(errInvalidPageID, err)
 	}
 	index, err := s.loadRevisionIndex(rev.PageID)
 	if err != nil {
@@ -341,7 +345,7 @@ func (s *FSStore) PruneRevisions(pageID string, keepCount int) error {
 		return nil
 	}
 	if err := validateStorageID(pageID); err != nil {
-		return fmt.Errorf("invalid page ID: %w", err)
+		return fmt.Errorf(errInvalidPageID, err)
 	}
 	names, err := s.revisionFileNames(pageID)
 	if err != nil || len(names) <= keepCount {
@@ -402,7 +406,7 @@ func (s *FSStore) revisionFileNames(pageID string) ([]string, error) {
 
 func (s *FSStore) ReadContentBlob(pageID, hash string) ([]byte, error) {
 	if err := validateStorageID(pageID); err != nil {
-		return nil, fmt.Errorf("invalid page ID: %w", err)
+		return nil, fmt.Errorf(errInvalidPageID, err)
 	}
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
@@ -427,7 +431,7 @@ func (s *FSStore) ReadContentBlob(pageID, hash string) ([]byte, error) {
 // Use this instead of ReadContentBlob when you don't need the full content in memory.
 func (s *FSStore) OpenContentBlob(pageID, hash string) (io.ReadCloser, error) {
 	if err := validateStorageID(pageID); err != nil {
-		return nil, fmt.Errorf("invalid page ID: %w", err)
+		return nil, fmt.Errorf(errInvalidPageID, err)
 	}
 	hash = strings.TrimSpace(hash)
 	if hash == "" {
@@ -451,7 +455,7 @@ func (s *FSStore) OpenContentBlob(pageID, hash string) (io.ReadCloser, error) {
 // revision of pageID still references it. Errors are non-fatal — callers should log them.
 func (s *FSStore) DeleteContentBlobIfUnreferenced(pageID, hash string) error {
 	if err := validateStorageID(pageID); err != nil {
-		return fmt.Errorf("invalid page ID: %w", err)
+		return fmt.Errorf(errInvalidPageID, err)
 	}
 	names, err := s.revisionFileNames(pageID)
 	if err != nil {

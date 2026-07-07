@@ -24,11 +24,16 @@ import (
 // gcLooseThreshold is the number of loose objects that triggers a gc() run.
 // git itself defaults to 6700; we use a lower value because the backup repo
 // accumulates objects predictably and we prefer smaller, more frequent packs.
-const gcLooseThreshold = 500
-
-// networkTimeout caps how long a single SSH pull or push may block the
-// scheduler goroutine. A TCP-blackholed remote would otherwise stall it forever.
-const networkTimeout = 2 * time.Minute
+const (
+	gcLooseThreshold               = 500
+	networkTimeout                 = 2 * time.Minute
+	errWriteGitignoreFailed        = "failed to write .gitignore: %w"
+	errComputeRelativeRootFailed   = "failed to compute relative path for root: %w"
+	errComputeRelativeAssetsFailed = "failed to compute relative path for assets: %w"
+	errStageRootDirFailed          = "failed to stage root dir: %w"
+	errStageAssetsDirFailed        = "failed to stage assets dir: %w"
+	errCommitFailed                = "failed to commit: %w"
+)
 
 // errRemoteBranchNotFound is returned by initWithRemoteHistory when the remote
 // repository has commits on other branches but not on cfg.Branch. The caller
@@ -93,7 +98,7 @@ func Init(cfg Config) (*Repository, error) {
 		// Ensure .gitignore exists even for repos created before this feature
 		// was added, or if it was manually deleted.
 		if err := EnsureGitignore(repoDir); err != nil {
-			return nil, fmt.Errorf("failed to write .gitignore: %w", err)
+			return nil, fmt.Errorf(errWriteGitignoreFailed, err)
 		}
 		return r, nil
 	}
@@ -120,7 +125,7 @@ func Init(cfg Config) (*Repository, error) {
 				r.lastPushedHash = head.Hash()
 			}
 			if err := EnsureGitignore(repoDir); err != nil {
-				return nil, fmt.Errorf("failed to write .gitignore: %w", err)
+				return nil, fmt.Errorf(errWriteGitignoreFailed, err)
 			}
 			return r, nil
 		}
@@ -145,7 +150,7 @@ func Init(cfg Config) (*Repository, error) {
 	r.repo = repo
 
 	if err := EnsureGitignore(repoDir); err != nil {
-		return nil, fmt.Errorf("failed to write .gitignore: %w", err)
+		return nil, fmt.Errorf(errWriteGitignoreFailed, err)
 	}
 
 	// Create initial commit with root/ and assets/ if they exist
@@ -322,11 +327,11 @@ func (r *Repository) makeInitialCommit() error {
 	// Compute relative paths from repo root
 	rootRel, err := filepath.Rel(r.repoDir, r.cfg.RootDir)
 	if err != nil {
-		return fmt.Errorf("failed to compute relative path for root: %w", err)
+		return fmt.Errorf(errComputeRelativeRootFailed, err)
 	}
 	assetsRel, err := filepath.Rel(r.repoDir, r.cfg.AssetsDir)
 	if err != nil {
-		return fmt.Errorf("failed to compute relative path for assets: %w", err)
+		return fmt.Errorf(errComputeRelativeAssetsFailed, err)
 	}
 	slog.Debug("makeInitialCommit: resolved relative paths", "rootRel", rootRel, "assetsRel", assetsRel)
 
@@ -339,7 +344,7 @@ func (r *Repository) makeInitialCommit() error {
 	if _, err := os.Stat(r.cfg.RootDir); err == nil {
 		slog.Debug("makeInitialCommit: staging root dir", "path", rootRel)
 		if _, err := wt.Add(filepath.ToSlash(rootRel)); err != nil {
-			return fmt.Errorf("failed to stage root dir: %w", err)
+			return fmt.Errorf(errStageRootDirFailed, err)
 		}
 		// Check if root has any files
 		if hasFilesFlag, err := hasFiles(r.cfg.RootDir); err == nil && hasFilesFlag {
@@ -357,7 +362,7 @@ func (r *Repository) makeInitialCommit() error {
 	if _, err := os.Stat(r.cfg.AssetsDir); err == nil {
 		slog.Debug("makeInitialCommit: staging assets dir", "path", assetsRel)
 		if _, err := wt.Add(filepath.ToSlash(assetsRel)); err != nil {
-			return fmt.Errorf("failed to stage assets dir: %w", err)
+			return fmt.Errorf(errStageAssetsDirFailed, err)
 		}
 		// Check if assets has any files
 		if hasFilesFlag, err := hasFiles(r.cfg.AssetsDir); err == nil && hasFilesFlag {
@@ -404,7 +409,7 @@ func (r *Repository) makeInitialCommit() error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to commit: %w", err)
+		return fmt.Errorf(errCommitFailed, err)
 	}
 	slog.Debug("makeInitialCommit: initial commit created", "hash", commit.String())
 
@@ -483,15 +488,15 @@ func (r *Repository) RunBackup() error {
 
 	rootRel, err := filepath.Rel(r.repoDir, r.cfg.RootDir)
 	if err != nil {
-		errMsg := fmt.Errorf("failed to compute relative path for root: %w", err).Error()
+		errMsg := fmt.Errorf(errComputeRelativeRootFailed, err).Error()
 		r.status.SetError(errMsg)
-		return fmt.Errorf("failed to compute relative path for root: %w", err)
+		return fmt.Errorf(errComputeRelativeRootFailed, err)
 	}
 	assetsRel, err := filepath.Rel(r.repoDir, r.cfg.AssetsDir)
 	if err != nil {
-		errMsg := fmt.Errorf("failed to compute relative path for assets: %w", err).Error()
+		errMsg := fmt.Errorf(errComputeRelativeAssetsFailed, err).Error()
 		r.status.SetError(errMsg)
-		return fmt.Errorf("failed to compute relative path for assets: %w", err)
+		return fmt.Errorf(errComputeRelativeAssetsFailed, err)
 	}
 	slog.Debug("RunBackup: staging content directories", "rootRel", rootRel, "assetsRel", assetsRel)
 
@@ -500,10 +505,10 @@ func (r *Repository) RunBackup() error {
 
 	if _, err := os.Stat(r.cfg.RootDir); err == nil {
 		if _, err := wt.Add(filepath.ToSlash(rootRel)); err != nil {
-			errMsg := fmt.Errorf("failed to stage root dir: %w", err).Error()
+			errMsg := fmt.Errorf(errStageRootDirFailed, err).Error()
 			slog.Debug("RunBackup: failed to stage root dir", "error", errMsg)
 			r.status.SetError(errMsg)
-			return fmt.Errorf("failed to stage root dir: %w", err)
+			return fmt.Errorf(errStageRootDirFailed, err)
 		}
 		slog.Debug("RunBackup: staged root dir", "path", rootRel)
 	} else {
@@ -512,10 +517,10 @@ func (r *Repository) RunBackup() error {
 	}
 	if _, err := os.Stat(r.cfg.AssetsDir); err == nil {
 		if _, err := wt.Add(filepath.ToSlash(assetsRel)); err != nil {
-			errMsg := fmt.Errorf("failed to stage assets dir: %w", err).Error()
+			errMsg := fmt.Errorf(errStageAssetsDirFailed, err).Error()
 			slog.Debug("RunBackup: failed to stage assets dir", "error", errMsg)
 			r.status.SetError(errMsg)
-			return fmt.Errorf("failed to stage assets dir: %w", err)
+			return fmt.Errorf(errStageAssetsDirFailed, err)
 		}
 		slog.Debug("RunBackup: staged assets dir", "path", assetsRel)
 	} else {
@@ -588,10 +593,10 @@ func (r *Repository) RunBackup() error {
 			r.status.SetSuccess(time.Now())
 			return nil
 		}
-		errMsg := fmt.Errorf("failed to commit: %w", err).Error()
+		errMsg := fmt.Errorf(errCommitFailed, err).Error()
 		slog.Debug("RunBackup: commit failed", "error", errMsg)
 		r.status.SetError(errMsg)
-		return fmt.Errorf("failed to commit: %w", err)
+		return fmt.Errorf(errCommitFailed, err)
 	}
 	slog.Debug("RunBackup: commit created", "hash", commit.String(), "message", commitMsg)
 

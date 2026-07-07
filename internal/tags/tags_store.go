@@ -13,6 +13,11 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const (
+	logCloseRowsFailed = "could not close rows"
+	sqlLimitFmt        = " LIMIT %d"
+)
+
 type TagsStore struct {
 	mu sync.Mutex
 	db *sql.DB
@@ -200,7 +205,7 @@ func (s *TagsStore) GetExcerptsForPages(pageIDs []string) (map[string]string, er
 	if err != nil {
 		return nil, err
 	}
-	defer shared.LogClose(rows.Close, "could not close rows")
+	defer shared.LogClose(rows.Close, logCloseRowsFailed)
 
 	result := make(map[string]string)
 	for rows.Next() {
@@ -245,14 +250,14 @@ func (s *TagsStore) GetAllTags(filter string, limit int) ([]TagCount, error) {
 		ORDER BY count DESC, tag ASC
 	`
 	if limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", limit)
+		query += fmt.Sprintf(sqlLimitFmt, limit)
 	}
 
 	rows, err := s.db.Query(query, escapeLikePrefix(filter))
 	if err != nil {
 		return nil, err
 	}
-	defer shared.LogClose(rows.Close, "could not close rows")
+	defer shared.LogClose(rows.Close, logCloseRowsFailed)
 
 	var result []TagCount
 	for rows.Next() {
@@ -304,14 +309,14 @@ func (s *TagsStore) GetAllTagsForSelection(filter string, selected []string, lim
 		ORDER BY count DESC, tag ASC
 	`, selectionPlaceholders, selectionPlaceholders)
 	if limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", limit)
+		query += fmt.Sprintf(sqlLimitFmt, limit)
 	}
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer shared.LogClose(rows.Close, "could not close rows")
+	defer shared.LogClose(rows.Close, logCloseRowsFailed)
 
 	var result []TagCount
 	for rows.Next() {
@@ -350,7 +355,7 @@ func (s *TagsStore) GetPageIDsByTags(tags []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer shared.LogClose(rows.Close, "could not close rows")
+	defer shared.LogClose(rows.Close, logCloseRowsFailed)
 
 	var pageIDs []string
 	for rows.Next() {
@@ -372,14 +377,14 @@ func (s *TagsStore) getAllTagsLocked(filter string, limit int) ([]TagCount, erro
 		ORDER BY count DESC, tag ASC
 	`
 	if limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", limit)
+		query += fmt.Sprintf(sqlLimitFmt, limit)
 	}
 
 	rows, err := s.db.Query(query, escapeLikePrefix(filter))
 	if err != nil {
 		return nil, err
 	}
-	defer shared.LogClose(rows.Close, "could not close rows")
+	defer shared.LogClose(rows.Close, logCloseRowsFailed)
 
 	var result []TagCount
 	for rows.Next() {
@@ -415,7 +420,7 @@ func (s *TagsStore) GetTagsForPages(pageIDs []string) (map[string][]string, erro
 	if err != nil {
 		return nil, err
 	}
-	defer shared.LogClose(rows.Close, "could not close rows")
+	defer shared.LogClose(rows.Close, logCloseRowsFailed)
 
 	result := make(map[string][]string)
 	for rows.Next() {
