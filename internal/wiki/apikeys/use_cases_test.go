@@ -3,6 +3,7 @@ package apikeys
 import (
 	"context"
 	"testing"
+	"time"
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
@@ -107,6 +108,41 @@ func TestCreateAPIKey_RejectsInvalidRole(t *testing.T) {
 	}
 }
 
+func TestCreateAPIKey_RejectsNonFutureExpiry(t *testing.T) {
+	create, _, _, users := setupAPIKeyUseCases(t)
+	owner, err := users.CreateUser("dave2", "dave2@example.com", "password123", coreauth.RoleViewer)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	past := time.Now().Add(-time.Hour)
+	_, err = create.Execute(context.Background(), CreateAPIKeyInput{Name: "k", UserID: owner.ID, ExpiresAt: &past, CreatedBy: "admin1"})
+	var ve *sharederrors.ValidationErrors
+	if !isValidationError(err, &ve) {
+		t.Fatalf("expected *ValidationErrors, got %T: %v", err, err)
+	}
+	if !hasFieldError(ve, "expiresAt") {
+		t.Errorf("expected a validation error on field 'expiresAt', got %+v", ve.Errors)
+	}
+}
+
+func TestCreateAPIKey_AcceptsFutureExpiry(t *testing.T) {
+	create, _, _, users := setupAPIKeyUseCases(t)
+	owner, err := users.CreateUser("dave3", "dave3@example.com", "password123", coreauth.RoleViewer)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	future := time.Now().Add(time.Hour)
+	out, err := create.Execute(context.Background(), CreateAPIKeyInput{Name: "k", UserID: owner.ID, ExpiresAt: &future, CreatedBy: "admin1"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if out.Key.ExpiresAt == nil || !out.Key.ExpiresAt.Equal(future) {
+		t.Errorf("expected ExpiresAt %v, got %v", future, out.Key.ExpiresAt)
+	}
+}
+
 func TestCreateAPIKey_PropagatesUnknownUserError(t *testing.T) {
 	create, _, _, _ := setupAPIKeyUseCases(t)
 
@@ -157,6 +193,37 @@ func TestRevokeAPIKey_PropagatesNotFound(t *testing.T) {
 	err := revoke.Execute(context.Background(), RevokeAPIKeyInput{ID: "missing"})
 	if err != coreauth.ErrAPIKeyNotFound {
 		t.Fatalf("expected ErrAPIKeyNotFound, got %v", err)
+	}
+}
+
+// ─── nil-service defense in depth (mirrors wiki/auth's ErrAuthDisabled guard) ─
+//
+// A nil *coreauth.APIKeyService means the Wiki composition root built it
+// under --disable-auth (see wiki.go's initAuth). The HTTP routes are already
+// RequireAdmin-gated so this should be unreachable via the API, but each use
+// case defends its own invariant rather than trusting the caller.
+
+func TestCreateAPIKey_NilServiceReturnsAPIKeysDisabled(t *testing.T) {
+	uc := NewCreateAPIKeyUseCase(nil)
+	_, err := uc.Execute(context.Background(), CreateAPIKeyInput{Name: "k", UserID: "u1", CreatedBy: "admin1"})
+	if err != ErrAPIKeysDisabled {
+		t.Fatalf("expected ErrAPIKeysDisabled, got %v", err)
+	}
+}
+
+func TestListAPIKeys_NilServiceReturnsAPIKeysDisabled(t *testing.T) {
+	uc := NewListAPIKeysUseCase(nil)
+	_, err := uc.Execute(context.Background())
+	if err != ErrAPIKeysDisabled {
+		t.Fatalf("expected ErrAPIKeysDisabled, got %v", err)
+	}
+}
+
+func TestRevokeAPIKey_NilServiceReturnsAPIKeysDisabled(t *testing.T) {
+	uc := NewRevokeAPIKeyUseCase(nil)
+	err := uc.Execute(context.Background(), RevokeAPIKeyInput{ID: "k1"})
+	if err != ErrAPIKeysDisabled {
+		t.Fatalf("expected ErrAPIKeysDisabled, got %v", err)
 	}
 }
 

@@ -2,12 +2,22 @@ package apikeys
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
+
+// ErrAPIKeysDisabled is returned when an api-key operation is called while
+// authentication is disabled (mirrors wikiauth.ErrAuthDisabled). The HTTP
+// routes are already RequireAdmin-gated (which itself hard-blocks when auth
+// is disabled), so this should be unreachable in practice — it exists as
+// defense in depth against a nil APIKeyService, the same way LoginUseCase
+// guards against a nil AuthService rather than relying solely on the
+// HTTP-layer guard.
+var ErrAPIKeysDisabled = errors.New("api key management is disabled")
 
 // ─── CreateAPIKeyUseCase ─────────────────────────────────────────────────────
 
@@ -33,6 +43,10 @@ func NewCreateAPIKeyUseCase(k *coreauth.APIKeyService) *CreateAPIKeyUseCase {
 }
 
 func (uc *CreateAPIKeyUseCase) Execute(_ context.Context, in CreateAPIKeyInput) (*CreateAPIKeyOutput, error) {
+	if uc.keys == nil {
+		return nil, ErrAPIKeysDisabled
+	}
+
 	ve := sharederrors.NewValidationErrors()
 	if strings.TrimSpace(in.Name) == "" {
 		ve.Add("name", "Name must not be empty")
@@ -42,6 +56,9 @@ func (uc *CreateAPIKeyUseCase) Execute(_ context.Context, in CreateAPIKeyInput) 
 	}
 	if in.Role != "" && !coreauth.IsValidRole(in.Role) {
 		ve.Add("role", "Invalid role")
+	}
+	if in.ExpiresAt != nil && !in.ExpiresAt.After(time.Now()) {
+		ve.Add("expiresAt", "Expiry date must be in the future")
 	}
 	if ve.HasErrors() {
 		return nil, ve
@@ -75,6 +92,10 @@ func NewListAPIKeysUseCase(k *coreauth.APIKeyService) *ListAPIKeysUseCase {
 }
 
 func (uc *ListAPIKeysUseCase) Execute(_ context.Context) (*ListAPIKeysOutput, error) {
+	if uc.keys == nil {
+		return nil, ErrAPIKeysDisabled
+	}
+
 	keys, err := uc.keys.ListAPIKeys()
 	if err != nil {
 		return nil, err
@@ -95,5 +116,8 @@ func NewRevokeAPIKeyUseCase(k *coreauth.APIKeyService) *RevokeAPIKeyUseCase {
 }
 
 func (uc *RevokeAPIKeyUseCase) Execute(_ context.Context, in RevokeAPIKeyInput) error {
+	if uc.keys == nil {
+		return ErrAPIKeysDisabled
+	}
 	return uc.keys.RevokeAPIKey(in.ID)
 }
