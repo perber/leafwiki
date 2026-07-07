@@ -39,8 +39,10 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 }
 
 // RegisterRoutes implements RouteRegistrar. All three routes are admin-only
-// and use the normal cookie-authenticated session — API keys manage
-// themselves through the UI, not through another API key.
+// and require the normal cookie-authenticated session — RequireCookieSession
+// enforces that API keys manage themselves through the UI, not through
+// another API key (an admin-scoped key must not be able to enumerate or
+// manage every key in the system).
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 	base := ctx.Base
@@ -52,9 +54,9 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
 
-	authGroup.POST("/api-keys", authmw.RequireAdmin(opts.AuthDisabled), r.handleCreateAPIKey)
-	authGroup.GET("/api-keys", authmw.RequireAdmin(opts.AuthDisabled), r.handleListAPIKeys)
-	authGroup.DELETE("/api-keys/:id", authmw.RequireAdmin(opts.AuthDisabled), r.handleRevokeAPIKey)
+	authGroup.POST("/api-keys", authmw.RequireCookieSession(), authmw.RequireAdmin(opts.AuthDisabled), r.handleCreateAPIKey)
+	authGroup.GET("/api-keys", authmw.RequireCookieSession(), authmw.RequireAdmin(opts.AuthDisabled), r.handleListAPIKeys)
+	authGroup.DELETE("/api-keys/:id", authmw.RequireCookieSession(), authmw.RequireAdmin(opts.AuthDisabled), r.handleRevokeAPIKey)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────

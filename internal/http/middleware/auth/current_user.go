@@ -36,3 +36,12 @@ func TryGetUser(c *gin.Context) *auth.User {
 	}
 	return user
 }
+
+// IsAPIKeyAuth reports whether the current request's user was resolved from
+// a Bearer API key (set by InjectAPIKeyUser) rather than a normal cookie/JWT
+// session or reverse-proxy header.
+func IsAPIKeyAuth(c *gin.Context) bool {
+	v, _ := c.Get("apiKeyAuth")
+	b, _ := v.(bool)
+	return b
+}

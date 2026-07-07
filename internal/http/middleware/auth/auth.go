@@ -73,6 +73,20 @@ func RequireAdmin(authDisabled bool) gin.HandlerFunc {
 	}
 }
 
+// RequireCookieSession blocks a request whose "user" was resolved from a
+// Bearer API key rather than a normal cookie/JWT session. Used for endpoints
+// that must remain UI/session-only, like API key management itself — an API
+// key must not be usable to create, list, or revoke other API keys.
+func RequireCookieSession() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if IsAPIKeyAuth(c) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "this endpoint requires a browser session, not an API key"})
+			return
+		}
+		c.Next()
+	}
+}
+
 func RequireSelfOrAdmin(authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Block all user management operations when authentication is disabled

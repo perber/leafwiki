@@ -106,6 +106,38 @@ func TestAPIKeys_NonAdminCannotManageKeys(t *testing.T) {
 	}
 }
 
+// TestAPIKeys_AdminScopedKeyCannotManageKeys is the regression test for the
+// code-review finding that an admin-scoped API key could list (and, absent
+// CSRF's incidental protection, create/revoke) every key in the system via
+// Bearer auth. RequireCookieSession now closes this explicitly: even an
+// admin-scoped key must be rejected from /api/api-keys, regardless of role.
+func TestAPIKeys_AdminScopedKeyCannotManageKeys(t *testing.T) {
+	w, router := newAPIKeyRouterTest(t)
+
+	owner, err := w.UserService().CreateUser("admin-agent-owner", "admin-agent-owner@example.com", "password123", coreauth.RoleAdmin)
+	if err != nil {
+		t.Fatalf("CreateUser err: %v", err)
+	}
+
+	createBody := `{"name":"admin key","userId":"` + owner.ID + `","role":"admin"}`
+	createRec := authenticatedRequest(t, router, http.MethodPost, "/api/api-keys", strings.NewReader(createBody))
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 creating admin-scoped key, got %d: %s", createRec.Code, createRec.Body.String())
+	}
+	var created struct {
+		Secret string `json:"secret"`
+	}
+	if err := json.Unmarshal(createRec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("unmarshal create response: %v", err)
+	}
+
+	listRec := httptest.NewRecorder()
+	router.ServeHTTP(listRec, bearerRequest(http.MethodGet, "/api/api-keys", created.Secret))
+	if listRec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 listing keys with an admin-scoped Bearer key, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+}
+
 // TestAPIKeys_ViewerScopedKeyCanReadButNotWrite is the end-to-end proof of the
 // permission model: a viewer-scoped key can reach a read endpoint, but is
 // rejected on a mutating one. The write attempt is rejected for CSRF reasons
