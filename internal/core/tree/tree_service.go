@@ -69,7 +69,7 @@ func (t *TreeService) LoadTree() error {
 			return err
 		}
 		if reconstructed == nil {
-			return fmt.Errorf(errNilTreeReconstructed)
+			return errors.New(errNilTreeReconstructed)
 		}
 		t.tree = reconstructed
 		t.rebuildIndexesLocked()
@@ -96,7 +96,7 @@ func (t *TreeService) LoadTree() error {
 	}
 
 	if t.tree == nil {
-		return fmt.Errorf(errNilTreeReconstructed)
+		return errors.New(errNilTreeReconstructed)
 	}
 
 	t.log.Info("Migrating schema", "fromVersion", schema.Version, "toVersion", CurrentSchemaVersion)
@@ -110,7 +110,7 @@ func (t *TreeService) LoadTree() error {
 		return err
 	}
 	if reconstructed == nil {
-		return fmt.Errorf(errNilTreeReconstructed)
+		return errors.New(errNilTreeReconstructed)
 	}
 
 	t.tree = reconstructed
