@@ -43,7 +43,8 @@ export default class TreeView {
     expectedActionTestId:
       | 'tree-view-action-button-sort'
       | 'tree-view-action-button-move'
-      | 'tree-view-action-button-delete',
+      | 'tree-view-action-button-delete'
+      | 'tree-view-action-button-rename',
   ) {
     await nodeRow.waitFor({ state: 'visible' });
     await nodeRow.scrollIntoViewIfNeeded();
@@ -249,6 +250,24 @@ export default class TreeView {
     );
     await expect(moveButton).toBeVisible();
     await moveButton.click();
+  }
+
+  async openRenameDialogForPage(pageTitle: string, parentPage?: string) {
+    await this.ensureSidebarVisible();
+    await this.closeBlockingOverlayIfPresent();
+
+    if (parentPage) {
+      await this.expandNodeByTitle(parentPage);
+    }
+
+    const nodeRow = this.getNodeRowByTitle(pageTitle);
+    await this.openMoreActionsMenuForNodeRow(nodeRow, 'tree-view-action-button-rename');
+
+    const renameButton = this.page.locator(
+      '[role="menuitem"][data-testid="tree-view-action-button-rename"]',
+    );
+    await expect(renameButton).toBeVisible();
+    await renameButton.click();
   }
 
   async openDeleteDialogForPage(pageTitle: string, parentPage?: string) {

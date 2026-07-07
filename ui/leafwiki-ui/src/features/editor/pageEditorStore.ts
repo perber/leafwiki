@@ -45,6 +45,7 @@ export interface PageEditorState {
   savePage: (options?: { silent?: boolean }) => Promise<Page | null | undefined> // save the current page
   forceOverwrite: () => Promise<Page | null | undefined> // re-fetch server version, then save
   loadPageData: (path: string) => Promise<void> // load page data by path
+  resetEditorState: () => void // clear the store back to its pristine (no page loaded) shape
 }
 
 function tagsChanged(current: string[], original: string[]): boolean {
@@ -354,5 +355,25 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         useProgressbarStore.getState().setLoading(false)
       }
     }
+  },
+  // Called when PageEditor unmounts so `page` (and thus currentEditorPageId
+  // reads elsewhere, e.g. TreeNodeActionsMenu's rename/delete guards) doesn't
+  // keep pointing at the last-edited page indefinitely after the editor closes.
+  resetEditorState: () => {
+    loadController?.abort()
+    set({
+      error: null,
+      isLoading: false,
+      notFound: false,
+      page: null,
+      title: '',
+      slug: '',
+      content: '',
+      tags: [],
+      frontmatterFields: [],
+      frontmatterUnsupported: '',
+      frontmatterErrors: {},
+      initialPage: null,
+    })
   },
 }))
