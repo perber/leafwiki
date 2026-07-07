@@ -154,6 +154,12 @@ export default function UserToolbar() {
             >
               Import
             </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => navigate('/settings/api-keys')}
+            >
+              API Keys
+            </DropdownMenuItem>
             {backupEnabled && (
               <DropdownMenuItem
                 className="cursor-pointer"

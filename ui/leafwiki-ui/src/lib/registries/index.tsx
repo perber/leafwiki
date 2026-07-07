@@ -5,11 +5,13 @@ import { getShortcutDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { FolderTree, Search as SearchIcon } from 'lucide-react'
 import {
   AddPageDialog,
+  ApiKeyFormDialog,
   AssetManagerDialog,
   ChangeOwnPasswordDialog,
   ChangePasswordDialog,
   CopyPageDialog,
   CreatePageByPathDialog,
+  DeleteApiKeyDialog,
   DeletePageDialog,
   DeleteUserDialog,
   EditPageMetadataDialog,
@@ -73,6 +75,9 @@ export const DIALOG_CHANGE_OWN_PASSWORD = 'change-own-password'
 export const DIALOG_USER_FORM = 'user-form'
 export const DIALOG_CHANGE_USER_PASSWORD = 'change-user-password'
 export const DIALOG_DELETE_USER_CONFIRMATION = 'delete-user-confirmation'
+export const DIALOG_API_KEY_FORM = 'api-key-form'
+export const DIALOG_DELETE_API_KEY_CONFIRMATION =
+  'delete-api-key-confirmation'
 export const DIALOG_UNSAVED_CHANGES = 'unsaved-changes'
 export const DIALOG_IMAGE_PREVIEW = 'image-preview'
 export const DIALOG_PAGE_QUICK_SWITCHER = 'page-quick-switcher'
@@ -218,6 +223,25 @@ dialogRegistry.register({
       <DeleteUserDialog
         key={DIALOG_DELETE_USER_CONFIRMATION}
         {...(props as React.ComponentProps<typeof DeleteUserDialog>)}
+      />
+    )
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_API_KEY_FORM,
+  render: () => {
+    return <ApiKeyFormDialog key={DIALOG_API_KEY_FORM} />
+  },
+})
+
+dialogRegistry.register({
+  type: DIALOG_DELETE_API_KEY_CONFIRMATION,
+  render: (props) => {
+    return (
+      <DeleteApiKeyDialog
+        key={DIALOG_DELETE_API_KEY_CONFIRMATION}
+        {...(props as React.ComponentProps<typeof DeleteApiKeyDialog>)}
       />
     )
   },

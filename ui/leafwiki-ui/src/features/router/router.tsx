@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom'
 import {
+  ApiKeysManagement,
   BackupSettings,
   BrandingSettings,
   Importer,
@@ -58,6 +59,16 @@ export const createLeafWikiRouter = (
         ) : (
           <AuthWrapper>
             <BrandingSettings />
+          </AuthWrapper>
+        ),
+      },
+      {
+        path: '/settings/api-keys',
+        element: isReadOnlyViewer ? (
+          <Navigate to="/" />
+        ) : (
+          <AuthWrapper>
+            <ApiKeysManagement />
           </AuthWrapper>
         ),
       },

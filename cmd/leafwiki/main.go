@@ -432,6 +432,7 @@ func main() {
 			UserService:    w.UserService(),
 			LogoutURL:      httpRemoteUserLogoutURL,
 		},
+		APIKeyService:     w.APIKeyService(),
 		DisableRequestLog: disableRequestLog,
 		UserManagementURL: userManagementURL,
 	})

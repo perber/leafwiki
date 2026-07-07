@@ -19,6 +19,7 @@ import (
 	"github.com/perber/wiki/internal/properties"
 	"github.com/perber/wiki/internal/search"
 	"github.com/perber/wiki/internal/tags"
+	wikiapikeys "github.com/perber/wiki/internal/wiki/apikeys"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikiauth "github.com/perber/wiki/internal/wiki/auth"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
@@ -41,6 +42,7 @@ type Wiki struct {
 	auth         *auth.AuthService
 	userResolver *auth.UserResolver
 	user         *auth.UserService
+	apiKeys      *auth.APIKeyService
 	asset        *assets.AssetService
 	branding     *branding.BrandingService
 	searchIndex  *search.SQLiteIndex
@@ -57,6 +59,7 @@ type Wiki struct {
 	tagsRoutes       *wikitags.Routes
 	propertiesRoutes *wikiproperties.Routes
 	brandingRoutes   *wikibranding.Routes
+	apiKeysRoutes    *wikiapikeys.Routes
 	importerRoutes   *wikiimporter.Routes
 	healthRoutes     *wikihealth.Routes
 	revision         *revision.Service
@@ -186,6 +189,13 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 	if err != nil {
 		return err
 	}
+
+	apiKeyStore, err := auth.NewAPIKeyStore(w.storageDir)
+	if err != nil {
+		return err
+	}
+	w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.user)
+
 	if !options.AuthDisabled {
 		sessionStore, err := auth.NewSessionStore(w.storageDir)
 		if err != nil {
@@ -314,6 +324,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.tagsRoutes = w.buildTagsRoutes()
 	w.propertiesRoutes = w.buildPropertiesRoutes()
 	w.brandingRoutes = w.buildBrandingRoutes()
+	w.apiKeysRoutes = w.buildAPIKeysRoutes()
 	w.importerRoutes = w.buildImporterRoutes(options)
 	w.healthRoutes = wikihealth.NewRoutes(wikihealth.RoutesConfig{
 		Index:      w.searchIndex,
@@ -451,6 +462,15 @@ func (w *Wiki) buildBrandingRoutes() *wikibranding.Routes {
 	})
 }
 
+func (w *Wiki) buildAPIKeysRoutes() *wikiapikeys.Routes {
+	return wikiapikeys.NewRoutes(wikiapikeys.RoutesConfig{
+		CreateAPIKey: wikiapikeys.NewCreateAPIKeyUseCase(w.apiKeys),
+		ListAPIKeys:  wikiapikeys.NewListAPIKeysUseCase(w.apiKeys),
+		RevokeAPIKey: wikiapikeys.NewRevokeAPIKeyUseCase(w.apiKeys),
+		AuthService:  w.auth,
+	})
+}
+
 func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 	importerDir := filepath.Join(options.StorageDir, ".importer")
 	adapter := NewWikiImportAdapter(w)
@@ -482,6 +502,7 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.tagsRoutes,
 		w.propertiesRoutes,
 		w.brandingRoutes,
+		w.apiKeysRoutes,
 		w.importerRoutes,
 		w.healthRoutes,
 		w.resyncRoutes,
@@ -731,9 +752,14 @@ func (w *Wiki) UserService() *auth.UserService {
 	return w.user
 }
 
+// APIKeyService returns the API key service used for Bearer authentication.
+func (w *Wiki) APIKeyService() *auth.APIKeyService {
+	return w.apiKeys
+}
+
 func (w *Wiki) Close() error {
-	w.shutdownCancel()  // signal in-flight reloads to abort
-	w.reloadWG.Wait()   // drain goroutines before closing stores
+	w.shutdownCancel() // signal in-flight reloads to abort
+	w.reloadWG.Wait()  // drain goroutines before closing stores
 	w.status.Finish()
 	if w.auth != nil {
 		// When auth is enabled, AuthService owns both the session store and user store.
@@ -742,6 +768,12 @@ func (w *Wiki) Close() error {
 		}
 	} else if w.user != nil {
 		if err := w.user.Close(); err != nil {
+			return err
+		}
+	}
+
+	if w.apiKeys != nil {
+		if err := w.apiKeys.Close(); err != nil {
 			return err
 		}
 	}
