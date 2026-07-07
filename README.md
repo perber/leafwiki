@@ -31,6 +31,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - Runs on Linux, macOS, Windows, Raspberry Pi (x86_64 and ARM64)
 - Reverse-proxy friendly with `--base-path`
 - Reverse-proxy authentication via trusted HTTP header (v0.10+)
+- API keys for programmatic and agent access, admin-managed, read-only (see [API Keys](#api-keys))
 - Three access modes: fully internal, public read with login-only editing, or open editing without login (see [Operating Modes](#operating-modes))
 - Roles: admin, editor, viewer
 
@@ -377,6 +378,20 @@ Available since v0.10.0. Use when an upstream proxy authenticates users and forw
 - Only trusts the header from IPs listed in `--trusted-proxy-ips`
 - If the forwarded username doesn't exist in LeafWiki, the request is rejected
 - Do not enable without configuring `--trusted-proxy-ips`
+
+### API Keys
+
+Admin-managed keys for programmatic or agent access — create them from **Settings → API Keys**.
+
+```bash
+curl -H "Authorization: Bearer lw_..." https://your-wiki.example.com/api/tree
+```
+
+- A key belongs to a real user: every request made through it is attributed to that user, the same way manual edits are
+- A key's permission is the *narrower* of its own role and its owner's role — a viewer-scoped key stays read-only even if its owner is an admin, and demoting a user automatically caps every key they own
+- Keys can have an optional expiry date and are revocable at any time; revocation takes effect on the next request
+- The full key is shown once, at creation — store it securely, it cannot be viewed again afterward
+- Read-only for now: a request made with a key is rejected for any write, regardless of role
 
 ### Unix Socket (v0.11.3)
 
