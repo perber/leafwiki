@@ -23,6 +23,34 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 
 ---
 
+## Table of Contents
+
+- [Features](#features)
+- [Good fit / not a fit](#good-fit--not-a-fit)
+- [Install](#install)
+  - [Docker](#docker)
+  - [Docker Compose](#docker-compose)
+  - [Linux installer](#linux-installer)
+  - [Binary](#binary)
+  - [Reset admin password](#reset-admin-password)
+- [Operating Modes](#operating-modes)
+- [Dev Setup](#dev-setup)
+- [Configuration](#configuration)
+  - [CLI Flags](#cli-flags)
+  - [Environment Variables](#environment-variables)
+  - [Custom Stylesheet](#custom-stylesheet)
+  - [Reverse-Proxy Authentication](#reverse-proxy-authentication)
+  - [Unix Socket](#unix-socket-v0113)
+  - [Git Backup](#git-backup-v0113-experimental)
+  - [Security](#security)
+  - [Operations notes](#operations-notes)
+- [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Sorting Pages](#sorting-pages)
+- [Support this project](#support-this-project)
+- [Contributing](#contributing)
+
+---
+
 ## Features
 
 **Operations:**
