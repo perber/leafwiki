@@ -35,11 +35,19 @@ import * as apiKeyAPI from '@/lib/api/apikeys'
 
 describe('ApiKeyFormDialog', () => {
   beforeEach(() => {
-    useDialogsStore.setState({ dialogType: DIALOG_API_KEY_FORM, dialogProps: null })
+    useDialogsStore.setState({
+      dialogType: DIALOG_API_KEY_FORM,
+      dialogProps: null,
+    })
     useApiKeyStore.setState({ apiKeys: [] })
     useUserStore.setState({
       users: [
-        { id: 'u1', username: 'agent-owner', email: 'a@example.com', role: 'editor' },
+        {
+          id: 'u1',
+          username: 'agent-owner',
+          email: 'a@example.com',
+          role: 'editor',
+        },
       ],
     })
     vi.clearAllMocks()
@@ -49,15 +57,24 @@ describe('ApiKeyFormDialog', () => {
     const user = userEvent.setup()
     render(<ApiKeyFormDialog />)
 
-    expect(screen.getByTestId('api-key-form-dialog-button-confirm')).toBeDisabled()
+    expect(
+      screen.getByTestId('api-key-form-dialog-button-confirm'),
+    ).toBeDisabled()
 
-    await user.type(screen.getByPlaceholderText('e.g. research-agent'), 'agent key')
-    expect(screen.getByTestId('api-key-form-dialog-button-confirm')).toBeDisabled()
+    await user.type(
+      screen.getByPlaceholderText('e.g. research-agent'),
+      'agent key',
+    )
+    expect(
+      screen.getByTestId('api-key-form-dialog-button-confirm'),
+    ).toBeDisabled()
 
     await user.click(screen.getByTestId('api-key-owner-select'))
     await user.click(await screen.findByRole('option', { name: 'agent-owner' }))
 
-    expect(screen.getByTestId('api-key-form-dialog-button-confirm')).not.toBeDisabled()
+    expect(
+      screen.getByTestId('api-key-form-dialog-button-confirm'),
+    ).not.toBeDisabled()
   })
 
   it('reveals the one-time secret after creation and copies it', async () => {
@@ -85,7 +102,10 @@ describe('ApiKeyFormDialog', () => {
 
     render(<ApiKeyFormDialog />)
 
-    await user.type(screen.getByPlaceholderText('e.g. research-agent'), 'agent key')
+    await user.type(
+      screen.getByPlaceholderText('e.g. research-agent'),
+      'agent key',
+    )
     await user.click(screen.getByTestId('api-key-owner-select'))
     await user.click(await screen.findByRole('option', { name: 'agent-owner' }))
     await user.click(screen.getByTestId('api-key-form-dialog-button-confirm'))
@@ -138,7 +158,10 @@ describe('ApiKeyFormDialog', () => {
 
     render(<ApiKeyFormDialog />)
 
-    await user.type(screen.getByPlaceholderText('e.g. research-agent'), 'agent key')
+    await user.type(
+      screen.getByPlaceholderText('e.g. research-agent'),
+      'agent key',
+    )
     await user.click(screen.getByTestId('api-key-owner-select'))
     await user.click(await screen.findByRole('option', { name: 'agent-owner' }))
     await user.type(screen.getByTestId('api-key-expires-at'), '2026-07-07')

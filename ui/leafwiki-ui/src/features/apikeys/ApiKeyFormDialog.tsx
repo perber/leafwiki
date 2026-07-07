@@ -133,8 +133,7 @@ export function ApiKeyFormDialog() {
             Copy
           </Button>
           <p className="text-muted text-sm">
-            This is the only time the full key will be shown. Store it
-            securely.
+            This is the only time the full key will be shown. Store it securely.
           </p>
         </div>
       ) : (

@@ -66,8 +66,8 @@ export function DeleteApiKeyDialog({
       ]}
     >
       <p className="text-muted text-sm">
-        The API key <strong>{apiKeyName}</strong> will immediately stop
-        working. Any agent or automation using it will lose access.
+        The API key <strong>{apiKeyName}</strong> will immediately stop working.
+        Any agent or automation using it will lose access.
       </p>
     </BaseDialog>
   )

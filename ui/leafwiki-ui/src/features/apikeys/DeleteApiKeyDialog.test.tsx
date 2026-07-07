@@ -39,9 +39,7 @@ describe('DeleteApiKeyDialog', () => {
 
     expect(screen.getByText('agent key')).toBeInTheDocument()
 
-    await user.click(
-      screen.getByTestId('delete-api-key-dialog-button-confirm'),
-    )
+    await user.click(screen.getByTestId('delete-api-key-dialog-button-confirm'))
 
     await waitFor(() =>
       expect(apiKeyAPI.deleteApiKey).toHaveBeenCalledWith('k1'),
@@ -56,9 +54,7 @@ describe('DeleteApiKeyDialog', () => {
 
     render(<DeleteApiKeyDialog apiKeyId="k1" apiKeyName="agent key" />)
 
-    await user.click(
-      screen.getByTestId('delete-api-key-dialog-button-confirm'),
-    )
+    await user.click(screen.getByTestId('delete-api-key-dialog-button-confirm'))
 
     await waitFor(() => expect(apiKeyAPI.deleteApiKey).toHaveBeenCalled())
     // Dialog stays mounted/open — no crash, no unexpected list refresh call.

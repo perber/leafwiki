@@ -44,7 +44,10 @@ describe('useApiKeyStore', () => {
 
   it('createApiKey returns the secret and refreshes the list', async () => {
     const created = makeKey({ id: 'k2' })
-    const result: CreateApiKeyResult = { key: created, secret: 'lw_ab12cd34_secret' }
+    const result: CreateApiKeyResult = {
+      key: created,
+      secret: 'lw_ab12cd34_secret',
+    }
     ;(apiKeyAPI.createApiKey as ReturnType<typeof vi.fn>).mockResolvedValue(
       result,
     )

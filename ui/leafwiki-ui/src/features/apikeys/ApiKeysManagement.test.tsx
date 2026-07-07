@@ -64,7 +64,12 @@ describe('ApiKeysManagement', () => {
       },
     ])
     ;(userAPI.getUsers as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { id: 'u1', username: 'agent-owner', email: 'a@example.com', role: 'editor' },
+      {
+        id: 'u1',
+        username: 'agent-owner',
+        email: 'a@example.com',
+        role: 'editor',
+      },
     ])
 
     render(<ApiKeysManagement />)
