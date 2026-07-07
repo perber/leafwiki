@@ -113,10 +113,15 @@ describe('ApiKeyFormDialog', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('normalizes a same-day expiry to end of day, not start of day', async () => {
-    // Regression test: normalizing to midnight UTC made picking "today" as
-    // the expiry produce an already-expired key in effectively every
-    // timezone. End-of-day keeps "today" valid for the rest of the day.
+  it('normalizes a same-day expiry to the end of the local day', async () => {
+    // Regression test, two bugs: (1) normalizing to midnight UTC made
+    // picking "today" produce an already-expired key in effectively every
+    // timezone; (2) anchoring end-of-day to UTC directly (rather than the
+    // user's local timezone) shifted the displayed expiry to the next
+    // calendar day for timezones east of UTC. The expected value is computed
+    // the same way the component does, so this test is correct regardless of
+    // which timezone it runs in.
+    const expectedExpiresAt = new Date('2026-07-07T23:59:59').toISOString()
     const user = userEvent.setup()
     ;(apiKeyAPI.createApiKey as ReturnType<typeof vi.fn>).mockResolvedValue({
       key: {
@@ -141,7 +146,7 @@ describe('ApiKeyFormDialog', () => {
 
     await waitFor(() =>
       expect(apiKeyAPI.createApiKey).toHaveBeenCalledWith(
-        expect.objectContaining({ expiresAt: '2026-07-07T23:59:59Z' }),
+        expect.objectContaining({ expiresAt: expectedExpiresAt }),
       ),
     )
   })

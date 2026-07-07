@@ -18,16 +18,24 @@ import { toast } from 'sonner'
 
 const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
 
-// expiresAt holds a plain "YYYY-MM-DD" from the date input; the backend
-// expects RFC3339. Normalize to the END of the selected day (23:59:59 UTC),
-// not the start — the backend rejects a non-future expiry, and midnight UTC
-// of "today" is already in the past the instant the key is created in every
-// timezone at or west of UTC, making the most natural choice (picking today)
-// always fail. End-of-day keeps "today" valid for the rest of the day
-// everywhere.
+// expiresAt holds a plain "YYYY-MM-DD" from the date input — the user's
+// LOCAL calendar date, with no timezone attached (that's what a date picker
+// means: "the day I clicked," not a UTC date). The backend expects RFC3339
+// and rejects a non-future expiry, so this normalizes to the end of that day
+// — but end of day in the user's OWN timezone, not UTC. Anchoring to UTC
+// directly (`${dateOnly}T23:59:59Z`) is wrong two ways: for timezones west of
+// UTC it can still land in the past for "today", and for timezones east of
+// UTC the resulting instant lands in the small hours of the *next* local day,
+// so a key the admin picked "Jan 1" for shows as expiring "Jan 2" once
+// rendered back in their own timezone. Parsing the string WITHOUT a "Z"
+// suffix makes the browser treat it as local time (a plain ECMA-262
+// date-time-without-offset string is always local, unlike a date-only string
+// which is UTC — the exact opposite of what's needed here), so this
+// constructs local end-of-day and only then converts to the UTC instant the
+// wire format needs.
 function toExpiresAtRFC3339(dateOnly: string): string | undefined {
   if (!dateOnly) return undefined
-  return `${dateOnly}T23:59:59Z`
+  return new Date(`${dateOnly}T23:59:59`).toISOString()
 }
 
 export function ApiKeyFormDialog() {
