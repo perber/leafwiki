@@ -151,8 +151,20 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 
 	if opts.APIKeyService != nil {
+		// Deliberate design choice: a key is injected globally, so it is
+		// exactly as powerful as role(user) ∩ role(key) everywhere the normal
+		// RequireAuth/RequireAdmin/RequireEditorOrAdmin guards apply — the
+		// same way roles work everywhere else in the app — rather than being
+		// restricted to a curated subset of read routes. Writes are, for now,
+		// separately blocked for Bearer callers by CSRFMiddleware (see
+		// InjectAPIKeyUser's doc comment).
 		base.Use(auth_middleware.InjectAPIKeyUser(auth_middleware.APIKeyConfig{
 			Service: opts.APIKeyService,
+			// Only failed attempts count toward the limit (NotifyResult
+			// resets on success), so this never throttles a valid key's
+			// normal traffic — it exists to cap the cost of prefix/secret
+			// guessing now that Resolve uses a fast constant-time compare.
+			RateLimiter: security.NewKeyedLimiter(20, 5*time.Minute, true),
 		}))
 	}
 

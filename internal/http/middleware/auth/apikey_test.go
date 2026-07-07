@@ -4,10 +4,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
 type apiKeyFixture struct {
@@ -201,6 +203,65 @@ func TestInjectAPIKeyUser_RevokedKeyRejected(t *testing.T) {
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401 for revoked key, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestInjectAPIKeyUser_RateLimitsFailedAttempts verifies that repeated
+// invalid Bearer attempts from the same client are eventually throttled with
+// 429, protecting against prefix/secret guessing now that Resolve uses a
+// fast constant-time compare instead of the (deliberately slow) bcrypt.
+func TestInjectAPIKeyUser_RateLimitsFailedAttempts(t *testing.T) {
+	f := createAPIKeyFixture(t)
+	cleanupWithErrorCheck(t, "api key fixture", f.closeAll)
+
+	limiter := security.NewKeyedLimiter(2, time.Minute, true)
+	router := apiKeyRouter(authmw.APIKeyConfig{Service: f.keyService, RateLimiter: limiter}, nil)
+
+	badToken := "lw_deadbeef_" + "0000000000000000000000000000000000000000000000000000000000000000"
+
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Authorization", "Bearer "+badToken)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: expected 401, got %d", i+1, w.Code)
+		}
+	}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+badToken)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 after exceeding the limit, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestInjectAPIKeyUser_RateLimiterResetsOnValidKey verifies a valid key's
+// traffic never accumulates toward the failed-attempt limit.
+func TestInjectAPIKeyUser_RateLimiterResetsOnValidKey(t *testing.T) {
+	f := createAPIKeyFixture(t)
+	cleanupWithErrorCheck(t, "api key fixture", f.closeAll)
+
+	_, token, err := f.keyService.CreateAPIKey(coreauth.CreateAPIKeyParams{
+		Name: "k", UserID: f.owner.ID, CreatedBy: "admin1",
+	})
+	if err != nil {
+		t.Fatalf("CreateAPIKey err: %v", err)
+	}
+
+	limiter := security.NewKeyedLimiter(1, time.Minute, true)
+	router := apiKeyRouter(authmw.APIKeyConfig{Service: f.keyService, RateLimiter: limiter}, nil)
+
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("request %d with a valid key: expected 200, got %d: %s", i+1, w.Code, w.Body.String())
+		}
 	}
 }
 

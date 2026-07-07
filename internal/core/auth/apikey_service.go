@@ -2,14 +2,36 @@ package auth
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/perber/wiki/internal/core/shared"
-	"golang.org/x/crypto/bcrypt"
 )
+
+// dummySecretHash is compared against on an unknown-prefix lookup so Resolve
+// does the same amount of work whether or not the prefix exists — otherwise
+// an unknown prefix would return faster than a known prefix with a wrong
+// secret, letting a caller enumerate which prefixes are registered purely by
+// timing responses. Mirrors AuthService's dummyHash for the same reason (see
+// auth_service.go).
+var dummySecretHash = hashSecret("leafwiki-dummy-api-key-secret-for-timing-equalization")
+
+// hashSecret computes the stored form of an API key secret. The secret is a
+// 32-byte cryptographically random value (see generateSecret), not a human
+// password — brute-forcing it is already infeasible regardless of hash speed,
+// so a slow, adaptive hash (bcrypt) buys no extra security here and only adds
+// cost (and, worse, turns a known prefix into a cheap CPU-exhaustion target).
+// A fast cryptographic hash compared in constant time is the right tool for a
+// high-entropy secret — the same choice this codebase already makes for CSRF
+// tokens (see middleware/security/csrf.go).
+func hashSecret(secret string) string {
+	sum := sha256.Sum256([]byte(secret))
+	return hex.EncodeToString(sum[:])
+}
 
 // apiKeyTokenPrefix marks a bearer credential as an API key (as opposed to a
 // JWT access token), so the Bearer middleware can decide whether to act on it.
@@ -61,16 +83,19 @@ func (s *APIKeyService) CreateAPIKey(p CreateAPIKeyParams) (*APIKey, string, err
 		return nil, "", err
 	}
 
-	// A random-prefix collision is astronomically unlikely; retry once defensively
-	// rather than fail the request outright.
+	secret, err := generateSecret()
+	if err != nil {
+		return nil, "", err
+	}
+	hash := hashSecret(secret)
+
+	// A random-prefix collision is astronomically unlikely; retry the prefix
+	// alone once defensively rather than fail the request outright. The
+	// secret and its hash don't depend on the prefix, so they're generated
+	// only once above rather than redone on every retry.
 	const maxAttempts = 2
 	for attempt := 1; ; attempt++ {
-		prefix, secret, err := generateKeyToken()
-		if err != nil {
-			return nil, "", err
-		}
-
-		hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
+		prefix, err := generatePrefix()
 		if err != nil {
 			return nil, "", err
 		}
@@ -80,7 +105,7 @@ func (s *APIKeyService) CreateAPIKey(p CreateAPIKeyParams) (*APIKey, string, err
 			Name:      p.Name,
 			UserID:    p.UserID,
 			Prefix:    prefix,
-			KeyHash:   string(hash),
+			KeyHash:   hash,
 			Role:      role,
 			ExpiresAt: p.ExpiresAt,
 			CreatedBy: p.CreatedBy,
@@ -114,7 +139,11 @@ func (s *APIKeyService) RevokeAPIKey(id string) error {
 //
 // Any malformed token, unknown prefix, or secret mismatch is reported as the
 // single ErrAPIKeyInvalid, so a caller cannot distinguish "no such key" from
-// "wrong secret" (avoids leaking which prefixes exist).
+// "wrong secret" (avoids leaking which prefixes exist). To back that promise,
+// the secret is hashed and compared even when the prefix is unknown (against
+// dummySecretHash) — otherwise an unknown prefix would return faster than a
+// known prefix with a wrong secret, leaking exactly the distinction this
+// comment claims is hidden.
 func (s *APIKeyService) Resolve(token string) (*User, error) {
 	prefix, secret, ok := parseKeyToken(token)
 	if !ok {
@@ -122,11 +151,17 @@ func (s *APIKeyService) Resolve(token string) (*User, error) {
 	}
 
 	key, err := s.store.GetByPrefix(prefix)
-	if err != nil {
-		return nil, ErrAPIKeyInvalid
+	found := err == nil
+	if err != nil && err != ErrAPIKeyNotFound {
+		slog.Default().Warn("api key resolve: prefix lookup failed", "error", err)
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(key.KeyHash), []byte(secret)); err != nil {
+	storedHash := dummySecretHash
+	if found {
+		storedHash = key.KeyHash
+	}
+	match := subtle.ConstantTimeCompare([]byte(hashSecret(secret)), []byte(storedHash)) == 1
+	if !found || !match {
 		return nil, ErrAPIKeyInvalid
 	}
 
@@ -140,6 +175,7 @@ func (s *APIKeyService) Resolve(token string) (*User, error) {
 
 	owner, err := s.users.GetUserByID(key.UserID)
 	if err != nil {
+		slog.Default().Warn("api key resolve: owner lookup failed", "error", err, "keyID", key.ID)
 		return nil, ErrAPIKeyInvalid
 	}
 
@@ -157,18 +193,38 @@ func (s *APIKeyService) Resolve(token string) (*User, error) {
 
 // ─── pure helpers ────────────────────────────────────────────────────────────
 
-// generateKeyToken produces a fresh (prefix, secret) pair. prefix is the public,
-// indexed lookup value; secret is never stored, only its bcrypt hash is.
+// generatePrefix produces a fresh public, indexed lookup value for a new key.
+func generatePrefix() (string, error) {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// generateSecret produces a fresh 32-byte random secret. It is never stored;
+// only hashSecret's output is persisted.
+func generateSecret() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// generateKeyToken produces a fresh (prefix, secret) pair together. Kept as a
+// single call for callers (and tests) that don't need CreateAPIKey's
+// generate-secret-once / retry-only-the-prefix split.
 func generateKeyToken() (prefix string, secret string, err error) {
-	prefixBytes := make([]byte, 4)
-	if _, err = rand.Read(prefixBytes); err != nil {
+	prefix, err = generatePrefix()
+	if err != nil {
 		return "", "", err
 	}
-	secretBytes := make([]byte, 32)
-	if _, err = rand.Read(secretBytes); err != nil {
+	secret, err = generateSecret()
+	if err != nil {
 		return "", "", err
 	}
-	return hex.EncodeToString(prefixBytes), hex.EncodeToString(secretBytes), nil
+	return prefix, secret, nil
 }
 
 // LooksLikeAPIKeyToken reports whether raw is shaped like a LeafWiki API key

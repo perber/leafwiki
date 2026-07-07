@@ -36,6 +36,48 @@ func mustCreateUser(t *testing.T, users *UserService, username, role string) *Us
 	return user
 }
 
+// ─── hashSecret / timing-equalization ───────────────────────────────────────
+
+func TestHashSecret_DeterministicAndDistinct(t *testing.T) {
+	h1 := hashSecret("secret-a")
+	h2 := hashSecret("secret-a")
+	h3 := hashSecret("secret-b")
+	if h1 != h2 {
+		t.Fatalf("expected hashSecret to be deterministic, got %q vs %q", h1, h2)
+	}
+	if h1 == h3 {
+		t.Fatalf("expected different secrets to hash differently")
+	}
+	if h1 == dummySecretHash {
+		t.Fatalf("real secret hash must not collide with the dummy hash used for timing equalization")
+	}
+}
+
+func TestAPIKeyService_Resolve_UnknownPrefixAndWrongSecretBothInvalid(t *testing.T) {
+	// Both cases must go through the same hash-and-compare path (unknown
+	// prefix compares against dummySecretHash) so a caller can't distinguish
+	// them by response shape or timing. This asserts the observable contract;
+	// see hashSecret's doc comment for why the timing property matters.
+	svc, users := setupTestAPIKeyService(t)
+	owner := mustCreateUser(t, users, "carol2", RoleViewer)
+
+	_, token, err := svc.CreateAPIKey(CreateAPIKeyParams{Name: "k", UserID: owner.ID, CreatedBy: "admin1"})
+	if err != nil {
+		t.Fatalf("CreateAPIKey err: %v", err)
+	}
+	prefix, _, _ := parseKeyToken(token)
+
+	unknownPrefixToken := apiKeyTokenPrefix + "deadbeef_" + strings.Repeat("a", 64)
+	wrongSecretToken := apiKeyTokenPrefix + prefix + "_" + strings.Repeat("b", 64)
+
+	if _, err := svc.Resolve(unknownPrefixToken); err != ErrAPIKeyInvalid {
+		t.Fatalf("unknown prefix: expected ErrAPIKeyInvalid, got %v", err)
+	}
+	if _, err := svc.Resolve(wrongSecretToken); err != ErrAPIKeyInvalid {
+		t.Fatalf("wrong secret: expected ErrAPIKeyInvalid, got %v", err)
+	}
+}
+
 // ─── token generation / parsing ─────────────────────────────────────────────
 
 func TestGenerateKeyToken_ProducesNonEmptyDistinctValues(t *testing.T) {
