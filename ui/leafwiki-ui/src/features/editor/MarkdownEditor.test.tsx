@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MarkdownEditor from './MarkdownEditor'
@@ -100,6 +100,7 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
   beforeEach(() => {
     mountSpy.mockClear()
     capturedOnChange = null
+    window.localStorage.clear()
     mockIsMobile = false
     mockEditorState = {
       ...mockEditorState,
@@ -193,5 +194,70 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
 
     expect(layout).not.toBeNull()
     expect(divider).not.toBeNull()
+  })
+
+  it('resizes side-by-side desktop panes when dragging the divider', () => {
+    mockEditorState = {
+      ...mockEditorState,
+      previewVisible: true,
+      previewStacked: false,
+    }
+
+    const { getByTestId, container } = render(
+      <MarkdownEditor
+        initialValue="original content"
+        pageId="page-1"
+        onChange={vi.fn()}
+      />,
+    )
+
+    const divider = getByTestId('editor-preview-resize-handle')
+    const layout = divider.parentElement as HTMLDivElement
+    layout.getBoundingClientRect = vi.fn(
+      () =>
+        ({
+          width: 1000,
+        }) as DOMRect,
+    )
+
+    fireEvent.mouseDown(divider, { clientX: 500 })
+    fireEvent.mouseMove(document, { clientX: 600 })
+    fireEvent.mouseUp(document)
+
+    const editorPane = container.querySelector(
+      '.markdown-editor__editor-pane--half',
+    ) as HTMLDivElement
+
+    expect(editorPane.style.flex).toBe('0 0 60%')
+    expect(divider).toHaveAttribute('aria-valuenow', '60')
+  })
+
+  it('does not resize panes in stacked desktop preview mode', () => {
+    mockEditorState = {
+      ...mockEditorState,
+      previewVisible: true,
+      previewStacked: true,
+    }
+
+    const { getByTestId, container } = render(
+      <MarkdownEditor
+        initialValue="original content"
+        pageId="page-1"
+        onChange={vi.fn()}
+      />,
+    )
+
+    const divider = getByTestId('editor-preview-resize-handle')
+
+    fireEvent.mouseDown(divider, { clientX: 500 })
+    fireEvent.mouseMove(document, { clientX: 600 })
+    fireEvent.mouseUp(document)
+
+    const editorPane = container.querySelector(
+      '.markdown-editor__editor-pane--stacked',
+    ) as HTMLDivElement
+
+    expect(editorPane.style.flex).toBe('')
+    expect(divider).not.toHaveAttribute('aria-valuenow')
   })
 })
