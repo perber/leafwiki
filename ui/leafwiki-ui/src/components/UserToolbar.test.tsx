@@ -26,7 +26,8 @@ describe('UserToolbar', () => {
     useConfigStore.setState({
       authDisabled: false,
       httpRemoteUserEnabled: false,
-      httpRemoteUserLogoutUrl: '',
+      loginUrl: '',
+      logoutUrl: '',
       userManagementUrl: '',
     })
     useBackupStore.setState({ enabled: false })
@@ -183,7 +184,7 @@ describe('UserToolbar', () => {
       const user = userEvent.setup()
       const logoutSpy = vi.spyOn(authAPI, 'logout').mockResolvedValue()
       useConfigStore.setState({
-        httpRemoteUserLogoutUrl: 'https://control-plane.example.com/logout',
+        logoutUrl: 'https://control-plane.example.com/logout',
       })
 
       renderWithLoginRoute()
@@ -203,7 +204,7 @@ describe('UserToolbar', () => {
 
     it('falls back to the local /login route when no logout URL is configured', async () => {
       const user = userEvent.setup()
-      useConfigStore.setState({ httpRemoteUserLogoutUrl: '' })
+      useConfigStore.setState({ logoutUrl: '' })
 
       renderWithLoginRoute()
 
@@ -214,6 +215,42 @@ describe('UserToolbar', () => {
       await waitFor(() => {
         expect(screen.getByTestId('login-form-sentinel')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('login redirect', () => {
+    let originalLocation: Location
+
+    beforeEach(() => {
+      originalLocation = window.location
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...originalLocation, href: '' },
+      })
+      useSessionStore.setState({ user: null })
+    })
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation,
+      })
+    })
+
+    it('redirects to the login URL when clicking Login and loginUrl is configured', () => {
+      useConfigStore.setState({
+        loginUrl: 'https://idp.example.com/login',
+      })
+
+      render(
+        <MemoryRouter>
+          <UserToolbar />
+        </MemoryRouter>,
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+
+      expect(window.location.href).toBe('https://idp.example.com/login')
     })
   })
 

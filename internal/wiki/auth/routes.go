@@ -141,7 +141,8 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			"enableLinkRefactor":      opts.EnableLinkRefactor,
 			"gitBackupEnabled":        opts.GitBackupEnabled,
 			"httpRemoteUserEnabled":   opts.HTTPRemoteUser.Enabled,
-			"httpRemoteUserLogoutUrl": opts.HTTPRemoteUser.LogoutURL,
+			"loginUrl":                opts.LoginURL,
+			"logoutUrl":               opts.LogoutURL,
 			"userManagementUrl":       opts.UserManagementURL,
 		})
 	}
