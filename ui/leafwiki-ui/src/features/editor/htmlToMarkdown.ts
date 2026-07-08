@@ -84,7 +84,61 @@ function createConverter(): TurndownService {
     },
   })
 
+  // GFM tables require a header row, but turndown-plugin-gfm only recognizes
+  // one when its cells are literal <th> elements — otherwise it keeps the
+  // whole table as raw, unconverted HTML. Many real paste sources (Google
+  // Sheets, plain web tables, Excel-to-HTML) render every cell as <td> with
+  // no <th> at all, so their tables would silently survive as raw HTML.
+  // Override the table rules to always treat a table's first row as the
+  // header, regardless of whether its cells are <th> or <td>.
+  td.addRule('table', {
+    filter: 'table',
+    replacement: (content) => `\n\n${content.replace('\n\n', '\n')}\n\n`,
+  })
+
+  td.addRule('tableSection', {
+    filter: ['thead', 'tbody', 'tfoot'],
+    replacement: (content) => content,
+  })
+
+  td.addRule('tableRow', {
+    filter: 'tr',
+    replacement: (content, node) => {
+      const tr = node as HTMLTableRowElement
+      let borderCells = ''
+      if (isFirstTableRow(tr)) {
+        const alignMap: Record<string, string> = {
+          left: ':--',
+          right: '--:',
+          center: ':-:',
+        }
+        for (const cell of Array.from(tr.cells)) {
+          const align = (cell.getAttribute('align') || '').toLowerCase()
+          borderCells += tableCell(alignMap[align] || '---', cell)
+        }
+      }
+      return `\n${content}${borderCells ? `\n${borderCells}` : ''}`
+    },
+  })
+
+  td.addRule('tableCell', {
+    filter: ['th', 'td'],
+    replacement: (content, node) =>
+      tableCell(content, node as HTMLTableCellElement),
+  })
+
   return td
+}
+
+function isFirstTableRow(tr: HTMLTableRowElement): boolean {
+  const table = tr.closest('table')
+  return !!table && table.rows[0] === tr
+}
+
+function tableCell(content: string, node: HTMLTableCellElement): string {
+  const index = Array.from(node.parentNode?.childNodes ?? []).indexOf(node)
+  const prefix = index === 0 ? '| ' : ' '
+  return `${prefix}${content} |`
 }
 
 const converter = createConverter()
