@@ -59,7 +59,8 @@ services:
       - "--enable-http-remote-user=true"
       - "--http-remote-user-header-name=X-Forwarded-User"
       - "--trusted-proxy-ips=172.16.0.0/12"
-      - "--http-remote-user-logout-url=http://localhost:4180/oauth2/sign_out"
+      - "--login-url=http://localhost:4180/oauth2/start"
+      - "--logout-url=http://localhost:4180/oauth2/sign_out"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/config"]
       interval: 2s

@@ -320,7 +320,8 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--enable-http-remote-user`      | Enable reverse-proxy auth via HTTP header                               | `false`       | v0.10.0 |
 | `--http-remote-user-header-name` | Header name carrying the username from the proxy                        | `Remote-User` | v0.10.0 |
 | `--trusted-proxy-ips`            | Trusted proxy IPs/CIDRs for remote-user header                          | `""`          | v0.10.0 |
-| `--http-remote-user-logout-url`  | Logout redirect when reverse-proxy auth is active                       | `""`          | v0.10.0 |
+| `--login-url`                    | Redirect to an external URL instead of the built-in login form          | `""`          | v0.11.5 |
+| `--logout-url`                   | Redirect to an external URL after logout                                | `""`          | v0.11.5 |
 | `--disable-request-log`          | Suppress per-request HTTP access log lines                              | `false`       | v0.10.1 |
 | `--git-backup`                   | ⚗️ Enable git backup to a remote repository                             | `false`       | v0.11.3 |
 | `--git-backup-remote`            | ⚗️ SSH remote URL for git backup (e.g. `git@github.com:user/repo.git`) | `""`          | v0.11.3 |
@@ -360,7 +361,8 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_ENABLE_HTTP_REMOTE_USER`      | Reverse-proxy auth via header                        | `false`       | v0.10.0 |
 | `LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME` | Username header from proxy                           | `Remote-User` | v0.10.0 |
 | `LEAFWIKI_TRUSTED_PROXY_IPS`            | Trusted proxy IPs/CIDRs                              | `""`          | v0.10.0 |
-| `LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL`  | Logout redirect URL                                  | `""`          | v0.10.0 |
+| `LEAFWIKI_LOGIN_URL`                    | Redirect to an external URL instead of the login form | `""`          | v0.11.5 |
+| `LEAFWIKI_LOGOUT_URL`                   | Redirect to an external URL after logout             | `""`          | v0.11.5 |
 | `LEAFWIKI_DISABLE_REQUEST_LOG`          | Suppress per-request HTTP access log lines           | `false`       | v0.10.1 |
 | `LEAFWIKI_GIT_BACKUP`                   | ⚗️ Enable git backup                                | `false`       | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_REMOTE`            | ⚗️ SSH remote URL                                   | `""`          | v0.11.3 |
@@ -399,12 +401,14 @@ Available since v0.10.0. Use when an upstream proxy authenticates users and forw
   --enable-http-remote-user=true \
   --http-remote-user-header-name=X-Forwarded-User \
   --trusted-proxy-ips=127.0.0.1,172.18.0.0/16 \
-  --http-remote-user-logout-url=https://auth.example.com/logout
+  --login-url=https://auth.example.com/login \
+  --logout-url=https://auth.example.com/logout
 ```
 
 - Only trusts the header from IPs listed in `--trusted-proxy-ips`
 - If the forwarded username doesn't exist in LeafWiki, the request is rejected
 - Do not enable without configuring `--trusted-proxy-ips`
+- `--login-url` and `--logout-url` are independent, optional redirect targets — set either or both to send users to an external IdP instead of the built-in login form / to redirect after logout
 
 ### Unix Socket (v0.11.3)
 

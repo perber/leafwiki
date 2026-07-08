@@ -1001,6 +1001,96 @@ func TestConfigEndpoint_UserManagementUrlDefaultsToEmpty(t *testing.T) {
 	}
 }
 
+func TestConfigEndpoint_IncludesLoginAndLogoutUrl(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		LoginURL:                "https://idp.example.com/login",
+		LogoutURL:               "https://idp.example.com/logout",
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	gotLogin, ok := resp["loginUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected loginUrl in config response, got %v", resp)
+	}
+	if gotLogin != "https://idp.example.com/login" {
+		t.Fatalf("Expected loginUrl=%q, got %q", "https://idp.example.com/login", gotLogin)
+	}
+
+	gotLogout, ok := resp["logoutUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected logoutUrl in config response, got %v", resp)
+	}
+	if gotLogout != "https://idp.example.com/logout" {
+		t.Fatalf("Expected logoutUrl=%q, got %q", "https://idp.example.com/logout", gotLogout)
+	}
+}
+
+func TestConfigEndpoint_LoginAndLogoutUrlDefaultToEmpty(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	gotLogin, ok := resp["loginUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected loginUrl in config response, got %v", resp)
+	}
+	if gotLogin != "" {
+		t.Fatalf("Expected loginUrl to default to empty string, got %q", gotLogin)
+	}
+
+	gotLogout, ok := resp["logoutUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected logoutUrl in config response, got %v", resp)
+	}
+	if gotLogout != "" {
+		t.Fatalf("Expected logoutUrl to default to empty string, got %q", gotLogout)
+	}
+}
+
 func TestRefactorPreviewEndpoint_UsesFrontendJSONShape(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
