@@ -14,6 +14,7 @@ import { deferStateUpdate } from '@/lib/deferState'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { fetchTags, TagCount } from '@/lib/api/tags'
 import { useDebounce } from '@/lib/useDebounce'
+import { getShortcutDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { X } from 'lucide-react'
 import {
   startTransition,
@@ -32,6 +33,14 @@ type SearchProps = {
 
 const t = (key: string, opts?: Record<string, unknown>) =>
   i18next.t(key, { ...opts, ns: 'search' })
+
+// Sidebar panel switching must keep working while the search field is
+// focused, otherwise the shortcuts are only reachable from elsewhere on
+// the page (see HotKeyHandler's input/button focus guard).
+const SEARCH_INPUT_ALLOWED_HOTKEYS = [
+  getShortcutDefinition('sidebar.explorer.open').keyCombo,
+  getShortcutDefinition('sidebar.search.open').keyCombo,
+].join(' ')
 
 export default function Search({ active = false }: SearchProps) {
   const location = useLocation()
@@ -284,6 +293,7 @@ export default function Search({ active = false }: SearchProps) {
           placeholder={t('input.placeholder')}
           value={inputQuery}
           data-testid="search-input"
+          data-allow-hotkeys={SEARCH_INPUT_ALLOWED_HOTKEYS}
           onChange={(e) => {
             const nextQuery = e.target.value
             invalidatePendingRequests()
