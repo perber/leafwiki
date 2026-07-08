@@ -67,6 +67,17 @@ export default function PageEditor() {
     openNode(initialPage.id)
   }, [openNode, initialPage?.id])
 
+  // Reset the editor store on unmount so stale `page` data (and thus
+  // currentEditorPageId reads elsewhere) doesn't outlive the editor session.
+  // Declared after useAutoSave() so its cleanup runs after useAutoSave's own
+  // unmount cleanup, which may synchronously kick off a flush save that reads
+  // store state before it's cleared here.
+  useEffect(() => {
+    return () => {
+      usePageEditorStore.getState().resetEditorState()
+    }
+  }, [])
+
   // callbacks to save / close
   const handleSave = useCallback(() => {
     savePage()
