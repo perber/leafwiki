@@ -25,6 +25,8 @@ type PropertyKeyCount struct {
 	Count int    `json:"count"`
 }
 
+const logCloseRowsFailed = "could not close rows"
+
 type PropertiesStore struct {
 	mu sync.Mutex
 	db *sql.DB
@@ -149,7 +151,7 @@ func (s *PropertiesStore) GetAllPropertyKeys(filter string, limit int) ([]Proper
 	if err != nil {
 		return nil, err
 	}
-	defer shared.LogClose(rows.Close, "could not close rows")
+	defer shared.LogClose(rows.Close, logCloseRowsFailed)
 
 	var result []PropertyKeyCount
 	for rows.Next() {
@@ -174,7 +176,7 @@ func (s *PropertiesStore) GetPageIDsByProperty(key, value string) ([]string, err
 	if err != nil {
 		return nil, err
 	}
-	defer shared.LogClose(rows.Close, "could not close rows")
+	defer shared.LogClose(rows.Close, logCloseRowsFailed)
 
 	var pageIDs []string
 	for rows.Next() {
@@ -210,7 +212,7 @@ func (s *PropertiesStore) GetPropertiesForPages(pageIDs []string) (map[string]ma
 	if err != nil {
 		return nil, err
 	}
-	defer shared.LogClose(rows.Close, "could not close rows")
+	defer shared.LogClose(rows.Close, logCloseRowsFailed)
 
 	result := make(map[string]map[string]PropertyEntry)
 	for rows.Next() {

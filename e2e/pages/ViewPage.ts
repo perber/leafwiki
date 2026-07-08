@@ -1,6 +1,5 @@
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 import { toAppPath } from './appPath';
-import { expect } from '@playwright/test';
 
 export default class ViewPage {
   constructor(private page: Page) {}

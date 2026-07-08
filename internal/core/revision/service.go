@@ -28,6 +28,13 @@ type assetManifestEntry struct {
 	hash string
 }
 
+const (
+	errContentHashMismatch       = "content hash mismatch: computed=%s saved=%s"
+	errAssetManifestHashMismatch = "asset manifest hash mismatch: computed=%s saved=%s"
+	errFailedToRestorePage       = "Failed to restore page"
+	errFailedToRestorePageFmt    = "failed to restore page %s"
+)
+
 type Service struct {
 	storageDir         string
 	pages              *tree.TreeService
@@ -179,7 +186,7 @@ func (s *Service) RecordAssetChange(pageID, authorID, summary string) (*Revision
 		return nil, false, err
 	}
 	if contentHash != state.ContentHash {
-		return nil, false, fmt.Errorf("content hash mismatch: computed=%s saved=%s", state.ContentHash, contentHash)
+		return nil, false, fmt.Errorf(errContentHashMismatch, state.ContentHash, contentHash)
 	}
 
 	if err := s.persistLiveAssets(pageID, state.Assets); err != nil {
@@ -191,7 +198,7 @@ func (s *Service) RecordAssetChange(pageID, authorID, summary string) (*Revision
 		return nil, false, err
 	}
 	if savedManifestHash != state.AssetManifestHash {
-		return nil, false, fmt.Errorf("asset manifest hash mismatch: computed=%s saved=%s", state.AssetManifestHash, savedManifestHash)
+		return nil, false, fmt.Errorf(errAssetManifestHashMismatch, state.AssetManifestHash, savedManifestHash)
 	}
 
 	rev, err := s.newRevision(RevisionTypeAssetUpdate, state, authorID, summary, savedManifestHash)
@@ -232,7 +239,7 @@ func (s *Service) RecordStructureChange(pageID, authorID, summary string) (*Revi
 		return nil, false, err
 	}
 	if contentHash != state.ContentHash {
-		return nil, false, fmt.Errorf("content hash mismatch: computed=%s saved=%s", state.ContentHash, contentHash)
+		return nil, false, fmt.Errorf(errContentHashMismatch, state.ContentHash, contentHash)
 	}
 
 	rev, err := s.newRevision(RevisionTypeStructureUpdate, state, authorID, summary, assetManifestHash)
@@ -277,7 +284,7 @@ func (s *Service) resolveAssetManifestHash(pageID string, prev *Revision) (strin
 		return "", err
 	}
 	if savedManifestHash != fullState.AssetManifestHash {
-		return "", fmt.Errorf("asset manifest hash mismatch: computed=%s saved=%s", fullState.AssetManifestHash, savedManifestHash)
+		return "", fmt.Errorf(errAssetManifestHashMismatch, fullState.AssetManifestHash, savedManifestHash)
 	}
 	s.assetManifestCache.Store(pageID, assetManifestEntry{hash: savedManifestHash})
 	return savedManifestHash, nil
@@ -513,8 +520,8 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	if pageID == "" {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_invalid_page_id",
-			"Failed to restore page",
-			"failed to restore page %s",
+			errFailedToRestorePage,
+			errFailedToRestorePageFmt,
 			nil,
 			pageID,
 		)
@@ -542,8 +549,8 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		}
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
+			errFailedToRestorePage,
+			errFailedToRestorePageFmt,
 			err,
 			pageID,
 		)
@@ -567,8 +574,8 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		}
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
+			errFailedToRestorePage,
+			errFailedToRestorePageFmt,
 			err,
 			pageID,
 		)
@@ -600,8 +607,8 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	if err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
+			errFailedToRestorePage,
+			errFailedToRestorePageFmt,
 			err,
 			pageID,
 		)
@@ -611,8 +618,8 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	if err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
+			errFailedToRestorePage,
+			errFailedToRestorePageFmt,
 			err,
 			pageID,
 		)
@@ -620,8 +627,8 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent, tree.VersionUnchecked, nil, nil, restorePreserveFrontmatter); err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
+			errFailedToRestorePage,
+			errFailedToRestorePageFmt,
 			err,
 			pageID,
 		)
@@ -642,8 +649,8 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		}
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
+			errFailedToRestorePage,
+			errFailedToRestorePageFmt,
 			err,
 			pageID,
 		)
@@ -664,8 +671,8 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 		}
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
-			"Failed to restore page",
-			"failed to restore page %s",
+			errFailedToRestorePage,
+			errFailedToRestorePageFmt,
 			err,
 			pageID,
 		)
@@ -770,7 +777,7 @@ func (s *Service) recordContentUpdateForPage(page *tree.Page, authorID, summary 
 			return nil, false, err
 		}
 		if contentHash != state.ContentHash {
-			return nil, false, fmt.Errorf("content hash mismatch: computed=%s saved=%s", state.ContentHash, contentHash)
+			return nil, false, fmt.Errorf(errContentHashMismatch, state.ContentHash, contentHash)
 		}
 		assetManifestHash, err := s.resolveAssetManifestHash(page.ID, prev)
 		if err != nil {
@@ -807,7 +814,7 @@ func (s *Service) recordContentUpdateForPage(page *tree.Page, authorID, summary 
 		return nil, false, err
 	}
 	if contentHash != state.ContentHash {
-		return nil, false, fmt.Errorf("content hash mismatch: computed=%s saved=%s", state.ContentHash, contentHash)
+		return nil, false, fmt.Errorf(errContentHashMismatch, state.ContentHash, contentHash)
 	}
 
 	rev, err := s.newRevision(RevisionTypeContentUpdate, state, authorID, summary, assetManifestHash)
@@ -1049,7 +1056,7 @@ func (s *Service) recordRestoreRevision(pageID, authorID string) error {
 		return err
 	}
 	if contentHash != state.ContentHash {
-		return fmt.Errorf("content hash mismatch: computed=%s saved=%s", state.ContentHash, contentHash)
+		return fmt.Errorf(errContentHashMismatch, state.ContentHash, contentHash)
 	}
 
 	if err := s.persistLiveAssets(pageID, state.Assets); err != nil {
@@ -1061,7 +1068,7 @@ func (s *Service) recordRestoreRevision(pageID, authorID string) error {
 		return err
 	}
 	if savedManifestHash != state.AssetManifestHash {
-		return fmt.Errorf("asset manifest hash mismatch: computed=%s saved=%s", state.AssetManifestHash, savedManifestHash)
+		return fmt.Errorf(errAssetManifestHashMismatch, state.AssetManifestHash, savedManifestHash)
 	}
 
 	rev, err := s.newRevision(RevisionTypeRestore, state, authorID, "page restored", savedManifestHash)

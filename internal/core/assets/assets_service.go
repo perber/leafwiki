@@ -17,7 +17,13 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 )
 
-const DefaultMaxUploadSizeBytes int64 = 50 * 1024 * 1024
+const (
+	DefaultMaxUploadSizeBytes int64 = 50 * 1024 * 1024
+	errInvalidAssetName             = "Invalid asset name"
+	errInvalidAssetNameFmt          = "invalid asset name %s"
+	errAssetNotFound                = "Asset not found"
+	errAssetNotFoundFmt             = "asset %s not found"
+)
 
 type AssetService struct {
 	assetsDir string
@@ -164,19 +170,19 @@ func (s *AssetService) DeleteAsset(page *tree.PageNode, filename string) error {
 	defer s.mu.Unlock()
 
 	if err := validateFilename(filename); err != nil {
-		return sharederrors.NewLocalizedError("asset_invalid_name", "Invalid asset name", "invalid asset name %s", nil, filename)
+		return sharederrors.NewLocalizedError("asset_invalid_name", errInvalidAssetName, errInvalidAssetNameFmt, nil, filename)
 	}
 
 	assetPath, err := s.getAssetPagePath(page)
 	if err != nil {
-		return sharederrors.NewLocalizedError("asset_not_found", "Asset not found", "asset %s not found", nil, filename)
+		return sharederrors.NewLocalizedError("asset_not_found", errAssetNotFound, errAssetNotFoundFmt, nil, filename)
 	}
 
 	fullPath := assetFileDiskPath(assetPath, filename)
 
 	if err := os.Remove(fullPath); err != nil {
 		if os.IsNotExist(err) {
-			return sharederrors.NewLocalizedError("asset_not_found", "Asset not found", "asset %s not found", nil, filename)
+			return sharederrors.NewLocalizedError("asset_not_found", errAssetNotFound, errAssetNotFoundFmt, nil, filename)
 		}
 		return sharederrors.NewLocalizedError("asset_delete_failed", "Failed to delete asset", "failed to delete asset %s", err, filename)
 	}
@@ -211,12 +217,12 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 	defer s.mu.Unlock()
 
 	if err := validateFilename(oldFilename); err != nil {
-		return "", sharederrors.NewLocalizedError("asset_invalid_name", "Invalid asset name", "invalid asset name %s", nil, oldFilename)
+		return "", sharederrors.NewLocalizedError("asset_invalid_name", errInvalidAssetName, errInvalidAssetNameFmt, nil, oldFilename)
 	}
 
 	assetPath, err := s.getAssetPagePath(page)
 	if err != nil {
-		return "", sharederrors.NewLocalizedError("asset_not_found", "Asset not found", "asset %s not found", nil, oldFilename)
+		return "", sharederrors.NewLocalizedError("asset_not_found", errAssetNotFound, errAssetNotFoundFmt, nil, oldFilename)
 	}
 
 	oldFullPath := assetFileDiskPath(assetPath, oldFilename)
@@ -234,7 +240,7 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 	newFilenameWithoutExt := newFilename[:len(newFilename)-len(newExt)]
 	// Ensure that the new asset is a valid filename (slug)
 	if err := s.slugger.IsValidSlug(newFilenameWithoutExt); err != nil {
-		return "", sharederrors.NewLocalizedError("asset_invalid_name", "Invalid asset name", "invalid asset name %s", nil, newFilename)
+		return "", sharederrors.NewLocalizedError("asset_invalid_name", errInvalidAssetName, errInvalidAssetNameFmt, nil, newFilename)
 	}
 
 	// Ensure that no file with the new name already exists
@@ -245,7 +251,7 @@ func (s *AssetService) RenameAsset(page *tree.PageNode, oldFilename, newFilename
 	}
 
 	if _, err := os.Stat(oldFullPath); os.IsNotExist(err) {
-		return "", sharederrors.NewLocalizedError("asset_not_found", "Asset not found", "asset %s not found", nil, oldFilename)
+		return "", sharederrors.NewLocalizedError("asset_not_found", errAssetNotFound, errAssetNotFoundFmt, nil, oldFilename)
 	}
 
 	if err := os.Rename(oldFullPath, newFullPath); err != nil {
