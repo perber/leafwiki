@@ -2,6 +2,7 @@ import { mapApiError } from '@/lib/api/errors'
 import { useApiKeyStore } from '@/stores/apikeys'
 import { useUserStore } from '@/stores/users'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useSetTitle } from '../viewer/setTitle'
 import { CreateApiKeyButton } from './CreateApiKeyButton'
@@ -14,17 +15,18 @@ function formatTimestamp(value?: string): string {
 }
 
 export default function ApiKeysManagement() {
+  const { t } = useTranslation('apikeys')
   const { apiKeys, loadApiKeys, reset } = useApiKeyStore()
   const { users, loadUsers } = useUserStore()
   const [loading, setLoading] = useState(true)
-  useSetTitle({ title: 'API Keys' })
+  useSetTitle({ title: t('page.title') })
   useToolbarActions()
 
   useEffect(() => {
     Promise.all([loadApiKeys(), loadUsers()])
       .catch((err) => {
         console.warn(err)
-        const mapped = mapApiError(err, 'Error loading API keys')
+        const mapped = mapApiError(err, t('page.loadErrorFallback'))
         toast.error(mapped.message)
       })
       .finally(() => {
@@ -34,14 +36,14 @@ export default function ApiKeysManagement() {
     return () => {
       reset()
     }
-  }, [loadApiKeys, loadUsers, reset])
+  }, [loadApiKeys, loadUsers, reset, t])
 
   const usernameFor = (userId: string) =>
     users.find((u) => u.id === userId)?.username ?? userId
 
   return (
     <div className="settings">
-      <h1 className="settings__title">API Keys</h1>
+      <h1 className="settings__title">{t('page.heading')}</h1>
 
       <div className="settings__header-actions">
         <CreateApiKeyButton />
@@ -52,26 +54,38 @@ export default function ApiKeysManagement() {
           <table className="settings__table">
             <thead className="settings__table-head">
               <tr>
-                <th className="settings__table-header-cell">Name</th>
-                <th className="settings__table-header-cell">Owner</th>
-                <th className="settings__table-header-cell">Role</th>
-                <th className="settings__table-header-cell">Expires</th>
-                <th className="settings__table-header-cell">Last used</th>
-                <th className="settings__table-header-cell">Actions</th>
+                <th className="settings__table-header-cell">
+                  {t('table.name')}
+                </th>
+                <th className="settings__table-header-cell">
+                  {t('table.owner')}
+                </th>
+                <th className="settings__table-header-cell">
+                  {t('table.role')}
+                </th>
+                <th className="settings__table-header-cell">
+                  {t('table.expires')}
+                </th>
+                <th className="settings__table-header-cell">
+                  {t('table.lastUsed')}
+                </th>
+                <th className="settings__table-header-cell">
+                  {t('table.actions')}
+                </th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
                   <td colSpan={6} className="settings__table-body-message">
-                    Loading API keys...
+                    {t('table.loading')}
                   </td>
                 </tr>
               )}
               {!loading && apiKeys.length === 0 && (
                 <tr>
                   <td colSpan={6} className="settings__table-body-message">
-                    No API keys found.
+                    {t('table.empty')}
                   </td>
                 </tr>
               )}
@@ -91,7 +105,9 @@ export default function ApiKeysManagement() {
                             : 'settings__role-pill--default'
                         }`}
                       >
-                        {apiKey.role}
+                        {t(`role.${apiKey.role}`, {
+                          defaultValue: apiKey.role,
+                        })}
                       </span>
                     </td>
                     <td className="settings__table-cell">
@@ -104,7 +120,7 @@ export default function ApiKeysManagement() {
                       <div className="settings__actions">
                         {apiKey.revokedAt ? (
                           <span className="settings__table-body-message">
-                            Revoked
+                            {t('table.revoked')}
                           </span>
                         ) : (
                           <DeleteApiKeyButton apiKey={apiKey} />

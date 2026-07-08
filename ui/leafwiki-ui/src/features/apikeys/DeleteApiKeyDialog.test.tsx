@@ -1,3 +1,4 @@
+import '@/lib/i18n'
 import { DIALOG_DELETE_API_KEY_CONFIRMATION } from '@/lib/registries'
 import { useApiKeyStore } from '@/stores/apikeys'
 import { useDialogsStore } from '@/stores/dialogs'

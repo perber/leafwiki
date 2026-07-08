@@ -1,5 +1,6 @@
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
+import enApiKeys from '../locales/en/apikeys.json'
 import enAuth from '../locales/en/auth.json'
 import enBackup from '../locales/en/backup.json'
 import enBranding from '../locales/en/branding.json'
@@ -14,6 +15,7 @@ i18next.use(initReactI18next).init({
   fallbackLng: 'en',
   resources: {
     en: {
+      apikeys: enApiKeys,
       auth: enAuth,
       backup: enBackup,
       branding: enBranding,

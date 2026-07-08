@@ -1,3 +1,4 @@
+import '@/lib/i18n'
 import { DIALOG_DELETE_API_KEY_CONFIRMATION } from '@/lib/registries'
 import { useApiKeyStore } from '@/stores/apikeys'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -78,7 +79,7 @@ describe('ApiKeysManagement', () => {
       expect(screen.getByText('agent key')).toBeInTheDocument(),
     )
     expect(screen.getByText('agent-owner')).toBeInTheDocument()
-    expect(screen.getByText('viewer')).toBeInTheDocument()
+    expect(screen.getByText('Viewer')).toBeInTheDocument()
   })
 
   it('shows "Revoked" instead of the revoke action for an already-revoked key', async () => {

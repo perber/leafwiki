@@ -14,6 +14,7 @@ import { DIALOG_API_KEY_FORM } from '@/lib/registries'
 import { useApiKeyStore } from '@/stores/apikeys'
 import { useUserStore } from '@/stores/users'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
@@ -39,6 +40,7 @@ function toExpiresAtRFC3339(dateOnly: string): string | undefined {
 }
 
 export function ApiKeyFormDialog() {
+  const { t } = useTranslation('apikeys')
   const [name, setName] = useState('')
   const [userId, setUserId] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
@@ -66,12 +68,12 @@ export function ApiKeyFormDialog() {
         // capability the backend can't yet honor.
         expiresAt: toExpiresAtRFC3339(expiresAt),
       })
-      toast.success('API key created successfully')
+      toast.success(t('create.successToast'))
       setResult(created)
       return false // Keep the dialog open to reveal the secret
     } catch (err) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, 'Error creating API key')
+      handleFieldErrors(err, setFieldErrors, t('create.errorFallback'))
       return false
     } finally {
       setLoading(false)
@@ -81,32 +83,34 @@ export function ApiKeyFormDialog() {
   const handleCopy = async () => {
     if (!result) return
     await navigator.clipboard.writeText(result.secret)
-    toast.success('Copied to clipboard')
+    toast.success(t('secret.copiedToast'))
   }
 
   return (
     <BaseDialog
       dialogType={DIALOG_API_KEY_FORM}
-      dialogTitle={result ? 'API Key Created' : 'New API Key'}
+      dialogTitle={result ? t('secret.title') : t('create.title')}
       dialogDescription={
-        result
-          ? 'Copy this key now — it will not be shown again.'
-          : 'Create a new API key for automation or agent access.'
+        result ? t('secret.description') : t('create.description')
       }
       onClose={() => true}
       onConfirm={handleCreate}
       testidPrefix="api-key-form-dialog"
       cancelButton={
         result
-          ? { label: 'Done', variant: 'default', autoFocus: true }
-          : { label: 'Cancel', variant: 'outline', disabled: loading }
+          ? { label: t('secret.done'), variant: 'default', autoFocus: true }
+          : {
+              label: t('create.cancel'),
+              variant: 'outline',
+              disabled: loading,
+            }
       }
       buttons={
         result
           ? []
           : [
               {
-                label: 'Create',
+                label: t('create.submit'),
                 actionType: 'confirm',
                 loading,
                 disabled: loading || !name || !userId,
@@ -117,7 +121,7 @@ export function ApiKeyFormDialog() {
       {result ? (
         <div className="space-y-4 pt-2">
           <FormInput
-            label="secret"
+            label={t('secret.label')}
             name="secret"
             value={result.secret}
             onChange={() => {}}
@@ -130,24 +134,22 @@ export function ApiKeyFormDialog() {
             onClick={handleCopy}
             data-testid="api-key-secret-copy"
           >
-            Copy
+            {t('secret.copy')}
           </Button>
-          <p className="text-muted text-sm">
-            This is the only time the full key will be shown. Store it securely.
-          </p>
+          <p className="text-muted text-sm">{t('secret.helper')}</p>
         </div>
       ) : (
         <div className="space-y-4 pt-2">
           <FormInput
             autoFocus={true}
-            label="name"
+            label={t('create.nameLabel')}
             name="name"
             value={name}
             onChange={(val) => {
               setName(val)
               setFieldErrors((prev) => ({ ...prev, name: '' }))
             }}
-            placeholder="e.g. research-agent"
+            placeholder={t('create.namePlaceholder')}
             error={fieldErrors.name}
             allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
           />
@@ -159,7 +161,7 @@ export function ApiKeyFormDialog() {
             }}
           >
             <SelectTrigger data-testid="api-key-owner-select">
-              <SelectValue placeholder="Select an owning user" />
+              <SelectValue placeholder={t('create.userPlaceholder')} />
             </SelectTrigger>
             <SelectContent>
               {users.map((user) => (
@@ -170,7 +172,7 @@ export function ApiKeyFormDialog() {
             </SelectContent>
           </Select>
           <FormInput
-            label="expires at (optional)"
+            label={t('create.expiresLabel')}
             name="expiresAt"
             type="date"
             value={expiresAt}
@@ -181,9 +183,7 @@ export function ApiKeyFormDialog() {
             error={fieldErrors.expiresAt}
             testid="api-key-expires-at"
           />
-          <p className="text-muted text-sm">
-            New keys are viewer (read-only) for now.
-          </p>
+          <p className="text-muted text-sm">{t('create.roleHelper')}</p>
         </div>
       )}
     </BaseDialog>

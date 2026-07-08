@@ -3,6 +3,7 @@ import { mapApiError } from '@/lib/api/errors'
 import { DIALOG_DELETE_API_KEY_CONFIRMATION } from '@/lib/registries'
 import { useApiKeyStore } from '@/stores/apikeys'
 import { useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 type DeleteApiKeyDialogProps = {
@@ -14,6 +15,7 @@ export function DeleteApiKeyDialog({
   apiKeyId,
   apiKeyName,
 }: DeleteApiKeyDialogProps) {
+  const { t } = useTranslation('apikeys')
   const { deleteApiKey } = useApiKeyStore()
 
   const [loading, setLoading] = useState(false)
@@ -22,14 +24,11 @@ export function DeleteApiKeyDialog({
     setLoading(true)
     try {
       await deleteApiKey(apiKeyId)
-      toast.success('API key revoked successfully')
+      toast.success(t('delete.successToast'))
       return true // Close the dialog
     } catch (err) {
       console.error('Error revoking API key:', err)
-      const mapped = mapApiError(
-        err,
-        'Failed to revoke API key. Please try again.',
-      )
+      const mapped = mapApiError(err, t('delete.errorFallback'))
       toast.error(mapped.message)
       return false // Keep the dialog open
     } finally {
@@ -40,8 +39,8 @@ export function DeleteApiKeyDialog({
   return (
     <BaseDialog
       dialogType={DIALOG_DELETE_API_KEY_CONFIRMATION}
-      dialogTitle="Revoke API Key?"
-      dialogDescription="Are you sure you want to revoke this API key? This action cannot be undone."
+      dialogTitle={t('delete.title')}
+      dialogDescription={t('delete.description')}
       onClose={() => true}
       onConfirm={async (): Promise<boolean> => {
         return await handleRevoke()
@@ -49,14 +48,14 @@ export function DeleteApiKeyDialog({
       defaultAction="cancel"
       testidPrefix="delete-api-key-dialog"
       cancelButton={{
-        label: 'Cancel',
+        label: t('delete.cancel'),
         variant: 'outline',
         disabled: loading,
         autoFocus: true,
       }}
       buttons={[
         {
-          label: loading ? 'Revoking...' : 'Revoke',
+          label: loading ? t('delete.confirming') : t('delete.confirm'),
           actionType: 'confirm',
           variant: 'destructive',
           autoFocus: false,
@@ -66,8 +65,12 @@ export function DeleteApiKeyDialog({
       ]}
     >
       <p className="text-muted text-sm">
-        The API key <strong>{apiKeyName}</strong> will immediately stop working.
-        Any agent or automation using it will lose access.
+        <Trans
+          i18nKey="delete.body"
+          ns="apikeys"
+          values={{ name: apiKeyName }}
+          components={{ strong: <strong /> }}
+        />
       </p>
     </BaseDialog>
   )

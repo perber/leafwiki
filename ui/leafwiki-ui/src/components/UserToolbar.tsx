@@ -39,7 +39,7 @@ const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
 )
 
 export default function UserToolbar() {
-  const { t } = useTranslation(['auth', 'backup'])
+  const { t } = useTranslation(['auth', 'backup', 'apikeys'])
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
@@ -158,7 +158,7 @@ export default function UserToolbar() {
               className="cursor-pointer"
               onClick={() => navigate('/settings/api-keys')}
             >
-              API Keys
+              {t('menu.title', { ns: 'apikeys' })}
             </DropdownMenuItem>
             {backupEnabled && (
               <DropdownMenuItem

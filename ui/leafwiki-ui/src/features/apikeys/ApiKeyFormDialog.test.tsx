@@ -1,3 +1,4 @@
+import '@/lib/i18n'
 import { DIALOG_API_KEY_FORM } from '@/lib/registries'
 import { useApiKeyStore } from '@/stores/apikeys'
 import { useDialogsStore } from '@/stores/dialogs'
