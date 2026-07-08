@@ -191,6 +191,34 @@ describe('htmlToMarkdown', () => {
         '| Item | Value |\n| --- | --- |\n| A | 1 |\n| B | 2 |',
       )
     })
+
+    // Many real paste sources (Google Sheets, plain web tables, Excel-to-HTML)
+    // render every cell as <td> with no <th> at all. turndown-plugin-gfm only
+    // recognizes a header row made of literal <th> cells and otherwise keeps
+    // the whole table as raw, unconverted HTML.
+    it('converts table with no th header cells', () => {
+      const html = `
+        <table>
+          <tbody>
+            <tr><td>Name</td><td>Age</td></tr>
+            <tr><td>Alice</td><td>30</td></tr>
+          </tbody>
+        </table>
+      `
+      const result = htmlToMarkdown(html)
+      expect(result).toBe('| Name | Age |\n| --- | --- |\n| Alice | 30 |')
+    })
+
+    it('converts table with no thead/tbody at all', () => {
+      const html = `
+        <table>
+          <tr><td>Name</td><td>Age</td></tr>
+          <tr><td>Alice</td><td>30</td></tr>
+        </table>
+      `
+      const result = htmlToMarkdown(html)
+      expect(result).toBe('| Name | Age |\n| --- | --- |\n| Alice | 30 |')
+    })
   })
 
   describe('paragraphs', () => {
