@@ -1,0 +1,107 @@
+{
+  "unknown": "Unknown",
+  "unknownTime": "Unknown time",
+  "empty": "(empty)",
+  "trigger": {
+    "contentUpdate": "Saved after content update",
+    "assetUpdate": "Saved after asset update",
+    "structureUpdate": "Saved after structure update",
+    "restore": "Saved after restore",
+    "delete": "Saved before delete",
+    "default": "Saved as {{type}}"
+  },
+  "assetChange": {
+    "added": "Added",
+    "removed": "Removed",
+    "modified": "Replaced"
+  },
+  "list": {
+    "title": "Revision History",
+    "loading": "Loading history...",
+    "loadMore": "Load more",
+    "loadingMore": "Loading...",
+    "noPreviousRevisions": "No previous revisions yet. Older versions will appear here after more changes.",
+    "noRevisions": "No revisions yet. They will appear here after the page changes.",
+    "activeVersion": "Active version",
+    "resizeAriaLabel": "Resize revision list"
+  },
+  "mobileTabs": {
+    "revisions": "Revisions",
+    "details": "Details"
+  },
+  "tabs": {
+    "preview": "Preview",
+    "changes": "Changes",
+    "raw": "Raw Text",
+    "assets": "Assets"
+  },
+  "header": {
+    "revisionBy": "Revision by {{author}} · {{time}}",
+    "revisionSlug": "Revision slug: {{slug}}",
+    "currentSlug": "Current slug: {{slug}}",
+    "assetChangesCount": "{{count}} asset changes",
+    "assetsCount": "{{count}} Assets"
+  },
+  "structure": {
+    "title": "Title",
+    "slug": "Slug"
+  },
+  "restore": {
+    "button": "Restore",
+    "restoring": "Restoring...",
+    "currentVersion": "Current version"
+  },
+  "loading": {
+    "diff": "Loading diff...",
+    "preview": "Loading preview..."
+  },
+  "empty": {
+    "noRevisionSelected": "No revision selected",
+    "selectRevision": "Select a revision from the list to view details.",
+    "noPreview": "No preview available.",
+    "noDiffFromCurrent": "No differences from the current version.",
+    "noComparison": "No comparison data available.",
+    "noRawText": "No raw text available.",
+    "noAssetData": "No asset data available.",
+    "noTextDiff": "No text difference between this revision and the active version.",
+    "noAssetsInRevision": "No assets were stored with this revision."
+  },
+  "changes": {
+    "summaryHeading": "Change Summary",
+    "linesAdded": "Lines added since",
+    "linesRemoved": "Lines removed since",
+    "assetsChanged": "Assets changed",
+    "diffHeading": "Diff",
+    "comparedToActive": "compared to the active version",
+    "assetsHeading": "Assets ({{count}})",
+    "addedCount": "{{count}} added",
+    "replacedCount": "{{count}} replaced",
+    "removedCount": "{{count}} removed"
+  },
+  "rawText": {
+    "heading": "Raw Text"
+  },
+  "assets": {
+    "heading": "Assets",
+    "openAsset": "Open asset",
+    "downloadAsset": "Download asset",
+    "bytes": "{{count}} bytes"
+  },
+  "restoreDialog": {
+    "title": "Restore revision?",
+    "description": "This restores the revision content, title, and assets. The current slug and location stay unchanged.",
+    "restoredTitle": "Restored title:",
+    "slugNote": "This revision used slug <1>{{revisionSlug}}</1>. The current slug <2>{{currentSlug}}</2> will stay unchanged.",
+    "confirmButton": "Restore revision"
+  },
+  "toast": {
+    "restored": "Revision restored",
+    "restoreFailed": "Failed to restore revision"
+  },
+  "errors": {
+    "loadFailed": "Failed to load page history",
+    "previewFailed": "Failed to load revision preview",
+    "compareFailed": "Failed to compare revisions",
+    "loadMoreFailed": "Failed to load more revisions"
+  }
+}

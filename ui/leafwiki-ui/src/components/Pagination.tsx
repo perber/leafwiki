@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 export function Pagination({
   total,
   page,
@@ -9,6 +11,7 @@ export function Pagination({
   limit: number
   onPageChange: (page: number) => void
 }) {
+  const { t } = useTranslation('common')
   const totalPages = Math.ceil(total / limit)
   if (totalPages <= 1) return null
 
@@ -19,17 +22,17 @@ export function Pagination({
         disabled={page === 0}
         className="pagination__button"
       >
-        ← Prev
+        {t('pagination.prev')}
       </button>
       <span>
-        Page {page + 1} of {totalPages}
+        {t('pagination.pageOf', { page: page + 1, total: totalPages })}
       </span>
       <button
         onClick={() => onPageChange(Math.min(totalPages - 1, page + 1))}
         disabled={page >= totalPages - 1}
         className="pagination__button"
       >
-        Next →
+        {t('pagination.next')}
       </button>
     </div>
   )

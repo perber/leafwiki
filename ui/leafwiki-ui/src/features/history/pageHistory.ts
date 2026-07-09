@@ -1,4 +1,5 @@
 import { mapApiError, type ApiUiError } from '@/lib/api/errors'
+import i18next from '@/lib/i18n'
 import {
   compareRevisions,
   getLatestRevision,
@@ -109,7 +110,7 @@ async function loadPageHistoryState(
     })
   } catch (err) {
     update({
-      listError: mapApiError(err, 'Failed to load page history'),
+      listError: mapApiError(err, i18next.t('errors.loadFailed', { ns: 'history' })),
       revisions: [],
       nextCursor: '',
       latestRevisionId: null,
@@ -205,7 +206,7 @@ export function usePageHistory(pageId: string | null, enabled = true) {
         if (cancelled) return
         update({
           snapshot: null,
-          previewError: mapApiError(err, 'Failed to load revision preview'),
+          previewError: mapApiError(err, i18next.t('errors.previewFailed', { ns: 'history' })),
         })
       } finally {
         if (!cancelled) {
@@ -252,7 +253,7 @@ export function usePageHistory(pageId: string | null, enabled = true) {
         if (cancelled) return
         update({
           comparison: null,
-          previewError: mapApiError(err, 'Failed to compare revisions'),
+          previewError: mapApiError(err, i18next.t('errors.compareFailed', { ns: 'history' })),
         })
       } finally {
         if (!cancelled) {
@@ -288,7 +289,7 @@ export async function loadMorePageHistory() {
     })
   } catch (err) {
     usePageHistoryStore.getState().update({
-      listError: mapApiError(err, 'Failed to load more revisions'),
+      listError: mapApiError(err, i18next.t('errors.loadMoreFailed', { ns: 'history' })),
     })
   } finally {
     usePageHistoryStore.getState().update({

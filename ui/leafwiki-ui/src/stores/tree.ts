@@ -4,6 +4,7 @@ import {
   NODE_KIND_SECTION,
   PageNode,
 } from '@/lib/api/pages'
+import i18next from '@/lib/i18n'
 import { FlatPageSearchItem, buildFlatPageSearchItems } from '@/lib/pageSearch'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
@@ -285,7 +286,7 @@ export const useTreeStore = create<TreeStore>()(
           if (err instanceof Error) {
             set({ error: err.message })
           } else {
-            set({ error: 'An unknown error occurred' })
+            set({ error: i18next.t('unknownError', { ns: 'common' }) })
           }
         } finally {
           if (!silent) set({ loading: false })

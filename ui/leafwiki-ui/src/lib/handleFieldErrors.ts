@@ -1,4 +1,5 @@
 import { mapApiError } from './api/errors'
+import i18next from './i18n'
 import { toast } from 'sonner'
 
 type FieldError = {
@@ -17,9 +18,11 @@ type APIError = {
 export function handleFieldErrors(
   err: unknown,
   setFieldErrors?: (errors: Record<string, string>) => void,
-  fallbackMessage = 'Something went wrong',
+  fallbackMessage?: string,
 ) {
   const error = err as APIError
+  const resolvedFallback =
+    fallbackMessage ?? i18next.t('somethingWentWrong', { ns: 'common' })
 
   console.warn('Error:', error)
 
@@ -29,9 +32,9 @@ export function handleFieldErrors(
       errorMap[e.field] = e.message
     }
     setFieldErrors?.(errorMap)
-    toast.error('Validation failed')
+    toast.error(i18next.t('validationFailed', { ns: 'common' }))
   } else {
-    const mapped = mapApiError(err, fallbackMessage)
+    const mapped = mapApiError(err, resolvedFallback)
     toast.error(mapped.message)
   }
 }

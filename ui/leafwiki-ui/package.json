@@ -47,6 +47,7 @@
     "copy-to-clipboard": "^4.0.2",
     "date-fns": "^4.4.0",
     "i18next": "^26.3.4",
+    "i18next-http-backend": "^3.0.6",
     "katex": "^0.17.0",
     "lucide-react": "^1.23.0",
     "mermaid": "^11.16.0",

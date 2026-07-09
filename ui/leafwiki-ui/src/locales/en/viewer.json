@@ -54,6 +54,26 @@
     "collapse": "Collapse table of contents",
     "expand": "Expand table of contents"
   },
+  "toolbar": {
+    "editItem": "Edit {{item}}",
+    "shareItem": "Share {{item}}",
+    "printItem": "Print {{item}}",
+    "copyItem": "Copy {{item}}",
+    "deleteItem": "Delete {{item}}",
+    "historyItem": "{{item}} History"
+  },
+  "shoutout": {
+    "info": "Info",
+    "success": "Success",
+    "warning": "Warning",
+    "error": "Error"
+  },
+  "sectionList": {
+    "sectionSuffix": "(Section)",
+    "updated": "Updated",
+    "updatedBy": "by {{user}}",
+    "subpagesAriaLabel": "Subpages of {{title}}"
+  },
   "shortcutsHelp": {
     "menuItem": "Keyboard Shortcuts",
     "title": "Available keyboard shortcuts",

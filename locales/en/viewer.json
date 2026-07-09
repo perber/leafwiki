@@ -1,0 +1,160 @@
+{
+  "layout": {
+    "toggleSidebar": "Toggle sidebar",
+    "resizeSidebar": "Resize sidebar",
+    "closeSidebar": "Close sidebar"
+  },
+  "section": {
+    "overviewTitle": "Overview of '{{title}}'",
+    "overviewDescriptionBase": "This page is the default overview of the section and lists its pages and sections.",
+    "overviewDescriptionEditorHint": "When editing this page, you can define a custom start page for the section.",
+    "overviewDescriptionReadOnly": "This page is an auto-generated overview of the section.",
+    "emptyTitle": "This section is empty.",
+    "emptyDescriptionEditor": "The section {{title}} does not contain any pages or sections yet. Start by adding a new page or create a new section.",
+    "emptyDescriptionReadOnly": "The section {{title}} does not contain any pages or sections yet.",
+    "addPage": "Add Page",
+    "addSection": "Add Section"
+  },
+  "markdownPreview": {
+    "renderError": "This page contains Markdown that could not be rendered safely.",
+    "brokenLinkTooltip": "This page doesn't exist yet."
+  },
+  "backlinks": {
+    "referencedBy": "Referenced by",
+    "loading": "Loading…",
+    "noReferences": "No pages reference this page.",
+    "brokenLinks": "Broken links",
+    "noBrokenLinks": "No broken links.",
+    "brokenOutgoingsTitle": "This page links to missing targets",
+    "brokenIncomingTitle": "Pages linking to an old path"
+  },
+  "pinned": {
+    "sectionTitle": "Pinned",
+    "pagesSectionTitle": "Pages",
+    "pinPage": "Pin",
+    "unpinPage": "Unpin",
+    "pinSuccess": "Page pinned",
+    "unpinSuccess": "Page unpinned",
+    "pinError": "Failed to update pin status"
+  },
+  "toc": {
+    "title": "Table of contents",
+    "onThisPage": "On this page"
+  },
+  "toolbar": {
+    "editItem": "Edit {{item}}",
+    "shareItem": "Share {{item}}",
+    "printItem": "Print {{item}}",
+    "copyItem": "Copy {{item}}",
+    "deleteItem": "Delete {{item}}",
+    "historyItem": "{{item}} History"
+  },
+  "shoutout": {
+    "info": "Info",
+    "success": "Success",
+    "warning": "Warning",
+    "error": "Error"
+  },
+  "sectionList": {
+    "sectionSuffix": "(Section)",
+    "updated": "Updated",
+    "updatedBy": "by {{user}}",
+    "subpagesAriaLabel": "Subpages of {{title}}"
+  },
+  "shortcutsHelp": {
+    "menuItem": "Keyboard Shortcuts",
+    "title": "Available keyboard shortcuts",
+    "description": "A quick overview of shortcuts for the current page mode.",
+    "currentMode": "Current page mode: {{mode}}",
+    "dialogHint": "Dialog shortcuts are also included while this dialog is open.",
+    "closeButton": "Close",
+    "categories": {
+      "navigation": "Navigation",
+      "editing": "Editing",
+      "viewing": "Viewing",
+      "dialogs": "Dialogs"
+    },
+    "modes": {
+      "view": "view",
+      "edit": "edit",
+      "history": "history",
+      "settings": "settings",
+      "user-management": "user management",
+      "dialog": "dialog"
+    },
+    "items": {
+      "goToPage": {
+        "action": "Go to page"
+      },
+      "openShortcutsHelp": {
+        "action": "Open keyboard shortcuts"
+      },
+      "editPage": {
+        "action": "Edit page"
+      },
+      "sharePage": {
+        "action": "Share page"
+      },
+      "printPage": {
+        "action": "Print page"
+      },
+      "copyPage": {
+        "action": "Copy page"
+      },
+      "deletePage": {
+        "action": "Delete page"
+      },
+      "pageHistory": {
+        "action": "Page history"
+      },
+      "openExplorer": {
+        "action": "Open explorer"
+      },
+      "openSearch": {
+        "action": "Open search"
+      },
+      "savePage": {
+        "action": "Save page"
+      },
+      "closeEditor": {
+        "action": "Close editor"
+      },
+      "formatBold": {
+        "action": "Format bold"
+      },
+      "formatItalic": {
+        "action": "Format italic"
+      },
+      "insertHeadingOne": {
+        "action": "Insert heading 1"
+      },
+      "insertHeadingTwo": {
+        "action": "Insert heading 2"
+      },
+      "insertHeadingThree": {
+        "action": "Insert heading 3"
+      },
+      "formatInlineCode": {
+        "action": "Format inline code"
+      },
+      "insertLink": {
+        "action": "Insert link"
+      },
+      "backToPage": {
+        "action": "Back to page"
+      },
+      "closeDialog": {
+        "action": "Close dialog"
+      },
+      "confirmDialog": {
+        "action": "Dialog default action"
+      },
+      "confirmRename": {
+        "action": "Confirm rename"
+      },
+      "cancelRename": {
+        "action": "Cancel rename"
+      }
+    }
+  }
+}

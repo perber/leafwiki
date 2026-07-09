@@ -1,3 +1,4 @@
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -40,7 +41,7 @@ const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
 )
 
 export default function UserToolbar() {
-  const { t } = useTranslation(['auth', 'backup'])
+  const { t } = useTranslation(['auth', 'backup', 'common', 'users'])
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
@@ -79,6 +80,7 @@ export default function UserToolbar() {
   if (!user && !authDisabled) {
     return (
       <div className="user-toolbar">
+        <LanguageSwitcher />
         <Button
           size="sm"
           onClick={() =>
@@ -94,6 +96,7 @@ export default function UserToolbar() {
   if (authDisabled) {
     return (
       <div className="user-toolbar">
+        <LanguageSwitcher />
         <span className="user-toolbar__not-logged-in">
           {t('login.publicEditor')}
         </span>
@@ -116,6 +119,7 @@ export default function UserToolbar() {
 
   return (
     <div className="user-toolbar">
+      <LanguageSwitcher />
       <DropdownMenu>
         <DropdownMenuTrigger className="user-toolbar__dropdown-trigger">
           <Avatar
@@ -151,13 +155,13 @@ export default function UserToolbar() {
               className="cursor-pointer"
               onClick={() => navigate('/settings/branding')}
             >
-              Branding Settings
+              {t('settings.branding', { ns: 'common' })}
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => navigate('/settings/importer')}
             >
-              Import
+              {t('settings.import', { ns: 'common' })}
             </DropdownMenuItem>
             {backupEnabled && (
               <DropdownMenuItem
@@ -171,12 +175,12 @@ export default function UserToolbar() {
               className="cursor-pointer"
               onClick={() => navigate('/settings/maintenance')}
             >
-              Maintenance
+              {t('settings.maintenance', { ns: 'common' })}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </RoleGuard>
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-            Version {__APP_VERSION__}
+            {t('version', { ns: 'common', version: __APP_VERSION__ })}
           </DropdownMenuLabel>
           <RoleGuard roles={['admin', 'editor']}>
             <DropdownMenuSeparator />
@@ -194,7 +198,7 @@ export default function UserToolbar() {
             className="cursor-pointer"
             onClick={() => openDialog(DIALOG_CHANGE_OWN_PASSWORD)}
           >
-            Change Own Password
+            {t('changeOwnPasswordTitle', { ns: 'users' })}
           </DropdownMenuItem>
           {(!httpRemoteUserEnabled || logoutUrl) && (
             <DropdownMenuItem
@@ -202,7 +206,7 @@ export default function UserToolbar() {
               onClick={handleLogout}
               data-testid="user-toolbar-logout"
             >
-              Logout
+              {t('userMenu.logout')}
             </DropdownMenuItem>
           )}
           <RoleGuard roles={['admin']}>
@@ -217,7 +221,7 @@ export default function UserToolbar() {
                 rel="noopener noreferrer"
               >
                 <Heart className="size-3.5 shrink-0" />
-                <span>Support LeafWiki</span>
+                <span>{t('supportLeafWiki', { ns: 'common' })}</span>
               </a>
             </DropdownMenuItem>
           </RoleGuard>

@@ -9,6 +9,7 @@ import {
   updatePage,
 } from '@/lib/api/pages'
 import { isPageNotFoundError, mapApiError } from '@/lib/api/errors'
+import i18next from '@/lib/i18n'
 import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { create } from 'zustand'
@@ -344,7 +345,7 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         return
       }
 
-      const mapped = mapApiError(err, 'An unknown error occurred')
+      const mapped = mapApiError(err, i18next.t('unknownError', { ns: 'common' }))
       set({
         error: mapped.message,
         notFound: false,

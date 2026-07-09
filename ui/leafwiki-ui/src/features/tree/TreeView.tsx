@@ -38,7 +38,8 @@ import { TreeDndProvider } from './TreeDnd'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
-  const { t } = useTranslation('viewer')
+  const { t: tViewer } = useTranslation('viewer')
+  const { t } = useTranslation('tree')
   const tree = useTreeStore((s) => s.tree)
   const loading = useTreeStore((s) => s.loading)
   const error = useTreeStore((s) => s.error)
@@ -103,13 +104,13 @@ export default function TreeView() {
 
   if (loading)
     return (
-      <p className="tree-view__status tree-view__status--loading">Loading...</p>
+      <p className="tree-view__status tree-view__status--loading">{t('loading')}</p>
     )
 
   if (error || !tree)
     return (
       <p className="tree-view__status tree-view__status--error">
-        Error: {error}
+        {t('errorPrefix')} {error}
       </p>
     )
 
@@ -125,7 +126,7 @@ export default function TreeView() {
                 size={18}
               />
             }
-            tooltip="Create new page"
+            tooltip={t('createNewPage')}
             onClick={() =>
               openDialog(DIALOG_ADD_PAGE, {
                 parentId: '',
@@ -141,7 +142,7 @@ export default function TreeView() {
                 size={18}
               />
             }
-            tooltip="Create new section"
+            tooltip={t('createNewSection')}
             onClick={() =>
               openDialog(DIALOG_ADD_PAGE, {
                 parentId: '',
@@ -158,7 +159,7 @@ export default function TreeView() {
             icon={
               <MoreHorizontal className="tree-view__action-icon" size={18} />
             }
-            tooltip="More actions"
+            tooltip={t('moreActions')}
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-44">
@@ -168,7 +169,7 @@ export default function TreeView() {
             data-testid="tree-view-action-button-expand-all"
           >
             <ChevronsDown size={15} />
-            Expand all
+            {t('expandAll')}
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer gap-2"
@@ -176,7 +177,7 @@ export default function TreeView() {
             data-testid="tree-view-action-button-collapse-all"
           >
             <ChevronsUp size={15} />
-            Collapse all
+            {t('collapseAll')}
           </DropdownMenuItem>
           {!readOnlyMode && tree && (
             <DropdownMenuItem
@@ -185,7 +186,7 @@ export default function TreeView() {
               data-testid="tree-view-action-button-sort"
             >
               <List size={15} />
-              Sort pages
+              {t('sortChildren')}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -203,9 +204,9 @@ export default function TreeView() {
       {hasPinned && (
         <SidebarAccordionSection
           value="pinned"
-          title={t('pinned.sectionTitle')}
+          title={tViewer('pinned.sectionTitle')}
           icon={<Pin size={11} />}
-          collapseToggleLabel={t('pinned.togglePinnedSection')}
+          collapseToggleLabel={tViewer('pinned.togglePinnedSection')}
         >
           <PinnedSection />
         </SidebarAccordionSection>
@@ -213,17 +214,17 @@ export default function TreeView() {
       {hasFavorites && (
         <SidebarAccordionSection
           value="favorites"
-          title={t('favorites.sectionTitle')}
+          title={tViewer('favorites.sectionTitle')}
           icon={<Star size={11} />}
-          collapseToggleLabel={t('favorites.toggleFavoritesSection')}
+          collapseToggleLabel={tViewer('favorites.toggleFavoritesSection')}
         >
           <FavoritesSection />
         </SidebarAccordionSection>
       )}
       <SidebarAccordionSection
         value="pages"
-        title={t('pinned.pagesSectionTitle')}
-        collapseToggleLabel={t('pinned.togglePagesSection')}
+        title={tViewer('pinned.pagesSectionTitle')}
+        collapseToggleLabel={tViewer('pinned.togglePagesSection')}
         actions={pagesToolbar}
       >
         <TreeDndProvider enabled={!readOnlyMode}>

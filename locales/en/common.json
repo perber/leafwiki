@@ -1,0 +1,58 @@
+{
+  "errorPrefix": "Error:",
+  "validationFailed": "Validation failed",
+  "somethingWentWrong": "Something went wrong",
+  "moreActions": "More actions",
+  "breadcrumbAriaLabel": "Breadcrumb",
+  "version": "Version {{version}}",
+  "supportLeafWiki": "Support LeafWiki",
+  "pageBadge": "Page",
+  "settings": {
+    "branding": "Branding Settings",
+    "import": "Import",
+    "maintenance": "Maintenance"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "create": "Create",
+    "close": "Close",
+    "move": "Move",
+    "copy": "Copy",
+    "edit": "Edit",
+    "update": "Update",
+    "updating": "Updating...",
+    "deleting": "Deleting...",
+    "copying": "Copying...",
+    "restoring": "Restoring...",
+    "insert": "Insert",
+    "openLink": "Open link",
+    "copyLink": "Copy link",
+    "loadMore": "Load more",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Reloading the page usually fixes this.",
+    "reload": "Reload page",
+    "recover": "Try to recover",
+    "details": "Error details"
+  },
+  "pagination": {
+    "prev": "← Prev",
+    "next": "Next →",
+    "pageOf": "Page {{page}} of {{total}}"
+  },
+  "tags": {
+    "loading": "Loading…",
+    "noMatches": "No matching tags found.",
+    "remove": "Remove tag {{tag}}"
+  },
+  "unknownError": "An unknown error occurred",
+  "configLoadFailed": "Could not load configuration",
+  "language": {
+    "label": "Language"
+  }
+}

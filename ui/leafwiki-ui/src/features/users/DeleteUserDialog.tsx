@@ -3,6 +3,7 @@ import { mapApiError } from '@/lib/api/errors'
 import { DIALOG_DELETE_USER_CONFIRMATION } from '@/lib/registries'
 import { useUserStore } from '@/stores/users'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 type DeleteUserDialogProps = {
@@ -11,6 +12,8 @@ type DeleteUserDialogProps = {
 }
 
 export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
+  const { t } = useTranslation('users')
+  const { t: tCommon } = useTranslation('common')
   const { deleteUser } = useUserStore()
 
   const [loading, setLoading] = useState(false)
@@ -19,16 +22,13 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
     setLoading(true)
     try {
       await deleteUser(userId)
-      toast.success('User deleted successfully')
-      return true // Close the dialog
+      toast.success(t('toast.deleted'))
+      return true
     } catch (err) {
       console.error('Error deleting user:', err)
-      const mapped = mapApiError(
-        err,
-        'Failed to delete user. Please try again.',
-      )
+      const mapped = mapApiError(err, t('toast.deleteFailed'))
       toast.error(mapped.message)
-      return false // Keep the dialog open
+      return false
     } finally {
       setLoading(false)
     }
@@ -37,8 +37,8 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
   return (
     <BaseDialog
       dialogType={DIALOG_DELETE_USER_CONFIRMATION}
-      dialogTitle="Delete User?"
-      dialogDescription="Are you sure you want to delete this user? This action cannot be undone."
+      dialogTitle={t('deleteUserTitle')}
+      dialogDescription={t('deleteUserDescription')}
       onClose={() => true}
       onConfirm={async (): Promise<boolean> => {
         return await handleDelete()
@@ -46,14 +46,14 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
       defaultAction="cancel"
       testidPrefix="delete-user-dialog"
       cancelButton={{
-        label: 'Cancel',
+        label: t('actions.cancel'),
         variant: 'outline',
         disabled: loading,
         autoFocus: true,
       }}
       buttons={[
         {
-          label: loading ? 'Deleting...' : 'Delete',
+          label: loading ? tCommon('actions.deleting') : t('actions.delete'),
           actionType: 'confirm',
           autoFocus: false,
           loading,
@@ -62,8 +62,7 @@ export function DeleteUserDialog({ userId, username }: DeleteUserDialogProps) {
       ]}
     >
       <p className="text-muted text-sm">
-        The user <strong>{username}</strong> will be permanently removed from
-        the system.
+        {t('deleteConfirmBody', { username })}
       </p>
     </BaseDialog>
   )

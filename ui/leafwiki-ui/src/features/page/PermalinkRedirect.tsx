@@ -2,6 +2,7 @@ import Page404 from '@/components/Page404'
 import { getPermalinkTarget } from '@/lib/api/pages'
 import { isPageNotFoundError } from '@/lib/api/errors'
 import { useProgressbarStore } from '@/features/progressbar/progressbarStore'
+import i18next from '@/lib/i18n'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
@@ -47,7 +48,7 @@ export default function PermalinkRedirect() {
           return
         }
 
-        setError('An unknown error occurred')
+        setError(i18next.t('unknownError', { ns: 'common' }))
       } finally {
         if (active) {
           setLoading(false)

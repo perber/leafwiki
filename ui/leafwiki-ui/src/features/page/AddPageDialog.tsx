@@ -6,9 +6,11 @@ import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import i18next from '@/lib/i18n'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
 import { buildEditUrl } from '@/lib/routePath'
+import { useItemLabels } from '@/lib/useItemLabels'
 import { useTreeStore } from '@/stores/tree'
 import { CalendarDays } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
@@ -24,6 +26,8 @@ export function AddPageDialog({
   parentId,
   nodeKind = NODE_KIND_PAGE,
 }: AddPageDialogProps) {
+  const { t } = useTranslation('page')
+  const { itemCapitalized } = useItemLabels(nodeKind)
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [loading, setLoading] = useState(false)
@@ -34,8 +38,6 @@ export function AddPageDialog({
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
   const navigate = useNavigate()
-  const itemLabel = nodeKind === NODE_KIND_PAGE ? 'page' : 'section'
-  const itemLabelCapitalized = nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'
 
   const isCreateButtonDisabled =
     !title ||
@@ -65,26 +67,26 @@ export function AddPageDialog({
   const handleCreate = useCallback(
     async (
       redirect: boolean = true,
-      nodeKind?: 'page' | 'section',
+      kind?: 'page' | 'section',
     ): Promise<boolean> => {
-      if (!nodeKind) nodeKind = NODE_KIND_PAGE
+      if (!kind) kind = NODE_KIND_PAGE
       if (!title) return false
 
       if (!slug) {
-        toast.error('Slug could not be generated. Please enter it manually.')
+        toast.error(t('toast.slugGenerationFailed'))
         return false
       }
 
       if (!slugTouched && (slugLoading || title !== lastSlugTitle)) {
-        toast.warning('Please wait until the slug is fully generated.')
+        toast.warning(t('toast.slugGenerating'))
         return false
       }
 
       setLoading(true)
       setFieldErrors({})
       try {
-        await createPage({ title, slug, parentId, kind: nodeKind })
-        toast.success(`${itemLabelCapitalized} created`)
+        await createPage({ title, slug, parentId, kind })
+        toast.success(t('toast.pageCreated', { item: itemCapitalized }))
         await reloadTree()
         if (redirect) {
           const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
@@ -93,7 +95,7 @@ export function AddPageDialog({
         return true
       } catch (err: unknown) {
         console.warn(err)
-        handleFieldErrors(err, setFieldErrors, `Error creating ${itemLabel}`)
+        handleFieldErrors(err, setFieldErrors, t('toast.createError'))
         return false
       } finally {
         setLoading(false)
@@ -109,8 +111,8 @@ export function AddPageDialog({
       reloadTree,
       parentPath,
       navigate,
-      itemLabel,
-      itemLabelCapitalized,
+      itemCapitalized,
+      t,
     ],
   )
 
@@ -122,7 +124,7 @@ export function AddPageDialog({
   const buttons = useMemo(() => {
     const b: BaseDialogConfirmButton[] = [
       {
-        label: 'Create',
+        label: t('actions.create'),
         actionType: 'no-redirect',
         autoFocus: true,
         loading,
@@ -132,7 +134,7 @@ export function AddPageDialog({
     ]
     if (nodeKind === NODE_KIND_PAGE) {
       b.push({
-        label: `Create & Edit ${itemLabelCapitalized}`,
+        label: t('addPage.createAndEditPage'),
         actionType: 'confirm',
         autoFocus: false,
         loading,
@@ -141,17 +143,19 @@ export function AddPageDialog({
       })
     }
     return b
-  }, [isCreateButtonDisabled, loading, nodeKind, itemLabelCapitalized])
+  }, [isCreateButtonDisabled, loading, nodeKind, t])
 
   return (
     <BaseDialog
       dialogTitle={
-        nodeKind === 'page' ? 'Create a new page' : 'Create a new section'
+        nodeKind === 'page'
+          ? t('addPage.titlePage')
+          : t('addPage.titleSection')
       }
       dialogDescription={
         nodeKind === 'page'
-          ? 'Enter the title of the new page'
-          : 'Enter the title of the new section'
+          ? t('addPage.descriptionPage')
+          : t('addPage.descriptionSection')
       }
       dialogType={DIALOG_ADD_PAGE}
       onClose={handleCancel}
@@ -160,7 +164,7 @@ export function AddPageDialog({
       }}
       testidPrefix="add-page-dialog"
       cancelButton={{
-        label: 'Cancel',
+        label: t('actions.cancel'),
         variant: 'outline',
         disabled: loading,
         autoFocus: false,
@@ -171,14 +175,14 @@ export function AddPageDialog({
         <div className="page-dialog__title-row">
           <FormInput
             autoFocus={true}
-            label="Title"
+            label={t('createPage.titleLabel')}
             value={title}
             onChange={(val) => {
               handleTitleChange(val)
               setFieldErrors((prev) => ({ ...prev, title: '' }))
             }}
             testid="add-page-title-input"
-            placeholder={`${itemLabelCapitalized} title`}
+            placeholder={t('editMetadata.titlePlaceholder', { item: itemCapitalized })}
             error={fieldErrors.title}
             allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
           />
@@ -211,7 +215,7 @@ export function AddPageDialog({
         />
       </div>
       <span className="dialog__path" data-testid="add-page-path-display">
-        Path: {parentPath !== '' && `${parentPath}/`}
+        {t('createPage.pathPrefix')} {parentPath !== '' && `${parentPath}/`}
         {slug && `${slug}`}
       </span>
     </BaseDialog>

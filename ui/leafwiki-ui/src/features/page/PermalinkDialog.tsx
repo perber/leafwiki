@@ -7,6 +7,7 @@ import { buildPermalinkPath, withBasePath } from '@/lib/routePath'
 import copy from 'copy-to-clipboard'
 import { Copy, ExternalLink } from 'lucide-react'
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 type PermalinkDialogProps = {
@@ -14,6 +15,8 @@ type PermalinkDialogProps = {
 }
 
 export function PermalinkDialog({ page }: PermalinkDialogProps) {
+  const { t } = useTranslation('page')
+  const { t: tCommon } = useTranslation('common')
   const permalink = useMemo(() => {
     const path = withBasePath(buildPermalinkPath(page.id, page.slug))
     if (typeof window === 'undefined') {
@@ -24,31 +27,31 @@ export function PermalinkDialog({ page }: PermalinkDialogProps) {
 
   const handleCopy = () => {
     if (!copy(permalink)) {
-      toast.error('Could not copy permalink')
+      toast.error(t('toast.permalinkCopyFailed'))
       return
     }
 
-    toast.success('Permalink copied')
+    toast.success(t('toast.permalinkCopied'))
   }
 
   const handleClose = () => true
 
   return (
     <BaseDialog
-      dialogTitle="Share page"
-      dialogDescription={`Shareable URL for ${page.title}`}
+      dialogTitle={t('share.title')}
+      dialogDescription={t('share.description', { title: page.title })}
       dialogType={DIALOG_PAGE_PERMALINK}
       onClose={handleClose}
       onConfirm={async () => false}
       testidPrefix="permalink-dialog"
       cancelButton={{
-        label: 'Close',
+        label: tCommon('actions.close'),
         variant: 'outline',
       }}
     >
       <div className="space-y-3">
         <FormInput
-          label="Shareable URL"
+          label={t('share.urlLabel')}
           value={permalink}
           onChange={() => {}}
           readOnly={true}
@@ -63,7 +66,7 @@ export function PermalinkDialog({ page }: PermalinkDialogProps) {
             data-testid="permalink-dialog-copy-button"
           >
             <Copy />
-            Copy link
+            {tCommon('actions.copyLink')}
           </Button>
           <Button
             type="button"
@@ -73,7 +76,7 @@ export function PermalinkDialog({ page }: PermalinkDialogProps) {
           >
             <a href={permalink} target="_blank" rel="noreferrer">
               <ExternalLink />
-              Open link
+              {tCommon('actions.openLink')}
             </a>
           </Button>
         </div>

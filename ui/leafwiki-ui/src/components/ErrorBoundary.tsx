@@ -1,3 +1,4 @@
+import i18next from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Component, ErrorInfo } from 'react'
@@ -42,6 +43,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
     if (!error) return this.props.children
 
+    const t = (key: string) =>
+      i18next.t(key, { ns: 'common', keyPrefix: 'errorBoundary' })
+
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
         <div className="flex flex-col items-center gap-4 text-center">
@@ -50,11 +54,10 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
           <div className="flex flex-col gap-1">
             <h1 className="text-foreground text-xl font-semibold">
-              Something went wrong
+              {t('title')}
             </h1>
             <p className="text-muted-foreground max-w-md text-sm">
-              An unexpected error occurred. Reloading the page usually fixes
-              this.
+              {t('description')}
             </p>
           </div>
         </div>
@@ -62,16 +65,16 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex gap-3">
           <Button onClick={this.handleReload} className="gap-2">
             <RefreshCw className="h-4 w-4" />
-            Reload page
+            {t('reload')}
           </Button>
           <Button variant="outline" onClick={this.handleReset}>
-            Try to recover
+            {t('recover')}
           </Button>
         </div>
 
         <details className="border-border bg-muted/40 w-full max-w-xl rounded-md border">
           <summary className="text-muted-foreground cursor-pointer p-3 text-xs font-medium select-none">
-            Error details
+            {t('details')}
           </summary>
           <pre className="text-destructive overflow-auto p-3 pt-0 text-xs break-all whitespace-pre-wrap">
             {error.stack ?? error.message}

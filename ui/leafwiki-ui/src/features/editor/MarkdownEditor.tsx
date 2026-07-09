@@ -27,6 +27,7 @@ import {
 import { uploadAsset, UploadAssetResponse } from '@/lib/api/assets'
 import { mapApiError } from '@/lib/api/errors'
 import { formatBytes, IMAGE_EXTENSIONS } from '@/lib/config'
+import i18next from '@/lib/i18n'
 import { useConfigStore } from '@/stores/config'
 import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
@@ -194,7 +195,10 @@ const MarkdownEditor = (
       for (const file of files) {
         if (file.size > maxAssetUploadSizeBytes) {
           toast.error(
-            `File too large. Max ${formatBytes(maxAssetUploadSizeBytes)} allowed.`,
+            i18next.t('toast.fileTooLarge', {
+              ns: 'assets',
+              size: formatBytes(maxAssetUploadSizeBytes),
+            }),
           )
           continue
         }
@@ -203,7 +207,7 @@ const MarkdownEditor = (
         try {
           const res: UploadAssetResponse = await uploadAsset(pageId, file)
 
-          toast.success(`Uploaded ${file.name}`)
+          toast.success(`${t('upload.success')} ${file.name}`)
 
           // The result of uploadAsset looks like this:
           // {"file":"/assets/0NmpvSivg/preview-scrollbar.gif"}
@@ -232,7 +236,9 @@ const MarkdownEditor = (
           editorViewRef.current?.focus()
         } catch (err) {
           console.error('Upload failed', err)
-          toast.error(mapApiError(err, `Failed to upload ${file.name}`).message)
+          toast.error(
+            mapApiError(err, t('upload.failed')).message,
+          )
         }
       }
     },
@@ -696,8 +702,8 @@ const MarkdownEditor = (
           {/* Mobile Tabs */}
           <div className="markdown-editor__tabs" role="tablist">
             {[
-              { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
-              { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
+              { id: 'editor', label: t('tabs.editor'), icon: <Code2 size={16} /> },
+              { id: 'preview', label: t('tabs.preview'), icon: <Eye size={16} /> },
             ].map((tab) => (
               <button
                 key={tab.id}

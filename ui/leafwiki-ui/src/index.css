@@ -818,7 +818,11 @@
 
   /* Login Form*/
   .login {
-    @apply border-surface-border bg-surface text-interface-text mx-auto w-full max-w-sm pt-8 shadow-md sm:mx-0 sm:h-screen sm:w-96 sm:max-w-none sm:border-r sm:pt-0;
+    @apply border-surface-border bg-surface text-interface-text relative mx-auto w-full max-w-sm pt-8 shadow-md sm:mx-0 sm:h-screen sm:w-96 sm:max-w-none sm:border-r sm:pt-0;
+  }
+
+  .login__language-switcher {
+    @apply absolute top-3 right-3;
   }
 
   .login__form {

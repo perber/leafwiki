@@ -102,6 +102,7 @@ type RouterOptions struct {
 	UserManagementURL       string                   // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
 	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
 	LogoutURL               string                   // Optional URL the frontend redirects to after logout
+	LocalesDir              string                   // Directory with runtime locale JSON files (sibling of data dir by default)
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.
@@ -166,6 +167,8 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	for _, r := range registrars {
 		r.RegisterRoutes(ctx)
 	}
+
+	RegisterLocalesRoutes(base, opts.LocalesDir)
 
 	// Resolve custom stylesheet: prefer pre-validated FrontendConfig path,
 	// fall back to normalizing opts.CustomStylesheet against StorageDir.
@@ -233,7 +236,8 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 				!strings.HasPrefix(path, "/api") &&
 				!strings.HasPrefix(path, "/assets") &&
 				!strings.HasPrefix(path, "/static") &&
-				!strings.HasPrefix(path, "/branding") {
+				!strings.HasPrefix(path, "/branding") &&
+				!strings.HasPrefix(path, "/locales") {
 
 				c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 				data, err := fs.ReadFile(fsys, "index.html")

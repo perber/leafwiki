@@ -1,0 +1,33 @@
+{
+  "createNewPage": "Create new page",
+  "createNewSection": "Create new section",
+  "moreActions": "More actions",
+  "openMoreActions": "Open more actions",
+  "unpinPage": "Unpin page",
+  "loading": "Loading...",
+  "errorPrefix": "Error:",
+  "expandAll": "Expand all",
+  "collapseAll": "Collapse all",
+  "sortChildren": "Sort pages",
+  "untitledPage": "Untitled Page",
+  "actions": {
+    "addPage": "Add Page",
+    "addSection": "Add Section",
+    "editItem": "Edit {{item}}",
+    "renameItem": "Rename {{item}}",
+    "copyPage": "Copy Page",
+    "sortChildren": "Sort {{item}} Children",
+    "moveItem": "Move {{item}}",
+    "convertToPage": "Convert to Page",
+    "deleteItem": "Delete {{item}}"
+  },
+  "toast": {
+    "converted": "Page converted successfully",
+    "versionConflict": "This page was modified by another user. Please try again.",
+    "convertFailed": "Failed to convert page",
+    "editingRenameBlocked": "This {{item}} is currently being edited. Please use the editor title bar to rename it.",
+    "renamed": "{{item}} renamed successfully",
+    "renameFailed": "Failed to rename page",
+    "editingDeleteBlocked": "This {{item}} is currently being edited. Please close the editor before deleting it."
+  }
+}

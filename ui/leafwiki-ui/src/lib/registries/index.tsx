@@ -2,6 +2,7 @@ import TreeView from '@/features/tree/TreeView'
 import { DialogRegistry } from '@/lib/registries/dialogRegistry'
 import { PanelItemRegistry } from '@/lib/registries/panelItemRegistry'
 import { getShortcutDefinition } from '@/lib/shortcuts/shortcutCatalog'
+import i18next from '@/lib/i18n'
 import { FolderTree, Search as SearchIcon } from 'lucide-react'
 import {
   AddPageDialog,
@@ -38,7 +39,7 @@ export const SIDEBAR_SEARCH_PANEL_ID = 'search'
 
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
-  label: 'Explorer',
+  label: i18next.t('explorer', { ns: 'sidebar' }),
   hotkey: getShortcutDefinition('sidebar.explorer.open').keyCombo,
   modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <FolderTree size={16} />,
@@ -49,7 +50,7 @@ panelItemRegistry.register({
 
 panelItemRegistry.register({
   id: SIDEBAR_SEARCH_PANEL_ID,
-  label: 'Search',
+  label: i18next.t('search', { ns: 'sidebar' }),
   hotkey: getShortcutDefinition('sidebar.search.open').keyCombo,
   modes: ['view', 'edit', 'history', 'settings', 'user-management'],
   icon: () => <SearchIcon size={16} />,

@@ -1,7 +1,9 @@
 import { Button } from '@/components/ui/button'
+import i18next from '@/lib/i18n'
 import { useImportStore } from '@/stores/import'
 import { FileUp, Loader2, PlayIcon, UploadIcon, XIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useSetTitle } from '../viewer/setTitle'
 import { useToolbarActions } from './useToolbarActions'
@@ -9,14 +11,7 @@ import { useToolbarActions } from './useToolbarActions'
 type ResultFilter = 'all' | 'created' | 'skipped' | 'failed'
 
 function getPlanActionLabel(action: 'create' | 'update' | 'skip'): string {
-  switch (action) {
-    case 'create':
-      return 'Create page'
-    case 'update':
-      return 'Update page'
-    case 'skip':
-      return 'Skip item'
-  }
+  return i18next.t(`planAction.${action}`, { ns: 'importer' })
 }
 
 function getPlanActionClass(action: 'create' | 'update' | 'skip'): string {
@@ -35,19 +30,10 @@ function getResultActionLabel(
   hasError: boolean,
 ): string {
   if (hasError) {
-    return 'Needs attention'
+    return i18next.t('resultAction.needsAttention', { ns: 'importer' })
   }
 
-  switch (action) {
-    case 'created':
-      return 'Created'
-    case 'updated':
-      return 'Updated'
-    case 'skipped':
-      return 'Skipped'
-    case 'conflicted':
-      return 'Conflicted'
-  }
+  return i18next.t(`resultAction.${action}`, { ns: 'importer' })
 }
 
 function getResultActionClass(
@@ -69,9 +55,10 @@ function getResultActionClass(
 }
 
 export default function Importer() {
+  const { t } = useTranslation('importer')
   // reset toolbar actions on mount
   useToolbarActions()
-  useSetTitle({ title: 'Import' })
+  useSetTitle({ title: t('title') })
   const navigate = useNavigate()
   const zipRef = useRef<HTMLInputElement>(null)
   const [zipFileName, setZipFileName] = useState('')
@@ -146,22 +133,22 @@ export default function Importer() {
           : 'settings__pill settings__pill-success'
   const statusLabel =
     importStatus === 'running'
-      ? 'Running'
+      ? t('status.running')
       : importStatus === 'completed'
-        ? 'Completed'
+        ? t('status.completed')
         : importStatus === 'canceled'
-          ? 'Canceled'
+          ? t('status.canceled')
           : importStatus === 'failed'
-            ? 'Failed'
+            ? t('status.failed')
             : importStatus === 'planned'
-              ? 'Planned'
-              : 'Idle'
+              ? t('status.planned')
+              : t('status.idle')
   const clearButtonLabel =
     importStatus === 'running'
       ? importPlan?.cancel_requested
-        ? 'Cancel Requested'
-        : 'Cancel Import'
-      : 'Clear Import Plan'
+        ? t('actions.cancelRequested')
+        : t('actions.cancelImport')
+      : t('actions.clearImportPlan')
   const currentStep =
     importStatus === 'running'
       ? 3
@@ -176,23 +163,23 @@ export default function Importer() {
   const stepItems = [
     {
       number: 1,
-      title: 'Select Zip',
-      description: 'Choose the package you want to import.',
+      title: t('steps.selectZip.title'),
+      description: t('steps.selectZip.description'),
     },
     {
       number: 2,
-      title: 'Review Plan',
-      description: 'Check the generated pages and paths.',
+      title: t('steps.reviewPlan.title'),
+      description: t('steps.reviewPlan.description'),
     },
     {
       number: 3,
-      title: 'Run Import',
-      description: 'Watch progress while the importer works.',
+      title: t('steps.runImport.title'),
+      description: t('steps.runImport.description'),
     },
     {
       number: 4,
-      title: 'Review Result',
-      description: 'Inspect imported, skipped, or failed items.',
+      title: t('steps.reviewResult.title'),
+      description: t('steps.reviewResult.description'),
     },
   ]
   const planItems = importPlan?.items ?? []
@@ -244,65 +231,80 @@ export default function Importer() {
   const showResultStep = currentStep === 4
   const showRunSection = currentStep === 2 || currentStep === 3
   const nextActionText = !importPlan
-    ? 'Choose a zip file and create an import plan.'
+    ? t('nextAction.chooseZip')
     : importStatus === 'planned'
-      ? 'Review the generated items, then start the import.'
+      ? t('nextAction.reviewPlan')
       : importStatus === 'running'
         ? importPlan.cancel_requested
-          ? 'Cancellation was requested. The importer will stop after the current item finishes.'
-          : 'The import is running. You can stay on this page and watch the progress update.'
+          ? t('nextAction.cancelRequested')
+          : t('nextAction.running')
         : importStatus === 'completed'
-          ? 'The import finished successfully. Review the result below, or start a new import with another zip package.'
+          ? t('nextAction.completed')
           : importStatus === 'failed'
-            ? 'The import stopped with an error. Check the message and result items below.'
+            ? t('nextAction.failed')
             : importStatus === 'canceled'
-              ? 'The import was canceled. Completed work was kept and is shown below.'
-              : 'Select a zip file to begin.'
+              ? t('nextAction.canceled')
+              : t('nextAction.selectZip')
+
+  const filterLabels: Record<ResultFilter, string> = {
+    all: t('result.filterAll'),
+    created: t('result.filterCreated'),
+    skipped: t('result.filterSkipped'),
+    failed: t('result.filterFailed'),
+  }
 
   return (
     <>
       <div className="settings importer">
-        <h1 className="settings__title">Import</h1>
+        <h1 className="settings__title">{t('title')}</h1>
         <div className="settings__section">
-          <h2 className="settings__section-title">Before You Start</h2>
+          <h2 className="settings__section-title">{t('beforeStart.title')}</h2>
           <p className="settings__section-description">
-            Import a zip archive with Markdown files. LeafWiki first creates a
-            review plan, and only imports pages after you explicitly start the
-            execution step.
+            {t('beforeStart.description')}
           </p>
           <div className="importer__callout">
-            <div className="importer__callout-title">What happens next?</div>
+            <div className="importer__callout-title">
+              {t('beforeStart.whatHappensNext')}
+            </div>
             <div className="importer__callout-body">
               <strong>
-                Step {currentStep}
-                {currentStepItem ? `: ${currentStepItem.title}` : ''}
+                {t('beforeStart.stepLabel', {
+                  number: currentStep,
+                  title: currentStepItem?.title ?? '',
+                })}
               </strong>
               <span>{nextActionText}</span>
             </div>
           </div>
           <div className="importer__info-grid">
             <div className="importer__info-card">
-              <div className="importer__info-title">Safe review first</div>
+              <div className="importer__info-title">
+                {t('beforeStart.safeReviewTitle')}
+              </div>
               <div className="importer__info-text">
-                Creating the plan does not import pages yet.
+                {t('beforeStart.safeReviewText')}
               </div>
             </div>
             <div className="importer__info-card">
-              <div className="importer__info-title">Links and assets</div>
+              <div className="importer__info-title">
+                {t('beforeStart.linksAssetsTitle')}
+              </div>
               <div className="importer__info-text">
-                Internal links and embedded assets are rewritten during import.
+                {t('beforeStart.linksAssetsText')}
               </div>
             </div>
             <div className="importer__info-card">
-              <div className="importer__info-title">Still in alpha</div>
+              <div className="importer__info-title">
+                {t('beforeStart.alphaTitle')}
+              </div>
               <div className="importer__info-text">
-                Some Markdown variants may still need manual cleanup afterward.
+                {t('beforeStart.alphaText')}
               </div>
             </div>
           </div>
         </div>
         <div className="settings__section">
-          <h2 className="settings__section-title">Import Flow</h2>
+          <h2 className="settings__section-title">{t('flow.title')}</h2>
           <div className="importer__steps">
             {stepItems.map((step) => {
               const state =
@@ -331,26 +333,25 @@ export default function Importer() {
         </div>
         {showPackageStep && (
           <div className="settings__section">
-            <h2 className="settings__section-title">Choose Import Package</h2>
+            <h2 className="settings__section-title">{t('package.title')}</h2>
             <p className="settings__section-description">
-              Select a zip archive that contains Markdown files. After that, we
-              create a preview plan so you can inspect paths, actions, and notes
-              before the import runs.
+              {t('package.description')}
             </p>
             <p className="settings__section-description">
-              If you run into problems, unexpected results, or unsupported edge
-              cases, please create an issue on our{' '}
+              {t('package.issuesHint')}{' '}
               <a
                 href="https://github.com/perber/leafwiki/issues"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                GitHub repository
+                {t('package.githubRepository')}
               </a>
               .
             </p>
             <div className="settings__preview">
-              <span className="settings__preview-label">Current Zip:</span>
+              <span className="settings__preview-label">
+                {t('package.currentZip')}
+              </span>
               {zipFileName ? (
                 <>
                   <span className="settings__preview-filename">
@@ -359,7 +360,7 @@ export default function Importer() {
                 </>
               ) : (
                 <span className="settings__preview-placeholder">
-                  No zip file selected
+                  {t('package.noZipSelected')}
                 </span>
               )}
             </div>
@@ -381,12 +382,9 @@ export default function Importer() {
                 }}
               >
                 <FileUp className="mr-2 h-4 w-4" />
-                Select Zip File
+                {t('actions.selectZipFile')}
               </Button>
-              <div className="settings__hint">
-                Supported input: a single `.zip` archive containing your
-                Markdown knowledge base.
-              </div>
+              <div className="settings__hint">{t('package.supportedInput')}</div>
             </div>
             <Button
               variant="default"
@@ -401,34 +399,34 @@ export default function Importer() {
               ) : (
                 <UploadIcon className="mr-2 h-4 w-4" />
               )}
-              Import from Zip
+              {t('actions.importFromZip')}
             </Button>
-            <div className="settings__hint">
-              This only creates the review plan. No pages are imported until you
-              click `Execute Import Plan`.
-            </div>
+            <div className="settings__hint">{t('package.planOnlyHint')}</div>
           </div>
         )}
         {importPlan && showPlanStep && (
           <div className="settings__section">
-            <h2 className="settings__section-title">Import Plan</h2>
+            <h2 className="settings__section-title">{t('plan.title')}</h2>
             <p className="settings__section-description">
-              Review what LeafWiki is about to create, update, or skip before
-              you start the import.
+              {t('plan.description')}
             </p>
             <div className="importer__status-banner">
               <div className="importer__status-header">
                 <div>
-                  <div className="settings__preview-label">Current Status</div>
+                  <div className="settings__preview-label">
+                    {t('plan.currentStatus')}
+                  </div>
                   <div className="importer__status-title">{statusLabel}</div>
                 </div>
                 <span className={statusPillClass}>{statusLabel}</span>
               </div>
               <div className="importer__status-meta">
-                <span>Plan ID: {importPlan.id}</span>
-                {progressLabel ? <span>Progress: {progressLabel}</span> : null}
+                <span>{t('plan.planId', { id: importPlan.id })}</span>
+                {progressLabel ? (
+                  <span>{t('plan.progress', { label: progressLabel })}</span>
+                ) : null}
                 {importPlan.total_items > 0 ? (
-                  <span>{progressPercent}% complete</span>
+                  <span>{t('plan.percentComplete', { percent: progressPercent })}</span>
                 ) : null}
               </div>
               {importPlan.total_items > 0 ? (
@@ -442,19 +440,19 @@ export default function Importer() {
             </div>
             <div className="importer__summary-grid importer__summary-grid--three">
               <div className="importer__summary-card">
-                <div className="importer__summary-label">Will Create</div>
+                <div className="importer__summary-label">{t('plan.willCreate')}</div>
                 <div className="importer__summary-value">
                   {plannedCreateCount}
                 </div>
               </div>
               <div className="importer__summary-card">
-                <div className="importer__summary-label">Will Update</div>
+                <div className="importer__summary-label">{t('plan.willUpdate')}</div>
                 <div className="importer__summary-value">
                   {plannedUpdateCount}
                 </div>
               </div>
               <div className="importer__summary-card">
-                <div className="importer__summary-label">Will Skip</div>
+                <div className="importer__summary-label">{t('plan.willSkip')}</div>
                 <div className="importer__summary-value">
                   {plannedSkipCount}
                 </div>
@@ -463,17 +461,18 @@ export default function Importer() {
             {importStatus === 'running' && (
               <p className="settings__section-description importer__status-copy">
                 {importPlan.cancel_requested
-                  ? 'Cancellation has been requested. The importer will stop after the current item finishes.'
-                  : 'The import is running in the background. You can stay on this page to watch progress.'}
+                  ? t('plan.cancelRequestedCopy')
+                  : t('plan.runningCopy')}
                 {importPlan.current_item_source_path
-                  ? ` Currently processing ${importPlan.current_item_source_path}.`
+                  ? t('plan.currentlyProcessing', {
+                      path: importPlan.current_item_source_path,
+                    })
                   : ''}
               </p>
             )}
             {importStatus === 'canceled' && (
               <p className="settings__section-description importer__status-copy">
-                The import was canceled. Completed items were kept, and the
-                partial result is shown below.
+                {t('plan.canceledCopy')}
               </p>
             )}
             {importStatus === 'failed' && importPlan.execution_error && (
@@ -492,18 +491,20 @@ export default function Importer() {
                     </tr>
                     <tr>
                       <th className="settings__table-header-cell">
-                        Tree Hash:
+                        {t('plan.treeHash')}
                       </th>
                       <td>{importPlan.tree_hash}</td>
                     </tr>
                     <tr>
-                      <th className="settings__table-header-cell">Progress:</th>
+                      <th className="settings__table-header-cell">
+                        {t('plan.progress', { label: progressLabel ?? '0/0' })}
+                      </th>
                       <td>{progressLabel ?? '0/0'}</td>
                     </tr>
                     {importPlan.started_at && (
                       <tr>
                         <th className="settings__table-header-cell">
-                          Started At:
+                          {t('plan.startedAt')}
                         </th>
                         <td>
                           {new Date(importPlan.started_at).toLocaleString()}
@@ -513,7 +514,7 @@ export default function Importer() {
                     {importPlan.finished_at && (
                       <tr>
                         <th className="settings__table-header-cell">
-                          Finished At:
+                          {t('plan.finishedAt')}
                         </th>
                         <td>
                           {new Date(importPlan.finished_at).toLocaleString()}
@@ -537,7 +538,7 @@ export default function Importer() {
                 ) : (
                   <UploadIcon className="mr-2 h-4 w-4" />
                 )}
-                Start New Import
+                {t('actions.startNewImport')}
               </Button>
               <Button
                 variant="destructive"
@@ -551,7 +552,7 @@ export default function Importer() {
                 ) : (
                   <XIcon className="mr-2 h-4 w-4" />
                 )}
-                Close and Clear
+                {t('actions.closeAndClear')}
               </Button>
             </div>
           </div>
@@ -560,11 +561,10 @@ export default function Importer() {
           <>
             <div className="settings__section">
               <h2 className="settings__section-title">
-                Planned Items ({importPlan.items.length})
+                {t('plan.plannedItems', { count: importPlan.items.length })}
               </h2>
               <p className="settings__section-description">
-                These are the individual files LeafWiki detected in the package
-                and how they map to target pages.
+                {t('plan.plannedItemsDescription')}
               </p>
               <div className="settings__field">
                 <div className="settings__table-card">
@@ -573,18 +573,22 @@ export default function Importer() {
                       <thead className="settings__table-head">
                         <tr>
                           <th className="settings__table-header-cell">
-                            Import File
+                            {t('plan.importFile')}
                           </th>
                           <th className="settings__table-header-cell">
-                            Target Page
-                          </th>
-                          <th className="settings__table-header-cell">Title</th>
-                          <th className="settings__table-header-cell">Type</th>
-                          <th className="settings__table-header-cell">
-                            Planned Action
+                            {t('plan.targetPage')}
                           </th>
                           <th className="settings__table-header-cell">
-                            Notes for Review
+                            {t('plan.titleColumn')}
+                          </th>
+                          <th className="settings__table-header-cell">
+                            {t('plan.typeColumn')}
+                          </th>
+                          <th className="settings__table-header-cell">
+                            {t('plan.plannedAction')}
+                          </th>
+                          <th className="settings__table-header-cell">
+                            {t('plan.notesForReview')}
                           </th>
                         </tr>
                       </thead>
@@ -615,7 +619,7 @@ export default function Importer() {
                                 item.notes.join(', ')
                               ) : (
                                 <span className="importer__muted-copy">
-                                  No special notes
+                                  {t('plan.noSpecialNotes')}
                                 </span>
                               )}
                             </td>
@@ -631,11 +635,9 @@ export default function Importer() {
         )}
         {importPlan && showRunSection && (
           <div className="settings__section">
-            <h2 className="settings__section-title">Run Import</h2>
+            <h2 className="settings__section-title">{t('run.title')}</h2>
             <p className="settings__section-description">
-              {showPlanStep
-                ? 'Start the import once the plan looks correct. You can also clear the current plan and begin again with a different package.'
-                : 'The importer is currently working through the generated plan. You can stay on this page to monitor progress or request cancellation.'}
+              {showPlanStep ? t('run.descriptionPlan') : t('run.descriptionRunning')}
             </p>
             {showRunStep && (
               <>
@@ -643,7 +645,7 @@ export default function Importer() {
                   <div className="importer__status-header">
                     <div>
                       <div className="settings__preview-label">
-                        Current Status
+                        {t('plan.currentStatus')}
                       </div>
                       <div className="importer__status-title">
                         {statusLabel}
@@ -652,12 +654,14 @@ export default function Importer() {
                     <span className={statusPillClass}>{statusLabel}</span>
                   </div>
                   <div className="importer__status-meta">
-                    <span>Plan ID: {importPlan.id}</span>
+                    <span>{t('plan.planId', { id: importPlan.id })}</span>
                     {progressLabel ? (
-                      <span>Progress: {progressLabel}</span>
+                      <span>{t('plan.progress', { label: progressLabel })}</span>
                     ) : null}
                     {importPlan.total_items > 0 ? (
-                      <span>{progressPercent}% complete</span>
+                      <span>
+                        {t('plan.percentComplete', { percent: progressPercent })}
+                      </span>
                     ) : null}
                   </div>
                   {importPlan.total_items > 0 ? (
@@ -671,8 +675,8 @@ export default function Importer() {
                 </div>
                 <p className="settings__section-description importer__status-copy">
                   {importPlan.cancel_requested
-                    ? 'Cancellation has been requested. The importer will stop after the current item finishes.'
-                    : 'The import is running in the background. You can stay on this page to watch progress.'}
+                    ? t('plan.cancelRequestedCopy')
+                    : t('plan.runningCopy')}
                   {importPlan.current_item_source_path
                     ? ` Currently processing ${importPlan.current_item_source_path}.`
                     : ''}
@@ -700,8 +704,8 @@ export default function Importer() {
                   <PlayIcon className="mr-2 h-4 w-4" />
                 )}
                 {importStatus === 'running'
-                  ? 'Import Running'
-                  : 'Execute Import Plan'}
+                  ? t('actions.importRunning')
+                  : t('actions.executeImportPlan')}
               </Button>
               <Button
                 variant="destructive"
@@ -726,42 +730,39 @@ export default function Importer() {
         )}
         {importResult && showResultStep && (
           <div className="settings__section">
-            <h2 className="settings__section-title">Import Result</h2>
+            <h2 className="settings__section-title">{t('result.title')}</h2>
             <p className="settings__section-description">
-              This is the final outcome of the import. Skipped items usually
-              need manual review, while failed items need attention before
-              retrying.
+              {t('result.description')}
             </p>
             <div className="importer__callout">
               <div className="importer__callout-title">
-                Want to import another package?
+                {t('result.anotherPackageTitle')}
               </div>
               <div className="importer__callout-body">
-                <span>
-                  Start a new import to clear this result and choose a different
-                  zip file.
-                </span>
+                <span>{t('result.anotherPackageBody')}</span>
               </div>
             </div>
             <div className="importer__summary-grid">
               <div className="importer__summary-card">
-                <div className="importer__summary-label">Created</div>
+                <div className="importer__summary-label">{t('result.created')}</div>
                 <div className="importer__summary-value">{createdCount}</div>
               </div>
               <div className="importer__summary-card">
-                <div className="importer__summary-label">Skipped</div>
+                <div className="importer__summary-label">{t('result.skipped')}</div>
                 <div className="importer__summary-value">{skippedCount}</div>
               </div>
               <div className="importer__summary-card">
-                <div className="importer__summary-label">Failed</div>
+                <div className="importer__summary-label">{t('result.failed')}</div>
                 <div className="importer__summary-value">{failedCount}</div>
               </div>
               <div className="importer__summary-card">
-                <div className="importer__summary-label">Tree Updated</div>
+                <div className="importer__summary-label">
+                  {t('result.treeUpdated')}
+                </div>
                 <div className="importer__summary-value">
                   {importResult.tree_hash === importResult.tree_hash_before
-                    ? 'No'
-                    : 'Yes'}
+                    ? t('result.treeUpdatedNo')
+                    : t('result.treeUpdatedYes')}
                 </div>
               </div>
             </div>
@@ -772,19 +773,19 @@ export default function Importer() {
                   <tbody>
                     <tr>
                       <th className="settings__table-header-cell">
-                        Imported Count:
+                        {t('result.importedCount')}
                       </th>
                       <td>{importResult.imported_count}</td>
                     </tr>
                     <tr>
                       <th className="settings__table-header-cell">
-                        Updated Count:
+                        {t('result.updatedCount')}
                       </th>
                       <td>{importResult.updated_count}</td>
                     </tr>
                     <tr>
                       <th className="settings__table-header-cell">
-                        Skipped Count:
+                        {t('result.skippedCount')}
                       </th>
                       <td>{importResult.skipped_count}</td>
                     </tr>
@@ -805,7 +806,7 @@ export default function Importer() {
                 ) : (
                   <UploadIcon className="mr-2 h-4 w-4" />
                 )}
-                Start New Import
+                {t('actions.startNewImport')}
               </Button>
               <Button
                 variant="destructive"
@@ -819,7 +820,7 @@ export default function Importer() {
                 ) : (
                   <XIcon className="mr-2 h-4 w-4" />
                 )}
-                Close and Clear
+                {t('actions.closeAndClear')}
               </Button>
             </div>
           </div>
@@ -827,12 +828,13 @@ export default function Importer() {
         {importResult && showResultStep && importResult.items.length > 0 && (
           <div className="settings__section">
             <h2 className="settings__section-title">
-              Result Items ({filteredResultItems.length}/
-              {importResult.items.length})
+              {t('result.resultItems', {
+                filtered: filteredResultItems.length,
+                total: importResult.items.length,
+              })}
             </h2>
             <p className="settings__section-description">
-              Use the filters to focus on successful imports, skipped items, or
-              failures.
+              {t('result.filterDescription')}
             </p>
             <div className="importer__result-toolbar">
               <div className="importer__filter-group">
@@ -851,14 +853,14 @@ export default function Importer() {
                       setResultFilter(filter)
                     }}
                   >
-                    {filter}
+                    {filterLabels[filter]}
                   </button>
                 ))}
               </div>
               <input
                 type="search"
                 className="importer__search"
-                placeholder="Filter by path, action, or error"
+                placeholder={t('result.filterPlaceholder')}
                 value={resultSearch}
                 onChange={(e) => {
                   setResultSearch(e.target.value)
@@ -871,13 +873,17 @@ export default function Importer() {
                   <thead className="settings__table-head">
                     <tr>
                       <th className="settings__table-header-cell">
-                        Imported File
+                        {t('result.importedFile')}
                       </th>
                       <th className="settings__table-header-cell">
-                        Resulting Page
+                        {t('result.resultingPage')}
                       </th>
-                      <th className="settings__table-header-cell">Outcome</th>
-                      <th className="settings__table-header-cell">Details</th>
+                      <th className="settings__table-header-cell">
+                        {t('result.outcome')}
+                      </th>
+                      <th className="settings__table-header-cell">
+                        {t('result.details')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -906,14 +912,14 @@ export default function Importer() {
                           {item.error ? (
                             item.error
                           ) : item.action === 'created' ? (
-                            'Imported successfully'
+                            t('result.importedSuccessfully')
                           ) : item.action === 'updated' ? (
-                            'Existing page was updated'
+                            t('result.existingPageUpdated')
                           ) : item.action === 'skipped' ? (
-                            'Skipped without error'
+                            t('result.skippedWithoutError')
                           ) : (
                             <span className="importer__muted-copy">
-                              No extra details
+                              {t('result.noExtraDetails')}
                             </span>
                           )}
                         </td>
@@ -925,7 +931,7 @@ export default function Importer() {
                           className="settings__table-body-message"
                           colSpan={4}
                         >
-                          No items match the current filter.
+                          {t('result.noMatchingItems')}
                         </td>
                       </tr>
                     )}

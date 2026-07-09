@@ -51,6 +51,7 @@ func writeUsage(w io.Writer) {
 	--port             Port to run the server on (default: 8080)
 	--unix-socket      Path to a unix domain socket to listen on (overrides --host and --port)
 	--data-dir         Path to data directory (default: ./data)
+	--locales-dir      Path to locale JSON files (default: <parent-of-data-dir>/locales)
 	--admin-password   Initial admin password (used only if no admin exists)
 	--admin-username   Initial admin username (used only if no admin exists) (default: admin)
 	--admin-email      Initial admin email (used only if no admin exists) (default: admin@localhost)
@@ -217,6 +218,7 @@ type cliFlags struct {
 	gitBackupSSHKnownHosts  *string
 	gitBackupInterval       *time.Duration
 	revisionCoalesceWindow  *time.Duration
+	localesDir              *string
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -263,6 +265,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
 		gitBackupInterval:       fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
 		revisionCoalesceWindow:  fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
+		localesDir:              fs.String("locales-dir", "", "path to locale JSON files served at /locales (default: <parent-of-data-dir>/locales)"),
 	}
 }
 
@@ -290,6 +293,8 @@ func main() {
 	port := resolveString("port", *flags.port, visited, "LEAFWIKI_PORT", "8080")
 	unixSocket := resolveString("unix-socket", *flags.unixSocket, visited, "LEAFWIKI_UNIX_SOCKET", "")
 	dataDir := resolveString("data-dir", *flags.dataDir, visited, "LEAFWIKI_DATA_DIR", "./data")
+	localesDirFlag := resolveString("locales-dir", *flags.localesDir, visited, "LEAFWIKI_LOCALES_DIR", "")
+	localesDir := httpinternal.ResolveLocalesDir(dataDir, localesDirFlag)
 	adminPassword := resolveString("admin-password", *flags.adminPassword, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
 	// Empty stays empty here; auth.UserService applies the "admin"/"admin@localhost"
 	// fallback itself, so that default lives in exactly one place.
@@ -519,6 +524,7 @@ func main() {
 		UserManagementURL: userManagementURL,
 		LoginURL:          loginURL,
 		LogoutURL:         logoutURL,
+		LocalesDir:        localesDir,
 	})
 
 	reloadSignals := make(chan os.Signal, 1)

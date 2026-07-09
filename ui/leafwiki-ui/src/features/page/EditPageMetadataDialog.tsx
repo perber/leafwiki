@@ -4,9 +4,11 @@ import { FormInput } from '@/components/FormInput'
 import { Button } from '@/components/ui/button'
 import i18next from '@/lib/i18n'
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
+import { useItemLabels } from '@/lib/useItemLabels'
 import { useTreeStore } from '@/stores/tree'
 import { CalendarDays } from 'lucide-react'
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 
 const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
@@ -28,16 +30,14 @@ export function EditPageMetadataDialog({
   slug: propSlug,
   onChange,
 }: EditPageMetadataDialogProps) {
+  const { t } = useTranslation('page')
+  const { item, itemCapitalized } = useItemLabels(itemKind)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
-  const itemLabel = itemKind === NODE_KIND_PAGE ? 'page' : 'section'
-  const itemLabelCapitalized = itemKind === NODE_KIND_PAGE ? 'Page' : 'Section'
 
   const [title, setTitle] = useState(propTitle)
   const [slug, setSlug] = useState(propSlug)
   const [slugTouched, setSlugTouched] = useState(false)
   const [slugLoading, setSlugLoading] = useState(false)
-  // In edit mode (currentId set) the slug is already known — initialise to the
-  // current title so the save button is enabled immediately.
   const initialLastSlugTitle = currentId ? propTitle : ''
   const [lastSlugTitle, setLastSlugTitle] = useState(initialLastSlugTitle)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -68,8 +68,8 @@ export function EditPageMetadataDialog({
   return (
     <BaseDialog
       dialogType={DIALOG_EDIT_PAGE_METADATA}
-      dialogTitle={`Edit ${itemLabel} metadata`}
-      dialogDescription={`Change metadata of the ${itemLabel}`}
+      dialogTitle={t('editMetadata.title', { item: itemCapitalized })}
+      dialogDescription={t('editMetadata.description', { item })}
       onClose={() => {
         resetForm()
         return true
@@ -110,7 +110,9 @@ export function EditPageMetadataDialog({
             })}
             value={title}
             onChange={handleTitleChange}
-            placeholder={`${itemLabelCapitalized} title`}
+            placeholder={t('editMetadata.titlePlaceholder', {
+              item: itemCapitalized,
+            })}
             error={fieldErrors.title}
             testid="edit-page-metadata-dialog-title-input"
             allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
