@@ -1,0 +1,58 @@
+{
+  "errorPrefix": "Ошибка:",
+  "validationFailed": "Ошибка проверки данных",
+  "somethingWentWrong": "Что-то пошло не так",
+  "moreActions": "Дополнительные действия",
+  "breadcrumbAriaLabel": "Навигационная цепочка",
+  "version": "Версия {{version}}",
+  "supportLeafWiki": "Поддержать LeafWiki",
+  "pageBadge": "Страница",
+  "settings": {
+    "branding": "Настройки оформления",
+    "import": "Импорт",
+    "maintenance": "Обслуживание"
+  },
+  "actions": {
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "delete": "Удалить",
+    "create": "Создать",
+    "close": "Закрыть",
+    "move": "Переместить",
+    "copy": "Копировать",
+    "edit": "Редактировать",
+    "update": "Обновить",
+    "updating": "Обновление...",
+    "deleting": "Удаление...",
+    "copying": "Копирование...",
+    "restoring": "Восстановление...",
+    "insert": "Вставить",
+    "openLink": "Открыть ссылку",
+    "copyLink": "Копировать ссылку",
+    "loadMore": "Загрузить ещё",
+    "yes": "Да",
+    "no": "Нет"
+  },
+  "errorBoundary": {
+    "title": "Что-то пошло не так",
+    "description": "Произошла непредвиденная ошибка. Обычно помогает перезагрузка страницы.",
+    "reload": "Перезагрузить страницу",
+    "recover": "Попробовать восстановить",
+    "details": "Подробности ошибки"
+  },
+  "pagination": {
+    "prev": "← Назад",
+    "next": "Далее →",
+    "pageOf": "Страница {{page}} из {{total}}"
+  },
+  "tags": {
+    "loading": "Загрузка…",
+    "noMatches": "Подходящих тегов не найдено.",
+    "remove": "Удалить тег {{tag}}"
+  },
+  "unknownError": "Произошла неизвестная ошибка",
+  "configLoadFailed": "Не удалось загрузить конфигурацию",
+  "language": {
+    "label": "Язык"
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "wikiLinkDisambiguation": {
+    "title": "Найдено несколько страниц",
+    "descriptionPrefix": "Несколько страниц соответствуют",
+    "descriptionSuffix": ". Выберите нужную."
+  },
+  "slugInput": {
+    "label": "Адрес",
+    "placeholder": "Адрес страницы"
+  },
+  "addPageDialog": {
+    "dateTitleTooltip": "Установить заголовок на сегодняшнюю дату"
+  },
+  "editPageMetadataDialog": {
+    "titleLabel": "Заголовок",
+    "pathPrefix": "Путь:",
+    "cancelButton": "Отмена",
+    "saveButton": "Изменить",
+    "dateTitleTooltip": "Установить заголовок на сегодняшнюю дату"
+  },
+  "toolbar": {
+    "boldTooltip": "Жирный (Ctrl+B)",
+    "italicTooltip": "Курсив (Ctrl+I)",
+    "strikethroughTooltip": "Зачёркнутый",
+    "linkTooltip": "Ссылка (Ctrl+K)",
+    "heading1Tooltip": "Заголовок 1 (Ctrl+Alt+1)",
+    "heading2Tooltip": "Заголовок 2 (Ctrl+Alt+2)",
+    "heading3Tooltip": "Заголовок 3 (Ctrl+Alt+3)",
+    "tableTooltip": "Таблица",
+    "tableSizeSelect": "Выберите размер",
+    "tableSizeLabel": "{{col}} × {{row}}",
+    "tableInsertAriaLabel": "Вставить таблицу {{col}} x {{row}}",
+    "codeBlockTooltip": "Блок кода",
+    "inlineCodeTooltip": "Код в строке (Ctrl+`)",
+    "imageTooltip": "Изображение / файл",
+    "undoTooltip": "Отменить",
+    "redoTooltip": "Повторить",
+    "lineWrapEnableTooltip": "Включить перенос строк",
+    "lineWrapDisableTooltip": "Отключить перенос строк",
+    "moreOptionsAriaLabel": "Дополнительные параметры форматирования",
+    "previewSplitTooltip": "Предпросмотр рядом с редактором",
+    "previewStackedTooltip": "Предпросмотр под редактором",
+    "showPreviewTooltip": "Показать предпросмотр",
+    "hidePreviewTooltip": "Скрыть предпросмотр",
+    "pasteRichTooltip": "Вставить с форматированием (Ctrl+Shift+V)",
+    "pastePlainTooltip": "Вставить без форматирования (Ctrl+V)",
+    "pasteRich": "Вставить с форматированием",
+    "pastePlain": "Вставить без форматирования",
+    "pasteClipboardError": "Не удалось прочитать буфер обмена",
+    "strikethrough": "Зачёркнутый",
+    "heading1": "Заголовок 1",
+    "heading2": "Заголовок 2",
+    "heading3": "Заголовок 3",
+    "insertTable": "Вставить таблицу (3×3)",
+    "lineWrap": "Перенос строк",
+    "autoSave": "Автосохранение",
+    "autoSavePaused": "приостановлено"
+  },
+  "autoSave": {
+    "savedToast": "Сохранено",
+    "versionConflictToast": "Автосохранение приостановлено — страницу изменил другой пользователь. Сохраните вручную.",
+    "errorFallback": "Автосохранение не удалось"
+  },
+  "titleBar": {
+    "changes": "(Изменения)",
+    "dirtyMarker": "*"
+  },
+  "toolbarActions": {
+    "closeEditor": "Закрыть редактор",
+    "savePage": "Сохранить страницу"
+  },
+  "save": {
+    "success": "Страница сохранена",
+    "saveAnyway": "Всё равно сохранить",
+    "versionConflict": "Страницу изменил другой пользователь. Всё равно сохранить?",
+    "errorFallback": "Ошибка сохранения страницы",
+    "versionConflictAgain": "Страницу снова изменили во время сохранения. Перезагрузите страницу и примените изменения заново."
+  },
+  "upload": {
+    "fileTooLarge": "Файл слишком большой",
+    "success": "Загружено",
+    "failed": "Не удалось загрузить"
+  },
+  "tabs": {
+    "editor": "Редактор",
+    "preview": "Просмотр"
+  },
+  "linkInsert": {
+    "title": "Вставить ссылку",
+    "displayText": "Текст",
+    "url": "URL",
+    "displayTextPlaceholder": "Текст ссылки",
+    "urlPlaceholder": "https://example.com",
+    "urlPageSearchPlaceholder": "https:// или поиск страниц…"
+  },
+  "frontmatter": {
+    "metadata": "Метаданные",
+    "tags": "Теги",
+    "properties": "Свойства",
+    "keyPlaceholder": "Ключ",
+    "valuePlaceholder": "Значение",
+    "addProperty": "Добавить свойство",
+    "internalFieldsHint": "Служебные поля скрыты на странице.",
+    "summary_one": "{{count}} свойство",
+    "summary_few": "{{count}} свойства",
+    "summary_many": "{{count}} свойств",
+    "summary_other": "{{count}} свойств",
+    "addTag": "Добавить тег",
+    "internalFields": "Служебные поля",
+    "hint": "Пока используйте плоские поля. Для вложенных метаданных позже можно применять точечные ключи, например seo.title.",
+    "unsupportedNotice": "Сложный существующий frontmatter сохраняется в фоне, но пока недоступен для редактирования в этом компактном виде.",
+    "removeFieldAriaLabel": "Удалить поле frontmatter {{name}}",
+    "tagsSummary_one": "{{count}} тег",
+    "tagsSummary_few": "{{count}} тега",
+    "tagsSummary_many": "{{count}} тегов",
+    "tagsSummary_other": "{{count}} тегов"
+  },
+  "codeBlock": {
+    "copyFailed": "Не удалось скопировать код",
+    "copied": "Код скопирован",
+    "copyCode": "Копировать код",
+    "copiedLabel": "Скопировано"
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "createPage": {
+    "title": "Создать страницу",
+    "titleByPath": "Создать новую страницу",
+    "description": "Введите заголовок",
+    "titleLabel": "Заголовок",
+    "titlePlaceholder": "Заголовок страницы",
+    "pathLabel": "Путь",
+    "pathPlaceholder": "Путь страницы",
+    "pathPrefix": "Путь:"
+  },
+  "addPage": {
+    "titlePage": "Создать новую страницу",
+    "titleSection": "Создать новый раздел",
+    "descriptionPage": "Введите заголовок новой страницы",
+    "descriptionSection": "Введите заголовок нового раздела",
+    "createAndEditPage": "Создать и редактировать страницу",
+    "createAndEditSection": "Создать и редактировать раздел"
+  },
+  "delete": {
+    "title": "Удалить {{item}}?",
+    "description": "Вы уверены, что хотите удалить {{item}}? Это действие нельзя отменить.",
+    "modifiedWarning": "Страницу изменил другой пользователь.",
+    "modifiedConfirm": "Страница обновлена. Проверьте и попробуйте снова.",
+    "modifiedConfirmDelete": "Страница обновлена. Всё равно удалить?",
+    "backlinksErrorPartial": "Не удалось загрузить ссылки. Удаление возможно, но влияние на ссылки не показано.",
+    "backlinksLoading": "Проверка ссылок на эту страницу...",
+    "backlinksError": "Не удалось загрузить ссылки на страницу.",
+    "backlinksCount_one": "На эту страницу ссылается {{count}} страница.",
+    "backlinksCount_few": "На эту страницу ссылаются {{count}} страницы.",
+    "backlinksCount_many": "На эту страницу ссылаются {{count}} страниц.",
+    "backlinksCount_other": "На эту страницу ссылаются {{count}} страниц.",
+    "backlinksImpact": "После удаления эти ссылки станут битыми.",
+    "noBacklinks": "Ни одна страница не ссылается на эту.",
+    "recursiveLabel": "Также удалить все подстраницы",
+    "backlinksLoadFailed": "Не удалось загрузить ссылки"
+  },
+  "move": {
+    "title": "Переместить {{item}}",
+    "description": "Выберите нового родителя для {{item}}"
+  },
+  "copy": {
+    "title": "Копировать {{item}}",
+    "description": "Создать копию {{item}}",
+    "copyAndEditPage": "Копировать и редактировать страницу",
+    "copyAndEditSection": "Копировать и редактировать раздел",
+    "defaultTitlePrefix": "Копия {{title}}"
+  },
+  "editMetadata": {
+    "title": "Изменить метаданные: {{item}}",
+    "description": "Изменить метаданные {{item}}",
+    "titlePlaceholder": "Заголовок: {{item}}"
+  },
+  "sort": {
+    "title": "Сортировка дочерних элементов: {{item}}",
+    "description": "Перетащите элементы, используйте стрелки или сортируйте по алфавиту. Изменения сохраняются после нажатия «Сохранить».",
+    "dragAriaLabel": "Перетащите для изменения порядка",
+    "sortAlphabetically": "Сортировать по алфавиту:",
+    "asc": "А → Я",
+    "desc": "Я → А"
+  },
+  "share": {
+    "title": "Поделиться страницей",
+    "description": "Ссылка для страницы «{{title}}»",
+    "urlLabel": "Ссылка"
+  },
+  "refactor": {
+    "title": "Обновить ссылки?",
+    "description": "Изменение затрагивает путь страницы. Проверьте затронутые страницы перед продолжением.",
+    "saveWithoutUpdating": "Сохранить без обновления ссылок",
+    "continue": "Продолжить",
+    "oldPath": "Старый путь:",
+    "newPath": "Новый путь:",
+    "rewriteLinksLabel": "Автоматически обновить ссылки на ссылающихся страницах",
+    "referencingPages_one": "Ссылающиеся страницы ({{count}})",
+    "referencingPages_few": "Ссылающиеся страницы ({{count}})",
+    "referencingPages_many": "Ссылающиеся страницы ({{count}})",
+    "referencingPages_other": "Ссылающиеся страницы ({{count}})",
+    "noReferences": "Ни одна страница не ссылается на этот путь."
+  },
+  "unsaved": {
+    "title": "Несохранённые изменения",
+    "description": "Есть несохранённые изменения. Уйти со страницы? Данные будут потеряны."
+  },
+  "quickSwitcher": {
+    "title": "Перейти к странице",
+    "description": "Поиск страниц по заголовку, пути или навигации.",
+    "placeholder": "Введите заголовок страницы…",
+    "searchAriaLabel": "Поиск страниц",
+    "resultsAriaLabel": "Подходящие страницы",
+    "goToPageAriaLabel": "Перейти к странице",
+    "goToPageTitle": "Перейти к странице ({{hotkey}})",
+    "noResults": "Подходящих страниц не найдено."
+  },
+  "pageSelect": {
+    "topLevel": "Верхний уровень",
+    "placeholder": "Поиск страниц...",
+    "searchAriaLabel": "Поиск страниц",
+    "listAriaLabel": "Страницы",
+    "noResults": "Страницы не найдены."
+  },
+  "notFound": {
+    "title": "Страница не найдена",
+    "description": "Запрашиваемая страница не существует.",
+    "createHint": "Создайте страницу, нажав кнопку ниже.",
+    "createButton": "Создать страницу"
+  },
+  "historyPage": {
+    "backToPage": "Вернуться к странице"
+  },
+  "kinds": {
+    "page": "страницу",
+    "pageCapitalized": "Страницу",
+    "section": "раздел",
+    "sectionCapitalized": "Раздел"
+  },
+  "actions": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "create": "Создать",
+    "change": "Изменить",
+    "creating": "Создание...",
+    "leaveAnyway": "Выйти без сохранения",
+    "rename": "Переименовать"
+  },
+  "toast": {
+    "pageCreated": "{{item}} создана",
+    "createError": "Ошибка создания страницы",
+    "deleted": "{{item}} удалена",
+    "copied": "{{item}} скопирована",
+    "moved": "Страница перемещена",
+    "moveError": "Ошибка перемещения {{item}}",
+    "copyError": "Ошибка копирования {{item}}",
+    "deleteError": "Ошибка удаления {{item}}",
+    "sortError": "Ошибка сортировки подстраниц {{item}}",
+    "sorted": "Дочерние элементы {{item}} отсортированы",
+    "slugGenerationFailed": "Не удалось сгенерировать адрес. Введите вручную.",
+    "slugGenerating": "Дождитесь завершения генерации адреса.",
+    "permalinkCopied": "Ссылка скопирована",
+    "permalinkCopyFailed": "Не удалось скопировать ссылку"
+  },
+  "createByPath": {
+    "existsWarning": "Страница по этому пути уже существует.",
+    "lookupTitle": "Результат проверки пути:",
+    "segmentExists": "существует",
+    "segmentWillBeCreated": "будет создан"
+  }
+}

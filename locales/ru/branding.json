@@ -1,0 +1,40 @@
+{
+  "pageTitle": "Настройки оформления",
+  "siteName": {
+    "title": "Название сайта",
+    "description": "Название, отображаемое в шапке, заголовках страниц и на экране входа.",
+    "label": "Название сайта",
+    "placeholder": "LeafWiki"
+  },
+  "logo": {
+    "title": "Логотип",
+    "description": "Логотип в шапке рядом с названием сайта.",
+    "currentLabel": "Текущий логотип:",
+    "noLogo": "Логотип не загружен",
+    "uploadLabel": "Загрузить логотип",
+    "uploadButton": "Загрузить изображение",
+    "hint": "Форматы: {{exts}}, макс. {{size}} МБ"
+  },
+  "favicon": {
+    "title": "Иконка сайта",
+    "description": "Иконка во вкладке браузера.",
+    "currentLabel": "Текущая иконка:",
+    "noFavicon": "Используется иконка по умолчанию",
+    "uploadLabel": "Загрузить иконку",
+    "uploadButton": "Загрузить иконку",
+    "hint": "Форматы: {{exts}}, макс. {{size}} МБ"
+  },
+  "save": "Сохранить настройки",
+  "toast": {
+    "logoDeleted": "Логотип удалён",
+    "logoDeleteFailed": "Не удалось удалить логотип",
+    "faviconDeleted": "Иконка удалена",
+    "faviconDeleteFailed": "Не удалось удалить иконку",
+    "brandingSaved": "Настройки оформления сохранены",
+    "brandingSaveFailed": "Не удалось сохранить настройки оформления",
+    "logoUploaded": "Логотип загружен",
+    "logoUploadFailed": "Не удалось загрузить логотип",
+    "faviconUploaded": "Иконка загружена",
+    "faviconUploadFailed": "Не удалось загрузить иконку"
+  }
+}

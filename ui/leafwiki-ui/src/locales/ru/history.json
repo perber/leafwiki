@@ -1,0 +1,107 @@
+{
+  "unknown": "Неизвестно",
+  "unknownTime": "Неизвестное время",
+  "empty": "(пусто)",
+  "trigger": {
+    "contentUpdate": "Сохранено после изменения содержимого",
+    "assetUpdate": "Сохранено после изменения вложений",
+    "structureUpdate": "Сохранено после изменения структуры",
+    "restore": "Сохранено после восстановления",
+    "delete": "Сохранено перед удалением",
+    "default": "Сохранено как {{type}}"
+  },
+  "assetChange": {
+    "added": "Добавлено",
+    "removed": "Удалено",
+    "modified": "Заменено"
+  },
+  "list": {
+    "title": "История версий",
+    "loading": "Загрузка истории...",
+    "loadMore": "Загрузить ещё",
+    "loadingMore": "Загрузка...",
+    "noPreviousRevisions": "Предыдущих версий пока нет. Они появятся здесь после дальнейших изменений.",
+    "noRevisions": "Версий пока нет. Они появятся здесь после изменения страницы.",
+    "activeVersion": "Текущая версия",
+    "resizeAriaLabel": "Изменить ширину списка версий"
+  },
+  "mobileTabs": {
+    "revisions": "Версии",
+    "details": "Подробности"
+  },
+  "tabs": {
+    "preview": "Просмотр",
+    "changes": "Изменения",
+    "raw": "Исходный текст",
+    "assets": "Вложения"
+  },
+  "header": {
+    "revisionBy": "Версия от {{author}} · {{time}}",
+    "revisionSlug": "Slug версии: {{slug}}",
+    "currentSlug": "Текущий slug: {{slug}}",
+    "assetChangesCount": "Изменений вложений: {{count}}",
+    "assetsCount": "Вложений: {{count}}"
+  },
+  "structure": {
+    "title": "Заголовок",
+    "slug": "Slug"
+  },
+  "restore": {
+    "button": "Восстановить",
+    "restoring": "Восстановление...",
+    "currentVersion": "Текущая версия"
+  },
+  "loading": {
+    "diff": "Загрузка diff...",
+    "preview": "Загрузка просмотра..."
+  },
+  "empty": {
+    "noRevisionSelected": "Версия не выбрана",
+    "selectRevision": "Выберите версию из списка, чтобы просмотреть подробности.",
+    "noPreview": "Просмотр недоступен.",
+    "noDiffFromCurrent": "Нет отличий от текущей версии.",
+    "noComparison": "Данные сравнения недоступны.",
+    "noRawText": "Исходный текст недоступен.",
+    "noAssetData": "Данные о вложениях недоступны.",
+    "noTextDiff": "Нет текстовых отличий между этой версией и активной.",
+    "noAssetsInRevision": "С этой версией не сохранено вложений."
+  },
+  "changes": {
+    "summaryHeading": "Сводка изменений",
+    "linesAdded": "Строк добавлено",
+    "linesRemoved": "Строк удалено",
+    "assetsChanged": "Вложений изменено",
+    "diffHeading": "Diff",
+    "comparedToActive": "по сравнению с активной версией",
+    "assetsHeading": "Вложения ({{count}})",
+    "addedCount": "добавлено: {{count}}",
+    "replacedCount": "заменено: {{count}}",
+    "removedCount": "удалено: {{count}}"
+  },
+  "rawText": {
+    "heading": "Исходный текст"
+  },
+  "assets": {
+    "heading": "Вложения",
+    "openAsset": "Открыть вложение",
+    "downloadAsset": "Скачать вложение",
+    "bytes": "{{count}} байт"
+  },
+  "restoreDialog": {
+    "title": "Восстановить версию?",
+    "description": "Будут восстановлены содержимое, заголовок и вложения версии. Текущий slug и расположение не изменятся.",
+    "restoredTitle": "Восстанавливаемый заголовок:",
+    "slugNote": "В этой версии использовался slug <1>{{revisionSlug}}</1>. Текущий slug <2>{{currentSlug}}</2> останется без изменений.",
+    "confirmButton": "Восстановить версию"
+  },
+  "toast": {
+    "restored": "Версия восстановлена",
+    "restoreFailed": "Не удалось восстановить версию"
+  },
+  "errors": {
+    "loadFailed": "Не удалось загрузить историю страницы",
+    "previewFailed": "Не удалось загрузить предпросмотр версии",
+    "compareFailed": "Не удалось сравнить версии",
+    "loadMoreFailed": "Не удалось загрузить больше версий"
+  }
+}
