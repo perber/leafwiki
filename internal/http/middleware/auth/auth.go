@@ -7,6 +7,8 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 )
 
+const errUserNotAuthenticated = "User not authenticated"
+
 func RequireAuth(authService *auth.AuthService, authCookies *AuthCookies, authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Short-circuit only when a trusted upstream already stored a valid user.
@@ -59,7 +61,7 @@ func RequireAdmin(authDisabled bool) gin.HandlerFunc {
 
 		userValue, exists := c.Get("user")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": errUserNotAuthenticated})
 			return
 		}
 
@@ -83,7 +85,7 @@ func RequireSelfOrAdmin(authDisabled bool) gin.HandlerFunc {
 
 		userValue, exists := c.Get("user")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": errUserNotAuthenticated})
 			return
 		}
 
@@ -142,13 +144,13 @@ func RequireEditorOrAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userValue, exists := c.Get("user")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": errUserNotAuthenticated})
 			return
 		}
 
 		user, ok := userValue.(*auth.User)
 		if !ok {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": errUserNotAuthenticated})
 			return
 		}
 
@@ -165,7 +167,7 @@ func RequireSelf() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userValue, exists := c.Get("user")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User not authenticated"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": errUserNotAuthenticated})
 			return
 		}
 

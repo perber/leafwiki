@@ -27,6 +27,8 @@ func GenerateUniqueID() (string, error) {
 
 var charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
 
+const errFailedToCloseTempFile = "failed to close temp file"
+
 var ErrFileTooLarge = errors.New("file too large")
 
 func GenerateRandomPassword(length int) (string, error) {
@@ -77,7 +79,7 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 		if err := tmpFile.Chmod(perm); err != nil {
 			chmodErr := fmt.Errorf("chmod temp file: %w", err)
 			if closeErr := tmpFile.Close(); closeErr != nil {
-				slog.Default().Error("failed to close temp file", "operation", "chmod", "error", closeErr)
+				slog.Default().Error(errFailedToCloseTempFile, "operation", "chmod", "error", closeErr)
 			}
 			return chmodErr
 		}
@@ -86,7 +88,7 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 	if _, err := tmpFile.Write(data); err != nil {
 		writeErr := fmt.Errorf("write temp file: %w", err)
 		if closeErr := tmpFile.Close(); closeErr != nil {
-			slog.Default().Error("failed to close temp file", "operation", "write", "error", closeErr)
+			slog.Default().Error(errFailedToCloseTempFile, "operation", "write", "error", closeErr)
 		}
 		return writeErr
 	}
@@ -94,7 +96,7 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 	if err := tmpFile.Sync(); err != nil {
 		syncErr := fmt.Errorf("sync temp file: %w", err)
 		if closeErr := tmpFile.Close(); closeErr != nil {
-			slog.Default().Error("failed to close temp file", "operation", "sync", "error", closeErr)
+			slog.Default().Error(errFailedToCloseTempFile, "operation", "sync", "error", closeErr)
 		}
 		return syncErr
 	}

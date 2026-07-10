@@ -14,6 +14,11 @@ import (
 )
 
 // BrandingService provides branding operations
+const (
+	errFailedToDeleteLogo    = "Failed to delete logo"
+	errFailedToDeleteFavicon = "Failed to delete favicon"
+)
+
 type BrandingService struct {
 	store          *BrandingStore
 	brandingConfig *BrandingConfig
@@ -175,7 +180,7 @@ func (s *BrandingService) DeleteLogo() error {
 	if containsPathTraversal(s.brandingConfig.LogoFile) {
 		return sharederrors.NewLocalizedError(
 			"branding_logo_delete_failed",
-			"Failed to delete logo",
+			errFailedToDeleteLogo,
 			"invalid logo file path",
 			nil,
 		)
@@ -185,7 +190,7 @@ func (s *BrandingService) DeleteLogo() error {
 	if err := os.Remove(logoPath); err != nil && !os.IsNotExist(err) {
 		return sharederrors.NewLocalizedError(
 			"branding_logo_delete_failed",
-			"Failed to delete logo",
+			errFailedToDeleteLogo,
 			"failed to delete logo",
 			err,
 		)
@@ -195,7 +200,7 @@ func (s *BrandingService) DeleteLogo() error {
 	if err := s.store.Save(s.brandingConfig); err != nil {
 		return sharederrors.NewLocalizedError(
 			"branding_logo_delete_failed",
-			"Failed to delete logo",
+			errFailedToDeleteLogo,
 			"failed to delete logo",
 			err,
 		)
@@ -265,7 +270,7 @@ func (s *BrandingService) DeleteFavicon() error {
 	if containsPathTraversal(s.brandingConfig.FaviconFile) {
 		return sharederrors.NewLocalizedError(
 			"branding_favicon_delete_failed",
-			"Failed to delete favicon",
+			errFailedToDeleteFavicon,
 			"invalid favicon file path",
 			nil,
 		)
@@ -275,7 +280,7 @@ func (s *BrandingService) DeleteFavicon() error {
 	if err := os.Remove(faviconPath); err != nil && !os.IsNotExist(err) {
 		return sharederrors.NewLocalizedError(
 			"branding_favicon_delete_failed",
-			"Failed to delete favicon",
+			errFailedToDeleteFavicon,
 			"failed to delete favicon",
 			err,
 		)
@@ -285,7 +290,7 @@ func (s *BrandingService) DeleteFavicon() error {
 	if err := s.store.Save(s.brandingConfig); err != nil {
 		return sharederrors.NewLocalizedError(
 			"branding_favicon_delete_failed",
-			"Failed to delete favicon",
+			errFailedToDeleteFavicon,
 			"failed to delete favicon",
 			err,
 		)

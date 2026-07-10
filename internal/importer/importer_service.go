@@ -236,10 +236,10 @@ func FindMarkdownEntries(sourceBasePath string) ([]ImportMDFile, error) {
 		sort.SliceStable(out, func(i, j int) bool {
 			nameI := strings.ToLower(filepath.Base(out[i].SourcePath))
 			nameJ := strings.ToLower(filepath.Base(out[j].SourcePath))
-			if nameI == "index.md" && nameJ != "index.md" {
+			if nameI == indexFilename && nameJ != indexFilename {
 				return true
 			}
-			if nameJ == "index.md" && nameI != "index.md" {
+			if nameJ == indexFilename && nameI != indexFilename {
 				return false
 			}
 			return false

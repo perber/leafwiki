@@ -17,6 +17,12 @@ import (
 	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
+const (
+	pagesIdRoutePath         = "/pages/:id"
+	errInvalidRequestUserMsg = "Invalid request"
+	errInvalidRequestLogMsg  = "invalid request"
+)
+
 // Routes is the RouteRegistrar for the pages domain.
 type Routes struct {
 	treeService      *tree.TreeService
@@ -106,7 +112,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		pub.GET("/pages/lookup", r.handleLookupPath)
 		pub.GET("/pages/permalink/:id", r.handleResolvePermalink)
 		pub.GET("/pages/:id/download", r.handleDownload)
-		pub.GET("/pages/:id", r.handleGetPage)
+		pub.GET(pagesIdRoutePath, r.handleGetPage)
 	}
 
 	authGroup := ctx.Base.Group("/api")
@@ -118,7 +124,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	if !opts.PublicAccess {
 		authGroup.GET("/tree", r.handleGetTree)
-		authGroup.GET("/pages/:id", r.handleGetPage)
+		authGroup.GET(pagesIdRoutePath, r.handleGetPage)
 		authGroup.GET("/pages/:id/download", r.handleDownload)
 		authGroup.GET("/pages/lookup", r.handleLookupPath)
 		authGroup.GET("/pages/by-path", r.handleGetByPath)
@@ -128,8 +134,8 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	authGroup.GET("/pages/slug-suggestion", authmw.RequireEditorOrAdmin(), r.handleSuggestSlug)
 	authGroup.POST("/pages", authmw.RequireEditorOrAdmin(), r.handleCreate)
-	authGroup.PUT("/pages/:id", authmw.RequireEditorOrAdmin(), r.handleUpdate)
-	authGroup.DELETE("/pages/:id", authmw.RequireEditorOrAdmin(), r.handleDelete)
+	authGroup.PUT(pagesIdRoutePath, authmw.RequireEditorOrAdmin(), r.handleUpdate)
+	authGroup.DELETE(pagesIdRoutePath, authmw.RequireEditorOrAdmin(), r.handleDelete)
 	authGroup.PUT("/pages/:id/move", authmw.RequireEditorOrAdmin(), r.handleMove)
 	authGroup.PUT("/pages/:id/sort", authmw.RequireEditorOrAdmin(), r.handleSort)
 	authGroup.PUT("/pages/:id/pin", authmw.RequireEditorOrAdmin(), r.handlePin)
@@ -264,7 +270,7 @@ func (r *Routes) handleCreate(c *gin.Context) {
 		Kind     *string `json:"kind"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -293,7 +299,7 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 		Properties map[string]string `json:"properties"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	if err := validatePageMetadataInput(req.Tags, req.Properties); err != nil {
@@ -372,7 +378,7 @@ func (r *Routes) handleSort(c *gin.Context) {
 		OrderedIDs []string `json:"orderedIds"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	if err := r.sortPages.Execute(c.Request.Context(), SortPagesInput{
@@ -391,7 +397,7 @@ func (r *Routes) handlePin(c *gin.Context) {
 		Pinned  bool   `json:"pinned"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	out, err := r.pinPage.Execute(c.Request.Context(), PinPageInput{
@@ -413,7 +419,7 @@ func (r *Routes) handleEnsurePath(c *gin.Context) {
 		Kind  *string `json:"kind"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -438,7 +444,7 @@ func (r *Routes) handleConvert(c *gin.Context) {
 		Version string `json:"version" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	if req.Kind != "page" && req.Kind != "section" {
@@ -466,7 +472,7 @@ func (r *Routes) handleCopy(c *gin.Context) {
 		Slug     string  `json:"slug" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -494,7 +500,7 @@ func (r *Routes) handleRefactorPreview(c *gin.Context) {
 		NewParentID *string `json:"parentId"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	out, err := r.previewRefactor.Execute(c.Request.Context(), RefactorPreviewInput{
@@ -520,7 +526,7 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 		RewriteLinks bool    `json:"rewriteLinks"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, "Invalid request", "invalid request")
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	user := authmw.MustGetUser(c)

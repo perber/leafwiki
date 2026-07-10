@@ -3,8 +3,6 @@ import {
   closeCompletion,
   completionStatus,
 } from '@codemirror/autocomplete'
-import { htmlToMarkdown } from './htmlToMarkdown'
-import { uploadInlineDataUriImages } from './pasteImageUpload'
 import {
   defaultKeymap,
   history,
@@ -18,7 +16,6 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, keymap } from '@codemirror/view'
 import { githubLight } from '@fsegurai/codemirror-theme-github-light'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useConfigStore } from '@/stores/config'
 import { useDesignModeStore } from '../designtoggle/designmode'
 import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
 import type { InternalLinkCompletion } from './internalLinkCompletion'
@@ -53,6 +50,10 @@ type MarkdownCodeEditorProps = {
   onCursorLineChange?: (line: number) => void
   editorViewRef: React.RefObject<EditorView | null>
   lineWrap?: boolean
+  // Rich paste (HTML → Markdown) is intentionally not wired to plain Ctrl/Cmd+V
+  // yet — it's only reachable via Ctrl/Cmd+Shift+V and the toolbar buttons
+  // while it's being tested. See MarkdownEditor's `pasteRich`.
+  onPasteRich?: () => void | Promise<void>
 }
 
 // CodeMirror uses 80 for the built-in detail slot, so render the path just before it.
@@ -81,10 +82,12 @@ export default function MarkdownCodeEditor({
   onChange,
   onCursorLineChange,
   lineWrap = true,
+  onPasteRich,
 }: MarkdownCodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const onChangeRef = useRef(onChange)
+  const onPasteRichRef = useRef(onPasteRich)
   const valueRef = useRef(initialValue)
   // Always tracks the latest initialValue so the setup effect can read it
   // without having it in the dependency array (which would reinitialize on every keystroke).
@@ -97,20 +100,15 @@ export default function MarkdownCodeEditor({
   const [themeCompartment] = useState(() => new Compartment())
   const [lineWrapCompartment] = useState(() => new Compartment())
 
-  const maxAssetUploadSizeBytes = useConfigStore(
-    (s) => s.maxAssetUploadSizeBytes,
-  )
-  const maxAssetUploadSizeBytesRef = useRef(maxAssetUploadSizeBytes)
-
   // Always use the latest onChange function
   useEffect(() => {
     onChangeRef.current = onChange
   }, [onChange])
 
-  // Always use the latest upload size limit without reinitializing the editor
+  // Always use the latest paste-rich handler without reinitializing the editor
   useEffect(() => {
-    maxAssetUploadSizeBytesRef.current = maxAssetUploadSizeBytes
-  }, [maxAssetUploadSizeBytes])
+    onPasteRichRef.current = onPasteRich
+  }, [onPasteRich])
 
   // Initial editor setup (only once)
   useEffect(() => {
@@ -185,23 +183,11 @@ export default function MarkdownCodeEditor({
         preventDefault: true,
       },
       {
+        // Rich paste (HTML → Markdown conversion) lives behind this explicit
+        // shortcut for now, not plain Ctrl/Cmd+V, while it's being tested.
         key: 'Shift-Mod-v',
-        run: (view: EditorView) => {
-          navigator.clipboard
-            .readText()
-            .then((text) => {
-              if (!text) return
-              // The view may have been destroyed (unmount, or a page-navigation
-              // reinit) while the clipboard read was pending — dispatching to it
-              // then would silently no-op instead of throwing, dropping the paste.
-              if (!view.dom.isConnected) return
-              const sel = view.state.selection.main
-              view.dispatch({
-                changes: { from: sel.from, to: sel.to, insert: text },
-                selection: { anchor: sel.from + text.length },
-              })
-            })
-            .catch(() => {})
+        run: () => {
+          onPasteRichRef.current?.()
           return true
         },
         preventDefault: true,
@@ -265,55 +251,11 @@ export default function MarkdownCodeEditor({
               event.preventDefault()
             }
           },
-          paste(event, view) {
-            const { clipboardData } = event
-            if (!clipboardData) return false
-
-            // Files are handled by the outer React onPaste handler (asset upload)
-            const hasFiles =
-              clipboardData.files.length > 0 ||
-              Array.from(clipboardData.items).some(
-                (item) => item.kind === 'file',
-              )
-            if (hasFiles) return false
-
-            if (clipboardData.types.includes('text/html')) {
-              const html = clipboardData.getData('text/html')
-              if (html) {
-                const md = htmlToMarkdown(html)
-                if (md) {
-                  event.preventDefault()
-                  const sel = view.state.selection.main
-                  const pageId = resetKey
-                  // Pasted HTML can embed images as inline base64 data URIs
-                  // (Word/Outlook, some web pages) with no separate file
-                  // clipboard item, so `hasFiles` above wouldn't catch them.
-                  // Upload those as real assets instead of inlining the raw
-                  // base64 payload into the document.
-                  uploadInlineDataUriImages(
-                    md,
-                    pageId,
-                    maxAssetUploadSizeBytesRef.current,
-                  ).then((withUploadedImages) => {
-                    if (!view.dom.isConnected) return
-                    view.dispatch({
-                      changes: {
-                        from: sel.from,
-                        to: sel.to,
-                        insert: withUploadedImages,
-                      },
-                      selection: {
-                        anchor: sel.from + withUploadedImages.length,
-                      },
-                    })
-                  })
-                  return true
-                }
-              }
-            }
-
-            return false
-          },
+          // Rich paste (HTML → Markdown) is not wired to the plain paste event
+          // here — it's only reachable via the Shift-Mod-v keymap above and the
+          // toolbar buttons while it's being tested. Plain Ctrl/Cmd+V and file
+          // pastes fall through to CodeMirror's default handling / the outer
+          // React onPaste handler (asset upload).
         }),
         updateListener,
         EditorView.theme({

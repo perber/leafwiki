@@ -17,6 +17,8 @@ var ErrAuthDisabled = errors.New("authentication is disabled")
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
 
+const logReloadUserResolverCacheWarning = "warning: could not reload user resolver cache: %v"
+
 // ─── LoginUseCase ────────────────────────────────────────────────────────────
 
 type LoginInput struct {
@@ -141,7 +143,7 @@ func (uc *CreateUserUseCase) Execute(_ context.Context, in CreateUserInput) (*Cr
 		return nil, err
 	}
 	if err := uc.resolver.Reload(); err != nil {
-		log.Printf("warning: could not reload user resolver cache: %v", err)
+		log.Printf(logReloadUserResolverCacheWarning, err)
 	}
 	return &CreateUserOutput{User: user.ToPublicUser()}, nil
 }
@@ -203,7 +205,7 @@ func (uc *UpdateUserUseCase) Execute(_ context.Context, in UpdateUserInput) (*Up
 		return nil, err
 	}
 	if err := uc.resolver.Reload(); err != nil {
-		log.Printf("warning: could not reload user resolver cache: %v", err)
+		log.Printf(logReloadUserResolverCacheWarning, err)
 	}
 	return &UpdateUserOutput{User: user.ToPublicUser()}, nil
 }
@@ -259,7 +261,7 @@ func (uc *DeleteUserUseCase) Execute(_ context.Context, in DeleteUserInput) erro
 		return err
 	}
 	if err := uc.resolver.Reload(); err != nil {
-		log.Printf("warning: could not reload user resolver cache: %v", err)
+		log.Printf(logReloadUserResolverCacheWarning, err)
 	}
 	return nil
 }

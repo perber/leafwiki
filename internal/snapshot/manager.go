@@ -22,6 +22,8 @@ var ErrAlreadyRunning = sharederrors.NewLocalizedError(
 	nil,
 )
 
+const errFailedToListSnapshots = "Failed to list snapshots"
+
 type SnapshotEntry struct {
 	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -69,7 +71,7 @@ func (m *Manager) List() ([]SnapshotEntry, error) {
 		}
 		return nil, sharederrors.NewLocalizedError(
 			"snapshot_list_failed",
-			"Failed to list snapshots",
+			errFailedToListSnapshots,
 			"failed to list snapshots",
 			err,
 		)
@@ -84,7 +86,7 @@ func (m *Manager) List() ([]SnapshotEntry, error) {
 		if err != nil {
 			return nil, sharederrors.NewLocalizedError(
 				"snapshot_list_failed",
-				"Failed to list snapshots",
+				errFailedToListSnapshots,
 				"failed to read snapshot metadata %s",
 				err,
 				de.Name(),
@@ -94,7 +96,7 @@ func (m *Manager) List() ([]SnapshotEntry, error) {
 		if err := json.Unmarshal(data, &entry); err != nil {
 			return nil, sharederrors.NewLocalizedError(
 				"snapshot_list_failed",
-				"Failed to list snapshots",
+				errFailedToListSnapshots,
 				"failed to parse snapshot metadata %s",
 				err,
 				de.Name(),

@@ -10,6 +10,11 @@ import (
 
 // ─── GetBrandingUseCase ──────────────────────────────────────────────────────
 
+const (
+	errFailedToLoadBrandingUserMsg = "Failed to load branding config"
+	errFailedToLoadBrandingLogMsg  = "failed to load branding config"
+)
+
 type GetBrandingOutput struct {
 	Config *corebanding.BrandingConfigResponse
 }
@@ -27,8 +32,8 @@ func (uc *GetBrandingUseCase) Execute(_ context.Context) (*GetBrandingOutput, er
 	if err != nil {
 		return nil, sharederrors.NewLocalizedError(
 			ErrCodeBrandingConfigUnavailable,
-			"Failed to load branding config",
-			"failed to load branding config",
+			errFailedToLoadBrandingUserMsg,
+			errFailedToLoadBrandingLogMsg,
 			err,
 		)
 	}
@@ -57,8 +62,8 @@ func (uc *UpdateBrandingUseCase) Execute(_ context.Context, in UpdateBrandingInp
 	if err != nil {
 		return nil, sharederrors.NewLocalizedError(
 			ErrCodeBrandingConfigUnavailable,
-			"Failed to load branding config",
-			"failed to load branding config",
+			errFailedToLoadBrandingUserMsg,
+			errFailedToLoadBrandingLogMsg,
 			err,
 		)
 	}
@@ -94,8 +99,8 @@ func (uc *UploadLogoUseCase) Execute(_ context.Context, in UploadLogoInput) (*Up
 	if err != nil {
 		return nil, sharederrors.NewLocalizedError(
 			ErrCodeBrandingConfigUnavailable,
-			"Failed to load branding config",
-			"failed to load branding config",
+			errFailedToLoadBrandingUserMsg,
+			errFailedToLoadBrandingLogMsg,
 			err,
 		)
 	}
@@ -120,8 +125,8 @@ func (uc *DeleteLogoUseCase) Execute(_ context.Context) (*GetBrandingOutput, err
 	if err != nil {
 		return nil, sharederrors.NewLocalizedError(
 			ErrCodeBrandingConfigUnavailable,
-			"Failed to load branding config",
-			"failed to load branding config",
+			errFailedToLoadBrandingUserMsg,
+			errFailedToLoadBrandingLogMsg,
 			err,
 		)
 	}
@@ -157,8 +162,8 @@ func (uc *UploadFaviconUseCase) Execute(_ context.Context, in UploadFaviconInput
 	if err != nil {
 		return nil, sharederrors.NewLocalizedError(
 			ErrCodeBrandingConfigUnavailable,
-			"Failed to load branding config",
-			"failed to load branding config",
+			errFailedToLoadBrandingUserMsg,
+			errFailedToLoadBrandingLogMsg,
 			err,
 		)
 	}
@@ -183,8 +188,8 @@ func (uc *DeleteFaviconUseCase) Execute(_ context.Context) (*GetBrandingOutput, 
 	if err != nil {
 		return nil, sharederrors.NewLocalizedError(
 			ErrCodeBrandingConfigUnavailable,
-			"Failed to load branding config",
-			"failed to load branding config",
+			errFailedToLoadBrandingUserMsg,
+			errFailedToLoadBrandingLogMsg,
 			err,
 		)
 	}
