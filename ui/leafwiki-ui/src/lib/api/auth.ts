@@ -224,6 +224,108 @@ export async function fetchWithAuth(
   }
 }
 
+// parseContentDispositionFilename extracts the filename from a
+// Content-Disposition header, preferring the RFC 5987 `filename*` form and
+// falling back to the plain `filename` parameter. Returns null when absent.
+export function parseContentDispositionFilename(
+  header: string | null,
+): string | null {
+  if (!header) return null
+
+  const extended = header.match(/filename\*=\s*(?:UTF-8'')?([^;]+)/i)
+  if (extended?.[1]) {
+    const raw = extended[1].trim().replace(/^"|"$/g, '')
+    try {
+      return decodeURIComponent(raw) || null
+    } catch {
+      return raw || null
+    }
+  }
+
+  const basic = header.match(/filename\s*=\s*"?([^";]+)"?/i)
+  if (basic?.[1]) {
+    return basic[1].trim() || null
+  }
+
+  return null
+}
+
+// fetchBlobWithAuth performs an authenticated GET that returns binary data
+// (e.g. a downloadable file). It mirrors fetchWithAuth's token refresh and
+// 401 retry handling but resolves to the response Blob together with the
+// filename advertised by the server's Content-Disposition header.
+export async function fetchBlobWithAuth(
+  path: string,
+  retry = true,
+): Promise<{ blob: Blob; filename: string | null }> {
+  const store = useSessionStore.getState()
+  const sessionLogout = store.logout
+  const config = useConfigStore.getState()
+  const authDisabled = config.authDisabled
+  const httpRemoteUserEnabled = config.httpRemoteUserEnabled
+
+  const doFetch = async (): Promise<Response> =>
+    fetch(`${API_BASE_URL}${path}`, { credentials: 'include' })
+
+  if (
+    shouldRefreshBeforeRequest(
+      store.user,
+      store.accessTokenExpiresAt,
+      authDisabled,
+      httpRemoteUserEnabled,
+    )
+  ) {
+    try {
+      await ensureRefresh()
+    } catch {
+      await clearSessionState(sessionLogout)
+      throw new Error('Unauthorized')
+    }
+  }
+
+  let res = await doFetch()
+
+  if (res.status === 401 && retry && !authDisabled && !httpRemoteUserEnabled) {
+    try {
+      await ensureRefresh()
+      res = await doFetch()
+    } catch {
+      await clearSessionState(sessionLogout)
+      throw new Error('Unauthorized')
+    }
+  }
+
+  if (!res.ok) {
+    const errorText = await res.text()
+    let errorBody: unknown = null
+    try {
+      errorBody = errorText ? JSON.parse(errorText) : null
+    } catch {
+      throw new ApiError(errorText || 'Request failed', res.status)
+    }
+
+    if (isApiLocalizedErrorResponse(errorBody)) {
+      throw new ApiLocalizedError(errorBody.error)
+    }
+
+    if (
+      errorBody &&
+      typeof errorBody === 'object' &&
+      typeof (errorBody as { error?: unknown }).error === 'string'
+    ) {
+      throw new ApiError((errorBody as { error: string }).error, res.status)
+    }
+
+    throw new ApiError('Request failed', res.status)
+  }
+
+  const blob = await res.blob()
+  const filename = parseContentDispositionFilename(
+    res.headers.get('Content-Disposition'),
+  )
+  return { blob, filename }
+}
+
 declare global {
   var __leafwikiRefreshPromise: Promise<void> | null
 }

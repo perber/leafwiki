@@ -1,9 +1,9 @@
-import type { Page } from '@/lib/api/pages'
+import { downloadPageFile, NODE_KIND_SECTION, type Page } from '@/lib/api/pages'
 
-function sanitizeMarkdownFilename(value: string): string {
+function sanitizeDownloadFilename(value: string): string {
   const sanitized = value
     .trim()
-    .replace(/\.md$/i, '')
+    .replace(/\.(md|zip)$/i, '')
     .replace(/[\\/:*?"<>|]+/g, '-')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
@@ -13,20 +13,22 @@ function sanitizeMarkdownFilename(value: string): string {
   return sanitized || 'page'
 }
 
-export function getMarkdownDownloadFilename(page: Page): string {
+// getDownloadFallbackFilename derives a client-side filename used only when the
+// server response omits a Content-Disposition header. Sections are downloaded
+// as a ZIP archive of their subtree, pages as Markdown.
+export function getDownloadFallbackFilename(page: Page): string {
   const pathSegment = page.path.split('/').filter(Boolean).pop()
-  return `${sanitizeMarkdownFilename(pathSegment || page.slug || page.title)}.md`
+  const base = sanitizeDownloadFilename(pathSegment || page.slug || page.title)
+  const extension = page.kind === NODE_KIND_SECTION ? 'zip' : 'md'
+  return `${base}.${extension}`
 }
 
-export function downloadPageMarkdown(page: Page) {
-  const blob = new Blob([page.content], {
-    type: 'text/markdown;charset=utf-8',
-  })
+function triggerBlobDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
 
   link.href = url
-  link.download = getMarkdownDownloadFilename(page)
+  link.download = filename
   link.style.display = 'none'
 
   document.body.appendChild(link)
@@ -34,4 +36,13 @@ export function downloadPageMarkdown(page: Page) {
   link.remove()
 
   URL.revokeObjectURL(url)
+}
+
+// downloadPageMarkdown downloads a node through the API: a page is saved as a
+// Markdown (.md) file, a section as a ZIP (.zip) archive of its whole subtree.
+// The file is saved with the filename advertised by the server's
+// Content-Disposition header, falling back to a client-derived name.
+export async function downloadPageMarkdown(page: Page): Promise<void> {
+  const { blob, filename } = await downloadPageFile(page.id)
+  triggerBlobDownload(blob, filename || getDownloadFallbackFilename(page))
 }

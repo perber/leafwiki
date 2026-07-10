@@ -91,8 +91,8 @@ export default function PageViewer() {
     }, [page, openDialog]),
     downloadMarkdown: useCallback(() => {
       if (!page) return
-      downloadPageMarkdown(page)
-    }, [page]),
+      downloadPageMarkdown(page).catch(() => toast.error(t('download.error')))
+    }, [page, t]),
     isPinned,
     onPinToggle: useCallback(() => {
       if (!page) return

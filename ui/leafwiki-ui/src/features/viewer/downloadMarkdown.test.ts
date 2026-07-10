@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { Page } from '@/lib/api/pages'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { downloadPageFile, type Page } from '@/lib/api/pages'
 import {
   downloadPageMarkdown,
-  getMarkdownDownloadFilename,
+  getDownloadFallbackFilename,
 } from './downloadMarkdown'
+
+vi.mock('@/lib/api/pages', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api/pages')>()
+  return { ...actual, downloadPageFile: vi.fn() }
+})
 
 const page = (overrides: Partial<Page>): Page => ({
   id: 'page-1',
@@ -16,18 +21,26 @@ const page = (overrides: Partial<Page>): Page => ({
   ...overrides,
 })
 
-describe('getMarkdownDownloadFilename', () => {
-  it('uses the last path segment as a markdown filename', () => {
+describe('getDownloadFallbackFilename', () => {
+  it('uses the last path segment with a .md extension for pages', () => {
     expect(
-      getMarkdownDownloadFilename(
+      getDownloadFallbackFilename(
         page({ path: 'docs/getting-started', slug: 'ignored' }),
       ),
     ).toBe('getting-started.md')
   })
 
+  it('uses a .zip extension for sections', () => {
+    expect(
+      getDownloadFallbackFilename(
+        page({ path: 'docs/guides', slug: 'ignored', kind: 'section' }),
+      ),
+    ).toBe('guides.zip')
+  })
+
   it('sanitizes unsafe filename characters', () => {
     expect(
-      getMarkdownDownloadFilename(
+      getDownloadFallbackFilename(
         page({ path: 'docs/API: Keys?', slug: 'ignored' }),
       ),
     ).toBe('api-keys.md')
@@ -35,7 +48,7 @@ describe('getMarkdownDownloadFilename', () => {
 
   it('falls back to the title when path and slug are blank', () => {
     expect(
-      getMarkdownDownloadFilename(
+      getDownloadFallbackFilename(
         page({ path: '', slug: '', title: 'Welcome Page' }),
       ),
     ).toBe('welcome-page.md')
@@ -43,7 +56,19 @@ describe('getMarkdownDownloadFilename', () => {
 })
 
 describe('downloadPageMarkdown', () => {
-  it('downloads the page content as markdown', async () => {
+  beforeEach(() => {
+    vi.mocked(downloadPageFile).mockReset()
+  })
+
+  it('downloads the file returned by the API using the server filename', async () => {
+    const blob = new Blob(['# Example\n\nMarkdown body\n'], {
+      type: 'text/markdown',
+    })
+    vi.mocked(downloadPageFile).mockResolvedValue({
+      blob,
+      filename: 'example.md',
+    })
+
     const objectUrl = 'blob:leafwiki-page'
     const createObjectURL = vi
       .spyOn(URL, 'createObjectURL')
@@ -51,23 +76,52 @@ describe('downloadPageMarkdown', () => {
     const revokeObjectURL = vi
       .spyOn(URL, 'revokeObjectURL')
       .mockImplementation(() => {})
+    let capturedName: string | undefined
     const click = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => {})
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        capturedName = this.download
+      })
 
-    downloadPageMarkdown(
-      page({
-        path: 'docs/example',
-        content: '# Example\n\nMarkdown body\n',
-      }),
-    )
+    await downloadPageMarkdown(page({ id: 'p1', path: 'docs/example' }))
 
+    expect(downloadPageFile).toHaveBeenCalledWith('p1')
     expect(createObjectURL).toHaveBeenCalledTimes(1)
-    const blob = createObjectURL.mock.calls[0][0] as Blob
-    await expect(blob.text()).resolves.toBe('# Example\n\nMarkdown body\n')
-
+    expect(createObjectURL).toHaveBeenCalledWith(blob)
+    expect(capturedName).toBe('example.md')
     expect(click).toHaveBeenCalledTimes(1)
     expect(revokeObjectURL).toHaveBeenCalledWith(objectUrl)
+
+    createObjectURL.mockRestore()
+    revokeObjectURL.mockRestore()
+    click.mockRestore()
+  })
+
+  it('falls back to a derived filename when the server omits one', async () => {
+    vi.mocked(downloadPageFile).mockResolvedValue({
+      blob: new Blob(['content']),
+      filename: null,
+    })
+
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:leafwiki-section')
+    const revokeObjectURL = vi
+      .spyOn(URL, 'revokeObjectURL')
+      .mockImplementation(() => {})
+    let capturedName: string | undefined
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        capturedName = this.download
+      })
+
+    await downloadPageMarkdown(
+      page({ id: 's1', path: 'docs/guides', kind: 'section' }),
+    )
+
+    expect(downloadPageFile).toHaveBeenCalledWith('s1')
+    expect(capturedName).toBe('guides.zip')
 
     createObjectURL.mockRestore()
     revokeObjectURL.mockRestore()

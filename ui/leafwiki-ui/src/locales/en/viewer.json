@@ -28,6 +28,9 @@
     "brokenOutgoingsTitle": "This page links to missing targets",
     "brokenIncomingTitle": "Pages linking to an old path"
   },
+  "download": {
+    "error": "Failed to download"
+  },
   "pinned": {
     "sectionTitle": "Pinned",
     "pagesSectionTitle": "Pages",
