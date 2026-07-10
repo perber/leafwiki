@@ -1548,6 +1548,62 @@ Trailing content`;
       .toBeGreaterThanOrEqual(0);
   });
 
+  test('toc panel toggle hotkey collapses and expands the toc side panel', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `toc-toggle-hotkey-${timestamp}`;
+    const title = `Toc Toggle Hotkey ${timestamp}`;
+    const content = `# Intro
+
+Intro text.
+
+## Section One
+
+Content.
+
+## Section Two
+
+Content.
+
+## Section Three
+
+Content.
+
+## Section Four
+
+Content.`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const tocCollapseButton = page.getByTestId('toc-side-panel-collapse');
+    const tocExpandButton = page.getByTestId('toc-side-panel-expand');
+
+    // The panel's footprint is fixed width (no layout shift on toggle) — only
+    // its content crossfades, so we assert on the collapse/expand buttons
+    // rather than the outer panel, which stays mounted either way.
+    await expect(tocCollapseButton).toBeVisible();
+
+    await dispatchLayoutShortcut(page, {
+      key: 'o',
+      code: 'KeyO',
+      ctrlKey: true,
+      shiftKey: true,
+    });
+    await expect(tocExpandButton).toBeVisible();
+    await expect(tocCollapseButton).toBeHidden();
+
+    await dispatchLayoutShortcut(page, {
+      key: 'o',
+      code: 'KeyO',
+      ctrlKey: true,
+      shiftKey: true,
+    });
+    await expect(tocCollapseButton).toBeVisible();
+    await expect(tocExpandButton).toBeHidden();
+  });
+
   test('navigating away from page with footnote headline stays responsive', async ({ page }) => {
     const timestamp = Date.now();
     const slug = `footnotes-navigation-repro-${timestamp}`;

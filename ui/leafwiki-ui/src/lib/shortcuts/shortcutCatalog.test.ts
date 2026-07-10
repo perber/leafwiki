@@ -32,6 +32,7 @@ describe('shortcutCatalog', () => {
       'viewer.page.history',
       'viewer.page.print',
       'viewer.page.permalink',
+      'viewer.toc.toggle',
       'sidebar.explorer.open',
       'sidebar.search.open',
       'shortcuts.help.open',

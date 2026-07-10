@@ -14,12 +14,14 @@ import { withBasePath } from '@/lib/routePath'
 import { useAppMode } from '@/lib/useAppMode'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { cn } from '@/lib/utils'
 import { useBrandingStore } from '@/stores/branding'
 import {
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
   useSidebarStore,
 } from '@/stores/sidebar'
+import { useTocPanelStore } from '@/stores/tocPanel'
 import { MenuIcon } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -43,6 +45,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const sidebarVisible = useSidebarStore((s) => s.sidebarVisible)
   const setSidebarVisible = useSidebarStore((s) => s.setSidebarVisible)
+  const tocPanelCollapsed = useTocPanelStore((s) => s.collapsed)
   const sidebarWidth = useSidebarStore((s) => s.sidebarWidth)
   const setSidebarWidth = useSidebarStore((s) => s.setSidebarWidth)
   const isMobile = useIsMobile()
@@ -290,7 +293,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               {children}
             </main>
-            <div id="app-toc-pane-root" className="app-layout__toc-pane" />
+            <div
+              id="app-toc-pane-root"
+              className={cn(
+                'app-layout__toc-pane',
+                tocPanelCollapsed && 'app-layout__toc-pane--collapsed',
+              )}
+            />
           </div>
         </div>
       </div>
