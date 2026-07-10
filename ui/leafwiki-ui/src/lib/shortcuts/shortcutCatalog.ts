@@ -15,6 +15,7 @@ export type ShortcutId =
   | 'viewer.page.copy'
   | 'viewer.page.delete'
   | 'viewer.page.history'
+  | 'viewer.toc.toggle'
   | 'editor.page.close'
   | 'editor.page.save'
   | 'editor.format.bold'
@@ -156,6 +157,16 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     keyCombo: 'Mod+KeyH',
     defaultDisplayLabel: 'Ctrl+H',
     macDisplayLabel: 'Cmd+H',
+    modes: ['view'],
+    customizable: true,
+  },
+  {
+    id: 'viewer.toc.toggle',
+    labelKey: 'shortcutsHelp.items.toggleToc.action',
+    categoryKey: 'shortcutsHelp.categories.viewing',
+    keyCombo: 'Mod+Shift+KeyO',
+    defaultDisplayLabel: 'Ctrl+Shift+O',
+    macDisplayLabel: 'Cmd+Shift+O',
     modes: ['view'],
     customizable: true,
   },

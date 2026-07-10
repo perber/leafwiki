@@ -39,7 +39,9 @@
   },
   "toc": {
     "title": "Table of contents",
-    "onThisPage": "On this page"
+    "onThisPage": "On this page",
+    "collapse": "Collapse table of contents",
+    "expand": "Expand table of contents"
   },
   "shortcutsHelp": {
     "menuItem": "Keyboard Shortcuts",
@@ -86,6 +88,9 @@
       },
       "pageHistory": {
         "action": "Page history"
+      },
+      "toggleToc": {
+        "action": "Toggle table of contents"
       },
       "openExplorer": {
         "action": "Open explorer"

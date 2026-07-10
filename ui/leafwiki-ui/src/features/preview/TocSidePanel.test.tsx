@@ -1,5 +1,6 @@
 import { act, render, screen, fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useTocPanelStore } from '@/stores/tocPanel'
 import { TocSidePanel } from './TocSidePanel'
 import type { TocEntry } from './extractTocEntries'
 
@@ -9,6 +10,8 @@ vi.mock('react-i18next', () => ({
       const map: Record<string, string> = {
         'toc.title': 'Table of contents',
         'toc.onThisPage': 'On this page',
+        'toc.collapse': 'Collapse table of contents',
+        'toc.expand': 'Expand table of contents',
       }
       return map[key] ?? key
     },
@@ -39,6 +42,7 @@ let scrollContainer: HTMLDivElement
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useTocPanelStore.setState({ collapsed: false })
 
   scrollContainer = document.createElement('div')
   scrollContainer.id = 'scroll-container'
@@ -214,5 +218,71 @@ describe('TocSidePanel — scroll spy', () => {
     const { unmount } = render(<TocSidePanel entries={entries} />)
     unmount()
     expect(removeSpy).toHaveBeenCalledWith('scroll', expect.any(Function))
+  })
+})
+
+describe('TocSidePanel — collapse/expand', () => {
+  it('collapses the panel when the collapse button is clicked', () => {
+    render(<TocSidePanel entries={entries} />)
+
+    // Single, always-mounted toggle button — its testid/label swap with state
+    // instead of a separate collapse/expand element, so its position never
+    // changes.
+    fireEvent.click(screen.getByTestId('toc-side-panel-collapse'))
+
+    expect(screen.getByTestId('toc-side-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('toc-side-panel-list')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    )
+    expect(screen.getByTestId('toc-side-panel-expand')).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('toc-side-panel-collapse'),
+    ).not.toBeInTheDocument()
+    expect(useTocPanelStore.getState().collapsed).toBe(true)
+  })
+
+  it('expands the panel again when the expand button is clicked', () => {
+    useTocPanelStore.setState({ collapsed: true })
+    render(<TocSidePanel entries={entries} />)
+
+    fireEvent.click(screen.getByTestId('toc-side-panel-expand'))
+
+    expect(screen.getByTestId('toc-side-panel-list')).toHaveAttribute(
+      'aria-hidden',
+      'false',
+    )
+    expect(screen.getByTestId('toc-side-panel-collapse')).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('toc-side-panel-expand'),
+    ).not.toBeInTheDocument()
+    expect(useTocPanelStore.getState().collapsed).toBe(false)
+  })
+
+  it('renders collapsed when the store starts out collapsed', () => {
+    useTocPanelStore.setState({ collapsed: true })
+    render(<TocSidePanel entries={entries} />)
+
+    expect(screen.getByTestId('toc-side-panel-expand')).toBeInTheDocument()
+    expect(screen.getByTestId('toc-side-panel-list')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    )
+  })
+
+  it('toggles the --collapsed modifier class on the nav element', () => {
+    render(<TocSidePanel entries={entries} />)
+
+    // Drives the border-color fade here; AppLayout applies the matching
+    // modifier to .app-layout__toc-pane to shrink its width (see index.css).
+    expect(screen.getByTestId('toc-side-panel').className).not.toMatch(
+      /page-viewer__toc-panel--collapsed/,
+    )
+
+    fireEvent.click(screen.getByTestId('toc-side-panel-collapse'))
+
+    expect(screen.getByTestId('toc-side-panel').className).toMatch(
+      /page-viewer__toc-panel--collapsed/,
+    )
   })
 })
