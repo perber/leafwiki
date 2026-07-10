@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ type Routes struct {
 	convertPage      *ConvertPageUseCase
 	copyPage         *CopyPageUseCase
 	getPage          *GetPageUseCase
+	downloadPage     *DownloadPageUseCase
 	findByPath       *FindByPathUseCase
 	findByTitle      *FindByTitleUseCase
 	lookupPath       *LookupPagePathUseCase
@@ -50,6 +52,7 @@ type RoutesConfig struct {
 	ConvertPage      *ConvertPageUseCase
 	CopyPage         *CopyPageUseCase
 	GetPage          *GetPageUseCase
+	DownloadPage     *DownloadPageUseCase
 	FindByPath       *FindByPathUseCase
 	FindByTitle      *FindByTitleUseCase
 	LookupPath       *LookupPagePathUseCase
@@ -75,6 +78,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		convertPage:      cfg.ConvertPage,
 		copyPage:         cfg.CopyPage,
 		getPage:          cfg.GetPage,
+		downloadPage:     cfg.DownloadPage,
 		findByPath:       cfg.FindByPath,
 		findByTitle:      cfg.FindByTitle,
 		lookupPath:       cfg.LookupPath,
@@ -101,6 +105,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		pub.GET("/pages/by-title", r.handleFindByTitle)
 		pub.GET("/pages/lookup", r.handleLookupPath)
 		pub.GET("/pages/permalink/:id", r.handleResolvePermalink)
+		pub.GET("/pages/:id/download", r.handleDownload)
 		pub.GET("/pages/:id", r.handleGetPage)
 	}
 
@@ -114,6 +119,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	if !opts.PublicAccess {
 		authGroup.GET("/tree", r.handleGetTree)
 		authGroup.GET("/pages/:id", r.handleGetPage)
+		authGroup.GET("/pages/:id/download", r.handleDownload)
 		authGroup.GET("/pages/lookup", r.handleLookupPath)
 		authGroup.GET("/pages/by-path", r.handleGetByPath)
 		authGroup.GET("/pages/by-title", r.handleFindByTitle)
@@ -160,6 +166,24 @@ func (r *Routes) handleGetPage(c *gin.Context) {
 		return
 	}
 	r.respondPage(c, http.StatusOK, out.Page)
+}
+
+// handleDownload serves a page as a Markdown file, or a section (and its whole
+// subtree) as a ZIP archive. Access follows the same rules as viewing a page:
+// public when public access is enabled, otherwise authenticated.
+func (r *Routes) handleDownload(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	out, err := r.downloadPage.Execute(c.Request.Context(), DownloadPageInput{ID: id})
+	if err != nil {
+		respondWithPageError(c, err)
+		return
+	}
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": out.Filename})
+	if disposition == "" {
+		disposition = "attachment"
+	}
+	c.Header("Content-Disposition", disposition)
+	c.Data(http.StatusOK, out.ContentType, out.Data)
 }
 
 func (r *Routes) handleGetByPath(c *gin.Context) {

@@ -350,6 +350,7 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 		ConvertPage:      wikipages.NewConvertPageUseCase(w.tree, w.revision, w.log),
 		CopyPage:         wikipages.NewCopyPageUseCase(w.tree, w.slug, o, w.asset, w.log),
 		GetPage:          wikipages.NewGetPageUseCase(w.tree),
+		DownloadPage:     wikipages.NewDownloadPageUseCase(w.tree),
 		FindByPath:       wikipages.NewFindByPathUseCase(w.tree),
 		FindByTitle:      wikipages.NewFindByTitleUseCase(w.tree),
 		LookupPath:       wikipages.NewLookupPagePathUseCase(w.tree),
