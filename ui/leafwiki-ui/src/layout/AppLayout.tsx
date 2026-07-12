@@ -57,6 +57,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { siteName, logoFile, logoVersion } = useBrandingStore()
 
   const sidebarContainerRef = useRef<HTMLDivElement | null>(null)
+  const sidebarPanelRef = useRef<HTMLDivElement | null>(null)
   const liveSidebarWidthRef = useRef(sidebarWidth)
 
   const handleSidebarResize = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -83,6 +84,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       if (sidebarContainerRef.current) {
         sidebarContainerRef.current.style.width = `${nextWidth}px`
+      }
+      if (sidebarPanelRef.current) {
+        sidebarPanelRef.current.style.width = `${nextWidth}px`
       }
     }
 
@@ -269,7 +273,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               />
             </div>
           )}
-          <Sidebar />
+          {/*
+            Rendered at its final width at all times and only ever moved via
+            transform. This keeps the sidebar's own content (tree labels etc.)
+            from re-wrapping through every intermediate width while the outer
+            container's width animates open/closed.
+          */}
+          <div
+            ref={sidebarPanelRef}
+            className="app-layout__sidebar-panel transition-transform duration-200"
+            style={{
+              width: isMobile ? MOBILE_SIDEBAR_WIDTH : sidebarWidth,
+              transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)',
+            }}
+          >
+            <Sidebar />
+          </div>
         </div>
 
         {/* Overlay for mobile sidebar */}
