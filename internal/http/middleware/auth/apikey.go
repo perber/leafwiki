@@ -62,7 +62,7 @@ func InjectAPIKeyUser(cfg APIKeyConfig) gin.HandlerFunc {
 		if cfg.RateLimiter != nil {
 			limiterKey = security.ClientKey(c)
 			if !cfg.RateLimiter.Allow(limiterKey) {
-				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "too many api key attempts, please try again later"})
+				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Too many API key attempts, please try again later"})
 				return
 			}
 		}
@@ -73,7 +73,7 @@ func InjectAPIKeyUser(cfg APIKeyConfig) gin.HandlerFunc {
 		}
 		if err != nil {
 			slog.Default().Warn("api key auth: rejected", "error", err)
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired api key"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired API key"})
 			return
 		}
 

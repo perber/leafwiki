@@ -65,7 +65,7 @@ type CreateAPIKeyParams struct {
 
 // CreateAPIKey creates and persists a new API key, returning the stored record
 // together with the plaintext token. The token is shown to the caller exactly
-// once here — only its bcrypt hash is ever persisted.
+// once here — only its SHA-256 hash is ever persisted.
 func (s *APIKeyService) CreateAPIKey(p CreateAPIKeyParams) (*APIKey, string, error) {
 	role := p.Role
 	if role == "" {

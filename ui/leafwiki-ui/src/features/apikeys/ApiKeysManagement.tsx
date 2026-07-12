@@ -1,7 +1,7 @@
 import { mapApiError } from '@/lib/api/errors'
 import { useApiKeyStore } from '@/stores/apikeys'
 import { useUserStore } from '@/stores/users'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useSetTitle } from '../viewer/setTitle'
@@ -38,8 +38,11 @@ export default function ApiKeysManagement() {
     }
   }, [loadApiKeys, loadUsers, reset, t])
 
-  const usernameFor = (userId: string) =>
-    users.find((u) => u.id === userId)?.username ?? userId
+  const usernameById = useMemo(
+    () => new Map(users.map((u) => [u.id, u.username])),
+    [users],
+  )
+  const usernameFor = (userId: string) => usernameById.get(userId) ?? userId
 
   return (
     <div className="settings">

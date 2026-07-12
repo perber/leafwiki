@@ -3,6 +3,8 @@
   "admin user cannot be deleted": "Admin user cannot be deleted",
   "api key not found": "API key not found",
   "api key request failed": "API key request failed",
+  "api keys are not available when authentication is disabled": "API keys are not available when authentication is disabled",
+  "could not generate a unique api key, please try again": "Could not generate a unique key, please try again",
   "cannot remove admin role from the last admin user": "Cannot remove the admin role from the last admin. Assign admin to another user first.",
   "asset %s already exists": "Asset %s already exists",
   "asset %s not found": "Asset %s not found",

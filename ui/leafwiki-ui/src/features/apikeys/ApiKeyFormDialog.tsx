@@ -82,8 +82,13 @@ export function ApiKeyFormDialog() {
 
   const handleCopy = async () => {
     if (!result) return
-    await navigator.clipboard.writeText(result.secret)
-    toast.success(t('secret.copiedToast'))
+    try {
+      await navigator.clipboard.writeText(result.secret)
+      toast.success(t('secret.copiedToast'))
+    } catch (err) {
+      console.warn(err)
+      toast.error(t('secret.copyErrorToast'))
+    }
   }
 
   return (

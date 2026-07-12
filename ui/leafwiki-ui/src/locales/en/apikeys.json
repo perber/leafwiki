@@ -43,6 +43,7 @@
     "label": "secret",
     "copy": "Copy",
     "copiedToast": "Copied to clipboard",
+    "copyErrorToast": "Could not copy to clipboard",
     "helper": "This is the only time the full key will be shown. Store it securely.",
     "done": "Done"
   },

@@ -10,14 +10,14 @@ import (
 )
 
 // APIKey is the persisted representation of an API key. The plaintext secret
-// is never stored — only KeyHash (a bcrypt hash of the secret half of the
+// is never stored — only KeyHash (a SHA-256 hash of the secret half of the
 // token) is kept, so a leaked database yields no usable keys.
 type APIKey struct {
 	ID         string
 	Name       string
 	UserID     string // the user this key belongs to and acts as
 	Prefix     string // public, indexed lookup value
-	KeyHash    string // bcrypt hash of the secret
+	KeyHash    string // SHA-256 hash of the secret
 	Role       string // narrows UserID's role; never widens it
 	ExpiresAt  *time.Time
 	CreatedBy  string
