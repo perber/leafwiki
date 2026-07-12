@@ -14,6 +14,11 @@ import (
 
 // ─── UploadAssetUseCase ──────────────────────────────────────────────────────
 
+const (
+	errPageNotFoundUserMsg = "Page not found"
+	errPageNotFoundLogMsg  = "page %s not found"
+)
+
 type UploadAssetInput struct {
 	UserID   string
 	PageID   string
@@ -41,7 +46,7 @@ func (uc *UploadAssetUseCase) Execute(_ context.Context, in UploadAssetInput) (*
 	page, err := uc.tree.FindPageByID(in.PageID)
 	if err != nil {
 		if errors.Is(err, tree.ErrPageNotFound) {
-			return nil, sharederrors.NewLocalizedError("asset_page_not_found", "Page not found", "page %s not found", err, in.PageID)
+			return nil, sharederrors.NewLocalizedError("asset_page_not_found", errPageNotFoundUserMsg, errPageNotFoundLogMsg, err, in.PageID)
 		}
 		return nil, err
 	}
@@ -76,7 +81,7 @@ func (uc *ListAssetsUseCase) Execute(_ context.Context, in ListAssetsInput) (*Li
 	page, err := uc.tree.FindPageByID(in.PageID)
 	if err != nil {
 		if errors.Is(err, tree.ErrPageNotFound) {
-			return nil, sharederrors.NewLocalizedError("asset_page_not_found", "Page not found", "page %s not found", err, in.PageID)
+			return nil, sharederrors.NewLocalizedError("asset_page_not_found", errPageNotFoundUserMsg, errPageNotFoundLogMsg, err, in.PageID)
 		}
 		return nil, err
 	}
@@ -115,7 +120,7 @@ func (uc *RenameAssetUseCase) Execute(_ context.Context, in RenameAssetInput) (*
 	page, err := uc.tree.FindPageByID(in.PageID)
 	if err != nil {
 		if errors.Is(err, tree.ErrPageNotFound) {
-			return nil, sharederrors.NewLocalizedError("asset_page_not_found", "Page not found", "page %s not found", err, in.PageID)
+			return nil, sharederrors.NewLocalizedError("asset_page_not_found", errPageNotFoundUserMsg, errPageNotFoundLogMsg, err, in.PageID)
 		}
 		return nil, err
 	}
@@ -150,7 +155,7 @@ func (uc *DeleteAssetUseCase) Execute(_ context.Context, in DeleteAssetInput) er
 	page, err := uc.tree.FindPageByID(in.PageID)
 	if err != nil {
 		if errors.Is(err, tree.ErrPageNotFound) {
-			return sharederrors.NewLocalizedError("asset_page_not_found", "Page not found", "page %s not found", err, in.PageID)
+			return sharederrors.NewLocalizedError("asset_page_not_found", errPageNotFoundUserMsg, errPageNotFoundLogMsg, err, in.PageID)
 		}
 		return err
 	}

@@ -1,5 +1,4 @@
-import { Page } from '@playwright/test';
-import { expect } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 import { toAppPath } from './appPath';
 
 export default class NotFoundPage {

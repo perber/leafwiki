@@ -20,6 +20,7 @@ function App() {
   const authDisabled = useConfigStore((s) => s.authDisabled)
   const enableRevision = useConfigStore((s) => s.enableRevision)
   const userManagementUrl = useConfigStore((s) => s.userManagementUrl)
+  const loginUrl = useConfigStore((s) => s.loginUrl)
   const loadBranding = useBrandingStore((s) => s.loadBranding)
   const lastConfigErrorRef = useRef<string | null>(null)
 
@@ -60,9 +61,16 @@ function App() {
         authDisabled,
         enableRevision,
         userManagementUrl,
+        loginUrl,
         BASE_PATH || undefined,
       ),
-    [isReadOnlyViewer, authDisabled, enableRevision, userManagementUrl],
+    [
+      isReadOnlyViewer,
+      authDisabled,
+      enableRevision,
+      userManagementUrl,
+      loginUrl,
+    ],
   )
 
   return (

@@ -15,6 +15,14 @@ import (
 	"github.com/perber/wiki/internal/http/middleware/utils"
 )
 
+const (
+	httpsRequiredLogMsg        = "https required for auth cookies use allow insecure"
+	httpsRequiredUserMsg       = "HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups."
+	errInvalidRequestUserMsg   = "Invalid request"
+	errInvalidRequestLogMsg    = "invalid request"
+	errFailedToIssueCSRFCookie = "Failed to issue CSRF cookie"
+)
+
 // DisableRefreshTokenRateLimit can be set via ldflags for E2E/debug builds.
 var DisableRefreshTokenRateLimit = "false"
 
@@ -113,7 +121,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 func writeAuthCookieError(c *gin.Context, err error, httpsMsg, internalMsg, logMsg string) {
 	if errors.Is(err, utils.ErrHTTPSRequired) {
-		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, httpsMsg, "https required for auth cookies use allow insecure")
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, httpsMsg, httpsRequiredLogMsg)
 		return
 	}
 	slog.Default().Error(logMsg, "error", err)
@@ -125,8 +133,8 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if _, err := ctx.CSRFCookie.Issue(c); err != nil {
 			writeAuthCookieError(c, err,
-				"HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-				"Failed to issue CSRF cookie",
+				httpsRequiredUserMsg,
+				errFailedToIssueCSRFCookie,
 				"failed to issue config CSRF cookie",
 			)
 			return
@@ -141,7 +149,8 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			"enableLinkRefactor":      opts.EnableLinkRefactor,
 			"gitBackupEnabled":        opts.GitBackupEnabled,
 			"httpRemoteUserEnabled":   opts.HTTPRemoteUser.Enabled,
-			"httpRemoteUserLogoutUrl": opts.HTTPRemoteUser.LogoutURL,
+			"loginUrl":                opts.LoginURL,
+			"logoutUrl":               opts.LogoutURL,
 			"userManagementUrl":       opts.UserManagementURL,
 		})
 	}
@@ -189,7 +198,7 @@ func (r *Routes) handleLogin(rctx httpinternal.RouterContext) gin.HandlerFunc {
 		if _, err := rctx.CSRFCookie.Issue(c); err != nil {
 			writeAuthCookieError(c, err,
 				"HTTPS is required for login cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-				"Failed to issue CSRF cookie",
+				errFailedToIssueCSRFCookie,
 				"failed to issue login CSRF cookie",
 			)
 			return
@@ -197,8 +206,8 @@ func (r *Routes) handleLogin(rctx httpinternal.RouterContext) gin.HandlerFunc {
 		if err := rctx.AuthCookies.Set(c, out.Token.Token, out.Token.RefreshToken); err != nil {
 			if errors.Is(err, utils.ErrHTTPSRequired) {
 				respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed,
-					"HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-					"https required for auth cookies use allow insecure")
+					httpsRequiredUserMsg,
+					httpsRequiredLogMsg)
 				return
 			}
 			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
@@ -248,8 +257,8 @@ func (r *Routes) handleRefreshToken(rctx httpinternal.RouterContext) gin.Handler
 		}
 		if _, err := rctx.CSRFCookie.Issue(c); err != nil {
 			writeAuthCookieError(c, err,
-				"HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-				"Failed to issue CSRF cookie",
+				httpsRequiredUserMsg,
+				errFailedToIssueCSRFCookie,
 				"failed to issue refresh CSRF cookie",
 			)
 			return
@@ -257,8 +266,8 @@ func (r *Routes) handleRefreshToken(rctx httpinternal.RouterContext) gin.Handler
 		if err := rctx.AuthCookies.Set(c, out.Token.Token, out.Token.RefreshToken); err != nil {
 			if errors.Is(err, utils.ErrHTTPSRequired) {
 				respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed,
-					"HTTPS is required for auth cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
-					"https required for auth cookies use allow insecure")
+					httpsRequiredUserMsg,
+					httpsRequiredLogMsg)
 				return
 			}
 			respondWithAuthStatusError(c, http.StatusInternalServerError, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
@@ -280,7 +289,7 @@ func (r *Routes) handleCreateUser(c *gin.Context) {
 		Role     string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, "Invalid request", "invalid request")
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	out, err := r.createUser.Execute(c.Request.Context(), CreateUserInput{
@@ -315,7 +324,7 @@ func (r *Routes) handleUpdateUser(c *gin.Context) {
 		Role     string `json:"role"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, "Invalid request", "invalid request")
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	out, err := r.updateUser.Execute(c.Request.Context(), UpdateUserInput{
@@ -348,7 +357,7 @@ func (r *Routes) handleChangeOwnPassword(c *gin.Context) {
 		NewPassword string `json:"newPassword" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, "Invalid request", "invalid request")
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 		return
 	}
 	if err := r.changeOwnPassword.Execute(c.Request.Context(), ChangeOwnPasswordInput{

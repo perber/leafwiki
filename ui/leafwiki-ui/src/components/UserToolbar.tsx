@@ -51,9 +51,8 @@ export default function UserToolbar() {
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
   const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)
-  const httpRemoteUserLogoutUrl = useConfigStore(
-    (s) => s.httpRemoteUserLogoutUrl,
-  )
+  const logoutUrl = useConfigStore((s) => s.logoutUrl)
+  const loginUrl = useConfigStore((s) => s.loginUrl)
   const userManagementUrl = useConfigStore((s) => s.userManagementUrl)
 
   useEffect(() => {
@@ -79,7 +78,12 @@ export default function UserToolbar() {
   if (!user && !authDisabled) {
     return (
       <div className="user-toolbar">
-        <Button size="sm" onClick={() => navigate('/login')}>
+        <Button
+          size="sm"
+          onClick={() =>
+            loginUrl ? (window.location.href = loginUrl) : navigate('/login')
+          }
+        >
           {t('login.loginButton')}
         </Button>
       </div>
@@ -97,12 +101,12 @@ export default function UserToolbar() {
   }
 
   const handleLogout = async () => {
-    if (httpRemoteUserLogoutUrl) {
+    if (logoutUrl) {
       // Redirect immediately instead of clearing local session state first —
       // clearing it here would flash the local login screen before the
       // browser navigates away (see plans/logout-flash-and-external-user-management.md).
       authAPI.logout().catch(() => {})
-      window.location.href = httpRemoteUserLogoutUrl
+      window.location.href = logoutUrl
       return
     }
     await logout()
@@ -197,7 +201,7 @@ export default function UserToolbar() {
           >
             Change Own Password
           </DropdownMenuItem>
-          {(!httpRemoteUserEnabled || httpRemoteUserLogoutUrl) && (
+          {(!httpRemoteUserEnabled || logoutUrl) && (
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={handleLogout}

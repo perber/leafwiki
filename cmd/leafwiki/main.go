@@ -30,6 +30,11 @@ import (
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 )
 
+const (
+	gitBackupSSHKeyFlagName = "git-backup-ssh-key"
+	errInvalidEnvVarValue   = "Invalid environment variable value"
+)
+
 func writeUsage(w io.Writer) {
 	if _, err := fmt.Fprintln(w, `LeafWiki – lightweight selfhosted wiki 🌿
 
@@ -65,7 +70,10 @@ func writeUsage(w io.Writer) {
 	--enable-http-remote-user       Enable reverse-proxy authentication via HTTP header (default: false)
 	--http-remote-user-header-name  HTTP header carrying the username from a trusted proxy (default: Remote-User)
 	--trusted-proxy-ips             Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
-	--http-remote-user-logout-url   URL the frontend redirects to after logout in proxy-auth mode (default: "")
+	--login-url                     URL the frontend redirects to instead of the built-in login form
+	                                 (e.g. an external SSO/IdP login page) (default: "")
+	--logout-url                    URL the frontend redirects to after logout
+	                                 (e.g. an external SSO/IdP logout page) (default: "")
 	--user-management-url           URL to an external user-management page; when set, the built-in
 	                                 User Management UI is replaced with a link to this URL (default: "")
 	--disable-request-log           Suppress per-request HTTP access log lines (default: false)
@@ -104,7 +112,8 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_ENABLE_HTTP_REMOTE_USER
 	LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME
 	LEAFWIKI_TRUSTED_PROXY_IPS
-	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
+	LEAFWIKI_LOGIN_URL
+	LEAFWIKI_LOGOUT_URL
 	LEAFWIKI_USER_MANAGEMENT_URL
 	LEAFWIKI_DISABLE_REQUEST_LOG
 	LEAFWIKI_GIT_BACKUP
@@ -173,7 +182,8 @@ type cliFlags struct {
 	enableHTTPRemoteUser    *bool
 	httpRemoteUserHeader    *string
 	trustedProxyIPs         *string
-	httpRemoteUserLogoutURL *string
+	loginURL                *string
+	logoutURL               *string
 	userManagementURL       *string
 	disableRequestLog       *bool
 	gitBackup               *bool
@@ -212,7 +222,8 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		enableHTTPRemoteUser:    fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
 		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
 		trustedProxyIPs:         fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
-		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "URL the frontend redirects to after logout when reverse-proxy auth is active (e.g. https://auth.example.com/logout)"),
+		loginURL:                fs.String("login-url", "", "URL the frontend redirects to instead of the built-in login form (e.g. an external SSO/IdP login page)"),
+		logoutURL:               fs.String("logout-url", "", "URL the frontend redirects to after logout (e.g. an external SSO/IdP logout page)"),
 		userManagementURL:       fs.String("user-management-url", "", "URL to an external user-management page; when set, the built-in User Management UI is replaced with a link to this URL"),
 		disableRequestLog:       fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
 		gitBackup:               fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
@@ -221,7 +232,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupRemote:         fs.String("git-backup-remote", "", "git remote URL (SSH) for backups (required when git-backup is enabled)"),
 		gitBackupBranch:         fs.String("git-backup-branch", "", "git branch to push to (default: main)"),
 		gitBackupSSHKeyPath:     fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
-		gitBackupSSHKey:         fs.String("git-backup-ssh-key", "", "raw SSH private key for git backup (env var preferred)"),
+		gitBackupSSHKey:         fs.String(gitBackupSSHKeyFlagName, "", "raw SSH private key for git backup (env var preferred)"),
 		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
 		gitBackupInterval:       fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
 		revisionCoalesceWindow:  fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
@@ -275,7 +286,8 @@ func main() {
 	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
 	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
 	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
-	httpRemoteUserLogoutURL := resolveString("http-remote-user-logout-url", *flags.httpRemoteUserLogoutURL, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL", "")
+	loginURL := resolveString("login-url", *flags.loginURL, visited, "LEAFWIKI_LOGIN_URL", "")
+	logoutURL := resolveString("logout-url", *flags.logoutURL, visited, "LEAFWIKI_LOGOUT_URL", "")
 	userManagementURL := resolveString("user-management-url", *flags.userManagementURL, visited, "LEAFWIKI_USER_MANAGEMENT_URL", "")
 	disableRequestLog := resolveBool("disable-request-log", *flags.disableRequestLog, visited, "LEAFWIKI_DISABLE_REQUEST_LOG")
 	gitBackupEnabled := resolveBool("git-backup", *flags.gitBackup, visited, "LEAFWIKI_GIT_BACKUP")
@@ -284,7 +296,7 @@ func main() {
 	gitBackupRemote := resolveString("git-backup-remote", *flags.gitBackupRemote, visited, "LEAFWIKI_GIT_BACKUP_REMOTE", "")
 	gitBackupBranch := resolveString("git-backup-branch", *flags.gitBackupBranch, visited, "LEAFWIKI_GIT_BACKUP_BRANCH", "main")
 	gitBackupSSHKeyPath := resolveString("git-backup-ssh-key-path", *flags.gitBackupSSHKeyPath, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH", "")
-	gitBackupSSHKey := resolveString("git-backup-ssh-key", *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
+	gitBackupSSHKey := resolveString(gitBackupSSHKeyFlagName, *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
 	gitBackupInterval := resolveDuration("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL")
 	gitBackupSSHKnownHosts := resolveString("git-backup-ssh-known-hosts", *flags.gitBackupSSHKnownHosts, visited, "LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS", "")
 	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
@@ -297,6 +309,16 @@ func main() {
 
 	if err := validateHTTPRemoteUserConfig(enableHTTPRemoteUser, trustedProxyIPsRaw); err != nil {
 		fail("Invalid HTTP remote user configuration", "error", err)
+	}
+
+	if err := validateRedirectURL("login-url", loginURL); err != nil {
+		fail("Invalid login URL configuration", "error", err)
+	}
+	if err := validateRedirectURL("logout-url", logoutURL); err != nil {
+		fail("Invalid logout URL configuration", "error", err)
+	}
+	if err := validateRedirectURL("user-management-url", userManagementURL); err != nil {
+		fail("Invalid user management URL configuration", "error", err)
 	}
 
 	if enableHTTPRemoteUser {
@@ -387,7 +409,7 @@ func main() {
 		if gitBackupRemote != "" && !strings.HasPrefix(gitBackupRemote, "git@") && !strings.HasPrefix(gitBackupRemote, "ssh://") {
 			fail("--git-backup-remote must be an SSH URL (e.g. git@github.com:user/repo.git or ssh://...)")
 		}
-		if visited["git-backup-ssh-key"] {
+		if visited[gitBackupSSHKeyFlagName] {
 			slog.Warn("SSH private key passed via --git-backup-ssh-key flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_SSH_KEY environment variable")
 		}
 		backupRepo, err := backup.Init(backup.Config{
@@ -430,11 +452,12 @@ func main() {
 			HeaderName:     httpRemoteUserHeader,
 			TrustedProxies: trustedProxies,
 			UserService:    w.UserService(),
-			LogoutURL:      httpRemoteUserLogoutURL,
 		},
 		APIKeyService:     w.APIKeyService(),
 		DisableRequestLog: disableRequestLog,
 		UserManagementURL: userManagementURL,
+		LoginURL:          loginURL,
+		LogoutURL:         logoutURL,
 	})
 
 	reloadSignals := make(chan os.Signal, 1)
@@ -552,7 +575,7 @@ func resolveBool(flagName string, flagVal bool, visited map[string]bool, envVar 
 			return b
 		}
 		// If env var is set but invalid, fail fast (helps operators)
-		fail("Invalid environment variable value", "variable", envVar, "value", env, "expected", "true/false/1/0/yes/no")
+		fail(errInvalidEnvVarValue, "variable", envVar, "value", env, "expected", "true/false/1/0/yes/no")
 	}
 	return flagVal // default from flag
 }
@@ -566,7 +589,7 @@ func resolveInt(flagName string, flagVal int, visited map[string]bool, envVar st
 		if _, err := fmt.Sscanf(env, "%d", &n); err == nil {
 			return n
 		}
-		fail("Invalid environment variable value", "variable", envVar, "value", env, "expected", "integer")
+		fail(errInvalidEnvVarValue, "variable", envVar, "value", env, "expected", "integer")
 	}
 	return def
 }
@@ -580,7 +603,7 @@ func resolveDuration(flagName string, flagVal time.Duration, visited map[string]
 			return d
 		}
 		// If env var is set but invalid, fail fast (helps operators)
-		fail("Invalid environment variable value", "variable", envVar, "value", env, "expected", "duration like 24h, 15m")
+		fail(errInvalidEnvVarValue, "variable", envVar, "value", env, "expected", "duration like 24h, 15m")
 	}
 	return flagVal // default from flag
 }
@@ -632,6 +655,16 @@ func validateHTTPRemoteUserConfig(enabled bool, trustedProxyIPsRaw string) error
 	}
 	if !hasTrustedProxy {
 		return fmt.Errorf("--trusted-proxy-ips is required when --enable-http-remote-user is set. Set it using --trusted-proxy-ips or LEAFWIKI_TRUSTED_PROXY_IPS")
+	}
+	return nil
+}
+
+func validateRedirectURL(flagName, url string) error {
+	if url == "" {
+		return nil
+	}
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return fmt.Errorf("--%s must start with http:// or https://", flagName)
 	}
 	return nil
 }

@@ -78,7 +78,6 @@ type HTTPRemoteUserConfig struct {
 	HeaderName     string
 	TrustedProxies *auth_middleware.TrustedProxies
 	UserService    *coreauth.UserService
-	LogoutURL      string // optional URL the frontend redirects to after logout
 }
 
 // RouterOptions holds global HTTP server configuration shared across all domains.
@@ -100,6 +99,8 @@ type RouterOptions struct {
 	APIKeyService           *coreauth.APIKeyService // Bearer API-key authentication; nil disables the feature
 	DisableRequestLog       bool                    // Whether to suppress per-request access log lines
 	UserManagementURL       string                  // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
+	LoginURL                string                  // Optional URL the frontend redirects to instead of showing the built-in login form
+	LogoutURL               string                  // Optional URL the frontend redirects to after logout
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.

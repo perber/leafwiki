@@ -12,7 +12,10 @@ import (
 	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
-const importMaxUploadSize = 500 << 20 // 500 MiB
+const (
+	importMaxUploadSize = 500 << 20 // 500 MiB
+	importPlanRoutePath = "/import/plan"
+)
 
 // Routes is the RouteRegistrar for the importer domain.
 type Routes struct {
@@ -65,10 +68,10 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
 
-	authGroup.POST("/import/plan", authmw.RequireEditorOrAdmin(), r.handleCreatePlan)
-	authGroup.GET("/import/plan", authmw.RequireEditorOrAdmin(), r.handleGetPlan)
+	authGroup.POST(importPlanRoutePath, authmw.RequireEditorOrAdmin(), r.handleCreatePlan)
+	authGroup.GET(importPlanRoutePath, authmw.RequireEditorOrAdmin(), r.handleGetPlan)
 	authGroup.POST("/import/execute", authmw.RequireEditorOrAdmin(), r.handleExecute)
-	authGroup.DELETE("/import/plan", authmw.RequireEditorOrAdmin(), r.handleClearPlan)
+	authGroup.DELETE(importPlanRoutePath, authmw.RequireEditorOrAdmin(), r.handleClearPlan)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────

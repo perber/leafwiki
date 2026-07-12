@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import test, { Page, expect } from '@playwright/test';
 import { getCsrfScript } from '../helpers/api';
 import EditPage from '../pages/EditPage';
+import EditPageMetadataDialog from '../pages/EditPageMetadataDialog';
 import LoginPage from '../pages/LoginPage';
+import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
@@ -759,6 +761,45 @@ test.describe('Editor', () => {
         ).toBeGreaterThan(100);
       }
     }
+  });
+
+  // ── Editor lifecycle ────────────────────────────────────────────────────────
+
+  test('rename-via-tree-is-not-blocked-after-closing-editor', async ({ page }) => {
+    const stamp = Date.now();
+    const slug = `editor-rename-after-close-${stamp}`;
+    const title = `Editor Rename After Close ${stamp}`;
+    const renamedTitle = `${title} Renamed`;
+
+    await createPageWithMetadata(page, {
+      title,
+      slug,
+      content: 'Content.',
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.expectEditorStillOpen();
+    await editPage.closeEditor();
+
+    // Regression: the editor store used to keep `page` populated after the
+    // editor unmounted, so renaming this same page via the tree's "..." menu
+    // was permanently blocked by a stale "currently being edited" toast even
+    // though the editor was already closed.
+    const treeView = new TreeView(page);
+    await treeView.openRenameDialogForPage(title);
+
+    const metadataDialog = new EditPageMetadataDialog(page);
+    await metadataDialog.fillTitle(renamedTitle);
+    await metadataDialog.submit();
+
+    await expect(page.getByText('currently being edited')).not.toBeVisible();
+    await page.getByText('renamed successfully').waitFor({ state: 'visible' });
+    await page.waitForURL(new RegExp(`/${slug}-renamed$`));
+    await expect(page.locator('.breadcrumbs-nav__current')).toHaveText(renamedTitle);
   });
 });
 

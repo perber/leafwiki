@@ -13,6 +13,7 @@ import {
   RootRedirect,
   UserManagement,
 } from './lazy-routes'
+import ExternalRedirect from '../auth/ExternalRedirect'
 import AuthWrapper from './RouterAuthWrapper'
 import ReadOnlyWrapper from './RouterReadOnlyWrapper'
 
@@ -21,13 +22,20 @@ export const createLeafWikiRouter = (
   authDisabled: boolean,
   enableRevision: boolean,
   userManagementUrl: string,
+  loginUrl: string,
   basename?: string,
 ) =>
   createBrowserRouter(
     [
       {
         path: '/login',
-        element: authDisabled ? <Navigate to="/" replace /> : <LoginForm />,
+        element: authDisabled ? (
+          <Navigate to="/" replace />
+        ) : loginUrl ? (
+          <ExternalRedirect to={loginUrl} />
+        ) : (
+          <LoginForm />
+        ),
       },
       {
         path: '/',

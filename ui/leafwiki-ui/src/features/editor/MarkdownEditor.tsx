@@ -208,6 +208,95 @@ const MarkdownEditor = (
     [onChange],
   )
 
+  // Rich paste (HTML → Markdown) is only reachable via Ctrl/Cmd+Shift+V and the
+  // toolbar/dropdown buttons for now — plain Ctrl/Cmd+V stays default browser
+  // paste while rich paste is being tested. See MarkdownCodeEditor's
+  // Shift-Mod-v keymap, which calls this same callback.
+  const pasteRich = useCallback(async () => {
+    const startView = editorViewRef.current
+    if (!startView) return
+    let md: string | null = null
+    try {
+      if (typeof navigator.clipboard.read === 'function') {
+        const items = await navigator.clipboard.read()
+        for (const item of items) {
+          if (item.types.includes('text/html')) {
+            const blob = await item.getType('text/html')
+            md = htmlToMarkdown(await blob.text()) || null
+            break
+          }
+        }
+        // Reuse the same clipboard read for the plain-text fallback instead
+        // of issuing a second navigator.clipboard call, which can trigger a
+        // second permission prompt for the same paste action.
+        if (!md) {
+          for (const item of items) {
+            if (item.types.includes('text/plain')) {
+              const blob = await item.getType('text/plain')
+              md = (await blob.text()) || null
+              break
+            }
+          }
+        }
+      }
+    } catch {
+      // clipboard-read permission denied or API unavailable — fall through to readText
+    }
+    if (!md) {
+      try {
+        md = (await navigator.clipboard.readText()) || null
+      } catch {
+        toast.error(t('toolbar.pasteClipboardError'))
+        return
+      }
+    }
+    if (!md) return
+    md = await uploadInlineDataUriImages(md, pageId, maxAssetUploadSizeBytes)
+    // Re-read after awaits: the editor may have been destroyed, or replaced
+    // by a different page's editor (navigation during the async clipboard
+    // read), while this was pending — only proceed if it's still the same
+    // live view the paste was initiated on.
+    const view = editorViewRef.current
+    if (!view || view !== startView) return
+    const sel = view.state.selection.main
+    view.dispatch({
+      changes: { from: sel.from, to: sel.to, insert: md },
+      selection: { anchor: sel.from + md.length },
+    })
+    const newDoc = view.state.doc.toString()
+    setMarkdown(newDoc)
+    onChange(newDoc)
+    view.focus()
+  }, [maxAssetUploadSizeBytes, onChange, pageId, t])
+
+  const pastePlain = useCallback(async () => {
+    const startView = editorViewRef.current
+    if (!startView) return
+    let text: string
+    try {
+      text = await navigator.clipboard.readText()
+    } catch {
+      toast.error(t('toolbar.pasteClipboardError'))
+      return
+    }
+    if (!text) return
+    // Re-read after await: the editor may have been destroyed, or replaced
+    // by a different page's editor (navigation during the async clipboard
+    // read), while this was pending — only proceed if it's still the same
+    // live view the paste was initiated on.
+    const view = editorViewRef.current
+    if (!view || view !== startView) return
+    const sel = view.state.selection.main
+    view.dispatch({
+      changes: { from: sel.from, to: sel.to, insert: text },
+      selection: { anchor: sel.from + text.length },
+    })
+    const newDoc = view.state.doc.toString()
+    setMarkdown(newDoc)
+    onChange(newDoc)
+    view.focus()
+  }, [onChange, t])
+
   useImperativeHandle(ref, () => ({
     insertAtCursor: (text: string) => {
       const view = editorViewRef.current
@@ -314,89 +403,8 @@ const MarkdownEditor = (
         redo(view)
       }
     },
-    pasteRich: async () => {
-      const startView = editorViewRef.current
-      if (!startView) return
-      let md: string | null = null
-      try {
-        if (typeof navigator.clipboard.read === 'function') {
-          const items = await navigator.clipboard.read()
-          for (const item of items) {
-            if (item.types.includes('text/html')) {
-              const blob = await item.getType('text/html')
-              md = htmlToMarkdown(await blob.text()) || null
-              break
-            }
-          }
-          // Reuse the same clipboard read for the plain-text fallback instead
-          // of issuing a second navigator.clipboard call, which can trigger a
-          // second permission prompt for the same paste action.
-          if (!md) {
-            for (const item of items) {
-              if (item.types.includes('text/plain')) {
-                const blob = await item.getType('text/plain')
-                md = (await blob.text()) || null
-                break
-              }
-            }
-          }
-        }
-      } catch {
-        // clipboard-read permission denied or API unavailable — fall through to readText
-      }
-      if (!md) {
-        try {
-          md = (await navigator.clipboard.readText()) || null
-        } catch {
-          toast.error(t('toolbar.pasteClipboardError'))
-          return
-        }
-      }
-      if (!md) return
-      md = await uploadInlineDataUriImages(md, pageId, maxAssetUploadSizeBytes)
-      // Re-read after awaits: the editor may have been destroyed, or replaced
-      // by a different page's editor (navigation during the async clipboard
-      // read), while this was pending — only proceed if it's still the same
-      // live view the paste was initiated on.
-      const view = editorViewRef.current
-      if (!view || view !== startView) return
-      const sel = view.state.selection.main
-      view.dispatch({
-        changes: { from: sel.from, to: sel.to, insert: md },
-        selection: { anchor: sel.from + md.length },
-      })
-      const newDoc = view.state.doc.toString()
-      setMarkdown(newDoc)
-      onChange(newDoc)
-      view.focus()
-    },
-    pastePlain: async () => {
-      const startView = editorViewRef.current
-      if (!startView) return
-      let text: string
-      try {
-        text = await navigator.clipboard.readText()
-      } catch {
-        toast.error(t('toolbar.pasteClipboardError'))
-        return
-      }
-      if (!text) return
-      // Re-read after await: the editor may have been destroyed, or replaced
-      // by a different page's editor (navigation during the async clipboard
-      // read), while this was pending — only proceed if it's still the same
-      // live view the paste was initiated on.
-      const view = editorViewRef.current
-      if (!view || view !== startView) return
-      const sel = view.state.selection.main
-      view.dispatch({
-        changes: { from: sel.from, to: sel.to, insert: text },
-        selection: { anchor: sel.from + text.length },
-      })
-      const newDoc = view.state.doc.toString()
-      setMarkdown(newDoc)
-      onChange(newDoc)
-      view.focus()
-    },
+    pasteRich,
+    pastePlain,
   }))
 
   const onAssetVersionChange = useCallback(
@@ -543,6 +551,7 @@ const MarkdownEditor = (
             onCursorLineChange={onCursorLineChange}
             editorViewRef={editorViewRef}
             lineWrap={lineWrap}
+            onPasteRich={pasteRich}
           />
         </>
       )
@@ -551,6 +560,7 @@ const MarkdownEditor = (
       handleEditorChange,
       markdown,
       pageId,
+      pasteRich,
       lineWrap,
       onCursorLineChange,
       renderToolbar,

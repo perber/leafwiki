@@ -20,7 +20,11 @@ type LinksStore struct {
 	db         *sql.DB
 }
 
-const maxOutgoingLinksQueryArgs = 900
+const (
+	maxOutgoingLinksQueryArgs = 900
+	logCloseRowsFailed        = "could not close rows"
+	logCloseStatementFailed   = "could not close statement"
+)
 
 type PageLinkUpdate struct {
 	FromPageID string
@@ -200,7 +204,7 @@ func (s *LinksStore) AddLinks(fromPageID string, fromTitle string, toLinks []Tar
 	}
 	defer func() {
 		if err := stmt.Close(); err != nil {
-			slog.Default().Error("could not close statement", "error", err)
+			slog.Default().Error(logCloseStatementFailed, "error", err)
 		}
 	}()
 
@@ -252,7 +256,7 @@ func (s *LinksStore) replaceLinksAndHealTx(tx *sql.Tx, updates []PageLinkUpdate)
 	}
 	defer func() {
 		if err := deleteStmt.Close(); err != nil {
-			slog.Default().Error("could not close statement", "error", err)
+			slog.Default().Error(logCloseStatementFailed, "error", err)
 		}
 	}()
 
@@ -262,7 +266,7 @@ func (s *LinksStore) replaceLinksAndHealTx(tx *sql.Tx, updates []PageLinkUpdate)
 	}
 	defer func() {
 		if err := insertStmt.Close(); err != nil {
-			slog.Default().Error("could not close statement", "error", err)
+			slog.Default().Error(logCloseStatementFailed, "error", err)
 		}
 	}()
 
@@ -276,7 +280,7 @@ func (s *LinksStore) replaceLinksAndHealTx(tx *sql.Tx, updates []PageLinkUpdate)
 	}
 	defer func() {
 		if err := healStmt.Close(); err != nil {
-			slog.Default().Error("could not close statement", "error", err)
+			slog.Default().Error(logCloseStatementFailed, "error", err)
 		}
 	}()
 
@@ -314,7 +318,7 @@ func (s *LinksStore) GetBacklinksForPage(pageID string) ([]Backlink, error) {
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.Default().Error("could not close rows", "error", err)
+			slog.Default().Error(logCloseRowsFailed, "error", err)
 		}
 	}()
 
@@ -353,7 +357,7 @@ func (s *LinksStore) GetOutgoingLinksForPage(pageID string) ([]Outgoing, error) 
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.Default().Error("could not close rows", "error", err)
+			slog.Default().Error(logCloseRowsFailed, "error", err)
 		}
 	}()
 
@@ -424,7 +428,7 @@ func (s *LinksStore) appendOutgoingLinksForPageBatch(outgoingByPageID map[string
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.Default().Error("could not close rows", "error", err)
+			slog.Default().Error(logCloseRowsFailed, "error", err)
 		}
 	}()
 
@@ -461,7 +465,7 @@ func (s *LinksStore) GetRefactorMatchesForPrefix(oldPrefix string) ([]RefactorLi
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.Default().Error("could not close rows", "error", err)
+			slog.Default().Error(logCloseRowsFailed, "error", err)
 		}
 	}()
 
@@ -496,7 +500,7 @@ func (s *LinksStore) GetRefactorSourcePageIDsForPrefix(oldPrefix string) ([]stri
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.Default().Error("could not close rows", "error", err)
+			slog.Default().Error(logCloseRowsFailed, "error", err)
 		}
 	}()
 
@@ -529,7 +533,7 @@ func (s *LinksStore) GetRefactorSourcePageIDsForWikiLinkTitle(title string) ([]s
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.Default().Error("could not close rows", "error", err)
+			slog.Default().Error(logCloseRowsFailed, "error", err)
 		}
 	}()
 
@@ -563,7 +567,7 @@ func (s *LinksStore) GetBrokenIncomingForPath(toPath string) ([]Backlink, error)
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.Default().Error("could not close rows", "error", err)
+			slog.Default().Error(logCloseRowsFailed, "error", err)
 		}
 	}()
 

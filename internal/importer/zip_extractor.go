@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+const logCloseFailed = "close failed"
+
 type ZipExtractor struct {
 	log *slog.Logger
 }
@@ -31,7 +33,7 @@ func (x *ZipExtractor) ExtractToDir(zipPath string, baseDir string) (*ZipWorkspa
 	}
 	defer func() {
 		if err := r.Close(); err != nil {
-			x.log.Error("close failed", "error", err)
+			x.log.Error(logCloseFailed, "error", err)
 		}
 	}()
 
@@ -82,7 +84,7 @@ func (x *ZipExtractor) ExtractToDir(zipPath string, baseDir string) (*ZipWorkspa
 			}
 			defer func() {
 				if err := rc.Close(); err != nil {
-					x.log.Error("close failed", "error", err)
+					x.log.Error(logCloseFailed, "error", err)
 				}
 			}()
 
@@ -92,7 +94,7 @@ func (x *ZipExtractor) ExtractToDir(zipPath string, baseDir string) (*ZipWorkspa
 			}
 			defer func() {
 				if err := out.Close(); err != nil {
-					x.log.Error("close failed", "error", err)
+					x.log.Error(logCloseFailed, "error", err)
 				}
 			}()
 
