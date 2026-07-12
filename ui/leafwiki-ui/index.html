@@ -5,10 +5,11 @@
     <link rel="icon" href="{{__FAVICON_HREF__}}" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="base-path" content="{{__BASE_PATH__}}" />
-    <title>{{__SITE_NAME__}}</title>
+    <title>{{__PAGE_TITLE__}}</title>
+    {{__PAGE_HEAD__}}
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">{{__SSR_CONTENT__}}</div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

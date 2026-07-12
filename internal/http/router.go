@@ -14,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/assets"
 	coreauth "github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/seo"
+	"github.com/perber/wiki/internal/core/tree"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/maintenance"
@@ -123,6 +125,7 @@ type RouterOptions struct {
 	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
 	LogoutURL               string                   // Optional URL the frontend redirects to after logout
 	WriteGate               *restore.WriteGate       // Optional; when set, gates mutating requests while a restore is in progress. nil disables the middleware entirely (no snapshot/restore enabled)
+	PublicBaseURL           string                   // Optional absolute origin (e.g. "https://wiki.example.com") used for canonical/OpenGraph URLs and sitemap.xml; falls back to the request's Host header when empty
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.
@@ -136,6 +139,13 @@ type FrontendConfig struct {
 	CustomStylesheetPath string
 	// StorageDir is used to validate that CustomStylesheet in RouterOptions is within the storage dir.
 	StorageDir string
+	// FindPageByRoutePath resolves a page route path (e.g. "docs/intro") to its
+	// content, for server-rendering page Markdown into the initial HTML shell.
+	// Nil disables SSR content injection.
+	FindPageByRoutePath func(routePath string) (*tree.Page, error)
+	// GetTree returns the current page tree, used to build sitemap.xml.
+	// Nil disables sitemap.xml.
+	GetTree func() *tree.PageNode
 }
 
 // NewRouter creates the HTTP engine, builds the shared RouterContext, delegates all
@@ -246,6 +256,42 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 		})
 	}
 
+	// robots.txt / sitemap.xml are SEO-only routes, independent of whether the
+	// SPA frontend is embedded in this build. Both are withheld unless the
+	// wiki allows public read access, so a private wiki is never advertised
+	// to crawlers even if it's reachable at a public URL.
+	base.GET("/robots.txt", func(c *gin.Context) {
+		c.Header("Content-Type", "text/plain; charset=utf-8")
+		if opts.PublicAccess == nil || !opts.PublicAccess.Enabled() {
+			c.String(http.StatusOK, "User-agent: *\nDisallow: /\n")
+			return
+		}
+		origin := opts.PublicBaseURL
+		if origin == "" {
+			origin = publicOrigin(c, opts)
+		}
+		sitemapURL := strings.TrimRight(origin, "/") + opts.BasePath + "/sitemap.xml"
+		c.String(http.StatusOK, "User-agent: *\nAllow: /\nSitemap: %s\n", sitemapURL)
+	})
+
+	base.GET("/sitemap.xml", func(c *gin.Context) {
+		if opts.PublicAccess == nil || !opts.PublicAccess.Enabled() || frontendCfg.GetTree == nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		baseURL := opts.PublicBaseURL
+		if baseURL == "" {
+			baseURL = publicOrigin(c, opts)
+		}
+		body, err := seo.BuildSitemap(frontendCfg.GetTree(), strings.TrimRight(baseURL, "/")+opts.BasePath)
+		if err != nil {
+			slog.Default().Error("failed to build sitemap.xml", "error", err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		c.Data(http.StatusOK, "application/xml; charset=utf-8", body)
+	})
+
 	// Serve the embedded frontend SPA on all unknown routes.
 	if EmbedFrontend == "true" {
 		fsys, err := fs.Sub(frontend, "dist")
@@ -292,33 +338,8 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 					return
 				}
 
-				siteName := "LeafWiki"
-				if frontendCfg.GetSiteName != nil {
-					if name := frontendCfg.GetSiteName(); name != "" {
-						siteName = name
-					}
-				}
-				faviconFile := ""
-				if frontendCfg.GetFaviconFile != nil {
-					faviconFile = frontendCfg.GetFaviconFile()
-				}
-
-				doc := string(data)
-				escapedBasePath := html.EscapeString(opts.BasePath)
-				doc = strings.ReplaceAll(doc, "{{__SITE_NAME__}}", html.EscapeString(siteName))
-				doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", escapedBasePath)
-				doc = strings.ReplaceAll(doc, "{{__FAVICON_HREF__}}", html.EscapeString(BuildFrontendFaviconHref(opts.BasePath, faviconFile)))
-				// Rewrite Vite's relative "./static/" asset references to absolute paths
-				// so they resolve correctly when index.html is served for deep SPA routes.
-				// Lazy chunks still use import.meta.url for their own path resolution.
-				doc = strings.ReplaceAll(doc, `"./static/`, `"`+escapedBasePath+`/static/`)
-
-				doc = injectIntoHead(doc, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
-
-				if opts.InjectCodeInHeader != "" {
-					doc = injectIntoHead(doc, opts.InjectCodeInHeader)
-				}
-				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(doc))
+				doc := BuildSPADocument(string(data), c, path, opts, frontendCfg, customStylesheetPath)
+				c.Data(http.StatusOK, "text/html; charset=utf-8", doc)
 			} else {
 				c.String(http.StatusNotFound, "Page not found")
 			}
@@ -326,6 +347,74 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 
 	return engine
+}
+
+// BuildSPADocument renders the SPA shell for a matched non-API GET request,
+// optionally server-rendering the resolved page's Markdown and SEO metadata
+// into it. path is the request path with opts.BasePath already stripped
+// (see the NoRoute handler). Exported so tests can exercise it against a
+// synthetic index.html template without depending on the embedded frontend
+// build (dist/index.html only exists in binaries built with
+// EmbedFrontend=true and a real `npm run build` output).
+func BuildSPADocument(rawHTML string, c *gin.Context, path string, opts RouterOptions, frontendCfg FrontendConfig, customStylesheetPath string) []byte {
+	siteName := "LeafWiki"
+	if frontendCfg.GetSiteName != nil {
+		if name := frontendCfg.GetSiteName(); name != "" {
+			siteName = name
+		}
+	}
+	faviconFile := ""
+	if frontendCfg.GetFaviconFile != nil {
+		faviconFile = frontendCfg.GetFaviconFile()
+	}
+
+	// Server-render the page's Markdown into the shell for search crawlers,
+	// link-preview bots, and LLM agents that request the page without
+	// executing JavaScript. The SPA still boots and takes over via
+	// createRoot(...).render(), replacing this content exactly as it
+	// replaces the empty shell today - this is not full SPA SSR/hydration.
+	// Only offered for public wikis so private content is never rendered to
+	// unauthenticated requests (mirrors opts.PublicAccess gating on the
+	// pages API).
+	meta := seo.PageMeta{SiteName: siteName}
+	ssrContent := ""
+	pageHead := ""
+	if opts.PublicAccess != nil && opts.PublicAccess.Enabled() && frontendCfg.FindPageByRoutePath != nil {
+		if page, findErr := frontendCfg.FindPageByRoutePath(strings.Trim(path, "/")); findErr == nil && page != nil {
+			if rendered, renderErr := seo.RenderHTML(page.Content); renderErr == nil {
+				canonicalURL := strings.TrimRight(opts.PublicBaseURL, "/")
+				if canonicalURL == "" {
+					canonicalURL = publicOrigin(c, opts)
+				}
+				canonicalURL += opts.BasePath + path
+				meta = seo.BuildPageMeta(siteName, page.Title, page.Content, canonicalURL)
+				ssrContent = rendered
+				pageHead = meta.HeadTags()
+			} else {
+				slog.Default().Warn("SSR markdown render failed", "path", path, "error", renderErr)
+			}
+		}
+	}
+
+	doc := rawHTML
+	escapedBasePath := html.EscapeString(opts.BasePath)
+	doc = strings.ReplaceAll(doc, "{{__PAGE_TITLE__}}", html.EscapeString(meta.DocumentTitle()))
+	doc = strings.ReplaceAll(doc, "{{__PAGE_HEAD__}}", pageHead)
+	doc = strings.ReplaceAll(doc, "{{__SSR_CONTENT__}}", ssrContent)
+	doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", escapedBasePath)
+	doc = strings.ReplaceAll(doc, "{{__FAVICON_HREF__}}", html.EscapeString(BuildFrontendFaviconHref(opts.BasePath, faviconFile)))
+	// Rewrite Vite's relative "./static/" asset references to absolute paths
+	// so they resolve correctly when index.html is served for deep SPA routes.
+	// Lazy chunks still use import.meta.url for their own path resolution.
+	doc = strings.ReplaceAll(doc, `"./static/`, `"`+escapedBasePath+`/static/`)
+
+	doc = injectIntoHead(doc, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
+
+	if opts.InjectCodeInHeader != "" {
+		doc = injectIntoHead(doc, opts.InjectCodeInHeader)
+	}
+
+	return []byte(doc)
 }
 
 func BuildFrontendFaviconHref(basePath, faviconFile string) string {
@@ -371,6 +460,25 @@ func buildCustomStylesheetTag(basePath, customStylesheet string) string {
 		return ""
 	}
 	return `<link rel="stylesheet" href="` + basePath + `/custom.css">`
+}
+
+// publicOrigin returns the best-effort absolute origin (scheme://host) for
+// the current request, honoring X-Forwarded-Proto/-Host from a trusted
+// reverse proxy. Used as a fallback for canonical/OpenGraph URLs and
+// sitemap.xml when RouterOptions.PublicBaseURL is not explicitly configured.
+func publicOrigin(c *gin.Context, opts RouterOptions) string {
+	scheme := "http"
+	if c.Request.TLS != nil || !opts.AllowInsecure {
+		scheme = "https"
+	}
+	if proto := c.Request.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = strings.TrimSpace(strings.Split(proto, ",")[0])
+	}
+	host := c.Request.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = c.Request.Host
+	}
+	return scheme + "://" + host
 }
 
 func injectIntoHead(html, snippet string) string {
