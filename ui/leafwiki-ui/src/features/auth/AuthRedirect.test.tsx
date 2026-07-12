@@ -85,35 +85,37 @@ describe('Auth redirect flow', () => {
       value: { ...originalLocation, href: '' },
     })
 
-    useConfigStore.setState({
-      loginUrl: 'https://idp.example.com/login',
-    })
+    try {
+      useConfigStore.setState({
+        loginUrl: 'https://idp.example.com/login',
+      })
 
-    render(
-      <MemoryRouter initialEntries={['/some/protected/page']}>
-        <Routes>
-          <Route path="/login" element={<LocationProbe />} />
-          <Route
-            path="*"
-            element={
-              <RequireAuth>
-                <div>Protected page</div>
-              </RequireAuth>
-            }
-          />
-        </Routes>
-      </MemoryRouter>,
-    )
+      render(
+        <MemoryRouter initialEntries={['/some/protected/page']}>
+          <Routes>
+            <Route path="/login" element={<LocationProbe />} />
+            <Route
+              path="*"
+              element={
+                <RequireAuth>
+                  <div>Protected page</div>
+                </RequireAuth>
+              }
+            />
+          </Routes>
+        </MemoryRouter>,
+      )
 
-    await waitFor(() => {
-      expect(window.location.href).toBe('https://idp.example.com/login')
-    })
-    expect(screen.queryByTestId('pathname')).not.toBeInTheDocument()
-
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: originalLocation,
-    })
+      await waitFor(() => {
+        expect(window.location.href).toBe('https://idp.example.com/login')
+      })
+      expect(screen.queryByTestId('pathname')).not.toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation,
+      })
+    }
   })
 
   it('returns to the requested page after successful login', async () => {

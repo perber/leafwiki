@@ -409,6 +409,7 @@ Available since v0.10.0. Use when an upstream proxy authenticates users and forw
 - If the forwarded username doesn't exist in LeafWiki, the request is rejected
 - Do not enable without configuring `--trusted-proxy-ips`
 - `--login-url` and `--logout-url` are independent, optional redirect targets — set either or both to send users to an external IdP instead of the built-in login form / to redirect after logout
+- `--login-url`, `--logout-url`, and `--user-management-url` must start with `http://` or `https://`; the server refuses to start otherwise
 
 ### Unix Socket (v0.11.3)
 

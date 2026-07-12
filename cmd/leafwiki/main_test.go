@@ -93,6 +93,29 @@ func TestValidateHTTPRemoteUserConfig(t *testing.T) {
 	}
 }
 
+func TestValidateRedirectURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{"empty", "", false},
+		{"http", "http://idp.example.com/login", false},
+		{"https", "https://idp.example.com/login", false},
+		{"javascript scheme", "javascript:alert(1)", true},
+		{"relative path", "/login", true},
+		{"data scheme", "data:text/html,<script>alert(1)</script>", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateRedirectURL("login-url", tc.url)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateRedirectURL(%q) error = %v, wantErr %v", tc.url, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateListenConfig(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -28,10 +28,10 @@ export const createLeafWikiRouter = (
     [
       {
         path: '/login',
-        element: loginUrl ? (
-          <ExternalRedirect to={loginUrl} />
-        ) : authDisabled ? (
+        element: authDisabled ? (
           <Navigate to="/" replace />
+        ) : loginUrl ? (
+          <ExternalRedirect to={loginUrl} />
         ) : (
           <LoginForm />
         ),
