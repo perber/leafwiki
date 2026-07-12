@@ -523,7 +523,11 @@
   }
 
   .app-layout__sidebar-container {
-    @apply relative z-30 box-border h-full overflow-auto pr-1 max-sm:fixed max-sm:h-[calc(100dvh-55px)];
+    @apply relative z-30 box-border h-full overflow-x-hidden overflow-y-auto pr-1 max-sm:fixed max-sm:h-[calc(100dvh-55px)];
+  }
+
+  .app-layout__sidebar-panel {
+    @apply h-full;
   }
 
   .app-layout__sidebar-container--flush {
@@ -531,7 +535,7 @@
   }
 
   .app-layout__sidebar-resizer {
-    @apply absolute inset-y-0 right-0 flex w-1 cursor-col-resize items-center justify-center;
+    @apply absolute inset-y-0 right-0 z-10 flex w-1 cursor-col-resize items-center justify-center;
   }
 
   .app-layout__sidebar-resize-handle {
