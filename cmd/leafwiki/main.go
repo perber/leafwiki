@@ -306,6 +306,16 @@ func main() {
 		fail("Invalid HTTP remote user configuration", "error", err)
 	}
 
+	if err := validateRedirectURL("login-url", loginURL); err != nil {
+		fail("Invalid login URL configuration", "error", err)
+	}
+	if err := validateRedirectURL("logout-url", logoutURL); err != nil {
+		fail("Invalid logout URL configuration", "error", err)
+	}
+	if err := validateRedirectURL("user-management-url", userManagementURL); err != nil {
+		fail("Invalid user management URL configuration", "error", err)
+	}
+
 	if enableHTTPRemoteUser {
 		slog.Default().Info("Reverse-proxy authentication enabled",
 			"header", httpRemoteUserHeader,
@@ -639,6 +649,16 @@ func validateHTTPRemoteUserConfig(enabled bool, trustedProxyIPsRaw string) error
 	}
 	if !hasTrustedProxy {
 		return fmt.Errorf("--trusted-proxy-ips is required when --enable-http-remote-user is set. Set it using --trusted-proxy-ips or LEAFWIKI_TRUSTED_PROXY_IPS")
+	}
+	return nil
+}
+
+func validateRedirectURL(flagName, url string) error {
+	if url == "" {
+		return nil
+	}
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return fmt.Errorf("--%s must start with http:// or https://", flagName)
 	}
 	return nil
 }
