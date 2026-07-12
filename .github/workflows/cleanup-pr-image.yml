@@ -1,0 +1,98 @@
+name: Cleanup PR test images
+
+on:
+  pull_request:
+    types: [closed]
+
+  schedule:
+    - cron: "0 3 1 * *" # Tous les 1er du mois à 03:00 UTC
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup-closed-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete closed PR images
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const packageName = context.repo.repo.toLowerCase();
+            const prefix = `pr-${context.payload.pull_request.number}-`;
+
+            const versions = await github.paginate(
+              github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+              {
+                org: owner,
+                package_type: "container",
+                package_name: packageName,
+                per_page: 100,
+              }
+            );
+
+            for (const version of versions) {
+              const tags = version.metadata?.container?.tags ?? [];
+
+              if (!tags.some(tag => tag.startsWith(prefix))) {
+                continue;
+              }
+
+              core.info(`Deleting ${tags.join(", ")}`);
+
+              await github.rest.packages.deletePackageVersionForOrg({
+                org: owner,
+                package_type: "container",
+                package_name: packageName,
+                package_version_id: version.id,
+              });
+            }
+
+  cleanup-old-images:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete old PR images
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const packageName = context.repo.repo.toLowerCase();
+            const retentionDays = 30;
+
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - retentionDays);
+
+            const versions = await github.paginate(
+              github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+              {
+                org: owner,
+                package_type: "container",
+                package_name: packageName,
+                per_page: 100,
+              }
+            );
+
+            for (const version of versions) {
+              const tags = version.metadata?.container?.tags ?? [];
+
+              const isPrImage = tags.some(tag => tag.startsWith("pr-"));
+              const createdAt = new Date(version.created_at);
+
+              if (!isPrImage || createdAt > cutoff) {
+                continue;
+              }
+
+              core.info(`Deleting old image ${tags.join(", ")}`);
+
+              await github.rest.packages.deletePackageVersionForOrg({
+                org: owner,
+                package_type: "container",
+                package_name: packageName,
+                package_version_id: version.id,
+              });
+            }
