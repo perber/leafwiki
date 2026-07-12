@@ -1,3 +1,4 @@
+import { isValidElement } from 'react'
 import { Navigate } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import ExternalRedirect from '../auth/ExternalRedirect'
@@ -7,7 +8,11 @@ import { createLeafWikiRouter } from './router'
 function loginRouteElementType(authDisabled: boolean, loginUrl: string) {
   const router = createLeafWikiRouter(false, authDisabled, false, '', loginUrl)
   const loginRoute = router.routes.find((route) => route.path === '/login')
-  return loginRoute?.element?.type
+  const element = loginRoute?.element
+  if (!isValidElement(element)) {
+    throw new Error('expected /login route to render an element')
+  }
+  return element.type
 }
 
 describe('createLeafWikiRouter /login route', () => {
