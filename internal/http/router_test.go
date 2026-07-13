@@ -269,6 +269,20 @@ func getPageByPathViaAPI(t *testing.T, router http.Handler, path string) *apiPag
 	return &page
 }
 
+func getMetricsBody(t *testing.T, router http.Handler) string {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from /metrics, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	return rec.Body.String()
+}
+
 func getPermalinkTargetViaAPI(t *testing.T, router http.Handler, id string) *apiPermalinkTarget {
 	t.Helper()
 
@@ -627,6 +641,94 @@ func TestDisableRequestLog_DoesNotCrash(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestMetricsEndpoint_ReturnsPrometheusMetrics(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from /api/health, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := getMetricsBody(t, router)
+
+	if !strings.Contains(body, "leafwiki_http_requests_total") {
+		t.Fatalf("expected metrics output to contain request counter, got: %s", body)
+	}
+	if !strings.Contains(body, "leafwiki_http_request_duration_seconds") {
+		t.Fatalf("expected metrics output to contain duration histogram, got: %s", body)
+	}
+	if !strings.Contains(body, "leafwiki_http_requests_in_flight") {
+		t.Fatalf("expected metrics output to contain in-flight gauge, got: %s", body)
+	}
+}
+
+func TestMetricsEndpoint_UsesNormalizedHealthRouteLabel(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from /api/health, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := getMetricsBody(t, router)
+	expected := `leafwiki_http_requests_total{method="GET",route="/api/health",status="200"} 1`
+	if !strings.Contains(body, expected) {
+		t.Fatalf("expected metrics output to contain %q, got: %s", expected, body)
+	}
+}
+
+func TestMetricsEndpoint_UsesRoutePatternForPageIDRequests(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	page := createPageViaAPI(t, router, "Metrics Page", "metrics-page", nil, pageNodeKind())
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/"+page.ID, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from page lookup, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := getMetricsBody(t, router)
+	expected := `leafwiki_http_requests_total{method="GET",route="/api/pages/:id",status="200"} 1`
+	if !strings.Contains(body, expected) {
+		t.Fatalf("expected metrics output to contain %q, got: %s", expected, body)
+	}
+	if strings.Contains(body, "/api/pages/"+page.ID) {
+		t.Fatalf("expected metrics output not to contain concrete page ID %q, got: %s", page.ID, body)
+	}
+}
+
+func TestMetricsEndpoint_UsesUnmatchedLabelForUnknownRoutes(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/does-not-exist/123", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 from unknown route, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := getMetricsBody(t, router)
+	expected := `leafwiki_http_requests_total{method="GET",route="unmatched",status="404"} 1`
+	if !strings.Contains(body, expected) {
+		t.Fatalf("expected metrics output to contain %q, got: %s", expected, body)
 	}
 }
 
