@@ -2645,6 +2645,37 @@
     @apply hidden;
   }
 
+  .tree-node--dragging,
+  .tree-node__children--dragging {
+    @apply opacity-40;
+  }
+
+  .tree-node--drop-inside {
+    @apply bg-brand/10 rounded;
+    box-shadow: inset 0 0 0 1.5px hsl(var(--brand) / 0.45);
+  }
+
+  .tree-node__drop-line {
+    @apply bg-brand pointer-events-none absolute right-1 left-1 z-10 h-0.5 rounded;
+  }
+
+  .tree-node__drop-line--top {
+    top: -1px;
+  }
+
+  .tree-node__drop-line--bottom {
+    bottom: -1px;
+  }
+
+  .tree-node__nest-hint {
+    @apply text-brand pointer-events-none absolute top-1/2 right-2 z-10 -translate-y-1/2;
+  }
+
+  .tree-dnd__overlay {
+    @apply border-surface-border text-interface-text pointer-events-none max-w-56 cursor-grabbing truncate rounded border px-2.5 py-1.5 text-sm shadow-md;
+    background: hsl(var(--surface));
+  }
+
   .btn {
     @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium;
   }
