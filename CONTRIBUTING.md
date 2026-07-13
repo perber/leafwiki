@@ -98,7 +98,7 @@ Start the backend (in another terminal):
 
 ``` bash
 cd cmd/leafwiki
-go run main.go --jwt-secret=dev --admin-password=dev --public-access=true --allow-insecure=true
+go run . --jwt-secret=dev --admin-password=dev --public-access=true --allow-insecure=true
 ```
 
 The frontend dev server usually runs at:

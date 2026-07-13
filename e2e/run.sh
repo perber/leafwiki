@@ -106,7 +106,7 @@ start_local() {
     cd "$repo_root"
     go run \
       -ldflags="-X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X github.com/perber/wiki/internal/wiki/auth.DisableRefreshTokenRateLimit=true" \
-      ./cmd/leafwiki/main.go \
+      ./cmd/leafwiki \
       --host 127.0.0.1 \
       --port "$app_port" \
       --data-dir "$local_data_dir" \

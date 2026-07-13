@@ -31,20 +31,23 @@ func (s *UserService) InitDefaultAdmin(username, email, newPassword string) erro
 		return nil
 	}
 
-	username = strings.TrimSpace(username)
-	if username == "" {
-		username = defaultAdminUsername
-	}
-	email = strings.TrimSpace(email)
-	if email == "" {
-		email = defaultAdminEmail
-	}
+	username = defaultIfEmpty(username, defaultAdminUsername)
+	email = defaultIfEmpty(email, defaultAdminEmail)
 
 	if _, err := s.CreateUser(username, email, newPassword, "admin"); err != nil {
 		return fmt.Errorf("failed to create default admin: %w", err)
 	}
 
 	return nil
+}
+
+// defaultIfEmpty trims value and returns fallback if the result is empty.
+func defaultIfEmpty(value, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func (s *UserService) CreateUser(username, email, password, role string) (*User, error) {
@@ -293,7 +296,7 @@ func (s *UserService) ChangeOwnPassword(id, oldPassword, newPassword string) err
 	return nil
 }
 
-func (s *UserService) ResetAdminUserPassword() (*User, error) {
+func (s *UserService) ResetAdminUserPassword(username, email string) (*User, error) {
 	// Generate a new password for the admin user
 	password, err := shared.GenerateRandomPassword(16)
 	if err != nil {
@@ -305,7 +308,9 @@ func (s *UserService) ResetAdminUserPassword() (*User, error) {
 	if err != nil {
 		if err == ErrUserNotFound {
 			// Create default admin user
-			adminUser, err = s.CreateUser(defaultAdminUsername, defaultAdminEmail, password, RoleAdmin)
+			username = defaultIfEmpty(username, defaultAdminUsername)
+			email = defaultIfEmpty(email, defaultAdminEmail)
+			adminUser, err = s.CreateUser(username, email, password, RoleAdmin)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create default admin: %w", err)
 			}

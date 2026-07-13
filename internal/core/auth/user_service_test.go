@@ -208,7 +208,7 @@ func TestUserService_ResetAdminUserPassword(t *testing.T) {
 	}
 
 	// Reset admin password
-	adminUser, err := service.ResetAdminUserPassword()
+	adminUser, err := service.ResetAdminUserPassword("", "")
 	if err != nil {
 		t.Fatalf("ResetAdminUserPassword failed: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestUserService_ResetAdminUserPassword_NoAdmin(t *testing.T) {
 	// Don't create an admin user first - test should create one
 
 	// Reset admin password (should create new admin)
-	adminUser, err := service.ResetAdminUserPassword()
+	adminUser, err := service.ResetAdminUserPassword("", "")
 	if err != nil {
 		t.Fatalf("ResetAdminUserPassword failed: %v", err)
 	}
@@ -264,6 +264,32 @@ func TestUserService_ResetAdminUserPassword_NoAdmin(t *testing.T) {
 
 	// Verify we can log in with the new password
 	_, err = service.GetUserByEmailOrUsernameAndPassword("admin", adminUser.Password)
+	if err != nil {
+		t.Errorf("Failed to login with new password: %v", err)
+	}
+}
+
+func TestUserService_ResetAdminUserPassword_NoAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	// Don't create an admin user first - test should create one with the given identity
+
+	adminUser, err := service.ResetAdminUserPassword("root", "root@example.com")
+	if err != nil {
+		t.Fatalf("ResetAdminUserPassword failed: %v", err)
+	}
+
+	if adminUser.Username != "root" {
+		t.Errorf("Expected username 'root', got: %s", adminUser.Username)
+	}
+
+	if adminUser.Email != "root@example.com" {
+		t.Errorf("Expected email 'root@example.com', got: %s", adminUser.Email)
+	}
+
+	// Verify we can log in with the new password
+	_, err = service.GetUserByEmailOrUsernameAndPassword("root", adminUser.Password)
 	if err != nil {
 		t.Errorf("Failed to login with new password: %v", err)
 	}

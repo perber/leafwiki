@@ -80,6 +80,7 @@ func writeUsage(w io.Writer) {
 	                                 (e.g. an external SSO/IdP login page) (default: "")
 	--logout-url                    URL the frontend redirects to after logout
 	                                 (e.g. an external SSO/IdP logout page) (default: "")
+	--http-remote-user-logout-url   Deprecated: use --logout-url instead
 	--user-management-url           URL to an external user-management page; when set, the built-in
 	                                 User Management UI is replaced with a link to this URL (default: "")
 	--disable-request-log           Suppress per-request HTTP access log lines (default: false)
@@ -125,6 +126,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_TRUSTED_PROXY_IPS
 	LEAFWIKI_LOGIN_URL
 	LEAFWIKI_LOGOUT_URL
+	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL  (deprecated: use LEAFWIKI_LOGOUT_URL instead)
 	LEAFWIKI_USER_MANAGEMENT_URL
 	LEAFWIKI_DISABLE_REQUEST_LOG
 	LEAFWIKI_GIT_BACKUP
@@ -200,6 +202,7 @@ type cliFlags struct {
 	trustedProxyIPs         *string
 	loginURL                *string
 	logoutURL               *string
+	httpRemoteUserLogoutURL *string
 	userManagementURL       *string
 	disableRequestLog       *bool
 	gitBackup               *bool
@@ -245,6 +248,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		trustedProxyIPs:         fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
 		loginURL:                fs.String("login-url", "", "URL the frontend redirects to instead of the built-in login form (e.g. an external SSO/IdP login page)"),
 		logoutURL:               fs.String("logout-url", "", "URL the frontend redirects to after logout (e.g. an external SSO/IdP logout page)"),
+		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "deprecated: use --logout-url instead"),
 		userManagementURL:       fs.String("user-management-url", "", "URL to an external user-management page; when set, the built-in User Management UI is replaced with a link to this URL"),
 		disableRequestLog:       fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
 		gitBackup:               fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
@@ -285,8 +289,10 @@ func main() {
 	unixSocket := resolveString("unix-socket", *flags.unixSocket, visited, "LEAFWIKI_UNIX_SOCKET", "")
 	dataDir := resolveString("data-dir", *flags.dataDir, visited, "LEAFWIKI_DATA_DIR", "./data")
 	adminPassword := resolveString("admin-password", *flags.adminPassword, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
-	adminUsername := resolveString("admin-username", *flags.adminUsername, visited, "LEAFWIKI_ADMIN_USERNAME", "admin")
-	adminEmail := resolveString("admin-email", *flags.adminEmail, visited, "LEAFWIKI_ADMIN_EMAIL", "admin@localhost")
+	// Empty stays empty here; auth.UserService applies the "admin"/"admin@localhost"
+	// fallback itself, so that default lives in exactly one place.
+	adminUsername := resolveString("admin-username", *flags.adminUsername, visited, "LEAFWIKI_ADMIN_USERNAME", "")
+	adminEmail := resolveString("admin-email", *flags.adminEmail, visited, "LEAFWIKI_ADMIN_EMAIL", "")
 	jwtSecret := resolveString("jwt-secret", *flags.jwtSecret, visited, "LEAFWIKI_JWT_SECRET", "")
 	injectCodeInHeader := resolveString("inject-code-in-header", *flags.injectCodeInHeader, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
 	customStylesheet := resolveString("custom-stylesheet", *flags.customStylesheet, visited, "LEAFWIKI_CUSTOM_STYLESHEET", "")
@@ -314,6 +320,10 @@ func main() {
 	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
 	loginURL := resolveString("login-url", *flags.loginURL, visited, "LEAFWIKI_LOGIN_URL", "")
 	logoutURL := resolveString("logout-url", *flags.logoutURL, visited, "LEAFWIKI_LOGOUT_URL", "")
+	if resolved, usedDeprecated := resolveLogoutURL(logoutURL, *flags.httpRemoteUserLogoutURL, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL"); usedDeprecated {
+		slog.Default().Warn("--http-remote-user-logout-url/LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL is deprecated, use --logout-url/LEAFWIKI_LOGOUT_URL instead")
+		logoutURL = resolved
+	}
 	userManagementURL := resolveString("user-management-url", *flags.userManagementURL, visited, "LEAFWIKI_USER_MANAGEMENT_URL", "")
 	disableRequestLog := resolveBool("disable-request-log", *flags.disableRequestLog, visited, "LEAFWIKI_DISABLE_REQUEST_LOG")
 	gitBackupEnabled := resolveBool("git-backup", *flags.gitBackup, visited, "LEAFWIKI_GIT_BACKUP")
@@ -343,9 +353,9 @@ func main() {
 	if err := validateRedirectURL("logout-url", logoutURL); err != nil {
 		fail("Invalid logout URL configuration", "error", err)
 	}
-	if err := validateRedirectURL("user-management-url", userManagementURL); err != nil {
-		fail("Invalid user management URL configuration", "error", err)
-	}
+	// --user-management-url is only ever used as a plain <a href> in the frontend
+	// (relative paths and other schemes work fine there), so it isn't restricted
+	// to http(s) like --login-url/--logout-url, which the browser navigates to directly.
 
 	if enableHTTPRemoteUser {
 		slog.Default().Info("Reverse-proxy authentication enabled",
@@ -370,7 +380,7 @@ func main() {
 	if len(args) > 0 {
 		switch args[0] {
 		case "reset-admin-password":
-			user, err := tools.ResetAdminPassword(dataDir)
+			user, err := tools.ResetAdminPassword(dataDir, adminUsername, adminEmail)
 			if err != nil {
 				fail("Password reset failed", "error", err)
 			}
@@ -645,7 +655,7 @@ func removeStaleUnixSocket(socketPath string) error {
 func resolveString(flagName, flagVal string, visited map[string]bool, envVar string, def string) string {
 	// If flag was explicitly set, it takes precedence
 	if visited[flagName] {
-		return flagVal
+		return strings.TrimSpace(flagVal)
 	}
 	// Next, check environment variable
 	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
@@ -749,11 +759,27 @@ func validateHTTPRemoteUserConfig(enabled bool, trustedProxyIPsRaw string) error
 	return nil
 }
 
+// resolveLogoutURL resolves --logout-url/LEAFWIKI_LOGOUT_URL, falling back to
+// the deprecated --http-remote-user-logout-url/LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
+// when the new option isn't set. usedDeprecated tells the caller whether to log
+// a deprecation warning.
+func resolveLogoutURL(logoutURL, deprecatedFlagVal string, visited map[string]bool, deprecatedEnvVar string) (resolved string, usedDeprecated bool) {
+	if logoutURL != "" {
+		return logoutURL, false
+	}
+	deprecated := resolveString("http-remote-user-logout-url", deprecatedFlagVal, visited, deprecatedEnvVar, "")
+	if deprecated == "" {
+		return "", false
+	}
+	return deprecated, true
+}
+
 func validateRedirectURL(flagName, url string) error {
 	if url == "" {
 		return nil
 	}
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+	lower := strings.ToLower(url)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
 		return fmt.Errorf("--%s must start with http:// or https://", flagName)
 	}
 	return nil
