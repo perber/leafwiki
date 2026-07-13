@@ -1,9 +1,11 @@
+import { Accordion } from '@/components/ui/accordion'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { SidebarAccordionSection } from '@/features/sidebar/SidebarAccordionSection'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE, DIALOG_SORT_PAGES } from '@/lib/registries'
@@ -12,6 +14,7 @@ import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { toWikiLookupPath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useSidebarPanelsStore } from '@/stores/sidebarPanels'
 import { useTreeStore } from '@/stores/tree'
 import {
   ChevronsDown,
@@ -20,6 +23,7 @@ import {
   FolderPlus,
   List,
   MoreHorizontal,
+  Pin,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -51,6 +55,8 @@ export default function TreeView() {
   const hasPinned = pinnedPages.length > 0
   const openDialog = useDialogsStore((state) => state.openDialog)
   const readOnlyMode = useIsReadOnly()
+  const openSections = useSidebarPanelsStore((s) => s.openSections)
+  const setOpenSections = useSidebarPanelsStore((s) => s.setOpenSections)
 
   useEffect(() => {
     if (!tree || !currentPath) return
@@ -99,103 +105,115 @@ export default function TreeView() {
       </p>
     )
 
-  return (
-    <div className="tree-view">
-      <PinnedSection />
-      <div className="tree-view__pages">
-        {hasPinned && (
-          <div className="tree-view__section-header">
-            {t('pinned.pagesSectionTitle')}
-          </div>
-        )}
-        <div className="tree-view__toolbar">
-          {!readOnlyMode && (
-            <>
-              <TreeViewActionButton
-                actionName="add"
-                icon={
-                  <FilePlus
-                    className="tree-view__action-icon text-brand/70!"
-                    size={18}
-                  />
-                }
-                tooltip="Create new page"
-                onClick={() =>
-                  openDialog(DIALOG_ADD_PAGE, {
-                    parentId: '',
-                    nodeKind: NODE_KIND_PAGE,
-                  })
-                }
+  const pagesToolbar = (
+    <>
+      {!readOnlyMode && (
+        <>
+          <TreeViewActionButton
+            actionName="add"
+            icon={
+              <FilePlus
+                className="tree-view__action-icon text-brand/70!"
+                size={18}
               />
-              <TreeViewActionButton
-                actionName="add-section"
-                icon={
-                  <FolderPlus
-                    className="tree-view__action-icon text-brand/70!"
-                    size={18}
-                  />
-                }
-                tooltip="Create new section"
-                onClick={() =>
-                  openDialog(DIALOG_ADD_PAGE, {
-                    parentId: '',
-                    nodeKind: NODE_KIND_SECTION,
-                  })
-                }
+            }
+            tooltip="Create new page"
+            onClick={() =>
+              openDialog(DIALOG_ADD_PAGE, {
+                parentId: '',
+                nodeKind: NODE_KIND_PAGE,
+              })
+            }
+          />
+          <TreeViewActionButton
+            actionName="add-section"
+            icon={
+              <FolderPlus
+                className="tree-view__action-icon text-brand/70!"
+                size={18}
               />
-            </>
+            }
+            tooltip="Create new section"
+            onClick={() =>
+              openDialog(DIALOG_ADD_PAGE, {
+                parentId: '',
+                nodeKind: NODE_KIND_SECTION,
+              })
+            }
+          />
+        </>
+      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <TreeViewActionButton
+            actionName="tree-overflow"
+            icon={
+              <MoreHorizontal className="tree-view__action-icon" size={18} />
+            }
+            tooltip="More actions"
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-44">
+          <DropdownMenuItem
+            className="cursor-pointer gap-2"
+            onClick={expandAll}
+            data-testid="tree-view-action-button-expand-all"
+          >
+            <ChevronsDown size={15} />
+            Expand all
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer gap-2"
+            onClick={collapseAll}
+            data-testid="tree-view-action-button-collapse-all"
+          >
+            <ChevronsUp size={15} />
+            Collapse all
+          </DropdownMenuItem>
+          {!readOnlyMode && tree && (
+            <DropdownMenuItem
+              className="cursor-pointer gap-2"
+              onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: tree })}
+              data-testid="tree-view-action-button-sort"
+            >
+              <List size={15} />
+              Sort pages
+            </DropdownMenuItem>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <TreeViewActionButton
-                actionName="tree-overflow"
-                icon={
-                  <MoreHorizontal
-                    className="tree-view__action-icon"
-                    size={18}
-                  />
-                }
-                tooltip="More actions"
-              />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44">
-              <DropdownMenuItem
-                className="cursor-pointer gap-2"
-                onClick={expandAll}
-                data-testid="tree-view-action-button-expand-all"
-              >
-                <ChevronsDown size={15} />
-                Expand all
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="cursor-pointer gap-2"
-                onClick={collapseAll}
-                data-testid="tree-view-action-button-collapse-all"
-              >
-                <ChevronsUp size={15} />
-                Collapse all
-              </DropdownMenuItem>
-              {!readOnlyMode && tree && (
-                <DropdownMenuItem
-                  className="cursor-pointer gap-2"
-                  onClick={() =>
-                    openDialog(DIALOG_SORT_PAGES, { parent: tree })
-                  }
-                  data-testid="tree-view-action-button-sort"
-                >
-                  <List size={15} />
-                  Sort pages
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  )
+
+  return (
+    <Accordion
+      type="multiple"
+      value={openSections}
+      onValueChange={setOpenSections}
+      className="tree-view"
+    >
+      {hasPinned && (
+        <SidebarAccordionSection
+          value="pinned"
+          title={t('pinned.sectionTitle')}
+          icon={<Pin size={11} />}
+          collapseToggleLabel={t('pinned.togglePinnedSection')}
+        >
+          <PinnedSection />
+        </SidebarAccordionSection>
+      )}
+      <SidebarAccordionSection
+        value="pages"
+        title={t('pinned.pagesSectionTitle')}
+        collapseToggleLabel={t('pinned.togglePagesSection')}
+        actions={pagesToolbar}
+      >
         <div className="tree-view__nodes">
           {tree?.children?.map((node) => (
             <TreeNode key={node.id} node={node} />
           ))}
         </div>
-      </div>
-    </div>
+      </SidebarAccordionSection>
+    </Accordion>
   )
 }
