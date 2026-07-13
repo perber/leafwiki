@@ -18,10 +18,10 @@ export default function RequireAuth({ children }: Props) {
   if (authDisabled) return <>{children}</>
 
   if (!user && !isRefreshing) {
-    if (loginUrl) {
-      return <ExternalRedirect to={loginUrl} />
-    }
     const redirectTo = `${location.pathname}${location.search}${location.hash}`
+    if (loginUrl) {
+      return <ExternalRedirect to={loginUrl} returnTo={redirectTo} />
+    }
     return <Navigate to="/login" replace state={{ redirectTo }} />
   }
 
