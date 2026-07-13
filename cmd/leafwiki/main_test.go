@@ -27,9 +27,11 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 		"--jwt-secret",
 		"--admin-password",
 		"--allow-insecure",
+		"--enable-metrics",
 		"--data-dir",
 		"--unix-socket",
 		"LEAFWIKI_UNIX_SOCKET",
+		"LEAFWIKI_ENABLE_METRICS",
 	} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("expected usage output to contain %q, got %q", expected, output)
@@ -47,6 +49,7 @@ func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
 		"-jwt-secret=test-secret",
 		"-admin-password=test-password",
 		"-allow-insecure=true",
+		"-enable-metrics=true",
 		"-unix-socket=/tmp/leafwiki.sock",
 	})
 	if err != nil {
@@ -61,6 +64,9 @@ func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
 	}
 	if !*flags.allowInsecure {
 		t.Fatalf("expected allow-insecure to be true")
+	}
+	if !*flags.enableMetrics {
+		t.Fatalf("expected enable-metrics to be true")
 	}
 	if got := *flags.unixSocket; got != "/tmp/leafwiki.sock" {
 		t.Fatalf("expected unix socket %q, got %q", "/tmp/leafwiki.sock", got)
@@ -175,6 +181,7 @@ func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 		"--jwt-secret=test-secret",
 		"--admin-password=test-password",
 		"--allow-insecure=true",
+		"--enable-metrics=true",
 		"--unix-socket=/tmp/leafwiki.sock",
 	})
 	if err != nil {
@@ -189,6 +196,9 @@ func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 	}
 	if !*flags.allowInsecure {
 		t.Fatalf("expected allow-insecure to be true")
+	}
+	if !*flags.enableMetrics {
+		t.Fatalf("expected enable-metrics to be true")
 	}
 	if got := *flags.unixSocket; got != "/tmp/leafwiki.sock" {
 		t.Fatalf("expected unix socket %q, got %q", "/tmp/leafwiki.sock", got)

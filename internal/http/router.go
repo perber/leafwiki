@@ -95,6 +95,7 @@ type RouterOptions struct {
 	MaxAssetUploadSizeBytes int64                // Maximum allowed size in bytes for asset uploads
 	EnableRevision          bool                 // Whether the revision / page history feature is enabled
 	EnableLinkRefactor      bool                 // Whether the link refactoring feature is enabled in the frontend
+	EnableMetrics           bool                 // Whether the Prometheus /metrics endpoint and HTTP metrics middleware are enabled
 	GitBackupEnabled        bool                 // Whether git backup is enabled (surfaced to admin UI via /api/config)
 	HTTPRemoteUser          HTTPRemoteUserConfig // Reverse-proxy authentication via HTTP header
 	DisableRequestLog       bool                 // Whether to suppress per-request access log lines
@@ -136,14 +137,20 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	csrfCookie := security.NewCSRFCookie(opts.AllowInsecure, 3*24*time.Hour)
 
 	engine := gin.New()
-	metrics := httpmetrics.NewHTTPMetrics()
+	var metrics *httpmetrics.HTTPMetrics
 	if !opts.DisableRequestLog {
 		engine.Use(slogRequestLogger())
 	}
-	engine.Use(metrics.Middleware())
+	if opts.EnableMetrics {
+		metrics = httpmetrics.NewHTTPMetrics()
+		engine.Use(metrics.Middleware())
+	}
 	engine.Use(gin.RecoveryWithWriter(gin.DefaultErrorWriter))
 	base := engine.Group(opts.BasePath)
-	base.GET("/metrics", metrics.Handler())
+
+	if opts.EnableMetrics {
+		base.GET("/metrics", metrics.Handler())
+	}
 
 	if opts.HTTPRemoteUser.Enabled {
 		base.Use(auth_middleware.InjectRemoteUser(auth_middleware.RemoteUserConfig{

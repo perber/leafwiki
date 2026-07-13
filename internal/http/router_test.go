@@ -51,6 +51,20 @@ func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return createRouterTestInstanceWithMaxAssetUploadSize(w, t, assets.DefaultMaxUploadSizeBytes)
 }
 
+func createRouterTestInstanceWithMetricsEnabled(w *wiki.Wiki, t *testing.T) *gin.Engine {
+	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		CustomStylesheet:        "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		EnableMetrics:           true,
+	})
+}
+
 func createRouterTestInstanceWithRevision(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
@@ -647,7 +661,7 @@ func TestDisableRequestLog_DoesNotCrash(t *testing.T) {
 func TestMetricsEndpoint_ReturnsPrometheusMetrics(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-	router := createRouterTestInstance(w, t)
+	router := createRouterTestInstanceWithMetricsEnabled(w, t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	rec := httptest.NewRecorder()
@@ -673,7 +687,7 @@ func TestMetricsEndpoint_ReturnsPrometheusMetrics(t *testing.T) {
 func TestMetricsEndpoint_UsesNormalizedHealthRouteLabel(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-	router := createRouterTestInstance(w, t)
+	router := createRouterTestInstanceWithMetricsEnabled(w, t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	rec := httptest.NewRecorder()
@@ -693,7 +707,7 @@ func TestMetricsEndpoint_UsesNormalizedHealthRouteLabel(t *testing.T) {
 func TestMetricsEndpoint_UsesRoutePatternForPageIDRequests(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-	router := createRouterTestInstance(w, t)
+	router := createRouterTestInstanceWithMetricsEnabled(w, t)
 
 	page := createPageViaAPI(t, router, "Metrics Page", "metrics-page", nil, pageNodeKind())
 
@@ -715,7 +729,7 @@ func TestMetricsEndpoint_UsesRoutePatternForPageIDRequests(t *testing.T) {
 func TestMetricsEndpoint_UsesUnmatchedLabelForUnknownRoutes(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-	router := createRouterTestInstance(w, t)
+	router := createRouterTestInstanceWithMetricsEnabled(w, t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/does-not-exist/123", nil)
 	rec := httptest.NewRecorder()
@@ -729,6 +743,20 @@ func TestMetricsEndpoint_UsesUnmatchedLabelForUnknownRoutes(t *testing.T) {
 	expected := `leafwiki_http_requests_total{method="GET",route="unmatched",status="404"} 1`
 	if !strings.Contains(body, expected) {
 		t.Fatalf("expected metrics output to contain %q, got: %s", expected, body)
+	}
+}
+
+func TestMetricsEndpoint_DisabledByDefault_ReturnsNotFound(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 from disabled /metrics endpoint, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

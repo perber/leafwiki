@@ -65,6 +65,7 @@ func writeUsage(w io.Writer) {
 	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
 	--enable-revision             Enable the revision / page history feature (default: false)
 	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
+	--enable-metrics              Enable the Prometheus /metrics endpoint and HTTP route metrics (default: false)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
 	--revision-coalesce-window    Window for coalescing rapid successive saves by the same author (e.g. 5m, 0 = disabled) (default: 5m)
 	--enable-http-remote-user       Enable reverse-proxy authentication via HTTP header (default: false)
@@ -107,6 +108,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_MAX_ASSET_UPLOAD_SIZE
 	LEAFWIKI_ENABLE_REVISION
 	LEAFWIKI_ENABLE_LINK_REFACTOR
+	LEAFWIKI_ENABLE_METRICS
 	LEAFWIKI_MAX_REVISION_HISTORY
 	LEAFWIKI_REVISION_COALESCE_WINDOW
 	LEAFWIKI_ENABLE_HTTP_REMOTE_USER
@@ -178,6 +180,7 @@ type cliFlags struct {
 	maxAssetUploadSize      *string
 	enableRevision          *bool
 	enableLinkRefactor      *bool
+	enableMetrics           *bool
 	maxRevisionHistory      *int
 	enableHTTPRemoteUser    *bool
 	httpRemoteUserHeader    *string
@@ -218,6 +221,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
 		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
 		enableLinkRefactor:      fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
+		enableMetrics:           fs.Bool("enable-metrics", false, "enable the Prometheus /metrics endpoint and HTTP route metrics (default: false)"),
 		maxRevisionHistory:      fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
 		enableHTTPRemoteUser:    fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
 		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
@@ -281,6 +285,7 @@ func main() {
 	)
 	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
 	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
+	enableMetrics := resolveBool("enable-metrics", *flags.enableMetrics, visited, "LEAFWIKI_ENABLE_METRICS")
 	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
 	revisionCoalesceWindow := resolveDuration("revision-coalesce-window", *flags.revisionCoalesceWindow, visited, "LEAFWIKI_REVISION_COALESCE_WINDOW")
 	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
@@ -446,6 +451,7 @@ func main() {
 		MaxAssetUploadSizeBytes: maxAssetUploadSize,
 		EnableRevision:          enableRevision,
 		EnableLinkRefactor:      enableLinkRefactor,
+		EnableMetrics:           enableMetrics,
 		GitBackupEnabled:        gitBackupEnabled,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:        enableHTTPRemoteUser,
