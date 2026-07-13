@@ -83,12 +83,6 @@ func (m *HTTPMetrics) Middleware() gin.HandlerFunc {
 	}
 }
 
-func (m *HTTPMetrics) Handler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		m.handler.ServeHTTP(c.Writer, c.Request)
-	}
-}
-
 func (m *HTTPMetrics) HTTPHandler() http.Handler {
 	return m.handler
 }
