@@ -28,6 +28,8 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 	for _, expected := range []string{
 		"--jwt-secret",
 		"--admin-password",
+		"--admin-username",
+		"--admin-email",
 		"--allow-insecure",
 		"--enable-metrics",
 		"--metrics-host",
@@ -35,6 +37,8 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 		"--data-dir",
 		"--unix-socket",
 		"LEAFWIKI_UNIX_SOCKET",
+		"LEAFWIKI_ADMIN_USERNAME",
+		"LEAFWIKI_ADMIN_EMAIL",
 		"LEAFWIKI_ENABLE_METRICS",
 		"LEAFWIKI_METRICS_HOST",
 		"LEAFWIKI_METRICS_PORT",
@@ -54,6 +58,8 @@ func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
 	err := fs.Parse([]string{
 		"-jwt-secret=test-secret",
 		"-admin-password=test-password",
+		"-admin-username=test-admin",
+		"-admin-email=test-admin@example.com",
 		"-allow-insecure=true",
 		"-enable-metrics=true",
 		"-metrics-host=127.0.0.2",
@@ -69,6 +75,12 @@ func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
 	}
 	if got := *flags.adminPassword; got != "test-password" {
 		t.Fatalf("expected admin password %q, got %q", "test-password", got)
+	}
+	if got := *flags.adminUsername; got != "test-admin" {
+		t.Fatalf("expected admin username %q, got %q", "test-admin", got)
+	}
+	if got := *flags.adminEmail; got != "test-admin@example.com" {
+		t.Fatalf("expected admin email %q, got %q", "test-admin@example.com", got)
 	}
 	if !*flags.allowInsecure {
 		t.Fatalf("expected allow-insecure to be true")
@@ -122,6 +134,8 @@ func TestValidateRedirectURL(t *testing.T) {
 		{"empty", "", false},
 		{"http", "http://idp.example.com/login", false},
 		{"https", "https://idp.example.com/login", false},
+		{"uppercase scheme", "HTTPS://idp.example.com/login", false},
+		{"mixed-case scheme", "Https://idp.example.com/login", false},
 		{"javascript scheme", "javascript:alert(1)", true},
 		{"relative path", "/login", true},
 		{"data scheme", "data:text/html,<script>alert(1)</script>", true},
@@ -133,6 +147,57 @@ func TestValidateRedirectURL(t *testing.T) {
 				t.Fatalf("validateRedirectURL(%q) error = %v, wantErr %v", tc.url, err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestResolveLogoutURL(t *testing.T) {
+	tests := []struct {
+		name               string
+		logoutURL          string
+		deprecatedFlagVal  string
+		visited            map[string]bool
+		wantResolved       string
+		wantUsedDeprecated bool
+	}{
+		{
+			name:         "new flag set, deprecated ignored",
+			logoutURL:    "https://idp.example.com/logout",
+			wantResolved: "https://idp.example.com/logout",
+		},
+		{
+			name:               "only deprecated flag set",
+			deprecatedFlagVal:  "https://idp.example.com/logout",
+			visited:            map[string]bool{"http-remote-user-logout-url": true},
+			wantResolved:       "https://idp.example.com/logout",
+			wantUsedDeprecated: true,
+		},
+		{
+			name:         "neither set",
+			wantResolved: "",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			visited := tc.visited
+			if visited == nil {
+				visited = map[string]bool{}
+			}
+			resolved, usedDeprecated := resolveLogoutURL(tc.logoutURL, tc.deprecatedFlagVal, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL")
+			if resolved != tc.wantResolved {
+				t.Fatalf("resolveLogoutURL() resolved = %q, want %q", resolved, tc.wantResolved)
+			}
+			if usedDeprecated != tc.wantUsedDeprecated {
+				t.Fatalf("resolveLogoutURL() usedDeprecated = %v, want %v", usedDeprecated, tc.wantUsedDeprecated)
+			}
+		})
+	}
+}
+
+func TestResolveString_TrimsCLIFlagValue(t *testing.T) {
+	visited := map[string]bool{"login-url": true}
+	got := resolveString("login-url", " https://idp.example.com/login ", visited, "LEAFWIKI_LOGIN_URL", "")
+	if want := "https://idp.example.com/login"; got != want {
+		t.Fatalf("resolveString() = %q, want %q", got, want)
 	}
 }
 
@@ -194,6 +259,8 @@ func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 	err := fs.Parse([]string{
 		"--jwt-secret=test-secret",
 		"--admin-password=test-password",
+		"--admin-username=test-admin",
+		"--admin-email=test-admin@example.com",
 		"--allow-insecure=true",
 		"--enable-metrics=true",
 		"--metrics-host=127.0.0.2",
@@ -209,6 +276,12 @@ func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 	}
 	if got := *flags.adminPassword; got != "test-password" {
 		t.Fatalf("expected admin password %q, got %q", "test-password", got)
+	}
+	if got := *flags.adminUsername; got != "test-admin" {
+		t.Fatalf("expected admin username %q, got %q", "test-admin", got)
+	}
+	if got := *flags.adminEmail; got != "test-admin@example.com" {
+		t.Fatalf("expected admin email %q, got %q", "test-admin@example.com", got)
 	}
 	if !*flags.allowInsecure {
 		t.Fatalf("expected allow-insecure to be true")

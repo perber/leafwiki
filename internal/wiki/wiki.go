@@ -79,6 +79,8 @@ const SYSTEM_USER_ID = "system"
 
 type WikiOptions struct {
 	StorageDir              string        // Path to storage directory
+	AdminUsername           string        // Initial admin username (optional; defaults to "admin")
+	AdminEmail              string        // Initial admin email (optional; defaults to "admin@localhost")
 	AdminPassword           string        // Initial admin password
 	JWTSecret               string        // JWT secret for authentication
 	AccessTokenTimeout      time.Duration // Access token timeout duration
@@ -182,7 +184,7 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 	}
 	w.user = auth.NewUserService(store)
 	if !options.AuthDisabled {
-		if err := w.user.InitDefaultAdmin(options.AdminPassword); err != nil {
+		if err := w.user.InitDefaultAdmin(options.AdminUsername, options.AdminEmail, options.AdminPassword); err != nil {
 			return err
 		}
 	}

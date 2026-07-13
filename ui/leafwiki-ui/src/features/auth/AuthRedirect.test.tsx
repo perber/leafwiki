@@ -78,7 +78,7 @@ describe('Auth redirect flow', () => {
     )
   })
 
-  it('redirects externally instead of to /login when loginUrl is configured', async () => {
+  it('redirects externally instead of to /login when loginUrl is configured, preserving the requested path', async () => {
     const originalLocation = window.location
     Object.defineProperty(window, 'location', {
       configurable: true,
@@ -106,8 +106,13 @@ describe('Auth redirect flow', () => {
         </MemoryRouter>,
       )
 
+      const expectedReturnTo = encodeURIComponent(
+        `${originalLocation.origin}/some/protected/page`,
+      )
       await waitFor(() => {
-        expect(window.location.href).toBe('https://idp.example.com/login')
+        expect(window.location.href).toBe(
+          `https://idp.example.com/login?redirect_uri=${expectedReturnTo}`,
+        )
       })
       expect(screen.queryByTestId('pathname')).not.toBeInTheDocument()
     } finally {
