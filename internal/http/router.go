@@ -83,25 +83,25 @@ type HTTPRemoteUserConfig struct {
 
 // RouterOptions holds global HTTP server configuration shared across all domains.
 type RouterOptions struct {
-	PublicAccess            bool          // Whether the wiki allows public read access
-	InjectCodeInHeader      string        // Raw HTML/JS code to inject into the <head> tag
-	CustomStylesheet        string        // Path to a custom CSS file (resolved by wiki before passing)
-	AllowInsecure           bool          // Whether to allow insecure HTTP connections
-	AccessTokenTimeout      time.Duration // Duration for access token validity
-	RefreshTokenTimeout     time.Duration // Duration for refresh token validity
-	HideLinkMetadataSection bool          // Whether to hide the link metadata section in the frontend UI
-	AuthDisabled            bool          // Whether authentication is disabled
-	BasePath                string        // URL prefix when served behind a reverse proxy (e.g. "/wiki")
-	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset uploads
-	EnableRevision          bool          // Whether the revision / page history feature is enabled
-	EnableLinkRefactor      bool          // Whether the link refactoring feature is enabled in the frontend
-	Metrics                 *httpmetrics.HTTPMetrics
-	GitBackupEnabled        bool                 // Whether git backup is enabled (surfaced to admin UI via /api/config)
-	HTTPRemoteUser          HTTPRemoteUserConfig // Reverse-proxy authentication via HTTP header
-	DisableRequestLog       bool                 // Whether to suppress per-request access log lines
-	UserManagementURL       string               // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
-	LoginURL                string               // Optional URL the frontend redirects to instead of showing the built-in login form
-	LogoutURL               string               // Optional URL the frontend redirects to after logout
+	PublicAccess            bool                     // Whether the wiki allows public read access
+	InjectCodeInHeader      string                   // Raw HTML/JS code to inject into the <head> tag
+	CustomStylesheet        string                   // Path to a custom CSS file (resolved by wiki before passing)
+	AllowInsecure           bool                     // Whether to allow insecure HTTP connections
+	AccessTokenTimeout      time.Duration            // Duration for access token validity
+	RefreshTokenTimeout     time.Duration            // Duration for refresh token validity
+	HideLinkMetadataSection bool                     // Whether to hide the link metadata section in the frontend UI
+	AuthDisabled            bool                     // Whether authentication is disabled
+	BasePath                string                   // URL prefix when served behind a reverse proxy (e.g. "/wiki")
+	MaxAssetUploadSizeBytes int64                    // Maximum allowed size in bytes for asset uploads
+	EnableRevision          bool                     // Whether the revision / page history feature is enabled
+	EnableLinkRefactor      bool                     // Whether the link refactoring feature is enabled in the frontend
+	Metrics                 *httpmetrics.HTTPMetrics // Optional Prometheus HTTP metrics collector; nil disables request instrumentation
+	GitBackupEnabled        bool                     // Whether git backup is enabled (surfaced to admin UI via /api/config)
+	HTTPRemoteUser          HTTPRemoteUserConfig     // Reverse-proxy authentication via HTTP header
+	DisableRequestLog       bool                     // Whether to suppress per-request access log lines
+	UserManagementURL       string                   // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
+	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
+	LogoutURL               string                   // Optional URL the frontend redirects to after logout
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.

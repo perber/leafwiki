@@ -511,7 +511,8 @@ func runServer(
 	reloadSignals, shutdownSignals <-chan os.Signal,
 ) error {
 	server := &http.Server{
-		Handler: router.Handler(),
+		Handler:           router.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	var shutdownMetricsServer func()
@@ -565,12 +566,15 @@ func startMetricsServer(metrics *httpmetrics.HTTPMetrics, host, port string) (fu
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", metrics.HTTPHandler())
 
-	server := &http.Server{Handler: mux}
+	server := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 	slog.Default().Info("Starting metrics server", "address", listener.Addr().String())
 
 	go func() {
 		err := server.Serve(listener)
-		if err == nil || errors.Is(err, http.ErrServerClosed) {
+		if errors.Is(err, http.ErrServerClosed) {
 			return
 		}
 		slog.Default().Error("metrics server stopped unexpectedly", "error", err)
