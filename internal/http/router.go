@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/assets"
 	coreauth "github.com/perber/wiki/internal/core/auth"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
 )
@@ -135,11 +136,14 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	csrfCookie := security.NewCSRFCookie(opts.AllowInsecure, 3*24*time.Hour)
 
 	engine := gin.New()
+	metrics := httpmetrics.NewHTTPMetrics()
 	if !opts.DisableRequestLog {
 		engine.Use(slogRequestLogger())
 	}
+	engine.Use(metrics.Middleware())
 	engine.Use(gin.RecoveryWithWriter(gin.DefaultErrorWriter))
 	base := engine.Group(opts.BasePath)
+	base.GET("/metrics", metrics.Handler())
 
 	if opts.HTTPRemoteUser.Enabled {
 		base.Use(auth_middleware.InjectRemoteUser(auth_middleware.RemoteUserConfig{
