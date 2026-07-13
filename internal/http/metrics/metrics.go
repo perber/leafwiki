@@ -88,3 +88,7 @@ func (m *HTTPMetrics) Handler() gin.HandlerFunc {
 		m.handler.ServeHTTP(c.Writer, c.Request)
 	}
 }
+
+func (m *HTTPMetrics) HTTPHandler() http.Handler {
+	return m.handler
+}

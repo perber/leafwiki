@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 )
 
 func TestWriteUsage_UsesLongFlags(t *testing.T) {
@@ -28,10 +30,14 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 		"--admin-password",
 		"--allow-insecure",
 		"--enable-metrics",
+		"--metrics-host",
+		"--metrics-port",
 		"--data-dir",
 		"--unix-socket",
 		"LEAFWIKI_UNIX_SOCKET",
 		"LEAFWIKI_ENABLE_METRICS",
+		"LEAFWIKI_METRICS_HOST",
+		"LEAFWIKI_METRICS_PORT",
 	} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("expected usage output to contain %q, got %q", expected, output)
@@ -50,6 +56,8 @@ func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
 		"-admin-password=test-password",
 		"-allow-insecure=true",
 		"-enable-metrics=true",
+		"-metrics-host=127.0.0.2",
+		"-metrics-port=9100",
 		"-unix-socket=/tmp/leafwiki.sock",
 	})
 	if err != nil {
@@ -67,6 +75,12 @@ func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
 	}
 	if !*flags.enableMetrics {
 		t.Fatalf("expected enable-metrics to be true")
+	}
+	if got := *flags.metricsHost; got != "127.0.0.2" {
+		t.Fatalf("expected metrics host %q, got %q", "127.0.0.2", got)
+	}
+	if got := *flags.metricsPort; got != "9100" {
+		t.Fatalf("expected metrics port %q, got %q", "9100", got)
 	}
 	if got := *flags.unixSocket; got != "/tmp/leafwiki.sock" {
 		t.Fatalf("expected unix socket %q, got %q", "/tmp/leafwiki.sock", got)
@@ -182,6 +196,8 @@ func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 		"--admin-password=test-password",
 		"--allow-insecure=true",
 		"--enable-metrics=true",
+		"--metrics-host=127.0.0.2",
+		"--metrics-port=9100",
 		"--unix-socket=/tmp/leafwiki.sock",
 	})
 	if err != nil {
@@ -200,8 +216,55 @@ func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 	if !*flags.enableMetrics {
 		t.Fatalf("expected enable-metrics to be true")
 	}
+	if got := *flags.metricsHost; got != "127.0.0.2" {
+		t.Fatalf("expected metrics host %q, got %q", "127.0.0.2", got)
+	}
+	if got := *flags.metricsPort; got != "9100" {
+		t.Fatalf("expected metrics port %q, got %q", "9100", got)
+	}
 	if got := *flags.unixSocket; got != "/tmp/leafwiki.sock" {
 		t.Fatalf("expected unix socket %q, got %q", "/tmp/leafwiki.sock", got)
+	}
+}
+
+func TestStartMetricsServer_ServesOnlyMetricsEndpoint(t *testing.T) {
+	metrics := httpmetrics.NewHTTPMetrics()
+	stopServer, addr, err := startMetricsServer(metrics, "127.0.0.1", "0")
+	if err != nil {
+		t.Fatalf("startMetricsServer() error = %v", err)
+	}
+	defer stopServer()
+
+	resp, err := http.Get("http://" + addr + "/metrics")
+	if err != nil {
+		t.Fatalf("GET /metrics failed: %v", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from /metrics, got %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("reading /metrics response failed: %v", err)
+	}
+	if !strings.Contains(string(body), "leafwiki_http_requests_in_flight") {
+		t.Fatalf("expected metrics output, got %q", string(body))
+	}
+
+	notFoundResp, err := http.Get("http://" + addr + "/api/health")
+	if err != nil {
+		t.Fatalf("GET /api/health failed: %v", err)
+	}
+	defer func() {
+		_ = notFoundResp.Body.Close()
+	}()
+
+	if notFoundResp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 from non-metrics path, got %d", notFoundResp.StatusCode)
 	}
 }
 

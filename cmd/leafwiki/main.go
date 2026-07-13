@@ -25,6 +25,7 @@ import (
 	"github.com/perber/wiki/internal/backup"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
@@ -65,7 +66,9 @@ func writeUsage(w io.Writer) {
 	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
 	--enable-revision             Enable the revision / page history feature (default: false)
 	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
-	--enable-metrics              Enable the Prometheus /metrics endpoint and HTTP route metrics (default: false)
+	--enable-metrics              Enable the Prometheus /metrics endpoint on a separate listener (default: false)
+	--metrics-host                Host/IP for the metrics listener (default: 127.0.0.1)
+	--metrics-port                Port for the metrics listener (default: 9091)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
 	--revision-coalesce-window    Window for coalescing rapid successive saves by the same author (e.g. 5m, 0 = disabled) (default: 5m)
 	--enable-http-remote-user       Enable reverse-proxy authentication via HTTP header (default: false)
@@ -109,6 +112,8 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_ENABLE_REVISION
 	LEAFWIKI_ENABLE_LINK_REFACTOR
 	LEAFWIKI_ENABLE_METRICS
+	LEAFWIKI_METRICS_HOST
+	LEAFWIKI_METRICS_PORT
 	LEAFWIKI_MAX_REVISION_HISTORY
 	LEAFWIKI_REVISION_COALESCE_WINDOW
 	LEAFWIKI_ENABLE_HTTP_REMOTE_USER
@@ -181,6 +186,8 @@ type cliFlags struct {
 	enableRevision          *bool
 	enableLinkRefactor      *bool
 	enableMetrics           *bool
+	metricsHost             *string
+	metricsPort             *string
 	maxRevisionHistory      *int
 	enableHTTPRemoteUser    *bool
 	httpRemoteUserHeader    *string
@@ -221,7 +228,9 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
 		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
 		enableLinkRefactor:      fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
-		enableMetrics:           fs.Bool("enable-metrics", false, "enable the Prometheus /metrics endpoint and HTTP route metrics (default: false)"),
+		enableMetrics:           fs.Bool("enable-metrics", false, "enable the Prometheus /metrics endpoint on a separate listener (default: false)"),
+		metricsHost:             fs.String("metrics-host", "", "host/IP address for the Prometheus metrics listener (default: 127.0.0.1)"),
+		metricsPort:             fs.String("metrics-port", "", "port for the Prometheus metrics listener (default: 9091)"),
 		maxRevisionHistory:      fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
 		enableHTTPRemoteUser:    fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
 		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
@@ -286,6 +295,8 @@ func main() {
 	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
 	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
 	enableMetrics := resolveBool("enable-metrics", *flags.enableMetrics, visited, "LEAFWIKI_ENABLE_METRICS")
+	metricsHost := resolveString("metrics-host", *flags.metricsHost, visited, "LEAFWIKI_METRICS_HOST", "127.0.0.1")
+	metricsPort := resolveString("metrics-port", *flags.metricsPort, visited, "LEAFWIKI_METRICS_PORT", "9091")
 	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
 	revisionCoalesceWindow := resolveDuration("revision-coalesce-window", *flags.revisionCoalesceWindow, visited, "LEAFWIKI_REVISION_COALESCE_WINDOW")
 	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
@@ -330,6 +341,12 @@ func main() {
 		slog.Default().Info("Reverse-proxy authentication enabled",
 			"header", httpRemoteUserHeader,
 			"trusted_proxies", trustedProxyIPsRaw,
+		)
+	}
+	if enableMetrics {
+		slog.Default().Info("Prometheus metrics enabled",
+			"metrics_host", metricsHost,
+			"metrics_port", metricsPort,
 		)
 	}
 
@@ -438,6 +455,11 @@ func main() {
 		w.SetBackupRoutes(wikibackup.NewRoutes(backupRepo, backupScheduler, w.AuthService()))
 	}
 
+	var metrics *httpmetrics.HTTPMetrics
+	if enableMetrics {
+		metrics = httpmetrics.NewHTTPMetrics()
+	}
+
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccess,
 		InjectCodeInHeader:      injectCodeInHeader,
@@ -451,7 +473,7 @@ func main() {
 		MaxAssetUploadSizeBytes: maxAssetUploadSize,
 		EnableRevision:          enableRevision,
 		EnableLinkRefactor:      enableLinkRefactor,
-		EnableMetrics:           enableMetrics,
+		Metrics:                 metrics,
 		GitBackupEnabled:        gitBackupEnabled,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:        enableHTTPRemoteUser,
@@ -473,7 +495,7 @@ func main() {
 	signal.Notify(shutdownSignals, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(shutdownSignals)
 
-	if err := runServer(router, host, port, unixSocket, dataDir, w.TriggerResyncAsync, reloadSignals, shutdownSignals); err != nil {
+	if err := runServer(router, host, port, unixSocket, dataDir, metrics, metricsHost, metricsPort, w.TriggerResyncAsync, reloadSignals, shutdownSignals); err != nil {
 		slog.Default().Error("Failed to start server", "error", err)
 		exitCode = 1
 		return
@@ -483,11 +505,23 @@ func main() {
 func runServer(
 	router *gin.Engine,
 	host, port, unixSocket, dataDir string,
+	metrics *httpmetrics.HTTPMetrics,
+	metricsHost, metricsPort string,
 	reload func(),
 	reloadSignals, shutdownSignals <-chan os.Signal,
 ) error {
 	server := &http.Server{
 		Handler: router.Handler(),
+	}
+
+	var shutdownMetricsServer func()
+	if metrics != nil {
+		stopMetricsServer, _, err := startMetricsServer(metrics, metricsHost, metricsPort)
+		if err != nil {
+			return err
+		}
+		shutdownMetricsServer = stopMetricsServer
+		defer shutdownMetricsServer()
 	}
 
 	if unixSocket == "" {
@@ -519,6 +553,40 @@ func runServer(
 	)
 
 	return serveWithLifecycle(server, listener, cleanup, reload, reloadSignals, shutdownSignals)
+}
+
+func startMetricsServer(metrics *httpmetrics.HTTPMetrics, host, port string) (func(), string, error) {
+	listenAddr := host + ":" + port
+	listener, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, "", err
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", metrics.HTTPHandler())
+
+	server := &http.Server{Handler: mux}
+	slog.Default().Info("Starting metrics server", "address", listener.Addr().String())
+
+	go func() {
+		err := server.Serve(listener)
+		if err == nil || errors.Is(err, http.ErrServerClosed) {
+			return
+		}
+		slog.Default().Error("metrics server stopped unexpectedly", "error", err)
+	}()
+
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			if closeErr := server.Close(); closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
+				slog.Default().Error("failed to close metrics server", "error", errors.Join(err, closeErr))
+				return
+			}
+			slog.Default().Error("failed to shut down metrics server gracefully", "error", err)
+		}
+	}, listener.Addr().String(), nil
 }
 
 func listenOnUnixSocket(socketPath string) (net.Listener, error) {
