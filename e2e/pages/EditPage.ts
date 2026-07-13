@@ -43,6 +43,9 @@ export default class EditPage {
       await expect(saveButton).toBeEnabled({ timeout: 3000 });
       await saveButton.click();
       await this.page.getByText('Page saved successfully').last().waitFor({ state: 'visible' });
+      // The dirty flag can clear slightly after the success toast; closing the
+      // editor before it does trips the unsaved-changes blocker on slow runners.
+      await expect(dirtyIndicator).toHaveCount(0, { timeout: 5000 });
       return;
     } catch {
       await expect(saveButton).toBeDisabled();
