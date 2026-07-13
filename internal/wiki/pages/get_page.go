@@ -132,10 +132,10 @@ func (uc *ResolvePermalinkUseCase) Execute(_ context.Context, in ResolvePermalin
 
 // WikiLinkMatch is a lightweight page descriptor returned by the by-title API.
 type WikiLinkMatch struct {
-	ID    string          `json:"id"`
-	Title string          `json:"title"`
-	Path  string          `json:"path"`
-	Kind  tree.NodeKind   `json:"kind"`
+	ID    string        `json:"id"`
+	Title string        `json:"title"`
+	Path  string        `json:"path"`
+	Kind  tree.NodeKind `json:"kind"`
 }
 
 // FindByTitleOutput is the output of FindByTitleUseCase.

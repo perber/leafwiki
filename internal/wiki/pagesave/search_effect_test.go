@@ -27,7 +27,7 @@ func setupSearchTest(t *testing.T) (*tree.TreeService, *search.SQLiteIndex, *Sea
 		}
 	})
 
-	effect := NewSearchIndexSideEffect(index, treeSvc, nil)
+	effect := NewSearchIndexSideEffect(index, treeSvc, nil, nil)
 	return treeSvc, index, effect
 }
 

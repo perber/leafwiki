@@ -9,9 +9,9 @@ import (
 	"github.com/perber/wiki/internal/core/revision"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 )
-
 
 // ─── DTO types ───────────────────────────────────────────────────────────────
 
@@ -36,7 +36,6 @@ type RevisionResponse struct {
 	LastAuthorID      string              `json:"lastAuthorId,omitempty"`
 	Summary           string              `json:"summary,omitempty"`
 }
-
 
 // RevisionAssetResponse is the JSON representation of a revision asset.
 type RevisionAssetResponse struct {
@@ -136,7 +135,6 @@ func toComparisonResponse(cmp *revision.RevisionComparison, userResolver *coreau
 		AssetChanges:   changes,
 	}
 }
-
 
 // ─── ListRevisionsUseCase ────────────────────────────────────────────────────
 
@@ -308,13 +306,19 @@ type RestoreRevisionUseCase struct {
 	tree         *tree.TreeService
 	orchestrator *pagesave.PageSaveOrchestrator
 	log          *slog.Logger
+	metrics      *httpmetrics.HTTPMetrics
 }
 
-func NewRestoreRevisionUseCase(r *revision.Service, t *tree.TreeService, o *pagesave.PageSaveOrchestrator, log *slog.Logger) *RestoreRevisionUseCase {
-	return &RestoreRevisionUseCase{revision: r, tree: t, orchestrator: o, log: log}
+func NewRestoreRevisionUseCase(r *revision.Service, t *tree.TreeService, o *pagesave.PageSaveOrchestrator, log *slog.Logger, metrics *httpmetrics.HTTPMetrics) *RestoreRevisionUseCase {
+	return &RestoreRevisionUseCase{revision: r, tree: t, orchestrator: o, log: log, metrics: metrics}
 }
 
-func (uc *RestoreRevisionUseCase) Execute(_ context.Context, in RestoreRevisionInput) (*RestoreRevisionOutput, error) {
+func (uc *RestoreRevisionUseCase) Execute(_ context.Context, in RestoreRevisionInput) (out *RestoreRevisionOutput, err error) {
+	started := time.Now()
+	defer func() {
+		uc.metrics.ObservePageSaveWorkflow(string(pagesave.PageOperationRestore), err, started)
+	}()
+
 	if uc.revision == nil {
 		return nil, sharederrors.NewLocalizedError(
 			ErrCodeRevisionServiceUnavailable,
@@ -337,7 +341,6 @@ func (uc *RestoreRevisionUseCase) Execute(_ context.Context, in RestoreRevisionI
 	})
 	return &RestoreRevisionOutput{Page: page}, nil
 }
-
 
 // ─── CheckIntegrityUseCase ───────────────────────────────────────────────────
 

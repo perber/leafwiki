@@ -12,7 +12,7 @@ import (
 func TestTriggerResyncUseCase_Execute_LaunchesTrigger(t *testing.T) {
 	job := NewResyncJob()
 	called := false
-	uc := NewTriggerResyncUseCase(job, func() { called = true })
+	uc := NewTriggerResyncUseCase(job, func() { called = true }, nil)
 
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -26,7 +26,7 @@ func TestTriggerResyncUseCase_Execute_ReturnsLocalizedErrorWhenAlreadyRunning(t 
 	job := NewResyncJob()
 	job.Start() // simulate running
 
-	uc := NewTriggerResyncUseCase(job, func() { t.Error("trigger must not be called") })
+	uc := NewTriggerResyncUseCase(job, func() { t.Error("trigger must not be called") }, nil)
 	err := uc.Execute(context.Background())
 
 	if err == nil {

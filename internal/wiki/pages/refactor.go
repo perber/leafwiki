@@ -6,10 +6,12 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/perber/wiki/internal/core/revision"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 )
@@ -298,6 +300,7 @@ type ApplyPageRefactorUseCase struct {
 	links    *links.LinkService
 	log      *slog.Logger
 	preview  *PreviewPageRefactorUseCase
+	metrics  *httpmetrics.HTTPMetrics
 }
 
 // NewApplyPageRefactorUseCase constructs an ApplyPageRefactorUseCase.
@@ -307,6 +310,7 @@ func NewApplyPageRefactorUseCase(
 	r *revision.Service,
 	l *links.LinkService,
 	log *slog.Logger,
+	metrics *httpmetrics.HTTPMetrics,
 ) *ApplyPageRefactorUseCase {
 	return &ApplyPageRefactorUseCase{
 		tree:     t,
@@ -315,11 +319,13 @@ func NewApplyPageRefactorUseCase(
 		links:    l,
 		log:      log,
 		preview:  NewPreviewPageRefactorUseCase(t, s, l, log),
+		metrics:  metrics,
 	}
 }
 
 // Execute applies the refactor operation to the page tree.
 func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorApplyInput) (*tree.Page, error) {
+	started := time.Now()
 	plan, err := uc.buildApplyPlan(in)
 	if err != nil {
 		return nil, err
@@ -342,13 +348,14 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 	}
 
 	o := pagesave.NewPageSaveOrchestrator(
-		pagesave.NewLinkIndexSideEffect(uc.links, uc.log),
-		pagesave.NewRevisionSideEffect(uc.revision, uc.log),
+		uc.metrics,
+		pagesave.NewLinkIndexSideEffect(uc.links, uc.log, uc.metrics),
+		pagesave.NewRevisionSideEffect(uc.revision, uc.log, uc.metrics),
 	)
 
 	switch in.Kind {
 	case RefactorKindRename:
-		updateUC := NewUpdatePageUseCase(uc.tree, uc.slug, o, uc.log)
+		updateUC := NewUpdatePageUseCase(uc.tree, uc.slug, o, uc.log, uc.metrics)
 		updated, err := updateUC.Execute(ctx, UpdatePageInput{
 			UserID:  in.UserID,
 			ID:      in.PageID,
@@ -369,14 +376,18 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 				return nil, err
 			}
 		}
-		return uc.tree.GetPage(updated.Page.ID)
+		page, err := uc.tree.GetPage(updated.Page.ID)
+		if err == nil {
+			uc.metrics.ObserveRefactor(in.Kind, in.RewriteLinks, plan.affectedPages, plan.matchedLinks, started)
+		}
+		return page, err
 
 	case RefactorKindMove:
 		parentID := ""
 		if in.NewParentID != nil {
 			parentID = *in.NewParentID
 		}
-		moveUC := NewMovePageUseCase(uc.tree, o, uc.log)
+		moveUC := NewMovePageUseCase(uc.tree, o, uc.log, uc.metrics)
 		if err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, Version: in.Version, ParentID: parentID}); err != nil {
 			return nil, err
 		}
@@ -388,7 +399,11 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 				return nil, err
 			}
 		}
-		return uc.tree.GetPage(in.PageID)
+		page, err := uc.tree.GetPage(in.PageID)
+		if err == nil {
+			uc.metrics.ObserveRefactor(in.Kind, in.RewriteLinks, plan.affectedPages, plan.matchedLinks, started)
+		}
+		return page, err
 
 	default:
 		return nil, fmt.Errorf("unsupported refactor kind: %s", in.Kind)
@@ -400,6 +415,8 @@ type applyRefactorPlan struct {
 	oldPath         string
 	newPath         string
 	affectedPageIDs []string
+	affectedPages   int
+	matchedLinks    int
 }
 
 func (uc *ApplyPageRefactorUseCase) buildApplyPlan(in RefactorApplyInput) (*applyRefactorPlan, error) {
@@ -423,6 +440,13 @@ func (uc *ApplyPageRefactorUseCase) buildApplyPlan(in RefactorApplyInput) (*appl
 	if !in.RewriteLinks || uc.links == nil {
 		return plan, nil
 	}
+
+	affectedPages, matchedLinks, err := uc.preview.getAffectedPages(oldPath, page.Title, subtreeIDSet(page.PageNode), sentinelTitleForRefactor(page, in))
+	if err != nil {
+		return nil, err
+	}
+	plan.affectedPages = len(affectedPages)
+	plan.matchedLinks = matchedLinks
 
 	pageIDs, err := uc.links.GetRefactorSourcePageIDsForPrefix(oldPath)
 	if err != nil {
@@ -463,6 +487,13 @@ func (uc *ApplyPageRefactorUseCase) buildApplyPlan(in RefactorApplyInput) (*appl
 	}
 
 	return plan, nil
+}
+
+func sentinelTitleForRefactor(page *tree.Page, in RefactorApplyInput) string {
+	if in.Kind == RefactorKindRename && in.Title != page.Title {
+		return page.Title
+	}
+	return ""
 }
 
 type pathChangeSnapshot struct {

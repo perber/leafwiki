@@ -1,16 +1,21 @@
 package wikiresync
 
-import "context"
+import (
+	"context"
+
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
+)
 
 // ─── TriggerResyncUseCase ─────────────────────────────────────────────────────
 
 type TriggerResyncUseCase struct {
 	job     *ResyncJob
 	trigger func()
+	metrics *httpmetrics.HTTPMetrics
 }
 
-func NewTriggerResyncUseCase(job *ResyncJob, trigger func()) *TriggerResyncUseCase {
-	return &TriggerResyncUseCase{job: job, trigger: trigger}
+func NewTriggerResyncUseCase(job *ResyncJob, trigger func(), metrics *httpmetrics.HTTPMetrics) *TriggerResyncUseCase {
+	return &TriggerResyncUseCase{job: job, trigger: trigger, metrics: metrics}
 }
 
 func (uc *TriggerResyncUseCase) Execute(_ context.Context) error {

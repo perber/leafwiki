@@ -55,9 +55,9 @@ func newTestDeps(t *testing.T) *testDeps {
 }
 
 func newTestOrchestrator(d *testDeps) *pagesave.PageSaveOrchestrator {
-	return pagesave.NewPageSaveOrchestrator(
-		pagesave.NewLinkIndexSideEffect(d.links, nil),
-		pagesave.NewRevisionSideEffect(d.revision, nil),
+	return pagesave.NewPageSaveOrchestrator(nil,
+		pagesave.NewLinkIndexSideEffect(d.links, nil, nil),
+		pagesave.NewRevisionSideEffect(d.revision, nil, nil),
 	)
 }
 
@@ -73,10 +73,10 @@ func sectionKind() *tree.NodeKind {
 
 func TestRestoreRevisionUseCase_RestoresAssetsAndStructure(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := wikipages.NewCreatePageUseCase(deps.tree, deps.slug, newTestOrchestrator(deps), nil)
-	updateUC := wikipages.NewUpdatePageUseCase(deps.tree, deps.slug, newTestOrchestrator(deps), nil)
-	moveUC := wikipages.NewMovePageUseCase(deps.tree, newTestOrchestrator(deps), nil)
-	restoreUC := wikirevisions.NewRestoreRevisionUseCase(deps.revision, deps.tree, newTestOrchestrator(deps), nil)
+	createUC := wikipages.NewCreatePageUseCase(deps.tree, deps.slug, newTestOrchestrator(deps), nil, nil)
+	updateUC := wikipages.NewUpdatePageUseCase(deps.tree, deps.slug, newTestOrchestrator(deps), nil, nil)
+	moveUC := wikipages.NewMovePageUseCase(deps.tree, newTestOrchestrator(deps), nil, nil)
+	restoreUC := wikirevisions.NewRestoreRevisionUseCase(deps.revision, deps.tree, newTestOrchestrator(deps), nil, nil)
 
 	docs, err := createUC.Execute(context.Background(), wikipages.CreatePageInput{
 		UserID: "system", Title: "Docs", Slug: "docs", Kind: sectionKind(),

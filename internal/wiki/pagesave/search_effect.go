@@ -6,21 +6,27 @@ import (
 	"strings"
 
 	"github.com/perber/wiki/internal/core/tree"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/search"
 )
 
 // SearchIndexSideEffect updates the search index after every page mutation.
 type SearchIndexSideEffect struct {
-	index *search.SQLiteIndex
-	tree  *tree.TreeService // only used by IndexAllPages for the initial walk
-	log   *slog.Logger
+	index   *search.SQLiteIndex
+	tree    *tree.TreeService // only used by IndexAllPages for the initial walk
+	log     *slog.Logger
+	metrics *httpmetrics.HTTPMetrics
 }
 
-func NewSearchIndexSideEffect(index *search.SQLiteIndex, treeService *tree.TreeService, log *slog.Logger) *SearchIndexSideEffect {
+func NewSearchIndexSideEffect(index *search.SQLiteIndex, treeService *tree.TreeService, log *slog.Logger, metrics *httpmetrics.HTTPMetrics) *SearchIndexSideEffect {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &SearchIndexSideEffect{index: index, tree: treeService, log: log}
+	return &SearchIndexSideEffect{index: index, tree: treeService, log: log, metrics: metrics}
+}
+
+func (e *SearchIndexSideEffect) Name() string {
+	return "search"
 }
 
 func (e *SearchIndexSideEffect) Apply(event PageSaveEvent) {
@@ -31,12 +37,12 @@ func (e *SearchIndexSideEffect) Apply(event PageSaveEvent) {
 	switch event.Operation {
 	case PageOperationCreate, PageOperationUpdate, PageOperationRestore:
 		if event.After != nil {
-			e.indexPage(event.After)
+			e.indexPage(event.After, event.Operation)
 		}
 
 	case PageOperationMove:
 		for _, page := range event.AffectedPages {
-			e.indexPage(page)
+			e.indexPage(page, event.Operation)
 		}
 
 	case PageOperationDelete:
@@ -85,19 +91,19 @@ func (e *SearchIndexSideEffect) IndexAllPagesContext(ctx context.Context) error 
 			e.log.Warn("skipping page during search bootstrap", "pageID", ids[i], "error", errs[i])
 			continue
 		}
-		e.writeToIndex(page, page.RawContent)
+		e.writeToIndex(page, page.RawContent, "")
 	}
 	return nil
 }
 
-func (e *SearchIndexSideEffect) indexPage(page *tree.Page) {
+func (e *SearchIndexSideEffect) indexPage(page *tree.Page, operation PageOperationType) {
 	if page == nil {
 		return
 	}
-	e.writeToIndex(page, page.RawContent)
+	e.writeToIndex(page, page.RawContent, operation)
 }
 
-func (e *SearchIndexSideEffect) writeToIndex(page *tree.Page, content string) {
+func (e *SearchIndexSideEffect) writeToIndex(page *tree.Page, content string, operation PageOperationType) {
 	path := strings.TrimPrefix(page.CalculatePath(), "/")
 	filePath := path
 	if filePath != "" {
@@ -105,5 +111,8 @@ func (e *SearchIndexSideEffect) writeToIndex(page *tree.Page, content string) {
 	}
 	if err := e.index.IndexPage(path, filePath, page.ID, page.Title, page.Kind, content); err != nil {
 		e.log.Warn("failed to update search index for page", "pageID", page.ID, "error", err)
+		if operation != "" {
+			e.metrics.IncPageSaveSideEffectFailure(string(operation), e.Name())
+		}
 	}
 }
