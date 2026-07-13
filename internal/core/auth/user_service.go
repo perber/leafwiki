@@ -8,6 +8,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	defaultAdminUsername = "admin"
+	defaultAdminEmail    = "admin@localhost"
+)
+
 type UserService struct {
 	store *UserStore
 }
@@ -18,7 +23,7 @@ func NewUserService(store *UserStore) *UserService {
 	}
 }
 
-func (s *UserService) InitDefaultAdmin(newPassword string) error {
+func (s *UserService) InitDefaultAdmin(username, email, newPassword string) error {
 	// Check if admin user already exists
 
 	if _, err := s.store.GetAdminUser(); err == nil {
@@ -26,7 +31,16 @@ func (s *UserService) InitDefaultAdmin(newPassword string) error {
 		return nil
 	}
 
-	if _, err := s.CreateUser("admin", "admin@localhost", newPassword, "admin"); err != nil {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		username = defaultAdminUsername
+	}
+	email = strings.TrimSpace(email)
+	if email == "" {
+		email = defaultAdminEmail
+	}
+
+	if _, err := s.CreateUser(username, email, newPassword, "admin"); err != nil {
 		return fmt.Errorf("failed to create default admin: %w", err)
 	}
 
@@ -291,7 +305,7 @@ func (s *UserService) ResetAdminUserPassword() (*User, error) {
 	if err != nil {
 		if err == ErrUserNotFound {
 			// Create default admin user
-			adminUser, err = s.CreateUser("admin", "admin@localhost", password, RoleAdmin)
+			adminUser, err = s.CreateUser(defaultAdminUsername, defaultAdminEmail, password, RoleAdmin)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create default admin: %w", err)
 			}

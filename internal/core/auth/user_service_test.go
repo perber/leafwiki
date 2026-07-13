@@ -152,14 +152,48 @@ func TestUserService_InitDefaultAdmin(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
 	service := NewUserService(store)
 
-	err := service.InitDefaultAdmin("")
+	err := service.InitDefaultAdmin("", "", "")
 	if err != nil {
 		t.Errorf("InitDefaultAdmin failed: %v", err)
 	}
 
 	users, err := service.GetUsers()
-	if err != nil || len(users) != 1 || users[0].Username != "admin" {
+	if err != nil || len(users) != 1 || users[0].Username != "admin" || users[0].Email != "admin@localhost" {
 		t.Errorf("Expected default admin user, got: %+v", users)
+	}
+}
+
+func TestUserService_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
+	store, _ := NewUserStore(t.TempDir())
+	service := NewUserService(store)
+
+	err := service.InitDefaultAdmin("root", "root@example.com", "")
+	if err != nil {
+		t.Errorf("InitDefaultAdmin failed: %v", err)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil || len(users) != 1 || users[0].Username != "root" || users[0].Email != "root@example.com" {
+		t.Errorf("Expected admin user with custom username/email, got: %+v", users)
+	}
+}
+
+func TestUserService_InitDefaultAdmin_SkipsWhenAdminAlreadyExists(t *testing.T) {
+	store, _ := NewUserStore(t.TempDir())
+	service := NewUserService(store)
+
+	if _, err := service.CreateUser("admin", "admin@localhost", "existing", "admin"); err != nil {
+		t.Fatalf("Failed to create initial admin user: %v", err)
+	}
+
+	err := service.InitDefaultAdmin("root", "root@example.com", "new")
+	if err != nil {
+		t.Errorf("InitDefaultAdmin failed: %v", err)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil || len(users) != 1 || users[0].Username != "admin" || users[0].Email != "admin@localhost" {
+		t.Errorf("Expected existing admin user to be left untouched, got: %+v", users)
 	}
 }
 

@@ -276,7 +276,7 @@ npm run dev
 **Terminal 2 — Backend:**
 ```bash
 cd cmd/leafwiki
-go run main.go --jwt-secret=yoursecret --allow-insecure=true --admin-password=yourpassword
+go run . --jwt-secret=yoursecret --allow-insecure=true --admin-password=yourpassword
 ```
 
 Vite starts on `http://localhost:5173`. The backend binds to `127.0.0.1` by default.
@@ -294,6 +294,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 | `--jwt-secret` | Secret for signing JWTs. Keep it secure. |
 | `--admin-password` | Initial admin password (only applied if no admin exists yet). |
 
+### Optional admin identity
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--admin-username` | Initial admin username (only applied if no admin exists yet). | `admin` |
+| `--admin-email` | Initial admin email (only applied if no admin exists yet). | `admin@localhost` |
+
 For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 
 ### CLI Flags
@@ -304,6 +311,8 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--port`                         | Port the server listens on                                              | `8080`        | –       |
 | `--unix-socket`                  | Unix domain socket path; overrides `--host` and `--port`                | `""`          | v0.11.3 |
 | `--data-dir`                     | Directory where data is stored                                          | `./data`      | –       |
+| `--admin-username`               | Initial admin username (only applied if no admin exists yet)            | `admin`       | unreleased |
+| `--admin-email`                  | Initial admin email (only applied if no admin exists yet)               | `admin@localhost` | unreleased |
 | `--public-access`                | Allow public read-only access                                           | `false`       | –       |
 | `--base-path`                    | URL prefix for reverse proxy setups (e.g. `/wiki`)                      | `""`          | v0.8.2  |
 | `--allow-insecure`               | ⚠️ Enables HTTP for auth cookies (required for plain HTTP)              | `false`       | v0.7.0  |
@@ -344,6 +353,8 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_UNIX_SOCKET`                  | Unix domain socket path; overrides host/port         | `""`          | v0.11.3 |
 | `LEAFWIKI_DATA_DIR`                     | Data directory path                                  | `./data`      | –       |
 | `LEAFWIKI_ADMIN_PASSWORD`               | Initial admin password *(required)*                  | –             | –       |
+| `LEAFWIKI_ADMIN_USERNAME`               | Initial admin username (only applied if no admin exists yet) | `admin`       | unreleased |
+| `LEAFWIKI_ADMIN_EMAIL`                  | Initial admin email (only applied if no admin exists yet) | `admin@localhost` | unreleased |
 | `LEAFWIKI_JWT_SECRET`                   | JWT signing secret *(required)*                      | –             | –       |
 | `LEAFWIKI_PUBLIC_ACCESS`                | Allow public read-only access                        | `false`       | –       |
 | `LEAFWIKI_BASE_PATH`                    | URL prefix for reverse proxy                         | `""`          | v0.8.2  |

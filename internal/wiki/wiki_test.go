@@ -197,6 +197,30 @@ func TestWiki_InitDefaultAdmin_UsesGivenPassword(t *testing.T) {
 	}
 }
 
+func TestWiki_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:          t.TempDir(),
+		AdminUsername:       "root",
+		AdminEmail:          "root@example.com",
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+
+	user, err := wikiInstance.user.GetUserByEmailOrUsernameAndPassword("root", "admin")
+	if err != nil {
+		t.Fatalf("Admin user with custom username not found: %v", err)
+	}
+	if user.Email != "root@example.com" {
+		t.Errorf("Expected admin email %q, got %q", "root@example.com", user.Email)
+	}
+}
+
 func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

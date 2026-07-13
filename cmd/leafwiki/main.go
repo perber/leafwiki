@@ -51,6 +51,8 @@ func writeUsage(w io.Writer) {
 	--unix-socket      Path to a unix domain socket to listen on (overrides --host and --port)
 	--data-dir         Path to data directory (default: ./data)
 	--admin-password   Initial admin password (used only if no admin exists)
+	--admin-username   Initial admin username (used only if no admin exists) (default: admin)
+	--admin-email      Initial admin email (used only if no admin exists) (default: admin@localhost)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
 	--public-access    Allow public access to the wiki only with read access (default: false)
 	--allow-insecure   Allow insecure HTTP connections (default: false)                      
@@ -99,6 +101,8 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_JWT_SECRET
 	LEAFWIKI_LOG_LEVEL
 	LEAFWIKI_ADMIN_PASSWORD
+	LEAFWIKI_ADMIN_USERNAME
+	LEAFWIKI_ADMIN_EMAIL
 	LEAFWIKI_PUBLIC_ACCESS
 	LEAFWIKI_ALLOW_INSECURE
 	LEAFWIKI_INJECT_CODE_IN_HEADER
@@ -171,6 +175,8 @@ type cliFlags struct {
 	port                    *string
 	unixSocket              *string
 	dataDir                 *string
+	adminUsername           *string
+	adminEmail              *string
 	adminPassword           *string
 	jwtSecret               *string
 	publicAccess            *bool
@@ -214,6 +220,8 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		port:                    fs.String("port", "", "port to run the server on"),
 		unixSocket:              fs.String("unix-socket", "", "path to a unix domain socket to listen on; overrides --host and --port"),
 		dataDir:                 fs.String("data-dir", "", "path to data directory"),
+		adminUsername:           fs.String("admin-username", "", "initial admin username (used only if no admin exists) (default: admin)"),
+		adminEmail:              fs.String("admin-email", "", "initial admin email (used only if no admin exists) (default: admin@localhost)"),
 		adminPassword:           fs.String("admin-password", "", "initial admin password"),
 		jwtSecret:               fs.String("jwt-secret", "", "JWT secret for authentication"),
 		publicAccess:            fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
@@ -277,6 +285,8 @@ func main() {
 	unixSocket := resolveString("unix-socket", *flags.unixSocket, visited, "LEAFWIKI_UNIX_SOCKET", "")
 	dataDir := resolveString("data-dir", *flags.dataDir, visited, "LEAFWIKI_DATA_DIR", "./data")
 	adminPassword := resolveString("admin-password", *flags.adminPassword, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
+	adminUsername := resolveString("admin-username", *flags.adminUsername, visited, "LEAFWIKI_ADMIN_USERNAME", "admin")
+	adminEmail := resolveString("admin-email", *flags.adminEmail, visited, "LEAFWIKI_ADMIN_EMAIL", "admin@localhost")
 	jwtSecret := resolveString("jwt-secret", *flags.jwtSecret, visited, "LEAFWIKI_JWT_SECRET", "")
 	injectCodeInHeader := resolveString("inject-code-in-header", *flags.injectCodeInHeader, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
 	customStylesheet := resolveString("custom-stylesheet", *flags.customStylesheet, visited, "LEAFWIKI_CUSTOM_STYLESHEET", "")
@@ -412,6 +422,8 @@ func main() {
 
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
 		StorageDir:             dataDir,
+		AdminUsername:          adminUsername,
+		AdminEmail:             adminEmail,
 		AdminPassword:          adminPassword,
 		JWTSecret:              jwtSecret,
 		AccessTokenTimeout:     accessTokenTimeout,
