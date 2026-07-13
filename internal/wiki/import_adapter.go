@@ -68,12 +68,12 @@ func (a *WikiImportAdapter) ListAssets(pageID string) ([]string, error) {
 }
 
 func (a *WikiImportAdapter) orchestrator() *pagesave.PageSaveOrchestrator {
-	return pagesave.NewPageSaveOrchestrator(
-		pagesave.NewSearchIndexSideEffect(a.searchIndex, a.tree, a.log),
-		pagesave.NewLinkIndexSideEffect(a.links, a.log),
-		pagesave.NewTagsSideEffect(a.tags, a.log),
-		pagesave.NewPropertiesSideEffect(a.props, a.log),
-		pagesave.NewRevisionSideEffect(a.revision, a.log),
+	return pagesave.NewPageSaveOrchestrator(nil,
+		pagesave.NewSearchIndexSideEffect(a.searchIndex, a.tree, a.log, nil),
+		pagesave.NewLinkIndexSideEffect(a.links, a.log, nil),
+		pagesave.NewTagsSideEffect(a.tags, a.log, nil),
+		pagesave.NewPropertiesSideEffect(a.props, a.log, nil),
+		pagesave.NewRevisionSideEffect(a.revision, a.log, nil),
 	)
 }
 
@@ -93,7 +93,7 @@ func (a *WikiImportAdapter) UpdatePage(userID, id, title, slug string, content *
 	if err != nil {
 		return nil, err
 	}
-	out, err := wikipages.NewUpdatePageUseCase(a.tree, a.slug, a.orchestrator(), a.log).Execute(
+	out, err := wikipages.NewUpdatePageUseCase(a.tree, a.slug, a.orchestrator(), a.log, nil).Execute(
 		context.Background(),
 		wikipages.UpdatePageInput{UserID: userID, ID: id, Version: current.Version(), Title: title, Slug: slug, Content: content, Kind: kind, PreserveFrontmatter: true},
 	)

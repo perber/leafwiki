@@ -405,6 +405,11 @@ func main() {
 		}
 	}
 
+	var metrics *httpmetrics.HTTPMetrics
+	if enableMetrics {
+		metrics = httpmetrics.NewHTTPMetrics()
+	}
+
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
 		StorageDir:             dataDir,
 		AdminPassword:          adminPassword,
@@ -415,6 +420,7 @@ func main() {
 		EnableRevision:         enableRevision,
 		MaxRevisionHistory:     maxRevisionHistory,
 		RevisionCoalesceWindow: revisionCoalesceWindow,
+		Metrics:                metrics,
 	})
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)
@@ -453,11 +459,6 @@ func main() {
 		backupScheduler = backup.NewScheduler(backupRepo)
 		defer backupScheduler.Stop()
 		w.SetBackupRoutes(wikibackup.NewRoutes(backupRepo, backupScheduler, w.AuthService()))
-	}
-
-	var metrics *httpmetrics.HTTPMetrics
-	if enableMetrics {
-		metrics = httpmetrics.NewHTTPMetrics()
 	}
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{

@@ -20,7 +20,7 @@ func init() {
 func newTestRouter(job *ResyncJob, trigger func()) *gin.Engine {
 	r := gin.New()
 	routes := &Routes{
-		triggerUC: NewTriggerResyncUseCase(job, trigger),
+		triggerUC: NewTriggerResyncUseCase(job, trigger, nil),
 		statusUC:  NewGetResyncStatusUseCase(job),
 	}
 	r.POST("/resync", routes.handleTriggerResync)
