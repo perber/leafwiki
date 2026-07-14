@@ -350,7 +350,7 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 		ConvertPage:      wikipages.NewConvertPageUseCase(w.tree, w.revision, w.log),
 		CopyPage:         wikipages.NewCopyPageUseCase(w.tree, w.slug, o, w.asset, w.log),
 		GetPage:          wikipages.NewGetPageUseCase(w.tree),
-		DownloadPage:     wikipages.NewDownloadPageUseCase(w.tree),
+		DownloadPage:     wikipages.NewDownloadPageUseCase(w.tree, w.asset),
 		FindByPath:       wikipages.NewFindByPathUseCase(w.tree),
 		FindByTitle:      wikipages.NewFindByTitleUseCase(w.tree),
 		LookupPath:       wikipages.NewLookupPagePathUseCase(w.tree),
@@ -733,8 +733,8 @@ func (w *Wiki) UserService() *auth.UserService {
 }
 
 func (w *Wiki) Close() error {
-	w.shutdownCancel()  // signal in-flight reloads to abort
-	w.reloadWG.Wait()   // drain goroutines before closing stores
+	w.shutdownCancel() // signal in-flight reloads to abort
+	w.reloadWG.Wait()  // drain goroutines before closing stores
 	w.status.Finish()
 	if w.auth != nil {
 		// When auth is enabled, AuthService owns both the session store and user store.

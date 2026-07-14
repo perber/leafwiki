@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki/pages"
 )
 
@@ -39,7 +40,7 @@ func TestDownloadPageUseCase_Page_ReturnsCleanMarkdown(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
-	downloadUC := pages.NewDownloadPageUseCase(deps.tree)
+	downloadUC := pages.NewDownloadPageUseCase(deps.tree, deps.assets)
 
 	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Getting Started", Slug: "getting-started", Kind: pageKind(),
@@ -75,11 +76,55 @@ func TestDownloadPageUseCase_Page_ReturnsCleanMarkdown(t *testing.T) {
 	}
 }
 
+func TestDownloadPageUseCase_PageWithAssets_ReturnsPortableZip(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	downloadUC := pages.NewDownloadPageUseCase(deps.tree, deps.assets)
+
+	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", Title: "Getting Started", Slug: "getting-started", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating page: %v", err)
+	}
+	assetURL := saveTestAsset(t, deps, created.Page.PageNode, "logo.png", []byte("image bytes"))
+
+	content := "# Getting Started\n\n![Logo](" + assetURL + ")\n"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "user1", ID: created.Page.ID, Version: created.Page.Version(),
+		Title: "Getting Started", Slug: "getting-started", Content: &content, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("unexpected error updating page: %v", err)
+	}
+
+	out, err := downloadUC.Execute(context.Background(), pages.DownloadPageInput{ID: created.Page.ID})
+	if err != nil {
+		t.Fatalf("unexpected error downloading page: %v", err)
+	}
+
+	if out.Filename != "getting-started.zip" {
+		t.Errorf("expected filename %q, got %q", "getting-started.zip", out.Filename)
+	}
+	if out.ContentType != "application/zip" {
+		t.Errorf("unexpected content type %q", out.ContentType)
+	}
+
+	entries := readZipEntries(t, out.Data)
+	expectedMarkdown := "# Getting Started\n\n![Logo](getting-started_assets/logo.png)\n"
+	if got := entries["getting-started.md"]; got != expectedMarkdown {
+		t.Errorf("expected getting-started.md = %q, got %q", expectedMarkdown, got)
+	}
+	if got := entries["getting-started_assets/logo.png"]; got != "image bytes" {
+		t.Errorf("expected image bytes in zip, got %q", got)
+	}
+}
+
 func TestDownloadPageUseCase_Section_ZipsWholeSubtree(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
 	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
-	downloadUC := pages.NewDownloadPageUseCase(deps.tree)
+	downloadUC := pages.NewDownloadPageUseCase(deps.tree, deps.assets)
 
 	// docs/ (section)
 	//   docs/intro (page)
@@ -160,13 +205,73 @@ func TestDownloadPageUseCase_Section_ZipsWholeSubtree(t *testing.T) {
 	}
 }
 
+func TestDownloadPageUseCase_SectionWithAssets_RewritesMarkdownLinks(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	downloadUC := pages.NewDownloadPageUseCase(deps.tree, deps.assets)
+
+	section, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", Title: "Docs", Slug: "docs", Kind: sectionKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating section: %v", err)
+	}
+	sectionID := section.Page.ID
+
+	intro, err := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "user1", ParentID: &sectionID, Title: "Intro", Slug: "intro", Kind: pageKind(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating intro page: %v", err)
+	}
+	assetURL := saveTestAsset(t, deps, intro.Page.PageNode, "diagram.png", []byte("diagram bytes"))
+
+	introContent := "# Intro\n\n![Diagram](" + assetURL + ")\n"
+	if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+		UserID: "user1", ID: intro.Page.ID, Version: intro.Page.Version(),
+		Title: "Intro", Slug: "intro", Content: &introContent, Kind: pageKind(),
+	}); err != nil {
+		t.Fatalf("unexpected error updating intro page: %v", err)
+	}
+
+	out, err := downloadUC.Execute(context.Background(), pages.DownloadPageInput{ID: sectionID})
+	if err != nil {
+		t.Fatalf("unexpected error downloading section: %v", err)
+	}
+
+	entries := readZipEntries(t, out.Data)
+	expectedMarkdown := "# Intro\n\n![Diagram](intro_assets/diagram.png)\n"
+	if got := entries["docs/intro.md"]; got != expectedMarkdown {
+		t.Errorf("expected docs/intro.md = %q, got %q", expectedMarkdown, got)
+	}
+	if got := entries["docs/intro_assets/diagram.png"]; got != "diagram bytes" {
+		t.Errorf("expected diagram bytes in zip, got %q", got)
+	}
+}
+
 func TestDownloadPageUseCase_NotFound_ReturnsError(t *testing.T) {
 	deps := newTestDeps(t)
-	downloadUC := pages.NewDownloadPageUseCase(deps.tree)
+	downloadUC := pages.NewDownloadPageUseCase(deps.tree, deps.assets)
 
 	if _, err := downloadUC.Execute(context.Background(), pages.DownloadPageInput{ID: "nonexistent"}); err == nil {
 		t.Fatal("expected error for non-existent node, got nil")
 	}
+}
+
+func saveTestAsset(t *testing.T, deps *testDeps, page *tree.PageNode, name string, content []byte) string {
+	t.Helper()
+	file, filename, err := test_utils.CreateMultipartFile(name, content)
+	if err != nil {
+		t.Fatalf("failed to create test asset: %v", err)
+	}
+	defer file.Close()
+
+	url, err := deps.assets.SaveAssetForPage(page, file, filename, 1024)
+	if err != nil {
+		t.Fatalf("failed to save test asset: %v", err)
+	}
+	return url
 }
 
 func keys(m map[string]string) []string {
