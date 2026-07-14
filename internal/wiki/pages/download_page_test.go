@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki/pages"
 )
@@ -38,8 +39,9 @@ func readZipEntries(t *testing.T, data []byte) map[string]string {
 
 func TestDownloadPageUseCase_Page_ReturnsCleanMarkdown(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	metrics := httpmetrics.NewHTTPMetrics()
+	createUC := newDownloadTestCreatePageUseCase(deps, metrics)
+	updateUC := newDownloadTestUpdatePageUseCase(deps, metrics)
 	downloadUC := pages.NewDownloadPageUseCase(deps.tree, deps.assets)
 
 	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -78,8 +80,9 @@ func TestDownloadPageUseCase_Page_ReturnsCleanMarkdown(t *testing.T) {
 
 func TestDownloadPageUseCase_PageWithAssets_ReturnsPortableZip(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	metrics := httpmetrics.NewHTTPMetrics()
+	createUC := newDownloadTestCreatePageUseCase(deps, metrics)
+	updateUC := newDownloadTestUpdatePageUseCase(deps, metrics)
 	downloadUC := pages.NewDownloadPageUseCase(deps.tree, deps.assets)
 
 	created, err := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -122,8 +125,9 @@ func TestDownloadPageUseCase_PageWithAssets_ReturnsPortableZip(t *testing.T) {
 
 func TestDownloadPageUseCase_Section_ZipsWholeSubtree(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	metrics := httpmetrics.NewHTTPMetrics()
+	createUC := newDownloadTestCreatePageUseCase(deps, metrics)
+	updateUC := newDownloadTestUpdatePageUseCase(deps, metrics)
 	downloadUC := pages.NewDownloadPageUseCase(deps.tree, deps.assets)
 
 	// docs/ (section)
@@ -207,8 +211,9 @@ func TestDownloadPageUseCase_Section_ZipsWholeSubtree(t *testing.T) {
 
 func TestDownloadPageUseCase_SectionWithAssets_RewritesMarkdownLinks(t *testing.T) {
 	deps := newTestDeps(t)
-	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
-	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default())
+	metrics := httpmetrics.NewHTTPMetrics()
+	createUC := newDownloadTestCreatePageUseCase(deps, metrics)
+	updateUC := newDownloadTestUpdatePageUseCase(deps, metrics)
 	downloadUC := pages.NewDownloadPageUseCase(deps.tree, deps.assets)
 
 	section, err := createUC.Execute(context.Background(), pages.CreatePageInput{
@@ -272,6 +277,14 @@ func saveTestAsset(t *testing.T, deps *testDeps, page *tree.PageNode, name strin
 		t.Fatalf("failed to save test asset: %v", err)
 	}
 	return url
+}
+
+func newDownloadTestCreatePageUseCase(deps *testDeps, metrics *httpmetrics.HTTPMetrics) *pages.CreatePageUseCase {
+	return pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), metrics)
+}
+
+func newDownloadTestUpdatePageUseCase(deps *testDeps, metrics *httpmetrics.HTTPMetrics) *pages.UpdatePageUseCase {
+	return pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), metrics)
 }
 
 func keys(m map[string]string) []string {
