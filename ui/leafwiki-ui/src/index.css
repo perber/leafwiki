@@ -936,7 +936,7 @@
   }
 
   .markdown-editor__divider--stacked {
-    @apply bg-surface-border h-1 w-full;
+    @apply h-1 w-full cursor-row-resize;
   }
 
   .markdown-editor__preview-container {

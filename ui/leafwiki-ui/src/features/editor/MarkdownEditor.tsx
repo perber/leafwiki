@@ -577,21 +577,25 @@ const MarkdownEditor = (
   )
 
   const handleSplitResize = (event: ReactMouseEvent<HTMLDivElement>) => {
-    if (isMobile || previewStacked || !showPreview) return
+    if (isMobile || !showPreview) return
 
     event.preventDefault()
     event.stopPropagation()
 
-    const startX = event.clientX
+    const startPosition = previewStacked ? event.clientY : event.clientX
     const startWidth = editorPaneWidth
-    const splitWidth =
-      desktopSplitRef.current?.getBoundingClientRect().width ||
-      window.innerWidth
+    const splitRect = desktopSplitRef.current?.getBoundingClientRect()
+    const splitSize =
+      (previewStacked ? splitRect?.height : splitRect?.width) ||
+      (previewStacked ? window.innerHeight : window.innerWidth)
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      const delta = moveEvent.clientX - startX
+      const currentPosition = previewStacked
+        ? moveEvent.clientY
+        : moveEvent.clientX
+      const delta = currentPosition - startPosition
       const nextWidth = clampEditorPaneWidth(
-        startWidth + (delta / splitWidth) * 100,
+        startWidth + (delta / splitSize) * 100,
       )
 
       liveEditorPaneWidthRef.current = nextWidth
@@ -747,9 +751,7 @@ const MarkdownEditor = (
                   : 'custom-scrollbar markdown-editor__editor-pane markdown-editor__editor-pane--full'
               }
               style={
-                showPreview && !previewStacked
-                  ? { flex: `0 0 ${editorPaneWidth}%` }
-                  : undefined
+                showPreview ? { flex: `0 0 ${editorPaneWidth}%` } : undefined
               }
             >
               {renderEditor(false)}
@@ -760,7 +762,11 @@ const MarkdownEditor = (
                 <div
                   className={
                     previewStacked
-                      ? 'markdown-editor__divider--stacked'
+                      ? `markdown-editor__divider markdown-editor__divider--stacked ${
+                          isResizingSplit
+                            ? 'markdown-editor__divider--active'
+                            : ''
+                        }`
                       : `markdown-editor__divider ${
                           isResizingSplit
                             ? 'markdown-editor__divider--active'
@@ -774,9 +780,7 @@ const MarkdownEditor = (
                   aria-label="Resize editor and preview panes"
                   aria-valuemin={MIN_EDITOR_PANE_WIDTH}
                   aria-valuemax={MAX_EDITOR_PANE_WIDTH}
-                  aria-valuenow={
-                    previewStacked ? undefined : Math.round(editorPaneWidth)
-                  }
+                  aria-valuenow={Math.round(editorPaneWidth)}
                   data-testid="editor-preview-resize-handle"
                 />
 
@@ -787,7 +791,9 @@ const MarkdownEditor = (
                       : 'markdown-editor__preview-container'
                   }
                   style={
-                    previewStacked ? undefined : { flex: '1 1 0', minWidth: 0 }
+                    previewStacked
+                      ? { flex: '1 1 0', minHeight: 0 }
+                      : { flex: '1 1 0', minWidth: 0 }
                   }
                 >
                   {renderPreview()}

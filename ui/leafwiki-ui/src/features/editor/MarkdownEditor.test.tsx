@@ -232,7 +232,7 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
     expect(divider).toHaveAttribute('aria-valuenow', '60')
   })
 
-  it('does not resize panes in stacked desktop preview mode', () => {
+  it('resizes stacked desktop panes when dragging the divider vertically', () => {
     mockEditorState = {
       ...mockEditorState,
       previewVisible: true,
@@ -248,16 +248,24 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
     )
 
     const divider = getByTestId('editor-preview-resize-handle')
+    const layout = divider.parentElement as HTMLDivElement
+    layout.getBoundingClientRect = vi.fn(
+      () =>
+        ({
+          height: 1000,
+        }) as DOMRect,
+    )
 
-    fireEvent.mouseDown(divider, { clientX: 500 })
-    fireEvent.mouseMove(document, { clientX: 600 })
+    fireEvent.mouseDown(divider, { clientY: 500 })
+    fireEvent.mouseMove(document, { clientY: 600 })
     fireEvent.mouseUp(document)
 
     const editorPane = container.querySelector(
       '.markdown-editor__editor-pane--stacked',
     ) as HTMLDivElement
 
-    expect(editorPane.style.flex).toBe('')
-    expect(divider).not.toHaveAttribute('aria-valuenow')
+    expect(editorPane.style.flex).toBe('0 0 60%')
+    expect(divider).toHaveAttribute('aria-valuenow', '60')
+    expect(divider).toHaveAttribute('aria-orientation', 'horizontal')
   })
 })
