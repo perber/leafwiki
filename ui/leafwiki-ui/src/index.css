@@ -2559,6 +2559,35 @@
     border: none;
   }
 
+  .tree-view__favorite-item {
+    @apply text-interface-text relative flex items-center text-sm;
+  }
+
+  .tree-view__favorite-item--active {
+    @apply text-brand;
+  }
+
+  .tree-view__favorite-item:not(.tree-view__favorite-item--active):hover {
+    @apply bg-tree-node-hover;
+  }
+
+  .tree-view__favorite-item-link {
+    @apply flex min-w-0 flex-1 items-center gap-1.5 truncate px-1 py-2 no-underline;
+    color: inherit;
+  }
+
+  .tree-view__favorite-item-icon {
+    @apply shrink-0 opacity-60;
+  }
+
+  .tree-view__favorite-item-title {
+    @apply truncate;
+  }
+
+  .tree-view__favorite-item-remove {
+    @apply ml-auto;
+  }
+
   .tree-node {
     @apply text-interface-text relative flex cursor-pointer items-center transition-all;
   }
@@ -2640,6 +2669,20 @@
 
   .tree-node__action-icon {
     @apply text-muted hover:text-interface-text cursor-pointer;
+  }
+
+  .favorite-toggle-button {
+    @apply text-muted hover:text-interface-text shrink-0 cursor-pointer rounded p-0.5 opacity-70 hover:opacity-100;
+    background: none;
+    border: none;
+  }
+
+  .favorite-toggle-button--active {
+    @apply text-brand opacity-100;
+  }
+
+  .page-viewer__favorite-toggle {
+    @apply ml-2 shrink-0;
   }
 
   .tree-node__children {
