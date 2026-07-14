@@ -951,11 +951,16 @@
   }
 
   .markdown-editor__divider {
-    @apply bg-surface-border h-full w-1;
+    @apply bg-surface-border h-full w-1 shrink-0 cursor-col-resize transition-colors duration-200;
+  }
+
+  .markdown-editor__divider:hover,
+  .markdown-editor__divider--active {
+    @apply bg-brand-light;
   }
 
   .markdown-editor__divider--stacked {
-    @apply bg-surface-border h-1 w-full;
+    @apply h-1 w-full cursor-row-resize;
   }
 
   .markdown-editor__preview-container {
