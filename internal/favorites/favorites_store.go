@@ -6,7 +6,6 @@ package favorites
 import (
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -28,28 +27,22 @@ func NewFavoritesStore(storageDir string) (*FavoritesStore, error) {
 	normalized := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
 	dbPath := filepath.Join(normalized, "favorites.db")
 
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open favorites database: %w", err)
-	}
-
-	s := &FavoritesStore{db: db}
-	if err := s.ensureSchema(); err != nil {
-		_ = db.Close()
-		if !sqliteutil.IsSQLiteRecoverableError(err) {
-			return nil, err
-		}
-		slog.Default().Warn("favorites database corrupt, removing and retrying", "error", err)
-		sqliteutil.RemoveSQLiteFiles(dbPath)
-		db, err = sql.Open("sqlite", dbPath)
+	s := &FavoritesStore{}
+	err := sqliteutil.RetryOnCorruption(dbPath, func() error {
+		db, err := sql.Open("sqlite", dbPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to reopen favorites database after recovery: %w", err)
+			return fmt.Errorf("failed to open favorites database: %w", err)
 		}
-		s = &FavoritesStore{db: db}
-		if err = s.ensureSchema(); err != nil {
+		s.db = db
+		if err := s.ensureSchema(); err != nil {
 			_ = db.Close()
-			return nil, err
+			s.db = nil
+			return err
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return s, nil
 }
