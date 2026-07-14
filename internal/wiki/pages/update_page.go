@@ -3,9 +3,11 @@ package pages
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
@@ -34,6 +36,7 @@ type UpdatePageUseCase struct {
 	slug         *tree.SlugService
 	orchestrator *pagesave.PageSaveOrchestrator
 	log          *slog.Logger
+	metrics      *httpmetrics.HTTPMetrics
 }
 
 // NewUpdatePageUseCase constructs an UpdatePageUseCase.
@@ -42,12 +45,18 @@ func NewUpdatePageUseCase(
 	s *tree.SlugService,
 	o *pagesave.PageSaveOrchestrator,
 	log *slog.Logger,
+	metrics *httpmetrics.HTTPMetrics,
 ) *UpdatePageUseCase {
-	return &UpdatePageUseCase{tree: t, slug: s, orchestrator: o, log: log}
+	return &UpdatePageUseCase{tree: t, slug: s, orchestrator: o, log: log, metrics: metrics}
 }
 
 // Execute validates, updates the node, and fires post-save side effects.
-func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (*UpdatePageOutput, error) {
+func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (out *UpdatePageOutput, err error) {
+	started := time.Now()
+	defer func() {
+		uc.metrics.ObservePageSaveWorkflow(string(pagesave.PageOperationUpdate), err, started)
+	}()
+
 	ve := sharederrors.NewValidationErrors()
 	if in.Title == "" {
 		ve.Add("title", "Title must not be empty")

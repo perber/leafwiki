@@ -16,6 +16,7 @@ import {
   DIALOG_SHORTCUTS_HELP,
 } from '@/lib/registries'
 import { useTranslation } from 'react-i18next'
+import { redirectToExternal } from '@/lib/redirectToExternal'
 import {
   createHotkeyDefinition,
   getShortcutDisplayLabel,
@@ -81,7 +82,7 @@ export default function UserToolbar() {
         <Button
           size="sm"
           onClick={() =>
-            loginUrl ? (window.location.href = loginUrl) : navigate('/login')
+            loginUrl ? redirectToExternal(loginUrl) : navigate('/login')
           }
         >
           {t('login.loginButton')}
@@ -106,7 +107,7 @@ export default function UserToolbar() {
       // clearing it here would flash the local login screen before the
       // browser navigates away (see plans/logout-flash-and-external-user-management.md).
       authAPI.logout().catch(() => {})
-      window.location.href = logoutUrl
+      redirectToExternal(logoutUrl)
       return
     }
     await logout()

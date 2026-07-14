@@ -2,17 +2,25 @@ package wiki
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/perber/wiki/internal/core/tree"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/test_utils"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 )
 
 func createWikiTestInstance(t *testing.T) *Wiki {
+	return createWikiTestInstanceWithMetrics(t, nil)
+}
+
+func createWikiTestInstanceWithMetrics(t *testing.T, metrics *httpmetrics.HTTPMetrics) *Wiki {
 	wikiInstance, err := NewWiki(&WikiOptions{
 		StorageDir:          t.TempDir(),
 		AdminPassword:       "admin",
@@ -20,11 +28,24 @@ func createWikiTestInstance(t *testing.T) *Wiki {
 		AccessTokenTimeout:  15 * time.Minute,
 		RefreshTokenTimeout: 7 * 24 * time.Hour,
 		EnableRevision:      true,
+		Metrics:             metrics,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create wiki instance: %v", err)
 	}
 	return wikiInstance
+}
+
+func metricsBody(t *testing.T, metrics *httpmetrics.HTTPMetrics) string {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	metrics.HTTPHandler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected metrics endpoint to return 200, got %d", rec.Code)
+	}
+	return rec.Body.String()
 }
 
 func pageNodeKind() *tree.NodeKind {
@@ -35,7 +56,7 @@ func pageNodeKind() *tree.NodeKind {
 func createPageForTest(t *testing.T, w *Wiki, userID string, parentID *string, title, slug string, kind *tree.NodeKind) *tree.Page {
 	t.Helper()
 
-	out, err := wikipages.NewCreatePageUseCase(w.tree, w.slug, w.newPageOrchestrator(), w.log).Execute(
+	out, err := wikipages.NewCreatePageUseCase(w.tree, w.slug, w.newPageOrchestrator(), w.log, nil).Execute(
 		context.Background(),
 		wikipages.CreatePageInput{UserID: userID, ParentID: parentID, Title: title, Slug: slug, Kind: kind},
 	)
@@ -53,7 +74,7 @@ func updatePageForTest(t *testing.T, w *Wiki, userID, id, title, slug string, co
 		t.Fatalf("GetPage before update failed: %v", err)
 	}
 
-	out, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.newPageOrchestrator(), w.log).Execute(
+	out, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.newPageOrchestrator(), w.log, nil).Execute(
 		context.Background(),
 		wikipages.UpdatePageInput{UserID: userID, ID: id, Version: current.Version(), Title: title, Slug: slug, Content: content, Kind: kind},
 	)
@@ -71,7 +92,7 @@ func deletePageForTest(t *testing.T, w *Wiki, userID, id string, recursive bool)
 		t.Fatalf("GetPage before delete failed: %v", err)
 	}
 
-	if err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.newPageOrchestrator(), w.log).Execute(
+	if err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.newPageOrchestrator(), w.log, nil).Execute(
 		context.Background(),
 		wikipages.DeletePageInput{UserID: userID, ID: id, Version: current.Version(), Recursive: recursive},
 	); err != nil {
@@ -95,7 +116,7 @@ func TestWiki_DeletePage_WithChildren(t *testing.T) {
 	parent := createPageForTest(t, w, "system", nil, "Parent", "parent", pageNodeKind())
 	createPageForTest(t, w, "system", &parent.ID, "Child", "child", pageNodeKind())
 
-	err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.newPageOrchestrator(), w.log).Execute(
+	err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.newPageOrchestrator(), w.log, nil).Execute(
 		context.Background(),
 		wikipages.DeletePageInput{UserID: "system", ID: parent.ID, Version: parent.Version(), Recursive: false},
 	)
@@ -116,6 +137,34 @@ func TestWiki_DeletePage_Recursive(t *testing.T) {
 	}
 	if _, err := w.tree.GetPage(child.ID); err == nil {
 		t.Fatalf("expected deleted child to be gone")
+	}
+}
+
+func TestWiki_TriggerResyncAsync_EmitsMetrics(t *testing.T) {
+	metrics := httpmetrics.NewHTTPMetrics()
+	w := createWikiTestInstanceWithMetrics(t, metrics)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	w.TriggerResyncAsync()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		status := w.resyncJob.Status()
+		if status.Done {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for resync to finish")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	body := metricsBody(t, metrics)
+	if !strings.Contains(body, `leafwiki_resync_runs_total{result="success"} 1`) {
+		t.Fatalf("expected resync run metric, got: %s", body)
+	}
+	if !strings.Contains(body, `leafwiki_resync_duration_seconds_bucket{result="success"`) {
+		t.Fatalf("expected resync duration metric, got: %s", body)
 	}
 }
 
@@ -145,6 +194,30 @@ func TestWiki_InitDefaultAdmin_UsesGivenPassword(t *testing.T) {
 	_, err := w.user.GetUserByEmailOrUsernameAndPassword("admin", "admin")
 	if err != nil {
 		t.Fatalf("Admin user not found: %v", err)
+	}
+}
+
+func TestWiki_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:          t.TempDir(),
+		AdminUsername:       "root",
+		AdminEmail:          "root@example.com",
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+
+	user, err := wikiInstance.user.GetUserByEmailOrUsernameAndPassword("root", "admin")
+	if err != nil {
+		t.Fatalf("Admin user with custom username not found: %v", err)
+	}
+	if user.Email != "root@example.com" {
+		t.Errorf("Expected admin email %q, got %q", "root@example.com", user.Email)
 	}
 }
 

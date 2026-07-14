@@ -3,9 +3,11 @@ package pages
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
@@ -25,10 +27,11 @@ type CreatePageOutput struct {
 
 // CreatePageUseCase creates a new page in the tree and fires post-save side effects.
 type CreatePageUseCase struct {
-	tree        *tree.TreeService
-	slug        *tree.SlugService
+	tree         *tree.TreeService
+	slug         *tree.SlugService
 	orchestrator *pagesave.PageSaveOrchestrator
-	log         *slog.Logger
+	log          *slog.Logger
+	metrics      *httpmetrics.HTTPMetrics
 }
 
 // NewCreatePageUseCase constructs a CreatePageUseCase.
@@ -37,12 +40,18 @@ func NewCreatePageUseCase(
 	s *tree.SlugService,
 	o *pagesave.PageSaveOrchestrator,
 	log *slog.Logger,
+	metrics *httpmetrics.HTTPMetrics,
 ) *CreatePageUseCase {
-	return &CreatePageUseCase{tree: t, slug: s, orchestrator: o, log: log}
+	return &CreatePageUseCase{tree: t, slug: s, orchestrator: o, log: log, metrics: metrics}
 }
 
 // Execute validates input, creates the page node, and fires post-save side effects.
-func (uc *CreatePageUseCase) Execute(_ context.Context, in CreatePageInput) (*CreatePageOutput, error) {
+func (uc *CreatePageUseCase) Execute(_ context.Context, in CreatePageInput) (out *CreatePageOutput, err error) {
+	started := time.Now()
+	defer func() {
+		uc.metrics.ObservePageSaveWorkflow(string(pagesave.PageOperationCreate), err, started)
+	}()
+
 	ve := sharederrors.NewValidationErrors()
 
 	if in.Title == "" {

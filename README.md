@@ -277,7 +277,7 @@ npm run dev
 **Terminal 2 — Backend:**
 ```bash
 cd cmd/leafwiki
-go run main.go --jwt-secret=yoursecret --allow-insecure=true --admin-password=yourpassword
+go run . --jwt-secret=yoursecret --allow-insecure=true --admin-password=yourpassword
 ```
 
 Vite starts on `http://localhost:5173`. The backend binds to `127.0.0.1` by default.
@@ -295,6 +295,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 | `--jwt-secret` | Secret for signing JWTs. Keep it secure. |
 | `--admin-password` | Initial admin password (only applied if no admin exists yet). |
 
+### Optional admin identity
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--admin-username` | Initial admin username (only applied if no admin exists yet). | `admin` |
+| `--admin-email` | Initial admin email (only applied if no admin exists yet). | `admin@localhost` |
+
 For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 
 ### CLI Flags
@@ -305,6 +312,8 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--port`                         | Port the server listens on                                              | `8080`        | –       |
 | `--unix-socket`                  | Unix domain socket path; overrides `--host` and `--port`                | `""`          | v0.11.3 |
 | `--data-dir`                     | Directory where data is stored                                          | `./data`      | –       |
+| `--admin-username`               | Initial admin username (only applied if no admin exists yet)            | `admin`       | v0.12.0 |
+| `--admin-email`                  | Initial admin email (only applied if no admin exists yet)               | `admin@localhost` | v0.12.0 |
 | `--public-access`                | Allow public read-only access                                           | `false`       | –       |
 | `--base-path`                    | URL prefix for reverse proxy setups (e.g. `/wiki`)                      | `""`          | v0.8.2  |
 | `--allow-insecure`               | ⚠️ Enables HTTP for auth cookies (required for plain HTTP)              | `false`       | v0.7.0  |
@@ -321,8 +330,9 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--enable-http-remote-user`      | Enable reverse-proxy auth via HTTP header                               | `false`       | v0.10.0 |
 | `--http-remote-user-header-name` | Header name carrying the username from the proxy                        | `Remote-User` | v0.10.0 |
 | `--trusted-proxy-ips`            | Trusted proxy IPs/CIDRs for remote-user header                          | `""`          | v0.10.0 |
-| `--login-url`                    | Redirect to an external URL instead of the built-in login form          | `""`          | v0.11.5 |
-| `--logout-url`                   | Redirect to an external URL after logout                                | `""`          | v0.11.5 |
+| `--login-url`                    | Redirect to an external URL instead of the built-in login form          | `""`          | v0.12.0 |
+| `--logout-url`                   | Redirect to an external URL after logout                                | `""`          | v0.12.0 |
+| `--http-remote-user-logout-url`  | ⚠️ Deprecated, use `--logout-url` instead                               | `""`          | v0.10.0 |
 | `--disable-request-log`          | Suppress per-request HTTP access log lines                              | `false`       | v0.10.1 |
 | `--git-backup`                   | ⚗️ Enable git backup to a remote repository                             | `false`       | v0.11.3 |
 | `--git-backup-remote`            | ⚗️ SSH remote URL for git backup (e.g. `git@github.com:user/repo.git`) | `""`          | v0.11.3 |
@@ -345,6 +355,8 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_UNIX_SOCKET`                  | Unix domain socket path; overrides host/port         | `""`          | v0.11.3 |
 | `LEAFWIKI_DATA_DIR`                     | Data directory path                                  | `./data`      | –       |
 | `LEAFWIKI_ADMIN_PASSWORD`               | Initial admin password *(required)*                  | –             | –       |
+| `LEAFWIKI_ADMIN_USERNAME`               | Initial admin username (only applied if no admin exists yet) | `admin`       | v0.12.0 |
+| `LEAFWIKI_ADMIN_EMAIL`                  | Initial admin email (only applied if no admin exists yet) | `admin@localhost` | v0.12.0 |
 | `LEAFWIKI_JWT_SECRET`                   | JWT signing secret *(required)*                      | –             | –       |
 | `LEAFWIKI_PUBLIC_ACCESS`                | Allow public read-only access                        | `false`       | –       |
 | `LEAFWIKI_BASE_PATH`                    | URL prefix for reverse proxy                         | `""`          | v0.8.2  |
@@ -362,8 +374,9 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_ENABLE_HTTP_REMOTE_USER`      | Reverse-proxy auth via header                        | `false`       | v0.10.0 |
 | `LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME` | Username header from proxy                           | `Remote-User` | v0.10.0 |
 | `LEAFWIKI_TRUSTED_PROXY_IPS`            | Trusted proxy IPs/CIDRs                              | `""`          | v0.10.0 |
-| `LEAFWIKI_LOGIN_URL`                    | Redirect to an external URL instead of the login form | `""`          | v0.11.5 |
-| `LEAFWIKI_LOGOUT_URL`                   | Redirect to an external URL after logout             | `""`          | v0.11.5 |
+| `LEAFWIKI_LOGIN_URL`                    | Redirect to an external URL instead of the login form | `""`          | v0.12.0 |
+| `LEAFWIKI_LOGOUT_URL`                   | Redirect to an external URL after logout             | `""`          | v0.12.0 |
+| `LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL`  | ⚠️ Deprecated, use `LEAFWIKI_LOGOUT_URL` instead     | `""`          | v0.10.0 |
 | `LEAFWIKI_DISABLE_REQUEST_LOG`          | Suppress per-request HTTP access log lines           | `false`       | v0.10.1 |
 | `LEAFWIKI_GIT_BACKUP`                   | ⚗️ Enable git backup                                | `false`       | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_REMOTE`            | ⚗️ SSH remote URL                                   | `""`          | v0.11.3 |
@@ -410,7 +423,9 @@ Available since v0.10.0. Use when an upstream proxy authenticates users and forw
 - If the forwarded username doesn't exist in LeafWiki, the request is rejected
 - Do not enable without configuring `--trusted-proxy-ips`
 - `--login-url` and `--logout-url` are independent, optional redirect targets — set either or both to send users to an external IdP instead of the built-in login form / to redirect after logout
-- `--login-url`, `--logout-url`, and `--user-management-url` must start with `http://` or `https://`; the server refuses to start otherwise
+- `--login-url` and `--logout-url` must start with `http://` or `https://`; the server refuses to start otherwise. `--user-management-url` has no such restriction — it's only used as a link, so relative paths work too
+- ⚠️ `--login-url` takes effect regardless of `--enable-http-remote-user` and has no in-app bypass: once set, *every* unauthenticated visit (including `/login` itself) redirects to it immediately. Double-check the URL before setting it — a wrong or unreachable value locks all users, including admins, out of the built-in login form
+- `--http-remote-user-logout-url` (v0.10.0) is deprecated; use `--logout-url` instead. It still works as a fallback when `--logout-url`/`LEAFWIKI_LOGOUT_URL` isn't set, but a deprecation warning is logged
 
 ### API Keys
 

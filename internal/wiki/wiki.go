@@ -14,6 +14,7 @@ import (
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	coreimporter "github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/properties"
@@ -74,12 +75,15 @@ type Wiki struct {
 	shutdownCtx      context.Context
 	shutdownCancel   context.CancelFunc
 	log              *slog.Logger
+	metrics          *httpmetrics.HTTPMetrics
 }
 
 const SYSTEM_USER_ID = "system"
 
 type WikiOptions struct {
 	StorageDir              string        // Path to storage directory
+	AdminUsername           string        // Initial admin username (optional; defaults to "admin")
+	AdminEmail              string        // Initial admin email (optional; defaults to "admin@localhost")
 	AdminPassword           string        // Initial admin password
 	JWTSecret               string        // JWT secret for authentication
 	AccessTokenTimeout      time.Duration // Access token timeout duration
@@ -89,6 +93,7 @@ type WikiOptions struct {
 	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 	RevisionCoalesceWindow  time.Duration // Window for coalescing rapid successive saves; 0 = disabled
+	Metrics                 *httpmetrics.HTTPMetrics
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
@@ -99,6 +104,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		resyncJob:      wikiresync.NewResyncJob(),
 		shutdownCtx:    shutdownCtx,
 		shutdownCancel: shutdownCancel,
+		metrics:        options.Metrics,
 	}
 	if err := w.initAuth(options); err != nil {
 		return nil, err
@@ -181,7 +187,7 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 	}
 	w.user = auth.NewUserService(store)
 	if !options.AuthDisabled {
-		if err := w.user.InitDefaultAdmin(options.AdminPassword); err != nil {
+		if err := w.user.InitDefaultAdmin(options.AdminUsername, options.AdminEmail, options.AdminPassword); err != nil {
 			return err
 		}
 	}
@@ -296,7 +302,7 @@ func (w *Wiki) initSearch() error {
 		return fmt.Errorf("failed to init search index: %w", err)
 	}
 	w.status = search.NewIndexingStatus()
-	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
+	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log, w.metrics)
 	w.log.Info("search indexing started")
 	w.reloadWG.Add(1)
 	go func() {
@@ -341,7 +347,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 		StorageDir: w.storageDir,
 	})
 	w.resyncRoutes = wikiresync.NewRoutes(
-		wikiresync.NewTriggerResyncUseCase(w.resyncJob, w.launchReloadWithProgress),
+		wikiresync.NewTriggerResyncUseCase(w.resyncJob, w.launchReloadWithProgress, w.metrics),
 		wikiresync.NewGetResyncStatusUseCase(w.resyncJob),
 		w.auth,
 	)
@@ -351,11 +357,12 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 
 func (w *Wiki) newPageOrchestrator() *pagesave.PageSaveOrchestrator {
 	return pagesave.NewPageSaveOrchestrator(
-		pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log),
-		pagesave.NewLinkIndexSideEffect(w.links, w.log),
-		pagesave.NewRevisionSideEffect(w.revision, w.log),
-		pagesave.NewTagsSideEffect(w.tags, w.log),
-		pagesave.NewPropertiesSideEffect(w.props, w.log),
+		w.metrics,
+		pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log, w.metrics),
+		pagesave.NewLinkIndexSideEffect(w.links, w.log, w.metrics),
+		pagesave.NewRevisionSideEffect(w.revision, w.log, w.metrics),
+		pagesave.NewTagsSideEffect(w.tags, w.log, w.metrics),
+		pagesave.NewPropertiesSideEffect(w.props, w.log, w.metrics),
 	)
 }
 
@@ -363,10 +370,10 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 	o := w.newPageOrchestrator()
 	return wikipages.NewRoutes(wikipages.RoutesConfig{
 		TreeService:      w.tree,
-		CreatePage:       wikipages.NewCreatePageUseCase(w.tree, w.slug, o, w.log),
-		UpdatePage:       wikipages.NewUpdatePageUseCase(w.tree, w.slug, o, w.log),
-		DeletePage:       wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, o, w.log),
-		MovePage:         wikipages.NewMovePageUseCase(w.tree, o, w.log),
+		CreatePage:       wikipages.NewCreatePageUseCase(w.tree, w.slug, o, w.log, w.metrics),
+		UpdatePage:       wikipages.NewUpdatePageUseCase(w.tree, w.slug, o, w.log, w.metrics),
+		DeletePage:       wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, o, w.log, w.metrics),
+		MovePage:         wikipages.NewMovePageUseCase(w.tree, o, w.log, w.metrics),
 		ConvertPage:      wikipages.NewConvertPageUseCase(w.tree, w.revision, w.log),
 		CopyPage:         wikipages.NewCopyPageUseCase(w.tree, w.slug, o, w.asset, w.log),
 		GetPage:          wikipages.NewGetPageUseCase(w.tree),
@@ -378,7 +385,7 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 		EnsurePath:       wikipages.NewEnsurePathUseCase(w.tree, w.slug, o, w.log),
 		SuggestSlug:      wikipages.NewSuggestSlugUseCase(w.tree, w.slug),
 		PreviewRefactor:  wikipages.NewPreviewPageRefactorUseCase(w.tree, w.slug, w.links, w.log),
-		ApplyRefactor:    wikipages.NewApplyPageRefactorUseCase(w.tree, w.slug, w.revision, w.links, w.log),
+		ApplyRefactor:    wikipages.NewApplyPageRefactorUseCase(w.tree, w.slug, w.revision, w.links, w.log, w.metrics),
 		PinPage:          wikipages.NewPinPageUseCase(w.tree, w.log),
 		UserResolver:     w.userResolver,
 		AuthService:      w.auth,
@@ -419,7 +426,7 @@ func (w *Wiki) buildRevisionsRoutes() *wikirevisions.Routes {
 		CompareRevisions: wikirevisions.NewCompareRevisionsUseCase(w.revision),
 		GetRevisionAsset: wikirevisions.NewGetRevisionAssetUseCase(w.revision),
 		GetLatest:        wikirevisions.NewGetLatestRevisionUseCase(w.revision),
-		RestoreRevision:  wikirevisions.NewRestoreRevisionUseCase(w.revision, w.tree, w.newPageOrchestrator(), w.log),
+		RestoreRevision:  wikirevisions.NewRestoreRevisionUseCase(w.revision, w.tree, w.newPageOrchestrator(), w.log, w.metrics),
 		CheckIntegrity:   wikirevisions.NewCheckIntegrityUseCase(w.revision),
 		UserResolver:     w.userResolver,
 		AuthService:      w.auth,
@@ -560,7 +567,7 @@ func (w *Wiki) EnsureWelcomePage() error {
 	}
 	o := w.newPageOrchestrator()
 	k := tree.NodeKindPage
-	createOut, err := wikipages.NewCreatePageUseCase(w.tree, w.slug, o, w.log).Execute(
+	createOut, err := wikipages.NewCreatePageUseCase(w.tree, w.slug, o, w.log, w.metrics).Execute(
 		context.Background(),
 		wikipages.CreatePageInput{UserID: SYSTEM_USER_ID, Title: "Welcome to LeafWiki", Slug: "welcome-to-leafwiki", Kind: &k},
 	)
@@ -605,7 +612,7 @@ For more information, visit the [LeafWiki GitHub repository](https://github.com/
 	if err != nil {
 		return err
 	}
-	if _, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, o, w.log).Execute(
+	if _, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, o, w.log, w.metrics).Execute(
 		context.Background(),
 		wikipages.UpdatePageInput{UserID: SYSTEM_USER_ID, ID: p.ID, Version: current.Version(), Title: p.Title, Slug: p.Slug, Content: &content, Kind: &k},
 	); err != nil {
@@ -656,7 +663,7 @@ func (w *Wiki) ReloadFromFSContext(ctx context.Context) error {
 
 	w.status.Start()
 	defer w.status.Finish()
-	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
+	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log, w.metrics)
 	if err := searchEffect.IndexAllPagesContext(ctx); err != nil {
 		w.log.Warn("search re-index failed during reload", "error", err)
 		w.status.Fail()
@@ -682,12 +689,19 @@ func (w *Wiki) launchReloadWithProgress() {
 // Must only be called via launchReloadWithProgress (which tracks the WG).
 func (w *Wiki) reloadWithProgress(ctx context.Context) {
 	job := w.resyncJob
+	started := time.Now()
+	var finishErr error
+
+	defer func() {
+		w.metrics.ObserveResyncRun(finishErr, started)
+	}()
 
 	// Catch panics so a bug in any phase always releases the job and mutex.
 	defer func() {
 		if r := recover(); r != nil {
+			finishErr = fmt.Errorf("panic during reload: %v", r)
 			w.log.Error("panic during filesystem reload", "panic", r)
-			job.Finish(fmt.Errorf("panic during reload: %v", r))
+			job.Finish(finishErr)
 		}
 	}()
 
@@ -698,26 +712,30 @@ func (w *Wiki) reloadWithProgress(ctx context.Context) {
 
 	job.SetPhase(wikiresync.PhaseTree)
 	if err := w.tree.ReconstructTreeFromFSContext(ctx); err != nil {
-		job.Finish(fmt.Errorf("tree reconstruction failed: %w", err))
+		finishErr = fmt.Errorf("tree reconstruction failed: %w", err)
+		job.Finish(finishErr)
 		return
 	}
 
 	if ctx.Err() != nil {
-		job.Finish(ctx.Err())
+		finishErr = ctx.Err()
+		job.Finish(finishErr)
 		return
 	}
 
 	job.SetPhase(wikiresync.PhaseLinks)
 	if err := w.links.IndexAllPagesContext(ctx); err != nil {
 		if ctx.Err() != nil {
-			job.Finish(ctx.Err())
+			finishErr = ctx.Err()
+			job.Finish(finishErr)
 			return
 		}
 		w.log.Warn("link re-index failed during reload", "error", err)
 	}
 
 	if ctx.Err() != nil {
-		job.Finish(ctx.Err())
+		finishErr = ctx.Err()
+		job.Finish(finishErr)
 		return
 	}
 
@@ -726,18 +744,20 @@ func (w *Wiki) reloadWithProgress(ctx context.Context) {
 
 	job.SetPhase(wikiresync.PhaseSearch)
 	w.status.Start()
-	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log)
+	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log, w.metrics)
 	if err := searchEffect.IndexAllPagesContext(ctx); err != nil {
 		w.log.Warn("search re-index failed during reload", "error", err)
 		w.status.Fail()
 		w.status.Finish()
-		job.Finish(fmt.Errorf("search re-index failed: %w", err))
+		finishErr = fmt.Errorf("search re-index failed: %w", err)
+		job.Finish(finishErr)
 		return
 	}
 	w.status.Success()
 	w.status.Finish()
 
 	w.log.Info("filesystem reload completed (async)")
+	finishErr = nil
 	job.Finish(nil)
 }
 

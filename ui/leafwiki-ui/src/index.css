@@ -2465,8 +2465,38 @@
     @apply w-full;
   }
 
-  .tree-view__toolbar {
-    @apply mt-1 mb-2 ml-1 flex;
+  .sidebar-accordion-section__header {
+    @apply flex w-full items-center justify-between gap-2 px-1 py-1;
+  }
+
+  .sidebar-accordion-section__title {
+    @apply text-muted flex items-center gap-1 text-xs font-medium tracking-wide uppercase select-none;
+  }
+
+  .sidebar-accordion-section__count {
+    @apply text-muted text-xs font-normal normal-case;
+  }
+
+  .sidebar-accordion-section__actions {
+    @apply flex items-center gap-1;
+  }
+
+  .sidebar-accordion-section__trigger {
+    @apply text-muted hover:text-interface-text flex cursor-pointer items-center justify-center rounded p-0.5 opacity-70 hover:opacity-100;
+    background: none;
+    border: none;
+  }
+
+  .sidebar-accordion-section__trigger svg {
+    @apply transition-transform duration-200;
+  }
+
+  .sidebar-accordion-section__trigger[data-state='open'] svg {
+    @apply rotate-180;
+  }
+
+  .sidebar-accordion-section__content {
+    @apply pt-1 pb-2;
   }
 
   .tree-view__status {
@@ -2490,19 +2520,7 @@
   }
 
   .tree-view__pinned {
-    @apply mb-1 w-full;
-  }
-
-  .tree-view__section-header {
-    @apply text-muted flex items-center gap-1 px-1 py-0.5 text-xs font-medium tracking-wide uppercase select-none;
-  }
-
-  .tree-view__pinned-header {
-    @apply text-muted flex items-center gap-1 px-1 py-0.5 text-xs font-medium tracking-wide uppercase select-none;
-  }
-
-  .tree-view__pinned-divider {
-    @apply bg-surface-border mt-1 mb-2 h-px w-full;
+    @apply w-full;
   }
 
   .tree-view__pinned-item {

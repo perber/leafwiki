@@ -35,7 +35,9 @@
     "unpinPage": "Unpin",
     "pinSuccess": "Page pinned",
     "unpinSuccess": "Page unpinned",
-    "pinError": "Failed to update pin status"
+    "pinError": "Failed to update pin status",
+    "togglePinnedSection": "Toggle pinned pages section",
+    "togglePagesSection": "Toggle pages section"
   },
   "toc": {
     "title": "Table of contents",

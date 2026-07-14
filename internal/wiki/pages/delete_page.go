@@ -3,10 +3,12 @@ package pages
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
@@ -25,6 +27,7 @@ type DeletePageUseCase struct {
 	assets       *assets.AssetService
 	orchestrator *pagesave.PageSaveOrchestrator
 	log          *slog.Logger
+	metrics      *httpmetrics.HTTPMetrics
 }
 
 // NewDeletePageUseCase constructs a DeletePageUseCase.
@@ -34,12 +37,18 @@ func NewDeletePageUseCase(
 	a *assets.AssetService,
 	o *pagesave.PageSaveOrchestrator,
 	log *slog.Logger,
+	metrics *httpmetrics.HTTPMetrics,
 ) *DeletePageUseCase {
-	return &DeletePageUseCase{tree: t, revision: r, assets: a, orchestrator: o, log: log}
+	return &DeletePageUseCase{tree: t, revision: r, assets: a, orchestrator: o, log: log, metrics: metrics}
 }
 
 // Execute deletes the page, cleaning up links (via orchestrator), assets, and revision data.
-func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) error {
+func (uc *DeletePageUseCase) Execute(_ context.Context, in DeletePageInput) (err error) {
+	started := time.Now()
+	defer func() {
+		uc.metrics.ObservePageSaveWorkflow(string(pagesave.PageOperationDelete), err, started)
+	}()
+
 	if in.ID == "root" || in.ID == "" {
 		return newPageRootOperationError("delete")
 	}

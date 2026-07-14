@@ -3,8 +3,10 @@ package pages
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/perber/wiki/internal/core/tree"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 )
 
@@ -21,6 +23,7 @@ type MovePageUseCase struct {
 	tree         *tree.TreeService
 	orchestrator *pagesave.PageSaveOrchestrator
 	log          *slog.Logger
+	metrics      *httpmetrics.HTTPMetrics
 }
 
 // NewMovePageUseCase constructs a MovePageUseCase.
@@ -28,12 +31,18 @@ func NewMovePageUseCase(
 	t *tree.TreeService,
 	o *pagesave.PageSaveOrchestrator,
 	log *slog.Logger,
+	metrics *httpmetrics.HTTPMetrics,
 ) *MovePageUseCase {
-	return &MovePageUseCase{tree: t, orchestrator: o, log: log}
+	return &MovePageUseCase{tree: t, orchestrator: o, log: log, metrics: metrics}
 }
 
 // Execute moves the page and fires post-save side effects for the whole subtree.
-func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
+func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) (err error) {
+	started := time.Now()
+	defer func() {
+		uc.metrics.ObservePageSaveWorkflow(string(pagesave.PageOperationMove), err, started)
+	}()
+
 	if in.ID == "root" || in.ID == "" {
 		return newPageRootOperationError("move")
 	}
@@ -67,7 +76,7 @@ func (uc *MovePageUseCase) Execute(_ context.Context, in MovePageInput) error {
 		oldPath = beforePage.CalculatePath()
 	}
 
-	if err := uc.tree.MoveNode(in.UserID, in.ID, in.ParentID, in.Version); err != nil {
+	if err = uc.tree.MoveNode(in.UserID, in.ID, in.ParentID, in.Version); err != nil {
 		return err
 	}
 
