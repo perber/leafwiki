@@ -198,7 +198,9 @@ func writeAssetToZip(zw *zip.Writer, name, diskPath string) error {
 	if err != nil {
 		return fmt.Errorf("open asset %q: %w", diskPath, err)
 	}
-	defer src.Close()
+	defer func() {
+		_ = src.Close()
+	}()
 
 	fw, err := zw.Create(name)
 	if err != nil {

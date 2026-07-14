@@ -270,7 +270,9 @@ func saveTestAsset(t *testing.T, deps *testDeps, page *tree.PageNode, name strin
 	if err != nil {
 		t.Fatalf("failed to create test asset: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	url, err := deps.assets.SaveAssetForPage(page, file, filename, 1024)
 	if err != nil {
