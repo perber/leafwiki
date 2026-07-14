@@ -611,16 +611,12 @@ leafwiki_last_author_id: bob
 	}
 }
 
-// --- Phase 2: .leafwikiignore reconstruction filtering ---
-
 func TestNodeStore_ReconstructTreeFromFS_IgnoresMatchingFile(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	// FS: root/page1.md, root/secret.md, .leafwikiignore excludes secret.md
 	mustWriteFile(t, filepath.Join(tmp, "root", "page1.md"), "# Page 1", 0o644)
 	mustWriteFile(t, filepath.Join(tmp, "root", "secret.md"), "# Secret", 0o644)
-	// Write .leafwikiignore at data dir root (not inside root/)
 	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "secret.md", 0o644)
 
 	cache := ignore.NewCache(filepath.Join(tmp, "root"))
@@ -632,7 +628,7 @@ func TestNodeStore_ReconstructTreeFromFS_IgnoresMatchingFile(t *testing.T) {
 	}
 
 	if findChildBySlugExist(tree, "page1") != nil {
-		// page1 should be present
+
 	} else {
 		t.Fatal("expected page1 to be in tree")
 	}
@@ -722,7 +718,6 @@ func TestNodeStore_ReconstructTreeFromFS_NestedIgnoredPath(t *testing.T) {
 	}
 }
 
-// findChildBySlugExist is a non-fatal variant for ignore tests
 func findChildBySlugExist(parent *PageNode, slug string) *PageNode {
 	for _, ch := range parent.Children {
 		if ch.Slug == slug {
@@ -732,17 +727,10 @@ func findChildBySlugExist(parent *PageNode, slug string) *PageNode {
 	return nil
 }
 
-// --- Task 2.2: Reconstruction with multi-level ignores ---
-
 func TestReconstructTreeFromFS_MultiLevelIgnore(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	// FS: root/.leafwikiignore: "draft*"
-	//      root/docs/.leafwikiignore: "!draft-important.md"
-	//      root/draft-me.md (should be excluded)
-	//      root/docs/draft-important.md (should be un-ignored)
-	//      root/docs/keep.md (should be present)
 	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "draft*", 0o644)
 	mustWriteFile(t, filepath.Join(tmp, "root", "docs", ".leafwikiignore"), "!draft-important.md", 0o644)
 	mustWriteFile(t, filepath.Join(tmp, "root", "draft-me.md"), "# Draft Me", 0o644)
@@ -757,36 +745,28 @@ func TestReconstructTreeFromFS_MultiLevelIgnore(t *testing.T) {
 		t.Fatalf("ReconstructTreeFromFS: %v", err)
 	}
 
-	// draft-me.md should be excluded (root draft* matches)
 	if findChildBySlugExist(tree, "draft-me") != nil {
 		t.Fatal("expected draft-me.md to be excluded by root draft*")
 	}
 
-	// Find the docs section
 	docs := findChildBySlugExist(tree, "docs")
 	if docs == nil {
 		t.Fatal("expected docs section to exist")
 	}
 
-	// docs/draft-important.md should be included (negated by docs !draft-important.md)
 	if findChildBySlugExist(docs, "draft-important") == nil {
 		t.Fatal("expected docs/draft-important.md to be un-ignored by !draft-important.md")
 	}
 
-	// docs/keep.md should be present (no pattern matches)
 	if findChildBySlugExist(docs, "keep") == nil {
 		t.Fatal("expected docs/keep.md to be present")
 	}
 }
 
-// --- Task 2.3: Write guards use effective rules ---
-
 func TestCreatePage_MultiLevelIgnore(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
-	// Root has no restriction (empty .leafwikiignore).
-	// Child drafts/.leafwikiignore ignores "secret.md".
 	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "", 0o644)
 
 	cache := ignore.NewCache(filepath.Join(tmp, "root"))
@@ -795,15 +775,12 @@ func TestCreatePage_MultiLevelIgnore(t *testing.T) {
 	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
 	draftsSection := &PageNode{ID: "s1", Slug: "drafts", Title: "Drafts", Kind: NodeKindSection, Parent: root}
 
-	// Creating the drafts section should succeed (no restriction at root level)
 	if err := store.CreateSection(root, draftsSection); err != nil {
 		t.Fatalf("expected CreateSection to succeed for drafts: %v", err)
 	}
 
-	// Write drafts/.leafwikiignore AFTER creating the section
 	mustWriteFile(t, filepath.Join(tmp, "root", "drafts", ".leafwikiignore"), "secret", 0o644)
 
-	// Creating secret.md under drafts should fail (ignored by drafts/.leafwikiignore)
 	entry := &PageNode{ID: "p1", Slug: "secret", Title: "Secret", Kind: NodeKindPage, Parent: draftsSection}
 	err := store.CreatePage(draftsSection, entry)
 	if err == nil {
@@ -817,7 +794,6 @@ func TestCreatePage_MultiLevelIgnore(t *testing.T) {
 		t.Fatalf("expected reason mentioning leafwikiignore, got %q", opErr.Reason)
 	}
 
-	// Creating notes.md under drafts should succeed
 	entry2 := &PageNode{ID: "p2", Slug: "notes", Title: "Notes", Kind: NodeKindPage, Parent: draftsSection}
 	if err := store.CreatePage(draftsSection, entry2); err != nil {
 		t.Fatalf("expected CreatePage to succeed for non-ignored notes: %v", err)

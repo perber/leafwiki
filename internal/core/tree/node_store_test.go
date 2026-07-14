@@ -1683,7 +1683,6 @@ func TestNodeStore_MoveNode_RejectsIgnoredDestination(t *testing.T) {
 	mustMkdir(t, filepath.Join(tmp, "root", "s"))
 	mustWriteFile(t, filepath.Join(tmp, "root", "s", "p.md"), "# hi", 0o644)
 
-	// Create archive section that exists on disk
 	mustMkdir(t, filepath.Join(tmp, "root", "archive"))
 	mustWriteFile(t, filepath.Join(tmp, "root", "archive", "index.md"), "# Archive", 0o644)
 	archiveSection := &PageNode{ID: "s2", Slug: "archive", Title: "Archive", Kind: NodeKindSection, Parent: root}

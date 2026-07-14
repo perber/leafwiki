@@ -333,13 +333,13 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 			continue
 		}
 
-			// Check .leafwikiignore
-	if ig := f.getIgnoreForDir(currentPath); ig != nil {
-		relPath, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), filepath.Join(currentPath, name))
-		if relPath != "" && ig.Matches(filepath.ToSlash(relPath), entry.IsDir()) {
-			continue
+		// Check .leafwikiignore
+		if ig := f.getIgnoreForDir(currentPath); ig != nil {
+			relPath, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), filepath.Join(currentPath, name))
+			if relPath != "" && ig.Matches(filepath.ToSlash(relPath), entry.IsDir()) {
+				continue
+			}
 		}
-	}
 
 		// defaults
 		title := name
