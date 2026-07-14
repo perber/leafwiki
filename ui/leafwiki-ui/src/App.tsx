@@ -19,6 +19,7 @@ function App() {
   const loadConfig = useConfigStore((s) => s.loadConfig)
   const authDisabled = useConfigStore((s) => s.authDisabled)
   const enableRevision = useConfigStore((s) => s.enableRevision)
+  const enableApiKeyManagement = useConfigStore((s) => s.enableApiKeyManagement)
   const userManagementUrl = useConfigStore((s) => s.userManagementUrl)
   const loginUrl = useConfigStore((s) => s.loginUrl)
   const loadBranding = useBrandingStore((s) => s.loadBranding)
@@ -60,6 +61,7 @@ function App() {
         isReadOnlyViewer,
         authDisabled,
         enableRevision,
+        enableApiKeyManagement,
         userManagementUrl,
         loginUrl,
         BASE_PATH || undefined,
@@ -68,6 +70,7 @@ function App() {
       isReadOnlyViewer,
       authDisabled,
       enableRevision,
+      enableApiKeyManagement,
       userManagementUrl,
       loginUrl,
     ],

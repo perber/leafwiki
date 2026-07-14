@@ -90,6 +90,7 @@ type WikiOptions struct {
 	RefreshTokenTimeout     time.Duration // Refresh token timeout duration
 	AuthDisabled            bool          // Whether authentication is disabled
 	EnableRevision          bool          // Whether revision recording/storage is enabled
+	EnableAPIKeyManagement  bool          // Whether the experimental API key management feature is enabled
 	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 	RevisionCoalesceWindow  time.Duration // Window for coalescing rapid successive saves; 0 = disabled
@@ -212,11 +213,18 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 		// registered at all — a key created before a later --disable-auth
 		// restart must not keep authenticating (and narrowing/blocking)
 		// requests in a mode where auth is supposed to be irrelevant.
-		apiKeyStore, err := auth.NewAPIKeyStore(w.storageDir)
-		if err != nil {
-			return err
+		//
+		// The feature is additionally gated behind EnableAPIKeyManagement:
+		// it ships experimental and off by default, so w.apiKeys stays nil
+		// (and the Bearer middleware/admin routes stay disabled) until an
+		// operator explicitly opts in.
+		if options.EnableAPIKeyManagement {
+			apiKeyStore, err := auth.NewAPIKeyStore(w.storageDir)
+			if err != nil {
+				return err
+			}
+			w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.user)
 		}
-		w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.user)
 	}
 	return nil
 }

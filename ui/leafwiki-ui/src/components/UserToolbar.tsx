@@ -49,6 +49,7 @@ export default function UserToolbar() {
   const authDisabled = useConfigStore((s) => s.authDisabled)
   const readOnly = useIsReadOnly()
   const backupEnabled = useConfigStore((s) => s.gitBackupEnabled)
+  const apiKeysEnabled = useConfigStore((s) => s.enableApiKeyManagement)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
   const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)
@@ -159,12 +160,14 @@ export default function UserToolbar() {
             >
               Import
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => navigate('/settings/api-keys')}
-            >
-              {t('menu.title', { ns: 'apikeys' })}
-            </DropdownMenuItem>
+            {apiKeysEnabled && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => navigate('/settings/api-keys')}
+              >
+                {t('menu.title', { ns: 'apikeys' })}
+              </DropdownMenuItem>
+            )}
             {backupEnabled && (
               <DropdownMenuItem
                 className="cursor-pointer"

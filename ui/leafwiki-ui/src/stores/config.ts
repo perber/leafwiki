@@ -9,6 +9,7 @@ type ConfigStore = {
   maxAssetUploadSizeBytes: number
   enableRevision: boolean
   enableLinkRefactor: boolean
+  enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
   httpRemoteUserEnabled: boolean
   loginUrl: string
@@ -27,6 +28,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   maxAssetUploadSizeBytes: DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
   enableRevision: false,
   enableLinkRefactor: false,
+  enableApiKeyManagement: false,
   gitBackupEnabled: false,
   httpRemoteUserEnabled: false,
   loginUrl: '',
@@ -53,6 +55,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         maxAssetUploadSizeBytes,
         enableRevision: config.enableRevision ?? false,
         enableLinkRefactor: config.enableLinkRefactor ?? false,
+        enableApiKeyManagement: config.enableApiKeyManagement ?? false,
         gitBackupEnabled: config.gitBackupEnabled ?? false,
         httpRemoteUserEnabled: config.httpRemoteUserEnabled ?? false,
         loginUrl: config.loginUrl ?? '',

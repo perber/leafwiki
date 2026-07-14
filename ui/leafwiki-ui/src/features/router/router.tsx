@@ -21,6 +21,7 @@ export const createLeafWikiRouter = (
   isReadOnlyViewer: boolean,
   authDisabled: boolean,
   enableRevision: boolean,
+  enableApiKeyManagement: boolean,
   userManagementUrl: string,
   loginUrl: string,
   basename?: string,
@@ -72,7 +73,9 @@ export const createLeafWikiRouter = (
       },
       {
         path: '/settings/api-keys',
-        element: isReadOnlyViewer ? (
+        element: !enableApiKeyManagement ? (
+          <Navigate to="/" replace />
+        ) : isReadOnlyViewer ? (
           <Navigate to="/" />
         ) : (
           <AuthWrapper>

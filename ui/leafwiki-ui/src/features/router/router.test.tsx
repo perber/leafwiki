@@ -6,7 +6,14 @@ import { LoginForm } from './lazy-routes'
 import { createLeafWikiRouter } from './router'
 
 function loginRouteElementType(authDisabled: boolean, loginUrl: string) {
-  const router = createLeafWikiRouter(false, authDisabled, false, '', loginUrl)
+  const router = createLeafWikiRouter(
+    false,
+    authDisabled,
+    false,
+    false,
+    '',
+    loginUrl,
+  )
   const loginRoute = router.routes.find((route) => route.path === '/login')
   const element = loginRoute?.element
   if (!isValidElement(element)) {

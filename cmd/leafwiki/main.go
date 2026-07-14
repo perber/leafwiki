@@ -68,6 +68,7 @@ func writeUsage(w io.Writer) {
 	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
 	--enable-revision             Enable the revision / page history feature (default: false)
 	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
+	--enable-api-key-management   Enable the experimental API key management feature (default: false)
 	--enable-metrics              Enable the Prometheus /metrics endpoint on a separate listener (default: false)
 	--metrics-host                Host/IP for the metrics listener (default: 127.0.0.1)
 	--metrics-port                Port for the metrics listener (default: 9091)
@@ -116,6 +117,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_MAX_ASSET_UPLOAD_SIZE
 	LEAFWIKI_ENABLE_REVISION
 	LEAFWIKI_ENABLE_LINK_REFACTOR
+	LEAFWIKI_ENABLE_API_KEY_MANAGEMENT
 	LEAFWIKI_ENABLE_METRICS
 	LEAFWIKI_METRICS_HOST
 	LEAFWIKI_METRICS_PORT
@@ -193,6 +195,7 @@ type cliFlags struct {
 	maxAssetUploadSize      *string
 	enableRevision          *bool
 	enableLinkRefactor      *bool
+	enableAPIKeyManagement  *bool
 	enableMetrics           *bool
 	metricsHost             *string
 	metricsPort             *string
@@ -239,6 +242,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
 		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
 		enableLinkRefactor:      fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
+		enableAPIKeyManagement:  fs.Bool("enable-api-key-management", false, "enable the experimental API key management feature (default: false)"),
 		enableMetrics:           fs.Bool("enable-metrics", false, "enable the Prometheus /metrics endpoint on a separate listener (default: false)"),
 		metricsHost:             fs.String("metrics-host", "", "host/IP address for the Prometheus metrics listener (default: 127.0.0.1)"),
 		metricsPort:             fs.String("metrics-port", "", "port for the Prometheus metrics listener (default: 9091)"),
@@ -310,6 +314,7 @@ func main() {
 	)
 	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
 	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
+	enableAPIKeyManagement := resolveBool("enable-api-key-management", *flags.enableAPIKeyManagement, visited, "LEAFWIKI_ENABLE_API_KEY_MANAGEMENT")
 	enableMetrics := resolveBool("enable-metrics", *flags.enableMetrics, visited, "LEAFWIKI_ENABLE_METRICS")
 	metricsHost := resolveString("metrics-host", *flags.metricsHost, visited, "LEAFWIKI_METRICS_HOST", "127.0.0.1")
 	metricsPort := resolveString("metrics-port", *flags.metricsPort, visited, "LEAFWIKI_METRICS_PORT", "9091")
@@ -440,6 +445,7 @@ func main() {
 		RefreshTokenTimeout:    refreshTokenTimeout,
 		AuthDisabled:           disableAuth,
 		EnableRevision:         enableRevision,
+		EnableAPIKeyManagement: enableAPIKeyManagement,
 		MaxRevisionHistory:     maxRevisionHistory,
 		RevisionCoalesceWindow: revisionCoalesceWindow,
 		Metrics:                metrics,
@@ -496,6 +502,7 @@ func main() {
 		MaxAssetUploadSizeBytes: maxAssetUploadSize,
 		EnableRevision:          enableRevision,
 		EnableLinkRefactor:      enableLinkRefactor,
+		EnableAPIKeyManagement:  enableAPIKeyManagement,
 		Metrics:                 metrics,
 		GitBackupEnabled:        gitBackupEnabled,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
