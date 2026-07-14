@@ -330,6 +330,7 @@ func (r *Routes) handleMove(c *gin.Context) {
 	var req struct {
 		Version  string `json:"version" binding:"required"`
 		ParentID string `json:"parentId"`
+		Position *int   `json:"position"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidPayload, "Invalid payload", "invalid payload")
@@ -340,7 +341,7 @@ func (r *Routes) handleMove(c *gin.Context) {
 		return
 	}
 	if err := r.movePage.Execute(c.Request.Context(), MovePageInput{
-		UserID: user.ID, ID: id, Version: req.Version, ParentID: req.ParentID,
+		UserID: user.ID, ID: id, Version: req.Version, ParentID: req.ParentID, Position: req.Position,
 	}); err != nil {
 		respondWithPageError(c, err)
 		return

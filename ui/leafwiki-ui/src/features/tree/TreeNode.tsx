@@ -6,10 +6,12 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import clsx from 'clsx'
-import { ChevronUp, FilePlus } from 'lucide-react'
+import { ChevronUp, FilePlus, FolderPlus } from 'lucide-react'
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTreeDnd } from './treeDndContext'
 import { useTreeNodeActionsMenusStore } from './treeNodeActionsMenus'
 import TreeNodeActionsMenu from './TreeNodeActionsMenu'
 
@@ -31,6 +33,27 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   )
   const isActive = isStoreActive
 
+  const dnd = useTreeDnd()
+  const {
+    setNodeRef: setDragRef,
+    listeners,
+    isDragging,
+  } = useDraggable({
+    id: node.id,
+    data: { node },
+    disabled: !dnd.enabled,
+  })
+  const { setNodeRef: setDropRef } = useDroppable({
+    id: node.id,
+    data: { node },
+    disabled: !dnd.enabled,
+  })
+  const setRowRef = (el: HTMLElement | null) => {
+    setDragRef(el)
+    setDropRef(el)
+  }
+  const dropTarget = dnd.dropTarget?.nodeId === node.id ? dnd.dropTarget : null
+
   const indent = 4
   const markerOffset = 8 // Distance from left for the vertical line
 
@@ -42,6 +65,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
         className="tree-node__link"
         data-testid={`tree-node-link-${node.id}`}
         aria-current={isActive ? 'page' : undefined}
+        draggable={false}
       >
         <span
           className={clsx('tree-node__title', {
@@ -59,15 +83,29 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   return (
     <>
       <div
+        ref={setRowRef}
+        {...(dnd.enabled ? listeners : {})}
         className={clsx('tree-node', {
           'tree-node--active': isActive,
           'tree-node--inactive': !isActive,
+          'tree-node--dragging': isDragging,
+          'tree-node--drop-inside': dropTarget?.zone === 'inside',
         })}
         data-testid={`tree-node-${node.id}`}
         style={{ paddingLeft: indent }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
+        {dropTarget?.zone === 'before' && (
+          <div className="tree-node__drop-line tree-node__drop-line--top" />
+        )}
+        {dropTarget?.zone === 'after' && (
+          <div className="tree-node__drop-line tree-node__drop-line--bottom" />
+        )}
+        {dropTarget?.zone === 'inside' && node.kind !== NODE_KIND_SECTION && (
+          // Nesting into a page converts it into a section on drop
+          <FolderPlus size={14} className="tree-node__nest-hint" />
+        )}
         <div
           className={clsx('tree-node__marker', {
             'tree-node__marker--active': isActive,
@@ -123,6 +161,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
       <div
         className={clsx('tree-node__children', {
           'tree-node__children--closed': !open,
+          'tree-node__children--dragging': dnd.activeId === node.id,
         })}
       >
         {hasChildren &&

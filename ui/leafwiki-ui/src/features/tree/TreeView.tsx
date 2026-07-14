@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { usePageEditorStore } from '../editor/pageEditorStore'
 import { PinnedSection } from './PinnedSection'
+import { TreeDndProvider } from './TreeDnd'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
@@ -208,11 +209,13 @@ export default function TreeView() {
         collapseToggleLabel={t('pinned.togglePagesSection')}
         actions={pagesToolbar}
       >
-        <div className="tree-view__nodes">
-          {tree?.children?.map((node) => (
-            <TreeNode key={node.id} node={node} />
-          ))}
-        </div>
+        <TreeDndProvider enabled={!readOnlyMode}>
+          <div className="tree-view__nodes">
+            {tree?.children?.map((node) => (
+              <TreeNode key={node.id} node={node} />
+            ))}
+          </div>
+        </TreeDndProvider>
       </SidebarAccordionSection>
     </Accordion>
   )

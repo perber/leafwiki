@@ -1276,8 +1276,16 @@ func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string
 	}, nil
 }
 
-// MoveNode moves a node to another parent (root if parentID is empty/"root")
+// MoveNode moves a node to another parent (root if parentID is empty/"root"),
+// appending it at the end of the new parent's children.
 func (t *TreeService) MoveNode(userID string, id string, parentID string, expectedVersion string) error {
+	return t.MoveNodeToPosition(userID, id, parentID, expectedVersion, -1)
+}
+
+// MoveNodeToPosition moves a node to another parent (root if parentID is empty/"root")
+// and inserts it at the given index among the new parent's children.
+// A negative or out-of-range position appends at the end.
+func (t *TreeService) MoveNodeToPosition(userID string, id string, parentID string, expectedVersion string, position int) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -1355,8 +1363,14 @@ func (t *TreeService) MoveNode(userID string, id string, parentID string, expect
 		}
 	}
 
-	node.Position = len(newParent.Children)
-	newParent.Children = append(newParent.Children, node)
+	insertAt := len(newParent.Children)
+	if position >= 0 && position < len(newParent.Children) {
+		insertAt = position
+	}
+	newParent.Children = append(newParent.Children, nil)
+	copy(newParent.Children[insertAt+1:], newParent.Children[insertAt:])
+	newParent.Children[insertAt] = node
+	node.Position = insertAt
 	node.Parent = newParent
 	t.rebuildChildSlugIndexForParentLocked(oldParent)
 	t.rebuildChildSlugIndexForParentLocked(newParent)

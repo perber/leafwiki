@@ -1,4 +1,9 @@
-import { fetchTree, PageNode } from '@/lib/api/pages'
+import {
+  fetchTree,
+  NODE_KIND_PAGE,
+  NODE_KIND_SECTION,
+  PageNode,
+} from '@/lib/api/pages'
 import { FlatPageSearchItem, buildFlatPageSearchItems } from '@/lib/pageSearch'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
@@ -54,8 +59,13 @@ type TreeStore = {
   pinnedPages: PageNode[]
   expandAll: () => void
   collapseAll: () => void
-  reloadTree: () => Promise<void>
+  reloadTree: (options?: { silent?: boolean }) => Promise<void>
   patchNodeVersion: (id: string, version: string) => void
+  moveNodeLocally: (
+    nodeId: string,
+    targetParentId: string,
+    index: number,
+  ) => void
   setPinnedLocally: (id: string, pinned: boolean, version: string) => void
   toggleNode: (id: string) => void
   openNode: (id: string) => void
@@ -192,6 +202,45 @@ export const useTreeStore = create<TreeStore>()(
         })
       },
 
+      moveNodeLocally: (
+        nodeId: string,
+        targetParentId: string,
+        index: number,
+      ) => {
+        const current = get().tree
+        if (!current) return
+
+        const tree = structuredClone(current)
+        const { byId: clonedById } = buildIndexes(tree)
+
+        const node = clonedById[nodeId]
+        const target = clonedById[targetParentId]
+        const oldParent = node?.parentId ? clonedById[node.parentId] : null
+        if (!node || !target || !oldParent?.children) return
+
+        const oldIndex = oldParent.children.findIndex((c) => c.id === nodeId)
+        if (oldIndex === -1) return
+        oldParent.children.splice(oldIndex, 1)
+
+        const children = target.children ?? []
+        target.children = children
+        const insertAt = Math.max(0, Math.min(index, children.length))
+        children.splice(insertAt, 0, node)
+        if (target.kind === NODE_KIND_PAGE) {
+          // Moving a node under a page converts that page into a section
+          // server-side; mirror it locally so the row updates instantly.
+          target.kind = NODE_KIND_SECTION
+        }
+
+        assignParentIds(tree)
+        const { byPath, byId } = buildIndexes(tree)
+        const flatPages = buildFlatPageSearchItems(tree)
+        const pinnedPages = Object.values(byId)
+          .filter((n) => n.pinned === true)
+          .sort((a, b) => a.title.localeCompare(b.title))
+        set({ tree, byPath, byId, flatPages, pinnedPages })
+      },
+
       setPinnedLocally: (id: string, pinned: boolean, version: string) => {
         const byId = get().byId
         const byPath = get().byPath
@@ -209,8 +258,10 @@ export const useTreeStore = create<TreeStore>()(
         })
       },
 
-      reloadTree: async () => {
-        set({ loading: true, error: null })
+      reloadTree: async (options?: { silent?: boolean }) => {
+        const silent = options?.silent === true
+        if (silent) set({ error: null })
+        else set({ loading: true, error: null })
 
         try {
           const tree = await fetchTree()
@@ -237,7 +288,7 @@ export const useTreeStore = create<TreeStore>()(
             set({ error: 'An unknown error occurred' })
           }
         } finally {
-          set({ loading: false })
+          if (!silent) set({ loading: false })
         }
       },
     }),

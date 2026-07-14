@@ -616,50 +616,57 @@ export default function MarkdownPreview({
     return () => observer.disconnect()
   }, [showToc, tocEntries.length, onStickyTocChange])
 
-  const markdownBody = (
-    <MarkdownPreviewErrorBoundary resetKey={`${path ?? ''}:${content}`}>
-      <>
-        <ReactMarkdown
-          // singleDollarTextMath disabled: $var in bash/code prose would be parsed
-          // as math delimiters and conflict with wikilink preprocessing. Use $$...$$ for math.
-          remarkPlugins={[
-            [remarkMath, { singleDollarTextMath: false }],
-            remarkGfm,
-          ]}
-          rehypePlugins={[
-            rehypeRaw,
-            rehypeLineNumber,
-            rehypeWhitelistStyles,
-            [rehypeKatex, { output: 'html', strict: 'ignore' }],
-            [rehypeSanitize, schema],
-            [
-              rehypeHighlight,
-              {
-                languages: {
-                  ...common,
-                  bash,
-                  sh: bash,
-                  shell,
-                  console: shell,
-                  shellsession: shell,
-                  dockerfile,
-                  http,
-                  nginx,
-                  nix,
-                  powershell,
-                  protobuf,
+  // Memoized on the resolved markdown string: tree updates (e.g. drag reorder
+  // in the sidebar) swap the store's byId identity on every change, and without
+  // this the whole remark/rehype pipeline would re-parse and re-render the
+  // article on each of those updates even though nothing in it changed.
+  const markdownBody = useMemo(
+    () => (
+      <MarkdownPreviewErrorBoundary resetKey={`${path ?? ''}:${content}`}>
+        <>
+          <ReactMarkdown
+            // singleDollarTextMath disabled: $var in bash/code prose would be parsed
+            // as math delimiters and conflict with wikilink preprocessing. Use $$...$$ for math.
+            remarkPlugins={[
+              [remarkMath, { singleDollarTextMath: false }],
+              remarkGfm,
+            ]}
+            rehypePlugins={[
+              rehypeRaw,
+              rehypeLineNumber,
+              rehypeWhitelistStyles,
+              [rehypeKatex, { output: 'html', strict: 'ignore' }],
+              [rehypeSanitize, schema],
+              [
+                rehypeHighlight,
+                {
+                  languages: {
+                    ...common,
+                    bash,
+                    sh: bash,
+                    shell,
+                    console: shell,
+                    shellsession: shell,
+                    dockerfile,
+                    http,
+                    nginx,
+                    nix,
+                    powershell,
+                    protobuf,
+                  },
                 },
-              },
-            ],
-          ]}
-          components={components}
-          urlTransform={transformMarkdownUrl}
-        >
-          {normalizedContent}
-        </ReactMarkdown>
-        <div id="mermaid-renderer"></div>
-      </>
-    </MarkdownPreviewErrorBoundary>
+              ],
+            ]}
+            components={components}
+            urlTransform={transformMarkdownUrl}
+          >
+            {normalizedContent}
+          </ReactMarkdown>
+          <div id="mermaid-renderer"></div>
+        </>
+      </MarkdownPreviewErrorBoundary>
+    ),
+    [normalizedContent, components, path, content],
   )
 
   if (!showToc || tocEntries.length <= 3) {
