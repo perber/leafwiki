@@ -2,16 +2,7 @@ import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
 import { withBasePath } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
-import bash from 'highlight.js/lib/languages/bash'
-import dockerfile from 'highlight.js/lib/languages/dockerfile'
-import http from 'highlight.js/lib/languages/http'
-import nginx from 'highlight.js/lib/languages/nginx'
-import nix from 'highlight.js/lib/languages/nix'
-import powershell from 'highlight.js/lib/languages/powershell'
-import protobuf from 'highlight.js/lib/languages/protobuf'
-import shell from 'highlight.js/lib/languages/shell'
 import 'katex/dist/katex.min.css'
-import { common } from 'lowlight'
 import {
   AnchorHTMLAttributes,
   AudioHTMLAttributes,
@@ -51,6 +42,7 @@ import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndenta
 import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
+import { syntaxHighlightLanguages } from './syntaxHighlightLanguages'
 import { TocDropdownButton } from './TocDropdownButton'
 
 const schema = {
@@ -640,20 +632,7 @@ export default function MarkdownPreview({
               [
                 rehypeHighlight,
                 {
-                  languages: {
-                    ...common,
-                    bash,
-                    sh: bash,
-                    shell,
-                    console: shell,
-                    shellsession: shell,
-                    dockerfile,
-                    http,
-                    nginx,
-                    nix,
-                    powershell,
-                    protobuf,
-                  },
+                  languages: syntaxHighlightLanguages,
                 },
               ],
             ]}

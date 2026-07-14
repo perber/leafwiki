@@ -53,6 +53,24 @@ if (Test-Path $path) {
     expect(powershellCodeBlock?.querySelector('.hljs-variable')).not.toBeNull()
   })
 
+  it('highlights AutoHotkey code fences', () => {
+    const content = `\`\`\`autohotkey
+#Requires AutoHotkey v2.0
+if WinExist("Untitled - Notepad") {
+  WinActivate
+}
+\`\`\``
+
+    const { container } = render(<MarkdownPreview content={content} />)
+
+    const autohotkeyCodeBlock = container.querySelector(
+      'code.language-autohotkey.hljs',
+    )
+    expect(autohotkeyCodeBlock).not.toBeNull()
+    expect(autohotkeyCodeBlock?.querySelector('.hljs-meta')).not.toBeNull()
+    expect(autohotkeyCodeBlock?.querySelector('.hljs-string')).not.toBeNull()
+  })
+
   it('renders external images from markdown image syntax', () => {
     const { container } = render(
       <MarkdownPreview content="![Remote diagram](https://example.com/diagram.png)" />,
