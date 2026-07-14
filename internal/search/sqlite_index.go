@@ -109,22 +109,17 @@ func NewSQLiteIndex(storageDir string) (*SQLiteIndex, error) {
 		filename:   "search.db",
 	}
 
-	if err := s.ensureSchema(); err != nil {
-		// Only attempt recovery for genuine SQLite I/O or corruption errors
-		// (SQLITE_IOERR=10, SQLITE_CORRUPT=11, SQLITE_NOTADB=26).
-		// Transient errors like SQLITE_BUSY are returned immediately.
-		if !sqliteutil.IsSQLiteRecoverableError(err) {
-			return nil, err
+	err := sqliteutil.RetryOnCorruption(searchIndexDatabasePath(s.storageDir, s.filename), func() error {
+		if err := s.ensureSchema(); err != nil {
+			if closeErr := s.Close(); closeErr != nil {
+				slog.Default().Warn("failed to close corrupt search database before recovery", "error", closeErr)
+			}
+			return err
 		}
-		slog.Default().Warn("search index initialization failed, removing corrupt database and retrying", "error", err)
-		if closeErr := s.Close(); closeErr != nil {
-			slog.Default().Warn("failed to close corrupt search database before recovery", "error", closeErr)
-		}
-		sqliteutil.RemoveSQLiteFiles(searchIndexDatabasePath(s.storageDir, s.filename))
-		if err2 := s.ensureSchema(); err2 != nil {
-			_ = s.Close()
-			return nil, err2
-		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return s, nil
