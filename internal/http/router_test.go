@@ -19,6 +19,7 @@ import (
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
@@ -49,6 +50,20 @@ func createWikiTestInstanceWithRevisionFlag(t *testing.T, enableRevision bool) *
 
 func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return createRouterTestInstanceWithMaxAssetUploadSize(w, t, assets.DefaultMaxUploadSizeBytes)
+}
+
+func createRouterTestInstanceWithMetricsEnabled(w *wiki.Wiki, t *testing.T) *gin.Engine {
+	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            false,
+		InjectCodeInHeader:      "",
+		CustomStylesheet:        "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		Metrics:                 httpmetrics.NewHTTPMetrics(),
+	})
 }
 
 func createRouterTestInstanceWithRevision(w *wiki.Wiki, t *testing.T) *gin.Engine {
@@ -630,6 +645,34 @@ func TestDisableRequestLog_DoesNotCrash(t *testing.T) {
 	}
 }
 
+func TestMetricsEndpoint_IsNotExposedOnAppRouterByDefault(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 from disabled /metrics endpoint, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestMetricsEndpoint_IsNotExposedOnAppRouterWhenMetricsEnabled(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstanceWithMetricsEnabled(w, t)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 from app router /metrics endpoint, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestMeEndpoint_Unauthenticated_Returns200WithNullBody(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
@@ -998,6 +1041,96 @@ func TestConfigEndpoint_UserManagementUrlDefaultsToEmpty(t *testing.T) {
 
 	if got != "" {
 		t.Fatalf("Expected userManagementUrl to default to empty string, got %q", got)
+	}
+}
+
+func TestConfigEndpoint_IncludesLoginAndLogoutUrl(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		LoginURL:                "https://idp.example.com/login",
+		LogoutURL:               "https://idp.example.com/logout",
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	gotLogin, ok := resp["loginUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected loginUrl in config response, got %v", resp)
+	}
+	if gotLogin != "https://idp.example.com/login" {
+		t.Fatalf("Expected loginUrl=%q, got %q", "https://idp.example.com/login", gotLogin)
+	}
+
+	gotLogout, ok := resp["logoutUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected logoutUrl in config response, got %v", resp)
+	}
+	if gotLogout != "https://idp.example.com/logout" {
+		t.Fatalf("Expected logoutUrl=%q, got %q", "https://idp.example.com/logout", gotLogout)
+	}
+}
+
+func TestConfigEndpoint_LoginAndLogoutUrlDefaultToEmpty(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	gotLogin, ok := resp["loginUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected loginUrl in config response, got %v", resp)
+	}
+	if gotLogin != "" {
+		t.Fatalf("Expected loginUrl to default to empty string, got %q", gotLogin)
+	}
+
+	gotLogout, ok := resp["logoutUrl"].(string)
+	if !ok {
+		t.Fatalf("Expected logoutUrl in config response, got %v", resp)
+	}
+	if gotLogout != "" {
+		t.Fatalf("Expected logoutUrl to default to empty string, got %q", gotLogout)
 	}
 }
 

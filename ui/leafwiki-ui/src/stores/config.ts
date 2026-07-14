@@ -11,7 +11,8 @@ type ConfigStore = {
   enableLinkRefactor: boolean
   gitBackupEnabled: boolean
   httpRemoteUserEnabled: boolean
-  httpRemoteUserLogoutUrl: string
+  loginUrl: string
+  logoutUrl: string
   userManagementUrl: string
   error: string | null
   loading: boolean
@@ -28,7 +29,8 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   enableLinkRefactor: false,
   gitBackupEnabled: false,
   httpRemoteUserEnabled: false,
-  httpRemoteUserLogoutUrl: '',
+  loginUrl: '',
+  logoutUrl: '',
   userManagementUrl: '',
   error: null,
   loading: false,
@@ -53,7 +55,8 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         enableLinkRefactor: config.enableLinkRefactor ?? false,
         gitBackupEnabled: config.gitBackupEnabled ?? false,
         httpRemoteUserEnabled: config.httpRemoteUserEnabled ?? false,
-        httpRemoteUserLogoutUrl: config.httpRemoteUserLogoutUrl ?? '',
+        loginUrl: config.loginUrl ?? '',
+        logoutUrl: config.logoutUrl ?? '',
         userManagementUrl: config.userManagementUrl ?? '',
         error: null,
         hasLoaded: true,

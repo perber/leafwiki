@@ -30,7 +30,7 @@ func TestResetAdminPassword(t *testing.T) {
 	}
 
 	// Now test ResetAdminPassword
-	adminUser, err := ResetAdminPassword(tempDir)
+	adminUser, err := ResetAdminPassword(tempDir, "", "")
 	if err != nil {
 		t.Fatalf("ResetAdminPassword failed: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestResetAdminPassword_NoAdmin(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Test ResetAdminPassword when no admin exists
-	adminUser, err := ResetAdminPassword(tempDir)
+	adminUser, err := ResetAdminPassword(tempDir, "", "")
 	if err != nil {
 		t.Fatalf("ResetAdminPassword failed: %v", err)
 	}
@@ -98,5 +98,23 @@ func TestResetAdminPassword_NoAdmin(t *testing.T) {
 	_, err = userService.GetUserByEmailOrUsernameAndPassword("admin", adminUser.Password)
 	if err != nil {
 		t.Errorf("Failed to login with new password: %v", err)
+	}
+}
+
+func TestResetAdminPassword_NoAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
+	// Create a temporary directory for the test (no admin user exists)
+	tempDir := t.TempDir()
+
+	adminUser, err := ResetAdminPassword(tempDir, "root", "root@example.com")
+	if err != nil {
+		t.Fatalf("ResetAdminPassword failed: %v", err)
+	}
+
+	if adminUser.Username != "root" {
+		t.Errorf("Expected username 'root', got: %s", adminUser.Username)
+	}
+
+	if adminUser.Email != "root@example.com" {
+		t.Errorf("Expected email 'root@example.com', got: %s", adminUser.Email)
 	}
 }

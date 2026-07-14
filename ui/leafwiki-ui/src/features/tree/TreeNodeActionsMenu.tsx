@@ -13,6 +13,7 @@ import {
   NODE_KIND_SECTION,
   pinPage,
   previewPageRefactor,
+  updatePage,
 } from '@/lib/api/pages'
 import type { Page, PageNode } from '@/lib/api/pages'
 import { asApiLocalizedError, mapApiError } from '@/lib/api/errors'
@@ -26,6 +27,7 @@ import {
 } from '@/lib/registries'
 import { stripBasePath } from '@/lib/routePath'
 import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
+import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useViewerStore } from '@/features/viewer/viewer'
 import { useTreeStore } from '@/stores/tree'
@@ -61,6 +63,7 @@ export default function TreeNodeActionsMenu({
   const { t } = useTranslation('viewer')
   const { id: nodeId, kind: nodeKind, children, version: nodeVersion } = node
   const currentEditorPageId = usePageEditorStore((state) => state.page?.id)
+  const enableLinkRefactor = useConfigStore((s) => s.enableLinkRefactor)
   const openDialog = useDialogsStore((state) => state.openDialog)
   const reloadTree = useTreeStore((state) => state.reloadTree)
   const hasChildren = children && children.length > 0
@@ -140,27 +143,41 @@ export default function TreeNodeActionsMenu({
           return
         }
 
-        const preview = await previewPageRefactor(page.id, {
-          kind: 'rename',
-          title,
-          slug,
-        })
-        const rewriteLinks = await confirmPageRefactor(preview, {
-          allowSkipRewrite: true,
-        })
+        let updatedPage: Page | null
 
-        if (rewriteLinks === null) {
-          return
+        if (slugChanged && enableLinkRefactor) {
+          const preview = await previewPageRefactor(page.id, {
+            kind: 'rename',
+            title,
+            slug,
+          })
+          const rewriteLinks = await confirmPageRefactor(preview, {
+            allowSkipRewrite: true,
+          })
+
+          if (rewriteLinks === null) {
+            return
+          }
+
+          updatedPage = await applyPageRefactor(page.id, {
+            kind: 'rename',
+            version: page.version,
+            title,
+            slug,
+            content: page.content,
+            rewriteLinks,
+          })
+        } else {
+          updatedPage = await updatePage(
+            page.id,
+            page.version,
+            title,
+            slug,
+            page.content,
+            page.tags ?? [],
+            page.properties ?? {},
+          )
         }
-
-        const updatedPage: Page | null = await applyPageRefactor(page.id, {
-          kind: 'rename',
-          version: page.version,
-          title,
-          slug,
-          content: page.content,
-          rewriteLinks,
-        })
 
         await reloadTree()
 
@@ -204,6 +221,7 @@ export default function TreeNodeActionsMenu({
     },
     [
       currentEditorPageId,
+      enableLinkRefactor,
       getCurrentRoutePath,
       navigate,
       node.path,

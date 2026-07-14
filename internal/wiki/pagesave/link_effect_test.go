@@ -24,7 +24,7 @@ func setupLinkEffect(t *testing.T) (*LinkIndexSideEffect, *links.LinkService, *t
 		t.Fatalf("NewLinksStore: %v", err)
 	}
 	svc := links.NewLinkService(dataDir, ts, store)
-	return NewLinkIndexSideEffect(svc, nil), svc, ts
+	return NewLinkIndexSideEffect(svc, nil, nil), svc, ts
 }
 
 // TestLinkIndexSideEffect_Rename_HealsPreexistingBrokenWikilinks verifies that

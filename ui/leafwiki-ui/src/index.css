@@ -523,7 +523,11 @@
   }
 
   .app-layout__sidebar-container {
-    @apply relative z-30 box-border h-full overflow-auto pr-1 max-sm:fixed max-sm:h-[calc(100dvh-55px)];
+    @apply relative z-30 box-border h-full overflow-x-hidden overflow-y-auto pr-1 max-sm:fixed max-sm:h-[calc(100dvh-55px)];
+  }
+
+  .app-layout__sidebar-panel {
+    @apply h-full;
   }
 
   .app-layout__sidebar-container--flush {
@@ -531,7 +535,7 @@
   }
 
   .app-layout__sidebar-resizer {
-    @apply absolute inset-y-0 right-0 flex w-1 cursor-col-resize items-center justify-center;
+    @apply absolute inset-y-0 right-0 z-10 flex w-1 cursor-col-resize items-center justify-center;
   }
 
   .app-layout__sidebar-resize-handle {
@@ -567,7 +571,13 @@
     display: none;
   }
 
-  /* TOC right pane — hidden by default and when empty (no portal content) */
+  /* TOC right pane — hidden by default and when empty (no portal content).
+     Width shrinks to icon-only on collapse so the article actually reclaims
+     the reading width (not just a fixed-footprint content crossfade). The
+     subheader bar's matching padding-right (.page-viewer__subheader--toc-
+     reserved / --collapsed in the subheader rules below) transitions with
+     the exact same width/duration so it stays aligned with <main> at every
+     frame, not just at rest. */
   .app-layout__toc-pane {
     display: none;
   }
@@ -582,6 +592,20 @@
       width: 16rem;
       flex-shrink: 0;
       padding-top: 1.5rem;
+      overflow: hidden;
+      transition: width 200ms ease;
+    }
+
+    /* 3rem, not a rounder 2.5rem: the header needs pl-3 (12px) + border-l
+       (1px) + the toggle button (~22px) + its gap-2 (8px) to the title even
+       when the title has shrunk to 0 width — ~43px minimum. At 2.5rem
+       (40px) the header narrowly overflowed its own box right at the end of
+       the collapse animation, which made justify-between's space-between
+       fall back to packing from the start (no slack left to distribute),
+       causing the button to visibly jump a couple of px right at the tail
+       of the transition instead of staying flush against the right edge. */
+    .app-layout__toc-pane--collapsed:not(:empty) {
+      width: 3rem;
     }
   }
 
@@ -1592,6 +1616,27 @@
     @apply bg-background/92 border-surface-border border-b backdrop-blur-sm md:h-12;
   }
 
+  /* The subheader bar/border itself stays full-width (this is a sibling of
+     the toc pane, not inside it, so the scrollbar stays at the true outer
+     edge and the border spans the whole row). This padding instead shrinks
+     just its own content box to match <main>'s width, so
+     .page-viewer__subheader-inner's mx-auto centers at the same x position
+     as the article — same effect as being a real flex sibling of the toc
+     pane, without actually being one. Transitions in lockstep with
+     .app-layout__toc-pane's own width (same 200ms/values) so the two stay
+     aligned mid-animation, not just at rest. */
+  @media (min-width: 1280px) {
+    .page-viewer__subheader--toc-reserved {
+      padding-right: 16rem;
+      transition: padding-right 200ms ease;
+    }
+
+    .page-viewer__subheader--toc-reserved-collapsed {
+      padding-right: 3rem;
+      transition: padding-right 200ms ease;
+    }
+  }
+
   .page-viewer__subheader-inner {
     @apply mx-auto flex w-full max-w-5xl flex-col gap-2 px-4 pt-0.75 pb-1.25 sm:px-8 md:h-full md:flex-row md:items-center md:justify-between md:gap-4 md:py-0;
   }
@@ -1604,6 +1649,10 @@
     @apply flex min-w-0 flex-col justify-center gap-0.5;
   }
 
+  /* Falls back to the dropdown below the reserved side panel's breakpoint
+     (see .app-layout__toc-pane) — same xl breakpoint, since the panel now
+     takes real space rather than floating, so there's no overlap risk to
+     guard against with a more precise measurement. */
   .page-viewer__toc-button {
     @apply flex w-auto items-center self-start md:shrink-0 md:justify-end md:self-center xl:hidden;
   }
@@ -1616,21 +1665,69 @@
     @apply flex min-h-0 flex-1 flex-col gap-8;
   }
 
-  /* TOC panel renders inside app-layout__toc-pane (right pane portal) */
+  /* TOC panel renders inside app-layout__toc-pane (right pane portal), which
+     animates its own width (16rem <-> 3rem) on collapse/expand (see
+     .app-layout__toc-pane) — <main> and the subheader both reflow to
+     reclaim/give up that space. The border fades with the content via
+     border-color (not display/width), independent of the always-visible
+     header/toggle button below. */
   .page-viewer__toc-panel {
-    @apply w-full;
+    @apply border-surface-border w-full border-l pb-4 pl-3 transition-colors duration-200;
   }
 
-  .page-viewer__toc-panel-inner {
-    @apply border-surface-border border-l pb-4 pl-3;
+  .page-viewer__toc-panel--collapsed {
+    @apply border-transparent;
   }
 
+  .page-viewer__toc-panel-header {
+    @apply mb-2 flex items-center justify-between gap-2;
+  }
+
+  /* No opacity fade here: min-width: 0 + nowrap + overflow-hidden mean this
+     already shrinks/clips in real time as .app-layout__toc-pane's own width
+     transition narrows it — that reads as the text sliding away under the
+     collapsing edge, not a fade. visibility is delayed on the way out (so
+     Playwright/AT visibility checks stay accurate) but flips back
+     immediately on the way in. */
   .page-viewer__toc-panel-title {
-    @apply text-interface-text mb-2 text-xs font-semibold tracking-wide uppercase;
+    @apply text-interface-text min-w-0 flex-1 overflow-hidden text-xs font-semibold tracking-wide whitespace-nowrap uppercase;
+    visibility: visible;
+    transition: visibility 0s linear 0s;
   }
 
+  /* Toggle button is a single, always-mounted element (see TocSidePanel.tsx)
+     rather than two swapped elements — only its icon changes between
+     collapsed/expanded. shrink-0 keeps it a fixed size as the title shrinks
+     away and the pane narrows around it. */
+  .page-viewer__toc-panel-toggle-button {
+    @apply text-interface-text/60 hover:text-interface-text hover:bg-surface-alt flex shrink-0 cursor-pointer items-center justify-center rounded p-1 transition-colors;
+    background: none;
+    border: none;
+  }
+
+  .page-viewer__toc-panel-list {
+    visibility: visible;
+    transition: visibility 0s linear 0s;
+  }
+
+  /* No opacity — entries are w-full block elements, so they already track
+     .app-layout__toc-pane's width transition frame-by-frame (real flex/block
+     reflow, not a separate animation), and overflow-hidden + whitespace-
+     nowrap on .page-viewer__toc-panel-entry clip the text as that shrinks.
+     That's the "slide the content away" motion; this class just makes it
+     non-interactive and, after the collapse finishes (transition-delay),
+     hidden from assistive tech / Playwright visibility checks. */
+  .page-viewer__toc-panel-hidden {
+    @apply pointer-events-none;
+    visibility: hidden;
+    transition-delay: 200ms;
+  }
+
+  /* Single-line + ellipsis: without this, long headings wrap to multiple
+     lines as the pane narrows during the collapse transition, which reads as
+     jumbled reflow rather than a clean shrink. */
   .page-viewer__toc-panel-entry {
-    @apply text-interface-text/70 hover:text-interface-text block w-full cursor-pointer py-0.5 text-left text-sm leading-snug transition-colors;
+    @apply text-interface-text/70 hover:text-interface-text block w-full cursor-pointer overflow-hidden py-0.5 text-left text-sm leading-snug text-ellipsis whitespace-nowrap transition-colors;
     background: none;
     border: none;
   }
@@ -2368,8 +2465,38 @@
     @apply w-full;
   }
 
-  .tree-view__toolbar {
-    @apply mt-1 mb-2 ml-1 flex;
+  .sidebar-accordion-section__header {
+    @apply flex w-full items-center justify-between gap-2 px-1 py-1;
+  }
+
+  .sidebar-accordion-section__title {
+    @apply text-muted flex items-center gap-1 text-xs font-medium tracking-wide uppercase select-none;
+  }
+
+  .sidebar-accordion-section__count {
+    @apply text-muted text-xs font-normal normal-case;
+  }
+
+  .sidebar-accordion-section__actions {
+    @apply flex items-center gap-1;
+  }
+
+  .sidebar-accordion-section__trigger {
+    @apply text-muted hover:text-interface-text flex cursor-pointer items-center justify-center rounded p-0.5 opacity-70 hover:opacity-100;
+    background: none;
+    border: none;
+  }
+
+  .sidebar-accordion-section__trigger svg {
+    @apply transition-transform duration-200;
+  }
+
+  .sidebar-accordion-section__trigger[data-state='open'] svg {
+    @apply rotate-180;
+  }
+
+  .sidebar-accordion-section__content {
+    @apply pt-1 pb-2;
   }
 
   .tree-view__status {
@@ -2393,19 +2520,7 @@
   }
 
   .tree-view__pinned {
-    @apply mb-1 w-full;
-  }
-
-  .tree-view__section-header {
-    @apply text-muted flex items-center gap-1 px-1 py-0.5 text-xs font-medium tracking-wide uppercase select-none;
-  }
-
-  .tree-view__pinned-header {
-    @apply text-muted flex items-center gap-1 px-1 py-0.5 text-xs font-medium tracking-wide uppercase select-none;
-  }
-
-  .tree-view__pinned-divider {
-    @apply bg-surface-border mt-1 mb-2 h-px w-full;
+    @apply w-full;
   }
 
   .tree-view__pinned-item {

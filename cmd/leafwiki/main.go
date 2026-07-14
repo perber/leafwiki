@@ -25,6 +25,7 @@ import (
 	"github.com/perber/wiki/internal/backup"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/wiki"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
@@ -50,6 +51,8 @@ func writeUsage(w io.Writer) {
 	--unix-socket      Path to a unix domain socket to listen on (overrides --host and --port)
 	--data-dir         Path to data directory (default: ./data)
 	--admin-password   Initial admin password (used only if no admin exists)
+	--admin-username   Initial admin username (used only if no admin exists) (default: admin)
+	--admin-email      Initial admin email (used only if no admin exists) (default: admin@localhost)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
 	--public-access    Allow public access to the wiki only with read access (default: false)
 	--allow-insecure   Allow insecure HTTP connections (default: false)                      
@@ -65,12 +68,19 @@ func writeUsage(w io.Writer) {
 	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
 	--enable-revision             Enable the revision / page history feature (default: false)
 	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
+	--enable-metrics              Enable the Prometheus /metrics endpoint on a separate listener (default: false)
+	--metrics-host                Host/IP for the metrics listener (default: 127.0.0.1)
+	--metrics-port                Port for the metrics listener (default: 9091)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
 	--revision-coalesce-window    Window for coalescing rapid successive saves by the same author (e.g. 5m, 0 = disabled) (default: 5m)
 	--enable-http-remote-user       Enable reverse-proxy authentication via HTTP header (default: false)
 	--http-remote-user-header-name  HTTP header carrying the username from a trusted proxy (default: Remote-User)
 	--trusted-proxy-ips             Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
-	--http-remote-user-logout-url   URL the frontend redirects to after logout in proxy-auth mode (default: "")
+	--login-url                     URL the frontend redirects to instead of the built-in login form
+	                                 (e.g. an external SSO/IdP login page) (default: "")
+	--logout-url                    URL the frontend redirects to after logout
+	                                 (e.g. an external SSO/IdP logout page) (default: "")
+	--http-remote-user-logout-url   Deprecated: use --logout-url instead
 	--user-management-url           URL to an external user-management page; when set, the built-in
 	                                 User Management UI is replaced with a link to this URL (default: "")
 	--disable-request-log           Suppress per-request HTTP access log lines (default: false)
@@ -92,6 +102,8 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_JWT_SECRET
 	LEAFWIKI_LOG_LEVEL
 	LEAFWIKI_ADMIN_PASSWORD
+	LEAFWIKI_ADMIN_USERNAME
+	LEAFWIKI_ADMIN_EMAIL
 	LEAFWIKI_PUBLIC_ACCESS
 	LEAFWIKI_ALLOW_INSECURE
 	LEAFWIKI_INJECT_CODE_IN_HEADER
@@ -104,12 +116,17 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_MAX_ASSET_UPLOAD_SIZE
 	LEAFWIKI_ENABLE_REVISION
 	LEAFWIKI_ENABLE_LINK_REFACTOR
+	LEAFWIKI_ENABLE_METRICS
+	LEAFWIKI_METRICS_HOST
+	LEAFWIKI_METRICS_PORT
 	LEAFWIKI_MAX_REVISION_HISTORY
 	LEAFWIKI_REVISION_COALESCE_WINDOW
 	LEAFWIKI_ENABLE_HTTP_REMOTE_USER
 	LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME
 	LEAFWIKI_TRUSTED_PROXY_IPS
-	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
+	LEAFWIKI_LOGIN_URL
+	LEAFWIKI_LOGOUT_URL
+	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL  (deprecated: use LEAFWIKI_LOGOUT_URL instead)
 	LEAFWIKI_USER_MANAGEMENT_URL
 	LEAFWIKI_DISABLE_REQUEST_LOG
 	LEAFWIKI_GIT_BACKUP
@@ -160,6 +177,8 @@ type cliFlags struct {
 	port                    *string
 	unixSocket              *string
 	dataDir                 *string
+	adminUsername           *string
+	adminEmail              *string
 	adminPassword           *string
 	jwtSecret               *string
 	publicAccess            *bool
@@ -174,10 +193,15 @@ type cliFlags struct {
 	maxAssetUploadSize      *string
 	enableRevision          *bool
 	enableLinkRefactor      *bool
+	enableMetrics           *bool
+	metricsHost             *string
+	metricsPort             *string
 	maxRevisionHistory      *int
 	enableHTTPRemoteUser    *bool
 	httpRemoteUserHeader    *string
 	trustedProxyIPs         *string
+	loginURL                *string
+	logoutURL               *string
 	httpRemoteUserLogoutURL *string
 	userManagementURL       *string
 	disableRequestLog       *bool
@@ -199,6 +223,8 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		port:                    fs.String("port", "", "port to run the server on"),
 		unixSocket:              fs.String("unix-socket", "", "path to a unix domain socket to listen on; overrides --host and --port"),
 		dataDir:                 fs.String("data-dir", "", "path to data directory"),
+		adminUsername:           fs.String("admin-username", "", "initial admin username (used only if no admin exists) (default: admin)"),
+		adminEmail:              fs.String("admin-email", "", "initial admin email (used only if no admin exists) (default: admin@localhost)"),
 		adminPassword:           fs.String("admin-password", "", "initial admin password"),
 		jwtSecret:               fs.String("jwt-secret", "", "JWT secret for authentication"),
 		publicAccess:            fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
@@ -213,11 +239,16 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
 		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
 		enableLinkRefactor:      fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
+		enableMetrics:           fs.Bool("enable-metrics", false, "enable the Prometheus /metrics endpoint on a separate listener (default: false)"),
+		metricsHost:             fs.String("metrics-host", "", "host/IP address for the Prometheus metrics listener (default: 127.0.0.1)"),
+		metricsPort:             fs.String("metrics-port", "", "port for the Prometheus metrics listener (default: 9091)"),
 		maxRevisionHistory:      fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
 		enableHTTPRemoteUser:    fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
 		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
 		trustedProxyIPs:         fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
-		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "URL the frontend redirects to after logout when reverse-proxy auth is active (e.g. https://auth.example.com/logout)"),
+		loginURL:                fs.String("login-url", "", "URL the frontend redirects to instead of the built-in login form (e.g. an external SSO/IdP login page)"),
+		logoutURL:               fs.String("logout-url", "", "URL the frontend redirects to after logout (e.g. an external SSO/IdP logout page)"),
+		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "deprecated: use --logout-url instead"),
 		userManagementURL:       fs.String("user-management-url", "", "URL to an external user-management page; when set, the built-in User Management UI is replaced with a link to this URL"),
 		disableRequestLog:       fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
 		gitBackup:               fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
@@ -258,6 +289,10 @@ func main() {
 	unixSocket := resolveString("unix-socket", *flags.unixSocket, visited, "LEAFWIKI_UNIX_SOCKET", "")
 	dataDir := resolveString("data-dir", *flags.dataDir, visited, "LEAFWIKI_DATA_DIR", "./data")
 	adminPassword := resolveString("admin-password", *flags.adminPassword, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
+	// Empty stays empty here; auth.UserService applies the "admin"/"admin@localhost"
+	// fallback itself, so that default lives in exactly one place.
+	adminUsername := resolveString("admin-username", *flags.adminUsername, visited, "LEAFWIKI_ADMIN_USERNAME", "")
+	adminEmail := resolveString("admin-email", *flags.adminEmail, visited, "LEAFWIKI_ADMIN_EMAIL", "")
 	jwtSecret := resolveString("jwt-secret", *flags.jwtSecret, visited, "LEAFWIKI_JWT_SECRET", "")
 	injectCodeInHeader := resolveString("inject-code-in-header", *flags.injectCodeInHeader, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
 	customStylesheet := resolveString("custom-stylesheet", *flags.customStylesheet, visited, "LEAFWIKI_CUSTOM_STYLESHEET", "")
@@ -275,12 +310,20 @@ func main() {
 	)
 	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
 	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
+	enableMetrics := resolveBool("enable-metrics", *flags.enableMetrics, visited, "LEAFWIKI_ENABLE_METRICS")
+	metricsHost := resolveString("metrics-host", *flags.metricsHost, visited, "LEAFWIKI_METRICS_HOST", "127.0.0.1")
+	metricsPort := resolveString("metrics-port", *flags.metricsPort, visited, "LEAFWIKI_METRICS_PORT", "9091")
 	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
 	revisionCoalesceWindow := resolveDuration("revision-coalesce-window", *flags.revisionCoalesceWindow, visited, "LEAFWIKI_REVISION_COALESCE_WINDOW")
 	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
 	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
 	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
-	httpRemoteUserLogoutURL := resolveString("http-remote-user-logout-url", *flags.httpRemoteUserLogoutURL, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL", "")
+	loginURL := resolveString("login-url", *flags.loginURL, visited, "LEAFWIKI_LOGIN_URL", "")
+	logoutURL := resolveString("logout-url", *flags.logoutURL, visited, "LEAFWIKI_LOGOUT_URL", "")
+	if resolved, usedDeprecated := resolveLogoutURL(logoutURL, *flags.httpRemoteUserLogoutURL, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL"); usedDeprecated {
+		slog.Default().Warn("--http-remote-user-logout-url/LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL is deprecated, use --logout-url/LEAFWIKI_LOGOUT_URL instead")
+		logoutURL = resolved
+	}
 	userManagementURL := resolveString("user-management-url", *flags.userManagementURL, visited, "LEAFWIKI_USER_MANAGEMENT_URL", "")
 	disableRequestLog := resolveBool("disable-request-log", *flags.disableRequestLog, visited, "LEAFWIKI_DISABLE_REQUEST_LOG")
 	gitBackupEnabled := resolveBool("git-backup", *flags.gitBackup, visited, "LEAFWIKI_GIT_BACKUP")
@@ -304,10 +347,26 @@ func main() {
 		fail("Invalid HTTP remote user configuration", "error", err)
 	}
 
+	if err := validateRedirectURL("login-url", loginURL); err != nil {
+		fail("Invalid login URL configuration", "error", err)
+	}
+	if err := validateRedirectURL("logout-url", logoutURL); err != nil {
+		fail("Invalid logout URL configuration", "error", err)
+	}
+	// --user-management-url is only ever used as a plain <a href> in the frontend
+	// (relative paths and other schemes work fine there), so it isn't restricted
+	// to http(s) like --login-url/--logout-url, which the browser navigates to directly.
+
 	if enableHTTPRemoteUser {
 		slog.Default().Info("Reverse-proxy authentication enabled",
 			"header", httpRemoteUserHeader,
 			"trusted_proxies", trustedProxyIPsRaw,
+		)
+	}
+	if enableMetrics {
+		slog.Default().Info("Prometheus metrics enabled",
+			"metrics_host", metricsHost,
+			"metrics_port", metricsPort,
 		)
 	}
 
@@ -321,7 +380,7 @@ func main() {
 	if len(args) > 0 {
 		switch args[0] {
 		case "reset-admin-password":
-			user, err := tools.ResetAdminPassword(dataDir)
+			user, err := tools.ResetAdminPassword(dataDir, adminUsername, adminEmail)
 			if err != nil {
 				fail("Password reset failed", "error", err)
 			}
@@ -366,8 +425,15 @@ func main() {
 		}
 	}
 
+	var metrics *httpmetrics.HTTPMetrics
+	if enableMetrics {
+		metrics = httpmetrics.NewHTTPMetrics()
+	}
+
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
 		StorageDir:             dataDir,
+		AdminUsername:          adminUsername,
+		AdminEmail:             adminEmail,
 		AdminPassword:          adminPassword,
 		JWTSecret:              jwtSecret,
 		AccessTokenTimeout:     accessTokenTimeout,
@@ -376,6 +442,7 @@ func main() {
 		EnableRevision:         enableRevision,
 		MaxRevisionHistory:     maxRevisionHistory,
 		RevisionCoalesceWindow: revisionCoalesceWindow,
+		Metrics:                metrics,
 	})
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)
@@ -429,16 +496,18 @@ func main() {
 		MaxAssetUploadSizeBytes: maxAssetUploadSize,
 		EnableRevision:          enableRevision,
 		EnableLinkRefactor:      enableLinkRefactor,
+		Metrics:                 metrics,
 		GitBackupEnabled:        gitBackupEnabled,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:        enableHTTPRemoteUser,
 			HeaderName:     httpRemoteUserHeader,
 			TrustedProxies: trustedProxies,
 			UserService:    w.UserService(),
-			LogoutURL:      httpRemoteUserLogoutURL,
 		},
 		DisableRequestLog: disableRequestLog,
 		UserManagementURL: userManagementURL,
+		LoginURL:          loginURL,
+		LogoutURL:         logoutURL,
 	})
 
 	reloadSignals := make(chan os.Signal, 1)
@@ -449,7 +518,7 @@ func main() {
 	signal.Notify(shutdownSignals, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(shutdownSignals)
 
-	if err := runServer(router, host, port, unixSocket, dataDir, w.TriggerResyncAsync, reloadSignals, shutdownSignals); err != nil {
+	if err := runServer(router, host, port, unixSocket, dataDir, metrics, metricsHost, metricsPort, w.TriggerResyncAsync, reloadSignals, shutdownSignals); err != nil {
 		slog.Default().Error("Failed to start server", "error", err)
 		exitCode = 1
 		return
@@ -459,11 +528,24 @@ func main() {
 func runServer(
 	router *gin.Engine,
 	host, port, unixSocket, dataDir string,
+	metrics *httpmetrics.HTTPMetrics,
+	metricsHost, metricsPort string,
 	reload func(),
 	reloadSignals, shutdownSignals <-chan os.Signal,
 ) error {
 	server := &http.Server{
-		Handler: router.Handler(),
+		Handler:           router.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	var shutdownMetricsServer func()
+	if metrics != nil {
+		stopMetricsServer, _, err := startMetricsServer(metrics, metricsHost, metricsPort)
+		if err != nil {
+			return err
+		}
+		shutdownMetricsServer = stopMetricsServer
+		defer shutdownMetricsServer()
 	}
 
 	if unixSocket == "" {
@@ -495,6 +577,43 @@ func runServer(
 	)
 
 	return serveWithLifecycle(server, listener, cleanup, reload, reloadSignals, shutdownSignals)
+}
+
+func startMetricsServer(metrics *httpmetrics.HTTPMetrics, host, port string) (func(), string, error) {
+	listenAddr := host + ":" + port
+	listener, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, "", err
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", metrics.HTTPHandler())
+
+	server := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	slog.Default().Info("Starting metrics server", "address", listener.Addr().String())
+
+	go func() {
+		err := server.Serve(listener)
+		if errors.Is(err, http.ErrServerClosed) {
+			return
+		}
+		slog.Default().Error("metrics server stopped unexpectedly", "error", err)
+	}()
+
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			if closeErr := server.Close(); closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
+				slog.Default().Error("failed to close metrics server", "error", errors.Join(err, closeErr))
+				return
+			}
+			slog.Default().Error("failed to shut down metrics server gracefully", "error", err)
+		}
+	}, listener.Addr().String(), nil
 }
 
 func listenOnUnixSocket(socketPath string) (net.Listener, error) {
@@ -536,7 +655,7 @@ func removeStaleUnixSocket(socketPath string) error {
 func resolveString(flagName, flagVal string, visited map[string]bool, envVar string, def string) string {
 	// If flag was explicitly set, it takes precedence
 	if visited[flagName] {
-		return flagVal
+		return strings.TrimSpace(flagVal)
 	}
 	// Next, check environment variable
 	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
@@ -636,6 +755,32 @@ func validateHTTPRemoteUserConfig(enabled bool, trustedProxyIPsRaw string) error
 	}
 	if !hasTrustedProxy {
 		return fmt.Errorf("--trusted-proxy-ips is required when --enable-http-remote-user is set. Set it using --trusted-proxy-ips or LEAFWIKI_TRUSTED_PROXY_IPS")
+	}
+	return nil
+}
+
+// resolveLogoutURL resolves --logout-url/LEAFWIKI_LOGOUT_URL, falling back to
+// the deprecated --http-remote-user-logout-url/LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
+// when the new option isn't set. usedDeprecated tells the caller whether to log
+// a deprecation warning.
+func resolveLogoutURL(logoutURL, deprecatedFlagVal string, visited map[string]bool, deprecatedEnvVar string) (resolved string, usedDeprecated bool) {
+	if logoutURL != "" {
+		return logoutURL, false
+	}
+	deprecated := resolveString("http-remote-user-logout-url", deprecatedFlagVal, visited, deprecatedEnvVar, "")
+	if deprecated == "" {
+		return "", false
+	}
+	return deprecated, true
+}
+
+func validateRedirectURL(flagName, url string) error {
+	if url == "" {
+		return nil
+	}
+	lower := strings.ToLower(url)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+		return fmt.Errorf("--%s must start with http:// or https://", flagName)
 	}
 	return nil
 }

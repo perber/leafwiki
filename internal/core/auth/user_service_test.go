@@ -152,14 +152,48 @@ func TestUserService_InitDefaultAdmin(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
 	service := NewUserService(store)
 
-	err := service.InitDefaultAdmin("")
+	err := service.InitDefaultAdmin("", "", "")
 	if err != nil {
 		t.Errorf("InitDefaultAdmin failed: %v", err)
 	}
 
 	users, err := service.GetUsers()
-	if err != nil || len(users) != 1 || users[0].Username != "admin" {
+	if err != nil || len(users) != 1 || users[0].Username != "admin" || users[0].Email != "admin@localhost" {
 		t.Errorf("Expected default admin user, got: %+v", users)
+	}
+}
+
+func TestUserService_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
+	store, _ := NewUserStore(t.TempDir())
+	service := NewUserService(store)
+
+	err := service.InitDefaultAdmin("root", "root@example.com", "")
+	if err != nil {
+		t.Errorf("InitDefaultAdmin failed: %v", err)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil || len(users) != 1 || users[0].Username != "root" || users[0].Email != "root@example.com" {
+		t.Errorf("Expected admin user with custom username/email, got: %+v", users)
+	}
+}
+
+func TestUserService_InitDefaultAdmin_SkipsWhenAdminAlreadyExists(t *testing.T) {
+	store, _ := NewUserStore(t.TempDir())
+	service := NewUserService(store)
+
+	if _, err := service.CreateUser("admin", "admin@localhost", "existing", "admin"); err != nil {
+		t.Fatalf("Failed to create initial admin user: %v", err)
+	}
+
+	err := service.InitDefaultAdmin("root", "root@example.com", "new")
+	if err != nil {
+		t.Errorf("InitDefaultAdmin failed: %v", err)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil || len(users) != 1 || users[0].Username != "admin" || users[0].Email != "admin@localhost" {
+		t.Errorf("Expected existing admin user to be left untouched, got: %+v", users)
 	}
 }
 
@@ -174,7 +208,7 @@ func TestUserService_ResetAdminUserPassword(t *testing.T) {
 	}
 
 	// Reset admin password
-	adminUser, err := service.ResetAdminUserPassword()
+	adminUser, err := service.ResetAdminUserPassword("", "")
 	if err != nil {
 		t.Fatalf("ResetAdminUserPassword failed: %v", err)
 	}
@@ -211,7 +245,7 @@ func TestUserService_ResetAdminUserPassword_NoAdmin(t *testing.T) {
 	// Don't create an admin user first - test should create one
 
 	// Reset admin password (should create new admin)
-	adminUser, err := service.ResetAdminUserPassword()
+	adminUser, err := service.ResetAdminUserPassword("", "")
 	if err != nil {
 		t.Fatalf("ResetAdminUserPassword failed: %v", err)
 	}
@@ -230,6 +264,32 @@ func TestUserService_ResetAdminUserPassword_NoAdmin(t *testing.T) {
 
 	// Verify we can log in with the new password
 	_, err = service.GetUserByEmailOrUsernameAndPassword("admin", adminUser.Password)
+	if err != nil {
+		t.Errorf("Failed to login with new password: %v", err)
+	}
+}
+
+func TestUserService_ResetAdminUserPassword_NoAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	// Don't create an admin user first - test should create one with the given identity
+
+	adminUser, err := service.ResetAdminUserPassword("root", "root@example.com")
+	if err != nil {
+		t.Fatalf("ResetAdminUserPassword failed: %v", err)
+	}
+
+	if adminUser.Username != "root" {
+		t.Errorf("Expected username 'root', got: %s", adminUser.Username)
+	}
+
+	if adminUser.Email != "root@example.com" {
+		t.Errorf("Expected email 'root@example.com', got: %s", adminUser.Email)
+	}
+
+	// Verify we can log in with the new password
+	_, err = service.GetUserByEmailOrUsernameAndPassword("root", adminUser.Password)
 	if err != nil {
 		t.Errorf("Failed to login with new password: %v", err)
 	}

@@ -11,13 +11,17 @@ import {
 } from '@/lib/registries'
 import { buildHistoryUrl } from '@/lib/routePath'
 import { pinPage } from '@/lib/api/pages'
+import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
+import { cn } from '@/lib/utils'
 import {
   getParentWikiRoutePath,
   getWikiTargetRoutePath,
   toWikiLookupPath,
 } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useHotKeysStore } from '@/stores/hotkeys'
+import { useTocPanelStore } from '@/stores/tocPanel'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -49,6 +53,8 @@ export default function PageViewer() {
   const { pathname } = location
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
+  const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
+  const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)
   const openNode = useTreeStore((state) => state.openNode)
   const setPinnedLocally = useTreeStore((s) => s.setPinnedLocally)
   const loading = useViewerStore((s) => s.isLoading)
@@ -144,6 +150,21 @@ export default function PageViewer() {
   // Single scroll spy for both the dropdown and the side panel.
   const tocActiveId = useTocScrollSpy(showTocButton ? tocEntries : [])
 
+  const toggleTocCollapsed = useTocPanelStore((state) => state.toggleCollapsed)
+  const tocCollapsed = useTocPanelStore((state) => state.collapsed)
+
+  useEffect(() => {
+    if (!showTocButton) return
+
+    const tocToggleHotkey = createHotkeyDefinition(
+      'viewer.toc.toggle',
+      toggleTocCollapsed,
+    )
+    registerHotkey(tocToggleHotkey)
+
+    return () => unregisterHotkey(tocToggleHotkey.keyCombo)
+  }, [showTocButton, toggleTocCollapsed, registerHotkey, unregisterHotkey])
+
   const editorName = displayUser(page?.metadata?.lastAuthor)
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
   const showUpdated = updatedRelative
@@ -153,7 +174,15 @@ export default function PageViewer() {
   const subheader =
     page && !error && subheaderRoot
       ? createPortal(
-          <div className="page-viewer__subheader print:hidden">
+          <div
+            className={cn(
+              'page-viewer__subheader print:hidden',
+              showTocButton &&
+                (tocCollapsed
+                  ? 'page-viewer__subheader--toc-reserved-collapsed'
+                  : 'page-viewer__subheader--toc-reserved'),
+            )}
+          >
             <div className="page-viewer__subheader-inner">
               <div className="page-viewer__subheader-main">
                 <div className="page-viewer__subheader-copy">

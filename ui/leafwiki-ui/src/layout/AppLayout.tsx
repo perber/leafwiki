@@ -14,12 +14,14 @@ import { withBasePath } from '@/lib/routePath'
 import { useAppMode } from '@/lib/useAppMode'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { cn } from '@/lib/utils'
 import { useBrandingStore } from '@/stores/branding'
 import {
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
   useSidebarStore,
 } from '@/stores/sidebar'
+import { useTocPanelStore } from '@/stores/tocPanel'
 import { MenuIcon } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -43,6 +45,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const sidebarVisible = useSidebarStore((s) => s.sidebarVisible)
   const setSidebarVisible = useSidebarStore((s) => s.setSidebarVisible)
+  const tocPanelCollapsed = useTocPanelStore((s) => s.collapsed)
   const sidebarWidth = useSidebarStore((s) => s.sidebarWidth)
   const setSidebarWidth = useSidebarStore((s) => s.setSidebarWidth)
   const isMobile = useIsMobile()
@@ -54,6 +57,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { siteName, logoFile, logoVersion } = useBrandingStore()
 
   const sidebarContainerRef = useRef<HTMLDivElement | null>(null)
+  const sidebarPanelRef = useRef<HTMLDivElement | null>(null)
   const liveSidebarWidthRef = useRef(sidebarWidth)
 
   const handleSidebarResize = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -80,6 +84,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       if (sidebarContainerRef.current) {
         sidebarContainerRef.current.style.width = `${nextWidth}px`
+      }
+      if (sidebarPanelRef.current) {
+        sidebarPanelRef.current.style.width = `${nextWidth}px`
       }
     }
 
@@ -266,7 +273,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               />
             </div>
           )}
-          <Sidebar />
+          {/*
+            Rendered at its final width at all times and only ever moved via
+            transform. This keeps the sidebar's own content (tree labels etc.)
+            from re-wrapping through every intermediate width while the outer
+            container's width animates open/closed.
+          */}
+          <div
+            ref={sidebarPanelRef}
+            className="app-layout__sidebar-panel transition-transform duration-200"
+            style={{
+              width: isMobile ? MOBILE_SIDEBAR_WIDTH : sidebarWidth,
+              transform: sidebarVisible ? 'translateX(0)' : 'translateX(-100%)',
+            }}
+          >
+            <Sidebar />
+          </div>
         </div>
 
         {/* Overlay for mobile sidebar */}
@@ -290,7 +312,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               {children}
             </main>
-            <div id="app-toc-pane-root" className="app-layout__toc-pane" />
+            <div
+              id="app-toc-pane-root"
+              className={cn(
+                'app-layout__toc-pane',
+                tocPanelCollapsed && 'app-layout__toc-pane--collapsed',
+              )}
+            />
           </div>
         </div>
       </div>

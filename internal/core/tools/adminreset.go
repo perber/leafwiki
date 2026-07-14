@@ -6,7 +6,7 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 )
 
-func ResetAdminPassword(storageDir string) (*auth.User, error) {
+func ResetAdminPassword(storageDir, username, email string) (*auth.User, error) {
 	store, err := auth.NewUserStore(storageDir)
 	if err != nil {
 		return nil, err
@@ -18,5 +18,5 @@ func ResetAdminPassword(storageDir string) (*auth.User, error) {
 	}()
 
 	userService := auth.NewUserService(store)
-	return userService.ResetAdminUserPassword()
+	return userService.ResetAdminUserPassword(username, email)
 }

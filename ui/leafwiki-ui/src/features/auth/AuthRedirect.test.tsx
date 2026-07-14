@@ -78,6 +78,51 @@ describe('Auth redirect flow', () => {
     )
   })
 
+  it('redirects externally instead of to /login when loginUrl is configured, preserving the requested path', async () => {
+    const originalLocation = window.location
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, href: '' },
+    })
+
+    try {
+      useConfigStore.setState({
+        loginUrl: 'https://idp.example.com/login',
+      })
+
+      render(
+        <MemoryRouter initialEntries={['/some/protected/page']}>
+          <Routes>
+            <Route path="/login" element={<LocationProbe />} />
+            <Route
+              path="*"
+              element={
+                <RequireAuth>
+                  <div>Protected page</div>
+                </RequireAuth>
+              }
+            />
+          </Routes>
+        </MemoryRouter>,
+      )
+
+      const expectedReturnTo = encodeURIComponent(
+        `${originalLocation.origin}/some/protected/page`,
+      )
+      await waitFor(() => {
+        expect(window.location.href).toBe(
+          `https://idp.example.com/login?redirect_uri=${expectedReturnTo}`,
+        )
+      })
+      expect(screen.queryByTestId('pathname')).not.toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation,
+      })
+    }
+  })
+
   it('returns to the requested page after successful login', async () => {
     loginMock.mockResolvedValue({
       accessTokenExpiresAt: 1234567890,
