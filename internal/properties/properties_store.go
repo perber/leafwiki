@@ -3,7 +3,6 @@ package properties
 import (
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -36,28 +35,22 @@ func NewPropertiesStore(storageDir string) (*PropertiesStore, error) {
 	normalized := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
 	dbPath := filepath.Join(normalized, "properties.db")
 
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open properties database: %w", err)
-	}
-
-	s := &PropertiesStore{db: db}
-	if err := s.ensureSchema(); err != nil {
-		_ = db.Close()
-		if !sqliteutil.IsSQLiteRecoverableError(err) {
-			return nil, err
-		}
-		slog.Default().Warn("properties database corrupt, removing and retrying", "error", err)
-		sqliteutil.RemoveSQLiteFiles(dbPath)
-		db, err = sql.Open("sqlite", dbPath)
+	s := &PropertiesStore{}
+	err := sqliteutil.RetryOnCorruption(dbPath, func() error {
+		db, err := sql.Open("sqlite", dbPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to reopen properties database after recovery: %w", err)
+			return fmt.Errorf("failed to open properties database: %w", err)
 		}
-		s = &PropertiesStore{db: db}
-		if err = s.ensureSchema(); err != nil {
+		s.db = db
+		if err := s.ensureSchema(); err != nil {
 			_ = db.Close()
-			return nil, err
+			s.db = nil
+			return err
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return s, nil
 }
