@@ -150,11 +150,12 @@ func printUsage() {
 
 func setupLogger() {
 	level := slog.LevelInfo
-	if os.Getenv("LEAFWIKI_LOG_LEVEL") == "debug" {
+	switch os.Getenv("LEAFWIKI_LOG_LEVEL") {
+	case "debug":
 		level = slog.LevelDebug
-	} else if (os.Getenv("LEAFWIKI_LOG_LEVEL")) == "error" {
+	case "error":
 		level = slog.LevelError
-	} else if (os.Getenv("LEAFWIKI_LOG_LEVEL")) == "warn" {
+	case "warn":
 		level = slog.LevelWarn
 	}
 

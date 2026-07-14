@@ -32,11 +32,11 @@ type TreeService struct {
 }
 
 const (
-	legacyTreeFilename                     = "tree.json"
-	errNilTreeReconstructed                = "internal error: tree reconstruction returned nil tree"
-	errPersistChildOrderFailed             = "could not persist child order: %w"
-	errGetPageContentFailed                = "could not get page content: %w"
-	errRollbackMovedNodeFailed             = "rollback moved node: %w"
+	legacyTreeFilename         = "tree.json"
+	errNilTreeReconstructed    = "internal error: tree reconstruction returned nil tree"
+	errPersistChildOrderFailed = "could not persist child order: %w"
+	errGetPageContentFailed    = "could not get page content: %w"
+	errRollbackMovedNodeFailed = "rollback moved node: %w"
 )
 
 func NewTreeService(storageDir string) *TreeService {

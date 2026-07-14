@@ -74,7 +74,7 @@ func (f *fakeWiki) UpdatePage(userID string, id, title, slug string, content *st
 		return nil, f.updateErr
 	}
 	// simulate tree change after update
-	f.treeHash = f.treeHash + "-changed"
+	f.treeHash += "-changed"
 	k := tree.NodeKindPage
 	if kind != nil {
 		k = *kind
@@ -633,7 +633,9 @@ title: Guides
 func TestPlanner_CreatePlan_SkipsIgnoredPaths(t *testing.T) {
 	tmp := t.TempDir()
 	// Create source files under root/ to match production structure
-	os.MkdirAll(filepath.Join(tmp, "root", "drafts"), 0o755)
+	if err := os.MkdirAll(filepath.Join(tmp, "root", "drafts"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
 	test_utils.WriteFile(t, tmp, "root/readme.md", "# Readme")
 	test_utils.WriteFile(t, tmp, "root/drafts/note.md", "# Draft Note")
 
@@ -667,7 +669,9 @@ func TestPlanner_CreatePlan_SkipsIgnoredPaths(t *testing.T) {
 func TestPlanner_CreatePlan_IncludesNonIgnoredPaths(t *testing.T) {
 	tmp := t.TempDir()
 	// Create source files under root/ to match production structure
-	os.MkdirAll(filepath.Join(tmp, "root", "notes"), 0o755)
+	if err := os.MkdirAll(filepath.Join(tmp, "root", "notes"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
 	test_utils.WriteFile(t, tmp, "root/readme.md", "# Readme")
 	test_utils.WriteFile(t, tmp, "root/notes/note.md", "# Note")
 

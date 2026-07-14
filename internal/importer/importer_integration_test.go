@@ -11,8 +11,8 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/properties"
-	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/tags"
+	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
 

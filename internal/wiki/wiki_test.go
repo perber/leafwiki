@@ -395,7 +395,9 @@ func TestWiki_ResyncRespectsLeafwikiignore(t *testing.T) {
 	tmp := t.TempDir()
 
 	rootDir := filepath.Join(tmp, "root")
-	os.MkdirAll(rootDir, 0o755)
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
 
 	// .leafwikiignore goes in root/ alongside the markdown files
 	test_utils.WriteFile(t, tmp, "root/.leafwikiignore", "secret.md")
