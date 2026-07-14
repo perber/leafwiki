@@ -1,4 +1,4 @@
-import { fetchWithAuth } from './auth'
+import { fetchBlobWithAuth, fetchWithAuth } from './auth'
 
 export const NODE_KIND_PAGE = 'page'
 export const NODE_KIND_SECTION = 'section'
@@ -99,6 +99,16 @@ export async function getPageByPath(
     `/api/pages/by-path?path=${encodeURIComponent(path)}`,
     { signal },
   )) as Page
+}
+
+// downloadPageFile fetches the server-rendered download for a node: a page is
+// returned as Markdown (.md), a section as a ZIP archive (.zip) of its whole
+// subtree. The blob and the server-advertised filename are returned so the
+// caller can save the file honoring the Content-Disposition header.
+export async function downloadPageFile(
+  id: string,
+): Promise<{ blob: Blob; filename: string | null }> {
+  return fetchBlobWithAuth(`/api/pages/${encodeURIComponent(id)}/download`)
 }
 
 export async function getPermalinkTarget(id: string): Promise<PermalinkTarget> {

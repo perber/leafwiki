@@ -33,6 +33,12 @@ type AssetService struct {
 	mu sync.RWMutex
 }
 
+type AssetFile struct {
+	Name       string
+	DiskPath   string
+	PublicPath string
+}
+
 func assetPageDiskPath(assetsDir string, pageID string) string {
 	normalizedAssetsDir := filepath.FromSlash(strings.ReplaceAll(assetsDir, `\`, `/`))
 	return filepath.Join(normalizedAssetsDir, pageID)
@@ -159,6 +165,39 @@ func (s *AssetService) ListAssetsForPage(page *tree.PageNode) ([]string, error) 
 		if !f.IsDir() {
 			result = append(result, s.buildPublicPath(page, f.Name()))
 		}
+	}
+
+	return result, nil
+}
+
+// ListAssetFilesForPage returns exportable asset files for a page.
+func (s *AssetService) ListAssetFilesForPage(page *tree.PageNode) ([]AssetFile, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	pagePath, err := s.getAssetPagePath(page)
+	if err != nil {
+		return []AssetFile{}, nil
+	}
+
+	files, err := os.ReadDir(pagePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []AssetFile{}, nil
+		}
+		return nil, fmt.Errorf("could not read page assets: %w", err)
+	}
+
+	result := []AssetFile{}
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		result = append(result, AssetFile{
+			Name:       f.Name(),
+			DiskPath:   assetFileDiskPath(pagePath, f.Name()),
+			PublicPath: s.buildPublicPath(page, f.Name()),
+		})
 	}
 
 	return result, nil

@@ -35,6 +35,7 @@ import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { TocSidePanel } from '../preview/TocSidePanel'
 import { useTocScrollSpy } from '../preview/useTocScrollSpy'
 import Breadcrumbs from './Breadcrumbs'
+import { downloadPageMarkdown } from './downloadMarkdown'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
 import { PageMetadata } from './PageMetadata'
 import { useScrollToHeadline } from './useScrollToHeadline'
@@ -94,6 +95,10 @@ export default function PageViewer() {
       if (!page) return
       openDialog(DIALOG_COPY_PAGE, { sourcePage: page })
     }, [page, openDialog]),
+    downloadMarkdown: useCallback(() => {
+      if (!page) return
+      downloadPageMarkdown(page).catch(() => toast.error(t('download.error')))
+    }, [page, t]),
     isPinned,
     onPinToggle: useCallback(() => {
       if (!page) return

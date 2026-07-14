@@ -11,6 +11,7 @@ import { useConfigStore } from '@/stores/config'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import {
   Copy,
+  Download,
   History,
   Link2,
   Pencil,
@@ -31,6 +32,7 @@ export interface ToolbarActionsOptions {
   showPermalink: () => void
   deletePage: () => void
   copyPage: () => void
+  downloadMarkdown: () => void
   isPinned: boolean
   onPinToggle: () => void
 }
@@ -43,6 +45,7 @@ export function useToolbarActions({
   showPermalink,
   deletePage,
   copyPage,
+  downloadMarkdown,
   isPinned,
   onPinToggle,
 }: ToolbarActionsOptions) {
@@ -59,8 +62,23 @@ export function useToolbarActions({
     /Mac|iPhone|iPad|iPod/.test(navigator.platform)
 
   useEffect(() => {
-    if (readOnlyMode || appMode !== 'view') {
+    if (appMode !== 'view') {
       setButtons([])
+      return
+    }
+
+    const readOnlyButtons: ToolbarButton[] = [
+      {
+        id: 'download-page',
+        label: `Download ${itemLabel}`,
+        hotkey: '',
+        icon: <Download size={18} />,
+        action: downloadMarkdown,
+      },
+    ]
+
+    if (readOnlyMode) {
+      setButtons(readOnlyButtons)
       return
     }
 
@@ -94,6 +112,14 @@ export function useToolbarActions({
         icon: <Copy size={18} />,
         variant: 'outline',
         action: copyPage,
+      },
+      {
+        id: 'download-page',
+        label: `Download ${itemLabel}`,
+        hotkey: '',
+        icon: <Download size={18} />,
+        variant: 'outline',
+        action: downloadMarkdown,
       },
       {
         id: 'pin-page',
@@ -184,6 +210,7 @@ export function useToolbarActions({
     setButtons,
     deletePage,
     copyPage,
+    downloadMarkdown,
     editPage,
     printPage,
     showHistory,
