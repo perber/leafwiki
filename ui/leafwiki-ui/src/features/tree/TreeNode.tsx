@@ -1,3 +1,4 @@
+import { FavoriteToggleButton } from '@/features/favorites/FavoriteToggleButton'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
@@ -5,6 +6,7 @@ import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useSessionStore } from '@/stores/session'
 import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { ChevronUp, FilePlus } from 'lucide-react'
@@ -29,6 +31,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   const isActionsMenuOpen = useTreeNodeActionsMenusStore(
     (s) => s.openMenuNodeId === node.id,
   )
+  const isLoggedIn = useSessionStore((s) => s.user !== null)
   const isActive = isStoreActive
 
   const indent = 4
@@ -96,25 +99,35 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
             )
           }
           {linkText}
-          {!readOnlyMode && (isMobile || hovered || isActionsMenuOpen) && (
+          {(isMobile || hovered || isActionsMenuOpen) && (
             <div className={clsx('tree-node__actions', treeActionButtonStyle)}>
-              <TreeViewActionButton
-                actionName="add"
-                icon={
-                  <FilePlus
-                    size={18}
-                    className={clsx(
-                      'tree-node__action-icon',
-                      isMobile && 'text-brand/70!',
-                    )}
+              {isLoggedIn && (
+                <FavoriteToggleButton
+                  pageId={node.id}
+                  className="tree-node__favorite-toggle"
+                />
+              )}
+              {!readOnlyMode && (
+                <>
+                  <TreeViewActionButton
+                    actionName="add"
+                    icon={
+                      <FilePlus
+                        size={18}
+                        className={clsx(
+                          'tree-node__action-icon',
+                          isMobile && 'text-brand/70!',
+                        )}
+                      />
+                    }
+                    tooltip="Create new page"
+                    onClick={() =>
+                      openDialog(DIALOG_ADD_PAGE, { parentId: node.id })
+                    }
                   />
-                }
-                tooltip="Create new page"
-                onClick={() =>
-                  openDialog(DIALOG_ADD_PAGE, { parentId: node.id })
-                }
-              />
-              <TreeNodeActionsMenu node={node} />
+                  <TreeNodeActionsMenu node={node} />
+                </>
+              )}
             </div>
           )}
         </div>

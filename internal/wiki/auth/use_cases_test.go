@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/favorites"
 )
 
 func setupUpdateUserUseCase(t *testing.T) (*UpdateUserUseCase, *coreauth.UserService) {
@@ -206,5 +207,56 @@ func TestUpdateUser_AdminInvalidRole(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected validation error for invalid role, got nil")
+	}
+}
+
+// TestDeleteUser_RemovesFavoritesForUser verifies that deleting a user cascades
+// to clean up their favorites.db rows, even though sessions.db does not have
+// the same cleanup today (deliberately not copying that gap, see plans/favorites.md).
+func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
+	store, err := coreauth.NewUserStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewUserStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("Close user store: %v", err)
+		}
+	})
+	userSvc := coreauth.NewUserService(store)
+	resolver, err := coreauth.NewUserResolver(userSvc)
+	if err != nil {
+		t.Fatalf("NewUserResolver: %v", err)
+	}
+
+	favoritesStore, err := favorites.NewFavoritesStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFavoritesStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := favoritesStore.Close(); err != nil {
+			t.Errorf("Close favorites store: %v", err)
+		}
+	})
+
+	user, err := userSvc.CreateUser("bob", "bob@example.com", "pass", coreauth.RoleViewer)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if err := favoritesStore.Add(user.ID, "page-1"); err != nil {
+		t.Fatalf("failed to seed favorite: %v", err)
+	}
+
+	uc := NewDeleteUserUseCase(userSvc, resolver, favoritesStore, slog.Default())
+	if err := uc.Execute(context.Background(), DeleteUserInput{ID: user.ID}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	ids, err := favoritesStore.ListPageIDsForUser(user.ID)
+	if err != nil {
+		t.Fatalf("ListPageIDsForUser: %v", err)
+	}
+	if len(ids) != 0 {
+		t.Errorf("expected favorites for deleted user to be cleaned up, got %v", ids)
 	}
 }

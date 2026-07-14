@@ -10,6 +10,7 @@ import (
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/favorites"
 )
 
 // ErrAuthDisabled is returned when an auth operation is called while auth is disabled.
@@ -247,13 +248,14 @@ func (uc *ChangeOwnPasswordUseCase) Execute(_ context.Context, in ChangeOwnPassw
 type DeleteUserInput struct{ ID string }
 
 type DeleteUserUseCase struct {
-	user     *coreauth.UserService
-	resolver *coreauth.UserResolver
-	log      *slog.Logger
+	user      *coreauth.UserService
+	resolver  *coreauth.UserResolver
+	favorites *favorites.FavoritesStore
+	log       *slog.Logger
 }
 
-func NewDeleteUserUseCase(u *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger) *DeleteUserUseCase {
-	return &DeleteUserUseCase{user: u, resolver: r, log: log}
+func NewDeleteUserUseCase(u *coreauth.UserService, r *coreauth.UserResolver, f *favorites.FavoritesStore, log *slog.Logger) *DeleteUserUseCase {
+	return &DeleteUserUseCase{user: u, resolver: r, favorites: f, log: log}
 }
 
 func (uc *DeleteUserUseCase) Execute(_ context.Context, in DeleteUserInput) error {
@@ -262,6 +264,9 @@ func (uc *DeleteUserUseCase) Execute(_ context.Context, in DeleteUserInput) erro
 	}
 	if err := uc.resolver.Reload(); err != nil {
 		log.Printf(logReloadUserResolverCacheWarning, err)
+	}
+	if err := uc.favorites.DeleteAllForUser(in.ID); err != nil {
+		uc.log.Warn("failed to delete favorites for deleted user", "userID", in.ID, "error", err)
 	}
 	return nil
 }

@@ -13,7 +13,7 @@ type SidebarPanelsStore = {
 export const useSidebarPanelsStore = create<SidebarPanelsStore>()(
   persist(
     (set) => ({
-      openSections: ['pinned', 'pages'],
+      openSections: ['pinned', 'favorites', 'pages'],
       setOpenSections: (ids) => set({ openSections: ids }),
     }),
     {
