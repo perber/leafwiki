@@ -9,11 +9,20 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
+
+// loginChallengeLifetime bounds how long a "password verified, TOTP pending"
+// challenge stays valid. Kept short since it only bridges the two login steps.
+const loginChallengeLifetime = 5 * time.Minute
+
+const loginChallengeTokenType = "login_challenge"
 
 type AuthService struct {
 	userService          *UserService
 	sessionStore         *SessionStore
+	totp                 *TOTPService
 	secretKey            []byte
 	accessTokenLifetime  time.Duration
 	refreshTokenLifetime time.Duration
@@ -21,7 +30,7 @@ type AuthService struct {
 	dummyHash            []byte
 }
 
-func NewAuthService(userService *UserService, sessionStore *SessionStore, secret string, accessTokenTimeout, refreshTokenTimeout time.Duration) *AuthService {
+func NewAuthService(userService *UserService, sessionStore *SessionStore, totpService *TOTPService, secret string, accessTokenTimeout, refreshTokenTimeout time.Duration) *AuthService {
 	if len(secret) < 32 {
 		slog.Warn("JWT secret is too short; a minimum of 32 characters is strongly recommended", "length", len(secret))
 	}
@@ -31,6 +40,7 @@ func NewAuthService(userService *UserService, sessionStore *SessionStore, secret
 	return &AuthService{
 		userService:          userService,
 		sessionStore:         sessionStore,
+		totp:                 totpService,
 		secretKey:            []byte(secret),
 		accessTokenLifetime:  accessTokenTimeout,
 		refreshTokenLifetime: refreshTokenTimeout,
@@ -62,8 +72,22 @@ type AuthToken struct {
 	RefreshToken         string      `json:"refresh_token"`
 	AccessTokenExpiresAt int64       `json:"accessTokenExpiresAt"`
 	User                 *PublicUser `json:"user"`
+
+	// RequiresTOTP and LoginChallengeToken are set instead of Token/RefreshToken/User
+	// when Login succeeds on password but the account has TOTP enabled: no cookies
+	// may be issued yet, and the caller must complete the handshake via
+	// CompleteTOTPLogin before real tokens exist. Never marshaled directly (the
+	// HTTP layer builds its own response shapes for both cases).
+	RequiresTOTP        bool   `json:"-"`
+	LoginChallengeToken string `json:"-"`
 }
 
+// Login verifies identifier/password. If the account has TOTP disabled, it
+// behaves exactly as before: real access/refresh tokens are issued and auth
+// cookies may be set immediately. If TOTP is enabled, no tokens are issued;
+// instead a short-lived login challenge is returned, and CompleteTOTPLogin
+// must be called with the resulting LoginChallengeToken and a valid TOTP or
+// recovery code before cookies may be set.
 func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	user, err := a.userService.GetUserByIdentifier(identifier)
 	if err != nil {
@@ -82,6 +106,345 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	a.attempts.reset(user.ID)
 	user.Password = ""
 
+	if user.TOTPEnabled {
+		return a.beginTOTPChallenge(user)
+	}
+
+	return a.issueTokens(user)
+}
+
+// CompleteTOTPLogin finishes a login handshake started by Login when a user
+// has TOTP enabled. It validates challengeToken (single use, short-lived) and
+// then code as either a current TOTP code or an unused recovery code; only on
+// success are the same access/refresh tokens issued that a password-only
+// login would have produced.
+func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken, error) {
+	if a.totp == nil {
+		return nil, errTOTPNotConfigured()
+	}
+
+	userID, jti, err := a.parseLoginChallenge(challengeToken)
+	if err != nil {
+		return nil, err
+	}
+
+	active, err := a.sessionStore.IsActive(jti, userID, loginChallengeTokenType, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	if !active {
+		return nil, errInvalidLoginChallenge()
+	}
+
+	if !a.attempts.recordAttempt(userID) {
+		return nil, ErrUserAccountLocked
+	}
+
+	user, err := a.userService.GetUserByID(userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+	if !user.TOTPEnabled || user.TOTPSecretEncrypted == "" {
+		// TOTP was disabled after the challenge was issued; it can no longer be completed.
+		return nil, errInvalidLoginChallenge()
+	}
+
+	valid, err := a.verifyTOTPOrRecoveryCode(user, code)
+	if err != nil {
+		return nil, err
+	}
+	if !valid {
+		return nil, errTOTPInvalidCode()
+	}
+
+	a.attempts.reset(userID)
+
+	// Single-use: revoke the challenge now that it has been consumed successfully.
+	if err := a.sessionStore.RevokeSession(jti); err != nil {
+		slog.Warn("failed to revoke used login challenge session", "error", err)
+	}
+
+	user.Password = ""
+	return a.issueTokens(user)
+}
+
+// StartTOTPSetup verifies the user's current password, generates a fresh TOTP
+// secret, and stores it as pending (TOTP stays disabled until ConfirmTOTPSetup
+// verifies a code against it). Returns the manual-entry secret and otpauth://
+// URI for the frontend to render as a QR code; the plaintext secret is never
+// persisted.
+func (a *AuthService) StartTOTPSetup(userID, currentPassword string) (*GeneratedSecret, error) {
+	if a.totp == nil {
+		return nil, errTOTPNotConfigured()
+	}
+	if _, err := a.userService.DoesIDAndPasswordMatch(userID, currentPassword); err != nil {
+		return nil, err
+	}
+	user, err := a.userService.GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user.TOTPEnabled {
+		return nil, errTOTPAlreadyEnabled()
+	}
+
+	generated, err := a.totp.GenerateSecret(user.Email)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.userService.SetPendingTOTPSecret(userID, generated.EncryptedSecret); err != nil {
+		return nil, err
+	}
+	return generated, nil
+}
+
+// ConfirmTOTPSetup verifies code against the pending secret set by
+// StartTOTPSetup and, on success, enables TOTP and returns freshly generated
+// recovery codes in plaintext (shown to the user exactly once; only their
+// hashes are persisted). Every other session for the user is revoked;
+// currentRefreshToken identifies the caller's own session, which is left intact.
+func (a *AuthService) ConfirmTOTPSetup(userID, code, currentRefreshToken string) ([]string, error) {
+	if a.totp == nil {
+		return nil, errTOTPNotConfigured()
+	}
+	user, err := a.userService.GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user.TOTPEnabled {
+		return nil, errTOTPAlreadyEnabled()
+	}
+	if user.TOTPSecretEncrypted == "" {
+		return nil, errTOTPSetupNotStarted()
+	}
+
+	valid, err := a.totp.VerifyCode(user.TOTPSecretEncrypted, code)
+	if err != nil {
+		return nil, err
+	}
+	if !valid {
+		return nil, errTOTPInvalidCode()
+	}
+
+	codes, hashes, err := a.totp.GenerateRecoveryCodes(0)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.userService.EnableTOTP(userID, user.TOTPSecretEncrypted, hashes); err != nil {
+		return nil, err
+	}
+
+	if err := a.RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken); err != nil {
+		slog.Warn("failed to revoke other sessions after enabling TOTP", "userID", userID, "error", err)
+	}
+
+	return codes, nil
+}
+
+// DisableTOTP verifies the user's current password plus a valid TOTP or
+// recovery code, then disables TOTP and clears the stored secret and recovery
+// codes. Every other session for the user is revoked; currentRefreshToken
+// identifies the caller's own session, which is left intact.
+func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshToken string) error {
+	if _, err := a.userService.DoesIDAndPasswordMatch(userID, currentPassword); err != nil {
+		return err
+	}
+	user, err := a.userService.GetUserByID(userID)
+	if err != nil {
+		return err
+	}
+	if !user.TOTPEnabled {
+		return errTOTPNotEnabled()
+	}
+
+	valid, err := a.verifyTOTPOrRecoveryCode(user, code)
+	if err != nil {
+		return err
+	}
+	if !valid {
+		return errTOTPInvalidCode()
+	}
+
+	if err := a.userService.DisableTOTP(userID); err != nil {
+		return err
+	}
+
+	if err := a.RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken); err != nil {
+		slog.Warn("failed to revoke other sessions after disabling TOTP", "userID", userID, "error", err)
+	}
+
+	return nil
+}
+
+// TOTPStatus is the non-secret TOTP status exposed to the user themselves.
+type TOTPStatus struct {
+	Enabled                bool
+	RecoveryCodesRemaining int
+}
+
+// GetTOTPStatus returns userID's current TOTP status. Never exposes the
+// secret or the recovery codes themselves, only whether TOTP is enabled and
+// how many recovery codes remain unused.
+func (a *AuthService) GetTOTPStatus(userID string) (*TOTPStatus, error) {
+	user, err := a.userService.GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	return &TOTPStatus{
+		Enabled:                user.TOTPEnabled,
+		RecoveryCodesRemaining: len(user.TOTPRecoveryCodeHashes),
+	}, nil
+}
+
+// RevokeAllUserSessionsExceptCurrent revokes every other session for userID,
+// preserving the one identified by currentRefreshToken. If currentRefreshToken
+// cannot be parsed (e.g. missing), every session is revoked — a safe fallback
+// over silently preserving an unidentified session.
+func (a *AuthService) RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken string) error {
+	var exceptJTI string
+	if claims, err := a.parseClaims(currentRefreshToken); err == nil {
+		if jti, ok := claims["jti"].(string); ok {
+			exceptJTI = jti
+		}
+	}
+	return a.sessionStore.RevokeAllSessionsForUserExcept(userID, exceptJTI)
+}
+
+// verifyTOTPOrRecoveryCode checks code against user's current TOTP secret or,
+// failing that, their remaining recovery codes — consuming (removing) a
+// matched recovery code so it cannot be reused. Shared by the login handshake
+// and the self-service disable flow.
+func (a *AuthService) verifyTOTPOrRecoveryCode(user *User, code string) (bool, error) {
+	valid, err := a.totp.VerifyCode(user.TOTPSecretEncrypted, code)
+	if err != nil {
+		return false, err
+	}
+	if valid {
+		return true, nil
+	}
+	idx, matched := VerifyRecoveryCode(code, user.TOTPRecoveryCodeHashes)
+	if !matched {
+		return false, nil
+	}
+	remaining := make([]string, 0, len(user.TOTPRecoveryCodeHashes)-1)
+	remaining = append(remaining, user.TOTPRecoveryCodeHashes[:idx]...)
+	remaining = append(remaining, user.TOTPRecoveryCodeHashes[idx+1:]...)
+	if err := a.userService.UpdateRecoveryCodeHashes(user.ID, remaining); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func errInvalidLoginChallenge() error {
+	return sharederrors.NewLocalizedError(
+		"auth_totp_challenge_invalid",
+		"Invalid or expired login challenge",
+		"invalid or expired TOTP login challenge",
+		nil,
+	)
+}
+
+func errTOTPNotConfigured() error {
+	return sharederrors.NewLocalizedError(
+		"auth_totp_not_configured",
+		"Two-factor authentication is not available on this server",
+		"TOTP requested but no TOTP encryption key is configured",
+		nil,
+	)
+}
+
+func errTOTPInvalidCode() error {
+	return sharederrors.NewLocalizedError(
+		"auth_totp_invalid_code",
+		"Invalid authentication code",
+		"invalid TOTP or recovery code",
+		nil,
+	)
+}
+
+func errTOTPAlreadyEnabled() error {
+	return sharederrors.NewLocalizedError(
+		"auth_totp_already_enabled",
+		"Two-factor authentication is already enabled",
+		"TOTP is already enabled for this account",
+		nil,
+	)
+}
+
+func errTOTPSetupNotStarted() error {
+	return sharederrors.NewLocalizedError(
+		"auth_totp_setup_not_started",
+		"Two-factor authentication setup was not started",
+		"no pending TOTP setup for this account",
+		nil,
+	)
+}
+
+func errTOTPNotEnabled() error {
+	return sharederrors.NewLocalizedError(
+		"auth_totp_not_enabled",
+		"Two-factor authentication is not enabled",
+		"TOTP is not enabled for this account",
+		nil,
+	)
+}
+
+// parseLoginChallenge validates challengeToken's signature, type, and required
+// claims, returning the subject user ID and challenge jti.
+func (a *AuthService) parseLoginChallenge(challengeToken string) (userID, jti string, err error) {
+	claims, err := a.parseClaims(challengeToken)
+	if err != nil {
+		return "", "", errInvalidLoginChallenge()
+	}
+	typ, ok := claims["typ"].(string)
+	if !ok || typ != loginChallengeTokenType {
+		return "", "", errInvalidLoginChallenge()
+	}
+	userID, ok = claims["sub"].(string)
+	if !ok || userID == "" {
+		return "", "", errInvalidLoginChallenge()
+	}
+	jti, ok = claims["jti"].(string)
+	if !ok || jti == "" {
+		return "", "", errInvalidLoginChallenge()
+	}
+	return userID, jti, nil
+}
+
+// beginTOTPChallenge issues a short-lived, single-use login challenge for a
+// user who passed the password check but still needs to prove TOTP.
+func (a *AuthService) beginTOTPChallenge(user *User) (*AuthToken, error) {
+	jti, err := generateJTI()
+	if err != nil {
+		return nil, err
+	}
+	expiresAt := time.Now().Add(loginChallengeLifetime)
+	claims := jwt.MapClaims{
+		"sub": user.ID,
+		"typ": loginChallengeTokenType,
+		"jti": jti,
+		"exp": expiresAt.Unix(),
+		"iat": time.Now().Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString(a.secretKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := a.sessionStore.CreateSession(jti, user.ID, loginChallengeTokenType, expiresAt); err != nil {
+		return nil, err
+	}
+
+	return &AuthToken{
+		RequiresTOTP:        true,
+		LoginChallengeToken: signed,
+	}, nil
+}
+
+// issueTokens generates and stores access/refresh tokens for an already fully
+// authenticated user (password-only login, or password + TOTP/recovery code).
+func (a *AuthService) issueTokens(user *User) (*AuthToken, error) {
 	accessToken, _, accessTokenExpiresAt, err := a.generateToken(user, a.accessTokenLifetime, "access")
 	if err != nil {
 		return nil, err

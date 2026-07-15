@@ -44,6 +44,7 @@ type Wiki struct {
 	auth         *auth.AuthService
 	userResolver *auth.UserResolver
 	user         *auth.UserService
+	totp         *auth.TOTPService
 	asset        *assets.AssetService
 	branding     *branding.BrandingService
 	searchIndex  *search.SQLiteIndex
@@ -94,6 +95,7 @@ type WikiOptions struct {
 	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 	RevisionCoalesceWindow  time.Duration // Window for coalescing rapid successive saves; 0 = disabled
+	TOTPEncryptionKey       string        // Key used to encrypt per-user TOTP secrets at rest; empty disables TOTP self-service
 	Metrics                 *httpmetrics.HTTPMetrics
 }
 
@@ -199,12 +201,19 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 	if err != nil {
 		return err
 	}
+	if options.TOTPEncryptionKey != "" {
+		totpService, err := auth.NewTOTPService([]byte(options.TOTPEncryptionKey))
+		if err != nil {
+			return fmt.Errorf("invalid TOTP encryption key: %w", err)
+		}
+		w.totp = totpService
+	}
 	if !options.AuthDisabled {
 		sessionStore, err := auth.NewSessionStore(w.storageDir)
 		if err != nil {
 			return err
 		}
-		w.auth = auth.NewAuthService(w.user, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+		w.auth = auth.NewAuthService(w.user, sessionStore, w.totp, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 	}
 	return nil
 }
@@ -401,6 +410,7 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 	return wikiauth.NewRoutes(wikiauth.RoutesConfig{
 		Login:             wikiauth.NewLoginUseCase(w.auth),
+		CompleteTOTPLogin: wikiauth.NewCompleteTOTPLoginUseCase(w.auth),
 		Logout:            wikiauth.NewLogoutUseCase(w.auth),
 		RefreshToken:      wikiauth.NewRefreshTokenUseCase(w.auth),
 		CreateUser:        wikiauth.NewCreateUserUseCase(w.user, w.userResolver, w.log),
@@ -409,6 +419,10 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.user, w.userResolver, w.favorites, w.log),
 		GetUsers:          wikiauth.NewGetUsersUseCase(w.user),
 		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.user),
+		StartTOTPSetup:    wikiauth.NewStartTOTPSetupUseCase(w.auth),
+		ConfirmTOTPSetup:  wikiauth.NewConfirmTOTPSetupUseCase(w.auth),
+		DisableTOTP:       wikiauth.NewDisableTOTPUseCase(w.auth),
+		GetTOTPStatus:     wikiauth.NewGetTOTPStatusUseCase(w.auth),
 		AuthService:       w.auth,
 	})
 }
@@ -535,6 +549,13 @@ func (w *Wiki) SetBackupRoutes(r *wikibackup.Routes) {
 // AuthService returns the authentication service.
 func (w *Wiki) AuthService() *auth.AuthService {
 	return w.auth
+}
+
+// TOTPService returns the TOTP service, or nil if no --totp-encryption-key /
+// LEAFWIKI_TOTP_ENCRYPTION_KEY was configured (TOTP self-service is then
+// unavailable until an operator sets one).
+func (w *Wiki) TOTPService() *auth.TOTPService {
+	return w.totp
 }
 
 // FrontendConfig returns the minimal runtime data required by the router to serve the SPA.

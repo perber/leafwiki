@@ -3,6 +3,10 @@ package auth
 import (
 	"testing"
 	"time"
+
+	"github.com/pquerna/otp/totp"
+
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
 func setupTestAuthService(t *testing.T) *AuthService {
@@ -25,8 +29,564 @@ func setupTestAuthService(t *testing.T) *AuthService {
 		t.Fatal(err)
 	}
 
-	authService := NewAuthService(userService, sessionStore, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	authService := NewAuthService(userService, sessionStore, nil, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
 	return authService
+}
+
+// totpTestFixture wires an AuthService to a real TOTPService and a "testuser"
+// with TOTP already enabled, for exercising the two-step login handshake.
+type totpTestFixture struct {
+	authService  *AuthService
+	store        *UserStore
+	totpService  *TOTPService
+	userID       string
+	plainSecret  string
+	recoveryCode string // one of the plaintext recovery codes, valid until consumed
+}
+
+func setupTOTPTestFixture(t *testing.T) *totpTestFixture {
+	t.Helper()
+	store, err := NewUserStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	userService := NewUserService(store)
+
+	user, err := userService.CreateUser("testuser", "test@example.com", "securepass", "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sessionStore, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	totpService, err := NewTOTPService(testEncryptionKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	generated, err := totpService.GenerateSecret(user.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plainSecret, err := totpService.decrypt(generated.EncryptedSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	codes, hashes, err := totpService.GenerateRecoveryCodes(3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.EnableTOTP(user.ID, generated.EncryptedSecret, hashes); err != nil {
+		t.Fatal(err)
+	}
+
+	authService := NewAuthService(userService, sessionStore, totpService, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+
+	return &totpTestFixture{
+		authService:  authService,
+		store:        store,
+		totpService:  totpService,
+		userID:       user.ID,
+		plainSecret:  plainSecret,
+		recoveryCode: codes[0],
+	}
+}
+
+func (f *totpTestFixture) currentCode(t *testing.T) string {
+	t.Helper()
+	code, err := totp.GenerateCode(f.plainSecret, time.Now())
+	if err != nil {
+		t.Fatalf("failed to generate reference TOTP code: %v", err)
+	}
+	return code
+}
+
+func TestAuthService_Login_TOTPEnabled_ReturnsChallengeInsteadOfTokens(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	result, err := f.authService.Login("testuser", "securepass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	if !result.RequiresTOTP {
+		t.Fatal("expected RequiresTOTP = true for a TOTP-enabled user")
+	}
+	if result.LoginChallengeToken == "" {
+		t.Fatal("expected a non-empty login challenge token")
+	}
+	if result.Token != "" || result.RefreshToken != "" {
+		t.Fatal("expected no access/refresh tokens before the TOTP step completes")
+	}
+}
+
+func TestAuthService_Login_TOTPEnabled_WrongPasswordStillRejected(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	if _, err := f.authService.Login("testuser", "wrong-password"); err != ErrUserInvalidCredentials {
+		t.Fatalf("expected ErrUserInvalidCredentials, got %v", err)
+	}
+}
+
+func TestAuthService_CompleteTOTPLogin_ValidCodeIssuesTokens(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	challenge, err := f.authService.Login("testuser", "securepass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	final, err := f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, f.currentCode(t))
+	if err != nil {
+		t.Fatalf("CompleteTOTPLogin failed: %v", err)
+	}
+	if final.Token == "" || final.RefreshToken == "" {
+		t.Fatal("expected access and refresh tokens after a valid TOTP code")
+	}
+
+	user, err := f.authService.ValidateToken(final.Token)
+	if err != nil {
+		t.Fatalf("ValidateToken failed: %v", err)
+	}
+	if user.Username != "testuser" {
+		t.Errorf("expected username 'testuser', got %q", user.Username)
+	}
+}
+
+func TestAuthService_CompleteTOTPLogin_InvalidCodeRejected(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	challenge, err := f.authService.Login("testuser", "securepass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	_, err = f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, "000000")
+	if err == nil {
+		t.Fatal("expected error for wrong TOTP code")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_invalid_code" {
+		t.Fatalf("expected auth_totp_invalid_code, got %#v", err)
+	}
+}
+
+func TestAuthService_CompleteTOTPLogin_ChallengeIsSingleUse(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	challenge, err := f.authService.Login("testuser", "securepass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	code := f.currentCode(t)
+	if _, err := f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, code); err != nil {
+		t.Fatalf("first CompleteTOTPLogin failed: %v", err)
+	}
+
+	// Replaying the same challenge token, even with a still-valid code, must fail.
+	_, err = f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, code)
+	if err == nil {
+		t.Fatal("expected error when reusing an already-consumed login challenge")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_challenge_invalid" {
+		t.Fatalf("expected auth_totp_challenge_invalid, got %#v", err)
+	}
+}
+
+func TestAuthService_CompleteTOTPLogin_RecoveryCodeWorksOnceAndOnlyOnce(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	challenge1, err := f.authService.Login("testuser", "securepass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if _, err := f.authService.CompleteTOTPLogin(challenge1.LoginChallengeToken, f.recoveryCode); err != nil {
+		t.Fatalf("CompleteTOTPLogin with recovery code failed: %v", err)
+	}
+
+	user, err := f.store.GetUserByID(f.userID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if len(user.TOTPRecoveryCodeHashes) != 2 {
+		t.Fatalf("expected 1 recovery code hash to be consumed, 2 remaining, got %d", len(user.TOTPRecoveryCodeHashes))
+	}
+
+	// A second, fresh login challenge must reject the now-consumed recovery code.
+	challenge2, err := f.authService.Login("testuser", "securepass")
+	if err != nil {
+		t.Fatalf("second Login failed: %v", err)
+	}
+	_, err = f.authService.CompleteTOTPLogin(challenge2.LoginChallengeToken, f.recoveryCode)
+	if err == nil {
+		t.Fatal("expected error when reusing an already-consumed recovery code")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_invalid_code" {
+		t.Fatalf("expected auth_totp_invalid_code, got %#v", err)
+	}
+}
+
+func TestAuthService_CompleteTOTPLogin_NotConfiguredWhenNoEncryptionKey(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	// Simulate an operator unsetting --totp-encryption-key after TOTP was
+	// already enabled for this user: rebuild the AuthService without a TOTPService.
+	authServiceNoTOTP := NewAuthService(NewUserService(f.store), mustNewSessionStore(t), nil, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+
+	challenge, err := authServiceNoTOTP.Login("testuser", "securepass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+	if !challenge.RequiresTOTP {
+		t.Fatal("expected a login challenge even though the TOTP service is unavailable")
+	}
+
+	_, err = authServiceNoTOTP.CompleteTOTPLogin(challenge.LoginChallengeToken, "123456")
+	if err == nil {
+		t.Fatal("expected error when TOTP service is not configured")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_not_configured" {
+		t.Fatalf("expected auth_totp_not_configured, got %#v", err)
+	}
+}
+
+func mustNewSessionStore(t *testing.T) *SessionStore {
+	t.Helper()
+	s, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// totpSetupFixture wires an AuthService to a real TOTPService and a fresh
+// "testuser" with TOTP not yet enabled, for exercising the self-service
+// setup/confirm/disable/status flows from scratch.
+type totpSetupFixture struct {
+	authService *AuthService
+	store       *UserStore
+	sessionStr  *SessionStore
+	totpService *TOTPService
+	userID      string
+}
+
+func setupTOTPSetupFixture(t *testing.T) *totpSetupFixture {
+	t.Helper()
+	store, err := NewUserStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	userService := NewUserService(store)
+
+	user, err := userService.CreateUser("testuser", "test@example.com", "securepass", "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sessionStore, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	totpService, err := NewTOTPService(testEncryptionKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	authService := NewAuthService(userService, sessionStore, totpService, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+
+	return &totpSetupFixture{
+		authService: authService,
+		store:       store,
+		sessionStr:  sessionStore,
+		totpService: totpService,
+		userID:      user.ID,
+	}
+}
+
+func TestAuthService_StartTOTPSetup_WrongPasswordRejected(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	if _, err := f.authService.StartTOTPSetup(f.userID, "wrong-password"); err != ErrUserInvalidCredentials {
+		t.Fatalf("expected ErrUserInvalidCredentials, got %v", err)
+	}
+}
+
+func TestAuthService_StartTOTPSetup_ReturnsSecretAndStoresPending(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	generated, err := f.authService.StartTOTPSetup(f.userID, "securepass")
+	if err != nil {
+		t.Fatalf("StartTOTPSetup failed: %v", err)
+	}
+	if generated.Secret == "" || generated.OTPAuthURL == "" {
+		t.Fatal("expected a non-empty manual-entry secret and otpauth URL")
+	}
+
+	user, err := f.store.GetUserByID(f.userID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if user.TOTPEnabled {
+		t.Fatal("TOTP must stay disabled until ConfirmTOTPSetup succeeds")
+	}
+	if user.TOTPSecretEncrypted == "" {
+		t.Fatal("expected pending encrypted secret to be stored")
+	}
+}
+
+func TestAuthService_StartTOTPSetup_AlreadyEnabledRejected(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	_, err := f.authService.StartTOTPSetup(f.userID, "securepass")
+	if err == nil {
+		t.Fatal("expected error when TOTP is already enabled")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_already_enabled" {
+		t.Fatalf("expected auth_totp_already_enabled, got %#v", err)
+	}
+}
+
+func TestAuthService_ConfirmTOTPSetup_NoPendingSetupRejected(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	_, err := f.authService.ConfirmTOTPSetup(f.userID, "123456", "")
+	if err == nil {
+		t.Fatal("expected error when no setup was started")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_setup_not_started" {
+		t.Fatalf("expected auth_totp_setup_not_started, got %#v", err)
+	}
+}
+
+func TestAuthService_ConfirmTOTPSetup_InvalidCodeRejected(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	if _, err := f.authService.StartTOTPSetup(f.userID, "securepass"); err != nil {
+		t.Fatalf("StartTOTPSetup failed: %v", err)
+	}
+
+	_, err := f.authService.ConfirmTOTPSetup(f.userID, "000000", "")
+	if err == nil {
+		t.Fatal("expected error for wrong code")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_invalid_code" {
+		t.Fatalf("expected auth_totp_invalid_code, got %#v", err)
+	}
+
+	user, err := f.store.GetUserByID(f.userID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if user.TOTPEnabled {
+		t.Fatal("TOTP must not be enabled after a failed confirmation")
+	}
+}
+
+func TestAuthService_ConfirmTOTPSetup_ValidCodeEnablesAndReturnsRecoveryCodes(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	generated, err := f.authService.StartTOTPSetup(f.userID, "securepass")
+	if err != nil {
+		t.Fatalf("StartTOTPSetup failed: %v", err)
+	}
+	plainSecret, err := f.totpService.decrypt(generated.EncryptedSecret)
+	if err != nil {
+		t.Fatalf("failed to decrypt secret for test setup: %v", err)
+	}
+	code, err := totp.GenerateCode(plainSecret, time.Now())
+	if err != nil {
+		t.Fatalf("failed to generate reference TOTP code: %v", err)
+	}
+
+	codes, err := f.authService.ConfirmTOTPSetup(f.userID, code, "")
+	if err != nil {
+		t.Fatalf("ConfirmTOTPSetup failed: %v", err)
+	}
+	if len(codes) == 0 {
+		t.Fatal("expected non-empty plaintext recovery codes")
+	}
+
+	user, err := f.store.GetUserByID(f.userID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if !user.TOTPEnabled {
+		t.Fatal("expected TOTP enabled after successful confirmation")
+	}
+	if len(user.TOTPRecoveryCodeHashes) != len(codes) {
+		t.Fatalf("expected %d stored recovery code hashes, got %d", len(codes), len(user.TOTPRecoveryCodeHashes))
+	}
+}
+
+func TestAuthService_ConfirmTOTPSetup_RevokesOtherSessionsButKeepsCurrent(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	// Simulate an existing "other device" session, plus the session performing this request.
+	if err := f.sessionStr.CreateSession("other-device", f.userID, "refresh", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("failed to seed other-device session: %v", err)
+	}
+	currentRefreshToken, currentJTI, _, err := f.authService.generateToken(&User{ID: f.userID}, time.Hour, "refresh")
+	if err != nil {
+		t.Fatalf("failed to generate current refresh token: %v", err)
+	}
+	if err := f.sessionStr.CreateSession(currentJTI, f.userID, "refresh", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("failed to seed current session: %v", err)
+	}
+
+	generated, err := f.authService.StartTOTPSetup(f.userID, "securepass")
+	if err != nil {
+		t.Fatalf("StartTOTPSetup failed: %v", err)
+	}
+	plainSecret, err := f.totpService.decrypt(generated.EncryptedSecret)
+	if err != nil {
+		t.Fatalf("failed to decrypt secret: %v", err)
+	}
+	code, err := totp.GenerateCode(plainSecret, time.Now())
+	if err != nil {
+		t.Fatalf("failed to generate reference TOTP code: %v", err)
+	}
+
+	if _, err := f.authService.ConfirmTOTPSetup(f.userID, code, currentRefreshToken); err != nil {
+		t.Fatalf("ConfirmTOTPSetup failed: %v", err)
+	}
+
+	if active, _ := f.sessionStr.IsActive("other-device", f.userID, "refresh", time.Now()); active {
+		t.Fatal("expected other-device session to be revoked after enabling TOTP")
+	}
+	if active, _ := f.sessionStr.IsActive(currentJTI, f.userID, "refresh", time.Now()); !active {
+		t.Fatal("expected the session performing setup to remain active")
+	}
+}
+
+func TestAuthService_DisableTOTP_WrongPasswordRejected(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	err := f.authService.DisableTOTP(f.userID, "wrong-password", f.currentCode(t), "")
+	if err != ErrUserInvalidCredentials {
+		t.Fatalf("expected ErrUserInvalidCredentials, got %v", err)
+	}
+}
+
+func TestAuthService_DisableTOTP_WrongCodeRejected(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	err := f.authService.DisableTOTP(f.userID, "securepass", "000000", "")
+	if err == nil {
+		t.Fatal("expected error for wrong code")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_invalid_code" {
+		t.Fatalf("expected auth_totp_invalid_code, got %#v", err)
+	}
+
+	user, err := f.store.GetUserByID(f.userID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if !user.TOTPEnabled {
+		t.Fatal("TOTP must remain enabled after a failed disable attempt")
+	}
+}
+
+func TestAuthService_DisableTOTP_NotEnabledRejected(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	err := f.authService.DisableTOTP(f.userID, "securepass", "000000", "")
+	if err == nil {
+		t.Fatal("expected error when TOTP is not enabled")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_not_enabled" {
+		t.Fatalf("expected auth_totp_not_enabled, got %#v", err)
+	}
+}
+
+func TestAuthService_DisableTOTP_ValidCodeDisablesAndRevokesOtherSessions(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	if err := f.authService.sessionStore.CreateSession("other-device", f.userID, "refresh", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("failed to seed other-device session: %v", err)
+	}
+
+	if err := f.authService.DisableTOTP(f.userID, "securepass", f.currentCode(t), ""); err != nil {
+		t.Fatalf("DisableTOTP failed: %v", err)
+	}
+
+	user, err := f.store.GetUserByID(f.userID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if user.TOTPEnabled {
+		t.Fatal("expected TOTP disabled")
+	}
+	if user.TOTPSecretEncrypted != "" {
+		t.Fatal("expected secret cleared")
+	}
+	if len(user.TOTPRecoveryCodeHashes) != 0 {
+		t.Fatal("expected recovery codes cleared")
+	}
+	if active, _ := f.authService.sessionStore.IsActive("other-device", f.userID, "refresh", time.Now()); active {
+		t.Fatal("expected other-device session to be revoked after disabling TOTP")
+	}
+}
+
+func TestAuthService_DisableTOTP_RecoveryCodeAlsoAccepted(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	if err := f.authService.DisableTOTP(f.userID, "securepass", f.recoveryCode, ""); err != nil {
+		t.Fatalf("DisableTOTP with recovery code failed: %v", err)
+	}
+
+	user, err := f.store.GetUserByID(f.userID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if user.TOTPEnabled {
+		t.Fatal("expected TOTP disabled")
+	}
+}
+
+func TestAuthService_GetTOTPStatus(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	status, err := f.authService.GetTOTPStatus(f.userID)
+	if err != nil {
+		t.Fatalf("GetTOTPStatus failed: %v", err)
+	}
+	if !status.Enabled {
+		t.Fatal("expected enabled = true")
+	}
+	if status.RecoveryCodesRemaining != 3 {
+		t.Fatalf("expected 3 remaining recovery codes, got %d", status.RecoveryCodesRemaining)
+	}
+}
+
+func TestAuthService_GetTOTPStatus_NotEnabled(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	status, err := f.authService.GetTOTPStatus(f.userID)
+	if err != nil {
+		t.Fatalf("GetTOTPStatus failed: %v", err)
+	}
+	if status.Enabled {
+		t.Fatal("expected enabled = false")
+	}
+	if status.RecoveryCodesRemaining != 0 {
+		t.Fatalf("expected 0 remaining recovery codes, got %d", status.RecoveryCodesRemaining)
+	}
 }
 
 func TestAuthService_LoginAndValidateToken(t *testing.T) {
