@@ -332,10 +332,20 @@ func (s *UserService) ResetAdminUserPassword(username, email string) (*User, err
 	return adminUser, nil
 }
 
-// UpdateRecoveryCodeHashes replaces the stored TOTP recovery-code hashes for
-// id, e.g. to atomically remove a hash after it has been consumed at login.
+// UpdateRecoveryCodeHashes unconditionally replaces the stored TOTP
+// recovery-code hashes for id. Not safe against concurrent recovery-code
+// consumption; use ConsumeRecoveryCodeHash for that.
 func (s *UserService) UpdateRecoveryCodeHashes(id string, hashes []string) error {
 	return s.store.UpdateRecoveryCodeHashes(id, hashes)
+}
+
+// ConsumeRecoveryCodeHash atomically replaces oldHashes with newHashes for id
+// via compare-and-swap: the write only takes effect if the stored hashes
+// still match oldHashes exactly. Returns swapped=false (with no error) if
+// they no longer match — e.g. a concurrent request already consumed a code —
+// so the caller can re-read the current hashes and retry.
+func (s *UserService) ConsumeRecoveryCodeHash(id string, oldHashes, newHashes []string) (swapped bool, err error) {
+	return s.store.ConsumeRecoveryCodeHash(id, oldHashes, newHashes)
 }
 
 // SetPendingTOTPSecret stores a freshly generated, not-yet-confirmed encrypted

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -231,6 +232,48 @@ func TestAuthService_CompleteTOTPLogin_RecoveryCodeWorksOnceAndOnlyOnce(t *testi
 	localized, ok := sharederrors.AsLocalizedError(err)
 	if !ok || localized.Code != "auth_totp_invalid_code" {
 		t.Fatalf("expected auth_totp_invalid_code, got %#v", err)
+	}
+}
+
+// TestAuthService_CompleteTOTPLogin_ConcurrentRecoveryCodeUseOnlyOneSucceeds
+// is the regression test for the recovery-code double-redemption race:
+// concurrent login attempts presenting the same still-valid recovery code
+// must not all succeed — the code must be consumable exactly once even under
+// concurrency, not just when used sequentially.
+func TestAuthService_CompleteTOTPLogin_ConcurrentRecoveryCodeUseOnlyOneSucceeds(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	const attempts = 5
+	tokens := make([]string, attempts)
+	for i := 0; i < attempts; i++ {
+		challenge, err := f.authService.Login("testuser", "securepass")
+		if err != nil {
+			t.Fatalf("Login #%d failed: %v", i, err)
+		}
+		tokens[i] = challenge.LoginChallengeToken
+	}
+
+	results := make(chan error, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func(token string) {
+			defer wg.Done()
+			_, err := f.authService.CompleteTOTPLogin(token, f.recoveryCode)
+			results <- err
+		}(tokens[i])
+	}
+	wg.Wait()
+	close(results)
+
+	successCount := 0
+	for err := range results {
+		if err == nil {
+			successCount++
+		}
+	}
+	if successCount != 1 {
+		t.Fatalf("expected exactly 1 of %d concurrent logins with the same recovery code to succeed, got %d", attempts, successCount)
 	}
 }
 

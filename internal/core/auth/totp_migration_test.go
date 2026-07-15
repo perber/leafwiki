@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"sync"
 	"testing"
 
 	"github.com/perber/wiki/internal/test_utils"
@@ -264,6 +265,113 @@ func TestUserStore_TOTPMethods_NotFoundForUnknownUser(t *testing.T) {
 	}
 	if err := store.UpdateRecoveryCodeHashes("missing", nil); err != ErrUserNotFound {
 		t.Fatalf("expected ErrUserNotFound from UpdateRecoveryCodeHashes, got %v", err)
+	}
+}
+
+func TestUserStore_ConsumeRecoveryCodeHash_SwapsOnlyWhenOldHashesMatch(t *testing.T) {
+	store := setupTestUserStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	user := &User{ID: "1", Username: "testuser", Password: "password", Email: "testuser@example.com", Role: RoleEditor}
+	if err := store.CreateUser(user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+	original := []string{"hash1", "hash2", "hash3"}
+	if err := store.EnableTOTP(user.ID, "encrypted-secret", original); err != nil {
+		t.Fatalf("EnableTOTP failed: %v", err)
+	}
+
+	// A stale oldHashes (as if the row changed since it was last read) must
+	// not swap.
+	stale := []string{"hash1", "hash2"}
+	swapped, err := store.ConsumeRecoveryCodeHash(user.ID, stale, []string{"hash1"})
+	if err != nil {
+		t.Fatalf("ConsumeRecoveryCodeHash (stale) failed: %v", err)
+	}
+	if swapped {
+		t.Fatal("expected no swap when oldHashes does not match the stored value")
+	}
+	unchanged, err := store.GetUserByID(user.ID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if len(unchanged.TOTPRecoveryCodeHashes) != 3 {
+		t.Fatalf("expected hashes unchanged after a failed compare-and-swap, got %v", unchanged.TOTPRecoveryCodeHashes)
+	}
+
+	// The correct oldHashes must swap successfully.
+	swapped, err = store.ConsumeRecoveryCodeHash(user.ID, original, []string{"hash2", "hash3"})
+	if err != nil {
+		t.Fatalf("ConsumeRecoveryCodeHash failed: %v", err)
+	}
+	if !swapped {
+		t.Fatal("expected swap to succeed when oldHashes matches the stored value")
+	}
+	updated, err := store.GetUserByID(user.ID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if len(updated.TOTPRecoveryCodeHashes) != 2 {
+		t.Fatalf("expected 2 remaining hashes after swap, got %v", updated.TOTPRecoveryCodeHashes)
+	}
+
+	// Retrying with the now-stale original oldHashes must no longer swap.
+	swapped, err = store.ConsumeRecoveryCodeHash(user.ID, original, []string{"hash3"})
+	if err != nil {
+		t.Fatalf("ConsumeRecoveryCodeHash (retry with stale oldHashes) failed: %v", err)
+	}
+	if swapped {
+		t.Fatal("expected no swap when retrying with hashes that are no longer current")
+	}
+}
+
+// TestUserStore_ConsumeRecoveryCodeHash_ConcurrentRequestsOnlyOneWins is the
+// regression test for the recovery-code double-redemption race: two
+// concurrent requests presenting the same recovery code must not both
+// succeed in consuming it.
+func TestUserStore_ConsumeRecoveryCodeHash_ConcurrentRequestsOnlyOneWins(t *testing.T) {
+	store := setupTestUserStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	user := &User{ID: "1", Username: "testuser", Password: "password", Email: "testuser@example.com", Role: RoleEditor}
+	if err := store.CreateUser(user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+	original := []string{"hash1", "hash2", "hash3"}
+	if err := store.EnableTOTP(user.ID, "encrypted-secret", original); err != nil {
+		t.Fatalf("EnableTOTP failed: %v", err)
+	}
+
+	// Simulate two concurrent requests that both read the same original
+	// hashes and both computed the same "remove hash1" result, racing to
+	// write it back.
+	const attempts = 10
+	remaining := []string{"hash2", "hash3"}
+	results := make(chan bool, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			swapped, err := store.ConsumeRecoveryCodeHash(user.ID, original, remaining)
+			if err != nil {
+				t.Errorf("ConsumeRecoveryCodeHash failed: %v", err)
+				return
+			}
+			results <- swapped
+		}()
+	}
+	wg.Wait()
+	close(results)
+
+	successCount := 0
+	for swapped := range results {
+		if swapped {
+			successCount++
+		}
+	}
+	if successCount != 1 {
+		t.Fatalf("expected exactly 1 of %d concurrent consume attempts to succeed, got %d", attempts, successCount)
 	}
 }
 
