@@ -8,19 +8,19 @@ import (
 )
 
 const (
-	ErrCodeAssetFileTooLarge      = "asset_file_too_large"
-	ErrCodeAssetMissingFile       = "asset_missing_file"
-	ErrCodeAssetMissingName       = "asset_missing_name"
-	ErrCodeAssetPageNotFound      = "asset_page_not_found"
-	ErrCodeAssetNotFound          = "asset_not_found"
-	ErrCodeAssetAlreadyExists     = "asset_already_exists"
-	ErrCodeAssetInvalidExtension  = "asset_invalid_extension"
-	ErrCodeAssetInvalidName       = "asset_invalid_name"
-	ErrCodeAssetInvalidPayload    = "asset_invalid_payload"
-	ErrCodeAssetUploadFailed      = "asset_upload_failed"
-	ErrCodeAssetDeleteFailed      = "asset_delete_failed"
-	ErrCodeAssetRenameFailed      = "asset_rename_failed"
-	ErrCodeAssetInternalError     = "asset_internal_error"
+	ErrCodeAssetFileTooLarge     = "asset_file_too_large"
+	ErrCodeAssetMissingFile      = "asset_missing_file"
+	ErrCodeAssetMissingName      = "asset_missing_name"
+	ErrCodeAssetPageNotFound     = "asset_page_not_found"
+	ErrCodeAssetNotFound         = "asset_not_found"
+	ErrCodeAssetAlreadyExists    = "asset_already_exists"
+	ErrCodeAssetInvalidExtension = "asset_invalid_extension"
+	ErrCodeAssetInvalidName      = "asset_invalid_name"
+	ErrCodeAssetInvalidPayload   = "asset_invalid_payload"
+	ErrCodeAssetUploadFailed     = "asset_upload_failed"
+	ErrCodeAssetDeleteFailed     = "asset_delete_failed"
+	ErrCodeAssetRenameFailed     = "asset_rename_failed"
+	ErrCodeAssetInternalError    = "asset_internal_error"
 )
 
 // AssetErrorResponse is the structured JSON error body returned by asset endpoints.

@@ -10,22 +10,22 @@ import (
 )
 
 const (
-	ErrCodeAuthDisabled             = "auth_disabled"
-	ErrCodeAuthInvalidCredentials   = "auth_invalid_credentials"
-	ErrCodeAuthTokenExpired         = "auth_token_expired"
-	ErrCodeAuthUserNotFound         = "auth_user_not_found"
-	ErrCodeAuthUserAlreadyExists    = "auth_user_already_exists"
-	ErrCodeAuthInvalidRole          = "auth_invalid_role"
-	ErrCodeAuthForbidden            = "auth_forbidden"
-	ErrCodeAuthAdminCannotDelete    = "auth_admin_cannot_delete"
+	ErrCodeAuthDisabled                 = "auth_disabled"
+	ErrCodeAuthInvalidCredentials       = "auth_invalid_credentials"
+	ErrCodeAuthTokenExpired             = "auth_token_expired"
+	ErrCodeAuthUserNotFound             = "auth_user_not_found"
+	ErrCodeAuthUserAlreadyExists        = "auth_user_already_exists"
+	ErrCodeAuthInvalidRole              = "auth_invalid_role"
+	ErrCodeAuthForbidden                = "auth_forbidden"
+	ErrCodeAuthAdminCannotDelete        = "auth_admin_cannot_delete"
 	ErrCodeAuthLastAdminCannotBeDemoted = "auth_last_admin_cannot_be_demoted"
-	ErrCodeAuthInternalError        = "auth_internal_error"
-	ErrCodeAuthInvalidPayload       = "auth_invalid_payload"
-	ErrCodeAuthCookieFailed         = "auth_cookie_failed"
-	ErrCodeAuthCsrfFailed           = "auth_csrf_failed"
-	ErrCodeAuthInvalidRefreshToken  = "auth_invalid_refresh_token"
-	ErrCodeAuthInvalidRequest       = "auth_invalid_request"
-	ErrCodeAuthAccountLocked        = "auth_account_locked"
+	ErrCodeAuthInternalError            = "auth_internal_error"
+	ErrCodeAuthInvalidPayload           = "auth_invalid_payload"
+	ErrCodeAuthCookieFailed             = "auth_cookie_failed"
+	ErrCodeAuthCsrfFailed               = "auth_csrf_failed"
+	ErrCodeAuthInvalidRefreshToken      = "auth_invalid_refresh_token"
+	ErrCodeAuthInvalidRequest           = "auth_invalid_request"
+	ErrCodeAuthAccountLocked            = "auth_account_locked"
 )
 
 // AuthErrorResponse is the structured JSON error body returned by auth endpoints.

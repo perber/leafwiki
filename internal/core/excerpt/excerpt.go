@@ -34,9 +34,9 @@ var (
 	shoutoutClosePattern = regexp.MustCompile(`^ {0,3}:::\s*$`)
 	fencePattern         = regexp.MustCompile(`^ {0,3}(?P<marker>` + "`{3,}|~{3,}" + `).*$`)
 
-	shoutoutTypeIdx      = shoutoutOpenPattern.SubexpIndex("type")
-	fenceMarkerIdx       = fencePattern.SubexpIndex("marker")
-	blockQuotePrefix     = regexp.MustCompile(`^(> ?)+`)
+	shoutoutTypeIdx  = shoutoutOpenPattern.SubexpIndex("type")
+	fenceMarkerIdx   = fencePattern.SubexpIndex("marker")
+	blockQuotePrefix = regexp.MustCompile(`^(> ?)+`)
 )
 
 type fenceState struct {

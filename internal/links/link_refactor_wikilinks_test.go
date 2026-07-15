@@ -138,7 +138,6 @@ func TestFindWikiLinksForPath_TitleMatchCaseInsensitive(t *testing.T) {
 	}
 }
 
-
 func TestFindWikiLinksForPath_SkipsCodeBlocks(t *testing.T) {
 	engine := NewMarkdownRefactorEngine()
 	// Fenced code block: no occurrence outside code → nothing reported.

@@ -23,6 +23,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/backup"
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
@@ -149,11 +150,12 @@ func printUsage() {
 
 func setupLogger() {
 	level := slog.LevelInfo
-	if os.Getenv("LEAFWIKI_LOG_LEVEL") == "debug" {
+	switch os.Getenv("LEAFWIKI_LOG_LEVEL") {
+	case "debug":
 		level = slog.LevelDebug
-	} else if (os.Getenv("LEAFWIKI_LOG_LEVEL")) == "error" {
+	case "error":
 		level = slog.LevelError
-	} else if (os.Getenv("LEAFWIKI_LOG_LEVEL")) == "warn" {
+	case "warn":
 		level = slog.LevelWarn
 	}
 
@@ -447,6 +449,15 @@ func main() {
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)
 	}
+
+	// Log .leafwikiignore status
+	rootDir := filepath.Join(dataDir, "root")
+	if ignoreFile, err := ignore.LoadFromDir(rootDir); err != nil {
+		slog.Default().Warn("invalid .leafwikiignore", "error", err)
+	} else if ignoreFile != nil {
+		slog.Default().Info("loaded .leafwikiignore", "patterns", ignoreFile.PatternCount())
+	}
+
 	defer func() {
 		if err := w.Close(); err != nil {
 			slog.Default().Error("Failed to close Wiki", "error", err)

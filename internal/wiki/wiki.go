@@ -11,6 +11,7 @@ import (
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/favorites"
@@ -69,6 +70,7 @@ type Wiki struct {
 	backupRoutes     *wikibackup.Routes
 	resyncRoutes     *wikiresync.Routes
 	resyncJob        *wikiresync.ResyncJob
+	ignoreCache      *ignore.Cache
 	reloadMu         sync.Mutex
 	reloadWG         sync.WaitGroup
 	shutdownCtx      context.Context
@@ -208,12 +210,19 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 }
 
 func (w *Wiki) initCoreServices(options *WikiOptions) error {
+	// Create a shared ignore cache for multi-level .leafwikiignore resolution.
+	rootDir := filepath.Join(w.storageDir, "root")
+	w.ignoreCache = ignore.NewCache(rootDir)
+
 	w.tree = tree.NewTreeService(w.storageDir)
+	w.tree.SetIgnoreCache(w.ignoreCache)
 	if err := w.tree.LoadTree(); err != nil {
 		return err
 	}
 	w.slug = tree.NewSlugService()
 	w.asset = assets.NewAssetService(w.storageDir, w.slug)
+	w.asset.SetIgnoreCache(w.ignoreCache)
+
 	return nil
 }
 
@@ -478,7 +487,9 @@ func (w *Wiki) buildBrandingRoutes() *wikibranding.Routes {
 func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 	importerDir := filepath.Join(options.StorageDir, ".importer")
 	adapter := NewWikiImportAdapter(w)
-	planner := coreimporter.NewPlanner(adapter, w.slug)
+	planner := coreimporter.NewPlanner(adapter, w.slug, options.StorageDir)
+	planner.SetIgnoreCache(w.ignoreCache)
+
 	store := coreimporter.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
 	svc := coreimporter.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), options.MaxAssetUploadSizeBytes)
 	return wikiimporter.NewRoutes(wikiimporter.RoutesConfig{

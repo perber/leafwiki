@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	NodeKindPage    = "page"
-	NodeKindSection = "section"
+	NodeKindPage              = "page"
+	NodeKindSection           = "section"
 	logErrorAddingFrontmatter = "Error adding frontmatter to child node"
 )
 

@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	ErrCodeSearchUnavailable    = "search_unavailable"
-	ErrCodeSearchInternal       = "search_internal_error"
-	ErrCodeSearchMissingQuery   = "search_missing_query"
-	ErrCodeSearchInvalidOffset  = "search_invalid_offset"
-	ErrCodeSearchInvalidLimit   = "search_invalid_limit"
+	ErrCodeSearchUnavailable   = "search_unavailable"
+	ErrCodeSearchInternal      = "search_internal_error"
+	ErrCodeSearchMissingQuery  = "search_missing_query"
+	ErrCodeSearchInvalidOffset = "search_invalid_offset"
+	ErrCodeSearchInvalidLimit  = "search_invalid_limit"
 )
 
 // SearchErrorResponse is the structured JSON error body returned by search endpoints.

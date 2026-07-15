@@ -61,11 +61,12 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 	ve := sharederrors.NewValidationErrors()
 	trimmedSiteName := strings.TrimSpace(siteName)
 
-	if trimmedSiteName == "" {
+	switch {
+	case trimmedSiteName == "":
 		ve.Add("siteName", "Site name must not be empty")
-	} else if len(trimmedSiteName) > s.brandingConfig.BrandingConstraints.MaxSiteNameLength {
+	case len(trimmedSiteName) > s.brandingConfig.BrandingConstraints.MaxSiteNameLength:
 		ve.Add("siteName", fmt.Sprintf("Site name must not exceed %d characters", s.brandingConfig.BrandingConstraints.MaxSiteNameLength))
-	} else if containsControlCharacters(trimmedSiteName) {
+	case containsControlCharacters(trimmedSiteName):
 		ve.Add("siteName", "Site name contains invalid control characters")
 	}
 

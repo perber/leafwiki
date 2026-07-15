@@ -6,7 +6,6 @@ import (
 	"github.com/perber/wiki/internal/core/markdown"
 )
 
-
 type PropertiesService struct {
 	store *PropertiesStore
 }
@@ -104,7 +103,6 @@ func extractFlatEntryDepth(prefix string, value interface{}, result map[string]P
 		}
 	}
 }
-
 
 func toPropertyEntry(value interface{}) (PropertyEntry, bool) {
 	s, ok := value.(string)

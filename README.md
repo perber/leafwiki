@@ -545,6 +545,63 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 
 ---
 
+## .leafwikiignore — Ignore Files
+
+LeafWiki indexes every `.md` file it finds on disk. If you have files or directories you want to keep on disk but exclude from the wiki (draft pages, archive sections, private notes, imported markdown being organized), create a `.leafwikiignore` file at the root of your wiki's data directory.
+
+**Location:** Anywhere under `root/`. A `.leafwikiignore` at the wiki root applies to the entire wiki; per-directory files apply to their directory and its children.
+
+**Syntax:** Standard gitignore-style patterns:
+
+| Pattern | Meaning |
+|---------|---------|
+| `#` | Comment |
+| `*` | Matches anything except `/` |
+| `?` | Matches any single char except `/` |
+| `**` | Matches zero or more directories |
+| Trailing `/` | Directory-only match |
+| Leading `/` | Anchored to wiki root |
+| `!` prefix | Negation (un-ignore) |
+
+**Examples:**
+
+```gitignore
+# Exclude all log files
+*.log
+
+# Exclude entire directory
+drafts/
+
+# Exclude everything except important.md
+*.md
+!important.md
+```
+
+**Notes:**
+- Changes to any `.leafwikiignore` require a restart to take effect.
+- Ignored files are hidden completely — remove the ignore pattern to see them again.
+- Per-directory ignore files are supported: any directory under `root/` may contain its own `.leafwikiignore`. Patterns accumulate from root to leaf, and child patterns can negate parent patterns with `!`.
+
+**Multi-level example:**
+
+```gitignore
+# root/.leafwikiignore — applies everywhere
+*.md
+
+# root/docs/.leafwikiignore — un-ignore specific files under docs/
+!important.md
+
+# root/docs/archive/.leafwikiignore — re-ignore files under archive/
+*.md
+```
+
+In this example:
+- All `.md` files are ignored by default (root rule).
+- `docs/important.md` is un-ignored (child negation).
+- `docs/archive/` is re-ignored (grandchild re-applies the restriction).
+
+---
+
 ## Sorting Pages
 
 Page order in LeafWiki is **explicit and manual** — it does not follow filename or alphabetical order automatically. By default, pages appear in the order they were created.

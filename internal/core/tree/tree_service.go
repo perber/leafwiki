@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/treemigration"
 )
@@ -31,23 +32,30 @@ type TreeService struct {
 }
 
 const (
-	legacyTreeFilename                     = "tree.json"
-	errNilTreeReconstructed                = "internal error: tree reconstruction returned nil tree"
-	errPersistChildOrderFailed             = "could not persist child order: %w"
-	errGetPageContentFailed                = "could not get page content: %w"
-	errRollbackMovedNodeFailed             = "rollback moved node: %w"
+	legacyTreeFilename         = "tree.json"
+	errNilTreeReconstructed    = "internal error: tree reconstruction returned nil tree"
+	errPersistChildOrderFailed = "could not persist child order: %w"
+	errGetPageContentFailed    = "could not get page content: %w"
+	errRollbackMovedNodeFailed = "rollback moved node: %w"
 )
 
 func NewTreeService(storageDir string) *TreeService {
+	store := NewNodeStore(storageDir)
+
 	return &TreeService{
 		storageDir:   storageDir,
 		tree:         nil,
-		store:        NewNodeStore(storageDir),
+		store:        store,
 		log:          slog.Default().With("component", "TreeService"),
 		nodesByID:    make(map[string]*PageNode),
 		nodesByTitle: make(map[string][]*PageNode),
 		childSlugs:   make(map[string]map[string]*PageNode),
 	}
+}
+
+// SetIgnoreCache sets the ignore cache for multi-level ignore resolution.
+func (t *TreeService) SetIgnoreCache(ignoreCache *ignore.Cache) {
+	t.store.SetIgnoreCache(ignoreCache)
 }
 
 // LoadTree reconstructs the in-memory tree from the filesystem.

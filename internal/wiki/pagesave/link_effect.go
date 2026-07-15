@@ -59,14 +59,12 @@ func (e *LinkIndexSideEffect) Apply(event PageSaveEvent) {
 			for _, p := range event.AffectedPages {
 				e.updateAndHeal(p, event.Operation)
 			}
-		} else {
-			if event.After != nil {
-				if err := e.svc.UpdateLinksForPage(event.After, event.After.Content); err != nil {
-					e.log.Warn("failed to update links for page", "pageID", event.After.ID, "error", err)
-					e.recordFailure(event.Operation)
-				}
-				e.healExact(event.After, event.Operation)
+		} else if event.After != nil {
+			if err := e.svc.UpdateLinksForPage(event.After, event.After.Content); err != nil {
+				e.log.Warn("failed to update links for page", "pageID", event.After.ID, "error", err)
+				e.recordFailure(event.Operation)
 			}
+			e.healExact(event.After, event.Operation)
 		}
 
 	case PageOperationMove:

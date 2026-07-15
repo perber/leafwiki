@@ -11,8 +11,8 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/properties"
-	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/tags"
+	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
 
@@ -82,7 +82,7 @@ func newTestWiki(t *testing.T) *wiki.Wiki {
 
 func newTestImporterService(t *testing.T, w *wiki.Wiki) *importer.ImporterService {
 	t.Helper()
-	planner := importer.NewPlanner(wiki.NewWikiImportAdapter(w), tree.NewSlugService())
+	planner := importer.NewPlanner(wiki.NewWikiImportAdapter(w), tree.NewSlugService(), "")
 	importerDir := filepath.Join(w.GetStorageDir(), ".importer")
 	return importer.NewImporterService(
 		planner,

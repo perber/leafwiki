@@ -3,7 +3,7 @@ package wikibackup
 import "github.com/gin-gonic/gin"
 
 const (
-	ErrCodeBackupNotEnabled  = "backup_not_enabled"
+	ErrCodeBackupNotEnabled    = "backup_not_enabled"
 	ErrCodeBackupInternalError = "backup_internal_error"
 )
 

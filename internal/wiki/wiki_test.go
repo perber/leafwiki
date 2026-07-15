@@ -390,3 +390,47 @@ func TestWiki_EnsureBaselineRevisions_SkipsUnreadablePages(t *testing.T) {
 		t.Fatalf("expected no baseline revision for unreadable page, got %d", len(brokenRevisions))
 	}
 }
+
+func TestWiki_ResyncRespectsLeafwikiignore(t *testing.T) {
+	tmp := t.TempDir()
+
+	rootDir := filepath.Join(tmp, "root")
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// .leafwikiignore goes in root/ alongside the markdown files
+	test_utils.WriteFile(t, tmp, "root/.leafwikiignore", "secret.md")
+	test_utils.WriteFile(t, tmp, "root/public.md", "# Public Page")
+	test_utils.WriteFile(t, tmp, "root/secret.md", "# Secret Page")
+
+	w, err := NewWiki(&WikiOptions{
+		StorageDir:          tmp,
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("NewWiki: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	// Verify tree has only the public page
+	tree := w.tree.GetTree()
+	if len(tree.Children) != 1 {
+		t.Fatalf("expected 1 child in root, got %d", len(tree.Children))
+	}
+	if tree.Children[0].Slug != "public" {
+		t.Fatalf("expected child slug 'public', got %q", tree.Children[0].Slug)
+	}
+
+	// Verify ignored page is not findable
+	lookup, err := w.tree.LookupPagePath("secret")
+	if err != nil {
+		t.Fatalf("LookupPagePath: %v", err)
+	}
+	if lookup.Exists {
+		t.Fatal("expected ignored page 'secret' to not exist")
+	}
+}
