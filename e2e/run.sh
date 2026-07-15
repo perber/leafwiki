@@ -80,6 +80,7 @@ start_docker() {
     --enable-link-refactor=true \
     --revision-coalesce-window=0 \
     --jwt-secret=e2e-tests-secret \
+    --totp-encryption-key=e2e-tests-totp-encryption-key-32 \
     --admin-password=admin
 
   echo "✅ Container started on $app_url"
@@ -115,6 +116,7 @@ start_local() {
       --enable-link-refactor=true \
       --revision-coalesce-window=0 \
       --jwt-secret=e2e-tests-secret \
+      --totp-encryption-key=e2e-tests-totp-encryption-key-32 \
       --admin-password=admin
   ) >"$server_log" 2>&1 &
 
