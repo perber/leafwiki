@@ -48,7 +48,11 @@ func (f *UserStore) Connect() error {
 	if f.db != nil {
 		return nil
 	}
-	db, err := sql.Open("sqlite", databasePath(f.storageDir, f.filename))
+	// busy_timeout makes concurrent writers (e.g. two requests racing to
+	// consume the same TOTP recovery code via ConsumeRecoveryCodeHash) block
+	// and retry internally for up to 5s instead of failing immediately with
+	// SQLITE_BUSY, which ConsumeRecoveryCodeHash's caller does not retry on.
+	db, err := sql.Open("sqlite", databasePath(f.storageDir, f.filename)+"?_pragma=busy_timeout(5000)")
 	if err != nil {
 		return err
 	}
@@ -543,8 +547,10 @@ func (f *UserStore) DisableTOTP(userID string) error {
 	return err
 }
 
-// UpdateRecoveryCodeHashes replaces the stored recovery-code hashes for userID,
-// e.g. to atomically remove a hash after it has been consumed at login.
+// UpdateRecoveryCodeHashes unconditionally replaces the stored recovery-code
+// hashes for userID. Not safe against concurrent recovery-code consumption
+// (two callers racing on stale reads can both overwrite each other's write);
+// use ConsumeRecoveryCodeHash for that.
 func (f *UserStore) UpdateRecoveryCodeHashes(userID string, recoveryCodeHashes []string) error {
 	err := f.Connect()
 	if err != nil {
@@ -566,4 +572,46 @@ func (f *UserStore) UpdateRecoveryCodeHashes(userID string, recoveryCodeHashes [
 		WHERE id = ?;
 	`, string(codesJSON), userID)
 	return err
+}
+
+// ConsumeRecoveryCodeHash atomically replaces oldHashes with newHashes for
+// userID via compare-and-swap on the stored JSON column: the write only takes
+// effect if the row's current totp_recovery_codes_json still serializes to
+// exactly oldHashes. This guards against two concurrent requests both
+// consuming the same recovery code — only the first compare-and-swap can
+// match the row's current state; the loser gets swapped=false and must
+// re-read and retry against the now-current hashes (see
+// AuthService.verifyTOTPOrRecoveryCode).
+//
+// json.Marshal of a []string is deterministic, so re-encoding the
+// previously-read oldHashes here reproduces exactly what was last written,
+// with no need to carry the raw JSON string alongside the parsed slice.
+func (f *UserStore) ConsumeRecoveryCodeHash(userID string, oldHashes, newHashes []string) (swapped bool, err error) {
+	if err := f.Connect(); err != nil {
+		return false, err
+	}
+
+	oldJSON, err := json.Marshal(oldHashes)
+	if err != nil {
+		return false, fmt.Errorf("failed to encode recovery codes for user %s: %w", userID, err)
+	}
+	newJSON, err := json.Marshal(newHashes)
+	if err != nil {
+		return false, fmt.Errorf("failed to encode recovery codes for user %s: %w", userID, err)
+	}
+
+	result, err := f.db.Exec(`
+		UPDATE users
+		SET totp_recovery_codes_json = ?
+		WHERE id = ? AND totp_recovery_codes_json = ?;
+	`, string(newJSON), userID, string(oldJSON))
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rowsAffected == 1, nil
 }

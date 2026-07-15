@@ -310,10 +310,22 @@ func (a *AuthService) RevokeAllUserSessionsExceptCurrent(userID, currentRefreshT
 	return a.sessionStore.RevokeAllSessionsForUserExcept(userID, exceptJTI)
 }
 
+// maxRecoveryCodeConsumeAttempts bounds the compare-and-swap retry loop in
+// verifyTOTPOrRecoveryCode. Contention here only ever comes from concurrent
+// requests racing to consume the same code, so a handful of retries is ample;
+// exhausting them denies the request rather than risking a double-consume.
+const maxRecoveryCodeConsumeAttempts = 3
+
 // verifyTOTPOrRecoveryCode checks code against user's current TOTP secret or,
 // failing that, their remaining recovery codes — consuming (removing) a
 // matched recovery code so it cannot be reused. Shared by the login handshake
 // and the self-service disable flow.
+//
+// Recovery-code consumption uses optimistic concurrency (compare-and-swap on
+// the stored hash list) rather than a plain read-then-write, so that two
+// concurrent requests presenting the same recovery code cannot both succeed:
+// only the first writer's compare-and-swap can match the row's current state;
+// the loser re-reads the now-current hashes and retries against those.
 func (a *AuthService) verifyTOTPOrRecoveryCode(user *User, code string) (bool, error) {
 	valid, err := a.totp.VerifyCode(user.TOTPSecretEncrypted, code)
 	if err != nil {
@@ -322,17 +334,37 @@ func (a *AuthService) verifyTOTPOrRecoveryCode(user *User, code string) (bool, e
 	if valid {
 		return true, nil
 	}
-	idx, matched := VerifyRecoveryCode(code, user.TOTPRecoveryCodeHashes)
-	if !matched {
-		return false, nil
+
+	hashes := user.TOTPRecoveryCodeHashes
+	for attempt := 0; attempt < maxRecoveryCodeConsumeAttempts; attempt++ {
+		idx, matched := VerifyRecoveryCode(code, hashes)
+		if !matched {
+			return false, nil
+		}
+
+		remaining := make([]string, 0, len(hashes)-1)
+		remaining = append(remaining, hashes[:idx]...)
+		remaining = append(remaining, hashes[idx+1:]...)
+
+		swapped, err := a.userService.ConsumeRecoveryCodeHash(user.ID, hashes, remaining)
+		if err != nil {
+			return false, err
+		}
+		if swapped {
+			return true, nil
+		}
+
+		// Lost the race: a concurrent request already changed the stored
+		// hashes (e.g. consumed the same or a different code first).
+		// Re-read the current state and retry against it.
+		refreshed, err := a.userService.GetUserByID(user.ID)
+		if err != nil {
+			return false, err
+		}
+		hashes = refreshed.TOTPRecoveryCodeHashes
 	}
-	remaining := make([]string, 0, len(user.TOTPRecoveryCodeHashes)-1)
-	remaining = append(remaining, user.TOTPRecoveryCodeHashes[:idx]...)
-	remaining = append(remaining, user.TOTPRecoveryCodeHashes[idx+1:]...)
-	if err := a.userService.UpdateRecoveryCodeHashes(user.ID, remaining); err != nil {
-		return false, err
-	}
-	return true, nil
+
+	return false, nil
 }
 
 func errInvalidLoginChallenge() error {
