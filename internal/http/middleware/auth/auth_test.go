@@ -38,7 +38,7 @@ func createTestAuthFixture(t *testing.T) *authFixture {
 	}
 
 	return &authFixture{
-		auth: coreauth.NewAuthService(userService, sessionStore, "test-secret-key-for-unit-tests-1", 15*time.Minute, 7*24*time.Hour),
+		auth: coreauth.NewAuthService(userService, sessionStore, nil, "test-secret-key-for-unit-tests-1", 15*time.Minute, 7*24*time.Hour),
 		close: func() error {
 			if err := sessionStore.Close(); err != nil {
 				_ = userStore.Close()

@@ -23,6 +23,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/backup"
+	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -55,6 +56,9 @@ func writeUsage(w io.Writer) {
 	--admin-username   Initial admin username (used only if no admin exists) (default: admin)
 	--admin-email      Initial admin email (used only if no admin exists) (default: admin@localhost)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
+	--totp-encryption-key    Key to encrypt per-user TOTP secrets at rest, min 32 bytes
+	                         (required only once a user enables TOTP; leave unset to keep
+	                         TOTP self-service unavailable) (default: "")
 	--public-access    Allow public access to the wiki only with read access (default: false)
 	--allow-insecure   Allow insecure HTTP connections (default: false)                      
 	--access-token-timeout  Access token timeout duration (e.g. 24h, 15m) (default: 15m)
@@ -101,6 +105,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_UNIX_SOCKET
 	LEAFWIKI_DATA_DIR
 	LEAFWIKI_JWT_SECRET
+	LEAFWIKI_TOTP_ENCRYPTION_KEY
 	LEAFWIKI_LOG_LEVEL
 	LEAFWIKI_ADMIN_PASSWORD
 	LEAFWIKI_ADMIN_USERNAME
@@ -183,6 +188,7 @@ type cliFlags struct {
 	adminEmail              *string
 	adminPassword           *string
 	jwtSecret               *string
+	totpEncryptionKey       *string
 	publicAccess            *bool
 	allowInsecure           *bool
 	injectCodeInHeader      *string
@@ -229,6 +235,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		adminEmail:              fs.String("admin-email", "", "initial admin email (used only if no admin exists) (default: admin@localhost)"),
 		adminPassword:           fs.String("admin-password", "", "initial admin password"),
 		jwtSecret:               fs.String("jwt-secret", "", "JWT secret for authentication"),
+		totpEncryptionKey:       fs.String("totp-encryption-key", "", "key to encrypt per-user TOTP secrets at rest, min 32 bytes (leave unset to keep TOTP self-service unavailable)"),
 		publicAccess:            fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
 		allowInsecure:           fs.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)"),
 		injectCodeInHeader:      fs.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")"),
@@ -296,6 +303,7 @@ func main() {
 	adminUsername := resolveString("admin-username", *flags.adminUsername, visited, "LEAFWIKI_ADMIN_USERNAME", "")
 	adminEmail := resolveString("admin-email", *flags.adminEmail, visited, "LEAFWIKI_ADMIN_EMAIL", "")
 	jwtSecret := resolveString("jwt-secret", *flags.jwtSecret, visited, "LEAFWIKI_JWT_SECRET", "")
+	totpEncryptionKey := resolveString("totp-encryption-key", *flags.totpEncryptionKey, visited, "LEAFWIKI_TOTP_ENCRYPTION_KEY", "")
 	injectCodeInHeader := resolveString("inject-code-in-header", *flags.injectCodeInHeader, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
 	customStylesheet := resolveString("custom-stylesheet", *flags.customStylesheet, visited, "LEAFWIKI_CUSTOM_STYLESHEET", "")
 	allowInsecure := resolveBool("allow-insecure", *flags.allowInsecure, visited, "LEAFWIKI_ALLOW_INSECURE")
@@ -427,6 +435,10 @@ func main() {
 		}
 	}
 
+	if totpEncryptionKey != "" && len(totpEncryptionKey) < auth.MinTOTPEncryptionKeyLen {
+		fail("--totp-encryption-key/LEAFWIKI_TOTP_ENCRYPTION_KEY is too short", "minimum_bytes", auth.MinTOTPEncryptionKeyLen, "got", len(totpEncryptionKey))
+	}
+
 	var metrics *httpmetrics.HTTPMetrics
 	if enableMetrics {
 		metrics = httpmetrics.NewHTTPMetrics()
@@ -438,6 +450,7 @@ func main() {
 		AdminEmail:             adminEmail,
 		AdminPassword:          adminPassword,
 		JWTSecret:              jwtSecret,
+		TOTPEncryptionKey:      totpEncryptionKey,
 		AccessTokenTimeout:     accessTokenTimeout,
 		RefreshTokenTimeout:    refreshTokenTimeout,
 		AuthDisabled:           disableAuth,
