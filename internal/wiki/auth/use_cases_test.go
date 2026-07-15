@@ -210,6 +210,39 @@ func TestUpdateUser_AdminInvalidRole(t *testing.T) {
 	}
 }
 
+// TestCompleteTOTPLoginUseCase_AuthDisabled verifies the use case refuses to
+// run (rather than nil-pointer-dereferencing into AuthService) when auth is
+// disabled, matching every other use case's ErrAuthDisabled guard.
+func TestCompleteTOTPLoginUseCase_AuthDisabled(t *testing.T) {
+	uc := NewCompleteTOTPLoginUseCase(nil)
+
+	_, err := uc.Execute(context.Background(), CompleteTOTPLoginInput{
+		LoginChallengeToken: "token",
+		Code:                "123456",
+	})
+	if !errors.Is(err, ErrAuthDisabled) {
+		t.Fatalf("expected ErrAuthDisabled, got %v", err)
+	}
+}
+
+// TestTOTPUseCases_AuthDisabled verifies every self-service TOTP use case
+// refuses to run when auth is disabled, matching every other use case's
+// ErrAuthDisabled guard.
+func TestTOTPUseCases_AuthDisabled(t *testing.T) {
+	if _, err := NewStartTOTPSetupUseCase(nil).Execute(context.Background(), StartTOTPSetupInput{}); !errors.Is(err, ErrAuthDisabled) {
+		t.Fatalf("StartTOTPSetupUseCase: expected ErrAuthDisabled, got %v", err)
+	}
+	if _, err := NewConfirmTOTPSetupUseCase(nil).Execute(context.Background(), ConfirmTOTPSetupInput{}); !errors.Is(err, ErrAuthDisabled) {
+		t.Fatalf("ConfirmTOTPSetupUseCase: expected ErrAuthDisabled, got %v", err)
+	}
+	if err := NewDisableTOTPUseCase(nil).Execute(context.Background(), DisableTOTPInput{}); !errors.Is(err, ErrAuthDisabled) {
+		t.Fatalf("DisableTOTPUseCase: expected ErrAuthDisabled, got %v", err)
+	}
+	if _, err := NewGetTOTPStatusUseCase(nil).Execute(context.Background(), GetTOTPStatusInput{}); !errors.Is(err, ErrAuthDisabled) {
+		t.Fatalf("GetTOTPStatusUseCase: expected ErrAuthDisabled, got %v", err)
+	}
+}
+
 // TestDeleteUser_RemovesFavoritesForUser verifies that deleting a user cascades
 // to clean up their favorites.db rows, even though sessions.db does not have
 // the same cleanup today (deliberately not copying that gap, see plans/favorites.md).
