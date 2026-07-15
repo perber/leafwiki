@@ -15,7 +15,7 @@ import (
 // PropertyEntry is a single property value with its type.
 type PropertyEntry struct {
 	Value string
-	Type  string // currently always "text"
+	Type  string
 }
 
 // PropertyKeyCount carries a property key and the number of pages that have it.

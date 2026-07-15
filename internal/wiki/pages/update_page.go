@@ -21,7 +21,7 @@ type UpdatePageInput struct {
 	Content             *string
 	Kind                *tree.NodeKind
 	Tags                []string
-	Properties          map[string]string
+	Properties          map[string]tree.MetadataValue
 	PreserveFrontmatter bool
 }
 

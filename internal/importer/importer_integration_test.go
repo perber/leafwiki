@@ -205,8 +205,9 @@ func TestImporterService_ExecuteCurrentPlan_IndexesTagsAndPropertiesImmediately(
 	if err != nil {
 		t.Fatalf("GetAllPropertyKeys err: %v", err)
 	}
-	if len(keys) != 2 {
-		t.Fatalf("expected 2 indexed string properties, got %#v", keys)
+	// Indexed keys: status, owner, priority (number), owners.0 (list element)
+	if len(keys) != 4 {
+		t.Fatalf("expected 4 indexed properties, got %#v", keys)
 	}
 
 	statusPageIDs, err := propsStore.GetPageIDsByProperty("status", "published")
@@ -225,12 +226,13 @@ func TestImporterService_ExecuteCurrentPlan_IndexesTagsAndPropertiesImmediately(
 		t.Fatalf("expected owner property to be indexed for one page, got %v", ownerPageIDs)
 	}
 
+	// Numeric properties are now indexed too.
 	priorityPageIDs, err := propsStore.GetPageIDsByProperty("priority", "3")
 	if err != nil {
 		t.Fatalf("GetPageIDsByProperty(priority) err: %v", err)
 	}
-	if len(priorityPageIDs) != 0 {
-		t.Fatalf("expected numeric property to be skipped, got %v", priorityPageIDs)
+	if len(priorityPageIDs) != 1 {
+		t.Fatalf("expected numeric priority property to be indexed, got %v", priorityPageIDs)
 	}
 }
 

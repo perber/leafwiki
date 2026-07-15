@@ -663,7 +663,7 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool, expec
 // When preserveFrontmatter is true the content is treated as raw markdown with
 // embedded frontmatter (UpsertContentPreservingFrontmatter).
 // When both are absent, content is a plain body update (UpsertContent).
-func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, expectedVersion string, tags []string, properties map[string]string, preserveFrontmatter bool) error {
+func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, expectedVersion string, tags []string, properties map[string]MetadataValue, preserveFrontmatter bool) error {
 	return t.withLockedTree(func() error {
 		if t.tree == nil {
 			return ErrTreeNotLoaded
@@ -969,7 +969,8 @@ func (t *TreeService) GetPages(ids []string) ([]*Page, []error) {
 			if err != nil {
 				errs[tk.index] = fmt.Errorf(errGetPageContentFailed, err)
 			} else {
-				pages[tk.index] = &Page{PageNode: tk.node, Content: content, RawContent: raw}
+				tags, props := ParseFrontmatterMetadata(raw)
+				pages[tk.index] = &Page{PageNode: tk.node, Content: content, RawContent: raw, Tags: tags, Properties: props}
 			}
 			mu.Unlock()
 		}(tk)
@@ -999,10 +1000,13 @@ func (t *TreeService) GetPage(id string) (*Page, error) {
 		return nil, fmt.Errorf(errGetPageContentFailed, err)
 	}
 
+	tags, props := ParseFrontmatterMetadata(raw)
 	return &Page{
 		PageNode:   page,
 		Content:    content,
 		RawContent: raw,
+		Tags:       tags,
+		Properties: props,
 	}, nil
 }
 
