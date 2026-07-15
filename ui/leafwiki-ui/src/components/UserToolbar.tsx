@@ -14,6 +14,8 @@ import i18next from '@/lib/i18n'
 import {
   DIALOG_CHANGE_OWN_PASSWORD,
   DIALOG_SHORTCUTS_HELP,
+  DIALOG_TOTP_DISABLE,
+  DIALOG_TOTP_SETUP,
 } from '@/lib/registries'
 import { useTranslation } from 'react-i18next'
 import { redirectToExternal } from '@/lib/redirectToExternal'
@@ -40,7 +42,7 @@ const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
 )
 
 export default function UserToolbar() {
-  const { t } = useTranslation(['auth', 'backup'])
+  const { t } = useTranslation(['auth', 'backup', 'users'])
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
@@ -196,6 +198,24 @@ export default function UserToolbar() {
           >
             Change Own Password
           </DropdownMenuItem>
+          {!authDisabled &&
+            (user?.totpEnabled ? (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => openDialog(DIALOG_TOTP_DISABLE)}
+                data-testid="user-toolbar-totp-disable"
+              >
+                {t('totp.menuDisable', { ns: 'users' })}
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => openDialog(DIALOG_TOTP_SETUP)}
+                data-testid="user-toolbar-totp-enable"
+              >
+                {t('totp.menuEnable', { ns: 'users' })}
+              </DropdownMenuItem>
+            ))}
           {(!httpRemoteUserEnabled || logoutUrl) && (
             <DropdownMenuItem
               className="cursor-pointer"

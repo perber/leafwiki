@@ -37,6 +37,7 @@ describe('UserToolbar', () => {
         username: 'alice',
         email: 'alice@example.com',
         role: 'editor',
+        totpEnabled: false,
       },
     })
   })
@@ -111,6 +112,7 @@ describe('UserToolbar', () => {
           username: 'bob',
           email: 'bob@example.com',
           role: 'viewer',
+          totpEnabled: false,
         },
       })
     })
@@ -262,6 +264,7 @@ describe('UserToolbar', () => {
           username: 'admin',
           email: 'admin@example.com',
           role: 'admin',
+          totpEnabled: false,
         },
       })
     })

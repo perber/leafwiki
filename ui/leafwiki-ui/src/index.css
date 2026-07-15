@@ -841,6 +841,27 @@
     @apply w-full;
   }
 
+  .login__totp-description {
+    @apply text-muted-foreground mb-4 text-sm;
+  }
+
+  /* TOTP setup dialog */
+  .totp-setup__qr {
+    @apply flex justify-center rounded bg-white p-3;
+  }
+
+  .totp-setup__manual-key {
+    @apply text-interface-text text-center text-sm;
+  }
+
+  .totp-setup__manual-key code {
+    @apply bg-surface-alt rounded px-1.5 py-0.5 font-mono text-xs break-all;
+  }
+
+  .totp-setup__recovery-codes {
+    @apply bg-surface-alt text-interface-text rounded p-3 font-mono text-sm leading-relaxed;
+  }
+
   .editor-title-bar {
     @apply flex flex-1 flex-col items-center justify-center;
   }

@@ -1,0 +1,40 @@
+{
+  "totp": {
+    "column": "2FA",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "menuEnable": "Enable Two-Factor Authentication",
+    "menuDisable": "Disable Two-Factor Authentication",
+    "cancel": "Cancel",
+    "setup": {
+      "passwordStepTitle": "Enable two-factor authentication",
+      "passwordStepDescription": "Confirm your current password to start setup.",
+      "passwordPlaceholder": "Current Password",
+      "continue": "Continue",
+      "continuing": "Checking...",
+      "verifyStepTitle": "Scan the QR code",
+      "verifyStepDescription": "Scan this QR code with your authenticator app, or enter the key manually. Then enter the 6-digit code it shows.",
+      "manualKeyLabel": "Manual entry key",
+      "codePlaceholder": "6-digit code",
+      "enable": "Enable",
+      "enabling": "Verifying...",
+      "recoveryStepTitle": "Save your recovery codes",
+      "recoveryStepDescription": "Store these codes somewhere safe. Each one can be used once to log in if you lose access to your authenticator app. They will not be shown again.",
+      "copyRecoveryCodes": "Copy codes",
+      "recoveryCodesCopied": "Recovery codes copied to clipboard",
+      "done": "Done",
+      "successToast": "Two-factor authentication enabled",
+      "errorFallback": "Could not enable two-factor authentication"
+    },
+    "disable": {
+      "title": "Disable two-factor authentication",
+      "description": "Confirm your current password and a code from your authenticator app or a recovery code.",
+      "passwordPlaceholder": "Current Password",
+      "codePlaceholder": "Code or recovery code",
+      "confirm": "Disable",
+      "disabling": "Disabling...",
+      "successToast": "Two-factor authentication disabled",
+      "errorFallback": "Could not disable two-factor authentication"
+    }
+  }
+}
