@@ -332,6 +332,29 @@ func (s *UserService) ResetAdminUserPassword(username, email string) (*User, err
 	return adminUser, nil
 }
 
+// UpdateRecoveryCodeHashes replaces the stored TOTP recovery-code hashes for
+// id, e.g. to atomically remove a hash after it has been consumed at login.
+func (s *UserService) UpdateRecoveryCodeHashes(id string, hashes []string) error {
+	return s.store.UpdateRecoveryCodeHashes(id, hashes)
+}
+
+// SetPendingTOTPSecret stores a freshly generated, not-yet-confirmed encrypted
+// TOTP secret for id. TOTP remains disabled until EnableTOTP confirms it.
+func (s *UserService) SetPendingTOTPSecret(id, encryptedSecret string) error {
+	return s.store.SetPendingTOTPSecret(id, encryptedSecret)
+}
+
+// EnableTOTP marks TOTP enabled for id with the confirmed encrypted secret and
+// the hashed recovery codes generated alongside it.
+func (s *UserService) EnableTOTP(id, encryptedSecret string, recoveryCodeHashes []string) error {
+	return s.store.EnableTOTP(id, encryptedSecret, recoveryCodeHashes)
+}
+
+// DisableTOTP clears TOTP secret, enabled flag, and recovery codes for id.
+func (s *UserService) DisableTOTP(id string) error {
+	return s.store.DisableTOTP(id)
+}
+
 func (s *UserService) Close() error {
 	return s.store.Close()
 }
