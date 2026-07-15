@@ -29,6 +29,7 @@ var DisableRefreshTokenRateLimit = "false"
 // Routes is the RouteRegistrar for the auth domain.
 type Routes struct {
 	login             *LoginUseCase
+	completeTOTPLogin *CompleteTOTPLoginUseCase
 	logout            *LogoutUseCase
 	refreshToken      *RefreshTokenUseCase
 	createUser        *CreateUserUseCase
@@ -37,12 +38,17 @@ type Routes struct {
 	deleteUser        *DeleteUserUseCase
 	getUsers          *GetUsersUseCase
 	getUserByID       *GetUserByIDUseCase
+	startTOTPSetup    *StartTOTPSetupUseCase
+	confirmTOTPSetup  *ConfirmTOTPSetupUseCase
+	disableTOTP       *DisableTOTPUseCase
+	getTOTPStatus     *GetTOTPStatusUseCase
 	authService       *coreauth.AuthService
 }
 
 // RoutesConfig holds the dependencies to build an auth Routes instance.
 type RoutesConfig struct {
 	Login             *LoginUseCase
+	CompleteTOTPLogin *CompleteTOTPLoginUseCase
 	Logout            *LogoutUseCase
 	RefreshToken      *RefreshTokenUseCase
 	CreateUser        *CreateUserUseCase
@@ -51,6 +57,10 @@ type RoutesConfig struct {
 	DeleteUser        *DeleteUserUseCase
 	GetUsers          *GetUsersUseCase
 	GetUserByID       *GetUserByIDUseCase
+	StartTOTPSetup    *StartTOTPSetupUseCase
+	ConfirmTOTPSetup  *ConfirmTOTPSetupUseCase
+	DisableTOTP       *DisableTOTPUseCase
+	GetTOTPStatus     *GetTOTPStatusUseCase
 	AuthService       *coreauth.AuthService
 }
 
@@ -58,6 +68,7 @@ type RoutesConfig struct {
 func NewRoutes(cfg RoutesConfig) *Routes {
 	return &Routes{
 		login:             cfg.Login,
+		completeTOTPLogin: cfg.CompleteTOTPLogin,
 		logout:            cfg.Logout,
 		refreshToken:      cfg.RefreshToken,
 		createUser:        cfg.CreateUser,
@@ -66,6 +77,10 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		deleteUser:        cfg.DeleteUser,
 		getUsers:          cfg.GetUsers,
 		getUserByID:       cfg.GetUserByID,
+		startTOTPSetup:    cfg.StartTOTPSetup,
+		confirmTOTPSetup:  cfg.ConfirmTOTPSetup,
+		disableTOTP:       cfg.DisableTOTP,
+		getTOTPStatus:     cfg.GetTOTPStatus,
 		authService:       cfg.AuthService,
 	}
 }
@@ -78,6 +93,10 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	nonAuth := ctx.Base.Group("/api")
 	nonAuth.POST("/auth/login", loginRateLimiter, r.handleLogin(ctx))
+	// Shares loginRateLimiter's per-IP budget with /auth/login: both steps of the
+	// same handshake draw from one bucket, since both are exposed to credential/code
+	// guessing before a session exists.
+	nonAuth.POST("/auth/login/totp", loginRateLimiter, r.handleLoginTOTP(ctx))
 	if DisableRefreshTokenRateLimit == "true" {
 		nonAuth.POST("/auth/refresh-token", r.handleRefreshToken(ctx))
 	} else {
@@ -114,6 +133,15 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	if !opts.AuthDisabled {
 		authGroup.PUT("/users/me/password", r.handleChangeOwnPassword)
+
+		// Setup/confirm/disable all guess a secret (password, TOTP code, or
+		// recovery code); share one rate-limit budget separate from the
+		// pre-auth login endpoints above.
+		totpSetupRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)
+		authGroup.POST("/users/me/totp/setup/start", totpSetupRateLimiter, r.handleStartTOTPSetup)
+		authGroup.POST("/users/me/totp/setup/confirm", totpSetupRateLimiter, r.handleConfirmTOTPSetup(ctx))
+		authGroup.POST("/users/me/totp/disable", totpSetupRateLimiter, r.handleDisableTOTP(ctx))
+		authGroup.GET("/users/me/totp/status", r.handleTOTPStatus)
 	}
 }
 
@@ -171,10 +199,11 @@ func (r *Routes) handleMe(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"id":       user.ID,
-		"username": user.Username,
-		"email":    user.Email,
-		"role":     user.Role,
+		"id":          user.ID,
+		"username":    user.Username,
+		"email":       user.Email,
+		"role":        user.Role,
+		"totpEnabled": user.TOTPEnabled,
 	})
 }
 
@@ -190,6 +219,61 @@ func (r *Routes) handleLogin(rctx httpinternal.RouterContext) gin.HandlerFunc {
 		}
 		out, err := r.login.Execute(c.Request.Context(), LoginInput{
 			Identifier: req.Identifier, Password: req.Password,
+		})
+		if err != nil {
+			respondWithAuthError(c, err)
+			return
+		}
+		if out.Token.RequiresTOTP {
+			// Password verified, but no cookies may be issued until the TOTP
+			// step completes via POST /auth/login/totp.
+			c.JSON(http.StatusOK, gin.H{
+				"requiresTotp":        true,
+				"loginChallengeToken": out.Token.LoginChallengeToken,
+			})
+			return
+		}
+		if _, err := rctx.CSRFCookie.Issue(c); err != nil {
+			writeAuthCookieError(c, err,
+				"HTTPS is required for login cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
+				errFailedToIssueCSRFCookie,
+				"failed to issue login CSRF cookie",
+			)
+			return
+		}
+		if err := rctx.AuthCookies.Set(c, out.Token.Token, out.Token.RefreshToken); err != nil {
+			if errors.Is(err, utils.ErrHTTPSRequired) {
+				respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed,
+					httpsRequiredUserMsg,
+					httpsRequiredLogMsg)
+				return
+			}
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":              "Login successful",
+			"user":                 out.Token.User,
+			"accessTokenExpiresAt": out.Token.AccessTokenExpiresAt,
+		})
+	}
+}
+
+// handleLoginTOTP completes a login handshake started by handleLogin when the
+// account has TOTP enabled. Only on a valid TOTP/recovery code are auth
+// cookies issued; the challenge token itself is single-use and short-lived.
+func (r *Routes) handleLoginTOTP(rctx httpinternal.RouterContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			LoginChallengeToken string `json:"loginChallengeToken" binding:"required"`
+			Code                string `json:"code" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidPayload, "Invalid login payload", "invalid login payload")
+			return
+		}
+		out, err := r.completeTOTPLogin.Execute(c.Request.Context(), CompleteTOTPLoginInput{
+			LoginChallengeToken: req.LoginChallengeToken, Code: req.Code,
 		})
 		if err != nil {
 			respondWithAuthError(c, err)
@@ -367,4 +451,110 @@ func (r *Routes) handleChangeOwnPassword(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// handleStartTOTPSetup begins TOTP enrollment for the current user: verifies
+// their current password and returns a fresh, not-yet-enabled secret for the
+// frontend to render as a QR code (and show for manual entry).
+func (r *Routes) handleStartTOTPSetup(c *gin.Context) {
+	user := authmw.MustGetUser(c)
+	if user == nil {
+		return
+	}
+	var req struct {
+		CurrentPassword string `json:"currentPassword" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
+		return
+	}
+	out, err := r.startTOTPSetup.Execute(c.Request.Context(), StartTOTPSetupInput{
+		UserID: user.ID, CurrentPassword: req.CurrentPassword,
+	})
+	if err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"secret":     out.Secret,
+		"otpAuthUrl": out.OTPAuthURL,
+	})
+}
+
+// handleConfirmTOTPSetup completes TOTP enrollment: verifies a code against
+// the pending secret from handleStartTOTPSetup, enables TOTP, and returns the
+// one-time plaintext recovery codes. Every other session for the user is
+// revoked; the session making this request is identified via its own refresh
+// cookie and left intact.
+func (r *Routes) handleConfirmTOTPSetup(rctx httpinternal.RouterContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user := authmw.MustGetUser(c)
+		if user == nil {
+			return
+		}
+		var req struct {
+			Code string `json:"code" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
+			return
+		}
+		refreshToken, _ := rctx.AuthCookies.ReadRefresh(c)
+		out, err := r.confirmTOTPSetup.Execute(c.Request.Context(), ConfirmTOTPSetupInput{
+			UserID: user.ID, Code: req.Code, CurrentRefreshToken: refreshToken,
+		})
+		if err != nil {
+			respondWithAuthError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"recoveryCodes": out.RecoveryCodes,
+		})
+	}
+}
+
+// handleDisableTOTP disables TOTP for the current user after verifying their
+// current password plus a TOTP or recovery code. Every other session for the
+// user is revoked; the session making this request is left intact.
+func (r *Routes) handleDisableTOTP(rctx httpinternal.RouterContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user := authmw.MustGetUser(c)
+		if user == nil {
+			return
+		}
+		var req struct {
+			CurrentPassword string `json:"currentPassword" binding:"required"`
+			Code            string `json:"code" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
+			return
+		}
+		refreshToken, _ := rctx.AuthCookies.ReadRefresh(c)
+		if err := r.disableTOTP.Execute(c.Request.Context(), DisableTOTPInput{
+			UserID: user.ID, CurrentPassword: req.CurrentPassword, Code: req.Code, CurrentRefreshToken: refreshToken,
+		}); err != nil {
+			respondWithAuthError(c, err)
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
+// handleTOTPStatus returns the current user's own TOTP status. Never exposes
+// the secret or recovery codes themselves.
+func (r *Routes) handleTOTPStatus(c *gin.Context) {
+	user := authmw.MustGetUser(c)
+	if user == nil {
+		return
+	}
+	out, err := r.getTOTPStatus.Execute(c.Request.Context(), GetTOTPStatusInput{UserID: user.ID})
+	if err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"enabled":                out.Enabled,
+		"recoveryCodesRemaining": out.RecoveryCodesRemaining,
+	})
 }
