@@ -7,6 +7,7 @@ type UserInfo = {
   username: string
   email: string
   role: 'admin' | 'editor' | 'viewer'
+  totpEnabled: boolean
 }
 
 // Unix timestamp in seconds, matching the backend's use of time.Now().Unix().
