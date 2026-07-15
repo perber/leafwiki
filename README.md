@@ -615,6 +615,10 @@ Both paths share the same resync job, so either way you get the same consistent 
 
 **New files without a `leafwiki_id`:** every page's identity lives in a `leafwiki_id` field in its own frontmatter, not in its filename or path — that's what lets pages survive renames and moves without losing their identity. If you add a `.md` file yourself (not created through the app) and it has no `leafwiki_id` yet, the next resync generates one and **writes it back into the file on disk**. This is automatic and requires no action from you, but it does mean the file changes on disk after the resync — worth knowing if you manage `root/` with your own separate Git workflow (outside LeafWiki's built-in [Git Backup](#git-backup-v0113-experimental)), since that ID write-back will show up as an extra diff you didn't make yourself.
 
+**Links after external renames/moves.** `--enable-link-refactor` only rewrites incoming links when a page is renamed or moved *through the app*. If you rename or move a page's file directly on disk, the page itself stays correctly identified (via its `leafwiki_id`), but links on other pages that pointed to it won't be updated automatically — check backlinks/link status after external renames, or do renames through the app if you rely on automatic link rewriting.
+
+**Links to `.md` files don't resolve.** LeafWiki serves pages under clean slugs without the `.md` extension, so a standard relative Markdown link like `[Other Page](./other-page.md)` won't resolve — it points at a path that doesn't exist. Use `[[Page Title]]` wiki-link syntax for internal links instead; it resolves by page identity, not by file path, and survives renames.
+
 ---
 
 ## Sorting Pages
