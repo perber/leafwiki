@@ -45,6 +45,8 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   - [Security](#security)
   - [Operations notes](#operations-notes)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
+- [.leafwikiignore — Ignore Files](#leafwikiignore--ignore-files)
+- [External Edits & Resync](#external-edits--resync)
 - [Sorting Pages](#sorting-pages)
 - [Support this project](#support-this-project)
 - [Contributing](#contributing)
@@ -599,6 +601,19 @@ In this example:
 - All `.md` files are ignored by default (root rule).
 - `docs/important.md` is un-ignored (child negation).
 - `docs/archive/` is re-ignored (grandchild re-applies the restriction).
+
+---
+
+## External Edits & Resync
+
+If you edit Markdown files directly on disk — a text editor, Git, a script, a bulk import — LeafWiki won't pick up the changes on its own. Trigger a resync one of two ways:
+
+- **Admin UI:** trigger it manually from the maintenance/admin settings page, with live progress across four phases (tree, links, tags, search).
+- **OS signal:** send `SIGUSR1` or `SIGHUP` to the running process (e.g., from a git post-receive hook or a cron job) — no restart needed.
+
+Both paths share the same resync job, so either way you get the same consistent result. This is separate from `.leafwikiignore` changes, which are only read at startup (see above).
+
+**New files without a `leafwiki_id`:** every page's identity lives in a `leafwiki_id` field in its own frontmatter, not in its filename or path — that's what lets pages survive renames and moves without losing their identity. If you add a `.md` file yourself (not created through the app) and it has no `leafwiki_id` yet, the next resync generates one and **writes it back into the file on disk**. This is automatic and requires no action from you, but it does mean the file changes on disk after the resync — worth knowing if you manage `root/` with your own separate Git workflow (outside LeafWiki's built-in [Git Backup](#git-backup-v0113-experimental)), since that ID write-back will show up as an extra diff you didn't make yourself.
 
 ---
 
