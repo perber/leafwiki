@@ -1,5 +1,6 @@
 import { getConfig } from '@/lib/api/config'
 import { DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES } from '@/lib/config'
+import i18next from '@/lib/i18n'
 import { create } from 'zustand'
 
 type ConfigStore = {
@@ -67,7 +68,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         error:
           error instanceof Error
             ? error.message
-            : 'Could not load configuration',
+            : i18next.t('configLoadFailed', { ns: 'common' }),
         hasLoaded: true,
       })
     } finally {

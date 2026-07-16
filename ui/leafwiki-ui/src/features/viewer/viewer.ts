@@ -3,6 +3,7 @@
 
 import { getPageByPath, Page } from '@/lib/api/pages'
 import { isPageNotFoundError } from '@/lib/api/errors'
+import i18next from '@/lib/i18n'
 import { create } from 'zustand'
 import { useProgressbarStore } from '../progressbar/progressbarStore'
 
@@ -47,7 +48,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
       } else if (err instanceof Error) {
         set({ error: err.message, notFound: false })
       } else {
-        set({ error: 'An unknown error occurred', notFound: false })
+        set({ error: i18next.t('unknownError', { ns: 'common' }), notFound: false })
       }
     } finally {
       if (!signal.aborted) {

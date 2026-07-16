@@ -1,4 +1,5 @@
 import * as brandingAPI from '@/lib/api/branding'
+import i18next from '@/lib/i18n'
 import { withBasePath } from '@/lib/routePath'
 import { create } from 'zustand'
 
@@ -59,7 +60,7 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to load branding',
+        error: err instanceof Error ? err.message : i18next.t('branding.toast.brandingSaveFailed'),
         isLoading: false,
       })
     }
@@ -78,7 +79,7 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to update branding',
+        error: err instanceof Error ? err.message : i18next.t('branding.toast.brandingSaveFailed'),
         isLoading: false,
       })
       throw err
@@ -96,7 +97,7 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to upload logo',
+        error: err instanceof Error ? err.message : i18next.t('branding.toast.logoUploadFailed'),
       })
       throw err
     } finally {
@@ -116,7 +117,7 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to upload favicon',
+        error: err instanceof Error ? err.message : i18next.t('branding.toast.faviconUploadFailed'),
       })
       throw err
     } finally {
@@ -135,7 +136,7 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to delete logo',
+        error: err instanceof Error ? err.message : i18next.t('branding.toast.logoDeleteFailed'),
       })
       throw err
     } finally {
@@ -155,7 +156,7 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to delete favicon',
+        error: err instanceof Error ? err.message : i18next.t('branding.toast.faviconDeleteFailed'),
       })
       throw err
     } finally {

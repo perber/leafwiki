@@ -5,11 +5,13 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { Pencil } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { TooltipWrapper } from '../../components/TooltipWrapper'
 import { usePageEditorStore } from './pageEditorStore'
 import { isDirtyState } from './pageEditorStore'
 
 export function EditorTitleBar() {
+  const { t } = useTranslation('editor')
   const isMobile = useIsMobile()
   const appMode = useAppMode()
   const page = usePageEditorStore((state) => state.page)
@@ -63,11 +65,15 @@ export function EditorTitleBar() {
           {title && <span className="editor-title-bar__title">{title}</span>}
           <Pencil size={16} className="editor-title-bar__icon" />
           {dirty && !isMobile && (
-            <span className="editor-title-bar__dirty-indicator">(Changes)</span>
+            <span className="editor-title-bar__dirty-indicator">
+              {t('titleBar.changes')}
+            </span>
           )}
 
           {dirty && isMobile && (
-            <span className="editor-title-bar__dirty-indicator">*</span>
+            <span className="editor-title-bar__dirty-indicator">
+              {t('titleBar.dirtyMarker')}
+            </span>
           )}
         </TooltipWrapper>
       </button>

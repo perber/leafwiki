@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { useTreeStore } from '@/stores/tree'
 import { File, FolderTree } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const LISTBOX_ID = 'page-select-results'
 
@@ -34,6 +35,7 @@ export function PageSelect({
   onChange: (id: string) => void
   autoFocus?: boolean
 }) {
+  const { t } = useTranslation('page')
   const { tree } = useTreeStore()
   const [search, setSearch] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -42,13 +44,18 @@ export function PageSelect({
   const flatPages = useMemo<FlatPage[]>(() => {
     if (!tree) return []
     const pages: FlatPage[] = [
-      { id: 'root', title: 'Top Level', depth: 0, kind: NODE_KIND_SECTION },
+      {
+        id: 'root',
+        title: t('pageSelect.topLevel'),
+        depth: 0,
+        kind: NODE_KIND_SECTION,
+      },
     ]
     for (const child of tree.children || []) {
       pages.push(...flattenTree(child))
     }
     return pages
-  }, [tree])
+  }, [tree, t])
 
   const filtered = useMemo(() => {
     const trimmedSearch = search.trim().toLowerCase()
@@ -75,7 +82,7 @@ export function PageSelect({
   return (
     <div className="flex flex-col gap-2">
       <Input
-        placeholder="Search pages..."
+        placeholder={t('pageSelect.placeholder')}
         value={search}
         autoFocus={autoFocus}
         role="combobox"
@@ -86,7 +93,7 @@ export function PageSelect({
           filtered.length > 0 ? filtered[clampedActiveIndex]?.id : undefined
         }
         aria-autocomplete="list"
-        aria-label="Search pages"
+        aria-label={t('pageSelect.searchAriaLabel')}
         onChange={(e) => setSearch(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') {
@@ -113,10 +120,10 @@ export function PageSelect({
       <div className="custom-scrollbar max-h-56 overflow-y-auto rounded-md border">
         {filtered.length === 0 && (
           <p className="text-muted-foreground px-3 py-2 text-sm">
-            No pages found.
+            {t('pageSelect.noResults')}
           </p>
         )}
-        <ul id={LISTBOX_ID} role="listbox" aria-label="Pages">
+        <ul id={LISTBOX_ID} role="listbox" aria-label={t('pageSelect.listAriaLabel')}>
           {filtered.map((page, index) => {
             const active = index === clampedActiveIndex
             const Icon = page.kind === NODE_KIND_SECTION ? FolderTree : File

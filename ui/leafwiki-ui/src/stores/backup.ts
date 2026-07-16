@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import i18next from '@/lib/i18n'
 import {
   fetchBackupStatus,
   triggerBackupPush,
@@ -50,7 +51,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         statusError: '',
       })
     } catch {
-      set({ isLoading: false, statusError: 'Failed to load backup status' })
+      set({ isLoading: false, statusError: i18next.t('toast.statusLoadFailed', { ns: 'backup' }) })
     }
   },
 

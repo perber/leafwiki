@@ -1,0 +1,126 @@
+{
+  "layout": {
+    "toggleSidebar": "Показать/скрыть боковую панель",
+    "resizeSidebar": "Изменить ширину боковой панели",
+    "closeSidebar": "Закрыть боковую панель"
+  },
+  "section": {
+    "overviewTitle": "Обзор раздела «{{title}}»",
+    "overviewDescriptionBase": "Эта страница — обзор раздела по умолчанию со списком страниц и подразделов.",
+    "overviewDescriptionEditorHint": "При редактировании можно задать свою стартовую страницу для раздела.",
+    "overviewDescriptionReadOnly": "Эта страница автоматически сформирована как обзор раздела.",
+    "emptyTitle": "Раздел пуст.",
+    "emptyDescriptionEditor": "Раздел {{title}} пока не содержит страниц и подразделов. Добавьте страницу или создайте подраздел.",
+    "emptyDescriptionReadOnly": "Раздел {{title}} пока не содержит страниц и подразделов.",
+    "addPage": "Добавить страницу",
+    "addSection": "Добавить раздел"
+  },
+  "markdownPreview": {
+    "renderError": "Страница содержит Markdown, который нельзя безопасно отобразить.",
+    "brokenLinkTooltip": "Эта страница ещё не существует."
+  },
+  "backlinks": {
+    "referencedBy": "Ссылки на эту страницу",
+    "loading": "Загрузка…",
+    "noReferences": "Ни одна страница не ссылается на эту.",
+    "brokenLinks": "Битые ссылки",
+    "noBrokenLinks": "Битых ссылок нет.",
+    "brokenOutgoingsTitle": "Страница ссылается на несуществующие цели",
+    "brokenIncomingTitle": "Страницы со ссылкой на старый путь"
+  },
+  "pinned": {
+    "sectionTitle": "Закреплённые",
+    "pagesSectionTitle": "Страницы",
+    "pinPage": "Закрепить",
+    "unpinPage": "Открепить",
+    "pinSuccess": "Страница закреплена",
+    "unpinSuccess": "Страница откреплена",
+    "pinError": "Не удалось изменить закрепление",
+    "togglePinnedSection": "Показать/скрыть закреплённые страницы",
+    "togglePagesSection": "Показать/скрыть раздел страниц"
+  },
+  "favorites": {
+    "sectionTitle": "Избранное",
+    "addFavorite": "Добавить в избранное",
+    "removeFavorite": "Убрать из избранного",
+    "addSuccess": "Добавлено в избранное",
+    "removeSuccess": "Удалено из избранного",
+    "favoriteError": "Не удалось обновить избранное",
+    "toggleFavoritesSection": "Показать/скрыть избранное"
+  },
+  "toc": {
+    "title": "Содержание",
+    "onThisPage": "На этой странице",
+    "collapse": "Свернуть содержание",
+    "expand": "Развернуть содержание"
+  },
+  "toolbar": {
+    "editItem": "Редактировать {{item}}",
+    "shareItem": "Поделиться: {{item}}",
+    "printItem": "Печать: {{item}}",
+    "copyItem": "Копировать {{item}}",
+    "deleteItem": "Удалить {{item}}",
+    "historyItem": "История: {{item}}"
+  },
+  "shoutout": {
+    "info": "Информация",
+    "success": "Успех",
+    "warning": "Предупреждение",
+    "error": "Ошибка"
+  },
+  "sectionList": {
+    "sectionSuffix": "(Раздел)",
+    "updated": "Обновлено",
+    "updatedBy": "пользователем {{user}}",
+    "subpagesAriaLabel": "Подстраницы раздела {{title}}"
+  },
+  "shortcutsHelp": {
+    "menuItem": "Горячие клавиши",
+    "title": "Доступные горячие клавиши",
+    "description": "Краткий обзор сочетаний клавиш для текущего режима страницы.",
+    "currentMode": "Текущий режим: {{mode}}",
+    "dialogHint": "Сочетания для диалогов также показаны, пока открыт этот диалог.",
+    "closeButton": "Закрыть",
+    "categories": {
+      "navigation": "Навигация",
+      "editing": "Редактирование",
+      "viewing": "Просмотр",
+      "dialogs": "Диалоги"
+    },
+    "modes": {
+      "view": "просмотр",
+      "edit": "редактирование",
+      "history": "история",
+      "settings": "настройки",
+      "user-management": "пользователи",
+      "dialog": "диалог"
+    },
+    "items": {
+      "goToPage": { "action": "Перейти к странице" },
+      "openShortcutsHelp": { "action": "Открыть горячие клавиши" },
+      "editPage": { "action": "Редактировать страницу" },
+      "sharePage": { "action": "Поделиться страницей" },
+      "printPage": { "action": "Печать страницы" },
+      "copyPage": { "action": "Копировать страницу" },
+      "deletePage": { "action": "Удалить страницу" },
+      "pageHistory": { "action": "История страницы" },
+      "toggleToc": { "action": "Показать/скрыть содержание" },
+      "openExplorer": { "action": "Открыть проводник" },
+      "openSearch": { "action": "Открыть поиск" },
+      "savePage": { "action": "Сохранить страницу" },
+      "closeEditor": { "action": "Закрыть редактор" },
+      "formatBold": { "action": "Жирный" },
+      "formatItalic": { "action": "Курсив" },
+      "insertHeadingOne": { "action": "Заголовок 1" },
+      "insertHeadingTwo": { "action": "Заголовок 2" },
+      "insertHeadingThree": { "action": "Заголовок 3" },
+      "formatInlineCode": { "action": "Код в строке" },
+      "insertLink": { "action": "Вставить ссылку" },
+      "backToPage": { "action": "Вернуться к странице" },
+      "closeDialog": { "action": "Закрыть диалог" },
+      "confirmDialog": { "action": "Действие по умолчанию" },
+      "confirmRename": { "action": "Подтвердить переименование" },
+      "cancelRename": { "action": "Отменить переименование" }
+    }
+  }
+}

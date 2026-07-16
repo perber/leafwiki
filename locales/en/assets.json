@@ -1,0 +1,45 @@
+{
+  "dialog": {
+    "title": "Asset Manager",
+    "description": "Upload or select an asset to insert into the page."
+  },
+  "title": "Assets",
+  "dropzone": {
+    "dragOrClick": "Drag files here or click to upload",
+    "maxSize": "Max file size: {{size}}"
+  },
+  "uploading": "Uploading...",
+  "loading": "Loading assets...",
+  "empty": "No assets yet. Upload files to get started.",
+  "tip": "Tip: Drag and drop files directly onto this area.",
+  "uploadingCount_one": "Uploading {{count}} file…",
+  "uploadingCount_other": "Uploading {{count}} files…",
+  "item": {
+    "insertImageLink": "Insert image link",
+    "insertAudioPlayer": "Insert audio player",
+    "insertVideoPlayer": "Insert video player",
+    "insertImage": "Insert image",
+    "insertLink": "Insert link"
+  },
+  "imagePreview": {
+    "openInNewTab": "Open in new tab"
+  },
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "insertImage": "Insert image",
+    "insertLink": "Insert link",
+    "insertPlayer": "Insert player",
+    "rename": "Rename",
+    "delete": "Delete"
+  },
+  "toast": {
+    "fileTooLarge": "File too large. Max {{size}} allowed.",
+    "uploadFailed": "Asset upload failed",
+    "uploaded": "Uploaded",
+    "renamed": "Asset renamed",
+    "deleted": "Asset deleted",
+    "renameFailed": "Rename failed",
+    "deleteFailed": "Delete failed"
+  }
+}

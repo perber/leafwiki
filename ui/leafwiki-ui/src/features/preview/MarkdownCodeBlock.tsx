@@ -10,6 +10,7 @@ import {
   useEffect,
   useState,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 type CodeElementProps = {
@@ -37,6 +38,7 @@ export default function MarkdownCodeBlock(
   props: ClassAttributes<HTMLPreElement> &
     HTMLAttributes<HTMLPreElement> & { children?: ReactNode; node?: unknown },
 ) {
+  const { t } = useTranslation('editor')
   const { children, node, ...preProps } = props
   void node
   const [copied, setCopied] = useState(false)
@@ -69,25 +71,27 @@ export default function MarkdownCodeBlock(
   const handleCopy = () => {
     const copiedSuccessfully = copy(code)
     if (!copiedSuccessfully) {
-      toast.error('Could not copy code')
+      toast.error(t('codeBlock.copyFailed'))
       return
     }
 
     setCopied(true)
-    toast.success('Code copied')
+    toast.success(t('codeBlock.copied'))
   }
+
+  const copyLabel = copied ? t('codeBlock.copiedLabel') : t('codeBlock.copyCode')
 
   return (
     <div className="markdown-code-block">
       <div className="markdown-code-block__actions">
-        <TooltipWrapper label={copied ? 'Copied' : 'Copy code'}>
+        <TooltipWrapper label={copyLabel}>
           <Button
             type="button"
             variant="outline"
             size="icon"
             className="markdown-code-block__copy-button"
             onClick={handleCopy}
-            aria-label={copied ? 'Code copied' : 'Copy code'}
+            aria-label={copyLabel}
             data-testid="markdown-code-copy-button"
           >
             {copied ? <Check /> : <Copy />}

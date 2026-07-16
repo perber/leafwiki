@@ -15,9 +15,11 @@ import { useTreeStore } from '@/stores/tree'
 import { File, FolderTree } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { searchQuickSwitcherItems } from './pageQuickSwitcher'
 
 export function PageQuickSwitcherDialog() {
+  const { t } = useTranslation('page')
   const navigate = useNavigate()
   const closeDialog = useDialogsStore((state) => state.closeDialog)
   const isOpen = useDialogsStore(
@@ -92,9 +94,9 @@ export function PageQuickSwitcherDialog() {
     >
       <DialogContent className="max-h-[85dvh] gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="border-b px-4 pt-4 pb-3">
-          <DialogTitle>Go to page</DialogTitle>
+          <DialogTitle>{t('quickSwitcher.title')}</DialogTitle>
           <DialogDescription>
-            Search existing pages by title, path, or breadcrumb.
+            {t('quickSwitcher.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -102,8 +104,8 @@ export function PageQuickSwitcherDialog() {
           <Input
             ref={inputRef}
             defaultValue=""
-            placeholder="Type a page title…"
-            aria-label="Search pages"
+            placeholder={t('quickSwitcher.placeholder')}
+            aria-label={t('quickSwitcher.searchAriaLabel')}
             role="combobox"
             aria-haspopup="listbox"
             aria-activedescendant={
@@ -151,13 +153,13 @@ export function PageQuickSwitcherDialog() {
         <div className="custom-scrollbar max-h-[70dvh] overflow-y-auto px-2 pb-2">
           {results.length === 0 ? (
             <div className="text-muted-foreground px-2 py-6 text-sm">
-              No matching page found.
+              {t('quickSwitcher.noResults')}
             </div>
           ) : (
             <ul
               id="page-quick-switcher-results"
               role="listbox"
-              aria-label="Matching pages"
+              aria-label={t('quickSwitcher.resultsAriaLabel')}
               className="space-y-1"
             >
               {results.map((item, index) => {

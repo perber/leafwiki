@@ -1,5 +1,6 @@
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
+import i18next from '@/lib/i18n'
 import { withBasePath } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
 import 'katex/dist/katex.min.css'
@@ -151,10 +152,7 @@ function getShoutoutConfig(children: ReactNode): ShoutoutConfig | null {
 }
 
 function getAlertLabel(kind: SemanticAlertKind) {
-  if (kind === 'info') return 'Info'
-  if (kind === 'success') return 'Success'
-  if (kind === 'warning') return 'Warning'
-  return 'Error'
+  return i18next.t(`shoutout.${kind}`, { ns: 'viewer' })
 }
 
 function getSemanticShoutoutTitle(kind: string) {
@@ -194,7 +192,7 @@ class MarkdownPreviewErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border p-4 text-sm">
-          This page contains Markdown that could not be rendered safely.
+          {i18next.t('markdownPreview.renderError', { ns: 'viewer' })}
         </div>
       )
     }

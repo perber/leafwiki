@@ -5,6 +5,7 @@ import clsx from 'clsx'
 import { File, Folder, PinOff } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 type Props = {
   node: PageNode
@@ -12,6 +13,7 @@ type Props = {
 }
 
 export function PinnedPageItem({ node, onUnpin }: Props) {
+  const { t } = useTranslation('tree')
   const activeNodeId = useTreeStore((s) => s.activeNodeId)
   const isActive = activeNodeId === node.id
   const [hovered, setHovered] = useState(false)
@@ -40,8 +42,8 @@ export function PinnedPageItem({ node, onUnpin }: Props) {
             e.preventDefault()
             onUnpin()
           }}
-          title="Unpin"
-          aria-label="Unpin page"
+          title={t('unpinPage')}
+          aria-label={t('unpinPage')}
         >
           <PinOff size={13} />
         </button>

@@ -9,6 +9,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { FileSearch } from 'lucide-react'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const isMacOS =
   typeof navigator !== 'undefined' &&
@@ -19,6 +20,7 @@ const quickSwitcherHotkeyLabel = getShortcutDisplayLabel(
 )
 
 export function PageQuickSwitcherTrigger() {
+  const { t } = useTranslation('page')
   const appMode = useAppMode()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
@@ -43,12 +45,14 @@ export function PageQuickSwitcherTrigger() {
       variant="outline"
       size="sm"
       onClick={() => openDialog(DIALOG_PAGE_QUICK_SWITCHER)}
-      aria-label="Go to page"
-      title={`Go to page (${quickSwitcherHotkeyLabel})`}
+      aria-label={t('quickSwitcher.goToPageAriaLabel')}
+      title={t('quickSwitcher.goToPageTitle', {
+        hotkey: quickSwitcherHotkeyLabel,
+      })}
       className="max-md:px-2"
     >
       <FileSearch size={16} />
-      <span className="max-md:hidden">Go to page</span>
+      <span className="max-md:hidden">{t('quickSwitcher.title')}</span>
       <span className="text-muted-foreground ml-1 hidden text-xs md:inline">
         {quickSwitcherHotkeyLabel}
       </span>

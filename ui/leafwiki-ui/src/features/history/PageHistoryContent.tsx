@@ -11,6 +11,7 @@ import {
   type RevisionSnapshot,
 } from '@/lib/api/revisions'
 import { formatRelativeTime } from '@/lib/formatDate'
+import i18next from '@/lib/i18n'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildHistoryUrl, withBasePath } from '@/lib/routePath'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -24,6 +25,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -78,10 +80,10 @@ type RevisionGroup = {
 }
 
 function groupLabel(value?: string) {
-  if (!value) return 'Unknown'
+  if (!value) return i18next.t('unknown', { ns: 'history' })
 
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Unknown'
+  if (Number.isNaN(date.getTime())) return i18next.t('unknown', { ns: 'history' })
 
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
@@ -107,7 +109,7 @@ function groupRevisions(revisions: Revision[]): RevisionGroup[] {
 }
 
 function revisionTitle(revision: Revision) {
-  if (!revision.createdAt) return 'Unknown time'
+  if (!revision.createdAt) return i18next.t('unknownTime', { ns: 'history' })
 
   const date = new Date(revision.createdAt)
   if (Number.isNaN(date.getTime())) return revision.createdAt
@@ -118,7 +120,11 @@ function revisionTitle(revision: Revision) {
 }
 
 function revisionMeta(revision: Revision) {
-  return revision.author?.username || revision.authorId || 'Unknown'
+  return (
+    revision.author?.username ||
+    revision.authorId ||
+    i18next.t('unknown', { ns: 'history' })
+  )
 }
 
 function getPathLeaf(path: string) {
@@ -143,35 +149,39 @@ type DiffSummary = {
 function revisionTriggerLabel(type: string) {
   switch (type) {
     case 'content_update':
-      return 'Saved after content update'
+      return i18next.t('trigger.contentUpdate', { ns: 'history' })
     case 'asset_update':
-      return 'Saved after asset update'
+      return i18next.t('trigger.assetUpdate', { ns: 'history' })
     case 'structure_update':
-      return 'Saved after structure update'
+      return i18next.t('trigger.structureUpdate', { ns: 'history' })
     case 'restore':
-      return 'Saved after restore'
+      return i18next.t('trigger.restore', { ns: 'history' })
     case 'delete':
-      return 'Saved before delete'
+      return i18next.t('trigger.delete', { ns: 'history' })
     default:
-      return `Saved as ${type}`
+      return i18next.t('trigger.default', { ns: 'history', type })
   }
 }
 
 function assetChangeLabel(status: RevisionAssetChange['status']) {
   switch (status) {
     case 'added':
-      return 'Added'
+      return i18next.t('assetChange.added', { ns: 'history' })
     case 'removed':
-      return 'Removed'
+      return i18next.t('assetChange.removed', { ns: 'history' })
     case 'modified':
-      return 'Replaced'
+      return i18next.t('assetChange.modified', { ns: 'history' })
     default:
       return status
   }
 }
 
 function displayAuthor(revision: Revision) {
-  return revision.author?.username || revision.authorId || 'Unknown'
+  return (
+    revision.author?.username ||
+    revision.authorId ||
+    i18next.t('unknown', { ns: 'history' })
+  )
 }
 
 function formatTimestamp(value?: string) {
@@ -428,22 +438,24 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
   return (
     <div className="page-history__detail-stack">
       <section className="page-history__summary">
-        <div className="page-history__section-heading">Change Summary</div>
+        <div className="page-history__section-heading">
+          {i18next.t('changes.summaryHeading', { ns: 'history' })}
+        </div>
         <div className="page-history__summary-grid">
           <SummaryStat
-            label="Lines added since"
+            label={i18next.t('changes.linesAdded', { ns: 'history' })}
             value={String(diff.summary.addedLines)}
             emphasized={diff.summary.addedLines > 0}
             tone="added"
           />
           <SummaryStat
-            label="Lines removed since"
+            label={i18next.t('changes.linesRemoved', { ns: 'history' })}
             value={String(diff.summary.removedLines)}
             emphasized={diff.summary.removedLines > 0}
             tone="removed"
           />
           <SummaryStat
-            label="Assets changed"
+            label={i18next.t('changes.assetsChanged', { ns: 'history' })}
             value={String(comparison.assetChanges.length)}
             emphasized={comparison.assetChanges.length > 0}
           />
@@ -452,9 +464,9 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
 
       <section className="page-history__section">
         <div className="page-history__section-heading">
-          Diff{' '}
+          {i18next.t('changes.diffHeading', { ns: 'history' })}{' '}
           <span className="page-history__section-heading-note">
-            compared to the active version
+            {i18next.t('changes.comparedToActive', { ns: 'history' })}
           </span>
         </div>
         <DiffView comparison={comparison} />
@@ -463,7 +475,10 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
       {comparison.assetChanges.length > 0 ? (
         <details className="page-history__asset-details">
           <summary className="page-history__asset-summary">
-            Assets ({comparison.assetChanges.length})
+            {i18next.t('changes.assetsHeading', {
+              ns: 'history',
+              count: comparison.assetChanges.length,
+            })}
           </summary>
           <div className="page-history__asset-list">
             {comparison.assetChanges.map((change) => (
@@ -480,13 +495,28 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
           </div>
           <div className="page-history__asset-summary-row">
             {assetSummary.added > 0 ? (
-              <span>{assetSummary.added} added</span>
+              <span>
+                {i18next.t('changes.addedCount', {
+                  ns: 'history',
+                  count: assetSummary.added,
+                })}
+              </span>
             ) : null}
             {assetSummary.modified > 0 ? (
-              <span>{assetSummary.modified} replaced</span>
+              <span>
+                {i18next.t('changes.replacedCount', {
+                  ns: 'history',
+                  count: assetSummary.modified,
+                })}
+              </span>
             ) : null}
             {assetSummary.removed > 0 ? (
-              <span>{assetSummary.removed} removed</span>
+              <span>
+                {i18next.t('changes.removedCount', {
+                  ns: 'history',
+                  count: assetSummary.removed,
+                })}
+              </span>
             ) : null}
           </div>
         </details>
@@ -535,10 +565,12 @@ function RawTextPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
   return (
     <div className="page-history__detail-stack">
       <section className="page-history__section">
-        <div className="page-history__section-heading">Raw Text</div>
+        <div className="page-history__section-heading">
+          {i18next.t('rawText.heading', { ns: 'history' })}
+        </div>
         <div className="custom-scrollbar markdown-code-block page-history__raw-text-block">
           <pre className="custom-scrollbar page-history__snapshot-content">
-            <code>{snapshot.content || '(empty)'}</code>
+            <code>{snapshot.content || i18next.t('empty', { ns: 'history' })}</code>
           </pre>
         </div>
       </section>
@@ -581,7 +613,10 @@ function HistoryAssetItem({
           <span className="asset-item__filename">{baseName}</span>
           <span className="page-history__asset-copy-meta">
             {asset.mimeType || 'application/octet-stream'} ·{' '}
-            {Intl.NumberFormat().format(asset.sizeBytes)} bytes
+            {i18next.t('assets.bytes', {
+              ns: 'history',
+              count: asset.sizeBytes,
+            })}
           </span>
         </div>
       </div>
@@ -596,7 +631,7 @@ function HistoryAssetItem({
           href={assetUrl}
           target="_blank"
           rel="noreferrer"
-          title="Open asset"
+          title={i18next.t('assets.openAsset', { ns: 'history' })}
           data-testid={`history-asset-open-${baseName}`}
         >
           <ExternalLink size={16} />
@@ -611,7 +646,7 @@ function HistoryAssetItem({
         <a
           href={assetUrl}
           download={baseName}
-          title="Download asset"
+          title={i18next.t('assets.downloadAsset', { ns: 'history' })}
           data-testid={`history-asset-download-${baseName}`}
         >
           <Download size={16} />
@@ -625,10 +660,12 @@ function AssetsPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
   return (
     <div className="page-history__detail-stack">
       <section className="page-history__section">
-        <div className="page-history__section-heading">Assets</div>
+        <div className="page-history__section-heading">
+          {i18next.t('assets.heading', { ns: 'history' })}
+        </div>
         {snapshot.assets.length === 0 ? (
           <div className="page-history__empty-message">
-            No assets were stored with this revision.
+            {i18next.t('empty.noAssetsInRevision', { ns: 'history' })}
           </div>
         ) : (
           <ul className="page-history__asset-list">
@@ -653,6 +690,8 @@ export function PageHistoryContent({
   pageSlug,
   testidPrefix = 'page-history',
 }: PageHistoryContentProps) {
+  const { t } = useTranslation('history')
+  const { t: tCommon } = useTranslation('common')
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const revisions = usePageHistoryStore((state) => state.revisions)
@@ -698,23 +737,25 @@ export function PageHistoryContent({
     if (!selectedRevision) return []
 
     const result = [
-      `Revision slug: ${selectedRevision.slug || '/'}`,
+      t('header.revisionSlug', { slug: selectedRevision.slug || '/' }),
       getPathLeaf(selectedRevision.path),
       revisionTriggerLabel(selectedRevision.type),
     ]
 
     if (pageSlug && pageSlug !== selectedRevision.slug) {
-      result.unshift(`Current slug: ${pageSlug}`)
+      result.unshift(t('header.currentSlug', { slug: pageSlug }))
     }
 
     if (comparison) {
-      result.push(`${comparison.assetChanges.length} asset changes`)
+      result.push(
+        t('header.assetChangesCount', { count: comparison.assetChanges.length }),
+      )
     } else if (snapshot) {
-      result.push(`${snapshot.assets.length} Assets`)
+      result.push(t('header.assetsCount', { count: snapshot.assets.length }))
     }
 
     return result
-  }, [comparison, pageSlug, selectedRevision, snapshot])
+  }, [comparison, pageSlug, selectedRevision, snapshot, t])
 
   const structureChanges = useMemo(() => {
     if (!comparison) return []
@@ -723,30 +764,30 @@ export function PageHistoryContent({
 
     if (comparison.base.revision?.title !== comparison.target.revision?.title) {
       changes.push({
-        label: 'Title',
-        from: comparison.base.revision?.title || '(empty)',
-        to: comparison.target.revision?.title || '(empty)',
+        label: t('structure.title'),
+        from: comparison.base.revision?.title || t('empty'),
+        to: comparison.target.revision?.title || t('empty'),
       })
     }
 
     if (comparison.base.revision?.slug !== comparison.target.revision?.slug) {
       changes.push({
-        label: 'Slug',
-        from: comparison.base.revision?.slug || '(empty)',
-        to: comparison.target.revision?.slug || '(empty)',
+        label: t('structure.slug'),
+        from: comparison.base.revision?.slug || t('empty'),
+        to: comparison.target.revision?.slug || t('empty'),
       })
     }
 
     return changes
-  }, [comparison])
+  }, [comparison, t])
 
   // Preview is first and the default active tab so users immediately see the
   // rendered content of the selected revision without an extra click.
   const tabs: { id: HistoryTab; label: string }[] = [
-    { id: 'preview', label: 'Preview' },
-    { id: 'changes', label: 'Changes' },
-    { id: 'raw', label: 'Raw Text' },
-    { id: 'assets', label: 'Assets' },
+    { id: 'preview', label: t('tabs.preview') },
+    { id: 'changes', label: t('tabs.changes') },
+    { id: 'raw', label: t('tabs.raw') },
+    { id: 'assets', label: t('tabs.assets') },
   ]
 
   const detailLoading =
@@ -832,9 +873,9 @@ export function PageHistoryContent({
         replace: true,
         state: createNavigationVisitState(),
       })
-      toast.success('Revision restored')
+      toast.success(t('toast.restored'))
     } catch (err) {
-      const mapped = mapApiError(err, 'Failed to restore revision')
+      const mapped = mapApiError(err, t('toast.restoreFailed'))
       toast.error(mapped.message)
     } finally {
       setRestoreLoading(false)
@@ -877,7 +918,7 @@ export function PageHistoryContent({
   const renderDetailContent = () => {
     if (listLoading) {
       return (
-        <div className="page-history__loading-state">Loading history...</div>
+        <div className="page-history__loading-state">{t('list.loading')}</div>
       )
     }
 
@@ -888,8 +929,8 @@ export function PageHistoryContent({
     if (!selectedRevision) {
       return (
         <EmptyState
-          title="No revision selected"
-          message="Select a revision from the list to view details."
+          title={t('empty.noRevisionSelected')}
+          message={t('empty.selectRevision')}
         />
       )
     }
@@ -898,8 +939,8 @@ export function PageHistoryContent({
       return (
         <div className="page-history__loading-state">
           {activeTab === 'changes' || activeTab === 'assets'
-            ? 'Loading diff...'
-            : 'Loading preview...'}
+            ? t('loading.diff')
+            : t('loading.preview')}
         </div>
       )
     }
@@ -913,7 +954,7 @@ export function PageHistoryContent({
         <PreviewPanel snapshot={snapshot} />
       ) : (
         <div className="page-history__empty-message page-history__empty-message--padded">
-          No preview available.
+          {t('empty.noPreview')}
         </div>
       )
     }
@@ -922,7 +963,7 @@ export function PageHistoryContent({
       if (isSelectedRevisionLatest) {
         return (
           <div className="page-history__empty-message page-history__empty-message--padded">
-            No differences from the current version.
+            {t('empty.noDiffFromCurrent')}
           </div>
         )
       }
@@ -931,7 +972,7 @@ export function PageHistoryContent({
         <ChangesPanel comparison={comparison} />
       ) : (
         <div className="page-history__empty-message page-history__empty-message--padded">
-          No comparison data available.
+          {t('empty.noComparison')}
         </div>
       )
     }
@@ -941,7 +982,7 @@ export function PageHistoryContent({
         <RawTextPanel snapshot={snapshot} />
       ) : (
         <div className="page-history__empty-message page-history__empty-message--padded">
-          No raw text available.
+          {t('empty.noRawText')}
         </div>
       )
     }
@@ -950,7 +991,7 @@ export function PageHistoryContent({
       <AssetsPanel snapshot={snapshot} />
     ) : (
       <div className="page-history__empty-message page-history__empty-message--padded">
-        No asset data available.
+        {t('empty.noAssetData')}
       </div>
     )
   }
@@ -960,7 +1001,7 @@ export function PageHistoryContent({
       return (
         <div className="page-history__list-status">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading history...
+          {t('list.loading')}
         </div>
       )
     }
@@ -977,8 +1018,8 @@ export function PageHistoryContent({
       return (
         <div className="page-history__list-status">
           {latestRevisionId
-            ? 'No previous revisions yet. Older versions will appear here after more changes.'
-            : 'No revisions yet. They will appear here after the page changes.'}
+            ? t('list.noPreviousRevisions')
+            : t('list.noRevisions')}
         </div>
       )
     }
@@ -1012,7 +1053,7 @@ export function PageHistoryContent({
                       <RevisionBadge
                         testId={`history-sidebar-revision-current-badge-${revision.id}`}
                       >
-                        Active version
+                        {t('list.activeVersion')}
                       </RevisionBadge>
                     ) : null}
                   </div>
@@ -1033,7 +1074,7 @@ export function PageHistoryContent({
               onClick={() => void loadMorePageHistory()}
               disabled={loadingMore}
             >
-              {loadingMore ? 'Loading...' : 'Load more'}
+              {loadingMore ? t('list.loadingMore') : t('list.loadMore')}
             </Button>
           </div>
         ) : null}
@@ -1047,8 +1088,8 @@ export function PageHistoryContent({
         <div className="markdown-editor__tabs" role="tablist">
           {(
             [
-              { id: 'list', label: 'Revisions', icon: <History size={16} /> },
-              { id: 'detail', label: 'Details', icon: <FileText size={16} /> },
+              { id: 'list', label: t('mobileTabs.revisions'), icon: <History size={16} /> },
+              { id: 'detail', label: t('mobileTabs.details'), icon: <FileText size={16} /> },
             ] as const
           ).map((tab) => {
             const active =
@@ -1084,7 +1125,7 @@ export function PageHistoryContent({
               <div className="page-history__list-header">
                 <div className="page-history__list-title">
                   <History className="h-4 w-4" />
-                  Revision History
+                  {t('list.title')}
                 </div>
               </div>
               <div className="page-history__list-scroll custom-scrollbar">
@@ -1102,7 +1143,7 @@ export function PageHistoryContent({
                 }}
                 role="separator"
                 aria-orientation="vertical"
-                aria-label="Resize revision list"
+                aria-label={t('list.resizeAriaLabel')}
                 data-testid={`${testidPrefix}-list-resize-handle`}
               >
                 <div
@@ -1132,9 +1173,12 @@ export function PageHistoryContent({
               </div>
               {selectedRevision ? (
                 <div className="page-history__header-subtitle">
-                  Revision by {displayAuthor(selectedRevision)} ·{' '}
-                  {formatRelativeTime(selectedRevision.createdAt) ||
-                    formatTimestamp(selectedRevision.createdAt)}
+                  {t('header.revisionBy', {
+                    author: displayAuthor(selectedRevision),
+                    time:
+                      formatRelativeTime(selectedRevision.createdAt) ||
+                      formatTimestamp(selectedRevision.createdAt),
+                  })}
                 </div>
               ) : null}
               {selectedRevision ? (
@@ -1173,10 +1217,10 @@ export function PageHistoryContent({
                 data-testid={`${testidPrefix}-restore`}
               >
                 {restoreLoading
-                  ? 'Restoring...'
+                  ? tCommon('actions.restoring')
                   : isSelectedRevisionLatest
-                    ? 'Current version'
-                    : 'Restore'}
+                    ? t('restore.currentVersion')
+                    : t('restore.button')}
               </Button>
             </div>
           </div>

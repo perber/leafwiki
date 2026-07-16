@@ -9,6 +9,7 @@ import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type Props = {
   src: string
@@ -16,6 +17,7 @@ type Props = {
 }
 
 export function ImagePreviewDialog({ src, alt }: Props) {
+  const { t } = useTranslation('assets')
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
@@ -80,7 +82,7 @@ export function ImagePreviewDialog({ src, alt }: Props) {
               className="text-muted-foreground hover:text-foreground ml-auto text-sm underline"
               onClick={(e) => e.stopPropagation()}
             >
-              Open in new tab
+              {t('imagePreview.openInNewTab')}
             </a>
           </DialogTitle>
         </DialogHeader>

@@ -1,0 +1,164 @@
+{
+  "title": "Import",
+  "planAction": {
+    "create": "Create page",
+    "update": "Update page",
+    "skip": "Skip item"
+  },
+  "resultAction": {
+    "needsAttention": "Needs attention",
+    "created": "Created",
+    "updated": "Updated",
+    "skipped": "Skipped",
+    "conflicted": "Conflicted"
+  },
+  "status": {
+    "running": "Running",
+    "completed": "Completed",
+    "canceled": "Canceled",
+    "failed": "Failed",
+    "planned": "Planned",
+    "idle": "Idle"
+  },
+  "actions": {
+    "cancelRequested": "Cancel Requested",
+    "cancelImport": "Cancel Import",
+    "clearImportPlan": "Clear Import Plan",
+    "selectZipFile": "Select Zip File",
+    "importFromZip": "Import from Zip",
+    "startNewImport": "Start New Import",
+    "closeAndClear": "Close and Clear",
+    "executeImportPlan": "Execute Import Plan",
+    "importRunning": "Import Running"
+  },
+  "steps": {
+    "selectZip": {
+      "title": "Select Zip",
+      "description": "Choose the package you want to import."
+    },
+    "reviewPlan": {
+      "title": "Review Plan",
+      "description": "Check the generated pages and paths."
+    },
+    "runImport": {
+      "title": "Run Import",
+      "description": "Watch progress while the importer works."
+    },
+    "reviewResult": {
+      "title": "Review Result",
+      "description": "Inspect imported, skipped, or failed items."
+    }
+  },
+  "beforeStart": {
+    "title": "Before You Start",
+    "description": "Import a zip archive with Markdown files. LeafWiki first creates a review plan, and only imports pages after you explicitly start the execution step.",
+    "whatHappensNext": "What happens next?",
+    "stepLabel": "Step {{number}}: {{title}}",
+    "safeReviewTitle": "Safe review first",
+    "safeReviewText": "Creating the plan does not import pages yet.",
+    "linksAssetsTitle": "Links and assets",
+    "linksAssetsText": "Internal links and embedded assets are rewritten during import.",
+    "alphaTitle": "Still in alpha",
+    "alphaText": "Some Markdown variants may still need manual cleanup afterward."
+  },
+  "nextAction": {
+    "chooseZip": "Choose a zip file and create an import plan.",
+    "reviewPlan": "Review the generated items, then start the import.",
+    "cancelRequested": "Cancellation was requested. The importer will stop after the current item finishes.",
+    "running": "The import is running. You can stay on this page and watch the progress update.",
+    "completed": "The import finished successfully. Review the result below, or start a new import with another zip package.",
+    "failed": "The import stopped with an error. Check the message and result items below.",
+    "canceled": "The import was canceled. Completed work was kept and is shown below.",
+    "selectZip": "Select a zip file to begin."
+  },
+  "flow": {
+    "title": "Import Flow"
+  },
+  "package": {
+    "title": "Choose Import Package",
+    "description": "Select a zip archive that contains Markdown files. After that, we create a preview plan so you can inspect paths, actions, and notes before the import runs.",
+    "issuesHint": "If you run into problems, unexpected results, or unsupported edge cases, please create an issue on our",
+    "githubRepository": "GitHub repository",
+    "currentZip": "Current Zip:",
+    "noZipSelected": "No zip file selected",
+    "supportedInput": "Supported input: a single `.zip` archive containing your Markdown knowledge base.",
+    "planOnlyHint": "This only creates the review plan. No pages are imported until you click `Execute Import Plan`."
+  },
+  "plan": {
+    "title": "Import Plan",
+    "description": "Review what LeafWiki is about to create, update, or skip before you start the import.",
+    "currentStatus": "Current Status",
+    "planId": "Plan ID: {{id}}",
+    "progress": "Progress: {{label}}",
+    "percentComplete": "{{percent}}% complete",
+    "willCreate": "Will Create",
+    "willUpdate": "Will Update",
+    "willSkip": "Will Skip",
+    "runningCopy": "The import is running in the background. You can stay on this page to watch progress.",
+    "cancelRequestedCopy": "Cancellation has been requested. The importer will stop after the current item finishes.",
+    "currentlyProcessing": " Currently processing {{path}}.",
+    "canceledCopy": "The import was canceled. Completed items were kept, and the partial result is shown below.",
+    "treeHash": "Tree Hash:",
+    "startedAt": "Started At:",
+    "finishedAt": "Finished At:",
+    "plannedItems": "Planned Items ({{count}})",
+    "plannedItemsDescription": "These are the individual files LeafWiki detected in the package and how they map to target pages.",
+    "importFile": "Import File",
+    "targetPage": "Target Page",
+    "titleColumn": "Title",
+    "typeColumn": "Type",
+    "plannedAction": "Planned Action",
+    "notesForReview": "Notes for Review",
+    "noSpecialNotes": "No special notes"
+  },
+  "run": {
+    "title": "Run Import",
+    "descriptionPlan": "Start the import once the plan looks correct. You can also clear the current plan and begin again with a different package.",
+    "descriptionRunning": "The importer is currently working through the generated plan. You can stay on this page to monitor progress or request cancellation."
+  },
+  "result": {
+    "title": "Import Result",
+    "description": "This is the final outcome of the import. Skipped items usually need manual review, while failed items need attention before retrying.",
+    "anotherPackageTitle": "Want to import another package?",
+    "anotherPackageBody": "Start a new import to clear this result and choose a different zip file.",
+    "created": "Created",
+    "skipped": "Skipped",
+    "failed": "Failed",
+    "treeUpdated": "Tree Updated",
+    "importedCount": "Imported Count:",
+    "updatedCount": "Updated Count:",
+    "skippedCount": "Skipped Count:",
+    "resultItems": "Result Items ({{filtered}}/{{total}})",
+    "filterDescription": "Use the filters to focus on successful imports, skipped items, or failures.",
+    "filterPlaceholder": "Filter by path, action, or error",
+    "importedFile": "Imported File",
+    "resultingPage": "Resulting Page",
+    "outcome": "Outcome",
+    "details": "Details",
+    "importedSuccessfully": "Imported successfully",
+    "existingPageUpdated": "Existing page was updated",
+    "skippedWithoutError": "Skipped without error",
+    "noExtraDetails": "No extra details",
+    "noMatchingItems": "No items match the current filter.",
+    "filterAll": "all",
+    "filterCreated": "created",
+    "filterSkipped": "skipped",
+    "filterFailed": "failed",
+    "treeUpdatedYes": "Yes",
+    "treeUpdatedNo": "No"
+  },
+  "toast": {
+    "planCreated": "Import plan created successfully",
+    "createPlanFailed": "Failed to create import plan",
+    "loadPlanFailed": "Failed to load import plan",
+    "noPlanToExecute": "No import plan to execute",
+    "completed": "Import completed successfully",
+    "canceled": "Import canceled",
+    "executionFailed": "Import execution failed",
+    "executeFailed": "Failed to execute import plan",
+    "noPlanToClear": "No import plan to clear",
+    "finishedBeforeCancel": "Import finished before cancellation completed",
+    "planCleared": "Import plan cleared",
+    "cancelFailed": "Failed to cancel or clear import plan"
+  }
+}

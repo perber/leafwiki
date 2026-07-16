@@ -1,3 +1,4 @@
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { login } from '@/lib/api/auth'
@@ -69,6 +70,9 @@ export default function LoginForm() {
     <>
       <title>{t('login.pageTitle', { siteName })}</title>
       <div className="login">
+        <div className="login__language-switcher">
+          <LanguageSwitcher />
+        </div>
         <form onSubmit={handleSubmit} className="login__form">
           <h1 className="login__title">
             {logoFile ? (

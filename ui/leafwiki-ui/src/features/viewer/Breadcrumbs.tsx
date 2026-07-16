@@ -2,10 +2,12 @@ import { useAppMode } from '@/lib/useAppMode'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { useTreeStore } from '@/stores/tree'
 import { FolderTree } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useViewerStore } from './viewer'
 
 export default function Breadcrumbs() {
+  const { t } = useTranslation('common')
   const tree = useTreeStore((s) => s.tree)
   const page = useViewerStore((s) => s.page)
 
@@ -38,7 +40,7 @@ export default function Breadcrumbs() {
   const breadcrumbs = buildBreadcrumbs()
 
   return (
-    <nav className="breadcrumbs-nav" aria-label="Breadcrumb">
+    <nav className="breadcrumbs-nav" aria-label={t('breadcrumbAriaLabel')}>
       <span className="breadcrumbs-nav__icon" aria-hidden="true">
         <FolderTree size={14} strokeWidth={1.8} />
       </span>

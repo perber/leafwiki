@@ -188,9 +188,9 @@ export default function PageViewer() {
                   {showUpdated && (
                     <div className="page-viewer__metadata">
                       <span className="page-viewer__metadata-item">
-                        Updated{' '}
+                        {t('sectionList.updated')}{' '}
                         {editorName
-                          ? `by ${editorName} · ${updatedRelative}`
+                          ? `${t('sectionList.updatedBy', { user: editorName })} · ${updatedRelative}`
                           : updatedRelative}
                       </span>
                     </div>

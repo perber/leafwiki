@@ -67,6 +67,11 @@ export default defineConfig(({ command }: ConfigEnv) => ({
         changeOrigin: true,
         secure: false,
       },
+      '/locales': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   optimizeDeps: {

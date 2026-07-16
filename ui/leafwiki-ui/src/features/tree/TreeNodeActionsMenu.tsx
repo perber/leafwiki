@@ -48,6 +48,7 @@ import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { useItemLabels } from '@/lib/useItemLabels'
 import { usePageEditorStore } from '../editor/pageEditorStore'
 import { confirmPageRefactor } from '../page/pageRefactorDialogState'
 import { TreeViewActionButton } from './TreeViewActionButton'
@@ -60,8 +61,10 @@ export type TreeNodeActionsMenuProps = {
 export default function TreeNodeActionsMenu({
   node,
 }: TreeNodeActionsMenuProps) {
-  const { t } = useTranslation('viewer')
+  const { t } = useTranslation('tree')
+  const { t: tViewer } = useTranslation('viewer')
   const { id: nodeId, kind: nodeKind, children, version: nodeVersion } = node
+  const { itemCapitalized } = useItemLabels(nodeKind)
   const currentEditorPageId = usePageEditorStore((state) => state.page?.id)
   const enableLinkRefactor = useConfigStore((s) => s.enableLinkRefactor)
   const openDialog = useDialogsStore((state) => state.openDialog)
@@ -80,7 +83,7 @@ export default function TreeNodeActionsMenu({
       nodeVersion,
     )
       .then(() => {
-        toast.success('Page converted successfully')
+        toast.success(t('toast.converted'))
         reloadTree()
       })
       .catch((err) => {
@@ -94,15 +97,13 @@ export default function TreeNodeActionsMenu({
               .loadPageData(viewerPage.path)
               .catch(console.error)
           }
-          toast.error(
-            'This page was modified by another user. Please try again.',
-          )
+          toast.error(t('toast.versionConflict'))
         } else {
-          const mapped = mapApiError(err, 'Failed to convert page')
+          const mapped = mapApiError(err, t('toast.convertFailed'))
           toast.error(mapped.message)
         }
       })
-  }, [nodeId, nodeKind, nodeVersion, reloadTree])
+  }, [nodeId, nodeKind, nodeVersion, reloadTree, t])
 
   const setPinnedLocally = useTreeStore((s) => s.setPinnedLocally)
 
@@ -119,17 +120,17 @@ export default function TreeNodeActionsMenu({
       .then((updated) => {
         setPinnedLocally(nodeId, newPinned, updated.version)
         toast.success(
-          node.pinned ? t('pinned.unpinSuccess') : t('pinned.pinSuccess'),
+          node.pinned ? tViewer('pinned.unpinSuccess') : tViewer('pinned.pinSuccess'),
         )
       })
-      .catch(() => toast.error(t('pinned.pinError')))
-  }, [nodeId, nodeVersion, node.pinned, setPinnedLocally, t])
+      .catch(() => toast.error(tViewer('pinned.pinError')))
+  }, [nodeId, nodeVersion, node.pinned, setPinnedLocally, tViewer])
 
   const handleRenamePage = useCallback(
     async (title: string, slug: string) => {
       if (currentEditorPageId === nodeId) {
         toast.warning(
-          `This ${nodeKind === NODE_KIND_PAGE ? 'page' : 'section'} is currently being edited. Please use the editor title bar to rename it.`,
+          t('toast.editingRenameBlocked', { item: itemCapitalized }),
         )
         return
       }
@@ -202,20 +203,16 @@ export default function TreeNodeActionsMenu({
           navigate(`/${updatedPage.path}`)
         }
 
-        toast.success(
-          `${nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'} renamed successfully`,
-        )
+        toast.success(t('toast.renamed', { item: itemCapitalized }))
       } catch (err) {
         const localized = asApiLocalizedError(err)
         if (localized?.code === 'page_version_conflict') {
           await reloadTree()
-          toast.error(
-            'This page was modified by another user. Please try again.',
-          )
+          toast.error(t('toast.versionConflict'))
           return
         }
 
-        const mapped = mapApiError(err, 'Failed to rename page')
+        const mapped = mapApiError(err, t('toast.renameFailed'))
         toast.error(mapped.message)
       }
     },
@@ -227,7 +224,8 @@ export default function TreeNodeActionsMenu({
       node.path,
       nodeId,
       nodeKind,
-      reloadTree,
+      itemCapitalized,
+      t,
     ],
   )
 
@@ -236,11 +234,11 @@ export default function TreeNodeActionsMenu({
       open={open}
       onOpenChange={(nextOpen) => setOpenMenuNodeId(nextOpen ? node.id : null)}
     >
-      <DropdownMenuTrigger asChild aria-label="More actions">
+      <DropdownMenuTrigger asChild aria-label={t('moreActions')}>
         <TreeViewActionButton
           actionName="open-more-actions"
           icon={<MoreVertical size={18} className="tree-node__action-icon" />}
-          tooltip="Open more actions"
+          tooltip={t('openMoreActions')}
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
@@ -253,7 +251,8 @@ export default function TreeNodeActionsMenu({
             })
           }}
         >
-          <FilePlus size={18} className="tree-node__action-icon" /> Add Page
+          <FilePlus size={18} className="tree-node__action-icon" />{' '}
+          {t('actions.addPage')}
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer"
@@ -264,8 +263,8 @@ export default function TreeNodeActionsMenu({
             })
           }}
         >
-          <FolderPlus size={18} className="tree-node__action-icon" /> Add
-          Section
+          <FolderPlus size={18} className="tree-node__action-icon" />{' '}
+          {t('actions.addSection')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -274,8 +273,8 @@ export default function TreeNodeActionsMenu({
             navigate(`/e/${node.path}`)
           }}
         >
-          <Pencil size={18} className="tree-node__action-icon" /> Edit{' '}
-          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+          <Pencil size={18} className="tree-node__action-icon" />{' '}
+          {t('actions.editItem', { item: itemCapitalized })}
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer"
@@ -291,8 +290,8 @@ export default function TreeNodeActionsMenu({
             })
           }}
         >
-          <Pencil size={18} className="tree-node__action-icon" /> Rename{' '}
-          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+          <Pencil size={18} className="tree-node__action-icon" />{' '}
+          {t('actions.renameItem', { item: itemCapitalized })}
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_PAGE && (
           <DropdownMenuItem
@@ -301,7 +300,8 @@ export default function TreeNodeActionsMenu({
               openDialog(DIALOG_COPY_PAGE, { sourcePage: node })
             }}
           >
-            <Copy size={18} className="tree-node__action-icon" /> Copy Page
+            <Copy size={18} className="tree-node__action-icon" />{' '}
+            {t('actions.copyPage')}
           </DropdownMenuItem>
         )}
         {hasChildren && (
@@ -310,8 +310,8 @@ export default function TreeNodeActionsMenu({
             data-testid="tree-view-action-button-sort"
             onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: node })}
           >
-            <List size={18} className="tree-node__action-icon" /> Sort{' '}
-            {nodeKind === NODE_KIND_SECTION ? 'Section' : 'Page'} Children
+            <List size={18} className="tree-node__action-icon" />{' '}
+            {t('actions.sortChildren', { item: itemCapitalized })}
           </DropdownMenuItem>
         )}
         <DropdownMenuItem
@@ -319,16 +319,16 @@ export default function TreeNodeActionsMenu({
           data-testid="tree-view-action-button-move"
           onClick={() => openDialog(DIALOG_MOVE_PAGE, { pageId: node.id })}
         >
-          <Move size={18} className="tree-node__action-icon" /> Move{' '}
-          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+          <Move size={18} className="tree-node__action-icon" />{' '}
+          {t('actions.moveItem', { item: itemCapitalized })}
         </DropdownMenuItem>
         {nodeKind === NODE_KIND_SECTION && !hasChildren && (
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={handleConvertPage}
           >
-            <Repeat2 size={18} className="tree-node__action-icon" /> Convert to
-            Page
+            <Repeat2 size={18} className="tree-node__action-icon" />{' '}
+            {t('actions.convertToPage')}
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
@@ -340,12 +340,12 @@ export default function TreeNodeActionsMenu({
           {node.pinned ? (
             <>
               <PinOff size={18} className="tree-node__action-icon" />{' '}
-              {t('pinned.unpinPage')}
+              {tViewer('pinned.unpinPage')}
             </>
           ) : (
             <>
               <Pin size={18} className="tree-node__action-icon" />{' '}
-              {t('pinned.pinPage')}
+              {tViewer('pinned.pinPage')}
             </>
           )}
         </DropdownMenuItem>
@@ -363,7 +363,7 @@ export default function TreeNodeActionsMenu({
 
             if (isCurrentlyEditedNode) {
               toast.warning(
-                `This ${nodeKind === NODE_KIND_PAGE ? 'page' : 'section'} is currently being edited. Please close the editor before deleting it.`,
+                t('toast.editingDeleteBlocked', { item: itemCapitalized }),
               )
               return
             }
@@ -378,7 +378,7 @@ export default function TreeNodeActionsMenu({
           }}
         >
           <Trash size={18} className="tree-node__action-icon text-error" />{' '}
-          Delete {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+          {t('actions.deleteItem', { item: itemCapitalized })}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

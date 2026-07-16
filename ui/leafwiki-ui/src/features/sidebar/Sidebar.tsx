@@ -6,8 +6,13 @@ import { useAppMode } from '@/lib/useAppMode'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSidebarStore } from '@/stores/sidebar'
 import { JSX, Suspense, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const registeredItems = panelItemRegistry.getAllItems()
+const sidebarLabelKeys: Partial<Record<string, string>> = {
+  tree: 'explorer',
+  search: 'search',
+}
 const sidebarShortcutIds: Partial<
   Record<string, 'sidebar.explorer.open' | 'sidebar.search.open'>
 > = {
@@ -16,6 +21,7 @@ const sidebarShortcutIds: Partial<
 }
 
 export default function Sidebar() {
+  const { t, i18n } = useTranslation('sidebar')
   const appMode = useAppMode()
   const sidebarMode = useSidebarStore((state) => state.sidebarMode)
   const setSidebarMode = useSidebarStore((state) => state.setSidebarMode)
@@ -36,10 +42,12 @@ export default function Sidebar() {
       () =>
         items.map((item) => ({
           id: item.id,
-          label: item.label,
+          label: sidebarLabelKeys[item.id]
+            ? t(sidebarLabelKeys[item.id]!)
+            : item.label,
           icon: item.icon,
         })),
-      [items],
+      [items, t, i18n.language],
     )
 
   useEffect(() => {

@@ -8,12 +8,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ToolbarButton } from '@/features/toolbar/ToolbarButton'
 import { cn } from '@/lib/utils'
+import { useTranslation } from 'react-i18next'
 import { Check, MoreHorizontal } from 'lucide-react'
 import { useToolbarStore } from './toolbarStore'
 
 const VISIBLE_BUTTONS = 2
 
 export function Toolbar() {
+  const { t } = useTranslation('common')
   const buttons = useToolbarStore((state) => state.buttons)
   const visibleButtons = buttons.slice(0, VISIBLE_BUTTONS)
   const overflowButtons = buttons.slice(VISIBLE_BUTTONS)
@@ -43,7 +45,7 @@ export function Toolbar() {
               variant="outline"
               size="icon"
               className="h-8 w-8 shadow-xs"
-              aria-label="More actions"
+              aria-label={t('moreActions')}
               data-testid="toolbar-overflow-button"
             >
               <MoreHorizontal size={18} />

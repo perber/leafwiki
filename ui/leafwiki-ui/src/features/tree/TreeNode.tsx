@@ -13,6 +13,7 @@ import clsx from 'clsx'
 import { ChevronUp, FilePlus, FolderPlus } from 'lucide-react'
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useTreeDnd } from './treeDndContext'
 import { useTreeNodeActionsMenusStore } from './treeNodeActionsMenus'
 import TreeNodeActionsMenu from './TreeNodeActionsMenu'
@@ -22,6 +23,7 @@ type Props = {
 }
 
 export const TreeNode = React.memo(function TreeNode({ node }: Props) {
+  const { t } = useTranslation('tree')
   const open = useTreeStore((s) => !!s.openNodeIdSet?.[node.id])
   const isStoreActive = useTreeStore((s) => s.activeNodeId === node.id)
   const toggleNode = useTreeStore((s) => s.toggleNode)
@@ -75,7 +77,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
             'tree-node__title--active': isActive,
           })}
         >
-          {node.title || 'Untitled Page'}
+          {node.title || t('untitledPage')}
         </span>
       </Link>
     </div>
@@ -158,7 +160,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
                         )}
                       />
                     }
-                    tooltip="Create new page"
+                    tooltip={t('createNewPage')}
                     onClick={() =>
                       openDialog(DIALOG_ADD_PAGE, { parentId: node.id })
                     }

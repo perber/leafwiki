@@ -9,9 +9,11 @@ import {
 } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_MOVE_PAGE } from '@/lib/registries'
+import { useItemLabels } from '@/lib/useItemLabels'
 import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PageSelect } from './PageSelect'
@@ -19,12 +21,14 @@ import { refreshAfterPageRefactor } from './pageMutationRefresh'
 import { confirmPageRefactor } from './pageRefactorDialogState'
 
 export function MovePageDialog({ pageId }: { pageId: string }) {
+  const { t } = useTranslation('page')
+  const { t: tCommon } = useTranslation('common')
   const { tree } = useTreeStore()
   const [loading, setLoading] = useState(false)
   const [, setFieldErrors] = useState<Record<string, string>>({})
   const page = useTreeStore((s) => s.getPageById(pageId))
+  const { item, itemCapitalized } = useItemLabels(page?.kind ?? NODE_KIND_PAGE)
   const enableLinkRefactor = useConfigStore((s) => s.enableLinkRefactor)
-  // get opened route from react router
   const currentPath = useLocation().pathname
   const navigate = useNavigate()
 
@@ -47,9 +51,6 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
   if (!tree) return null
   if (!parentId) return null
   if (!page) return null
-
-  const itemLabel = page.kind === NODE_KIND_PAGE ? 'page' : 'section'
-  const itemLabelCapitalized = page.kind === NODE_KIND_PAGE ? 'Page' : 'Section'
 
   const getSyntheticMovePreview = (): PageRefactorPreview => {
     const nextParent = newParentId
@@ -109,11 +110,11 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
         navigate,
       })
 
-      toast.success('Page moved successfully')
-      return true // Close the dialog
+      toast.success(t('toast.moved'))
+      return true
     } catch (err: unknown) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, `Error moving ${itemLabel}`)
+      handleFieldErrors(err, setFieldErrors, t('toast.moveError', { item }))
       return false
     } finally {
       setLoading(false)
@@ -124,8 +125,8 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
     <BaseDialog
       dialogType={DIALOG_MOVE_PAGE}
       testidPrefix="move-page-dialog"
-      dialogTitle={`Move ${itemLabelCapitalized}`}
-      dialogDescription={`Select a new parent for this ${itemLabel}`}
+      dialogTitle={t('move.title', { item: itemCapitalized })}
+      dialogDescription={t('move.description', { item })}
       onClose={() => true}
       onConfirm={async (type) => {
         if (type === 'confirm') {
@@ -134,14 +135,14 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
         return false
       }}
       cancelButton={{
-        label: 'Cancel',
+        label: t('actions.cancel'),
         variant: 'outline',
         autoFocus: false,
         disabled: loading,
       }}
       buttons={[
         {
-          label: 'Move',
+          label: tCommon('actions.move'),
           actionType: 'confirm',
           disabled: newParentId === parentId || loading,
           variant: 'default',

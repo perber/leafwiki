@@ -4,6 +4,7 @@ import { formatBytes } from '@/lib/config'
 import { useConfigStore } from '@/stores/config'
 import { UploadCloud } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { AssetItem } from './AssetItem'
 
@@ -22,6 +23,7 @@ export function AssetManager({
   onAssetVersionChange,
   isRenamingRef,
 }: Props) {
+  const { t } = useTranslation('assets')
   const [assets, setAssets] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -61,7 +63,7 @@ export function AssetManager({
   const handleUploadFile = async (file: File) => {
     if (file.size > maxAssetUploadSizeBytes) {
       toast.error(
-        `File too large. Max ${formatBytes(maxAssetUploadSizeBytes)} allowed.`,
+        t('toast.fileTooLarge', { size: formatBytes(maxAssetUploadSizeBytes) }),
       )
       return
     }
@@ -74,7 +76,7 @@ export function AssetManager({
       onAssetVersionChange?.()
     } catch (err) {
       console.error('Upload failed', err)
-      toast.error(mapApiError(err, 'Asset upload failed').message)
+      toast.error(mapApiError(err, t('toast.uploadFailed')).message)
     } finally {
       setUploadingFiles((prev) => {
         const next = new Set(prev)
@@ -111,7 +113,7 @@ export function AssetManager({
 
   return (
     <div className="asset-manager">
-      <div className="asset-manager__title">Assets</div>
+      <div className="asset-manager__title">{t('title')}</div>
 
       <div
         data-testid="asset-upload-dropzone"
@@ -133,10 +135,10 @@ export function AssetManager({
       >
         <UploadCloud className="asset-manager__dropzone-icon" size={20} />
         <p className="asset-manager__dropzone-text">
-          Drop files here or click to upload
+          {t('dropzone.dragOrClick')}
         </p>
         <p className="asset-manager__dropzone-text">
-          Max file size: {formatBytes(maxAssetUploadSizeBytes)}
+          {t('dropzone.maxSize', { size: formatBytes(maxAssetUploadSizeBytes) })}
         </p>
         <input
           type="file"
@@ -147,17 +149,16 @@ export function AssetManager({
         />
         {uploadingFiles.size > 0 && (
           <div className="asset-manager__dropzone-uploading">
-            Uploading {uploadingFiles.size} file
-            {uploadingFiles.size > 1 ? 's' : ''}…
+            {t('uploadingCount', { count: uploadingFiles.size })}
           </div>
         )}
       </div>
 
       <div className="asset-manager__list-container">
         {loading ? (
-          <p className="asset-manager__loading">Loading assets…</p>
+          <p className="asset-manager__loading">{t('loading')}</p>
         ) : assets.length === 0 ? (
-          <p className="asset-manager__empty">No assets yet</p>
+          <p className="asset-manager__empty">{t('empty')}</p>
         ) : (
           <ul className="asset-manager__list custom-scrollbar">
             {assets.map((filename) => (
@@ -178,8 +179,7 @@ export function AssetManager({
       </div>
 
       <p className="asset-manager__tip">
-        Tip: Double-click inserts the default markup. Images can also be added
-        as links, and audio/video have a player insert button.
+        {t('tip')}
       </p>
     </div>
   )

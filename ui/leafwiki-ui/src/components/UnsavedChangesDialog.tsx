@@ -1,4 +1,5 @@
 import { DIALOG_UNSAVED_CHANGES } from '@/lib/registries'
+import { useTranslation } from 'react-i18next'
 import BaseDialog from './BaseDialog'
 
 type UnsavedChangesDialogProps = {
@@ -10,10 +11,12 @@ export function UnsavedChangesDialog({
   onConfirm,
   onCancel,
 }: UnsavedChangesDialogProps) {
+  const { t } = useTranslation('page')
+
   return (
     <BaseDialog
-      dialogTitle="Unsaved Changes"
-      dialogDescription="You have unsaved changes. Are you sure you want to leave this page? Unsaved data will be lost."
+      dialogTitle={t('unsaved.title')}
+      dialogDescription={t('unsaved.description')}
       dialogType={DIALOG_UNSAVED_CHANGES}
       testidPrefix="unsaved-changes-dialog"
       onClose={() => {
@@ -25,13 +28,13 @@ export function UnsavedChangesDialog({
         return true
       }}
       cancelButton={{
-        label: 'Cancel',
+        label: t('actions.cancel'),
         variant: 'secondary',
         autoFocus: true,
       }}
       buttons={[
         {
-          label: 'Leave anyway',
+          label: t('actions.leaveAnyway'),
           variant: 'destructive',
           actionType: 'confirm',
           disabled: false,

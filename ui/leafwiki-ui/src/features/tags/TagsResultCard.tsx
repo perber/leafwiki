@@ -3,6 +3,7 @@ import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { MouseEvent, forwardRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
 import type { PageEditorState } from '../editor/pageEditorStore'
 import { usePageEditorStore } from '../editor/pageEditorStore'
@@ -23,6 +24,7 @@ const TagsResultCard = forwardRef<HTMLDivElement, TagsResultCardProps>(
     { item, activeTags, isSelected = false, onMouseEnter, onFocus, onTagClick },
     ref,
   ) {
+    const { t } = useTranslation('common')
     const location = useLocation()
     const currentEditorPageId = usePageEditorStore(
       (state: PageEditorState) => state.page?.id ?? state.initialPage?.id,
@@ -70,7 +72,7 @@ const TagsResultCard = forwardRef<HTMLDivElement, TagsResultCardProps>(
             {item.title}
           </div>
           <div className="search-result-card__meta">
-            <span className="search-result-card__badge">Page</span>
+            <span className="search-result-card__badge">{t('pageBadge')}</span>
           </div>
           {item.excerpt && (
             <div className="search-result-card__excerpt">{item.excerpt}</div>

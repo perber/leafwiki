@@ -1,6 +1,5 @@
 import { Button } from '@/components/ui/button'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION, Page } from '@/lib/api/pages'
-import i18next from '@/lib/i18n'
 import { formatRelativeTime } from '@/lib/formatDate'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
@@ -9,10 +8,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { FilePlus, FolderPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
-
-const t = (key: string, opts?: Record<string, unknown>) =>
-  i18next.t(key, { ...opts, ns: 'viewer' })
-
+import { useTranslation } from 'react-i18next'
 type EmptySectionChildrenListProps = {
   page: Page
 }
@@ -24,6 +20,7 @@ function displayUser(label?: { username: string }) {
 export default function EmptySectionChildrenList({
   page,
 }: EmptySectionChildrenListProps) {
+  const { t } = useTranslation('viewer')
   const getPageById = useTreeStore((s) => s.getPageById)
   const node = getPageById(page.id)
   const openDialog = useDialogsStore((s) => s.openDialog)
@@ -53,7 +50,7 @@ export default function EmptySectionChildrenList({
     <>
       {hasChildren && (
         <nav
-          aria-label={`Subpages of ${page.title}`}
+          aria-label={t('sectionList.subpagesAriaLabel', { title: page.title })}
           className="child-list__section"
         >
           <h2 className="child-list__section-title mb-1">
@@ -82,14 +79,13 @@ export default function EmptySectionChildrenList({
                   <Link to={`/${n.path}`} state={createNavigationVisitState()}>
                     {n.title}
                   </Link>{' '}
-                  {n.kind === NODE_KIND_SECTION && ' (Section)'}
+                  {n.kind === NODE_KIND_SECTION && ` ${t('sectionList.sectionSuffix')}`}
                   <br />
-                  {/* Last edited info */}
                   <span className="text-muted text-sm">
                     {' '}
-                    Updated{' '}
+                    {t('sectionList.updated')}{' '}
                     {editorName
-                      ? `by ${editorName} · ${updatedRelative}`
+                      ? `${t('sectionList.updatedBy', { user: editorName })} · ${updatedRelative}`
                       : updatedRelative}
                   </span>
                 </li>
@@ -118,7 +114,7 @@ export default function EmptySectionChildrenList({
       {/* No children - Add Button and allow users to create a new page */}
       {!hasChildren && (
         <nav
-          aria-label={`Subpages of ${page.title}`}
+          aria-label={t('sectionList.subpagesAriaLabel', { title: page.title })}
           className="child-list__section"
         >
           <div>

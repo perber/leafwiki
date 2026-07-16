@@ -1,0 +1,54 @@
+{
+  "editUser": "Редактировать пользователя",
+  "newUser": "Новый пользователь",
+  "editUserDescription": "Изменить данные пользователя",
+  "newUserDescription": "Создать нового пользователя",
+  "pageTitle": "Управление пользователями",
+  "deleteUserTitle": "Удалить пользователя?",
+  "deleteUserDescription": "Вы уверены, что хотите удалить этого пользователя? Это действие нельзя отменить.",
+  "deleteConfirmBody": "Пользователь {{username}} будет безвозвратно удалён из системы.",
+  "changePasswordFor": "Сменить пароль для {{username}}",
+  "changePasswordDescription": "Установите новый пароль для пользователя.",
+  "changeOwnPasswordTitle": "Сменить свой пароль",
+  "changeOwnPasswordDescription": "Смените пароль. Запомните его!",
+  "username": "Имя пользователя",
+  "email": "Email",
+  "password": "Пароль",
+  "oldPassword": "Старый пароль",
+  "newPassword": "Новый пароль",
+  "confirmPassword": "Подтвердите пароль",
+  "selectRole": "Выберите роль",
+  "table": {
+    "username": "Имя пользователя",
+    "email": "Email",
+    "role": "Роль",
+    "actions": "Действия",
+    "loading": "Загрузка пользователей...",
+    "empty": "Пользователи не найдены."
+  },
+  "roles": {
+    "viewer": "Читатель",
+    "editor": "Редактор",
+    "admin": "Администратор"
+  },
+  "actions": {
+    "edit": "Редактировать",
+    "delete": "Удалить",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "changePassword": "Сменить пароль",
+    "updatePassword": "Обновить пароль"
+  },
+  "validation": {
+    "passwordMinLength": "Пароль должен содержать не менее 8 символов",
+    "passwordMismatch": "Пароли не совпадают"
+  },
+  "toast": {
+    "saved": "Пользователь сохранён",
+    "deleted": "Пользователь удалён",
+    "passwordChanged": "Пароль изменён",
+    "loadUsersError": "Ошибка загрузки пользователей",
+    "updatePasswordError": "Ошибка обновления пароля",
+    "deleteFailed": "Не удалось удалить пользователя. Попробуйте снова."
+  }
+}

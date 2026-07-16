@@ -2,6 +2,7 @@ import BaseDialog from '@/components/BaseDialog'
 import { type Revision } from '@/lib/api/revisions'
 import { DIALOG_RESTORE_REVISION_CONFIRMATION } from '@/lib/registries'
 import { useRef } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 
 export type RestoreRevisionDialogProps = {
   revision: Revision
@@ -14,6 +15,8 @@ export function RestoreRevisionDialog({
   currentSlug,
   onResolve,
 }: RestoreRevisionDialogProps) {
+  const { t } = useTranslation('history')
+  const { t: tCommon } = useTranslation('common')
   const resolvedRef = useRef(false)
 
   const resolveOnce = (value: boolean | null) => {
@@ -29,8 +32,8 @@ export function RestoreRevisionDialog({
   return (
     <BaseDialog
       dialogType={DIALOG_RESTORE_REVISION_CONFIRMATION}
-      dialogTitle="Restore revision?"
-      dialogDescription="This restores the revision content, title, and assets. The current slug and location stay unchanged."
+      dialogTitle={t('restoreDialog.title')}
+      dialogDescription={t('restoreDialog.description')}
       onClose={() => {
         resolveOnce(null)
         return true
@@ -45,13 +48,13 @@ export function RestoreRevisionDialog({
       defaultAction="cancel"
       testidPrefix="restore-revision-dialog"
       cancelButton={{
-        label: 'Cancel',
+        label: tCommon('actions.cancel'),
         variant: 'outline',
         autoFocus: true,
       }}
       buttons={[
         {
-          label: 'Restore revision',
+          label: t('restoreDialog.confirmButton'),
           actionType: 'confirm',
           variant: 'default',
           autoFocus: false,
@@ -60,7 +63,7 @@ export function RestoreRevisionDialog({
     >
       <div className="space-y-3 text-sm">
         <div>
-          <span className="font-medium">Restored title:</span>{' '}
+          <span className="font-medium">{t('restoreDialog.restoredTitle')}</span>{' '}
           <span data-testid="restore-revision-dialog-title">
             {revision.title}
           </span>
@@ -70,10 +73,18 @@ export function RestoreRevisionDialog({
             className="rounded border border-amber-300 bg-amber-50 p-3 text-amber-950"
             data-testid="restore-revision-dialog-slug-note"
           >
-            This revision used slug{' '}
-            <span className="font-mono">{revision.slug}</span>. The current slug{' '}
-            <span className="font-mono">{currentSlug}</span> will stay
-            unchanged.
+            <Trans
+              i18nKey="restoreDialog.slugNote"
+              ns="history"
+              values={{
+                revisionSlug: revision.slug,
+                currentSlug,
+              }}
+              components={{
+                1: <span className="font-mono" />,
+                2: <span className="font-mono" />,
+              }}
+            />
           </div>
         ) : null}
       </div>
