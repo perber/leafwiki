@@ -141,6 +141,55 @@
   color: var(--hljs-foreground);
 }
 
+/* Line numbers: opt-in via a trailing "=" on the code fence language (#1313).
+   The gutter shares the code block's top padding and line-height so numbers
+   line up with their source lines (fenced code does not soft-wrap). */
+.page-viewer__content .markdown-code-block__body,
+.markdown-editor__preview .markdown-code-block__body,
+.page-history__preview-body .markdown-code-block__body {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.page-viewer__content
+  .markdown-code-block--line-numbers
+  .markdown-code-block__line-numbers,
+.markdown-editor__preview
+  .markdown-code-block--line-numbers
+  .markdown-code-block__line-numbers,
+.page-history__preview-body
+  .markdown-code-block--line-numbers
+  .markdown-code-block__line-numbers {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 1em 0.75em;
+  text-align: right;
+  user-select: none;
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono',
+    monospace;
+  line-height: 1.7;
+  color: var(--hljs-comment);
+  background: var(--hljs-background);
+  border-right: 1px solid
+    color-mix(in oklab, var(--hljs-foreground) 12%, transparent);
+}
+
+.page-viewer__content .markdown-code-block--line-numbers pre,
+.markdown-editor__preview .markdown-code-block--line-numbers pre,
+.page-history__preview-body .markdown-code-block--line-numbers pre {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.page-viewer__content .markdown-code-block--line-numbers pre code.hljs,
+.markdown-editor__preview .markdown-code-block--line-numbers pre code.hljs,
+.page-history__preview-body .markdown-code-block--line-numbers pre code.hljs {
+  line-height: 1.7;
+}
+
 .page-viewer__content pre code.hljs,
 .markdown-editor__preview pre code.hljs,
 .page-history__preview-body pre code.hljs {

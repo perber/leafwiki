@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react'
 import { toast } from 'sonner'
+import { LINE_NUMBERS_CLASS } from './rehypeCodeLineNumbers'
 
 type CodeElementProps = {
   className?: string
@@ -60,6 +61,10 @@ export default function MarkdownCodeBlock(
 
   const className = child.props.className ?? ''
   const code = readTextContent(child.props.children)
+  const showLineNumbers = className.split(/\s+/).includes(LINE_NUMBERS_CLASS)
+  const lineCount = showLineNumbers
+    ? Math.max(1, code.replace(/\n$/, '').split('\n').length)
+    : 0
 
   const isCodeBlock = className.includes('language-') || code.includes('\n')
   if (!isCodeBlock) {
@@ -77,29 +82,59 @@ export default function MarkdownCodeBlock(
     toast.success('Code copied')
   }
 
+  const actions = (
+    <div className="markdown-code-block__actions">
+      <TooltipWrapper label={copied ? 'Copied' : 'Copy code'}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="markdown-code-block__copy-button"
+          onClick={handleCopy}
+          aria-label={copied ? 'Code copied' : 'Copy code'}
+          data-testid="markdown-code-copy-button"
+        >
+          {copied ? <Check /> : <Copy />}
+        </Button>
+      </TooltipWrapper>
+    </div>
+  )
+
+  const pre = (
+    <pre
+      {...preProps}
+      className={`custom-scrollbar ${preProps.className ?? ''}`.trim()}
+    >
+      {children}
+    </pre>
+  )
+
+  if (showLineNumbers) {
+    return (
+      <div className="markdown-code-block markdown-code-block--line-numbers">
+        {actions}
+        <div className="markdown-code-block__body">
+          <span
+            className="markdown-code-block__line-numbers"
+            aria-hidden="true"
+            data-testid="markdown-code-line-numbers"
+          >
+            {Array.from({ length: lineCount }, (_, index) => (
+              <span key={index} className="markdown-code-block__line-number">
+                {index + 1}
+              </span>
+            ))}
+          </span>
+          {pre}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="markdown-code-block">
-      <div className="markdown-code-block__actions">
-        <TooltipWrapper label={copied ? 'Copied' : 'Copy code'}>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="markdown-code-block__copy-button"
-            onClick={handleCopy}
-            aria-label={copied ? 'Code copied' : 'Copy code'}
-            data-testid="markdown-code-copy-button"
-          >
-            {copied ? <Check /> : <Copy />}
-          </Button>
-        </TooltipWrapper>
-      </div>
-      <pre
-        {...preProps}
-        className={`custom-scrollbar ${preProps.className ?? ''}`.trim()}
-      >
-        {children}
-      </pre>
+      {actions}
+      {pre}
     </div>
   )
 }
