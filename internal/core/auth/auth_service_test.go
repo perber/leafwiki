@@ -235,33 +235,70 @@ func TestAuthService_CompleteTOTPLogin_RecoveryCodeWorksOnceAndOnlyOnce(t *testi
 	}
 }
 
+// TestAuthService_TOTPGuessing_CannotBypassLockoutViaRepeatedCorrectPasswordLogin
+// is the regression test for the login-lockout bypass: Login() must not reset
+// the shared per-user attempt counter while TOTP is still required, or an
+// attacker who already knows the password could keep resetting the guess
+// budget by resubmitting it, turning the 6-digit TOTP code into an
+// unlimited-attempt guessing target. Alternating a correct-password login
+// with a wrong TOTP guess must still hit the account lock within
+// loginMaxFailures combined attempts.
+func TestAuthService_TOTPGuessing_CannotBypassLockoutViaRepeatedCorrectPasswordLogin(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	locked := false
+	for i := 0; i < 10; i++ {
+		challenge, err := f.authService.Login("testuser", "securepass")
+		if err != nil {
+			if err == ErrUserAccountLocked {
+				locked = true
+				break
+			}
+			t.Fatalf("Login failed unexpectedly on iteration %d: %v", i, err)
+		}
+
+		_, err = f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, "000000")
+		if err == ErrUserAccountLocked {
+			locked = true
+			break
+		}
+	}
+
+	if !locked {
+		t.Fatal("expected repeated correct-password logins interleaved with wrong TOTP guesses to eventually lock the account")
+	}
+}
+
 // TestAuthService_CompleteTOTPLogin_ConcurrentRecoveryCodeUseOnlyOneSucceeds
 // is the regression test for the recovery-code double-redemption race:
 // concurrent login attempts presenting the same still-valid recovery code
 // must not all succeed — the code must be consumable exactly once even under
-// concurrency, not just when used sequentially.
+// concurrency, not just when used sequentially. Reuses a single challenge
+// token across all attempts (rather than one per attempt) since Login() no
+// longer resets the shared lockout counter for TOTP-enabled accounts —
+// several sequential Login() calls would otherwise trip the account lock
+// before any CompleteTOTPLogin call runs, which is exactly the bypass that
+// change closed.
 func TestAuthService_CompleteTOTPLogin_ConcurrentRecoveryCodeUseOnlyOneSucceeds(t *testing.T) {
 	f := setupTOTPTestFixture(t)
 
-	const attempts = 5
-	tokens := make([]string, attempts)
-	for i := 0; i < attempts; i++ {
-		challenge, err := f.authService.Login("testuser", "securepass")
-		if err != nil {
-			t.Fatalf("Login #%d failed: %v", i, err)
-		}
-		tokens[i] = challenge.LoginChallengeToken
+	challenge, err := f.authService.Login("testuser", "securepass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
 	}
 
+	// Stay safely under loginMaxFailures so this test only exercises the
+	// recovery-code race, not the (separately tested) account lockout.
+	const attempts = 3
 	results := make(chan error, attempts)
 	var wg sync.WaitGroup
 	for i := 0; i < attempts; i++ {
 		wg.Add(1)
-		go func(token string) {
+		go func() {
 			defer wg.Done()
-			_, err := f.authService.CompleteTOTPLogin(token, f.recoveryCode)
+			_, err := f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, f.recoveryCode)
 			results <- err
-		}(tokens[i])
+		}()
 	}
 	wg.Wait()
 	close(results)
@@ -284,15 +321,10 @@ func TestAuthService_CompleteTOTPLogin_NotConfiguredWhenNoEncryptionKey(t *testi
 	// already enabled for this user: rebuild the AuthService without a TOTPService.
 	authServiceNoTOTP := NewAuthService(NewUserService(f.store), mustNewSessionStore(t), nil, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
 
-	challenge, err := authServiceNoTOTP.Login("testuser", "securepass")
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-	if !challenge.RequiresTOTP {
-		t.Fatal("expected a login challenge even though the TOTP service is unavailable")
-	}
-
-	_, err = authServiceNoTOTP.CompleteTOTPLogin(challenge.LoginChallengeToken, "123456")
+	// Login itself must fail fast with a clear error here, rather than issuing
+	// a challenge CompleteTOTPLogin could never redeem (which would strand the
+	// user on a code prompt with no valid code to enter).
+	_, err := authServiceNoTOTP.Login("testuser", "securepass")
 	if err == nil {
 		t.Fatal("expected error when TOTP service is not configured")
 	}
@@ -541,6 +573,26 @@ func TestAuthService_DisableTOTP_WrongCodeRejected(t *testing.T) {
 	}
 	if !user.TOTPEnabled {
 		t.Fatal("TOTP must remain enabled after a failed disable attempt")
+	}
+}
+
+// TestAuthService_DisableTOTP_NotConfiguredWhenNoEncryptionKey is the
+// regression test for the DisableTOTP nil-pointer panic: an operator running
+// without --totp-encryption-key (a.totp == nil) while a user still has TOTP
+// enabled must get a clean auth_totp_not_configured error from DisableTOTP,
+// not a panic.
+func TestAuthService_DisableTOTP_NotConfiguredWhenNoEncryptionKey(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	authServiceNoTOTP := NewAuthService(NewUserService(f.store), mustNewSessionStore(t), nil, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+
+	err := authServiceNoTOTP.DisableTOTP(f.userID, "securepass", "000000", "")
+	if err == nil {
+		t.Fatal("expected error when TOTP service is not configured")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_totp_not_configured" {
+		t.Fatalf("expected auth_totp_not_configured, got %#v", err)
 	}
 }
 

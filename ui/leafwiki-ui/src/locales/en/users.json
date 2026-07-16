@@ -1,4 +1,6 @@
 {
+  "loading": "Loading users...",
+  "noUsersFound": "No users found.",
   "totp": {
     "column": "2FA",
     "enabled": "Enabled",

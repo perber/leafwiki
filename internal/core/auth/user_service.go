@@ -190,20 +190,20 @@ func (s *UserService) UpdatePassword(id string, newpassword string) error {
 	return nil
 }
 
-func (s *UserService) DoesIDAndPasswordMatch(id, password string) (bool, error) {
-	// Check if user exists
+// DoesIDAndPasswordMatch verifies that password matches the stored hash for
+// id, returning the fetched user on success so callers that need it right
+// afterward (e.g. StartTOTPSetup, DisableTOTP) don't have to re-fetch it.
+func (s *UserService) DoesIDAndPasswordMatch(id, password string) (*User, error) {
 	user, err := s.store.GetUserByID(id)
 	if err != nil {
-		return false, ErrUserNotFound
+		return nil, ErrUserNotFound
 	}
 
-	// Check if password is correct
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
-	if err != nil {
-		return false, ErrUserInvalidCredentials
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return nil, ErrUserInvalidCredentials
 	}
 
-	return true, nil
+	return user, nil
 }
 
 func (s *UserService) DeleteUser(id string) error {
@@ -330,13 +330,6 @@ func (s *UserService) ResetAdminUserPassword(username, email string) (*User, err
 	adminUser.Password = password // Set the password to the generated one
 
 	return adminUser, nil
-}
-
-// UpdateRecoveryCodeHashes unconditionally replaces the stored TOTP
-// recovery-code hashes for id. Not safe against concurrent recovery-code
-// consumption; use ConsumeRecoveryCodeHash for that.
-func (s *UserService) UpdateRecoveryCodeHashes(id string, hashes []string) error {
-	return s.store.UpdateRecoveryCodeHashes(id, hashes)
 }
 
 // ConsumeRecoveryCodeHash atomically replaces oldHashes with newHashes for id

@@ -217,8 +217,12 @@ func TestUserStore_TOTPLifecycle(t *testing.T) {
 
 	// Consuming a recovery code removes just that one hash.
 	remaining := []string{"hash1", "hash3"}
-	if err := store.UpdateRecoveryCodeHashes(user.ID, remaining); err != nil {
-		t.Fatalf("UpdateRecoveryCodeHashes failed: %v", err)
+	swapped, err := store.ConsumeRecoveryCodeHash(user.ID, hashes, remaining)
+	if err != nil {
+		t.Fatalf("ConsumeRecoveryCodeHash failed: %v", err)
+	}
+	if !swapped {
+		t.Fatal("expected ConsumeRecoveryCodeHash to swap when oldHashes matches the stored value")
 	}
 	afterConsume, err := store.GetUserByID(user.ID)
 	if err != nil {
@@ -263,8 +267,19 @@ func TestUserStore_TOTPMethods_NotFoundForUnknownUser(t *testing.T) {
 	if err := store.DisableTOTP("missing"); err != ErrUserNotFound {
 		t.Fatalf("expected ErrUserNotFound from DisableTOTP, got %v", err)
 	}
-	if err := store.UpdateRecoveryCodeHashes("missing", nil); err != ErrUserNotFound {
-		t.Fatalf("expected ErrUserNotFound from UpdateRecoveryCodeHashes, got %v", err)
+
+	// ConsumeRecoveryCodeHash deliberately does not existence-check: it's a
+	// compare-and-swap, and for a nonexistent user the WHERE clause simply
+	// matches zero rows, so it reports swapped=false with no error (its only
+	// caller, verifyTOTPOrRecoveryCode, always already holds a freshly
+	// fetched user, so this can only happen via a concurrent deletion, which
+	// the caller's retry loop resolves via GetUserByID).
+	swapped, err := store.ConsumeRecoveryCodeHash("missing", []string{"hash1"}, []string{})
+	if err != nil {
+		t.Fatalf("expected no error from ConsumeRecoveryCodeHash for unknown user, got %v", err)
+	}
+	if swapped {
+		t.Fatal("expected swapped=false from ConsumeRecoveryCodeHash for unknown user")
 	}
 }
 

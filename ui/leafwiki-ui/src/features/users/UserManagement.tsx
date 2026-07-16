@@ -59,14 +59,14 @@ export default function UserManagement() {
                 {loading && (
                   <tr>
                     <td colSpan={5} className="settings__table-body-message">
-                      Loading users...
+                      {t('loading')}
                     </td>
                   </tr>
                 )}
                 {!loading && users.length === 0 && (
                   <tr>
                     <td colSpan={5} className="settings__table-body-message">
-                      No users found.
+                      {t('noUsersFound')}
                     </td>
                   </tr>
                 )}

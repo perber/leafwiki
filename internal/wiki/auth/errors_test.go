@@ -125,3 +125,22 @@ func TestRespondWithAuthError_TOTPNotEnabled(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
+
+func TestRespondWithAuthError_TOTPVerificationFailed(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+
+	respondWithAuthError(c, sharederrors.NewLocalizedError(
+		ErrCodeAuthTOTPVerificationFailed,
+		"Two-factor authentication is temporarily unavailable",
+		"failed to verify TOTP code",
+		nil,
+	))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+}

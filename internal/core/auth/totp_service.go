@@ -153,7 +153,7 @@ func generateRecoveryCode() (string, error) {
 
 // VerifyRecoveryCode reports whether code matches any of hashes. On a match,
 // matchedIndex is the position of the matched hash so the caller can remove
-// it (via UserStore.UpdateRecoveryCodeHashes) to enforce single use.
+// it (via UserStore.ConsumeRecoveryCodeHash) to enforce single use.
 func VerifyRecoveryCode(code string, hashes []string) (matchedIndex int, ok bool) {
 	normalized := strings.ToUpper(strings.TrimSpace(code))
 	for i, hash := range hashes {

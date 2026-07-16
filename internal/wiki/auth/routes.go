@@ -499,7 +499,14 @@ func (r *Routes) handleConfirmTOTPSetup(rctx httpinternal.RouterContext) gin.Han
 			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 			return
 		}
-		refreshToken, _ := rctx.AuthCookies.ReadRefresh(c)
+		refreshToken, err := rctx.AuthCookies.ReadRefresh(c)
+		if err != nil {
+			// Falls back to revoking every session for this user, including
+			// the one making this request (see
+			// AuthService.RevokeAllUserSessionsExceptCurrent) — log it so an
+			// unexpected logout right after enabling TOTP is diagnosable.
+			slog.Default().Warn("could not read refresh token while confirming TOTP setup; will revoke all sessions", "userID", user.ID, "error", err)
+		}
 		out, err := r.confirmTOTPSetup.Execute(c.Request.Context(), ConfirmTOTPSetupInput{
 			UserID: user.ID, Code: req.Code, CurrentRefreshToken: refreshToken,
 		})
@@ -530,7 +537,14 @@ func (r *Routes) handleDisableTOTP(rctx httpinternal.RouterContext) gin.HandlerF
 			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
 			return
 		}
-		refreshToken, _ := rctx.AuthCookies.ReadRefresh(c)
+		refreshToken, err := rctx.AuthCookies.ReadRefresh(c)
+		if err != nil {
+			// Falls back to revoking every session for this user, including
+			// the one making this request (see
+			// AuthService.RevokeAllUserSessionsExceptCurrent) — log it so an
+			// unexpected logout right after disabling TOTP is diagnosable.
+			slog.Default().Warn("could not read refresh token while disabling TOTP; will revoke all sessions", "userID", user.ID, "error", err)
+		}
 		if err := r.disableTOTP.Execute(c.Request.Context(), DisableTOTPInput{
 			UserID: user.ID, CurrentPassword: req.CurrentPassword, Code: req.Code, CurrentRefreshToken: refreshToken,
 		}); err != nil {
