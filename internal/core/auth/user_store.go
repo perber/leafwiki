@@ -547,33 +547,6 @@ func (f *UserStore) DisableTOTP(userID string) error {
 	return err
 }
 
-// UpdateRecoveryCodeHashes unconditionally replaces the stored recovery-code
-// hashes for userID. Not safe against concurrent recovery-code consumption
-// (two callers racing on stale reads can both overwrite each other's write);
-// use ConsumeRecoveryCodeHash for that.
-func (f *UserStore) UpdateRecoveryCodeHashes(userID string, recoveryCodeHashes []string) error {
-	err := f.Connect()
-	if err != nil {
-		return err
-	}
-
-	if _, err := f.GetUserByID(userID); err != nil {
-		return err
-	}
-
-	codesJSON, err := json.Marshal(recoveryCodeHashes)
-	if err != nil {
-		return fmt.Errorf("failed to encode recovery codes for user %s: %w", userID, err)
-	}
-
-	_, err = f.db.Exec(`
-		UPDATE users
-		SET totp_recovery_codes_json = ?
-		WHERE id = ?;
-	`, string(codesJSON), userID)
-	return err
-}
-
 // ConsumeRecoveryCodeHash atomically replaces oldHashes with newHashes for
 // userID via compare-and-swap on the stored JSON column: the write only takes
 // effect if the row's current totp_recovery_codes_json still serializes to

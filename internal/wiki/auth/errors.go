@@ -32,6 +32,7 @@ const (
 	ErrCodeAuthTOTPAlreadyEnabled       = "auth_totp_already_enabled"
 	ErrCodeAuthTOTPSetupNotStarted      = "auth_totp_setup_not_started"
 	ErrCodeAuthTOTPNotEnabled           = "auth_totp_not_enabled"
+	ErrCodeAuthTOTPVerificationFailed   = "auth_totp_verification_failed"
 )
 
 // AuthErrorResponse is the structured JSON error body returned by auth endpoints.
@@ -120,7 +121,7 @@ func authErrorStatus(code string) int {
 		return http.StatusUnauthorized
 	case ErrCodeAuthTOTPChallengeInvalid:
 		return http.StatusUnprocessableEntity
-	case ErrCodeAuthTOTPNotConfigured:
+	case ErrCodeAuthTOTPNotConfigured, ErrCodeAuthTOTPVerificationFailed:
 		return http.StatusServiceUnavailable
 	case ErrCodeAuthTOTPAlreadyEnabled:
 		return http.StatusConflict

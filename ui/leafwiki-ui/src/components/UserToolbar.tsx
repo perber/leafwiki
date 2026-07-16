@@ -196,7 +196,7 @@ export default function UserToolbar() {
             className="cursor-pointer"
             onClick={() => openDialog(DIALOG_CHANGE_OWN_PASSWORD)}
           >
-            Change Own Password
+            {t('userMenu.changeOwnPassword')}
           </DropdownMenuItem>
           {!authDisabled &&
             (user?.totpEnabled ? (

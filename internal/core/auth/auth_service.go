@@ -103,13 +103,29 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 		return nil, ErrUserInvalidCredentials
 	}
 
-	a.attempts.reset(user.ID)
 	user.Password = ""
 
 	if user.TOTPEnabled {
+		if a.totp == nil {
+			// Config drift: TOTP was enabled for this user while an encryption
+			// key was configured, but the server is currently running without
+			// one. Fail here, at the password step, rather than issuing a
+			// challenge CompleteTOTPLogin can never redeem (it requires
+			// a.totp too), which would otherwise strand the user on a code
+			// prompt with no valid code to enter.
+			return nil, errTOTPNotConfigured()
+		}
+		// Do not reset the attempt counter yet: a correct password is not a
+		// complete login while TOTP is still required. CompleteTOTPLogin
+		// shares this same per-user counter to rate-limit TOTP/recovery-code
+		// guesses; resetting it here would let anyone who already knows the
+		// password wipe out failed TOTP attempts by simply resubmitting the
+		// password, defeating the lockout on TOTP code brute-forcing. The
+		// counter is only reset once CompleteTOTPLogin fully succeeds.
 		return a.beginTOTPChallenge(user)
 	}
 
+	a.attempts.reset(user.ID)
 	return a.issueTokens(user)
 }
 
@@ -177,10 +193,7 @@ func (a *AuthService) StartTOTPSetup(userID, currentPassword string) (*Generated
 	if a.totp == nil {
 		return nil, errTOTPNotConfigured()
 	}
-	if _, err := a.userService.DoesIDAndPasswordMatch(userID, currentPassword); err != nil {
-		return nil, err
-	}
-	user, err := a.userService.GetUserByID(userID)
+	user, err := a.userService.DoesIDAndPasswordMatch(userID, currentPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +233,7 @@ func (a *AuthService) ConfirmTOTPSetup(userID, code, currentRefreshToken string)
 
 	valid, err := a.totp.VerifyCode(user.TOTPSecretEncrypted, code)
 	if err != nil {
-		return nil, err
+		return nil, errTOTPVerificationFailed(err)
 	}
 	if !valid {
 		return nil, errTOTPInvalidCode()
@@ -246,10 +259,10 @@ func (a *AuthService) ConfirmTOTPSetup(userID, code, currentRefreshToken string)
 // codes. Every other session for the user is revoked; currentRefreshToken
 // identifies the caller's own session, which is left intact.
 func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshToken string) error {
-	if _, err := a.userService.DoesIDAndPasswordMatch(userID, currentPassword); err != nil {
-		return err
+	if a.totp == nil {
+		return errTOTPNotConfigured()
 	}
-	user, err := a.userService.GetUserByID(userID)
+	user, err := a.userService.DoesIDAndPasswordMatch(userID, currentPassword)
 	if err != nil {
 		return err
 	}
@@ -329,7 +342,7 @@ const maxRecoveryCodeConsumeAttempts = 3
 func (a *AuthService) verifyTOTPOrRecoveryCode(user *User, code string) (bool, error) {
 	valid, err := a.totp.VerifyCode(user.TOTPSecretEncrypted, code)
 	if err != nil {
-		return false, err
+		return false, errTOTPVerificationFailed(err)
 	}
 	if valid {
 		return true, nil
@@ -418,6 +431,20 @@ func errTOTPNotEnabled() error {
 		"Two-factor authentication is not enabled",
 		"TOTP is not enabled for this account",
 		nil,
+	)
+}
+
+// errTOTPVerificationFailed wraps an unexpected failure to even attempt TOTP
+// verification (e.g. the stored secret could not be decrypted, typically
+// after a TOTP encryption key was rotated or corrupted) as a LocalizedError,
+// per this repo's convention that domain errors reaching HTTP handlers must
+// be *sharederrors.LocalizedError, not a bare fmt.Errorf/errors.New.
+func errTOTPVerificationFailed(cause error) error {
+	return sharederrors.NewLocalizedError(
+		"auth_totp_verification_failed",
+		"Two-factor authentication is temporarily unavailable",
+		"failed to verify TOTP code",
+		cause,
 	)
 }
 
