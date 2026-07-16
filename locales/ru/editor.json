@@ -85,6 +85,7 @@
     "editor": "Редактор",
     "preview": "Просмотр"
   },
+  "resizePanesAriaLabel": "Изменить размер панелей редактора и просмотра",
   "linkInsert": {
     "title": "Вставить ссылку",
     "displayText": "Текст",

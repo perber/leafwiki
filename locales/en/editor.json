@@ -85,6 +85,7 @@
     "editor": "Editor",
     "preview": "Preview"
   },
+  "resizePanesAriaLabel": "Resize editor and preview panes",
   "linkInsert": {
     "title": "Insert Link",
     "displayText": "Display Text",

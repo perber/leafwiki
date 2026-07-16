@@ -35,11 +35,24 @@
     "unpinPage": "Открепить",
     "pinSuccess": "Страница закреплена",
     "unpinSuccess": "Страница откреплена",
-    "pinError": "Не удалось изменить закрепление"
+    "pinError": "Не удалось изменить закрепление",
+    "togglePinnedSection": "Показать/скрыть закреплённые страницы",
+    "togglePagesSection": "Показать/скрыть раздел страниц"
+  },
+  "favorites": {
+    "sectionTitle": "Избранное",
+    "addFavorite": "Добавить в избранное",
+    "removeFavorite": "Убрать из избранного",
+    "addSuccess": "Добавлено в избранное",
+    "removeSuccess": "Удалено из избранного",
+    "favoriteError": "Не удалось обновить избранное",
+    "toggleFavoritesSection": "Показать/скрыть избранное"
   },
   "toc": {
     "title": "Содержание",
-    "onThisPage": "На этой странице"
+    "onThisPage": "На этой странице",
+    "collapse": "Свернуть содержание",
+    "expand": "Развернуть содержание"
   },
   "toolbar": {
     "editItem": "Редактировать {{item}}",
@@ -91,6 +104,7 @@
       "copyPage": { "action": "Копировать страницу" },
       "deletePage": { "action": "Удалить страницу" },
       "pageHistory": { "action": "История страницы" },
+      "toggleToc": { "action": "Показать/скрыть содержание" },
       "openExplorer": { "action": "Открыть проводник" },
       "openSearch": { "action": "Открыть поиск" },
       "savePage": { "action": "Сохранить страницу" },

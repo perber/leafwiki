@@ -35,11 +35,24 @@
     "unpinPage": "Unpin",
     "pinSuccess": "Page pinned",
     "unpinSuccess": "Page unpinned",
-    "pinError": "Failed to update pin status"
+    "pinError": "Failed to update pin status",
+    "togglePinnedSection": "Toggle pinned pages section",
+    "togglePagesSection": "Toggle pages section"
+  },
+  "favorites": {
+    "sectionTitle": "Favorites",
+    "addFavorite": "Add to favorites",
+    "removeFavorite": "Remove from favorites",
+    "addSuccess": "Added to favorites",
+    "removeSuccess": "Removed from favorites",
+    "favoriteError": "Failed to update favorites",
+    "toggleFavoritesSection": "Toggle favorites section"
   },
   "toc": {
     "title": "Table of contents",
-    "onThisPage": "On this page"
+    "onThisPage": "On this page",
+    "collapse": "Collapse table of contents",
+    "expand": "Expand table of contents"
   },
   "toolbar": {
     "editItem": "Edit {{item}}",
@@ -106,6 +119,9 @@
       },
       "pageHistory": {
         "action": "Page history"
+      },
+      "toggleToc": {
+        "action": "Toggle table of contents"
       },
       "openExplorer": {
         "action": "Open explorer"
