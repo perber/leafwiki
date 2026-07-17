@@ -40,7 +40,7 @@ export function TOTPDisableDialog() {
       setCurrentPassword('')
       setCode('')
       const message = mapApiError(err, t('totp.disable.errorFallback')).message
-      setFieldErrors({ currentPassword: message })
+      setFieldErrors({ currentPassword: message, code: message })
       return false
     } finally {
       setLoading(false)
