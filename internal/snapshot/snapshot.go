@@ -23,6 +23,13 @@ type Config struct {
 	SchemaFile  string
 	UsersDBPath string
 	WikiVersion string // injected from build info
+
+	// Interval is the automatic snapshot interval; 0 means manual-only
+	// (no ticker, only explicit triggers). Mirrors backup.Config.Interval.
+	Interval time.Duration
+	// RetentionCount is how many of the newest snapshots to keep after each
+	// successful run; <= 0 means unlimited (no pruning).
+	RetentionCount int
 }
 
 type backupMeta struct {
@@ -33,10 +40,13 @@ type backupMeta struct {
 
 // createSnapshot builds the ZIP and sidecar JSON, returns the snapshot ID.
 func createSnapshot(ctx context.Context, cfg Config) (string, error) {
-	id := "snapshot-" + time.Now().UTC().Format("20060102-150405")
-
 	if err := os.MkdirAll(cfg.BackupsDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create backups directory: %w", err)
+	}
+
+	id, err := uniqueSnapshotID(cfg.BackupsDir, time.Now().UTC())
+	if err != nil {
+		return "", fmt.Errorf("failed to allocate snapshot id: %w", err)
 	}
 
 	tmpDir, err := os.MkdirTemp("", "leafwiki-snapshot-*")
@@ -53,6 +63,7 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 	createdAt := time.Now().UTC()
 	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
 	if err := writeSnapshotZip(zipPath, cfg, id, createdAt, usersDBCopy); err != nil {
+		_ = os.Remove(zipPath) // best-effort cleanup of a partial/invalid zip left by the failed write
 		return "", fmt.Errorf("failed to write snapshot zip: %w", err)
 	}
 
@@ -68,6 +79,30 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 	}
 
 	return id, nil
+}
+
+// uniqueSnapshotID returns a snapshot ID based on t that has no existing
+// .zip or .json file in backupsDir yet. IDs are second-precision timestamps,
+// so two runs completing within the same second would otherwise collide and
+// silently overwrite each other's snapshot; this appends a "-2", "-3", ...
+// suffix until a free slot is found.
+func uniqueSnapshotID(backupsDir string, t time.Time) (string, error) {
+	base := "snapshot-" + t.Format("20060102-150405")
+	id := base
+	for i := 2; ; i++ {
+		_, zipErr := os.Stat(filepath.Join(backupsDir, id+".zip"))
+		_, jsonErr := os.Stat(filepath.Join(backupsDir, id+".json"))
+		if os.IsNotExist(zipErr) && os.IsNotExist(jsonErr) {
+			return id, nil
+		}
+		if zipErr != nil && !os.IsNotExist(zipErr) {
+			return "", zipErr
+		}
+		if jsonErr != nil && !os.IsNotExist(jsonErr) {
+			return "", jsonErr
+		}
+		id = fmt.Sprintf("%s-%d", base, i)
+	}
 }
 
 // vacuumBusyTimeout bounds how long VACUUM INTO waits for a writer to

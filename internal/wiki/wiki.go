@@ -35,6 +35,7 @@ import (
 	wikiresync "github.com/perber/wiki/internal/wiki/resync"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
+	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 	wikitags "github.com/perber/wiki/internal/wiki/tags"
 )
 
@@ -69,6 +70,7 @@ type Wiki struct {
 	props            *properties.PropertiesService
 	favorites        *favorites.FavoritesStore
 	backupRoutes     *wikibackup.Routes
+	snapshotRoutes   *wikisnapshot.Routes
 	resyncRoutes     *wikiresync.Routes
 	resyncJob        *wikiresync.ResyncJob
 	ignoreCache      *ignore.Cache
@@ -538,12 +540,20 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 	if w.backupRoutes != nil {
 		registrars = append(registrars, w.backupRoutes)
 	}
+	if w.snapshotRoutes != nil {
+		registrars = append(registrars, w.snapshotRoutes)
+	}
 	return registrars
 }
 
 // SetBackupRoutes sets the backup routes and must be called before router creation.
 func (w *Wiki) SetBackupRoutes(r *wikibackup.Routes) {
 	w.backupRoutes = r
+}
+
+// SetSnapshotRoutes sets the full-backup (snapshot) routes and must be called before router creation.
+func (w *Wiki) SetSnapshotRoutes(r *wikisnapshot.Routes) {
+	w.snapshotRoutes = r
 }
 
 // AuthService returns the authentication service.
