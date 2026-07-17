@@ -19,6 +19,7 @@ export type Config = {
   enableRevision: boolean
   enableLinkRefactor: boolean
   gitBackupEnabled: boolean
+  snapshotEnabled: boolean
   httpRemoteUserEnabled: boolean
   loginUrl: string
   logoutUrl: string
