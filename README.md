@@ -42,6 +42,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   - [Reverse-Proxy Authentication](#reverse-proxy-authentication)
   - [Unix Socket](#unix-socket-v0113)
   - [Git Backup](#git-backup-v0113-experimental)
+  - [Full Backup](#full-backup-unreleased-experimental)
   - [Security](#security)
   - [Operations notes](#operations-notes)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
@@ -499,7 +500,58 @@ environment:
 - Either `--git-backup-ssh-key` or `--git-backup-ssh-key-path` is required when a remote is configured. Prefer the environment variable to avoid the key appearing in process listings.
 - `--git-backup-ssh-known-hosts` is optional but recommended. If not set, LeafWiki falls back to `~/.ssh/known_hosts`. If that file does not exist either (common in containers), SSH host key verification is **disabled** — leaving connections open to MITM attacks. Set this flag explicitly in production.
 - If the remote diverges (e.g. someone pushed directly to the backup branch), LeafWiki will stop auto-pushing and show a **Conflict — remote diverged** warning in the UI. Click **Force Push** in the UI to overwrite the remote with the current local backup history. Your wiki content is never lost — the local backup repo is always authoritative.
-- This backs up **content only** — the SQLite database is not included. For a full backup, use your data directory (`cp -r` with the app stopped).
+- This backs up **content only** — the SQLite database is not included. For a full backup, use your data directory (`cp -r` with the app stopped), or enable **Full Backup** below.
+
+---
+
+### Full Backup (unreleased, experimental)
+
+> **Experimental** — This feature is new and may change in future releases. Test it thoroughly before relying on it for critical data.
+
+Full Backup creates a downloadable ZIP snapshot of the **entire** wiki data directory: `root/` (pages), `assets/`, `branding/`, `schema.json`, and the SQLite **users database** (`users.db`, taken via `VACUUM INTO` for a consistent copy while the server keeps running). This is the one place the users database — and everything needed to fully recreate an instance — is included; Git Backup above deliberately excludes it.
+
+Snapshots run automatically on a configurable interval, keep only the most recent N (default 10, configurable), and can also be triggered manually from the **Full Backup** page, where existing snapshots can be downloaded or deleted.
+
+**CLI flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--snapshot` | Enable full backup snapshots | `false` |
+| `--snapshot-interval` | Snapshot interval (e.g. `24h`, `6h`); `0` = manual-only | `24h` |
+| `--snapshot-retention` | Number of most recent snapshots to keep; `<= 0` = keep all | `10` |
+| `--snapshot-dir` | Directory to store snapshot ZIPs in | `<data-dir>/snapshots` |
+
+**Environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `LEAFWIKI_SNAPSHOT` | Enable full backup snapshots |
+| `LEAFWIKI_SNAPSHOT_INTERVAL` | Snapshot interval |
+| `LEAFWIKI_SNAPSHOT_RETENTION` | Number of most recent snapshots to keep |
+| `LEAFWIKI_SNAPSHOT_DIR` | Directory to store snapshot ZIPs in |
+
+**Example (Docker Compose):**
+
+```yaml
+environment:
+  - LEAFWIKI_SNAPSHOT=true
+  - LEAFWIKI_SNAPSHOT_INTERVAL=24h
+  - LEAFWIKI_SNAPSHOT_RETENTION=10
+```
+
+**Restoring from a Full Backup (manual process):**
+
+There is currently no in-app restore — restoring is a manual, server-stop-required procedure:
+
+1. Stop the LeafWiki server.
+2. Extract the downloaded snapshot ZIP.
+3. Replace `root/`, `assets/`, `branding/`, `schema.json`, and `users.db` in your data directory with the extracted files.
+4. Restart the server.
+
+**Notes:**
+
+- The `users.db` copy includes password hashes and TOTP secrets — treat downloaded snapshots as sensitive and store them securely.
+- Retention pruning deletes the oldest snapshots after each successful run once the configured count is exceeded; it does not affect snapshots you download and store elsewhere.
 
 ---
 
