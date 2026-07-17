@@ -10,6 +10,7 @@ type Status struct {
 	IsRunning      bool
 	LastSnapshotAt time.Time
 	LastError      string
+	LastPruneError string
 }
 
 // TryStart atomically marks the status as running, unless it already is.
@@ -24,12 +25,17 @@ func (s *Status) TryStart() bool {
 	return true
 }
 
-func (s *Status) SetSuccess(t time.Time) {
+// SetSuccess marks the run as finished successfully. pruneErr is the error
+// message from retention pruning (empty if pruning succeeded or was
+// skipped); the caller is expected to run pruning before calling this, while
+// IsRunning is still true, so a concurrent run cannot start mid-prune.
+func (s *Status) SetSuccess(t time.Time, pruneErr string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.IsRunning = false
 	s.LastSnapshotAt = t
 	s.LastError = ""
+	s.LastPruneError = pruneErr
 }
 
 func (s *Status) SetError(err string) {
@@ -51,6 +57,7 @@ func (s *Status) Snapshot() StatusSnapshot {
 		IsRunning:      s.IsRunning,
 		LastSnapshotAt: lastSnapshotAt,
 		LastError:      s.LastError,
+		LastPruneError: s.LastPruneError,
 	}
 }
 
@@ -58,4 +65,5 @@ type StatusSnapshot struct {
 	IsRunning      bool       `json:"isRunning"`
 	LastSnapshotAt *time.Time `json:"lastSnapshotAt,omitempty"`
 	LastError      string     `json:"lastError,omitempty"`
+	LastPruneError string     `json:"lastPruneError,omitempty"`
 }

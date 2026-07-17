@@ -97,6 +97,7 @@ type RouterOptions struct {
 	EnableLinkRefactor      bool                     // Whether the link refactoring feature is enabled in the frontend
 	Metrics                 *httpmetrics.HTTPMetrics // Optional Prometheus HTTP metrics collector; nil disables request instrumentation
 	GitBackupEnabled        bool                     // Whether git backup is enabled (surfaced to admin UI via /api/config)
+	SnapshotEnabled         bool                     // Whether full-backup (snapshot) is enabled (surfaced to admin UI via /api/config)
 	HTTPRemoteUser          HTTPRemoteUserConfig     // Reverse-proxy authentication via HTTP header
 	DisableRequestLog       bool                     // Whether to suppress per-request access log lines
 	UserManagementURL       string                   // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
