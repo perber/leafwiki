@@ -16,13 +16,14 @@ import (
 )
 
 type Config struct {
-	BackupsDir  string
-	RootDir     string
-	AssetsDir   string
-	BrandingDir string
-	SchemaFile  string
-	UsersDBPath string
-	WikiVersion string // injected from build info
+	BackupsDir         string
+	RootDir            string
+	AssetsDir          string
+	BrandingDir        string
+	BrandingConfigFile string // storageDir/branding.json (site name, active logo/favicon filename) — separate from BrandingDir, which only holds the uploaded logo/favicon image files
+	SchemaFile         string
+	UsersDBPath        string
+	WikiVersion        string // injected from build info
 
 	// Interval is the automatic snapshot interval; 0 means manual-only
 	// (no ticker, only explicit triggers). Mirrors backup.Config.Interval.
@@ -142,6 +143,9 @@ func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time
 		return err
 	}
 	if err := addDirToZip(w, cfg.BrandingDir, "branding/"); err != nil {
+		return err
+	}
+	if err := addFileToZip(w, cfg.BrandingConfigFile, "branding.json"); err != nil {
 		return err
 	}
 	if err := addFileToZip(w, cfg.SchemaFile, "schema.json"); err != nil {

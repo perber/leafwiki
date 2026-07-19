@@ -197,6 +197,16 @@ func (s *SessionStore) RevokeAllSessionsForUserExcept(userID, exceptID string) e
 	})
 }
 
+// DeleteAllSessions removes every session row regardless of state (active,
+// expired, or already revoked) — used after a restore, where the previous
+// sessions.db content is no longer meaningful against a swapped-in users.db.
+func (s *SessionStore) DeleteAllSessions() error {
+	return s.withDB(func(db *sql.DB) error {
+		_, err := db.Exec(`DELETE FROM sessions;`)
+		return err
+	})
+}
+
 func (s *SessionStore) CleanupExpiredSessions() error {
 	now := time.Now()
 	return s.withDB(func(db *sql.DB) error {

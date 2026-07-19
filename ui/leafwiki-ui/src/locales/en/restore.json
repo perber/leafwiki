@@ -1,0 +1,32 @@
+{
+  "restoreButton": "Restore",
+  "restoreConfirmTitle": "Restore this backup?",
+  "restoreConfirmDescription": "This overwrites all live content, users, and settings with what's in this backup, and immediately logs everyone out — including you. Everyone must log back in. Writes are temporarily disabled while the restore runs. This cannot be undone.",
+  "restoreConfirmCancel": "Cancel",
+  "restoreConfirmAction": "Restore",
+  "restoring": "Restoring…",
+  "progressLabel": "Current Phase",
+  "resyncTailLabel": "Restore complete — rebuilding search index before reload",
+  "progress": {
+    "validating": "Validating backup",
+    "swapping": "Swapping files",
+    "reopening_auth": "Reopening user database",
+    "invalidating_sessions": "Invalidating sessions",
+    "reloading_branding": "Reloading branding",
+    "tree": "Rebuilding page tree",
+    "links": "Indexing links",
+    "tags": "Rebuilding tags & properties",
+    "search": "Indexing search"
+  },
+  "versionWarningLabel": "Version mismatch",
+  "needsInterventionTitle": "Restore needs attention",
+  "needsInterventionDescription": "The restore could not finish cleanly and this instance may be left in a partially-restored state. Writes remain disabled until this is resolved. Restarting the server now re-loads whatever is actually on disk, which is the supported way back to a consistent state.",
+  "selfRestartButton": "Restart server now",
+  "selfRestarting": "Restarting server… this page will reload automatically in a few seconds.",
+  "toast": {
+    "restoreTriggered": "Restore started",
+    "restoreTriggerFailed": "Failed to start restore",
+    "restoreFailed": "Restore failed",
+    "restoreSucceeded": "Restore completed. Reloading…"
+  }
+}

@@ -12,11 +12,20 @@ import {
 import { Button } from '@/components/ui/button'
 import { formatBytes } from '@/lib/config'
 import { snapshotDownloadUrl } from '@/lib/api/snapshot'
-import { Download, HardDriveDownload, Loader2, Trash2 } from 'lucide-react'
+import { ApiLocalizedError, mapApiError } from '@/lib/api/errors'
+import {
+  AlertTriangle,
+  Download,
+  HardDriveDownload,
+  History,
+  Loader2,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useSnapshotStore } from '@/stores/snapshot'
+import { useRestoreStore } from '@/stores/restore'
 import { useSetTitle } from '../viewer/setTitle'
 import { useToolbarActions } from './useToolbarActions'
 
@@ -32,6 +41,7 @@ function formatDate(value: string | null, fallback: string): string {
 
 export default function SnapshotSettings() {
   const { t } = useTranslation('snapshot')
+  const { t: tRestore } = useTranslation('restore')
   const {
     enabled,
     retentionCount,
@@ -48,9 +58,20 @@ export default function SnapshotSettings() {
     triggerNow,
     remove,
   } = useSnapshotStore()
+  const {
+    isLoading: isRestoring,
+    phase: restorePhase,
+    isResyncPhase,
+    needsIntervention,
+    versionWarning,
+    trigger: triggerRestore,
+    selfRestart,
+  } = useRestoreStore()
 
   const [isTriggering, setIsTriggering] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [restoringId, setRestoringId] = useState<string | null>(null)
+  const [isSelfRestarting, setIsSelfRestarting] = useState(false)
 
   useToolbarActions()
   useSetTitle({ title: t('pageTitle') })
@@ -84,6 +105,41 @@ export default function SnapshotSettings() {
     }
   }
 
+  const handleRestore = async (id: string) => {
+    setRestoringId(id)
+    try {
+      await triggerRestore(id)
+      if (useRestoreStore.getState().needsIntervention) {
+        return
+      }
+      toast.success(tRestore('toast.restoreSucceeded'))
+      window.location.reload()
+    } catch (err) {
+      if (
+        err instanceof ApiLocalizedError &&
+        err.code === 'restore_already_running'
+      ) {
+        toast.error(tRestore('toast.restoreTriggerFailed'))
+      } else {
+        toast.error(mapApiError(err, tRestore('toast.restoreFailed')).message)
+      }
+    } finally {
+      setRestoringId(null)
+    }
+  }
+
+  const handleSelfRestart = async () => {
+    setIsSelfRestarting(true)
+    await selfRestart()
+    // The connection drops as the process replaces itself; give it a moment
+    // to come back up before reloading into the fresh instance.
+    window.setTimeout(() => window.location.reload(), 5000)
+  }
+
+  const restorePhaseLabel = restorePhase
+    ? tRestore(`progress.${restorePhase}`, { defaultValue: restorePhase })
+    : '…'
+
   return (
     <div className="settings">
       <h1 className="settings__title">{t('pageTitle')}</h1>
@@ -92,6 +148,62 @@ export default function SnapshotSettings() {
       {statusError && (
         <div className="settings__section">
           <p className="text-error text-sm">{statusError}</p>
+        </div>
+      )}
+
+      {needsIntervention && (
+        <div className="settings__section border-error/20 bg-error/5">
+          <h2 className="settings__section-title text-error flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            {tRestore('needsInterventionTitle')}
+          </h2>
+          <p className="settings__section-description">
+            {tRestore('needsInterventionDescription')}
+          </p>
+          <div className="settings__actions">
+            <Button
+              variant="destructive"
+              onClick={handleSelfRestart}
+              disabled={isSelfRestarting}
+            >
+              {isSelfRestarting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <AlertTriangle className="mr-2 h-4 w-4" />
+              )}
+              {isSelfRestarting
+                ? tRestore('selfRestarting')
+                : tRestore('selfRestartButton')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isRestoring && (
+        <div className="settings__section">
+          <div className="importer__status-banner">
+            <div className="importer__status-header">
+              <div>
+                <div className="settings__preview-label">
+                  {tRestore('progressLabel')}
+                </div>
+                <div className="importer__status-title">
+                  {restorePhaseLabel}
+                </div>
+                {isResyncPhase && (
+                  <div className="text-muted text-xs">
+                    {tRestore('resyncTailLabel')}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          {versionWarning && (
+            <p className="settings__hint text-warning mt-2">
+              <strong>{tRestore('versionWarningLabel')}:</strong>{' '}
+              {versionWarning}
+            </p>
+          )}
         </div>
       )}
 
@@ -225,6 +337,42 @@ export default function SnapshotSettings() {
                           {t('download')}
                         </a>
                       </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isRestoring || restoringId === snap.id}
+                          >
+                            {restoringId === snap.id ? (
+                              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <History className="mr-2 h-3.5 w-3.5" />
+                            )}
+                            {tRestore('restoreButton')}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              {tRestore('restoreConfirmTitle')}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {tRestore('restoreConfirmDescription')}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>
+                              {tRestore('restoreConfirmCancel')}
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleRestore(snap.id)}
+                            >
+                              {tRestore('restoreConfirmAction')}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button

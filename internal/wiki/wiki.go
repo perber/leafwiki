@@ -33,6 +33,7 @@ import (
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
+	wikirestore "github.com/perber/wiki/internal/wiki/restore"
 	wikiresync "github.com/perber/wiki/internal/wiki/resync"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
@@ -74,6 +75,7 @@ type Wiki struct {
 	favorites        *favorites.FavoritesStore
 	backupRoutes     *wikibackup.Routes
 	snapshotRoutes   *wikisnapshot.Routes
+	restoreRoutes    *wikirestore.Routes
 	resyncRoutes     *wikiresync.Routes
 	resyncJob        *wikiresync.ResyncJob
 	ignoreCache      *ignore.Cache
@@ -580,6 +582,9 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 	if w.snapshotRoutes != nil {
 		registrars = append(registrars, w.snapshotRoutes)
 	}
+	if w.restoreRoutes != nil {
+		registrars = append(registrars, w.restoreRoutes)
+	}
 	return registrars
 }
 
@@ -593,9 +598,19 @@ func (w *Wiki) SetSnapshotRoutes(r *wikisnapshot.Routes) {
 	w.snapshotRoutes = r
 }
 
+// SetRestoreRoutes sets the live-restore routes and must be called before router creation.
+func (w *Wiki) SetRestoreRoutes(r *wikirestore.Routes) {
+	w.restoreRoutes = r
+}
+
 // AuthService returns the authentication service.
 func (w *Wiki) AuthService() *auth.AuthService {
 	return w.auth
+}
+
+// BrandingService returns the branding service.
+func (w *Wiki) BrandingService() *branding.BrandingService {
+	return w.branding
 }
 
 // TOTPService returns the TOTP service, or nil if no --totp-encryption-key /

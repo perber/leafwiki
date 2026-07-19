@@ -16,7 +16,9 @@ import (
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/http/middleware/maintenance"
 	"github.com/perber/wiki/internal/http/middleware/security"
+	"github.com/perber/wiki/internal/restore"
 )
 
 //go:embed dist/**
@@ -105,6 +107,7 @@ type RouterOptions struct {
 	UserManagementURL       string                   // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
 	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
 	LogoutURL               string                   // Optional URL the frontend redirects to after logout
+	WriteGate               *restore.WriteGate       // Optional; when set, gates mutating requests while a restore is in progress. nil disables the middleware entirely (no snapshot/restore enabled)
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.
@@ -148,6 +151,10 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 	engine.Use(gin.RecoveryWithWriter(gin.DefaultErrorWriter))
 	base := engine.Group(opts.BasePath)
+
+	if opts.WriteGate != nil {
+		base.Use(maintenance.WriteGateMiddleware(opts.WriteGate))
+	}
 
 	if opts.HTTPRemoteUser.Enabled {
 		base.Use(auth_middleware.InjectRemoteUser(auth_middleware.RemoteUserConfig{

@@ -45,6 +45,22 @@ func NewBrandingService(storageDir string) (*BrandingService, error) {
 	}, nil
 }
 
+// Reload re-reads the branding configuration from disk and replaces the
+// in-memory cache. Used after a restore swaps in a different branding.json —
+// without this, GetBranding/UpdateBranding would keep serving the pre-restore
+// config until the process next restarted.
+func (s *BrandingService) Reload() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cfg, err := s.store.Load()
+	if err != nil {
+		return fmt.Errorf("failed to reload branding config: %w", err)
+	}
+	s.brandingConfig = cfg
+	return nil
+}
+
 // GetBranding returns the current branding configuration
 func (s *BrandingService) GetBranding() (*BrandingConfigResponse, error) {
 	s.mu.RLock()

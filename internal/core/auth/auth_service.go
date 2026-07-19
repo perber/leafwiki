@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -20,6 +21,10 @@ const loginChallengeLifetime = 5 * time.Minute
 const loginChallengeTokenType = "login_challenge"
 
 type AuthService struct {
+	// mu guards only userService — it's the one field ReplaceUserStore swaps
+	// after a restore (users.db is part of the snapshot ZIP). sessionStore
+	// (sessions.db) is never swapped, so it needs no lock.
+	mu                   sync.RWMutex
 	userService          *UserService
 	sessionStore         *SessionStore
 	totp                 *TOTPService
@@ -28,6 +33,53 @@ type AuthService struct {
 	refreshTokenLifetime time.Duration
 	attempts             *loginAttemptTracker
 	dummyHash            []byte
+}
+
+// users returns the current *UserService under a read lock. Callers use the
+// returned pointer directly for the rest of their operation — the lock is
+// only held long enough to copy the pointer, never across a query or a
+// bcrypt hash, so ReplaceUserStore swapping it mid-request never serializes
+// unrelated logins/refreshes on this mutex.
+func (a *AuthService) users() *UserService {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.userService
+}
+
+// ReplaceUserStore opens a fresh UserStore/UserService against
+// storageDir/users.db and swaps it in, closing the previous one afterward.
+// Used by a live restore after users.db has been swapped in on disk. Requests
+// already in flight against the old *UserService when the swap happens just
+// finish against it (a query on an about-to-close *sql.DB may transiently
+// fail) — acceptable given the write-gate has already stopped new mutating
+// traffic for the duration of the restore, and GET requests self-heal on
+// their next call.
+func (a *AuthService) ReplaceUserStore(storageDir string) error {
+	newStore, err := NewUserStore(storageDir)
+	if err != nil {
+		return err
+	}
+	newUserService := NewUserService(newStore)
+
+	a.mu.Lock()
+	old := a.userService
+	a.userService = newUserService
+	a.mu.Unlock()
+
+	if old != nil {
+		if err := old.Close(); err != nil {
+			slog.Warn("failed to close previous user store after restore", "error", err)
+		}
+	}
+	return nil
+}
+
+// InvalidateAllSessions revokes every active session on this instance —
+// every logged-in user (including whoever triggered this) must log back in.
+// Used after a restore: the restored users.db may have entirely different
+// user IDs/passwords than the sessions currently trusting this process.
+func (a *AuthService) InvalidateAllSessions() error {
+	return a.sessionStore.DeleteAllSessions()
 }
 
 func NewAuthService(userService *UserService, sessionStore *SessionStore, totpService *TOTPService, secret string, accessTokenTimeout, refreshTokenTimeout time.Duration) *AuthService {
@@ -59,7 +111,7 @@ func (a *AuthService) Close() error {
 	}
 
 	if a.userService != nil {
-		if err := a.userService.Close(); err != nil {
+		if err := a.users().Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -89,7 +141,7 @@ type AuthToken struct {
 // must be called with the resulting LoginChallengeToken and a valid TOTP or
 // recovery code before cookies may be set.
 func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
-	user, err := a.userService.GetUserByIdentifier(identifier)
+	user, err := a.users().GetUserByIdentifier(identifier)
 	if err != nil {
 		_ = bcrypt.CompareHashAndPassword(a.dummyHash, []byte(password))
 		return nil, ErrUserInvalidCredentials
@@ -156,7 +208,7 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 		return nil, ErrUserAccountLocked
 	}
 
-	user, err := a.userService.GetUserByID(userID)
+	user, err := a.users().GetUserByID(userID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
@@ -193,7 +245,7 @@ func (a *AuthService) StartTOTPSetup(userID, currentPassword string) (*Generated
 	if a.totp == nil {
 		return nil, errTOTPNotConfigured()
 	}
-	user, err := a.userService.DoesIDAndPasswordMatch(userID, currentPassword)
+	user, err := a.users().DoesIDAndPasswordMatch(userID, currentPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +257,7 @@ func (a *AuthService) StartTOTPSetup(userID, currentPassword string) (*Generated
 	if err != nil {
 		return nil, err
 	}
-	if err := a.userService.SetPendingTOTPSecret(userID, generated.EncryptedSecret); err != nil {
+	if err := a.users().SetPendingTOTPSecret(userID, generated.EncryptedSecret); err != nil {
 		return nil, err
 	}
 	return generated, nil
@@ -220,7 +272,7 @@ func (a *AuthService) ConfirmTOTPSetup(userID, code, currentRefreshToken string)
 	if a.totp == nil {
 		return nil, errTOTPNotConfigured()
 	}
-	user, err := a.userService.GetUserByID(userID)
+	user, err := a.users().GetUserByID(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +295,7 @@ func (a *AuthService) ConfirmTOTPSetup(userID, code, currentRefreshToken string)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.userService.EnableTOTP(userID, user.TOTPSecretEncrypted, hashes); err != nil {
+	if err := a.users().EnableTOTP(userID, user.TOTPSecretEncrypted, hashes); err != nil {
 		return nil, err
 	}
 
@@ -262,7 +314,7 @@ func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshT
 	if a.totp == nil {
 		return errTOTPNotConfigured()
 	}
-	user, err := a.userService.DoesIDAndPasswordMatch(userID, currentPassword)
+	user, err := a.users().DoesIDAndPasswordMatch(userID, currentPassword)
 	if err != nil {
 		return err
 	}
@@ -278,7 +330,7 @@ func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshT
 		return errTOTPInvalidCode()
 	}
 
-	if err := a.userService.DisableTOTP(userID); err != nil {
+	if err := a.users().DisableTOTP(userID); err != nil {
 		return err
 	}
 
@@ -299,7 +351,7 @@ type TOTPStatus struct {
 // secret or the recovery codes themselves, only whether TOTP is enabled and
 // how many recovery codes remain unused.
 func (a *AuthService) GetTOTPStatus(userID string) (*TOTPStatus, error) {
-	user, err := a.userService.GetUserByID(userID)
+	user, err := a.users().GetUserByID(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +411,7 @@ func (a *AuthService) verifyTOTPOrRecoveryCode(user *User, code string) (bool, e
 		remaining = append(remaining, hashes[:idx]...)
 		remaining = append(remaining, hashes[idx+1:]...)
 
-		swapped, err := a.userService.ConsumeRecoveryCodeHash(user.ID, hashes, remaining)
+		swapped, err := a.users().ConsumeRecoveryCodeHash(user.ID, hashes, remaining)
 		if err != nil {
 			return false, err
 		}
@@ -370,7 +422,7 @@ func (a *AuthService) verifyTOTPOrRecoveryCode(user *User, code string) (bool, e
 		// Lost the race: a concurrent request already changed the stored
 		// hashes (e.g. consumed the same or a different code first).
 		// Re-read the current state and retry against it.
-		refreshed, err := a.userService.GetUserByID(user.ID)
+		refreshed, err := a.users().GetUserByID(user.ID)
 		if err != nil {
 			return false, err
 		}
@@ -559,7 +611,7 @@ func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
 		return nil, ErrInvalidToken
 	}
 
-	user, err := a.userService.GetUserByID(userID)
+	user, err := a.users().GetUserByID(userID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
@@ -700,5 +752,5 @@ func (a *AuthService) ValidateToken(tokenString string) (*User, error) {
 		return nil, ErrInvalidToken
 	}
 
-	return a.userService.GetUserByID(userID)
+	return a.users().GetUserByID(userID)
 }

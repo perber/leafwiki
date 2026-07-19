@@ -1,6 +1,6 @@
 {
   "pageTitle": "Full Backup",
-  "pageDescription": "Create downloadable full backups, including the database (users, TOTP secrets) along with page content, assets, and branding. This is separate from Git Content Backup, which covers page content only.",
+  "pageDescription": "Create downloadable full backups, including the database (users, TOTP secrets) along with page content, assets, and branding settings. This is separate from Git Content Backup, which covers page content only.",
   "sectionTitle": "Full Backup",
   "sectionDescription": "Automatically creates a full backup on the configured interval. Only the most recent backups are kept — configure the schedule and retention count in your server environment settings.",
   "statusLabel": "Status",

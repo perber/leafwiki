@@ -509,7 +509,7 @@ environment:
 
 > **Experimental** — This feature is new and may change in future releases. Test it thoroughly before relying on it for critical data.
 
-Full Backup creates a downloadable ZIP snapshot of the **entire** wiki data directory: `root/` (pages), `assets/`, `branding/`, `schema.json`, and the SQLite **users database** (`users.db`, taken via `VACUUM INTO` for a consistent copy while the server keeps running). This is the one place the users database — and everything needed to fully recreate an instance — is included; Git Backup above deliberately excludes it.
+Full Backup creates a downloadable ZIP snapshot of the **entire** wiki data directory: `root/` (pages), `assets/`, `branding/`, `branding.json`, `schema.json`, and the SQLite **users database** (`users.db`, taken via `VACUUM INTO` for a consistent copy while the server keeps running). This is the one place the users database — and everything needed to fully recreate an instance — is included; Git Backup above deliberately excludes it.
 
 Snapshots run automatically on a configurable interval, keep only the most recent N (default 10, configurable), and can also be triggered manually from the **Full Backup** page, where existing snapshots can be downloaded or deleted.
 
@@ -540,19 +540,34 @@ environment:
   - LEAFWIKI_SNAPSHOT_RETENTION=10
 ```
 
-**Restoring from a Full Backup (manual process):**
+**Restoring from a Full Backup — in-app, zero-downtime:**
 
-There is currently no in-app restore — restoring is a manual, server-stop-required procedure:
+When `--snapshot` is enabled, the **Full Backup** admin page also offers a **Restore** action on each snapshot in the list, alongside Download/Delete. Restoring one of the instance's own snapshots:
 
-1. Stop the LeafWiki server.
-2. Extract the downloaded snapshot ZIP.
-3. Replace `root/`, `assets/`, `branding/`, `schema.json`, and `users.db` in your data directory with the extracted files.
-4. Restart the server.
+1. Validates the snapshot (structure + a sanity check against the staged `users.db`) before touching anything live.
+2. Temporarily returns `503` for write requests (reads keep working) while it swaps `root/`, `assets/`, `branding/`, `branding.json`, `schema.json`, and `users.db` into place.
+3. Reopens the user database, **invalidates every session — including yours** (everyone must log back in), and reloads branding.
+4. Rebuilds the search/links/tags/properties indexes the same way a filesystem resync does, with progress shown on the same page.
+
+If a restore fails partway through, it's automatically rolled back to exactly the pre-restore state and the write-gate lifts — no manual steps needed. In the rare case that the rollback itself can't complete (disk full, permissions, etc.), the page shows a "restore needs attention" banner with a **Restart server now** button: this is the documented recovery path (a fresh process boot always reads a consistent state off disk), not a general-purpose restart control.
+
+There is no arbitrary-ZIP-upload endpoint — the in-app restore only ever restores a snapshot this instance already produced and has listed.
+
+**Restoring from a Full Backup — disaster recovery / migrating to a fresh instance:**
+
+For restoring onto a box that isn't running yet (a fresh install, or after `root/`/`users.db`/etc. were lost entirely), use the CLI subcommand *before* starting the server. Pass `--data-dir` **before** the subcommand (Go's flag parsing stops at the first non-flag argument):
+
+```bash
+leafwiki --data-dir ./data restore-snapshot /path/to/snapshot-20260101-120000.zip
+```
+
+This validates and extracts the ZIP directly over `--data-dir` (default `./data`), same swap logic as the in-app restore, then exits — start the server normally afterward. This is what the old fully-manual procedure (stop server, unzip, copy files over, restart) automated; that manual procedure still works too if you'd rather do it by hand.
 
 **Notes:**
 
 - The `users.db` copy includes password hashes and TOTP secrets — treat downloaded snapshots as sensitive and store them securely.
 - Retention pruning deletes the oldest snapshots after each successful run once the configured count is exceeded; it does not affect snapshots you download and store elsewhere.
+- A snapshot only restores what it captured — if an item wasn't present when the snapshot was taken (e.g. an older snapshot from before `branding.json` was added to the format), the corresponding live item is left untouched rather than cleared.
 
 ---
 

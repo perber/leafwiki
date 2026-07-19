@@ -177,6 +177,40 @@ func TestBrandingService_DeleteLogo_FileMissingStillClearsConfig(t *testing.T) {
 	}
 }
 
+func TestBrandingService_Reload_PicksUpExternallyWrittenConfig(t *testing.T) {
+	svc, dir := newTestBrandingService(t)
+
+	cfg, err := svc.GetBranding()
+	if err != nil {
+		t.Fatalf("GetBranding() error: %v", err)
+	}
+	if cfg.SiteName == "Restored Site" {
+		t.Fatal("test setup: SiteName should not already be the value being restored to")
+	}
+
+	// Simulate a restore: branding.json is replaced on disk out from under
+	// the running BrandingService (e.g. by internal/restore's file swap),
+	// without going through UpdateBranding/store.Save.
+	store := NewBrandingStore(dir)
+	newConfig := DefaultBrandingConfig()
+	newConfig.SiteName = "Restored Site"
+	if err := store.Save(newConfig); err != nil {
+		t.Fatalf("store.Save() error: %v", err)
+	}
+
+	if err := svc.Reload(); err != nil {
+		t.Fatalf("Reload() error: %v", err)
+	}
+
+	reloaded, err := svc.GetBranding()
+	if err != nil {
+		t.Fatalf("GetBranding() error: %v", err)
+	}
+	if reloaded.SiteName != "Restored Site" {
+		t.Errorf("expected in-memory cache to reflect the externally written config, got SiteName=%q", reloaded.SiteName)
+	}
+}
+
 func TestBrandingService_DeleteLogo_InvalidPath_ReturnsErrorAndDoesNotDeleteExternalFile(t *testing.T) {
 	svc, _ := newTestBrandingService(t)
 	externalFile := filepath.Join(t.TempDir(), "logo.png")
