@@ -127,6 +127,42 @@ func TestHandleStatus_Enabled(t *testing.T) {
 	}
 }
 
+func TestHandleList_NotEnabledWhenManagerNil(t *testing.T) {
+	router := newTestRouter(&Routes{})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/snapshot", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+}
+
+func TestHandleDownload_NotEnabledWhenManagerNil(t *testing.T) {
+	router := newTestRouter(&Routes{})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/snapshot/snapshot-20260101-000000/download", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+}
+
+func TestHandleDelete_NotEnabledWhenManagerNil(t *testing.T) {
+	router := newTestRouter(&Routes{})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodDelete, "/snapshot/snapshot-20260101-000000", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+}
+
 func TestHandleTrigger_NotEnabledWhenSchedulerNil(t *testing.T) {
 	router := newTestRouter(&Routes{})
 
@@ -211,6 +247,9 @@ func TestHandleDownload_ReturnsZip(t *testing.T) {
 	}
 	if ct := w.Header().Get("Content-Type"); ct != "application/zip" {
 		t.Errorf("expected Content-Type application/zip, got %q", ct)
+	}
+	if cc := w.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("expected Cache-Control no-store (snapshot contains users.db), got %q", cc)
 	}
 	disposition := w.Header().Get("Content-Disposition")
 	if disposition == "" {

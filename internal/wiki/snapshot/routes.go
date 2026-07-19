@@ -67,8 +67,18 @@ func (r *Routes) handleStatus(c *gin.Context) {
 	})
 }
 
+// respondNotEnabled writes the standard 503 response for handlers that need
+// a non-nil manager/scheduler, which is only nil if snapshots are disabled.
+func (r *Routes) respondNotEnabled(c *gin.Context) {
+	respondWithSnapshotStatusError(c, http.StatusServiceUnavailable, ErrCodeSnapshotNotEnabled, "Snapshot backup is not enabled", "snapshot backup not enabled")
+}
+
 // handleList returns all finished snapshots, newest first.
 func (r *Routes) handleList(c *gin.Context) {
+	if r.manager == nil {
+		r.respondNotEnabled(c)
+		return
+	}
 	entries, err := r.manager.List()
 	if err != nil {
 		respondWithSnapshotError(c, err)
@@ -80,7 +90,7 @@ func (r *Routes) handleList(c *gin.Context) {
 // handleTrigger triggers an immediate snapshot and returns 202 Accepted.
 func (r *Routes) handleTrigger(c *gin.Context) {
 	if r.scheduler == nil {
-		respondWithSnapshotStatusError(c, http.StatusServiceUnavailable, ErrCodeSnapshotNotEnabled, "Snapshot backup is not enabled", "snapshot backup not enabled")
+		r.respondNotEnabled(c)
 		return
 	}
 	if !r.scheduler.TriggerNow() {
@@ -92,6 +102,10 @@ func (r *Routes) handleTrigger(c *gin.Context) {
 
 // handleDownload streams the ZIP file for a given snapshot id as an attachment.
 func (r *Routes) handleDownload(c *gin.Context) {
+	if r.manager == nil {
+		r.respondNotEnabled(c)
+		return
+	}
 	id := c.Param("id")
 	zipPath, err := r.manager.SnapshotZipPath(id)
 	if err != nil {
@@ -118,12 +132,20 @@ func (r *Routes) handleDownload(c *gin.Context) {
 		disposition = "attachment"
 	}
 	c.Header("Content-Disposition", disposition)
+	// The zip contains users.db (password hashes, TOTP secrets) — never let
+	// proxies/browsers cache it.
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
 	c.Writer.Header().Set("Content-Type", "application/zip")
 	http.ServeContent(c.Writer, c.Request, filename, stat.ModTime(), f)
 }
 
 // handleDelete removes a snapshot's ZIP and sidecar metadata.
 func (r *Routes) handleDelete(c *gin.Context) {
+	if r.manager == nil {
+		r.respondNotEnabled(c)
+		return
+	}
 	id := c.Param("id")
 	if err := r.manager.Delete(id); err != nil {
 		respondWithSnapshotError(c, err)
