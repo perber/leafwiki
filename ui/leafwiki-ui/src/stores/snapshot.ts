@@ -72,9 +72,15 @@ export const useSnapshotStore = create<SnapshotState>((set, get) => ({
   },
 
   triggerNow: async () => {
-    await triggerSnapshot()
-    await get().loadStatus()
-    await get().loadList()
+    try {
+      await triggerSnapshot()
+    } finally {
+      // Reload even on failure (e.g. 409 because a run is already in
+      // progress) so the UI reflects current server state instead of
+      // staying stale behind the error.
+      await get().loadStatus()
+      await get().loadList()
+    }
   },
 
   remove: async (id: string) => {
