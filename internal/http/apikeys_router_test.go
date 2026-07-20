@@ -11,14 +11,31 @@ import (
 	"github.com/perber/wiki/internal/core/assets"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
+	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
 
 // newAPIKeyRouterTest builds a Wiki + router pair mirroring createRouterTestInstance,
 // but additionally wires the wiki's APIKeyService so Bearer API-key auth is active.
+//
+// It cannot use createWikiTestInstance: that helper leaves EnableAPIKeyManagement
+// unset, so the wiki never constructs an APIKeyService (see wiki.go's initAuth) and
+// every key operation hits the nil-service ErrAPIKeysDisabled guard.
 func newAPIKeyRouterTest(t *testing.T) (*wiki.Wiki, http.Handler) {
 	t.Helper()
-	w := createWikiTestInstance(t)
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:             t.TempDir(),
+		AdminPassword:          "admin",
+		JWTSecret:              "secretkey",
+		AccessTokenTimeout:     15 * time.Minute,
+		RefreshTokenTimeout:    7 * 24 * time.Hour,
+		EnableRevision:         true,
+		EnableAPIKeyManagement: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            false,
 		AllowInsecure:           true,
@@ -26,6 +43,7 @@ func newAPIKeyRouterTest(t *testing.T) (*wiki.Wiki, http.Handler) {
 		RefreshTokenTimeout:     7 * 24 * time.Hour,
 		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
 		APIKeyService:           w.APIKeyService(),
+		EnableAPIKeyManagement:  true,
 	})
 	return w, router
 }
