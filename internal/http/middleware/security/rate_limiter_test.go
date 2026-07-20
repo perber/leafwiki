@@ -127,6 +127,49 @@ func TestRateLimiter_ReleasesLockAfterLimit(t *testing.T) {
 	}
 }
 
+func TestKeyedLimiter_AllowAndDeny(t *testing.T) {
+	kl := NewKeyedLimiter(2, time.Minute, false)
+
+	if !kl.Allow("k1") {
+		t.Fatalf("expected first hit to be allowed")
+	}
+	if !kl.Allow("k1") {
+		t.Fatalf("expected second hit to be allowed")
+	}
+	if kl.Allow("k1") {
+		t.Fatalf("expected third hit within the limit window to be denied")
+	}
+	if !kl.Allow("k2") {
+		t.Fatalf("expected a different key to be unaffected by k1's count")
+	}
+}
+
+func TestKeyedLimiter_NotifyResultResetsOnSuccess(t *testing.T) {
+	kl := NewKeyedLimiter(1, time.Minute, true)
+
+	if !kl.Allow("k1") {
+		t.Fatalf("expected first hit to be allowed")
+	}
+	kl.NotifyResult("k1", true)
+
+	if !kl.Allow("k1") {
+		t.Fatalf("expected hit to be allowed again after a successful result reset the count")
+	}
+}
+
+func TestKeyedLimiter_NotifyResultDoesNotResetOnFailure(t *testing.T) {
+	kl := NewKeyedLimiter(1, time.Minute, true)
+
+	if !kl.Allow("k1") {
+		t.Fatalf("expected first hit to be allowed")
+	}
+	kl.NotifyResult("k1", false)
+
+	if kl.Allow("k1") {
+		t.Fatalf("expected the count to remain after a failed result")
+	}
+}
+
 func TestRateLimiter_WindowExpires(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

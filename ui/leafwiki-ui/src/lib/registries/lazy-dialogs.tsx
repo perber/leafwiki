@@ -104,6 +104,16 @@ export const UserFormDialog = lazy(() =>
     default: m.UserFormDialog,
   })),
 )
+export const ApiKeyFormDialog = lazy(() =>
+  import('@/features/apikeys/ApiKeyFormDialog').then((m) => ({
+    default: m.ApiKeyFormDialog,
+  })),
+)
+export const DeleteApiKeyDialog = lazy(() =>
+  import('@/features/apikeys/DeleteApiKeyDialog').then((m) => ({
+    default: m.DeleteApiKeyDialog,
+  })),
+)
 export const TOTPSetupDialog = lazy(() =>
   import('@/features/users/TOTPSetupDialog').then((m) => ({
     default: m.TOTPSetupDialog,

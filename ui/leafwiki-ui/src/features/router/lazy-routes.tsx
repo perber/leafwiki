@@ -1,5 +1,8 @@
 import { lazy } from 'react'
 
+export const ApiKeysManagement = lazy(
+  () => import('../apikeys/ApiKeysManagement'),
+)
 export const BackupSettings = lazy(() => import('../backup/BackupSettings'))
 export const LoginForm = lazy(() => import('../auth/LoginForm'))
 export const BrandingSettings = lazy(

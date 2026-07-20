@@ -42,7 +42,13 @@ const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
 )
 
 export default function UserToolbar() {
-  const { t } = useTranslation(['auth', 'backup', 'snapshot', 'users'])
+  const { t } = useTranslation([
+    'auth',
+    'backup',
+    'apikeys',
+    'snapshot',
+    'users',
+  ])
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
@@ -51,6 +57,7 @@ export default function UserToolbar() {
   const authDisabled = useConfigStore((s) => s.authDisabled)
   const readOnly = useIsReadOnly()
   const backupEnabled = useConfigStore((s) => s.gitBackupEnabled)
+  const apiKeysEnabled = useConfigStore((s) => s.enableApiKeyManagement)
   const snapshotEnabled = useConfigStore((s) => s.snapshotEnabled)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
@@ -162,6 +169,14 @@ export default function UserToolbar() {
             >
               Import
             </DropdownMenuItem>
+            {apiKeysEnabled && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => navigate('/settings/api-keys')}
+              >
+                {t('menu.title', { ns: 'apikeys' })}
+              </DropdownMenuItem>
+            )}
             {backupEnabled && (
               <DropdownMenuItem
                 className="cursor-pointer"

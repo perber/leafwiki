@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "title": "API Keys"
+  },
+  "page": {
+    "title": "API Keys",
+    "heading": "API Keys",
+    "loadErrorFallback": "Error loading API keys"
+  },
+  "table": {
+    "name": "Name",
+    "owner": "Owner",
+    "role": "Role",
+    "expires": "Expires",
+    "lastUsed": "Last used",
+    "actions": "Actions",
+    "loading": "Loading API keys...",
+    "empty": "No API keys found.",
+    "revoked": "Revoked"
+  },
+  "role": {
+    "admin": "Admin",
+    "editor": "Editor",
+    "viewer": "Viewer"
+  },
+  "create": {
+    "button": "New API Key",
+    "title": "New API Key",
+    "description": "Create a new API key for automation or agent access.",
+    "nameLabel": "name",
+    "namePlaceholder": "e.g. research-agent",
+    "userPlaceholder": "Select an owning user",
+    "expiresLabel": "expires at (optional)",
+    "roleHelper": "New keys are viewer (read-only) for now.",
+    "cancel": "Cancel",
+    "submit": "Create",
+    "successToast": "API key created successfully",
+    "errorFallback": "Error creating API key"
+  },
+  "secret": {
+    "title": "API Key Created",
+    "description": "Copy this key now — it will not be shown again.",
+    "label": "secret",
+    "copy": "Copy",
+    "copiedToast": "Copied to clipboard",
+    "copyErrorToast": "Could not copy to clipboard",
+    "helper": "This is the only time the full key will be shown. Store it securely.",
+    "done": "Done"
+  },
+  "delete": {
+    "button": "Revoke",
+    "title": "Revoke API Key?",
+    "description": "Are you sure you want to revoke this API key? This action cannot be undone.",
+    "body": "The API key <strong>{{name}}</strong> will immediately stop working. Any agent or automation using it will lose access.",
+    "cancel": "Cancel",
+    "confirm": "Revoke",
+    "confirming": "Revoking...",
+    "successToast": "API key revoked successfully",
+    "errorFallback": "Failed to revoke API key. Please try again."
+  }
+}

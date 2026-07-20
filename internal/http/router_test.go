@@ -969,6 +969,79 @@ func TestConfigEndpoint_IncludesEnableLinkRefactor(t *testing.T) {
 	}
 }
 
+func TestConfigEndpoint_IncludesEnableAPIKeyManagement(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		InjectCodeInHeader:      "",
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		HideLinkMetadataSection: false,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		EnableAPIKeyManagement:  true,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	gotEnabled, ok := resp["enableApiKeyManagement"].(bool)
+	if !ok {
+		t.Fatalf("Expected enableApiKeyManagement in config response, got %v", resp)
+	}
+
+	if !gotEnabled {
+		t.Fatalf("Expected enableApiKeyManagement=true, got %v", gotEnabled)
+	}
+}
+
+func TestConfigEndpoint_EnableAPIKeyManagementDefaultsToFalse(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	gotEnabled, ok := resp["enableApiKeyManagement"].(bool)
+	if !ok {
+		t.Fatalf("Expected enableApiKeyManagement in config response, got %v", resp)
+	}
+
+	if gotEnabled {
+		t.Fatalf("Expected enableApiKeyManagement=false by default, got %v", gotEnabled)
+	}
+}
+
 func TestConfigEndpoint_IncludesUserManagementUrl(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

@@ -262,6 +262,75 @@ func TestWiki_AuthDisabled_Initialization(t *testing.T) {
 	}
 }
 
+// TestWiki_AuthDisabled_APIKeysUnavailable guards against the exact
+// regression a code review caught: API-key auth must not remain active when
+// --disable-auth is set, or a key created before a later restart with
+// --disable-auth could keep authenticating (and narrowing/blocking)
+// requests in a mode where auth is supposed to be irrelevant.
+func TestWiki_AuthDisabled_APIKeysUnavailable(t *testing.T) {
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:   t.TempDir(),
+		AuthDisabled: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance with AuthDisabled: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+
+	if wikiInstance.apiKeys != nil {
+		t.Error("Expected api key service to be nil when AuthDisabled is true")
+	}
+	if wikiInstance.APIKeyService() != nil {
+		t.Error("Expected APIKeyService() to be nil when AuthDisabled is true")
+	}
+}
+
+// TestWiki_APIKeyManagementDisabled_APIKeysUnavailable ensures the
+// experimental API key feature stays off by default: with auth enabled but
+// EnableAPIKeyManagement left false, APIKeyService() must be nil so the
+// Bearer middleware never gets registered and the admin CRUD routes report
+// the feature as disabled.
+func TestWiki_APIKeyManagementDisabled_APIKeysUnavailable(t *testing.T) {
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:             t.TempDir(),
+		AdminPassword:          "admin",
+		JWTSecret:              "secretkey",
+		AccessTokenTimeout:     15 * time.Minute,
+		RefreshTokenTimeout:    7 * 24 * time.Hour,
+		EnableAPIKeyManagement: false,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+
+	if wikiInstance.APIKeyService() != nil {
+		t.Error("Expected APIKeyService() to be nil when EnableAPIKeyManagement is false")
+	}
+}
+
+// TestWiki_APIKeyManagementEnabled_APIKeysAvailable confirms opting in via
+// EnableAPIKeyManagement actually constructs the service (auth must also be
+// enabled, since API keys are meaningless without it).
+func TestWiki_APIKeyManagementEnabled_APIKeysAvailable(t *testing.T) {
+	wikiInstance, err := NewWiki(&WikiOptions{
+		StorageDir:             t.TempDir(),
+		AdminPassword:          "admin",
+		JWTSecret:              "secretkey",
+		AccessTokenTimeout:     15 * time.Minute,
+		RefreshTokenTimeout:    7 * 24 * time.Hour,
+		EnableAPIKeyManagement: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
+
+	if wikiInstance.APIKeyService() == nil {
+		t.Error("Expected APIKeyService() to be non-nil when EnableAPIKeyManagement is true")
+	}
+}
+
 func TestWiki_AuthDisabled_LoginUnavailable(t *testing.T) {
 	// Create a wiki instance with AuthDisabled set to true
 	wikiInstance, err := NewWiki(&WikiOptions{

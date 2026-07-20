@@ -95,10 +95,12 @@ type RouterOptions struct {
 	MaxAssetUploadSizeBytes int64                    // Maximum allowed size in bytes for asset uploads
 	EnableRevision          bool                     // Whether the revision / page history feature is enabled
 	EnableLinkRefactor      bool                     // Whether the link refactoring feature is enabled in the frontend
+	EnableAPIKeyManagement  bool                     // Whether the experimental API key management feature is enabled
 	Metrics                 *httpmetrics.HTTPMetrics // Optional Prometheus HTTP metrics collector; nil disables request instrumentation
 	GitBackupEnabled        bool                     // Whether git backup is enabled (surfaced to admin UI via /api/config)
 	SnapshotEnabled         bool                     // Whether full-backup (snapshot) is enabled (surfaced to admin UI via /api/config)
 	HTTPRemoteUser          HTTPRemoteUserConfig     // Reverse-proxy authentication via HTTP header
+	APIKeyService           *coreauth.APIKeyService  // Bearer API-key authentication; nil disables the feature
 	DisableRequestLog       bool                     // Whether to suppress per-request access log lines
 	UserManagementURL       string                   // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
 	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
@@ -153,6 +155,24 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 			HeaderName:     opts.HTTPRemoteUser.HeaderName,
 			TrustedProxies: opts.HTTPRemoteUser.TrustedProxies,
 			UserService:    opts.HTTPRemoteUser.UserService,
+		}))
+	}
+
+	if opts.APIKeyService != nil {
+		// Deliberate design choice: a key is injected globally, so it is
+		// exactly as powerful as role(user) ∩ role(key) everywhere the normal
+		// RequireAuth/RequireAdmin/RequireEditorOrAdmin guards apply — the
+		// same way roles work everywhere else in the app — rather than being
+		// restricted to a curated subset of read routes. Writes are, for now,
+		// separately blocked for Bearer callers by CSRFMiddleware (see
+		// InjectAPIKeyUser's doc comment).
+		base.Use(auth_middleware.InjectAPIKeyUser(auth_middleware.APIKeyConfig{
+			Service: opts.APIKeyService,
+			// Only failed attempts count toward the limit (NotifyResult
+			// resets on success), so this never throttles a valid key's
+			// normal traffic — it exists to cap the cost of prefix/secret
+			// guessing now that Resolve uses a fast constant-time compare.
+			RateLimiter: security.NewKeyedLimiter(20, 5*time.Minute, true),
 		}))
 	}
 

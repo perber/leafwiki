@@ -18,6 +18,7 @@ export type Config = {
   maxAssetUploadSizeBytes: number
   enableRevision: boolean
   enableLinkRefactor: boolean
+  enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
   snapshotEnabled: boolean
   httpRemoteUserEnabled: boolean
