@@ -3,6 +3,8 @@ package snapshot
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,21 +41,77 @@ func NewManager(cfg Config) *Manager {
 	return &Manager{cfg: cfg}
 }
 
-// TriggerSnapshot starts a backup job asynchronously.
-// Returns ErrAlreadyRunning if a backup is already in progress.
+// TriggerSnapshot starts a snapshot job asynchronously.
+// Returns ErrAlreadyRunning if a snapshot is already in progress.
 func (m *Manager) TriggerSnapshot() error {
 	if !m.status.TryStart() {
 		return ErrAlreadyRunning
 	}
-
 	go func() {
-		_, err := createSnapshot(context.Background(), m.cfg)
-		if err != nil {
-			m.status.SetError(err.Error())
-			return
-		}
-		m.status.SetSuccess(time.Now().UTC())
+		_ = m.runOnceLocked(context.Background())
 	}()
+	return nil
+}
+
+// RunOnce runs a snapshot synchronously, including retention pruning
+// afterward, and updates status. Returns ErrAlreadyRunning if a snapshot is
+// already in progress. Intended for the Scheduler, which serializes calls
+// from its own goroutine loop.
+func (m *Manager) RunOnce(ctx context.Context) error {
+	if !m.status.TryStart() {
+		return ErrAlreadyRunning
+	}
+	return m.runOnceLocked(ctx)
+}
+
+// runOnceLocked performs the snapshot + prune + status update. The caller
+// must have already won the TryStart race. IsRunning is only released (via
+// SetSuccess/SetError) once both the snapshot and pruning are done, so a
+// concurrent RunOnce/TriggerSnapshot cannot start while pruning is still
+// in flight. A panic anywhere in this chain (e.g. a corrupted-input panic
+// inside zip/sqlite handling) is recovered here — not just logged by the
+// Scheduler — so IsRunning is always reset and the feature never gets stuck.
+func (m *Manager) runOnceLocked(ctx context.Context) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic during snapshot: %v", r)
+			m.status.SetError(err.Error())
+		}
+	}()
+
+	if _, createErr := createSnapshot(ctx, m.cfg); createErr != nil {
+		m.status.SetError(createErr.Error())
+		return createErr
+	}
+
+	var pruneErrMsg string
+	if pruneErr := m.pruneOldSnapshots(); pruneErr != nil {
+		slog.Warn("snapshot retention pruning failed", "error", pruneErr)
+		pruneErrMsg = pruneErr.Error()
+	}
+	m.status.SetSuccess(time.Now().UTC(), pruneErrMsg)
+	return nil
+}
+
+// pruneOldSnapshots deletes the oldest snapshots beyond cfg.RetentionCount.
+// A RetentionCount <= 0 means unlimited (no pruning).
+func (m *Manager) pruneOldSnapshots() error {
+	if m.cfg.RetentionCount <= 0 {
+		return nil
+	}
+	entries, err := m.List()
+	if err != nil {
+		return err
+	}
+	if len(entries) <= m.cfg.RetentionCount {
+		return nil
+	}
+	for _, entry := range entries[m.cfg.RetentionCount:] {
+		if err := m.Delete(entry.ID); err != nil {
+			return err
+		}
+		slog.Info("snapshot pruned", "id", entry.ID, "retention_count", m.cfg.RetentionCount)
+	}
 	return nil
 }
 
@@ -157,6 +215,35 @@ func (m *Manager) Delete(id string) error {
 // BackupsDir returns the configured folder (for the download handler).
 func (m *Manager) BackupsDir() string {
 	return m.cfg.BackupsDir
+}
+
+// SnapshotZipPath validates id and returns the absolute path to its ZIP
+// file, for the HTTP download handler to open and stream. This is the
+// security boundary against path traversal (via validateSnapshotID).
+func (m *Manager) SnapshotZipPath(id string) (string, error) {
+	if err := validateSnapshotID(id); err != nil {
+		return "", err
+	}
+	path := filepath.Join(m.cfg.BackupsDir, id+".zip")
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return "", sharederrors.NewLocalizedError(
+				"snapshot_not_found",
+				"Snapshot not found",
+				"snapshot %s not found",
+				nil,
+				id,
+			)
+		}
+		return "", sharederrors.NewLocalizedError(
+			"snapshot_internal_error",
+			"Failed to access snapshot",
+			"failed to access snapshot %s",
+			err,
+			id,
+		)
+	}
+	return path, nil
 }
 
 func validateSnapshotID(id string) error {

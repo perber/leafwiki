@@ -7,6 +7,7 @@ import {
   ClipboardEvent,
   forwardRef,
   JSX,
+  MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -57,6 +58,26 @@ type Props = {
   pageId: string
 }
 
+const DEFAULT_EDITOR_PANE_WIDTH = 50
+const MIN_EDITOR_PANE_WIDTH = 25
+const MAX_EDITOR_PANE_WIDTH = 75
+const EDITOR_PANE_WIDTH_STORAGE_KEY = 'leafwiki-editor-pane-width'
+
+function clampEditorPaneWidth(value: number) {
+  return Math.min(MAX_EDITOR_PANE_WIDTH, Math.max(MIN_EDITOR_PANE_WIDTH, value))
+}
+
+function getInitialEditorPaneWidth() {
+  if (typeof window === 'undefined') return DEFAULT_EDITOR_PANE_WIDTH
+
+  const storedValue = window.localStorage.getItem(EDITOR_PANE_WIDTH_STORAGE_KEY)
+  const parsed = Number.parseFloat(storedValue ?? '')
+
+  if (Number.isNaN(parsed)) return DEFAULT_EDITOR_PANE_WIDTH
+
+  return clampEditorPaneWidth(parsed)
+}
+
 const MarkdownEditor = (
   { initialValue = '', onChange, pageId }: Props,
   ref: React.ForwardedRef<MarkdownEditorRef>,
@@ -88,6 +109,7 @@ const MarkdownEditor = (
 
   const { t } = useTranslation('editor')
   const previewRef = useRef<HTMLDivElement | null>(null)
+  const desktopSplitRef = useRef<HTMLDivElement | null>(null)
 
   const setPreviewRef = useCallback((node: HTMLDivElement | null) => {
     if (node) {
@@ -98,9 +120,18 @@ const MarkdownEditor = (
   const editorViewRef = useRef<EditorView | null>(null)
   const rafRef = useRef<number | null>(null)
   const currentCursorLineRef = useRef<number | null>(null)
+  const liveEditorPaneWidthRef = useRef(DEFAULT_EDITOR_PANE_WIDTH)
+  const resizeHandlersRef = useRef<{
+    onMouseMove: (event: MouseEvent) => void
+    onMouseUp: () => void
+  } | null>(null)
   const [assetVersion, setAssetVersion] = useState(() => Date.now()) // Initial version based on current timestamp
 
   const [markdown, setMarkdown] = useState(initialValue)
+  const [editorPaneWidth, setEditorPaneWidth] = useState(
+    getInitialEditorPaneWidth,
+  )
+  const [isResizingSplit, setIsResizingSplit] = useState(false)
   const debouncedPreview = useDebounce(markdown, 100)
   const isMobile = useIsMobile()
   const maxAssetUploadSizeBytes = useConfigStore(
@@ -116,6 +147,18 @@ const MarkdownEditor = (
   } = useEditorStore()
 
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
+
+  useEffect(() => {
+    liveEditorPaneWidthRef.current = editorPaneWidth
+  }, [editorPaneWidth])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(
+      EDITOR_PANE_WIDTH_STORAGE_KEY,
+      String(editorPaneWidth),
+    )
+  }, [editorPaneWidth])
 
   // Handles paste requests.
   // This allows to paste images from clipboard directly into the editor.
@@ -517,6 +560,66 @@ const MarkdownEditor = (
     }
   }, [assetVersion, debouncedPreview, scrollPreviewToLine, showPreview])
 
+  useEffect(() => {
+    if (!isResizingSplit || !resizeHandlersRef.current) return
+
+    const { onMouseMove, onMouseUp } = resizeHandlersRef.current
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [isResizingSplit])
+
+  useEffect(
+    () => () => {
+      if (!resizeHandlersRef.current) return
+
+      const { onMouseMove, onMouseUp } = resizeHandlersRef.current
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    },
+    [],
+  )
+
+  const handleSplitResize = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (isMobile || !showPreview) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const startPosition = previewStacked ? event.clientY : event.clientX
+    const startWidth = editorPaneWidth
+    const splitRect = desktopSplitRef.current?.getBoundingClientRect()
+    const splitSize =
+      (previewStacked ? splitRect?.height : splitRect?.width) ||
+      (previewStacked ? window.innerHeight : window.innerWidth)
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const currentPosition = previewStacked
+        ? moveEvent.clientY
+        : moveEvent.clientX
+      const delta = currentPosition - startPosition
+      const nextWidth = clampEditorPaneWidth(
+        startWidth + (delta / splitSize) * 100,
+      )
+
+      liveEditorPaneWidthRef.current = nextWidth
+      setEditorPaneWidth(nextWidth)
+    }
+
+    const onMouseUp = () => {
+      setEditorPaneWidth(liveEditorPaneWidthRef.current)
+      setIsResizingSplit(false)
+      resizeHandlersRef.current = null
+    }
+
+    resizeHandlersRef.current = { onMouseMove, onMouseUp }
+    setIsResizingSplit(true)
+  }
+
   const renderToolbar = useCallback((): JSX.Element => {
     return (
       <MarkdownToolbar
@@ -642,6 +745,7 @@ const MarkdownEditor = (
         <div className="flex h-full w-full flex-col">
           {renderToolbar()}
           <div
+            ref={desktopSplitRef}
             className={
               previewStacked && showPreview
                 ? 'markdown-editor__stacked-layout'
@@ -656,6 +760,9 @@ const MarkdownEditor = (
                     : 'custom-scrollbar markdown-editor__editor-pane markdown-editor__editor-pane--half'
                   : 'custom-scrollbar markdown-editor__editor-pane markdown-editor__editor-pane--full'
               }
+              style={
+                showPreview ? { flex: `0 0 ${editorPaneWidth}%` } : undefined
+              }
             >
               {renderEditor(false)}
             </div>
@@ -665,17 +772,38 @@ const MarkdownEditor = (
                 <div
                   className={
                     previewStacked
-                      ? 'markdown-editor__divider--stacked'
-                      : 'markdown-editor__divider'
+                      ? `markdown-editor__divider markdown-editor__divider--stacked ${
+                          isResizingSplit
+                            ? 'markdown-editor__divider--active'
+                            : ''
+                        }`
+                      : `markdown-editor__divider ${
+                          isResizingSplit
+                            ? 'markdown-editor__divider--active'
+                            : ''
+                        }`
                   }
                   id="editor-preview-divider"
-                ></div>
+                  onMouseDown={handleSplitResize}
+                  role="separator"
+                  aria-orientation={previewStacked ? 'horizontal' : 'vertical'}
+                  aria-label="Resize editor and preview panes"
+                  aria-valuemin={MIN_EDITOR_PANE_WIDTH}
+                  aria-valuemax={MAX_EDITOR_PANE_WIDTH}
+                  aria-valuenow={Math.round(editorPaneWidth)}
+                  data-testid="editor-preview-resize-handle"
+                />
 
                 <div
                   className={
                     previewStacked
                       ? 'markdown-editor__preview-container markdown-editor__preview-container--stacked'
                       : 'markdown-editor__preview-container'
+                  }
+                  style={
+                    previewStacked
+                      ? { flex: '1 1 0', minHeight: 0 }
+                      : { flex: '1 1 0', minWidth: 0 }
                   }
                 >
                   {renderPreview()}

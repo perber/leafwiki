@@ -42,3 +42,29 @@ func RemoveSQLiteFiles(dbPath string) {
 		}
 	}
 }
+
+// RetryOnCorruption calls open, which is expected to fully bring a store to
+// a working state (open the connection and ensure its schema exists),
+// cleaning up after itself on failure. If open's error is a recoverable
+// SQLite I/O/corruption error, the database files at dbPath are removed and
+// open is called exactly once more; any other error, or a second failure,
+// is returned as-is.
+//
+// This factors out the "open → ensure schema → on recoverable corruption,
+// wipe and retry once" sequence that is otherwise duplicated, near-verbatim,
+// across every per-domain SQLite store constructor (tags, links, properties,
+// search, favorites). Each store keeps its own opening mechanics (eager
+// sql.Open, a lazy Connect(), or a fully lazy withDB helper) inside the
+// closure; only the recovery policy is shared.
+func RetryOnCorruption(dbPath string, open func() error) error {
+	err := open()
+	if err == nil {
+		return nil
+	}
+	if !IsSQLiteRecoverableError(err) {
+		return err
+	}
+	slog.Default().Warn("database corrupt, removing and retrying", "path", dbPath, "error", err)
+	RemoveSQLiteFiles(dbPath)
+	return open()
+}

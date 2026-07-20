@@ -5,6 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { FavoritesSection } from '@/features/favorites/FavoritesSection'
 import { SidebarAccordionSection } from '@/features/sidebar/SidebarAccordionSection'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION } from '@/lib/api/pages'
@@ -14,6 +15,8 @@ import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { toWikiLookupPath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useFavoritesStore } from '@/stores/favorites'
+import { useSessionStore } from '@/stores/session'
 import { useSidebarPanelsStore } from '@/stores/sidebarPanels'
 import { useTreeStore } from '@/stores/tree'
 import {
@@ -24,12 +27,14 @@ import {
   List,
   MoreHorizontal,
   Pin,
+  Star,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { usePageEditorStore } from '../editor/pageEditorStore'
 import { PinnedSection } from './PinnedSection'
+import { TreeDndProvider } from './TreeDnd'
 import { TreeNode } from './TreeNode'
 
 export default function TreeView() {
@@ -53,6 +58,9 @@ export default function TreeView() {
 
   const pinnedPages = useTreeStore((s) => s.pinnedPages)
   const hasPinned = pinnedPages.length > 0
+  const favoritePageIds = useFavoritesStore((s) => s.favoritePageIds)
+  const isLoggedIn = useSessionStore((s) => s.user !== null)
+  const hasFavorites = isLoggedIn && favoritePageIds.size > 0
   const openDialog = useDialogsStore((state) => state.openDialog)
   const readOnlyMode = useIsReadOnly()
   const openSections = useSidebarPanelsStore((s) => s.openSections)
@@ -202,17 +210,29 @@ export default function TreeView() {
           <PinnedSection />
         </SidebarAccordionSection>
       )}
+      {hasFavorites && (
+        <SidebarAccordionSection
+          value="favorites"
+          title={t('favorites.sectionTitle')}
+          icon={<Star size={11} />}
+          collapseToggleLabel={t('favorites.toggleFavoritesSection')}
+        >
+          <FavoritesSection />
+        </SidebarAccordionSection>
+      )}
       <SidebarAccordionSection
         value="pages"
         title={t('pinned.pagesSectionTitle')}
         collapseToggleLabel={t('pinned.togglePagesSection')}
         actions={pagesToolbar}
       >
-        <div className="tree-view__nodes">
-          {tree?.children?.map((node) => (
-            <TreeNode key={node.id} node={node} />
-          ))}
-        </div>
+        <TreeDndProvider enabled={!readOnlyMode}>
+          <div className="tree-view__nodes">
+            {tree?.children?.map((node) => (
+              <TreeNode key={node.id} node={node} />
+            ))}
+          </div>
+        </TreeDndProvider>
       </SidebarAccordionSection>
     </Accordion>
   )

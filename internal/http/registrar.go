@@ -1,9 +1,9 @@
 package http
 
 import (
+	"github.com/gin-gonic/gin"
 	authmiddleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
-	"github.com/gin-gonic/gin"
 )
 
 // RouterContext holds the shared HTTP infrastructure passed to each RouteRegistrar.

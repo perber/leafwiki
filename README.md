@@ -43,9 +43,12 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   - [API Keys](#api-keys-experimental)
   - [Unix Socket](#unix-socket-v0113)
   - [Git Backup](#git-backup-v0113-experimental)
+  - [Full Backup](#full-backup-unreleased-experimental)
   - [Security](#security)
   - [Operations notes](#operations-notes)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
+- [.leafwikiignore — Ignore Files](#leafwikiignore--ignore-files)
+- [External Edits & Resync](#external-edits--resync)
 - [Sorting Pages](#sorting-pages)
 - [Support this project](#support-this-project)
 - [Contributing](#contributing)
@@ -521,7 +524,58 @@ environment:
 - Either `--git-backup-ssh-key` or `--git-backup-ssh-key-path` is required when a remote is configured. Prefer the environment variable to avoid the key appearing in process listings.
 - `--git-backup-ssh-known-hosts` is optional but recommended. If not set, LeafWiki falls back to `~/.ssh/known_hosts`. If that file does not exist either (common in containers), SSH host key verification is **disabled** — leaving connections open to MITM attacks. Set this flag explicitly in production.
 - If the remote diverges (e.g. someone pushed directly to the backup branch), LeafWiki will stop auto-pushing and show a **Conflict — remote diverged** warning in the UI. Click **Force Push** in the UI to overwrite the remote with the current local backup history. Your wiki content is never lost — the local backup repo is always authoritative.
-- This backs up **content only** — the SQLite database is not included. For a full backup, use your data directory (`cp -r` with the app stopped).
+- This backs up **content only** — the SQLite database is not included. For a full backup, use your data directory (`cp -r` with the app stopped), or enable **Full Backup** below.
+
+---
+
+### Full Backup (unreleased, experimental)
+
+> **Experimental** — This feature is new and may change in future releases. Test it thoroughly before relying on it for critical data.
+
+Full Backup creates a downloadable ZIP snapshot of the **entire** wiki data directory: `root/` (pages), `assets/`, `branding/`, `schema.json`, and the SQLite **users database** (`users.db`, taken via `VACUUM INTO` for a consistent copy while the server keeps running). This is the one place the users database — and everything needed to fully recreate an instance — is included; Git Backup above deliberately excludes it.
+
+Snapshots run automatically on a configurable interval, keep only the most recent N (default 10, configurable), and can also be triggered manually from the **Full Backup** page, where existing snapshots can be downloaded or deleted.
+
+**CLI flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--snapshot` | Enable full backup snapshots | `false` |
+| `--snapshot-interval` | Snapshot interval (e.g. `24h`, `6h`); `0` = manual-only | `24h` |
+| `--snapshot-retention` | Number of most recent snapshots to keep; `<= 0` = keep all | `10` |
+| `--snapshot-dir` | Directory to store snapshot ZIPs in | `<data-dir>/snapshots` |
+
+**Environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `LEAFWIKI_SNAPSHOT` | Enable full backup snapshots |
+| `LEAFWIKI_SNAPSHOT_INTERVAL` | Snapshot interval |
+| `LEAFWIKI_SNAPSHOT_RETENTION` | Number of most recent snapshots to keep |
+| `LEAFWIKI_SNAPSHOT_DIR` | Directory to store snapshot ZIPs in |
+
+**Example (Docker Compose):**
+
+```yaml
+environment:
+  - LEAFWIKI_SNAPSHOT=true
+  - LEAFWIKI_SNAPSHOT_INTERVAL=24h
+  - LEAFWIKI_SNAPSHOT_RETENTION=10
+```
+
+**Restoring from a Full Backup (manual process):**
+
+There is currently no in-app restore — restoring is a manual, server-stop-required procedure:
+
+1. Stop the LeafWiki server.
+2. Extract the downloaded snapshot ZIP.
+3. Replace `root/`, `assets/`, `branding/`, `schema.json`, and `users.db` in your data directory with the extracted files.
+4. Restart the server.
+
+**Notes:**
+
+- The `users.db` copy includes password hashes and TOTP secrets — treat downloaded snapshots as sensitive and store them securely.
+- Retention pruning deletes the oldest snapshots after each successful run once the configured count is exceeded; it does not affect snapshots you download and store elsewhere.
 
 ---
 
@@ -566,6 +620,76 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 
 `Ctrl+V` / `Cmd+V` for pasting images and files works in the editor.  
 `Esc` closes modals, dialogs, and edit mode.
+
+---
+
+## .leafwikiignore — Ignore Files
+
+LeafWiki indexes every `.md` file it finds on disk. If you have files or directories you want to keep on disk but exclude from the wiki (draft pages, archive sections, private notes, imported markdown being organized), create a `.leafwikiignore` file at the root of your wiki's data directory.
+
+**Location:** Anywhere under `root/`. A `.leafwikiignore` at the wiki root applies to the entire wiki; per-directory files apply to their directory and its children.
+
+**Syntax:** Standard gitignore-style patterns:
+
+| Pattern | Meaning |
+|---------|---------|
+| `#` | Comment |
+| `*` | Matches anything except `/` |
+| `?` | Matches any single char except `/` |
+| `**` | Matches zero or more directories |
+| Trailing `/` | Directory-only match |
+| Leading `/` | Anchored to wiki root |
+| `!` prefix | Negation (un-ignore) |
+
+**Examples:**
+
+```gitignore
+# Exclude all log files
+*.log
+
+# Exclude entire directory
+drafts/
+
+# Exclude everything except important.md
+*.md
+!important.md
+```
+
+**Notes:**
+- Changes to any `.leafwikiignore` require a restart to take effect.
+- Ignored files are hidden completely — remove the ignore pattern to see them again.
+- Per-directory ignore files are supported: any directory under `root/` may contain its own `.leafwikiignore`. Patterns accumulate from root to leaf, and child patterns can negate parent patterns with `!`.
+
+**Multi-level example:**
+
+```gitignore
+# root/.leafwikiignore — applies everywhere
+*.md
+
+# root/docs/.leafwikiignore — un-ignore specific files under docs/
+!important.md
+
+# root/docs/archive/.leafwikiignore — re-ignore files under archive/
+*.md
+```
+
+In this example:
+- All `.md` files are ignored by default (root rule).
+- `docs/important.md` is un-ignored (child negation).
+- `docs/archive/` is re-ignored (grandchild re-applies the restriction).
+
+---
+
+## External Edits & Resync
+
+If you edit Markdown files directly on disk — a text editor, Git, a script, a bulk import — LeafWiki won't pick up the changes on its own. Trigger a resync one of two ways:
+
+- **Admin UI:** trigger it manually from the maintenance/admin settings page, with live progress across four phases (tree, links, tags, search).
+- **OS signal:** send `SIGUSR1` or `SIGHUP` to the running process (e.g., from a git post-receive hook or a cron job) — no restart needed.
+
+Both paths share the same resync job, so either way you get the same consistent result. This is separate from `.leafwikiignore` changes, which are only read at startup (see above).
+
+**New files without a `leafwiki_id`:** every page's identity lives in a `leafwiki_id` field in its own frontmatter, not in its filename or path — that's what lets pages survive renames and moves without losing their identity. If you add a `.md` file yourself (not created through the app) and it has no `leafwiki_id` yet, the next resync generates one and **writes it back into the file on disk**. This is automatic and requires no action from you, but it does mean the file changes on disk after the resync — worth knowing if you manage `root/` with your own separate Git workflow (outside LeafWiki's built-in [Git Backup](#git-backup-v0113-experimental)), since that ID write-back will show up as an extra diff you didn't make yourself.
 
 ---
 

@@ -12,8 +12,8 @@ import (
 
 // Routes is the RouteRegistrar for the links domain.
 type Routes struct {
-	getLinkStatus  *GetLinkStatusUseCase
-	authService    *coreauth.AuthService
+	getLinkStatus *GetLinkStatusUseCase
+	authService   *coreauth.AuthService
 }
 
 // RoutesConfig holds the dependencies required to build a Routes instance.

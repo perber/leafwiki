@@ -48,6 +48,7 @@ describe('ApiKeyFormDialog', () => {
           username: 'agent-owner',
           email: 'a@example.com',
           role: 'editor',
+          totpEnabled: false,
         },
       ],
     })

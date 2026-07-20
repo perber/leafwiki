@@ -182,13 +182,18 @@ export async function movePage(
   id: string,
   version: string,
   parentId: string | null,
+  position?: number,
 ) {
   if (parentId === '' || parentId == 'root') parentId = null
 
   return await fetchWithAuth(`/api/pages/${id}/move`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ version, parentId }),
+    body: JSON.stringify(
+      position === undefined
+        ? { version, parentId }
+        : { version, parentId, position },
+    ),
   })
 }
 

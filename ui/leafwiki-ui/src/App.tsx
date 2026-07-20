@@ -3,6 +3,7 @@ import { createLeafWikiRouter } from '@/features/router/router'
 import { useBootstrapAuth } from '@/lib/bootstrapAuth'
 import { BASE_PATH } from '@/lib/config'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { useFavoritesStore } from '@/stores/favorites'
 import { useSessionStore } from '@/stores/session'
 import useApplyDesignMode from '@/useApplyDesignMode'
 import { Loader2 } from 'lucide-react'
@@ -29,14 +30,28 @@ function App() {
   useBootstrapAuth(configHasLoaded && !authDisabled)
 
   const isLoggedIn = useSessionStore((s) => !!s.user)
+  const userId = useSessionStore((s) => s.user?.id ?? null)
   const isRefreshing = useSessionStore((s) => s.isRefreshing)
   const isReadOnly = useIsReadOnly()
   const isReadOnlyViewer = isReadOnly && !isLoggedIn
+  const loadFavorites = useFavoritesStore((s) => s.loadFavorites)
+  const clearFavorites = useFavoritesStore((s) => s.clearFavorites)
 
   useApplyDesignMode()
   useEffect(() => {
     loadConfig()
   }, [loadConfig])
+
+  // Favorites are per-user server truth — (re)load whenever the logged-in
+  // user changes, and clear them on logout so a second user on the same
+  // browser never sees the first user's favorites.
+  useEffect(() => {
+    if (userId) {
+      loadFavorites()
+    } else {
+      clearFavorites()
+    }
+  }, [userId, loadFavorites, clearFavorites])
 
   useLayoutEffect(() => {
     // Load branding configuration

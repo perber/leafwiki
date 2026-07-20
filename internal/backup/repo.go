@@ -43,13 +43,13 @@ var errRemoteBranchNotFound = errors.New("remote branch not found")
 
 // Repository wraps a git repository with backup-specific state.
 type Repository struct {
-	mu               sync.Mutex     // serialises RunBackup and ForcePush so the HTTP handler can't race the scheduler goroutine
+	mu               sync.Mutex // serialises RunBackup and ForcePush so the HTTP handler can't race the scheduler goroutine
 	cfg              Config
 	repoDir          string
 	repo             *gogit.Repository
 	status           *Status
 	looseObjsSinceGC int
-	lastPushedHash   plumbing.Hash  // hash of the last commit successfully pushed; zero = never pushed
+	lastPushedHash   plumbing.Hash // hash of the last commit successfully pushed; zero = never pushed
 }
 
 // Init opens an existing repo at repoDir or initialises a new one.
@@ -855,10 +855,11 @@ func (r *Repository) buildSSHAuth() (ssh.AuthMethod, error) {
 	var err error
 
 	// Try SSHKey string first
-	if r.cfg.SSHKey != "" {
+	switch {
+	case r.cfg.SSHKey != "":
 		slog.Debug("buildSSHAuth: using inline SSH key")
 		privateKey = []byte(r.cfg.SSHKey)
-	} else if r.cfg.SSHKeyPath != "" {
+	case r.cfg.SSHKeyPath != "":
 		slog.Debug("buildSSHAuth: reading SSH key from file", "path", r.cfg.SSHKeyPath)
 		privateKey, err = os.ReadFile(r.cfg.SSHKeyPath)
 		if err != nil {
@@ -866,7 +867,7 @@ func (r *Repository) buildSSHAuth() (ssh.AuthMethod, error) {
 			return nil, fmt.Errorf("failed to read SSH key: %w", err)
 		}
 		slog.Debug("buildSSHAuth: SSH key file read successfully", "path", r.cfg.SSHKeyPath, "size", len(privateKey))
-	} else {
+	default:
 		slog.Debug("buildSSHAuth: no SSH key configured (neither inline nor path)")
 		return nil, fmt.Errorf("no SSH key provided")
 	}

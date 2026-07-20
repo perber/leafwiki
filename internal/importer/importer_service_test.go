@@ -29,7 +29,7 @@ func mustWrite(t *testing.T, base, rel, content string) string {
 
 func newServiceWithFakeWiki(t *testing.T, w *fakeWiki) *ImporterService {
 	t.Helper()
-	planner := NewPlanner(w, tree.NewSlugService())
+	planner := NewPlanner(w, tree.NewSlugService(), "")
 	importerDir := filepath.Join(t.TempDir(), ".importer")
 	store := NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
 	return &ImporterService{
@@ -315,7 +315,7 @@ func TestImporterService_ResumesRunningImportFromPersistedState(t *testing.T) {
 	stateRoot := t.TempDir()
 	stateFile := filepath.Join(stateRoot, "current-plan.json")
 	w := &fakeWiki{treeHash: "partial-tree", lookups: map[string]*tree.PathLookup{}}
-	planner := NewPlanner(w, tree.NewSlugService())
+	planner := NewPlanner(w, tree.NewSlugService(), "")
 	store := NewPlanStore(stateFile)
 
 	service := &ImporterService{
@@ -375,7 +375,7 @@ func TestImporterService_ResumeRunningImport_FailsWhenTreeHashChanged(t *testing
 	stateRoot := t.TempDir()
 	stateFile := filepath.Join(stateRoot, "current-plan.json")
 	w := &fakeWiki{treeHash: "changed-tree", lookups: map[string]*tree.PathLookup{}}
-	planner := NewPlanner(w, tree.NewSlugService())
+	planner := NewPlanner(w, tree.NewSlugService(), "")
 	store := NewPlanStore(stateFile)
 
 	service := &ImporterService{

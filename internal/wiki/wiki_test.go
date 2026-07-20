@@ -92,7 +92,7 @@ func deletePageForTest(t *testing.T, w *Wiki, userID, id string, recursive bool)
 		t.Fatalf("GetPage before delete failed: %v", err)
 	}
 
-	if err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.newPageOrchestrator(), w.log, nil).Execute(
+	if err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.favorites, w.newPageOrchestrator(), w.log, nil).Execute(
 		context.Background(),
 		wikipages.DeletePageInput{UserID: userID, ID: id, Version: current.Version(), Recursive: recursive},
 	); err != nil {
@@ -116,7 +116,7 @@ func TestWiki_DeletePage_WithChildren(t *testing.T) {
 	parent := createPageForTest(t, w, "system", nil, "Parent", "parent", pageNodeKind())
 	createPageForTest(t, w, "system", &parent.ID, "Child", "child", pageNodeKind())
 
-	err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.newPageOrchestrator(), w.log, nil).Execute(
+	err := wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.favorites, w.newPageOrchestrator(), w.log, nil).Execute(
 		context.Background(),
 		wikipages.DeletePageInput{UserID: "system", ID: parent.ID, Version: parent.Version(), Recursive: false},
 	)
@@ -457,5 +457,49 @@ func TestWiki_EnsureBaselineRevisions_SkipsUnreadablePages(t *testing.T) {
 	}
 	if len(brokenRevisions) != 0 {
 		t.Fatalf("expected no baseline revision for unreadable page, got %d", len(brokenRevisions))
+	}
+}
+
+func TestWiki_ResyncRespectsLeafwikiignore(t *testing.T) {
+	tmp := t.TempDir()
+
+	rootDir := filepath.Join(tmp, "root")
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// .leafwikiignore goes in root/ alongside the markdown files
+	test_utils.WriteFile(t, tmp, "root/.leafwikiignore", "secret.md")
+	test_utils.WriteFile(t, tmp, "root/public.md", "# Public Page")
+	test_utils.WriteFile(t, tmp, "root/secret.md", "# Secret Page")
+
+	w, err := NewWiki(&WikiOptions{
+		StorageDir:          tmp,
+		AdminPassword:       "admin",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("NewWiki: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	// Verify tree has only the public page
+	tree := w.tree.GetTree()
+	if len(tree.Children) != 1 {
+		t.Fatalf("expected 1 child in root, got %d", len(tree.Children))
+	}
+	if tree.Children[0].Slug != "public" {
+		t.Fatalf("expected child slug 'public', got %q", tree.Children[0].Slug)
+	}
+
+	// Verify ignored page is not findable
+	lookup, err := w.tree.LookupPagePath("secret")
+	if err != nil {
+		t.Fatalf("LookupPagePath: %v", err)
+	}
+	if lookup.Exists {
+		t.Fatal("expected ignored page 'secret' to not exist")
 	}
 }

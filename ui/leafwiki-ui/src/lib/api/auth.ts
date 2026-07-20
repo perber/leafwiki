@@ -11,7 +11,25 @@ export type AuthResponse = {
     username: string
     email: string
     role: 'admin' | 'editor' | 'viewer'
+    totpEnabled: boolean
   }
+}
+
+// Returned by POST /api/auth/login instead of AuthResponse when the account
+// has TOTP enabled: password was correct, but no cookies are set yet. Call
+// completeTOTPLogin with loginChallengeToken and a TOTP or recovery code to
+// finish logging in.
+export type LoginChallenge = {
+  requiresTotp: true
+  loginChallengeToken: string
+}
+
+function isLoginChallenge(data: unknown): data is LoginChallenge {
+  return (
+    !!data &&
+    typeof data === 'object' &&
+    (data as { requiresTotp?: unknown }).requiresTotp === true
+  )
 }
 
 const REFRESH_TIMEOUT_MS = 15000
@@ -53,12 +71,12 @@ export async function fetchMe(): Promise<AuthResponse['user'] | null> {
   return user ?? null
 }
 
-export async function login(identifier: string, password: string) {
-  const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+async function postLoginRequest<T>(path: string, body: object): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier, password }),
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) {
@@ -84,12 +102,44 @@ export async function login(identifier: string, password: string) {
     throw new Error('Login failed')
   }
 
-  const data: AuthResponse = await res.json()
+  return (await res.json()) as T
+}
 
+function applyAuthResponse(data: AuthResponse) {
   const { setAccessTokenExpiresAt, setUser } = useSessionStore.getState()
   setAccessTokenExpiresAt(data.accessTokenExpiresAt)
   setUser(data.user)
+}
 
+export async function login(
+  identifier: string,
+  password: string,
+): Promise<AuthResponse | LoginChallenge> {
+  const data = await postLoginRequest<AuthResponse | LoginChallenge>(
+    '/api/auth/login',
+    { identifier, password },
+  )
+
+  if (isLoginChallenge(data)) {
+    return data
+  }
+
+  applyAuthResponse(data)
+  return data
+}
+
+// completeTOTPLogin finishes a login handshake started by login() when the
+// account has TOTP enabled: code is either a current TOTP code or an unused
+// recovery code. Only on success are cookies set.
+export async function completeTOTPLogin(
+  loginChallengeToken: string,
+  code: string,
+): Promise<AuthResponse> {
+  const data = await postLoginRequest<AuthResponse>('/api/auth/login/totp', {
+    loginChallengeToken,
+    code,
+  })
+  applyAuthResponse(data)
   return data
 }
 

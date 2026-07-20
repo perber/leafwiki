@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 )
@@ -59,26 +60,32 @@ type ResolvedNode struct {
 }
 
 type NodeStore struct {
-	storageDir string
-	log        *slog.Logger
-	slugger    *SlugService
+	storageDir  string
+	log         *slog.Logger
+	slugger     *SlugService
+	ignoreCache *ignore.Cache
+}
+
+// SetIgnoreCache sets the ignore cache to use for multi-level ignore resolution.
+func (f *NodeStore) SetIgnoreCache(ignoreCache *ignore.Cache) {
+	f.ignoreCache = ignoreCache
 }
 
 const (
-	reconstructSystemUserID      = "system"
-	orderFilename                = ".order.json"
-	indexFilename                = "index.md"
-	errEntryRequired             = "an entry is required"
-	errParentEntryRequired       = "a parent entry is required"
-	errExpectedPageMissing       = "expected page file missing"
-	errExpectedFolderMissing     = "expected folder missing"
-	errExpectedFolderFoundFile   = "expected folder but found file"
-	errExpectedFileMissing       = "expected file missing"
-	errExpectedFileFoundFolder   = "expected file but found folder"
-	errUnknownNodeKind           = "unknown node kind: %q"
-	errLoadMarkdownFailed        = "could not load markdown file: %w"
-	errWriteMarkdownFailed       = "could not write markdown file: %w"
-	errEnsureParentFailed        = "could not ensure parent directory exists: %w"
+	reconstructSystemUserID    = "system"
+	orderFilename              = ".order.json"
+	indexFilename              = "index.md"
+	errEntryRequired           = "an entry is required"
+	errParentEntryRequired     = "a parent entry is required"
+	errExpectedPageMissing     = "expected page file missing"
+	errExpectedFolderMissing   = "expected folder missing"
+	errExpectedFolderFoundFile = "expected folder but found file"
+	errExpectedFileMissing     = "expected file missing"
+	errExpectedFileFoundFolder = "expected file but found folder"
+	errUnknownNodeKind         = "unknown node kind: %q"
+	errLoadMarkdownFailed      = "could not load markdown file: %w"
+	errWriteMarkdownFailed     = "could not write markdown file: %w"
+	errEnsureParentFailed      = "could not ensure parent directory exists: %w"
 )
 
 type childOrderFile struct {
@@ -324,6 +331,14 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 		// optional: skip hidden stuff
 		if strings.HasPrefix(name, ".") {
 			continue
+		}
+
+		// Check .leafwikiignore
+		if ig := f.getIgnoreForDir(currentPath); ig != nil {
+			relPath, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), filepath.Join(currentPath, name))
+			if relPath != "" && ig.Matches(filepath.ToSlash(relPath), entry.IsDir()) {
+				continue
+			}
 		}
 
 		// defaults
@@ -601,6 +616,13 @@ func (f *NodeStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 
 	// Destination paths
 	destBase := filepath.Join(parentDir, newEntry.Slug)
+
+	// Guard against ignored paths
+	rel, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), destBase)
+	if f.isPathIgnored(rel, false) {
+		return &InvalidOpError{Op: "CreatePage", Reason: "target path matches .leafwikiignore"}
+	}
+
 	destFile := destBase + ".md"
 	destDir := destBase
 
@@ -618,7 +640,7 @@ func (f *NodeStore) CreatePage(parentEntry *PageNode, newEntry *PageNode) error 
 	return nil
 }
 
-// CreateSection creates a new section (folder) under the given parent entry.
+// CreateSection creates a new section (folder) under the given paren
 func (f *NodeStore) CreateSection(parentEntry *PageNode, newEntry *PageNode) error {
 	if parentEntry == nil {
 		return &InvalidOpError{Op: "CreateSection", Reason: errParentEntryRequired}
@@ -651,6 +673,13 @@ func (f *NodeStore) CreateSection(parentEntry *PageNode, newEntry *PageNode) err
 
 	// Destination base paths
 	destBase := filepath.Join(parentDir, newEntry.Slug)
+
+	// Guard against ignored paths
+	rel, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), destBase)
+	if f.isPathIgnored(rel, true) {
+		return &InvalidOpError{Op: "CreateSection", Reason: "target path matches .leafwikiignore"}
+	}
+
 	destFile := destBase + ".md"
 	destDir := destBase
 
@@ -857,6 +886,13 @@ func (f *NodeStore) MoveNode(entry *PageNode, parentEntry *PageNode) error {
 
 	// Destination base path (same slug, under new parent)
 	destBase := filepath.Join(parentDir, entry.Slug)
+
+	// Guard against ignored paths
+	rel, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), destBase)
+	if f.isPathIgnored(rel, entry.Kind == NodeKindSection) {
+		return &InvalidOpError{Op: "MoveNode", Reason: "target path matches .leafwikiignore"}
+	}
+
 	destFile := destBase + ".md"
 	destDir := destBase
 
@@ -1010,6 +1046,12 @@ func (f *NodeStore) RenameNode(entry *PageNode, newSlug string) error {
 
 	// new base path: same parent dir, last segment replaced
 	newBase := filepath.Join(filepath.Dir(oldBase), newSlug)
+
+	// Guard against ignored paths
+	rel, _ := filepath.Rel(filepath.Join(f.storageDir, "root"), newBase)
+	if f.isPathIgnored(rel, entry.Kind == NodeKindSection) {
+		return &InvalidOpError{Op: "RenameNode", Reason: "target path matches .leafwikiignore"}
+	}
 
 	// destination collision checks
 	if fileExists(newBase+".md") || fileExists(newBase) {
@@ -1167,6 +1209,31 @@ func (f *NodeStore) SyncFrontmatterIfExists(entry *PageNode) error {
 		return fmt.Errorf("write markdown file: %w", err)
 	}
 	return nil
+}
+
+// getIgnoreForDir returns the compiled ignore rules for the given directory,
+// delegating to the shared cache. Returns nil if no rules apply.
+func (f *NodeStore) getIgnoreForDir(dir string) *ignore.IgnoreFile {
+	if f.ignoreCache == nil {
+		return nil
+	}
+	return f.ignoreCache.Get(dir)
+}
+
+// isPathIgnored checks if a relative path matches the ignore rules
+// governed by the nearest .leafwikiignore file.
+func (f *NodeStore) isPathIgnored(relPath string, isDir bool) bool {
+	if relPath == "" {
+		return false
+	}
+	// Resolve the absolute path to find the enclosing directory
+	absPath := filepath.Join(f.storageDir, "root", relPath)
+	dir := filepath.Dir(absPath)
+	ig := f.getIgnoreForDir(dir)
+	if ig == nil {
+		return false
+	}
+	return ig.Matches(filepath.ToSlash(relPath), isDir)
 }
 
 func (f *NodeStore) dirPathForNode(entry *PageNode) (string, error) {

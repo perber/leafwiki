@@ -8,6 +8,8 @@ import enEditor from '../locales/en/editor.json'
 import enErrors from '../locales/en/errors.json'
 import enMaintenance from '../locales/en/maintenance.json'
 import enSearch from '../locales/en/search.json'
+import enSnapshot from '../locales/en/snapshot.json'
+import enUsers from '../locales/en/users.json'
 import enViewer from '../locales/en/viewer.json'
 
 i18next.use(initReactI18next).init({
@@ -23,6 +25,8 @@ i18next.use(initReactI18next).init({
       editor: enEditor,
       maintenance: enMaintenance,
       search: enSearch,
+      snapshot: enSnapshot,
+      users: enUsers,
       viewer: enViewer,
     },
   },

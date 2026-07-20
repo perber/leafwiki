@@ -57,7 +57,7 @@ func (f *fakeExecWiki) UpdatePage(userID string, id, title, slug string, content
 		return f.updateFn(userID, id, title, slug, content, kind)
 	}
 	// simulate tree change
-	f.hash = f.hash + "-changed"
+	f.hash += "-changed"
 	return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
 }
 
@@ -346,7 +346,7 @@ func TestExecutor_Create_RewritesMarkdownAndWikiLinksToImportedPages(t *testing.
 		if content != nil {
 			updatedContentByTitle[title] = *content
 		}
-		w.hash = w.hash + "-changed"
+		w.hash += "-changed"
 		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
 	}
 	plan := &PlanResult{
@@ -482,7 +482,7 @@ func TestExecutor_Create_WikiLinkFallsBackToUniqueNestedBasenameOnly(t *testing.
 		if content != nil {
 			updatedContentByTitle[title] = *content
 		}
-		w.hash = w.hash + "-changed"
+		w.hash += "-changed"
 		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
 	}
 
@@ -527,7 +527,7 @@ func TestExecutor_Create_WikiLinkResolvesUniqueNestedPathSuffix(t *testing.T) {
 		if content != nil {
 			updatedContentByTitle[title] = *content
 		}
-		w.hash = w.hash + "-changed"
+		w.hash += "-changed"
 		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
 	}
 
@@ -566,7 +566,7 @@ func TestExecutor_Create_UnresolvedWikiLinkStaysAsWikiLink(t *testing.T) {
 		if content != nil {
 			updatedContentByTitle[title] = *content
 		}
-		w.hash = w.hash + "-changed"
+		w.hash += "-changed"
 		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
 	}
 
@@ -613,7 +613,7 @@ func TestExecutor_Create_DoesNotRewriteLinksInsideCode(t *testing.T) {
 		if content != nil {
 			updatedContentByTitle[title] = *content
 		}
-		w.hash = w.hash + "-changed"
+		w.hash += "-changed"
 		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
 	}
 
@@ -663,7 +663,7 @@ func TestExecutor_Create_RewritesWindowsStyleMarkdownAndAssetPaths(t *testing.T)
 		if content != nil {
 			updatedContentByTitle[title] = *content
 		}
-		w.hash = w.hash + "-changed"
+		w.hash += "-changed"
 		return &tree.Page{PageNode: &tree.PageNode{ID: id, Title: title, Slug: slug, Kind: *kind}}, nil
 	}
 

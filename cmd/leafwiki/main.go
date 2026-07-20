@@ -23,13 +23,23 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/backup"
+	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/wiki"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
+	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 )
+
+// Version is the LeafWiki build version. It defaults to "dev" for local/unset
+// builds; release builds can inject the real version the same way Dockerfile
+// already injects internal/http.Environment, e.g.
+// -ldflags "-X main.Version=v0.12.0".
+var Version = "dev"
 
 const (
 	gitBackupSSHKeyFlagName = "git-backup-ssh-key"
@@ -54,6 +64,9 @@ func writeUsage(w io.Writer) {
 	--admin-username   Initial admin username (used only if no admin exists) (default: admin)
 	--admin-email      Initial admin email (used only if no admin exists) (default: admin@localhost)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
+	--totp-encryption-key    Key to encrypt per-user TOTP secrets at rest, min 32 bytes
+	                         (required only once a user enables TOTP; leave unset to keep
+	                         TOTP self-service unavailable) (default: "")
 	--public-access    Allow public access to the wiki only with read access (default: false)
 	--allow-insecure   Allow insecure HTTP connections (default: false)                      
 	--access-token-timeout  Access token timeout duration (e.g. 24h, 15m) (default: 15m)
@@ -94,6 +107,10 @@ func writeUsage(w io.Writer) {
 	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
 	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
 	--git-backup-interval          Git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)
+	--snapshot                     Enable full backup snapshots (ZIP incl. the SQLite database) (default: false)
+	--snapshot-interval            Snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)
+	--snapshot-retention           Number of most recent snapshots to keep; <= 0 = keep all (default: 10)
+	--snapshot-dir                 Directory to store snapshot ZIPs in (default: <data-dir>/snapshots)
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -101,6 +118,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_UNIX_SOCKET
 	LEAFWIKI_DATA_DIR
 	LEAFWIKI_JWT_SECRET
+	LEAFWIKI_TOTP_ENCRYPTION_KEY
 	LEAFWIKI_LOG_LEVEL
 	LEAFWIKI_ADMIN_PASSWORD
 	LEAFWIKI_ADMIN_USERNAME
@@ -140,6 +158,10 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_GIT_BACKUP_SSH_KEY
 	LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS
 	LEAFWIKI_GIT_BACKUP_INTERVAL
+	LEAFWIKI_SNAPSHOT
+	LEAFWIKI_SNAPSHOT_INTERVAL
+	LEAFWIKI_SNAPSHOT_RETENTION
+	LEAFWIKI_SNAPSHOT_DIR
 	`); err != nil {
 		panic(err)
 	}
@@ -151,11 +173,12 @@ func printUsage() {
 
 func setupLogger() {
 	level := slog.LevelInfo
-	if os.Getenv("LEAFWIKI_LOG_LEVEL") == "debug" {
+	switch os.Getenv("LEAFWIKI_LOG_LEVEL") {
+	case "debug":
 		level = slog.LevelDebug
-	} else if (os.Getenv("LEAFWIKI_LOG_LEVEL")) == "error" {
+	case "error":
 		level = slog.LevelError
-	} else if (os.Getenv("LEAFWIKI_LOG_LEVEL")) == "warn" {
+	case "warn":
 		level = slog.LevelWarn
 	}
 
@@ -183,6 +206,7 @@ type cliFlags struct {
 	adminEmail              *string
 	adminPassword           *string
 	jwtSecret               *string
+	totpEncryptionKey       *string
 	publicAccess            *bool
 	allowInsecure           *bool
 	injectCodeInHeader      *string
@@ -218,6 +242,10 @@ type cliFlags struct {
 	gitBackupSSHKnownHosts  *string
 	gitBackupInterval       *time.Duration
 	revisionCoalesceWindow  *time.Duration
+	snapshotEnabled         *bool
+	snapshotInterval        *time.Duration
+	snapshotRetention       *int
+	snapshotDir             *string
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -230,6 +258,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		adminEmail:              fs.String("admin-email", "", "initial admin email (used only if no admin exists) (default: admin@localhost)"),
 		adminPassword:           fs.String("admin-password", "", "initial admin password"),
 		jwtSecret:               fs.String("jwt-secret", "", "JWT secret for authentication"),
+		totpEncryptionKey:       fs.String("totp-encryption-key", "", "key to encrypt per-user TOTP secrets at rest, min 32 bytes (leave unset to keep TOTP self-service unavailable)"),
 		publicAccess:            fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
 		allowInsecure:           fs.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)"),
 		injectCodeInHeader:      fs.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")"),
@@ -265,6 +294,10 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
 		gitBackupInterval:       fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
 		revisionCoalesceWindow:  fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
+		snapshotEnabled:         fs.Bool("snapshot", false, "enable full backup snapshots (ZIP incl. the SQLite database) (default: false)"),
+		snapshotInterval:        fs.Duration("snapshot-interval", 24*time.Hour, "snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)"),
+		snapshotRetention:       fs.Int("snapshot-retention", 10, "number of most recent snapshots to keep; <= 0 = keep all (default: 10)"),
+		snapshotDir:             fs.String("snapshot-dir", "", "directory to store snapshot ZIPs in (default: <data-dir>/snapshots)"),
 	}
 }
 
@@ -298,6 +331,7 @@ func main() {
 	adminUsername := resolveString("admin-username", *flags.adminUsername, visited, "LEAFWIKI_ADMIN_USERNAME", "")
 	adminEmail := resolveString("admin-email", *flags.adminEmail, visited, "LEAFWIKI_ADMIN_EMAIL", "")
 	jwtSecret := resolveString("jwt-secret", *flags.jwtSecret, visited, "LEAFWIKI_JWT_SECRET", "")
+	totpEncryptionKey := resolveString("totp-encryption-key", *flags.totpEncryptionKey, visited, "LEAFWIKI_TOTP_ENCRYPTION_KEY", "")
 	injectCodeInHeader := resolveString("inject-code-in-header", *flags.injectCodeInHeader, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
 	customStylesheet := resolveString("custom-stylesheet", *flags.customStylesheet, visited, "LEAFWIKI_CUSTOM_STYLESHEET", "")
 	allowInsecure := resolveBool("allow-insecure", *flags.allowInsecure, visited, "LEAFWIKI_ALLOW_INSECURE")
@@ -340,6 +374,10 @@ func main() {
 	gitBackupSSHKey := resolveString(gitBackupSSHKeyFlagName, *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
 	gitBackupInterval := resolveDuration("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL")
 	gitBackupSSHKnownHosts := resolveString("git-backup-ssh-known-hosts", *flags.gitBackupSSHKnownHosts, visited, "LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS", "")
+	snapshotEnabled := resolveBool("snapshot", *flags.snapshotEnabled, visited, "LEAFWIKI_SNAPSHOT")
+	snapshotInterval := resolveDuration("snapshot-interval", *flags.snapshotInterval, visited, "LEAFWIKI_SNAPSHOT_INTERVAL")
+	snapshotRetention := resolveInt("snapshot-retention", *flags.snapshotRetention, visited, "LEAFWIKI_SNAPSHOT_RETENTION", 10)
+	snapshotDir := resolveString("snapshot-dir", *flags.snapshotDir, visited, "LEAFWIKI_SNAPSHOT_DIR", "")
 	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
 	if err != nil {
 		fail("invalid --trusted-proxy-ips value", "error", err)
@@ -430,6 +468,10 @@ func main() {
 		}
 	}
 
+	if totpEncryptionKey != "" && len(totpEncryptionKey) < auth.MinTOTPEncryptionKeyLen {
+		fail("--totp-encryption-key/LEAFWIKI_TOTP_ENCRYPTION_KEY is too short", "minimum_bytes", auth.MinTOTPEncryptionKeyLen, "got", len(totpEncryptionKey))
+	}
+
 	var metrics *httpmetrics.HTTPMetrics
 	if enableMetrics {
 		metrics = httpmetrics.NewHTTPMetrics()
@@ -441,6 +483,7 @@ func main() {
 		AdminEmail:             adminEmail,
 		AdminPassword:          adminPassword,
 		JWTSecret:              jwtSecret,
+		TOTPEncryptionKey:      totpEncryptionKey,
 		AccessTokenTimeout:     accessTokenTimeout,
 		RefreshTokenTimeout:    refreshTokenTimeout,
 		AuthDisabled:           disableAuth,
@@ -453,6 +496,15 @@ func main() {
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)
 	}
+
+	// Log .leafwikiignore status
+	rootDir := filepath.Join(dataDir, "root")
+	if ignoreFile, err := ignore.LoadFromDir(rootDir); err != nil {
+		slog.Default().Warn("invalid .leafwikiignore", "error", err)
+	} else if ignoreFile != nil {
+		slog.Default().Info("loaded .leafwikiignore", "patterns", ignoreFile.PatternCount())
+	}
+
 	defer func() {
 		if err := w.Close(); err != nil {
 			slog.Default().Error("Failed to close Wiki", "error", err)
@@ -489,6 +541,28 @@ func main() {
 		w.SetBackupRoutes(wikibackup.NewRoutes(backupRepo, backupScheduler, w.AuthService()))
 	}
 
+	// Initialize full backup snapshots if enabled
+	if snapshotEnabled {
+		snapshotsDir := snapshotDir
+		if snapshotsDir == "" {
+			snapshotsDir = filepath.Join(dataDir, "snapshots")
+		}
+		snapshotManager := snapshot.NewManager(snapshot.Config{
+			BackupsDir:     snapshotsDir,
+			RootDir:        filepath.Join(dataDir, "root"),
+			AssetsDir:      filepath.Join(dataDir, "assets"),
+			BrandingDir:    filepath.Join(dataDir, "branding"),
+			SchemaFile:     filepath.Join(dataDir, "schema.json"),
+			UsersDBPath:    filepath.Join(dataDir, "users.db"),
+			WikiVersion:    Version,
+			Interval:       snapshotInterval,
+			RetentionCount: snapshotRetention,
+		})
+		snapshotScheduler := snapshot.NewScheduler(snapshotManager)
+		defer snapshotScheduler.Stop()
+		w.SetSnapshotRoutes(wikisnapshot.NewRoutes(snapshotManager, snapshotScheduler, w.AuthService(), snapshotRetention))
+	}
+
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccess,
 		InjectCodeInHeader:      injectCodeInHeader,
@@ -505,6 +579,7 @@ func main() {
 		EnableAPIKeyManagement:  enableAPIKeyManagement,
 		Metrics:                 metrics,
 		GitBackupEnabled:        gitBackupEnabled,
+		SnapshotEnabled:         snapshotEnabled,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:        enableHTTPRemoteUser,
 			HeaderName:     httpRemoteUserHeader,

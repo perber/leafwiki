@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/markdown"
 )
 
@@ -1612,4 +1613,136 @@ func mustRead(t *testing.T, path string) []byte {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return b
+}
+
+// --- Phase 3: write operation guards for .leafwikiignore ---
+
+func TestNodeStore_CreatePage_RejectsIgnoredPath(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "drafts", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "p1", Slug: "drafts", Title: "Drafts", Kind: NodeKindPage, Parent: root}
+
+	err := store.CreatePage(root, entry)
+	if err == nil {
+		t.Fatal("expected error for ignored path")
+	}
+	var opErr *InvalidOpError
+	if !errors.As(err, &opErr) {
+		t.Fatalf("expected InvalidOpError, got %T: %v", err, err)
+	}
+	if !strings.Contains(opErr.Reason, "leafwikiignore") {
+		t.Fatalf("expected reason mentioning leafwikiignore, got %q", opErr.Reason)
+	}
+}
+
+func TestNodeStore_CreateSection_RejectsIgnoredPath(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "archive", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "s1", Slug: "archive", Title: "Archive", Kind: NodeKindSection, Parent: root}
+
+	err := store.CreateSection(root, entry)
+	if err == nil {
+		t.Fatal("expected error for ignored path")
+	}
+	var opErr *InvalidOpError
+	if !errors.As(err, &opErr) {
+		t.Fatalf("expected InvalidOpError, got %T: %v", err, err)
+	}
+	if !strings.Contains(opErr.Reason, "leafwikiignore") {
+		t.Fatalf("expected reason mentioning leafwikiignore, got %q", opErr.Reason)
+	}
+}
+
+func TestNodeStore_MoveNode_RejectsIgnoredDestination(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "archive/", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	sec := &PageNode{ID: "s", Slug: "s", Title: "S", Kind: NodeKindSection, Parent: root}
+	page := &PageNode{ID: "p1", Slug: "p", Title: "P", Kind: NodeKindPage, Parent: sec}
+
+	mustMkdir(t, filepath.Join(tmp, "root", "s"))
+	mustWriteFile(t, filepath.Join(tmp, "root", "s", "p.md"), "# hi", 0o644)
+
+	mustMkdir(t, filepath.Join(tmp, "root", "archive"))
+	mustWriteFile(t, filepath.Join(tmp, "root", "archive", "index.md"), "# Archive", 0o644)
+	archiveSection := &PageNode{ID: "s2", Slug: "archive", Title: "Archive", Kind: NodeKindSection, Parent: root}
+
+	err := store.MoveNode(page, archiveSection)
+	if err == nil {
+		t.Fatal("expected error for ignored destination")
+	}
+	var opErr *InvalidOpError
+	if !errors.As(err, &opErr) {
+		t.Fatalf("expected InvalidOpError, got %T: %v", err, err)
+	}
+	if !strings.Contains(opErr.Reason, "leafwikiignore") {
+		t.Fatalf("expected reason mentioning leafwikiignore, got %q", opErr.Reason)
+	}
+}
+
+func TestNodeStore_RenameNode_RejectsIgnoredSlug(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "*.tmp", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	page := &PageNode{ID: "p1", Slug: "notes", Title: "Notes", Kind: NodeKindPage, Parent: root}
+	mustWriteFile(t, filepath.Join(tmp, "root", "notes.md"), "# Notes", 0o644)
+
+	err := store.RenameNode(page, "notes.tmp")
+	if err == nil {
+		t.Fatal("expected error for ignored slug")
+	}
+	var opErr *InvalidOpError
+	if !errors.As(err, &opErr) {
+		t.Fatalf("expected InvalidOpError, got %T: %v", err, err)
+	}
+	if !strings.Contains(opErr.Reason, "leafwikiignore") {
+		t.Fatalf("expected reason mentioning leafwikiignore, got %q", opErr.Reason)
+	}
+}
+
+func TestNodeStore_CreatePage_PassesThroughNonIgnoredPath(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustWriteFile(t, filepath.Join(tmp, "root", ".leafwikiignore"), "*.log", 0o644)
+
+	cache := ignore.NewCache(filepath.Join(tmp, "root"))
+	store.SetIgnoreCache(cache)
+
+	root := &PageNode{ID: "root", Slug: "root", Title: "root", Kind: NodeKindSection}
+	entry := &PageNode{ID: "p1", Slug: "readme", Title: "Readme", Kind: NodeKindPage, Parent: root}
+
+	err := store.CreatePage(root, entry)
+	if err != nil {
+		t.Fatalf("expected no error for non-ignored path, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(tmp, "root", "readme.md")); statErr != nil {
+		t.Fatalf("expected readme.md to exist: %v", statErr)
+	}
 }

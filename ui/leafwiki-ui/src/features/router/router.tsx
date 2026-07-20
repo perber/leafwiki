@@ -11,6 +11,7 @@ import {
   PageViewer,
   PermalinkRedirect,
   RootRedirect,
+  SnapshotSettings,
   UserManagement,
 } from './lazy-routes'
 import ExternalRedirect from '../auth/ExternalRedirect'
@@ -90,6 +91,16 @@ export const createLeafWikiRouter = (
         ) : (
           <AuthWrapper>
             <BackupSettings />
+          </AuthWrapper>
+        ),
+      },
+      {
+        path: '/settings/snapshots',
+        element: isReadOnlyViewer ? (
+          <Navigate to="/" />
+        ) : (
+          <AuthWrapper>
+            <SnapshotSettings />
           </AuthWrapper>
         ),
       },

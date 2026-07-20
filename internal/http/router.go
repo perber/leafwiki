@@ -98,6 +98,7 @@ type RouterOptions struct {
 	EnableAPIKeyManagement  bool                     // Whether the experimental API key management feature is enabled
 	Metrics                 *httpmetrics.HTTPMetrics // Optional Prometheus HTTP metrics collector; nil disables request instrumentation
 	GitBackupEnabled        bool                     // Whether git backup is enabled (surfaced to admin UI via /api/config)
+	SnapshotEnabled         bool                     // Whether full-backup (snapshot) is enabled (surfaced to admin UI via /api/config)
 	HTTPRemoteUser          HTTPRemoteUserConfig     // Reverse-proxy authentication via HTTP header
 	APIKeyService           *coreauth.APIKeyService  // Bearer API-key authentication; nil disables the feature
 	DisableRequestLog       bool                     // Whether to suppress per-request access log lines

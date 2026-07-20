@@ -182,6 +182,21 @@ func (s *SessionStore) RevokeAllSessionsForUser(userID string) error {
 	})
 }
 
+// RevokeAllSessionsForUserExcept revokes every active session for userID
+// except the one identified by exceptID. If exceptID is empty, every session
+// is revoked (same as RevokeAllSessionsForUser) — the safe fallback when the
+// caller could not identify which session to preserve.
+func (s *SessionStore) RevokeAllSessionsForUserExcept(userID, exceptID string) error {
+	return s.withDB(func(db *sql.DB) error {
+		_, err := db.Exec(`
+			UPDATE sessions
+			SET revoked_at = ?
+			WHERE user_id = ? AND revoked_at IS NULL AND id != ?;
+		`, time.Now().Unix(), userID, exceptID)
+		return err
+	})
+}
+
 func (s *SessionStore) CleanupExpiredSessions() error {
 	now := time.Now()
 	return s.withDB(func(db *sql.DB) error {

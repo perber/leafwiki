@@ -10,6 +10,7 @@ import (
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/favorites"
 )
 
 // ErrAuthDisabled is returned when an auth operation is called while auth is disabled.
@@ -47,6 +48,152 @@ func (uc *LoginUseCase) Execute(_ context.Context, in LoginInput) (*LoginOutput,
 		return nil, err
 	}
 	return &LoginOutput{Token: token}, nil
+}
+
+// ─── CompleteTOTPLoginUseCase ────────────────────────────────────────────────
+
+type CompleteTOTPLoginInput struct {
+	LoginChallengeToken string
+	Code                string
+}
+
+type CompleteTOTPLoginOutput struct {
+	Token *coreauth.AuthToken
+}
+
+type CompleteTOTPLoginUseCase struct {
+	auth *coreauth.AuthService
+}
+
+func NewCompleteTOTPLoginUseCase(a *coreauth.AuthService) *CompleteTOTPLoginUseCase {
+	return &CompleteTOTPLoginUseCase{auth: a}
+}
+
+func (uc *CompleteTOTPLoginUseCase) Execute(_ context.Context, in CompleteTOTPLoginInput) (*CompleteTOTPLoginOutput, error) {
+	if uc.auth == nil {
+		return nil, ErrAuthDisabled
+	}
+	token, err := uc.auth.CompleteTOTPLogin(in.LoginChallengeToken, in.Code)
+	if err != nil {
+		return nil, err
+	}
+	return &CompleteTOTPLoginOutput{Token: token}, nil
+}
+
+// ─── StartTOTPSetupUseCase ───────────────────────────────────────────────────
+
+type StartTOTPSetupInput struct {
+	UserID          string
+	CurrentPassword string
+}
+
+type StartTOTPSetupOutput struct {
+	Secret     string // manual-entry base32 secret
+	OTPAuthURL string // otpauth:// URI for QR-code rendering
+}
+
+type StartTOTPSetupUseCase struct {
+	auth *coreauth.AuthService
+}
+
+func NewStartTOTPSetupUseCase(a *coreauth.AuthService) *StartTOTPSetupUseCase {
+	return &StartTOTPSetupUseCase{auth: a}
+}
+
+func (uc *StartTOTPSetupUseCase) Execute(_ context.Context, in StartTOTPSetupInput) (*StartTOTPSetupOutput, error) {
+	if uc.auth == nil {
+		return nil, ErrAuthDisabled
+	}
+	generated, err := uc.auth.StartTOTPSetup(in.UserID, in.CurrentPassword)
+	if err != nil {
+		return nil, err
+	}
+	return &StartTOTPSetupOutput{Secret: generated.Secret, OTPAuthURL: generated.OTPAuthURL}, nil
+}
+
+// ─── ConfirmTOTPSetupUseCase ─────────────────────────────────────────────────
+
+type ConfirmTOTPSetupInput struct {
+	UserID              string
+	Code                string
+	CurrentRefreshToken string
+}
+
+type ConfirmTOTPSetupOutput struct {
+	RecoveryCodes []string
+}
+
+type ConfirmTOTPSetupUseCase struct {
+	auth *coreauth.AuthService
+}
+
+func NewConfirmTOTPSetupUseCase(a *coreauth.AuthService) *ConfirmTOTPSetupUseCase {
+	return &ConfirmTOTPSetupUseCase{auth: a}
+}
+
+func (uc *ConfirmTOTPSetupUseCase) Execute(_ context.Context, in ConfirmTOTPSetupInput) (*ConfirmTOTPSetupOutput, error) {
+	if uc.auth == nil {
+		return nil, ErrAuthDisabled
+	}
+	codes, err := uc.auth.ConfirmTOTPSetup(in.UserID, in.Code, in.CurrentRefreshToken)
+	if err != nil {
+		return nil, err
+	}
+	return &ConfirmTOTPSetupOutput{RecoveryCodes: codes}, nil
+}
+
+// ─── DisableTOTPUseCase ──────────────────────────────────────────────────────
+
+type DisableTOTPInput struct {
+	UserID              string
+	CurrentPassword     string
+	Code                string
+	CurrentRefreshToken string
+}
+
+type DisableTOTPUseCase struct {
+	auth *coreauth.AuthService
+}
+
+func NewDisableTOTPUseCase(a *coreauth.AuthService) *DisableTOTPUseCase {
+	return &DisableTOTPUseCase{auth: a}
+}
+
+func (uc *DisableTOTPUseCase) Execute(_ context.Context, in DisableTOTPInput) error {
+	if uc.auth == nil {
+		return ErrAuthDisabled
+	}
+	return uc.auth.DisableTOTP(in.UserID, in.CurrentPassword, in.Code, in.CurrentRefreshToken)
+}
+
+// ─── GetTOTPStatusUseCase ────────────────────────────────────────────────────
+
+type GetTOTPStatusInput struct {
+	UserID string
+}
+
+type GetTOTPStatusOutput struct {
+	Enabled                bool
+	RecoveryCodesRemaining int
+}
+
+type GetTOTPStatusUseCase struct {
+	auth *coreauth.AuthService
+}
+
+func NewGetTOTPStatusUseCase(a *coreauth.AuthService) *GetTOTPStatusUseCase {
+	return &GetTOTPStatusUseCase{auth: a}
+}
+
+func (uc *GetTOTPStatusUseCase) Execute(_ context.Context, in GetTOTPStatusInput) (*GetTOTPStatusOutput, error) {
+	if uc.auth == nil {
+		return nil, ErrAuthDisabled
+	}
+	status, err := uc.auth.GetTOTPStatus(in.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return &GetTOTPStatusOutput{Enabled: status.Enabled, RecoveryCodesRemaining: status.RecoveryCodesRemaining}, nil
 }
 
 // ─── LogoutUseCase ───────────────────────────────────────────────────────────
@@ -247,13 +394,14 @@ func (uc *ChangeOwnPasswordUseCase) Execute(_ context.Context, in ChangeOwnPassw
 type DeleteUserInput struct{ ID string }
 
 type DeleteUserUseCase struct {
-	user     *coreauth.UserService
-	resolver *coreauth.UserResolver
-	log      *slog.Logger
+	user      *coreauth.UserService
+	resolver  *coreauth.UserResolver
+	favorites *favorites.FavoritesStore
+	log       *slog.Logger
 }
 
-func NewDeleteUserUseCase(u *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger) *DeleteUserUseCase {
-	return &DeleteUserUseCase{user: u, resolver: r, log: log}
+func NewDeleteUserUseCase(u *coreauth.UserService, r *coreauth.UserResolver, f *favorites.FavoritesStore, log *slog.Logger) *DeleteUserUseCase {
+	return &DeleteUserUseCase{user: u, resolver: r, favorites: f, log: log}
 }
 
 func (uc *DeleteUserUseCase) Execute(_ context.Context, in DeleteUserInput) error {
@@ -262,6 +410,9 @@ func (uc *DeleteUserUseCase) Execute(_ context.Context, in DeleteUserInput) erro
 	}
 	if err := uc.resolver.Reload(); err != nil {
 		log.Printf(logReloadUserResolverCacheWarning, err)
+	}
+	if err := uc.favorites.DeleteAllForUser(in.ID); err != nil {
+		uc.log.Warn("failed to delete favorites for deleted user", "userID", in.ID, "error", err)
 	}
 	return nil
 }

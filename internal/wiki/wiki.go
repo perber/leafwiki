@@ -11,8 +11,10 @@ import (
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/favorites"
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	coreimporter "github.com/perber/wiki/internal/importer"
@@ -34,6 +36,7 @@ import (
 	wikiresync "github.com/perber/wiki/internal/wiki/resync"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
+	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 	wikitags "github.com/perber/wiki/internal/wiki/tags"
 )
 
@@ -44,6 +47,7 @@ type Wiki struct {
 	userResolver *auth.UserResolver
 	user         *auth.UserService
 	apiKeys      *auth.APIKeyService
+	totp         *auth.TOTPService
 	asset        *assets.AssetService
 	branding     *branding.BrandingService
 	searchIndex  *search.SQLiteIndex
@@ -67,9 +71,12 @@ type Wiki struct {
 	links            *links.LinkService
 	tags             *tags.TagsService
 	props            *properties.PropertiesService
+	favorites        *favorites.FavoritesStore
 	backupRoutes     *wikibackup.Routes
+	snapshotRoutes   *wikisnapshot.Routes
 	resyncRoutes     *wikiresync.Routes
 	resyncJob        *wikiresync.ResyncJob
+	ignoreCache      *ignore.Cache
 	reloadMu         sync.Mutex
 	reloadWG         sync.WaitGroup
 	shutdownCtx      context.Context
@@ -94,6 +101,7 @@ type WikiOptions struct {
 	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 	RevisionCoalesceWindow  time.Duration // Window for coalescing rapid successive saves; 0 = disabled
+	TOTPEncryptionKey       string        // Key used to encrypt per-user TOTP secrets at rest; empty disables TOTP self-service
 	Metrics                 *httpmetrics.HTTPMetrics
 }
 
@@ -120,6 +128,9 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		return nil, err
 	}
 	if err := w.initPropertiesService(); err != nil {
+		return nil, err
+	}
+	if err := w.initFavoritesService(); err != nil {
 		return nil, err
 	}
 	w.bootstrapTagsAndProperties()
@@ -196,13 +207,19 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 	if err != nil {
 		return err
 	}
-
+	if options.TOTPEncryptionKey != "" {
+		totpService, err := auth.NewTOTPService([]byte(options.TOTPEncryptionKey))
+		if err != nil {
+			return fmt.Errorf("invalid TOTP encryption key: %w", err)
+		}
+		w.totp = totpService
+	}
 	if !options.AuthDisabled {
 		sessionStore, err := auth.NewSessionStore(w.storageDir)
 		if err != nil {
 			return err
 		}
-		w.auth = auth.NewAuthService(w.user, sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+		w.auth = auth.NewAuthService(w.user, sessionStore, w.totp, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
 
 		// API keys are only meaningful when authentication is meaningful:
 		// key management is admin-only and RequireAdmin already hard-blocks
@@ -230,12 +247,19 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 }
 
 func (w *Wiki) initCoreServices(options *WikiOptions) error {
+	// Create a shared ignore cache for multi-level .leafwikiignore resolution.
+	rootDir := filepath.Join(w.storageDir, "root")
+	w.ignoreCache = ignore.NewCache(rootDir)
+
 	w.tree = tree.NewTreeService(w.storageDir)
+	w.tree.SetIgnoreCache(w.ignoreCache)
 	if err := w.tree.LoadTree(); err != nil {
 		return err
 	}
 	w.slug = tree.NewSlugService()
 	w.asset = assets.NewAssetService(w.storageDir, w.slug)
+	w.asset.SetIgnoreCache(w.ignoreCache)
+
 	return nil
 }
 
@@ -266,6 +290,15 @@ func (w *Wiki) initPropertiesService() error {
 		return fmt.Errorf("failed to init properties store: %w", err)
 	}
 	w.props = properties.NewPropertiesService(propsStore)
+	return nil
+}
+
+func (w *Wiki) initFavoritesService() error {
+	store, err := favorites.NewFavoritesStore(w.storageDir)
+	if err != nil {
+		return fmt.Errorf("failed to init favorites store: %w", err)
+	}
+	w.favorites = store
 	return nil
 }
 
@@ -380,7 +413,7 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 		TreeService:      w.tree,
 		CreatePage:       wikipages.NewCreatePageUseCase(w.tree, w.slug, o, w.log, w.metrics),
 		UpdatePage:       wikipages.NewUpdatePageUseCase(w.tree, w.slug, o, w.log, w.metrics),
-		DeletePage:       wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, o, w.log, w.metrics),
+		DeletePage:       wikipages.NewDeletePageUseCase(w.tree, w.revision, w.asset, w.favorites, o, w.log, w.metrics),
 		MovePage:         wikipages.NewMovePageUseCase(w.tree, o, w.log, w.metrics),
 		ConvertPage:      wikipages.NewConvertPageUseCase(w.tree, w.revision, w.log),
 		CopyPage:         wikipages.NewCopyPageUseCase(w.tree, w.slug, o, w.asset, w.log),
@@ -395,6 +428,9 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 		PreviewRefactor:  wikipages.NewPreviewPageRefactorUseCase(w.tree, w.slug, w.links, w.log),
 		ApplyRefactor:    wikipages.NewApplyPageRefactorUseCase(w.tree, w.slug, w.revision, w.links, w.log, w.metrics),
 		PinPage:          wikipages.NewPinPageUseCase(w.tree, w.log),
+		AddFavorite:      wikipages.NewAddFavoriteUseCase(w.tree, w.favorites),
+		RemoveFavorite:   wikipages.NewRemoveFavoriteUseCase(w.favorites),
+		ListFavorites:    wikipages.NewListFavoritesUseCase(w.tree, w.favorites, w.log),
 		UserResolver:     w.userResolver,
 		AuthService:      w.auth,
 	})
@@ -403,14 +439,19 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 	return wikiauth.NewRoutes(wikiauth.RoutesConfig{
 		Login:             wikiauth.NewLoginUseCase(w.auth),
+		CompleteTOTPLogin: wikiauth.NewCompleteTOTPLoginUseCase(w.auth),
 		Logout:            wikiauth.NewLogoutUseCase(w.auth),
 		RefreshToken:      wikiauth.NewRefreshTokenUseCase(w.auth),
 		CreateUser:        wikiauth.NewCreateUserUseCase(w.user, w.userResolver, w.log),
 		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.user, w.userResolver, w.log),
 		ChangeOwnPassword: wikiauth.NewChangeOwnPasswordUseCase(w.user),
-		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.user, w.userResolver, w.log),
+		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.user, w.userResolver, w.favorites, w.log),
 		GetUsers:          wikiauth.NewGetUsersUseCase(w.user),
 		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.user),
+		StartTOTPSetup:    wikiauth.NewStartTOTPSetupUseCase(w.auth),
+		ConfirmTOTPSetup:  wikiauth.NewConfirmTOTPSetupUseCase(w.auth),
+		DisableTOTP:       wikiauth.NewDisableTOTPUseCase(w.auth),
+		GetTOTPStatus:     wikiauth.NewGetTOTPStatusUseCase(w.auth),
 		AuthService:       w.auth,
 	})
 }
@@ -498,7 +539,9 @@ func (w *Wiki) buildAPIKeysRoutes() *wikiapikeys.Routes {
 func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 	importerDir := filepath.Join(options.StorageDir, ".importer")
 	adapter := NewWikiImportAdapter(w)
-	planner := coreimporter.NewPlanner(adapter, w.slug)
+	planner := coreimporter.NewPlanner(adapter, w.slug, options.StorageDir)
+	planner.SetIgnoreCache(w.ignoreCache)
+
 	store := coreimporter.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
 	svc := coreimporter.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), options.MaxAssetUploadSizeBytes)
 	return wikiimporter.NewRoutes(wikiimporter.RoutesConfig{
@@ -534,6 +577,9 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 	if w.backupRoutes != nil {
 		registrars = append(registrars, w.backupRoutes)
 	}
+	if w.snapshotRoutes != nil {
+		registrars = append(registrars, w.snapshotRoutes)
+	}
 	return registrars
 }
 
@@ -542,9 +588,21 @@ func (w *Wiki) SetBackupRoutes(r *wikibackup.Routes) {
 	w.backupRoutes = r
 }
 
+// SetSnapshotRoutes sets the full-backup (snapshot) routes and must be called before router creation.
+func (w *Wiki) SetSnapshotRoutes(r *wikisnapshot.Routes) {
+	w.snapshotRoutes = r
+}
+
 // AuthService returns the authentication service.
 func (w *Wiki) AuthService() *auth.AuthService {
 	return w.auth
+}
+
+// TOTPService returns the TOTP service, or nil if no --totp-encryption-key /
+// LEAFWIKI_TOTP_ENCRYPTION_KEY was configured (TOTP self-service is then
+// unavailable until an operator sets one).
+func (w *Wiki) TOTPService() *auth.TOTPService {
+	return w.totp
 }
 
 // FrontendConfig returns the minimal runtime data required by the router to serve the SPA.

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/tree"
@@ -58,18 +59,34 @@ type PlanResult struct {
 
 // Planner is responsible for creating an import plan
 type Planner struct {
-	log     *slog.Logger
-	wiki    ImporterWiki
-	slugger *tree.SlugService
+	log         *slog.Logger
+	wiki        ImporterWiki
+	slugger     *tree.SlugService
+	storageDir  string
+	ignoreCache *ignore.Cache
 }
 
 // NewPlanner creates a new Planner
-func NewPlanner(wiki ImporterWiki, slugger *tree.SlugService) *Planner {
+func NewPlanner(wiki ImporterWiki, slugger *tree.SlugService, storageDir string) *Planner {
 	return &Planner{
-		log:     slog.Default().With("component", "Planner"),
-		wiki:    wiki,
-		slugger: slugger,
+		log:        slog.Default().With("component", "Planner"),
+		wiki:       wiki,
+		slugger:    slugger,
+		storageDir: storageDir,
 	}
+}
+
+// SetIgnoreCache sets the ignore cache for filtering import targets.
+func (p *Planner) SetIgnoreCache(ignoreCache *ignore.Cache) {
+	p.ignoreCache = ignoreCache
+}
+
+// getIgnoreForDir returns the compiled ignore rules for the given directory.
+func (p *Planner) getIgnoreForDir(dir string) *ignore.IgnoreFile {
+	if p.ignoreCache == nil {
+		return nil
+	}
+	return p.ignoreCache.Get(dir)
 }
 
 // CreatePlan creates an import plan based on the provided entries and options
@@ -91,6 +108,17 @@ func (p *Planner) CreatePlan(entries []ImportMDFile, options PlanOptions) (*Plan
 			p.log.Warn("could not import resource", "source_path", entry.SourcePath, "error", err)
 			result.Errors = append(result.Errors, err.Error())
 			continue
+		}
+
+		// Skip entries targeting ignored paths
+		targetRel := filepath.ToSlash(resEntry.TargetPath)
+		isDir := resEntry.Kind == tree.NodeKindSection
+		dir := filepath.Join(p.storageDir, "root", filepath.Dir(targetRel))
+		if ig := p.getIgnoreForDir(dir); ig != nil {
+			if ig.Matches(targetRel, isDir) {
+				p.log.Debug("skipping import entry matching .leafwikiignore", "target", targetRel, "source", entry.SourcePath)
+				continue
+			}
 		}
 
 		result.Items = append(result.Items, *resEntry)

@@ -39,6 +39,15 @@
     "togglePinnedSection": "Toggle pinned pages section",
     "togglePagesSection": "Toggle pages section"
   },
+  "favorites": {
+    "sectionTitle": "Favorites",
+    "addFavorite": "Add to favorites",
+    "removeFavorite": "Remove from favorites",
+    "addSuccess": "Added to favorites",
+    "removeSuccess": "Removed from favorites",
+    "favoriteError": "Failed to update favorites",
+    "toggleFavoritesSection": "Toggle favorites section"
+  },
   "toc": {
     "title": "Table of contents",
     "onThisPage": "On this page",

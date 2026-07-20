@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { login } from '@/lib/api/auth'
+import { completeTOTPLogin, login } from '@/lib/api/auth'
 import { mapApiError } from '@/lib/api/errors'
 import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
@@ -35,6 +35,10 @@ export default function LoginForm() {
   const { t } = useTranslation('auth')
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+  const [loginChallengeToken, setLoginChallengeToken] = useState<string | null>(
+    null,
+  )
+  const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
 
   const location = useLocation()
@@ -48,13 +52,17 @@ export default function LoginForm() {
     return <Navigate to={redirectTo || '/'} replace />
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
+      const result = await login(identifier, password)
+      if ('requiresTotp' in result) {
+        setLoginChallengeToken(result.loginChallengeToken)
+        return
+      }
       // user already set in the store by the login function
-      await login(identifier, password)
       // Restore the originally requested page after successful login.
       navigate(redirectTo || '/', { replace: true })
     } catch (err) {
@@ -65,23 +73,96 @@ export default function LoginForm() {
     }
   }
 
+  const handleTotpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!loginChallengeToken) return
+    setLoading(true)
+
+    try {
+      // user already set in the store by completeTOTPLogin
+      await completeTOTPLogin(loginChallengeToken, code)
+      navigate(redirectTo || '/', { replace: true })
+    } catch (err) {
+      const mapped = mapApiError(err, t('login.totp.errorFallback'))
+      toast.error(mapped.message)
+      setCode('')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const logoHeader = (
+    <h1 className="login__title">
+      {logoFile ? (
+        <img
+          src={`${withBasePath(`/branding/${logoFile}`)}?v=${logoVersion}`}
+          alt={siteName}
+          className="login__logo-image"
+        />
+      ) : (
+        <span>🌿</span>
+      )}{' '}
+      {siteName}
+    </h1>
+  )
+
+  if (loginChallengeToken) {
+    return (
+      <>
+        <title>{t('login.pageTitle', { siteName })}</title>
+        <div className="login">
+          <form onSubmit={handleTotpSubmit} className="login__form">
+            {logoHeader}
+            <p className="login__totp-description">
+              {t('login.totp.description')}
+            </p>
+
+            <div className="login__field">
+              <Input
+                type="text"
+                placeholder={t('login.totp.codePlaceholder')}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                required
+                name="code"
+                autoComplete="one-time-code"
+                autoFocus
+                data-testid="login-totp-code"
+                spellCheck={false}
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="login__submit"
+              disabled={loading}
+              data-testid="login-totp-submit"
+            >
+              {loading ? t('login.totp.submitting') : t('login.totp.submit')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={loading}
+              onClick={() => {
+                setLoginChallengeToken(null)
+                setCode('')
+              }}
+            >
+              {t('login.totp.back')}
+            </Button>
+          </form>
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <title>{t('login.pageTitle', { siteName })}</title>
       <div className="login">
-        <form onSubmit={handleSubmit} className="login__form">
-          <h1 className="login__title">
-            {logoFile ? (
-              <img
-                src={`${withBasePath(`/branding/${logoFile}`)}?v=${logoVersion}`}
-                alt={siteName}
-                className="login__logo-image"
-              />
-            ) : (
-              <span>🌿</span>
-            )}{' '}
-            {siteName}
-          </h1>
+        <form onSubmit={handleCredentialsSubmit} className="login__form">
+          {logoHeader}
 
           <div className="login__field">
             <Input

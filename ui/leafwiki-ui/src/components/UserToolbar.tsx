@@ -14,6 +14,8 @@ import i18next from '@/lib/i18n'
 import {
   DIALOG_CHANGE_OWN_PASSWORD,
   DIALOG_SHORTCUTS_HELP,
+  DIALOG_TOTP_DISABLE,
+  DIALOG_TOTP_SETUP,
 } from '@/lib/registries'
 import { useTranslation } from 'react-i18next'
 import { redirectToExternal } from '@/lib/redirectToExternal'
@@ -40,7 +42,13 @@ const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
 )
 
 export default function UserToolbar() {
-  const { t } = useTranslation(['auth', 'backup', 'apikeys'])
+  const { t } = useTranslation([
+    'auth',
+    'backup',
+    'apikeys',
+    'snapshot',
+    'users',
+  ])
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
@@ -50,6 +58,7 @@ export default function UserToolbar() {
   const readOnly = useIsReadOnly()
   const backupEnabled = useConfigStore((s) => s.gitBackupEnabled)
   const apiKeysEnabled = useConfigStore((s) => s.enableApiKeyManagement)
+  const snapshotEnabled = useConfigStore((s) => s.snapshotEnabled)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
   const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)
@@ -176,6 +185,14 @@ export default function UserToolbar() {
                 {t('menuLabel', { ns: 'backup' })}
               </DropdownMenuItem>
             )}
+            {snapshotEnabled && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => navigate('/settings/snapshots')}
+              >
+                {t('menuLabel', { ns: 'snapshot' })}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => navigate('/settings/maintenance')}
@@ -203,8 +220,26 @@ export default function UserToolbar() {
             className="cursor-pointer"
             onClick={() => openDialog(DIALOG_CHANGE_OWN_PASSWORD)}
           >
-            Change Own Password
+            {t('userMenu.changeOwnPassword')}
           </DropdownMenuItem>
+          {!authDisabled &&
+            (user?.totpEnabled ? (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => openDialog(DIALOG_TOTP_DISABLE)}
+                data-testid="user-toolbar-totp-disable"
+              >
+                {t('totp.menuDisable', { ns: 'users' })}
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => openDialog(DIALOG_TOTP_SETUP)}
+                data-testid="user-toolbar-totp-enable"
+              >
+                {t('totp.menuEnable', { ns: 'users' })}
+              </DropdownMenuItem>
+            ))}
           {(!httpRemoteUserEnabled || logoutUrl) && (
             <DropdownMenuItem
               className="cursor-pointer"

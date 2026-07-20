@@ -44,28 +44,21 @@ func NewLinksStore(storageDir string) (*LinksStore, error) {
 		filename:   "links.db",
 	}
 
-	if err := s.Connect(); err != nil {
+	// ensureSchema calls Connect() itself (idempotently), so it alone is
+	// enough to bring the store to a working state.
+	err := sqliteutil.RetryOnCorruption(linksDatabasePath(s.storageDir, s.filename), func() error {
+		if err := s.ensureSchema(); err != nil {
+			if s.db != nil {
+				_ = s.db.Close()
+				s.db = nil
+			}
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	if err := s.ensureSchema(); err != nil {
-		_ = s.db.Close()
-		s.db = nil
-		if !sqliteutil.IsSQLiteRecoverableError(err) {
-			return nil, err
-		}
-		slog.Default().Warn("links database corrupt, removing and retrying", "error", err)
-		sqliteutil.RemoveSQLiteFiles(linksDatabasePath(s.storageDir, s.filename))
-		if err2 := s.Connect(); err2 != nil {
-			return nil, err2
-		}
-		if err2 := s.ensureSchema(); err2 != nil {
-			_ = s.db.Close()
-			s.db = nil
-			return nil, err2
-		}
-	}
-
 	return s, nil
 }
 

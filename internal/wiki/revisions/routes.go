@@ -279,4 +279,3 @@ func (r *Routes) handleRestoreRevision(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, dto.ToAPIPage(out.Page, r.userResolver))
 }
-

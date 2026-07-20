@@ -11,6 +11,7 @@ type ConfigStore = {
   enableLinkRefactor: boolean
   enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
+  snapshotEnabled: boolean
   httpRemoteUserEnabled: boolean
   loginUrl: string
   logoutUrl: string
@@ -30,6 +31,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   enableLinkRefactor: false,
   enableApiKeyManagement: false,
   gitBackupEnabled: false,
+  snapshotEnabled: false,
   httpRemoteUserEnabled: false,
   loginUrl: '',
   logoutUrl: '',
@@ -57,6 +59,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         enableLinkRefactor: config.enableLinkRefactor ?? false,
         enableApiKeyManagement: config.enableApiKeyManagement ?? false,
         gitBackupEnabled: config.gitBackupEnabled ?? false,
+        snapshotEnabled: config.snapshotEnabled ?? false,
         httpRemoteUserEnabled: config.httpRemoteUserEnabled ?? false,
         loginUrl: config.loginUrl ?? '',
         logoutUrl: config.logoutUrl ?? '',

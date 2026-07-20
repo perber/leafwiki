@@ -10,22 +10,29 @@ import (
 )
 
 const (
-	ErrCodeAuthDisabled             = "auth_disabled"
-	ErrCodeAuthInvalidCredentials   = "auth_invalid_credentials"
-	ErrCodeAuthTokenExpired         = "auth_token_expired"
-	ErrCodeAuthUserNotFound         = "auth_user_not_found"
-	ErrCodeAuthUserAlreadyExists    = "auth_user_already_exists"
-	ErrCodeAuthInvalidRole          = "auth_invalid_role"
-	ErrCodeAuthForbidden            = "auth_forbidden"
-	ErrCodeAuthAdminCannotDelete    = "auth_admin_cannot_delete"
+	ErrCodeAuthDisabled                 = "auth_disabled"
+	ErrCodeAuthInvalidCredentials       = "auth_invalid_credentials"
+	ErrCodeAuthTokenExpired             = "auth_token_expired"
+	ErrCodeAuthUserNotFound             = "auth_user_not_found"
+	ErrCodeAuthUserAlreadyExists        = "auth_user_already_exists"
+	ErrCodeAuthInvalidRole              = "auth_invalid_role"
+	ErrCodeAuthForbidden                = "auth_forbidden"
+	ErrCodeAuthAdminCannotDelete        = "auth_admin_cannot_delete"
 	ErrCodeAuthLastAdminCannotBeDemoted = "auth_last_admin_cannot_be_demoted"
-	ErrCodeAuthInternalError        = "auth_internal_error"
-	ErrCodeAuthInvalidPayload       = "auth_invalid_payload"
-	ErrCodeAuthCookieFailed         = "auth_cookie_failed"
-	ErrCodeAuthCsrfFailed           = "auth_csrf_failed"
-	ErrCodeAuthInvalidRefreshToken  = "auth_invalid_refresh_token"
-	ErrCodeAuthInvalidRequest       = "auth_invalid_request"
-	ErrCodeAuthAccountLocked        = "auth_account_locked"
+	ErrCodeAuthInternalError            = "auth_internal_error"
+	ErrCodeAuthInvalidPayload           = "auth_invalid_payload"
+	ErrCodeAuthCookieFailed             = "auth_cookie_failed"
+	ErrCodeAuthCsrfFailed               = "auth_csrf_failed"
+	ErrCodeAuthInvalidRefreshToken      = "auth_invalid_refresh_token"
+	ErrCodeAuthInvalidRequest           = "auth_invalid_request"
+	ErrCodeAuthAccountLocked            = "auth_account_locked"
+	ErrCodeAuthTOTPInvalidCode          = "auth_totp_invalid_code"
+	ErrCodeAuthTOTPChallengeInvalid     = "auth_totp_challenge_invalid"
+	ErrCodeAuthTOTPNotConfigured        = "auth_totp_not_configured"
+	ErrCodeAuthTOTPAlreadyEnabled       = "auth_totp_already_enabled"
+	ErrCodeAuthTOTPSetupNotStarted      = "auth_totp_setup_not_started"
+	ErrCodeAuthTOTPNotEnabled           = "auth_totp_not_enabled"
+	ErrCodeAuthTOTPVerificationFailed   = "auth_totp_verification_failed"
 )
 
 // AuthErrorResponse is the structured JSON error body returned by auth endpoints.
@@ -110,6 +117,16 @@ func authErrorStatus(code string) int {
 		return http.StatusUnauthorized
 	case ErrCodeAuthDisabled, ErrCodeAuthForbidden:
 		return http.StatusForbidden
+	case ErrCodeAuthTOTPInvalidCode:
+		return http.StatusUnauthorized
+	case ErrCodeAuthTOTPChallengeInvalid:
+		return http.StatusUnprocessableEntity
+	case ErrCodeAuthTOTPNotConfigured, ErrCodeAuthTOTPVerificationFailed:
+		return http.StatusServiceUnavailable
+	case ErrCodeAuthTOTPAlreadyEnabled:
+		return http.StatusConflict
+	case ErrCodeAuthTOTPSetupNotStarted, ErrCodeAuthTOTPNotEnabled:
+		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
 	}
