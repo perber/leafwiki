@@ -40,7 +40,6 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   - [Environment Variables](#environment-variables)
   - [Custom Stylesheet](#custom-stylesheet)
   - [Reverse-Proxy Authentication](#reverse-proxy-authentication)
-  - [API Keys](#api-keys-experimental)
   - [Unix Socket](#unix-socket-v0113)
   - [Git Backup](#git-backup-v0113-experimental)
   - [Full Backup](#full-backup-unreleased-experimental)
@@ -430,28 +429,6 @@ Available since v0.10.0. Use when an upstream proxy authenticates users and forw
 - `--login-url` and `--logout-url` must start with `http://` or `https://`; the server refuses to start otherwise. `--user-management-url` has no such restriction — it's only used as a link, so relative paths work too
 - ⚠️ `--login-url` takes effect regardless of `--enable-http-remote-user` and has no in-app bypass: once set, *every* unauthenticated visit (including `/login` itself) redirects to it immediately. Double-check the URL before setting it — a wrong or unreachable value locks all users, including admins, out of the built-in login form
 - `--http-remote-user-logout-url` (v0.10.0) is deprecated; use `--logout-url` instead. It still works as a fallback when `--logout-url`/`LEAFWIKI_LOGOUT_URL` isn't set, but a deprecation warning is logged
-
-### API Keys (experimental)
-
-> **Experimental** — Off by default. Enable with `--enable-api-key-management` while this feature is introduced and stabilized.
-
-Admin-managed keys for programmatic or agent access — create them from **Settings → API Keys**.
-
-```bash
-./leafwiki --enable-api-key-management ...
-curl -H "Authorization: Bearer lw_..." https://your-wiki.example.com/api/tree
-```
-
-| Flag | Environment variable | Description | Default |
-|------|-----------------------|--------------|---------|
-| `--enable-api-key-management` | `LEAFWIKI_ENABLE_API_KEY_MANAGEMENT` | Enable the experimental API key management feature | `false` |
-
-- When disabled (the default), the "API Keys" admin page/menu entry is hidden, the `/api/api-keys` management routes report the feature as disabled, and Bearer authentication is never active
-- A key belongs to a real user: every request made through it is attributed to that user, the same way manual edits are
-- A key's permission is the *narrower* of its own role and its owner's role — a viewer-scoped key stays read-only even if its owner is an admin, and demoting a user automatically caps every key they own
-- Keys can have an optional expiry date and are revocable at any time; revocation takes effect on the next request
-- The full key is shown once, at creation — store it securely, it cannot be viewed again afterward
-- Read-only for now: a request made with a key is rejected for any write, regardless of role
 
 ### Unix Socket (v0.11.3)
 
