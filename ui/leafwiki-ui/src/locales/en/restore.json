@@ -28,5 +28,8 @@
     "restoreTriggerFailed": "Failed to start restore",
     "restoreFailed": "Restore failed",
     "restoreSucceeded": "Restore completed. Reloading…"
+  },
+  "errors": {
+    "jobLost": "Restore job lost — server may have restarted"
   }
 }

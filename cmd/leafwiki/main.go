@@ -582,6 +582,19 @@ func main() {
 		defer snapshotScheduler.Stop()
 		w.SetSnapshotRoutes(wikisnapshot.NewRoutes(snapshotManager, snapshotScheduler, w.AuthService(), snapshotRetention))
 
+		if runtime.GOOS == "windows" {
+			// A live restore renames users.db aside/in while AuthService's
+			// *sql.DB connection to it may still be open (the connection is
+			// only reopened afterward, in ReplaceUserStore) — on Windows,
+			// renaming a file with an open handle can fail with a sharing
+			// violation unless that handle was opened with FILE_SHARE_DELETE,
+			// which hasn't been verified for the sqlite driver in use here.
+			// Not blocking startup over it: this needs real Windows testing
+			// to confirm one way or the other, not a guess baked into a
+			// hard failure.
+			slog.Default().Warn("live restore (--snapshot) on Windows is not yet verified: renaming users.db while it may still be open could fail with a sharing violation; test a restore on this platform before relying on it, or use the offline `restore-snapshot` subcommand instead (it runs before the server starts, with no open handle on users.db)")
+		}
+
 		writeGate = restore.NewWriteGate()
 		restoreManager := restore.NewManager(restore.Config{
 			SnapshotManager: snapshotManager,
@@ -592,6 +605,10 @@ func main() {
 			BrandingService: w.BrandingService(),
 			TriggerResync:   w.TriggerResyncAsync,
 		})
+		// Registered after (so it runs before, defers are LIFO) the w.Close()
+		// deferred above: an in-flight restore must finish before AuthService's
+		// user/session stores get closed out from under it during shutdown.
+		defer restoreManager.Wait()
 		w.SetRestoreRoutes(wikirestore.NewRoutes(restoreManager, w.AuthService()))
 	}
 

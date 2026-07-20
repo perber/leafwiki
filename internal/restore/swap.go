@@ -147,9 +147,16 @@ type swapItem struct {
 	livePath   string
 	stagedPath string
 	preRestore string
-	// swapped is true once this item's live path has actually been renamed
-	// aside and the staged replacement moved in (only items present in the
-	// staging dir get swapped at all).
+	// movedAside is true once SwapAll has passed the move-aside step for this
+	// item — i.e. either the live path existed and was successfully renamed
+	// to preRestore, or it didn't exist at all (nothing to move aside).
+	// Tracked independently of swapped so that if the *second* rename
+	// (staged -> live) then fails, RollbackAll still knows to check for and
+	// restore a preRestore copy instead of silently leaving the item missing.
+	movedAside bool
+	// swapped is true once this item's staged replacement was fully moved
+	// into place (implies movedAside; only items present in the staging dir
+	// get swapped at all).
 	swapped bool
 }
 
@@ -198,6 +205,7 @@ func (sw *swapper) SwapAll() error {
 				return fmt.Errorf("failed to move aside %s: %w", item.name, err)
 			}
 		}
+		item.movedAside = true
 
 		if err := os.Rename(item.stagedPath, item.livePath); err != nil {
 			return fmt.Errorf("failed to move in restored %s: %w", item.name, err)
@@ -207,16 +215,24 @@ func (sw *swapper) SwapAll() error {
 	return nil
 }
 
-// RollbackAll reverses every item SwapAll already committed: removes the
-// restored content and moves each .pre-restore-* copy back into place.
-// Best-effort — accumulates every error rather than stopping at the first, so
-// every item still gets attempted even if one fails.
+// RollbackAll reverses every item SwapAll touched: removes any restored
+// content currently at the live path and moves each .pre-restore-* copy back
+// into place. Driven by movedAside, not swapped — an item whose move-aside
+// succeeded but whose move-in then failed (SwapAll's second rename) has no
+// live content of its own at all right now, but still has a pre-restore copy
+// that must be put back; checking only swapped would skip it and leave the
+// item permanently missing. Best-effort — accumulates every error rather than
+// stopping at the first, so every item still gets attempted even if one fails.
 func (sw *swapper) RollbackAll() error {
 	var errs []error
 	for _, item := range sw.items {
-		if !item.swapped {
+		// swapped always implies movedAside (SwapAll only ever sets swapped
+		// after movedAside, in the same iteration), so movedAside alone is
+		// the correct "did SwapAll touch this item at all" check.
+		if !item.movedAside {
 			continue
 		}
+		// Safe no-op if the move-in step never ran (nothing to remove).
 		if err := os.RemoveAll(item.livePath); err != nil {
 			errs = append(errs, fmt.Errorf("%s: failed to remove restored content: %w", item.name, err))
 			continue
@@ -224,6 +240,7 @@ func (sw *swapper) RollbackAll() error {
 		if _, statErr := os.Stat(item.preRestore); statErr != nil {
 			// Nothing was renamed aside (the live item didn't exist before
 			// the swap) — nothing to restore, the item is now correctly absent.
+			item.movedAside = false
 			item.swapped = false
 			continue
 		}
@@ -231,6 +248,7 @@ func (sw *swapper) RollbackAll() error {
 			errs = append(errs, fmt.Errorf("%s: failed to restore pre-restore copy: %w", item.name, err))
 			continue
 		}
+		item.movedAside = false
 		item.swapped = false
 	}
 	return errors.Join(errs...)

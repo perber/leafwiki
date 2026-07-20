@@ -110,8 +110,8 @@ func (a *AuthService) Close() error {
 		}
 	}
 
-	if a.userService != nil {
-		if err := a.users().Close(); err != nil {
+	if users := a.users(); users != nil {
+		if err := users.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -208,7 +208,14 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 		return nil, ErrUserAccountLocked
 	}
 
-	user, err := a.users().GetUserByID(userID)
+	// Captured once and threaded through to verifyTOTPOrRecoveryCode below,
+	// so the whole handshake (fetch + verify + consume-recovery-code) reads
+	// and writes against the same underlying user store even if a live
+	// restore hot-swaps AuthService.userService partway through — instead of
+	// each call independently re-reading whatever store is current at that
+	// instant.
+	users := a.users()
+	user, err := users.GetUserByID(userID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
@@ -217,7 +224,7 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 		return nil, errInvalidLoginChallenge()
 	}
 
-	valid, err := a.verifyTOTPOrRecoveryCode(user, code)
+	valid, err := a.verifyTOTPOrRecoveryCode(users, user, code)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +252,10 @@ func (a *AuthService) StartTOTPSetup(userID, currentPassword string) (*Generated
 	if a.totp == nil {
 		return nil, errTOTPNotConfigured()
 	}
-	user, err := a.users().DoesIDAndPasswordMatch(userID, currentPassword)
+	// Captured once so both calls below hit the same store even across a
+	// concurrent live-restore swap — see CompleteTOTPLogin's comment.
+	users := a.users()
+	user, err := users.DoesIDAndPasswordMatch(userID, currentPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +267,7 @@ func (a *AuthService) StartTOTPSetup(userID, currentPassword string) (*Generated
 	if err != nil {
 		return nil, err
 	}
-	if err := a.users().SetPendingTOTPSecret(userID, generated.EncryptedSecret); err != nil {
+	if err := users.SetPendingTOTPSecret(userID, generated.EncryptedSecret); err != nil {
 		return nil, err
 	}
 	return generated, nil
@@ -272,7 +282,10 @@ func (a *AuthService) ConfirmTOTPSetup(userID, code, currentRefreshToken string)
 	if a.totp == nil {
 		return nil, errTOTPNotConfigured()
 	}
-	user, err := a.users().GetUserByID(userID)
+	// Captured once so both calls below hit the same store even across a
+	// concurrent live-restore swap — see CompleteTOTPLogin's comment.
+	users := a.users()
+	user, err := users.GetUserByID(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +308,7 @@ func (a *AuthService) ConfirmTOTPSetup(userID, code, currentRefreshToken string)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.users().EnableTOTP(userID, user.TOTPSecretEncrypted, hashes); err != nil {
+	if err := users.EnableTOTP(userID, user.TOTPSecretEncrypted, hashes); err != nil {
 		return nil, err
 	}
 
@@ -314,7 +327,10 @@ func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshT
 	if a.totp == nil {
 		return errTOTPNotConfigured()
 	}
-	user, err := a.users().DoesIDAndPasswordMatch(userID, currentPassword)
+	// Captured once so every call below hits the same store even across a
+	// concurrent live-restore swap — see CompleteTOTPLogin's comment.
+	users := a.users()
+	user, err := users.DoesIDAndPasswordMatch(userID, currentPassword)
 	if err != nil {
 		return err
 	}
@@ -322,7 +338,7 @@ func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshT
 		return errTOTPNotEnabled()
 	}
 
-	valid, err := a.verifyTOTPOrRecoveryCode(user, code)
+	valid, err := a.verifyTOTPOrRecoveryCode(users, user, code)
 	if err != nil {
 		return err
 	}
@@ -330,7 +346,7 @@ func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshT
 		return errTOTPInvalidCode()
 	}
 
-	if err := a.users().DisableTOTP(userID); err != nil {
+	if err := users.DisableTOTP(userID); err != nil {
 		return err
 	}
 
@@ -386,12 +402,18 @@ const maxRecoveryCodeConsumeAttempts = 3
 // matched recovery code so it cannot be reused. Shared by the login handshake
 // and the self-service disable flow.
 //
+// users is the *UserService the caller already fetched user from — threaded
+// through explicitly (rather than calling a.users() again in here) so the
+// whole fetch-verify-consume-and-retry sequence reads and writes against one
+// consistent store even if a live restore hot-swaps AuthService.userService
+// partway through.
+//
 // Recovery-code consumption uses optimistic concurrency (compare-and-swap on
 // the stored hash list) rather than a plain read-then-write, so that two
 // concurrent requests presenting the same recovery code cannot both succeed:
 // only the first writer's compare-and-swap can match the row's current state;
 // the loser re-reads the now-current hashes and retries against those.
-func (a *AuthService) verifyTOTPOrRecoveryCode(user *User, code string) (bool, error) {
+func (a *AuthService) verifyTOTPOrRecoveryCode(users *UserService, user *User, code string) (bool, error) {
 	valid, err := a.totp.VerifyCode(user.TOTPSecretEncrypted, code)
 	if err != nil {
 		return false, errTOTPVerificationFailed(err)
@@ -411,7 +433,7 @@ func (a *AuthService) verifyTOTPOrRecoveryCode(user *User, code string) (bool, e
 		remaining = append(remaining, hashes[:idx]...)
 		remaining = append(remaining, hashes[idx+1:]...)
 
-		swapped, err := a.users().ConsumeRecoveryCodeHash(user.ID, hashes, remaining)
+		swapped, err := users.ConsumeRecoveryCodeHash(user.ID, hashes, remaining)
 		if err != nil {
 			return false, err
 		}
@@ -422,7 +444,7 @@ func (a *AuthService) verifyTOTPOrRecoveryCode(user *User, code string) (bool, e
 		// Lost the race: a concurrent request already changed the stored
 		// hashes (e.g. consumed the same or a different code first).
 		// Re-read the current state and retry against it.
-		refreshed, err := a.users().GetUserByID(user.ID)
+		refreshed, err := users.GetUserByID(user.ID)
 		if err != nil {
 			return false, err
 		}

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import i18next from '@/lib/i18n'
 import {
   triggerRestore,
   getRestoreStatus,
@@ -87,7 +88,7 @@ export const useRestoreStore = create<RestoreState>((set) => ({
       }
       if (!status.running) {
         set({ isLoading: false, phase: null })
-        throw new Error('Restore job lost — server may have restarted')
+        throw new Error(i18next.t('errors.jobLost', { ns: 'restore' }))
       }
     }
   },

@@ -210,6 +210,39 @@ func TestManager_Restore_ErrAlreadyRunning(t *testing.T) {
 	waitForRestoreDone(t, f.manager)
 }
 
+// TestManager_Restore_RejectsNewTriggerWhileNeedsIntervention is the
+// regression test for a real gap found in review: TriggerRestore had no
+// guard against starting a brand-new restore while a previous one left the
+// instance in a NeedsIntervention state (write-gate stuck engaged, possibly
+// half-swapped filesystem) — silently clearing that flag and compounding the
+// corruption instead of forcing the documented self-restart recovery.
+func TestManager_Restore_RejectsNewTriggerWhileNeedsIntervention(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+
+	// Force the job directly into NeedsIntervention without going through a
+	// real failure sequence — Job.Start()/FinishNeedsIntervention() are
+	// exercised in isolation by job_test.go; here we only need Manager to
+	// observe that state.
+	f.manager.job.Start()
+	f.manager.job.FinishNeedsIntervention(errTest("rollback also failed"))
+
+	err := f.manager.TriggerRestore(f.snapshotID)
+	loc, ok := sharederrors.AsLocalizedError(err)
+	if !ok || loc.Code != "restore_needs_intervention" {
+		t.Fatalf("expected restore_needs_intervention, got %v", err)
+	}
+
+	// And Start() itself must not have been called — status should still
+	// reflect the stuck NeedsIntervention state, not a freshly running job.
+	status := f.manager.Status()
+	if status.Running {
+		t.Error("TriggerRestore must not start a new run while NeedsIntervention is set")
+	}
+	if !status.NeedsIntervention {
+		t.Error("expected NeedsIntervention to remain set after a rejected trigger")
+	}
+}
+
 func TestManager_Restore_RollsBackOnBrandingReloadFailure(t *testing.T) {
 	// The snapshot's branding.json is deliberately invalid JSON: the file
 	// swap itself succeeds (SwapAll doesn't parse content), but

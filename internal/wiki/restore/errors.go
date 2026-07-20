@@ -47,7 +47,7 @@ func respondWithRestoreError(c *gin.Context, err error) {
 
 func restoreErrorStatus(code string) int {
 	switch code {
-	case "restore_already_running":
+	case "restore_already_running", "restore_needs_intervention":
 		return http.StatusConflict
 	case ErrCodeRestoreNotIntervenable:
 		return http.StatusConflict

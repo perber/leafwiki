@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
@@ -19,6 +20,30 @@ var ErrRestoreAlreadyRunning = sharederrors.NewLocalizedError(
 	nil,
 )
 
+// ErrRestoreNeedsIntervention is returned by TriggerRestore when a previous
+// restore left the instance in a NeedsIntervention state. Starting a new
+// restore on top of a half-swapped filesystem and orphaned .pre-restore-*
+// copies would compound the inconsistency instead of resolving it — the only
+// supported way out is self-restart (see Manager.SelfRestart / ADR-0009).
+var ErrRestoreNeedsIntervention = sharederrors.NewLocalizedError(
+	"restore_needs_intervention",
+	"This instance needs attention before a new restore can be started — restart the server first",
+	"a previous restore needs intervention before a new restore can be started",
+	nil,
+)
+
+// ErrWritesDisabled is returned by the write-gate HTTP middleware
+// (internal/http/middleware/maintenance) when a mutating request arrives
+// while a restore is swapping files. Defined here, not hand-rolled in the
+// middleware, so that response follows the same *sharederrors.LocalizedError
+// convention as every other error this feature returns.
+var ErrWritesDisabled = sharederrors.NewLocalizedError(
+	"restore_writes_disabled",
+	"A restore is in progress; writes are temporarily disabled",
+	"a restore is in progress; writes are temporarily disabled",
+	nil,
+)
+
 // gateDrainTimeout bounds how long the restore sequence waits, once the
 // write gate is engaged, for requests already in flight (started just before
 // Engage()) to finish before files are swapped out from under them. A
@@ -29,6 +54,11 @@ const gateDrainTimeout = 10 * time.Second
 type Manager struct {
 	cfg Config
 	job *Job
+	// wg tracks the in-flight runLocked goroutine (if any), so callers that
+	// need the process to shut down cleanly (main.go) can wait for a restore
+	// to finish before closing the services it depends on (AuthService,
+	// BrandingService) out from under it.
+	wg sync.WaitGroup
 }
 
 func NewManager(cfg Config) *Manager {
@@ -36,18 +66,33 @@ func NewManager(cfg Config) *Manager {
 }
 
 // TriggerRestore starts a restore job asynchronously for the given snapshot
-// id. Returns ErrRestoreAlreadyRunning if a restore is already in progress.
+// id. Returns ErrRestoreAlreadyRunning if a restore is already in progress,
+// or ErrRestoreNeedsIntervention if a previous restore left the instance in
+// a state where a new one must not be started (see ErrRestoreNeedsIntervention).
 func (m *Manager) TriggerRestore(id string) error {
+	if m.job.Status().NeedsIntervention {
+		return ErrRestoreNeedsIntervention
+	}
 	if !m.job.Start() {
 		return ErrRestoreAlreadyRunning
 	}
-	go m.runLocked(id)
+	m.wg.Go(func() {
+		m.runLocked(id)
+	})
 	return nil
 }
 
 // Status returns the current restore job state (thread-safe).
 func (m *Manager) Status() JobStatus {
 	return m.job.Status()
+}
+
+// Wait blocks until any in-flight restore triggered via TriggerRestore has
+// fully finished. Intended to be called during process shutdown, before
+// closing services (AuthService, BrandingService) a running restore depends
+// on — see cmd/leafwiki/main.go.
+func (m *Manager) Wait() {
+	m.wg.Wait()
 }
 
 // SelfRestart re-execs the current process. Callers (the HTTP handler) are

@@ -342,7 +342,11 @@ export default function SnapshotSettings() {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={isRestoring || restoringId === snap.id}
+                            disabled={
+                              isRestoring ||
+                              restoringId === snap.id ||
+                              needsIntervention
+                            }
                           >
                             {restoringId === snap.id ? (
                               <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />

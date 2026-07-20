@@ -160,6 +160,95 @@ func TestSwapper_SwapAll_LeavesItemUntouchedWhenNotCapturedBySnapshot(t *testing
 	}
 }
 
+// TestSwapper_RollbackAll_RestoresItemWhenMoveInNeverHappened is the
+// regression test for a real bug found in review: when SwapAll's move-aside
+// step succeeds but the following move-in step fails, the item was
+// previously left with swapped=false even though its live path had already
+// been renamed away — RollbackAll then skipped it entirely (it only checked
+// swapped), permanently losing that item's data while reporting a clean
+// rollback. This constructs that exact intermediate state directly (movedAside
+// true, swapped false, live path missing, pre-restore copy present) and
+// verifies RollbackAll now restores it.
+func TestSwapper_RollbackAll_RestoresItemWhenMoveInNeverHappened(t *testing.T) {
+	dataDir := t.TempDir()
+	livePath := filepath.Join(dataDir, "users.db")
+	preRestore := livePath + ".pre-restore-test"
+	const original = "original users.db content"
+	if err := os.WriteFile(preRestore, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sw := &swapper{items: []*swapItem{{
+		name:       "users.db",
+		livePath:   livePath,
+		stagedPath: filepath.Join(dataDir, "staged-users.db-never-existed"),
+		preRestore: preRestore,
+		movedAside: true,
+		swapped:    false,
+	}}}
+
+	if err := sw.RollbackAll(); err != nil {
+		t.Fatalf("RollbackAll failed: %v", err)
+	}
+
+	got, err := os.ReadFile(livePath)
+	if err != nil {
+		t.Fatalf("expected original content restored at livePath: %v", err)
+	}
+	if string(got) != original {
+		t.Errorf("got %q, want %q", got, original)
+	}
+	if _, err := os.Stat(preRestore); !os.IsNotExist(err) {
+		t.Errorf("expected pre-restore copy to be consumed, got err=%v", err)
+	}
+}
+
+// TestSwapper_SwapAll_MoveInFailureAfterMoveAside_IsRecoverableByRollback
+// reproduces the same bug end-to-end through SwapAll itself: the move-aside
+// rename (within dataDir) succeeds, but the move-in rename fails because the
+// staged item's parent directory has no write permission (removing its
+// directory entry, which os.Rename needs to do, is denied) — while dataDir
+// itself is untouched, so the first rename is unaffected.
+func TestSwapper_SwapAll_MoveInFailureAfterMoveAside_IsRecoverableByRollback(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root ignores permission bits, cannot force the rename to fail this way")
+	}
+
+	dataDir := t.TempDir()
+	const liveContent = "original live users.db"
+	test_utils.WriteFile(t, dataDir, "users.db", liveContent)
+
+	stagedDir := t.TempDir()
+	test_utils.WriteFile(t, stagedDir, "users.db", "restored content that must never land")
+	if err := os.Chmod(stagedDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(stagedDir, 0o700) }) // let t.TempDir() clean up
+
+	sw := &swapper{items: []*swapItem{{
+		name:       "users.db",
+		livePath:   filepath.Join(dataDir, "users.db"),
+		stagedPath: filepath.Join(stagedDir, "users.db"),
+		preRestore: filepath.Join(dataDir, "users.db.pre-restore-test"),
+	}}}
+
+	if err := sw.SwapAll(); err == nil {
+		t.Fatal("expected SwapAll to fail when the move-in step can't remove the staged source entry")
+	}
+
+	if err := sw.RollbackAll(); err != nil {
+		t.Fatalf("RollbackAll failed: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(dataDir, "users.db"))
+	if err != nil {
+		t.Fatalf("expected original live content restored after rollback, got err: %v", err)
+	}
+	if string(got) != liveContent {
+		t.Errorf("got %q, want %q", got, liveContent)
+	}
+}
+
 func TestSwapper_RollbackAll_RestoresPreRestoreCopy(t *testing.T) {
 	zipPath := buildFixtureSnapshot(t, "v1.0.0")
 	dataDir := t.TempDir()
