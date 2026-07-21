@@ -112,14 +112,18 @@ export default function SnapshotSettings() {
       if (useRestoreStore.getState().needsIntervention) {
         return
       }
-      toast.success(tRestore('toast.restoreSucceeded'))
+      if (useRestoreStore.getState().resyncConfirmed) {
+        toast.success(tRestore('toast.restoreSucceeded'))
+      } else {
+        toast.warning(tRestore('toast.restoreSucceededResyncUnconfirmed'))
+      }
       window.location.reload()
     } catch (err) {
       if (
         err instanceof ApiLocalizedError &&
         err.code === 'restore_already_running'
       ) {
-        toast.error(tRestore('toast.restoreTriggerFailed'))
+        toast.info(tRestore('toast.restoreAlreadyRunning'))
       } else {
         toast.error(mapApiError(err, tRestore('toast.restoreFailed')).message)
       }

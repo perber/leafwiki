@@ -24,10 +24,10 @@
   "selfRestartButton": "Restart server now",
   "selfRestarting": "Restarting server… this page will reload automatically in a few seconds.",
   "toast": {
-    "restoreTriggered": "Restore started",
-    "restoreTriggerFailed": "Failed to start restore",
+    "restoreAlreadyRunning": "A restore is already in progress",
     "restoreFailed": "Restore failed",
-    "restoreSucceeded": "Restore completed. Reloading…"
+    "restoreSucceeded": "Restore completed. Reloading…",
+    "restoreSucceededResyncUnconfirmed": "Restore completed, but couldn't confirm the search index finished rebuilding. Reloading — trigger a manual sync from Maintenance if search results look stale."
   },
   "errors": {
     "jobLost": "Restore job lost — server may have restarted"

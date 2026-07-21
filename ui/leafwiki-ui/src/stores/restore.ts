@@ -21,6 +21,12 @@ interface RestoreState {
   isResyncPhase: boolean
   needsIntervention: boolean
   versionWarning: string | null
+  // False when the tail-end resync's completion could not be confirmed (the
+  // poll lost track of the job or kept erroring). The restore itself still
+  // succeeded at this point — only the search/links/tags rebuild status is
+  // unknown — so this is a soft signal for the UI to caveat, not an error to
+  // throw and have the caller mistake for the restore itself having failed.
+  resyncConfirmed: boolean
   trigger: (id: string) => Promise<void>
   selfRestart: () => Promise<void>
 }
@@ -35,6 +41,7 @@ export const useRestoreStore = create<RestoreState>((set) => ({
   isResyncPhase: false,
   needsIntervention: false,
   versionWarning: null,
+  resyncConfirmed: true,
 
   trigger: async (id: string) => {
     set({
@@ -43,6 +50,7 @@ export const useRestoreStore = create<RestoreState>((set) => ({
       isResyncPhase: false,
       needsIntervention: false,
       versionWarning: null,
+      resyncConfirmed: true,
     })
     try {
       await triggerRestore(id)
@@ -106,7 +114,10 @@ export const useRestoreStore = create<RestoreState>((set) => ({
 
 // pollResyncTail polls the existing resync status endpoint (no new endpoint,
 // per ADR-0004's polling pattern) until the resync the restore already
-// triggered server-side finishes.
+// triggered server-side finishes. Never throws: the restore itself already
+// succeeded by the time this runs, so a lost job or repeated poll errors
+// here are reported via resyncConfirmed=false (a caveat), not as a failure
+// of the overall restore.
 async function pollResyncTail(
   set: (partial: Partial<RestoreState>) => void,
 ): Promise<void> {
@@ -117,14 +128,29 @@ async function pollResyncTail(
       const status = await getResyncStatus()
       consecutiveErrors = 0
       set({ phase: status.phase || null })
-      if (status.done || !status.running) {
+      if (status.done) {
         set({ isLoading: false, phase: null, isResyncPhase: false })
+        return
+      }
+      if (!status.running) {
+        // Job lost (e.g. server restarted) before ever reporting done.
+        set({
+          isLoading: false,
+          phase: null,
+          isResyncPhase: false,
+          resyncConfirmed: false,
+        })
         return
       }
     } catch {
       consecutiveErrors++
       if (consecutiveErrors >= POLL_ERROR_LIMIT) {
-        set({ isLoading: false, phase: null, isResyncPhase: false })
+        set({
+          isLoading: false,
+          phase: null,
+          isResyncPhase: false,
+          resyncConfirmed: false,
+        })
         return
       }
     }
