@@ -29,9 +29,11 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/wiki"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
+	wikirestore "github.com/perber/wiki/internal/wiki/restore"
 	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 )
 
@@ -53,6 +55,7 @@ func writeUsage(w io.Writer) {
 	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--unix-socket <PATH>] [--data-dir <DIR>]
 	leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--unix-socket <PATH>] [--data-dir <DIR>]
 	leafwiki reset-admin-password
+	leafwiki [--data-dir <DIR>] restore-snapshot <path-to-zip>
 	leafwiki --help
 
 	Options:
@@ -111,6 +114,12 @@ func writeUsage(w io.Writer) {
 	--snapshot-interval            Snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)
 	--snapshot-retention           Number of most recent snapshots to keep; <= 0 = keep all (default: 10)
 	--snapshot-dir                 Directory to store snapshot ZIPs in (default: <data-dir>/snapshots)
+	                               When --snapshot is enabled, live restore-from-snapshot is also available
+	                               via the admin UI (Settings > Full Backup) and gates writes (503) while a
+	                               restore is swapping files. For disaster recovery or migrating a snapshot
+	                               to a fresh instance, use the "restore-snapshot" subcommand instead (run it
+	                               before starting the server against that data directory; pass --data-dir
+	                               *before* the subcommand, e.g. "leafwiki --data-dir ./data restore-snapshot file.zip").
 
 	Environment variables:
 	LEAFWIKI_HOST
@@ -431,6 +440,15 @@ func main() {
 			fmt.Println("Admin password reset successfully.")
 			fmt.Printf("New password for user %s: %s\n", user.Username, user.Password)
 			return
+		case "restore-snapshot":
+			if len(args) < 2 {
+				fail("restore-snapshot requires a path to a snapshot zip: leafwiki [--data-dir <DIR>] restore-snapshot <path-to-zip>")
+			}
+			if err := restore.RestoreOffline(dataDir, args[1]); err != nil {
+				fail("Restore failed", "error", err)
+			}
+			fmt.Println("Snapshot restored successfully. Start the server normally to pick up the restored data.")
+			return
 		case "--help", "-h", "help":
 			printUsage()
 			return
@@ -542,25 +560,56 @@ func main() {
 	}
 
 	// Initialize full backup snapshots if enabled
+	var writeGate *restore.WriteGate
 	if snapshotEnabled {
 		snapshotsDir := snapshotDir
 		if snapshotsDir == "" {
 			snapshotsDir = filepath.Join(dataDir, "snapshots")
 		}
 		snapshotManager := snapshot.NewManager(snapshot.Config{
-			BackupsDir:     snapshotsDir,
-			RootDir:        filepath.Join(dataDir, "root"),
-			AssetsDir:      filepath.Join(dataDir, "assets"),
-			BrandingDir:    filepath.Join(dataDir, "branding"),
-			SchemaFile:     filepath.Join(dataDir, "schema.json"),
-			UsersDBPath:    filepath.Join(dataDir, "users.db"),
-			WikiVersion:    Version,
-			Interval:       snapshotInterval,
-			RetentionCount: snapshotRetention,
+			BackupsDir:         snapshotsDir,
+			RootDir:            filepath.Join(dataDir, "root"),
+			AssetsDir:          filepath.Join(dataDir, "assets"),
+			BrandingDir:        filepath.Join(dataDir, "branding"),
+			BrandingConfigFile: filepath.Join(dataDir, "branding.json"),
+			SchemaFile:         filepath.Join(dataDir, "schema.json"),
+			UsersDBPath:        filepath.Join(dataDir, "users.db"),
+			WikiVersion:        Version,
+			Interval:           snapshotInterval,
+			RetentionCount:     snapshotRetention,
 		})
 		snapshotScheduler := snapshot.NewScheduler(snapshotManager)
 		defer snapshotScheduler.Stop()
 		w.SetSnapshotRoutes(wikisnapshot.NewRoutes(snapshotManager, snapshotScheduler, w.AuthService(), snapshotRetention))
+
+		if runtime.GOOS == "windows" {
+			// A live restore renames users.db aside/in while AuthService's
+			// *sql.DB connection to it may still be open (the connection is
+			// only reopened afterward, in ReplaceUserStore) — on Windows,
+			// renaming a file with an open handle can fail with a sharing
+			// violation unless that handle was opened with FILE_SHARE_DELETE,
+			// which hasn't been verified for the sqlite driver in use here.
+			// Not blocking startup over it: this needs real Windows testing
+			// to confirm one way or the other, not a guess baked into a
+			// hard failure.
+			slog.Default().Warn("live restore (--snapshot) on Windows is not yet verified: renaming users.db while it may still be open could fail with a sharing violation; test a restore on this platform before relying on it, or use the offline `restore-snapshot` subcommand instead (it runs before the server starts, with no open handle on users.db)")
+		}
+
+		writeGate = restore.NewWriteGate()
+		restoreManager := restore.NewManager(restore.Config{
+			SnapshotManager: snapshotManager,
+			DataDir:         dataDir,
+			WikiVersion:     Version,
+			WriteGate:       writeGate,
+			AuthService:     w.AuthService(),
+			BrandingService: w.BrandingService(),
+			TriggerResync:   w.TriggerResyncAsync,
+		})
+		// Registered after (so it runs before, defers are LIFO) the w.Close()
+		// deferred above: an in-flight restore must finish before AuthService's
+		// user/session stores get closed out from under it during shutdown.
+		defer restoreManager.Wait()
+		w.SetRestoreRoutes(wikirestore.NewRoutes(restoreManager, w.AuthService()))
 	}
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
@@ -591,6 +640,7 @@ func main() {
 		UserManagementURL: userManagementURL,
 		LoginURL:          loginURL,
 		LogoutURL:         logoutURL,
+		WriteGate:         writeGate,
 	})
 
 	reloadSignals := make(chan os.Signal, 1)

@@ -23,6 +23,7 @@ func newTestConfig(t *testing.T) Config {
 	assetsDir := filepath.Join(base, "assets")
 	backupsDir := filepath.Join(base, "backups")
 	usersDBPath := filepath.Join(base, "users.db")
+	brandingConfigFile := test_utils.WriteFile(t, base, "branding.json", `{"siteName":"Test Site"}`)
 
 	test_utils.WriteFile(t, rootDir, "page.md", "# Hello\n")
 	test_utils.WriteFile(t, assetsDir, "image.png", "fake-image-bytes")
@@ -30,11 +31,12 @@ func newTestConfig(t *testing.T) Config {
 	createTestUsersDB(t, usersDBPath)
 
 	return Config{
-		BackupsDir:  backupsDir,
-		RootDir:     rootDir,
-		AssetsDir:   assetsDir,
-		UsersDBPath: usersDBPath,
-		WikiVersion: "v0.0.0-test",
+		BackupsDir:         backupsDir,
+		RootDir:            rootDir,
+		AssetsDir:          assetsDir,
+		BrandingConfigFile: brandingConfigFile,
+		UsersDBPath:        usersDBPath,
+		WikiVersion:        "v0.0.0-test",
 	}
 }
 
@@ -108,9 +110,35 @@ func TestCreateSnapshot_ContainsExpectedFiles(t *testing.T) {
 		got[f.Name] = true
 	}
 
-	for _, want := range []string{"root/page.md", "assets/image.png", "users.db", "backup-meta.json"} {
+	for _, want := range []string{"root/page.md", "assets/image.png", "users.db", "branding.json", "backup-meta.json"} {
 		if !got[want] {
 			t.Errorf("zip missing expected entry %q; got entries: %v", want, got)
+		}
+	}
+}
+
+func TestCreateSnapshot_BrandingConfigFileIsOptional(t *testing.T) {
+	// An instance that has never touched branding settings has no
+	// branding.json on disk yet — createSnapshot must not fail over that
+	// (matches addFileToZip's existing "missing optional source" behavior).
+	cfg := newTestConfig(t)
+	cfg.BrandingConfigFile = filepath.Join(t.TempDir(), "does-not-exist", "branding.json")
+
+	id, err := createSnapshot(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("createSnapshot failed: %v", err)
+	}
+
+	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open zip: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
+
+	for _, f := range r.File {
+		if f.Name == "branding.json" {
+			t.Error("expected no branding.json entry when the source file doesn't exist")
 		}
 	}
 }
