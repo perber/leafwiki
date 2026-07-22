@@ -15,6 +15,7 @@ type SeedPage = {
 
 type CreatedPage = SeedPage & {
   id: string;
+  version: string;
 };
 
 type SeedResult = {
@@ -67,11 +68,17 @@ async function seedPages(page: import('@playwright/test').Page, pages: SeedPage[
         throw new Error(`Failed to seed ${seedPage.slug}: ${response.status} ${bodyText}`);
       }
 
-      const createdPage = (await response.json()) as { id: string; title: string; slug: string };
+      const createdPage = (await response.json()) as {
+        id: string;
+        title: string;
+        slug: string;
+        version: string;
+      };
       createdPages.push({
         id: createdPage.id,
         title: seedPage.title,
         slug: seedPage.slug,
+        version: createdPage.version,
       });
     }
 
@@ -108,13 +115,16 @@ async function cleanupPages(page: import('@playwright/test').Page, createdPages:
     }
 
     for (const createdPage of [...pagesToDelete].reverse()) {
-      const response = await fetch(`/api/pages/${createdPage.id}?recursive=false`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-          'X-CSRF-Token': csrfToken,
+      const response = await fetch(
+        `/api/pages/${createdPage.id}?recursive=false&version=${encodeURIComponent(createdPage.version)}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            'X-CSRF-Token': csrfToken,
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         const bodyText = await response.text();
