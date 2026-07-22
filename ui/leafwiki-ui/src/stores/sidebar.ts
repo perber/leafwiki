@@ -19,6 +19,12 @@ type SidebarStore = {
 
   sidebarWidth: number
   setSidebarWidth: (width: number) => void
+
+  // Bumped whenever the search shortcut is triggered while the search panel
+  // is already open, so Search.tsx can refocus its input even though
+  // sidebarVisible/sidebarMode don't change value (no re-render otherwise).
+  searchFocusRequestId: number
+  requestSearchFocus: () => void
 }
 
 export const useSidebarStore = create<SidebarStore>()(
@@ -38,6 +44,12 @@ export const useSidebarStore = create<SidebarStore>()(
         )
         set({ sidebarWidth: clamped })
       },
+
+      searchFocusRequestId: 0,
+      requestSearchFocus: () =>
+        set((state) => ({
+          searchFocusRequestId: state.searchFocusRequestId + 1,
+        })),
     }),
     {
       name: 'leafwiki-sidebar', // localStorage key
