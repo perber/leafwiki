@@ -53,9 +53,9 @@ func RemoveSQLiteFiles(dbPath string) {
 // This factors out the "open → ensure schema → on recoverable corruption,
 // wipe and retry once" sequence that is otherwise duplicated, near-verbatim,
 // across every per-domain SQLite store constructor (tags, links, properties,
-// search, favorites). Each store keeps its own opening mechanics (eager
-// sql.Open, a lazy Connect(), or a fully lazy withDB helper) inside the
-// closure; only the recovery policy is shared.
+// search, favorites, users, sessions). Each store keeps its own opening
+// mechanics (eager sql.Open, a lazy Connect(), or a fully lazy withDB helper)
+// inside the closure; only the recovery policy is shared.
 func RetryOnCorruption(dbPath string, open func() error) error {
 	err := open()
 	if err == nil {

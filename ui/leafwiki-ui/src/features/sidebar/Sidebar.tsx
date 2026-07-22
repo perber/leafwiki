@@ -1,6 +1,6 @@
 import ScrollableContainer from '@/components/ScrollableContainer'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
-import { panelItemRegistry } from '@/lib/registries'
+import { panelItemRegistry, SIDEBAR_SEARCH_PANEL_ID } from '@/lib/registries'
 import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useAppMode } from '@/lib/useAppMode'
 import { useHotKeysStore } from '@/stores/hotkeys'
@@ -20,6 +20,9 @@ export default function Sidebar() {
   const sidebarMode = useSidebarStore((state) => state.sidebarMode)
   const setSidebarMode = useSidebarStore((state) => state.setSidebarMode)
   const setSidebarVisible = useSidebarStore((state) => state.setSidebarVisible)
+  const requestSearchFocus = useSidebarStore(
+    (state) => state.requestSearchFocus,
+  )
 
   const items = useMemo(
     () =>
@@ -61,12 +64,18 @@ export default function Sidebar() {
     const actionMap = new Map<string, () => void>()
     items.forEach((item) => {
       actionMap.set(item.id, () => {
+        const state = useSidebarStore.getState()
+        const alreadyActive =
+          state.sidebarVisible && state.sidebarMode === item.id
         setSidebarVisible(true)
         setSidebarMode(item.id)
+        if (alreadyActive && item.id === SIDEBAR_SEARCH_PANEL_ID) {
+          requestSearchFocus()
+        }
       })
     })
     return actionMap
-  }, [items, setSidebarMode, setSidebarVisible])
+  }, [items, setSidebarMode, setSidebarVisible, requestSearchFocus])
 
   // Memoize hotkey definitions using the stable actions
   const hotKeyDefs = useMemo(

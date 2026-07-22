@@ -15,6 +15,7 @@ import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { fetchTags, TagCount } from '@/lib/api/tags'
 import { useDebounce } from '@/lib/useDebounce'
 import { getShortcutDefinition } from '@/lib/shortcuts/shortcutCatalog'
+import { useSidebarStore } from '@/stores/sidebar'
 import { X } from 'lucide-react'
 import {
   startTransition,
@@ -63,6 +64,9 @@ export default function Search({ active = false }: SearchProps) {
   const [availableTagsError, setAvailableTagsError] = useState(false)
   const [facetTags, setFacetTags] = useState<SearchTagFacet[]>([])
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const searchFocusRequestId = useSidebarStore(
+    (state) => state.searchFocusRequestId,
+  )
   const resultRefs = useRef<(HTMLAnchorElement | null)[]>([])
   const latestRequestIdRef = useRef(0)
 
@@ -159,7 +163,9 @@ export default function Search({ active = false }: SearchProps) {
     if (active) {
       searchInputRef.current?.focus()
     }
-  }, [active])
+    // searchFocusRequestId is bumped when the search shortcut is pressed
+    // again while already active, to refocus the input on demand.
+  }, [active, searchFocusRequestId])
 
   useEffect(() => {
     if (!active) {

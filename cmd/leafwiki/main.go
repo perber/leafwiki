@@ -110,7 +110,7 @@ func writeUsage(w io.Writer) {
 	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
 	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
 	--git-backup-interval          Git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)
-	--snapshot                     Enable full backup snapshots (ZIP incl. the SQLite database) (default: false)
+	--snapshot                     Enable full backup snapshots (ZIP incl. the SQLite database) (default: true)
 	--snapshot-interval            Snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)
 	--snapshot-retention           Number of most recent snapshots to keep; <= 0 = keep all (default: 10)
 	--snapshot-dir                 Directory to store snapshot ZIPs in (default: <data-dir>/snapshots)
@@ -303,7 +303,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
 		gitBackupInterval:       fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
 		revisionCoalesceWindow:  fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
-		snapshotEnabled:         fs.Bool("snapshot", false, "enable full backup snapshots (ZIP incl. the SQLite database) (default: false)"),
+		snapshotEnabled:         fs.Bool("snapshot", true, "enable full backup snapshots (ZIP incl. the SQLite database) (default: true)"),
 		snapshotInterval:        fs.Duration("snapshot-interval", 24*time.Hour, "snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)"),
 		snapshotRetention:       fs.Int("snapshot-retention", 10, "number of most recent snapshots to keep; <= 0 = keep all (default: 10)"),
 		snapshotDir:             fs.String("snapshot-dir", "", "directory to store snapshot ZIPs in (default: <data-dir>/snapshots)"),
