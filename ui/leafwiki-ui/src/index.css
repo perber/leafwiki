@@ -2624,7 +2624,7 @@
   }
 
   .tree-node {
-    @apply text-interface-text relative flex cursor-pointer items-center transition-all;
+    @apply text-interface-text relative flex cursor-pointer items-center transition-colors;
   }
 
   .tree-node--active {

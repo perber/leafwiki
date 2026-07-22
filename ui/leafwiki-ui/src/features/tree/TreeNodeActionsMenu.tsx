@@ -26,9 +26,12 @@ import {
   DIALOG_SORT_PAGES,
 } from '@/lib/registries'
 import { stripBasePath } from '@/lib/routePath'
+import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { getDeleteRedirectRoutePath } from '@/lib/wikiPath'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useFavoritesStore } from '@/stores/favorites'
+import { useSessionStore } from '@/stores/session'
 import { useViewerStore } from '@/features/viewer/viewer'
 import { useTreeStore } from '@/stores/tree'
 import {
@@ -42,6 +45,7 @@ import {
   Pin,
   PinOff,
   Repeat2,
+  Star,
   Trash,
 } from 'lucide-react'
 import { useCallback } from 'react'
@@ -66,6 +70,11 @@ export default function TreeNodeActionsMenu({
   const enableLinkRefactor = useConfigStore((s) => s.enableLinkRefactor)
   const openDialog = useDialogsStore((state) => state.openDialog)
   const reloadTree = useTreeStore((state) => state.reloadTree)
+  const readOnlyMode = useIsReadOnly()
+  const isLoggedIn = useSessionStore((s) => s.user !== null)
+  const isFavorited = useFavoritesStore((s) => s.favoritePageIds.has(nodeId))
+  const addFavorite = useFavoritesStore((s) => s.addFavorite)
+  const removeFavorite = useFavoritesStore((s) => s.removeFavorite)
   const hasChildren = children && children.length > 0
   const navigate = useNavigate()
   const setOpenMenuNodeId = useTreeNodeActionsMenusStore(
@@ -124,6 +133,20 @@ export default function TreeNodeActionsMenu({
       })
       .catch(() => toast.error(t('pinned.pinError')))
   }, [nodeId, nodeVersion, node.pinned, setPinnedLocally, t])
+
+  const handleToggleFavorite = useCallback(async () => {
+    try {
+      if (isFavorited) {
+        await removeFavorite(nodeId)
+        toast.success(t('favorites.removeSuccess'))
+      } else {
+        await addFavorite(nodeId)
+        toast.success(t('favorites.addSuccess'))
+      }
+    } catch {
+      toast.error(t('favorites.favoriteError'))
+    }
+  }, [isFavorited, addFavorite, removeFavorite, nodeId, t])
 
   const handleRenamePage = useCallback(
     async (title: string, slug: string) => {
@@ -244,142 +267,168 @@ export default function TreeNodeActionsMenu({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem
-          className="cursor-pointer"
-          onClick={() => {
-            openDialog(DIALOG_ADD_PAGE, {
-              parentId: nodeId,
-              nodeKind: NODE_KIND_PAGE,
-            })
-          }}
-        >
-          <FilePlus size={18} className="tree-node__action-icon" /> Add Page
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="cursor-pointer"
-          onClick={() => {
-            openDialog(DIALOG_ADD_PAGE, {
-              parentId: nodeId,
-              nodeKind: NODE_KIND_SECTION,
-            })
-          }}
-        >
-          <FolderPlus size={18} className="tree-node__action-icon" /> Add
-          Section
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="cursor-pointer"
-          onClick={() => {
-            navigate(`/e/${node.path}`)
-          }}
-        >
-          <Pencil size={18} className="tree-node__action-icon" /> Edit{' '}
-          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="cursor-pointer"
-          data-testid="tree-view-action-button-rename"
-          onClick={() => {
-            openDialog(DIALOG_EDIT_PAGE_METADATA, {
-              parentId: node.parentId ?? '',
-              currentId: node.id,
-              itemKind: node.kind,
-              title: node.title,
-              slug: node.slug,
-              onChange: handleRenamePage,
-            })
-          }}
-        >
-          <Pencil size={18} className="tree-node__action-icon" /> Rename{' '}
-          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
-        </DropdownMenuItem>
-        {nodeKind === NODE_KIND_PAGE && (
+        {!readOnlyMode && (
+          <>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => {
+                openDialog(DIALOG_ADD_PAGE, {
+                  parentId: nodeId,
+                  nodeKind: NODE_KIND_PAGE,
+                })
+              }}
+            >
+              <FilePlus size={18} className="tree-node__action-icon" /> Add Page
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => {
+                openDialog(DIALOG_ADD_PAGE, {
+                  parentId: nodeId,
+                  nodeKind: NODE_KIND_SECTION,
+                })
+              }}
+            >
+              <FolderPlus size={18} className="tree-node__action-icon" /> Add
+              Section
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => {
+                navigate(`/e/${node.path}`)
+              }}
+            >
+              <Pencil size={18} className="tree-node__action-icon" /> Edit{' '}
+              {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              data-testid="tree-view-action-button-rename"
+              onClick={() => {
+                openDialog(DIALOG_EDIT_PAGE_METADATA, {
+                  parentId: node.parentId ?? '',
+                  currentId: node.id,
+                  itemKind: node.kind,
+                  title: node.title,
+                  slug: node.slug,
+                  onChange: handleRenamePage,
+                })
+              }}
+            >
+              <Pencil size={18} className="tree-node__action-icon" /> Rename{' '}
+              {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+            </DropdownMenuItem>
+            {nodeKind === NODE_KIND_PAGE && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => {
+                  openDialog(DIALOG_COPY_PAGE, { sourcePage: node })
+                }}
+              >
+                <Copy size={18} className="tree-node__action-icon" /> Copy Page
+              </DropdownMenuItem>
+            )}
+            {hasChildren && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                data-testid="tree-view-action-button-sort"
+                onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: node })}
+              >
+                <List size={18} className="tree-node__action-icon" /> Sort{' '}
+                {nodeKind === NODE_KIND_SECTION ? 'Section' : 'Page'} Children
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              className="cursor-pointer"
+              data-testid="tree-view-action-button-move"
+              onClick={() => openDialog(DIALOG_MOVE_PAGE, { pageId: node.id })}
+            >
+              <Move size={18} className="tree-node__action-icon" /> Move{' '}
+              {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+            </DropdownMenuItem>
+            {nodeKind === NODE_KIND_SECTION && !hasChildren && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={handleConvertPage}
+              >
+                <Repeat2 size={18} className="tree-node__action-icon" /> Convert
+                to Page
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {isLoggedIn && (
           <DropdownMenuItem
             className="cursor-pointer"
-            onClick={() => {
-              openDialog(DIALOG_COPY_PAGE, { sourcePage: node })
-            }}
+            data-testid="tree-view-action-button-favorite"
+            onClick={handleToggleFavorite}
           >
-            <Copy size={18} className="tree-node__action-icon" /> Copy Page
+            <Star
+              size={18}
+              className="tree-node__action-icon"
+              fill={isFavorited ? 'currentColor' : 'none'}
+            />{' '}
+            {isFavorited
+              ? t('favorites.removeFavorite')
+              : t('favorites.addFavorite')}
           </DropdownMenuItem>
         )}
-        {hasChildren && (
+        {!readOnlyMode && (
           <DropdownMenuItem
             className="cursor-pointer"
-            data-testid="tree-view-action-button-sort"
-            onClick={() => openDialog(DIALOG_SORT_PAGES, { parent: node })}
+            data-testid="tree-view-action-button-pin"
+            onClick={handleTogglePin}
           >
-            <List size={18} className="tree-node__action-icon" /> Sort{' '}
-            {nodeKind === NODE_KIND_SECTION ? 'Section' : 'Page'} Children
+            {node.pinned ? (
+              <>
+                <PinOff size={18} className="tree-node__action-icon" />{' '}
+                {t('pinned.unpinPage')}
+              </>
+            ) : (
+              <>
+                <Pin size={18} className="tree-node__action-icon" />{' '}
+                {t('pinned.pinPage')}
+              </>
+            )}
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem
-          className="cursor-pointer"
-          data-testid="tree-view-action-button-move"
-          onClick={() => openDialog(DIALOG_MOVE_PAGE, { pageId: node.id })}
-        >
-          <Move size={18} className="tree-node__action-icon" /> Move{' '}
-          {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
-        </DropdownMenuItem>
-        {nodeKind === NODE_KIND_SECTION && !hasChildren && (
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={handleConvertPage}
-          >
-            <Repeat2 size={18} className="tree-node__action-icon" /> Convert to
-            Page
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="cursor-pointer"
-          data-testid="tree-view-action-button-pin"
-          onClick={handleTogglePin}
-        >
-          {node.pinned ? (
-            <>
-              <PinOff size={18} className="tree-node__action-icon" />{' '}
-              {t('pinned.unpinPage')}
-            </>
-          ) : (
-            <>
-              <Pin size={18} className="tree-node__action-icon" />{' '}
-              {t('pinned.pinPage')}
-            </>
-          )}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-error cursor-pointer"
-          data-testid="tree-view-action-button-delete"
-          onClick={() => {
-            const currentRoutePath = getCurrentRoutePath()
-            const currentRouterPath =
-              stripBasePath(currentRoutePath) ?? currentRoutePath
-            const isCurrentlyEditedNode =
-              currentRouterPath.startsWith('/e/') &&
-              currentEditorPageId === node.id
+        {!readOnlyMode && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-error cursor-pointer"
+              data-testid="tree-view-action-button-delete"
+              onClick={() => {
+                const currentRoutePath = getCurrentRoutePath()
+                const currentRouterPath =
+                  stripBasePath(currentRoutePath) ?? currentRoutePath
+                const isCurrentlyEditedNode =
+                  currentRouterPath.startsWith('/e/') &&
+                  currentEditorPageId === node.id
 
-            if (isCurrentlyEditedNode) {
-              toast.warning(
-                `This ${nodeKind === NODE_KIND_PAGE ? 'page' : 'section'} is currently being edited. Please close the editor before deleting it.`,
-              )
-              return
-            }
+                if (isCurrentlyEditedNode) {
+                  toast.warning(
+                    `This ${nodeKind === NODE_KIND_PAGE ? 'page' : 'section'} is currently being edited. Please close the editor before deleting it.`,
+                  )
+                  return
+                }
 
-            openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
-              pageId: node?.id,
-              redirectTo: getDeleteRedirectRoutePath(
-                currentRouterPath,
-                node.path,
-              ),
-            })
-          }}
-        >
-          <Trash size={18} className="tree-node__action-icon text-error" />{' '}
-          Delete {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
-        </DropdownMenuItem>
+                openDialog(DIALOG_DELETE_PAGE_CONFIRMATION, {
+                  pageId: node?.id,
+                  redirectTo: getDeleteRedirectRoutePath(
+                    currentRouterPath,
+                    node.path,
+                  ),
+                })
+              }}
+            >
+              <Trash size={18} className="tree-node__action-icon text-error" />{' '}
+              Delete {nodeKind === NODE_KIND_PAGE ? 'Page' : 'Section'}
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
