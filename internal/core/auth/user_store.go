@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	_ "modernc.org/sqlite"
 )
 
@@ -33,13 +34,22 @@ func NewUserStore(storageDir string) (*UserStore, error) {
 		filename:   "users.db",
 	}
 
-	err := u.Connect()
+	// ensureSchema calls Connect() itself (idempotently), so it alone is
+	// enough to bring the store to a working state.
+	err := sqliteutil.RetryOnCorruption(databasePath(u.storageDir, u.filename), func() error {
+		if err := u.ensureSchema(); err != nil {
+			if u.db != nil {
+				_ = u.db.Close()
+				u.db = nil
+			}
+			return err
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	return u, u.ensureSchema()
-
+	return u, nil
 }
 
 func (f *UserStore) Connect() error {

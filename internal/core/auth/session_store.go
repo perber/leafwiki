@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	_ "modernc.org/sqlite"
 )
 
@@ -35,13 +36,17 @@ func NewSessionStore(storageDir string) (*SessionStore, error) {
 		done:       make(chan struct{}),
 	}
 
-	err := s.ensureSchema()
-	if err != nil {
-		// Ensure any opened database connection is closed on error
-		if s.db != nil {
-			_ = s.db.Close()
-			s.db = nil
+	err := sqliteutil.RetryOnCorruption(sessionDatabasePath(s.storageDir, s.filename), func() error {
+		if err := s.ensureSchema(); err != nil {
+			if s.db != nil {
+				_ = s.db.Close()
+				s.db = nil
+			}
+			return err
 		}
+		return nil
+	})
+	if err != nil {
 		cancel()
 		return nil, err
 	}
