@@ -577,23 +577,37 @@
      subheader bar's matching padding-right (.page-viewer__subheader--toc-
      reserved / --collapsed in the subheader rules below) transitions with
      the exact same width/duration so it stays aligned with <main> at every
-     frame, not just at rest. */
+     frame, not just at rest.
+
+     Stays `display: flex; width: 0` (not `display: none`) even when empty,
+     so the pane always has a real box to animate width from/to. Toggling
+     `display: none` <-> `flex` on mount/unmount of the portaled TocSidePanel
+     (e.g. navigating from a page with no TOC to one with a TOC) gives the
+     browser no previous width to transition from, so <main> would snap to
+     its narrower width in one frame while the subheader's padding-right
+     (which animates on an always-mounted node) still eased in over 200ms —
+     a visible desync between the two. Keeping a persistent 0-width flex box
+     here means that first appearance animates too, in lockstep. */
   .app-layout__toc-pane {
     display: none;
   }
 
   @media (min-width: 1280px) {
-    .app-layout__toc-pane:not(:empty) {
+    .app-layout__toc-pane {
       display: flex;
       flex-direction: column;
       position: sticky;
       top: 0;
       align-self: flex-start;
-      width: 16rem;
+      width: 0;
       flex-shrink: 0;
-      padding-top: 1.5rem;
       overflow: hidden;
       transition: width 200ms ease;
+    }
+
+    .app-layout__toc-pane:not(:empty) {
+      width: 16rem;
+      padding-top: 1.5rem;
     }
 
     /* 3rem, not a rounder 2.5rem: the header needs pl-3 (12px) + border-l
