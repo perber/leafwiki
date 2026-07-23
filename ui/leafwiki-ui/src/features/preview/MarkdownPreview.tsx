@@ -40,6 +40,7 @@ import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
 import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
+import { rehypeCodeLineNumbers } from './rehypeCodeLineNumbers'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 import { syntaxHighlightLanguages } from './syntaxHighlightLanguages'
@@ -629,6 +630,7 @@ export default function MarkdownPreview({
               rehypeWhitelistStyles,
               [rehypeKatex, { output: 'html', strict: 'ignore' }],
               [rehypeSanitize, schema],
+              rehypeCodeLineNumbers,
               [
                 rehypeHighlight,
                 {
