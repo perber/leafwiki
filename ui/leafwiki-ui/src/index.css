@@ -845,6 +845,10 @@
     @apply text-muted-foreground mb-4 text-sm;
   }
 
+  .login__totp-back {
+    @apply mt-2 w-full;
+  }
+
   /* TOTP setup dialog */
   .totp-setup__qr {
     @apply flex justify-center rounded bg-white p-3;
