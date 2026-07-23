@@ -14,9 +14,13 @@ If you've looked at Wiki.js or Outline and thought "this is too much to operate 
 → If it fits, [a star](https://github.com/perber/leafwiki) helps others find it.
 
 ```bash
+# Docker
 docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   ghcr.io/perber/leafwiki:latest \
   --jwt-secret=yoursecret --admin-password=yourpassword --allow-insecure=true
+
+# Nix
+nix run github:perber/leafwiki -- --help
 ```
 
 → [All install options](#install) (Docker Compose, Linux installer, binary)
@@ -199,6 +203,81 @@ sudo ./install.sh --non-interactive --env-file ./.env
 **Deployment examples:**
 - [Install with nginx on Ubuntu](docs/install/nginx.md)
 - [Install on a Raspberry Pi](docs/install/raspberry.md)
+
+### Nix
+
+#### Try it without installing
+
+```bash
+nix run github:perber/leafwiki -- --jwt-secret=yoursecret --admin-password=yourpassword --allow-insecure=true
+```
+
+#### Add to a NixOS configuration
+
+In your `flake.nix`:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    leafwiki.url = "github:perber/leafwiki";
+  };
+
+  outputs = { nixpkgs, leafwiki, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        leafwiki.nixosModules.default
+        {
+          services.leafwiki = {
+            enable = true;
+            jwtSecretFile   = "/run/secrets/leafwiki-jwt";
+            adminPasswordFile = "/run/secrets/leafwiki-admin-password";
+            # Optional overrides:
+            # host    = "0.0.0.0";
+            # port    = 8080;
+            # dataDir = "/var/lib/leafwiki";
+            # disableAuth = true; # insecure - only for local dev instances!
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+Secrets are loaded from files at service start using systemd `LoadCredential`, so they never appear in the Nix store or the unit file.
+
+#### Add to a Home Manager configuration
+
+```nix
+{
+  inputs = {
+    home-manager.url = "github:nix-community/home-manager";
+    leafwiki.url = "github:perber/leafwiki";
+  };
+
+  outputs = { home-manager, leafwiki, ... }: {
+    homeConfigurations.myuser = home-manager.lib.homeManagerConfiguration {
+      modules = [
+        leafwiki.homeManagerModules.default
+        {
+          services.leafwiki = {
+            enable = true;
+            jwtSecretFile     = "/run/user/1000/secrets/leafwiki-jwt";
+            adminPasswordFile = "/run/user/1000/secrets/leafwiki-admin-password";
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+The Home Manager module runs leafwiki as a `systemd --user` service. Enable lingering so it starts at boot without a login session:
+
+```bash
+loginctl enable-linger $USER
+```
 
 ### Binary
 
