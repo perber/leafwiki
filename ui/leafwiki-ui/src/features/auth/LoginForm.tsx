@@ -143,6 +143,7 @@ export default function LoginForm() {
             <Button
               type="button"
               variant="ghost"
+              className="login__totp-back"
               disabled={loading}
               onClick={() => {
                 setLoginChallengeToken(null)
