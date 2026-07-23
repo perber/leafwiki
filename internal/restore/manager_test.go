@@ -48,7 +48,8 @@ func newManagerFixtureWithBranding(t *testing.T, wikiVersion, brandingJSON strin
 	if err != nil {
 		t.Fatalf("NewUserStore failed: %v", err)
 	}
-	authService := auth.NewAuthService(auth.NewUserService(userStore), sessionStore, nil, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	sessions := auth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := auth.NewAuthService(auth.NewUserService(userStore), sessions, nil)
 
 	brandingService, err := branding.NewBrandingService(dataDir)
 	if err != nil {
