@@ -30,7 +30,8 @@ func setupTestAuthService(t *testing.T) *AuthService {
 		t.Fatal(err)
 	}
 
-	authService := NewAuthService(userService, sessionStore, nil, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	sessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	authService := NewAuthService(userService, sessions, nil)
 	return authService
 }
 
@@ -86,7 +87,8 @@ func setupTOTPTestFixture(t *testing.T) *totpTestFixture {
 		t.Fatal(err)
 	}
 
-	authService := NewAuthService(userService, sessionStore, totpService, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	sessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	authService := NewAuthService(userService, sessions, totpService)
 
 	return &totpTestFixture{
 		authService:  authService,
@@ -319,7 +321,9 @@ func TestAuthService_CompleteTOTPLogin_NotConfiguredWhenNoEncryptionKey(t *testi
 
 	// Simulate an operator unsetting --totp-encryption-key after TOTP was
 	// already enabled for this user: rebuild the AuthService without a TOTPService.
-	authServiceNoTOTP := NewAuthService(NewUserService(f.store), mustNewSessionStore(t), nil, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	noTOTPUserService := NewUserService(f.store)
+	noTOTPSessions := NewSessionManager(mustNewSessionStore(t), "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	authServiceNoTOTP := NewAuthService(noTOTPUserService, noTOTPSessions, nil)
 
 	// Login itself must fail fast with a clear error here, rather than issuing
 	// a challenge CompleteTOTPLogin could never redeem (which would strand the
@@ -377,7 +381,8 @@ func setupTOTPSetupFixture(t *testing.T) *totpSetupFixture {
 		t.Fatal(err)
 	}
 
-	authService := NewAuthService(userService, sessionStore, totpService, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	sessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	authService := NewAuthService(userService, sessions, totpService)
 
 	return &totpSetupFixture{
 		authService: authService,
@@ -513,7 +518,7 @@ func TestAuthService_ConfirmTOTPSetup_RevokesOtherSessionsButKeepsCurrent(t *tes
 	if err := f.sessionStr.CreateSession("other-device", f.userID, "refresh", time.Now().Add(time.Hour)); err != nil {
 		t.Fatalf("failed to seed other-device session: %v", err)
 	}
-	currentRefreshToken, currentJTI, _, err := f.authService.generateToken(&User{ID: f.userID}, time.Hour, "refresh")
+	currentRefreshToken, currentJTI, _, err := f.authService.sessions.generateToken(&User{ID: f.userID}, time.Hour, "refresh")
 	if err != nil {
 		t.Fatalf("failed to generate current refresh token: %v", err)
 	}
@@ -584,7 +589,9 @@ func TestAuthService_DisableTOTP_WrongCodeRejected(t *testing.T) {
 func TestAuthService_DisableTOTP_NotConfiguredWhenNoEncryptionKey(t *testing.T) {
 	f := setupTOTPTestFixture(t)
 
-	authServiceNoTOTP := NewAuthService(NewUserService(f.store), mustNewSessionStore(t), nil, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	noTOTPUserService := NewUserService(f.store)
+	noTOTPSessions := NewSessionManager(mustNewSessionStore(t), "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
+	authServiceNoTOTP := NewAuthService(noTOTPUserService, noTOTPSessions, nil)
 
 	err := authServiceNoTOTP.DisableTOTP(f.userID, "securepass", "000000", "")
 	if err == nil {
@@ -612,7 +619,7 @@ func TestAuthService_DisableTOTP_NotEnabledRejected(t *testing.T) {
 func TestAuthService_DisableTOTP_ValidCodeDisablesAndRevokesOtherSessions(t *testing.T) {
 	f := setupTOTPTestFixture(t)
 
-	if err := f.authService.sessionStore.CreateSession("other-device", f.userID, "refresh", time.Now().Add(time.Hour)); err != nil {
+	if err := f.authService.sessions.sessionStore.CreateSession("other-device", f.userID, "refresh", time.Now().Add(time.Hour)); err != nil {
 		t.Fatalf("failed to seed other-device session: %v", err)
 	}
 
@@ -633,7 +640,7 @@ func TestAuthService_DisableTOTP_ValidCodeDisablesAndRevokesOtherSessions(t *tes
 	if len(user.TOTPRecoveryCodeHashes) != 0 {
 		t.Fatal("expected recovery codes cleared")
 	}
-	if active, _ := f.authService.sessionStore.IsActive("other-device", f.userID, "refresh", time.Now()); active {
+	if active, _ := f.authService.sessions.sessionStore.IsActive("other-device", f.userID, "refresh", time.Now()); active {
 		t.Fatal("expected other-device session to be revoked after disabling TOTP")
 	}
 }
@@ -878,10 +885,10 @@ func TestAuthService_RevokeAllUserSessions_MultipleUsers(t *testing.T) {
 func TestAuthService_Close_ClosesSessionAndUserStores(t *testing.T) {
 	authService := setupTestAuthService(t)
 
-	if authService.sessionStore == nil {
+	if authService.sessions == nil || authService.sessions.sessionStore == nil {
 		t.Fatal("expected session store to be initialized")
 	}
-	if authService.sessionStore.db == nil {
+	if authService.sessions.sessionStore.db == nil {
 		t.Fatal("expected session store db to be initialized")
 	}
 	if authService.userService == nil || authService.userService.store == nil {
@@ -895,7 +902,7 @@ func TestAuthService_Close_ClosesSessionAndUserStores(t *testing.T) {
 		t.Fatalf("Close failed: %v", err)
 	}
 
-	if authService.sessionStore.db != nil {
+	if authService.sessions.sessionStore.db != nil {
 		t.Fatal("expected session store db to be closed")
 	}
 	if authService.userService.store.db != nil {
