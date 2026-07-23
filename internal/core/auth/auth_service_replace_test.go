@@ -19,7 +19,9 @@ func TestAuthService_ReplaceUserStore_SwapsToNewUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authService := NewAuthService(NewUserService(oldStore), sessionStore, nil, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	oldUserService := NewUserService(oldStore)
+	sessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := NewAuthService(oldUserService, sessions, nil)
 	t.Cleanup(func() { _ = authService.Close() })
 
 	if _, err := authService.Login("old-user", "old-password"); err != nil {
@@ -90,7 +92,9 @@ func TestAuthService_ReplaceUserStore_ConcurrentLoginsDuringSwap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	authService := NewAuthService(NewUserService(oldStore), sessionStore, nil, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	sharedUserService := NewUserService(oldStore)
+	sharedSessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := NewAuthService(sharedUserService, sharedSessions, nil)
 	t.Cleanup(func() { _ = authService.Close() })
 
 	newDir := t.TempDir()
@@ -150,10 +154,10 @@ func TestAuthService_InvalidateAllSessions_RevokesActiveSessions(t *testing.T) {
 	f := setupTestAuthService(t)
 	t.Cleanup(func() { _ = f.Close() })
 
-	if err := f.sessionStore.CreateSession("jti-a", "user-a", "refresh", time.Now().Add(time.Hour)); err != nil {
+	if err := f.sessions.sessionStore.CreateSession("jti-a", "user-a", "refresh", time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.sessionStore.CreateSession("jti-b", "user-b", "refresh", time.Now().Add(time.Hour)); err != nil {
+	if err := f.sessions.sessionStore.CreateSession("jti-b", "user-b", "refresh", time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -162,7 +166,7 @@ func TestAuthService_InvalidateAllSessions_RevokesActiveSessions(t *testing.T) {
 	}
 
 	for _, s := range []struct{ jti, userID string }{{"jti-a", "user-a"}, {"jti-b", "user-b"}} {
-		active, err := f.sessionStore.IsActive(s.jti, s.userID, "refresh", time.Now())
+		active, err := f.sessions.sessionStore.IsActive(s.jti, s.userID, "refresh", time.Now())
 		if err != nil {
 			t.Fatalf("IsActive failed: %v", err)
 		}

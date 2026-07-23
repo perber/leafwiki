@@ -42,7 +42,8 @@ func newTestManager(t *testing.T) *restore.Manager {
 	if err != nil {
 		t.Fatalf("NewSessionStore failed: %v", err)
 	}
-	authService := coreauth.NewAuthService(coreauth.NewUserService(userStore), sessionStore, nil, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	sessions := coreauth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := coreauth.NewAuthService(coreauth.NewUserService(userStore), sessions, nil)
 	t.Cleanup(func() { _ = authService.Close() })
 
 	brandingService, err := branding.NewBrandingService(base)

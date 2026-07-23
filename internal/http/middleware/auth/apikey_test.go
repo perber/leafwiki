@@ -278,7 +278,8 @@ func TestInjectAPIKeyUser_WithRequireAuth(t *testing.T) {
 	}
 	cleanupWithErrorCheck(t, "session store", sessionStore.Close)
 
-	authService := coreauth.NewAuthService(f.userService, sessionStore, nil, "test-secret-key-for-unit-tests-1", 0, 0)
+	sessions := coreauth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", 0, 0)
+	authService := coreauth.NewAuthService(f.userService, sessions, nil)
 	authCookies := authmw.NewAuthCookies(true, 0, 0)
 
 	_, token, err := f.keyService.CreateAPIKey(coreauth.CreateAPIKeyParams{

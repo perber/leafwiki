@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"log/slog"
 	"sync"
@@ -22,17 +20,14 @@ const loginChallengeTokenType = "login_challenge"
 
 type AuthService struct {
 	// mu guards only userService — it's the one field ReplaceUserStore swaps
-	// after a restore (users.db is part of the snapshot ZIP). sessionStore
-	// (sessions.db) is never swapped, so it needs no lock.
-	mu                   sync.RWMutex
-	userService          *UserService
-	sessionStore         *SessionStore
-	totp                 *TOTPService
-	secretKey            []byte
-	accessTokenLifetime  time.Duration
-	refreshTokenLifetime time.Duration
-	attempts             *loginAttemptTracker
-	dummyHash            []byte
+	// after a restore (users.db is part of the snapshot ZIP). sessions'
+	// underlying session store is never swapped, so it needs no lock.
+	mu          sync.RWMutex
+	userService *UserService
+	sessions    *SessionManager
+	totp        *TOTPService
+	attempts    *loginAttemptTracker
+	dummyHash   []byte
 }
 
 // users returns the current *UserService under a read lock. Callers use the
@@ -79,33 +74,36 @@ func (a *AuthService) ReplaceUserStore(storageDir string) error {
 // Used after a restore: the restored users.db may have entirely different
 // user IDs/passwords than the sessions currently trusting this process.
 func (a *AuthService) InvalidateAllSessions() error {
-	return a.sessionStore.DeleteAllSessions()
+	return a.sessions.sessionStore.DeleteAllSessions()
 }
 
-func NewAuthService(userService *UserService, sessionStore *SessionStore, totpService *TOTPService, secret string, accessTokenTimeout, refreshTokenTimeout time.Duration) *AuthService {
-	if len(secret) < 32 {
-		slog.Warn("JWT secret is too short; a minimum of 32 characters is strongly recommended", "length", len(secret))
-	}
+func NewAuthService(userService *UserService, sessions *SessionManager, totpService *TOTPService) *AuthService {
 	// Pre-compute a dummy hash to equalize Login() timing for non-existent users,
 	// preventing username enumeration via response-time differences.
 	dummyHash, _ := bcrypt.GenerateFromPassword([]byte("leafwiki-dummy-password"), bcrypt.DefaultCost)
-	return &AuthService{
-		userService:          userService,
-		sessionStore:         sessionStore,
-		totp:                 totpService,
-		secretKey:            []byte(secret),
-		accessTokenLifetime:  accessTokenTimeout,
-		refreshTokenLifetime: refreshTokenTimeout,
-		attempts:             newLoginAttemptTracker(),
-		dummyHash:            dummyHash,
+	a := &AuthService{
+		userService: userService,
+		sessions:    sessions,
+		totp:        totpService,
+		attempts:    newLoginAttemptTracker(),
+		dummyHash:   dummyHash,
 	}
+	// Wired here rather than passed into NewSessionManager: a.users() reads
+	// through the mutex ReplaceUserStore swaps, so RefreshToken/ValidateToken
+	// stay correct across a live-restore hot-swap — this closure calls
+	// a.users() fresh on every invocation rather than capturing one
+	// *UserService at construction time.
+	sessions.resolveUser = func(id string) (*User, error) {
+		return a.users().GetUserByID(id)
+	}
+	return a
 }
 
 func (a *AuthService) Close() error {
 	var errs []error
 
-	if a.sessionStore != nil {
-		if err := a.sessionStore.Close(); err != nil {
+	if a.sessions != nil {
+		if err := a.sessions.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -178,7 +176,7 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	}
 
 	a.attempts.reset(user.ID)
-	return a.issueTokens(user)
+	return a.sessions.IssueSession(user)
 }
 
 // CompleteTOTPLogin finishes a login handshake started by Login when a user
@@ -196,7 +194,7 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 		return nil, err
 	}
 
-	active, err := a.sessionStore.IsActive(jti, userID, loginChallengeTokenType, time.Now())
+	active, err := a.sessions.sessionStore.IsActive(jti, userID, loginChallengeTokenType, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -235,12 +233,12 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 	a.attempts.reset(userID)
 
 	// Single-use: revoke the challenge now that it has been consumed successfully.
-	if err := a.sessionStore.RevokeSession(jti); err != nil {
+	if err := a.sessions.sessionStore.RevokeSession(jti); err != nil {
 		slog.Warn("failed to revoke used login challenge session", "error", err)
 	}
 
 	user.Password = ""
-	return a.issueTokens(user)
+	return a.sessions.IssueSession(user)
 }
 
 // StartTOTPSetup verifies the user's current password, generates a fresh TOTP
@@ -312,7 +310,7 @@ func (a *AuthService) ConfirmTOTPSetup(userID, code, currentRefreshToken string)
 		return nil, err
 	}
 
-	if err := a.RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken); err != nil {
+	if err := a.sessions.RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken); err != nil {
 		slog.Warn("failed to revoke other sessions after enabling TOTP", "userID", userID, "error", err)
 	}
 
@@ -350,7 +348,7 @@ func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshT
 		return err
 	}
 
-	if err := a.RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken); err != nil {
+	if err := a.sessions.RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken); err != nil {
 		slog.Warn("failed to revoke other sessions after disabling TOTP", "userID", userID, "error", err)
 	}
 
@@ -375,20 +373,6 @@ func (a *AuthService) GetTOTPStatus(userID string) (*TOTPStatus, error) {
 		Enabled:                user.TOTPEnabled,
 		RecoveryCodesRemaining: len(user.TOTPRecoveryCodeHashes),
 	}, nil
-}
-
-// RevokeAllUserSessionsExceptCurrent revokes every other session for userID,
-// preserving the one identified by currentRefreshToken. If currentRefreshToken
-// cannot be parsed (e.g. missing), every session is revoked — a safe fallback
-// over silently preserving an unidentified session.
-func (a *AuthService) RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken string) error {
-	var exceptJTI string
-	if claims, err := a.parseClaims(currentRefreshToken); err == nil {
-		if jti, ok := claims["jti"].(string); ok {
-			exceptJTI = jti
-		}
-	}
-	return a.sessionStore.RevokeAllSessionsForUserExcept(userID, exceptJTI)
 }
 
 // maxRecoveryCodeConsumeAttempts bounds the compare-and-swap retry loop in
@@ -523,9 +507,11 @@ func errTOTPVerificationFailed(cause error) error {
 }
 
 // parseLoginChallenge validates challengeToken's signature, type, and required
-// claims, returning the subject user ID and challenge jti.
+// claims, returning the subject user ID and challenge jti. Reuses
+// SessionManager's low-level JWT parsing since login-challenge tokens share
+// the same secret and signing method as access/refresh tokens.
 func (a *AuthService) parseLoginChallenge(challengeToken string) (userID, jti string, err error) {
-	claims, err := a.parseClaims(challengeToken)
+	claims, err := a.sessions.parseClaims(challengeToken)
 	if err != nil {
 		return "", "", errInvalidLoginChallenge()
 	}
@@ -545,7 +531,11 @@ func (a *AuthService) parseLoginChallenge(challengeToken string) (userID, jti st
 }
 
 // beginTOTPChallenge issues a short-lived, single-use login challenge for a
-// user who passed the password check but still needs to prove TOTP.
+// user who passed the password check but still needs to prove TOTP. It signs
+// its own claim shape (no role/email, unlike an access/refresh token) via
+// SessionManager's shared signing key, and records the challenge in the same
+// session store access/refresh sessions live in, disambiguated by
+// loginChallengeTokenType.
 func (a *AuthService) beginTOTPChallenge(user *User) (*AuthToken, error) {
 	jti, err := generateJTI()
 	if err != nil {
@@ -559,13 +549,12 @@ func (a *AuthService) beginTOTPChallenge(user *User) (*AuthToken, error) {
 		"exp": expiresAt.Unix(),
 		"iat": time.Now().Unix(),
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString(a.secretKey)
+	signed, err := a.sessions.signClaims(claims)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := a.sessionStore.CreateSession(jti, user.ID, loginChallengeTokenType, expiresAt); err != nil {
+	if err := a.sessions.sessionStore.CreateSession(jti, user.ID, loginChallengeTokenType, expiresAt); err != nil {
 		return nil, err
 	}
 
@@ -575,204 +564,23 @@ func (a *AuthService) beginTOTPChallenge(user *User) (*AuthToken, error) {
 	}, nil
 }
 
-// issueTokens generates and stores access/refresh tokens for an already fully
-// authenticated user (password-only login, or password + TOTP/recovery code).
-func (a *AuthService) issueTokens(user *User) (*AuthToken, error) {
-	accessToken, _, accessTokenExpiresAt, err := a.generateToken(user, a.accessTokenLifetime, "access")
-	if err != nil {
-		return nil, err
-	}
-
-	refreshToken, refreshJTI, _, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
-	if err != nil {
-		return nil, err
-	}
-
-	// store refresh token session
-	if err := a.sessionStore.CreateSession(
-		refreshJTI,
-		user.ID,
-		"refresh",
-		time.Now().Add(a.refreshTokenLifetime),
-	); err != nil {
-		return nil, err
-	}
-
-	return &AuthToken{
-		Token:                accessToken,
-		RefreshToken:         refreshToken,
-		AccessTokenExpiresAt: accessTokenExpiresAt,
-		User:                 user.ToPublicUser(),
-	}, nil
-}
+// RefreshToken, RevokeRefreshToken, RevokeAllUserSessions, and ValidateToken
+// delegate to SessionManager, which owns the JWT/session-store mechanics.
+// They stay exposed on AuthService because internal/wiki/auth's use cases and
+// internal/http/middleware/auth call them here, not on SessionManager directly.
 
 func (a *AuthService) RefreshToken(refreshToken string) (*AuthToken, error) {
-	claims, err := a.parseClaims(refreshToken)
-	if err != nil {
-		return nil, ErrInvalidToken
-	}
-
-	typ, ok := claims["typ"].(string)
-	if !ok || typ != "refresh" {
-		return nil, ErrInvalidToken
-	}
-
-	userID, ok := claims["sub"].(string)
-	if !ok {
-		return nil, ErrInvalidToken
-	}
-
-	jti, ok := claims["jti"].(string)
-	if !ok || jti == "" {
-		return nil, ErrInvalidToken
-	}
-
-	// Check if the refresh token session is active
-	active, err := a.sessionStore.IsActive(jti, userID, "refresh", time.Now())
-	if err != nil || !active {
-		return nil, ErrInvalidToken
-	}
-
-	user, err := a.users().GetUserByID(userID)
-	if err != nil {
-		return nil, ErrUserNotFound
-	}
-
-	user.Password = "" // Clear password from user object
-
-	newAccessToken, _, accessTokenExpiresAt, err := a.generateToken(user, a.accessTokenLifetime, "access")
-	if err != nil {
-		return nil, err
-	}
-
-	newRefreshToken, newRefreshJTI, _, err := a.generateToken(user, a.refreshTokenLifetime, "refresh")
-	if err != nil {
-		return nil, err
-	}
-
-	if err := a.sessionStore.CreateSession(
-		newRefreshJTI,
-		user.ID,
-		"refresh",
-		time.Now().Add(a.refreshTokenLifetime),
-	); err != nil {
-		return nil, err
-	}
-
-	// Revoke the old refresh token only after successfully creating the new session.
-	// This ensures that if token generation or session creation fails, the old token
-	// remains valid and the user can retry. If revocation fails, we log a warning but
-	// don't fail the refresh operation - the old token will expire naturally, and
-	// having two valid tokens temporarily is safer than logging the user out.
-	err = a.sessionStore.RevokeSession(jti)
-	if err != nil {
-		slog.Warn("failed to revoke used refresh token session", "error", err)
-	}
-
-	return &AuthToken{
-		Token:                newAccessToken,
-		RefreshToken:         newRefreshToken,
-		AccessTokenExpiresAt: accessTokenExpiresAt,
-		User:                 user.ToPublicUser(),
-	}, nil
+	return a.sessions.RefreshToken(refreshToken)
 }
 
 func (a *AuthService) RevokeRefreshToken(tokenString string) error {
-	claims, err := a.parseClaims(tokenString)
-	if err != nil {
-		return ErrInvalidToken
-	}
-
-	typ, ok := claims["typ"].(string)
-	if !ok || typ != "refresh" {
-		return ErrInvalidToken
-	}
-
-	jti, ok := claims["jti"].(string)
-	if !ok || jti == "" {
-		return ErrInvalidToken
-	}
-
-	return a.sessionStore.RevokeSession(jti)
+	return a.sessions.RevokeRefreshToken(tokenString)
 }
 
 func (a *AuthService) RevokeAllUserSessions(userID string) error {
-	return a.sessionStore.RevokeAllSessionsForUser(userID)
-}
-
-func generateJTI() (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}
-
-func (a *AuthService) parseClaims(tokenString string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return a.secretKey, nil
-	})
-
-	if err != nil || !token.Valid {
-		return nil, ErrInvalidToken
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, ErrInvalidToken
-	}
-
-	return claims, nil
-}
-
-func (a *AuthService) generateToken(user *User, duration time.Duration, typ string) (string, string, int64, error) {
-	jti, err := generateJTI()
-	if err != nil {
-		return "", "", 0, err
-	}
-	expiresAt := time.Now().Add(duration).Unix()
-	claims := jwt.MapClaims{
-		"sub":   user.ID,
-		"role":  user.Role,
-		"email": user.Email,
-		"exp":   expiresAt,
-		"iat":   time.Now().Unix(),
-		"typ":   typ,
-		"jti":   jti, // Unique identifier for the token
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString(a.secretKey)
-	if err != nil {
-		return "", "", 0, err
-	}
-	return signed, jti, expiresAt, nil
+	return a.sessions.RevokeAllUserSessions(userID)
 }
 
 func (a *AuthService) ValidateToken(tokenString string) (*User, error) {
-	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-		// Ensure signing method is correct
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return a.secretKey, nil
-	})
-
-	if err != nil || !token.Valid {
-		return nil, ErrInvalidToken
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, ErrInvalidToken
-	}
-
-	userID, ok := claims["sub"].(string)
-	if !ok {
-		return nil, ErrInvalidToken
-	}
-
-	return a.users().GetUserByID(userID)
+	return a.sessions.ValidateToken(tokenString)
 }

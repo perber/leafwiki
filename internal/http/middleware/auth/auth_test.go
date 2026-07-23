@@ -37,8 +37,9 @@ func createTestAuthFixture(t *testing.T) *authFixture {
 		t.Fatalf("Failed to init default admin: %v", err)
 	}
 
+	sessions := coreauth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", 15*time.Minute, 7*24*time.Hour)
 	return &authFixture{
-		auth: coreauth.NewAuthService(userService, sessionStore, nil, "test-secret-key-for-unit-tests-1", 15*time.Minute, 7*24*time.Hour),
+		auth: coreauth.NewAuthService(userService, sessions, nil),
 		close: func() error {
 			if err := sessionStore.Close(); err != nil {
 				_ = userStore.Close()

@@ -221,7 +221,8 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 		if err != nil {
 			return err
 		}
-		w.auth = auth.NewAuthService(w.user, sessionStore, w.totp, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+		sessions := auth.NewSessionManager(sessionStore, options.JWTSecret, options.AccessTokenTimeout, options.RefreshTokenTimeout)
+		w.auth = auth.NewAuthService(w.user, sessions, w.totp)
 
 		// API keys are only meaningful when authentication is meaningful:
 		// key management is admin-only and RequireAdmin already hard-blocks
