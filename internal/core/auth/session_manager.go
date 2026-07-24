@@ -22,6 +22,7 @@ type SessionManager struct {
 	secretKey            []byte
 	accessTokenLifetime  time.Duration
 	refreshTokenLifetime time.Duration
+	log                  *slog.Logger
 
 	// resolveUser fetches the current *User for a subject ID. It is called
 	// fresh on every RefreshToken/ValidateToken (never cached here) and is
@@ -40,8 +41,9 @@ type SessionManager struct {
 // must arrange for it to be assigned (NewAuthService does this) before
 // RefreshToken/ValidateToken are used.
 func NewSessionManager(sessionStore *SessionStore, secret string, accessTokenTimeout, refreshTokenTimeout time.Duration) *SessionManager {
+	log := slog.Default().With("component", "SessionManager")
 	if len(secret) < 32 {
-		slog.Warn("JWT secret is too short; a minimum of 32 characters is strongly recommended", "length", len(secret))
+		log.Warn("JWT secret is too short; a minimum of 32 characters is strongly recommended", "length", len(secret))
 	}
 	return &SessionManager{
 		sessionStore:         sessionStore,
@@ -49,6 +51,7 @@ func NewSessionManager(sessionStore *SessionStore, secret string, accessTokenTim
 		accessTokenLifetime:  accessTokenTimeout,
 		refreshTokenLifetime: refreshTokenTimeout,
 		now:                  time.Now,
+		log:                  log,
 	}
 }
 
@@ -86,6 +89,7 @@ func (s *SessionManager) IssueSession(user *User) (*AuthToken, error) {
 		return nil, err
 	}
 
+	s.log.Info("session issued", "userID", user.ID)
 	return &AuthToken{
 		Token:                accessToken,
 		RefreshToken:         refreshToken,
@@ -158,9 +162,10 @@ func (s *SessionManager) RefreshToken(refreshToken string) (*AuthToken, error) {
 	}
 
 	if err := s.sessionStore.RevokeSession(jti); err != nil {
-		slog.Warn("failed to revoke used refresh token session", "error", err)
+		s.log.Warn("failed to revoke used refresh token session", "error", err)
 	}
 
+	s.log.Info("session refreshed", "userID", user.ID)
 	return &AuthToken{
 		Token:                newAccessToken,
 		RefreshToken:         newRefreshToken,
@@ -185,7 +190,13 @@ func (s *SessionManager) RevokeRefreshToken(tokenString string) error {
 		return ErrInvalidToken
 	}
 
-	return s.sessionStore.RevokeSession(jti)
+	userID, _ := claims["sub"].(string)
+
+	err = s.sessionStore.RevokeSession(jti)
+	if err == nil {
+		s.log.Info("session revoked", "userID", userID)
+	}
+	return err
 }
 
 func (s *SessionManager) RevokeAllUserSessions(userID string) error {

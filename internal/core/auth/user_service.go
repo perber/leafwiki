@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/perber/wiki/internal/core/shared"
@@ -15,11 +16,13 @@ const (
 
 type UserService struct {
 	store *UserStore
+	log   *slog.Logger
 }
 
 func NewUserService(store *UserStore) *UserService {
 	return &UserService{
 		store: store,
+		log:   slog.Default().With("component", "UserService"),
 	}
 }
 
@@ -95,6 +98,7 @@ func (s *UserService) CreateUser(username, email, password, role string) (*User,
 		return nil, err
 	}
 
+	s.log.Info("user created", "userID", user.ID, "role", user.Role)
 	return user, nil
 }
 
@@ -147,6 +151,7 @@ func (s *UserService) UpdateUser(id, username, email, password, role string) (*U
 	}
 
 	// Update user fields
+	oldRole := user.Role
 	user.Username = username
 	user.Email = email
 	user.Role = role
@@ -165,6 +170,11 @@ func (s *UserService) UpdateUser(id, username, email, password, role string) (*U
 		return nil, err
 	}
 
+	if oldRole != user.Role {
+		s.log.Info("user role changed", "userID", user.ID, "oldRole", oldRole, "newRole", user.Role)
+	} else {
+		s.log.Info("user updated", "userID", user.ID)
+	}
 	return user, nil
 }
 
@@ -221,6 +231,7 @@ func (s *UserService) DeleteUser(id string) error {
 	if err != nil {
 		return err
 	}
+	s.log.Info("user deleted", "userID", id)
 	return nil
 }
 
@@ -293,6 +304,7 @@ func (s *UserService) ChangeOwnPassword(id, oldPassword, newPassword string) err
 		return err
 	}
 
+	s.log.Info("password changed", "userID", id)
 	return nil
 }
 
@@ -329,6 +341,7 @@ func (s *UserService) ResetAdminUserPassword(username, email string) (*User, err
 	// Note: I need to return the user with the new password, because the user lost his password
 	adminUser.Password = password // Set the password to the generated one
 
+	s.log.Info("admin password reset", "userID", adminUser.ID)
 	return adminUser, nil
 }
 

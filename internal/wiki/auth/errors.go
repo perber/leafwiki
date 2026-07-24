@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -95,6 +96,7 @@ func respondWithAuthError(c *gin.Context, err error) {
 	case errors.Is(err, ErrAuthDisabled):
 		respondWithAuthStatusError(c, http.StatusForbidden, ErrCodeAuthDisabled, "Authentication is disabled", "authentication is disabled")
 	default:
+		slog.Default().Error("unhandled auth error", "error", err)
 		respondWithAuthStatusError(c, http.StatusInternalServerError, ErrCodeAuthInternalError, "Authentication request failed", "authentication request failed")
 	}
 }

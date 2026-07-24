@@ -2,7 +2,6 @@ package auth
 
 import (
 	"errors"
-	"log"
 	"log/slog"
 	"net/http"
 	"time"
@@ -309,19 +308,20 @@ func (r *Routes) handleLoginTOTP(rctx httpinternal.RouterContext) gin.HandlerFun
 
 func (r *Routes) handleLogout(rctx httpinternal.RouterContext) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		refreshToken, _ := rctx.AuthCookies.ReadRefresh(c)
+		refreshToken, err := rctx.AuthCookies.ReadRefresh(c)
+		if err != nil {
+			slog.Default().Warn("could not read refresh token during logout; refresh token will not be revoked", "error", err)
+		}
 		if refreshToken != "" {
 			if err := r.logout.Execute(c.Request.Context(), LogoutInput{RefreshToken: refreshToken}); err != nil {
-				log.Printf("[INFO] Unable to revoke the refresh token: %v", err)
+				slog.Default().Warn("failed to revoke refresh token during logout", "error", err)
 			}
 		}
 		if err := rctx.AuthCookies.Clear(c); err != nil {
-			log.Printf("[INFO] Unable to clear auth cookies: %v", err)
 			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, "Failed to clear authentication cookies", "failed to clear authentication cookies")
 			return
 		}
 		if err := rctx.CSRFCookie.Clear(c); err != nil {
-			log.Printf("[INFO] Unable to clear CSRF cookie: %v", err)
 			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCsrfFailed, "Failed to clear CSRF cookie", "failed to clear csrf cookie")
 			return
 		}
