@@ -59,6 +59,7 @@ func writeUsage(w io.Writer) {
 	leafwiki --help
 
 	Options:
+	--log-format       Log output format: text or json (default: text)
 	--host             Host/IP address to bind the server to (default: 127.0.0.1)
 	--port             Port to run the server on (default: 8080)
 	--unix-socket      Path to a unix domain socket to listen on (overrides --host and --port)
@@ -129,6 +130,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_JWT_SECRET
 	LEAFWIKI_TOTP_ENCRYPTION_KEY
 	LEAFWIKI_LOG_LEVEL
+	LEAFWIKI_LOG_FORMAT
 	LEAFWIKI_ADMIN_PASSWORD
 	LEAFWIKI_ADMIN_USERNAME
 	LEAFWIKI_ADMIN_EMAIL
@@ -180,7 +182,7 @@ func printUsage() {
 	writeUsage(os.Stdout)
 }
 
-func setupLogger() {
+func setupLogger(w io.Writer, format string) {
 	level := slog.LevelInfo
 	switch os.Getenv("LEAFWIKI_LOG_LEVEL") {
 	case "debug":
@@ -191,10 +193,17 @@ func setupLogger() {
 		level = slog.LevelWarn
 	}
 
-	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	opts := &slog.HandlerOptions{
 		Level:     level,
 		AddSource: true,
-	})
+	}
+
+	var handler slog.Handler
+	if format == "json" {
+		handler = slog.NewJSONHandler(w, opts)
+	} else {
+		handler = slog.NewTextHandler(w, opts)
+	}
 
 	slog.SetDefault(slog.New(handler))
 }
@@ -207,6 +216,7 @@ func fail(msg string, args ...any) {
 var gracefulShutdownTimeout = 10 * time.Second
 
 type cliFlags struct {
+	logFormat               *string
 	host                    *string
 	port                    *string
 	unixSocket              *string
@@ -259,6 +269,7 @@ type cliFlags struct {
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
 	return &cliFlags{
+		logFormat:               fs.String("log-format", "", "log output format: text or json (default: text)"),
 		host:                    fs.String("host", "", "host/IP address to bind the server to (e.g. 127.0.0.1 or 0.0.0.0)"),
 		port:                    fs.String("port", "", "port to run the server on"),
 		unixSocket:              fs.String("unix-socket", "", "path to a unix domain socket to listen on; overrides --host and --port"),
@@ -311,7 +322,6 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 }
 
 func main() {
-	setupLogger()
 	exitCode := 0
 	defer func() {
 		if exitCode != 0 {
@@ -329,6 +339,9 @@ func main() {
 	// Track which flags were explicitly set on CLI
 	visited := map[string]bool{}
 	flag.Visit(func(f *flag.Flag) { visited[f.Name] = true })
+
+	logFormat := resolveLogFormat("log-format", *flags.logFormat, visited, "LEAFWIKI_LOG_FORMAT", "text")
+	setupLogger(os.Stdout, logFormat)
 
 	host := resolveString("host", *flags.host, visited, "LEAFWIKI_HOST", "127.0.0.1")
 	port := resolveString("port", *flags.port, visited, "LEAFWIKI_PORT", "8080")
@@ -796,6 +809,34 @@ func resolveString(flagName, flagVal string, visited map[string]bool, envVar str
 	}
 	// Fall back to provided default when flag wasn't set and no env var is present
 	return def
+}
+
+// CLI > ENV > default
+func resolveLogFormat(flagName, flagVal string, visited map[string]bool, envVar string, def string) string {
+	if visited[flagName] {
+		if f, ok := parseLogFormat(flagVal); ok {
+			return f
+		}
+		fail("Invalid flag value", "flag", flagName, "value", flagVal, "expected", "text or json")
+	}
+	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+		if f, ok := parseLogFormat(env); ok {
+			return f
+		}
+		// If env var is set but invalid, fail fast (helps operators)
+		fail(errInvalidEnvVarValue, "variable", envVar, "value", env, "expected", "text or json")
+	}
+	return def
+}
+
+func parseLogFormat(s string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "text":
+		return "text", true
+	case "json":
+		return "json", true
+	}
+	return "", false
 }
 
 // CLI > ENV > default(flag)
