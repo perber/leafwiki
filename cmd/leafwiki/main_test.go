@@ -154,6 +154,34 @@ func TestValidateRedirectURL(t *testing.T) {
 	}
 }
 
+// TestValidateRedirectURL_UserManagementURL confirms --user-management-url is
+// validated the same way as --login-url/--logout-url (http(s) only, no relative
+// paths or dangerous schemes) — it's rendered as a plain <a href>, but an
+// unsafe scheme there is still attacker-controlled markup.
+func TestValidateRedirectURL_UserManagementURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{"empty", "", false},
+		{"https", "https://idp.example.com/users", false},
+		{"javascript scheme", "javascript:alert(1)", true},
+		{"relative path", "/users", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateRedirectURL("user-management-url", tc.url)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateRedirectURL(%q) error = %v, wantErr %v", tc.url, err, tc.wantErr)
+			}
+			if err != nil && !strings.Contains(err.Error(), "user-management-url") {
+				t.Fatalf("validateRedirectURL(%q) error = %v, want it to mention the flag name", tc.url, err)
+			}
+		})
+	}
+}
+
 func TestResolveLogoutURL(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -273,6 +301,26 @@ func TestSetupLogger_SelectsHandlerByFormat(t *testing.T) {
 			t.Fatalf("expected valid JSON output, got %q", buf.String())
 		}
 	})
+}
+
+func TestRunRestoreSnapshotCommand_MissingArg_ReturnsUsageError(t *testing.T) {
+	err := runRestoreSnapshotCommand(t.TempDir(), []string{"restore-snapshot"})
+	if !errors.Is(err, errRestoreSnapshotUsage) {
+		t.Fatalf("runRestoreSnapshotCommand() error = %v, want errRestoreSnapshotUsage", err)
+	}
+}
+
+func TestRunRestoreSnapshotCommand_InvalidZipPath_PropagatesError(t *testing.T) {
+	dataDir := t.TempDir()
+	zipPath := filepath.Join(dataDir, "does-not-exist.zip")
+
+	err := runRestoreSnapshotCommand(dataDir, []string{"restore-snapshot", zipPath})
+	if err == nil {
+		t.Fatal("runRestoreSnapshotCommand() expected an error for a non-existent snapshot zip, got nil")
+	}
+	if errors.Is(err, errRestoreSnapshotUsage) {
+		t.Fatalf("runRestoreSnapshotCommand() error = %v, want a restore error, not the usage error", err)
+	}
 }
 
 func TestValidateListenConfig(t *testing.T) {
