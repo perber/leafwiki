@@ -3,6 +3,7 @@ package markdown
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -270,6 +271,113 @@ func TestParseFrontmatter(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:  "leafwiki_title with unquoted colon is auto-quoted and parses successfully",
+			input: "---\nleafwiki_id: abc123\nleafwiki_title: ADR-0001: Filesystem as Source of Truth\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiID:    "abc123",
+				LeafWikiTitle: "ADR-0001: Filesystem as Source of Truth",
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
+			name:  "leafwiki_pinned bool is unaffected when leafwiki_title in the same file needs colon-quoting",
+			input: "---\nleafwiki_title: ADR-0001: Filesystem as Source of Truth\nleafwiki_pinned: true\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiTitle:  "ADR-0001: Filesystem as Source of Truth",
+				LeafWikiPinned: true,
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
+			name:  "unquoted colon fixup and template placeholder fixup both apply in one document",
+			input: "---\nleafwiki_title: ADR-0001: Filesystem as Source of Truth\nDatum: {{date}}\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiTitle: "ADR-0001: Filesystem as Source of Truth",
+				ExtraFields: map[string]interface{}{
+					"Datum": "{{date}}",
+				},
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
+			name:        "unquoted colon in arbitrary ExtraFields key remains a parse error (scope guard)",
+			input:       "---\nleafwiki_id: abc123\ncustom_note: Some: Value\n---\nBody",
+			wantFM:      Frontmatter{},
+			wantBody:    "---\nleafwiki_id: abc123\ncustom_note: Some: Value\n---\nBody",
+			wantHas:     true,
+			wantErr:     true,
+			wantErrType: ErrFrontmatterParse,
+		},
+		{
+			name:  "leafwiki_title with a quoted substring followed by more unquoted colon text is fixed",
+			input: "---\nleafwiki_title: \"Start\" middle: end\"\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiTitle: "Start\" middle: end",
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
+			name:  "leafwiki_title starting with a backtick is fixed",
+			input: "---\nleafwiki_title: `code`: an explanation\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiTitle: "`code`: an explanation",
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
+			name:  "leafwiki_title starting with @ is fixed",
+			input: "---\nleafwiki_title: @mentions: how they work\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiTitle: "@mentions: how they work",
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
+			name:  "an unrelated leafwiki_title YAML comment is not corrupted when another field needs colon-fixing",
+			input: "---\nleafwiki_id: something: else\nleafwiki_title: #comment: oops\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiID: "something: else",
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
+			name:  "an indented line inside an unrelated block-scalar field is not corrupted by the colon fixup",
+			input: "---\nleafwiki_title: ADR-0001: Filesystem as Source of Truth\nnotes: |\n  Meeting notes.\n  leafwiki_title: v2: draft notes not real metadata\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiTitle: "ADR-0001: Filesystem as Source of Truth",
+				ExtraFields: map[string]interface{}{
+					"notes": "Meeting notes.\nleafwiki_title: v2: draft notes not real metadata",
+				},
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
+			name:  "leafwiki_title with an unquoted template placeholder followed by more colon text is fixed",
+			input: "---\nleafwiki_title: {{date}}: draft\n---\nBody",
+			wantFM: Frontmatter{
+				LeafWikiTitle: "{{date}}: draft",
+			},
+			wantBody: "Body",
+			wantHas:  true,
+			wantErr:  false,
+		},
+		{
 			name:  "frontmatter with whitespace in values",
 			input: "---\nleafwiki_id: \"  abc123  \"\nleafwiki_title: \"  My Title  \"\n---\nBody",
 			wantFM: Frontmatter{
@@ -300,6 +408,10 @@ func TestParseFrontmatter(t *testing.T) {
 				t.Fatalf("has = %v, want %v", has, tt.wantHas)
 			}
 
+			// WasRepaired() is asserted separately (see
+			// TestParseFrontmatter_WasRepaired); this table only cares about
+			// the parsed field values, so ignore it for the DeepEqual here.
+			fm.repaired = false
 			if !reflect.DeepEqual(fm, tt.wantFM) {
 				t.Fatalf("frontmatter = %+v, want %+v", fm, tt.wantFM)
 			}
@@ -596,5 +708,68 @@ func TestFrontmatter_MetadataRoundtripRFC3339(t *testing.T) {
 	}
 	if !reflect.DeepEqual(fm, input) {
 		t.Fatalf("frontmatter changed: got %+v want %+v", fm, input)
+	}
+}
+
+func TestParseFrontmatter_WasRepaired(t *testing.T) {
+	t.Run("clean frontmatter is not marked as repaired", func(t *testing.T) {
+		fm, _, has, err := ParseFrontmatter("---\nleafwiki_id: abc123\nleafwiki_title: My Title\n---\nBody")
+		if err != nil || !has {
+			t.Fatalf("unexpected has=%v err=%v", has, err)
+		}
+		if fm.WasRepaired() {
+			t.Fatalf("expected WasRepaired() to be false for clean frontmatter")
+		}
+	})
+
+	t.Run("frontmatter needing the colon fixup is marked as repaired", func(t *testing.T) {
+		fm, _, has, err := ParseFrontmatter("---\nleafwiki_title: ADR-0001: Filesystem as Source of Truth\n---\nBody")
+		if err != nil || !has {
+			t.Fatalf("unexpected has=%v err=%v", has, err)
+		}
+		if !fm.WasRepaired() {
+			t.Fatalf("expected WasRepaired() to be true after the colon fixup ran")
+		}
+	})
+
+	t.Run("a genuine parse failure is not marked as repaired", func(t *testing.T) {
+		fm, _, has, err := ParseFrontmatter("---\nleafwiki_id: [invalid: yaml: structure\n---\nBody")
+		if err == nil || !has {
+			t.Fatalf("expected a parse error, got has=%v err=%v", has, err)
+		}
+		if fm.WasRepaired() {
+			t.Fatalf("expected WasRepaired() to be false on a zero-value Frontmatter from a failed parse")
+		}
+	})
+}
+
+// TestKnownLeafWikiStringFrontmatterKeys_MatchesFrontmatterStruct guards
+// against knownLeafWikiStringFrontmatterKeys silently drifting out of sync
+// with the Frontmatter struct: every string field with a "leafwiki_*" yaml
+// tag (other than the bool leafwiki_pinned) must appear in the whitelist, or
+// that field silently loses unquoted-colon recovery with no compiler error.
+func TestKnownLeafWikiStringFrontmatterKeys_MatchesFrontmatterStruct(t *testing.T) {
+	whitelisted := make(map[string]bool, len(knownLeafWikiStringFrontmatterKeys))
+	for _, key := range knownLeafWikiStringFrontmatterKeys {
+		whitelisted[key] = true
+	}
+
+	fmType := reflect.TypeOf(Frontmatter{})
+	for i := 0; i < fmType.NumField(); i++ {
+		field := fmType.Field(i)
+		if field.Type.Kind() != reflect.String {
+			continue
+		}
+		tag := field.Tag.Get("yaml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		key := strings.Split(tag, ",")[0]
+		if !strings.HasPrefix(key, "leafwiki_") {
+			continue
+		}
+		if !whitelisted[key] {
+			t.Errorf("Frontmatter field %s (yaml key %q) is a leafwiki_* string field but missing from knownLeafWikiStringFrontmatterKeys", field.Name, key)
+		}
 	}
 }

@@ -366,6 +366,9 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 					// fall back to default title and generated ID, but still add the section and recurse
 				} else {
 					fm := mdFile.GetFrontmatter()
+					if fm.WasRepaired() {
+						f.log.Warn("frontmatter did not parse as-is and was auto-repaired", "path", indexPath)
+					}
 					metadata = f.metadataFromFrontmatter(fm, reconstructNow, indexPath)
 					title, err = mdFile.GetTitle()
 					if err != nil {
@@ -442,6 +445,9 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 			continue
 		}
 		fm := mdFile.GetFrontmatter()
+		if fm.WasRepaired() {
+			f.log.Warn("frontmatter did not parse as-is and was auto-repaired", "path", filePath)
+		}
 		metadata = f.metadataFromFrontmatter(fm, reconstructNow, filePath)
 		title, err = mdFile.GetTitle()
 		if err != nil {
