@@ -144,7 +144,7 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	user, err := a.users().GetUserByIdentifier(identifier)
 	if err != nil {
 		_ = bcrypt.CompareHashAndPassword(a.dummyHash, []byte(password))
-		a.log.Warn("login failed: invalid credentials", "identifier", identifier)
+		a.log.Warn("login failed: invalid credentials")
 		return nil, ErrUserInvalidCredentials
 	}
 
@@ -154,7 +154,7 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		a.log.Warn("login failed: invalid credentials", "identifier", identifier)
+		a.log.Warn("login failed: invalid credentials")
 		return nil, ErrUserInvalidCredentials
 	}
 
