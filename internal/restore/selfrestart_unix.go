@@ -7,6 +7,11 @@ import (
 	"syscall"
 )
 
+// execFn is a seam over syscall.Exec: replacing the process image can't be
+// exercised directly in a test without terminating the test binary itself,
+// so tests stub this to capture the computed exe/argv/env instead.
+var execFn = syscall.Exec
+
 // SelfRestart replaces the current process image in place (same PID) via
 // exec(3), re-running main()'s cold boot against whatever is currently on
 // disk. Used as the last-resort recovery path when a restore's rollback
@@ -19,5 +24,5 @@ func SelfRestart() error {
 	if err != nil {
 		return err
 	}
-	return syscall.Exec(exe, os.Args, os.Environ())
+	return execFn(exe, os.Args, os.Environ())
 }
