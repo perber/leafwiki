@@ -511,6 +511,47 @@ func TestAuthService_ConfirmTOTPSetup_ValidCodeEnablesAndReturnsRecoveryCodes(t 
 	}
 }
 
+// TestAuthService_ConfirmTOTPSetup_RecoveryCodesOnlyStoredAsHashesNotPlaintext
+// guards against recovery codes becoming re-fetchable: ConfirmTOTPSetup must
+// be the only place the plaintext codes are ever visible. Once persisted,
+// only irreversible hashes are stored, so no later read (GetTOTPStatus,
+// GetUserByID, admin user list, etc.) can ever reconstruct or re-display them.
+func TestAuthService_ConfirmTOTPSetup_RecoveryCodesOnlyStoredAsHashesNotPlaintext(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	generated, err := f.authService.StartTOTPSetup(f.userID, "securepass")
+	if err != nil {
+		t.Fatalf("StartTOTPSetup failed: %v", err)
+	}
+	plainSecret, err := f.totpService.decrypt(generated.EncryptedSecret)
+	if err != nil {
+		t.Fatalf("failed to decrypt secret: %v", err)
+	}
+	code, err := totp.GenerateCode(plainSecret, time.Now())
+	if err != nil {
+		t.Fatalf("failed to generate reference TOTP code: %v", err)
+	}
+	codes, err := f.authService.ConfirmTOTPSetup(f.userID, code, "")
+	if err != nil {
+		t.Fatalf("ConfirmTOTPSetup failed: %v", err)
+	}
+
+	user, err := f.store.GetUserByID(f.userID)
+	if err != nil {
+		t.Fatalf("failed to reload user: %v", err)
+	}
+	if len(user.TOTPRecoveryCodeHashes) != len(codes) {
+		t.Fatalf("expected %d stored hashes, got %d", len(codes), len(user.TOTPRecoveryCodeHashes))
+	}
+	for i, plaintext := range codes {
+		for _, stored := range user.TOTPRecoveryCodeHashes {
+			if stored == plaintext {
+				t.Fatalf("recovery code %d is stored in plaintext (%q) — it would be re-fetchable via GetUserByID", i, plaintext)
+			}
+		}
+	}
+}
+
 func TestAuthService_ConfirmTOTPSetup_RevokesOtherSessionsButKeepsCurrent(t *testing.T) {
 	f := setupTOTPSetupFixture(t)
 
@@ -688,6 +729,57 @@ func TestAuthService_GetTOTPStatus_NotEnabled(t *testing.T) {
 	}
 	if status.RecoveryCodesRemaining != 0 {
 		t.Fatalf("expected 0 remaining recovery codes, got %d", status.RecoveryCodesRemaining)
+	}
+}
+
+func TestAuthService_GetTOTPStatus_RecoveryCodesRemainingReachesZeroAfterAllConsumed(t *testing.T) {
+	f := setupTOTPSetupFixture(t)
+
+	generated, err := f.authService.StartTOTPSetup(f.userID, "securepass")
+	if err != nil {
+		t.Fatalf("StartTOTPSetup failed: %v", err)
+	}
+	plainSecret, err := f.totpService.decrypt(generated.EncryptedSecret)
+	if err != nil {
+		t.Fatalf("failed to decrypt secret: %v", err)
+	}
+	code, err := totp.GenerateCode(plainSecret, time.Now())
+	if err != nil {
+		t.Fatalf("failed to generate reference TOTP code: %v", err)
+	}
+	codes, err := f.authService.ConfirmTOTPSetup(f.userID, code, "")
+	if err != nil {
+		t.Fatalf("ConfirmTOTPSetup failed: %v", err)
+	}
+
+	for i, recoveryCode := range codes {
+		challenge, err := f.authService.Login("testuser", "securepass")
+		if err != nil {
+			t.Fatalf("Login failed on iteration %d: %v", i, err)
+		}
+		if _, err := f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, recoveryCode); err != nil {
+			t.Fatalf("CompleteTOTPLogin with recovery code failed on iteration %d: %v", i, err)
+		}
+
+		status, err := f.authService.GetTOTPStatus(f.userID)
+		if err != nil {
+			t.Fatalf("GetTOTPStatus failed on iteration %d: %v", i, err)
+		}
+		wantRemaining := len(codes) - i - 1
+		if status.RecoveryCodesRemaining != wantRemaining {
+			t.Fatalf("iteration %d: expected %d remaining recovery codes, got %d", i, wantRemaining, status.RecoveryCodesRemaining)
+		}
+	}
+
+	status, err := f.authService.GetTOTPStatus(f.userID)
+	if err != nil {
+		t.Fatalf("GetTOTPStatus failed: %v", err)
+	}
+	if status.RecoveryCodesRemaining != 0 {
+		t.Fatalf("expected 0 remaining recovery codes after consuming all of them, got %d", status.RecoveryCodesRemaining)
+	}
+	if !status.Enabled {
+		t.Fatal("expected TOTP to remain enabled after exhausting recovery codes")
 	}
 }
 
