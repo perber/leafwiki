@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -36,7 +38,9 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 		"--metrics-port",
 		"--data-dir",
 		"--unix-socket",
+		"--log-format",
 		"LEAFWIKI_UNIX_SOCKET",
+		"LEAFWIKI_LOG_FORMAT",
 		"LEAFWIKI_ADMIN_USERNAME",
 		"LEAFWIKI_ADMIN_EMAIL",
 		"LEAFWIKI_ENABLE_METRICS",
@@ -199,6 +203,76 @@ func TestResolveString_TrimsCLIFlagValue(t *testing.T) {
 	if want := "https://idp.example.com/login"; got != want {
 		t.Fatalf("resolveString() = %q, want %q", got, want)
 	}
+}
+
+func TestResolveLogFormat_Precedence(t *testing.T) {
+	tests := []struct {
+		name     string
+		flagVal  string
+		visited  bool
+		envVal   string
+		wantForm string
+	}{
+		{
+			name:     "neither set falls back to default",
+			wantForm: "text",
+		},
+		{
+			name:     "env var sets json",
+			envVal:   "json",
+			wantForm: "json",
+		},
+		{
+			name:     "env var is case-insensitive",
+			envVal:   "JSON",
+			wantForm: "json",
+		},
+		{
+			name:     "cli flag overrides env var",
+			flagVal:  "text",
+			visited:  true,
+			envVal:   "json",
+			wantForm: "text",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("LEAFWIKI_LOG_FORMAT", tc.envVal)
+			visited := map[string]bool{}
+			if tc.visited {
+				visited["log-format"] = true
+			}
+			got := resolveLogFormat("log-format", tc.flagVal, visited, "LEAFWIKI_LOG_FORMAT", "text")
+			if got != tc.wantForm {
+				t.Fatalf("resolveLogFormat() = %q, want %q", got, tc.wantForm)
+			}
+		})
+	}
+}
+
+func TestSetupLogger_SelectsHandlerByFormat(t *testing.T) {
+	t.Run("text format writes non-JSON output", func(t *testing.T) {
+		var buf bytes.Buffer
+		setupLogger(&buf, "text")
+		slog.Default().Info("hello")
+
+		if json.Valid(buf.Bytes()) {
+			t.Fatalf("expected non-JSON text output, got %q", buf.String())
+		}
+		if !strings.Contains(buf.String(), "msg=hello") {
+			t.Fatalf("expected text output to contain msg=hello, got %q", buf.String())
+		}
+	})
+
+	t.Run("json format writes valid JSON output", func(t *testing.T) {
+		var buf bytes.Buffer
+		setupLogger(&buf, "json")
+		slog.Default().Info("hello")
+
+		if !json.Valid(buf.Bytes()) {
+			t.Fatalf("expected valid JSON output, got %q", buf.String())
+		}
+	})
 }
 
 func TestValidateListenConfig(t *testing.T) {
