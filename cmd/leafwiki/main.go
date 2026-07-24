@@ -213,6 +213,18 @@ func fail(msg string, args ...any) {
 	os.Exit(1)
 }
 
+var errRestoreSnapshotUsage = errors.New("restore-snapshot requires a path to a snapshot zip: leafwiki [--data-dir <DIR>] restore-snapshot <path-to-zip>")
+
+// runRestoreSnapshotCommand implements the `restore-snapshot` subcommand: args
+// is flag.Args() (args[0] == "restore-snapshot"), so a snapshot path is
+// present at args[1].
+func runRestoreSnapshotCommand(dataDir string, args []string) error {
+	if len(args) < 2 {
+		return errRestoreSnapshotUsage
+	}
+	return restore.RestoreOffline(dataDir, args[1])
+}
+
 var gracefulShutdownTimeout = 10 * time.Second
 
 type cliFlags struct {
@@ -418,9 +430,9 @@ func main() {
 	if err := validateRedirectURL("logout-url", logoutURL); err != nil {
 		fail("Invalid logout URL configuration", "error", err)
 	}
-	// --user-management-url is only ever used as a plain <a href> in the frontend
-	// (relative paths and other schemes work fine there), so it isn't restricted
-	// to http(s) like --login-url/--logout-url, which the browser navigates to directly.
+	if err := validateRedirectURL("user-management-url", userManagementURL); err != nil {
+		fail("Invalid user management URL configuration", "error", err)
+	}
 
 	if enableHTTPRemoteUser {
 		slog.Default().Info("Reverse-proxy authentication enabled",
@@ -454,11 +466,12 @@ func main() {
 			fmt.Printf("New password for user %s: %s\n", user.Username, user.Password)
 			return
 		case "restore-snapshot":
-			if len(args) < 2 {
-				fail("restore-snapshot requires a path to a snapshot zip: leafwiki [--data-dir <DIR>] restore-snapshot <path-to-zip>")
-			}
-			if err := restore.RestoreOffline(dataDir, args[1]); err != nil {
-				fail("Restore failed", "error", err)
+			if err := runRestoreSnapshotCommand(dataDir, args); err != nil {
+				if errors.Is(err, errRestoreSnapshotUsage) {
+					fail(err.Error())
+				} else {
+					fail("Restore failed", "error", err)
+				}
 			}
 			fmt.Println("Snapshot restored successfully. Start the server normally to pick up the restored data.")
 			return
