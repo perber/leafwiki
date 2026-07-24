@@ -3,6 +3,8 @@ package restore
 import (
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -285,5 +287,56 @@ func TestManager_Restore_RollsBackOnBrandingReloadFailure(t *testing.T) {
 	}
 	if _, err := f.authService.Login("snapshot-admin", "snapshot-password-123"); err == nil {
 		t.Fatal("expected the snapshot's user to no longer exist after rollback")
+	}
+}
+
+// TestManager_Restore_BlocksConcurrentWritesDuringSwap runs real goroutines
+// racing WriteGate.TryEnter against a real Manager.runLocked (file swap, auth
+// reopen, branding reload) — closing the gap between the gate primitive's own
+// race coverage (writegate_test.go) and the HTTP middleware's gate coverage
+// (internal/http/middleware/maintenance/writegate_test.go), neither of which
+// exercises an actual in-flight restore.
+func TestManager_Restore_BlocksConcurrentWritesDuringSwap(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+
+	var admitted, rejected int64
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				if leave, ok := f.manager.cfg.WriteGate.TryEnter(); ok {
+					atomic.AddInt64(&admitted, 1)
+					time.Sleep(time.Millisecond)
+					leave()
+				} else {
+					atomic.AddInt64(&rejected, 1)
+				}
+			}
+		}()
+	}
+
+	if err := f.manager.TriggerRestore(f.snapshotID); err != nil {
+		t.Fatalf("TriggerRestore failed: %v", err)
+	}
+	status := waitForRestoreDone(t, f.manager)
+	close(stop)
+	wg.Wait()
+
+	if status.Error != "" {
+		t.Fatalf("expected successful restore, got: %s", status.Error)
+	}
+	if atomic.LoadInt64(&rejected) == 0 {
+		t.Error("expected at least some concurrent TryEnter calls to be rejected while the gate was engaged")
+	}
+	if f.manager.cfg.WriteGate.Engaged() {
+		t.Error("expected write gate to be disengaged after restore completes")
 	}
 }

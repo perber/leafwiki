@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -112,6 +113,48 @@ func TestSwapper_SwapAll_ReplacesLiveContentAndKeepsPreRestoreCopyUntilCommit(t 
 	sw.CommitAll()
 	if hasPreRestoreEntries(t, dataDir) {
 		t.Error("expected .pre-restore-* entries to be gone after CommitAll")
+	}
+}
+
+func TestSwapper_SwapAll_PermissionDeniedMovingAside(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission-bit semantics differ on windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("running as root bypasses permission checks")
+	}
+
+	zipPath := buildFixtureSnapshot(t, "v1.0.0")
+	dataDir := t.TempDir()
+	test_utils.WriteFile(t, dataDir, "root/live-page.md", "# Live content\n")
+
+	// Build the staging dir before dataDir is made read-only: extractAndValidate
+	// itself needs to create a directory inside dataDir, which is a separate
+	// concern from the rename-permission failure this test targets.
+	stagingDir, _, err := extractAndValidate(zipPath, dataDir)
+	if err != nil {
+		t.Fatalf("extractAndValidate failed: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(stagingDir) })
+
+	if err := os.Chmod(dataDir, 0o555); err != nil {
+		t.Fatalf("chmod failed: %v", err)
+	}
+	// Must run before t.TempDir()'s own cleanup, which needs dataDir writable
+	// to remove it; t.Cleanup runs LIFO, so registering this after t.TempDir()
+	// (called above) puts it first.
+	t.Cleanup(func() { _ = os.Chmod(dataDir, 0o755) })
+
+	sw := newSwapper(dataDir, stagingDir)
+	if err := sw.SwapAll(); err == nil {
+		t.Fatal("expected SwapAll to fail with a permission error")
+	}
+
+	if _, statErr := os.Stat(filepath.Join(dataDir, "root", "live-page.md")); statErr != nil {
+		t.Errorf("expected live content to remain untouched, got: %v", statErr)
+	}
+	if rbErr := sw.RollbackAll(); rbErr != nil {
+		t.Errorf("expected RollbackAll to be a safe no-op after a failed move-aside, got: %v", rbErr)
 	}
 }
 
