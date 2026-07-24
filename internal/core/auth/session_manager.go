@@ -29,6 +29,10 @@ type SessionManager struct {
 	// AuthService.ReplaceUserStore) rather than passed in here — at
 	// construction time there is no AuthService yet for it to read through.
 	resolveUser func(id string) (*User, error)
+
+	// now is a test seam (defaults to time.Now); tests in this package may
+	// override it with a fake clock.
+	now func() time.Time
 }
 
 // NewSessionManager constructs a SessionManager backed by sessionStore.
@@ -44,6 +48,7 @@ func NewSessionManager(sessionStore *SessionStore, secret string, accessTokenTim
 		secretKey:            []byte(secret),
 		accessTokenLifetime:  accessTokenTimeout,
 		refreshTokenLifetime: refreshTokenTimeout,
+		now:                  time.Now,
 	}
 }
 
@@ -62,16 +67,21 @@ func (s *SessionManager) IssueSession(user *User) (*AuthToken, error) {
 		return nil, err
 	}
 
-	refreshToken, refreshJTI, _, err := s.generateToken(user, s.refreshTokenLifetime, "refresh")
+	refreshToken, refreshJTI, refreshExpiresAt, err := s.generateToken(user, s.refreshTokenLifetime, "refresh")
 	if err != nil {
 		return nil, err
 	}
 
+	// Reuse the exact exp timestamp already embedded in the refresh token's
+	// claims for the session-store row, rather than computing a second,
+	// independent now().Add(lifetime) here — two separate calls could drift
+	// by up to a second, leaving the token still cryptographically valid
+	// while IsActive already treats its session row as expired (or vice versa).
 	if err := s.sessionStore.CreateSession(
 		refreshJTI,
 		user.ID,
 		"refresh",
-		time.Now().Add(s.refreshTokenLifetime),
+		time.Unix(refreshExpiresAt, 0),
 	); err != nil {
 		return nil, err
 	}
@@ -112,11 +122,14 @@ func (s *SessionManager) RefreshToken(refreshToken string) (*AuthToken, error) {
 		return nil, ErrInvalidToken
 	}
 
-	active, err := s.sessionStore.IsActive(jti, userID, "refresh", time.Now())
+	active, err := s.sessionStore.IsActive(jti, userID, "refresh", s.now())
 	if err != nil || !active {
 		return nil, ErrInvalidToken
 	}
 
+	if s.resolveUser == nil {
+		return nil, ErrSessionManagerNotWired
+	}
 	user, err := s.resolveUser(userID)
 	if err != nil {
 		return nil, ErrUserNotFound
@@ -128,16 +141,18 @@ func (s *SessionManager) RefreshToken(refreshToken string) (*AuthToken, error) {
 		return nil, err
 	}
 
-	newRefreshToken, newRefreshJTI, _, err := s.generateToken(user, s.refreshTokenLifetime, "refresh")
+	newRefreshToken, newRefreshJTI, newRefreshExpiresAt, err := s.generateToken(user, s.refreshTokenLifetime, "refresh")
 	if err != nil {
 		return nil, err
 	}
 
+	// See IssueSession's comment: reuse the token's own exp rather than a
+	// second, independently-computed now().Add(lifetime).
 	if err := s.sessionStore.CreateSession(
 		newRefreshJTI,
 		user.ID,
 		"refresh",
-		time.Now().Add(s.refreshTokenLifetime),
+		time.Unix(newRefreshExpiresAt, 0),
 	); err != nil {
 		return nil, err
 	}
@@ -201,11 +216,19 @@ func (s *SessionManager) ValidateToken(tokenString string) (*User, error) {
 		return nil, ErrInvalidToken
 	}
 
+	typ, ok := claims["typ"].(string)
+	if !ok || typ != "access" {
+		return nil, ErrInvalidToken
+	}
+
 	userID, ok := claims["sub"].(string)
 	if !ok {
 		return nil, ErrInvalidToken
 	}
 
+	if s.resolveUser == nil {
+		return nil, ErrSessionManagerNotWired
+	}
 	return s.resolveUser(userID)
 }
 
@@ -254,13 +277,13 @@ func (s *SessionManager) generateToken(user *User, duration time.Duration, typ s
 	if err != nil {
 		return "", "", 0, err
 	}
-	expiresAt := time.Now().Add(duration).Unix()
+	expiresAt := s.now().Add(duration).Unix()
 	claims := jwt.MapClaims{
 		"sub":   user.ID,
 		"role":  user.Role,
 		"email": user.Email,
 		"exp":   expiresAt,
-		"iat":   time.Now().Unix(),
+		"iat":   s.now().Unix(),
 		"typ":   typ,
 		"jti":   jti, // Unique identifier for the token
 	}

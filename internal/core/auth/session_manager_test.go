@@ -1,9 +1,24 @@
 package auth
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 )
+
+// readSessionExpiresAt reads back the raw expires_at column stored for jti,
+// so tests can compare it exactly against a token's own exp claim.
+func readSessionExpiresAt(t *testing.T, store *SessionStore, jti string) int64 {
+	t.Helper()
+	var expiresAt int64
+	err := store.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`SELECT expires_at FROM sessions WHERE id = ?`, jti).Scan(&expiresAt)
+	})
+	if err != nil {
+		t.Fatalf("failed to read session expires_at: %v", err)
+	}
+	return expiresAt
+}
 
 // setupTestSessionManager builds a SessionManager backed by a real (temp-dir)
 // SessionStore and an in-memory resolver over users, so tests can exercise
@@ -69,6 +84,69 @@ func TestSessionManager_ValidateToken_InvalidTokenRejected(t *testing.T) {
 	sm := setupTestSessionManager(t, nil)
 	if _, err := sm.ValidateToken("not-a-token"); err != ErrInvalidToken {
 		t.Fatalf("expected ErrInvalidToken, got %v", err)
+	}
+}
+
+// Regression test: ValidateToken must only accept typ=="access" tokens. It
+// previously accepted any validly-signed token regardless of typ, meaning a
+// refresh token (long-lived, and not checked against the session store here)
+// could be used as an access token.
+func TestSessionManager_ValidateToken_RejectsRefreshToken(t *testing.T) {
+	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
+	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
+
+	tokens, err := sm.IssueSession(user)
+	if err != nil {
+		t.Fatalf("IssueSession failed: %v", err)
+	}
+
+	if _, err := sm.ValidateToken(tokens.RefreshToken); err != ErrInvalidToken {
+		t.Fatalf("expected ErrInvalidToken when validating a refresh token as an access token, got %v", err)
+	}
+}
+
+// A SessionManager constructed directly (not via NewAuthService, which wires
+// resolveUser) must fail loudly rather than panic on a nil call.
+func TestSessionManager_ValidateToken_ResolveUserNotWired_ReturnsErrorInsteadOfPanicking(t *testing.T) {
+	store, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sm := NewSessionManager(store, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+
+	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
+	sm.resolveUser = func(id string) (*User, error) { return user, nil }
+	tokens, err := sm.IssueSession(user)
+	if err != nil {
+		t.Fatalf("IssueSession failed: %v", err)
+	}
+
+	// Simulate the not-yet-wired state ValidateToken/RefreshToken must guard against.
+	sm.resolveUser = nil
+
+	if _, err := sm.ValidateToken(tokens.Token); err == nil {
+		t.Fatal("expected an error, not a panic or nil, when resolveUser is unset")
+	}
+}
+
+func TestSessionManager_RefreshToken_ResolveUserNotWired_ReturnsErrorInsteadOfPanicking(t *testing.T) {
+	store, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sm := NewSessionManager(store, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+
+	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
+	sm.resolveUser = func(id string) (*User, error) { return user, nil }
+	tokens, err := sm.IssueSession(user)
+	if err != nil {
+		t.Fatalf("IssueSession failed: %v", err)
+	}
+
+	sm.resolveUser = nil
+
+	if _, err := sm.RefreshToken(tokens.RefreshToken); err == nil {
+		t.Fatal("expected an error, not a panic or nil, when resolveUser is unset")
 	}
 }
 
@@ -238,6 +316,99 @@ func TestSessionManager_RevokeAllUserSessionsExceptCurrent_UnparsableCurrentRevo
 
 	if _, err := sm.RefreshToken(tokens.RefreshToken); err == nil {
 		t.Fatal("expected every session to be revoked when the current token can't be identified")
+	}
+}
+
+// fakeAdvancingClock returns a clock that moves forward by step on every
+// call, so a bug that recomputes an expiry from a second, independent now()
+// call (instead of reusing an already-computed one) produces a deterministic,
+// detectable drift instead of an unreliable real-time race.
+func fakeAdvancingClock(step time.Duration) func() time.Time {
+	base := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+	calls := 0
+	return func() time.Time {
+		now := base.Add(time.Duration(calls) * step)
+		calls++
+		return now
+	}
+}
+
+// Regression test: IssueSession previously stored the refresh session's
+// expiry via its own now().Add(lifetime) call, separate from the exp already
+// embedded in the refresh token's claims moments earlier — the two could
+// drift, leaving a token still cryptographically valid while its session row
+// was already (or not yet) considered expired.
+func TestSessionManager_IssueSession_SessionExpiryMatchesRefreshTokenExp(t *testing.T) {
+	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
+	store, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sm := NewSessionManager(store, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	sm.resolveUser = func(id string) (*User, error) { return user, nil }
+	sm.now = fakeAdvancingClock(3 * time.Second)
+
+	tokens, err := sm.IssueSession(user)
+	if err != nil {
+		t.Fatalf("IssueSession failed: %v", err)
+	}
+
+	claims, err := sm.parseClaims(tokens.RefreshToken)
+	if err != nil {
+		t.Fatalf("failed to parse refresh token claims: %v", err)
+	}
+	tokenExp, ok := claims["exp"].(float64)
+	if !ok {
+		t.Fatalf("expected exp claim, got %#v", claims["exp"])
+	}
+	jti, ok := claims["jti"].(string)
+	if !ok {
+		t.Fatalf("expected jti claim, got %#v", claims["jti"])
+	}
+
+	storedExpiresAt := readSessionExpiresAt(t, store, jti)
+	if int64(tokenExp) != storedExpiresAt {
+		t.Fatalf("session-store expiry (%d) does not match refresh token's own exp claim (%d)", storedExpiresAt, int64(tokenExp))
+	}
+}
+
+// Same regression, exercised via RefreshToken's newly-issued refresh session.
+func TestSessionManager_RefreshToken_SessionExpiryMatchesNewRefreshTokenExp(t *testing.T) {
+	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
+	store, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sm := NewSessionManager(store, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	sm.resolveUser = func(id string) (*User, error) { return user, nil }
+	sm.now = fakeAdvancingClock(3 * time.Second)
+
+	initial, err := sm.IssueSession(user)
+	if err != nil {
+		t.Fatalf("IssueSession failed: %v", err)
+	}
+
+	refreshed, err := sm.RefreshToken(initial.RefreshToken)
+	if err != nil {
+		t.Fatalf("RefreshToken failed: %v", err)
+	}
+
+	claims, err := sm.parseClaims(refreshed.RefreshToken)
+	if err != nil {
+		t.Fatalf("failed to parse refresh token claims: %v", err)
+	}
+	tokenExp, ok := claims["exp"].(float64)
+	if !ok {
+		t.Fatalf("expected exp claim, got %#v", claims["exp"])
+	}
+	jti, ok := claims["jti"].(string)
+	if !ok {
+		t.Fatalf("expected jti claim, got %#v", claims["jti"])
+	}
+
+	storedExpiresAt := readSessionExpiresAt(t, store, jti)
+	if int64(tokenExp) != storedExpiresAt {
+		t.Fatalf("session-store expiry (%d) does not match refresh token's own exp claim (%d)", storedExpiresAt, int64(tokenExp))
 	}
 }
 
