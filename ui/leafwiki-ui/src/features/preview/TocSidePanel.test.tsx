@@ -85,6 +85,14 @@ describe('TocSidePanel — rendering', () => {
     )
   })
 
+  it('sets the full entry text as a title attribute for hover tooltips', () => {
+    render(<TocSidePanel entries={entries} />)
+    expect(screen.getByTestId('toc-entry-background')).toHaveAttribute(
+      'title',
+      'Background',
+    )
+  })
+
   it('does not register scroll listener when entries is empty', () => {
     const spy = vi.spyOn(scrollContainer, 'addEventListener')
     render(<TocSidePanel entries={[]} />)

@@ -89,6 +89,7 @@ export function TocSidePanel({ entries, activeId: externalActiveId }: Props) {
                   waitForStableLayout: false,
                 })
               }
+              title={entry.text}
               data-testid={`toc-entry-${entry.id}`}
               tabIndex={collapsed ? -1 : 0}
             >
