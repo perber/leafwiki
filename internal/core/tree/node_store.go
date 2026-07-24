@@ -22,16 +22,21 @@ func fileExists(p string) bool {
 	return err == nil
 }
 
-func ensureUniqueReconstructedID(seenIDs map[string]string, id string, path string) error {
+// ensureUniqueReconstructedID records id as seen for this reconstruct walk.
+// It returns the path of the earlier occurrence if id is a duplicate (the
+// caller should skip this node rather than add it to the tree), or an error
+// only if id is empty (defensive — callers always default to a freshly
+// generated ID before this is called, so this should be unreachable).
+func ensureUniqueReconstructedID(seenIDs map[string]string, id string, path string) (conflictPath string, err error) {
 	trimmedID := strings.TrimSpace(id)
 	if trimmedID == "" {
-		return fmt.Errorf("reconstruct tree from fs: empty leafwiki_id at %s", path)
+		return "", fmt.Errorf("reconstruct tree from fs: empty leafwiki_id at %s", path)
 	}
 	if existingPath, exists := seenIDs[trimmedID]; exists {
-		return fmt.Errorf("duplicate leafwiki_id %q in %s and %s", trimmedID, existingPath, path)
+		return existingPath, nil
 	}
 	seenIDs[trimmedID] = path
-	return nil
+	return "", nil
 }
 
 func ensureUniqueReconstructedSlug(seenSlugs map[string]string, slug string, path string) error {
@@ -397,8 +402,14 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 			if err := ensureUniqueReconstructedSlug(seenSlugs, child.Slug, filepath.Join(currentPath, name)); err != nil {
 				return err
 			}
-			if err := ensureUniqueReconstructedID(seenIDs, child.ID, indexPath); err != nil {
+			conflictPath, err := ensureUniqueReconstructedID(seenIDs, child.ID, indexPath)
+			if err != nil {
 				return err
+			}
+			if conflictPath != "" {
+				f.log.Warn("skipping section: duplicate leafwiki_id, keeping first occurrence",
+					"leafwikiID", child.ID, "path", indexPath, "conflictingPath", conflictPath)
+				continue
 			}
 			parent.Children = append(parent.Children, child)
 
@@ -467,8 +478,14 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 		if err := ensureUniqueReconstructedSlug(seenSlugs, child.Slug, filePath); err != nil {
 			return err
 		}
-		if err := ensureUniqueReconstructedID(seenIDs, child.ID, filePath); err != nil {
+		conflictPath, err := ensureUniqueReconstructedID(seenIDs, child.ID, filePath)
+		if err != nil {
 			return err
+		}
+		if conflictPath != "" {
+			f.log.Warn("skipping page: duplicate leafwiki_id, keeping first occurrence",
+				"leafwikiID", child.ID, "path", filePath, "conflictingPath", conflictPath)
+			continue
 		}
 		if needsWriteback {
 			f.writeReconstructedFrontmatter(mdFile, child)
