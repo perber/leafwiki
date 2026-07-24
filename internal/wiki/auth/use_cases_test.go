@@ -2,13 +2,78 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/pquerna/otp/totp"
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/favorites"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 )
+
+func metricsBody(t *testing.T, metrics *httpmetrics.HTTPMetrics) string {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	metrics.HTTPHandler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected metrics endpoint to return 200, got %d", rec.Code)
+	}
+	return rec.Body.String()
+}
+
+// testTOTPEncryptionKey is a throwaway 32-byte key for TOTPService in tests —
+// it never needs to match production, only to satisfy NewTOTPService's
+// minimum-length requirement.
+const testTOTPEncryptionKey = "test-totp-encryption-key-32byte!"
+
+// setupAuthUseCases builds a real AuthService (backed by temp-dir SQLite
+// stores, matching internal/core/auth's own test fixtures) together with a
+// fresh metrics registry, for exercising the wiki-layer use cases end to end.
+func setupAuthUseCases(t *testing.T, withTOTP bool) (*coreauth.AuthService, *coreauth.UserService, *httpmetrics.HTTPMetrics) {
+	t.Helper()
+
+	userStore, err := coreauth.NewUserStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewUserStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := userStore.Close(); err != nil {
+			t.Errorf("Close user store: %v", err)
+		}
+	})
+	userSvc := coreauth.NewUserService(userStore)
+
+	sessionStore, err := coreauth.NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSessionStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := sessionStore.Close(); err != nil {
+			t.Errorf("Close session store: %v", err)
+		}
+	})
+	sessions := coreauth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour*7)
+
+	var totpSvc *coreauth.TOTPService
+	if withTOTP {
+		totpSvc, err = coreauth.NewTOTPService([]byte(testTOTPEncryptionKey))
+		if err != nil {
+			t.Fatalf("NewTOTPService: %v", err)
+		}
+	}
+
+	authSvc := coreauth.NewAuthService(userSvc, sessions, totpSvc)
+	return authSvc, userSvc, httpmetrics.NewHTTPMetrics()
+}
 
 func setupUpdateUserUseCase(t *testing.T) (*UpdateUserUseCase, *coreauth.UserService) {
 	t.Helper()
@@ -210,11 +275,143 @@ func TestUpdateUser_AdminInvalidRole(t *testing.T) {
 	}
 }
 
+// TestLoginUseCase_EmitsSuccessMetric verifies that a successful password
+// login (no TOTP) records both the login-attempt outcome and the
+// session-issued event.
+func TestLoginUseCase_EmitsSuccessMetric(t *testing.T) {
+	authSvc, userSvc, metrics := setupAuthUseCases(t, false)
+	if _, err := userSvc.CreateUser("alice", "alice@example.com", "securepass", coreauth.RoleViewer); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	uc := NewLoginUseCase(authSvc, metrics)
+	if _, err := uc.Execute(context.Background(), LoginInput{Identifier: "alice", Password: "securepass"}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	body := metricsBody(t, metrics)
+	if !strings.Contains(body, `leafwiki_auth_login_attempts_total{outcome="success"} 1`) {
+		t.Fatalf("expected login success metric, got: %s", body)
+	}
+	if !strings.Contains(body, `leafwiki_auth_sessions_total{event="issued"} 1`) {
+		t.Fatalf("expected session issued metric, got: %s", body)
+	}
+}
+
+// TestLoginUseCase_EmitsLockedMetric verifies that once the per-user failure
+// threshold trips, a subsequent attempt is recorded under outcome="locked"
+// (distinct from the "invalid_credentials" outcome of the failures that
+// triggered the lock itself — see loginAttemptTracker.recordAttempt).
+func TestLoginUseCase_EmitsLockedMetric(t *testing.T) {
+	authSvc, userSvc, metrics := setupAuthUseCases(t, false)
+	if _, err := userSvc.CreateUser("alice", "alice@example.com", "securepass", coreauth.RoleViewer); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	uc := NewLoginUseCase(authSvc, metrics)
+	const maxFailures = 5
+	for i := 0; i < maxFailures; i++ {
+		if _, err := uc.Execute(context.Background(), LoginInput{Identifier: "alice", Password: "wrong"}); err == nil {
+			t.Fatalf("attempt %d: expected an error for wrong password", i)
+		}
+	}
+
+	_, err := uc.Execute(context.Background(), LoginInput{Identifier: "alice", Password: "wrong"})
+	if !errors.Is(err, coreauth.ErrUserAccountLocked) {
+		t.Fatalf("expected ErrUserAccountLocked once locked, got: %v", err)
+	}
+
+	body := metricsBody(t, metrics)
+	if !strings.Contains(body, `leafwiki_auth_login_attempts_total{outcome="locked"} 1`) {
+		t.Fatalf("expected locked outcome metric, got: %s", body)
+	}
+	if !strings.Contains(body, `leafwiki_auth_login_attempts_total{outcome="invalid_credentials"} 5`) {
+		t.Fatalf("expected 5 invalid_credentials attempts before the lock, got: %s", body)
+	}
+}
+
+// TestLogoutUseCase_EmitsSessionRevokedMetric verifies a normal logout after a
+// successful login records the session as revoked.
+func TestLogoutUseCase_EmitsSessionRevokedMetric(t *testing.T) {
+	authSvc, userSvc, metrics := setupAuthUseCases(t, false)
+	if _, err := userSvc.CreateUser("alice", "alice@example.com", "securepass", coreauth.RoleViewer); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	loginUC := NewLoginUseCase(authSvc, metrics)
+	out, err := loginUC.Execute(context.Background(), LoginInput{Identifier: "alice", Password: "securepass"})
+	if err != nil {
+		t.Fatalf("Login Execute: %v", err)
+	}
+
+	logoutUC := NewLogoutUseCase(authSvc, metrics)
+	if err := logoutUC.Execute(context.Background(), LogoutInput{RefreshToken: out.Token.RefreshToken}); err != nil {
+		t.Fatalf("Logout Execute: %v", err)
+	}
+
+	body := metricsBody(t, metrics)
+	if !strings.Contains(body, `leafwiki_auth_sessions_total{event="revoked"} 1`) {
+		t.Fatalf("expected session revoked metric, got: %s", body)
+	}
+}
+
+// TestCompleteTOTPLoginUseCase_EmitsVerificationMetric verifies a successful
+// TOTP login handshake records both the verification outcome and the
+// resulting session-issued event.
+func TestCompleteTOTPLoginUseCase_EmitsVerificationMetric(t *testing.T) {
+	authSvc, userSvc, metrics := setupAuthUseCases(t, true)
+	user, err := userSvc.CreateUser("alice", "alice@example.com", "securepass", coreauth.RoleViewer)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	generated, err := authSvc.StartTOTPSetup(user.ID, "securepass")
+	if err != nil {
+		t.Fatalf("StartTOTPSetup: %v", err)
+	}
+	setupCode, err := totp.GenerateCode(generated.Secret, time.Now())
+	if err != nil {
+		t.Fatalf("GenerateCode: %v", err)
+	}
+	if _, err := authSvc.ConfirmTOTPSetup(user.ID, setupCode, ""); err != nil {
+		t.Fatalf("ConfirmTOTPSetup: %v", err)
+	}
+
+	loginUC := NewLoginUseCase(authSvc, metrics)
+	loginOut, err := loginUC.Execute(context.Background(), LoginInput{Identifier: "alice", Password: "securepass"})
+	if err != nil {
+		t.Fatalf("Login Execute: %v", err)
+	}
+	if !loginOut.Token.RequiresTOTP {
+		t.Fatal("expected RequiresTOTP = true once TOTP is enabled")
+	}
+
+	loginCode, err := totp.GenerateCode(generated.Secret, time.Now())
+	if err != nil {
+		t.Fatalf("GenerateCode: %v", err)
+	}
+	completeUC := NewCompleteTOTPLoginUseCase(authSvc, metrics)
+	if _, err := completeUC.Execute(context.Background(), CompleteTOTPLoginInput{
+		LoginChallengeToken: loginOut.Token.LoginChallengeToken,
+		Code:                loginCode,
+	}); err != nil {
+		t.Fatalf("CompleteTOTPLogin Execute: %v", err)
+	}
+
+	body := metricsBody(t, metrics)
+	if !strings.Contains(body, `leafwiki_auth_totp_verifications_total{result="success"} 1`) {
+		t.Fatalf("expected totp verification success metric, got: %s", body)
+	}
+	if !strings.Contains(body, `leafwiki_auth_sessions_total{event="issued"} 1`) {
+		t.Fatalf("expected session issued metric, got: %s", body)
+	}
+}
+
 // TestCompleteTOTPLoginUseCase_AuthDisabled verifies the use case refuses to
 // run (rather than nil-pointer-dereferencing into AuthService) when auth is
 // disabled, matching every other use case's ErrAuthDisabled guard.
 func TestCompleteTOTPLoginUseCase_AuthDisabled(t *testing.T) {
-	uc := NewCompleteTOTPLoginUseCase(nil)
+	uc := NewCompleteTOTPLoginUseCase(nil, nil)
 
 	_, err := uc.Execute(context.Background(), CompleteTOTPLoginInput{
 		LoginChallengeToken: "token",
@@ -232,14 +429,69 @@ func TestTOTPUseCases_AuthDisabled(t *testing.T) {
 	if _, err := NewStartTOTPSetupUseCase(nil).Execute(context.Background(), StartTOTPSetupInput{}); !errors.Is(err, ErrAuthDisabled) {
 		t.Fatalf("StartTOTPSetupUseCase: expected ErrAuthDisabled, got %v", err)
 	}
-	if _, err := NewConfirmTOTPSetupUseCase(nil).Execute(context.Background(), ConfirmTOTPSetupInput{}); !errors.Is(err, ErrAuthDisabled) {
+	if _, err := NewConfirmTOTPSetupUseCase(nil, nil).Execute(context.Background(), ConfirmTOTPSetupInput{}); !errors.Is(err, ErrAuthDisabled) {
 		t.Fatalf("ConfirmTOTPSetupUseCase: expected ErrAuthDisabled, got %v", err)
 	}
-	if err := NewDisableTOTPUseCase(nil).Execute(context.Background(), DisableTOTPInput{}); !errors.Is(err, ErrAuthDisabled) {
+	if err := NewDisableTOTPUseCase(nil, nil).Execute(context.Background(), DisableTOTPInput{}); !errors.Is(err, ErrAuthDisabled) {
 		t.Fatalf("DisableTOTPUseCase: expected ErrAuthDisabled, got %v", err)
 	}
 	if _, err := NewGetTOTPStatusUseCase(nil).Execute(context.Background(), GetTOTPStatusInput{}); !errors.Is(err, ErrAuthDisabled) {
 		t.Fatalf("GetTOTPStatusUseCase: expected ErrAuthDisabled, got %v", err)
+	}
+}
+
+// TestGetUsersUseCase_DoesNotExposeTOTPSecretOrRecoveryCodes verifies that the
+// admin user list only ever surfaces the TOTPEnabled flag: the encrypted TOTP
+// secret and recovery code hashes on the internal User must never reach the
+// PublicUser the admin API serializes to JSON.
+func TestGetUsersUseCase_DoesNotExposeTOTPSecretOrRecoveryCodes(t *testing.T) {
+	store, err := coreauth.NewUserStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewUserStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("Close: %v", err)
+		}
+	})
+
+	userSvc := coreauth.NewUserService(store)
+	user, err := userSvc.CreateUser("alice", "alice@example.com", "pass", coreauth.RoleViewer)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	const secretMarker = "super-secret-encrypted-totp-blob"
+	const hashMarker = "super-secret-recovery-code-hash"
+	if err := store.EnableTOTP(user.ID, secretMarker, []string{hashMarker}); err != nil {
+		t.Fatalf("EnableTOTP: %v", err)
+	}
+
+	uc := NewGetUsersUseCase(userSvc)
+	out, err := uc.Execute(context.Background())
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	var found *coreauth.PublicUser
+	for _, u := range out.Users {
+		if u.ID == user.ID {
+			found = u
+		}
+	}
+	if found == nil {
+		t.Fatal("expected the created user to be present in GetUsers output")
+	}
+	if !found.TOTPEnabled {
+		t.Error("expected TOTPEnabled = true")
+	}
+
+	data, err := json.Marshal(found)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if strings.Contains(string(data), secretMarker) || strings.Contains(string(data), hashMarker) {
+		t.Fatalf("PublicUser JSON leaked TOTP secret material: %s", data)
 	}
 }
 

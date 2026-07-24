@@ -441,10 +441,10 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 
 func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 	return wikiauth.NewRoutes(wikiauth.RoutesConfig{
-		Login:             wikiauth.NewLoginUseCase(w.auth),
-		CompleteTOTPLogin: wikiauth.NewCompleteTOTPLoginUseCase(w.auth),
-		Logout:            wikiauth.NewLogoutUseCase(w.auth),
-		RefreshToken:      wikiauth.NewRefreshTokenUseCase(w.auth),
+		Login:             wikiauth.NewLoginUseCase(w.auth, w.metrics),
+		CompleteTOTPLogin: wikiauth.NewCompleteTOTPLoginUseCase(w.auth, w.metrics),
+		Logout:            wikiauth.NewLogoutUseCase(w.auth, w.metrics),
+		RefreshToken:      wikiauth.NewRefreshTokenUseCase(w.auth, w.metrics),
 		CreateUser:        wikiauth.NewCreateUserUseCase(w.user, w.userResolver, w.log),
 		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.user, w.userResolver, w.log),
 		ChangeOwnPassword: wikiauth.NewChangeOwnPasswordUseCase(w.user),
@@ -452,8 +452,8 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		GetUsers:          wikiauth.NewGetUsersUseCase(w.user),
 		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.user),
 		StartTOTPSetup:    wikiauth.NewStartTOTPSetupUseCase(w.auth),
-		ConfirmTOTPSetup:  wikiauth.NewConfirmTOTPSetupUseCase(w.auth),
-		DisableTOTP:       wikiauth.NewDisableTOTPUseCase(w.auth),
+		ConfirmTOTPSetup:  wikiauth.NewConfirmTOTPSetupUseCase(w.auth, w.metrics),
+		DisableTOTP:       wikiauth.NewDisableTOTPUseCase(w.auth, w.metrics),
 		GetTOTPStatus:     wikiauth.NewGetTOTPStatusUseCase(w.auth),
 		AuthService:       w.auth,
 	})

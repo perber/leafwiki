@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"database/sql"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -20,6 +20,7 @@ type SessionStore struct {
 	db         *sql.DB
 	cancel     context.CancelFunc
 	done       chan struct{}
+	log        *slog.Logger
 }
 
 func sessionDatabasePath(storageDir string, filename string) string {
@@ -34,6 +35,7 @@ func NewSessionStore(storageDir string) (*SessionStore, error) {
 		filename:   "sessions.db",
 		cancel:     cancel,
 		done:       make(chan struct{}),
+		log:        slog.Default().With("component", "SessionStore"),
 	}
 
 	err := sqliteutil.RetryOnCorruption(sessionDatabasePath(s.storageDir, s.filename), func() error {
@@ -62,7 +64,7 @@ func NewSessionStore(storageDir string) (*SessionStore, error) {
 				return
 			case <-ticker.C:
 				if err := s.CleanupExpiredSessions(); err != nil {
-					log.Printf("failed to cleanup expired sessions: %v", err)
+					s.log.Warn("failed to cleanup expired sessions", "error", err)
 				}
 			}
 		}

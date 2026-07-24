@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"log"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -11,14 +10,13 @@ import (
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/favorites"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 )
 
 // ErrAuthDisabled is returned when an auth operation is called while auth is disabled.
 var ErrAuthDisabled = errors.New("authentication is disabled")
 
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+$`)
-
-const logReloadUserResolverCacheWarning = "warning: could not reload user resolver cache: %v"
 
 // ─── LoginUseCase ────────────────────────────────────────────────────────────
 
@@ -32,11 +30,12 @@ type LoginOutput struct {
 }
 
 type LoginUseCase struct {
-	auth *coreauth.AuthService
+	auth    *coreauth.AuthService
+	metrics *httpmetrics.HTTPMetrics
 }
 
-func NewLoginUseCase(a *coreauth.AuthService) *LoginUseCase {
-	return &LoginUseCase{auth: a}
+func NewLoginUseCase(a *coreauth.AuthService, metrics *httpmetrics.HTTPMetrics) *LoginUseCase {
+	return &LoginUseCase{auth: a, metrics: metrics}
 }
 
 func (uc *LoginUseCase) Execute(_ context.Context, in LoginInput) (*LoginOutput, error) {
@@ -45,7 +44,21 @@ func (uc *LoginUseCase) Execute(_ context.Context, in LoginInput) (*LoginOutput,
 	}
 	token, err := uc.auth.Login(in.Identifier, in.Password)
 	if err != nil {
+		switch {
+		case errors.Is(err, coreauth.ErrUserAccountLocked):
+			uc.metrics.IncAuthLoginAttempt("locked")
+		case errors.Is(err, coreauth.ErrUserInvalidCredentials):
+			uc.metrics.IncAuthLoginAttempt("invalid_credentials")
+		default:
+			uc.metrics.IncAuthLoginAttempt("error")
+		}
 		return nil, err
+	}
+	if token.RequiresTOTP {
+		uc.metrics.IncAuthLoginAttempt("totp_required")
+	} else {
+		uc.metrics.IncAuthLoginAttempt("success")
+		uc.metrics.IncAuthSession("issued")
 	}
 	return &LoginOutput{Token: token}, nil
 }
@@ -62,11 +75,12 @@ type CompleteTOTPLoginOutput struct {
 }
 
 type CompleteTOTPLoginUseCase struct {
-	auth *coreauth.AuthService
+	auth    *coreauth.AuthService
+	metrics *httpmetrics.HTTPMetrics
 }
 
-func NewCompleteTOTPLoginUseCase(a *coreauth.AuthService) *CompleteTOTPLoginUseCase {
-	return &CompleteTOTPLoginUseCase{auth: a}
+func NewCompleteTOTPLoginUseCase(a *coreauth.AuthService, metrics *httpmetrics.HTTPMetrics) *CompleteTOTPLoginUseCase {
+	return &CompleteTOTPLoginUseCase{auth: a, metrics: metrics}
 }
 
 func (uc *CompleteTOTPLoginUseCase) Execute(_ context.Context, in CompleteTOTPLoginInput) (*CompleteTOTPLoginOutput, error) {
@@ -75,8 +89,15 @@ func (uc *CompleteTOTPLoginUseCase) Execute(_ context.Context, in CompleteTOTPLo
 	}
 	token, err := uc.auth.CompleteTOTPLogin(in.LoginChallengeToken, in.Code)
 	if err != nil {
+		if errors.Is(err, coreauth.ErrUserAccountLocked) {
+			uc.metrics.IncAuthTOTPVerification("locked")
+		} else {
+			uc.metrics.IncAuthTOTPVerification("invalid")
+		}
 		return nil, err
 	}
+	uc.metrics.IncAuthTOTPVerification("success")
+	uc.metrics.IncAuthSession("issued")
 	return &CompleteTOTPLoginOutput{Token: token}, nil
 }
 
@@ -124,11 +145,12 @@ type ConfirmTOTPSetupOutput struct {
 }
 
 type ConfirmTOTPSetupUseCase struct {
-	auth *coreauth.AuthService
+	auth    *coreauth.AuthService
+	metrics *httpmetrics.HTTPMetrics
 }
 
-func NewConfirmTOTPSetupUseCase(a *coreauth.AuthService) *ConfirmTOTPSetupUseCase {
-	return &ConfirmTOTPSetupUseCase{auth: a}
+func NewConfirmTOTPSetupUseCase(a *coreauth.AuthService, metrics *httpmetrics.HTTPMetrics) *ConfirmTOTPSetupUseCase {
+	return &ConfirmTOTPSetupUseCase{auth: a, metrics: metrics}
 }
 
 func (uc *ConfirmTOTPSetupUseCase) Execute(_ context.Context, in ConfirmTOTPSetupInput) (*ConfirmTOTPSetupOutput, error) {
@@ -139,6 +161,7 @@ func (uc *ConfirmTOTPSetupUseCase) Execute(_ context.Context, in ConfirmTOTPSetu
 	if err != nil {
 		return nil, err
 	}
+	uc.metrics.IncAuthTOTPEnrollment("enabled")
 	return &ConfirmTOTPSetupOutput{RecoveryCodes: codes}, nil
 }
 
@@ -152,18 +175,23 @@ type DisableTOTPInput struct {
 }
 
 type DisableTOTPUseCase struct {
-	auth *coreauth.AuthService
+	auth    *coreauth.AuthService
+	metrics *httpmetrics.HTTPMetrics
 }
 
-func NewDisableTOTPUseCase(a *coreauth.AuthService) *DisableTOTPUseCase {
-	return &DisableTOTPUseCase{auth: a}
+func NewDisableTOTPUseCase(a *coreauth.AuthService, metrics *httpmetrics.HTTPMetrics) *DisableTOTPUseCase {
+	return &DisableTOTPUseCase{auth: a, metrics: metrics}
 }
 
 func (uc *DisableTOTPUseCase) Execute(_ context.Context, in DisableTOTPInput) error {
 	if uc.auth == nil {
 		return ErrAuthDisabled
 	}
-	return uc.auth.DisableTOTP(in.UserID, in.CurrentPassword, in.Code, in.CurrentRefreshToken)
+	if err := uc.auth.DisableTOTP(in.UserID, in.CurrentPassword, in.Code, in.CurrentRefreshToken); err != nil {
+		return err
+	}
+	uc.metrics.IncAuthTOTPEnrollment("disabled")
+	return nil
 }
 
 // ─── GetTOTPStatusUseCase ────────────────────────────────────────────────────
@@ -201,16 +229,23 @@ func (uc *GetTOTPStatusUseCase) Execute(_ context.Context, in GetTOTPStatusInput
 type LogoutInput struct{ RefreshToken string }
 
 type LogoutUseCase struct {
-	auth *coreauth.AuthService
+	auth    *coreauth.AuthService
+	metrics *httpmetrics.HTTPMetrics
 }
 
-func NewLogoutUseCase(a *coreauth.AuthService) *LogoutUseCase { return &LogoutUseCase{auth: a} }
+func NewLogoutUseCase(a *coreauth.AuthService, metrics *httpmetrics.HTTPMetrics) *LogoutUseCase {
+	return &LogoutUseCase{auth: a, metrics: metrics}
+}
 
 func (uc *LogoutUseCase) Execute(_ context.Context, in LogoutInput) error {
 	if uc.auth == nil {
 		return ErrAuthDisabled
 	}
-	return uc.auth.RevokeRefreshToken(in.RefreshToken)
+	if err := uc.auth.RevokeRefreshToken(in.RefreshToken); err != nil {
+		return err
+	}
+	uc.metrics.IncAuthSession("revoked")
+	return nil
 }
 
 // ─── RefreshTokenUseCase ─────────────────────────────────────────────────────
@@ -222,11 +257,12 @@ type RefreshTokenOutput struct {
 }
 
 type RefreshTokenUseCase struct {
-	auth *coreauth.AuthService
+	auth    *coreauth.AuthService
+	metrics *httpmetrics.HTTPMetrics
 }
 
-func NewRefreshTokenUseCase(a *coreauth.AuthService) *RefreshTokenUseCase {
-	return &RefreshTokenUseCase{auth: a}
+func NewRefreshTokenUseCase(a *coreauth.AuthService, metrics *httpmetrics.HTTPMetrics) *RefreshTokenUseCase {
+	return &RefreshTokenUseCase{auth: a, metrics: metrics}
 }
 
 func (uc *RefreshTokenUseCase) Execute(_ context.Context, in RefreshTokenInput) (*RefreshTokenOutput, error) {
@@ -237,6 +273,7 @@ func (uc *RefreshTokenUseCase) Execute(_ context.Context, in RefreshTokenInput) 
 	if err != nil {
 		return nil, err
 	}
+	uc.metrics.IncAuthSession("refreshed")
 	return &RefreshTokenOutput{Token: token}, nil
 }
 
@@ -290,7 +327,7 @@ func (uc *CreateUserUseCase) Execute(_ context.Context, in CreateUserInput) (*Cr
 		return nil, err
 	}
 	if err := uc.resolver.Reload(); err != nil {
-		log.Printf(logReloadUserResolverCacheWarning, err)
+		uc.log.Warn("failed to reload user resolver cache", "error", err)
 	}
 	return &CreateUserOutput{User: user.ToPublicUser()}, nil
 }
@@ -352,7 +389,7 @@ func (uc *UpdateUserUseCase) Execute(_ context.Context, in UpdateUserInput) (*Up
 		return nil, err
 	}
 	if err := uc.resolver.Reload(); err != nil {
-		log.Printf(logReloadUserResolverCacheWarning, err)
+		uc.log.Warn("failed to reload user resolver cache", "error", err)
 	}
 	return &UpdateUserOutput{User: user.ToPublicUser()}, nil
 }
@@ -409,7 +446,7 @@ func (uc *DeleteUserUseCase) Execute(_ context.Context, in DeleteUserInput) erro
 		return err
 	}
 	if err := uc.resolver.Reload(); err != nil {
-		log.Printf(logReloadUserResolverCacheWarning, err)
+		uc.log.Warn("failed to reload user resolver cache", "error", err)
 	}
 	if err := uc.favorites.DeleteAllForUser(in.ID); err != nil {
 		uc.log.Warn("failed to delete favorites for deleted user", "userID", in.ID, "error", err)

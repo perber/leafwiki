@@ -28,6 +28,7 @@ type AuthService struct {
 	totp        *TOTPService
 	attempts    *loginAttemptTracker
 	dummyHash   []byte
+	log         *slog.Logger
 }
 
 // users returns the current *UserService under a read lock. Callers use the
@@ -63,7 +64,7 @@ func (a *AuthService) ReplaceUserStore(storageDir string) error {
 
 	if old != nil {
 		if err := old.Close(); err != nil {
-			slog.Warn("failed to close previous user store after restore", "error", err)
+			a.log.Warn("failed to close previous user store after restore", "error", err)
 		}
 	}
 	return nil
@@ -87,6 +88,7 @@ func NewAuthService(userService *UserService, sessions *SessionManager, totpServ
 		totp:        totpService,
 		attempts:    newLoginAttemptTracker(),
 		dummyHash:   dummyHash,
+		log:         slog.Default().With("component", "AuthService"),
 	}
 	// Wired here rather than passed into NewSessionManager: a.users() reads
 	// through the mutex ReplaceUserStore swaps, so RefreshToken/ValidateToken
@@ -142,14 +144,17 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	user, err := a.users().GetUserByIdentifier(identifier)
 	if err != nil {
 		_ = bcrypt.CompareHashAndPassword(a.dummyHash, []byte(password))
+		a.log.Warn("login failed: invalid credentials", "identifier", identifier)
 		return nil, ErrUserInvalidCredentials
 	}
 
 	if !a.attempts.recordAttempt(user.ID) {
+		a.log.Warn("login rejected: account locked", "userID", user.ID)
 		return nil, ErrUserAccountLocked
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		a.log.Warn("login failed: invalid credentials", "identifier", identifier)
 		return nil, ErrUserInvalidCredentials
 	}
 
@@ -176,6 +181,7 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	}
 
 	a.attempts.reset(user.ID)
+	a.log.Info("login succeeded", "userID", user.ID)
 	return a.sessions.IssueSession(user)
 }
 
@@ -203,6 +209,7 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 	}
 
 	if !a.attempts.recordAttempt(userID) {
+		a.log.Warn("totp login rejected: account locked", "userID", userID)
 		return nil, ErrUserAccountLocked
 	}
 
@@ -222,11 +229,12 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 		return nil, errInvalidLoginChallenge()
 	}
 
-	valid, err := a.verifyTOTPOrRecoveryCode(users, user, code)
+	valid, viaRecoveryCode, err := a.verifyTOTPOrRecoveryCode(users, user, code)
 	if err != nil {
 		return nil, err
 	}
 	if !valid {
+		a.log.Warn("totp verification failed", "userID", userID)
 		return nil, errTOTPInvalidCode()
 	}
 
@@ -234,7 +242,13 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 
 	// Single-use: revoke the challenge now that it has been consumed successfully.
 	if err := a.sessions.sessionStore.RevokeSession(jti); err != nil {
-		slog.Warn("failed to revoke used login challenge session", "error", err)
+		a.log.Warn("failed to revoke used login challenge session", "error", err)
+	}
+
+	if viaRecoveryCode {
+		a.log.Warn("login completed via recovery code (consumed)", "userID", userID)
+	} else {
+		a.log.Info("totp login succeeded", "userID", userID)
 	}
 
 	user.Password = ""
@@ -311,9 +325,10 @@ func (a *AuthService) ConfirmTOTPSetup(userID, code, currentRefreshToken string)
 	}
 
 	if err := a.sessions.RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken); err != nil {
-		slog.Warn("failed to revoke other sessions after enabling TOTP", "userID", userID, "error", err)
+		a.log.Warn("failed to revoke other sessions after enabling TOTP", "userID", userID, "error", err)
 	}
 
+	a.log.Info("totp enabled", "userID", userID)
 	return codes, nil
 }
 
@@ -336,7 +351,7 @@ func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshT
 		return errTOTPNotEnabled()
 	}
 
-	valid, err := a.verifyTOTPOrRecoveryCode(users, user, code)
+	valid, viaRecoveryCode, err := a.verifyTOTPOrRecoveryCode(users, user, code)
 	if err != nil {
 		return err
 	}
@@ -349,7 +364,13 @@ func (a *AuthService) DisableTOTP(userID, currentPassword, code, currentRefreshT
 	}
 
 	if err := a.sessions.RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken); err != nil {
-		slog.Warn("failed to revoke other sessions after disabling TOTP", "userID", userID, "error", err)
+		a.log.Warn("failed to revoke other sessions after disabling TOTP", "userID", userID, "error", err)
+	}
+
+	if viaRecoveryCode {
+		a.log.Warn("totp disabled via recovery code (consumed)", "userID", userID)
+	} else {
+		a.log.Info("totp disabled", "userID", userID)
 	}
 
 	return nil
@@ -384,7 +405,9 @@ const maxRecoveryCodeConsumeAttempts = 3
 // verifyTOTPOrRecoveryCode checks code against user's current TOTP secret or,
 // failing that, their remaining recovery codes — consuming (removing) a
 // matched recovery code so it cannot be reused. Shared by the login handshake
-// and the self-service disable flow.
+// and the self-service disable flow. viaRecoveryCode reports which of the two
+// matched, so callers can log recovery-code consumption distinctly (it burns
+// one of a finite set of codes, unlike an ordinary TOTP code).
 //
 // users is the *UserService the caller already fetched user from — threaded
 // through explicitly (rather than calling a.users() again in here) so the
@@ -397,20 +420,20 @@ const maxRecoveryCodeConsumeAttempts = 3
 // concurrent requests presenting the same recovery code cannot both succeed:
 // only the first writer's compare-and-swap can match the row's current state;
 // the loser re-reads the now-current hashes and retries against those.
-func (a *AuthService) verifyTOTPOrRecoveryCode(users *UserService, user *User, code string) (bool, error) {
-	valid, err := a.totp.VerifyCode(user.TOTPSecretEncrypted, code)
+func (a *AuthService) verifyTOTPOrRecoveryCode(users *UserService, user *User, code string) (valid, viaRecoveryCode bool, err error) {
+	valid, err = a.totp.VerifyCode(user.TOTPSecretEncrypted, code)
 	if err != nil {
-		return false, errTOTPVerificationFailed(err)
+		return false, false, errTOTPVerificationFailed(err)
 	}
 	if valid {
-		return true, nil
+		return true, false, nil
 	}
 
 	hashes := user.TOTPRecoveryCodeHashes
 	for attempt := 0; attempt < maxRecoveryCodeConsumeAttempts; attempt++ {
 		idx, matched := VerifyRecoveryCode(code, hashes)
 		if !matched {
-			return false, nil
+			return false, false, nil
 		}
 
 		remaining := make([]string, 0, len(hashes)-1)
@@ -419,10 +442,10 @@ func (a *AuthService) verifyTOTPOrRecoveryCode(users *UserService, user *User, c
 
 		swapped, err := users.ConsumeRecoveryCodeHash(user.ID, hashes, remaining)
 		if err != nil {
-			return false, err
+			return false, false, err
 		}
 		if swapped {
-			return true, nil
+			return true, true, nil
 		}
 
 		// Lost the race: a concurrent request already changed the stored
@@ -430,12 +453,12 @@ func (a *AuthService) verifyTOTPOrRecoveryCode(users *UserService, user *User, c
 		// Re-read the current state and retry against it.
 		refreshed, err := users.GetUserByID(user.ID)
 		if err != nil {
-			return false, err
+			return false, false, err
 		}
 		hashes = refreshed.TOTPRecoveryCodeHashes
 	}
 
-	return false, nil
+	return false, false, nil
 }
 
 func errInvalidLoginChallenge() error {

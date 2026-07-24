@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"log"
 	"sync"
 )
 
@@ -19,7 +18,10 @@ type UserResolver struct {
 func NewUserResolver(userService *UserService) (*UserResolver, error) {
 	users, err := userService.GetUsers() // preload users
 	if err != nil {
-		log.Println("Failed to preload users for UserResolver:", err)
+		// Not logged here: the error is returned to the caller (wiki.go's
+		// NewWiki), which propagates it up to main.go's own top-level
+		// fatal-error logging — logging here too would double-log the same
+		// failure (ADR-0008's "log once, at the swallow point" rule).
 		return nil, err
 	}
 	r := &UserResolver{

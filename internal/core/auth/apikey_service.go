@@ -44,10 +44,11 @@ const apiKeyLastUsedThrottle = 5 * time.Minute
 type APIKeyService struct {
 	store *APIKeyStore
 	users *UserService
+	log   *slog.Logger
 }
 
 func NewAPIKeyService(store *APIKeyStore, users *UserService) *APIKeyService {
-	return &APIKeyService{store: store, users: users}
+	return &APIKeyService{store: store, users: users, log: slog.Default().With("component", "APIKeyService")}
 }
 
 func (s *APIKeyService) Close() error {
@@ -153,7 +154,7 @@ func (s *APIKeyService) Resolve(token string) (*User, error) {
 	key, err := s.store.GetByPrefix(prefix)
 	found := err == nil
 	if err != nil && err != ErrAPIKeyNotFound {
-		slog.Default().Warn("api key resolve: prefix lookup failed", "error", err)
+		s.log.Warn("api key resolve: prefix lookup failed", "error", err)
 	}
 
 	storedHash := dummySecretHash
@@ -175,13 +176,13 @@ func (s *APIKeyService) Resolve(token string) (*User, error) {
 
 	owner, err := s.users.GetUserByID(key.UserID)
 	if err != nil {
-		slog.Default().Warn("api key resolve: owner lookup failed", "error", err, "keyID", key.ID)
+		s.log.Warn("api key resolve: owner lookup failed", "error", err, "keyID", key.ID)
 		return nil, ErrAPIKeyInvalid
 	}
 
 	if key.LastUsedAt == nil || now.Sub(*key.LastUsedAt) > apiKeyLastUsedThrottle {
 		if err := s.store.TouchLastUsed(key.ID, now); err != nil {
-			slog.Default().Warn("failed to update api key last_used_at", "error", err, "keyID", key.ID)
+			s.log.Warn("failed to update api key last_used_at", "error", err, "keyID", key.ID)
 		}
 	}
 
