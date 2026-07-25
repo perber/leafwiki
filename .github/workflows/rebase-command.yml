@@ -1,0 +1,70 @@
+name: Rebase Command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+
+jobs:
+  rebase:
+    if: >
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, '/rebase')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate permission and resolve PR head
+        id: pr
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const commenter = context.payload.comment.user.login;
+
+            const { data: perm } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: commenter,
+            });
+
+            if (!['admin', 'write'].includes(perm.permission)) {
+              core.setFailed(`@${commenter} does not have write access to this repository; refusing to rebase.`);
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            core.setOutput('head', `${pr.head.repo.owner.login}:${pr.head.ref}`);
+
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes',
+            });
+
+      - name: Rebase
+        id: rebase
+        uses: peter-evans/rebase@e4945786f7ca41fe6e101cead4395f5489593943 # v4.0.0
+        with:
+          head: ${{ steps.pr.outputs.head }}
+
+      - name: React with result
+        if: always() && steps.pr.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const success = '${{ steps.rebase.outputs.rebased-count }}' === '1';
+
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: success ? 'hooray' : 'confused',
+            });
