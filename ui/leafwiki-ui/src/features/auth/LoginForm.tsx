@@ -7,7 +7,7 @@ import { useBrandingStore } from '@/stores/branding'
 import { useSessionStore } from '@/stores/session'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 function getRedirectTo(state: unknown): string | null {

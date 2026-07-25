@@ -4,7 +4,7 @@ import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { forwardRef } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router'
 import { usePageEditorStore } from '../editor/pageEditorStore'
 import HighlightedSearchTitle from './HighlightedSearchTitle'
 

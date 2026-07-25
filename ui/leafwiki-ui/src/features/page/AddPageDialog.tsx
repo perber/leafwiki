@@ -9,7 +9,7 @@ import { buildEditUrl } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
 import { CalendarDays } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { SlugInputWithSuggestion } from './SlugInputWithSuggestion'
 

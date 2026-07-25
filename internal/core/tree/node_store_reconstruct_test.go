@@ -314,7 +314,42 @@ func TestNodeStore_ReconstructTreeFromFS_OrderFileIgnoresUnknownIDsAndKeepsRemai
 	}
 }
 
-func TestNodeStore_ReconstructTreeFromFS_ReturnsErrorOnDuplicateLeafWikiIDs(t *testing.T) {
+func TestNodeStore_ReconstructTreeFromFS_SkipsSectionSubtreeOnDuplicateLeafWikiID(t *testing.T) {
+	tmp := t.TempDir()
+	store := NewNodeStore(tmp)
+
+	mustMkdir(t, filepath.Join(tmp, "root", "first"))
+	mustWriteFile(t, filepath.Join(tmp, "root", "first", "index.md"), `---
+leafwiki_id: dup-section-id
+leafwiki_title: First
+---
+# First`, 0o644)
+
+	mustMkdir(t, filepath.Join(tmp, "root", "second"))
+	mustWriteFile(t, filepath.Join(tmp, "root", "second", "index.md"), `---
+leafwiki_id: dup-section-id
+leafwiki_title: Second
+---
+# Second`, 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "second", "nested.md"), `---
+leafwiki_id: nested-id
+leafwiki_title: Nested
+---
+# Nested`, 0o644)
+
+	tree, err := store.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
+	}
+
+	got := slugs(tree.Children)
+	want := []string{"first"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected children: got %v want %v (second section with a duplicate leafwiki_id, including its subtree, should be skipped)", got, want)
+	}
+}
+
+func TestNodeStore_ReconstructTreeFromFS_ContinuesPastDuplicateLeafWikiID(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
 
@@ -328,16 +363,21 @@ leafwiki_id: dup-id
 leafwiki_title: B
 ---
 # B`, 0o644)
+	mustWriteFile(t, filepath.Join(tmp, "root", "c.md"), `---
+leafwiki_id: unique-id
+leafwiki_title: C
+---
+# C`, 0o644)
 
-	_, err := store.ReconstructTreeFromFS()
-	if err == nil {
-		t.Fatalf("expected duplicate ID error")
+	tree, err := store.ReconstructTreeFromFS()
+	if err != nil {
+		t.Fatalf("ReconstructTreeFromFS: %v", err)
 	}
-	if !strings.Contains(err.Error(), "duplicate leafwiki_id") {
-		t.Fatalf("expected duplicate ID error, got: %v", err)
-	}
-	if !strings.Contains(err.Error(), "dup-id") {
-		t.Fatalf("expected duplicate ID to be mentioned, got: %v", err)
+
+	got := slugs(tree.Children)
+	want := []string{"a", "c"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("unexpected children: got %v want %v (reconstruct should continue past the duplicate ID and still pick up unrelated siblings)", got, want)
 	}
 }
 

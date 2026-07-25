@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 import { scrollToHeadlineHash } from '@/lib/scrollToHeadline'
 
 type UseScrollToHeadlineOptions = {

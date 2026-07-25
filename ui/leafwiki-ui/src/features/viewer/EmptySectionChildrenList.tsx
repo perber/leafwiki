@@ -8,7 +8,7 @@ import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { FilePlus, FolderPlus } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 const t = (key: string, opts?: Record<string, unknown>) =>
   i18next.t(key, { ...opts, ns: 'viewer' })

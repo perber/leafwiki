@@ -1,7 +1,7 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import RequireAuth from '@/features/auth/RequireAuth'
 import AppLayout from '@/layout/AppLayout'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 
 export default function AuthWrapper({
   children,

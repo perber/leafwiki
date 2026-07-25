@@ -30,7 +30,7 @@ import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSessionStore } from '@/stores/session'
 import { Heart } from 'lucide-react'
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { RoleGuard } from './RoleGuard'
 
 const isMacOS =

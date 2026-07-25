@@ -6,7 +6,7 @@
 import { DIALOG_UNSAVED_CHANGES } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useCallback, useEffect, useRef } from 'react'
-import { useBlocker } from 'react-router-dom'
+import { useBlocker } from 'react-router'
 import { useExternalUnloadBlocker } from './useExternalUnloadBlocker'
 
 type UseNavigationGuardProps = {

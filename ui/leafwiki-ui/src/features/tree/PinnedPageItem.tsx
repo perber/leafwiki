@@ -4,7 +4,7 @@ import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { File, Folder, PinOff } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 type Props = {
   node: PageNode

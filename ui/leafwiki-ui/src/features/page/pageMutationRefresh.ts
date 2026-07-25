@@ -3,7 +3,7 @@ import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildEditUrl, buildHistoryUrl, buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { useTreeStore } from '@/stores/tree'
-import { NavigateFunction } from 'react-router-dom'
+import { NavigateFunction } from 'react-router'
 import { useLinkStatusStore } from '../links/linkstatus_store'
 import { useViewerStore } from '../viewer/viewer'
 

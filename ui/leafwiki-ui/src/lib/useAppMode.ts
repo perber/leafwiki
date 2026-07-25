@@ -1,6 +1,6 @@
 // useAppMode returns the current application mode.
 import { stripBasePath } from '@/lib/routePath'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 
 export type AppMode =
   'edit' | 'history' | 'view' | 'dialog' | 'user-management' | 'settings'
