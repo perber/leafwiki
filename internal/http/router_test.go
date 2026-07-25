@@ -62,7 +62,7 @@ func createRouterTestInstanceWithMetricsEnabled(w *wiki.Wiki, t *testing.T) *gin
 		RefreshTokenTimeout:     7 * 24 * time.Hour,
 		HideLinkMetadataSection: false,
 		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
-		Metrics:                 httpmetrics.NewHTTPMetrics(),
+		Metrics:                 httpmetrics.NewHTTPMetrics("test"),
 	})
 }
 

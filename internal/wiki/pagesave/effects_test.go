@@ -106,7 +106,7 @@ func metricsBody(t *testing.T, metrics *httpmetrics.HTTPMetrics) string {
 }
 
 func TestPageSaveOrchestrator_RecordsSideEffectDurationAndFailures(t *testing.T) {
-	metrics := httpmetrics.NewHTTPMetrics()
+	metrics := httpmetrics.NewHTTPMetrics("test")
 	orchestrator := NewPageSaveOrchestrator(metrics, metricTestEffect{metrics: metrics})
 
 	orchestrator.Run(PageSaveEvent{Operation: PageOperationUpdate})

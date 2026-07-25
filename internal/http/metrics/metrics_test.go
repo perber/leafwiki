@@ -26,7 +26,7 @@ func getMetricsBody(t *testing.T, handler http.Handler) string {
 func TestHTTPMetrics_ExportsPrometheusMetrics(t *testing.T) {
 	gin.SetMode(gin.ReleaseMode)
 
-	metrics := NewHTTPMetrics()
+	metrics := NewHTTPMetrics("test")
 	router := gin.New()
 	router.Use(metrics.Middleware())
 	router.GET("/health", func(c *gin.Context) {
@@ -53,10 +53,22 @@ func TestHTTPMetrics_ExportsPrometheusMetrics(t *testing.T) {
 	}
 }
 
+func TestHTTPMetrics_ExportsBuildInfoWithVersionLabel(t *testing.T) {
+	gin.SetMode(gin.ReleaseMode)
+
+	metrics := NewHTTPMetrics("v0.12.0")
+
+	body := getMetricsBody(t, metrics.HTTPHandler())
+	expected := `leafwiki_build_info{version="v0.12.0"} 1`
+	if !strings.Contains(body, expected) {
+		t.Fatalf("expected metrics output to contain %q, got: %s", expected, body)
+	}
+}
+
 func TestHTTPMetrics_UsesNormalizedRouteLabel(t *testing.T) {
 	gin.SetMode(gin.ReleaseMode)
 
-	metrics := NewHTTPMetrics()
+	metrics := NewHTTPMetrics("test")
 	router := gin.New()
 	router.Use(metrics.Middleware())
 	router.GET("/api/health", func(c *gin.Context) {
@@ -81,7 +93,7 @@ func TestHTTPMetrics_UsesNormalizedRouteLabel(t *testing.T) {
 func TestHTTPMetrics_UsesRoutePatternForPathParams(t *testing.T) {
 	gin.SetMode(gin.ReleaseMode)
 
-	metrics := NewHTTPMetrics()
+	metrics := NewHTTPMetrics("test")
 	router := gin.New()
 	router.Use(metrics.Middleware())
 	router.GET("/api/pages/:id", func(c *gin.Context) {
@@ -109,7 +121,7 @@ func TestHTTPMetrics_UsesRoutePatternForPathParams(t *testing.T) {
 func TestHTTPMetrics_UsesUnmatchedLabelForUnknownRoutes(t *testing.T) {
 	gin.SetMode(gin.ReleaseMode)
 
-	metrics := NewHTTPMetrics()
+	metrics := NewHTTPMetrics("test")
 	router := gin.New()
 	router.Use(metrics.Middleware())
 

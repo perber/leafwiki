@@ -141,7 +141,7 @@ func TestWiki_DeletePage_Recursive(t *testing.T) {
 }
 
 func TestWiki_TriggerResyncAsync_EmitsMetrics(t *testing.T) {
-	metrics := httpmetrics.NewHTTPMetrics()
+	metrics := httpmetrics.NewHTTPMetrics("test")
 	w := createWikiTestInstanceWithMetrics(t, metrics)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 

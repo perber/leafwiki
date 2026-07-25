@@ -518,7 +518,7 @@ func main() {
 
 	var metrics *httpmetrics.HTTPMetrics
 	if enableMetrics {
-		metrics = httpmetrics.NewHTTPMetrics()
+		metrics = httpmetrics.NewHTTPMetrics(Version)
 	}
 
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
