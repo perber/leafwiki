@@ -8,7 +8,7 @@ import { useDebounce } from '@/lib/useDebounce'
 import { useTreeStore } from '@/stores/tree'
 import { Check, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'

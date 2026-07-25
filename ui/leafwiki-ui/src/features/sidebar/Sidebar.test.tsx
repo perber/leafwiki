@@ -2,7 +2,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSidebarStore } from '@/stores/sidebar'
 import { act, render } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Sidebar from './Sidebar'
 

@@ -9,7 +9,7 @@ import { useSessionStore } from '@/stores/session'
 import { TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 const ALERT_POLL_INTERVAL_MS = 30_000
 

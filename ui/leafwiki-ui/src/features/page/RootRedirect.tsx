@@ -1,5 +1,5 @@
 import { useTreeStore } from '@/stores/tree'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router'
 
 export default function RootRedirect() {
   const location = useLocation()

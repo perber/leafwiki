@@ -3,7 +3,7 @@ import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { MouseEvent, forwardRef } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router'
 import type { PageEditorState } from '../editor/pageEditorStore'
 import { usePageEditorStore } from '../editor/pageEditorStore'
 

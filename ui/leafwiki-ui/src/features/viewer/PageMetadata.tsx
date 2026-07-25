@@ -3,7 +3,7 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { Page } from '@/lib/api/pages'
 import { ChevronDown, ChevronRight, Tag } from 'lucide-react'
 import { useId, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 
 type Props = {
   page: Page

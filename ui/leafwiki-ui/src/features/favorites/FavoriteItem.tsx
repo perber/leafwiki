@@ -4,7 +4,7 @@ import { buildViewUrl } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
 import clsx from 'clsx'
 import { File, Folder } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 type Props = {
   node: PageNode

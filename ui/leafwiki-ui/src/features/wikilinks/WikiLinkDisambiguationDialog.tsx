@@ -13,7 +13,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { File, FolderTree } from 'lucide-react'
 import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 type WikiLinkDisambiguationDialogProps = {
   title: string

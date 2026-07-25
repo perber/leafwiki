@@ -3,7 +3,7 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { useTreeStore } from '@/stores/tree'
 import { render, screen } from '@testing-library/react'
 import type React from 'react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FavoritesSection } from './FavoritesSection'
 
