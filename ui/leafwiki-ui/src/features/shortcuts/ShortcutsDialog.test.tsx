@@ -1,7 +1,7 @@
 import { DIALOG_SHORTCUTS_HELP } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ShortcutsDialog } from './ShortcutsDialog'
 

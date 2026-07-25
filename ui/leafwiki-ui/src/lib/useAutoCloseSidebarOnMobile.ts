@@ -1,7 +1,7 @@
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useLayoutEffect, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 
 export function useAutoCloseSidebarOnMobile() {
   const location = useLocation()

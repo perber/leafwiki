@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 import { usePageEditorStore } from '../editor/pageEditorStore'
 import { PinnedSection } from './PinnedSection'
 import { TreeDndProvider } from './TreeDnd'

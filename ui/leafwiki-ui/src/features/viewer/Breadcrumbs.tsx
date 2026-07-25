@@ -2,7 +2,7 @@ import { useAppMode } from '@/lib/useAppMode'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { useTreeStore } from '@/stores/tree'
 import { FolderTree } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { useViewerStore } from './viewer'
 
 export default function Breadcrumbs() {

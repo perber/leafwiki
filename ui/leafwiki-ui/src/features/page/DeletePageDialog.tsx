@@ -11,7 +11,7 @@ import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { AlertTriangle } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 export type DeletePageDialogProps = {

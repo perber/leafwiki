@@ -25,7 +25,7 @@ import { useTocPanelStore } from '@/stores/tocPanel'
 import { MenuIcon } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 export const MOBILE_SIDEBAR_WIDTH = 320
 
