@@ -72,7 +72,7 @@ func setupAuthUseCases(t *testing.T, withTOTP bool) (*coreauth.AuthService, *cor
 	}
 
 	authSvc := coreauth.NewAuthService(userSvc, sessions, totpSvc)
-	return authSvc, userSvc, httpmetrics.NewHTTPMetrics()
+	return authSvc, userSvc, httpmetrics.NewHTTPMetrics("test")
 }
 
 func setupUpdateUserUseCase(t *testing.T) (*UpdateUserUseCase, *coreauth.UserService) {

@@ -423,7 +423,7 @@ func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 }
 
 func TestStartMetricsServer_ServesOnlyMetricsEndpoint(t *testing.T) {
-	metrics := httpmetrics.NewHTTPMetrics()
+	metrics := httpmetrics.NewHTTPMetrics("test")
 	stopServer, addr, err := startMetricsServer(metrics, "127.0.0.1", "0")
 	if err != nil {
 		t.Fatalf("startMetricsServer() error = %v", err)

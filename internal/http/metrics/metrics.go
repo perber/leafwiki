@@ -16,6 +16,7 @@ const unmatchedRoute = "unmatched"
 // metrics used for first-pass API load testing.
 type HTTPMetrics struct {
 	registry              *prometheus.Registry
+	buildInfo             *prometheus.GaugeVec
 	requestsTotal         *prometheus.CounterVec
 	requestDuration       *prometheus.HistogramVec
 	requestsInFlight      prometheus.Gauge
@@ -37,8 +38,21 @@ type HTTPMetrics struct {
 	handler               http.Handler
 }
 
-func NewHTTPMetrics() *HTTPMetrics {
+// NewHTTPMetrics creates the Prometheus registry and metrics. version is
+// reported via the leafwiki_build_info gauge so it can be scraped alongside
+// runtime metrics.
+func NewHTTPMetrics(version string) *HTTPMetrics {
 	registry := prometheus.NewRegistry()
+
+	buildInfo := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "leafwiki",
+			Name:      "build_info",
+			Help:      "Build information, constant 1, labeled by version.",
+		},
+		[]string{"version"},
+	)
+	buildInfo.WithLabelValues(version).Set(1)
 
 	requestsTotal := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -209,6 +223,7 @@ func NewHTTPMetrics() *HTTPMetrics {
 	)
 
 	registry.MustRegister(
+		buildInfo,
 		requestsTotal,
 		requestDuration,
 		requestsInFlight,
@@ -231,6 +246,7 @@ func NewHTTPMetrics() *HTTPMetrics {
 
 	return &HTTPMetrics{
 		registry:              registry,
+		buildInfo:             buildInfo,
 		requestsTotal:         requestsTotal,
 		requestDuration:       requestDuration,
 		requestsInFlight:      requestsInFlight,
