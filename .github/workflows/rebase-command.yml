@@ -42,12 +42,16 @@ jobs:
 
             core.setOutput('head', `${pr.head.repo.owner.login}:${pr.head.ref}`);
 
-            await github.rest.reactions.createForIssueComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: context.payload.comment.id,
-              content: 'eyes',
-            });
+            try {
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: context.payload.comment.id,
+                content: 'eyes',
+              });
+            } catch (error) {
+              core.warning(`Could not react to comment: ${error.message}`);
+            }
 
       - name: Rebase
         id: rebase
@@ -62,9 +66,13 @@ jobs:
           script: |
             const success = '${{ steps.rebase.outputs.rebased-count }}' === '1';
 
-            await github.rest.reactions.createForIssueComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: context.payload.comment.id,
-              content: success ? 'hooray' : 'confused',
-            });
+            try {
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: context.payload.comment.id,
+                content: success ? 'hooray' : 'confused',
+              });
+            } catch (error) {
+              core.warning(`Could not react to comment: ${error.message}`);
+            }
