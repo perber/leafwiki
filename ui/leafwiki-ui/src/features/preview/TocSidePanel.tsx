@@ -71,6 +71,7 @@ export function TocSidePanel({ entries, activeId: externalActiveId }: Props) {
       <ul
         className={cn(
           'page-viewer__toc-panel-list',
+          'custom-scrollbar',
           collapsed && 'page-viewer__toc-panel-hidden',
         )}
         aria-hidden={collapsed}

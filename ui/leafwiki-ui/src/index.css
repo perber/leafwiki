@@ -602,6 +602,12 @@
       width: 0;
       flex-shrink: 0;
       overflow: hidden;
+      /* Caps the panel to the height of #scroll-container (its sticky
+         containing block, itself bounded by .app-layout's viewport-derived
+         height) so it can never grow past the bottom of the window with
+         many headings. .page-viewer__toc-panel-list is the part that
+         actually scrolls once capped — see index.css further down. */
+      max-height: 100%;
       transition: width 200ms ease;
     }
 
@@ -1716,7 +1722,7 @@
      border-color (not display/width), independent of the always-visible
      header/toggle button below. */
   .page-viewer__toc-panel {
-    @apply border-surface-border w-full border-l pb-4 pl-3 transition-colors duration-200;
+    @apply border-surface-border flex min-h-0 w-full flex-1 flex-col border-l pb-4 pl-3 transition-colors duration-200;
   }
 
   .page-viewer__toc-panel--collapsed {
@@ -1749,7 +1755,13 @@
     border: none;
   }
 
+  /* flex: 1 + min-height: 0 lets this take whatever space is left in the
+     panel after the fixed-height header and scroll internally once that's
+     less than the entry list's natural height — the header stays put and
+     only the entries scroll, instead of the whole sticky panel growing
+     past the bottom of the viewport (see .app-layout__toc-pane). */
   .page-viewer__toc-panel-list {
+    @apply min-h-0 flex-1 overflow-y-auto;
     visibility: visible;
     transition: visibility 0s linear 0s;
   }
