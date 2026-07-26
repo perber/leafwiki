@@ -33,4 +33,8 @@ type Config struct {
 	// TriggerResync rebuilds the derived tree/search/links/tags/properties
 	// indexes from the restored root/assets. Typically wiki.Wiki.TriggerResyncAsync.
 	TriggerResync func()
+	// MaxUploadSizeBytes bounds how large an uploaded backup ZIP
+	// (TriggerRestoreFromUpload, via POST /restore/upload) may be. <= 0 falls
+	// back to DefaultMaxUploadSizeBytes.
+	MaxUploadSizeBytes int64
 }

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import i18next from '@/lib/i18n'
 import {
   triggerRestore,
+  triggerRestoreFromUpload,
   getRestoreStatus,
   triggerSelfRestart,
   RestoreStatus,
@@ -28,6 +29,7 @@ interface RestoreState {
   // throw and have the caller mistake for the restore itself having failed.
   resyncConfirmed: boolean
   trigger: (id: string) => Promise<void>
+  triggerUpload: (file: File) => Promise<void>
   selfRestart: () => Promise<void>
 }
 
@@ -58,47 +60,25 @@ export const useRestoreStore = create<RestoreState>((set) => ({
       set({ isLoading: false })
       throw err
     }
+    await pollUntilDone(set)
+  },
 
-    let consecutiveErrors = 0
-    for (;;) {
-      await sleep(POLL_INTERVAL_MS)
-
-      let status: RestoreStatus
-      try {
-        status = await getRestoreStatus()
-        consecutiveErrors = 0
-      } catch (err) {
-        consecutiveErrors++
-        if (consecutiveErrors >= POLL_ERROR_LIMIT) {
-          set({ isLoading: false, phase: null })
-          throw err
-        }
-        continue
-      }
-
-      set({
-        phase: status.phase || null,
-        versionWarning: status.versionWarning || null,
-      })
-
-      if (status.done) {
-        if (status.needsIntervention) {
-          set({ isLoading: false, needsIntervention: true })
-          return
-        }
-        if (status.error) {
-          set({ isLoading: false, phase: null })
-          throw new Error(status.error)
-        }
-        set({ isResyncPhase: true })
-        await pollResyncTail(set)
-        return
-      }
-      if (!status.running) {
-        set({ isLoading: false, phase: null })
-        throw new Error(i18next.t('errors.jobLost', { ns: 'restore' }))
-      }
+  triggerUpload: async (file: File) => {
+    set({
+      isLoading: true,
+      phase: null,
+      isResyncPhase: false,
+      needsIntervention: false,
+      versionWarning: null,
+      resyncConfirmed: true,
+    })
+    try {
+      await triggerRestoreFromUpload(file)
+    } catch (err) {
+      set({ isLoading: false })
+      throw err
     }
+    await pollUntilDone(set)
   },
 
   selfRestart: async () => {
@@ -111,6 +91,55 @@ export const useRestoreStore = create<RestoreState>((set) => ({
     }
   },
 }))
+
+// pollUntilDone polls the restore status endpoint until the job finishes,
+// updating phase/versionWarning as it goes — shared by trigger(id) and
+// triggerUpload(file) alike, since neither entrypoint affects how the
+// server-side job reports progress from here on.
+async function pollUntilDone(
+  set: (partial: Partial<RestoreState>) => void,
+): Promise<void> {
+  let consecutiveErrors = 0
+  for (;;) {
+    await sleep(POLL_INTERVAL_MS)
+
+    let status: RestoreStatus
+    try {
+      status = await getRestoreStatus()
+      consecutiveErrors = 0
+    } catch (err) {
+      consecutiveErrors++
+      if (consecutiveErrors >= POLL_ERROR_LIMIT) {
+        set({ isLoading: false, phase: null })
+        throw err
+      }
+      continue
+    }
+
+    set({
+      phase: status.phase || null,
+      versionWarning: status.versionWarning || null,
+    })
+
+    if (status.done) {
+      if (status.needsIntervention) {
+        set({ isLoading: false, needsIntervention: true })
+        return
+      }
+      if (status.error) {
+        set({ isLoading: false, phase: null })
+        throw new Error(status.error)
+      }
+      set({ isResyncPhase: true })
+      await pollResyncTail(set)
+      return
+    }
+    if (!status.running) {
+      set({ isLoading: false, phase: null })
+      throw new Error(i18next.t('errors.jobLost', { ns: 'restore' }))
+    }
+  }
+}
 
 // pollResyncTail polls the existing resync status endpoint (no new endpoint,
 // per ADR-0004's polling pattern) until the resync the restore already

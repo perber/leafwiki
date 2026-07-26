@@ -70,6 +70,19 @@ func (a *AuthService) ReplaceUserStore(storageDir string) error {
 	return nil
 }
 
+// PauseUserStoreForSwap closes the current UserStore's *sql.DB connection
+// and prevents it from reconnecting, releasing any OS-level file lock on
+// users.db before a live restore renames it. Needed on Windows, where an
+// open file handle blocks os.Rename with a sharing violation (POSIX allows
+// renaming an open file, which is why this was never needed there). Does not
+// replace the store — ReplaceUserStore does that afterward once the swap has
+// completed — so a request landing in between gets a clean, immediate error
+// (see errUserStoreUnavailable) instead of racing a reconnect against the
+// in-progress rename.
+func (a *AuthService) PauseUserStoreForSwap() error {
+	return a.users().suspendStore()
+}
+
 // InvalidateAllSessions revokes every active session on this instance —
 // every logged-in user (including whoever triggered this) must log back in.
 // Used after a restore: the restored users.db may have entirely different
@@ -459,6 +472,19 @@ func (a *AuthService) verifyTOTPOrRecoveryCode(users *UserService, user *User, c
 	}
 
 	return false, false, nil
+}
+
+// errUserStoreUnavailable is returned while the user store is suspended for
+// an in-progress live restore (see UserStore.suspend / PauseUserStoreForSwap).
+// A GET request landing in that window gets this immediately instead of
+// racing a reconnect against the file swap.
+func errUserStoreUnavailable() error {
+	return sharederrors.NewLocalizedError(
+		"auth_user_store_unavailable",
+		"The server is restoring from a backup — please try again in a moment",
+		"user store is suspended for an in-progress restore",
+		nil,
+	)
 }
 
 func errInvalidLoginChallenge() error {

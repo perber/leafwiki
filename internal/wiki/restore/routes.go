@@ -1,6 +1,7 @@
 package wikirestore
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -11,6 +12,15 @@ import (
 	"github.com/perber/wiki/internal/http/middleware/security"
 	"github.com/perber/wiki/internal/restore"
 )
+
+// uploadParseMaxMemory bounds how much of an uploaded restore ZIP
+// ParseMultipartForm is allowed to buffer in memory before mime/multipart
+// spills the rest to its own temp file on disk. Deliberately independent of
+// the (much larger) MaxUploadSizeBytes limit: reusing that limit here would
+// let ParseMultipartForm hold an entire near-max-size upload in RAM, which on
+// a resource-constrained deployment (e.g. a Raspberry Pi, an explicit
+// LeafWiki deployment target) risks OOM.
+const uploadParseMaxMemory = 32 << 20 // 32 MiB, matching net/http's own default
 
 // Routes is the RouteRegistrar for the live restore admin endpoints.
 type Routes struct {
@@ -40,6 +50,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	adminGroup := authGroup.Group("/admin")
 	adminGroup.Use(authmw.RequireAdmin(opts.AuthDisabled))
 
+	adminGroup.POST("/restore/upload", r.handleTriggerUpload)
 	adminGroup.POST("/restore/:id", r.handleTrigger)
 	adminGroup.GET("/restore/status", r.handleStatus)
 	adminGroup.POST("/restore/self-restart", r.handleSelfRestart)
@@ -60,6 +71,52 @@ func (r *Routes) handleTrigger(c *gin.Context) {
 	}
 	id := c.Param("id")
 	if err := r.manager.TriggerRestore(id); err != nil {
+		respondWithRestoreError(c, err)
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"ok": true})
+}
+
+// handleTriggerUpload starts a restore from an uploaded backup ZIP and
+// returns 202 Accepted. Progress and any validation failure (e.g. a
+// malformed or non-LeafWiki ZIP) surface asynchronously via handleStatus,
+// exactly as they do for handleTrigger.
+func (r *Routes) handleTriggerUpload(c *gin.Context) {
+	if r.manager == nil {
+		r.respondNotEnabled(c)
+		return
+	}
+
+	maxSize := r.manager.MaxUploadSizeBytes()
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
+	if err := c.Request.ParseMultipartForm(uploadParseMaxMemory); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			respondWithRestoreStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeRestoreUploadTooLarge, "Upload exceeds the maximum allowed size", "upload exceeds the maximum allowed size")
+			return
+		}
+		respondWithRestoreStatusError(c, http.StatusBadRequest, ErrCodeRestoreUploadInvalid, "Failed to parse the uploaded file", "failed to parse the uploaded file")
+		return
+	}
+	defer func() {
+		if c.Request.MultipartForm != nil {
+			_ = c.Request.MultipartForm.RemoveAll()
+		}
+	}()
+
+	fh, err := c.FormFile("file")
+	if err != nil {
+		respondWithRestoreStatusError(c, http.StatusBadRequest, ErrCodeRestoreMissingFile, "Missing file", "missing file")
+		return
+	}
+	file, err := fh.Open()
+	if err != nil {
+		respondWithRestoreStatusError(c, http.StatusBadRequest, ErrCodeRestoreFileOpenFailed, "Failed to open uploaded file", "failed to open uploaded file")
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	if err := r.manager.TriggerRestoreFromUpload(file); err != nil {
 		respondWithRestoreError(c, err)
 		return
 	}

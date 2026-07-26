@@ -52,6 +52,46 @@ func TestAuthService_ReplaceUserStore_SwapsToNewUsers(t *testing.T) {
 	}
 }
 
+// TestAuthService_PauseUserStoreForSwap_ThenReplaceUserStore_Recovers pins
+// the exact contract Manager.runFromZipPath depends on for the Windows
+// live-restore fix: pausing the store before the file swap must fail logins
+// cleanly (no panic, no hang, no silently reopened OS file handle — see
+// TestUserStore_Suspend_ClosesDBAndBlocksReconnect for that part), and the
+// subsequent ReplaceUserStore (once the swap has completed) must still bring
+// the service back to a fully working state.
+func TestAuthService_PauseUserStoreForSwap_ThenReplaceUserStore_Recovers(t *testing.T) {
+	f := setupTestAuthService(t)
+	t.Cleanup(func() { _ = f.Close() })
+
+	if err := f.PauseUserStoreForSwap(); err != nil {
+		t.Fatalf("PauseUserStoreForSwap failed: %v", err)
+	}
+
+	if _, err := f.Login("testuser", "securepass"); err == nil {
+		t.Fatal("expected Login to fail cleanly while the user store is paused")
+	}
+
+	newDir := t.TempDir()
+	newStore, err := NewUserStore(newDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewUserService(newStore).CreateUser("restored-user", "restored@example.com", "restored-password", "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if err := newStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := f.ReplaceUserStore(newDir); err != nil {
+		t.Fatalf("ReplaceUserStore after pause failed: %v", err)
+	}
+
+	if _, err := f.Login("restored-user", "restored-password"); err != nil {
+		t.Fatalf("expected login to succeed against the store swapped in after pause: %v", err)
+	}
+}
+
 func TestAuthService_ReplaceUserStore_ClosesPreviousStore(t *testing.T) {
 	f := setupTestAuthService(t)
 	t.Cleanup(func() { _ = f.Close() })

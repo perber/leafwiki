@@ -18,6 +18,17 @@ export async function triggerRestore(id: string): Promise<void> {
   })
 }
 
+export async function triggerRestoreFromUpload(file: File): Promise<void> {
+  const formData = new FormData()
+  formData.append('file', file)
+  await fetchWithAuth(`${RESTORE_URL}/upload`, {
+    method: 'POST',
+    body: formData,
+    headers: {}, // Let browser set Content-Type for FormData
+    credentials: 'include',
+  })
+}
+
 export async function getRestoreStatus(): Promise<RestoreStatus> {
   const res = await fetchWithAuth(`${RESTORE_URL}/status`, {
     credentials: 'include',

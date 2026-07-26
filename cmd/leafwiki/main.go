@@ -115,6 +115,8 @@ func writeUsage(w io.Writer) {
 	--snapshot-interval            Snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)
 	--snapshot-retention           Number of most recent snapshots to keep; <= 0 = keep all (default: 10)
 	--snapshot-dir                 Directory to store snapshot ZIPs in (default: <data-dir>/snapshots)
+	--restore-upload-max-size      Maximum size for an uploaded backup ZIP to restore from
+	                               (for example 500MiB, 500MB, 524288000) (default: 500MiB)
 	                               When --snapshot is enabled, live restore-from-snapshot is also available
 	                               via the admin UI (Settings > Full Backup) and gates writes (503) while a
 	                               restore is swapping files. For disaster recovery or migrating a snapshot
@@ -173,6 +175,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_SNAPSHOT_INTERVAL
 	LEAFWIKI_SNAPSHOT_RETENTION
 	LEAFWIKI_SNAPSHOT_DIR
+	LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE
 	`); err != nil {
 		panic(err)
 	}
@@ -277,6 +280,7 @@ type cliFlags struct {
 	snapshotInterval        *time.Duration
 	snapshotRetention       *int
 	snapshotDir             *string
+	restoreUploadMaxSize    *string
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -330,6 +334,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		snapshotInterval:        fs.Duration("snapshot-interval", 24*time.Hour, "snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)"),
 		snapshotRetention:       fs.Int("snapshot-retention", 10, "number of most recent snapshots to keep; <= 0 = keep all (default: 10)"),
 		snapshotDir:             fs.String("snapshot-dir", "", "directory to store snapshot ZIPs in (default: <data-dir>/snapshots)"),
+		restoreUploadMaxSize:    fs.String("restore-upload-max-size", "", "maximum size for an uploaded backup ZIP to restore from (for example 500MiB, 500MB, 524288000) (default: 500MiB)"),
 	}
 }
 
@@ -379,6 +384,10 @@ func main() {
 	maxAssetUploadSize := parseByteSize(
 		resolveString("max-asset-upload-size", *flags.maxAssetUploadSize, visited, "LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50MiB"),
 		"max asset upload size",
+	)
+	restoreUploadMaxSize := parseByteSize(
+		resolveString("restore-upload-max-size", *flags.restoreUploadMaxSize, visited, "LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE", "500MiB"),
+		"restore upload max size",
 	)
 	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
 	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
@@ -608,28 +617,16 @@ func main() {
 		defer snapshotScheduler.Stop()
 		w.SetSnapshotRoutes(wikisnapshot.NewRoutes(snapshotManager, snapshotScheduler, w.AuthService(), snapshotRetention))
 
-		if runtime.GOOS == "windows" {
-			// A live restore renames users.db aside/in while AuthService's
-			// *sql.DB connection to it may still be open (the connection is
-			// only reopened afterward, in ReplaceUserStore) — on Windows,
-			// renaming a file with an open handle can fail with a sharing
-			// violation unless that handle was opened with FILE_SHARE_DELETE,
-			// which hasn't been verified for the sqlite driver in use here.
-			// Not blocking startup over it: this needs real Windows testing
-			// to confirm one way or the other, not a guess baked into a
-			// hard failure.
-			slog.Default().Warn("live restore (--snapshot) on Windows is not yet verified: renaming users.db while it may still be open could fail with a sharing violation; test a restore on this platform before relying on it, or use the offline `restore-snapshot` subcommand instead (it runs before the server starts, with no open handle on users.db)")
-		}
-
 		writeGate = restore.NewWriteGate()
 		restoreManager := restore.NewManager(restore.Config{
-			SnapshotManager: snapshotManager,
-			DataDir:         dataDir,
-			WikiVersion:     Version,
-			WriteGate:       writeGate,
-			AuthService:     w.AuthService(),
-			BrandingService: w.BrandingService(),
-			TriggerResync:   w.TriggerResyncAsync,
+			SnapshotManager:    snapshotManager,
+			DataDir:            dataDir,
+			WikiVersion:        Version,
+			WriteGate:          writeGate,
+			AuthService:        w.AuthService(),
+			BrandingService:    w.BrandingService(),
+			TriggerResync:      w.TriggerResyncAsync,
+			MaxUploadSizeBytes: restoreUploadMaxSize,
 		})
 		// Registered after (so it runs before, defers are LIFO) the w.Close()
 		// deferred above: an in-flight restore must finish before AuthService's

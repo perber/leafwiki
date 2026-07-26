@@ -1,6 +1,7 @@
 package restore
 
 import (
+	"archive/zip"
 	"os"
 	"path/filepath"
 	"sync"
@@ -288,6 +289,259 @@ func TestManager_Restore_RollsBackOnBrandingReloadFailure(t *testing.T) {
 	if _, err := f.authService.Login("snapshot-admin", "snapshot-password-123"); err == nil {
 		t.Fatal("expected the snapshot's user to no longer exist after rollback")
 	}
+}
+
+func TestManager_MaxUploadSizeBytes_DefaultsWhenUnset(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+
+	if got := f.manager.MaxUploadSizeBytes(); got != DefaultMaxUploadSizeBytes {
+		t.Errorf("expected default %d, got %d", DefaultMaxUploadSizeBytes, got)
+	}
+}
+
+func TestManager_MaxUploadSizeBytes_UsesConfiguredValue(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+	f.manager.cfg.MaxUploadSizeBytes = 12345
+
+	if got := f.manager.MaxUploadSizeBytes(); got != 12345 {
+		t.Errorf("expected configured value 12345, got %d", got)
+	}
+}
+
+func TestManager_RestoreFromUpload_HappyPath(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+
+	zipPath := buildFixtureSnapshot(t, "v1.0.0")
+	upload, err := os.Open(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open fixture zip: %v", err)
+	}
+	defer func() { _ = upload.Close() }()
+
+	if err := f.manager.TriggerRestoreFromUpload(upload); err != nil {
+		t.Fatalf("TriggerRestoreFromUpload failed: %v", err)
+	}
+
+	status := waitForRestoreDone(t, f.manager)
+	if status.Error != "" {
+		t.Fatalf("expected successful restore, got error: %s", status.Error)
+	}
+	if status.NeedsIntervention {
+		t.Fatal("expected NeedsIntervention = false on a successful restore")
+	}
+
+	if _, err := os.Stat(filepath.Join(f.dataDir, "root", "welcome.md")); err != nil {
+		t.Errorf("expected restored root/welcome.md: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(f.dataDir, "root", "live-page.md")); !os.IsNotExist(err) {
+		t.Errorf("expected pre-restore live content to be gone, got err=%v", err)
+	}
+
+	if f.resyncCalls != 1 {
+		t.Errorf("expected resync to be triggered exactly once, got %d", f.resyncCalls)
+	}
+	if f.manager.cfg.WriteGate.Engaged() {
+		t.Error("expected write gate to be disengaged after a successful restore")
+	}
+
+	if _, err := f.authService.Login("snapshot-admin", "snapshot-password-123"); err != nil {
+		t.Fatalf("expected the snapshot's user to be able to log in after restore: %v", err)
+	}
+}
+
+func TestManager_RestoreFromUpload_InvalidZip_FailsCleanlyWithoutTouchingFiles(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+
+	// A zip with no entries at all is missing both required entries
+	// (backup-meta.json, users.db) — extractAndValidate must reject it before
+	// anything on disk is touched.
+	badZipPath := filepath.Join(t.TempDir(), "bad.zip")
+	zf, err := os.Create(badZipPath)
+	if err != nil {
+		t.Fatalf("failed to create bad zip file: %v", err)
+	}
+	zw := zip.NewWriter(zf)
+	if err := zw.Close(); err != nil {
+		t.Fatalf("failed to close empty zip writer: %v", err)
+	}
+	if err := zf.Close(); err != nil {
+		t.Fatalf("failed to close bad zip file: %v", err)
+	}
+
+	upload, err := os.Open(badZipPath)
+	if err != nil {
+		t.Fatalf("failed to open bad zip: %v", err)
+	}
+	defer func() { _ = upload.Close() }()
+
+	if err := f.manager.TriggerRestoreFromUpload(upload); err != nil {
+		t.Fatalf("TriggerRestoreFromUpload failed: %v", err)
+	}
+	status := waitForRestoreDone(t, f.manager)
+	if status.Error == "" {
+		t.Fatal("expected an error for an invalid zip")
+	}
+	if status.NeedsIntervention {
+		t.Error("an invalid zip should fail during validation, before anything is touched — not NeedsIntervention")
+	}
+	if f.manager.cfg.WriteGate.Engaged() {
+		t.Error("write gate should never have been engaged for a validation failure")
+	}
+	if _, err := os.Stat(filepath.Join(f.dataDir, "root", "live-page.md")); err != nil {
+		t.Errorf("expected live content to be completely untouched: %v", err)
+	}
+}
+
+// TestManager_RestoreFromUpload_StageUploadFailure_ReturnsLocalizedError is
+// the regression test for a review finding: stageUpload used to return plain
+// fmt.Errorf, which respondWithRestoreError can't render specifically (it
+// only recognizes *sharederrors.LocalizedError), so any staging failure
+// (disk full, permission error, ...) surfaced to the admin as a generic
+// "Restore request failed" instead of a real message — unlike every other
+// synchronous error this endpoint can return.
+func TestManager_RestoreFromUpload_StageUploadFailure_ReturnsLocalizedError(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+	// A DataDir whose parent doesn't exist makes os.CreateTemp fail
+	// deterministically, without relying on real disk-full/permission errors.
+	f.manager.cfg.DataDir = filepath.Join(f.dataDir, "does-not-exist")
+
+	zipPath := buildFixtureSnapshot(t, "v1.0.0")
+	upload, err := os.Open(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open fixture zip: %v", err)
+	}
+	defer func() { _ = upload.Close() }()
+
+	err = f.manager.TriggerRestoreFromUpload(upload)
+	loc, ok := sharederrors.AsLocalizedError(err)
+	if !ok || loc.Code != "restore_upload_staging_failed" {
+		t.Fatalf("expected restore_upload_staging_failed, got %v", err)
+	}
+}
+
+func TestManager_RestoreFromUpload_ErrAlreadyRunning(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+
+	zipPath := buildFixtureSnapshot(t, "v1.0.0")
+	upload1, err := os.Open(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open fixture zip: %v", err)
+	}
+	defer func() { _ = upload1.Close() }()
+
+	if err := f.manager.TriggerRestoreFromUpload(upload1); err != nil {
+		t.Fatalf("first TriggerRestoreFromUpload failed: %v", err)
+	}
+
+	upload2, err := os.Open(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open fixture zip: %v", err)
+	}
+	defer func() { _ = upload2.Close() }()
+
+	err = f.manager.TriggerRestoreFromUpload(upload2)
+	loc, ok := sharederrors.AsLocalizedError(err)
+	if !ok || loc.Code != "restore_already_running" {
+		t.Fatalf("expected restore_already_running, got %v", err)
+	}
+
+	waitForRestoreDone(t, f.manager)
+}
+
+func TestManager_RestoreFromUpload_RejectsWhileNeedsIntervention(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+
+	f.manager.job.Start()
+	f.manager.job.FinishNeedsIntervention(errTest("rollback also failed"))
+
+	zipPath := buildFixtureSnapshot(t, "v1.0.0")
+	upload, err := os.Open(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open fixture zip: %v", err)
+	}
+	defer func() { _ = upload.Close() }()
+
+	err = f.manager.TriggerRestoreFromUpload(upload)
+	loc, ok := sharederrors.AsLocalizedError(err)
+	if !ok || loc.Code != "restore_needs_intervention" {
+		t.Fatalf("expected restore_needs_intervention, got %v", err)
+	}
+
+	status := f.manager.Status()
+	if status.Running {
+		t.Error("TriggerRestoreFromUpload must not start a new run while NeedsIntervention is set")
+	}
+	if !status.NeedsIntervention {
+		t.Error("expected NeedsIntervention to remain set after a rejected trigger")
+	}
+}
+
+// TestManager_RestoreFromUpload_CleansUpTempFileAfterCompletion covers both a
+// successful and a failed upload restore: in either case, the temp file
+// stageUpload wrote the upload into (inside dataDir) must be gone once the
+// job finishes — it's a private implementation detail, not a snapshot to
+// retain.
+func TestManager_RestoreFromUpload_CleansUpTempFileAfterCompletion(t *testing.T) {
+	tempGlob := func(dataDir string) []string {
+		matches, err := filepath.Glob(filepath.Join(dataDir, ".leafwiki-restore-upload-*.zip"))
+		if err != nil {
+			t.Fatalf("Glob failed: %v", err)
+		}
+		return matches
+	}
+
+	t.Run("success", func(t *testing.T) {
+		f := newManagerFixture(t, "v1.0.0")
+		zipPath := buildFixtureSnapshot(t, "v1.0.0")
+		upload, err := os.Open(zipPath)
+		if err != nil {
+			t.Fatalf("failed to open fixture zip: %v", err)
+		}
+		defer func() { _ = upload.Close() }()
+
+		if err := f.manager.TriggerRestoreFromUpload(upload); err != nil {
+			t.Fatalf("TriggerRestoreFromUpload failed: %v", err)
+		}
+		waitForRestoreDone(t, f.manager)
+
+		if matches := tempGlob(f.dataDir); len(matches) != 0 {
+			t.Errorf("expected upload temp file to be cleaned up, found: %v", matches)
+		}
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		f := newManagerFixture(t, "v1.0.0")
+		badZipPath := filepath.Join(t.TempDir(), "bad.zip")
+		zf, err := os.Create(badZipPath)
+		if err != nil {
+			t.Fatalf("failed to create bad zip file: %v", err)
+		}
+		zw := zip.NewWriter(zf)
+		if err := zw.Close(); err != nil {
+			t.Fatalf("failed to close empty zip writer: %v", err)
+		}
+		if err := zf.Close(); err != nil {
+			t.Fatalf("failed to close bad zip file: %v", err)
+		}
+
+		upload, err := os.Open(badZipPath)
+		if err != nil {
+			t.Fatalf("failed to open bad zip: %v", err)
+		}
+		defer func() { _ = upload.Close() }()
+
+		if err := f.manager.TriggerRestoreFromUpload(upload); err != nil {
+			t.Fatalf("TriggerRestoreFromUpload failed: %v", err)
+		}
+		status := waitForRestoreDone(t, f.manager)
+		if status.Error == "" {
+			t.Fatal("expected the invalid zip to fail validation")
+		}
+
+		if matches := tempGlob(f.dataDir); len(matches) != 0 {
+			t.Errorf("expected upload temp file to be cleaned up even on failure, found: %v", matches)
+		}
+	})
 }
 
 // TestManager_Restore_BlocksConcurrentWritesDuringSwap runs real goroutines

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/test_utils"
 )
 
@@ -648,4 +649,51 @@ func TestUserStoreUpdatePassword(t *testing.T) {
 		t.Errorf("Expected password %s, got %s", "newpassword", retrievedUser.Password)
 	}
 
+}
+
+// TestUserStore_Suspend_ClosesDBAndBlocksReconnect is the regression test for
+// the root cause of the Windows live-restore bug: a plain Close() lets the
+// very next query silently reopen a new *sql.DB (Connect() reopens whenever
+// f.db is nil), which would race a reconnect against restore.SwapAll's
+// os.Rename of users.db. suspend() must close the connection AND make
+// Connect() refuse to reopen it, so a query landing during the swap window
+// fails fast instead of grabbing a fresh OS-level file handle.
+func TestUserStore_Suspend_ClosesDBAndBlocksReconnect(t *testing.T) {
+	store := setupTestUserStore(t)
+
+	user := &User{
+		ID:       "1",
+		Username: "suspend-test-user",
+		Password: "password1",
+		Email:    "suspend-test-user@example.com",
+		Role:     "admin",
+	}
+	if err := store.CreateUser(user); err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+
+	if err := store.suspend(); err != nil {
+		t.Fatalf("suspend failed: %v", err)
+	}
+	if store.db != nil {
+		t.Fatal("expected db to be nil immediately after suspend")
+	}
+
+	_, err := store.GetUserByUsername("suspend-test-user")
+	if err == nil {
+		t.Fatal("expected a query against a suspended store to fail, not silently reconnect")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_user_store_unavailable" {
+		t.Fatalf("expected auth_user_store_unavailable, got %v", err)
+	}
+	if store.db != nil {
+		t.Fatal("expected the failed query to NOT have reopened db — that's exactly the race this fix prevents")
+	}
+
+	// suspend must be idempotent — Manager.rollbackOrIntervene's cleanup
+	// paths may end up calling code that touches an already-suspended store.
+	if err := store.suspend(); err != nil {
+		t.Fatalf("expected a second suspend call to be a safe no-op, got: %v", err)
+	}
 }
