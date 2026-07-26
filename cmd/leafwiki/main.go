@@ -652,6 +652,7 @@ func main() {
 		Metrics:                 metrics,
 		GitBackupEnabled:        gitBackupEnabled,
 		SnapshotEnabled:         snapshotEnabled,
+		TOTPAvailable:           w.TOTPService() != nil,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:        enableHTTPRemoteUser,
 			HeaderName:     httpRemoteUserHeader,

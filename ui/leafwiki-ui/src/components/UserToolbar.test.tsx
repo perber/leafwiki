@@ -29,6 +29,7 @@ describe('UserToolbar', () => {
       loginUrl: '',
       logoutUrl: '',
       userManagementUrl: '',
+      totpAvailable: false,
     })
     useBackupStore.setState({ enabled: false })
     useSessionStore.setState({
@@ -253,6 +254,69 @@ describe('UserToolbar', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
       expect(window.location.href).toBe('https://idp.example.com/login')
+    })
+  })
+
+  describe('totp menu item', () => {
+    it('does not show "enable two-factor authentication" when totp is not available on the server', async () => {
+      const user = userEvent.setup()
+      useConfigStore.setState({ totpAvailable: false })
+
+      render(
+        <MemoryRouter>
+          <UserToolbar />
+        </MemoryRouter>,
+      )
+
+      const avatar = screen.getByTestId('user-toolbar-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+
+      expect(
+        screen.queryByTestId('user-toolbar-totp-enable'),
+      ).not.toBeInTheDocument()
+    })
+
+    it('shows "enable two-factor authentication" when totp is available on the server', async () => {
+      const user = userEvent.setup()
+      useConfigStore.setState({ totpAvailable: true })
+
+      render(
+        <MemoryRouter>
+          <UserToolbar />
+        </MemoryRouter>,
+      )
+
+      const avatar = screen.getByTestId('user-toolbar-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+
+      expect(screen.getByTestId('user-toolbar-totp-enable')).toBeInTheDocument()
+    })
+
+    it('still shows "disable two-factor authentication" for a user who already has it enabled, even when totpAvailable is false', async () => {
+      const user = userEvent.setup()
+      useConfigStore.setState({ totpAvailable: false })
+      useSessionStore.setState({
+        user: {
+          id: 'user-1',
+          username: 'alice',
+          email: 'alice@example.com',
+          role: 'editor',
+          totpEnabled: true,
+        },
+      })
+
+      render(
+        <MemoryRouter>
+          <UserToolbar />
+        </MemoryRouter>,
+      )
+
+      const avatar = screen.getByTestId('user-toolbar-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+
+      expect(
+        screen.getByTestId('user-toolbar-totp-disable'),
+      ).toBeInTheDocument()
     })
   })
 
