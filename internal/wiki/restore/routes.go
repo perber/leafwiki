@@ -98,6 +98,11 @@ func (r *Routes) handleTriggerUpload(c *gin.Context) {
 		respondWithRestoreStatusError(c, http.StatusBadRequest, ErrCodeRestoreUploadInvalid, "Failed to parse the uploaded file", "failed to parse the uploaded file")
 		return
 	}
+	defer func() {
+		if c.Request.MultipartForm != nil {
+			_ = c.Request.MultipartForm.RemoveAll()
+		}
+	}()
 
 	fh, err := c.FormFile("file")
 	if err != nil {

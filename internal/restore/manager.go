@@ -102,16 +102,16 @@ func (m *Manager) TriggerRestoreFromUpload(r io.Reader) error {
 	if m.job.Status().NeedsIntervention {
 		return ErrRestoreNeedsIntervention
 	}
+	if !m.job.Start() {
+		return ErrRestoreAlreadyRunning
+	}
 
 	zipPath, cleanup, err := m.stageUpload(r)
 	if err != nil {
+		m.job.Finish(err)
 		return err
 	}
 
-	if !m.job.Start() {
-		cleanup()
-		return ErrRestoreAlreadyRunning
-	}
 	m.wg.Go(func() {
 		defer cleanup()
 		m.runGuarded(func() { m.runFromZipPath(zipPath) })
