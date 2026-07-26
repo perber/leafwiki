@@ -1604,6 +1604,57 @@ Content.`;
     await expect(tocExpandButton).toBeHidden();
   });
 
+  test('toc side panel scrolls internally instead of overflowing the viewport when there are many headings', async ({
+    page,
+  }) => {
+    const timestamp = Date.now();
+    const slug = `toc-many-headings-${timestamp}`;
+    const title = `Toc Many Headings ${timestamp}`;
+    const headingCount = 40;
+    const sections = Array.from(
+      { length: headingCount },
+      (_, index) => `## Section ${index + 1}\n\nContent ${index + 1}.`,
+    ).join('\n\n');
+    const content = `# Intro\n\nIntro text.\n\n${sections}`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const tocPane = page.locator('.app-layout__toc-pane');
+    const tocList = page.getByTestId('toc-side-panel-list');
+    await expect(tocList).toBeVisible();
+
+    // Sanity check: with this many headings, the list's natural (unclipped)
+    // height genuinely exceeds the space available to it — otherwise the
+    // assertions below wouldn't be testing anything.
+    const { scrollHeight, clientHeight } = await tocList.evaluate((el) => ({
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+    }));
+    expect(scrollHeight).toBeGreaterThan(clientHeight);
+
+    // The sticky panel itself must stay within the viewport rather than
+    // growing past the bottom of the window.
+    const viewportSize = page.viewportSize();
+    const paneBox = await tocPane.boundingBox();
+    expect(paneBox).not.toBeNull();
+    expect(paneBox!.y + paneBox!.height).toBeLessThanOrEqual(viewportSize!.height + 1);
+
+    // The last entry starts out of view, but is reachable by scrolling the
+    // list itself — not stranded below the fold with no way to reach it.
+    const lastEntry = page.getByTestId(`toc-entry-section-${headingCount}`);
+    await expect(lastEntry).toBeAttached();
+    await expect(lastEntry).not.toBeInViewport();
+
+    await tocList.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+
+    await expect(lastEntry).toBeInViewport();
+  });
+
   test('navigating away from page with footnote headline stays responsive', async ({ page }) => {
     const timestamp = Date.now();
     const slug = `footnotes-navigation-repro-${timestamp}`;
