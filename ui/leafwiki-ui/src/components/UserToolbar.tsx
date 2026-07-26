@@ -59,6 +59,7 @@ export default function UserToolbar() {
   const backupEnabled = useConfigStore((s) => s.gitBackupEnabled)
   const apiKeysEnabled = useConfigStore((s) => s.enableApiKeyManagement)
   const snapshotEnabled = useConfigStore((s) => s.snapshotEnabled)
+  const totpAvailable = useConfigStore((s) => s.totpAvailable)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
   const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)
@@ -232,13 +233,15 @@ export default function UserToolbar() {
                 {t('totp.menuDisable', { ns: 'users' })}
               </DropdownMenuItem>
             ) : (
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={() => openDialog(DIALOG_TOTP_SETUP)}
-                data-testid="user-toolbar-totp-enable"
-              >
-                {t('totp.menuEnable', { ns: 'users' })}
-              </DropdownMenuItem>
+              totpAvailable && (
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => openDialog(DIALOG_TOTP_SETUP)}
+                  data-testid="user-toolbar-totp-enable"
+                >
+                  {t('totp.menuEnable', { ns: 'users' })}
+                </DropdownMenuItem>
+              )
             ))}
           {(!httpRemoteUserEnabled || logoutUrl) && (
             <DropdownMenuItem

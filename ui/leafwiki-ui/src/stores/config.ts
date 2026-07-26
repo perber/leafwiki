@@ -12,6 +12,7 @@ type ConfigStore = {
   enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
   snapshotEnabled: boolean
+  totpAvailable: boolean
   httpRemoteUserEnabled: boolean
   loginUrl: string
   logoutUrl: string
@@ -32,6 +33,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   enableApiKeyManagement: false,
   gitBackupEnabled: false,
   snapshotEnabled: false,
+  totpAvailable: false,
   httpRemoteUserEnabled: false,
   loginUrl: '',
   logoutUrl: '',
@@ -60,6 +62,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         enableApiKeyManagement: config.enableApiKeyManagement ?? false,
         gitBackupEnabled: config.gitBackupEnabled ?? false,
         snapshotEnabled: config.snapshotEnabled ?? false,
+        totpAvailable: config.totpAvailable ?? false,
         httpRemoteUserEnabled: config.httpRemoteUserEnabled ?? false,
         loginUrl: config.loginUrl ?? '',
         logoutUrl: config.logoutUrl ?? '',
