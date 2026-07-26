@@ -21,6 +21,9 @@ type UserStore struct {
 	storageDir string
 	filename   string
 	db         *sql.DB
+	// suspended is set by suspend() and makes Connect() refuse to lazily
+	// reopen db — see suspend's doc comment.
+	suspended bool
 }
 
 func databasePath(storageDir string, filename string) string {
@@ -55,6 +58,9 @@ func NewUserStore(storageDir string) (*UserStore, error) {
 func (f *UserStore) Connect() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.suspended {
+		return errUserStoreUnavailable()
+	}
 	if f.db != nil {
 		return nil
 	}
@@ -68,6 +74,27 @@ func (f *UserStore) Connect() error {
 	}
 	f.db = db
 	return nil
+}
+
+// suspend closes db (if open) and marks the store so Connect() refuses to
+// lazily reopen it — unlike a plain Close(), whose reconnect-on-next-query
+// behavior NewUserStore's corruption-retry path deliberately relies on.
+// Used by AuthService.PauseUserStoreForSwap before a live restore renames
+// users.db out from under this store: on Windows, an open file handle (or
+// one silently reopened by a query landing mid-swap) blocks the rename with
+// a sharing violation, which POSIX doesn't have. suspend is permanent for
+// this *UserStore instance — restore always continues with a brand new one
+// afterward (see AuthService.ReplaceUserStore), so there's no un-suspend.
+func (f *UserStore) suspend() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.suspended = true
+	if f.db == nil {
+		return nil
+	}
+	err := f.db.Close()
+	f.db = nil
+	return err
 }
 
 func (f *UserStore) ensureSchema() error {

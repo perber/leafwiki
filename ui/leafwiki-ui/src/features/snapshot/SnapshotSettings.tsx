@@ -16,12 +16,13 @@ import { ApiLocalizedError, mapApiError } from '@/lib/api/errors'
 import {
   AlertTriangle,
   Download,
+  FileUp,
   HardDriveDownload,
   History,
   Loader2,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useSnapshotStore } from '@/stores/snapshot'
@@ -65,6 +66,7 @@ export default function SnapshotSettings() {
     needsIntervention,
     versionWarning,
     trigger: triggerRestore,
+    triggerUpload,
     selfRestart,
   } = useRestoreStore()
 
@@ -72,6 +74,9 @@ export default function SnapshotSettings() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [restoringId, setRestoringId] = useState<string | null>(null)
   const [isSelfRestarting, setIsSelfRestarting] = useState(false)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [isRestoringUpload, setIsRestoringUpload] = useState(false)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
 
   useToolbarActions()
   useSetTitle({ title: t('pageTitle') })
@@ -129,6 +134,34 @@ export default function SnapshotSettings() {
       }
     } finally {
       setRestoringId(null)
+    }
+  }
+
+  const handleRestoreFromUpload = async () => {
+    if (!uploadFile) return
+    setIsRestoringUpload(true)
+    try {
+      await triggerUpload(uploadFile)
+      if (useRestoreStore.getState().needsIntervention) {
+        return
+      }
+      if (useRestoreStore.getState().resyncConfirmed) {
+        toast.success(tRestore('toast.restoreSucceeded'))
+      } else {
+        toast.warning(tRestore('toast.restoreSucceededResyncUnconfirmed'))
+      }
+      window.location.reload()
+    } catch (err) {
+      if (
+        err instanceof ApiLocalizedError &&
+        err.code === 'restore_already_running'
+      ) {
+        toast.info(tRestore('toast.restoreAlreadyRunning'))
+      } else {
+        toast.error(mapApiError(err, tRestore('toast.restoreFailed')).message)
+      }
+    } finally {
+      setIsRestoringUpload(false)
     }
   }
 
@@ -423,6 +456,87 @@ export default function SnapshotSettings() {
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="settings__section">
+            <h2 className="settings__section-title">
+              {tRestore('uploadSectionTitle')}
+            </h2>
+            <p className="settings__section-description">
+              {tRestore('uploadSectionDescription')}
+            </p>
+
+            <div className="settings__preview">
+              <span className="settings__preview-label">
+                {tRestore('currentFileLabel')}
+              </span>
+              {uploadFile ? (
+                <span className="settings__preview-filename">
+                  {uploadFile.name}
+                </span>
+              ) : (
+                <span className="settings__preview-placeholder">
+                  {tRestore('noFileSelected')}
+                </span>
+              )}
+            </div>
+
+            <div className="settings__actions">
+              <input
+                type="file"
+                ref={uploadInputRef}
+                accept=".zip"
+                className="hidden"
+                onChange={(e) => {
+                  setUploadFile(e.target.files?.[0] ?? null)
+                }}
+              />
+              <Button
+                variant="outline"
+                onClick={() => uploadInputRef.current?.click()}
+              >
+                <FileUp className="mr-2 h-4 w-4" />
+                {tRestore('uploadSelectButton')}
+              </Button>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    disabled={
+                      !uploadFile ||
+                      isRestoring ||
+                      isRestoringUpload ||
+                      needsIntervention
+                    }
+                  >
+                    {isRestoringUpload ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <History className="mr-2 h-4 w-4" />
+                    )}
+                    {tRestore('restoreButton')}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {tRestore('uploadConfirmTitle')}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {tRestore('uploadConfirmDescription')}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>
+                      {tRestore('uploadConfirmCancel')}
+                    </AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRestoreFromUpload}>
+                      {tRestore('uploadConfirmAction')}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </>
       )}

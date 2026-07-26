@@ -11,6 +11,10 @@ const (
 	ErrCodeRestoreNotEnabled      = "restore_not_enabled"
 	ErrCodeRestoreNotIntervenable = "restore_not_needs_intervention"
 	ErrCodeRestoreInternalError   = "restore_internal_error"
+	ErrCodeRestoreUploadTooLarge  = "restore_upload_too_large"
+	ErrCodeRestoreUploadInvalid   = "restore_upload_invalid"
+	ErrCodeRestoreMissingFile     = "restore_missing_file"
+	ErrCodeRestoreFileOpenFailed  = "restore_file_open_failed"
 )
 
 // RestoreErrorResponse is the structured JSON error body returned by restore endpoints.

@@ -374,3 +374,9 @@ func (s *UserService) DisableTOTP(id string) error {
 func (s *UserService) Close() error {
 	return s.store.Close()
 }
+
+// suspendStore closes the underlying store's DB connection and prevents it
+// from lazily reconnecting — see UserStore.suspend.
+func (s *UserService) suspendStore() error {
+	return s.store.suspend()
+}

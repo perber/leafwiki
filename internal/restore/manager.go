@@ -2,6 +2,7 @@ package restore
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"sync"
@@ -51,6 +52,10 @@ var ErrWritesDisabled = sharederrors.NewLocalizedError(
 // the whole operation over a slow request.
 const gateDrainTimeout = 10 * time.Second
 
+// DefaultMaxUploadSizeBytes is used by TriggerRestoreFromUpload's HTTP
+// handler (POST /restore/upload) when Config.MaxUploadSizeBytes is unset.
+const DefaultMaxUploadSizeBytes int64 = 500 * 1024 * 1024 // 500 MiB
+
 type Manager struct {
 	cfg Config
 	job *Job
@@ -82,9 +87,94 @@ func (m *Manager) TriggerRestore(id string) error {
 	return nil
 }
 
+// TriggerRestoreFromUpload starts a restore job asynchronously from an
+// uploaded ZIP, read in full from r. Returns the same errors as
+// TriggerRestore (ErrRestoreAlreadyRunning / ErrRestoreNeedsIntervention),
+// plus any error encountered while staging the upload to disk.
+//
+// Unlike TriggerRestore(id), staging happens synchronously before this
+// method returns: r is expected to be backed by the inbound HTTP request's
+// multipart body, which is only valid for the lifetime of that request — it
+// must be fully drained into a durable temp file before control returns to
+// the HTTP handler, since the actual restore then runs in a background
+// goroutine after the handler (and its response) has already completed.
+func (m *Manager) TriggerRestoreFromUpload(r io.Reader) error {
+	if m.job.Status().NeedsIntervention {
+		return ErrRestoreNeedsIntervention
+	}
+
+	zipPath, cleanup, err := m.stageUpload(r)
+	if err != nil {
+		return err
+	}
+
+	if !m.job.Start() {
+		cleanup()
+		return ErrRestoreAlreadyRunning
+	}
+	m.wg.Go(func() {
+		defer cleanup()
+		m.runGuarded(func() { m.runFromZipPath(zipPath) })
+	})
+	return nil
+}
+
+// stageUpload drains r into a fresh temp file inside dataDir (the same
+// filesystem extractAndValidate's staging directory uses, and for the same
+// reason — so nothing downstream needs a cross-filesystem copy). The
+// returned cleanup func removes the temp file; callers must invoke it
+// exactly once, whether or not the restore that follows succeeds.
+func (m *Manager) stageUpload(r io.Reader) (zipPath string, cleanup func(), err error) {
+	f, err := os.CreateTemp(m.cfg.DataDir, ".leafwiki-restore-upload-*.zip")
+	if err != nil {
+		return "", nil, errStageUploadFailed(err)
+	}
+	cleanup = func() { _ = os.Remove(f.Name()) }
+
+	if _, err := io.Copy(f, r); err != nil {
+		_ = f.Close()
+		cleanup()
+		return "", nil, errStageUploadFailed(err)
+	}
+	if err := f.Close(); err != nil {
+		cleanup()
+		return "", nil, errStageUploadFailed(err)
+	}
+	return f.Name(), cleanup, nil
+}
+
+// errStageUploadFailed wraps any failure to drain an uploaded backup ZIP to a
+// durable temp file (disk full, permission error, ...) as a LocalizedError,
+// per this repo's convention that domain errors reaching an HTTP handler must
+// be *sharederrors.LocalizedError, not a bare fmt.Errorf/errors.New. Unlike
+// this file's other fmt.Errorf calls (which only ever feed the async
+// job-status string), stageUpload's errors are returned synchronously to
+// TriggerRestoreFromUpload's HTTP handler, which only renders a specific
+// message for LocalizedError — anything else falls back to a generic
+// "Restore request failed".
+func errStageUploadFailed(cause error) error {
+	return sharederrors.NewLocalizedError(
+		"restore_upload_staging_failed",
+		"Failed to save the uploaded backup to disk",
+		"failed to stage uploaded backup: %s",
+		cause,
+		cause.Error(),
+	)
+}
+
 // Status returns the current restore job state (thread-safe).
 func (m *Manager) Status() JobStatus {
 	return m.job.Status()
+}
+
+// MaxUploadSizeBytes returns the configured limit for POST /restore/upload,
+// falling back to DefaultMaxUploadSizeBytes when Config.MaxUploadSizeBytes is
+// unset (<= 0).
+func (m *Manager) MaxUploadSizeBytes() int64 {
+	if m.cfg.MaxUploadSizeBytes > 0 {
+		return m.cfg.MaxUploadSizeBytes
+	}
+	return DefaultMaxUploadSizeBytes
 }
 
 // Wait blocks until any in-flight restore triggered via TriggerRestore has
@@ -101,27 +191,41 @@ func (m *Manager) SelfRestart() error {
 	return SelfRestart()
 }
 
-// runLocked performs the full validate -> gate -> swap -> reopen-auth ->
-// invalidate-sessions -> reload-branding -> commit -> resync sequence. A
-// panic anywhere in this chain is recovered here (not just logged), and
-// treated as NeedsIntervention: a panic mid-sequence means we don't know
-// which phases actually completed, so failing safe (gate stays engaged,
-// admin must self-restart) is the only sound response.
+// runLocked resolves the given snapshot id to a zip path and runs the
+// restore sequence against it (see runFromZipPath).
 func (m *Manager) runLocked(id string) {
+	m.runGuarded(func() {
+		zipPath, err := m.cfg.SnapshotManager.SnapshotZipPath(id)
+		if err != nil {
+			m.job.SetPhase(PhaseValidating)
+			m.job.Finish(err)
+			return
+		}
+		m.runFromZipPath(zipPath)
+	})
+}
+
+// runGuarded recovers from any panic raised by fn, treating it as
+// NeedsIntervention: a panic mid-sequence means we don't know which phases
+// actually completed, so failing safe (gate stays engaged, admin must
+// self-restart) is the only sound response. Shared by both the by-id
+// (runLocked) and by-upload (TriggerRestoreFromUpload) entrypoints.
+func (m *Manager) runGuarded(fn func()) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Default().Error("panic during restore", "panic", r)
 			m.job.FinishNeedsIntervention(fmt.Errorf("panic during restore: %v", r))
 		}
 	}()
+	fn()
+}
 
+// runFromZipPath performs the full validate -> gate -> swap -> reopen-auth ->
+// invalidate-sessions -> reload-branding -> commit -> resync sequence against
+// an already-resolved zip file on disk. Shared by the by-id and by-upload
+// restore entrypoints once each has produced a concrete zipPath.
+func (m *Manager) runFromZipPath(zipPath string) {
 	m.job.SetPhase(PhaseValidating)
-	zipPath, err := m.cfg.SnapshotManager.SnapshotZipPath(id)
-	if err != nil {
-		m.job.Finish(err)
-		return
-	}
-
 	stagingDir, meta, err := extractAndValidate(zipPath, m.cfg.DataDir)
 	if err != nil {
 		m.job.Finish(fmt.Errorf("snapshot validation failed: %w", err))
@@ -137,6 +241,28 @@ func (m *Manager) runLocked(id string) {
 	m.cfg.WriteGate.Engage()
 	if !m.cfg.WriteGate.WaitForDrain(gateDrainTimeout) {
 		slog.Default().Warn("restore: timed out waiting for in-flight requests to drain, proceeding anyway")
+	}
+
+	// AuthService's user store must release its OS-level handle on users.db
+	// before SwapAll renames it — on Windows an open handle (even one a GET
+	// request lazily reopened mid-swap) blocks the rename with a sharing
+	// violation, which POSIX doesn't have. Nothing on disk has been touched
+	// yet, so a failure here doesn't need a rollback — but PauseUserStoreForSwap
+	// (UserStore.suspend) marks the store suspended even when it fails, so
+	// AuthService is left unable to serve any request until something re-opens
+	// it. Recover that here by re-opening a fresh store before reporting the
+	// (retryable) failure — only if that recovery itself fails does this need
+	// NeedsIntervention, since at that point AuthService has no working store.
+	if m.cfg.AuthService != nil {
+		if err := m.cfg.AuthService.PauseUserStoreForSwap(); err != nil {
+			m.cfg.WriteGate.Disengage()
+			if repErr := m.cfg.AuthService.ReplaceUserStore(m.cfg.DataDir); repErr != nil {
+				m.job.FinishNeedsIntervention(fmt.Errorf("failed to release users.db before swap: %w (and failed to recover the user store: %v)", err, repErr))
+				return
+			}
+			m.job.Finish(fmt.Errorf("failed to release users.db before swap: %w", err))
+			return
+		}
 	}
 
 	sw := newSwapper(m.cfg.DataDir, stagingDir)
@@ -194,15 +320,16 @@ func (m *Manager) rollbackOrIntervene(sw *swapper, cause error) {
 		return
 	}
 
-	// If the failure happened after AuthService.ReplaceUserStore already
-	// succeeded (e.g. a later branding-reload failure), AuthService's
-	// in-memory handle is still open against the users.db RollbackAll just
-	// renamed away (POSIX keeps an already-open fd valid against its
-	// now-unlinked inode) — it would keep silently serving the rolled-back
-	// content instead of the original. Re-point it at whatever is actually
-	// on disk now (the just-restored original) so it can never drift from
-	// disk reality. Safe to call even when auth was never reopened this run
-	// (falls back to the file that's already there — the original).
+	// By the time this runs, AuthService's user store is always at least
+	// suspended (PauseUserStoreForSwap, before SwapAll) and possibly already
+	// pointed at the swapped-in file (ReplaceUserStore, if a later phase like
+	// branding-reload is what failed) — POSIX keeps an already-open fd valid
+	// against its now-unlinked inode, so in the latter case it would keep
+	// silently serving the rolled-back content instead of the original.
+	// Re-point it at whatever is actually on disk now (the just-restored
+	// original) so it can never drift from disk reality. Safe to call
+	// regardless of which of those two states auth was left in (falls back to
+	// the file that's already there — the original).
 	if m.cfg.AuthService != nil {
 		if err := m.cfg.AuthService.ReplaceUserStore(m.cfg.DataDir); err != nil {
 			slog.Default().Error("restore: rollback succeeded but re-syncing AuthService against the restored files failed, instance needs manual intervention",
