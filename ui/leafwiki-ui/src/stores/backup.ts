@@ -5,6 +5,7 @@ import {
   triggerForcePush,
   BackupStatusResponse,
 } from '@/lib/api/backup'
+import i18next from '@/lib/i18n'
 
 interface BackupState {
   enabled: boolean
@@ -50,7 +51,10 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         statusError: '',
       })
     } catch {
-      set({ isLoading: false, statusError: 'Failed to load backup status' })
+      set({
+        isLoading: false,
+        statusError: i18next.t('loadStatusErrorFallback', { ns: 'backup' }),
+      })
     }
   },
 

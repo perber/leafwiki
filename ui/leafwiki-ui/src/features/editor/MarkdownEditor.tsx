@@ -705,8 +705,16 @@ const MarkdownEditor = (
           {/* Mobile Tabs */}
           <div className="markdown-editor__tabs" role="tablist">
             {[
-              { id: 'editor', label: 'Editor', icon: <Code2 size={16} /> },
-              { id: 'preview', label: 'Preview', icon: <Eye size={16} /> },
+              {
+                id: 'editor',
+                label: t('markdownEditor.editorTab'),
+                icon: <Code2 size={16} />,
+              },
+              {
+                id: 'preview',
+                label: t('markdownEditor.previewTab'),
+                icon: <Eye size={16} />,
+              },
             ].map((tab) => (
               <button
                 key={tab.id}

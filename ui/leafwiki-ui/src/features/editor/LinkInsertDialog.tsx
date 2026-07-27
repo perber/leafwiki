@@ -113,11 +113,13 @@ export function LinkInsertDialog({
     >
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Insert Link</DialogTitle>
+          <DialogTitle>{t('linkInsertDialog.dialogTitle')}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="link-text">Display Text</Label>
+            <Label htmlFor="link-text">
+              {t('linkInsertDialog.displayTextLabel')}
+            </Label>
             <Input
               id="link-text"
               ref={textInputRef}
@@ -130,7 +132,7 @@ export function LinkInsertDialog({
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="link-url">URL</Label>
+            <Label htmlFor="link-url">{t('linkInsertDialog.urlLabel')}</Label>
             <div className="relative">
               <Input
                 id="link-url"
@@ -192,9 +194,11 @@ export function LinkInsertDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={closeDialog}>
-            Cancel
+            {t('linkInsertDialog.cancelButton')}
           </Button>
-          <Button onClick={handleConfirm}>Insert</Button>
+          <Button onClick={handleConfirm}>
+            {t('linkInsertDialog.insertButton')}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

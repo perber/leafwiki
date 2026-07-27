@@ -9,6 +9,7 @@ import {
   updatePage,
 } from '@/lib/api/pages'
 import { isPageNotFoundError, mapApiError } from '@/lib/api/errors'
+import i18next from '@/lib/i18n'
 import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { create } from 'zustand'
@@ -148,7 +149,9 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
     )
     if (Object.keys(frontmatterErrors).length > 0) {
       set({ frontmatterErrors })
-      throw new Error('Please fix metadata errors before saving.')
+      throw new Error(
+        i18next.t('pageEditor.metadataErrorsBeforeSave', { ns: 'editor' }),
+      )
     }
 
     // Only block concurrent auto-saves; manual saves always proceed
@@ -229,7 +232,9 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
           updatedPage?.content === null ||
           updatedPage?.content === undefined
         ) {
-          throw new Error('Updated page content is null or undefined')
+          throw new Error(
+            i18next.t('pageEditor.contentNullFallback', { ns: 'editor' }),
+          )
         }
         state.page.title = updatedPage.title
         state.page.slug = updatedPage.slug
@@ -344,7 +349,10 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         return
       }
 
-      const mapped = mapApiError(err, 'An unknown error occurred')
+      const mapped = mapApiError(
+        err,
+        i18next.t('pageEditor.unknownErrorFallback', { ns: 'editor' }),
+      )
       set({
         error: mapped.message,
         notFound: false,

@@ -103,13 +103,15 @@ export default function TreeView() {
 
   if (loading)
     return (
-      <p className="tree-view__status tree-view__status--loading">Loading...</p>
+      <p className="tree-view__status tree-view__status--loading">
+        {t('treeActions.loading')}
+      </p>
     )
 
   if (error || !tree)
     return (
       <p className="tree-view__status tree-view__status--error">
-        Error: {error}
+        {t('treeActions.loadErrorPrefix', { error })}
       </p>
     )
 
@@ -125,7 +127,7 @@ export default function TreeView() {
                 size={18}
               />
             }
-            tooltip="Create new page"
+            tooltip={t('treeActions.createNewPageTooltip')}
             onClick={() =>
               openDialog(DIALOG_ADD_PAGE, {
                 parentId: '',
@@ -141,7 +143,7 @@ export default function TreeView() {
                 size={18}
               />
             }
-            tooltip="Create new section"
+            tooltip={t('treeActions.createNewSectionTooltip')}
             onClick={() =>
               openDialog(DIALOG_ADD_PAGE, {
                 parentId: '',

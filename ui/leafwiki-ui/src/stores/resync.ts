@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { getResyncStatus, triggerResync } from '@/lib/api/resync'
+import i18next from '@/lib/i18n'
 
 const POLL_INTERVAL_MS = 800
 const POLL_ERROR_LIMIT = 3
@@ -62,7 +63,7 @@ export const useResyncStore = create<ResyncState>((set) => ({
       // running=false without done=true means the job was lost (server restart).
       if (!status.running) {
         set({ isLoading: false, phase: null })
-        throw new Error('Sync job lost — server may have restarted')
+        throw new Error(i18next.t('syncJobLostFallback', { ns: 'maintenance' }))
       }
     }
   },

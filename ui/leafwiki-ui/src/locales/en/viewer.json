@@ -16,14 +16,27 @@
     "emptyDescriptionEditor": "The section {{title}} does not contain any pages or sections yet. Start by adding a new page or create a new section.",
     "emptyDescriptionReadOnly": "The section {{title}} does not contain any pages or sections yet.",
     "addPage": "Add Page",
-    "addSection": "Add Section"
+    "addSection": "Add Section",
+    "subpagesAriaLabel": "Subpages of {{title}}",
+    "sectionSuffix": "(Section)",
+    "updatedByLabel": "Updated by {{editor}} · {{time}}",
+    "updatedLabel": "Updated {{time}}"
   },
   "markdownPreview": {
     "renderError": "This page contains Markdown that could not be rendered safely.",
     "brokenLinkTooltip": "This page doesn't exist yet."
   },
+  "mermaid": {
+    "renderError": "Unable to render Mermaid diagram.",
+    "noSvgOutput": "No SVG element in Mermaid output"
+  },
+  "headline": {
+    "linkToSection": "Link to section"
+  },
   "backlinks": {
     "errorPrefix": "Error: {{error}}",
+    "pageIdRequired": "Page ID is required",
+    "fetchFailedFallback": "Failed to fetch link status",
     "referencedBy": "Referenced by",
     "loading": "Loading…",
     "noReferences": "No pages reference this page.",
@@ -62,7 +75,22 @@
   "toolbar": {
     "moreActions": "More actions"
   },
+  "pageToolbar": {
+    "itemPage": "Page",
+    "itemSection": "Section",
+    "editButton": "Edit {{item}}",
+    "shareButton": "Share {{item}}",
+    "printButton": "Print {{item}}",
+    "copyButton": "Copy {{item}}",
+    "deleteButton": "Delete {{item}}",
+    "historyButton": "{{item}} History"
+  },
   "treeActions": {
+    "loading": "Loading...",
+    "loadErrorPrefix": "Error: {{error}}",
+    "createNewPageTooltip": "Create new page",
+    "createNewSectionTooltip": "Create new section",
+    "untitledPage": "Untitled Page",
     "convertedToast": "Page converted successfully",
     "conflictRetryMessage": "This page was modified by another user. Please try again.",
     "convertErrorFallback": "Failed to convert page",

@@ -1,5 +1,20 @@
 {
   "title": "Import",
+  "toast": {
+    "planCreatedSuccess": "Import plan created successfully",
+    "createPlanErrorFallback": "Failed to create import plan",
+    "loadPlanErrorFallback": "Failed to load import plan",
+    "noPlanToExecute": "No import plan to execute",
+    "executeSuccess": "Import completed successfully",
+    "canceledSuccess": "Import canceled",
+    "executionFailedFallback": "Import execution failed",
+    "executeErrorFallback": "Failed to execute import plan",
+    "noPlanToClear": "No import plan to clear",
+    "canceledBeforeCompletion": "Import finished before cancellation completed",
+    "planClearedSuccess": "Import plan cleared",
+    "cancelOrClearErrorFallback": "Failed to cancel or clear import plan",
+    "unexpectedCancelResponse": "Unexpected import cancel response"
+  },
   "planActions": {
     "create": "Create page",
     "update": "Update page",

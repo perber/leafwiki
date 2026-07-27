@@ -1,0 +1,35 @@
+{
+  "sidebar": {
+    "explorerTab": "Explorer",
+    "searchTab": "Search"
+  },
+  "errorBoundary": {
+    "heading": "Something went wrong",
+    "body": "An unexpected error occurred. Reloading the page usually fixes this.",
+    "reloadButton": "Reload page",
+    "tryRecoverButton": "Try to recover",
+    "detailsSummary": "Error details"
+  },
+  "page404": {
+    "heading": "Page Not Found",
+    "body": "The page you are looking for does not exist.",
+    "createPrompt": "Create the page by clicking the button below.",
+    "createButton": "Create Page"
+  },
+  "unsavedChangesDialog": {
+    "title": "Unsaved Changes",
+    "description": "You have unsaved changes. Are you sure you want to leave this page? Unsaved data will be lost.",
+    "cancelButton": "Cancel",
+    "leaveAnywayButton": "Leave anyway"
+  },
+  "dialog": {
+    "closeSrOnly": "Close"
+  },
+  "validation": {
+    "failedToast": "Validation failed"
+  },
+  "configLoad": {
+    "fetchErrorFallback": "Could not load config: {{status}} {{statusText}}",
+    "errorFallback": "Could not load configuration"
+  }
+}

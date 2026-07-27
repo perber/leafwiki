@@ -152,7 +152,9 @@ export function PageFrontmatterPanel({
                 className={`page-frontmatter-panel__title-row${hasErrors ? 'page-frontmatter-panel__title-row--has-errors' : ''}`}
               >
                 <Tag className="page-frontmatter-panel__title-icon" size={14} />
-                <span className="page-frontmatter-panel__title">Metadata</span>
+                <span className="page-frontmatter-panel__title">
+                  {t('frontmatterPanel.metadataTitle')}
+                </span>
               </div>
               <span
                 className={`page-frontmatter-panel__summary${hasErrors ? 'page-frontmatter-panel__summary--has-errors' : ''}`}
@@ -165,7 +167,7 @@ export function PageFrontmatterPanel({
             <div className="page-frontmatter-panel__stack">
               <div className="page-frontmatter-panel__row page-frontmatter-panel__row--tags">
                 <div className="page-frontmatter-panel__section-heading page-frontmatter-panel__section-heading--inline">
-                  Tags
+                  {t('frontmatterPanel.tagsHeading')}
                 </div>
                 <div className="page-frontmatter-panel__tags-field">
                   <TagInputWithSuggestions
@@ -189,7 +191,7 @@ export function PageFrontmatterPanel({
 
               <div className="page-frontmatter-panel__row page-frontmatter-panel__row--properties">
                 <div className="page-frontmatter-panel__section-heading page-frontmatter-panel__section-heading--inline">
-                  Properties
+                  {t('frontmatterPanel.propertiesHeading')}
                 </div>
                 <div className="page-frontmatter-panel__properties">
                   <div className="page-frontmatter-panel__properties-scroll custom-scrollbar">
@@ -232,7 +234,10 @@ export function PageFrontmatterPanel({
                                 type="button"
                                 className="page-frontmatter-panel__field-remove"
                                 onClick={() => removeField(index)}
-                                aria-label={`Remove frontmatter field ${field.key || index + 1}`}
+                                aria-label={t(
+                                  'frontmatterPanel.removeFieldAriaLabel',
+                                  { field: field.key || index + 1 },
+                                )}
                               >
                                 <Trash2 size={14} />
                               </button>

@@ -23,6 +23,8 @@
     "dateTitleTooltip": "Set title to today's date"
   },
   "toolbar": {
+    "closeEditorButton": "Close Editor",
+    "savePageButton": "Save Page",
     "boldTooltip": "Bold (Ctrl+B)",
     "italicTooltip": "Italic (Ctrl+I)",
     "strikethroughTooltip": "Strikethrough",
@@ -65,18 +67,37 @@
     "saveErrorFallback": "Error saving page",
     "saveAnyway": "Save anyway",
     "conflictAgainMessage": "The page was modified again while saving. Please reload the page and re-apply your changes.",
-    "errorPrefix": "Error: {{error}}"
+    "errorPrefix": "Error: {{error}}",
+    "metadataErrorsBeforeSave": "Please fix metadata errors before saving.",
+    "contentNullFallback": "Updated page content is null or undefined",
+    "unknownErrorFallback": "An unknown error occurred"
   },
   "linkInsertDialog": {
+    "dialogTitle": "Insert Link",
+    "displayTextLabel": "Display Text",
+    "urlLabel": "URL",
     "textPlaceholder": "Link text",
-    "urlPlaceholder": "https:// or search pages…"
+    "urlPlaceholder": "https:// or search pages…",
+    "cancelButton": "Cancel",
+    "insertButton": "Insert"
   },
   "frontmatterPanel": {
+    "metadataTitle": "Metadata",
+    "tagsHeading": "Tags",
+    "propertiesHeading": "Properties",
+    "removeFieldAriaLabel": "Remove frontmatter field {{field}}",
     "addTagPlaceholder": "Add tag",
     "keyPlaceholder": "Key",
     "valuePlaceholder": "Value"
   },
+  "tagInput": {
+    "loading": "Loading…",
+    "noMatchingTags": "No matching tags found.",
+    "removeTagAriaLabel": "Remove tag {{tag}}"
+  },
   "markdownEditor": {
+    "editorTab": "Editor",
+    "previewTab": "Preview",
     "resizeAriaLabel": "Resize editor and preview panes",
     "fileTooLarge": "File too large. Max {{maxSize}} allowed.",
     "uploadedToast": "Uploaded {{filename}}",

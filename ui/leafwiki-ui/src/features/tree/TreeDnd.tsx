@@ -359,7 +359,8 @@ export function TreeDndProvider({
         <DragOverlay dropAnimation={null} modifiers={[followCursor]}>
           {activeNode ? (
             <div className="tree-dnd__overlay">
-              {activeNode.title || 'Untitled Page'}
+              {activeNode.title ||
+                i18next.t('treeActions.untitledPage', { ns: 'viewer' })}
             </div>
           ) : null}
         </DragOverlay>,

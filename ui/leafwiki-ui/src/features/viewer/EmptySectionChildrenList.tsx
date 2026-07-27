@@ -53,7 +53,7 @@ export default function EmptySectionChildrenList({
     <>
       {hasChildren && (
         <nav
-          aria-label={`Subpages of ${page.title}`}
+          aria-label={t('section.subpagesAriaLabel', { title: page.title })}
           className="child-list__section"
         >
           <h2 className="child-list__section-title mb-1">
@@ -82,15 +82,18 @@ export default function EmptySectionChildrenList({
                   <Link to={`/${n.path}`} state={createNavigationVisitState()}>
                     {n.title}
                   </Link>{' '}
-                  {n.kind === NODE_KIND_SECTION && ' (Section)'}
+                  {n.kind === NODE_KIND_SECTION &&
+                    ` ${t('section.sectionSuffix')}`}
                   <br />
                   {/* Last edited info */}
                   <span className="text-muted text-sm">
                     {' '}
-                    Updated{' '}
                     {editorName
-                      ? `by ${editorName} · ${updatedRelative}`
-                      : updatedRelative}
+                      ? t('section.updatedByLabel', {
+                          editor: editorName,
+                          time: updatedRelative,
+                        })
+                      : t('section.updatedLabel', { time: updatedRelative })}
                   </span>
                 </li>
               )
@@ -118,7 +121,7 @@ export default function EmptySectionChildrenList({
       {/* No children - Add Button and allow users to create a new page */}
       {!hasChildren && (
         <nav
-          aria-label={`Subpages of ${page.title}`}
+          aria-label={t('section.subpagesAriaLabel', { title: page.title })}
           className="child-list__section"
         >
           <div>

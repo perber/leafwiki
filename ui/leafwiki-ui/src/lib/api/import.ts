@@ -1,3 +1,4 @@
+import i18next from '@/lib/i18n'
 import { fetchWithAuth } from './auth'
 
 export type ImportPlan = {
@@ -86,5 +87,7 @@ export async function cancelImportPlan(): Promise<ImportPlan | null> {
     return response as ImportPlan
   }
 
-  throw new Error('Unexpected import cancel response')
+  throw new Error(
+    i18next.t('toast.unexpectedCancelResponse', { ns: 'importer' }),
+  )
 }

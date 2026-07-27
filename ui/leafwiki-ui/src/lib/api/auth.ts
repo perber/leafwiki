@@ -1,7 +1,10 @@
+import i18next from '@/lib/i18n'
 import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { API_BASE_URL } from '../config'
 import { ApiLocalizedError, isApiLocalizedErrorResponse } from './errors'
+
+const t = (key: string) => i18next.t(key, { ns: 'auth' })
 
 export type AuthResponse = {
   accessTokenExpiresAt: number
@@ -84,7 +87,7 @@ async function postLoginRequest<T>(path: string, body: object): Promise<T> {
     try {
       errorBody = await res.json()
     } catch {
-      throw new Error('Login failed')
+      throw new Error(t('login.errorFallback'))
     }
 
     if (isApiLocalizedErrorResponse(errorBody)) {
@@ -99,7 +102,7 @@ async function postLoginRequest<T>(path: string, body: object): Promise<T> {
       throw new Error((errorBody as { error: string }).error)
     }
 
-    throw new Error('Login failed')
+    throw new Error(t('login.errorFallback'))
   }
 
   return (await res.json()) as T
@@ -211,7 +214,7 @@ export async function fetchWithAuth(
       await ensureRefresh()
     } catch {
       await clearSessionState(sessionLogout)
-      throw new Error('Unauthorized')
+      throw new Error(t('apiErrors.unauthorized'))
     }
   }
 
@@ -223,7 +226,7 @@ export async function fetchWithAuth(
       res = await doFetch()
     } catch {
       await clearSessionState(sessionLogout)
-      throw new Error('Unauthorized')
+      throw new Error(t('apiErrors.unauthorized'))
     }
   }
 
@@ -233,7 +236,7 @@ export async function fetchWithAuth(
     try {
       errorBody = errorText ? JSON.parse(errorText) : null
     } catch {
-      throw new ApiError(errorText || 'Request failed', res.status)
+      throw new ApiError(errorText || t('apiErrors.requestFailed'), res.status)
     }
 
     if (
@@ -264,7 +267,7 @@ export async function fetchWithAuth(
       throw new ApiError((errorBody as { message: string }).message, res.status)
     }
 
-    throw new ApiError('Request failed', res.status)
+    throw new ApiError(t('apiErrors.requestFailed'), res.status)
   }
 
   try {
@@ -334,7 +337,7 @@ async function refreshAccessToken() {
     })
 
     if (!res.ok) {
-      throw new ApiError('Refresh failed', res.status)
+      throw new ApiError(t('apiErrors.refreshFailed'), res.status)
     }
 
     const data: AuthResponse = await res.json()
@@ -342,7 +345,7 @@ async function refreshAccessToken() {
     store.setUser(data.user)
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('Refresh timed out')
+      throw new Error(t('apiErrors.refreshTimedOut'))
     }
 
     throw error
