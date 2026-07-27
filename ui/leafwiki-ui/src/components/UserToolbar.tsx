@@ -162,13 +162,13 @@ export default function UserToolbar() {
               className="cursor-pointer"
               onClick={() => navigate('/settings/branding')}
             >
-              Branding Settings
+              {t('userMenu.brandingSettings')}
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => navigate('/settings/importer')}
             >
-              Import
+              {t('userMenu.import')}
             </DropdownMenuItem>
             {apiKeysEnabled && (
               <DropdownMenuItem
@@ -198,12 +198,12 @@ export default function UserToolbar() {
               className="cursor-pointer"
               onClick={() => navigate('/settings/maintenance')}
             >
-              Maintenance
+              {t('userMenu.maintenance')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </RoleGuard>
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-            Version {__APP_VERSION__}
+            {t('userMenu.version', { version: __APP_VERSION__ })}
           </DropdownMenuLabel>
           <RoleGuard roles={['admin', 'editor']}>
             <DropdownMenuSeparator />
@@ -249,7 +249,7 @@ export default function UserToolbar() {
               onClick={handleLogout}
               data-testid="user-toolbar-logout"
             >
-              Logout
+              {t('userMenu.logout')}
             </DropdownMenuItem>
           )}
           <RoleGuard roles={['admin']}>
@@ -264,7 +264,7 @@ export default function UserToolbar() {
                 rel="noopener noreferrer"
               >
                 <Heart className="size-3.5 shrink-0" />
-                <span>Support LeafWiki</span>
+                <span>{t('userMenu.supportLeafWiki')}</span>
               </a>
             </DropdownMenuItem>
           </RoleGuard>

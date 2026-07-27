@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 
 type TagInputVariant = 'browse' | 'metadata'
 
@@ -91,6 +92,7 @@ function TagInputWithSuggestions({
   onArrowUp,
   onSubmitWithoutSuggestion,
 }: TagInputWithSuggestionsProps) {
+  const { t } = useTranslation('editor')
   const classes = variantClasses(variant)
   const allowCustomTags = allowsCustomTagCreation(variant)
   const useSelectedTagSuggestions = usesSelectedTagSuggestions(variant)
@@ -333,10 +335,12 @@ function TagInputWithSuggestions({
             }}
           >
             {loading ? (
-              <p className={classes.suggestionsEmpty}>Loading…</p>
+              <p className={classes.suggestionsEmpty}>
+                {t('tagInput.loading')}
+              </p>
             ) : showNoSuggestions ? (
               <p className={classes.suggestionsEmpty}>
-                No matching tags found.
+                {t('tagInput.noMatchingTags')}
               </p>
             ) : (
               suggestedTags.map(({ tag }, index) => (
@@ -382,7 +386,7 @@ function TagInputWithSuggestions({
               type="button"
               className={classes.chipRemove}
               onClick={() => removeTag(tag)}
-              aria-label={`Remove tag ${tag}`}
+              aria-label={t('tagInput.removeTagAriaLabel', { tag })}
             >
               <X size={12} />
             </button>

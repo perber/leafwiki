@@ -1,5 +1,13 @@
 {
   "pageTitle": "Branding Settings",
+  "storeErrors": {
+    "loadFallback": "Failed to load branding",
+    "updateFallback": "Failed to update branding",
+    "uploadLogoFallback": "Failed to upload logo",
+    "uploadFaviconFallback": "Failed to upload favicon",
+    "deleteLogoFallback": "Failed to delete logo",
+    "deleteFaviconFallback": "Failed to delete favicon"
+  },
   "siteName": {
     "title": "Site Name",
     "description": "The name displayed in the header, page titles, and login screen.",

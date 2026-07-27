@@ -4,6 +4,7 @@ import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type Page404Props = {
   targetPath?: string
@@ -14,6 +15,7 @@ export default function Page404({
   targetPath,
   allowCreate = false,
 }: Page404Props) {
+  const { t } = useTranslation('common')
   const readOnlyMode = useIsReadOnly()
   const openDialog = useDialogsStore((s) => s.openDialog)
   const [lookupState, setLookupState] = useState<{
@@ -65,15 +67,11 @@ export default function Page404({
   return (
     <div className="page404-shell">
       <div className="page404" data-testid="page404">
-        <h1 className="page404__title">Page Not Found</h1>
-        <p className="page404__text">
-          The page you are looking for does not exist.
-        </p>
+        <h1 className="page404__title">{t('page404.heading')}</h1>
+        <p className="page404__text">{t('page404.body')}</p>
         {showCreate && (
           <>
-            <p className="page404__text">
-              Create the page by clicking the button below.
-            </p>
+            <p className="page404__text">{t('page404.createPrompt')}</p>
             <Button
               className="mt-4"
               data-testid="page404-create-page-button"
@@ -86,7 +84,7 @@ export default function Page404({
               }
               variant={'outline'}
             >
-              Create Page
+              {t('page404.createButton')}
             </Button>
           </>
         )}

@@ -270,7 +270,7 @@ export default function TreeNodeActionsMenu({
         <TreeViewActionButton
           actionName="open-more-actions"
           icon={<MoreVertical size={18} className="tree-node__action-icon" />}
-          tooltip="Open more actions"
+          tooltip={t('toolbar.moreActions')}
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent>

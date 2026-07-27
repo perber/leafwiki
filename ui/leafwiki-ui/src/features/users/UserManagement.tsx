@@ -13,14 +13,14 @@ export default function UserManagement() {
   const { t } = useTranslation('users')
   const { users, loadUsers, reset } = useUserStore()
   const [loading, setLoading] = useState(true)
-  useSetTitle({ title: 'User Management' })
+  useSetTitle({ title: t('pageTitle') })
   useToolbarActions()
 
   useEffect(() => {
     loadUsers()
       .catch((err) => {
         console.warn(err)
-        const mapped = mapApiError(err, 'Error loading users')
+        const mapped = mapApiError(err, t('loadErrorFallback'))
         toast.error(mapped.message)
       })
       .finally(() => {
@@ -30,12 +30,12 @@ export default function UserManagement() {
     return () => {
       reset()
     }
-  }, [loadUsers, reset])
+  }, [loadUsers, reset, t])
 
   return (
     <>
       <div className="settings">
-        <h1 className="settings__title">User Management</h1>
+        <h1 className="settings__title">{t('pageTitle')}</h1>
 
         <div className="settings__header-actions">
           <CreateEditUserButton />
@@ -46,13 +46,21 @@ export default function UserManagement() {
             <table className="settings__table">
               <thead className="settings__table-head">
                 <tr>
-                  <th className="settings__table-header-cell">Username</th>
-                  <th className="settings__table-header-cell">Email</th>
-                  <th className="settings__table-header-cell">Role</th>
+                  <th className="settings__table-header-cell">
+                    {t('columns.username')}
+                  </th>
+                  <th className="settings__table-header-cell">
+                    {t('columns.email')}
+                  </th>
+                  <th className="settings__table-header-cell">
+                    {t('columns.role')}
+                  </th>
                   <th className="settings__table-header-cell">
                     {t('totp.column')}
                   </th>
-                  <th className="settings__table-header-cell">Actions</th>
+                  <th className="settings__table-header-cell">
+                    {t('columns.actions')}
+                  </th>
                 </tr>
               </thead>
               <tbody>

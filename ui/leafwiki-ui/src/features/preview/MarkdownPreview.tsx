@@ -1,4 +1,5 @@
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
+import i18next from '@/lib/i18n'
 import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
 import { withBasePath } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
@@ -194,7 +195,7 @@ class MarkdownPreviewErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border p-4 text-sm">
-          This page contains Markdown that could not be rendered safely.
+          {i18next.t('markdownPreview.renderError', { ns: 'viewer' })}
         </div>
       )
     }

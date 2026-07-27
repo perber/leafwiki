@@ -1,6 +1,9 @@
 import * as brandingAPI from '@/lib/api/branding'
+import i18next from '@/lib/i18n'
 import { withBasePath } from '@/lib/routePath'
 import { create } from 'zustand'
+
+const t = (key: string) => i18next.t(key, { ns: 'branding' })
 
 type BrandingStore = {
   siteName: string
@@ -59,7 +62,8 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to load branding',
+        error:
+          err instanceof Error ? err.message : t('storeErrors.loadFallback'),
         isLoading: false,
       })
     }
@@ -78,7 +82,8 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to update branding',
+        error:
+          err instanceof Error ? err.message : t('storeErrors.updateFallback'),
         isLoading: false,
       })
       throw err
@@ -96,7 +101,10 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to upload logo',
+        error:
+          err instanceof Error
+            ? err.message
+            : t('storeErrors.uploadLogoFallback'),
       })
       throw err
     } finally {
@@ -116,7 +124,10 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to upload favicon',
+        error:
+          err instanceof Error
+            ? err.message
+            : t('storeErrors.uploadFaviconFallback'),
       })
       throw err
     } finally {
@@ -135,7 +146,10 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to delete logo',
+        error:
+          err instanceof Error
+            ? err.message
+            : t('storeErrors.deleteLogoFallback'),
       })
       throw err
     } finally {
@@ -155,7 +169,10 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
       })
     } catch (err) {
       set({
-        error: err instanceof Error ? err.message : 'Failed to delete favicon',
+        error:
+          err instanceof Error
+            ? err.message
+            : t('storeErrors.deleteFaviconFallback'),
       })
       throw err
     } finally {

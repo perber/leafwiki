@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import i18next from '@/lib/i18n'
 
 type MermaidDefault = (typeof import('mermaid'))['default']
 
@@ -137,7 +138,8 @@ export function useMermaidInjector({
         const newSvg = template.content.querySelector(
           'svg',
         ) as SVGSVGElement | null
-        if (!newSvg) throw new Error('No SVG element in Mermaid output')
+        if (!newSvg)
+          throw new Error(i18next.t('mermaid.noSvgOutput', { ns: 'viewer' }))
         newSvg.setAttribute('width', '100%')
         newSvg.removeAttribute('height')
         newSvg.setAttribute('preserveAspectRatio', 'xMinYMin meet')

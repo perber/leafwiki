@@ -1,4 +1,5 @@
 import { fetchLinkStatus, type LinkStatusResult } from '@/lib/api/links'
+import i18next from '@/lib/i18n'
 import { create } from 'zustand'
 
 type LinkStatusStore = {
@@ -18,7 +19,11 @@ export const useLinkStatusStore = create<LinkStatusStore>((set) => ({
 
   fetchLinkStatusForPage: async (pageId: string) => {
     if (!pageId) {
-      set({ status: null, loading: false, error: 'Page ID is required' })
+      set({
+        status: null,
+        loading: false,
+        error: i18next.t('backlinks.pageIdRequired', { ns: 'viewer' }),
+      })
       return
     }
     set({ loading: true, error: null })
@@ -27,7 +32,9 @@ export const useLinkStatusStore = create<LinkStatusStore>((set) => ({
       set({ status: data, loading: false })
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : 'Failed to fetch link status'
+        err instanceof Error
+          ? err.message
+          : i18next.t('backlinks.fetchFailedFallback', { ns: 'viewer' })
       set({ error: msg, loading: false })
     }
   },

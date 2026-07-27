@@ -5,6 +5,7 @@ import enAssets from '../locales/en/assets.json'
 import enAuth from '../locales/en/auth.json'
 import enBackup from '../locales/en/backup.json'
 import enBranding from '../locales/en/branding.json'
+import enCommon from '../locales/en/common.json'
 import enEditor from '../locales/en/editor.json'
 import enErrors from '../locales/en/errors.json'
 import enHistory from '../locales/en/history.json'
@@ -27,6 +28,7 @@ i18next.use(initReactI18next).init({
       auth: enAuth,
       backup: enBackup,
       branding: enBranding,
+      common: enCommon,
       errors: enErrors,
       editor: enEditor,
       history: enHistory,

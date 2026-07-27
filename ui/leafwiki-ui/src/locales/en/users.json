@@ -1,6 +1,14 @@
 {
+  "pageTitle": "User Management",
   "loading": "Loading users...",
+  "loadErrorFallback": "Error loading users",
   "noUsersFound": "No users found.",
+  "columns": {
+    "username": "Username",
+    "email": "Email",
+    "role": "Role",
+    "actions": "Actions"
+  },
   "validation": {
     "passwordTooShort": "Password must be at least 8 characters long",
     "passwordsDoNotMatch": "Passwords do not match"

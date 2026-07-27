@@ -11,6 +11,7 @@
     "error": "Filesystem sync failed",
     "alreadyRunning": "Sync already in progress"
   },
+  "syncJobLostFallback": "Sync job lost — server may have restarted",
   "progress": {
     "label": "Current Phase",
     "tree": "Rebuilding page tree",

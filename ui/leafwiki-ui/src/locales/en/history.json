@@ -3,6 +3,12 @@
     "unknown": "Unknown",
     "unknownTime": "Unknown time"
   },
+  "errors": {
+    "loadListFallback": "Failed to load page history",
+    "loadPreviewFallback": "Failed to load revision preview",
+    "compareFallback": "Failed to compare revisions",
+    "loadMoreFallback": "Failed to load more revisions"
+  },
   "trigger": {
     "contentUpdate": "Saved after content update",
     "assetUpdate": "Saved after asset update",

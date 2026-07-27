@@ -1,4 +1,5 @@
 import { memo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMermaidInjector } from './useMermaidInjector'
 
 export default memo(function MermaidBlock({
@@ -10,6 +11,7 @@ export default memo(function MermaidBlock({
   dataLine?: string
   theme: 'default' | 'dark'
 }) {
+  const { t } = useTranslation('viewer')
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -28,7 +30,7 @@ export default memo(function MermaidBlock({
         className="border-destructive/40 bg-destructive/5 my-4 max-w-full rounded-md border p-4 whitespace-normal"
       >
         <p className="text-destructive text-sm font-medium">
-          Unable to render Mermaid diagram.
+          {t('mermaid.renderError')}
         </p>
         <p className="text-muted-foreground mt-2 pr-12 text-sm break-words">
           {errorMessage}
