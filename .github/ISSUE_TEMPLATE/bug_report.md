@@ -21,8 +21,13 @@ assignees: ''
 
 * [ ] Desktop Web
 * [ ] Mobile Web
-* [ ] iOS
-* [ ] Android
+
+### Running on
+* [ ] Docker
+* [ ] linux amd64
+* [ ] windows amd64
+* [ ] linux arm64
+* [ ] MacOS
 
 ### Steps to reproduce
 
