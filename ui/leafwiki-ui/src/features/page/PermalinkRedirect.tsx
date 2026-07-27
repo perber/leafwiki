@@ -3,9 +3,11 @@ import { getPermalinkTarget } from '@/lib/api/pages'
 import { isPageNotFoundError } from '@/lib/api/errors'
 import { useProgressbarStore } from '@/features/progressbar/progressbarStore'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router'
 
 export default function PermalinkRedirect() {
+  const { t } = useTranslation('page')
   const location = useLocation()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
@@ -47,7 +49,7 @@ export default function PermalinkRedirect() {
           return
         }
 
-        setError('An unknown error occurred')
+        setError(t('common.unknownError'))
       } finally {
         if (active) {
           setLoading(false)
@@ -61,14 +63,16 @@ export default function PermalinkRedirect() {
       active = false
       setLoading(false)
     }
-  }, [id, location.state, navigate, setLoading])
+  }, [id, location.state, navigate, setLoading, t])
 
   if (notFound) {
     return <Page404 />
   }
 
   if (error) {
-    return <p className="page-viewer__error">Error: {error}</p>
+    return (
+      <p className="page-viewer__error">{t('common.errorPrefix', { error })}</p>
+    )
   }
 
   return null

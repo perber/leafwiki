@@ -1,0 +1,33 @@
+{
+  "manager": {
+    "title": "Assets",
+    "fileTooLarge": "File too large. Max {{maxSize}} allowed.",
+    "uploadErrorFallback": "Asset upload failed",
+    "dropzoneText": "Drop files here or click to upload",
+    "maxFileSize": "Max file size: {{maxSize}}",
+    "uploading_one": "Uploading {{count}} file…",
+    "uploading_other": "Uploading {{count}} files…",
+    "loading": "Loading assets…",
+    "empty": "No assets yet",
+    "tip": "Tip: Double-click inserts the default markup. Images can also be added as links, and audio/video have a player insert button."
+  },
+  "item": {
+    "renameSuccess": "Asset renamed",
+    "renameErrorFallback": "Rename failed",
+    "deleteSuccess": "Asset deleted",
+    "deleteErrorFallback": "Delete failed",
+    "save": "Save",
+    "cancel": "Cancel",
+    "insertImageLink": "Insert image link",
+    "insertAudioPlayer": "Insert audio player",
+    "insertVideoPlayer": "Insert video player",
+    "insertImage": "Insert image",
+    "insertLink": "Insert link",
+    "rename": "Rename",
+    "delete": "Delete"
+  },
+  "dialog": {
+    "title": "Asset Manager",
+    "description": "Upload or select an asset to insert into the page."
+  }
+}

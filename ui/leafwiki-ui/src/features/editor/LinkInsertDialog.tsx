@@ -16,6 +16,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useTreeStore } from '@/stores/tree'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { MarkdownEditorRef } from './MarkdownEditor'
 
 const EXTERNAL_PREFIXES = ['http', 'https', 'mailto']
@@ -37,6 +38,7 @@ export function LinkInsertDialog({
   editorRef,
   selectedText,
 }: LinkInsertDialogProps) {
+  const { t } = useTranslation('editor')
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const open = useDialogsStore((s) => s.dialogType === DIALOG_LINK_INSERT)
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
@@ -121,7 +123,7 @@ export function LinkInsertDialog({
               ref={textInputRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Link text"
+              placeholder={t('linkInsertDialog.textPlaceholder')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleConfirm()
               }}
@@ -135,7 +137,7 @@ export function LinkInsertDialog({
                 ref={urlInputRef}
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https:// or search pages…"
+                placeholder={t('linkInsertDialog.urlPlaceholder')}
                 onFocus={() => setUrlFocused(true)}
                 onBlur={() => setTimeout(() => setUrlFocused(false), 150)}
                 onKeyDown={(e) => {

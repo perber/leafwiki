@@ -4,6 +4,9 @@
     "resizeSidebar": "Resize sidebar",
     "closeSidebar": "Close sidebar"
   },
+  "breadcrumbs": {
+    "navAriaLabel": "Breadcrumb"
+  },
   "section": {
     "overviewTitle": "Overview of '{{title}}'",
     "overviewDescriptionBase": "This page is the default overview of the section and lists its pages and sections.",
@@ -20,6 +23,7 @@
     "brokenLinkTooltip": "This page doesn't exist yet."
   },
   "backlinks": {
+    "errorPrefix": "Error: {{error}}",
     "referencedBy": "Referenced by",
     "loading": "Loading…",
     "noReferences": "No pages reference this page.",
@@ -37,7 +41,8 @@
     "unpinSuccess": "Page unpinned",
     "pinError": "Failed to update pin status",
     "togglePinnedSection": "Toggle pinned pages section",
-    "togglePagesSection": "Toggle pages section"
+    "togglePagesSection": "Toggle pages section",
+    "unpinPageAriaLabel": "Unpin page"
   },
   "favorites": {
     "sectionTitle": "Favorites",
@@ -53,6 +58,58 @@
     "onThisPage": "On this page",
     "collapse": "Collapse table of contents",
     "expand": "Expand table of contents"
+  },
+  "toolbar": {
+    "moreActions": "More actions"
+  },
+  "treeActions": {
+    "convertedToast": "Page converted successfully",
+    "conflictRetryMessage": "This page was modified by another user. Please try again.",
+    "convertErrorFallback": "Failed to convert page",
+    "renameEditingWarning": "This {{item}} is currently being edited. Please use the editor title bar to rename it.",
+    "renamedToast": "{{item}} renamed successfully",
+    "renameErrorFallback": "Failed to rename page",
+    "deleteEditingWarning": "This {{item}} is currently being edited. Please close the editor before deleting it.",
+    "menuAddPage": "Add Page",
+    "menuAddSection": "Add Section",
+    "menuEdit": "Edit {{item}}",
+    "menuRename": "Rename {{item}}",
+    "menuCopyPage": "Copy Page",
+    "menuSortChildren": "Sort {{item}} Children",
+    "menuMove": "Move {{item}}",
+    "menuConvertToPage": "Convert to Page",
+    "menuDelete": "Delete {{item}}",
+    "emptySectionToast": "\"{{title}}\" is now an empty section",
+    "convertBackAction": "Convert back to page",
+    "convertedBackToast": "\"{{title}}\" is a page again",
+    "convertBackErrorFallback": "Failed to convert section back to page",
+    "reorderErrorFallback": "Failed to reorder pages",
+    "moveErrorFallback": "Failed to move page"
+  },
+  "codeBlock": {
+    "copyErrorToast": "Could not copy code",
+    "copiedToast": "Code copied",
+    "copyTooltip": "Copy code",
+    "copiedTooltip": "Copied",
+    "copyAriaLabel": "Copy code",
+    "copiedAriaLabel": "Code copied"
+  },
+  "designToggle": {
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode"
+  },
+  "imagePreview": {
+    "openInNewTab": "Open in new tab"
+  },
+  "pageSwitcher": {
+    "trigger": "Go to page",
+    "triggerWithHotkey": "Go to page ({{hotkey}})",
+    "dialogTitle": "Go to page",
+    "dialogDescription": "Search existing pages by title, path, or breadcrumb.",
+    "searchPlaceholder": "Type a page title…",
+    "searchAriaLabel": "Search pages",
+    "noMatch": "No matching page found.",
+    "matchingPagesAriaLabel": "Matching pages"
   },
   "shortcutsHelp": {
     "menuItem": "Keyboard Shortcuts",

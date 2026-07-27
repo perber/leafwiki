@@ -79,7 +79,10 @@ export function SlugInputWithSuggestion({
         onSlugChange(suggestion)
         onLastSlugTitleChange?.(debouncedTitle)
       } catch (err) {
-        const mapped = mapApiError(err, 'Error generating slug')
+        const mapped = mapApiError(
+          err,
+          i18next.t('slugInput.generateErrorFallback', { ns: 'editor' }),
+        )
         toast.error(mapped.message)
       } finally {
         onSlugLoadingChange?.(false)

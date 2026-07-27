@@ -4,6 +4,7 @@ import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_CHANGE_USER_PASSWORD } from '@/lib/registries'
 import { useUserStore } from '@/stores/users'
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
@@ -17,6 +18,7 @@ export function ChangePasswordDialog({
   userId,
   username,
 }: ChangePasswordDialogProps) {
+  const { t } = useTranslation('users')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -47,7 +49,7 @@ export function ChangePasswordDialog({
     if (val.length < 8) {
       setFieldErrors((prev) => ({
         ...prev,
-        password: 'Password must be at least 8 characters long',
+        password: t('validation.passwordTooShort'),
       }))
     } else {
       setFieldErrors((prev) => ({ ...prev, password: '' }))
@@ -57,7 +59,10 @@ export function ChangePasswordDialog({
   const handleConfirmChange = (val: string) => {
     setConfirm(val)
     if (val !== password) {
-      setFieldErrors((prev) => ({ ...prev, confirm: 'Passwords do not match' }))
+      setFieldErrors((prev) => ({
+        ...prev,
+        confirm: t('validation.passwordsDoNotMatch'),
+      }))
     } else {
       setFieldErrors((prev) => ({ ...prev, confirm: '' }))
     }
@@ -70,11 +75,15 @@ export function ChangePasswordDialog({
         ...user,
         password,
       })
-      toast.success('Password changed successfully')
+      toast.success(t('changePasswordDialog.successToast'))
       return true // Close the dialog
     } catch (err) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, 'Error updating password')
+      handleFieldErrors(
+        err,
+        setFieldErrors,
+        t('changePasswordDialog.errorFallback'),
+      )
       return false // Keep the dialog open
     } finally {
       setLoading(false)
@@ -84,22 +93,24 @@ export function ChangePasswordDialog({
   return (
     <BaseDialog
       dialogType={DIALOG_CHANGE_USER_PASSWORD}
-      dialogTitle={`Change Password for ${username}`}
-      dialogDescription="Set a new password for the user."
+      dialogTitle={t('changePasswordDialog.title', { username })}
+      dialogDescription={t('changePasswordDialog.description')}
       onClose={resetForm}
       onConfirm={async () => {
         return await handleChange()
       }}
       testidPrefix="change-user-password-dialog"
       cancelButton={{
-        label: 'Cancel',
+        label: t('changePasswordDialog.cancel'),
         variant: 'outline',
         disabled: loading,
         autoFocus: true,
       }}
       buttons={[
         {
-          label: loading ? 'Updating...' : 'Update Password',
+          label: loading
+            ? t('changePasswordDialog.updating')
+            : t('changePasswordDialog.update'),
           actionType: 'confirm',
           autoFocus: false,
           loading,
@@ -120,23 +131,23 @@ export function ChangePasswordDialog({
         />
         <FormInput
           autoFocus={true}
-          label="New Password"
+          label={t('changePasswordDialog.newPasswordLabel')}
           name="new-password"
           type="password"
           value={password}
           onChange={handlePasswordChange}
-          placeholder="New Password"
+          placeholder={t('changePasswordDialog.newPasswordLabel')}
           autoComplete="new-password"
           error={fieldErrors.password}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         <FormInput
-          label="Confirm Password"
+          label={t('changePasswordDialog.confirmPasswordLabel')}
           name="confirm-new-password"
           type="password"
           value={confirm}
           onChange={handleConfirmChange}
-          placeholder="Confirm Password"
+          placeholder={t('changePasswordDialog.confirmPasswordLabel')}
           autoComplete="new-password"
           error={fieldErrors.confirm}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}

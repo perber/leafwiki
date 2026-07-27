@@ -29,8 +29,14 @@ export function EditPageMetadataDialog({
   onChange,
 }: EditPageMetadataDialogProps) {
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
-  const itemLabel = itemKind === NODE_KIND_PAGE ? 'page' : 'section'
-  const itemLabelCapitalized = itemKind === NODE_KIND_PAGE ? 'Page' : 'Section'
+  const itemLabel =
+    itemKind === NODE_KIND_PAGE
+      ? i18next.t('common.page', { ns: 'page' })
+      : i18next.t('common.section', { ns: 'page' })
+  const itemLabelCapitalized =
+    itemKind === NODE_KIND_PAGE
+      ? i18next.t('common.pageCapitalized', { ns: 'page' })
+      : i18next.t('common.sectionCapitalized', { ns: 'page' })
 
   const [title, setTitle] = useState(propTitle)
   const [slug, setSlug] = useState(propSlug)
@@ -68,8 +74,14 @@ export function EditPageMetadataDialog({
   return (
     <BaseDialog
       dialogType={DIALOG_EDIT_PAGE_METADATA}
-      dialogTitle={`Edit ${itemLabel} metadata`}
-      dialogDescription={`Change metadata of the ${itemLabel}`}
+      dialogTitle={i18next.t('editPageMetadataDialog.dialogTitle', {
+        ns: 'editor',
+        item: itemLabel,
+      })}
+      dialogDescription={i18next.t('editPageMetadataDialog.dialogDescription', {
+        ns: 'editor',
+        item: itemLabel,
+      })}
       onClose={() => {
         resetForm()
         return true
@@ -110,7 +122,10 @@ export function EditPageMetadataDialog({
             })}
             value={title}
             onChange={handleTitleChange}
-            placeholder={`${itemLabelCapitalized} title`}
+            placeholder={i18next.t('editPageMetadataDialog.titlePlaceholder', {
+              ns: 'editor',
+              item: itemLabelCapitalized,
+            })}
             error={fieldErrors.title}
             testid="edit-page-metadata-dialog-title-input"
             allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}

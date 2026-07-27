@@ -10,6 +10,7 @@ import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useDialogsStore } from '@/stores/dialogs'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AssetManager } from './AssetManager'
 
 export type AssetManagerDialogProps = {
@@ -23,6 +24,7 @@ export type AssetManagerDialogProps = {
 }
 
 export function AssetManagerDialog(props: AssetManagerDialogProps) {
+  const { t } = useTranslation('assets')
   const { pageId, editorRef, onAssetVersionChange, isRenamingRef } = props
   const closeDialog = useDialogsStore((s) => s.closeDialog)
   const open = useDialogsStore((s) => s.dialogType === DIALOG_ASSET_MANAGER)
@@ -65,10 +67,8 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
         }}
       >
         <DialogHeader>
-          <DialogTitle>Asset Manager</DialogTitle>
-          <DialogDescription>
-            Upload or select an asset to insert into the page.
-          </DialogDescription>
+          <DialogTitle>{t('dialog.title')}</DialogTitle>
+          <DialogDescription>{t('dialog.description')}</DialogDescription>
         </DialogHeader>
         <AssetManager
           pageId={pageId}

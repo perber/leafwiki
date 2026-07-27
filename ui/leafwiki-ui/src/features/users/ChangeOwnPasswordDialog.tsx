@@ -5,11 +5,13 @@ import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
 import { useSessionStore } from '@/stores/session'
 import { useUserStore } from '@/stores/users'
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
 
 export function ChangeOwnPasswordDialog() {
+  const { t } = useTranslation('users')
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -39,7 +41,7 @@ export function ChangeOwnPasswordDialog() {
     if (val.length < 8) {
       setFieldErrors((prev) => ({
         ...prev,
-        newPassword: 'Password must be at least 8 characters long',
+        newPassword: t('validation.passwordTooShort'),
       }))
     } else {
       setFieldErrors((prev) => ({ ...prev, newPassword: '' }))
@@ -49,7 +51,10 @@ export function ChangeOwnPasswordDialog() {
   const handleConfirmChange = (val: string) => {
     setConfirm(val)
     if (val !== newPassword) {
-      setFieldErrors((prev) => ({ ...prev, confirm: 'Passwords do not match' }))
+      setFieldErrors((prev) => ({
+        ...prev,
+        confirm: t('validation.passwordsDoNotMatch'),
+      }))
     } else {
       setFieldErrors((prev) => ({ ...prev, confirm: '' }))
     }
@@ -59,14 +64,18 @@ export function ChangeOwnPasswordDialog() {
     setLoading(true)
     try {
       await changeOwnPassword(oldPassword, newPassword)
-      toast.success('Password changed successfully')
+      toast.success(t('changeOwnPassword.successToast'))
       return true
     } catch (err) {
       console.warn(err)
       setOldPassword('')
       setNewPassword('')
       setConfirm('')
-      handleFieldErrors(err, setFieldErrors, 'Error updating password')
+      handleFieldErrors(
+        err,
+        setFieldErrors,
+        t('changeOwnPassword.errorFallback'),
+      )
       return false
     } finally {
       setLoading(false)
@@ -76,18 +85,20 @@ export function ChangeOwnPasswordDialog() {
   return (
     <BaseDialog
       dialogType={DIALOG_CHANGE_OWN_PASSWORD}
-      dialogTitle="Change Own Password"
-      dialogDescription="Change your password. Make sure to remember it!"
+      dialogTitle={t('changeOwnPassword.title')}
+      dialogDescription={t('changeOwnPassword.description')}
       testidPrefix="change-own-password-dialog"
       cancelButton={{
-        label: 'Cancel',
+        label: t('changeOwnPassword.cancel'),
         variant: 'outline',
         disabled: loading,
         autoFocus: false,
       }}
       buttons={[
         {
-          label: loading ? 'Saving...' : 'Save',
+          label: loading
+            ? t('changeOwnPassword.saving')
+            : t('changeOwnPassword.save'),
           actionType: 'confirm',
           autoFocus: true,
           loading,
@@ -118,34 +129,34 @@ export function ChangeOwnPasswordDialog() {
         />
         <FormInput
           autoFocus={true}
-          label="Old Password"
+          label={t('changeOwnPassword.oldPasswordLabel')}
           name="current-password"
           type="password"
           value={oldPassword}
           onChange={handleOldPasswordChange}
-          placeholder="Old Password"
+          placeholder={t('changeOwnPassword.oldPasswordLabel')}
           autoComplete="current-password"
           error={fieldErrors.oldPassword}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         <FormInput
-          label="New Password"
+          label={t('changeOwnPassword.newPasswordLabel')}
           name="new-password"
           type="password"
           value={newPassword}
           onChange={handleNewPasswordChange}
-          placeholder="New Password"
+          placeholder={t('changeOwnPassword.newPasswordLabel')}
           autoComplete="new-password"
           error={fieldErrors.newPassword}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         <FormInput
-          label="Confirm Password"
+          label={t('changeOwnPassword.confirmPasswordLabel')}
           name="confirm-new-password"
           type="password"
           value={confirm}
           onChange={handleConfirmChange}
-          placeholder="Confirm Password"
+          placeholder={t('changeOwnPassword.confirmPasswordLabel')}
           autoComplete="new-password"
           error={fieldErrors.confirm}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}

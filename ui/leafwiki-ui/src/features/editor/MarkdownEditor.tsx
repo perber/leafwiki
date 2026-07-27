@@ -194,7 +194,9 @@ const MarkdownEditor = (
       for (const file of files) {
         if (file.size > maxAssetUploadSizeBytes) {
           toast.error(
-            `File too large. Max ${formatBytes(maxAssetUploadSizeBytes)} allowed.`,
+            t('markdownEditor.fileTooLarge', {
+              maxSize: formatBytes(maxAssetUploadSizeBytes),
+            }),
           )
           continue
         }
@@ -203,7 +205,9 @@ const MarkdownEditor = (
         try {
           const res: UploadAssetResponse = await uploadAsset(pageId, file)
 
-          toast.success(`Uploaded ${file.name}`)
+          toast.success(
+            t('markdownEditor.uploadedToast', { filename: file.name }),
+          )
 
           // The result of uploadAsset looks like this:
           // {"file":"/assets/0NmpvSivg/preview-scrollbar.gif"}
@@ -232,11 +236,16 @@ const MarkdownEditor = (
           editorViewRef.current?.focus()
         } catch (err) {
           console.error('Upload failed', err)
-          toast.error(mapApiError(err, `Failed to upload ${file.name}`).message)
+          toast.error(
+            mapApiError(
+              err,
+              t('markdownEditor.uploadErrorFallback', { filename: file.name }),
+            ).message,
+          )
         }
       }
     },
-    [editorViewRef, maxAssetUploadSizeBytes, onChange, pageId, setMarkdown],
+    [editorViewRef, maxAssetUploadSizeBytes, onChange, pageId, setMarkdown, t],
   )
 
   useEffect(() => {
@@ -787,7 +796,7 @@ const MarkdownEditor = (
                   onMouseDown={handleSplitResize}
                   role="separator"
                   aria-orientation={previewStacked ? 'horizontal' : 'vertical'}
-                  aria-label="Resize editor and preview panes"
+                  aria-label={t('markdownEditor.resizeAriaLabel')}
                   aria-valuemin={MIN_EDITOR_PANE_WIDTH}
                   aria-valuemax={MAX_EDITOR_PANE_WIDTH}
                   aria-valuenow={Math.round(editorPaneWidth)}

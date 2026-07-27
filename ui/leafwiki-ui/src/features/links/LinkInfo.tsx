@@ -46,7 +46,9 @@ export function BacklinkInfo() {
     <div className="backlinks__pane">
       <div className="backlinks__content">
         {error && !loading ? (
-          <p className="page-viewer__error">Error: {error}</p>
+          <p className="page-viewer__error">
+            {t('backlinks.errorPrefix', { error })}
+          </p>
         ) : null}
 
         <div className="backlinks__group">

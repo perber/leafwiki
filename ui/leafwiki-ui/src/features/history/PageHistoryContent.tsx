@@ -11,6 +11,7 @@ import {
   type RevisionSnapshot,
 } from '@/lib/api/revisions'
 import { formatRelativeTime } from '@/lib/formatDate'
+import i18next from '@/lib/i18n'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildHistoryUrl, withBasePath } from '@/lib/routePath'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -45,6 +46,9 @@ import {
   usePageHistoryStore,
 } from './pageHistory'
 
+const t = (key: string, opts?: Record<string, unknown>) =>
+  i18next.t(key, { ...opts, ns: 'history' })
+
 export type PageHistoryContentProps = {
   pageId: string
   pageTitle: string
@@ -78,10 +82,10 @@ type RevisionGroup = {
 }
 
 function groupLabel(value?: string) {
-  if (!value) return 'Unknown'
+  if (!value) return t('common.unknown')
 
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Unknown'
+  if (Number.isNaN(date.getTime())) return t('common.unknown')
 
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
@@ -107,7 +111,7 @@ function groupRevisions(revisions: Revision[]): RevisionGroup[] {
 }
 
 function revisionTitle(revision: Revision) {
-  if (!revision.createdAt) return 'Unknown time'
+  if (!revision.createdAt) return t('common.unknownTime')
 
   const date = new Date(revision.createdAt)
   if (Number.isNaN(date.getTime())) return revision.createdAt
@@ -118,7 +122,7 @@ function revisionTitle(revision: Revision) {
 }
 
 function revisionMeta(revision: Revision) {
-  return revision.author?.username || revision.authorId || 'Unknown'
+  return revision.author?.username || revision.authorId || t('common.unknown')
 }
 
 function getPathLeaf(path: string) {
@@ -143,35 +147,35 @@ type DiffSummary = {
 function revisionTriggerLabel(type: string) {
   switch (type) {
     case 'content_update':
-      return 'Saved after content update'
+      return t('trigger.contentUpdate')
     case 'asset_update':
-      return 'Saved after asset update'
+      return t('trigger.assetUpdate')
     case 'structure_update':
-      return 'Saved after structure update'
+      return t('trigger.structureUpdate')
     case 'restore':
-      return 'Saved after restore'
+      return t('trigger.restore')
     case 'delete':
-      return 'Saved before delete'
+      return t('trigger.delete')
     default:
-      return `Saved as ${type}`
+      return t('trigger.generic', { type })
   }
 }
 
 function assetChangeLabel(status: RevisionAssetChange['status']) {
   switch (status) {
     case 'added':
-      return 'Added'
+      return t('assetChange.added')
     case 'removed':
-      return 'Removed'
+      return t('assetChange.removed')
     case 'modified':
-      return 'Replaced'
+      return t('assetChange.replaced')
     default:
       return status
   }
 }
 
 function displayAuthor(revision: Revision) {
-  return revision.author?.username || revision.authorId || 'Unknown'
+  return revision.author?.username || revision.authorId || t('common.unknown')
 }
 
 function formatTimestamp(value?: string) {
@@ -381,7 +385,7 @@ function DiffView({ comparison }: { comparison: RevisionComparison }) {
   if (!comparison.contentChanged) {
     return (
       <div className="page-history__empty-message">
-        No text difference between this revision and the active version.
+        {t('diff.noTextDifference')}
       </div>
     )
   }
@@ -428,22 +432,24 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
   return (
     <div className="page-history__detail-stack">
       <section className="page-history__summary">
-        <div className="page-history__section-heading">Change Summary</div>
+        <div className="page-history__section-heading">
+          {t('changes.summaryHeading')}
+        </div>
         <div className="page-history__summary-grid">
           <SummaryStat
-            label="Lines added since"
+            label={t('changes.linesAdded')}
             value={String(diff.summary.addedLines)}
             emphasized={diff.summary.addedLines > 0}
             tone="added"
           />
           <SummaryStat
-            label="Lines removed since"
+            label={t('changes.linesRemoved')}
             value={String(diff.summary.removedLines)}
             emphasized={diff.summary.removedLines > 0}
             tone="removed"
           />
           <SummaryStat
-            label="Assets changed"
+            label={t('changes.assetsChanged')}
             value={String(comparison.assetChanges.length)}
             emphasized={comparison.assetChanges.length > 0}
           />
@@ -452,9 +458,9 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
 
       <section className="page-history__section">
         <div className="page-history__section-heading">
-          Diff{' '}
+          {t('changes.diffHeading')}{' '}
           <span className="page-history__section-heading-note">
-            compared to the active version
+            {t('changes.diffNote')}
           </span>
         </div>
         <DiffView comparison={comparison} />
@@ -463,7 +469,9 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
       {comparison.assetChanges.length > 0 ? (
         <details className="page-history__asset-details">
           <summary className="page-history__asset-summary">
-            Assets ({comparison.assetChanges.length})
+            {t('changes.assetsDetails', {
+              count: comparison.assetChanges.length,
+            })}
           </summary>
           <div className="page-history__asset-list">
             {comparison.assetChanges.map((change) => (
@@ -480,13 +488,19 @@ function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
           </div>
           <div className="page-history__asset-summary-row">
             {assetSummary.added > 0 ? (
-              <span>{assetSummary.added} added</span>
+              <span>
+                {t('changes.assetAdded', { count: assetSummary.added })}
+              </span>
             ) : null}
             {assetSummary.modified > 0 ? (
-              <span>{assetSummary.modified} replaced</span>
+              <span>
+                {t('changes.assetReplaced', { count: assetSummary.modified })}
+              </span>
             ) : null}
             {assetSummary.removed > 0 ? (
-              <span>{assetSummary.removed} removed</span>
+              <span>
+                {t('changes.assetRemoved', { count: assetSummary.removed })}
+              </span>
             ) : null}
           </div>
         </details>
@@ -535,10 +549,12 @@ function RawTextPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
   return (
     <div className="page-history__detail-stack">
       <section className="page-history__section">
-        <div className="page-history__section-heading">Raw Text</div>
+        <div className="page-history__section-heading">
+          {t('rawText.heading')}
+        </div>
         <div className="custom-scrollbar markdown-code-block page-history__raw-text-block">
           <pre className="custom-scrollbar page-history__snapshot-content">
-            <code>{snapshot.content || '(empty)'}</code>
+            <code>{snapshot.content || t('rawText.empty')}</code>
           </pre>
         </div>
       </section>
@@ -580,7 +596,7 @@ function HistoryAssetItem({
         <div className="page-history__asset-copy">
           <span className="asset-item__filename">{baseName}</span>
           <span className="page-history__asset-copy-meta">
-            {asset.mimeType || 'application/octet-stream'} ·{' '}
+            {asset.mimeType || t('assetsPanel.octetStream')} ·{' '}
             {Intl.NumberFormat().format(asset.sizeBytes)} bytes
           </span>
         </div>
@@ -596,7 +612,7 @@ function HistoryAssetItem({
           href={assetUrl}
           target="_blank"
           rel="noreferrer"
-          title="Open asset"
+          title={t('assetsPanel.openAsset')}
           data-testid={`history-asset-open-${baseName}`}
         >
           <ExternalLink size={16} />
@@ -611,7 +627,7 @@ function HistoryAssetItem({
         <a
           href={assetUrl}
           download={baseName}
-          title="Download asset"
+          title={t('assetsPanel.downloadAsset')}
           data-testid={`history-asset-download-${baseName}`}
         >
           <Download size={16} />
@@ -625,10 +641,12 @@ function AssetsPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
   return (
     <div className="page-history__detail-stack">
       <section className="page-history__section">
-        <div className="page-history__section-heading">Assets</div>
+        <div className="page-history__section-heading">
+          {t('assetsPanel.heading')}
+        </div>
         {snapshot.assets.length === 0 ? (
           <div className="page-history__empty-message">
-            No assets were stored with this revision.
+            {t('assetsPanel.empty')}
           </div>
         ) : (
           <ul className="page-history__asset-list">
@@ -698,19 +716,21 @@ export function PageHistoryContent({
     if (!selectedRevision) return []
 
     const result = [
-      `Revision slug: ${selectedRevision.slug || '/'}`,
+      t('chips.revisionSlug', { slug: selectedRevision.slug || '/' }),
       getPathLeaf(selectedRevision.path),
       revisionTriggerLabel(selectedRevision.type),
     ]
 
     if (pageSlug && pageSlug !== selectedRevision.slug) {
-      result.unshift(`Current slug: ${pageSlug}`)
+      result.unshift(t('chips.currentSlug', { slug: pageSlug }))
     }
 
     if (comparison) {
-      result.push(`${comparison.assetChanges.length} asset changes`)
+      result.push(
+        t('chips.assetChangesCount', { count: comparison.assetChanges.length }),
+      )
     } else if (snapshot) {
-      result.push(`${snapshot.assets.length} Assets`)
+      result.push(t('chips.assetsCount', { count: snapshot.assets.length }))
     }
 
     return result
@@ -723,17 +743,17 @@ export function PageHistoryContent({
 
     if (comparison.base.revision?.title !== comparison.target.revision?.title) {
       changes.push({
-        label: 'Title',
-        from: comparison.base.revision?.title || '(empty)',
-        to: comparison.target.revision?.title || '(empty)',
+        label: t('header.titleLabel'),
+        from: comparison.base.revision?.title || t('header.emptyValue'),
+        to: comparison.target.revision?.title || t('header.emptyValue'),
       })
     }
 
     if (comparison.base.revision?.slug !== comparison.target.revision?.slug) {
       changes.push({
-        label: 'Slug',
-        from: comparison.base.revision?.slug || '(empty)',
-        to: comparison.target.revision?.slug || '(empty)',
+        label: t('header.slugLabel'),
+        from: comparison.base.revision?.slug || t('header.emptyValue'),
+        to: comparison.target.revision?.slug || t('header.emptyValue'),
       })
     }
 
@@ -743,10 +763,10 @@ export function PageHistoryContent({
   // Preview is first and the default active tab so users immediately see the
   // rendered content of the selected revision without an extra click.
   const tabs: { id: HistoryTab; label: string }[] = [
-    { id: 'preview', label: 'Preview' },
-    { id: 'changes', label: 'Changes' },
-    { id: 'raw', label: 'Raw Text' },
-    { id: 'assets', label: 'Assets' },
+    { id: 'preview', label: t('tabs.preview') },
+    { id: 'changes', label: t('tabs.changes') },
+    { id: 'raw', label: t('tabs.raw') },
+    { id: 'assets', label: t('tabs.assets') },
   ]
 
   const detailLoading =
@@ -832,9 +852,9 @@ export function PageHistoryContent({
         replace: true,
         state: createNavigationVisitState(),
       })
-      toast.success('Revision restored')
+      toast.success(t('toasts.restoreSuccess'))
     } catch (err) {
-      const mapped = mapApiError(err, 'Failed to restore revision')
+      const mapped = mapApiError(err, t('toasts.restoreErrorFallback'))
       toast.error(mapped.message)
     } finally {
       setRestoreLoading(false)
@@ -877,7 +897,9 @@ export function PageHistoryContent({
   const renderDetailContent = () => {
     if (listLoading) {
       return (
-        <div className="page-history__loading-state">Loading history...</div>
+        <div className="page-history__loading-state">
+          {t('detail.loadingHistory')}
+        </div>
       )
     }
 
@@ -888,8 +910,8 @@ export function PageHistoryContent({
     if (!selectedRevision) {
       return (
         <EmptyState
-          title="No revision selected"
-          message="Select a revision from the list to view details."
+          title={t('detail.noRevisionSelectedTitle')}
+          message={t('detail.noRevisionSelectedMessage')}
         />
       )
     }
@@ -898,8 +920,8 @@ export function PageHistoryContent({
       return (
         <div className="page-history__loading-state">
           {activeTab === 'changes' || activeTab === 'assets'
-            ? 'Loading diff...'
-            : 'Loading preview...'}
+            ? t('detail.loadingDiff')
+            : t('detail.loadingPreview')}
         </div>
       )
     }
@@ -913,7 +935,7 @@ export function PageHistoryContent({
         <PreviewPanel snapshot={snapshot} />
       ) : (
         <div className="page-history__empty-message page-history__empty-message--padded">
-          No preview available.
+          {t('detail.noPreview')}
         </div>
       )
     }
@@ -922,7 +944,7 @@ export function PageHistoryContent({
       if (isSelectedRevisionLatest) {
         return (
           <div className="page-history__empty-message page-history__empty-message--padded">
-            No differences from the current version.
+            {t('detail.noChangesFromCurrent')}
           </div>
         )
       }
@@ -931,7 +953,7 @@ export function PageHistoryContent({
         <ChangesPanel comparison={comparison} />
       ) : (
         <div className="page-history__empty-message page-history__empty-message--padded">
-          No comparison data available.
+          {t('detail.noComparisonData')}
         </div>
       )
     }
@@ -941,7 +963,7 @@ export function PageHistoryContent({
         <RawTextPanel snapshot={snapshot} />
       ) : (
         <div className="page-history__empty-message page-history__empty-message--padded">
-          No raw text available.
+          {t('detail.noRawText')}
         </div>
       )
     }
@@ -950,7 +972,7 @@ export function PageHistoryContent({
       <AssetsPanel snapshot={snapshot} />
     ) : (
       <div className="page-history__empty-message page-history__empty-message--padded">
-        No asset data available.
+        {t('detail.noAssetData')}
       </div>
     )
   }
@@ -960,7 +982,7 @@ export function PageHistoryContent({
       return (
         <div className="page-history__list-status">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading history...
+          {t('list.loading')}
         </div>
       )
     }
@@ -977,8 +999,8 @@ export function PageHistoryContent({
       return (
         <div className="page-history__list-status">
           {latestRevisionId
-            ? 'No previous revisions yet. Older versions will appear here after more changes.'
-            : 'No revisions yet. They will appear here after the page changes.'}
+            ? t('list.emptyWithLatest')
+            : t('list.emptyNoLatest')}
         </div>
       )
     }
@@ -1012,7 +1034,7 @@ export function PageHistoryContent({
                       <RevisionBadge
                         testId={`history-sidebar-revision-current-badge-${revision.id}`}
                       >
-                        Active version
+                        {t('list.activeVersionBadge')}
                       </RevisionBadge>
                     ) : null}
                   </div>
@@ -1033,7 +1055,7 @@ export function PageHistoryContent({
               onClick={() => void loadMorePageHistory()}
               disabled={loadingMore}
             >
-              {loadingMore ? 'Loading...' : 'Load more'}
+              {loadingMore ? t('list.loadMoreLoading') : t('list.loadMore')}
             </Button>
           </div>
         ) : null}
@@ -1047,8 +1069,16 @@ export function PageHistoryContent({
         <div className="markdown-editor__tabs" role="tablist">
           {(
             [
-              { id: 'list', label: 'Revisions', icon: <History size={16} /> },
-              { id: 'detail', label: 'Details', icon: <FileText size={16} /> },
+              {
+                id: 'list',
+                label: t('tabs.mobileRevisions'),
+                icon: <History size={16} />,
+              },
+              {
+                id: 'detail',
+                label: t('tabs.mobileDetails'),
+                icon: <FileText size={16} />,
+              },
             ] as const
           ).map((tab) => {
             const active =
@@ -1084,7 +1114,7 @@ export function PageHistoryContent({
               <div className="page-history__list-header">
                 <div className="page-history__list-title">
                   <History className="h-4 w-4" />
-                  Revision History
+                  {t('list.title')}
                 </div>
               </div>
               <div className="page-history__list-scroll custom-scrollbar">
@@ -1102,7 +1132,7 @@ export function PageHistoryContent({
                 }}
                 role="separator"
                 aria-orientation="vertical"
-                aria-label="Resize revision list"
+                aria-label={t('list.resizeAriaLabel')}
                 data-testid={`${testidPrefix}-list-resize-handle`}
               >
                 <div
@@ -1132,9 +1162,12 @@ export function PageHistoryContent({
               </div>
               {selectedRevision ? (
                 <div className="page-history__header-subtitle">
-                  Revision by {displayAuthor(selectedRevision)} ·{' '}
-                  {formatRelativeTime(selectedRevision.createdAt) ||
-                    formatTimestamp(selectedRevision.createdAt)}
+                  {t('header.revisionBy', {
+                    author: displayAuthor(selectedRevision),
+                    time:
+                      formatRelativeTime(selectedRevision.createdAt) ||
+                      formatTimestamp(selectedRevision.createdAt),
+                  })}
                 </div>
               ) : null}
               {selectedRevision ? (
@@ -1173,10 +1206,10 @@ export function PageHistoryContent({
                 data-testid={`${testidPrefix}-restore`}
               >
                 {restoreLoading
-                  ? 'Restoring...'
+                  ? t('header.restoreLoading')
                   : isSelectedRevisionLatest
-                    ? 'Current version'
-                    : 'Restore'}
+                    ? t('header.currentVersion')
+                    : t('header.restore')}
               </Button>
             </div>
           </div>
