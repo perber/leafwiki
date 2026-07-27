@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ChevronDown, ChevronRight, Plus, Tag, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EditorFrontmatterField } from './frontmatter'
 
 const METADATA_ALLOWED_HOTKEYS = 'Mod+KeyS Escape'
@@ -50,6 +51,7 @@ export function PageFrontmatterPanel({
   onTagsChange,
   onFieldsChange,
 }: PageFrontmatterPanelProps) {
+  const { t } = useTranslation('editor')
   const [showInternalFields, setShowInternalFields] = useState(false)
 
   const normalizedTags = useMemo(() => {
@@ -169,7 +171,7 @@ export function PageFrontmatterPanel({
                   <TagInputWithSuggestions
                     tags={normalizedTags}
                     onTagsChange={onTagsChange}
-                    placeholder="Add tag"
+                    placeholder={t('frontmatterPanel.addTagPlaceholder')}
                     variant="metadata"
                     inputTestId="page-frontmatter-tag-input"
                     inputHotkeys={METADATA_ALLOWED_HOTKEYS}
@@ -203,7 +205,9 @@ export function PageFrontmatterPanel({
                                     key: event.target.value,
                                   })
                                 }
-                                placeholder="Key"
+                                placeholder={t(
+                                  'frontmatterPanel.keyPlaceholder',
+                                )}
                                 className={`page-frontmatter-panel__field-key${errors[`properties.${index}.key`] ? 'page-frontmatter-panel__input--error' : ''}`}
                                 data-testid={`page-frontmatter-field-key-${index}`}
                                 data-allow-hotkeys={METADATA_ALLOWED_HOTKEYS}
@@ -217,7 +221,9 @@ export function PageFrontmatterPanel({
                                     value: event.target.value,
                                   })
                                 }
-                                placeholder="Value"
+                                placeholder={t(
+                                  'frontmatterPanel.valuePlaceholder',
+                                )}
                                 className={`page-frontmatter-panel__field-value${errors[`properties.${index}.value`] ? 'page-frontmatter-panel__input--error' : ''}`}
                                 data-testid={`page-frontmatter-field-value-${index}`}
                                 data-allow-hotkeys={METADATA_ALLOWED_HOTKEYS}

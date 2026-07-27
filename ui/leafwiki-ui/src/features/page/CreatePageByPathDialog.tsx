@@ -8,6 +8,7 @@ import { useDebounce } from '@/lib/useDebounce'
 import { useTreeStore } from '@/stores/tree'
 import { Check, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
@@ -26,6 +27,7 @@ export function CreatePageByPathDialog({
   readOnlyPath,
   forwardToEditMode,
 }: CreatePageByPathDialogProps) {
+  const { t } = useTranslation('page')
   // Dialog state from zustand store
   const navigate = useNavigate()
 
@@ -68,11 +70,15 @@ export function CreatePageByPathDialog({
         navigate(buildEditUrl(path))
       }
 
-      toast.success('Page created successfully')
+      toast.success(t('createByPathDialog.createdToast'))
       return true // Close the dialog
     } catch (err: unknown) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, 'Error creating page')
+      handleFieldErrors(
+        err,
+        setFieldErrors,
+        t('createByPathDialog.createErrorFallback'),
+      )
       return false // Keep the dialog open
     } finally {
       setLoading(false)
@@ -100,8 +106,8 @@ export function CreatePageByPathDialog({
 
   return (
     <BaseDialog
-      dialogTitle="Create a new page"
-      dialogDescription="Please enter the title"
+      dialogTitle={t('createByPathDialog.title')}
+      dialogDescription={t('createByPathDialog.description')}
       dialogType={DIALOG_CREATE_PAGE_BY_PATH}
       testidPrefix="create-page-by-path-dialog"
       onClose={() => true}
@@ -109,7 +115,7 @@ export function CreatePageByPathDialog({
         return await handleCreate()
       }}
       cancelButton={{
-        label: 'Cancel',
+        label: t('common.cancel'),
         variant: 'outline',
         disabled: loading,
         autoFocus: false,
@@ -117,10 +123,10 @@ export function CreatePageByPathDialog({
       buttons={[
         {
           label: loading
-            ? 'Creating...'
+            ? t('createByPathDialog.creating')
             : !forwardToEditMode
-              ? 'Create'
-              : 'Create & Edit',
+              ? t('createByPathDialog.create')
+              : t('createByPathDialog.createAndEdit'),
           actionType: 'confirm',
           autoFocus: true,
           loading,
@@ -132,13 +138,13 @@ export function CreatePageByPathDialog({
       <div>
         {lookup?.exists && (
           <div className="create-page-by-path-dialog__alert">
-            A page already exists at this path.
+            {t('createByPathDialog.existsAlert')}
           </div>
         )}
         {lookup && !lookup.exists && lookup.segments.length > 0 && (
           <>
             <strong className="create-page-by-path-dialog__lookup-title">
-              Result of path lookup:
+              {t('createByPathDialog.lookupResultTitle')}
             </strong>
             <ul className="custom-scrollbar create-page-by-path-dialog__lookup-list">
               {lookup.segments.map((segment, index) => (
@@ -160,7 +166,9 @@ export function CreatePageByPathDialog({
                   <span className="create-page-by-path-dialog__lookup-item-slug">
                     {segment.slug}
                   </span>{' '}
-                  {segment.exists ? 'exists' : 'will be created'}
+                  {segment.exists
+                    ? t('createByPathDialog.segmentExists')
+                    : t('createByPathDialog.segmentWillBeCreated')}
                 </li>
               ))}
             </ul>
@@ -171,26 +179,26 @@ export function CreatePageByPathDialog({
         <FormInput
           autoFocus={true}
           testid="create-page-by-path-title-input"
-          label="Title"
+          label={t('createByPathDialog.titleLabel')}
           value={title}
           onChange={(val) => {
             handleTitleChange(val)
             setFieldErrors((prev) => ({ ...prev, title: '' }))
           }}
-          placeholder="Page title"
+          placeholder={t('createByPathDialog.titlePlaceholder')}
           error={fieldErrors.title}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         <FormInput
           testid="create-page-by-path-path-input"
-          label="Path"
+          label={t('createByPathDialog.pathLabel')}
           value={path}
           readOnly={readOnlyPath}
           onChange={(val) => {
             setPath(val)
             setFieldErrors((prev) => ({ ...prev, path: '' }))
           }}
-          placeholder="Page path"
+          placeholder={t('createByPathDialog.pathPlaceholder')}
           error={fieldErrors.path}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />

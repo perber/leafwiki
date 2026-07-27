@@ -11,6 +11,7 @@ import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { Check, FileText, Link2, Pencil, Play, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { AssetPreviewTooltip } from './AssetPreviewTooltip'
 
@@ -39,6 +40,7 @@ export function AssetItem({
   onFilenameChange,
   onAssetVersionChange,
 }: Props) {
+  const { t } = useTranslation('assets')
   const markdownAssetUrl = filename
   const assetPath = filename.startsWith('/assets/')
     ? filename
@@ -67,12 +69,12 @@ export function AssetItem({
       }
 
       await renameAsset(pageId, baseName, newFilename)
-      toast.success('Asset renamed')
+      toast.success(t('item.renameSuccess'))
       onFilenameChange?.(baseName, newFilename)
       onAssetVersionChange?.()
       onReload()
     } catch (err: unknown) {
-      toast.error(mapApiError(err, 'Rename failed').message)
+      toast.error(mapApiError(err, t('item.renameErrorFallback')).message)
     }
   }, [
     pageId,
@@ -83,16 +85,17 @@ export function AssetItem({
     onFilenameChange,
     onAssetVersionChange,
     setEditingFilename,
+    t,
   ])
 
   const handleDelete = async () => {
     try {
       await deleteAsset(pageId, baseName)
-      toast.success('Asset deleted')
+      toast.success(t('item.deleteSuccess'))
       onReload()
       onAssetVersionChange?.()
     } catch (err) {
-      toast.error(mapApiError(err, 'Delete failed').message)
+      toast.error(mapApiError(err, t('item.deleteErrorFallback')).message)
       console.error('Delete failed', err)
     }
   }
@@ -204,7 +207,7 @@ export function AssetItem({
               size="icon"
               className="asset-item__action-button asset-item__action-button--save"
               onClick={handleRename}
-              title="Save"
+              title={t('item.save')}
             >
               <Check size={16} />
             </Button>
@@ -216,7 +219,7 @@ export function AssetItem({
                 setEditingFilename(null)
                 setNewName(baseName.replace(/\.[^/.]+$/, ''))
               }}
-              title="Cancel"
+              title={t('item.cancel')}
             >
               <X size={16} />
             </Button>
@@ -232,7 +235,7 @@ export function AssetItem({
                   e.stopPropagation()
                   handleInsertLink()
                 }}
-                title="Insert image link"
+                title={t('item.insertImageLink')}
                 data-testid="asset-insert-link-button"
               >
                 <Link2 size={16} />
@@ -247,7 +250,11 @@ export function AssetItem({
                   e.stopPropagation()
                   handleInsertPlayer()
                 }}
-                title={isAudio ? 'Insert audio player' : 'Insert video player'}
+                title={
+                  isAudio
+                    ? t('item.insertAudioPlayer')
+                    : t('item.insertVideoPlayer')
+                }
                 data-testid="asset-insert-player-button"
               >
                 <Play size={16} />
@@ -261,7 +268,7 @@ export function AssetItem({
                 e.stopPropagation()
                 handleInsertMarkdown()
               }}
-              title={isImage ? 'Insert image' : 'Insert link'}
+              title={isImage ? t('item.insertImage') : t('item.insertLink')}
               data-testid="asset-insert-default-button"
             >
               <FileText size={16} />
@@ -275,7 +282,7 @@ export function AssetItem({
                 setNewName(baseName.replace(/\.[^/.]+$/, ''))
                 setEditingFilename(filename)
               }}
-              title="Rename"
+              title={t('item.rename')}
             >
               <Pencil size={16} />
             </Button>
@@ -287,7 +294,7 @@ export function AssetItem({
                 e.stopPropagation()
                 handleDelete()
               }}
-              title="Delete"
+              title={t('item.delete')}
             >
               <Trash2 size={16} />
             </Button>

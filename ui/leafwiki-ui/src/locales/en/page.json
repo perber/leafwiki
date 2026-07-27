@@ -1,0 +1,124 @@
+{
+  "common": {
+    "page": "page",
+    "section": "section",
+    "pageCapitalized": "Page",
+    "sectionCapitalized": "Section",
+    "cancel": "Cancel",
+    "errorPrefix": "Error: {{error}}",
+    "unknownError": "An unknown error occurred"
+  },
+  "addDialog": {
+    "slugNotGenerated": "Slug could not be generated. Please enter it manually.",
+    "slugStillGenerating": "Please wait until the slug is fully generated.",
+    "createdToast": "{{item}} created",
+    "createErrorFallback": "Error creating {{item}}",
+    "create": "Create",
+    "createAndEdit": "Create & Edit {{item}}",
+    "titlePage": "Create a new page",
+    "titleSection": "Create a new section",
+    "descriptionPage": "Enter the title of the new page",
+    "descriptionSection": "Enter the title of the new section",
+    "titleLabel": "Title",
+    "titlePlaceholder": "{{item}} title",
+    "pathPrefix": "Path:"
+  },
+  "moveDialog": {
+    "movedToast": "Page moved successfully",
+    "moveErrorFallback": "Error moving {{item}}",
+    "title": "Move {{item}}",
+    "description": "Select a new parent for this {{item}}",
+    "move": "Move"
+  },
+  "deleteDialog": {
+    "loadReferencesErrorFallback": "Failed to load page references",
+    "deletedToast": "{{item}} deleted successfully",
+    "deleteErrorFallback": "Error deleting {{item}}",
+    "title": "Delete {{item}}?",
+    "description": "Are you sure you want to delete this {{item}}? This action cannot be undone.",
+    "deleting": "Deleting...",
+    "delete": "Delete",
+    "modifiedWarningTitle": "This page was modified by another user.",
+    "modifiedWarningBody": "The page has been refreshed. Do you still want to delete it?",
+    "backlinksLoading": "Checking which pages reference this page...",
+    "backlinksError": "Could not load page references. Deleting will still work, but link impact could not be shown.",
+    "backlinksWarning_one": "This page is referenced by {{count}} page.",
+    "backlinksWarning_other": "This page is referenced by {{count}} pages.",
+    "backlinksWarningBody": "Deleting this page will leave those links broken.",
+    "noBacklinks": "No pages currently reference this page.",
+    "deleteSubpages": "Also delete all subpages"
+  },
+  "sortDialog": {
+    "dragToReorder": "Drag to reorder",
+    "sortedToast": "{{item}} children sorted successfully",
+    "sortErrorFallback": "Error sorting {{item}} children",
+    "title": "Sort {{item}} Children",
+    "description": "Drag items to reorder, use the arrows, or sort alphabetically. Changes are saved after clicking 'Save'.",
+    "save": "Save",
+    "sortAlphabetically": "Sort alphabetically:",
+    "ascending": "A → Z",
+    "descending": "Z → A"
+  },
+  "copyDialog": {
+    "slugNotGenerated": "Slug could not be generated. Please enter it manually.",
+    "slugStillGenerating": "Please wait until the slug is fully generated.",
+    "copiedToast": "{{item}} copied",
+    "copyErrorFallback": "Error copying {{item}}",
+    "copyOfTitle": "Copy of {{title}}",
+    "title": "Copy {{item}}",
+    "description": "Create a copy of this {{item}}",
+    "copying": "Copying...",
+    "copyAndEdit": "Copy & Edit {{item}}",
+    "titleLabel": "Title",
+    "titlePlaceholder": "{{item}} title",
+    "pathPrefix": "Path:"
+  },
+  "permalinkDialog": {
+    "copyErrorToast": "Could not copy permalink",
+    "copiedToast": "Permalink copied",
+    "title": "Share page",
+    "description": "Shareable URL for {{title}}",
+    "close": "Close",
+    "urlLabel": "Shareable URL",
+    "copyLink": "Copy link",
+    "openLink": "Open link"
+  },
+  "createByPathDialog": {
+    "createdToast": "Page created successfully",
+    "createErrorFallback": "Error creating page",
+    "title": "Create a new page",
+    "description": "Please enter the title",
+    "creating": "Creating...",
+    "create": "Create",
+    "createAndEdit": "Create & Edit",
+    "existsAlert": "A page already exists at this path.",
+    "lookupResultTitle": "Result of path lookup:",
+    "segmentExists": "exists",
+    "segmentWillBeCreated": "will be created",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Page title",
+    "pathLabel": "Path",
+    "pathPlaceholder": "Page path"
+  },
+  "select": {
+    "topLevel": "Top Level",
+    "searchPlaceholder": "Search pages...",
+    "searchAriaLabel": "Search pages",
+    "noPagesFound": "No pages found.",
+    "pagesAriaLabel": "Pages"
+  },
+  "refactorDialog": {
+    "title": "Update references?",
+    "description": "This change affects the page path. Review the impacted pages before continuing.",
+    "saveWithoutRewrite": "Save without updating links",
+    "continue": "Continue",
+    "oldPath": "Old path:",
+    "newPath": "New path:",
+    "updateLinksLabel": "Update links on referencing pages automatically",
+    "referencingPages": "Referencing pages ({{count}})",
+    "noReferences": "No pages reference this path."
+  },
+  "historyPage": {
+    "backToPage": "Back to Page"
+  }
+}

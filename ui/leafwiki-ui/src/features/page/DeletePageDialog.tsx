@@ -11,6 +11,7 @@ import { useConfigStore } from '@/stores/config'
 import { useTreeStore } from '@/stores/tree'
 import { AlertTriangle } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
@@ -23,6 +24,7 @@ export function DeletePageDialog({
   pageId,
   redirectTo,
 }: DeletePageDialogProps) {
+  const { t } = useTranslation('page')
   const enableLinkRefactor = useConfigStore((s) => s.enableLinkRefactor)
   const navigate = useNavigate()
   const reloadTree = useTreeStore((s) => s.reloadTree)
@@ -57,7 +59,9 @@ export function DeletePageDialog({
       } catch (err) {
         if (cancelled) return
         const message =
-          err instanceof Error ? err.message : 'Failed to load page references'
+          err instanceof Error
+            ? err.message
+            : t('deleteDialog.loadReferencesErrorFallback')
         setBacklinksError(message)
         setBacklinks([])
       } finally {
@@ -72,18 +76,24 @@ export function DeletePageDialog({
     return () => {
       cancelled = true
     }
-  }, [enableLinkRefactor, pageId])
+  }, [enableLinkRefactor, pageId, t])
 
   if (!page) return null
   const hasChildren = (page.children?.length ?? 0) > 0
-  const itemLabel = page.kind === NODE_KIND_PAGE ? 'page' : 'section'
-  const itemLabelCapitalized = page.kind === NODE_KIND_PAGE ? 'Page' : 'Section'
+  const itemLabel =
+    page.kind === NODE_KIND_PAGE ? t('common.page') : t('common.section')
+  const itemLabelCapitalized =
+    page.kind === NODE_KIND_PAGE
+      ? t('common.pageCapitalized')
+      : t('common.sectionCapitalized')
 
   const handleDelete = async (): Promise<boolean> => {
     setLoading(true)
     try {
       await deletePage(pageId, deleteRecursive, page?.version ?? '')
-      toast.success(`${itemLabelCapitalized} deleted successfully`)
+      toast.success(
+        t('deleteDialog.deletedToast', { item: itemLabelCapitalized }),
+      )
       navigate(redirectTo, { state: createNavigationVisitState() })
       reloadTree().catch(console.error)
       return true
@@ -101,7 +111,11 @@ export function DeletePageDialog({
         }
         setPageModifiedWarning(true)
       } else {
-        handleFieldErrors(err, setFieldErrors, `Error deleting ${itemLabel}`)
+        handleFieldErrors(
+          err,
+          setFieldErrors,
+          t('deleteDialog.deleteErrorFallback', { item: itemLabel }),
+        )
       }
       return false
     } finally {
@@ -112,8 +126,8 @@ export function DeletePageDialog({
   return (
     <BaseDialog
       dialogType={DIALOG_DELETE_PAGE_CONFIRMATION}
-      dialogTitle={`Delete ${itemLabelCapitalized}?`}
-      dialogDescription={`Are you sure you want to delete this ${itemLabel}? This action cannot be undone.`}
+      dialogTitle={t('deleteDialog.title', { item: itemLabelCapitalized })}
+      dialogDescription={t('deleteDialog.description', { item: itemLabel })}
       onClose={() => true}
       onConfirm={async (): Promise<boolean> => {
         return await handleDelete()
@@ -121,14 +135,16 @@ export function DeletePageDialog({
       defaultAction="cancel"
       testidPrefix="delete-page-dialog"
       cancelButton={{
-        label: 'Cancel',
+        label: t('common.cancel'),
         variant: 'outline',
         disabled: loading,
         autoFocus: true,
       }}
       buttons={[
         {
-          label: loading ? 'Deleting...' : 'Delete',
+          label: loading
+            ? t('deleteDialog.deleting')
+            : t('deleteDialog.delete'),
           actionType: 'confirm',
           autoFocus: false,
           loading,
@@ -145,11 +161,9 @@ export function DeletePageDialog({
           >
             <div className="flex items-start gap-2 font-medium">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>This page was modified by another user.</span>
+              <span>{t('deleteDialog.modifiedWarningTitle')}</span>
             </div>
-            <p className="mt-1">
-              The page has been refreshed. Do you still want to delete it?
-            </p>
+            <p className="mt-1">{t('deleteDialog.modifiedWarningBody')}</p>
           </div>
         )}
         {enableLinkRefactor &&
@@ -158,15 +172,14 @@ export function DeletePageDialog({
               className="text-muted-foreground text-sm"
               data-testid="delete-page-dialog-backlinks-loading"
             >
-              Checking which pages reference this page...
+              {t('deleteDialog.backlinksLoading')}
             </p>
           ) : backlinksError ? (
             <div
               className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
               data-testid="delete-page-dialog-backlinks-error"
             >
-              Could not load page references. Deleting will still work, but link
-              impact could not be shown.
+              {t('deleteDialog.backlinksError')}
             </div>
           ) : backlinks.length > 0 ? (
             <div
@@ -176,12 +189,13 @@ export function DeletePageDialog({
               <div className="flex items-start gap-2 font-medium">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                  This page is referenced by {backlinks.length} page
-                  {backlinks.length === 1 ? '' : 's'}.
+                  {t('deleteDialog.backlinksWarning', {
+                    count: backlinks.length,
+                  })}
                 </span>
               </div>
               <p className="mt-2 text-sm">
-                Deleting this page will leave those links broken.
+                {t('deleteDialog.backlinksWarningBody')}
               </p>
               <ul
                 className="mt-3 max-h-40 space-y-1 overflow-auto pr-1 text-sm"
@@ -205,7 +219,7 @@ export function DeletePageDialog({
               className="text-muted-foreground text-sm"
               data-testid="delete-page-dialog-no-backlinks"
             >
-              No pages currently reference this page.
+              {t('deleteDialog.noBacklinks')}
             </p>
           ))}
 
@@ -217,7 +231,7 @@ export function DeletePageDialog({
                 checked={deleteRecursive}
                 onCheckedChange={(val) => setDeleteRecursive(!!val)}
               />
-              Also delete all subpages
+              {t('deleteDialog.deleteSubpages')}
             </label>
           </div>
         )}

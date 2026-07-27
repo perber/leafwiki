@@ -1,4 +1,5 @@
 import { Moon, Sun } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button'
 import { useDesignModeStore } from './designmode'
 import { TooltipWrapper } from '@/components/TooltipWrapper'
@@ -6,9 +7,13 @@ import { useAppMode } from '@/lib/useAppMode'
 import { useIsMobile } from '@/lib/useIsMobile'
 
 export default function DesignToggle() {
+  const { t } = useTranslation('viewer')
   const mode = useDesignModeStore((s) => s.mode)
   const setMode = useDesignModeStore((s) => s.setMode)
-  const label = mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+  const label =
+    mode === 'dark'
+      ? t('designToggle.switchToLight')
+      : t('designToggle.switchToDark')
   const isMobile = useIsMobile()
   const appMode = useAppMode()
 

@@ -13,6 +13,7 @@ import { DIALOG_USER_FORM } from '@/lib/registries'
 import { useSessionStore } from '@/stores/session'
 import { useUserStore } from '@/stores/users'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 const DIALOG_INPUT_ALLOWED_HOTKEYS = 'Enter'
@@ -22,6 +23,7 @@ type UserFormDialogProps = {
 }
 
 export function UserFormDialog({ user }: UserFormDialogProps) {
+  const { t } = useTranslation('users')
   const isEdit = !!user
   const [username, setUsername] = useState(user?.username || '')
   const [email, setEmail] = useState(user?.email || '')
@@ -54,11 +56,11 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
       } else {
         await createUser(userData)
       }
-      toast.success('User saved successfully')
+      toast.success(t('userForm.successToast'))
       return true // Close the dialog
     } catch (err) {
       console.warn(err)
-      handleFieldErrors(err, setFieldErrors, 'Error saving user')
+      handleFieldErrors(err, setFieldErrors, t('userForm.errorFallback'))
       return false // Keep the dialog open
     } finally {
       setLoading(false)
@@ -68,17 +70,23 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
   return (
     <BaseDialog
       dialogType={DIALOG_USER_FORM}
-      dialogTitle={isEdit ? 'Edit User' : 'New User'}
-      dialogDescription={isEdit ? 'Edit user details' : 'Create a new user'}
+      dialogTitle={isEdit ? t('userForm.editTitle') : t('userForm.newTitle')}
+      dialogDescription={
+        isEdit ? t('userForm.editDescription') : t('userForm.newDescription')
+      }
       onClose={() => true}
       onConfirm={async (): Promise<boolean> => {
         return await handleSubmit()
       }}
       testidPrefix="user-form-dialog"
-      cancelButton={{ label: 'Cancel', variant: 'outline', disabled: loading }}
+      cancelButton={{
+        label: t('userForm.cancel'),
+        variant: 'outline',
+        disabled: loading,
+      }}
       buttons={[
         {
-          label: 'Save',
+          label: t('userForm.save'),
           actionType: 'confirm',
           loading,
           disabled: loading || !username || !email || (!isEdit && !password),
@@ -88,41 +96,41 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
       <div className="space-y-4 pt-2">
         <FormInput
           autoFocus={true}
-          label="username"
+          label={t('userForm.usernameLabel')}
           name="username"
           value={username}
           onChange={(val) => {
             setUsername(val)
             setFieldErrors((prev) => ({ ...prev, username: '' }))
           }}
-          placeholder="username"
+          placeholder={t('userForm.usernamePlaceholder')}
           autoComplete="username"
           error={fieldErrors.username}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         <FormInput
-          label="email"
+          label={t('userForm.emailLabel')}
           name="email"
           value={email}
           onChange={(val) => {
             setEmail(val)
             setFieldErrors((prev) => ({ ...prev, email: '' }))
           }}
-          placeholder="email"
+          placeholder={t('userForm.emailPlaceholder')}
           autoComplete="email"
           error={fieldErrors.email}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
         {!isEdit && (
           <FormInput
-            label="password"
+            label={t('userForm.passwordLabel')}
             name="new-password"
             value={password}
             onChange={(val) => {
               setPassword(val)
               setFieldErrors((prev) => ({ ...prev, password: '' }))
             }}
-            placeholder="password"
+            placeholder={t('userForm.passwordPlaceholder')}
             autoComplete="new-password"
             error={fieldErrors.password}
             type="password"
@@ -138,17 +146,17 @@ export function UserFormDialog({ user }: UserFormDialogProps) {
           }}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Select a role" />
+            <SelectValue placeholder={t('userForm.rolePlaceholder')} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem key="viewer" value="viewer">
-              Viewer
+              {t('userForm.roleViewer')}
             </SelectItem>
             <SelectItem key="editor" value="editor">
-              Editor
+              {t('userForm.roleEditor')}
             </SelectItem>
             <SelectItem key="admin" value="admin">
-              Admin
+              {t('userForm.roleAdmin')}
             </SelectItem>
           </SelectContent>
         </Select>

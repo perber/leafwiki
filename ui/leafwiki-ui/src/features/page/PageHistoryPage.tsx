@@ -13,6 +13,7 @@ import { type HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { useTreeStore } from '@/stores/tree'
 import { useCallback, useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useToolbarStore } from '../toolbar/toolbarStore'
 import { getWikiTargetRoutePath, toWikiLookupPath } from '@/lib/wikiPath'
 import { useLocation, useNavigate } from 'react-router'
@@ -23,6 +24,7 @@ import { PageHistoryContent } from '@/features/history/PageHistoryContent'
 import { usePageHistory } from '@/features/history/pageHistory'
 
 export default function PageHistoryPage() {
+  const { t } = useTranslation('page')
   const location = useLocation()
   const { pathname } = location
   const navigate = useNavigate()
@@ -64,7 +66,7 @@ export default function PageHistoryPage() {
     setToolbarButtons([
       {
         id: 'close-history',
-        label: 'Back to Page',
+        label: t('historyPage.backToPage'),
         hotkey: getShortcutDisplayLabel('history.page.close', isMacOS),
         icon: <ArrowLeft size={18} />,
         action: closeHistory,
@@ -89,6 +91,7 @@ export default function PageHistoryPage() {
     registerHotkey,
     setToolbarButtons,
     unregisterHotkey,
+    t,
   ])
 
   const renderError = () => {
@@ -96,7 +99,11 @@ export default function PageHistoryPage() {
       return <Page404 targetPath={getWikiTargetRoutePath(pathname)} />
     }
     if (!loading && error) {
-      return <p className="page-viewer__error">Error: {error}</p>
+      return (
+        <p className="page-viewer__error">
+          {t('common.errorPrefix', { error })}
+        </p>
+      )
     }
     return null
   }

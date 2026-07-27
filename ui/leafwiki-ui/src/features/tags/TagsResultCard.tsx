@@ -1,3 +1,4 @@
+import i18next from '@/lib/i18n'
 import { TaggedPage } from '@/lib/api/tags'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildViewUrl } from '@/lib/routePath'
@@ -6,6 +7,9 @@ import { MouseEvent, forwardRef } from 'react'
 import { Link, useLocation } from 'react-router'
 import type { PageEditorState } from '../editor/pageEditorStore'
 import { usePageEditorStore } from '../editor/pageEditorStore'
+
+const t = (key: string, opts?: Record<string, unknown>) =>
+  i18next.t(key, { ...opts, ns: 'search' })
 
 type TagsResultCardProps = {
   item: TaggedPage
@@ -70,7 +74,9 @@ const TagsResultCard = forwardRef<HTMLDivElement, TagsResultCardProps>(
             {item.title}
           </div>
           <div className="search-result-card__meta">
-            <span className="search-result-card__badge">Page</span>
+            <span className="search-result-card__badge">
+              {t('resultCard.kindPage')}
+            </span>
           </div>
           {item.excerpt && (
             <div className="search-result-card__excerpt">{item.excerpt}</div>

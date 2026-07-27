@@ -1,6 +1,63 @@
 {
   "loading": "Loading users...",
   "noUsersFound": "No users found.",
+  "validation": {
+    "passwordTooShort": "Password must be at least 8 characters long",
+    "passwordsDoNotMatch": "Passwords do not match"
+  },
+  "changePasswordDialog": {
+    "title": "Change Password for {{username}}",
+    "description": "Set a new password for the user.",
+    "cancel": "Cancel",
+    "update": "Update Password",
+    "updating": "Updating...",
+    "newPasswordLabel": "New Password",
+    "confirmPasswordLabel": "Confirm Password",
+    "successToast": "Password changed successfully",
+    "errorFallback": "Error updating password"
+  },
+  "userForm": {
+    "editTitle": "Edit User",
+    "newTitle": "New User",
+    "editDescription": "Edit user details",
+    "newDescription": "Create a new user",
+    "cancel": "Cancel",
+    "save": "Save",
+    "successToast": "User saved successfully",
+    "errorFallback": "Error saving user",
+    "usernameLabel": "username",
+    "usernamePlaceholder": "username",
+    "emailLabel": "email",
+    "emailPlaceholder": "email",
+    "passwordLabel": "password",
+    "passwordPlaceholder": "password",
+    "rolePlaceholder": "Select a role",
+    "roleViewer": "Viewer",
+    "roleEditor": "Editor",
+    "roleAdmin": "Admin"
+  },
+  "deleteUser": {
+    "title": "Delete User?",
+    "description": "Are you sure you want to delete this user? This action cannot be undone.",
+    "cancel": "Cancel",
+    "deleting": "Deleting...",
+    "delete": "Delete",
+    "successToast": "User deleted successfully",
+    "errorFallback": "Failed to delete user. Please try again.",
+    "body": "The user <strong>{{username}}</strong> will be permanently removed from the system."
+  },
+  "changeOwnPassword": {
+    "title": "Change Own Password",
+    "description": "Change your password. Make sure to remember it!",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "save": "Save",
+    "successToast": "Password changed successfully",
+    "errorFallback": "Error updating password",
+    "oldPasswordLabel": "Old Password",
+    "newPasswordLabel": "New Password",
+    "confirmPasswordLabel": "Confirm Password"
+  },
   "totp": {
     "column": "2FA",
     "enabled": "Enabled",
