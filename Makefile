@@ -1,6 +1,6 @@
 BINARY_NAME=leafwiki
 CMD_DIR=./cmd/leafwiki
-VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || printf 'v0.1.0')
+VERSION ?= $(shell ./scripts/resolve-version.sh)
 RELEASE_DIR := releases
 DOCKER_BUILDER := Dockerfile.builder
 
@@ -14,10 +14,10 @@ PLATFORMS := \
 all: build
 
 build:
-	go build -o $(BINARY_NAME) $(CMD_DIR)
+	go build -ldflags "-X main.Version=$(VERSION)" -o $(BINARY_NAME) $(CMD_DIR)
 
 run:
-	go run $(CMD_DIR)
+	go run -ldflags "-X main.Version=$(VERSION)" $(CMD_DIR)
 
 clean:
 	rm -f $(BINARY_NAME)

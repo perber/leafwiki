@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -873,5 +874,69 @@ func TestDockerfileBuilder_GoBuildLdflags_InjectsAppVersion(t *testing.T) {
 
 	if !strings.Contains(line, "-X main.Version=${APP_VERSION}") {
 		t.Fatalf("expected Dockerfile.builder go build ldflags to inject main.Version from APP_VERSION, got: %s", line)
+	}
+}
+
+// TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue exercises
+// the deterministic branch of scripts/resolve-version.sh (the shared
+// algorithm used by both `make build`/`make run` and vite.config.ts). The
+// git-describe fallback branch is intentionally not tested here since its
+// output depends on the local repo's tag state and CI checkout depth.
+func TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue(t *testing.T) {
+	scriptPath := filepath.Join("..", "..", "scripts", "resolve-version.sh")
+
+	cmd := exec.Command(scriptPath)
+	cmd.Env = append(os.Environ(), "APP_VERSION=v9.9.9-test")
+
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("resolve-version.sh failed: %v", err)
+	}
+
+	if got := strings.TrimSpace(string(out)); got != "v9.9.9-test" {
+		t.Fatalf("expected resolve-version.sh to echo APP_VERSION override, got: %q", got)
+	}
+}
+
+// TestMakefile_BuildAndRunTargets_InjectVersionLdflags pins that the local
+// `make build`/`make run` targets inject main.Version the same way the
+// release/Docker targets do, instead of leaving local builds on the "dev"
+// default silently.
+func TestMakefile_BuildAndRunTargets_InjectVersionLdflags(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
+	if err != nil {
+		t.Fatalf("failed to read Makefile: %v", err)
+	}
+
+	for _, target := range []string{"build:", "run:"} {
+		idx := strings.Index(string(content), target)
+		if idx == -1 {
+			t.Fatalf("Makefile target %q not found", target)
+		}
+
+		recipeEnd := strings.Index(string(content)[idx:], "\n\n")
+		if recipeEnd == -1 {
+			recipeEnd = len(content) - idx
+		}
+		recipe := string(content)[idx : idx+recipeEnd]
+
+		if !strings.Contains(recipe, "-X main.Version=$(VERSION)") {
+			t.Fatalf("expected Makefile %q recipe to inject main.Version from $(VERSION), got: %s", target, recipe)
+		}
+	}
+}
+
+// TestViteConfig_ResolvesVersionViaSharedScript pins that the frontend
+// build resolves its version through the same scripts/resolve-version.sh
+// used by the Go build, rather than a second, independently-drifting
+// git-describe implementation in JS.
+func TestViteConfig_ResolvesVersionViaSharedScript(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join("..", "..", "ui", "leafwiki-ui", "vite.config.ts"))
+	if err != nil {
+		t.Fatalf("failed to read vite.config.ts: %v", err)
+	}
+
+	if !strings.Contains(string(content), "scripts/resolve-version.sh") {
+		t.Fatalf("expected vite.config.ts to resolve its version via scripts/resolve-version.sh, got:\n%s", content)
 	}
 }

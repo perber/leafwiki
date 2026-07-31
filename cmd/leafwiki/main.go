@@ -37,10 +37,10 @@ import (
 	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 )
 
-// Version is the LeafWiki build version. It defaults to "dev" for local/unset
-// builds; release builds can inject the real version the same way Dockerfile
-// already injects internal/http.Environment, e.g.
-// -ldflags "-X main.Version=v0.12.0".
+// Version is the LeafWiki build version. It defaults to "dev" for
+// raw `go build`/`go run` (bypassing make); `make build`, `make run`, and the
+// release/Docker builds all inject the real version resolved by
+// scripts/resolve-version.sh via -ldflags "-X main.Version=v0.12.0".
 var Version = "dev"
 
 const (
