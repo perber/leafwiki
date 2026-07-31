@@ -17,9 +17,9 @@ type RemoteUserConfig struct {
 	UserService    *coreauth.UserService
 }
 
-// InjectRemoteUser reads a username or email from a configured HTTP header when the
-// request originates from a trusted proxy IP. On success it stores the resolved user
-// in the Gin context so that RequireAuth can short-circuit JWT validation.
+// InjectRemoteUser reads a username from a configured HTTP header when the request
+// originates from a trusted proxy IP. On success it stores the resolved user in the
+// Gin context so that RequireAuth can short-circuit JWT validation.
 //
 // Behaviour by case:
 //   - disabled or untrusted source IP → no-op, normal auth applies
@@ -45,8 +45,8 @@ func InjectRemoteUser(cfg RemoteUserConfig) gin.HandlerFunc {
 			return
 		}
 
-		identifier := strings.TrimSpace(c.GetHeader(cfg.HeaderName))
-		if identifier == "" {
+		username := strings.TrimSpace(c.GetHeader(cfg.HeaderName))
+		if username == "" {
 			slog.Default().Debug("reverse proxy auth: trusted proxy sent no user header, skipping", "remote_addr", c.Request.RemoteAddr, "header", cfg.HeaderName)
 			// Trusted proxy but no header — let public endpoints work normally;
 			// RequireAuth will reject unauthenticated access to protected routes.
@@ -54,9 +54,9 @@ func InjectRemoteUser(cfg RemoteUserConfig) gin.HandlerFunc {
 			return
 		}
 
-		user, err := cfg.UserService.GetUserByIdentifier(identifier)
+		user, err := cfg.UserService.GetUserByUsername(username)
 		if err != nil {
-			slog.Default().Warn("reverse proxy auth: user not found", "identifier", identifier, "remote_addr", c.Request.RemoteAddr)
+			slog.Default().Warn("reverse proxy auth: user not found", "username", username, "remote_addr", c.Request.RemoteAddr)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "reverse proxy auth: user not found"})
 			return
 		}

@@ -169,33 +169,6 @@ func TestInjectRemoteUser_TrustedIP_ValidUser(t *testing.T) {
 	}
 }
 
-func TestInjectRemoteUser_TrustedIP_ValidUser_ByEmail(t *testing.T) {
-	f := createProxyFixture(t)
-	cleanupWithErrorCheck(t, "proxy fixture", f.close)
-
-	cfg := authmw.RemoteUserConfig{
-		Enabled:        true,
-		HeaderName:     "Remote-User",
-		TrustedProxies: mustParseTrustedProxies(t, "127.0.0.1"),
-		UserService:    f.userService,
-	}
-
-	req := httptest.NewRequest("GET", "/test", nil)
-	req.RemoteAddr = "127.0.0.1:1234"
-	// default admin's email (see InitDefaultAdmin), not its username
-	req.Header.Set("Remote-User", "admin@localhost")
-	w := httptest.NewRecorder()
-
-	proxyRouter(cfg).ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200 when header carries the user's email, got %d: %s", w.Code, w.Body.String())
-	}
-	if body := w.Body.String(); body != `{"username":"admin"}` {
-		t.Errorf("unexpected body: %s", body)
-	}
-}
-
 func TestInjectRemoteUser_TrustedIP_UnknownUser(t *testing.T) {
 	f := createProxyFixture(t)
 	cleanupWithErrorCheck(t, "proxy fixture", f.close)
