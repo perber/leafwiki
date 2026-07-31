@@ -831,3 +831,47 @@ func TestServeWithLifecycle_ShutdownDoesNotWaitForInFlightReload(t *testing.T) {
 		t.Fatal("reload did not finish after release")
 	}
 }
+
+// goBuildLdflagsLine extracts the `go build ... -ldflags="..."` line from a
+// Dockerfile so tests can assert on exactly what gets baked into the binary.
+func goBuildLdflagsLine(t *testing.T, dockerfilePath string) string {
+	t.Helper()
+
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", dockerfilePath, err)
+	}
+
+	for _, line := range strings.Split(string(content), "\n") {
+		if strings.Contains(line, "-ldflags=") {
+			return line
+		}
+	}
+
+	t.Fatalf("no -ldflags line found in %s", dockerfilePath)
+	return ""
+}
+
+// TestDockerfile_GoBuildLdflags_InjectsAppVersion pins the bug where
+// Dockerfile declared ARG APP_VERSION and threaded it into the frontend
+// build, but never into the Go binary's -ldflags — so every release image
+// silently shipped main.Version's "dev" default (e.g. into the
+// leafwiki_build_info metric).
+func TestDockerfile_GoBuildLdflags_InjectsAppVersion(t *testing.T) {
+	line := goBuildLdflagsLine(t, filepath.Join("..", "..", "Dockerfile"))
+
+	if !strings.Contains(line, "-X main.Version=${APP_VERSION}") {
+		t.Fatalf("expected Dockerfile go build ldflags to inject main.Version from APP_VERSION, got: %s", line)
+	}
+}
+
+// TestDockerfileBuilder_GoBuildLdflags_InjectsAppVersion is the same
+// regression check for Dockerfile.builder, used by `make release` to
+// produce the binaries attached to GitHub Releases.
+func TestDockerfileBuilder_GoBuildLdflags_InjectsAppVersion(t *testing.T) {
+	line := goBuildLdflagsLine(t, filepath.Join("..", "..", "Dockerfile.builder"))
+
+	if !strings.Contains(line, "-X main.Version=${APP_VERSION}") {
+		t.Fatalf("expected Dockerfile.builder go build ldflags to inject main.Version from APP_VERSION, got: %s", line)
+	}
+}

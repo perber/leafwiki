@@ -34,5 +34,5 @@ COPY . .
 COPY --from=frontend /ui/dist ./internal/http/dist
 
 RUN go build \
-  -ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production" \
+  -ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X main.Version=${APP_VERSION}" \
   -o /out/${OUTPUT} ./cmd/leafwiki
