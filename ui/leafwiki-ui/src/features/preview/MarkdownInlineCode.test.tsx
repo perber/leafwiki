@@ -25,10 +25,24 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-vi.mock('@/components/ui/tooltip', () => ({
-  Tooltip: ({ children }: { children: ReactNode }) => children,
-  TooltipTrigger: ({ children }: { children: ReactNode }) => children,
-  TooltipContent: ({ children }: { children: ReactNode }) => children,
+vi.mock('@/components/TooltipWrapper', () => ({
+  TooltipWrapper: ({
+    children,
+    label,
+    asChild,
+  }: {
+    children: ReactNode
+    label: string
+    asChild?: boolean
+  }) => (
+    <span
+      data-testid="inline-code-tooltip"
+      data-label={label}
+      data-as-child={String(asChild)}
+    >
+      {children}
+    </span>
+  ),
 }))
 
 describe('MarkdownInlineCode', () => {
@@ -52,16 +66,21 @@ describe('MarkdownInlineCode', () => {
     )
 
     const button = screen.getByTestId('markdown-inline-code-copy-button')
+    const tooltip = screen.getByTestId('inline-code-tooltip')
+    expect(tooltip).toHaveAttribute('data-label', 'Copy code')
+    expect(tooltip).toHaveAttribute('data-as-child', 'true')
     fireEvent.click(button)
 
     expect(copyMock).toHaveBeenCalledWith('npm run test')
     expect(toast.success).toHaveBeenCalled()
     expect(button).toHaveAttribute('aria-label', 'Code copied')
+    expect(tooltip).toHaveAttribute('data-label', 'Copied')
 
     act(() => {
       vi.advanceTimersByTime(2000)
     })
     expect(button).toHaveAttribute('aria-label', 'Copy code')
+    expect(tooltip).toHaveAttribute('data-label', 'Copy code')
   })
 
   it('reports clipboard failures without showing copied feedback', () => {

@@ -1,9 +1,5 @@
+import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { Check, Copy } from 'lucide-react'
 import { ClassAttributes, HTMLAttributes, MouseEvent, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -32,28 +28,28 @@ export default function MarkdownInlineCode({
       <code {...codeProps} className={`inline-code ${className ?? ''}`.trim()}>
         {children}
       </code>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="markdown-inline-code__copy-button"
-            onClick={handleCopy}
-            aria-label={
-              copied
-                ? t('codeBlock.copiedAriaLabel')
-                : t('codeBlock.copyAriaLabel')
-            }
-            data-testid="markdown-inline-code-copy-button"
-          >
-            {copied ? <Check /> : <Copy />}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="top" align="center">
-          {copied ? t('codeBlock.copiedTooltip') : t('codeBlock.copyTooltip')}
-        </TooltipContent>
-      </Tooltip>
+      <TooltipWrapper
+        label={
+          copied ? t('codeBlock.copiedTooltip') : t('codeBlock.copyTooltip')
+        }
+        asChild
+      >
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="markdown-inline-code__copy-button"
+          onClick={handleCopy}
+          aria-label={
+            copied
+              ? t('codeBlock.copiedAriaLabel')
+              : t('codeBlock.copyAriaLabel')
+          }
+          data-testid="markdown-inline-code-copy-button"
+        >
+          {copied ? <Check /> : <Copy />}
+        </Button>
+      </TooltipWrapper>
     </span>
   )
 }
