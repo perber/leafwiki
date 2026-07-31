@@ -53,11 +53,14 @@
     "sortedToast": "{{item}} children sorted successfully",
     "sortErrorFallback": "Error sorting {{item}} children",
     "title": "Sort {{item}} Children",
-    "description": "Drag items to reorder, use the arrows, or sort alphabetically. Changes are saved after clicking 'Save'.",
+    "description": "Drag items to reorder, use the arrows, or choose a sorting option. Changes are saved after clicking 'Save'.",
     "save": "Save",
     "sortAlphabetically": "Sort alphabetically:",
     "ascending": "A → Z",
-    "descending": "Z → A"
+    "descending": "Z → A",
+    "sortSections": "Group sections:",
+    "sectionsFirst": "Sections First",
+    "sectionsLast": "Sections Last"
   },
   "copyDialog": {
     "slugNotGenerated": "Slug could not be generated. Please enter it manually.",

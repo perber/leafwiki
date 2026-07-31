@@ -1,7 +1,8 @@
 // components/page/SortPagesDialog.tsx
 import BaseDialog from '@/components/BaseDialog'
 import { Button } from '@/components/ui/button'
-import { NODE_KIND_PAGE, PageNode, sortPages } from '@/lib/api/pages'
+import { NODE_KIND_PAGE, NODE_KIND_SECTION, sortPages } from '@/lib/api/pages'
+import type { PageNode } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_SORT_PAGES } from '@/lib/registries'
 import { useTreeStore } from '@/stores/tree'
@@ -111,6 +112,7 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
       ? t('common.pageCapitalized')
       : t('common.sectionCapitalized')
   const [order, setOrder] = useState(parent.children?.map((c) => c.id) || [])
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [loading, setLoading] = useState(false)
   const [, setFieldErrors] = useState<Record<string, string>>({})
   const reloadTree = useTreeStore((s) => s.reloadTree)
@@ -156,16 +158,38 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
     }
   }
 
-  const sortAlphabetically = (direction: 'asc' | 'desc') => {
+  const applySort = (
+    direction: 'asc' | 'desc',
+    sectionPosition?: 'first' | 'last',
+  ) => {
     setOrder((prev) =>
       [...prev].sort((a, b) => {
-        const titleA = nodeMap.get(a)?.title ?? ''
-        const titleB = nodeMap.get(b)?.title ?? ''
+        const nodeA = nodeMap.get(a)
+        const nodeB = nodeMap.get(b)
+
+        if (sectionPosition && nodeA?.kind !== nodeB?.kind) {
+          if (nodeA?.kind === NODE_KIND_SECTION) {
+            return sectionPosition === 'first' ? -1 : 1
+          }
+          return sectionPosition === 'first' ? 1 : -1
+        }
+
+        const titleA = nodeA?.title ?? ''
+        const titleB = nodeB?.title ?? ''
         return direction === 'asc'
           ? titleA.localeCompare(titleB)
           : titleB.localeCompare(titleA)
       }),
     )
+  }
+
+  const sortAlphabetically = (direction: 'asc' | 'desc') => {
+    setSortDirection(direction)
+    applySort(direction)
+  }
+
+  const sortBySectionPosition = (position: 'first' | 'last') => {
+    applySort(sortDirection, position)
   }
 
   const handleSave = async (): Promise<boolean> => {
@@ -236,6 +260,27 @@ export function SortPagesDialog({ parent }: { parent: PageNode }) {
           onClick={() => sortAlphabetically('desc')}
         >
           {t('sortDialog.descending')}
+        </Button>
+      </div>
+      <div className="sort-pages-dialog__toolbar">
+        <span className="sort-pages-dialog__toolbar-label">
+          {t('sortDialog.sortSections')}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="sort-sections-first-button"
+          onClick={() => sortBySectionPosition('first')}
+        >
+          {t('sortDialog.sectionsFirst')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="sort-sections-last-button"
+          onClick={() => sortBySectionPosition('last')}
+        >
+          {t('sortDialog.sectionsLast')}
         </Button>
       </div>
       <DndContext
