@@ -43,6 +43,7 @@ import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndenta
 import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
+import MarkdownInlineCode from './MarkdownInlineCode'
 import { syntaxHighlightLanguages } from './syntaxHighlightLanguages'
 import { TocDropdownButton } from './TocDropdownButton'
 
@@ -559,11 +560,7 @@ export default function MarkdownPreview({
         ) {
           return <code data-line={dataLine}>{children}</code>
         }
-        return (
-          <code data-line={dataLine} className="inline-code">
-            {children}
-          </code>
-        )
+        return <MarkdownInlineCode data-line={dataLine}>{children}</MarkdownInlineCode>
       },
     }),
     [enableHeadlineLinks, markdownLink, resolveAssetUrl, resolvedMode],

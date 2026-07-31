@@ -10,6 +10,41 @@
   font-weight: 500;
 }
 
+.page-viewer__content .markdown-inline-code,
+.markdown-editor__preview .markdown-inline-code,
+.page-history__preview-body .markdown-inline-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.page-viewer__content .markdown-inline-code__copy-button,
+.markdown-editor__preview .markdown-inline-code__copy-button,
+.page-history__preview-body .markdown-inline-code__copy-button {
+  --button-size: 1.3rem;
+  height: var(--button-size);
+  width: var(--button-size);
+  border-radius: 999px;
+  border-color: color-mix(in oklab, var(--hljs-foreground) 14%, transparent);
+  background: color-mix(in oklab, var(--hljs-background) 92%, transparent);
+  color: var(--hljs-foreground);
+  opacity: 0;
+  pointer-events: none;
+  padding: 0;
+  transition: opacity 150ms ease;
+}
+
+.page-viewer__content .markdown-inline-code:hover .markdown-inline-code__copy-button,
+.page-viewer__content .markdown-inline-code:focus-within .markdown-inline-code__copy-button,
+.markdown-editor__preview .markdown-inline-code:hover .markdown-inline-code__copy-button,
+.markdown-editor__preview .markdown-inline-code:focus-within .markdown-inline-code__copy-button,
+.page-history__preview-body .markdown-inline-code:hover .markdown-inline-code__copy-button,
+.page-history__preview-body .markdown-inline-code:focus-within .markdown-inline-code__copy-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .page-viewer__content .inline-code::after,
 .page-viewer__content .inline-code::before,
 .markdown-editor__preview .inline-code::after,
