@@ -10,13 +10,6 @@
   font-weight: 500;
 }
 
-.page-viewer__content .inline-code::after,
-.page-viewer__content .inline-code::before,
-.markdown-editor__preview .inline-code::after,
-.markdown-editor__preview .inline-code::before {
-  content: '';
-}
-
 :root:not(.dark) .page-viewer__content .inline-code,
 :root:not(.dark) .markdown-editor__preview .inline-code {
   background: hsl(var(--surface-alt)) !important;
