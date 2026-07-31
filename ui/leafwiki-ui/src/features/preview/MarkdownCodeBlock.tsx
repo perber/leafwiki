@@ -1,37 +1,18 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
-import copy from 'copy-to-clipboard'
 import { Check, Copy } from 'lucide-react'
 import {
   ClassAttributes,
   HTMLAttributes,
   ReactNode,
   isValidElement,
-  useEffect,
-  useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
+import { readTextContent, useCodeCopy } from './useCodeCopy'
 
 type CodeElementProps = {
   className?: string
   children?: ReactNode
-}
-
-function readTextContent(node: ReactNode): string {
-  if (typeof node === 'string' || typeof node === 'number') {
-    return String(node)
-  }
-
-  if (Array.isArray(node)) {
-    return node.map(readTextContent).join('')
-  }
-
-  if (isValidElement<{ children?: ReactNode }>(node)) {
-    return readTextContent(node.props.children)
-  }
-
-  return ''
 }
 
 export default function MarkdownCodeBlock(
@@ -41,42 +22,19 @@ export default function MarkdownCodeBlock(
   const { t } = useTranslation('viewer')
   const { children, node, ...preProps } = props
   void node
-  const [copied, setCopied] = useState(false)
   const child = Array.isArray(children) ? children[0] : children
+  const childIsCodeElement = isValidElement<CodeElementProps>(child)
+  const className = childIsCodeElement ? (child.props.className ?? '') : ''
+  const code = childIsCodeElement ? readTextContent(child.props.children) : ''
+  const { copied, copyCode } = useCodeCopy(code)
 
-  useEffect(() => {
-    if (!copied) return
-
-    const timeoutId = window.setTimeout(() => {
-      setCopied(false)
-    }, 2000)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [copied])
-
-  if (!isValidElement<CodeElementProps>(child)) {
+  if (!childIsCodeElement) {
     return <pre {...preProps}>{children}</pre>
   }
-
-  const className = child.props.className ?? ''
-  const code = readTextContent(child.props.children)
 
   const isCodeBlock = className.includes('language-') || code.includes('\n')
   if (!isCodeBlock) {
     return <pre {...preProps}>{children}</pre>
-  }
-
-  const handleCopy = () => {
-    const copiedSuccessfully = copy(code)
-    if (!copiedSuccessfully) {
-      toast.error(t('codeBlock.copyErrorToast'))
-      return
-    }
-
-    setCopied(true)
-    toast.success(t('codeBlock.copiedToast'))
   }
 
   return (
@@ -92,7 +50,7 @@ export default function MarkdownCodeBlock(
             variant="outline"
             size="icon"
             className="markdown-code-block__copy-button"
-            onClick={handleCopy}
+            onClick={copyCode}
             aria-label={
               copied
                 ? t('codeBlock.copiedAriaLabel')

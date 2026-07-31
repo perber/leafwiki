@@ -5,9 +5,39 @@
 .page-viewer__content .inline-code,
 .markdown-editor__preview .inline-code {
   border-radius: 0.25rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem 1.75rem 0.25rem 0.5rem;
   font-size: 0.75rem;
   font-weight: 500;
+}
+
+.markdown-inline-code {
+  position: relative;
+  display: inline-block;
+}
+
+.markdown-inline-code__copy-button {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  height: 1.25rem;
+  width: 1.25rem;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 0.125rem;
+  padding: 0;
+  opacity: 0;
+  box-shadow: none;
+}
+
+.markdown-inline-code:hover .markdown-inline-code__copy-button,
+.markdown-inline-code:focus-within .markdown-inline-code__copy-button {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .markdown-inline-code__copy-button {
+    opacity: 0.7;
+  }
 }
 
 :root:not(.dark) .page-viewer__content .inline-code,
