@@ -1,4 +1,7 @@
 services:
+  # Default config: reverse-proxy auth enabled, auto-create OFF (the documented
+  # default). Exercises the original "unknown proxy-asserted user is rejected"
+  # behavior end-to-end through the real CLI-flag -> router -> middleware wiring.
   leafwiki:
     build:
       context: ..
@@ -33,6 +36,47 @@ services:
     networks:
       proxy-net:
         ipv4_address: 172.30.0.3
+
+  # Auto-create config: same as above but with --enable-http-remote-user-auto-create
+  # and the email header set, for tests specific to that feature. Kept as a
+  # separate stack (rather than flipping the default one) so the default's
+  # "unknown user -> 401" behavior stays covered end-to-end too.
+  leafwiki-autocreate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        DISABLE_REFRESH_TOKEN_RATE_LIMIT: "true"
+    command:
+      - "--jwt-secret=proxy-e2e-secret"
+      - "--admin-password=admin"
+      - "--allow-insecure=true"
+      - "--enable-http-remote-user=true"
+      - "--trusted-proxy-ips=172.30.0.0/16"
+      - "--enable-http-remote-user-auto-create=true"
+      - "--http-remote-user-email-header-name=Remote-Email"
+      - "--http-remote-user-default-role=viewer"
+    networks:
+      proxy-net:
+        ipv4_address: 172.30.0.4
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/config"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  nginx-autocreate:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx/nginx-autocreate.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8096:80"
+    depends_on:
+      leafwiki-autocreate:
+        condition: service_healthy
+    networks:
+      proxy-net:
+        ipv4_address: 172.30.0.5
 
 networks:
   proxy-net:

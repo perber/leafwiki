@@ -2,17 +2,30 @@ package e2eproxy
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
-// doProxy makes a GET request through the nginx proxy.
+// doProxy makes a GET request through the default (auto-create off) nginx proxy.
 // Set testUser to non-empty to populate X-Test-User (nginx converts it to Remote-User).
 func doProxy(t *testing.T, path, testUser string, extraHeaders map[string]string) *http.Response {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodGet, proxyURL+path, nil)
+	return doProxyAt(t, proxyURL, path, testUser, extraHeaders)
+}
+
+// doAutoCreateProxy is doProxy against the auto-create-enabled stack.
+func doAutoCreateProxy(t *testing.T, path, testUser string, extraHeaders map[string]string) *http.Response {
+	t.Helper()
+	return doProxyAt(t, autoCreateProxyURL, path, testUser, extraHeaders)
+}
+
+func doProxyAt(t *testing.T, baseURL, path, testUser string, extraHeaders map[string]string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, baseURL+path, nil)
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
@@ -48,11 +61,16 @@ func assertStatus(t *testing.T, resp *http.Response, want int) {
 }
 
 // loginAdmin obtains an access-token cookie by logging in as admin directly
-// via the proxy (the login endpoint is public and unaffected by proxy auth).
+// via the default proxy (the login endpoint is public and unaffected by proxy auth).
 func loginAdmin(t *testing.T) string {
 	t.Helper()
+	return loginAdminAt(t, proxyURL)
+}
+
+func loginAdminAt(t *testing.T, baseURL string) string {
+	t.Helper()
 	payload := `{"identifier":"admin","password":"admin"}`
-	req, err := http.NewRequest(http.MethodPost, proxyURL+"/api/auth/login", strings.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, baseURL+"/api/auth/login", strings.NewReader(payload))
 	if err != nil {
 		t.Fatalf("build login request: %v", err)
 	}
@@ -85,10 +103,102 @@ func TestProxyAuth_ValidUser_Admin(t *testing.T) {
 }
 
 // TestProxyAuth_UnknownUser verifies that a proxy-provided username that does
-// not exist in LeafWiki results in 401.
+// not exist in LeafWiki results in 401 against the default (auto-create off)
+// stack — this is the shipped default and the behavior ADR-0010 promises stays
+// unchanged unless an operator opts in to auto-create.
 func TestProxyAuth_UnknownUser(t *testing.T) {
 	resp := doProxy(t, "/api/users", "no-such-user-xyz", nil)
 	assertStatus(t, resp, http.StatusUnauthorized)
+}
+
+// TestProxyAuth_AutoCreate_ProvisionsUnknownUser verifies that an unknown
+// proxy-asserted identity is auto-provisioned end-to-end through the real
+// nginx + LeafWiki stack (auto-create stack, port 8096), with the configured
+// default role and, when no email is forwarded, the synthesized placeholder
+// email.
+func TestProxyAuth_AutoCreate_ProvisionsUnknownUser(t *testing.T) {
+	username := fmt.Sprintf("e2e-autocreate-%d", time.Now().UnixNano())
+
+	resp := doAutoCreateProxy(t, "/api/config", username, nil)
+	assertStatus(t, resp, http.StatusOK)
+
+	found := findUserViaAdminAPI(t, autoCreateProxyURL, username)
+	if found.Role != "viewer" {
+		t.Errorf("expected auto-created role %q, got %q", "viewer", found.Role)
+	}
+	wantEmail := username + "@remote-user.invalid"
+	if found.Email != wantEmail {
+		t.Errorf("expected synthesized placeholder email %q, got %q", wantEmail, found.Email)
+	}
+}
+
+// TestProxyAuth_AutoCreate_UsesEmailHeader verifies that the optional email
+// header (X-Test-Email -> Remote-Email, mirroring
+// --http-remote-user-email-header-name) is used for the auto-created
+// account's email when present.
+func TestProxyAuth_AutoCreate_UsesEmailHeader(t *testing.T) {
+	username := fmt.Sprintf("e2e-autocreate-email-%d", time.Now().UnixNano())
+	email := username + "@example.com"
+
+	resp := doAutoCreateProxy(t, "/api/config", username, map[string]string{"X-Test-Email": email})
+	assertStatus(t, resp, http.StatusOK)
+
+	found := findUserViaAdminAPI(t, autoCreateProxyURL, username)
+	if found.Email != email {
+		t.Errorf("expected email from Remote-Email header %q, got %q", email, found.Email)
+	}
+}
+
+// TestProxyAuth_AutoCreate_EmailConflictReturns401 verifies that a brand-new
+// identity whose asserted email collides with a different, pre-existing
+// user (here: the stack's own default admin) is rejected with 401 rather
+// than a 500, and that no account is created as a side effect.
+func TestProxyAuth_AutoCreate_EmailConflictReturns401(t *testing.T) {
+	username := fmt.Sprintf("e2e-autocreate-conflict-%d", time.Now().UnixNano())
+
+	resp := doAutoCreateProxy(t, "/api/config", username, map[string]string{"X-Test-Email": "admin@localhost"})
+	assertStatus(t, resp, http.StatusUnauthorized)
+}
+
+type adminAPIUser struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+}
+
+// findUserViaAdminAPI logs in as admin on baseURL's stack and returns the
+// user matching username from GET /api/users, failing the test if not found.
+func findUserViaAdminAPI(t *testing.T, baseURL, username string) adminAPIUser {
+	t.Helper()
+
+	token := loginAdminAt(t, baseURL)
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/users", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.AddCookie(&http.Cookie{Name: "leafwiki_at", Value: token})
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("list users: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("list users failed %d: %s", resp.StatusCode, b)
+	}
+
+	var users []adminAPIUser
+	if err := json.NewDecoder(resp.Body).Decode(&users); err != nil {
+		t.Fatalf("decode users: %v", err)
+	}
+	for _, u := range users {
+		if u.Username == username {
+			return u
+		}
+	}
+	t.Fatalf("expected auto-created user %q to appear in /api/users", username)
+	return adminAPIUser{}
 }
 
 // TestProxyAuth_NoHeader_ProtectedRoute verifies that a request without
