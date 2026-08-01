@@ -263,14 +263,30 @@ func (s *UserService) GetUserByIdentifier(identifier string) (*User, error) {
 	return user, nil
 }
 
+// lookupRemoteUserByIdentifier resolves identifier as a username, falling
+// back to an email lookup. Unlike GetUserByIdentifier, it does not collapse
+// store errors into ErrUserNotFound: GetOrCreateRemoteUser auto-provisions on
+// ErrUserNotFound, so a transient store error (e.g. a DB hiccup) must not be
+// mistaken for "no such user" and trigger an unwanted account creation.
+func (s *UserService) lookupRemoteUserByIdentifier(identifier string) (*User, error) {
+	user, err := s.store.GetUserByUsername(identifier)
+	if err == nil {
+		return user, nil
+	}
+	if !errors.Is(err, ErrUserNotFound) {
+		return nil, err
+	}
+	return s.store.GetUserByEmail(identifier)
+}
+
 // GetOrCreateRemoteUser resolves identifier (username or email, same lookup as
-// GetUserByIdentifier) to an existing user, auto-provisioning a new one with a
-// random password and defaultRole if none exists. Used by the reverse-proxy
-// auto-create feature: identifier becomes the new user's username verbatim; if
-// email is empty, a non-deliverable placeholder is synthesized under the
-// RFC 2606 reserved ".invalid" TLD.
+// lookupRemoteUserByIdentifier) to an existing user, auto-provisioning a new
+// one with a random password and defaultRole if none exists. Used by the
+// reverse-proxy auto-create feature: identifier becomes the new user's
+// username verbatim; if email is empty, a non-deliverable placeholder is
+// synthesized under the RFC 2606 reserved ".invalid" TLD.
 func (s *UserService) GetOrCreateRemoteUser(identifier, email, defaultRole string) (*User, error) {
-	user, err := s.GetUserByIdentifier(identifier)
+	user, err := s.lookupRemoteUserByIdentifier(identifier)
 	if err == nil {
 		return user, nil
 	}
@@ -296,7 +312,7 @@ func (s *UserService) GetOrCreateRemoteUser(identifier, email, defaultRole strin
 			// different, unrelated existing user (identifier itself was never
 			// created). Disambiguate instead of assuming the race case: only treat
 			// it as recovered if identifier now resolves to a user.
-			if existing, lookupErr := s.GetUserByIdentifier(identifier); lookupErr == nil {
+			if existing, lookupErr := s.lookupRemoteUserByIdentifier(identifier); lookupErr == nil {
 				return existing, nil
 			}
 			return nil, ErrRemoteUserEmailConflict
