@@ -509,6 +509,25 @@ func TestUserService_GetOrCreateRemoteUser_InvalidRolePropagates(t *testing.T) {
 	}
 }
 
+func TestUserService_LookupRemoteUserByIdentifier_StoreErrorPropagates(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	// Simulate a transient store failure (e.g. a DB hiccup), not a genuine
+	// "user doesn't exist yet". GetOrCreateRemoteUser treats ErrUserNotFound
+	// as the auto-create trigger, so this lookup must surface the real store
+	// error instead of being misclassified as ErrUserNotFound — otherwise a
+	// transient failure would cause a spurious account to be provisioned.
+	if err := service.suspendStore(); err != nil {
+		t.Fatalf("suspendStore failed: %v", err)
+	}
+
+	_, err := service.lookupRemoteUserByIdentifier("henry")
+	if err == nil || errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected the underlying store error, not ErrUserNotFound, got: %v", err)
+	}
+}
+
 func TestUserService_GetOrCreateRemoteUser_EmailConflictWithDifferentUserReturnsDistinctError(t *testing.T) {
 	service := setupTestUserService(t)
 	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
