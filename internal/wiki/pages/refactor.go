@@ -342,7 +342,10 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 			rule.OldTitle = plan.page.Title
 			rule.NewTitle = in.Title
 		}
-		if err := uc.rewriteAffectedPages(in.UserID, plan.affectedPageIDs, []links.RewriteRule{rule}); err != nil {
+		stepStarted := time.Now()
+		err := uc.rewriteAffectedPages(in.UserID, plan.affectedPageIDs, []links.RewriteRule{rule})
+		uc.metrics.ObserveRefactorStep(in.Kind, "rewrite_affected_pages", stepStarted)
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -355,6 +358,7 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 
 	switch in.Kind {
 	case RefactorKindRename:
+		updateStepStarted := time.Now()
 		updateUC := NewUpdatePageUseCase(uc.tree, uc.slug, o, uc.log, uc.metrics)
 		updated, err := updateUC.Execute(ctx, UpdatePageInput{
 			UserID:  in.UserID,
@@ -365,14 +369,21 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 			Content: in.Content,
 			Kind:    kindPage(),
 		})
+		uc.metrics.ObserveRefactorStep(in.Kind, "update_target_page", updateStepStarted)
 		if err != nil {
 			return nil, err
 		}
-		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath); err != nil {
+		subtreeStepStarted := time.Now()
+		err = uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath)
+		uc.metrics.ObserveRefactorStep(in.Kind, "rewrite_path_changed_subtree", subtreeStepStarted)
+		if err != nil {
 			return nil, err
 		}
 		if in.RewriteLinks {
-			if err := uc.refreshAffectedPageLinks(plan.affectedPageIDs); err != nil {
+			refreshStepStarted := time.Now()
+			err := uc.refreshAffectedPageLinks(plan.affectedPageIDs)
+			uc.metrics.ObserveRefactorStep(in.Kind, "refresh_affected_links", refreshStepStarted)
+			if err != nil {
 				return nil, err
 			}
 		}
@@ -387,15 +398,24 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		if in.NewParentID != nil {
 			parentID = *in.NewParentID
 		}
+		moveStepStarted := time.Now()
 		moveUC := NewMovePageUseCase(uc.tree, o, uc.log, uc.metrics)
-		if err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, Version: in.Version, ParentID: parentID}); err != nil {
+		err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, Version: in.Version, ParentID: parentID})
+		uc.metrics.ObserveRefactorStep(in.Kind, "move_target_page", moveStepStarted)
+		if err != nil {
 			return nil, err
 		}
-		if err := uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath); err != nil {
+		subtreeStepStarted := time.Now()
+		err = uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath)
+		uc.metrics.ObserveRefactorStep(in.Kind, "rewrite_path_changed_subtree", subtreeStepStarted)
+		if err != nil {
 			return nil, err
 		}
 		if in.RewriteLinks {
-			if err := uc.refreshAffectedPageLinks(plan.affectedPageIDs); err != nil {
+			refreshStepStarted := time.Now()
+			err := uc.refreshAffectedPageLinks(plan.affectedPageIDs)
+			uc.metrics.ObserveRefactorStep(in.Kind, "refresh_affected_links", refreshStepStarted)
+			if err != nil {
 				return nil, err
 			}
 		}

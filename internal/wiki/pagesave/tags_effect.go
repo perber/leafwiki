@@ -40,8 +40,13 @@ func (e *TagsSideEffect) Apply(event PageSaveEvent) {
 		// page_id is stable across moves; tags in frontmatter are unchanged — no-op.
 
 	case PageOperationDelete:
+		ids := make([]string, 0, len(event.AffectedPages))
 		for _, p := range event.AffectedPages {
-			e.deleteTags(p, event.Operation)
+			ids = append(ids, p.ID)
+		}
+		if err := e.svc.DeletePageIndexes(ids); err != nil {
+			e.log.Warn("failed to batch-delete tag index for deleted subtree", "pageCount", len(ids), "error", err)
+			e.metrics.IncPageSaveSideEffectFailure(string(event.Operation), e.Name())
 		}
 	}
 }
@@ -49,13 +54,6 @@ func (e *TagsSideEffect) Apply(event PageSaveEvent) {
 func (e *TagsSideEffect) setTags(p *tree.Page, operation PageOperationType) {
 	if err := e.svc.IndexPageContent(p.ID, p.RawContent); err != nil {
 		e.log.Warn("failed to index page content", "pageID", p.ID, "error", err)
-		e.metrics.IncPageSaveSideEffectFailure(string(operation), e.Name())
-	}
-}
-
-func (e *TagsSideEffect) deleteTags(p *tree.Page, operation PageOperationType) {
-	if err := e.svc.DeletePageIndex(p.ID); err != nil {
-		e.log.Warn("failed to delete page index", "pageID", p.ID, "error", err)
 		e.metrics.IncPageSaveSideEffectFailure(string(operation), e.Name())
 	}
 }

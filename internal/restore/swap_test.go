@@ -83,6 +83,37 @@ func TestExtractAndValidate_RejectsCorruptUsersDB(t *testing.T) {
 	}
 }
 
+func TestRemoveStaleWALSidecars_RemovesWALAndSHMButNotTheMainFile(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "users.db")
+	test_utils.WriteFile(t, dir, "users.db", "irrelevant content, never opened as sqlite here")
+	test_utils.WriteFile(t, dir, "users.db-wal", "stale wal content")
+	test_utils.WriteFile(t, dir, "users.db-shm", "stale shm content")
+
+	if err := removeStaleWALSidecars(dbPath); err != nil {
+		t.Fatalf("removeStaleWALSidecars: %v", err)
+	}
+
+	for _, suffix := range []string{"-wal", "-shm"} {
+		if _, err := os.Stat(dbPath + suffix); !os.IsNotExist(err) {
+			t.Errorf("expected %s%s to be removed, stat err=%v", dbPath, suffix, err)
+		}
+	}
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Errorf("expected dbPath itself to remain untouched: %v", err)
+	}
+}
+
+func TestRemoveStaleWALSidecars_NoSidecarsPresentIsNotAnError(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "users.db")
+	test_utils.WriteFile(t, dir, "users.db", "irrelevant content, never opened as sqlite here")
+
+	if err := removeStaleWALSidecars(dbPath); err != nil {
+		t.Fatalf("removeStaleWALSidecars with no sidecars present: %v", err)
+	}
+}
+
 func TestSwapper_SwapAll_ReplacesLiveContentAndKeepsPreRestoreCopyUntilCommit(t *testing.T) {
 	zipPath := buildFixtureSnapshot(t, "v1.0.0")
 	dataDir := t.TempDir()

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/test_utils"
@@ -28,6 +29,18 @@ func props(kv ...string) map[string]PropertyEntry {
 }
 
 // ─── DB lifecycle ────────────────────────────────────────────────────────────
+
+func TestPropertiesStore_UsesWALJournalMode(t *testing.T) {
+	store := newTestStore(t)
+
+	var mode string
+	if err := store.db.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err != nil {
+		t.Fatalf("failed to read journal_mode: %v", err)
+	}
+	if !strings.EqualFold(mode, "wal") {
+		t.Fatalf("journal_mode = %q, want %q", mode, "wal")
+	}
+}
 
 func TestPropertiesStore_CreatesDatabaseInStorageDir(t *testing.T) {
 	tmp := t.TempDir()

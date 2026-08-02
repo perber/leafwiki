@@ -3412,6 +3412,12 @@ func TestApplyPageRefactorUseCase_EmitsRenameMetrics(t *testing.T) {
 	if !strings.Contains(body, `leafwiki_refactor_duration_seconds_bucket{kind="rename",rewrite_links="true"`) {
 		t.Fatalf("expected refactor duration metric, got: %s", body)
 	}
+	for _, step := range []string{"rewrite_affected_pages", "update_target_page", "rewrite_path_changed_subtree", "refresh_affected_links"} {
+		want := `leafwiki_refactor_step_duration_seconds_bucket{kind="rename",step="` + step + `"`
+		if !strings.Contains(body, want) {
+			t.Errorf("expected refactor step duration metric for step %q, got: %s", step, body)
+		}
+	}
 }
 
 func TestApplyPageRefactorUseCase_EmitsMoveMetrics(t *testing.T) {
@@ -3460,5 +3466,14 @@ func TestApplyPageRefactorUseCase_EmitsMoveMetrics(t *testing.T) {
 	body := metricsBody(t, metrics)
 	if !strings.Contains(body, `leafwiki_refactor_duration_seconds_bucket{kind="move",rewrite_links="false"`) {
 		t.Fatalf("expected move refactor duration metric, got: %s", body)
+	}
+	// RewriteLinks is false here, so only the two steps outside the
+	// RewriteLinks-gated blocks (rewrite_affected_pages, refresh_affected_links)
+	// fire unconditionally.
+	for _, step := range []string{"move_target_page", "rewrite_path_changed_subtree"} {
+		want := `leafwiki_refactor_step_duration_seconds_bucket{kind="move",step="` + step + `"`
+		if !strings.Contains(body, want) {
+			t.Errorf("expected refactor step duration metric for step %q, got: %s", step, body)
+		}
 	}
 }

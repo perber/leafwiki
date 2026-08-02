@@ -37,7 +37,7 @@ func NewPropertiesStore(storageDir string) (*PropertiesStore, error) {
 
 	s := &PropertiesStore{}
 	err := sqliteutil.RetryOnCorruption(dbPath, func() error {
-		db, err := sql.Open("sqlite", dbPath)
+		db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 		if err != nil {
 			return fmt.Errorf("failed to open properties database: %w", err)
 		}

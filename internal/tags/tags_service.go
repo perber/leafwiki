@@ -37,6 +37,10 @@ func (s *TagsService) DeletePageIndex(pageID string) error {
 	return s.store.DeletePageIndex(pageID)
 }
 
+func (s *TagsService) DeletePageIndexes(pageIDs []string) error {
+	return s.store.DeletePageIndexes(pageIDs)
+}
+
 func (s *TagsService) GetAllTags(filter string, limit int) ([]TagCount, error) {
 	return s.store.GetAllTags(filter, limit)
 }

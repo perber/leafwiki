@@ -79,7 +79,7 @@ func (s *SessionStore) withDB(fn func(db *sql.DB) error) error {
 	defer s.mu.Unlock()
 
 	if s.db == nil {
-		db, err := sql.Open("sqlite", sessionDatabasePath(s.storageDir, s.filename))
+		db, err := sql.Open("sqlite", sessionDatabasePath(s.storageDir, s.filename)+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 		if err != nil {
 			return err
 		}

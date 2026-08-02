@@ -141,6 +141,37 @@ func sanityCheckUsersDB(path string) error {
 // newSwapper's doc comment.
 var swapNames = []string{"root", "assets", "branding", "branding.json", "schema.json", "users.db"}
 
+// removeStaleWALSidecars deletes dbPath's -wal and -shm sidecar files, if
+// present, without touching dbPath itself. Missing files are not an error.
+//
+// users.db runs in WAL mode (internal/core/auth/user_store.go). A snapshot
+// ZIP's users.db is always a plain, sidecar-free single file — createSnapshot
+// (internal/snapshot) produces it via `VACUUM INTO`, which never emits a
+// -wal/-shm — so the *staged* replacement never has this problem. The live
+// side is the concern: before a swap, the live UserStore is either closed
+// (live restore, via UserStore.suspend — SQLite auto-checkpoints and
+// truncates the WAL when the last connection to a WAL-mode database closes)
+// or was never opened by this process at all (offline `restore-snapshot`,
+// run before the server starts). Either way, by the time a swap runs, any
+// -wal/-shm left at the live path is expected to be an empty/harmless
+// checkpoint remnant, not unflushed data — but leaving it in place is still
+// a bad idea: swapNames renames only users.db itself, so a stale sidecar
+// would be left sitting next to the *replacement* users.db, and a WAL file
+// that doesn't belong to the database next to it is exactly the kind of
+// ambiguous state worth not creating, however unlikely SQLite is to
+// misinterpret it. Called before newSwapper/SwapAll for the live users.db
+// path in both the live-restore (manager.go) and offline (offline.go)
+// paths.
+func removeStaleWALSidecars(dbPath string) error {
+	var errs []error
+	for _, suffix := range []string{"-wal", "-shm"} {
+		if err := os.Remove(dbPath + suffix); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
 // swapItem is one live path <-> staged path pair.
 type swapItem struct {
 	name       string

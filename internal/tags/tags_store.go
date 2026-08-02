@@ -33,7 +33,7 @@ func NewTagsStore(storageDir string) (*TagsStore, error) {
 
 	s := &TagsStore{}
 	err := sqliteutil.RetryOnCorruption(dbPath, func() error {
-		db, err := sql.Open("sqlite", dbPath)
+		db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 		if err != nil {
 			return fmt.Errorf("failed to open tags database: %w", err)
 		}
@@ -173,6 +173,49 @@ func (s *TagsStore) DeletePageIndex(pageID string) error {
 		_ = tx.Rollback()
 		return err
 	}
+	return tx.Commit()
+}
+
+// DeletePageIndexes removes tags and meta for all given pages in one
+// transaction, instead of one transaction per page — used by subtree
+// deletes, which can affect hundreds of pages in a single call.
+func (s *TagsStore) DeletePageIndexes(pageIDs []string) error {
+	if len(pageIDs) == 0 {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	tagsStmt, err := tx.Prepare(`DELETE FROM page_tags WHERE page_id = ?`)
+	if err != nil {
+		return err
+	}
+	defer shared.LogClose(tagsStmt.Close, "could not close statement")
+
+	metaStmt, err := tx.Prepare(`DELETE FROM page_meta WHERE page_id = ?`)
+	if err != nil {
+		return err
+	}
+	defer shared.LogClose(metaStmt.Close, "could not close statement")
+
+	for _, pageID := range pageIDs {
+		if _, err := tagsStmt.Exec(pageID); err != nil {
+			return fmt.Errorf("failed to delete tags for page %s: %w", pageID, err)
+		}
+		if _, err := metaStmt.Exec(pageID); err != nil {
+			return fmt.Errorf("failed to delete meta for page %s: %w", pageID, err)
+		}
+	}
+
 	return tx.Commit()
 }
 

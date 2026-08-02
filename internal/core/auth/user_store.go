@@ -68,7 +68,18 @@ func (f *UserStore) Connect() error {
 	// consume the same TOTP recovery code via ConsumeRecoveryCodeHash) block
 	// and retry internally for up to 5s instead of failing immediately with
 	// SQLITE_BUSY, which ConsumeRecoveryCodeHash's caller does not retry on.
-	db, err := sql.Open("sqlite", databasePath(f.storageDir, f.filename)+"?_pragma=busy_timeout(5000)")
+	// journal_mode(WAL) is load-test-verified: GetUserByID runs on every
+	// authenticated request (RequireAuth -> ValidateToken), and under the
+	// previous rollback-journal mode a handful of concurrent writes to this
+	// store (role/profile updates) measurably stalled reads system-wide
+	// (p95 +120-180ms at just 3 concurrent writers) via SQLite's file-level
+	// commit lock — WAL lets readers proceed without blocking on a writer's
+	// commit. Because this store (unlike search/tags/links) is
+	// non-derived source-of-truth data, enabling WAL here also required
+	// restore/swap.go to explicitly clean up -wal/-shm sidecars before a
+	// live or offline restore swap (see removeStaleWALSidecars) — read that
+	// comment before touching this pragma.
+	db, err := sql.Open("sqlite", databasePath(f.storageDir, f.filename)+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 	if err != nil {
 		return err
 	}

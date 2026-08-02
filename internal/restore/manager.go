@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -263,6 +264,15 @@ func (m *Manager) runFromZipPath(zipPath string) {
 			m.job.Finish(fmt.Errorf("failed to release users.db before swap: %w", err))
 			return
 		}
+	}
+
+	// Nothing on disk has been touched yet at this point (PauseUserStoreForSwap
+	// above only closes the in-process connection), so a failure here is
+	// reported the same retryable way as that step, without needing a
+	// rollback. See removeStaleWALSidecars for why this runs before SwapAll.
+	if err := removeStaleWALSidecars(filepath.Join(m.cfg.DataDir, "users.db")); err != nil {
+		m.job.Finish(fmt.Errorf("failed to clean up stale users.db WAL files before swap: %w", err))
+		return
 	}
 
 	sw := newSwapper(m.cfg.DataDir, stagingDir)

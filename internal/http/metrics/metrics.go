@@ -28,6 +28,7 @@ type HTTPMetrics struct {
 	refactorAffectedPages *prometheus.HistogramVec
 	refactorMatchedLinks  *prometheus.HistogramVec
 	refactorDuration      *prometheus.HistogramVec
+	refactorStepDuration  *prometheus.HistogramVec
 	resyncDuration        *prometheus.HistogramVec
 	resyncRuns            *prometheus.CounterVec
 	resyncFailures        *prometheus.CounterVec
@@ -158,6 +159,16 @@ func NewHTTPMetrics(version string) *HTTPMetrics {
 		[]string{"kind", "rewrite_links"},
 	)
 
+	refactorStepDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "leafwiki",
+			Name:      "refactor_step_duration_seconds",
+			Help:      "Rename and move refactor duration in seconds, broken down by internal step.",
+			Buckets:   []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		},
+		[]string{"kind", "step"},
+	)
+
 	resyncDuration := prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "leafwiki",
@@ -235,6 +246,7 @@ func NewHTTPMetrics(version string) *HTTPMetrics {
 		refactorAffectedPages,
 		refactorMatchedLinks,
 		refactorDuration,
+		refactorStepDuration,
 		resyncDuration,
 		resyncRuns,
 		resyncFailures,
@@ -258,6 +270,7 @@ func NewHTTPMetrics(version string) *HTTPMetrics {
 		refactorAffectedPages: refactorAffectedPages,
 		refactorMatchedLinks:  refactorMatchedLinks,
 		refactorDuration:      refactorDuration,
+		refactorStepDuration:  refactorStepDuration,
 		resyncDuration:        resyncDuration,
 		resyncRuns:            resyncRuns,
 		resyncFailures:        resyncFailures,
@@ -329,6 +342,18 @@ func (m *HTTPMetrics) ObserveRefactor(kind string, rewriteLinks bool, affectedPa
 	m.refactorAffectedPages.WithLabelValues(kind, rewrite).Observe(float64(affectedPages))
 	m.refactorMatchedLinks.WithLabelValues(kind, rewrite).Observe(float64(matchedLinks))
 	m.refactorDuration.WithLabelValues(kind, rewrite).Observe(time.Since(started).Seconds())
+}
+
+// ObserveRefactorStep records one internal step of a rename/move refactor
+// apply (e.g. "rewrite_affected_pages", "refresh_affected_links") — unlike
+// ObserveRefactor's single whole-call duration, this breaks the apply call
+// down so a slow refactor can be attributed to a specific step rather than
+// only observed in aggregate.
+func (m *HTTPMetrics) ObserveRefactorStep(kind, step string, started time.Time) {
+	if m == nil {
+		return
+	}
+	m.refactorStepDuration.WithLabelValues(kind, step).Observe(time.Since(started).Seconds())
 }
 
 func (m *HTTPMetrics) ObserveResyncTriggerAccepted() {

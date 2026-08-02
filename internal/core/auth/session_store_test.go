@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,24 @@ import (
 
 	"github.com/perber/wiki/internal/test_utils"
 )
+
+func TestSessionStore_UsesWALJournalMode(t *testing.T) {
+	store, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSessionStore err: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	var mode string
+	if err := store.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`PRAGMA journal_mode`).Scan(&mode)
+	}); err != nil {
+		t.Fatalf("failed to read journal_mode: %v", err)
+	}
+	if !strings.EqualFold(mode, "wal") {
+		t.Fatalf("journal_mode = %q, want %q", mode, "wal")
+	}
+}
 
 func TestSessionStore_CreateAndValidateSession(t *testing.T) {
 	store, err := NewSessionStore(t.TempDir())

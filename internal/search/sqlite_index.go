@@ -21,7 +21,7 @@ import (
 )
 
 type SQLiteIndex struct {
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	storageDir string
 	filename   string
 	db         *sql.DB
@@ -125,18 +125,60 @@ func NewSQLiteIndex(storageDir string) (*SQLiteIndex, error) {
 	return s, nil
 }
 
-func (s *SQLiteIndex) withDB(fn func(db *sql.DB) error) error {
+// connect returns the open *sql.DB, opening it on first use. Safe for
+// concurrent callers on both the read and write paths: the common case
+// (already open) only takes the cheap RLock; opening the connection is
+// the one operation that mutates s.db itself, so it's re-checked under
+// the exclusive Lock (standard double-checked locking) rather than
+// requiring every caller — including read-only ones — to hold the
+// exclusive lock just to be safe against a lazy-init race that almost
+// never happens after the first call.
+func (s *SQLiteIndex) connect() (*sql.DB, error) {
+	s.mu.RLock()
+	if s.db != nil {
+		db := s.db
+		s.mu.RUnlock()
+		return db, nil
+	}
+	s.mu.RUnlock()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.db == nil {
-		db, err := sql.Open("sqlite", searchIndexDatabasePath(s.storageDir, s.filename))
+		db, err := sql.Open("sqlite", searchIndexDatabasePath(s.storageDir, s.filename)+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 		if err != nil {
-			return err
+			return nil, err
 		}
 		s.db = db
 	}
+	return s.db, nil
+}
 
-	return fn(s.db)
+// withDB runs fn under the exclusive lock — use for anything that writes.
+func (s *SQLiteIndex) withDB(fn func(db *sql.DB) error) error {
+	db, err := s.connect()
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return fn(db)
+}
+
+// withDBRead runs fn under a shared read lock — use for read-only
+// queries (Search, SearchPageIDs, Ping) so concurrent readers don't
+// serialize behind each other the way withDB's writers must. Load-tested:
+// this is what fixed Search's reader-self-contention (see
+// loadtest/k6/search-only.js results), the same fix already applied to
+// internal/links/links_store.go for the identical symptom.
+func (s *SQLiteIndex) withDBRead(fn func(db *sql.DB) error) error {
+	db, err := s.connect()
+	if err != nil {
+		return err
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return fn(db)
 }
 
 func (s *SQLiteIndex) ensureSchema() error {
@@ -166,7 +208,7 @@ func (s *SQLiteIndex) Clear() error {
 }
 
 func (s *SQLiteIndex) Ping() error {
-	return s.withDB(func(db *sql.DB) error {
+	return s.withDBRead(func(db *sql.DB) error {
 		return db.Ping()
 	})
 }
@@ -183,31 +225,159 @@ func (s *SQLiteIndex) Close() error {
 	return nil
 }
 
-func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, title string, kind tree.NodeKind, raw string) error {
-	_, content, _, err := markdown.ParseFrontmatter(raw)
-	if err != nil {
-		return err
+// IndexPageInput bundles one page's worth of IndexPages input.
+type IndexPageInput struct {
+	Path     string
+	FilePath string
+	PageID   string
+	Title    string
+	Kind     tree.NodeKind
+	Raw      string
+}
+
+// IndexFailure pairs a failed input with why it failed, returned by
+// IndexPages for inputs skipped due to a per-page problem (e.g.
+// unparsable frontmatter) rather than a transaction-level failure.
+type IndexFailure struct {
+	PageID string
+	Err    error
+}
+
+// IndexPages indexes multiple pages in a single transaction — used for
+// subtree operations (recursive delete healing/move) where a naive
+// one-IndexPage-call-per-page loop would pay for one commit per page.
+// Load-tested: for a 200-page subtree this cut the search side effect's
+// share of total Move/Delete cost from ~75-93% to a small fraction (see
+// the Delete/Move/Rename load-test results).
+//
+// Inputs whose frontmatter fails to parse are skipped and reported via
+// the returned []IndexFailure rather than aborting the whole batch — the
+// rest still commit together. Only a transaction-level failure (e.g. the
+// commit itself failing) returns a non-nil error, in which case none of
+// the inputs were indexed. This preserves IndexPage's per-page fault
+// isolation for the most likely failure mode (bad content) while still
+// getting the throughput win for the common case (everything valid).
+func (s *SQLiteIndex) IndexPages(inputs []IndexPageInput) ([]IndexFailure, error) {
+	if len(inputs) == 0 {
+		return nil, nil
 	}
 
-	content = excerpt.NormalizeMarkdownBody(content)
+	type prepared struct {
+		path, filePath, pageID, title string
+		kind                          tree.NodeKind
+		headings, sanitizedBody       string
+	}
 
-	// Headings extracted from the Markdown
-	headings := extractHeadings(content)
+	var failures []IndexFailure
+	prepped := make([]prepared, 0, len(inputs))
+	for _, in := range inputs {
+		_, content, _, err := markdown.ParseFrontmatter(in.Raw)
+		if err != nil {
+			failures = append(failures, IndexFailure{PageID: in.PageID, Err: err})
+			continue
+		}
+		content = excerpt.NormalizeMarkdownBody(content)
+		prepped = append(prepped, prepared{
+			path:          in.Path,
+			filePath:      in.FilePath,
+			pageID:        in.PageID,
+			title:         in.Title,
+			kind:          in.Kind,
+			headings:      extractHeadings(content),
+			sanitizedBody: excerpt.PlainTextForSearch(content),
+		})
+	}
 
-	sanitizedBody := excerpt.PlainTextForSearch(content)
+	if len(prepped) == 0 {
+		return failures, nil
+	}
 
-	return s.withDB(func(db *sql.DB) error {
-		_, err := db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
+	err := s.withDB(func(db *sql.DB) error {
+		tx, err := db.Begin()
 		if err != nil {
 			return err
 		}
+		defer func() {
+			_ = tx.Rollback()
+		}()
 
-		_, err = db.Exec(`
-		INSERT INTO pages (path, filepath, pageID, kind, title, headings, content)
-		VALUES (?, ?, ?, ?, ?, ?, ?);
-	`, path, filePath, pageID, string(kind), title, headings, sanitizedBody)
+		deleteStmt, err := tx.Prepare(`DELETE FROM pages WHERE pageID = ?`)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = deleteStmt.Close()
+		}()
 
+		insertStmt, err := tx.Prepare(`
+			INSERT INTO pages (path, filepath, pageID, kind, title, headings, content)
+			VALUES (?, ?, ?, ?, ?, ?, ?);
+		`)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = insertStmt.Close()
+		}()
+
+		for _, p := range prepped {
+			if _, err := deleteStmt.Exec(p.pageID); err != nil {
+				return err
+			}
+			if _, err := insertStmt.Exec(p.path, p.filePath, p.pageID, string(p.kind), p.title, p.headings, p.sanitizedBody); err != nil {
+				return err
+			}
+		}
+
+		return tx.Commit()
+	})
+
+	return failures, err
+}
+
+func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, title string, kind tree.NodeKind, raw string) error {
+	failures, err := s.IndexPages([]IndexPageInput{{Path: path, FilePath: filePath, PageID: pageID, Title: title, Kind: kind, Raw: raw}})
+	if err != nil {
 		return err
+	}
+	if len(failures) > 0 {
+		return failures[0].Err
+	}
+	return nil
+}
+
+// RemovePages removes multiple pages from the index in a single
+// transaction — the batch counterpart to RemovePage, used for subtree
+// deletes for the same reason IndexPages exists (one commit instead of
+// one per page).
+func (s *SQLiteIndex) RemovePages(pageIDs []string) error {
+	if len(pageIDs) == 0 {
+		return nil
+	}
+	return s.withDB(func(db *sql.DB) error {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		stmt, err := tx.Prepare(`DELETE FROM pages WHERE pageID = ?`)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = stmt.Close()
+		}()
+
+		for _, pageID := range pageIDs {
+			if _, err := stmt.Exec(pageID); err != nil {
+				return err
+			}
+		}
+
+		return tx.Commit()
 	})
 }
 
@@ -261,7 +431,7 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 	sr := &SearchResult{TagFacets: []SearchTagFacet{}}
 	ftsQuery := buildFuzzyQuery(query)
 
-	err := s.withDB(func(db *sql.DB) error {
+	err := s.withDBRead(func(db *sql.DB) error {
 		var total int
 		whereClause, whereArgs := buildSearchWhereClause(query, ftsQuery, pageIDs)
 
@@ -355,7 +525,7 @@ func (s *SQLiteIndex) SearchPageIDs(query string, pageIDs []string) ([]string, e
 	ftsQuery := buildFuzzyQuery(query)
 	var result []string
 
-	err := s.withDB(func(db *sql.DB) error {
+	err := s.withDBRead(func(db *sql.DB) error {
 		whereClause, whereArgs := buildSearchWhereClause(query, ftsQuery, pageIDs)
 		searchQuery := fmt.Sprintf(`
 		SELECT pageID, %s AS bm25_score
