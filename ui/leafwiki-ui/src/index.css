@@ -2526,7 +2526,11 @@
   }
 
   .sidebar-accordion-section__title {
-    @apply text-muted flex items-center gap-1 text-xs font-medium tracking-wide uppercase select-none;
+    @apply text-muted hover:text-interface-text flex cursor-pointer items-center gap-1 text-xs font-medium tracking-wide uppercase select-none;
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
   }
 
   .sidebar-accordion-section__count {
