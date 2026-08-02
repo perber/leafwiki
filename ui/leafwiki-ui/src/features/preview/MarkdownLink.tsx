@@ -62,9 +62,19 @@ export function MarkdownLink({
   const { t } = useTranslation('viewer')
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
+  const getPageById = useTreeStore((s) => s.getPageById)
 
   const editMode = useAppMode() === 'edit'
   const readOnly = useIsReadOnly()
+
+  const getCurrentWikiPath = (): string => {
+    let locationPath = window.location.pathname
+    const stripped = stripBasePath(locationPath)
+    if (stripped !== null) {
+      locationPath = stripped
+    }
+    return normalizeWikiRoutePath(props.path ?? buildViewUrl(locationPath))
+  }
 
   if (href === undefined) {
     return <>{children}</>
@@ -94,12 +104,25 @@ export function MarkdownLink({
         <Button
           variant="link"
           onClick={async () => {
+            // Create the new page in the same folder as the page containing
+            // the link, not at the wiki root.
+            const currentPage = getPageByPath(
+              toWikiLookupPath(getCurrentWikiPath()),
+            )
+            const parentId = currentPage?.parentId ?? ''
+            const folderPath = parentId
+              ? (getPageById(parentId)?.path ?? '')
+              : ''
+
             // Ask the server for a valid slug so the create-page dialog
             // receives a proper path instead of the raw title (which may
             // contain spaces or special characters).
-            const slug = await suggestSlug('', title).catch(() => '')
+            const slug = await suggestSlug(parentId, title).catch(() => '')
+            const initialPath = [folderPath, slug || title]
+              .filter(Boolean)
+              .join('/')
             openDialog(DIALOG_CREATE_PAGE_BY_PATH, {
-              initialPath: slug || title,
+              initialPath,
               initialTitle: title,
               forwardToEditMode: !editMode,
             })
@@ -161,20 +184,7 @@ export function MarkdownLink({
       normalizedHref = normalizeWikiRoutePath(href)
     } else {
       // Relative link (e.g. "../stoff/change", "child-page", "./foo")
-      let locationPath = window.location.pathname
-
-      // Use stripBasePath utility (with boundary check)
-      const stripped = stripBasePath(locationPath)
-      if (stripped !== null) {
-        locationPath = stripped
-      }
-
-      // Then proceed as before
-      const currentPath = normalizeWikiRoutePath(
-        props.path ?? buildViewUrl(locationPath),
-      )
-
-      normalizedHref = resolveWikiLinkPath(currentPath, href)
+      normalizedHref = resolveWikiLinkPath(getCurrentWikiPath(), href)
     }
 
     /**
