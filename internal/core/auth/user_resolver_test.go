@@ -1,11 +1,14 @@
 package auth
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func setupTestUserResolver(t *testing.T) (*UserResolver, *UserService) {
 	t.Helper()
 	service := setupTestUserService(t)
-	resolver, err := NewUserResolver(service)
+	resolver, err := NewUserResolver(func() *UserService { return service })
 	if err != nil {
 		t.Fatalf("NewUserResolver failed: %v", err)
 	}
@@ -84,5 +87,64 @@ func TestUserResolver_Reload_ClearsCachedMisses(t *testing.T) {
 	resolver.mu.RUnlock()
 	if ok {
 		t.Fatalf("expected Reload to clear cached misses, but the entry is still present")
+	}
+}
+
+// TestUserResolver_ResolveUserLabel_ReflectsLiveRestore is a regression test
+// for the UserResolver half of "User-Management Routes Go Stale After Live
+// Restore": a UserResolver built from a plain *UserService (as wiki.go's
+// initAuth does with w.user) never sees a live restore's
+// AuthService.ReplaceUserStore swap, so a cache-miss lookup for a user that
+// only exists in the restored store fails forever.
+func TestUserResolver_ResolveUserLabel_ReflectsLiveRestore(t *testing.T) {
+	preStore, err := NewUserStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewUserStore(pre): %v", err)
+	}
+	preSvc := NewUserService(preStore)
+
+	sessionStore, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSessionStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := sessionStore.Close(); err != nil {
+			t.Errorf("Close session store: %v", err)
+		}
+	})
+	sessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authSvc := NewAuthService(preSvc, sessions, nil)
+	t.Cleanup(func() { _ = authSvc.Close() })
+
+	resolver, err := NewUserResolver(authSvc.UserService)
+	if err != nil {
+		t.Fatalf("NewUserResolver: %v", err)
+	}
+
+	postDir := t.TempDir()
+	postStore, err := NewUserStore(postDir)
+	if err != nil {
+		t.Fatalf("NewUserStore(post): %v", err)
+	}
+	postSvc := NewUserService(postStore)
+	postUser, err := postSvc.CreateUser("post-restore-admin", "post-restore-admin@example.com", "password123", RoleAdmin)
+	if err != nil {
+		t.Fatalf("CreateUser(post): %v", err)
+	}
+	if err := postStore.Close(); err != nil {
+		t.Fatalf("Close(postStore): %v", err)
+	}
+
+	// Simulates what a live restore does to AuthService.
+	if err := authSvc.ReplaceUserStore(postDir); err != nil {
+		t.Fatalf("ReplaceUserStore: %v", err)
+	}
+
+	label, err := resolver.ResolveUserLabel(postUser.ID)
+	if err != nil {
+		t.Fatalf("ResolveUserLabel failed after a live restore swapped the user store: %v", err)
+	}
+	if label == nil || label.Username != "post-restore-admin" {
+		t.Fatalf("expected the resolver to see the post-restore user, got %+v", label)
 	}
 }

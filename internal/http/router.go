@@ -80,7 +80,9 @@ type HTTPRemoteUserConfig struct {
 	Enabled        bool
 	HeaderName     string
 	TrustedProxies *auth_middleware.TrustedProxies
-	UserService    *coreauth.UserService
+	// UserService is resolved on every request rather than captured once
+	// here — see auth_middleware.RemoteUserConfig.UserService.
+	UserService func() *coreauth.UserService
 }
 
 // RouterOptions holds global HTTP server configuration shared across all domains.

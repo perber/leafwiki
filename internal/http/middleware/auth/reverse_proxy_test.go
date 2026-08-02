@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
@@ -11,7 +12,7 @@ import (
 )
 
 type proxyFixture struct {
-	userService *coreauth.UserService
+	userService func() *coreauth.UserService
 	close       func() error
 }
 
@@ -41,7 +42,7 @@ func createProxyFixture(t *testing.T) *proxyFixture {
 	}
 
 	return &proxyFixture{
-		userService: userService,
+		userService: func() *coreauth.UserService { return userService },
 		close:       userStore.Close,
 	}
 }
@@ -314,6 +315,70 @@ func TestInjectRemoteUser_MisconfiguredUserService(t *testing.T) {
 	}
 }
 
+// TestInjectRemoteUser_ReflectsLiveRestore is a regression test for the
+// remote-user half of "User-Management Routes Go Stale After Live Restore":
+// RemoteUserConfig.UserService used to be a *coreauth.UserService captured
+// once when the router was built, so it never saw a live restore's
+// AuthService.ReplaceUserStore swap. A resolver func must be called fresh on
+// every request instead.
+func TestInjectRemoteUser_ReflectsLiveRestore(t *testing.T) {
+	preDir := t.TempDir()
+	preStore, err := coreauth.NewUserStore(preDir)
+	if err != nil {
+		t.Fatalf("NewUserStore(pre): %v", err)
+	}
+	preSvc := coreauth.NewUserService(preStore)
+
+	sessionStore, err := coreauth.NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSessionStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := sessionStore.Close(); err != nil {
+			t.Errorf("Close session store: %v", err)
+		}
+	})
+	sessions := coreauth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authSvc := coreauth.NewAuthService(preSvc, sessions, nil)
+	t.Cleanup(func() { _ = authSvc.Close() })
+
+	cfg := authmw.RemoteUserConfig{
+		Enabled:        true,
+		HeaderName:     "Remote-User",
+		TrustedProxies: mustParseTrustedProxies(t, "127.0.0.1"),
+		UserService:    authSvc.UserService,
+	}
+
+	postDir := t.TempDir()
+	postStore, err := coreauth.NewUserStore(postDir)
+	if err != nil {
+		t.Fatalf("NewUserStore(post): %v", err)
+	}
+	postSvc := coreauth.NewUserService(postStore)
+	if _, err := postSvc.CreateUser("post-restore-admin", "post-restore-admin@example.com", "password123", coreauth.RoleAdmin); err != nil {
+		t.Fatalf("CreateUser(post): %v", err)
+	}
+	if err := postStore.Close(); err != nil {
+		t.Fatalf("Close(postStore): %v", err)
+	}
+
+	// Simulates what a live restore does to AuthService.
+	if err := authSvc.ReplaceUserStore(postDir); err != nil {
+		t.Fatalf("ReplaceUserStore: %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("Remote-User", "post-restore-admin")
+	w := httptest.NewRecorder()
+
+	proxyRouter(cfg).ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 resolving a post-restore-only user, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 // TestInjectRemoteUser_WithRequireAuth verifies the full middleware chain:
 // InjectRemoteUser sets the user, then RequireAuth short-circuits JWT validation.
 func TestInjectRemoteUser_WithRequireAuth(t *testing.T) {
@@ -328,7 +393,7 @@ func TestInjectRemoteUser_WithRequireAuth(t *testing.T) {
 	cleanupWithErrorCheck(t, "session store", sessionStore.Close)
 
 	sessions := coreauth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", 0, 0)
-	authService := coreauth.NewAuthService(f.userService, sessions, nil)
+	authService := coreauth.NewAuthService(f.userService(), sessions, nil)
 	authCookies := authmw.NewAuthCookies(true, 0, 0)
 
 	cfg := authmw.RemoteUserConfig{

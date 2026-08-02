@@ -36,6 +36,12 @@ type Config struct {
 	// BrandingService's in-memory config cache is reloaded from the restored
 	// branding.json after the file swap.
 	BrandingService *branding.BrandingService
+	// UserResolver's own in-memory author-label cache is reloaded after
+	// AuthService.ReplaceUserStore succeeds — the live UserService pointer
+	// alone doesn't invalidate labels already cached before the restore. nil
+	// is tolerated (every use below is nil-guarded) for callers/tests that
+	// don't wire one up.
+	UserResolver *auth.UserResolver
 	// TriggerResync rebuilds the derived tree/search/links/tags/properties
 	// indexes from the restored root/assets. Typically wiki.Wiki.TriggerResyncAsync.
 	TriggerResync func()

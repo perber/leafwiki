@@ -88,11 +88,12 @@ func setupUpdateUserUseCase(t *testing.T) (*UpdateUserUseCase, *coreauth.UserSer
 	})
 
 	userSvc := coreauth.NewUserService(store)
-	resolver, err := coreauth.NewUserResolver(userSvc)
+	userSvcFn := func() *coreauth.UserService { return userSvc }
+	resolver, err := coreauth.NewUserResolver(userSvcFn)
 	if err != nil {
 		t.Fatalf("NewUserResolver: %v", err)
 	}
-	return NewUpdateUserUseCase(userSvc, resolver, slog.Default()), userSvc
+	return NewUpdateUserUseCase(userSvcFn, resolver, slog.Default()), userSvc
 }
 
 // TestUpdateUser_AdminCanChangeRole verifies that an admin requester can promote
@@ -467,7 +468,7 @@ func TestGetUsersUseCase_DoesNotExposeTOTPSecretOrRecoveryCodes(t *testing.T) {
 		t.Fatalf("EnableTOTP: %v", err)
 	}
 
-	uc := NewGetUsersUseCase(userSvc)
+	uc := NewGetUsersUseCase(func() *coreauth.UserService { return userSvc })
 	out, err := uc.Execute(context.Background())
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -509,7 +510,8 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 		}
 	})
 	userSvc := coreauth.NewUserService(store)
-	resolver, err := coreauth.NewUserResolver(userSvc)
+	userSvcFn := func() *coreauth.UserService { return userSvc }
+	resolver, err := coreauth.NewUserResolver(userSvcFn)
 	if err != nil {
 		t.Fatalf("NewUserResolver: %v", err)
 	}
@@ -532,7 +534,7 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 		t.Fatalf("failed to seed favorite: %v", err)
 	}
 
-	uc := NewDeleteUserUseCase(userSvc, resolver, favoritesStore, slog.Default())
+	uc := NewDeleteUserUseCase(userSvcFn, resolver, favoritesStore, slog.Default())
 	if err := uc.Execute(context.Background(), DeleteUserInput{ID: user.ID}); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
@@ -543,5 +545,69 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 	}
 	if len(ids) != 0 {
 		t.Errorf("expected favorites for deleted user to be cleaned up, got %v", ids)
+	}
+}
+
+// TestGetUsersUseCase_ReflectsLiveRestore is the regression test for
+// "User-Management Routes Go Stale After Live Restore": wiki.go wires this use
+// case straight from w.user (the UserService captured once at boot), bypassing
+// AuthService entirely. A live restore's AuthService.ReplaceUserStore swaps
+// AuthService's own internal pointer and closes the old UserService's store —
+// but never touches whatever a caller captured directly, so a use case built
+// that way is left holding a closed store forever after a restore.
+func TestGetUsersUseCase_ReflectsLiveRestore(t *testing.T) {
+	preDir := t.TempDir()
+	preStore, err := coreauth.NewUserStore(preDir)
+	if err != nil {
+		t.Fatalf("NewUserStore(pre): %v", err)
+	}
+	preSvc := coreauth.NewUserService(preStore)
+
+	sessionStore, err := coreauth.NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSessionStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := sessionStore.Close(); err != nil {
+			t.Errorf("Close session store: %v", err)
+		}
+	})
+	sessions := coreauth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authSvc := coreauth.NewAuthService(preSvc, sessions, nil)
+	t.Cleanup(func() { _ = authSvc.Close() })
+
+	uc := NewGetUsersUseCase(authSvc.UserService)
+
+	postDir := t.TempDir()
+	postStore, err := coreauth.NewUserStore(postDir)
+	if err != nil {
+		t.Fatalf("NewUserStore(post): %v", err)
+	}
+	postSvc := coreauth.NewUserService(postStore)
+	postUser, err := postSvc.CreateUser("post-restore-admin", "post-restore-admin@example.com", "password123", coreauth.RoleAdmin)
+	if err != nil {
+		t.Fatalf("CreateUser(post): %v", err)
+	}
+	if err := postStore.Close(); err != nil {
+		t.Fatalf("Close(postStore): %v", err)
+	}
+
+	// Simulates what a live restore does to AuthService.
+	if err := authSvc.ReplaceUserStore(postDir); err != nil {
+		t.Fatalf("ReplaceUserStore: %v", err)
+	}
+
+	out, err := uc.Execute(context.Background())
+	if err != nil {
+		t.Fatalf("GetUsersUseCase.Execute failed after a live restore swapped the user store: %v", err)
+	}
+	found := false
+	for _, u := range out.Users {
+		if u.ID == postUser.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("GetUsersUseCase did not see the post-restore user set — it's still bound to the pre-restore UserService captured at construction time")
 	}
 }

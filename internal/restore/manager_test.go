@@ -680,6 +680,90 @@ func TestManager_Restore_HappyPath_PreservesAPIKeys(t *testing.T) {
 	}
 }
 
+// TestManager_Restore_HappyPath_ReloadsUserResolverCache is a regression test
+// for the UserResolver half of "User-Management Routes Go Stale After Live
+// Restore": UserResolver's own in-memory author-label cache is a separate
+// thing from AuthService's live UserService pointer — even with that pointer
+// fixed, a label resolved before the restore stays cached (and wrong) unless
+// something calls UserResolver.Reload() after the swap. This mirrors
+// TestManager_Restore_HappyPath_PreservesAPIKeys's shape.
+func TestManager_Restore_HappyPath_ReloadsUserResolverCache(t *testing.T) {
+	src := t.TempDir()
+	test_utils.WriteFile(t, src, "root/welcome.md", "# Snapshot content\n")
+	snapshotOwnerID := createRealUsersDB(t, src, "snapshot-admin", "snapshot-admin@example.com", "snapshot-password-123")
+
+	snapshotMgr := snapshotSvc.NewManager(snapshotSvc.Config{
+		BackupsDir:  filepath.Join(src, "backups"),
+		RootDir:     filepath.Join(src, "root"),
+		UsersDBPath: filepath.Join(src, "users.db"),
+		WikiVersion: "v1.0.0",
+	})
+	if err := snapshotMgr.RunOnce(context.Background()); err != nil {
+		t.Fatalf("failed to build fixture snapshot: %v", err)
+	}
+	entries, err := snapshotMgr.List()
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("expected 1 fixture snapshot, got %v (err=%v)", entries, err)
+	}
+	snapshotID := entries[0].ID
+
+	dataDir := t.TempDir()
+	liveOwnerID := createRealUsersDB(t, dataDir, "live-admin", "live-admin@example.com", "live-password-123")
+
+	userStore, err := auth.NewUserStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewUserStore failed: %v", err)
+	}
+	sessionStore, err := auth.NewSessionStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewSessionStore failed: %v", err)
+	}
+	sessions := auth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := auth.NewAuthService(auth.NewUserService(userStore), sessions, nil)
+	t.Cleanup(func() { _ = authService.Close() })
+
+	userResolver, err := auth.NewUserResolver(authService.UserService)
+	if err != nil {
+		t.Fatalf("NewUserResolver failed: %v", err)
+	}
+
+	// Populate the resolver's cache for the live-only admin before the
+	// restore — this is the entry that must NOT survive the restore.
+	if _, err := userResolver.ResolveUserLabel(liveOwnerID); err != nil {
+		t.Fatalf("failed to pre-populate resolver cache for live admin: %v", err)
+	}
+
+	brandingService, err := branding.NewBrandingService(dataDir)
+	if err != nil {
+		t.Fatalf("NewBrandingService failed: %v", err)
+	}
+
+	manager := NewManager(Config{
+		SnapshotManager: snapshotMgr,
+		DataDir:         dataDir,
+		WikiVersion:     "v1.0.0",
+		WriteGate:       NewWriteGate(),
+		AuthService:     authService,
+		BrandingService: brandingService,
+		UserResolver:    userResolver,
+	})
+
+	if err := manager.TriggerRestore(snapshotID); err != nil {
+		t.Fatalf("TriggerRestore failed: %v", err)
+	}
+	status := waitForRestoreDone(t, manager)
+	if status.Error != "" {
+		t.Fatalf("expected successful restore, got error: %s", status.Error)
+	}
+
+	if label, err := userResolver.ResolveUserLabel(snapshotOwnerID); err != nil || label == nil || label.Username != "snapshot-admin" {
+		t.Errorf("expected the resolver to resolve the restored snapshot admin, got label=%+v err=%v", label, err)
+	}
+	if label, err := userResolver.ResolveUserLabel(liveOwnerID); err == nil {
+		t.Errorf("expected the pre-restore cached label for the live-only admin to be gone after restore, got stale label=%+v", label)
+	}
+}
+
 // TestManager_Restore_APIKeyManagementDisabled_DoesNotError covers the common
 // case (API key management is off by default): cfg.APIKeyService is nil and
 // no api_keys.db was ever created, so restore must complete normally — the

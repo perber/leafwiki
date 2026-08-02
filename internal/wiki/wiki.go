@@ -205,7 +205,7 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 			return err
 		}
 	}
-	w.userResolver, err = auth.NewUserResolver(w.user)
+	w.userResolver, err = auth.NewUserResolver(w.UserService)
 	if err != nil {
 		return err
 	}
@@ -445,12 +445,12 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		CompleteTOTPLogin: wikiauth.NewCompleteTOTPLoginUseCase(w.auth, w.metrics),
 		Logout:            wikiauth.NewLogoutUseCase(w.auth, w.metrics),
 		RefreshToken:      wikiauth.NewRefreshTokenUseCase(w.auth, w.metrics),
-		CreateUser:        wikiauth.NewCreateUserUseCase(w.user, w.userResolver, w.log),
-		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.user, w.userResolver, w.log),
-		ChangeOwnPassword: wikiauth.NewChangeOwnPasswordUseCase(w.user),
-		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.user, w.userResolver, w.favorites, w.log),
-		GetUsers:          wikiauth.NewGetUsersUseCase(w.user),
-		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.user),
+		CreateUser:        wikiauth.NewCreateUserUseCase(w.UserService, w.userResolver, w.log),
+		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.UserService, w.userResolver, w.log),
+		ChangeOwnPassword: wikiauth.NewChangeOwnPasswordUseCase(w.UserService),
+		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.UserService, w.userResolver, w.favorites, w.log),
+		GetUsers:          wikiauth.NewGetUsersUseCase(w.UserService),
+		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.UserService),
 		StartTOTPSetup:    wikiauth.NewStartTOTPSetupUseCase(w.auth),
 		ConfirmTOTPSetup:  wikiauth.NewConfirmTOTPSetupUseCase(w.auth, w.metrics),
 		DisableTOTP:       wikiauth.NewDisableTOTPUseCase(w.auth, w.metrics),
@@ -859,8 +859,23 @@ func (w *Wiki) GetStorageDir() string {
 	return w.storageDir
 }
 
+// UserService returns the current *auth.UserService: AuthService's live,
+// restore-swap-tracking one when auth is enabled (see AuthService.UserService),
+// falling back to the UserService constructed in initAuth when auth is
+// disabled — in that mode there's no AuthService and, per
+// internal/restore/manager.go's AuthService-nil guards, a live restore never
+// swaps this store either, so the fallback is never stale.
 func (w *Wiki) UserService() *auth.UserService {
+	if w.auth != nil {
+		return w.auth.UserService()
+	}
 	return w.user
+}
+
+// UserResolver returns the author-label resolver shared across page/tag/
+// property routes and the user-management use cases.
+func (w *Wiki) UserResolver() *auth.UserResolver {
+	return w.userResolver
 }
 
 // APIKeyService returns the API key service used for Bearer authentication.
