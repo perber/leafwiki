@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/test_utils"
 )
 
@@ -217,6 +218,54 @@ func TestAPIKeyStore_TouchLastUsed(t *testing.T) {
 	}
 	if got.LastUsedAt == nil || !got.LastUsedAt.Equal(time.Unix(now.Unix(), 0)) {
 		t.Fatalf("expected LastUsedAt ~= %v, got %v", now, got.LastUsedAt)
+	}
+}
+
+// TestAPIKeyStore_Suspend_ClosesDBAndBlocksReconnect mirrors
+// TestUserStore_Suspend_ClosesDBAndBlocksReconnect: suspend() must close the
+// connection AND make withDB refuse to reopen it, so a query landing during
+// the restore swap window (Windows rename-of-open-file sharing violation)
+// fails fast instead of silently grabbing a fresh OS-level file handle.
+func TestAPIKeyStore_Suspend_ClosesDBAndBlocksReconnect(t *testing.T) {
+	store := setupTestAPIKeyStore(t)
+
+	key := &APIKey{
+		ID:        "k1",
+		Name:      "agent key",
+		UserID:    "u1",
+		Prefix:    "ab12cd",
+		KeyHash:   "hashed",
+		Role:      RoleViewer,
+		CreatedBy: "admin1",
+		CreatedAt: time.Now(),
+	}
+	if err := store.CreateAPIKey(key); err != nil {
+		t.Fatalf("CreateAPIKey failed: %v", err)
+	}
+
+	if err := store.suspend(); err != nil {
+		t.Fatalf("suspend failed: %v", err)
+	}
+	if store.db != nil {
+		t.Fatal("expected db to be nil immediately after suspend")
+	}
+
+	_, err := store.GetByPrefix("ab12cd")
+	if err == nil {
+		t.Fatal("expected a query against a suspended store to fail, not silently reconnect")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "apikey_store_unavailable" {
+		t.Fatalf("expected apikey_store_unavailable, got %v", err)
+	}
+	if store.db != nil {
+		t.Fatal("expected the failed query to NOT have reopened db — that's exactly the race this fix prevents")
+	}
+
+	// suspend must be idempotent — Manager.rollbackOrIntervene's cleanup
+	// paths may end up calling code that touches an already-suspended store.
+	if err := store.suspend(); err != nil {
+		t.Fatalf("expected a second suspend call to be a safe no-op, got: %v", err)
 	}
 }
 

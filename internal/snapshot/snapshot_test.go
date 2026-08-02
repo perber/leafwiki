@@ -56,6 +56,22 @@ func createTestUsersDB(t *testing.T, path string) {
 	}
 }
 
+func createTestAPIKeysDB(t *testing.T, path string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("failed to open api keys db: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(db.Close, t)
+
+	if _, err := db.Exec("CREATE TABLE api_keys (id INTEGER PRIMARY KEY, prefix TEXT)"); err != nil {
+		t.Fatalf("failed to create api_keys table: %v", err)
+	}
+	if _, err := db.Exec("INSERT INTO api_keys (prefix) VALUES (?)", "ab12cd"); err != nil {
+		t.Fatalf("failed to seed api_keys table: %v", err)
+	}
+}
+
 func TestCreateSnapshot_CreatesZip(t *testing.T) {
 	cfg := newTestConfig(t)
 
@@ -143,6 +159,61 @@ func TestCreateSnapshot_BrandingConfigFileIsOptional(t *testing.T) {
 	}
 }
 
+func TestCreateSnapshot_APIKeysDBIsOptional(t *testing.T) {
+	// The common case: API key management is off by default, so no
+	// api_keys.db exists on disk yet. createSnapshot must not fail over that
+	// (matches addFileToZip's existing "missing optional source" behavior) —
+	// newTestConfig doesn't set APIKeysDBPath, mirroring that default.
+	cfg := newTestConfig(t)
+
+	id, err := createSnapshot(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("createSnapshot failed: %v", err)
+	}
+
+	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open zip: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
+
+	for _, f := range r.File {
+		if f.Name == "api_keys.db" {
+			t.Error("expected no api_keys.db entry when the source file doesn't exist")
+		}
+	}
+}
+
+func TestCreateSnapshot_ContainsAPIKeysDBWhenPresent(t *testing.T) {
+	cfg := newTestConfig(t)
+	apiKeysDBPath := filepath.Join(t.TempDir(), "api_keys.db")
+	createTestAPIKeysDB(t, apiKeysDBPath)
+	cfg.APIKeysDBPath = apiKeysDBPath
+
+	id, err := createSnapshot(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("createSnapshot failed: %v", err)
+	}
+
+	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open zip: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
+
+	found := false
+	for _, f := range r.File {
+		if f.Name == "api_keys.db" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected an api_keys.db entry when the source file exists")
+	}
+}
+
 func TestCreateSnapshot_SameSecondCallsDoNotCollide(t *testing.T) {
 	cfg := newTestConfig(t)
 
@@ -202,7 +273,7 @@ func TestUniqueSnapshotID_AppendsSuffixOnCollision(t *testing.T) {
 	}
 }
 
-func TestVacuumUsersDB_WaitsForBusyWriter(t *testing.T) {
+func TestVacuumSQLiteDB_WaitsForBusyWriter(t *testing.T) {
 	base := t.TempDir()
 	srcPath := filepath.Join(base, "users.db")
 	createTestUsersDB(t, srcPath)
@@ -230,8 +301,8 @@ func TestVacuumUsersDB_WaitsForBusyWriter(t *testing.T) {
 	}()
 
 	dstPath := filepath.Join(base, "users-copy.db")
-	if err := vacuumUsersDB(context.Background(), srcPath, dstPath); err != nil {
-		t.Fatalf("vacuumUsersDB failed while a writer briefly held the database: %v", err)
+	if err := vacuumSQLiteDB(context.Background(), srcPath, dstPath); err != nil {
+		t.Fatalf("vacuumSQLiteDB failed while a writer briefly held the database: %v", err)
 	}
 
 	<-committed

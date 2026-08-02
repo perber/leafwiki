@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/perber/wiki/internal/core/shared"
@@ -42,17 +43,76 @@ const apiKeyTokenPrefix = "lw_"
 const apiKeyLastUsedThrottle = 5 * time.Minute
 
 type APIKeyService struct {
+	// mu guards only store — it's the one field Replace swaps after a restore
+	// (api_keys.db is part of the snapshot ZIP, mirroring AuthService.mu /
+	// userService).
+	mu    sync.RWMutex
 	store *APIKeyStore
-	users *UserService
-	log   *slog.Logger
+	// authService is depended on (rather than caching a *UserService copy)
+	// specifically so owner lookups (Resolve, CreateAPIKey) always go through
+	// AuthService.UserService(), which already tracks a live restore's
+	// ReplaceUserStore swap. A cached *UserService here would silently go
+	// stale after the first restore — users.db is AuthService's data, not
+	// APIKeyService's; only api_keys.db is swapped directly by this service
+	// (see Replace). NewAPIKeyService is only ever called with a non-nil
+	// AuthService (wiki.go constructs API key management inside the same
+	// !AuthDisabled block that builds AuthService first).
+	authService *AuthService
+	log         *slog.Logger
 }
 
-func NewAPIKeyService(store *APIKeyStore, users *UserService) *APIKeyService {
-	return &APIKeyService{store: store, users: users, log: slog.Default().With("component", "APIKeyService")}
+func NewAPIKeyService(store *APIKeyStore, authService *AuthService) *APIKeyService {
+	return &APIKeyService{store: store, authService: authService, log: slog.Default().With("component", "APIKeyService")}
+}
+
+// currentStore returns the current *APIKeyStore under a read lock. Callers
+// use the returned pointer directly for the rest of their operation — the
+// lock is only held long enough to copy the pointer, never across a query, so
+// Replace swapping it mid-request never serializes unrelated requests on this
+// mutex. Mirrors AuthService.users().
+func (s *APIKeyService) currentStore() *APIKeyStore {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.store
 }
 
 func (s *APIKeyService) Close() error {
-	return s.store.Close()
+	return s.currentStore().Close()
+}
+
+// PauseForSwap closes the current APIKeyStore's *sql.DB connection and
+// prevents it from reconnecting, releasing any OS-level file lock on
+// api_keys.db before a live restore renames it. Mirrors
+// AuthService.PauseUserStoreForSwap — see that doc comment and
+// APIKeyStore.suspend for the full Windows-rename rationale.
+func (s *APIKeyService) PauseForSwap() error {
+	return s.currentStore().suspend()
+}
+
+// Replace opens a fresh APIKeyStore against storageDir/api_keys.db and swaps
+// it in, closing the previous one afterward. Used by a live restore after
+// api_keys.db has been swapped in on disk (or left untouched, if this
+// snapshot didn't capture one) — either way a fresh store re-reads whatever is
+// actually on disk now, and NewAPIKeyStore's ensureSchema call brings a
+// pre-existing-but-older api_keys.db up to the current schema. Mirrors
+// AuthService.ReplaceUserStore.
+func (s *APIKeyService) Replace(storageDir string) error {
+	newStore, err := NewAPIKeyStore(storageDir)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	old := s.store
+	s.store = newStore
+	s.mu.Unlock()
+
+	if old != nil {
+		if err := old.Close(); err != nil {
+			s.log.Warn("failed to close previous api key store after restore", "error", err)
+		}
+	}
+	return nil
 }
 
 // CreateAPIKeyParams are the admin-supplied inputs for minting a new key.
@@ -75,7 +135,7 @@ func (s *APIKeyService) CreateAPIKey(p CreateAPIKeyParams) (*APIKey, string, err
 	if !IsValidRole(role) {
 		return nil, "", ErrUserInvalidRole
 	}
-	if _, err := s.users.GetUserByID(p.UserID); err != nil {
+	if _, err := s.authService.UserService().GetUserByID(p.UserID); err != nil {
 		return nil, "", err
 	}
 
@@ -89,6 +149,7 @@ func (s *APIKeyService) CreateAPIKey(p CreateAPIKeyParams) (*APIKey, string, err
 		return nil, "", err
 	}
 	hash := hashSecret(secret)
+	store := s.currentStore()
 
 	// A random-prefix collision is astronomically unlikely; retry the prefix
 	// alone once defensively rather than fail the request outright. The
@@ -113,7 +174,7 @@ func (s *APIKeyService) CreateAPIKey(p CreateAPIKeyParams) (*APIKey, string, err
 			CreatedAt: time.Now(),
 		}
 
-		if err := s.store.CreateAPIKey(key); err != nil {
+		if err := store.CreateAPIKey(key); err != nil {
 			if err == ErrAPIKeyPrefixCollision && attempt < maxAttempts {
 				continue
 			}
@@ -125,11 +186,11 @@ func (s *APIKeyService) CreateAPIKey(p CreateAPIKeyParams) (*APIKey, string, err
 }
 
 func (s *APIKeyService) ListAPIKeys() ([]*APIKey, error) {
-	return s.store.ListAll()
+	return s.currentStore().ListAll()
 }
 
 func (s *APIKeyService) RevokeAPIKey(id string) error {
-	return s.store.Revoke(id)
+	return s.currentStore().Revoke(id)
 }
 
 // Resolve validates a raw "Authorization: Bearer <token>" value and returns the
@@ -151,7 +212,8 @@ func (s *APIKeyService) Resolve(token string) (*User, error) {
 		return nil, ErrAPIKeyInvalid
 	}
 
-	key, err := s.store.GetByPrefix(prefix)
+	store := s.currentStore()
+	key, err := store.GetByPrefix(prefix)
 	found := err == nil
 	if err != nil && err != ErrAPIKeyNotFound {
 		s.log.Warn("api key resolve: prefix lookup failed", "error", err)
@@ -174,14 +236,14 @@ func (s *APIKeyService) Resolve(token string) (*User, error) {
 		return nil, ErrAPIKeyExpired
 	}
 
-	owner, err := s.users.GetUserByID(key.UserID)
+	owner, err := s.authService.UserService().GetUserByID(key.UserID)
 	if err != nil {
 		s.log.Warn("api key resolve: owner lookup failed", "error", err, "keyID", key.ID)
 		return nil, ErrAPIKeyInvalid
 	}
 
 	if key.LastUsedAt == nil || now.Sub(*key.LastUsedAt) > apiKeyLastUsedThrottle {
-		if err := s.store.TouchLastUsed(key.ID, now); err != nil {
+		if err := store.TouchLastUsed(key.ID, now); err != nil {
 			s.log.Warn("failed to update api key last_used_at", "error", err, "keyID", key.ID)
 		}
 	}

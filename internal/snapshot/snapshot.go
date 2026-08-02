@@ -23,6 +23,7 @@ type Config struct {
 	BrandingConfigFile string // storageDir/branding.json (site name, active logo/favicon filename) — separate from BrandingDir, which only holds the uploaded logo/favicon image files
 	SchemaFile         string
 	UsersDBPath        string
+	APIKeysDBPath      string // storageDir/api_keys.db — may not exist (API key management is disabled by default); addFileToZip/os.Stat guards make an absent file a safe no-op
 	WikiVersion        string // injected from build info
 
 	// Interval is the automatic snapshot interval; 0 means manual-only
@@ -57,13 +58,27 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	usersDBCopy := filepath.Join(tmpDir, "users.db")
-	if err := vacuumUsersDB(ctx, cfg.UsersDBPath, usersDBCopy); err != nil {
+	if err := vacuumSQLiteDB(ctx, cfg.UsersDBPath, usersDBCopy); err != nil {
 		return "", fmt.Errorf("failed to vacuum users database: %w", err)
+	}
+
+	// api_keys.db is optional (API key management is off by default). Unlike
+	// addFileToZip's silent-skip-on-missing, VACUUM INTO against a
+	// nonexistent source doesn't fail the same clean way, so the missing-file
+	// case is checked explicitly here rather than left to vacuumSQLiteDB.
+	var apiKeysDBCopy string
+	if cfg.APIKeysDBPath != "" {
+		if _, statErr := os.Stat(cfg.APIKeysDBPath); statErr == nil {
+			apiKeysDBCopy = filepath.Join(tmpDir, "api_keys.db")
+			if err := vacuumSQLiteDB(ctx, cfg.APIKeysDBPath, apiKeysDBCopy); err != nil {
+				return "", fmt.Errorf("failed to vacuum api keys database: %w", err)
+			}
+		}
 	}
 
 	createdAt := time.Now().UTC()
 	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
-	if err := writeSnapshotZip(zipPath, cfg, id, createdAt, usersDBCopy); err != nil {
+	if err := writeSnapshotZip(zipPath, cfg, id, createdAt, usersDBCopy, apiKeysDBCopy); err != nil {
 		_ = os.Remove(zipPath) // best-effort cleanup of a partial/invalid zip left by the failed write
 		return "", fmt.Errorf("failed to write snapshot zip: %w", err)
 	}
@@ -107,17 +122,24 @@ func uniqueSnapshotID(backupsDir string, t time.Time) (string, error) {
 }
 
 // vacuumBusyTimeout bounds how long VACUUM INTO waits for a writer to
-// release its lock before failing with SQLITE_BUSY. users.db has no WAL
-// mode or busy_timeout configured elsewhere, so without this a snapshot
-// taken while an admin action (e.g. user create/update) is mid-write would
-// fail immediately instead of just waiting the write out.
+// release its lock before failing with SQLITE_BUSY. Neither users.db nor
+// api_keys.db has WAL mode or busy_timeout configured elsewhere, so without
+// this a snapshot taken while an admin action (e.g. user create/update, API
+// key create/revoke) is mid-write would fail immediately instead of just
+// waiting the write out.
 const vacuumBusyTimeout = 5 * time.Second
 
-func vacuumUsersDB(ctx context.Context, srcPath, dstPath string) error {
+// vacuumSQLiteDB copies srcPath into dstPath via VACUUM INTO — a consistent,
+// point-in-time snapshot of a possibly-open SQLite file, safe to take while a
+// concurrent writer holds it (bounded by vacuumBusyTimeout), unlike a plain
+// file copy which could capture a torn/inconsistent page set. Shared by both
+// users.db and api_keys.db, which have the same "may be written to
+// concurrently while a snapshot runs" exposure.
+func vacuumSQLiteDB(ctx context.Context, srcPath, dstPath string) error {
 	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(%d)", srcPath, vacuumBusyTimeout.Milliseconds())
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return fmt.Errorf("failed to open users database: %w", err)
+		return fmt.Errorf("failed to open %s: %w", srcPath, err)
 	}
 	defer func() { _ = db.Close() }()
 
@@ -127,7 +149,7 @@ func vacuumUsersDB(ctx context.Context, srcPath, dstPath string) error {
 	return nil
 }
 
-func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time, usersDBPath string) error {
+func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time, usersDBPath, apiKeysDBPath string) error {
 	f, err := os.Create(zipPath)
 	if err != nil {
 		return fmt.Errorf("failed to create zip file: %w", err)
@@ -152,6 +174,9 @@ func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time
 		return err
 	}
 	if err := addFileToZip(w, usersDBPath, "users.db"); err != nil {
+		return err
+	}
+	if err := addFileToZip(w, apiKeysDBPath, "api_keys.db"); err != nil {
 		return err
 	}
 

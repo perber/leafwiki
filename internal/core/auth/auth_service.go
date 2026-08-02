@@ -42,6 +42,15 @@ func (a *AuthService) users() *UserService {
 	return a.userService
 }
 
+// UserService returns the current *UserService (exported alias of users, for
+// callers outside this package). APIKeyService depends on this rather than
+// caching its own *UserService, so its owner lookups (Resolve) automatically
+// track ReplaceUserStore swaps after a live restore instead of going stale —
+// api_keys.db is the only user data APIKeyService owns and hot-swaps itself.
+func (a *AuthService) UserService() *UserService {
+	return a.users()
+}
+
 // ReplaceUserStore opens a fresh UserStore/UserService against
 // storageDir/users.db and swaps it in, closing the previous one afterward.
 // Used by a live restore after users.db has been swapped in on disk. Requests
