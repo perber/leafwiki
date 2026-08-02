@@ -77,6 +77,20 @@ describe('SidebarAccordionSection', () => {
     expect(onValueChangeSpy).toHaveBeenCalledWith(['pinned'])
   })
 
+  it('collapses the section when the title area is clicked', () => {
+    const onValueChangeSpy = vi.fn()
+    render(
+      <ControlledAccordion
+        defaultValue={['pinned']}
+        onValueChangeSpy={onValueChangeSpy}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('Pinned'))
+
+    expect(onValueChangeSpy).toHaveBeenCalledWith([])
+  })
+
   it('clicking an action button does not toggle the section', () => {
     const onValueChangeSpy = vi.fn()
     render(

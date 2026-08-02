@@ -31,13 +31,15 @@ export function SidebarAccordionSection({
       className={cn('sidebar-accordion-section', className)}
     >
       <AccordionPrimitive.Header className="sidebar-accordion-section__header">
-        <div className="sidebar-accordion-section__title">
-          {icon}
-          <span>{title}</span>
-          {typeof count === 'number' && (
-            <span className="sidebar-accordion-section__count">{count}</span>
-          )}
-        </div>
+        <AccordionPrimitive.Trigger asChild id={undefined}>
+          <button type="button" className="sidebar-accordion-section__title">
+            {icon}
+            <span>{title}</span>
+            {typeof count === 'number' && (
+              <span className="sidebar-accordion-section__count">{count}</span>
+            )}
+          </button>
+        </AccordionPrimitive.Trigger>
         <div className="sidebar-accordion-section__actions">
           {actions}
           <AccordionPrimitive.Trigger asChild>
