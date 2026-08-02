@@ -291,12 +291,16 @@ type CreateUserOutput struct {
 }
 
 type CreateUserUseCase struct {
-	user     *coreauth.UserService
+	// user is resolved on every call rather than cached at construction, so
+	// this use case automatically tracks a live restore's
+	// AuthService.ReplaceUserStore swap instead of going stale — see
+	// Wiki.UserService().
+	user     func() *coreauth.UserService
 	resolver *coreauth.UserResolver
 	log      *slog.Logger
 }
 
-func NewCreateUserUseCase(u *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger) *CreateUserUseCase {
+func NewCreateUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger) *CreateUserUseCase {
 	return &CreateUserUseCase{user: u, resolver: r, log: log}
 }
 
@@ -322,7 +326,7 @@ func (uc *CreateUserUseCase) Execute(_ context.Context, in CreateUserInput) (*Cr
 		return nil, ve
 	}
 
-	user, err := uc.user.CreateUser(in.Username, in.Email, in.Password, in.Role)
+	user, err := uc.user().CreateUser(in.Username, in.Email, in.Password, in.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -348,12 +352,12 @@ type UpdateUserOutput struct {
 }
 
 type UpdateUserUseCase struct {
-	user     *coreauth.UserService
+	user     func() *coreauth.UserService
 	resolver *coreauth.UserResolver
 	log      *slog.Logger
 }
 
-func NewUpdateUserUseCase(u *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger) *UpdateUserUseCase {
+func NewUpdateUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger) *UpdateUserUseCase {
 	return &UpdateUserUseCase{user: u, resolver: r, log: log}
 }
 
@@ -377,14 +381,14 @@ func (uc *UpdateUserUseCase) Execute(_ context.Context, in UpdateUserInput) (*Up
 	}
 
 	if !in.RequesterIsAdmin || !roleProvided {
-		existing, err := uc.user.GetUserByID(in.ID)
+		existing, err := uc.user().GetUserByID(in.ID)
 		if err != nil {
 			return nil, err
 		}
 		role = existing.Role
 	}
 
-	user, err := uc.user.UpdateUser(in.ID, in.Username, in.Email, in.Password, role)
+	user, err := uc.user().UpdateUser(in.ID, in.Username, in.Email, in.Password, role)
 	if err != nil {
 		return nil, err
 	}
@@ -403,10 +407,10 @@ type ChangeOwnPasswordInput struct {
 }
 
 type ChangeOwnPasswordUseCase struct {
-	user *coreauth.UserService
+	user func() *coreauth.UserService
 }
 
-func NewChangeOwnPasswordUseCase(u *coreauth.UserService) *ChangeOwnPasswordUseCase {
+func NewChangeOwnPasswordUseCase(u func() *coreauth.UserService) *ChangeOwnPasswordUseCase {
 	return &ChangeOwnPasswordUseCase{user: u}
 }
 
@@ -417,13 +421,13 @@ func (uc *ChangeOwnPasswordUseCase) Execute(_ context.Context, in ChangeOwnPassw
 	} else if len(in.NewPassword) < 8 {
 		ve.Add("newPassword", "New password must be at least 8 characters long")
 	}
-	if _, err := uc.user.DoesIDAndPasswordMatch(in.UserID, in.OldPassword); err != nil {
+	if _, err := uc.user().DoesIDAndPasswordMatch(in.UserID, in.OldPassword); err != nil {
 		ve.Add("oldPassword", "Old password is incorrect")
 	}
 	if ve.HasErrors() {
 		return ve
 	}
-	return uc.user.ChangeOwnPassword(in.UserID, in.OldPassword, in.NewPassword)
+	return uc.user().ChangeOwnPassword(in.UserID, in.OldPassword, in.NewPassword)
 }
 
 // ─── DeleteUserUseCase ───────────────────────────────────────────────────────
@@ -431,18 +435,18 @@ func (uc *ChangeOwnPasswordUseCase) Execute(_ context.Context, in ChangeOwnPassw
 type DeleteUserInput struct{ ID string }
 
 type DeleteUserUseCase struct {
-	user      *coreauth.UserService
+	user      func() *coreauth.UserService
 	resolver  *coreauth.UserResolver
 	favorites *favorites.FavoritesStore
 	log       *slog.Logger
 }
 
-func NewDeleteUserUseCase(u *coreauth.UserService, r *coreauth.UserResolver, f *favorites.FavoritesStore, log *slog.Logger) *DeleteUserUseCase {
+func NewDeleteUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, f *favorites.FavoritesStore, log *slog.Logger) *DeleteUserUseCase {
 	return &DeleteUserUseCase{user: u, resolver: r, favorites: f, log: log}
 }
 
 func (uc *DeleteUserUseCase) Execute(_ context.Context, in DeleteUserInput) error {
-	if err := uc.user.DeleteUser(in.ID); err != nil {
+	if err := uc.user().DeleteUser(in.ID); err != nil {
 		return err
 	}
 	if err := uc.resolver.Reload(); err != nil {
@@ -461,13 +465,15 @@ type GetUsersOutput struct {
 }
 
 type GetUsersUseCase struct {
-	user *coreauth.UserService
+	user func() *coreauth.UserService
 }
 
-func NewGetUsersUseCase(u *coreauth.UserService) *GetUsersUseCase { return &GetUsersUseCase{user: u} }
+func NewGetUsersUseCase(u func() *coreauth.UserService) *GetUsersUseCase {
+	return &GetUsersUseCase{user: u}
+}
 
 func (uc *GetUsersUseCase) Execute(_ context.Context) (*GetUsersOutput, error) {
-	users, err := uc.user.GetUsers()
+	users, err := uc.user().GetUsers()
 	if err != nil {
 		return nil, err
 	}
@@ -487,15 +493,15 @@ type GetUserByIDOutput struct {
 }
 
 type GetUserByIDUseCase struct {
-	user *coreauth.UserService
+	user func() *coreauth.UserService
 }
 
-func NewGetUserByIDUseCase(u *coreauth.UserService) *GetUserByIDUseCase {
+func NewGetUserByIDUseCase(u func() *coreauth.UserService) *GetUserByIDUseCase {
 	return &GetUserByIDUseCase{user: u}
 }
 
 func (uc *GetUserByIDUseCase) Execute(_ context.Context, in GetUserByIDInput) (*GetUserByIDOutput, error) {
-	user, err := uc.user.GetUserByID(in.ID)
+	user, err := uc.user().GetUserByID(in.ID)
 	if err != nil {
 		return nil, err
 	}

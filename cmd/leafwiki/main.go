@@ -627,6 +627,7 @@ func main() {
 			AuthService:        w.AuthService(),
 			APIKeyService:      w.APIKeyService(),
 			BrandingService:    w.BrandingService(),
+			UserResolver:       w.UserResolver(),
 			TriggerResync:      w.TriggerResyncAsync,
 			MaxUploadSizeBytes: restoreUploadMaxSize,
 		})
@@ -659,7 +660,7 @@ func main() {
 			Enabled:        enableHTTPRemoteUser,
 			HeaderName:     httpRemoteUserHeader,
 			TrustedProxies: trustedProxies,
-			UserService:    w.UserService(),
+			UserService:    w.UserService,
 		},
 		APIKeyService:     w.APIKeyService(),
 		DisableRequestLog: disableRequestLog,

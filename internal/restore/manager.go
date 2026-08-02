@@ -332,6 +332,18 @@ func (m *Manager) runFromZipPath(zipPath string) {
 			// than rolling back an otherwise-successful restore over it.
 			slog.Default().Warn("restore: failed to invalidate sessions", "error", err)
 		}
+
+		// UserResolver.userService already tracks AuthService's swapped
+		// pointer live, but its own in-memory author-label cache doesn't —
+		// reload it so labels resolved before the restore don't linger.
+		// Same non-fatal treatment as InvalidateAllSessions above: stale
+		// author-name labels are a cosmetic papercut, not a data-integrity
+		// problem worth failing an otherwise-successful restore over.
+		if m.cfg.UserResolver != nil {
+			if err := m.cfg.UserResolver.Reload(); err != nil {
+				slog.Default().Warn("restore: failed to reload user resolver cache", "error", err)
+			}
+		}
 	}
 
 	// APIKeyService is nil when API key management is disabled — independent
@@ -390,6 +402,15 @@ func (m *Manager) rollbackOrIntervene(sw *swapper, cause error) {
 				"cause", cause, "resync_error", err)
 			m.job.FinishNeedsIntervention(fmt.Errorf("%w (rollback succeeded but AuthService re-sync failed: %v)", cause, err))
 			return
+		}
+
+		// Mirrors the reload after the main-path ReplaceUserStore call: the
+		// resync above may have re-pointed AuthService at a different store
+		// than whatever labels UserResolver had already cached.
+		if m.cfg.UserResolver != nil {
+			if err := m.cfg.UserResolver.Reload(); err != nil {
+				slog.Default().Warn("restore: failed to reload user resolver cache after rollback", "error", err)
+			}
 		}
 	}
 

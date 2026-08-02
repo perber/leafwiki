@@ -14,7 +14,11 @@ type RemoteUserConfig struct {
 	Enabled        bool
 	HeaderName     string
 	TrustedProxies *TrustedProxies
-	UserService    *coreauth.UserService
+	// UserService is resolved on every request rather than captured once when
+	// the router is built, so it automatically tracks a live restore's
+	// AuthService.ReplaceUserStore swap instead of going stale — see
+	// Wiki.UserService().
+	UserService func() *coreauth.UserService
 }
 
 // InjectRemoteUser reads a username or email from a configured HTTP header when the
@@ -54,7 +58,7 @@ func InjectRemoteUser(cfg RemoteUserConfig) gin.HandlerFunc {
 			return
 		}
 
-		user, err := cfg.UserService.GetUserByIdentifier(identifier)
+		user, err := cfg.UserService().GetUserByIdentifier(identifier)
 		if err != nil {
 			slog.Default().Warn("reverse proxy auth: user not found", "identifier", identifier, "remote_addr", c.Request.RemoteAddr)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "reverse proxy auth: user not found"})

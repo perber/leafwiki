@@ -10,13 +10,16 @@ type UserLabel struct {
 }
 
 type UserResolver struct {
-	userService *UserService
+	// userService is resolved on every call rather than cached, so ResolveUserLabel/
+	// Reload automatically track a live restore's AuthService.ReplaceUserStore swap
+	// instead of going stale — mirrors AuthService.UserService() itself.
+	userService func() *UserService
 	resolved    map[string]*UserLabel
 	mu          sync.RWMutex
 }
 
-func NewUserResolver(userService *UserService) (*UserResolver, error) {
-	users, err := userService.GetUsers() // preload users
+func NewUserResolver(userService func() *UserService) (*UserResolver, error) {
+	users, err := userService().GetUsers() // preload users
 	if err != nil {
 		// Not logged here: the error is returned to the caller (wiki.go's
 		// NewWiki), which propagates it up to main.go's own top-level
@@ -53,7 +56,7 @@ func (r *UserResolver) ResolveUserLabel(userID string) (*UserLabel, error) {
 	r.mu.RUnlock()
 
 	// fetch
-	user, err := r.userService.GetUserByID(userID)
+	user, err := r.userService().GetUserByID(userID)
 	if err != nil {
 		// Cache the miss too: GetUserByID collapses every store error into
 		// ErrUserNotFound, so an unresolvable ID won't resolve differently
@@ -83,7 +86,7 @@ func (r *UserResolver) ResolveUserLabel(userID string) (*UserLabel, error) {
 }
 
 func (r *UserResolver) Reload() error {
-	users, err := r.userService.GetUsers()
+	users, err := r.userService().GetUsers()
 	if err != nil {
 		return err
 	}
