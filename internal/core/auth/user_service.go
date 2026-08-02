@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -260,6 +261,67 @@ func (s *UserService) GetUserByIdentifier(identifier string) (*User, error) {
 		}
 	}
 	return user, nil
+}
+
+// lookupRemoteUserByIdentifier resolves identifier as a username, falling
+// back to an email lookup. Unlike GetUserByIdentifier, it does not collapse
+// store errors into ErrUserNotFound: GetOrCreateRemoteUser auto-provisions on
+// ErrUserNotFound, so a transient store error (e.g. a DB hiccup) must not be
+// mistaken for "no such user" and trigger an unwanted account creation.
+func (s *UserService) lookupRemoteUserByIdentifier(identifier string) (*User, error) {
+	user, err := s.store.GetUserByUsername(identifier)
+	if err == nil {
+		return user, nil
+	}
+	if !errors.Is(err, ErrUserNotFound) {
+		return nil, err
+	}
+	return s.store.GetUserByEmail(identifier)
+}
+
+// GetOrCreateRemoteUser resolves identifier (username or email, same lookup as
+// lookupRemoteUserByIdentifier) to an existing user, auto-provisioning a new
+// one with a random password and defaultRole if none exists. Used by the
+// reverse-proxy auto-create feature: identifier becomes the new user's
+// username verbatim; if email is empty, a non-deliverable placeholder is
+// synthesized under the RFC 2606 reserved ".invalid" TLD.
+func (s *UserService) GetOrCreateRemoteUser(identifier, email, defaultRole string) (*User, error) {
+	user, err := s.lookupRemoteUserByIdentifier(identifier)
+	if err == nil {
+		return user, nil
+	}
+	if !errors.Is(err, ErrUserNotFound) {
+		return nil, err
+	}
+
+	if email == "" {
+		email = identifier + "@remote-user.invalid"
+	}
+
+	password, err := shared.GenerateRandomPassword(32)
+	if err != nil {
+		return nil, err
+	}
+
+	created, err := s.CreateUser(identifier, email, password, defaultRole)
+	if err != nil {
+		if errors.Is(err, ErrUserAlreadyExists) {
+			// CreateUser's ErrUserAlreadyExists means either identifier collided
+			// (we lost a create race against a concurrent request for the same new
+			// identifier — the expected, recoverable case) or email collided with a
+			// different, unrelated existing user (identifier itself was never
+			// created). Disambiguate instead of assuming the race case: only treat
+			// it as recovered if identifier now resolves to a user.
+			if existing, lookupErr := s.lookupRemoteUserByIdentifier(identifier); lookupErr == nil {
+				return existing, nil
+			}
+			return nil, ErrRemoteUserEmailConflict
+		}
+		return nil, err
+	}
+
+	s.log.Info("remote user auto-provisioned", "userID", created.ID, "username", identifier, "role", defaultRole)
+	return created, nil
 }
 
 func (s *UserService) GetUserByEmailOrUsernameAndPassword(identifier, password string) (*User, error) {

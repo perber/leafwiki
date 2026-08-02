@@ -77,10 +77,13 @@ func disableClientCache(c *gin.Context) {
 
 // HTTPRemoteUserConfig configures reverse-proxy-based authentication.
 type HTTPRemoteUserConfig struct {
-	Enabled        bool
-	HeaderName     string
-	TrustedProxies *auth_middleware.TrustedProxies
-	UserService    *coreauth.UserService
+	Enabled         bool
+	HeaderName      string
+	AutoCreate      bool   // Whether to auto-provision users asserted by the proxy but unknown to LeafWiki
+	EmailHeaderName string // Optional header supplying the email for auto-created users
+	DefaultRole     string // Role assigned to auto-created users
+	TrustedProxies  *auth_middleware.TrustedProxies
+	UserService     *coreauth.UserService
 }
 
 // RouterOptions holds global HTTP server configuration shared across all domains.
@@ -159,10 +162,13 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 
 	if opts.HTTPRemoteUser.Enabled {
 		base.Use(auth_middleware.InjectRemoteUser(auth_middleware.RemoteUserConfig{
-			Enabled:        opts.HTTPRemoteUser.Enabled,
-			HeaderName:     opts.HTTPRemoteUser.HeaderName,
-			TrustedProxies: opts.HTTPRemoteUser.TrustedProxies,
-			UserService:    opts.HTTPRemoteUser.UserService,
+			Enabled:         opts.HTTPRemoteUser.Enabled,
+			HeaderName:      opts.HTTPRemoteUser.HeaderName,
+			AutoCreate:      opts.HTTPRemoteUser.AutoCreate,
+			EmailHeaderName: opts.HTTPRemoteUser.EmailHeaderName,
+			DefaultRole:     opts.HTTPRemoteUser.DefaultRole,
+			TrustedProxies:  opts.HTTPRemoteUser.TrustedProxies,
+			UserService:     opts.HTTPRemoteUser.UserService,
 		}))
 	}
 

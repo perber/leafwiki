@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"errors"
+	"sync"
 	"testing"
 
 	"github.com/perber/wiki/internal/test_utils"
@@ -292,5 +294,203 @@ func TestUserService_ResetAdminUserPassword_NoAdmin_UsesGivenUsernameAndEmail(t 
 	_, err = service.GetUserByEmailOrUsernameAndPassword("root", adminUser.Password)
 	if err != nil {
 		t.Errorf("Failed to login with new password: %v", err)
+	}
+}
+
+func TestUserService_GetOrCreateRemoteUser_CreatesNewUser(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	user, err := service.GetOrCreateRemoteUser("carol", "carol@example.com", RoleViewer)
+	if err != nil {
+		t.Fatalf("GetOrCreateRemoteUser failed: %v", err)
+	}
+
+	if user.Username != "carol" || user.Email != "carol@example.com" || user.Role != RoleViewer {
+		t.Errorf("User not created with expected data: %+v", user)
+	}
+}
+
+func TestUserService_GetOrCreateRemoteUser_ReturnsExistingUserOnSecondCall(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	first, err := service.GetOrCreateRemoteUser("carol", "carol@example.com", RoleViewer)
+	if err != nil {
+		t.Fatalf("first GetOrCreateRemoteUser failed: %v", err)
+	}
+
+	second, err := service.GetOrCreateRemoteUser("carol", "carol@example.com", RoleViewer)
+	if err != nil {
+		t.Fatalf("second GetOrCreateRemoteUser failed: %v", err)
+	}
+
+	if second.ID != first.ID {
+		t.Errorf("expected same user on second call, got different IDs: %s vs %s", first.ID, second.ID)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil {
+		t.Fatalf("GetUsers failed: %v", err)
+	}
+	count := 0
+	for _, u := range users {
+		if u.Username == "carol" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected exactly one 'carol' user, got %d", count)
+	}
+}
+
+func TestUserService_GetOrCreateRemoteUser_ReturnsExistingUserByEmail(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	preexisting, err := service.CreateUser("dave", "dave@example.com", "secure", RoleEditor)
+	if err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+
+	// Proxy asserts dave's email, not his username; GetOrCreateRemoteUser must
+	// resolve to the pre-existing account rather than creating a duplicate.
+	resolved, err := service.GetOrCreateRemoteUser("dave@example.com", "", RoleViewer)
+	if err != nil {
+		t.Fatalf("GetOrCreateRemoteUser failed: %v", err)
+	}
+
+	if resolved.ID != preexisting.ID {
+		t.Errorf("expected to resolve pre-existing user %s, got %s", preexisting.ID, resolved.ID)
+	}
+	if resolved.Role != RoleEditor {
+		t.Errorf("expected existing role to be preserved, got %s", resolved.Role)
+	}
+}
+
+func TestUserService_GetOrCreateRemoteUser_SynthesizesPlaceholderEmailWhenNoneGiven(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	user, err := service.GetOrCreateRemoteUser("erin", "", RoleViewer)
+	if err != nil {
+		t.Fatalf("GetOrCreateRemoteUser failed: %v", err)
+	}
+
+	want := "erin@remote-user.invalid"
+	if user.Email != want {
+		t.Errorf("expected synthesized email %q, got %q", want, user.Email)
+	}
+}
+
+func TestUserService_GetOrCreateRemoteUser_InvalidRolePropagates(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	_, err := service.GetOrCreateRemoteUser("frank", "frank@example.com", "guest")
+	if err != ErrUserInvalidRole {
+		t.Errorf("expected ErrUserInvalidRole, got: %v", err)
+	}
+}
+
+func TestUserService_LookupRemoteUserByIdentifier_StoreErrorPropagates(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	// Simulate a transient store failure (e.g. a DB hiccup), not a genuine
+	// "user doesn't exist yet". GetOrCreateRemoteUser treats ErrUserNotFound
+	// as the auto-create trigger, so this lookup must surface the real store
+	// error instead of being misclassified as ErrUserNotFound — otherwise a
+	// transient failure would cause a spurious account to be provisioned.
+	if err := service.suspendStore(); err != nil {
+		t.Fatalf("suspendStore failed: %v", err)
+	}
+
+	_, err := service.lookupRemoteUserByIdentifier("henry")
+	if err == nil || errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected the underlying store error, not ErrUserNotFound, got: %v", err)
+	}
+}
+
+func TestUserService_GetOrCreateRemoteUser_EmailConflictWithDifferentUserReturnsDistinctError(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	// A pre-existing, unrelated user already owns this email.
+	_, err := service.CreateUser("dave", "shared@example.com", "secure", RoleEditor)
+	if err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+
+	// A brand-new identifier ("newperson") whose asserted email collides with
+	// dave's — not a race on the same identifier, so this must not silently
+	// resolve to dave (account confusion) nor hang the caller with a generic
+	// "not found" after the failed create.
+	_, err = service.GetOrCreateRemoteUser("newperson", "shared@example.com", RoleViewer)
+	if !errors.Is(err, ErrRemoteUserEmailConflict) {
+		t.Errorf("expected ErrRemoteUserEmailConflict, got: %v", err)
+	}
+
+	// "newperson" must not have been created as a side effect.
+	if _, err := service.GetUserByUsername("newperson"); !errors.Is(err, ErrUserNotFound) {
+		t.Errorf("expected 'newperson' to not exist, got err: %v", err)
+	}
+}
+
+func TestUserService_GetOrCreateRemoteUser_ConcurrentCallsCreateExactlyOneUser(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	const goroutines = 20
+	results := make(chan *User, goroutines)
+	errs := make(chan error, goroutines)
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			user, err := service.GetOrCreateRemoteUser("grace", "grace@example.com", RoleViewer)
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- user
+		}()
+	}
+	wg.Wait()
+	close(results)
+	close(errs)
+
+	for err := range errs {
+		t.Errorf("GetOrCreateRemoteUser returned error: %v", err)
+	}
+
+	var firstID string
+	count := 0
+	for user := range results {
+		count++
+		if firstID == "" {
+			firstID = user.ID
+		} else if user.ID != firstID {
+			t.Errorf("expected all concurrent calls to resolve to the same user ID, got %s and %s", firstID, user.ID)
+		}
+	}
+	if count != goroutines {
+		t.Errorf("expected %d results, got %d", goroutines, count)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil {
+		t.Fatalf("GetUsers failed: %v", err)
+	}
+	graceCount := 0
+	for _, u := range users {
+		if u.Username == "grace" {
+			graceCount++
+		}
+	}
+	if graceCount != 1 {
+		t.Errorf("expected exactly one 'grace' user to have been created, got %d", graceCount)
 	}
 }
