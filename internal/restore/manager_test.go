@@ -2,6 +2,7 @@ package restore
 
 import (
 	"archive/zip"
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/auth"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	snapshotSvc "github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/test_utils"
 )
 
@@ -592,5 +594,110 @@ func TestManager_Restore_BlocksConcurrentWritesDuringSwap(t *testing.T) {
 	}
 	if f.manager.cfg.WriteGate.Engaged() {
 		t.Error("expected write gate to be disengaged after restore completes")
+	}
+}
+
+// TestManager_Restore_HappyPath_PreservesAPIKeys is the regression test for
+// the bug where a full backup/restore cycle silently dropped api_keys.db: a
+// key minted before the snapshot was taken (against the snapshot-source
+// dataDir) must still resolve after restore, and a key minted only against
+// the live dataDir (after the snapshot, so never captured) must be gone —
+// exactly mirroring how TestManager_Restore_HappyPath already asserts this
+// for users.db content.
+func TestManager_Restore_HappyPath_PreservesAPIKeys(t *testing.T) {
+	src := t.TempDir()
+	test_utils.WriteFile(t, src, "root/welcome.md", "# Snapshot content\n")
+	snapshotOwnerID := createRealUsersDB(t, src, "snapshot-admin", "snapshot-admin@example.com", "snapshot-password-123")
+	snapshotToken := createRealAPIKeysDB(t, src, snapshotOwnerID, "snapshot-key")
+
+	snapshotMgr := snapshotSvc.NewManager(snapshotSvc.Config{
+		BackupsDir:    filepath.Join(src, "backups"),
+		RootDir:       filepath.Join(src, "root"),
+		UsersDBPath:   filepath.Join(src, "users.db"),
+		APIKeysDBPath: filepath.Join(src, "api_keys.db"),
+		WikiVersion:   "v1.0.0",
+	})
+	if err := snapshotMgr.RunOnce(context.Background()); err != nil {
+		t.Fatalf("failed to build fixture snapshot: %v", err)
+	}
+	entries, err := snapshotMgr.List()
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("expected 1 fixture snapshot, got %v (err=%v)", entries, err)
+	}
+	snapshotID := entries[0].ID
+
+	dataDir := t.TempDir()
+	liveOwnerID := createRealUsersDB(t, dataDir, "live-admin", "live-admin@example.com", "live-password-123")
+	liveToken := createRealAPIKeysDB(t, dataDir, liveOwnerID, "live-key")
+
+	userStore, err := auth.NewUserStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewUserStore failed: %v", err)
+	}
+	sessionStore, err := auth.NewSessionStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewSessionStore failed: %v", err)
+	}
+	sessions := auth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := auth.NewAuthService(auth.NewUserService(userStore), sessions, nil)
+	t.Cleanup(func() { _ = authService.Close() })
+
+	apiKeyStore, err := auth.NewAPIKeyStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewAPIKeyStore failed: %v", err)
+	}
+	apiKeyService := auth.NewAPIKeyService(apiKeyStore, authService)
+	t.Cleanup(func() { _ = apiKeyService.Close() })
+
+	brandingService, err := branding.NewBrandingService(dataDir)
+	if err != nil {
+		t.Fatalf("NewBrandingService failed: %v", err)
+	}
+
+	manager := NewManager(Config{
+		SnapshotManager: snapshotMgr,
+		DataDir:         dataDir,
+		WikiVersion:     "v1.0.0",
+		WriteGate:       NewWriteGate(),
+		AuthService:     authService,
+		APIKeyService:   apiKeyService,
+		BrandingService: brandingService,
+	})
+
+	if err := manager.TriggerRestore(snapshotID); err != nil {
+		t.Fatalf("TriggerRestore failed: %v", err)
+	}
+	status := waitForRestoreDone(t, manager)
+	if status.Error != "" {
+		t.Fatalf("expected successful restore, got error: %s", status.Error)
+	}
+
+	if _, err := apiKeyService.Resolve(snapshotToken); err != nil {
+		t.Errorf("expected the snapshot's api key to still resolve after restore, got: %v", err)
+	}
+	if _, err := apiKeyService.Resolve(liveToken); err == nil {
+		t.Error("expected the live-only api key (created after the snapshot) to no longer resolve after restore")
+	}
+}
+
+// TestManager_Restore_APIKeyManagementDisabled_DoesNotError covers the common
+// case (API key management is off by default): cfg.APIKeyService is nil and
+// no api_keys.db was ever created, so restore must complete normally — the
+// new APIKeyService nil-guards in runFromZipPath/rollbackOrIntervene must not
+// panic, and swapNames' "skip items absent from the staging dir" behavior
+// must leave the missing api_keys.db alone.
+func TestManager_Restore_APIKeyManagementDisabled_DoesNotError(t *testing.T) {
+	f := newManagerFixture(t, "v1.0.0")
+	f.manager.cfg.APIKeyService = nil
+
+	if err := f.manager.TriggerRestore(f.snapshotID); err != nil {
+		t.Fatalf("TriggerRestore failed: %v", err)
+	}
+	status := waitForRestoreDone(t, f.manager)
+	if status.Error != "" {
+		t.Fatalf("expected successful restore, got error: %s", status.Error)
+	}
+	if status.NeedsIntervention {
+		t.Fatal("expected NeedsIntervention = false on a successful restore")
 	}
 }

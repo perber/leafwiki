@@ -243,7 +243,7 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 			if err != nil {
 				return err
 			}
-			w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.user)
+			w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.auth)
 		}
 	}
 	return nil

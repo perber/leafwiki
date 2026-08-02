@@ -27,6 +27,12 @@ type Config struct {
 	// AuthService's user store (users.db) is hot-swapped in place; its
 	// session store is untouched (sessions.db isn't part of the snapshot).
 	AuthService *auth.AuthService
+	// APIKeyService's key store (api_keys.db) is hot-swapped in place,
+	// mirroring AuthService's users.db handling. nil when API key management
+	// is disabled (the common case, off by default) — every use below is
+	// nil-guarded, matching the existing AuthService nil-guard used for
+	// --disable-auth.
+	APIKeyService *auth.APIKeyService
 	// BrandingService's in-memory config cache is reloaded from the restored
 	// branding.json after the file swap.
 	BrandingService *branding.BrandingService

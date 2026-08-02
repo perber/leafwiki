@@ -18,13 +18,21 @@ func setupTestAPIKeyService(t *testing.T) (*APIKeyService, *UserService) {
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(userStore.Close, t) })
 	userService := NewUserService(userStore)
 
+	sessionStore, err := NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSessionStore err: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(sessionStore.Close, t) })
+	sessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := NewAuthService(userService, sessions, nil)
+
 	keyStore, err := NewAPIKeyStore(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewAPIKeyStore err: %v", err)
 	}
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(keyStore.Close, t) })
 
-	return NewAPIKeyService(keyStore, userService), userService
+	return NewAPIKeyService(keyStore, authService), userService
 }
 
 func mustCreateUser(t *testing.T, users *UserService, username, role string) *User {

@@ -138,8 +138,11 @@ func sanityCheckUsersDB(path string) error {
 
 // swapNames lists every top-level item a snapshot ZIP may contain, in the
 // order they're swapped. All are optional in the staging dir — see
-// newSwapper's doc comment.
-var swapNames = []string{"root", "assets", "branding", "branding.json", "schema.json", "users.db"}
+// newSwapper's doc comment. sessions.db is deliberately absent: it's never
+// part of the snapshot (session state is ephemeral, tied to the running
+// process) — see AuthService.InvalidateAllSessions, called post-swap instead
+// of being restored.
+var swapNames = []string{"root", "assets", "branding", "branding.json", "schema.json", "users.db", "api_keys.db"}
 
 // removeStaleWALSidecars deletes dbPath's -wal and -shm sidecar files, if
 // present, without touching dbPath itself. Missing files are not an error.

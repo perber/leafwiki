@@ -25,6 +25,12 @@ func RestoreOffline(dataDir, zipPath string) error {
 	if err := removeStaleWALSidecars(filepath.Join(dataDir, "users.db")); err != nil {
 		return fmt.Errorf("failed to clean up stale users.db WAL files before swap: %w", err)
 	}
+	// api_keys.db runs in WAL mode too (internal/core/auth/apikey_store.go) —
+	// same stale-sidecar risk as users.db once it's part of swapNames, same
+	// fix.
+	if err := removeStaleWALSidecars(filepath.Join(dataDir, "api_keys.db")); err != nil {
+		return fmt.Errorf("failed to clean up stale api_keys.db WAL files before swap: %w", err)
+	}
 
 	sw := newSwapper(dataDir, stagingDir)
 	if err := sw.SwapAll(); err != nil {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/perber/wiki/internal/core/auth"
 	snapshotSvc "github.com/perber/wiki/internal/snapshot"
@@ -79,8 +80,9 @@ func buildFixtureSnapshot(t *testing.T, wikiVersion string) string {
 // schema (not a hand-rolled minimal one) and seeds a single user, so that
 // tests exercising AuthService.ReplaceUserStore/Login against the result see
 // a genuinely valid users.db rather than one missing columns the real schema
-// expects.
-func createRealUsersDB(t *testing.T, dataDir, username, email, password string) {
+// expects. Returns the created user's ID (e.g. for createRealAPIKeysDB, which
+// needs an existing owner to mint a key against).
+func createRealUsersDB(t *testing.T, dataDir, username, email, password string) string {
 	t.Helper()
 	store, err := auth.NewUserStore(dataDir)
 	if err != nil {
@@ -88,9 +90,53 @@ func createRealUsersDB(t *testing.T, dataDir, username, email, password string) 
 	}
 	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
 
-	if _, err := auth.NewUserService(store).CreateUser(username, email, password, "admin"); err != nil {
+	user, err := auth.NewUserService(store).CreateUser(username, email, password, "admin")
+	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
 	}
+	return user.ID
+}
+
+// createRealAPIKeysDB creates dataDir/api_keys.db via the real
+// auth.APIKeyStore/APIKeyService and mints a single key owned by ownerUserID
+// (must already exist in dataDir/users.db — CreateAPIKey looks the owner up),
+// returning the plaintext bearer token. NewAPIKeyService requires a real
+// *AuthService (owner lookups always go through AuthService.UserService() —
+// see apikey_service.go) — a throwaway sessions.db in its own tempdir is
+// built alongside it purely to satisfy the constructor; this helper never
+// logs in or otherwise exercises sessions.
+func createRealAPIKeysDB(t *testing.T, dataDir, ownerUserID, keyName string) string {
+	t.Helper()
+	userStore, err := auth.NewUserStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewUserStore failed: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(userStore.Close, t)
+
+	sessionStore, err := auth.NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSessionStore failed: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(sessionStore.Close, t)
+	sessions := auth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := auth.NewAuthService(auth.NewUserService(userStore), sessions, nil)
+
+	apiKeyStore, err := auth.NewAPIKeyStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewAPIKeyStore failed: %v", err)
+	}
+	apiKeyService := auth.NewAPIKeyService(apiKeyStore, authService)
+	defer test_utils.WrapCloseWithErrorCheck(apiKeyService.Close, t)
+
+	_, token, err := apiKeyService.CreateAPIKey(auth.CreateAPIKeyParams{
+		Name:      keyName,
+		UserID:    ownerUserID,
+		CreatedBy: ownerUserID,
+	})
+	if err != nil {
+		t.Fatalf("CreateAPIKey failed: %v", err)
+	}
+	return token
 }
 
 func createTestUsersDB(t *testing.T, path, email string) {
