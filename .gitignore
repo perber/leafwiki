@@ -51,3 +51,8 @@ ui.zip
 # local embedded frontend output for fast E2E runs
 internal/http/dist/*
 !internal/http/dist/.gitkeep
+
+# local-only AI agent config/docs (never pushed, see CLAUDE.md)
+/CLAUDE.md
+/AGENTS.md
+/.claude/
