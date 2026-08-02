@@ -1,0 +1,69 @@
+{
+  "generated_at": "2026-08-02T01:28:40.835251+00:00",
+  "git_commit": "c9496fdc",
+  "scenarios": [
+    {
+      "name": "convert-pages",
+      "avg_ms": 23.58,
+      "p95_ms": 36.92,
+      "http_req_failed_rate": 0,
+      "unexpected_errors": 0
+    },
+    {
+      "name": "copy-pages",
+      "avg_ms": 56.94,
+      "p95_ms": 77.25,
+      "http_req_failed_rate": 0,
+      "unexpected_errors": 0
+    },
+    {
+      "name": "create-pages",
+      "avg_ms": 41.54,
+      "p95_ms": 75.26,
+      "http_req_failed_rate": 0,
+      "unexpected_errors": 0
+    },
+    {
+      "name": "pin-pages",
+      "avg_ms": 32.87,
+      "p95_ms": 42.29,
+      "http_req_failed_rate": 0,
+      "unexpected_errors": 0
+    },
+    {
+      "name": "readers-content",
+      "avg_ms": 9.33,
+      "p95_ms": 26.25,
+      "http_req_failed_rate": 0,
+      "unexpected_errors": 0
+    },
+    {
+      "name": "search-only",
+      "avg_ms": 29.82,
+      "p95_ms": 47.38,
+      "http_req_failed_rate": 0,
+      "unexpected_errors": 0
+    },
+    {
+      "name": "sort-pages",
+      "avg_ms": 6.32,
+      "p95_ms": 8.08,
+      "http_req_failed_rate": 0,
+      "unexpected_errors": 0
+    },
+    {
+      "name": "tree-only",
+      "avg_ms": 8.42,
+      "p95_ms": 16.35,
+      "http_req_failed_rate": 0,
+      "unexpected_errors": 0
+    },
+    {
+      "name": "write-different-pages",
+      "avg_ms": 57.5,
+      "p95_ms": 113.5,
+      "http_req_failed_rate": 0,
+      "unexpected_errors": 0
+    }
+  ]
+}

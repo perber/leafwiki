@@ -134,3 +134,28 @@ func TestTagsSideEffect_Apply_Delete_RemovesTags(t *testing.T) {
 		t.Errorf("expected tag to be removed after delete, got %v", ids)
 	}
 }
+
+func TestTagsSideEffect_Apply_Delete_Recursive_RemovesTagsForAllAffectedPages(t *testing.T) {
+	treeSvc, tagsSvc, effect := setupTagsEffectTest(t)
+
+	rawA := "---\ntags:\n  - subtree\n---\n\nA."
+	rawB := "---\ntags:\n  - subtree\n---\n\nB."
+	pageA := createPageWithFrontmatter(t, treeSvc, "Subtree A", "subtree-a", rawA)
+	pageB := createPageWithFrontmatter(t, treeSvc, "Subtree B", "subtree-b", rawB)
+
+	effect.Apply(PageSaveEvent{Operation: PageOperationCreate, After: pageA})
+	effect.Apply(PageSaveEvent{Operation: PageOperationCreate, After: pageB})
+
+	effect.Apply(PageSaveEvent{
+		Operation:     PageOperationDelete,
+		AffectedPages: []*tree.Page{pageA, pageB},
+	})
+
+	ids, err := tagsSvc.GetPageIDsByTags([]string{"subtree"})
+	if err != nil {
+		t.Fatalf("GetPageIDsByTags: %v", err)
+	}
+	if len(ids) != 0 {
+		t.Errorf("expected both pages' tags to be removed after batch delete, got %v", ids)
+	}
+}

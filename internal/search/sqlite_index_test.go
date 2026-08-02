@@ -2,9 +2,11 @@ package search
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
@@ -60,6 +62,231 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 	}
 	if !strings.HasPrefix(gotContent, expectedContent) {
 		t.Errorf("expected content '%s', got '%s'", expectedContent, gotContent)
+	}
+}
+
+func TestSQLiteIndex_UsesWALJournalMode(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	var mode string
+	if err := index.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`PRAGMA journal_mode`).Scan(&mode)
+	}); err != nil {
+		t.Fatalf("failed to read journal_mode: %v", err)
+	}
+
+	if !strings.EqualFold(mode, "wal") {
+		t.Fatalf("journal_mode = %q, want %q", mode, "wal")
+	}
+}
+
+func TestSQLiteIndex_IndexPage_ReindexingExistingPageProducesExactlyOneRow(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	path := "docs/test.md"
+	pageID := "test123"
+
+	if err := index.IndexPage(path, path, pageID, "Test Page", tree.NodeKindPage, "first version"); err != nil {
+		t.Fatalf("first IndexPage failed: %v", err)
+	}
+	if err := index.IndexPage(path, path, pageID, "Test Page", tree.NodeKindPage, "second version"); err != nil {
+		t.Fatalf("second IndexPage failed: %v", err)
+	}
+
+	var count int
+	if err := index.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`SELECT COUNT(*) FROM pages WHERE pageID = ?`, pageID).Scan(&count)
+	}); err != nil {
+		t.Fatalf("failed to count rows: %v", err)
+	}
+
+	if count != 1 {
+		t.Fatalf("row count for pageID %s = %d, want 1 (re-indexing must replace, not duplicate, within one transaction)", pageID, count)
+	}
+}
+
+func TestSQLiteIndex_RemovePages_RemovesAllGivenIDs(t *testing.T) {
+	tmpDir := t.TempDir()
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	ids := []string{"page-a", "page-b", "page-c"}
+	for _, id := range ids {
+		if err := index.IndexPage(id, id, id, "Title "+id, tree.NodeKindPage, "content"); err != nil {
+			t.Fatalf("IndexPage(%s) failed: %v", id, err)
+		}
+	}
+
+	if err := index.RemovePages([]string{"page-a", "page-c"}); err != nil {
+		t.Fatalf("RemovePages failed: %v", err)
+	}
+
+	var count int
+	if err := index.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`SELECT COUNT(*) FROM pages WHERE pageID IN ('page-a', 'page-c')`).Scan(&count)
+	}); err != nil {
+		t.Fatalf("failed to count removed rows: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected page-a and page-c to be removed, %d rows remain", count)
+	}
+
+	if err := index.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`SELECT COUNT(*) FROM pages WHERE pageID = 'page-b'`).Scan(&count)
+	}); err != nil {
+		t.Fatalf("failed to count remaining rows: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected page-b to remain, got count=%d", count)
+	}
+}
+
+func TestSQLiteIndex_IndexPages_IndexesAllGivenInputs(t *testing.T) {
+	tmpDir := t.TempDir()
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	inputs := make([]IndexPageInput, 0, 5)
+	for i := 0; i < 5; i++ {
+		id := fmt.Sprintf("page-%d", i)
+		inputs = append(inputs, IndexPageInput{
+			Path: id, FilePath: id + ".md", PageID: id, Title: "Title " + id, Kind: tree.NodeKindPage, Raw: "body " + id,
+		})
+	}
+
+	failures, err := index.IndexPages(inputs)
+	if err != nil {
+		t.Fatalf("IndexPages failed: %v", err)
+	}
+	if len(failures) != 0 {
+		t.Fatalf("expected no failures, got %v", failures)
+	}
+
+	for _, in := range inputs {
+		var gotTitle string
+		if err := index.withDB(func(db *sql.DB) error {
+			return db.QueryRow(`SELECT title FROM pages WHERE pageID = ?`, in.PageID).Scan(&gotTitle)
+		}); err != nil {
+			t.Fatalf("failed to read back %s: %v", in.PageID, err)
+		}
+		if gotTitle != in.Title {
+			t.Errorf("pageID %s: title = %q, want %q", in.PageID, gotTitle, in.Title)
+		}
+	}
+}
+
+func TestSQLiteIndex_IndexPages_SkipsUnparsableInputOthersStillCommit(t *testing.T) {
+	tmpDir := t.TempDir()
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	// Properly fenced (so it's recognized as frontmatter at all) but
+	// invalid YAML inside (unclosed flow sequence) that markdown's
+	// sanitize-and-retry fallback doesn't know how to fix — confirmed by
+	// reading internal/core/markdown/frontmatter.go's
+	// sanitizeFrontmatterYAML, which only special-cases template
+	// placeholders and unquoted colons, neither of which apply here.
+	const badFrontmatter = "---\nleafwiki_title: [unclosed\n---\nbody\n"
+	inputs := []IndexPageInput{
+		{Path: "good-1", FilePath: "good-1.md", PageID: "good-1", Title: "Good 1", Kind: tree.NodeKindPage, Raw: "fine content"},
+		{Path: "bad", FilePath: "bad.md", PageID: "bad", Title: "Bad", Kind: tree.NodeKindPage, Raw: badFrontmatter},
+		{Path: "good-2", FilePath: "good-2.md", PageID: "good-2", Title: "Good 2", Kind: tree.NodeKindPage, Raw: "fine content too"},
+	}
+
+	failures, err := index.IndexPages(inputs)
+	if err != nil {
+		t.Fatalf("IndexPages returned a transaction-level error, want the batch to still commit for the valid inputs: %v", err)
+	}
+	if len(failures) != 1 || failures[0].PageID != "bad" {
+		t.Fatalf("failures = %v, want exactly one failure for pageID \"bad\"", failures)
+	}
+
+	for _, id := range []string{"good-1", "good-2"} {
+		var count int
+		if err := index.withDB(func(db *sql.DB) error {
+			return db.QueryRow(`SELECT COUNT(*) FROM pages WHERE pageID = ?`, id).Scan(&count)
+		}); err != nil {
+			t.Fatalf("failed to count %s: %v", id, err)
+		}
+		if count != 1 {
+			t.Errorf("expected %s to be indexed despite the other input failing, count=%d", id, count)
+		}
+	}
+
+	var badCount int
+	if err := index.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`SELECT COUNT(*) FROM pages WHERE pageID = 'bad'`).Scan(&badCount)
+	}); err != nil {
+		t.Fatalf("failed to count bad: %v", err)
+	}
+	if badCount != 0 {
+		t.Fatalf("expected the unparsable input to be skipped, not indexed")
+	}
+}
+
+// Pins the RWMutex change (mu sync.Mutex -> sync.RWMutex, Search/
+// SearchPageIDs/Ping moved to withDBRead): concurrent Search calls must
+// run without data races or errors. Run with `go test -race` to actually
+// catch a regression (mirrors
+// internal/links/links_store_test.go's TestLinksStore_ConcurrentReadsDoNotRace).
+func TestSQLiteIndex_ConcurrentSearchesDoNotRace(t *testing.T) {
+	tmpDir := t.TempDir()
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	for i := 0; i < 20; i++ {
+		id := fmt.Sprintf("page-%d", i)
+		if err := index.IndexPage(id, id, id, "Title "+id, tree.NodeKindPage, "searchable content"); err != nil {
+			t.Fatalf("IndexPage(%s) failed: %v", id, err)
+		}
+	}
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 40)
+	for i := 0; i < 20; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if _, err := index.Search("searchable", nil, 0, 10); err != nil {
+				errCh <- err
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if _, err := index.SearchPageIDs("searchable", nil); err != nil {
+				errCh <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Errorf("concurrent search failed: %v", err)
 	}
 }
 

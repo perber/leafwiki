@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +18,21 @@ func setupTestAPIKeyStore(t *testing.T) *APIKeyStore {
 		t.Fatalf("Failed to create api key store: %v", err)
 	}
 	return store
+}
+
+func TestAPIKeyStore_UsesWALJournalMode(t *testing.T) {
+	store := setupTestAPIKeyStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	var mode string
+	if err := store.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`PRAGMA journal_mode`).Scan(&mode)
+	}); err != nil {
+		t.Fatalf("failed to read journal_mode: %v", err)
+	}
+	if !strings.EqualFold(mode, "wal") {
+		t.Fatalf("journal_mode = %q, want %q", mode, "wal")
+	}
 }
 
 func TestAPIKeyStore_CreatesDatabaseInStorageDir(t *testing.T) {

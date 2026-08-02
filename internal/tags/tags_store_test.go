@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/test_utils"
@@ -20,6 +21,19 @@ func newTestStore(t *testing.T) *TagsStore {
 }
 
 // ─── DB lifecycle ────────────────────────────────────────────────────────────
+
+func TestTagsStore_UsesWALJournalMode(t *testing.T) {
+	store := newTestStore(t)
+
+	var mode string
+	if err := store.db.QueryRow(`PRAGMA journal_mode`).Scan(&mode); err != nil {
+		t.Fatalf("failed to read journal_mode: %v", err)
+	}
+
+	if !strings.EqualFold(mode, "wal") {
+		t.Fatalf("journal_mode = %q, want %q", mode, "wal")
+	}
+}
 
 func TestTagsStore_CreatesDatabaseInStorageDir(t *testing.T) {
 	tmp := t.TempDir()
@@ -558,6 +572,49 @@ func TestTagsStore_DeletePageIndex_NonExistentPageIsNoop(t *testing.T) {
 	store := newTestStore(t)
 	if err := store.DeletePageIndex("does-not-exist"); err != nil {
 		t.Fatalf("DeletePageIndex on unknown page: %v", err)
+	}
+}
+
+// ─── DeletePageIndexes ───────────────────────────────────────────────────────
+
+func TestTagsStore_DeletePageIndexes_RemovesTagsAndExcerptForAllGivenPages(t *testing.T) {
+	store := newTestStore(t)
+
+	_ = store.SetPageIndex("page-a", []string{"go"}, "excerpt a")
+	_ = store.SetPageIndex("page-b", []string{"js"}, "excerpt b")
+	_ = store.SetPageIndex("page-c", []string{"rust"}, "excerpt c")
+
+	if err := store.DeletePageIndexes([]string{"page-a", "page-c"}); err != nil {
+		t.Fatalf("DeletePageIndexes: %v", err)
+	}
+
+	tags, err := store.GetTagsForPages([]string{"page-a", "page-b", "page-c"})
+	if err != nil {
+		t.Fatalf("GetTagsForPages: %v", err)
+	}
+	if len(tags["page-a"]) != 0 || len(tags["page-c"]) != 0 {
+		t.Errorf("expected page-a and page-c to have no tags, got %v / %v", tags["page-a"], tags["page-c"])
+	}
+	if len(tags["page-b"]) != 1 || tags["page-b"][0] != "js" {
+		t.Errorf("expected page-b to keep its tag, got %v", tags["page-b"])
+	}
+
+	exc, err := store.GetExcerptsForPages([]string{"page-a", "page-b", "page-c"})
+	if err != nil {
+		t.Fatalf("GetExcerptsForPages: %v", err)
+	}
+	if exc["page-a"] != "" || exc["page-c"] != "" {
+		t.Errorf("expected page-a and page-c to have no excerpt, got %q / %q", exc["page-a"], exc["page-c"])
+	}
+	if exc["page-b"] != "excerpt b" {
+		t.Errorf("expected page-b to keep its excerpt, got %q", exc["page-b"])
+	}
+}
+
+func TestTagsStore_DeletePageIndexes_EmptyInputIsNoop(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.DeletePageIndexes(nil); err != nil {
+		t.Fatalf("DeletePageIndexes(nil): %v", err)
 	}
 }
 

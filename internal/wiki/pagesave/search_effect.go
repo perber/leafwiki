@@ -41,16 +41,42 @@ func (e *SearchIndexSideEffect) Apply(event PageSaveEvent) {
 		}
 
 	case PageOperationMove:
+		inputs := make([]search.IndexPageInput, 0, len(event.AffectedPages))
 		for _, page := range event.AffectedPages {
-			e.indexPage(page, event.Operation)
+			inputs = append(inputs, buildIndexInput(page))
+		}
+		failures, err := e.index.IndexPages(inputs)
+		if err != nil {
+			e.log.Warn("failed to batch-update search index for moved subtree", "pageCount", len(inputs), "error", err)
+			e.metrics.IncPageSaveSideEffectFailure(string(event.Operation), e.Name())
+		}
+		for _, f := range failures {
+			e.log.Warn("failed to update search index for page", "pageID", f.PageID, "error", f.Err)
+			e.metrics.IncPageSaveSideEffectFailure(string(event.Operation), e.Name())
 		}
 
 	case PageOperationDelete:
+		ids := make([]string, 0, len(event.AffectedPages))
 		for _, page := range event.AffectedPages {
-			if err := e.index.RemovePage(page.ID); err != nil {
-				e.log.Warn("failed to remove page from search index", "pageID", page.ID, "error", err)
-			}
+			ids = append(ids, page.ID)
 		}
+		if err := e.index.RemovePages(ids); err != nil {
+			e.log.Warn("failed to batch-remove deleted subtree from search index", "pageCount", len(ids), "error", err)
+			e.metrics.IncPageSaveSideEffectFailure(string(event.Operation), e.Name())
+		}
+	}
+}
+
+// buildIndexInput computes the (path, filePath) pair IndexPage/IndexPages
+// need for page, mirroring writeToIndex's single-page logic.
+func buildIndexInput(page *tree.Page) search.IndexPageInput {
+	path := strings.TrimPrefix(page.CalculatePath(), "/")
+	filePath := path
+	if filePath != "" {
+		filePath += ".md"
+	}
+	return search.IndexPageInput{
+		Path: path, FilePath: filePath, PageID: page.ID, Title: page.Title, Kind: page.Kind, Raw: page.RawContent,
 	}
 }
 

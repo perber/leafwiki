@@ -3,6 +3,7 @@ package restore
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // RestoreOffline validates and swaps a snapshot ZIP directly into dataDir,
@@ -16,6 +17,14 @@ func RestoreOffline(dataDir, zipPath string) error {
 		return fmt.Errorf("snapshot validation failed: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(stagingDir) }()
+
+	// No live connection exists in this offline path (the server hasn't
+	// started yet), so any leftover -wal/-shm here is from a prior unclean
+	// shutdown, not in-flight state — see removeStaleWALSidecars for why
+	// this still needs cleaning up before the swap.
+	if err := removeStaleWALSidecars(filepath.Join(dataDir, "users.db")); err != nil {
+		return fmt.Errorf("failed to clean up stale users.db WAL files before swap: %w", err)
+	}
 
 	sw := newSwapper(dataDir, stagingDir)
 	if err := sw.SwapAll(); err != nil {
