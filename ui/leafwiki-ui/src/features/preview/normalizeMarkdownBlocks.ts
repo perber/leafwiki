@@ -156,19 +156,19 @@ function appendCollapsibleBlock(
   blockLines: string[],
   title: string | undefined,
 ) {
-    const openAttr = blockType === 'collapsible' ? ' open' : ''
+  const openAttr = blockType === 'collapsible' ? ' open' : ''
 
-    output.push(`${indent}<details class="markdown-collapsible"${openAttr}>`)
+  output.push(`${indent}<details class="markdown-collapsible"${openAttr}>`)
 
-    if (title) {
-      output.push(`${indent}<summary>${title}</summary>`)
-      output.push('')
-    }
-
-    output.push(...blockLines)
-
-    output.push(`${indent}</details>`)
+  if (title) {
+    output.push(`${indent}<summary>${title}</summary>`)
+    output.push('')
   }
+
+  output.push(...blockLines)
+
+  output.push(`${indent}</details>`)
+}
 
 function appendShoutoutBlock(
   output: string[],
@@ -176,15 +176,15 @@ function appendShoutoutBlock(
   blockType: string,
   blockLines: string[],
 ) {
-    output.push(prefixQuoteLine(indent, `[!${blockType.toUpperCase()}]`))
+  output.push(prefixQuoteLine(indent, `[!${blockType.toUpperCase()}]`))
+  output.push(prefixQuoteLine(indent, ''))
+
+  if (blockLines.length === 0) {
     output.push(prefixQuoteLine(indent, ''))
-
-    if (blockLines.length === 0) {
-      output.push(prefixQuoteLine(indent, ''))
-      return
-    }
-
-    for (const blockLine of blockLines) {
-      output.push(prefixQuoteLine(indent, blockLine))
-    }
+    return
   }
+
+  for (const blockLine of blockLines) {
+    output.push(prefixQuoteLine(indent, blockLine))
+  }
+}
