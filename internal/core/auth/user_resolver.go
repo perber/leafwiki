@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"sync"
 )
 
@@ -58,17 +59,23 @@ func (r *UserResolver) ResolveUserLabel(userID string) (*UserLabel, error) {
 	// fetch
 	user, err := r.userService().GetUserByID(userID)
 	if err != nil {
-		// Cache the miss too: GetUserByID collapses every store error into
-		// ErrUserNotFound, so an unresolvable ID won't resolve differently
-		// on a later call without a Reload(). Without this, any reference
-		// to a nonexistent/deleted user (e.g. a page's creatorID after its
-		// author account was deleted) would hit userService/the store on
-		// every single call, forever.
-		r.mu.Lock()
-		if _, ok := r.resolved[userID]; !ok {
-			r.resolved[userID] = nil
+		if errors.Is(err, ErrUserNotFound) {
+			// Cache the miss: genuinely no such user, so an unresolvable ID
+			// won't resolve differently on a later call without a Reload().
+			// Without this, any reference to a nonexistent/deleted user
+			// (e.g. a page's creatorID after its author account was
+			// deleted) would hit userService/the store on every call,
+			// forever.
+			r.mu.Lock()
+			if _, ok := r.resolved[userID]; !ok {
+				r.resolved[userID] = nil
+			}
+			r.mu.Unlock()
 		}
-		r.mu.Unlock()
+		// A transient error (e.g. the store suspended for an in-progress
+		// live restore, see GetUserByID/mapUserLookupErr) is deliberately
+		// NOT cached — the next call should retry against the store rather
+		// than being permanently told "not found".
 		return nil, err
 	}
 	label := &UserLabel{ID: user.ID, Username: user.Username}

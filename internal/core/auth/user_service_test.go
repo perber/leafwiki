@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"errors"
 	"testing"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/test_utils"
 )
 
@@ -292,5 +294,120 @@ func TestUserService_ResetAdminUserPassword_NoAdmin_UsesGivenUsernameAndEmail(t 
 	_, err = service.GetUserByEmailOrUsernameAndPassword("root", adminUser.Password)
 	if err != nil {
 		t.Errorf("Failed to login with new password: %v", err)
+	}
+}
+
+// Regression tests for the bug where UserService collapsed a suspended
+// store's auth_user_store_unavailable LocalizedError (see
+// errUserStoreUnavailable / UserStore.suspend) down to the generic
+// ErrUserNotFound, so a request landing in a live restore's brief suspend
+// window saw a confusing "user not found" instead of "restore in progress".
+
+func TestUserService_GetUserByID_StoreSuspended_ReturnsStoreUnavailable(t *testing.T) {
+	service := setupTestUserService(t)
+
+	user, err := service.CreateUser("suspend-user", "suspend-user@example.com", "password1", RoleAdmin)
+	if err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+
+	if err := service.suspendStore(); err != nil {
+		t.Fatalf("suspendStore failed: %v", err)
+	}
+
+	_, err = service.GetUserByID(user.ID)
+	if err == nil {
+		t.Fatal("expected an error for a suspended store")
+	}
+	if errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected the store-unavailable error, not ErrUserNotFound: %v", err)
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_user_store_unavailable" {
+		t.Fatalf("expected auth_user_store_unavailable, got %v", err)
+	}
+}
+
+func TestUserService_GetUserByID_UnknownID_ReturnsErrUserNotFound(t *testing.T) {
+	service := setupTestUserService(t)
+
+	_, err := service.GetUserByID("does-not-exist")
+	if !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected ErrUserNotFound for a genuinely unknown ID, got %v", err)
+	}
+}
+
+func TestUserService_GetUserByUsername_StoreSuspended_ReturnsStoreUnavailable(t *testing.T) {
+	service := setupTestUserService(t)
+
+	_, err := service.CreateUser("suspend-user2", "suspend-user2@example.com", "password1", RoleAdmin)
+	if err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+
+	if err := service.suspendStore(); err != nil {
+		t.Fatalf("suspendStore failed: %v", err)
+	}
+
+	_, err = service.GetUserByUsername("suspend-user2")
+	if err == nil {
+		t.Fatal("expected an error for a suspended store")
+	}
+	if errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected the store-unavailable error, not ErrUserNotFound: %v", err)
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_user_store_unavailable" {
+		t.Fatalf("expected auth_user_store_unavailable, got %v", err)
+	}
+}
+
+func TestUserService_GetUserByIdentifier_StoreSuspended_ReturnsStoreUnavailable(t *testing.T) {
+	service := setupTestUserService(t)
+
+	_, err := service.CreateUser("suspend-user3", "suspend-user3@example.com", "password1", RoleAdmin)
+	if err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+
+	if err := service.suspendStore(); err != nil {
+		t.Fatalf("suspendStore failed: %v", err)
+	}
+
+	_, err = service.GetUserByIdentifier("suspend-user3")
+	if err == nil {
+		t.Fatal("expected an error for a suspended store")
+	}
+	if errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected the store-unavailable error, not ErrUserNotFound: %v", err)
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_user_store_unavailable" {
+		t.Fatalf("expected auth_user_store_unavailable, got %v", err)
+	}
+}
+
+func TestUserService_DeleteUser_StoreSuspended_ReturnsStoreUnavailable(t *testing.T) {
+	service := setupTestUserService(t)
+
+	user, err := service.CreateUser("suspend-user4", "suspend-user4@example.com", "password1", RoleEditor)
+	if err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+
+	if err := service.suspendStore(); err != nil {
+		t.Fatalf("suspendStore failed: %v", err)
+	}
+
+	err = service.DeleteUser(user.ID)
+	if err == nil {
+		t.Fatal("expected an error for a suspended store")
+	}
+	if errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected the store-unavailable error, not ErrUserNotFound: %v", err)
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "auth_user_store_unavailable" {
+		t.Fatalf("expected auth_user_store_unavailable, got %v", err)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/perber/wiki/internal/core/shared"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -102,10 +103,22 @@ func (s *UserService) CreateUser(username, email, password, role string) (*User,
 	return user, nil
 }
 
+// mapUserLookupErr maps a UserStore lookup error to ErrUserNotFound, except
+// when err is the store's own "suspended for live restore" LocalizedError
+// (see errUserStoreUnavailable), which is passed through unchanged so
+// callers can distinguish "restore in progress, retry" from "genuinely no
+// such user" instead of collapsing both into a 404.
+func mapUserLookupErr(err error) error {
+	if loc, ok := sharederrors.AsLocalizedError(err); ok && loc.Code == userStoreUnavailableCode {
+		return err
+	}
+	return ErrUserNotFound
+}
+
 func (s *UserService) GetUserByID(id string) (*User, error) {
 	user, err := s.store.GetUserByID(id)
 	if err != nil {
-		return nil, ErrUserNotFound
+		return nil, mapUserLookupErr(err)
 	}
 
 	return user, nil
@@ -115,7 +128,7 @@ func (s *UserService) UpdateUser(id, username, email, password, role string) (*U
 	// Check if user exists
 	user, err := s.store.GetUserByID(id)
 	if err != nil {
-		return nil, ErrUserNotFound
+		return nil, mapUserLookupErr(err)
 	}
 
 	// Check if username already exists (but if it's the same user, ignore)
@@ -206,7 +219,7 @@ func (s *UserService) UpdatePassword(id string, newpassword string) error {
 func (s *UserService) DoesIDAndPasswordMatch(id, password string) (*User, error) {
 	user, err := s.store.GetUserByID(id)
 	if err != nil {
-		return nil, ErrUserNotFound
+		return nil, mapUserLookupErr(err)
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
@@ -220,7 +233,7 @@ func (s *UserService) DeleteUser(id string) error {
 	// Check if user exists
 	user, err := s.store.GetUserByID(id)
 	if err != nil {
-		return ErrUserNotFound
+		return mapUserLookupErr(err)
 	}
 	// Check if user is admin
 	if user.HasRole(RoleAdmin) {
@@ -246,7 +259,7 @@ func (s *UserService) GetUsers() ([]*User, error) {
 func (s *UserService) GetUserByUsername(username string) (*User, error) {
 	user, err := s.store.GetUserByUsername(username)
 	if err != nil {
-		return nil, ErrUserNotFound
+		return nil, mapUserLookupErr(err)
 	}
 	return user, nil
 }
@@ -256,7 +269,7 @@ func (s *UserService) GetUserByIdentifier(identifier string) (*User, error) {
 	if err != nil {
 		user, err = s.store.GetUserByEmail(identifier)
 		if err != nil {
-			return nil, ErrUserNotFound
+			return nil, mapUserLookupErr(err)
 		}
 	}
 	return user, nil
@@ -267,7 +280,7 @@ func (s *UserService) GetUserByEmailOrUsernameAndPassword(identifier, password s
 	if err != nil {
 		user, err = s.store.GetUserByEmail(identifier)
 		if err != nil {
-			return nil, ErrUserNotFound
+			return nil, mapUserLookupErr(err)
 		}
 	}
 
@@ -283,7 +296,7 @@ func (s *UserService) ChangeOwnPassword(id, oldPassword, newPassword string) err
 	// Check if user exists
 	user, err := s.store.GetUserByID(id)
 	if err != nil {
-		return ErrUserNotFound
+		return mapUserLookupErr(err)
 	}
 
 	// Check if old password is correct
