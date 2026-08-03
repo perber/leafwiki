@@ -5,7 +5,7 @@
 .page-viewer__content .inline-code,
 .markdown-editor__preview .inline-code {
   border-radius: 0.25rem;
-  padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+  padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
   font-weight: 500;
 }
