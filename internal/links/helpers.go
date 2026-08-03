@@ -120,12 +120,18 @@ func extractWikiLinksFromMarkdown(content string) []string {
 
 // resolveWikiLinkTargets resolves [[Title]] and [[Folder/Title]] targets.
 //
-// Targets containing "/" are first tried as direct route-path lookups
-// ([[Folder/Title]] → /folder/title). If the path lookup fails, the target
-// is retried as a full title (handles titles like "C/C++"). A single title
-// match resolves the link; zero or N>1 matches produce a broken sentinel
-// stored as "wikilink:<target>" so the healing infrastructure can later
-// find and fix the record when a matching page is created.
+// Every target — including one containing "/" — is tried as a title lookup
+// first. A single title match always wins, even for a target like "TCP/IP"
+// or "C/C++ Guide" that also happens to look like a route path; this is
+// deliberate so a wikilink always prefers the page whose actual title
+// matches, rather than silently resolving to an unrelated page that just
+// happens to share a slug path. Only when there is NO title match at all is
+// a slash-containing target retried as a direct route-path lookup
+// ([[Folder/Title]] → /folder/title), which supports nested-path link hints
+// that are not real page titles. An ambiguous title match (N>1) is treated
+// the same as the plain-title case below — broken — rather than falling
+// back to a route-path guess, for consistency: ambiguity is always surfaced
+// as broken, never silently resolved via a different mechanism.
 func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []TargetLink {
 	if !treeService.IsLoaded() || len(targets) == 0 {
 		return nil
@@ -134,18 +140,6 @@ func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []T
 	var result []TargetLink
 	for _, target := range targets {
 		if strings.Contains(target, "/") {
-			routePath := strings.TrimPrefix(target, "/")
-			page, err := treeService.FindPageByRoutePath(routePath)
-			if err == nil && page != nil {
-				result = append(result, TargetLink{
-					TargetPageID:   page.ID,
-					TargetPagePath: normalizeWikiPath(page.CalculatePath()),
-					Broken:         false,
-				})
-				continue
-			}
-			// Path lookup failed — fall through to title lookup so that
-			// titles containing "/" (e.g. "C/C++") can still be resolved.
 			pages := treeService.FindPagesByTitle(target)
 			if len(pages) == 1 {
 				result = append(result, TargetLink{
@@ -155,11 +149,32 @@ func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []T
 				})
 				continue
 			}
-			// Store as a normal broken route path so HealLinksForExactPath
-			// can heal it when the page is later created at that path.
+			if len(pages) == 0 {
+				// No title matches this exact string — retry as a
+				// route-path hint (e.g. [[some/nested/page]]).
+				routePath := strings.TrimPrefix(target, "/")
+				page, err := treeService.FindPageByRoutePath(routePath)
+				if err == nil && page != nil {
+					result = append(result, TargetLink{
+						TargetPageID:   page.ID,
+						TargetPagePath: normalizeWikiPath(page.CalculatePath()),
+						Broken:         false,
+					})
+					continue
+				}
+				// Store as a normal broken route path so
+				// HealLinksForExactPath can heal it when the page is later
+				// created at that path.
+				result = append(result, TargetLink{
+					Broken:         true,
+					TargetPagePath: "/" + routePath,
+				})
+				continue
+			}
+			// N>1 title matches — ambiguous, same as the plain-title case.
 			result = append(result, TargetLink{
 				Broken:         true,
-				TargetPagePath: "/" + routePath,
+				TargetPagePath: wikilinkSentinel(target),
 			})
 			continue
 		}

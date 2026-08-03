@@ -1468,8 +1468,8 @@ func TestResolveWikiLinkTargets_SlashTitleFallback(t *testing.T) {
 		t.Fatalf("CreateNode: %v", err)
 	}
 
-	// "C/C++ Guide" contains "/" so it tries path lookup first,
-	// then falls back to title lookup.
+	// "C/C++ Guide" contains "/" but is tried as a title first and resolves
+	// directly — no colliding route path exists in this tree.
 	targets := resolveWikiLinkTargets(ts, []string{"C/C++ Guide"})
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(targets))
@@ -1479,6 +1479,76 @@ func TestResolveWikiLinkTargets_SlashTitleFallback(t *testing.T) {
 	}
 	if targets[0].TargetPageID != *idPtr {
 		t.Errorf("TargetPageID = %q, want %q", targets[0].TargetPageID, *idPtr)
+	}
+}
+
+// TestResolveWikiLinkTargets_SlashTitle_PrefersTitleOverCollidingRoutePath is
+// the regression test for "WikiLinks Break When the Target Title Contains a
+// Slash": a page titled "TCP/IP" must resolve to itself even when an
+// unrelated route path "tcp/ip" also exists in the tree — before the fix,
+// the route-path lookup was tried first and silently won, resolving the
+// link to the wrong page with Broken staying false.
+func TestResolveWikiLinkTargets_SlashTitle_PrefersTitleOverCollidingRoutePath(t *testing.T) {
+	storageDir := t.TempDir()
+	ts := tree.NewTreeService(storageDir)
+	if err := ts.LoadTree(); err != nil {
+		t.Fatalf("LoadTree: %v", err)
+	}
+
+	// A section slugged "TCP" with a child slugged "IP" — a colliding route
+	// path "TCP/IP" for the unrelated target string "TCP/IP". Slug matching
+	// is case-sensitive (findChildBySlugExactInParentLocked), so the slugs
+	// must match the target's exact casing for the collision to be real.
+	sectionID, err := ts.CreateNode("system", nil, "TCP Docs", "TCP", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode section: %v", err)
+	}
+	_, err = ts.CreateNode("system", sectionID, "IP Notes", "IP", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode child: %v", err)
+	}
+
+	// The actually-titled page "TCP/IP", unrelated to the section above.
+	titledIDPtr, err := ts.CreateNode("system", nil, "TCP/IP", "tcp-ip-guide", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode titled page: %v", err)
+	}
+
+	targets := resolveWikiLinkTargets(ts, []string{"TCP/IP"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if targets[0].Broken {
+		t.Fatalf("expected resolved link to the titled page, got broken")
+	}
+	if targets[0].TargetPageID != *titledIDPtr {
+		t.Errorf("TargetPageID = %q, want %q (the titled page, not the colliding slug path)", targets[0].TargetPageID, *titledIDPtr)
+	}
+	want := wikilinkSentinel("TCP/IP")
+	if targets[0].TargetPagePath != want {
+		t.Errorf("TargetPagePath = %q, want %q", targets[0].TargetPagePath, want)
+	}
+}
+
+func TestResolveWikiLinkTargets_AmbiguousSlashTitle_ReturnsBroken(t *testing.T) {
+	storageDir := t.TempDir()
+	ts := tree.NewTreeService(storageDir)
+	if err := ts.LoadTree(); err != nil {
+		t.Fatalf("LoadTree: %v", err)
+	}
+	if _, err := ts.CreateNode("system", nil, "TCP/IP", "tcp-ip-a", pageNodeKind()); err != nil {
+		t.Fatalf("CreateNode a: %v", err)
+	}
+	if _, err := ts.CreateNode("system", nil, "TCP/IP", "tcp-ip-b", pageNodeKind()); err != nil {
+		t.Fatalf("CreateNode b: %v", err)
+	}
+
+	targets := resolveWikiLinkTargets(ts, []string{"TCP/IP"})
+	if len(targets) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(targets))
+	}
+	if !targets[0].Broken {
+		t.Errorf("expected broken link for ambiguous slash-title match")
 	}
 }
 
