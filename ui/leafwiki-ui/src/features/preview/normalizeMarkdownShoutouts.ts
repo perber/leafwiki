@@ -1,5 +1,5 @@
 const shoutoutOpenPattern =
-  /^(?<indent> {0,3}):::\s*(?<type>[A-Za-z][\w-]*)\s*$/
+  /^(?<indent> {0,3}):::\s*(?<type>[A-Za-z][\w-]*)(?:\s+(?<title>\S.*))?\s*$/
 const shoutoutClosePattern = /^(?<indent> {0,3}):::\s*$/
 const fencedCodePattern = /^(?<indent> {0,3})(?<marker>`{3,}|~{3,})(?<rest>.*)$/
 
@@ -85,7 +85,8 @@ export function normalizeMarkdownShoutouts(content: string) {
     }
 
     const indent = openMatch.groups.indent ?? ''
-    const variant = normalizeShoutoutType(openMatch.groups.type ?? 'info')
+    const title = openMatch.groups.title?.trim()
+    const blockType = normalizeShoutoutType(openMatch.groups.type ?? 'info')
     const originalBlockLines = [line]
     const blockLines: string[] = []
     let closingIndex = index + 1
@@ -131,15 +132,10 @@ export function normalizeMarkdownShoutouts(content: string) {
       output.push('')
     }
 
-    output.push(prefixQuoteLine(indent, `[!${variant.toUpperCase()}]`))
-    output.push(prefixQuoteLine(indent, ''))
-
-    if (blockLines.length === 0) {
-      output.push(prefixQuoteLine(indent, ''))
+    if (blockType === 'collapsible' || blockType === 'collapsed') {
+      appendCollapsibleBlock(output, indent, blockType, blockLines, title)
     } else {
-      for (const blockLine of blockLines) {
-        output.push(prefixQuoteLine(indent, blockLine))
-      }
+      appendShoutoutBlock(output, indent, blockType, blockLines)
     }
 
     const nextLine = lines[closingIndex + 1]
@@ -152,3 +148,43 @@ export function normalizeMarkdownShoutouts(content: string) {
 
   return output.join('\n')
 }
+
+function appendCollapsibleBlock(
+  output: string[],
+  indent: string,
+  blockType: 'collapsible' | 'collapsed',
+  blockLines: string[],
+  title: string | undefined,
+) {
+    const openAttr = blockType === 'collapsible' ? ' open' : ''
+
+    output.push(`${indent}<details class="markdown-collapsible"${openAttr}>`)
+
+    if (title) {
+      output.push(`${indent}<summary>${title}</summary>`)
+      output.push('')
+    }
+
+    output.push(...blockLines)
+
+    output.push(`${indent}</details>`)
+  }
+
+function appendShoutoutBlock(
+  output: string[],
+  indent: string,
+  blockType: string,
+  blockLines: string[],
+) {
+    output.push(prefixQuoteLine(indent, `[!${blockType.toUpperCase()}]`))
+    output.push(prefixQuoteLine(indent, ''))
+
+    if (blockLines.length === 0) {
+      output.push(prefixQuoteLine(indent, ''))
+      return
+    }
+
+    for (const blockLine of blockLines) {
+      output.push(prefixQuoteLine(indent, blockLine))
+    }
+  }
