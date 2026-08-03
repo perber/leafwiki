@@ -483,13 +483,18 @@ func (a *AuthService) verifyTOTPOrRecoveryCode(users *UserService, user *User, c
 	return false, false, nil
 }
 
+// userStoreUnavailableCode identifies errUserStoreUnavailable's LocalizedError
+// so callers (e.g. UserService.mapUserLookupErr) can pass it through instead
+// of collapsing it into ErrUserNotFound.
+const userStoreUnavailableCode = "auth_user_store_unavailable"
+
 // errUserStoreUnavailable is returned while the user store is suspended for
 // an in-progress live restore (see UserStore.suspend / PauseUserStoreForSwap).
 // A GET request landing in that window gets this immediately instead of
 // racing a reconnect against the file swap.
 func errUserStoreUnavailable() error {
 	return sharederrors.NewLocalizedError(
-		"auth_user_store_unavailable",
+		userStoreUnavailableCode,
 		"The server is restoring from a backup — please try again in a moment",
 		"user store is suspended for an in-progress restore",
 		nil,

@@ -90,6 +90,41 @@ func TestUserResolver_Reload_ClearsCachedMisses(t *testing.T) {
 	}
 }
 
+// TestUserResolver_ResolveUserLabel_DoesNotCacheStoreUnavailableAsMiss is the
+// regression test for "UserService Swallows the Suspended-Store Error Into
+// ErrUserNotFound": before GetUserByID distinguished the two, ResolveUserLabel
+// permanently cached ANY error — including a transient "store suspended for
+// an in-progress live restore" error — as a cached miss, so a request landing
+// in that sub-second window would forever resolve nil for that user even
+// after the restore completed and the store came back.
+func TestUserResolver_ResolveUserLabel_DoesNotCacheStoreUnavailableAsMiss(t *testing.T) {
+	resolver, service := setupTestUserResolver(t)
+
+	user, err := service.CreateUser("bob", "bob@example.com", "secure", "editor")
+	if err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+
+	if err := service.suspendStore(); err != nil {
+		t.Fatalf("suspendStore failed: %v", err)
+	}
+
+	label, err := resolver.ResolveUserLabel(user.ID)
+	if err == nil {
+		t.Fatalf("expected an error while the store is suspended, got nil label=%+v", label)
+	}
+	if label != nil {
+		t.Fatalf("expected nil label for a suspended-store error, got %+v", label)
+	}
+
+	resolver.mu.RLock()
+	_, cached := resolver.resolved[user.ID]
+	resolver.mu.RUnlock()
+	if cached {
+		t.Fatalf("expected the transient store-unavailable error NOT to be cached as a miss, but resolved has an entry for %q", user.ID)
+	}
+}
+
 // TestUserResolver_ResolveUserLabel_ReflectsLiveRestore is a regression test
 // for the UserResolver half of "User-Management Routes Go Stale After Live
 // Restore": a UserResolver built from a plain *UserService (as wiki.go's
