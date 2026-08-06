@@ -40,7 +40,7 @@ import { MarkdownLink } from './MarkdownLink'
 import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
-import { normalizeMarkdownShoutouts } from './normalizeMarkdownShoutouts'
+import { normalizeMarkdownBlocks } from './normalizeMarkdownBlocks'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 import { syntaxHighlightLanguages } from './syntaxHighlightLanguages'
@@ -572,7 +572,7 @@ export default function MarkdownPreview({
   const normalizedContent = useMemo(
     () =>
       normalizeMarkdownListIndentation(
-        normalizeMarkdownShoutouts(
+        normalizeMarkdownBlocks(
           preprocessWikilinks(content, (title) => {
             const lower = title.toLowerCase()
             return Object.values(treeById).filter(
