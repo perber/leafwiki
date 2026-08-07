@@ -148,6 +148,50 @@
   padding-right: 3.5rem;
 }
 
+.page-viewer__content .markdown-code-block--line-numbers pre code,
+.markdown-editor__preview .markdown-code-block--line-numbers pre code,
+.page-history__preview-body .markdown-code-block--line-numbers pre code {
+  padding-left: 0;
+}
+
+.page-viewer__content .markdown-code-block__lines,
+.markdown-editor__preview .markdown-code-block__lines,
+.page-history__preview-body .markdown-code-block__lines {
+  display: block;
+  min-width: max-content;
+}
+
+.page-viewer__content .markdown-code-block__line,
+.markdown-editor__preview .markdown-code-block__line,
+.page-history__preview-body .markdown-code-block__line {
+  display: flex;
+  align-items: flex-start;
+  min-height: 1.35em;
+}
+
+.page-viewer__content .markdown-code-block__line-number,
+.markdown-editor__preview .markdown-code-block__line-number,
+.page-history__preview-body .markdown-code-block__line-number {
+  flex: 0 0 auto;
+  min-width: 2.5rem;
+  padding: 0 0.75rem 0 1em;
+  text-align: right;
+  user-select: none;
+  opacity: 0.45;
+  font: inherit;
+  line-height: inherit;
+  border-right: 1px solid
+    color-mix(in oklab, var(--hljs-foreground) 12%, transparent);
+}
+
+.page-viewer__content .markdown-code-block__line-content,
+.markdown-editor__preview .markdown-code-block__line-content,
+.page-history__preview-body .markdown-code-block__line-content {
+  flex: 1 1 auto;
+  padding-left: 0.85rem;
+  white-space: pre;
+}
+
 .page-viewer__content pre,
 .markdown-editor__preview pre,
 .page-history__preview-body pre {
