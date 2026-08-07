@@ -10,6 +10,7 @@ vi.mock('react-i18next', () => ({
       const map: Record<string, string> = {
         'toc.title': 'Table of contents',
         'toc.onThisPage': 'On this page',
+        'toc.empty': 'No headings on this page',
         'toc.collapse': 'Collapse table of contents',
         'toc.expand': 'Expand table of contents',
       }
@@ -68,6 +69,13 @@ describe('TocSidePanel — rendering', () => {
     expect(screen.getByText('Introduction')).toBeInTheDocument()
     expect(screen.getByText('Background')).toBeInTheDocument()
     expect(screen.getByText('Details')).toBeInTheDocument()
+  })
+
+  it('renders an empty state when there are no headings', () => {
+    render(<TocSidePanel entries={[]} />)
+    expect(screen.getByTestId('toc-side-panel-empty')).toHaveTextContent(
+      'No headings on this page',
+    )
   })
 
   it('renders data-testid on each entry button', () => {

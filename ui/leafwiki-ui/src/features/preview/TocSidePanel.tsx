@@ -77,27 +77,37 @@ export function TocSidePanel({ entries, activeId: externalActiveId }: Props) {
         aria-hidden={collapsed}
         data-testid="toc-side-panel-list"
       >
-        {entries.map((entry) => (
-          <li key={entry.id}>
-            <button
-              className={cn(
-                'page-viewer__toc-panel-entry',
-                getIndentClass(entry.level),
-                activeId === entry.id && 'page-viewer__toc-panel-entry--active',
-              )}
-              onClick={() =>
-                scrollToHeadlineHash(`#${encodeURIComponent(entry.id)}`, {
-                  waitForStableLayout: false,
-                })
-              }
-              title={entry.text}
-              data-testid={`toc-entry-${entry.id}`}
-              tabIndex={collapsed ? -1 : 0}
-            >
-              {entry.text}
-            </button>
+        {entries.length === 0 ? (
+          <li
+            className="page-viewer__toc-panel-empty"
+            data-testid="toc-side-panel-empty"
+          >
+            {t('toc.empty')}
           </li>
-        ))}
+        ) : (
+          entries.map((entry) => (
+            <li key={entry.id}>
+              <button
+                className={cn(
+                  'page-viewer__toc-panel-entry',
+                  getIndentClass(entry.level),
+                  activeId === entry.id &&
+                    'page-viewer__toc-panel-entry--active',
+                )}
+                onClick={() =>
+                  scrollToHeadlineHash(`#${encodeURIComponent(entry.id)}`, {
+                    waitForStableLayout: false,
+                  })
+                }
+                title={entry.text}
+                data-testid={`toc-entry-${entry.id}`}
+                tabIndex={collapsed ? -1 : 0}
+              >
+                {entry.text}
+              </button>
+            </li>
+          ))
+        )}
       </ul>
     </nav>
   )

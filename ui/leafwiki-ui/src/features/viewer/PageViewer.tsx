@@ -144,15 +144,19 @@ export default function PageViewer() {
     [page],
   )
 
-  const showTocButton = tocEntries.length > 3
+  // Always mount the desktop TOC side panel while viewing a page so the
+  // subheader/article column width stays stable across pages (see #1378).
+  // The mobile/dropdown control still only appears for longer TOCs.
+  const showTocSidePanel = Boolean(page && !error)
+  const showTocDropdown = tocEntries.length > 3
   // Single scroll spy for both the dropdown and the side panel.
-  const tocActiveId = useTocScrollSpy(showTocButton ? tocEntries : [])
+  const tocActiveId = useTocScrollSpy(showTocSidePanel ? tocEntries : [])
 
   const toggleTocCollapsed = useTocPanelStore((state) => state.toggleCollapsed)
   const tocCollapsed = useTocPanelStore((state) => state.collapsed)
 
   useEffect(() => {
-    if (!showTocButton) return
+    if (!showTocSidePanel) return
 
     const tocToggleHotkey = createHotkeyDefinition(
       'viewer.toc.toggle',
@@ -161,7 +165,7 @@ export default function PageViewer() {
     registerHotkey(tocToggleHotkey)
 
     return () => unregisterHotkey(tocToggleHotkey.keyCombo)
-  }, [showTocButton, toggleTocCollapsed, registerHotkey, unregisterHotkey])
+  }, [showTocSidePanel, toggleTocCollapsed, registerHotkey, unregisterHotkey])
 
   const editorName = displayUser(page?.metadata?.lastAuthor)
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
@@ -175,7 +179,7 @@ export default function PageViewer() {
           <div
             className={cn(
               'page-viewer__subheader print:hidden',
-              showTocButton &&
+              showTocSidePanel &&
                 (tocCollapsed
                   ? 'page-viewer__subheader--toc-reserved-collapsed'
                   : 'page-viewer__subheader--toc-reserved'),
@@ -204,7 +208,7 @@ export default function PageViewer() {
                   />
                 )}
               </div>
-              {showTocButton && (
+              {showTocDropdown && (
                 <div className="page-viewer__toc-button">
                   <TocDropdownButton
                     entries={tocEntries}
@@ -220,7 +224,7 @@ export default function PageViewer() {
       : null
 
   const tocPane =
-    showTocButton && page && !error && tocPaneRoot
+    showTocSidePanel && tocPaneRoot
       ? createPortal(
           <TocSidePanel entries={tocEntries} activeId={tocActiveId} />,
           tocPaneRoot,

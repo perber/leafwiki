@@ -69,6 +69,7 @@
   "toc": {
     "title": "Table of contents",
     "onThisPage": "On this page",
+    "empty": "No headings on this page",
     "collapse": "Collapse table of contents",
     "expand": "Expand table of contents"
   },
