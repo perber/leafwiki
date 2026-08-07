@@ -109,6 +109,22 @@ Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` dire
 If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
 
 ---
+---
+
+## UI localization (i18n)
+
+The LeafWiki UI uses `i18next` with English catalogs under `ui/leafwiki-ui/src/locales/en/`.
+
+To add or update translations:
+
+1. Prefer locale JSON keys over hardcoded English strings in React/TS code.
+2. Add or edit keys in the matching namespace file under `ui/leafwiki-ui/src/locales/en/` (for example `viewer.json`, `editor.json`).
+3. Register any **new** namespace file in `ui/leafwiki-ui/src/lib/i18n.ts`.
+4. Look up strings with `useTranslation('<namespace>')` in components, or `i18next.t(key, { ns: '<namespace>' })` outside React.
+
+English is the only shipped language today. A second language can be added later by creating `ui/leafwiki-ui/src/locales/<lang>/` catalogs and wiring them in `i18n.ts` — see #789.
+
+
 ## Pull request guidelines
 
 To keep reviews efficient, please follow these guidelines:
