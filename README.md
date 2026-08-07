@@ -570,6 +570,14 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 
 ---
 
+## Relative Markdown Links
+
+LeafWiki resolves relative page links with **page-as-folder** semantics: the current page path is treated as a folder, so `[Setup](setup)` on `/docs/guide` resolves to `/docs/guide/setup`, not a sibling `/docs/setup`.
+
+A trailing `.md` suffix in a link target is ignored for page lookup (for example `setup.md` → `setup`), which matches common filesystem / Obsidian-style Markdown.
+
+This differs from plain filesystem tools that treat the current file''s directory as the base. A broader sibling-folder model is discussed in #1236.
+
 ## External Edits & Resync
 
 If you edit Markdown files directly on disk — a text editor, Git, a script, a bulk import — LeafWiki won't pick up the changes on its own. Trigger a resync one of two ways:
