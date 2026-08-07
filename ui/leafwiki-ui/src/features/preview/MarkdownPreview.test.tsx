@@ -72,6 +72,48 @@ if WinExist("Untitled - Notepad") {
     expect(autohotkeyCodeBlock?.querySelector('.hljs-string')).not.toBeNull()
   })
 
+  it('shows line numbers when the fence language ends with =', () => {
+    const content = `\`\`\`bash=
+echo one
+echo two
+echo three
+\`\`\``
+
+    const { container } = render(<MarkdownPreview content={content} />)
+
+    const block = container.querySelector(
+      '.markdown-code-block--line-numbers',
+    )
+    expect(block).not.toBeNull()
+
+    const lineNumbers = container.querySelectorAll(
+      '.markdown-code-block__line-number',
+    )
+    expect(lineNumbers).toHaveLength(3)
+    expect(lineNumbers[0]?.textContent).toBe('1')
+    expect(lineNumbers[2]?.textContent).toBe('3')
+
+    const highlighted = container.querySelector('code.language-bash.hljs')
+    expect(highlighted).not.toBeNull()
+    expect(highlighted?.getAttribute('data-line-numbers')).toBe('true')
+  })
+
+  it('does not show line numbers for ordinary fences', () => {
+    const content = `\`\`\`bash
+echo one
+echo two
+\`\`\``
+
+    const { container } = render(<MarkdownPreview content={content} />)
+
+    expect(
+      container.querySelector('.markdown-code-block--line-numbers'),
+    ).toBeNull()
+    expect(
+      container.querySelector('.markdown-code-block__line-number'),
+    ).toBeNull()
+  })
+
   it('renders external images from markdown image syntax', () => {
     const { container } = render(
       <MarkdownPreview content="![Remote diagram](https://example.com/diagram.png)" />,
