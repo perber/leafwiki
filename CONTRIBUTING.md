@@ -109,6 +109,22 @@ Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` dire
 If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
 
 ---
+
+## UI localization (i18n)
+
+The LeafWiki UI uses `i18next` with per-feature namespace catalogs under `ui/leafwiki-ui/src/locales/<lang>/`. **English (`en/`) and German (`de/`) both ship today**, English being the fallback language. Every namespace file must exist for every language with an **identical set of keys** — `ui/leafwiki-ui/src/lib/i18n.test.ts` enforces this parity and the test suite fails on any mismatch.
+
+To add or update translations:
+
+1. Never hardcode user-facing strings in React/TS code — always go through a locale key.
+2. Add or edit keys in the matching namespace file under `ui/leafwiki-ui/src/locales/en/` (for example `viewer.json`, `editor.json`), then make the **same** key change in `ui/leafwiki-ui/src/locales/de/`.
+3. Look up strings with `useTranslation('<namespace>')` in components, or `i18next.t(key, { ns: '<namespace>' })` outside React.
+4. Run `npm run test` in `ui/leafwiki-ui` to confirm key parity still holds.
+
+Adding a **new namespace** only means creating `en/<namespace>.json` and `de/<namespace>.json` — `i18n.ts` globs `src/locales/*/*.json` at build time, so there is no registry to update. Adding **another language** is likewise just a new `ui/leafwiki-ui/src/locales/<lang>/` folder containing the full set of namespace files; it is picked up automatically and offered in the language switcher (see #789).
+
+---
+
 ## Pull request guidelines
 
 To keep reviews efficient, please follow these guidelines:
