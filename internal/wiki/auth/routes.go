@@ -12,6 +12,7 @@ import (
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
 	"github.com/perber/wiki/internal/http/middleware/utils"
+	"github.com/perber/wiki/internal/http/releasecheck"
 )
 
 const (
@@ -105,6 +106,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	// Config endpoint also lives here as it issues the CSRF cookie.
 	nonAuth.GET("/config", r.handleConfig(ctx))
+	nonAuth.GET("/get-last-release", r.handleGetLastRelease(ctx))
 
 	// /auth/me uses optional auth so that unauthenticated callers get 200+null
 	// instead of 401, which would cause browsers behind a Basic Auth reverse
@@ -182,7 +184,36 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			"loginUrl":                opts.LoginURL,
 			"logoutUrl":               opts.LogoutURL,
 			"userManagementUrl":       opts.UserManagementURL,
+			"version":                 opts.Version,
+			"updateCheckEnabled":      !opts.DisableUpdateCheck,
 		})
+	}
+}
+
+func (r *Routes) handleGetLastRelease(ctx httpinternal.RouterContext) gin.HandlerFunc {
+	opts := ctx.Opts
+	return func(c *gin.Context) {
+		if opts.DisableUpdateCheck {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "Update check is disabled",
+			})
+			return
+		}
+
+		release, err := releasecheck.FetchLatestRelease(
+			c.Request.Context(),
+			opts.UpdateCheckHTTPClient,
+			opts.UpdateCheckAPIURL,
+		)
+		if err != nil {
+			slog.Default().Warn("failed to fetch latest release", "error", err)
+			c.JSON(http.StatusBadGateway, gin.H{
+				"error": "Failed to fetch latest release",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, release)
 	}
 }
 
