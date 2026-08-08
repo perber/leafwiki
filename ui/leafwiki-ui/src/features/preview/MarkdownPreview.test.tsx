@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import MarkdownPreview from './MarkdownPreview'
 
@@ -91,5 +92,21 @@ if WinExist("Untitled - Notepad") {
     expect(image).not.toBeNull()
     expect(image?.getAttribute('src')).toBe('https://example.com/banner.png')
     expect(image?.getAttribute('alt')).toBe('Remote banner')
+  })
+
+  it('renders inline code with its copy action', () => {
+    const { container } = render(
+      <TooltipProvider>
+        <MarkdownPreview content="Use `npm run build` here." />
+      </TooltipProvider>,
+    )
+
+    const inlineCode = container.querySelector('.markdown-inline-code')
+    expect(inlineCode?.textContent).toContain('npm run build')
+    expect(
+      inlineCode?.querySelector(
+        '[data-testid="markdown-inline-code-copy-button"]',
+      ),
+    ).not.toBeNull()
   })
 })

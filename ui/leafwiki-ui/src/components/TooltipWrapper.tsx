@@ -13,6 +13,7 @@ type Props = {
   parentClassName?: string
   side?: 'left' | 'right' | 'top' | 'bottom'
   align?: 'start' | 'center' | 'end'
+  asChild?: boolean
 }
 
 export function TooltipWrapper({
@@ -21,19 +22,28 @@ export function TooltipWrapper({
   side,
   align,
   parentClassName,
+  asChild = false,
 }: Props) {
   const tooltipSide = side || 'top'
   const tooltipAlign = align || 'start'
   const isMobile = useIsMobile()
 
   if (isMobile) {
-    return <div className={clsx('flex', parentClassName)}>{children}</div>
+    return asChild ? (
+      <>{children}</>
+    ) : (
+      <div className={clsx('flex', parentClassName)}>{children}</div>
+    )
   }
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className={clsx('flex', parentClassName)}>{children}</div>
+        {asChild ? (
+          children
+        ) : (
+          <div className={clsx('flex', parentClassName)}>{children}</div>
+        )}
       </TooltipTrigger>
       <TooltipContent
         side={tooltipSide}
