@@ -73,7 +73,9 @@
     "expand": "Expand table of contents"
   },
   "toolbar": {
-    "moreActions": "More actions"
+    "moreActions": "More actions",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all"
   },
   "pageToolbar": {
     "itemPage": "Page",

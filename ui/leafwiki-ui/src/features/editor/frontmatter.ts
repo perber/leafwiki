@@ -1,3 +1,5 @@
+import i18next from '@/lib/i18n'
+
 const TAGS_KEY_PATTERN = /^tags\s*:\s*(.*)$/
 const FRONTMATTER_KEY_PATTERN = /^([^:\n][^:\n]*?)\s*:\s*(.*)$/
 const INTERNAL_FIELD_PREFIX = 'leafwiki_'
@@ -115,18 +117,18 @@ export function validateEditorFrontmatterMetadata(
 
   for (const tag of tags) {
     if (tag.trim() !== tag) {
-      errors.tags = 'Tags must not contain leading or trailing whitespace.'
+      errors.tags = i18next.t('frontmatterValidation.tagsWhitespace', { ns: 'editor' })
       break
     }
 
     if (tag.trim() === '') {
-      errors.tags = 'Tags must not be empty.'
+      errors.tags = i18next.t('frontmatterValidation.tagsEmpty', { ns: 'editor' })
       break
     }
 
     const key = tag.toLocaleLowerCase()
     if (seenTags.has(key)) {
-      errors.tags = 'Tags must be unique.'
+      errors.tags = i18next.t('frontmatterValidation.tagsUnique', { ns: 'editor' })
       break
     }
     seenTags.add(key)
@@ -140,34 +142,34 @@ export function validateEditorFrontmatterMetadata(
     const trimmedKey = field.key.trim()
 
     if (trimmedKey === '') {
-      errors[keyField] = 'Property key must not be empty.'
+      errors[keyField] = i18next.t('frontmatterValidation.keyEmpty', { ns: 'editor' })
       return
     }
 
     if (trimmedKey !== field.key) {
       errors[keyField] =
-        'Property key must not contain leading or trailing whitespace.'
+        i18next.t('frontmatterValidation.keyWhitespace', { ns: 'editor' })
       return
     }
 
     if (trimmedKey.toLocaleLowerCase().startsWith(INTERNAL_FIELD_PREFIX)) {
-      errors[keyField] = 'Property key uses a reserved prefix.'
+      errors[keyField] = i18next.t('frontmatterValidation.keyReservedPrefix', { ns: 'editor' })
       return
     }
 
     const lowerKey = trimmedKey.toLocaleLowerCase()
     if (lowerKey === 'tags') {
-      errors[keyField] = 'Property key is reserved.'
+      errors[keyField] = i18next.t('frontmatterValidation.keyReserved', { ns: 'editor' })
       return
     }
 
     const dedupeKey = trimmedKey.toLocaleLowerCase()
     const existingIndex = seenKeys.get(dedupeKey)
     if (existingIndex !== undefined) {
-      errors[keyField] = 'Property key must be unique.'
+      errors[keyField] = i18next.t('frontmatterValidation.keyUnique', { ns: 'editor' })
       if (!errors[`properties.${existingIndex}.key`]) {
         errors[`properties.${existingIndex}.key`] =
-          'Property key must be unique.'
+          i18next.t('frontmatterValidation.keyUnique', { ns: 'editor' })
       }
       return
     }
@@ -179,7 +181,7 @@ export function validateEditorFrontmatterMetadata(
 
     if (typeof field.value !== 'string') {
       errors[valueField] =
-        'Property value must be a string, number, boolean, or flat list.'
+        i18next.t('frontmatterValidation.valueType', { ns: 'editor' })
     }
   })
 
