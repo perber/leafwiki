@@ -8,6 +8,7 @@ import {
   RestoreStatus,
 } from '@/lib/api/restore'
 import { getResyncStatus } from '@/lib/api/resync'
+import { sleep } from '@/lib/sleep'
 
 const POLL_INTERVAL_MS = 800
 const POLL_ERROR_LIMIT = 3
@@ -31,10 +32,6 @@ interface RestoreState {
   trigger: (id: string) => Promise<void>
   triggerUpload: (file: File) => Promise<void>
   selfRestart: () => Promise<void>
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
 
 export const useRestoreStore = create<RestoreState>((set) => ({

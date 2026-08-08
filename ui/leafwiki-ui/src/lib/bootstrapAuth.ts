@@ -7,6 +7,7 @@ export function useBootstrapAuth(enabled = true) {
   const setUser = useSessionStore((s) => s.setUser)
   const setRefreshing = useSessionStore((s) => s.setRefreshing)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
+  const configLoadSucceeded = useConfigStore((s) => s.configLoadSucceeded)
 
   useEffect(() => {
     if (!enabled) {
@@ -18,9 +19,12 @@ export function useBootstrapAuth(enabled = true) {
     ;(async () => {
       setRefreshing(true)
       try {
-        if (httpRemoteUserEnabled) {
+        if (httpRemoteUserEnabled || !configLoadSucceeded) {
           // Proxy manages the session — resolve the current user via /api/auth/me.
-          // Token refresh does not apply in this mode.
+          // Token refresh does not apply in this mode. Also used when the auth
+          // mode isn't confirmed yet (config failed to load): /api/auth/me
+          // works regardless of mode, so it's a safe way to check identity
+          // without risking a wrong-mode refresh-token call.
           const user = await fetchMe()
           if (!cancelled) setUser(user)
         } else {
@@ -43,5 +47,11 @@ export function useBootstrapAuth(enabled = true) {
     return () => {
       cancelled = true
     }
-  }, [setUser, setRefreshing, enabled, httpRemoteUserEnabled])
+  }, [
+    setUser,
+    setRefreshing,
+    enabled,
+    httpRemoteUserEnabled,
+    configLoadSucceeded,
+  ])
 }
