@@ -47,7 +47,7 @@ afterEach(() => {
 })
 
 describe('loadConfig retry', () => {
-  it('TestLoadConfig_TransientFailureThenSuccess_RetriesAndSucceeds', async () => {
+  it('retries and succeeds after a transient /api/config failure', async () => {
     ;(configApi.getConfig as Mock)
       .mockRejectedValueOnce(new Error('network blip'))
       .mockResolvedValueOnce(baseConfig)
@@ -62,7 +62,7 @@ describe('loadConfig retry', () => {
     expect(configApi.getConfig).toHaveBeenCalledTimes(2)
   })
 
-  it('TestLoadConfig_PersistentFailure_GivesUpWithConfigLoadSucceededFalse', async () => {
+  it('gives up with configLoadSucceeded false after repeated failures', async () => {
     ;(configApi.getConfig as Mock).mockRejectedValue(new Error('down'))
 
     const loadPromise = useConfigStore.getState().loadConfig()
@@ -75,7 +75,7 @@ describe('loadConfig retry', () => {
     expect((configApi.getConfig as Mock).mock.calls.length).toBeGreaterThan(1)
   })
 
-  it('TestLoadConfig_ImmediateSuccess_DoesNotRetry', async () => {
+  it('does not retry when the first attempt succeeds', async () => {
     ;(configApi.getConfig as Mock).mockResolvedValueOnce(baseConfig)
 
     await useConfigStore.getState().loadConfig()

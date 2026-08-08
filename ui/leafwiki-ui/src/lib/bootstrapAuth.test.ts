@@ -36,7 +36,7 @@ beforeEach(() => {
 })
 
 describe('useBootstrapAuth', () => {
-  it('TestUseBootstrapAuth_ConfigLoadFailed_CallsFetchMeNotEnsureRefresh', async () => {
+  it('calls fetchMe (not ensureRefresh) when config failed to load', async () => {
     useConfigStore.setState({
       configLoadSucceeded: false,
       httpRemoteUserEnabled: false,
@@ -49,7 +49,7 @@ describe('useBootstrapAuth', () => {
     expect(ensureRefresh).not.toHaveBeenCalled()
   })
 
-  it('TestUseBootstrapAuth_HttpRemoteUserEnabled_CallsFetchMe', async () => {
+  it('calls fetchMe when httpRemoteUserEnabled is true', async () => {
     useConfigStore.setState({
       configLoadSucceeded: true,
       httpRemoteUserEnabled: true,
@@ -61,7 +61,7 @@ describe('useBootstrapAuth', () => {
     expect(ensureRefresh).not.toHaveBeenCalled()
   })
 
-  it('TestUseBootstrapAuth_SessionAuthConfirmed_CallsEnsureRefresh', async () => {
+  it('calls ensureRefresh for a confirmed session-auth deployment', async () => {
     useConfigStore.setState({
       configLoadSucceeded: true,
       httpRemoteUserEnabled: false,
@@ -73,7 +73,7 @@ describe('useBootstrapAuth', () => {
     expect(fetchMe).not.toHaveBeenCalled()
   })
 
-  it('TestUseBootstrapAuth_HttpRemoteUserEnabled_FetchMeAuthFailure_ClearsUser', async () => {
+  it('clears the user when fetchMe fails with an auth error', async () => {
     useConfigStore.setState({
       configLoadSucceeded: true,
       httpRemoteUserEnabled: true,
@@ -86,7 +86,7 @@ describe('useBootstrapAuth', () => {
     await waitFor(() => expect(useSessionStore.getState().user).toBeNull())
   })
 
-  it('TestUseBootstrapAuth_HttpRemoteUserEnabled_FetchMeServerError_PreservesUser', async () => {
+  it('preserves the user when fetchMe fails with a server/network error', async () => {
     useConfigStore.setState({
       configLoadSucceeded: true,
       httpRemoteUserEnabled: true,

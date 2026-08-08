@@ -67,7 +67,7 @@ describe('ensureRefresh', () => {
     useSessionStore.setState({ user: null, accessTokenExpiresAt: null })
   })
 
-  it('TestEnsureRefresh_ConfigLoadNotSucceeded_StillAttemptsRefresh', async () => {
+  it('still attempts refresh when config is not confirmed (may be a wasted 422)', async () => {
     // Deliberate: attempting the call is harmless by itself (worst case one
     // wasted 422). Skipping it here entirely would permanently disable
     // refresh for session-auth deployments that hit one bad /api/config
@@ -85,7 +85,7 @@ describe('ensureRefresh', () => {
     ).toBe(true)
   })
 
-  it('TestEnsureRefresh_HttpRemoteUserEnabled_DoesNotCallRefreshEndpoint', async () => {
+  it('does not call the refresh endpoint when httpRemoteUserEnabled is true', async () => {
     useConfigStore.setState({
       httpRemoteUserEnabled: true,
       configLoadSucceeded: true,
@@ -98,7 +98,7 @@ describe('ensureRefresh', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('TestEnsureRefresh_AuthDisabled_DoesNotCallRefreshEndpoint', async () => {
+  it('does not call the refresh endpoint when auth is disabled', async () => {
     useConfigStore.setState({ authDisabled: true })
     const fetchMock = createFetchMock({})
     vi.stubGlobal('fetch', fetchMock)
@@ -108,7 +108,7 @@ describe('ensureRefresh', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('TestEnsureRefresh_SessionAuthConfirmed_CallsRefreshEndpoint', async () => {
+  it('calls the refresh endpoint for a confirmed session-auth deployment', async () => {
     const fetchMock = createFetchMock({
       '/api/auth/refresh-token': {
         status: 200,
@@ -140,7 +140,7 @@ describe('fetchWithAuth', () => {
     useSessionStore.setState({ user: null, accessTokenExpiresAt: null })
   })
 
-  it('TestFetchWithAuth_ConfigLoadFailed_PreemptiveRefreshFails_RequestStillSucceeds', async () => {
+  it('still succeeds when a preemptive refresh fails and config has not loaded', async () => {
     // Reproduces the exact reported scenario (GitHub #1407): config failed to
     // load, a user is persisted from a prior header-auth session (so
     // accessTokenExpiresAt is null and shouldRefreshBeforeRequest fires on
@@ -166,7 +166,7 @@ describe('fetchWithAuth', () => {
     expect(useSessionStore.getState().user).toEqual(testUser)
   })
 
-  it('TestFetchWithAuth_ConfigLoadFailed_Genuine401_SurfacesErrorWithoutLogout', async () => {
+  it('surfaces a genuine 401 as an error without forcing logout when config has not loaded', async () => {
     useConfigStore.setState({ configLoadSucceeded: false })
     useSessionStore.setState({
       user: testUser,
@@ -190,7 +190,7 @@ describe('fetchWithAuth', () => {
     expect(useSessionStore.getState().user).toEqual(testUser)
   })
 
-  it('TestFetchWithAuth_SessionAuthConfirmed_401RetryStillWorks', async () => {
+  it('retries and succeeds after a 401 for a confirmed session-auth deployment', async () => {
     useConfigStore.setState({ configLoadSucceeded: true })
     useSessionStore.setState({
       user: testUser,
@@ -220,7 +220,7 @@ describe('fetchWithAuth', () => {
     ).toHaveLength(1)
   })
 
-  it('TestFetchWithAuth_SessionAuthConfirmed_ExpiredTokenStillForcesLogout', async () => {
+  it('still forces a logout when a confirmed session token is genuinely expired', async () => {
     useConfigStore.setState({ configLoadSucceeded: true })
     useSessionStore.setState({
       user: testUser,
