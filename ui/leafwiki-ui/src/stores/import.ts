@@ -2,6 +2,7 @@ import * as importAPI from '@/lib/api/import'
 import { ApiError } from '@/lib/api/auth'
 import { mapApiError } from '@/lib/api/errors'
 import i18next from '@/lib/i18n'
+import { sleep } from '@/lib/sleep'
 import { toast } from 'sonner'
 import { create } from 'zustand'
 import { useTreeStore } from './tree'
@@ -24,10 +25,6 @@ type ImportStore = {
 
 const IMPORT_POLL_INTERVAL_MS = 1000
 const IMPORT_POLL_RETRY_LIMIT = 3
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
-}
 
 async function pollImportPlanUntilSettled(
   initialPlan: importAPI.ImportPlan,

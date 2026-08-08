@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getResyncStatus, triggerResync } from '@/lib/api/resync'
 import i18next from '@/lib/i18n'
+import { sleep } from '@/lib/sleep'
 
 const POLL_INTERVAL_MS = 800
 const POLL_ERROR_LIMIT = 3
@@ -9,10 +10,6 @@ interface ResyncState {
   isLoading: boolean
   phase: string | null
   trigger: () => Promise<void>
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
 
 export const useResyncStore = create<ResyncState>((set) => ({

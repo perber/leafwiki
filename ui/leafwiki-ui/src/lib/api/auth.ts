@@ -170,6 +170,7 @@ export async function fetchWithAuth(
   const config = useConfigStore.getState()
   const authDisabled = config.authDisabled
   const httpRemoteUserEnabled = config.httpRemoteUserEnabled
+  const configLoadSucceeded = config.configLoadSucceeded
 
   const headers = new Headers(options.headers || {})
   if (!(options.body instanceof FormData)) {
@@ -213,8 +214,19 @@ export async function fetchWithAuth(
     try {
       await ensureRefresh()
     } catch {
-      await clearSessionState(sessionLogout)
-      throw new Error(t('apiErrors.unauthorized'))
+      // A refresh failure only proves the session is really gone once the
+      // auth mode is confirmed (configLoadSucceeded) — otherwise this could
+      // just as easily be a header-auth deployment whose refresh-token call
+      // was always going to 422 (accessTokenExpiresAt is never set in that
+      // mode, so the check above fires on every request). Forcing this
+      // request to fail on that guess — instead of letting the real request
+      // decide, the same way it already does when httpRemoteUserEnabled is
+      // *confirmed* true — is what caused GitHub #1407 (spurious
+      // CSRF-token-missing logouts, autosave breaking mid-edit).
+      if (configLoadSucceeded) {
+        await clearSessionState(sessionLogout)
+        throw new Error(t('apiErrors.unauthorized'))
+      }
     }
   }
 
@@ -225,8 +237,14 @@ export async function fetchWithAuth(
       await ensureRefresh()
       res = await doFetch()
     } catch {
-      await clearSessionState(sessionLogout)
-      throw new Error(t('apiErrors.unauthorized'))
+      if (configLoadSucceeded) {
+        await clearSessionState(sessionLogout)
+        throw new Error(t('apiErrors.unauthorized'))
+      }
+      // Unconfirmed mode: don't force a logout, but don't fabricate success
+      // either — `res` still holds the original 401 from above, so it falls
+      // through to the generic !res.ok handling below and surfaces as a
+      // normal error instead of a silent retry loop.
     }
   }
 
@@ -308,8 +326,18 @@ async function clearSessionState(sessionLogout: () => Promise<void>) {
 }
 
 export function ensureRefresh(): Promise<void> {
-  const { authDisabled } = useConfigStore.getState()
-  if (authDisabled) {
+  const { authDisabled, httpRemoteUserEnabled } = useConfigStore.getState()
+  // Session-token refresh only applies to session/JWT auth — skip it
+  // whenever that's confirmed false, instead of relying on every caller to
+  // have already checked httpRemoteUserEnabled itself. Deliberately NOT
+  // gated on configLoadSucceeded: attempting a refresh while the auth mode
+  // is still unconfirmed is harmless by itself (worst case one wasted call),
+  // and skipping it here entirely would permanently disable refresh for
+  // session-auth deployments that hit one bad /api/config fetch. The actual
+  // risk — treating an unconfirmed-mode refresh failure as confirmed
+  // unauthorized and forcing a logout — is guarded at the reaction site in
+  // fetchWithAuth instead, not here.
+  if (authDisabled || httpRemoteUserEnabled) {
     return Promise.resolve()
   }
 
