@@ -2,6 +2,8 @@ package shared
 
 import (
 	"bytes"
+	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -78,5 +80,47 @@ func TestWriteStreamAtomic_WritesToTargetFile(t *testing.T) {
 		if got := info.Mode().Perm(); got != 0o644 {
 			t.Fatalf("permissions = %04o, want 0644", got)
 		}
+	}
+}
+
+// Regression tests for the zip-bomb unbounded-decompression DoS (CWE-409)
+// fix's CopyWithBudget primitive: which cap trips must be attributed
+// correctly, and an attacker-controlled declared compressed size that
+// overflows int64 must not silently disable the decompression-ratio check.
+
+func TestCopyWithBudget_ReportsErrFileTooLarge_WhenEntryCapIsBinding(t *testing.T) {
+	limits := ExtractionLimits{MaxEntryBytes: 10, MaxTotalBytes: 1000, MaxRatio: 1 << 30, RatioFloorBytes: 1 << 30}
+	budget := NewSizeBudget(limits.MaxTotalBytes)
+
+	err := CopyWithBudget(&bytes.Buffer{}, strings.NewReader(strings.Repeat("A", 20)), 0, limits, budget)
+	if !errors.Is(err, ErrFileTooLarge) {
+		t.Fatalf("expected ErrFileTooLarge, got: %v", err)
+	}
+}
+
+func TestCopyWithBudget_ReportsErrCumulativeSizeTooLarge_WhenBudgetCapIsBinding(t *testing.T) {
+	limits := ExtractionLimits{MaxEntryBytes: 1000, MaxTotalBytes: 1000, MaxRatio: 1 << 30, RatioFloorBytes: 1 << 30}
+	budget := NewSizeBudget(limits.MaxTotalBytes)
+	budget.remaining = 10 // simulate most of the archive's budget already spent
+
+	err := CopyWithBudget(&bytes.Buffer{}, strings.NewReader(strings.Repeat("A", 20)), 0, limits, budget)
+	if !errors.Is(err, ErrCumulativeSizeTooLarge) {
+		t.Fatalf("expected ErrCumulativeSizeTooLarge, got: %v", err)
+	}
+}
+
+func TestCopyWithBudget_ClampsOverflowingDeclaredCompressedSize_KeepsRatioCheckFailClosed(t *testing.T) {
+	limits := ExtractionLimits{MaxEntryBytes: 1 << 30, MaxTotalBytes: 1 << 30, MaxRatio: 3, RatioFloorBytes: 50}
+	budget := NewSizeBudget(limits.MaxTotalBytes)
+
+	// A declared compressed size near uint64 max overflows a naive int64
+	// conversion to a negative number. If that silently disabled the ratio
+	// check (compressedSize > 0 becomes false), this copy would succeed
+	// despite decompressing well past the floor at a ratio no real entry of
+	// this declared size could produce.
+	declaredCompressedSize := uint64(math.MaxUint64)
+	err := CopyWithBudget(&bytes.Buffer{}, strings.NewReader(strings.Repeat("A", 5000)), declaredCompressedSize, limits, budget)
+	if !errors.Is(err, ErrDecompressionRatioTooHigh) {
+		t.Fatalf("expected the ratio check to stay active (fail-closed) for an overflowing declared compressed size, got: %v", err)
 	}
 }

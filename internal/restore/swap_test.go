@@ -3,12 +3,14 @@ package restore
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/perber/wiki/internal/core/shared"
 	snapshotSvc "github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/test_utils"
 )
@@ -80,6 +82,84 @@ func TestExtractAndValidate_RejectsCorruptUsersDB(t *testing.T) {
 
 	if _, _, err := extractAndValidate(zipPath, t.TempDir()); err == nil {
 		t.Fatal("expected error for a users.db that fails the sanity query")
+	}
+}
+
+// Regression tests for the zip-bomb unbounded-decompression DoS (CWE-409):
+// extractAndValidateWithLimits must enforce a per-file cap, a
+// cumulative-per-archive cap, and a decompression-ratio cap during restore
+// extraction, mirroring internal/importer's fix for the same gap.
+
+func TestExtractAndValidateWithLimits_RejectsEntryLargerThanPerFileLimit(t *testing.T) {
+	zipPath := writeRawZip(t, map[string]string{
+		"backup-meta.json": `{"id":"x","version":"v1"}`,
+		"users.db":         "irrelevant here, per-file cap trips first",
+		"big.txt":          strings.Repeat("A", 200),
+	})
+	limits := shared.ExtractionLimits{
+		MaxEntryBytes:   100,
+		MaxTotalBytes:   1 << 30,
+		MaxRatio:        1 << 30,
+		RatioFloorBytes: 1 << 30,
+	}
+
+	if _, _, err := extractAndValidateWithLimits(zipPath, t.TempDir(), limits); !errors.Is(err, shared.ErrFileTooLarge) {
+		t.Fatalf("expected ErrFileTooLarge, got: %v", err)
+	}
+}
+
+func TestExtractAndValidateWithLimits_RejectsManyFilesSummingPastCumulativeLimit(t *testing.T) {
+	zipPath := writeRawZip(t, map[string]string{
+		"backup-meta.json": `{"id":"x","version":"v1"}`,
+		"users.db":         "irrelevant here, cumulative cap trips first",
+		"a.txt":            strings.Repeat("A", 60),
+		"b.txt":            strings.Repeat("B", 60),
+		"c.txt":            strings.Repeat("C", 60),
+	})
+	limits := shared.ExtractionLimits{
+		MaxEntryBytes:   1 << 30,
+		MaxTotalBytes:   100,
+		MaxRatio:        1 << 30,
+		RatioFloorBytes: 1 << 30,
+	}
+
+	if _, _, err := extractAndValidateWithLimits(zipPath, t.TempDir(), limits); !errors.Is(err, shared.ErrCumulativeSizeTooLarge) {
+		t.Fatalf("expected ErrCumulativeSizeTooLarge, got: %v", err)
+	}
+}
+
+func TestExtractAndValidateWithLimits_RejectsHighDecompressionRatio(t *testing.T) {
+	zipPath := writeRawZip(t, map[string]string{
+		"backup-meta.json": `{"id":"x","version":"v1"}`,
+		"users.db":         "irrelevant here, ratio cap trips first",
+		"bomb.txt":         strings.Repeat("A", 5000),
+	})
+	limits := shared.ExtractionLimits{
+		MaxEntryBytes:   1 << 30,
+		MaxTotalBytes:   1 << 30,
+		MaxRatio:        3,
+		RatioFloorBytes: 50,
+	}
+
+	if _, _, err := extractAndValidateWithLimits(zipPath, t.TempDir(), limits); !errors.Is(err, shared.ErrDecompressionRatioTooHigh) {
+		t.Fatalf("expected ErrDecompressionRatioTooHigh, got: %v", err)
+	}
+}
+
+func TestExtractAndValidateWithLimits_AllowsLowRatioContentUnderFloor(t *testing.T) {
+	// A real fixture snapshot's users.db decompresses to ~20 KiB — comfortably
+	// under a 64 KiB floor, so even a deliberately low MaxRatio (3:1) must not
+	// false-positive on it: the floor, not the ratio, is what lets it through.
+	zipPath := buildFixtureSnapshot(t, "v1.2.3")
+	limits := shared.ExtractionLimits{
+		MaxEntryBytes:   1 << 30,
+		MaxTotalBytes:   1 << 30,
+		MaxRatio:        3,
+		RatioFloorBytes: 64 * 1024,
+	}
+
+	if _, _, err := extractAndValidateWithLimits(zipPath, t.TempDir(), limits); err != nil {
+		t.Fatalf("expected success for a real, small snapshot fixture under the ratio floor, got: %v", err)
 	}
 }
 

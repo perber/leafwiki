@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/security"
@@ -109,10 +110,27 @@ func (r *Routes) handleCreatePlan(c *gin.Context) {
 		File: file, TargetBasePath: targetBasePath,
 	})
 	if err != nil {
+		logRejectedZipExtraction(r.log, err)
 		respondWithImporterError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, out.Plan)
+}
+
+// logRejectedZipExtraction logs the full detail behind a zip-extraction-cap
+// rejection (exact byte counts, the internal call-path context) server-side
+// — the user-facing response deliberately only ever gets the static,
+// curated message these codes carry (see CreateImportPlanUseCase.Execute),
+// so this is the one place that detail would otherwise be lost entirely.
+func logRejectedZipExtraction(log *slog.Logger, err error) {
+	loc, ok := sharederrors.AsLocalizedError(err)
+	if !ok {
+		return
+	}
+	switch loc.Code {
+	case ErrCodeImporterZipEntryTooLarge, ErrCodeImporterZipExtractedTooLarge, ErrCodeImporterZipRatioTooHigh:
+		log.Warn("rejected import upload: zip extraction limit exceeded", "code", loc.Code, "error", loc.Cause)
+	}
 }
 
 func (r *Routes) handleGetPlan(c *gin.Context) {

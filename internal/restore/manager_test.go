@@ -3,8 +3,10 @@ package restore
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/auth"
+	coreshared "github.com/perber/wiki/internal/core/shared"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	snapshotSvc "github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/test_utils"
@@ -135,6 +138,91 @@ func TestManager_Restore_HappyPath(t *testing.T) {
 	}
 	if brandingCfg.SiteName != "Snapshot Site" {
 		t.Errorf("expected branding reloaded from the restored branding.json, got SiteName=%q", brandingCfg.SiteName)
+	}
+}
+
+// TestManager_Restore_ByID_DoesNotEnforceUploadExtractionCaps is a
+// regression test for the zip-bomb DoS fix's by-id/by-upload distinction: a
+// snapshot the server itself created is trusted content, not
+// attacker-controlled input, so restoring it by id must not be rejected by
+// the same DefaultZipExtractionLimits an untrusted upload goes through — a
+// legitimately large or highly-compressible (e.g. repetitive markdown, which
+// is exactly what a real wiki page often is) wiki must still be restorable.
+func TestManager_Restore_ByID_DoesNotEnforceUploadExtractionCaps(t *testing.T) {
+	src := t.TempDir()
+	rootDir := filepath.Join(src, "root")
+	// Highly repetitive content, past DefaultZipExtractionLimits' 1 MiB
+	// ratio floor, compresses at a ratio the by-upload path would flag as a
+	// decompression bomb (well over its 100:1 threshold).
+	test_utils.WriteFile(t, rootDir, "bomb-shaped.md", strings.Repeat("A", 2*1024*1024))
+	createRealUsersDB(t, src, "snap-admin", "snap-admin@example.com", "snap-password-123")
+
+	snapshotMgr := snapshotSvc.NewManager(snapshotSvc.Config{
+		BackupsDir:  filepath.Join(src, "backups"),
+		RootDir:     rootDir,
+		AssetsDir:   filepath.Join(src, "assets"),
+		BrandingDir: filepath.Join(src, "branding"),
+		UsersDBPath: filepath.Join(src, "users.db"),
+		WikiVersion: "v1.0.0",
+	})
+	if err := snapshotMgr.RunOnce(context.Background()); err != nil {
+		t.Fatalf("failed to build fixture snapshot: %v", err)
+	}
+	entries, err := snapshotMgr.List()
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("expected 1 fixture snapshot, got %v (err=%v)", entries, err)
+	}
+	snapshotID := entries[0].ID
+	zipPath, err := snapshotMgr.SnapshotZipPath(snapshotID)
+	if err != nil {
+		t.Fatalf("SnapshotZipPath failed: %v", err)
+	}
+
+	// Sanity check: the same content, run through the capped (by-upload)
+	// extraction path directly, really is rejected as ratio-bomb-shaped —
+	// otherwise this test wouldn't be proving anything about the by-id path
+	// being different.
+	if _, _, err := extractAndValidate(zipPath, t.TempDir()); !errors.Is(err, coreshared.ErrDecompressionRatioTooHigh) {
+		t.Fatalf("expected the capped (by-upload) extraction path to reject this fixture as a ratio bomb, got: %v", err)
+	}
+
+	dataDir := t.TempDir()
+	createRealUsersDB(t, dataDir, "live-admin", "live-admin@example.com", "live-password-123")
+	sessionStore, err := auth.NewSessionStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewSessionStore failed: %v", err)
+	}
+	userStore, err := auth.NewUserStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewUserStore failed: %v", err)
+	}
+	sessions := auth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := auth.NewAuthService(auth.NewUserService(userStore), sessions, nil)
+	t.Cleanup(func() { _ = authService.Close() })
+	brandingService, err := branding.NewBrandingService(dataDir)
+	if err != nil {
+		t.Fatalf("NewBrandingService failed: %v", err)
+	}
+
+	m := NewManager(Config{
+		SnapshotManager: snapshotMgr,
+		DataDir:         dataDir,
+		WikiVersion:     "v1.0.0",
+		WriteGate:       NewWriteGate(),
+		AuthService:     authService,
+		BrandingService: brandingService,
+		TriggerResync:   func() {},
+	})
+
+	if err := m.TriggerRestore(snapshotID); err != nil {
+		t.Fatalf("TriggerRestore failed: %v", err)
+	}
+	status := waitForRestoreDone(t, m)
+	if status.Error != "" {
+		t.Fatalf("expected by-id restore to succeed despite ratio-bomb-shaped content, got: %s", status.Error)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "root", "bomb-shaped.md")); err != nil {
+		t.Errorf("expected restored root/bomb-shaped.md: %v", err)
 	}
 }
 
