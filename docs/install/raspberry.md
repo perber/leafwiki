@@ -1,14 +1,14 @@
-# Install `Leafwiki` on a Raspberry Pi
+# Install `LeafWiki` on a Raspberry Pi
 
-Short introduction: this file explains how to install Leafwiki on a Raspberry Pi and how to expose it to the Internet using Cloudflare Tunnel.
+Short introduction: this file explains how to install LeafWiki on a Raspberry Pi and how to expose it to the Internet using Cloudflare Tunnel.
 
 ## Project installation
-To begin, you need to install `Leafwiki`. Here is the "quick install" command:
+To begin, you need to install `LeafWiki`. Here is the "quick install" command:
 ```bash
 curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh --arch arm64
 ```
 
-Thanks to this command, the Leafwiki service is now installed and should be accessible locally at:
+Thanks to this command, the LeafWiki service is now installed and should be accessible locally at:
 
 http://localhost:8080/
 
@@ -66,8 +66,8 @@ Connect to your Raspberry Pi via SSH and copy/paste the commands shown.
 
 ## Exposing your application
 
-Once the machine and the tunnel are connected, you must register the application to expose, here `Leafwiki`. Fill in the requested information and save the configuration.
+Once the machine and the tunnel are connected, you must register the application to expose, here `LeafWiki`. Fill in the requested information and save the configuration.
 
-Choose the `HTTP` protocol and enter `localhost:8080` to target Leafwiki.
+Choose the `HTTP` protocol and enter `localhost:8080` to target LeafWiki.
 
 ![image-6](../assets/install/raspberry/image-6.png)
