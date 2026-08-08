@@ -1,6 +1,7 @@
 import { getConfig } from '@/lib/api/config'
 import { DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES } from '@/lib/config'
 import i18next from '@/lib/i18n'
+import { sleep } from '@/lib/sleep'
 import { create } from 'zustand'
 
 type ConfigStore = {
@@ -21,8 +22,25 @@ type ConfigStore = {
   error: string | null
   loading: boolean
   hasLoaded: boolean
+  // True only after a *successful* /api/config fetch — distinct from
+  // hasLoaded, which also becomes true after a failed attempt (so the UI can
+  // stop showing the boot spinner). Consumers that would otherwise treat a
+  // failed session-token refresh as confirmed-unauthorized (and force a
+  // logout) must gate that reaction on this, not on hasLoaded — while the
+  // auth mode is unconfirmed, a refresh failure could just as easily mean
+  // "this is actually a header-auth deployment with no refresh cookie" as
+  // "the session really expired," and guessing wrong destroys a valid
+  // header-auth session (see lib/api/auth.ts's fetchWithAuth).
+  configLoadSucceeded: boolean
   loadConfig: () => Promise<void>
 }
+
+// A single failed attempt would otherwise leave configLoadSucceeded false —
+// and the auth mode unconfirmed — for the tab's whole life (loadConfig only
+// ever runs once, from App.tsx's mount effect). Bounded retry shrinks that
+// window to a few seconds for the common transient-blip case.
+const CONFIG_LOAD_MAX_ATTEMPTS = 3
+const CONFIG_LOAD_RETRY_DELAYS_MS = [500, 1000]
 
 export const useConfigStore = create<ConfigStore>((set) => ({
   publicAccess: false,
@@ -42,46 +60,64 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   error: null,
   loading: false,
   hasLoaded: false,
+  configLoadSucceeded: false,
 
   loadConfig: async () => {
     set({ loading: true, error: null })
-    try {
-      const config = await getConfig()
-      const maxAssetUploadSizeBytes = Number.isFinite(
-        config.maxAssetUploadSizeBytes,
-      )
-        ? config.maxAssetUploadSizeBytes
-        : DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES
 
-      set({
-        publicAccess: config.publicAccess,
-        hideLinkMetadataSection: config.hideLinkMetadataSection,
-        authDisabled: config.authDisabled,
-        maxAssetUploadSizeBytes,
-        enableRevision: config.enableRevision ?? false,
-        enableLinkRefactor: config.enableLinkRefactor ?? false,
-        enableApiKeyManagement: config.enableApiKeyManagement ?? false,
-        gitBackupEnabled: config.gitBackupEnabled ?? false,
-        snapshotEnabled: config.snapshotEnabled ?? false,
-        totpAvailable: config.totpAvailable ?? false,
-        httpRemoteUserEnabled: config.httpRemoteUserEnabled ?? false,
-        loginUrl: config.loginUrl ?? '',
-        logoutUrl: config.logoutUrl ?? '',
-        userManagementUrl: config.userManagementUrl ?? '',
-        error: null,
-        hasLoaded: true,
-      })
-    } catch (error) {
-      console.warn('Error loading configuration:', error)
-      set({
-        error:
-          error instanceof Error
-            ? error.message
-            : i18next.t('configLoad.errorFallback', { ns: 'common' }),
-        hasLoaded: true,
-      })
-    } finally {
-      set({ loading: false })
+    for (let attempt = 1; attempt <= CONFIG_LOAD_MAX_ATTEMPTS; attempt++) {
+      try {
+        const config = await getConfig()
+        const maxAssetUploadSizeBytes = Number.isFinite(
+          config.maxAssetUploadSizeBytes,
+        )
+          ? config.maxAssetUploadSizeBytes
+          : DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES
+
+        set({
+          publicAccess: config.publicAccess,
+          hideLinkMetadataSection: config.hideLinkMetadataSection,
+          authDisabled: config.authDisabled,
+          maxAssetUploadSizeBytes,
+          enableRevision: config.enableRevision ?? false,
+          enableLinkRefactor: config.enableLinkRefactor ?? false,
+          enableApiKeyManagement: config.enableApiKeyManagement ?? false,
+          gitBackupEnabled: config.gitBackupEnabled ?? false,
+          snapshotEnabled: config.snapshotEnabled ?? false,
+          totpAvailable: config.totpAvailable ?? false,
+          httpRemoteUserEnabled: config.httpRemoteUserEnabled ?? false,
+          loginUrl: config.loginUrl ?? '',
+          logoutUrl: config.logoutUrl ?? '',
+          userManagementUrl: config.userManagementUrl ?? '',
+          error: null,
+          hasLoaded: true,
+          configLoadSucceeded: true,
+          loading: false,
+        })
+        return
+      } catch (error) {
+        if (attempt === CONFIG_LOAD_MAX_ATTEMPTS) {
+          console.warn(
+            `Error loading configuration (attempt ${attempt}/${CONFIG_LOAD_MAX_ATTEMPTS}, giving up):`,
+            error,
+          )
+          set({
+            error:
+              error instanceof Error
+                ? error.message
+                : i18next.t('configLoad.errorFallback', { ns: 'common' }),
+            hasLoaded: true,
+            configLoadSucceeded: false,
+            loading: false,
+          })
+          return
+        }
+        console.warn(
+          `Error loading configuration (attempt ${attempt}/${CONFIG_LOAD_MAX_ATTEMPTS}, retrying):`,
+          error,
+        )
+        await sleep(CONFIG_LOAD_RETRY_DELAYS_MS[attempt - 1])
+      }
     }
   },
 }))
