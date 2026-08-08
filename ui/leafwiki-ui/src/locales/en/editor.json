@@ -107,5 +107,16 @@
     "savedToast": "Saved",
     "versionConflictToast": "Auto-save paused — page was changed by another user. Save manually to continue.",
     "errorFallback": "Auto-save failed"
+  },
+  "frontmatterValidation": {
+    "tagsWhitespace": "Tags must not contain leading or trailing whitespace.",
+    "tagsEmpty": "Tags must not be empty.",
+    "tagsUnique": "Tags must be unique.",
+    "keyEmpty": "Property key must not be empty.",
+    "keyWhitespace": "Property key must not contain leading or trailing whitespace.",
+    "keyReservedPrefix": "Property key uses a reserved prefix.",
+    "keyReserved": "Property key is reserved.",
+    "keyUnique": "Property key must be unique.",
+    "valueType": "Property value must be a string, number, boolean, or flat list."
   }
 }

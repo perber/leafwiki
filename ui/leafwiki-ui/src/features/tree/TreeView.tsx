@@ -160,7 +160,7 @@ export default function TreeView() {
             icon={
               <MoreHorizontal className="tree-view__action-icon" size={18} />
             }
-            tooltip="More actions"
+            tooltip={t('toolbar.moreActions')}
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-44">
@@ -170,7 +170,7 @@ export default function TreeView() {
             data-testid="tree-view-action-button-expand-all"
           >
             <ChevronsDown size={15} />
-            Expand all
+            {t('toolbar.expandAll')}
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer gap-2"
@@ -178,7 +178,7 @@ export default function TreeView() {
             data-testid="tree-view-action-button-collapse-all"
           >
             <ChevronsUp size={15} />
-            Collapse all
+            {t('toolbar.collapseAll')}
           </DropdownMenuItem>
           {!readOnlyMode && tree && (
             <DropdownMenuItem
