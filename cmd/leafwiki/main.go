@@ -102,6 +102,7 @@ func writeUsage(w io.Writer) {
 	--user-management-url           URL to an external user-management page; when set, the built-in
 	                                 User Management UI is replaced with a link to this URL (default: "")
 	--disable-request-log           Suppress per-request HTTP access log lines (default: false)
+	--disable-update-check          Disable checking GitHub for newer LeafWiki releases (default: false)
 	--git-backup                   Enable git backup to a remote repository (default: false)
 	--git-backup-author-name       Git commit author name for backups (default: LeafWiki Backup)
 	--git-backup-author-email      Git commit author email for backups (default: backup@leafwiki.local)
@@ -162,6 +163,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL  (deprecated: use LEAFWIKI_LOGOUT_URL instead)
 	LEAFWIKI_USER_MANAGEMENT_URL
 	LEAFWIKI_DISABLE_REQUEST_LOG
+	LEAFWIKI_DISABLE_UPDATE_CHECK
 	LEAFWIKI_GIT_BACKUP
 	LEAFWIKI_GIT_BACKUP_AUTHOR_NAME
 	LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL
@@ -266,6 +268,7 @@ type cliFlags struct {
 	httpRemoteUserLogoutURL *string
 	userManagementURL       *string
 	disableRequestLog       *bool
+	disableUpdateCheck      *bool
 	gitBackup               *bool
 	gitBackupAuthorName     *string
 	gitBackupAuthorEmail    *string
@@ -320,6 +323,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "deprecated: use --logout-url instead"),
 		userManagementURL:       fs.String("user-management-url", "", "URL to an external user-management page; when set, the built-in User Management UI is replaced with a link to this URL"),
 		disableRequestLog:       fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
+		disableUpdateCheck:      fs.Bool("disable-update-check", false, "disable checking GitHub for newer LeafWiki releases (default: false)"),
 		gitBackup:               fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
 		gitBackupAuthorName:     fs.String("git-backup-author-name", "", "git commit author name for backups (default: LeafWiki Backup)"),
 		gitBackupAuthorEmail:    fs.String("git-backup-author-email", "", "git commit author email for backups (default: backup@leafwiki.local)"),
@@ -408,6 +412,7 @@ func main() {
 	}
 	userManagementURL := resolveString("user-management-url", *flags.userManagementURL, visited, "LEAFWIKI_USER_MANAGEMENT_URL", "")
 	disableRequestLog := resolveBool("disable-request-log", *flags.disableRequestLog, visited, "LEAFWIKI_DISABLE_REQUEST_LOG")
+	disableUpdateCheck := resolveBool("disable-update-check", *flags.disableUpdateCheck, visited, "LEAFWIKI_DISABLE_UPDATE_CHECK")
 	gitBackupEnabled := resolveBool("git-backup", *flags.gitBackup, visited, "LEAFWIKI_GIT_BACKUP")
 	gitBackupAuthorName := resolveString("git-backup-author-name", *flags.gitBackupAuthorName, visited, "LEAFWIKI_GIT_BACKUP_AUTHOR_NAME", "LeafWiki Backup")
 	gitBackupAuthorEmail := resolveString("git-backup-author-email", *flags.gitBackupAuthorEmail, visited, "LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL", "backup@leafwiki.local")
@@ -662,12 +667,14 @@ func main() {
 			TrustedProxies: trustedProxies,
 			UserService:    w.UserService,
 		},
-		APIKeyService:     w.APIKeyService(),
-		DisableRequestLog: disableRequestLog,
-		UserManagementURL: userManagementURL,
-		LoginURL:          loginURL,
-		LogoutURL:         logoutURL,
-		WriteGate:         writeGate,
+		APIKeyService:      w.APIKeyService(),
+		DisableRequestLog:  disableRequestLog,
+		UserManagementURL:  userManagementURL,
+		LoginURL:           loginURL,
+		LogoutURL:          logoutURL,
+		WriteGate:          writeGate,
+		Version:            Version,
+		DisableUpdateCheck: disableUpdateCheck,
 	})
 
 	reloadSignals := make(chan os.Signal, 1)
