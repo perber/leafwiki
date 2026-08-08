@@ -570,7 +570,6 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 | Delete page           | `Ctrl + Delete` / `Cmd + Delete`       |
 | Bold                  | `Ctrl + B` / `Cmd + B`                 |
 | Italic                | `Ctrl + I` / `Cmd + I`                 |
-| Inline code           | `Ctrl+Backtick` / `Cmd+Backtick`           |
 | Insert link           | `Ctrl + K` / `Cmd + K`                 |
 | Headline 1–3          | `Ctrl + Alt + 1–3` / `Cmd + Alt + 1–3` |
 
