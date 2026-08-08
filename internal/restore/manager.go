@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	coreshared "github.com/perber/wiki/internal/core/shared"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
@@ -115,7 +116,7 @@ func (m *Manager) TriggerRestoreFromUpload(r io.Reader) error {
 
 	m.wg.Go(func() {
 		defer cleanup()
-		m.runGuarded(func() { m.runFromZipPath(zipPath) })
+		m.runGuarded(func() { m.runFromZipPath(zipPath, coreshared.DefaultZipExtractionLimits) })
 	})
 	return nil
 }
@@ -193,7 +194,11 @@ func (m *Manager) SelfRestart() error {
 }
 
 // runLocked resolves the given snapshot id to a zip path and runs the
-// restore sequence against it (see runFromZipPath).
+// restore sequence against it (see runFromZipPath). The snapshot itself was
+// produced by this server's own snapshot machinery, not attacker-controlled
+// input, so extraction runs unrestricted rather than under
+// DefaultZipExtractionLimits — a legitimately large wiki must still be able
+// to restore its own backup.
 func (m *Manager) runLocked(id string) {
 	m.runGuarded(func() {
 		zipPath, err := m.cfg.SnapshotManager.SnapshotZipPath(id)
@@ -202,7 +207,7 @@ func (m *Manager) runLocked(id string) {
 			m.job.Finish(err)
 			return
 		}
-		m.runFromZipPath(zipPath)
+		m.runFromZipPath(zipPath, coreshared.UnrestrictedExtractionLimits)
 	})
 }
 
@@ -224,10 +229,13 @@ func (m *Manager) runGuarded(fn func()) {
 // runFromZipPath performs the full validate -> gate -> swap -> reopen-auth ->
 // invalidate-sessions -> reload-branding -> commit -> resync sequence against
 // an already-resolved zip file on disk. Shared by the by-id and by-upload
-// restore entrypoints once each has produced a concrete zipPath.
-func (m *Manager) runFromZipPath(zipPath string) {
+// restore entrypoints once each has produced a concrete zipPath; limits is
+// coreshared.DefaultZipExtractionLimits for the by-upload path (untrusted
+// input) and coreshared.UnrestrictedExtractionLimits for the by-id path
+// (the server's own snapshot).
+func (m *Manager) runFromZipPath(zipPath string, limits coreshared.ExtractionLimits) {
 	m.job.SetPhase(PhaseValidating)
-	stagingDir, meta, err := extractAndValidate(zipPath, m.cfg.DataDir)
+	stagingDir, meta, err := extractAndValidateWithLimits(zipPath, m.cfg.DataDir, limits)
 	if err != nil {
 		m.job.Finish(fmt.Errorf("snapshot validation failed: %w", err))
 		return

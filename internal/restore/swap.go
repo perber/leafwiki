@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/perber/wiki/internal/core/shared"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
@@ -37,6 +37,10 @@ var requiredZipEntries = []string{"backup-meta.json", "users.db"}
 // trivial query against it — all before any live file is touched. The caller
 // must os.RemoveAll the returned staging dir once done with it.
 func extractAndValidate(zipPath, dataDir string) (stagingDir string, meta backupMeta, err error) {
+	return extractAndValidateWithLimits(zipPath, dataDir, shared.DefaultZipExtractionLimits)
+}
+
+func extractAndValidateWithLimits(zipPath, dataDir string, limits shared.ExtractionLimits) (stagingDir string, meta backupMeta, err error) {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return "", backupMeta{}, fmt.Errorf("failed to open snapshot zip: %w", err)
@@ -58,8 +62,9 @@ func extractAndValidate(zipPath, dataDir string) (stagingDir string, meta backup
 		return "", backupMeta{}, fmt.Errorf("failed to create staging directory: %w", err)
 	}
 
+	budget := shared.NewSizeBudget(limits.MaxTotalBytes)
 	for _, f := range r.File {
-		if err := extractZipEntry(f, stagingDir); err != nil {
+		if err := extractZipEntry(f, stagingDir, limits, budget); err != nil {
 			_ = os.RemoveAll(stagingDir)
 			return "", backupMeta{}, fmt.Errorf("failed to extract %s: %w", f.Name, err)
 		}
@@ -85,7 +90,7 @@ func extractAndValidate(zipPath, dataDir string) (stagingDir string, meta backup
 
 // extractZipEntry writes a single zip entry under destDir, rejecting any
 // entry whose path would escape destDir (zip slip).
-func extractZipEntry(f *zip.File, destDir string) error {
+func extractZipEntry(f *zip.File, destDir string, limits shared.ExtractionLimits, budget *shared.SizeBudget) error {
 	cleanName := filepath.Clean(f.Name)
 	if cleanName == "." || strings.HasPrefix(cleanName, "..") || filepath.IsAbs(cleanName) {
 		return fmt.Errorf("unsafe entry path %q", f.Name)
@@ -116,7 +121,7 @@ func extractZipEntry(f *zip.File, destDir string) error {
 	}
 	defer func() { _ = out.Close() }()
 
-	if _, err := io.Copy(out, rc); err != nil {
+	if err := shared.CopyWithBudget(out, rc, f.CompressedSize64, limits, budget); err != nil {
 		return err
 	}
 	return nil

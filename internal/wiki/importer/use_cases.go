@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	coreshared "github.com/perber/wiki/internal/core/shared"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	coreimporter "github.com/perber/wiki/internal/importer"
 )
@@ -30,6 +31,30 @@ func NewCreateImportPlanUseCase(svc *coreimporter.ImporterService) *CreateImport
 
 func (uc *CreateImportPlanUseCase) Execute(_ context.Context, in CreateImportPlanInput) (*CreateImportPlanOutput, error) {
 	if _, err := uc.svc.CreateImportPlanFromZipUpload(in.File, in.TargetBasePath); err != nil {
+		// Deliberately static, user-facing messages: err's wrapped chain
+		// (e.g. "extract zip to temp: extract zip: write file: file too
+		// large: 200 bytes (max 100)") is internal implementation detail —
+		// function names and call-path context, not anything a user should
+		// see. logRejectedZipExtraction (routes.go) logs it server-side
+		// instead.
+		if errors.Is(err, coreshared.ErrFileTooLarge) {
+			return nil, sharederrors.NewLocalizedError(
+				ErrCodeImporterZipEntryTooLarge, "A file inside the uploaded archive is too large",
+				"zip entry exceeds the per-file size limit", err,
+			)
+		}
+		if errors.Is(err, coreshared.ErrCumulativeSizeTooLarge) {
+			return nil, sharederrors.NewLocalizedError(
+				ErrCodeImporterZipExtractedTooLarge, "The uploaded archive is too large once decompressed",
+				"decompressed zip contents exceed the total size limit", err,
+			)
+		}
+		if errors.Is(err, coreshared.ErrDecompressionRatioTooHigh) {
+			return nil, sharederrors.NewLocalizedError(
+				ErrCodeImporterZipRatioTooHigh, "The uploaded archive looks like a decompression bomb",
+				"zip entry's decompression ratio exceeds the allowed maximum", err,
+			)
+		}
 		return nil, err
 	}
 	plan, err := uc.svc.GetCurrentPlan()

@@ -60,6 +60,49 @@ func waitForExecutionStatus(t *testing.T, is *ImporterService, want ExecutionSta
 
 // --- Tests ------------------------------------------------------------------
 
+// Regression tests for the zip-bomb DoS fix: an admin who's configured a
+// larger single-asset upload limit has already accepted files that size
+// individually, so the zip-extraction per-file cap must track it instead of
+// staying pinned to the original 50 MiB default and rejecting an import
+// containing one of those same, already-legitimate assets.
+
+func TestImporterService_NewImporterService_RaisesZipEntryCapToMatchConfiguredAssetMax(t *testing.T) {
+	planner := NewPlanner(&fakeWiki{}, tree.NewSlugService(), "")
+	store := NewPlanStore()
+
+	configuredMax := int64(200 * 1024 * 1024) // 200 MiB, larger than the 50 MiB default
+	is := NewImporterService(planner, store, t.TempDir(), configuredMax)
+
+	if got := is.zipExtractionLimits.MaxEntryBytes; got != configuredMax {
+		t.Errorf("zipExtractionLimits.MaxEntryBytes = %d, want %d (configured asset max)", got, configuredMax)
+	}
+}
+
+func TestImporterService_SetAssetMaxUploadSizeBytes_RaisesZipEntryCapWhenLarger(t *testing.T) {
+	planner := NewPlanner(&fakeWiki{}, tree.NewSlugService(), "")
+	store := NewPlanStore()
+	is := NewImporterService(planner, store, t.TempDir(), 0) // defaults: 50 MiB zip entry cap
+
+	is.SetAssetMaxUploadSizeBytes(200 * 1024 * 1024)
+
+	if got, want := is.zipExtractionLimits.MaxEntryBytes, int64(200*1024*1024); got != want {
+		t.Errorf("zipExtractionLimits.MaxEntryBytes = %d, want %d", got, want)
+	}
+}
+
+func TestImporterService_SetAssetMaxUploadSizeBytes_DoesNotLowerZipEntryCap(t *testing.T) {
+	planner := NewPlanner(&fakeWiki{}, tree.NewSlugService(), "")
+	store := NewPlanStore()
+	is := NewImporterService(planner, store, t.TempDir(), 0) // defaults: 50 MiB zip entry cap
+	defaultCap := is.zipExtractionLimits.MaxEntryBytes
+
+	is.SetAssetMaxUploadSizeBytes(10 * 1024 * 1024) // smaller than the 50 MiB default
+
+	if got := is.zipExtractionLimits.MaxEntryBytes; got != defaultCap {
+		t.Errorf("zipExtractionLimits.MaxEntryBytes = %d, want unchanged default %d", got, defaultCap)
+	}
+}
+
 func TestImporterService_createImportPlanFromFolder_StoresPlan(t *testing.T) {
 	tmp := t.TempDir()
 	mustWrite(t, tmp, "a.md", "# A\nbody")

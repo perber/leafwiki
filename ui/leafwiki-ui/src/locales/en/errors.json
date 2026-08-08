@@ -92,5 +92,8 @@
   "tree not loaded": "Tree not loaded",
   "upload exceeds maximum size limit": "Upload exceeds maximum size limit of 500 MiB",
   "user already exists": "User already exists",
-  "user not found": "User not found"
+  "user not found": "User not found",
+  "zip entry exceeds the per-file size limit": "A file inside the uploaded archive is too large",
+  "decompressed zip contents exceed the total size limit": "The uploaded archive is too large once decompressed",
+  "zip entry's decompression ratio exceeds the allowed maximum": "The uploaded archive looks like a decompression bomb"
 }

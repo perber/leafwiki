@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/perber/wiki/internal/core/assets"
+	"github.com/perber/wiki/internal/core/shared"
 )
 
 type ImporterService struct {
@@ -21,6 +22,7 @@ type ImporterService struct {
 	logger                  *slog.Logger
 	assetMaxUploadSizeBytes int64
 	workspaceBaseDir        string
+	zipExtractionLimits     shared.ExtractionLimits
 }
 
 type CurrentPlanState struct {
@@ -35,12 +37,30 @@ type CurrentPlanState struct {
 	ExecutionProgress
 }
 
-// SetAssetMaxUploadSizeBytes overrides the asset upload size limit after construction.
-// Values <= 0 are ignored.
+// SetAssetMaxUploadSizeBytes overrides the asset upload size limit after
+// construction. Values <= 0 are ignored. The zip-extraction per-file cap is
+// raised to match whenever it's configured larger than
+// shared.DefaultZipExtractionLimits.MaxEntryBytes: an admin who's opted into
+// bigger single-asset uploads has already accepted files that size onto
+// disk one at a time, so an import zip containing one of those same
+// legitimately-sized assets shouldn't be rejected by a zip-specific cap that
+// assumed the old, smaller default.
 func (is *ImporterService) SetAssetMaxUploadSizeBytes(n int64) {
 	if n > 0 {
 		is.assetMaxUploadSizeBytes = n
+		if n > is.zipExtractionLimits.MaxEntryBytes {
+			is.zipExtractionLimits.MaxEntryBytes = n
+		}
 	}
+}
+
+// SetZipExtractionLimits overrides the per-file/cumulative/decompression-ratio
+// caps enforced while extracting an uploaded zip (see shared.ExtractionLimits).
+// Production always uses shared.DefaultZipExtractionLimits; this exists so
+// tests can exercise the same real-filesystem extraction path with small,
+// fast-to-construct fixtures instead of multi-hundred-MiB ones.
+func (is *ImporterService) SetZipExtractionLimits(limits shared.ExtractionLimits) {
+	is.zipExtractionLimits = limits
 }
 
 func NewImporterService(planner *Planner, planStore *PlanStore, workspaceBaseDir string, assetMaxUploadSizeBytes int64) *ImporterService {
@@ -50,6 +70,10 @@ func NewImporterService(planner *Planner, planStore *PlanStore, workspaceBaseDir
 	if workspaceBaseDir == "" {
 		workspaceBaseDir = filepath.Join(os.TempDir(), "wiki-imports")
 	}
+	zipExtractionLimits := shared.DefaultZipExtractionLimits
+	if assetMaxUploadSizeBytes > zipExtractionLimits.MaxEntryBytes {
+		zipExtractionLimits.MaxEntryBytes = assetMaxUploadSizeBytes
+	}
 	service := &ImporterService{
 		planner:                 planner,
 		planStore:               planStore,
@@ -57,6 +81,7 @@ func NewImporterService(planner *Planner, planStore *PlanStore, workspaceBaseDir
 		logger:                  slog.Default().With("component", "ImporterService"),
 		assetMaxUploadSizeBytes: assetMaxUploadSizeBytes,
 		workspaceBaseDir:        workspaceBaseDir,
+		zipExtractionLimits:     zipExtractionLimits,
 	}
 	service.resumeInterruptedExecution()
 	return service
@@ -296,7 +321,7 @@ func (is *ImporterService) extractZipReaderToTemp(r io.Reader) (*ZipWorkspace, e
 		return nil, fmt.Errorf("close temp zip: %w", err)
 	}
 
-	ws, err := is.extractor.ExtractToDir(tmpPath, is.workspaceBaseDir)
+	ws, err := is.extractor.extractToDirWithLimits(tmpPath, is.workspaceBaseDir, is.zipExtractionLimits)
 	if err != nil {
 		return nil, fmt.Errorf("extract zip: %w", err)
 	}
