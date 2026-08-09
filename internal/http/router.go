@@ -111,6 +111,10 @@ type RouterOptions struct {
 	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
 	LogoutURL               string                   // Optional URL the frontend redirects to after logout
 	WriteGate               *restore.WriteGate       // Optional; when set, gates mutating requests while a restore is in progress. nil disables the middleware entirely (no snapshot/restore enabled)
+	Version                 string                   // Build version surfaced via /api/config (ldflags-injected in release builds)
+	DisableUpdateCheck      bool                     // When true, /api/get-last-release refuses outbound GitHub checks (air-gapped)
+	UpdateCheckHTTPClient   *http.Client             // Optional HTTP client for release checks; nil uses a short-timeout default
+	UpdateCheckAPIURL       string                   // Optional override of the GitHub latest-release API URL (tests)
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.

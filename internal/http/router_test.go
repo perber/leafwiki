@@ -1280,6 +1280,105 @@ func TestConfigEndpoint_LoginAndLogoutUrlDefaultToEmpty(t *testing.T) {
 	}
 }
 
+func TestConfigEndpoint_IncludesVersionAndUpdateCheckEnabled(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		Version:                 "v0.12.0",
+		DisableUpdateCheck:      false,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d", rec.Code)
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+
+	if resp["version"] != "v0.12.0" {
+		t.Fatalf("Expected version in config response, got %v", resp)
+	}
+	if resp["updateCheckEnabled"] != true {
+		t.Fatalf("Expected updateCheckEnabled=true in config response, got %v", resp)
+	}
+}
+
+func TestGetLastReleaseEndpoint_Disabled(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		DisableUpdateCheck:      true,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/get-last-release", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("Expected 403 Forbidden, got %d - %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetLastReleaseEndpoint_ReturnsLatestTag(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
+		_, _ = rw.Write([]byte(`{
+			"tag_name": "v0.12.0",
+			"name": "LeafWiki v0.12.0",
+			"html_url": "https://github.com/perber/leafwiki/releases/tag/v0.12.0",
+			"published_at": "2026-07-26T15:50:41Z"
+		}`))
+	}))
+	t.Cleanup(upstream.Close)
+
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            true,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		UpdateCheckHTTPClient:   upstream.Client(),
+		UpdateCheckAPIURL:       upstream.URL,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/get-last-release", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Invalid JSON response: %v", err)
+	}
+	if resp["tagName"] != "v0.12.0" {
+		t.Fatalf("Expected tagName v0.12.0, got %v", resp)
+	}
+}
+
 func TestRefactorPreviewEndpoint_UsesFrontendJSONShape(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

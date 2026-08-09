@@ -336,6 +336,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--logout-url`                   | Redirect to an external URL after logout                                | `""`          | v0.12.0 |
 | `--http-remote-user-logout-url`  | ⚠️ Deprecated, use `--logout-url` instead                               | `""`          | v0.10.0 |
 | `--disable-request-log`          | Suppress per-request HTTP access log lines                              | `false`       | v0.10.1 |
+| `--disable-update-check`         | Disable checking GitHub for newer LeafWiki releases (air-gapped)        | `false`       | –       |
 | `--log-format`                   | Log output format: `text` or `json`                                     | `text`        | v0.12.0 |
 | `--totp-encryption-key`          | Key to encrypt per-user TOTP secrets at rest (min 32 bytes); required only once a user enables TOTP | `""` | v0.12.0 |
 | `--enable-metrics`               | Enable the Prometheus `/metrics` endpoint on a separate listener        | `false`       | v0.12.0 |
@@ -391,6 +392,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_LOGOUT_URL`                   | Redirect to an external URL after logout             | `""`          | v0.12.0 |
 | `LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL`  | ⚠️ Deprecated, use `LEAFWIKI_LOGOUT_URL` instead     | `""`          | v0.10.0 |
 | `LEAFWIKI_DISABLE_REQUEST_LOG`          | Suppress per-request HTTP access log lines           | `false`       | v0.10.1 |
+| `LEAFWIKI_DISABLE_UPDATE_CHECK`           | Disable checking GitHub for newer releases           | `false`       | –       |
 | `LEAFWIKI_LOG_FORMAT`                   | Log output format: `text` or `json`                  | `text`        | v0.12.0 |
 | `LEAFWIKI_LOG_LEVEL`                    | Log level: `debug`, `info`, `warn`, `error` (env-var only, no CLI flag) | `info` | v0.8.0  |
 | `LEAFWIKI_TOTP_ENCRYPTION_KEY`          | Key to encrypt per-user TOTP secrets at rest (min 32 bytes) | `""`    | v0.12.0 |
