@@ -61,6 +61,15 @@ func respondWithAuthStatusError(c *gin.Context, status int, code, message, templ
 	})
 }
 
+// isUserStoreUnavailable reports whether err is the user store's own
+// "suspended for live restore" LocalizedError (see errUserStoreUnavailable
+// in internal/core/auth), so callers can bucket it separately from a genuine
+// failure instead of miscounting it as one.
+func isUserStoreUnavailable(err error) bool {
+	loc, ok := sharederrors.AsLocalizedError(err)
+	return ok && loc.Code == ErrCodeAuthUserStoreUnavailable
+}
+
 // respondWithAuthError is the central error handler for auth endpoints.
 func respondWithAuthError(c *gin.Context, err error) {
 	if loc, ok := sharederrors.AsLocalizedError(err); ok {

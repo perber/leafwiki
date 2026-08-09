@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/perber/wiki/internal/core/shared"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
 // dummySecretHash is compared against on an unknown-prefix lookup so Resolve
@@ -193,6 +194,24 @@ func (s *APIKeyService) RevokeAPIKey(id string) error {
 	return s.currentStore().Revoke(id)
 }
 
+// AsStoreUnavailableErr reports whether err is a store's own "suspended for
+// live restore" LocalizedError (APIKeyStore's or, via UserService,
+// UserStore's), returning it as a *LocalizedError if so. Resolve uses this to
+// propagate the distinct error instead of collapsing it into ErrAPIKeyInvalid;
+// exported so callers outside this package (e.g. the Bearer-auth middleware)
+// can do the same and read its message, without needing to know the
+// underlying error codes themselves.
+func AsStoreUnavailableErr(err error) (*sharederrors.LocalizedError, bool) {
+	loc, ok := sharederrors.AsLocalizedError(err)
+	if !ok {
+		return nil, false
+	}
+	if loc.Code == ErrCodeAPIKeyStoreUnavailable || loc.Code == userStoreUnavailableCode {
+		return loc, true
+	}
+	return nil, false
+}
+
 // Resolve validates a raw "Authorization: Bearer <token>" value and returns the
 // user the key acts as. The returned user's Role is narrowed to the
 // intersection of the owning user's role and the key's own role (see
@@ -205,7 +224,10 @@ func (s *APIKeyService) RevokeAPIKey(id string) error {
 // the secret is hashed and compared even when the prefix is unknown (against
 // dummySecretHash) — otherwise an unknown prefix would return faster than a
 // known prefix with a wrong secret, leaking exactly the distinction this
-// comment claims is hidden.
+// comment claims is hidden. The one exception is a suspended store (see
+// AsStoreUnavailableErr): that short-circuits before the hash compare, but
+// safely — the response is already distinguishable by status/content (503
+// vs. ErrAPIKeyInvalid), so the early return adds no new timing side-channel.
 func (s *APIKeyService) Resolve(token string) (*User, error) {
 	prefix, secret, ok := parseKeyToken(token)
 	if !ok {
@@ -214,6 +236,9 @@ func (s *APIKeyService) Resolve(token string) (*User, error) {
 
 	store := s.currentStore()
 	key, err := store.GetByPrefix(prefix)
+	if _, ok := AsStoreUnavailableErr(err); ok {
+		return nil, err
+	}
 	found := err == nil
 	if err != nil && err != ErrAPIKeyNotFound {
 		s.log.Warn("api key resolve: prefix lookup failed", "error", err)
@@ -237,6 +262,9 @@ func (s *APIKeyService) Resolve(token string) (*User, error) {
 	}
 
 	owner, err := s.authService.UserService().GetUserByID(key.UserID)
+	if _, ok := AsStoreUnavailableErr(err); ok {
+		return nil, err
+	}
 	if err != nil {
 		s.log.Warn("api key resolve: owner lookup failed", "error", err, "keyID", key.ID)
 		return nil, ErrAPIKeyInvalid

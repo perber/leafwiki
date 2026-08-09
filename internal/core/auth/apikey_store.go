@@ -104,13 +104,21 @@ func (s *APIKeyStore) suspend() error {
 	return err
 }
 
+// ErrCodeAPIKeyStoreUnavailable identifies errAPIKeyStoreUnavailable's
+// LocalizedError so callers (e.g. APIKeyService.AsStoreUnavailableErr, or the
+// wiki/apikeys HTTP layer's status mapping) can pass it through instead of
+// collapsing it into ErrAPIKeyInvalid. Exported — the sole source of truth
+// for this code, so no other layer needs its own copy of the literal.
+// Mirrors userStoreUnavailableCode.
+const ErrCodeAPIKeyStoreUnavailable = "apikey_store_unavailable"
+
 // errAPIKeyStoreUnavailable is returned while the store is suspended for an
 // in-progress live restore (see APIKeyStore.suspend / APIKeyService.PauseForSwap).
 // A request landing in that window gets this immediately instead of racing a
 // reconnect against the file swap. Mirrors errUserStoreUnavailable.
 func errAPIKeyStoreUnavailable() error {
 	return sharederrors.NewLocalizedError(
-		"apikey_store_unavailable",
+		ErrCodeAPIKeyStoreUnavailable,
 		"The server is restoring from a backup — please try again in a moment",
 		"api key store is suspended for an in-progress restore",
 		nil,

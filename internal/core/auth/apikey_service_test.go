@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/test_utils"
 )
 
@@ -58,6 +59,64 @@ func TestHashSecret_DeterministicAndDistinct(t *testing.T) {
 	}
 	if h1 == dummySecretHash {
 		t.Fatalf("real secret hash must not collide with the dummy hash used for timing equalization")
+	}
+}
+
+// Regression tests for the bug where Resolve collapsed a suspended store's
+// store-unavailable LocalizedError (either APIKeyStore's own, or UserStore's
+// via the owner lookup) down to the generic ErrAPIKeyInvalid, so a request
+// landing in a live restore's brief suspend window saw a confusing "invalid
+// key" instead of "restore in progress".
+
+func TestAPIKeyService_Resolve_KeyStoreSuspended_ReturnsStoreUnavailable(t *testing.T) {
+	svc, users := setupTestAPIKeyService(t)
+	owner := mustCreateUser(t, users, "suspend-key-store", RoleViewer)
+
+	_, token, err := svc.CreateAPIKey(CreateAPIKeyParams{Name: "k", UserID: owner.ID, CreatedBy: "admin1"})
+	if err != nil {
+		t.Fatalf("CreateAPIKey err: %v", err)
+	}
+
+	if err := svc.PauseForSwap(); err != nil {
+		t.Fatalf("PauseForSwap failed: %v", err)
+	}
+
+	_, err = svc.Resolve(token)
+	if err == nil {
+		t.Fatal("expected an error for a suspended api key store")
+	}
+	if err == ErrAPIKeyInvalid {
+		t.Fatalf("expected the store-unavailable error, not ErrAPIKeyInvalid: %v", err)
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != ErrCodeAPIKeyStoreUnavailable {
+		t.Fatalf("expected %s, got %v", ErrCodeAPIKeyStoreUnavailable, err)
+	}
+}
+
+func TestAPIKeyService_Resolve_UserStoreSuspended_ReturnsStoreUnavailable(t *testing.T) {
+	svc, users := setupTestAPIKeyService(t)
+	owner := mustCreateUser(t, users, "suspend-user-store", RoleViewer)
+
+	_, token, err := svc.CreateAPIKey(CreateAPIKeyParams{Name: "k", UserID: owner.ID, CreatedBy: "admin1"})
+	if err != nil {
+		t.Fatalf("CreateAPIKey err: %v", err)
+	}
+
+	if err := users.suspendStore(); err != nil {
+		t.Fatalf("suspendStore failed: %v", err)
+	}
+
+	_, err = svc.Resolve(token)
+	if err == nil {
+		t.Fatal("expected an error for a suspended user store")
+	}
+	if err == ErrAPIKeyInvalid {
+		t.Fatalf("expected the store-unavailable error, not ErrAPIKeyInvalid: %v", err)
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != userStoreUnavailableCode {
+		t.Fatalf("expected %s, got %v", userStoreUnavailableCode, err)
 	}
 }
 

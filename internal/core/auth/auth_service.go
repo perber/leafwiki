@@ -244,7 +244,7 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 	users := a.users()
 	user, err := users.GetUserByID(userID)
 	if err != nil {
-		return nil, ErrUserNotFound
+		return nil, err
 	}
 	if !user.TOTPEnabled || user.TOTPSecretEncrypted == "" {
 		// TOTP was disabled after the challenge was issued; it can no longer be completed.

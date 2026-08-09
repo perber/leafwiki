@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	wikiauth "github.com/perber/wiki/internal/wiki/auth"
 )
 
 const (
@@ -86,6 +87,8 @@ func apiKeyErrorStatus(code string) int {
 		return http.StatusConflict
 	case ErrCodeAPIKeysDisabled:
 		return http.StatusForbidden
+	case coreauth.ErrCodeAPIKeyStoreUnavailable, wikiauth.ErrCodeAuthUserStoreUnavailable:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}
