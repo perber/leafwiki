@@ -89,9 +89,16 @@ func (uc *CompleteTOTPLoginUseCase) Execute(_ context.Context, in CompleteTOTPLo
 	}
 	token, err := uc.auth.CompleteTOTPLogin(in.LoginChallengeToken, in.Code)
 	if err != nil {
-		if errors.Is(err, coreauth.ErrUserAccountLocked) {
+		switch {
+		case errors.Is(err, coreauth.ErrUserAccountLocked):
 			uc.metrics.IncAuthTOTPVerification("locked")
-		} else {
+		case isUserStoreUnavailable(err):
+			// Not a real verification failure — the user store is suspended
+			// for an in-progress live restore (see errUserStoreUnavailable).
+			// Bucketing this as "invalid" would spike that metric with zero
+			// actual bad codes during every restore.
+			uc.metrics.IncAuthTOTPVerification("unavailable")
+		default:
 			uc.metrics.IncAuthTOTPVerification("invalid")
 		}
 		return nil, err

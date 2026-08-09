@@ -179,6 +179,35 @@ func TestAuthService_CompleteTOTPLogin_InvalidCodeRejected(t *testing.T) {
 	}
 }
 
+// Regression test for the bug where CompleteTOTPLogin unconditionally
+// rewrote any GetUserByID error into ErrUserNotFound, discarding the
+// store-unavailable LocalizedError GetUserByID already correctly returns
+// during a live restore's brief suspend window (see mapUserLookupErr).
+func TestAuthService_CompleteTOTPLogin_UserStoreSuspended_ReturnsStoreUnavailable(t *testing.T) {
+	f := setupTOTPTestFixture(t)
+
+	challenge, err := f.authService.Login("testuser", "securepass")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	if err := f.store.suspend(); err != nil {
+		t.Fatalf("suspend failed: %v", err)
+	}
+
+	_, err = f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, f.currentCode(t))
+	if err == nil {
+		t.Fatal("expected an error for a suspended user store")
+	}
+	if err == ErrUserNotFound {
+		t.Fatalf("expected the store-unavailable error, not ErrUserNotFound: %v", err)
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != userStoreUnavailableCode {
+		t.Fatalf("expected %s, got %v", userStoreUnavailableCode, err)
+	}
+}
+
 func TestAuthService_CompleteTOTPLogin_ChallengeIsSingleUse(t *testing.T) {
 	f := setupTOTPTestFixture(t)
 
