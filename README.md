@@ -457,7 +457,7 @@ Available since v0.10.0. Use when an upstream proxy authenticates users and forw
 - ⚠️ `--login-url` takes effect regardless of `--enable-http-remote-user` and has no in-app bypass: once set, *every* unauthenticated visit (including `/login` itself) redirects to it immediately. Double-check the URL before setting it — a wrong or unreachable value locks all users, including admins, out of the built-in login form
 - `--http-remote-user-logout-url` (v0.10.0) is deprecated; use `--logout-url` instead. It still works as a fallback when `--logout-url`/`LEAFWIKI_LOGOUT_URL` isn't set, but a deprecation warning is logged
 
-#### Auto-creating users (v0.13.0)
+#### Auto-creating users (v0.12.1)
 
 By default, a proxy-asserted identity with no matching LeafWiki account is rejected (401). Set `--enable-http-remote-user-auto-create=true` to provision one automatically instead:
 
