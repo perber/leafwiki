@@ -20,6 +20,7 @@ import {
   Code2,
   Columns2,
   Eye,
+  Highlighter,
   Image,
   Italic,
   Link,
@@ -146,6 +147,23 @@ export default function MarkdownToolbar({
               className="markdown-toolbar__button"
             >
               <Strikethrough className="markdown-toolbar__icon" />
+            </Button>
+          </TooltipWrapper>
+        )}
+        {!isMobile && (
+          <TooltipWrapper
+            label={t('toolbar.highlightTooltip')}
+            side="top"
+            align="center"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => editorRef.current?.insertWrappedText('==')}
+              className="markdown-toolbar__button"
+              data-testid="format-highlight-button"
+            >
+              <Highlighter className="markdown-toolbar__icon" />
             </Button>
           </TooltipWrapper>
         )}
@@ -454,6 +472,12 @@ export default function MarkdownToolbar({
               >
                 <Strikethrough size={14} />
                 {t('toolbar.strikethrough')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => editorRef.current?.insertWrappedText('==')}
+              >
+                <Highlighter size={14} />
+                {t('toolbar.highlight')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

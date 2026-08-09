@@ -149,4 +149,39 @@ echo two
       ),
     ).not.toBeNull()
   })
+
+  it('renders ==text== as a mark element', () => {
+    const { container } = render(
+      <MarkdownPreview content="Some ==highlighted== text." />,
+    )
+
+    const mark = container.querySelector('mark')
+    expect(mark).not.toBeNull()
+    expect(mark?.textContent).toBe('highlighted')
+  })
+
+  it('supports nested formatting inside a highlighted span', () => {
+    const { container } = render(
+      <MarkdownPreview content="==**bold highlight**==" />,
+    )
+
+    const mark = container.querySelector('mark')
+    expect(mark).not.toBeNull()
+    expect(mark?.querySelector('strong')?.textContent).toBe('bold highlight')
+  })
+
+  it('does not convert == inside inline code or fenced code blocks', () => {
+    const content = [
+      'Use `==` as a diff marker.',
+      '',
+      '```',
+      'a == b',
+      '```',
+    ].join('\n')
+
+    const { container } = render(<MarkdownPreview content={content} />)
+
+    expect(container.querySelector('mark')).toBeNull()
+    expect(container.querySelector('code')?.textContent).toContain('==')
+  })
 })
