@@ -1678,14 +1678,24 @@
      .app-layout__toc-pane's own width (same 200ms/values) so the two stay
      aligned mid-animation, not just at rest. */
   @media (min-width: 1280px) {
+    /* transition lives on the base rule, not the reserved/collapsed
+       variants below, so it survives class removal (e.g. navigating to a
+       page without a toc). If it lived on the variant class instead, React
+       removing that class would remove the transition instruction in the
+       same commit as the padding-right change, and the browser would have
+       nothing left to animate from — an instant snap instead of an
+       animation. Mirrors .app-layout__toc-pane, which puts its width
+       transition on the always-present base class for the same reason. */
+    .page-viewer__subheader {
+      transition: padding-right 200ms ease;
+    }
+
     .page-viewer__subheader--toc-reserved {
       padding-right: 16rem;
-      transition: padding-right 200ms ease;
     }
 
     .page-viewer__subheader--toc-reserved-collapsed {
       padding-right: 3rem;
-      transition: padding-right 200ms ease;
     }
   }
 
