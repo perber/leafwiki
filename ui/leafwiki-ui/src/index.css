@@ -14,7 +14,9 @@
 ------------------------------------------------------- */
 @theme {
   /* Typography + Radii */
-  --font-sans: InterVariable, system-ui, sans-serif;
+  --font-sans:
+    InterVariable, system-ui, 'Segoe UI Emoji', 'Apple Color Emoji',
+    'Noto Color Emoji', sans-serif;
   --radius: 0.5rem;
   --radius-lg: 0.5rem;
   --radius-md: 0.375rem;
