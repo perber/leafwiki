@@ -72,7 +72,11 @@ describe('HotKeyHandler', () => {
 
   it('registers the keydown listener in the capture phase', () => {
     const addSpy = vi.spyOn(window, 'addEventListener')
-    render(<HotKeyHandler />)
+    render(
+      <MemoryRouter initialEntries={['/docs/getting-started']}>
+        <HotKeyHandler />
+      </MemoryRouter>,
+    )
     expect(addSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true)
     addSpy.mockRestore()
   })
