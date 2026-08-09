@@ -10,6 +10,44 @@
   font-weight: 500;
 }
 
+.markdown-inline-code {
+  position: relative;
+  display: inline-block;
+}
+
+.markdown-inline-code__copy-button {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  height: 1.25rem;
+  width: 1.25rem;
+  transform: translateY(-50%);
+  border-radius: var(--radius-sm);
+  padding: 0;
+  border-color: color-mix(in oklab, var(--hljs-foreground) 12%, transparent);
+  background: color-mix(in oklab, var(--hljs-background) 92%, transparent);
+  color: var(--hljs-foreground);
+  opacity: 0;
+  box-shadow: none;
+  transition: opacity 200ms;
+}
+
+.markdown-inline-code__copy-button:hover {
+  background: color-mix(in oklab, var(--hljs-background) 82%, white 10%);
+  color: var(--hljs-foreground);
+}
+
+.markdown-inline-code:hover .markdown-inline-code__copy-button,
+.markdown-inline-code:focus-within .markdown-inline-code__copy-button {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .markdown-inline-code__copy-button {
+    opacity: 0.7;
+  }
+}
+
 :root:not(.dark) .page-viewer__content .inline-code,
 :root:not(.dark) .markdown-editor__preview .inline-code {
   background: hsl(var(--surface-alt)) !important;

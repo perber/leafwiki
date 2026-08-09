@@ -35,6 +35,7 @@ import remarkMath from 'remark-math'
 import { extractTocEntries } from './extractTocEntries'
 import Headline from './Headline'
 import MarkdownCodeBlock from './MarkdownCodeBlock'
+import MarkdownInlineCode from './MarkdownInlineCode'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
 import './markdownPreviewCodeTheme.css'
@@ -560,9 +561,9 @@ export default function MarkdownPreview({
           return <code data-line={dataLine}>{children}</code>
         }
         return (
-          <code data-line={dataLine} className="inline-code">
+          <MarkdownInlineCode data-line={dataLine} className={className}>
             {children}
-          </code>
+          </MarkdownInlineCode>
         )
       },
     }),
