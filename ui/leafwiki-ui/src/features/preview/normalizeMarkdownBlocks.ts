@@ -122,9 +122,7 @@ export function normalizeMarkdownBlocks(content: string) {
 
     if (closingIndex >= lines.length || isMalformed) {
       output.push(...originalBlockLines)
-      if (closingIndex < lines.length) {
-        index = closingIndex
-      }
+      index = closingIndex < lines.length ? closingIndex : lines.length - 1
       continue
     }
 
