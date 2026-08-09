@@ -70,6 +70,46 @@ describe('HotKeyHandler', () => {
     useDialogsStore.setState({ dialogType: null, dialogProps: null })
   })
 
+  it('registers the keydown listener in the capture phase', () => {
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    render(
+      <MemoryRouter initialEntries={['/docs/getting-started']}>
+        <HotKeyHandler />
+      </MemoryRouter>,
+    )
+    expect(addSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true)
+    addSpy.mockRestore()
+  })
+
+  it('prevents the default browser action for Ctrl+Alt+P when registered', () => {
+    const action = vi.fn()
+    useHotKeysStore.getState().registerHotkey({
+      keyCombo: 'Mod+Alt+KeyP',
+      enabled: true,
+      mode: ['view'],
+      action,
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/docs/getting-started']}>
+        <HotKeyHandler />
+      </MemoryRouter>,
+    )
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'p',
+      code: 'KeyP',
+      ctrlKey: true,
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+    window.dispatchEvent(event)
+
+    expect(action).toHaveBeenCalledTimes(1)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
   it('switches to the Explorer panel on Ctrl+Shift+E while the search field is focused', async () => {
     renderApp()
 
