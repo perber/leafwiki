@@ -2522,7 +2522,48 @@
   .markdown-editor__preview .markdown-collapsible,
   .page-viewer__content .markdown-collapsible,
   .page-history__preview-body .markdown-collapsible {
-    @apply my-3;
+    @apply border-border/70 bg-surface-alt text-page-text my-6 rounded-lg border px-4 py-3;
+  }
+
+  .markdown-editor__preview .markdown-collapsible > summary,
+  .page-viewer__content .markdown-collapsible > summary,
+  .page-history__preview-body .markdown-collapsible > summary {
+    @apply -mx-4 -my-3 flex cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold select-none;
+  }
+
+  .markdown-editor__preview
+    .markdown-collapsible
+    > summary::-webkit-details-marker,
+  .page-viewer__content .markdown-collapsible > summary::-webkit-details-marker,
+  .page-history__preview-body
+    .markdown-collapsible
+    > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .markdown-editor__preview .markdown-collapsible > summary::before,
+  .page-viewer__content .markdown-collapsible > summary::before,
+  .page-history__preview-body .markdown-collapsible > summary::before {
+    content: '';
+    @apply border-muted h-1.5 w-1.5 shrink-0 -rotate-45 border-r-2 border-b-2 transition-transform duration-200;
+  }
+
+  .markdown-editor__preview .markdown-collapsible[open] > summary::before,
+  .page-viewer__content .markdown-collapsible[open] > summary::before,
+  .page-history__preview-body .markdown-collapsible[open] > summary::before {
+    @apply rotate-45;
+  }
+
+  .markdown-editor__preview .markdown-collapsible > summary + *,
+  .page-viewer__content .markdown-collapsible > summary + *,
+  .page-history__preview-body .markdown-collapsible > summary + * {
+    @apply mt-3;
+  }
+
+  .markdown-editor__preview .markdown-collapsible > :last-child,
+  .page-viewer__content .markdown-collapsible > :last-child,
+  .page-history__preview-body .markdown-collapsible > :last-child {
+    @apply mb-0;
   }
 
   .tree-view {
