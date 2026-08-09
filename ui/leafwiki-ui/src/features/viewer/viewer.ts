@@ -48,7 +48,10 @@ export const useViewerStore = create<ViewerState>((set) => ({
       } else if (err instanceof Error) {
         set({ error: err.message, notFound: false })
       } else {
-        set({ error: i18next.t('common.unknownError', { ns: 'page' }), notFound: false })
+        set({
+          error: i18next.t('common.unknownError', { ns: 'page' }),
+          notFound: false,
+        })
       }
     } finally {
       if (!signal.aborted) {
