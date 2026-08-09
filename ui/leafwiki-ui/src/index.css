@@ -2421,6 +2421,12 @@
     @apply ml-0.5 text-[0.7em];
   }
 
+  .markdown-editor__preview mark,
+  .page-viewer__content mark,
+  .page-history__preview-body mark {
+    @apply bg-warning/25 rounded-sm px-0.5 text-inherit;
+  }
+
   .markdown-editor__preview .markdown-shoutout,
   .page-viewer__content .markdown-shoutout,
   .page-history__preview-body .markdown-shoutout {

@@ -115,3 +115,71 @@ describe('MarkdownToolbar paste controls', () => {
     expect(await screen.findByText('toolbar.pastePlain')).toBeInTheDocument()
   })
 })
+
+describe('MarkdownToolbar highlight control', () => {
+  const insertWrappedTextMock = vi.fn()
+  const editorRef: RefObject<MarkdownEditorRef> = {
+    current: {
+      canUndo: () => false,
+      canRedo: () => false,
+      getMarkdown: () => '',
+      insertWrappedText: insertWrappedTextMock,
+      insertHeading: vi.fn(),
+      insertAtCursor: vi.fn(),
+      replaceSelection: vi.fn(),
+      pasteRich: vi.fn(),
+      pastePlain: vi.fn(),
+      focus: vi.fn(),
+      undo: vi.fn(),
+      redo: vi.fn(),
+      editorViewRef: { current: null },
+    },
+  }
+
+  beforeEach(() => {
+    mockIsMobile = false
+    insertWrappedTextMock.mockClear()
+  })
+
+  it('wraps the selection with == on desktop button click', () => {
+    render(
+      <MarkdownToolbar
+        editorRef={editorRef}
+        pageId="page-1"
+        previewVisible={false}
+        previewStacked={false}
+        onTogglePreview={vi.fn()}
+        onTogglePreviewLayout={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('format-highlight-button'))
+
+    expect(insertWrappedTextMock).toHaveBeenCalledWith('==')
+  })
+
+  it('wraps the selection with == from the mobile dropdown', async () => {
+    mockIsMobile = true
+
+    render(
+      <MarkdownToolbar
+        editorRef={editorRef}
+        pageId="page-1"
+        previewVisible={false}
+        previewStacked={false}
+        onTogglePreview={vi.fn()}
+        onTogglePreviewLayout={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.queryByTestId('format-highlight-button'),
+    ).not.toBeInTheDocument()
+
+    fireEvent.pointerDown(screen.getByLabelText('toolbar.moreOptionsAriaLabel'))
+
+    fireEvent.click(await screen.findByText('toolbar.highlight'))
+
+    expect(insertWrappedTextMock).toHaveBeenCalledWith('==')
+  })
+})

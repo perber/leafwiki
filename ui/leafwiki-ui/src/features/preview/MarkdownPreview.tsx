@@ -30,6 +30,7 @@ import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
+import remarkFlexibleMarkers from 'remark-flexible-markers'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { extractTocEntries } from './extractTocEntries'
@@ -60,7 +61,7 @@ const schema = {
     ],
     src: [...(defaultSchema.protocols?.src ?? []), 'http', 'https'],
   },
-  tagNames: [...(defaultSchema.tagNames || []), 'audio', 'video'],
+  tagNames: [...(defaultSchema.tagNames || []), 'audio', 'video', 'mark'],
   attributes: {
     ...defaultSchema.attributes,
     '*': [
@@ -636,6 +637,7 @@ export default function MarkdownPreview({
             remarkPlugins={[
               [remarkMath, { singleDollarTextMath: false }],
               remarkGfm,
+              remarkFlexibleMarkers,
             ]}
             rehypePlugins={[
               rehypeRaw,
