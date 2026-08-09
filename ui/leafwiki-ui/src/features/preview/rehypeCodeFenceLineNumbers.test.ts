@@ -2,9 +2,10 @@ import { rehypeCodeFenceLineNumbers } from './rehypeCodeFenceLineNumbers'
 import type { Root } from 'hast'
 
 function run(tree: Root) {
-  const transformer = rehypeCodeFenceLineNumbers() as (
+  const attacher = rehypeCodeFenceLineNumbers as unknown as () => (
     tree: Root,
   ) => void | Root | Promise<void | Root>
+  const transformer = attacher()
   return transformer(tree)
 }
 
@@ -24,7 +25,7 @@ describe('rehypeCodeFenceLineNumbers', () => {
 
     run(tree)
 
-    const code = tree.children[0] as {
+    const code = tree.children[0] as unknown as {
       properties: { className: string[]; 'data-line-numbers'?: string }
     }
     expect(code.properties.className).toEqual(['language-js'])
@@ -46,7 +47,7 @@ describe('rehypeCodeFenceLineNumbers', () => {
 
     run(tree)
 
-    const code = tree.children[0] as {
+    const code = tree.children[0] as unknown as {
       properties: { className: string[]; 'data-line-numbers'?: string }
     }
     expect(code.properties.className).toEqual(['language-js'])

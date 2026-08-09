@@ -2,7 +2,12 @@ import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Check, Copy } from 'lucide-react'
-import { ClassAttributes, HTMLAttributes, ReactNode, isValidElement } from 'react'
+import {
+  ClassAttributes,
+  HTMLAttributes,
+  ReactNode,
+  isValidElement,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { splitHighlightedLines } from './splitHighlightedLines'
 import { readTextContent, useCodeCopy } from './useCodeCopy'

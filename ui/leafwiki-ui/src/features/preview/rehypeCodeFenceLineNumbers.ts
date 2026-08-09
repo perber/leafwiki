@@ -33,7 +33,9 @@ export const rehypeCodeFenceLineNumbers: Plugin<[], Root> = () => {
         }
         enabled = true
         const withoutMarker = cls.slice(0, -1)
-        return withoutMarker === 'language-' ? 'language-plaintext' : withoutMarker
+        return withoutMarker === 'language-'
+          ? 'language-plaintext'
+          : withoutMarker
       })
 
       if (!enabled) return

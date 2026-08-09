@@ -81,9 +81,7 @@ echo three
 
     const { container } = render(<MarkdownPreview content={content} />)
 
-    const block = container.querySelector(
-      '.markdown-code-block--line-numbers',
-    )
+    const block = container.querySelector('.markdown-code-block--line-numbers')
     expect(block).not.toBeNull()
 
     const lineNumbers = container.querySelectorAll(
