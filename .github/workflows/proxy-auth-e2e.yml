@@ -36,6 +36,7 @@ jobs:
         run: go test -v -timeout 60s ./...
         env:
           E2E_PROXY_URL: http://localhost:8095
+          E2E_AUTOCREATE_PROXY_URL: http://localhost:8096
 
       - name: Print stack logs on failure
         if: failure()

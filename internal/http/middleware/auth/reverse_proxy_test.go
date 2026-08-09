@@ -379,6 +379,180 @@ func TestInjectRemoteUser_ReflectsLiveRestore(t *testing.T) {
 	}
 }
 
+func TestInjectRemoteUser_AutoCreateDisabled_UnknownUserStill401s(t *testing.T) {
+	f := createProxyFixture(t)
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
+
+	cfg := authmw.RemoteUserConfig{
+		Enabled:        true,
+		HeaderName:     "Remote-User",
+		AutoCreate:     false,
+		TrustedProxies: mustParseTrustedProxies(t, "127.0.0.1"),
+		UserService:    f.userService,
+	}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("Remote-User", "ghost")
+	w := httptest.NewRecorder()
+
+	proxyRouter(cfg).ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for unknown user with auto-create disabled, got %d", w.Code)
+	}
+}
+
+func TestInjectRemoteUser_AutoCreateEnabled_ProvisionsUnknownUser(t *testing.T) {
+	f := createProxyFixture(t)
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
+
+	cfg := authmw.RemoteUserConfig{
+		Enabled:        true,
+		HeaderName:     "Remote-User",
+		AutoCreate:     true,
+		DefaultRole:    coreauth.RoleViewer,
+		TrustedProxies: mustParseTrustedProxies(t, "127.0.0.1"),
+		UserService:    f.userService,
+	}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("Remote-User", "newperson")
+	w := httptest.NewRecorder()
+
+	proxyRouter(cfg).ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 with auto-create enabled, got %d: %s", w.Code, w.Body.String())
+	}
+	if body := w.Body.String(); body != `{"username":"newperson"}` {
+		t.Errorf("unexpected body: %s", body)
+	}
+
+	user, err := f.userService().GetUserByIdentifier("newperson")
+	if err != nil {
+		t.Fatalf("expected auto-created user to be persisted: %v", err)
+	}
+	if user.Role != coreauth.RoleViewer {
+		t.Errorf("expected auto-created user to have role %q, got %q", coreauth.RoleViewer, user.Role)
+	}
+	if user.Email != "newperson@remote-user.invalid" {
+		t.Errorf("expected synthesized placeholder email, got %q", user.Email)
+	}
+}
+
+func TestInjectRemoteUser_AutoCreateEnabled_UsesEmailHeader(t *testing.T) {
+	f := createProxyFixture(t)
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
+
+	cfg := authmw.RemoteUserConfig{
+		Enabled:         true,
+		HeaderName:      "Remote-User",
+		AutoCreate:      true,
+		EmailHeaderName: "Remote-Email",
+		DefaultRole:     coreauth.RoleViewer,
+		TrustedProxies:  mustParseTrustedProxies(t, "127.0.0.1"),
+		UserService:     f.userService,
+	}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("Remote-User", "newperson")
+	req.Header.Set("Remote-Email", "newperson@example.com")
+	w := httptest.NewRecorder()
+
+	proxyRouter(cfg).ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	user, err := f.userService().GetUserByIdentifier("newperson")
+	if err != nil {
+		t.Fatalf("expected auto-created user to be persisted: %v", err)
+	}
+	if user.Email != "newperson@example.com" {
+		t.Errorf("expected email from Remote-Email header, got %q", user.Email)
+	}
+}
+
+func TestInjectRemoteUser_AutoCreateEnabled_EmailConflictWithDifferentUserReturns401(t *testing.T) {
+	f := createProxyFixture(t)
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
+
+	cfg := authmw.RemoteUserConfig{
+		Enabled:         true,
+		HeaderName:      "Remote-User",
+		AutoCreate:      true,
+		EmailHeaderName: "Remote-Email",
+		DefaultRole:     coreauth.RoleViewer,
+		TrustedProxies:  mustParseTrustedProxies(t, "127.0.0.1"),
+		UserService:     f.userService,
+	}
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("Remote-User", "newperson")
+	// admin@localhost is the fixture's pre-existing default admin's email —
+	// not a race on "newperson", but a genuine conflict with a different user.
+	req.Header.Set("Remote-Email", "admin@localhost")
+	w := httptest.NewRecorder()
+
+	proxyRouter(cfg).ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for email conflict with a different user, got %d: %s", w.Code, w.Body.String())
+	}
+
+	if _, err := f.userService().GetUserByIdentifier("newperson"); err == nil {
+		t.Error("expected 'newperson' to not have been created as a side effect of the conflict")
+	}
+}
+
+func TestInjectRemoteUser_AutoCreateEnabled_SecondRequestReusesSameUser(t *testing.T) {
+	f := createProxyFixture(t)
+	cleanupWithErrorCheck(t, "proxy fixture", f.close)
+
+	cfg := authmw.RemoteUserConfig{
+		Enabled:        true,
+		HeaderName:     "Remote-User",
+		AutoCreate:     true,
+		DefaultRole:    coreauth.RoleViewer,
+		TrustedProxies: mustParseTrustedProxies(t, "127.0.0.1"),
+		UserService:    f.userService,
+	}
+
+	router := proxyRouter(cfg)
+
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.RemoteAddr = "127.0.0.1:1234"
+		req.Header.Set("Remote-User", "newperson")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("request %d: expected 200, got %d: %s", i, w.Code, w.Body.String())
+		}
+	}
+
+	users, err := f.userService().GetUsers()
+	if err != nil {
+		t.Fatalf("GetUsers failed: %v", err)
+	}
+	count := 0
+	for _, u := range users {
+		if u.Username == "newperson" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected exactly one 'newperson' user after two requests, got %d", count)
+	}
+}
+
 // TestInjectRemoteUser_WithRequireAuth verifies the full middleware chain:
 // InjectRemoteUser sets the user, then RequireAuth short-circuits JWT validation.
 func TestInjectRemoteUser_WithRequireAuth(t *testing.T) {

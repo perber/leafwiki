@@ -16,8 +16,15 @@ import (
 	"time"
 )
 
-// proxyURL is the nginx entry point (all requests go through the proxy).
+// proxyURL is the nginx entry point for the default-config stack (auto-create
+// off — all requests go through the proxy).
 var proxyURL string
+
+// autoCreateProxyURL is the nginx entry point for the second stack, which runs
+// LeafWiki with --enable-http-remote-user-auto-create=true. Kept as a separate
+// stack/port so the default stack's "unknown user -> 401" behavior stays
+// covered end-to-end, rather than being replaced by the auto-create behavior.
+var autoCreateProxyURL string
 
 // directURL is the LeafWiki port exposed directly, used to verify that the
 // same Remote-User header is rejected when it does not come from nginx.
@@ -28,10 +35,16 @@ var directURL string
 
 func TestMain(m *testing.M) {
 	proxyURL = envOr("E2E_PROXY_URL", "http://localhost:8095")
+	autoCreateProxyURL = envOr("E2E_AUTOCREATE_PROXY_URL", "http://localhost:8096")
 	directURL = envOr("E2E_DIRECT_URL", "")
 
 	if err := waitReachable(proxyURL+"/api/config", 60*time.Second); err != nil {
 		fmt.Fprintf(os.Stderr, "LeafWiki proxy stack not reachable at %s: %v\n", proxyURL, err)
+		fmt.Fprintln(os.Stderr, "Start the stack first:  docker compose up -d --wait")
+		os.Exit(1)
+	}
+	if err := waitReachable(autoCreateProxyURL+"/api/config", 60*time.Second); err != nil {
+		fmt.Fprintf(os.Stderr, "LeafWiki auto-create proxy stack not reachable at %s: %v\n", autoCreateProxyURL, err)
 		fmt.Fprintln(os.Stderr, "Start the stack first:  docker compose up -d --wait")
 		os.Exit(1)
 	}

@@ -130,6 +130,31 @@ func TestValidateHTTPRemoteUserConfig(t *testing.T) {
 	}
 }
 
+func TestValidateHTTPRemoteUserAutoCreateConfig(t *testing.T) {
+	tests := []struct {
+		name              string
+		autoCreateEnabled bool
+		remoteUserEnabled bool
+		defaultRole       string
+		wantErr           bool
+	}{
+		{"auto-create disabled, everything else irrelevant", false, false, "", false},
+		{"auto-create enabled, remote-user disabled", true, false, "viewer", true},
+		{"auto-create enabled, remote-user enabled, valid role", true, true, "viewer", false},
+		{"auto-create enabled, remote-user enabled, editor role", true, true, "editor", false},
+		{"auto-create enabled, remote-user enabled, admin role forbidden", true, true, "admin", true},
+		{"auto-create enabled, remote-user enabled, invalid role", true, true, "superuser", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateHTTPRemoteUserAutoCreateConfig(tc.autoCreateEnabled, tc.remoteUserEnabled, tc.defaultRole)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateHTTPRemoteUserAutoCreateConfig(%v, %v, %q) error = %v, wantErr %v", tc.autoCreateEnabled, tc.remoteUserEnabled, tc.defaultRole, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateRedirectURL(t *testing.T) {
 	tests := []struct {
 		name    string

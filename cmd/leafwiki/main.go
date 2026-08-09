@@ -91,9 +91,12 @@ func writeUsage(w io.Writer) {
 	--metrics-port                Port for the metrics listener (default: 9091)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
 	--revision-coalesce-window    Window for coalescing rapid successive saves by the same author (e.g. 5m, 0 = disabled) (default: 5m)
-	--enable-http-remote-user       Enable reverse-proxy authentication via HTTP header (default: false)
-	--http-remote-user-header-name  HTTP header carrying the username from a trusted proxy (default: Remote-User)
-	--trusted-proxy-ips             Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
+	--enable-http-remote-user               Enable reverse-proxy authentication via HTTP header (default: false)
+	--http-remote-user-header-name          HTTP header carrying the username or email from a trusted proxy (default: Remote-User)
+	--enable-http-remote-user-auto-create   Auto-provision users asserted by the trusted proxy but unknown to LeafWiki (default: false)
+	--http-remote-user-email-header-name    HTTP header carrying the email for auto-created users (default: "")
+	--http-remote-user-default-role         Role assigned to auto-created users; must not be "admin" (default: viewer)
+	--trusted-proxy-ips                     Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
 	--login-url                     URL the frontend redirects to instead of the built-in login form
 	                                 (e.g. an external SSO/IdP login page) (default: "")
 	--logout-url                    URL the frontend redirects to after logout
@@ -156,6 +159,9 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_REVISION_COALESCE_WINDOW
 	LEAFWIKI_ENABLE_HTTP_REMOTE_USER
 	LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME
+	LEAFWIKI_ENABLE_HTTP_REMOTE_USER_AUTO_CREATE
+	LEAFWIKI_HTTP_REMOTE_USER_EMAIL_HEADER_NAME
+	LEAFWIKI_HTTP_REMOTE_USER_DEFAULT_ROLE
 	LEAFWIKI_TRUSTED_PROXY_IPS
 	LEAFWIKI_LOGIN_URL
 	LEAFWIKI_LOGOUT_URL
@@ -231,110 +237,116 @@ func runRestoreSnapshotCommand(dataDir string, args []string) error {
 var gracefulShutdownTimeout = 10 * time.Second
 
 type cliFlags struct {
-	logFormat               *string
-	host                    *string
-	port                    *string
-	unixSocket              *string
-	dataDir                 *string
-	adminUsername           *string
-	adminEmail              *string
-	adminPassword           *string
-	jwtSecret               *string
-	totpEncryptionKey       *string
-	publicAccess            *bool
-	allowInsecure           *bool
-	injectCodeInHeader      *string
-	customStylesheet        *string
-	disableAuth             *bool
-	hideLinkMetadataSection *bool
-	accessTokenTimeout      *time.Duration
-	refreshTokenTimeout     *time.Duration
-	basePath                *string
-	maxAssetUploadSize      *string
-	enableRevision          *bool
-	enableLinkRefactor      *bool
-	enableAPIKeyManagement  *bool
-	enableMetrics           *bool
-	metricsHost             *string
-	metricsPort             *string
-	maxRevisionHistory      *int
-	enableHTTPRemoteUser    *bool
-	httpRemoteUserHeader    *string
-	trustedProxyIPs         *string
-	loginURL                *string
-	logoutURL               *string
-	httpRemoteUserLogoutURL *string
-	userManagementURL       *string
-	disableRequestLog       *bool
-	gitBackup               *bool
-	gitBackupAuthorName     *string
-	gitBackupAuthorEmail    *string
-	gitBackupRemote         *string
-	gitBackupBranch         *string
-	gitBackupSSHKeyPath     *string
-	gitBackupSSHKey         *string
-	gitBackupSSHKnownHosts  *string
-	gitBackupInterval       *time.Duration
-	revisionCoalesceWindow  *time.Duration
-	snapshotEnabled         *bool
-	snapshotInterval        *time.Duration
-	snapshotRetention       *int
-	snapshotDir             *string
-	restoreUploadMaxSize    *string
+	logFormat                      *string
+	host                           *string
+	port                           *string
+	unixSocket                     *string
+	dataDir                        *string
+	adminUsername                  *string
+	adminEmail                     *string
+	adminPassword                  *string
+	jwtSecret                      *string
+	totpEncryptionKey              *string
+	publicAccess                   *bool
+	allowInsecure                  *bool
+	injectCodeInHeader             *string
+	customStylesheet               *string
+	disableAuth                    *bool
+	hideLinkMetadataSection        *bool
+	accessTokenTimeout             *time.Duration
+	refreshTokenTimeout            *time.Duration
+	basePath                       *string
+	maxAssetUploadSize             *string
+	enableRevision                 *bool
+	enableLinkRefactor             *bool
+	enableAPIKeyManagement         *bool
+	enableMetrics                  *bool
+	metricsHost                    *string
+	metricsPort                    *string
+	maxRevisionHistory             *int
+	enableHTTPRemoteUser           *bool
+	httpRemoteUserHeader           *string
+	enableHTTPRemoteUserAutoCreate *bool
+	httpRemoteUserEmailHeader      *string
+	httpRemoteUserDefaultRole      *string
+	trustedProxyIPs                *string
+	loginURL                       *string
+	logoutURL                      *string
+	httpRemoteUserLogoutURL        *string
+	userManagementURL              *string
+	disableRequestLog              *bool
+	gitBackup                      *bool
+	gitBackupAuthorName            *string
+	gitBackupAuthorEmail           *string
+	gitBackupRemote                *string
+	gitBackupBranch                *string
+	gitBackupSSHKeyPath            *string
+	gitBackupSSHKey                *string
+	gitBackupSSHKnownHosts         *string
+	gitBackupInterval              *time.Duration
+	revisionCoalesceWindow         *time.Duration
+	snapshotEnabled                *bool
+	snapshotInterval               *time.Duration
+	snapshotRetention              *int
+	snapshotDir                    *string
+	restoreUploadMaxSize           *string
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
 	return &cliFlags{
-		logFormat:               fs.String("log-format", "", "log output format: text or json (default: text)"),
-		host:                    fs.String("host", "", "host/IP address to bind the server to (e.g. 127.0.0.1 or 0.0.0.0)"),
-		port:                    fs.String("port", "", "port to run the server on"),
-		unixSocket:              fs.String("unix-socket", "", "path to a unix domain socket to listen on; overrides --host and --port"),
-		dataDir:                 fs.String("data-dir", "", "path to data directory"),
-		adminUsername:           fs.String("admin-username", "", "initial admin username (used only if no admin exists) (default: admin)"),
-		adminEmail:              fs.String("admin-email", "", "initial admin email (used only if no admin exists) (default: admin@localhost)"),
-		adminPassword:           fs.String("admin-password", "", "initial admin password"),
-		jwtSecret:               fs.String("jwt-secret", "", "JWT secret for authentication"),
-		totpEncryptionKey:       fs.String("totp-encryption-key", "", "key to encrypt per-user TOTP secrets at rest, min 32 bytes (leave unset to keep TOTP self-service unavailable)"),
-		publicAccess:            fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
-		allowInsecure:           fs.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)"),
-		injectCodeInHeader:      fs.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")"),
-		customStylesheet:        fs.String("custom-stylesheet", "", "path to a custom CSS file served as /custom.css"),
-		disableAuth:             fs.Bool("disable-auth", false, "disable authentication completely (default: false) (WARNING: only use in trusted networks!)"),
-		hideLinkMetadataSection: fs.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)"),
-		accessTokenTimeout:      fs.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)"),
-		refreshTokenTimeout:     fs.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h) (default: 168h)"),
-		basePath:                fs.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)"),
-		maxAssetUploadSize:      fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
-		enableRevision:          fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
-		enableLinkRefactor:      fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
-		enableAPIKeyManagement:  fs.Bool("enable-api-key-management", false, "enable the experimental API key management feature (default: false)"),
-		enableMetrics:           fs.Bool("enable-metrics", false, "enable the Prometheus /metrics endpoint on a separate listener (default: false)"),
-		metricsHost:             fs.String("metrics-host", "", "host/IP address for the Prometheus metrics listener (default: 127.0.0.1)"),
-		metricsPort:             fs.String("metrics-port", "", "port for the Prometheus metrics listener (default: 9091)"),
-		maxRevisionHistory:      fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
-		enableHTTPRemoteUser:    fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
-		httpRemoteUserHeader:    fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username from a trusted proxy (default: Remote-User)"),
-		trustedProxyIPs:         fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
-		loginURL:                fs.String("login-url", "", "URL the frontend redirects to instead of the built-in login form (e.g. an external SSO/IdP login page)"),
-		logoutURL:               fs.String("logout-url", "", "URL the frontend redirects to after logout (e.g. an external SSO/IdP logout page)"),
-		httpRemoteUserLogoutURL: fs.String("http-remote-user-logout-url", "", "deprecated: use --logout-url instead"),
-		userManagementURL:       fs.String("user-management-url", "", "URL to an external user-management page; when set, the built-in User Management UI is replaced with a link to this URL"),
-		disableRequestLog:       fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
-		gitBackup:               fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
-		gitBackupAuthorName:     fs.String("git-backup-author-name", "", "git commit author name for backups (default: LeafWiki Backup)"),
-		gitBackupAuthorEmail:    fs.String("git-backup-author-email", "", "git commit author email for backups (default: backup@leafwiki.local)"),
-		gitBackupRemote:         fs.String("git-backup-remote", "", "git remote URL (SSH) for backups (required when git-backup is enabled)"),
-		gitBackupBranch:         fs.String("git-backup-branch", "", "git branch to push to (default: main)"),
-		gitBackupSSHKeyPath:     fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
-		gitBackupSSHKey:         fs.String(gitBackupSSHKeyFlagName, "", "raw SSH private key for git backup (env var preferred)"),
-		gitBackupSSHKnownHosts:  fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
-		gitBackupInterval:       fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
-		revisionCoalesceWindow:  fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
-		snapshotEnabled:         fs.Bool("snapshot", true, "enable full backup snapshots (ZIP incl. the SQLite database) (default: true)"),
-		snapshotInterval:        fs.Duration("snapshot-interval", 24*time.Hour, "snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)"),
-		snapshotRetention:       fs.Int("snapshot-retention", 10, "number of most recent snapshots to keep; <= 0 = keep all (default: 10)"),
-		snapshotDir:             fs.String("snapshot-dir", "", "directory to store snapshot ZIPs in (default: <data-dir>/snapshots)"),
-		restoreUploadMaxSize:    fs.String("restore-upload-max-size", "", "maximum size for an uploaded backup ZIP to restore from (for example 500MiB, 500MB, 524288000) (default: 500MiB)"),
+		logFormat:                      fs.String("log-format", "", "log output format: text or json (default: text)"),
+		host:                           fs.String("host", "", "host/IP address to bind the server to (e.g. 127.0.0.1 or 0.0.0.0)"),
+		port:                           fs.String("port", "", "port to run the server on"),
+		unixSocket:                     fs.String("unix-socket", "", "path to a unix domain socket to listen on; overrides --host and --port"),
+		dataDir:                        fs.String("data-dir", "", "path to data directory"),
+		adminUsername:                  fs.String("admin-username", "", "initial admin username (used only if no admin exists) (default: admin)"),
+		adminEmail:                     fs.String("admin-email", "", "initial admin email (used only if no admin exists) (default: admin@localhost)"),
+		adminPassword:                  fs.String("admin-password", "", "initial admin password"),
+		jwtSecret:                      fs.String("jwt-secret", "", "JWT secret for authentication"),
+		totpEncryptionKey:              fs.String("totp-encryption-key", "", "key to encrypt per-user TOTP secrets at rest, min 32 bytes (leave unset to keep TOTP self-service unavailable)"),
+		publicAccess:                   fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
+		allowInsecure:                  fs.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)"),
+		injectCodeInHeader:             fs.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")"),
+		customStylesheet:               fs.String("custom-stylesheet", "", "path to a custom CSS file served as /custom.css"),
+		disableAuth:                    fs.Bool("disable-auth", false, "disable authentication completely (default: false) (WARNING: only use in trusted networks!)"),
+		hideLinkMetadataSection:        fs.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)"),
+		accessTokenTimeout:             fs.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)"),
+		refreshTokenTimeout:            fs.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h) (default: 168h)"),
+		basePath:                       fs.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)"),
+		maxAssetUploadSize:             fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
+		enableRevision:                 fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
+		enableLinkRefactor:             fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
+		enableAPIKeyManagement:         fs.Bool("enable-api-key-management", false, "enable the experimental API key management feature (default: false)"),
+		enableMetrics:                  fs.Bool("enable-metrics", false, "enable the Prometheus /metrics endpoint on a separate listener (default: false)"),
+		metricsHost:                    fs.String("metrics-host", "", "host/IP address for the Prometheus metrics listener (default: 127.0.0.1)"),
+		metricsPort:                    fs.String("metrics-port", "", "port for the Prometheus metrics listener (default: 9091)"),
+		maxRevisionHistory:             fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
+		enableHTTPRemoteUser:           fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
+		httpRemoteUserHeader:           fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username or email from a trusted proxy (default: Remote-User)"),
+		enableHTTPRemoteUserAutoCreate: fs.Bool("enable-http-remote-user-auto-create", false, "auto-provision users asserted by the trusted proxy but unknown to LeafWiki (default: false)"),
+		httpRemoteUserEmailHeader:      fs.String("http-remote-user-email-header-name", "", "HTTP header name carrying the email for auto-created users (default: \"\")"),
+		httpRemoteUserDefaultRole:      fs.String("http-remote-user-default-role", "viewer", "role assigned to auto-created users; must not be \"admin\" (default: viewer)"),
+		trustedProxyIPs:                fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
+		loginURL:                       fs.String("login-url", "", "URL the frontend redirects to instead of the built-in login form (e.g. an external SSO/IdP login page)"),
+		logoutURL:                      fs.String("logout-url", "", "URL the frontend redirects to after logout (e.g. an external SSO/IdP logout page)"),
+		httpRemoteUserLogoutURL:        fs.String("http-remote-user-logout-url", "", "deprecated: use --logout-url instead"),
+		userManagementURL:              fs.String("user-management-url", "", "URL to an external user-management page; when set, the built-in User Management UI is replaced with a link to this URL"),
+		disableRequestLog:              fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
+		gitBackup:                      fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
+		gitBackupAuthorName:            fs.String("git-backup-author-name", "", "git commit author name for backups (default: LeafWiki Backup)"),
+		gitBackupAuthorEmail:           fs.String("git-backup-author-email", "", "git commit author email for backups (default: backup@leafwiki.local)"),
+		gitBackupRemote:                fs.String("git-backup-remote", "", "git remote URL (SSH) for backups (required when git-backup is enabled)"),
+		gitBackupBranch:                fs.String("git-backup-branch", "", "git branch to push to (default: main)"),
+		gitBackupSSHKeyPath:            fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
+		gitBackupSSHKey:                fs.String(gitBackupSSHKeyFlagName, "", "raw SSH private key for git backup (env var preferred)"),
+		gitBackupSSHKnownHosts:         fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
+		gitBackupInterval:              fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
+		revisionCoalesceWindow:         fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
+		snapshotEnabled:                fs.Bool("snapshot", true, "enable full backup snapshots (ZIP incl. the SQLite database) (default: true)"),
+		snapshotInterval:               fs.Duration("snapshot-interval", 24*time.Hour, "snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)"),
+		snapshotRetention:              fs.Int("snapshot-retention", 10, "number of most recent snapshots to keep; <= 0 = keep all (default: 10)"),
+		snapshotDir:                    fs.String("snapshot-dir", "", "directory to store snapshot ZIPs in (default: <data-dir>/snapshots)"),
+		restoreUploadMaxSize:           fs.String("restore-upload-max-size", "", "maximum size for an uploaded backup ZIP to restore from (for example 500MiB, 500MB, 524288000) (default: 500MiB)"),
 	}
 }
 
@@ -399,6 +411,9 @@ func main() {
 	revisionCoalesceWindow := resolveDuration("revision-coalesce-window", *flags.revisionCoalesceWindow, visited, "LEAFWIKI_REVISION_COALESCE_WINDOW")
 	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
 	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
+	enableHTTPRemoteUserAutoCreate := resolveBool("enable-http-remote-user-auto-create", *flags.enableHTTPRemoteUserAutoCreate, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER_AUTO_CREATE")
+	httpRemoteUserEmailHeader := resolveString("http-remote-user-email-header-name", *flags.httpRemoteUserEmailHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_EMAIL_HEADER_NAME", "")
+	httpRemoteUserDefaultRole := resolveString("http-remote-user-default-role", *flags.httpRemoteUserDefaultRole, visited, "LEAFWIKI_HTTP_REMOTE_USER_DEFAULT_ROLE", "viewer")
 	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
 	loginURL := resolveString("login-url", *flags.loginURL, visited, "LEAFWIKI_LOGIN_URL", "")
 	logoutURL := resolveString("logout-url", *flags.logoutURL, visited, "LEAFWIKI_LOGOUT_URL", "")
@@ -433,6 +448,10 @@ func main() {
 		fail("Invalid HTTP remote user configuration", "error", err)
 	}
 
+	if err := validateHTTPRemoteUserAutoCreateConfig(enableHTTPRemoteUserAutoCreate, enableHTTPRemoteUser, httpRemoteUserDefaultRole); err != nil {
+		fail("Invalid HTTP remote user auto-create configuration", "error", err)
+	}
+
 	if err := validateRedirectURL("login-url", loginURL); err != nil {
 		fail("Invalid login URL configuration", "error", err)
 	}
@@ -447,6 +466,8 @@ func main() {
 		slog.Default().Info("Reverse-proxy authentication enabled",
 			"header", httpRemoteUserHeader,
 			"trusted_proxies", trustedProxyIPsRaw,
+			"auto_create", enableHTTPRemoteUserAutoCreate,
+			"default_role", httpRemoteUserDefaultRole,
 		)
 	}
 	if enableMetrics {
@@ -657,10 +678,13 @@ func main() {
 		SnapshotEnabled:         snapshotEnabled,
 		TOTPAvailable:           w.TOTPService() != nil,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
-			Enabled:        enableHTTPRemoteUser,
-			HeaderName:     httpRemoteUserHeader,
-			TrustedProxies: trustedProxies,
-			UserService:    w.UserService,
+			Enabled:         enableHTTPRemoteUser,
+			HeaderName:      httpRemoteUserHeader,
+			AutoCreate:      enableHTTPRemoteUserAutoCreate,
+			EmailHeaderName: httpRemoteUserEmailHeader,
+			DefaultRole:     httpRemoteUserDefaultRole,
+			TrustedProxies:  trustedProxies,
+			UserService:     w.UserService,
 		},
 		APIKeyService:     w.APIKeyService(),
 		DisableRequestLog: disableRequestLog,
@@ -943,6 +967,26 @@ func validateHTTPRemoteUserConfig(enabled bool, trustedProxyIPsRaw string) error
 	}
 	if !hasTrustedProxy {
 		return fmt.Errorf("--trusted-proxy-ips is required when --enable-http-remote-user is set. Set it using --trusted-proxy-ips or LEAFWIKI_TRUSTED_PROXY_IPS")
+	}
+	return nil
+}
+
+// validateHTTPRemoteUserAutoCreateConfig guards the auto-create opt-in: it requires
+// reverse-proxy auth to already be enabled, and forbids "admin" as the default role so
+// a forged or misrouted proxy header can never mint an admin account by itself. An
+// operator who wants remote-provisioned admins can promote a user manually afterward.
+func validateHTTPRemoteUserAutoCreateConfig(autoCreateEnabled, remoteUserEnabled bool, defaultRole string) error {
+	if !autoCreateEnabled {
+		return nil
+	}
+	if !remoteUserEnabled {
+		return fmt.Errorf("--enable-http-remote-user-auto-create requires --enable-http-remote-user to also be set")
+	}
+	if !auth.IsValidRole(defaultRole) {
+		return fmt.Errorf("--http-remote-user-default-role %q is not a valid role", defaultRole)
+	}
+	if defaultRole == auth.RoleAdmin {
+		return fmt.Errorf("--http-remote-user-default-role must not be %q; promote auto-created users manually instead", auth.RoleAdmin)
 	}
 	return nil
 }
