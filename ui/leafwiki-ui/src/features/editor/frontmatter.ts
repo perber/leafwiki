@@ -117,18 +117,24 @@ export function validateEditorFrontmatterMetadata(
 
   for (const tag of tags) {
     if (tag.trim() !== tag) {
-      errors.tags = i18next.t('frontmatterValidation.tagsWhitespace', { ns: 'editor' })
+      errors.tags = i18next.t('frontmatterValidation.tagsWhitespace', {
+        ns: 'editor',
+      })
       break
     }
 
     if (tag.trim() === '') {
-      errors.tags = i18next.t('frontmatterValidation.tagsEmpty', { ns: 'editor' })
+      errors.tags = i18next.t('frontmatterValidation.tagsEmpty', {
+        ns: 'editor',
+      })
       break
     }
 
     const key = tag.toLocaleLowerCase()
     if (seenTags.has(key)) {
-      errors.tags = i18next.t('frontmatterValidation.tagsUnique', { ns: 'editor' })
+      errors.tags = i18next.t('frontmatterValidation.tagsUnique', {
+        ns: 'editor',
+      })
       break
     }
     seenTags.add(key)
@@ -142,34 +148,45 @@ export function validateEditorFrontmatterMetadata(
     const trimmedKey = field.key.trim()
 
     if (trimmedKey === '') {
-      errors[keyField] = i18next.t('frontmatterValidation.keyEmpty', { ns: 'editor' })
+      errors[keyField] = i18next.t('frontmatterValidation.keyEmpty', {
+        ns: 'editor',
+      })
       return
     }
 
     if (trimmedKey !== field.key) {
-      errors[keyField] =
-        i18next.t('frontmatterValidation.keyWhitespace', { ns: 'editor' })
+      errors[keyField] = i18next.t('frontmatterValidation.keyWhitespace', {
+        ns: 'editor',
+      })
       return
     }
 
     if (trimmedKey.toLocaleLowerCase().startsWith(INTERNAL_FIELD_PREFIX)) {
-      errors[keyField] = i18next.t('frontmatterValidation.keyReservedPrefix', { ns: 'editor' })
+      errors[keyField] = i18next.t('frontmatterValidation.keyReservedPrefix', {
+        ns: 'editor',
+      })
       return
     }
 
     const lowerKey = trimmedKey.toLocaleLowerCase()
     if (lowerKey === 'tags') {
-      errors[keyField] = i18next.t('frontmatterValidation.keyReserved', { ns: 'editor' })
+      errors[keyField] = i18next.t('frontmatterValidation.keyReserved', {
+        ns: 'editor',
+      })
       return
     }
 
     const dedupeKey = trimmedKey.toLocaleLowerCase()
     const existingIndex = seenKeys.get(dedupeKey)
     if (existingIndex !== undefined) {
-      errors[keyField] = i18next.t('frontmatterValidation.keyUnique', { ns: 'editor' })
+      errors[keyField] = i18next.t('frontmatterValidation.keyUnique', {
+        ns: 'editor',
+      })
       if (!errors[`properties.${existingIndex}.key`]) {
-        errors[`properties.${existingIndex}.key`] =
-          i18next.t('frontmatterValidation.keyUnique', { ns: 'editor' })
+        errors[`properties.${existingIndex}.key`] = i18next.t(
+          'frontmatterValidation.keyUnique',
+          { ns: 'editor' },
+        )
       }
       return
     }
@@ -180,8 +197,9 @@ export function validateEditorFrontmatterMetadata(
     }
 
     if (typeof field.value !== 'string') {
-      errors[valueField] =
-        i18next.t('frontmatterValidation.valueType', { ns: 'editor' })
+      errors[valueField] = i18next.t('frontmatterValidation.valueType', {
+        ns: 'editor',
+      })
     }
   })
 
