@@ -42,6 +42,7 @@ import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
 import { normalizeMarkdownBlocks } from './normalizeMarkdownBlocks'
+import { rehypeCodeFenceLineNumbers } from './rehypeCodeFenceLineNumbers'
 import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 import { syntaxHighlightLanguages } from './syntaxHighlightLanguages'
@@ -68,7 +69,15 @@ const schema = {
       'className',
       'data-leafwiki-generated-id',
       'data-line',
+      'data-line-numbers',
       'style',
+    ],
+    code: [
+      ...(defaultSchema.attributes?.code || []),
+      'className',
+      'class',
+      'data-line',
+      'data-line-numbers',
     ],
     audio: [...(defaultSchema.attributes?.audio || []), 'controls', 'src'],
     video: [
@@ -532,7 +541,10 @@ export default function MarkdownPreview({
       }: MarkdownNodeProp &
         JSX.IntrinsicAttributes &
         ClassAttributes<HTMLElement> &
-        HTMLAttributes<HTMLElement> & { 'data-line'?: string }) => {
+        HTMLAttributes<HTMLElement> & {
+          'data-line'?: string
+          'data-line-numbers'?: string | boolean
+        }) => {
         void node
         const { className, children, 'data-line': dataLine } = props
         if (className?.includes('language-mermaid')) {
@@ -628,6 +640,7 @@ export default function MarkdownPreview({
             rehypePlugins={[
               rehypeRaw,
               rehypeLineNumber,
+              rehypeCodeFenceLineNumbers,
               rehypeWhitelistStyles,
               [rehypeKatex, { output: 'html', strict: 'ignore' }],
               [rehypeSanitize, schema],
