@@ -199,6 +199,8 @@ sudo ./install.sh --non-interactive --env-file ./.env
 **Deployment examples:**
 - [Install with nginx on Ubuntu](docs/install/nginx.md)
 - [Install on a Raspberry Pi](docs/install/raspberry.md)
+- [How LeafWiki stores data](docs/storage.md)
+- [Backup and restore](docs/backup-restore.md)
 
 ### Binary
 
