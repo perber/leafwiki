@@ -2,6 +2,7 @@ import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_CHANGE_OWN_PASSWORD } from '@/lib/registries'
+import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { useUserStore } from '@/stores/users'
 import { useCallback, useState } from 'react'
@@ -17,6 +18,7 @@ export function ChangeOwnPasswordDialog() {
   const [confirm, setConfirm] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const allowWeakPasswords = useConfigStore((s) => s.allowWeakPasswords)
 
   const { user } = useSessionStore()
   const { changeOwnPassword } = useUserStore()
@@ -38,7 +40,7 @@ export function ChangeOwnPasswordDialog() {
 
   const handleNewPasswordChange = (val: string) => {
     setNewPassword(val)
-    if (val.length < 8) {
+    if (!allowWeakPasswords && val.length < 8) {
       setFieldErrors((prev) => ({
         ...prev,
         newPassword: t('validation.passwordTooShort'),

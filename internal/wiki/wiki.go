@@ -53,7 +53,8 @@ type Wiki struct {
 	branding     *branding.BrandingService
 	searchIndex  *search.SQLiteIndex
 	status       *search.IndexingStatus
-	storageDir   string
+	storageDir         string
+	allowWeakPasswords bool
 
 	// Domain route registrars (populated by NewWiki).
 	pagesRoutes      *wikipages.Routes
@@ -104,18 +105,20 @@ type WikiOptions struct {
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 	RevisionCoalesceWindow  time.Duration // Window for coalescing rapid successive saves; 0 = disabled
 	TOTPEncryptionKey       string        // Key used to encrypt per-user TOTP secrets at rest; empty disables TOTP self-service
+	AllowWeakPasswords      bool          // When true, skip the minimum 8-character password length check
 	Metrics                 *httpmetrics.HTTPMetrics
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
 	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	w := &Wiki{
-		storageDir:     options.StorageDir,
-		log:            slog.Default().With("component", "Wiki"),
-		resyncJob:      wikiresync.NewResyncJob(),
-		shutdownCtx:    shutdownCtx,
-		shutdownCancel: shutdownCancel,
-		metrics:        options.Metrics,
+		storageDir:         options.StorageDir,
+		allowWeakPasswords: options.AllowWeakPasswords,
+		log:                slog.Default().With("component", "Wiki"),
+		resyncJob:          wikiresync.NewResyncJob(),
+		shutdownCtx:        shutdownCtx,
+		shutdownCancel:     shutdownCancel,
+		metrics:            options.Metrics,
 	}
 	if err := w.initAuth(options); err != nil {
 		return nil, err
@@ -445,9 +448,9 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		CompleteTOTPLogin: wikiauth.NewCompleteTOTPLoginUseCase(w.auth, w.metrics),
 		Logout:            wikiauth.NewLogoutUseCase(w.auth, w.metrics),
 		RefreshToken:      wikiauth.NewRefreshTokenUseCase(w.auth, w.metrics),
-		CreateUser:        wikiauth.NewCreateUserUseCase(w.UserService, w.userResolver, w.log),
-		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.UserService, w.userResolver, w.log),
-		ChangeOwnPassword: wikiauth.NewChangeOwnPasswordUseCase(w.UserService),
+		CreateUser:        wikiauth.NewCreateUserUseCase(w.UserService, w.userResolver, w.log, w.allowWeakPasswords),
+		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.UserService, w.userResolver, w.log, w.allowWeakPasswords),
+		ChangeOwnPassword: wikiauth.NewChangeOwnPasswordUseCase(w.UserService, w.allowWeakPasswords),
 		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.UserService, w.userResolver, w.favorites, w.log),
 		GetUsers:          wikiauth.NewGetUsersUseCase(w.UserService),
 		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.UserService),

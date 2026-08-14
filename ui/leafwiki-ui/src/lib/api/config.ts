@@ -16,6 +16,7 @@ export type Config = {
   publicAccess: boolean
   hideLinkMetadataSection: boolean
   authDisabled: boolean
+  allowWeakPasswords: boolean
   maxAssetUploadSizeBytes: number
   enableRevision: boolean
   enableLinkRefactor: boolean

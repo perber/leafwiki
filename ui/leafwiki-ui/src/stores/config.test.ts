@@ -18,6 +18,7 @@ const baseConfig = {
   publicAccess: false,
   hideLinkMetadataSection: false,
   authDisabled: false,
+  allowWeakPasswords: false,
   maxAssetUploadSizeBytes: 1000,
   enableRevision: false,
   enableLinkRefactor: false,

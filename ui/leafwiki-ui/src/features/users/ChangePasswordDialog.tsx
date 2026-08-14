@@ -2,6 +2,7 @@ import BaseDialog from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { DIALOG_CHANGE_USER_PASSWORD } from '@/lib/registries'
+import { useConfigStore } from '@/stores/config'
 import { useUserStore } from '@/stores/users'
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +24,7 @@ export function ChangePasswordDialog({
   const [confirm, setConfirm] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const allowWeakPasswords = useConfigStore((s) => s.allowWeakPasswords)
 
   const { users, updateUser } = useUserStore()
 
@@ -37,16 +39,18 @@ export function ChangePasswordDialog({
 
   if (!user) return null
 
+  const passwordTooShort = !allowWeakPasswords && password.length < 8
+
   const submitDisabled =
     loading ||
-    password.length < 8 ||
+    passwordTooShort ||
     password !== confirm ||
     fieldErrors.password !== '' ||
     fieldErrors.confirm !== ''
 
   const handlePasswordChange = (val: string) => {
     setPassword(val)
-    if (val.length < 8) {
+    if (!allowWeakPasswords && val.length < 8) {
       setFieldErrors((prev) => ({
         ...prev,
         password: t('validation.passwordTooShort'),

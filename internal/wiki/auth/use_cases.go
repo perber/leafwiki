@@ -302,13 +302,14 @@ type CreateUserUseCase struct {
 	// this use case automatically tracks a live restore's
 	// AuthService.ReplaceUserStore swap instead of going stale — see
 	// Wiki.UserService().
-	user     func() *coreauth.UserService
-	resolver *coreauth.UserResolver
-	log      *slog.Logger
+	user               func() *coreauth.UserService
+	resolver           *coreauth.UserResolver
+	log                *slog.Logger
+	allowWeakPasswords bool
 }
 
-func NewCreateUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger) *CreateUserUseCase {
-	return &CreateUserUseCase{user: u, resolver: r, log: log}
+func NewCreateUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger, allowWeakPasswords bool) *CreateUserUseCase {
+	return &CreateUserUseCase{user: u, resolver: r, log: log, allowWeakPasswords: allowWeakPasswords}
 }
 
 func (uc *CreateUserUseCase) Execute(_ context.Context, in CreateUserInput) (*CreateUserOutput, error) {
@@ -323,7 +324,7 @@ func (uc *CreateUserUseCase) Execute(_ context.Context, in CreateUserInput) (*Cr
 	}
 	if in.Password == "" {
 		ve.Add("password", "Password must not be empty")
-	} else if len(in.Password) < 8 {
+	} else if !uc.allowWeakPasswords && len(in.Password) < 8 {
 		ve.Add("password", "Password must be at least 8 characters long")
 	}
 	if !coreauth.IsValidRole(in.Role) {
@@ -359,13 +360,14 @@ type UpdateUserOutput struct {
 }
 
 type UpdateUserUseCase struct {
-	user     func() *coreauth.UserService
-	resolver *coreauth.UserResolver
-	log      *slog.Logger
+	user               func() *coreauth.UserService
+	resolver           *coreauth.UserResolver
+	log                *slog.Logger
+	allowWeakPasswords bool
 }
 
-func NewUpdateUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger) *UpdateUserUseCase {
-	return &UpdateUserUseCase{user: u, resolver: r, log: log}
+func NewUpdateUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger, allowWeakPasswords bool) *UpdateUserUseCase {
+	return &UpdateUserUseCase{user: u, resolver: r, log: log, allowWeakPasswords: allowWeakPasswords}
 }
 
 func (uc *UpdateUserUseCase) Execute(_ context.Context, in UpdateUserInput) (*UpdateUserOutput, error) {
@@ -377,6 +379,9 @@ func (uc *UpdateUserUseCase) Execute(_ context.Context, in UpdateUserInput) (*Up
 		ve.Add("email", "Email must not be empty")
 	} else if !emailRegex.MatchString(in.Email) {
 		ve.Add("email", "Email is not valid")
+	}
+	if in.Password != "" && !uc.allowWeakPasswords && len(in.Password) < 8 {
+		ve.Add("password", "Password must be at least 8 characters long")
 	}
 	role := in.Role
 	roleProvided := strings.TrimSpace(in.Role) != ""
@@ -414,18 +419,19 @@ type ChangeOwnPasswordInput struct {
 }
 
 type ChangeOwnPasswordUseCase struct {
-	user func() *coreauth.UserService
+	user               func() *coreauth.UserService
+	allowWeakPasswords bool
 }
 
-func NewChangeOwnPasswordUseCase(u func() *coreauth.UserService) *ChangeOwnPasswordUseCase {
-	return &ChangeOwnPasswordUseCase{user: u}
+func NewChangeOwnPasswordUseCase(u func() *coreauth.UserService, allowWeakPasswords bool) *ChangeOwnPasswordUseCase {
+	return &ChangeOwnPasswordUseCase{user: u, allowWeakPasswords: allowWeakPasswords}
 }
 
 func (uc *ChangeOwnPasswordUseCase) Execute(_ context.Context, in ChangeOwnPasswordInput) error {
 	ve := sharederrors.NewValidationErrors()
 	if in.NewPassword == "" {
 		ve.Add("newPassword", "New password must not be empty")
-	} else if len(in.NewPassword) < 8 {
+	} else if !uc.allowWeakPasswords && len(in.NewPassword) < 8 {
 		ve.Add("newPassword", "New password must be at least 8 characters long")
 	}
 	if _, err := uc.user().DoesIDAndPasswordMatch(in.UserID, in.OldPassword); err != nil {

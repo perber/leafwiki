@@ -98,6 +98,7 @@ type RouterOptions struct {
 	RefreshTokenTimeout     time.Duration            // Duration for refresh token validity
 	HideLinkMetadataSection bool                     // Whether to hide the link metadata section in the frontend UI
 	AuthDisabled            bool                     // Whether authentication is disabled
+	AllowWeakPasswords      bool                     // Whether passwords shorter than 8 characters are allowed (surfaced via /api/config)
 	BasePath                string                   // URL prefix when served behind a reverse proxy (e.g. "/wiki")
 	MaxAssetUploadSizeBytes int64                    // Maximum allowed size in bytes for asset uploads
 	EnableRevision          bool                     // Whether the revision / page history feature is enabled

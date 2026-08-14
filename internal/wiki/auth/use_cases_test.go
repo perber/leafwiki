@@ -93,7 +93,7 @@ func setupUpdateUserUseCase(t *testing.T) (*UpdateUserUseCase, *coreauth.UserSer
 	if err != nil {
 		t.Fatalf("NewUserResolver: %v", err)
 	}
-	return NewUpdateUserUseCase(userSvcFn, resolver, slog.Default()), userSvc
+	return NewUpdateUserUseCase(userSvcFn, resolver, slog.Default(), false), userSvc
 }
 
 // TestUpdateUser_AdminCanChangeRole verifies that an admin requester can promote

@@ -8,6 +8,7 @@ type ConfigStore = {
   publicAccess: boolean
   hideLinkMetadataSection: boolean
   authDisabled: boolean
+  allowWeakPasswords: boolean
   maxAssetUploadSizeBytes: number
   enableRevision: boolean
   enableLinkRefactor: boolean
@@ -46,6 +47,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   publicAccess: false,
   hideLinkMetadataSection: false,
   authDisabled: false,
+  allowWeakPasswords: false,
   maxAssetUploadSizeBytes: DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
   enableRevision: false,
   enableLinkRefactor: false,
@@ -78,6 +80,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
           publicAccess: config.publicAccess,
           hideLinkMetadataSection: config.hideLinkMetadataSection,
           authDisabled: config.authDisabled,
+          allowWeakPasswords: config.allowWeakPasswords ?? false,
           maxAssetUploadSizeBytes,
           enableRevision: config.enableRevision ?? false,
           enableLinkRefactor: config.enableLinkRefactor ?? false,

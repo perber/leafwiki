@@ -170,6 +170,7 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			"publicAccess":            opts.PublicAccess,
 			"hideLinkMetadataSection": opts.HideLinkMetadataSection,
 			"authDisabled":            opts.AuthDisabled,
+			"allowWeakPasswords":      opts.AllowWeakPasswords,
 			"basePath":                opts.BasePath,
 			"maxAssetUploadSizeBytes": opts.MaxAssetUploadSizeBytes,
 			"enableRevision":          opts.EnableRevision,

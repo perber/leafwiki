@@ -80,6 +80,7 @@ func writeUsage(w io.Writer) {
 	--custom-stylesheet      Path to a .css file inside the data dir, served publicly as /custom.css
 	                         (or <base-path>/custom.css when --base-path is set) (default: "")
 	--disable-auth                Disable authentication completely (default: false) (WARNING: only use in trusted networks!)
+	--allow-weak-passwords        Allow passwords shorter than 8 characters (default: false) (WARNING: only use on trusted private networks!)
 	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false)
 	--base-path                   URL prefix when served behind a reverse proxy (e.g. /wiki) (default: "")
 	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
@@ -146,6 +147,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_ACCESS_TOKEN_TIMEOUT
 	LEAFWIKI_REFRESH_TOKEN_TIMEOUT
 	LEAFWIKI_DISABLE_AUTH
+	LEAFWIKI_ALLOW_WEAK_PASSWORDS
 	LEAFWIKI_HIDE_LINK_METADATA_SECTION
 	LEAFWIKI_BASE_PATH
 	LEAFWIKI_MAX_ASSET_UPLOAD_SIZE
@@ -252,6 +254,7 @@ type cliFlags struct {
 	injectCodeInHeader             *string
 	customStylesheet               *string
 	disableAuth                    *bool
+	allowWeakPasswords             *bool
 	hideLinkMetadataSection        *bool
 	accessTokenTimeout             *time.Duration
 	refreshTokenTimeout            *time.Duration
@@ -309,6 +312,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		injectCodeInHeader:             fs.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")"),
 		customStylesheet:               fs.String("custom-stylesheet", "", "path to a custom CSS file served as /custom.css"),
 		disableAuth:                    fs.Bool("disable-auth", false, "disable authentication completely (default: false) (WARNING: only use in trusted networks!)"),
+		allowWeakPasswords:             fs.Bool("allow-weak-passwords", false, "allow passwords shorter than 8 characters when creating or changing passwords (default: false) (WARNING: only use on trusted private networks!)"),
 		hideLinkMetadataSection:        fs.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)"),
 		accessTokenTimeout:             fs.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)"),
 		refreshTokenTimeout:            fs.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h) (default: 168h)"),
@@ -392,6 +396,7 @@ func main() {
 	refreshTokenTimeout := resolveDuration("refresh-token-timeout", *flags.refreshTokenTimeout, visited, "LEAFWIKI_REFRESH_TOKEN_TIMEOUT")
 	// If disable-auth is set, later logic will override publicAccess accordingly
 	disableAuth := resolveBool("disable-auth", *flags.disableAuth, visited, "LEAFWIKI_DISABLE_AUTH")
+	allowWeakPasswords := resolveBool("allow-weak-passwords", *flags.allowWeakPasswords, visited, "LEAFWIKI_ALLOW_WEAK_PASSWORDS")
 	basePath := normalizeBasePath(resolveString("base-path", *flags.basePath, visited, "LEAFWIKI_BASE_PATH", ""))
 	maxAssetUploadSize := parseByteSize(
 		resolveString("max-asset-upload-size", *flags.maxAssetUploadSize, visited, "LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50MiB"),
@@ -561,6 +566,7 @@ func main() {
 		AccessTokenTimeout:     accessTokenTimeout,
 		RefreshTokenTimeout:    refreshTokenTimeout,
 		AuthDisabled:           disableAuth,
+		AllowWeakPasswords:     allowWeakPasswords,
 		EnableRevision:         enableRevision,
 		EnableAPIKeyManagement: enableAPIKeyManagement,
 		MaxRevisionHistory:     maxRevisionHistory,
@@ -668,6 +674,7 @@ func main() {
 		AccessTokenTimeout:      accessTokenTimeout,
 		RefreshTokenTimeout:     refreshTokenTimeout,
 		AuthDisabled:            disableAuth,
+		AllowWeakPasswords:      allowWeakPasswords,
 		BasePath:                basePath,
 		MaxAssetUploadSizeBytes: maxAssetUploadSize,
 		EnableRevision:          enableRevision,
