@@ -18,9 +18,9 @@
   "forcePushButton": "Force Push",
   "hintDisabled": "Git backup is not enabled. To enable it, configure a remote repository in your server environment settings.",
   "manualSectionTitle": "Manual Backup",
-  "manualSectionDescription": "Trigger an immediate push of all current wiki content to the remote repository without waiting for the next scheduled sync.",
-  "pushNow": "Push now",
-  "pushing": "Pushing…",
+  "manualSectionDescription": "Trigger an immediate sync (pull then push) of all current wiki content with the remote repository without waiting for the next scheduled sync.",
+  "pushNow": "Sync now",
+  "pushing": "Syncing…",
   "menuLabel": "Git Content Backup",
   "warningAriaLabel": "Backup warning",
   "tooltip": {
