@@ -635,7 +635,9 @@ func (s *LinksStore) GetBrokenLinks() ([]BrokenLink, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	var result []BrokenLink
 
