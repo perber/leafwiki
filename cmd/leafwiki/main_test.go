@@ -349,6 +349,53 @@ func TestRunRestoreSnapshotCommand_InvalidZipPath_PropagatesError(t *testing.T) 
 	}
 }
 
+func TestValidateGitBackupRemote(t *testing.T) {
+	const (
+		sshKey   = "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n"
+		keyPath  = "/etc/leafwiki/id_ed25519"
+		user     = "jochumdev"
+		password = "github_pat_secret"
+	)
+	tests := []struct {
+		name         string
+		remote       string
+		sshKey       string
+		sshKeyPath   string
+		httpUsername string
+		httpPassword string
+		wantErr      bool
+	}{
+		{name: "no remote is local-only and needs no credentials"},
+
+		{name: "ssh remote with inline key", remote: "git@github.com:user/repo.git", sshKey: sshKey},
+		{name: "ssh remote with key path", remote: "git@github.com:user/repo.git", sshKeyPath: keyPath},
+		{name: "ssh url with key", remote: "ssh://git@github.com/user/repo.git", sshKey: sshKey},
+		{name: "ssh remote without key", remote: "git@github.com:user/repo.git", wantErr: true},
+		{name: "ssh remote with only http credentials", remote: "git@github.com:user/repo.git", httpUsername: user, httpPassword: password, wantErr: true},
+
+		{name: "https remote with username and password", remote: "https://github.com/user/repo.git", httpUsername: user, httpPassword: password},
+		{name: "http remote with username and password", remote: "http://gitea.internal/user/repo.git", httpUsername: user, httpPassword: password},
+		{name: "uppercase https scheme", remote: "HTTPS://github.com/user/repo.git", httpUsername: user, httpPassword: password},
+		{name: "https remote with credentials embedded in the URL", remote: "https://jochumdev:github_pat_secret@github.com/user/repo.git"},
+		{name: "https remote without any credentials", remote: "https://github.com/user/repo.git", wantErr: true},
+		{name: "https remote with username only", remote: "https://github.com/user/repo.git", httpUsername: user, wantErr: true},
+		{name: "https remote with password only", remote: "https://github.com/user/repo.git", httpPassword: password, wantErr: true},
+		// An SSH key is not a substitute for HTTP credentials.
+		{name: "https remote with only an ssh key", remote: "https://github.com/user/repo.git", sshKey: sshKey, wantErr: true},
+
+		{name: "file remote is not supported", remote: "file:///srv/backup.git", sshKey: sshKey, wantErr: true},
+		{name: "bare path is not supported", remote: "/srv/backup.git", sshKey: sshKey, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateGitBackupRemote(tc.remote, tc.sshKey, tc.sshKeyPath, tc.httpUsername, tc.httpPassword)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateGitBackupRemote(%q, ...) error = %v, wantErr %v", tc.remote, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateListenConfig(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -83,7 +83,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 **Opt-in via feature flags:**
 - Revision history (`--enable-revision`)
 - Automatic link rewriting when pages are renamed or moved (`--enable-link-refactor`)
-- Git backup — push wiki content to a remote Git repository via SSH (`--git-backup`, v0.11.3, experimental)
+- Git backup — push wiki content to a remote Git repository via SSH or HTTP(S) (`--git-backup`, v0.11.3, experimental)
 
 **Markdown import:**
 - ZIP-based importer for editors and admins
@@ -350,11 +350,13 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--snapshot-dir`                 | Directory to store snapshot ZIPs in                                     | `<data-dir>/snapshots` | v0.12.0 |
 | `--restore-upload-max-size`      | Max size for an uploaded backup ZIP to restore from                    | `500MiB`      | v0.12.0 |
 | `--git-backup`                   | ⚗️ Enable git backup to a remote repository                             | `false`       | v0.11.3 |
-| `--git-backup-remote`            | ⚗️ SSH remote URL for git backup (e.g. `git@github.com:user/repo.git`) | `""`          | v0.11.3 |
+| `--git-backup-remote`            | ⚗️ SSH or HTTP(S) remote URL for git backup (e.g. `git@github.com:user/repo.git`, `https://github.com/user/repo.git`) | `""` | v0.11.3 |
 | `--git-backup-branch`            | ⚗️ Branch to push to                                                    | `main`        | v0.11.3 |
 | `--git-backup-ssh-key`           | ⚗️ Raw SSH private key (prefer env var)                                 | `""`          | v0.11.3 |
 | `--git-backup-ssh-key-path`      | ⚗️ Path to SSH private key file                                         | `""`          | v0.11.3 |
 | `--git-backup-ssh-known-hosts`   | ⚗️ Path to `known_hosts` for MITM protection                            | `""`          | v0.11.3 |
+| `--git-backup-http-username`     | ⚗️ Username for HTTP(S) basic auth                                      | `""`          | v0.12.2 |
+| `--git-backup-http-password`     | ⚗️ Password or access token for HTTP(S) basic auth (prefer env var)     | `""`          | v0.12.2 |
 | `--git-backup-author-name`       | ⚗️ Git commit author name                                               | `LeafWiki Backup` | v0.11.3 |
 | `--git-backup-author-email`      | ⚗️ Git commit author email                                              | `backup@leafwiki.local` | v0.11.3 |
 | `--git-backup-interval`          | ⚗️ Backup interval (e.g. `60m`, `2h`); `0` = manual-only               | `60m`         | v0.11.3 |
@@ -409,11 +411,13 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_SNAPSHOT_DIR`                 | Directory to store snapshot ZIPs in                  | `<data-dir>/snapshots` | v0.12.0 |
 | `LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE`      | Max size for an uploaded backup ZIP to restore from  | `500MiB`      | v0.12.0 |
 | `LEAFWIKI_GIT_BACKUP`                   | ⚗️ Enable git backup                                | `false`       | v0.11.3 |
-| `LEAFWIKI_GIT_BACKUP_REMOTE`            | ⚗️ SSH remote URL                                   | `""`          | v0.11.3 |
+| `LEAFWIKI_GIT_BACKUP_REMOTE`            | ⚗️ SSH or HTTP(S) remote URL                        | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_BRANCH`            | ⚗️ Branch to push to                                | `main`        | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY`           | ⚗️ Raw SSH private key (preferred over path)        | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH`      | ⚗️ Path to SSH private key file                     | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS`   | ⚗️ Path to `known_hosts` file                       | `""`          | v0.11.3 |
+| `LEAFWIKI_GIT_BACKUP_HTTP_USERNAME`     | ⚗️ Username for HTTP(S) basic auth                  | `""`          | v0.12.2 |
+| `LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD`     | ⚗️ Password or access token for HTTP(S) basic auth  | `""`          | v0.12.2 |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_NAME`       | ⚗️ Git commit author name                           | `LeafWiki Backup` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL`      | ⚗️ Git commit author email                          | `backup@leafwiki.local` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_INTERVAL`          | ⚗️ Backup interval (e.g. `60m`); `0` = manual-only | `60m`         | v0.11.3 |
@@ -501,7 +505,9 @@ Use `--unix-socket` when LeafWiki should listen on a local unix domain socket in
 
 > **Experimental** — This feature is new and may change in future releases. Test it thoroughly before relying on it for critical data.
 
-Git Backup pushes wiki **content** to a remote Git repository via SSH on a configurable interval. It covers the `root/` (pages) and `assets/` directories. Database files (`.db`, `.db-wal`, etc.) and runtime files are excluded via `.gitignore`.
+Git Backup pushes wiki **content** to a remote Git repository on a configurable interval, either via **SSH** or via **HTTP(S) with username + password** (v0.12.2+). It covers the `root/` (pages) and `assets/` directories. Database files (`.db`, `.db-wal`, etc.) and runtime files are excluded via `.gitignore`.
+
+Which transport you use is derived from the remote URL: `git@...` / `ssh://...` authenticate with an SSH key, `https://...` / `http://...` with a username and password. On GitHub, GitLab and friends the "password" is an access token — which is often the more practical option, because a fine-grained token can be scoped to a **single repository**, whereas an SSH key added to your account grants access to everything that account can reach.
 
 Backups run automatically on a configurable interval and can also be triggered manually from the **Git Content Backup** page.
 
@@ -510,11 +516,13 @@ Backups run automatically on a configurable interval and can also be triggered m
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--git-backup` | Enable git backup | `false` |
-| `--git-backup-remote` | SSH remote URL (e.g. `git@github.com:user/repo.git`) | `""` |
+| `--git-backup-remote` | SSH or HTTP(S) remote URL (e.g. `git@github.com:user/repo.git`, `https://github.com/user/repo.git`) | `""` |
 | `--git-backup-branch` | Branch to push to | `main` |
 | `--git-backup-ssh-key` | Raw SSH private key (prefer env var) | `""` |
 | `--git-backup-ssh-key-path` | Path to SSH private key file | `""` |
 | `--git-backup-ssh-known-hosts` | Path to `known_hosts` for MITM protection | `""` |
+| `--git-backup-http-username` | Username for HTTP(S) basic auth (v0.12.2+) | `""` |
+| `--git-backup-http-password` | Password or access token for HTTP(S) basic auth (prefer env var, v0.12.2+) | `""` |
 | `--git-backup-author-name` | Git commit author name | `LeafWiki Backup` |
 | `--git-backup-author-email` | Git commit author email | `backup@leafwiki.local` |
 | `--git-backup-interval` | Backup interval (e.g. `60m`, `2h`); `0` = manual-only | `60m` |
@@ -524,16 +532,18 @@ Backups run automatically on a configurable interval and can also be triggered m
 | Variable | Description |
 |----------|-------------|
 | `LEAFWIKI_GIT_BACKUP` | Enable git backup |
-| `LEAFWIKI_GIT_BACKUP_REMOTE` | SSH remote URL |
+| `LEAFWIKI_GIT_BACKUP_REMOTE` | SSH or HTTP(S) remote URL |
 | `LEAFWIKI_GIT_BACKUP_BRANCH` | Branch to push to |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY` | Raw SSH private key |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH` | Path to SSH private key file |
 | `LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS` | Path to `known_hosts` file |
+| `LEAFWIKI_GIT_BACKUP_HTTP_USERNAME` | Username for HTTP(S) basic auth |
+| `LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD` | Password or access token for HTTP(S) basic auth |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_NAME` | Git commit author name |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL` | Git commit author email |
 | `LEAFWIKI_GIT_BACKUP_INTERVAL` | Backup interval |
 
-**Example (Docker Compose):**
+**Example — SSH (Docker Compose):**
 
 ```yaml
 environment:
@@ -544,11 +554,27 @@ environment:
   - LEAFWIKI_GIT_BACKUP_INTERVAL=60m
 ```
 
+**Example — HTTPS with an access token (Docker Compose, v0.12.2+):**
+
+```yaml
+environment:
+  - LEAFWIKI_GIT_BACKUP=true
+  - LEAFWIKI_GIT_BACKUP_REMOTE=https://github.com/youruser/yourwiki-backup.git
+  - LEAFWIKI_GIT_BACKUP_BRANCH=main
+  - LEAFWIKI_GIT_BACKUP_HTTP_USERNAME=youruser
+  - LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD=${LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD}  # from .env file
+  - LEAFWIKI_GIT_BACKUP_INTERVAL=60m
+```
+
+On GitHub, create a **fine-grained personal access token** limited to the backup repository with **Contents: Read and write** permission, and use it as the password. The username can be your GitHub username.
+
 **Notes:**
 
-- `--git-backup-remote` is required when using SSH push. The remote must be an SSH URL (`git@...` or `ssh://...`).
-- Either `--git-backup-ssh-key` or `--git-backup-ssh-key-path` is required when a remote is configured. Prefer the environment variable to avoid the key appearing in process listings.
-- `--git-backup-ssh-known-hosts` is optional but recommended. If not set, LeafWiki falls back to `~/.ssh/known_hosts`. If that file does not exist either (common in containers), SSH host key verification is **disabled** — leaving connections open to MITM attacks. Set this flag explicitly in production.
+- `--git-backup-remote` is required when pushing to a remote. It must be an SSH URL (`git@...` or `ssh://...`) or an HTTP(S) URL (`https://...`, `http://...`). Leave it unset for local-only backups.
+- For **SSH** remotes, either `--git-backup-ssh-key` or `--git-backup-ssh-key-path` is required. Prefer the environment variable to avoid the key appearing in process listings.
+- For **HTTP(S)** remotes, both `--git-backup-http-username` and `--git-backup-http-password` are required. Prefer `LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD` over the flag — LeafWiki warns at startup when the password is passed as a flag, since flags are visible in process listings. Credentials embedded directly in the remote URL (`https://user:token@host/repo.git`) also work and are masked in logs and in the UI.
+- Prefer `https://` over `http://`: with plain `http://` the credentials and your wiki content travel unencrypted, and LeafWiki logs a warning at startup.
+- `--git-backup-ssh-known-hosts` is optional but recommended for SSH remotes. If not set, LeafWiki falls back to `~/.ssh/known_hosts`. If that file does not exist either (common in containers), SSH host key verification is **disabled** — leaving connections open to MITM attacks. Set this flag explicitly in production. It has no effect on HTTP(S) remotes, which are verified via TLS.
 - If the remote diverges (e.g. someone pushed directly to the backup branch), LeafWiki will stop auto-pushing and show a **Conflict — remote diverged** warning in the UI. Click **Force Push** in the UI to overwrite the remote with the current local backup history. Your wiki content is never lost — the local backup repo is always authoritative.
 - This backs up **content only** — the SQLite database is not included. For a full backup, use your data directory (`cp -r` with the app stopped).
 
