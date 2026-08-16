@@ -10,6 +10,16 @@
   font-weight: 500;
 }
 
+/* Tailwind Typography's `prose` class wraps inline `code` in backticks via
+   ::before/::after; the pill styling above already sets code apart visually,
+   so drop the redundant backticks here. */
+.page-viewer__content .inline-code::before,
+.page-viewer__content .inline-code::after,
+.markdown-editor__preview .inline-code::before,
+.markdown-editor__preview .inline-code::after {
+  content: none;
+}
+
 .markdown-inline-code {
   position: relative;
   display: inline-block;

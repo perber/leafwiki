@@ -1,5 +1,6 @@
 import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { Button } from '@/components/ui/button'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { Check, Copy } from 'lucide-react'
 import { ClassAttributes, HTMLAttributes, MouseEvent, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -14,6 +15,7 @@ export default function MarkdownInlineCode({
   ...codeProps
 }: Props) {
   const { t } = useTranslation('viewer')
+  const isMobile = useIsMobile()
   const code = readTextContent(children)
   const { copied, copyCode } = useCodeCopy(code)
 
@@ -28,28 +30,30 @@ export default function MarkdownInlineCode({
       <code {...codeProps} className={`inline-code ${className ?? ''}`.trim()}>
         {children}
       </code>
-      <TooltipWrapper
-        label={
-          copied ? t('codeBlock.copiedTooltip') : t('codeBlock.copyTooltip')
-        }
-        asChild
-      >
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="markdown-inline-code__copy-button"
-          onClick={handleCopy}
-          aria-label={
-            copied
-              ? t('codeBlock.copiedAriaLabel')
-              : t('codeBlock.copyAriaLabel')
+      {!isMobile && (
+        <TooltipWrapper
+          label={
+            copied ? t('codeBlock.copiedTooltip') : t('codeBlock.copyTooltip')
           }
-          data-testid="markdown-inline-code-copy-button"
+          asChild
         >
-          {copied ? <Check /> : <Copy />}
-        </Button>
-      </TooltipWrapper>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="markdown-inline-code__copy-button"
+            onClick={handleCopy}
+            aria-label={
+              copied
+                ? t('codeBlock.copiedAriaLabel')
+                : t('codeBlock.copyAriaLabel')
+            }
+            data-testid="markdown-inline-code-copy-button"
+          >
+            {copied ? <Check /> : <Copy />}
+          </Button>
+        </TooltipWrapper>
+      )}
     </span>
   )
 }
