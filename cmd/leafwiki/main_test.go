@@ -902,6 +902,72 @@ func TestDockerfileBuilder_GoBuildLdflags_InjectsAppVersion(t *testing.T) {
 	}
 }
 
+// dockerBuildStageDeclaresArg checks that the multi-stage Docker build
+// stage containing marker (e.g. the `go build` line) is preceded by its own
+// `ARG argName` declaration *within that stage*. Docker scopes ARG per
+// build stage: an ARG declared in an earlier stage does not carry into a
+// later one, even though `${argName}` still substitutes silently as an
+// empty string there instead of failing the build.
+func dockerBuildStageDeclaresArg(t *testing.T, dockerfilePath, marker, argName string) bool {
+	t.Helper()
+
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", dockerfilePath, err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	markerIdx := -1
+	for i, line := range lines {
+		if strings.Contains(line, marker) {
+			markerIdx = i
+			break
+		}
+	}
+	if markerIdx == -1 {
+		t.Fatalf("no line containing %q found in %s", marker, dockerfilePath)
+	}
+
+	stageStart := 0
+	for i := markerIdx; i >= 0; i-- {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "FROM ") {
+			stageStart = i
+			break
+		}
+	}
+
+	for _, line := range lines[stageStart:markerIdx] {
+		if strings.TrimSpace(line) == "ARG "+argName {
+			return true
+		}
+	}
+	return false
+}
+
+// TestDockerfile_GoBuildStage_DeclaresAppVersionArg pins the bug where
+// Dockerfile's backend-build stage used ${APP_VERSION} in its go build
+// -ldflags without re-declaring `ARG APP_VERSION` in that stage (it was
+// only declared in the earlier frontend-build stage). Docker scopes ARG per
+// stage, so the ldflags line silently baked in an empty version string
+// instead of failing the build — every v0.12.x release image/binary shipped
+// main.Version="" (visible in the leafwiki_build_info metric and in the
+// snapshot/restore version-mismatch check, which silently no-ops when
+// WikiVersion is empty).
+func TestDockerfile_GoBuildStage_DeclaresAppVersionArg(t *testing.T) {
+	if !dockerBuildStageDeclaresArg(t, filepath.Join("..", "..", "Dockerfile"), "go build", "APP_VERSION") {
+		t.Fatal("Dockerfile's go build stage uses ${APP_VERSION} without declaring ARG APP_VERSION in that stage")
+	}
+}
+
+// TestDockerfileBuilder_GoBuildStage_DeclaresAppVersionArg is the same
+// regression check for Dockerfile.builder's builder stage.
+func TestDockerfileBuilder_GoBuildStage_DeclaresAppVersionArg(t *testing.T) {
+	if !dockerBuildStageDeclaresArg(t, filepath.Join("..", "..", "Dockerfile.builder"), "go build", "APP_VERSION") {
+		t.Fatal("Dockerfile.builder's builder stage uses ${APP_VERSION} without declaring ARG APP_VERSION in that stage")
+	}
+}
+
 // TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue exercises
 // the deterministic branch of scripts/resolve-version.sh (the shared
 // algorithm used by both `make build`/`make run` and vite.config.ts). The
