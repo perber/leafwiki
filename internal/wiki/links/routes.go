@@ -12,21 +12,24 @@ import (
 
 // Routes is the RouteRegistrar for the links domain.
 type Routes struct {
-	getLinkStatus *GetLinkStatusUseCase
-	authService   *coreauth.AuthService
+	getLinkStatus  *GetLinkStatusUseCase
+	getBrokenLinks *GetBrokenLinksUseCase
+	authService    *coreauth.AuthService
 }
 
 // RoutesConfig holds the dependencies required to build a Routes instance.
 type RoutesConfig struct {
-	GetLinkStatus *GetLinkStatusUseCase
-	AuthService   *coreauth.AuthService
+	GetLinkStatus  *GetLinkStatusUseCase
+	GetBrokenLinks *GetBrokenLinksUseCase
+	AuthService    *coreauth.AuthService
 }
 
 // NewRoutes constructs the links RouteRegistrar.
 func NewRoutes(cfg RoutesConfig) *Routes {
 	return &Routes{
-		getLinkStatus: cfg.GetLinkStatus,
-		authService:   cfg.AuthService,
+		getLinkStatus:  cfg.GetLinkStatus,
+		getBrokenLinks: cfg.GetBrokenLinks,
+		authService:    cfg.AuthService,
 	}
 }
 
@@ -48,6 +51,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	if !opts.PublicAccess {
 		authGroup.GET("/pages/:id/links", r.handleGetLinkStatus)
+		authGroup.GET("/links/broken", r.handleGetBrokenLinks)
 	}
 }
 
@@ -61,4 +65,14 @@ func (r *Routes) handleGetLinkStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, out.Status)
+}
+
+func (r *Routes) handleGetBrokenLinks(c *gin.Context) {
+	out, err := r.getBrokenLinks.Execute(c.Request.Context())
+	if err != nil {
+		respondWithLinkError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, out)
 }

@@ -58,6 +58,43 @@ func (uc *GetLinkStatusUseCase) Execute(_ context.Context, in GetLinkStatusInput
 	return &GetLinkStatusOutput{Status: status}, nil
 }
 
+type GetBrokenLinksOutput struct {
+	Links []corelinks.BrokenLink `json:"links"`
+}
+
+type GetBrokenLinksUseCase struct {
+	links *corelinks.LinkService
+}
+
+func NewGetBrokenLinksUseCase(
+	l *corelinks.LinkService,
+) *GetBrokenLinksUseCase {
+	return &GetBrokenLinksUseCase{
+		links: l,
+	}
+}
+
+func (uc *GetBrokenLinksUseCase) Execute(
+	_ context.Context,
+) (*GetBrokenLinksOutput, error) {
+	if uc.links == nil {
+		return nil, ErrLinkServiceUnavailable
+	}
+
+	links, err := uc.links.GetBrokenLinks()
+	if err != nil {
+		return nil, err
+	}
+
+	if links == nil {
+		links = []corelinks.BrokenLink{}
+	}
+
+	return &GetBrokenLinksOutput{
+		Links: links,
+	}, nil
+}
+
 // ─── GetBacklinksUseCase ─────────────────────────────────────────────────────
 
 type GetBacklinksInput struct {
