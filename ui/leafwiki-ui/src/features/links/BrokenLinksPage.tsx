@@ -37,9 +37,7 @@ export default function BrokenLinksPage() {
       setData(await fetchBrokenLinks())
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to load broken links.',
+        err instanceof Error ? err.message : 'Failed to load broken links.',
       )
     } finally {
       setLoading(false)
@@ -96,13 +94,11 @@ export default function BrokenLinksPage() {
       <div className="mb-6 flex items-start justify-between gap-6">
         <div>
           <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-error/20 bg-error/5 text-error">
+            <div className="border-error/20 bg-error/5 text-error grid h-9 w-9 shrink-0 place-items-center rounded-lg border">
               <Link2Off className="h-4.5 w-4.5" />
             </div>
 
-            <h2 className="settings__section-title">
-              Broken Links
-            </h2>
+            <h2 className="settings__section-title">Broken Links</h2>
           </div>
 
           <p className="settings__section-description">
@@ -116,16 +112,14 @@ export default function BrokenLinksPage() {
           disabled={loading || refreshing}
         >
           <RefreshCw
-            className={`mr-2 h-3.5 w-3.5 ${
-              refreshing ? 'animate-spin' : ''
-            }`}
+            className={`mr-2 h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
           />
           {refreshing ? 'Refreshing…' : 'Refresh'}
         </Button>
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg border border-error/20 bg-error/5 px-4 py-3 text-sm text-error">
+        <div className="border-error/20 bg-error/5 text-error mb-6 rounded-lg border px-4 py-3 text-sm">
           {error}
         </div>
       )}
@@ -138,29 +132,19 @@ export default function BrokenLinksPage() {
           loading={loading}
         />
 
-        <Stat
-          label="Missing pages"
-          value={missingPages}
-          loading={loading}
-        />
+        <Stat label="Missing pages" value={missingPages} loading={loading} />
 
-        <Stat
-          label="Affected pages"
-          value={affectedPages}
-          loading={loading}
-        />
+        <Stat label="Affected pages" value={affectedPages} loading={loading} />
       </div>
 
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm settings__section-title">Missing pages</h2>
+        <h2 className="settings__section-title text-sm">Missing pages</h2>
 
-        <span className="text-xs text-muted">
-          Sorted alphabetically
-        </span>
+        <span className="text-muted text-xs">Sorted alphabetically</span>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-border py-16 text-sm text-muted">
+        <div className="border-border text-muted flex items-center justify-center rounded-lg border py-16 text-sm">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           Loading broken links…
         </div>
@@ -169,10 +153,7 @@ export default function BrokenLinksPage() {
       ) : (
         <div className="flex flex-col gap-2.5">
           {groups.map((group) => (
-            <BrokenLinkGroupCard
-              key={group.to_path}
-              group={group}
-            />
+            <BrokenLinkGroupCard key={group.to_path} group={group} />
           ))}
         </div>
       )}
@@ -192,11 +173,11 @@ function Stat({
   loading: boolean
 }) {
   return (
-    <div className="rounded-lg border border-border bg-background px-4 py-3.5">
-      <div className="mb-1 text-xs text-muted">{label}</div>
+    <div className="border-border bg-background rounded-lg border px-4 py-3.5">
+      <div className="text-muted mb-1 text-xs">{label}</div>
 
       {loading ? (
-        <Loader2 className="h-5 w-5 animate-spin text-muted" />
+        <Loader2 className="text-muted h-5 w-5 animate-spin" />
       ) : (
         <div
           className={`text-2xl font-semibold ${
@@ -211,30 +192,22 @@ function Stat({
 }
 
 function displayMissingPage(path: string): string {
-  return path.startsWith('wikilink:')
-    ? path.slice('wikilink:'.length)
-    : path
+  return path.startsWith('wikilink:') ? path.slice('wikilink:'.length) : path
 }
 
-function BrokenLinkGroupCard({
-  group,
-}: {
-  group: BrokenLinkGroup
-}) {
+function BrokenLinkGroupCard({ group }: { group: BrokenLinkGroup }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-background">
-      <div className="flex items-center gap-2.5 border-b border-border bg-surface px-4 py-3">
-        <TriangleAlert className="h-4 w-4 shrink-0 text-error" />
+    <section className="border-border bg-background overflow-hidden rounded-lg border">
+      <div className="border-border bg-surface flex items-center gap-2.5 border-b px-4 py-3">
+        <TriangleAlert className="text-error h-4 w-4 shrink-0" />
 
-        <span className="min-w-0 truncate font-mono text-[13px] font-semibold text-error">
+        <span className="text-error min-w-0 truncate font-mono text-[13px] font-semibold">
           {displayMissingPage(group.to_path)}
         </span>
 
-        <span className="ml-auto shrink-0 rounded-full bg-error/10 px-2 py-0.5 text-[11px] font-semibold text-error">
+        <span className="bg-error/10 text-error ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold">
           {group.references.length}{' '}
-          {group.references.length === 1
-            ? 'reference'
-            : 'references'}
+          {group.references.length === 1 ? 'reference' : 'references'}
         </span>
       </div>
 
@@ -242,9 +215,9 @@ function BrokenLinkGroupCard({
         {group.references.map((reference) => (
           <div
             key={`${group.to_path}:${reference.from_page_id}`}
-            className="flex items-center gap-3 border-b border-border/50 px-1 py-2.5 last:border-0"
+            className="border-border/50 flex items-center gap-3 border-b px-1 py-2.5 last:border-0"
           >
-            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-surface text-muted">
+            <div className="bg-surface text-muted grid h-7 w-7 shrink-0 place-items-center rounded-md">
               <Link2Off className="h-3.5 w-3.5" />
             </div>
 
@@ -252,12 +225,12 @@ function BrokenLinkGroupCard({
               <Link
                 to={reference.from_path}
                 state={createNavigationVisitState()}
-                className="text-[13px] font-medium text-primary hover:underline"
+                className="text-primary text-[13px] font-medium hover:underline"
               >
                 {reference.from_title}
               </Link>
 
-              <div className="mt-0.5 text-[11px] text-muted">
+              <div className="text-muted mt-0.5 text-[11px]">
                 links to {displayMissingPage(group.to_path)}
               </div>
             </div>
@@ -270,14 +243,12 @@ function BrokenLinkGroupCard({
 
 function EmptyState() {
   return (
-    <div className="rounded-lg border border-dashed border-border px-5 py-16 text-center">
-      <div className="mb-3 text-3xl text-success">✓</div>
+    <div className="border-border rounded-lg border border-dashed px-5 py-16 text-center">
+      <div className="text-success mb-3 text-3xl">✓</div>
 
-      <h2 className="mb-1 text-base font-semibold">
-        No broken links
-      </h2>
+      <h2 className="mb-1 text-base font-semibold">No broken links</h2>
 
-      <p className="text-sm text-muted">
+      <p className="text-muted text-sm">
         All links in the wiki point to existing pages.
       </p>
     </div>
