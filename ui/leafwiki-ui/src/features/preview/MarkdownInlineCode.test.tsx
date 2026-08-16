@@ -5,7 +5,12 @@ import MarkdownInlineCode from './MarkdownInlineCode'
 
 const { copyMock } = vi.hoisted(() => ({ copyMock: vi.fn() }))
 
+let mockIsMobile = false
+
 vi.mock('copy-to-clipboard', () => ({ default: copyMock }))
+vi.mock('@/lib/useIsMobile', () => ({
+  useIsMobile: () => mockIsMobile,
+}))
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) =>
@@ -47,6 +52,7 @@ vi.mock('@/components/TooltipWrapper', () => ({
 
 describe('MarkdownInlineCode', () => {
   beforeEach(() => {
+    mockIsMobile = false
     copyMock.mockReset()
     copyMock.mockReturnValue(true)
     vi.mocked(toast.error).mockReset()
@@ -107,5 +113,14 @@ describe('MarkdownInlineCode', () => {
     expect(fireEvent.click(button)).toBe(false)
     expect(onParentClick).not.toHaveBeenCalled()
     expect(copyMock).toHaveBeenCalledWith('npm test')
+  })
+
+  it('does not render the copy button on mobile viewports', () => {
+    mockIsMobile = true
+    render(<MarkdownInlineCode>npm test</MarkdownInlineCode>)
+
+    expect(
+      screen.queryByTestId('markdown-inline-code-copy-button'),
+    ).not.toBeInTheDocument()
   })
 })

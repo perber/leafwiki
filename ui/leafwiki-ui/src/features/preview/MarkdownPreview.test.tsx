@@ -3,13 +3,21 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import MarkdownPreview from './MarkdownPreview'
 
+function renderPreview(content: string) {
+  return render(
+    <TooltipProvider>
+      <MarkdownPreview content={content} />
+    </TooltipProvider>,
+  )
+}
+
 describe('MarkdownPreview syntax highlighting', () => {
   beforeEach(() => {
     localStorage.setItem('design-mode', 'light')
     useDesignModeStore.setState({ mode: 'light' })
-    window.matchMedia = vi.fn().mockImplementation(() => ({
-      matches: true,
-      media: '(prefers-color-scheme: light)',
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-color-scheme: light)',
+      media: query,
       onchange: null,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
@@ -35,7 +43,7 @@ if (Test-Path $path) {
 }
 \`\`\``
 
-    const { container } = render(<MarkdownPreview content={content} />)
+    const { container } = renderPreview(content)
 
     const bashCodeBlock = container.querySelector('code.language-bash.hljs')
     expect(bashCodeBlock).not.toBeNull()
@@ -62,7 +70,7 @@ if WinExist("Untitled - Notepad") {
 }
 \`\`\``
 
-    const { container } = render(<MarkdownPreview content={content} />)
+    const { container } = renderPreview(content)
 
     const autohotkeyCodeBlock = container.querySelector(
       'code.language-autohotkey.hljs',
@@ -79,7 +87,7 @@ echo two
 echo three
 \`\`\``
 
-    const { container } = render(<MarkdownPreview content={content} />)
+    const { container } = renderPreview(content)
 
     const block = container.querySelector('.markdown-code-block--line-numbers')
     expect(block).not.toBeNull()
@@ -102,7 +110,7 @@ echo one
 echo two
 \`\`\``
 
-    const { container } = render(<MarkdownPreview content={content} />)
+    const { container } = renderPreview(content)
 
     expect(
       container.querySelector('.markdown-code-block--line-numbers'),
@@ -113,8 +121,8 @@ echo two
   })
 
   it('renders external images from markdown image syntax', () => {
-    const { container } = render(
-      <MarkdownPreview content="![Remote diagram](https://example.com/diagram.png)" />,
+    const { container } = renderPreview(
+      '![Remote diagram](https://example.com/diagram.png)',
     )
 
     const image = container.querySelector('img')
@@ -124,8 +132,8 @@ echo two
   })
 
   it('renders external images from sanitized inline html', () => {
-    const { container } = render(
-      <MarkdownPreview content='<img src="https://example.com/banner.png" alt="Remote banner" />' />,
+    const { container } = renderPreview(
+      '<img src="https://example.com/banner.png" alt="Remote banner" />',
     )
 
     const image = container.querySelector('img')
@@ -135,11 +143,7 @@ echo two
   })
 
   it('renders inline code with its copy action', () => {
-    const { container } = render(
-      <TooltipProvider>
-        <MarkdownPreview content="Use `npm run build` here." />
-      </TooltipProvider>,
-    )
+    const { container } = renderPreview('Use `npm run build` here.')
 
     const inlineCode = container.querySelector('.markdown-inline-code')
     expect(inlineCode?.textContent).toContain('npm run build')
@@ -151,9 +155,7 @@ echo two
   })
 
   it('renders ==text== as a mark element', () => {
-    const { container } = render(
-      <MarkdownPreview content="Some ==highlighted== text." />,
-    )
+    const { container } = renderPreview('Some ==highlighted== text.')
 
     const mark = container.querySelector('mark')
     expect(mark).not.toBeNull()
@@ -161,9 +163,7 @@ echo two
   })
 
   it('supports nested formatting inside a highlighted span', () => {
-    const { container } = render(
-      <MarkdownPreview content="==**bold highlight**==" />,
-    )
+    const { container } = renderPreview('==**bold highlight**==')
 
     const mark = container.querySelector('mark')
     expect(mark).not.toBeNull()
@@ -179,7 +179,7 @@ echo two
       '```',
     ].join('\n')
 
-    const { container } = render(<MarkdownPreview content={content} />)
+    const { container } = renderPreview(content)
 
     expect(container.querySelector('mark')).toBeNull()
     expect(container.querySelector('code')?.textContent).toContain('==')
