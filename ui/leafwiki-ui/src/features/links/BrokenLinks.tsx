@@ -1,7 +1,7 @@
 import { Link2Off, Loader2, RefreshCw, TriangleAlert } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
-
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { fetchBrokenLinks, type BrokenLinksResult } from '@/lib/api/links'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
@@ -18,7 +18,8 @@ type BrokenLinkGroup = {
   references: BrokenLinkReference[]
 }
 
-export default function BrokenLinksPage() {
+export default function BrokenLinks() {
+  const { t } = useTranslation('brokenLinks')
   const [data, setData] = useState<BrokenLinksResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -37,7 +38,7 @@ export default function BrokenLinksPage() {
       setData(await fetchBrokenLinks())
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Failed to load broken links.',
+        err instanceof Error ? err.message : t('error.loadFailed'),
       )
     } finally {
       setLoading(false)
@@ -98,12 +99,10 @@ export default function BrokenLinksPage() {
               <Link2Off className="h-4.5 w-4.5" />
             </div>
 
-            <h2 className="settings__section-title">Broken Links</h2>
+            <h2 className="settings__section-title">{t('title')}</h2>
           </div>
 
-          <p className="settings__section-description">
-            Find pages that link to missing wiki pages.
-          </p>
+          <p className="settings__section-description">{t('description')}</p>
         </div>
 
         <Button
@@ -114,7 +113,7 @@ export default function BrokenLinksPage() {
           <RefreshCw
             className={`mr-2 h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
           />
-          {refreshing ? 'Refreshing…' : 'Refresh'}
+          {refreshing ? t('button.refreshing') : t('button.text')}
         </Button>
       </div>
 
@@ -126,21 +125,21 @@ export default function BrokenLinksPage() {
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <Stat
-          label="Broken links"
+          label={t('summaryCard.broken')}
           value={brokenLinks}
           danger
           loading={loading}
         />
 
-        <Stat label="Missing pages" value={missingPages} loading={loading} />
+        <Stat label={t('summaryCard.missing')} value={missingPages} loading={loading} />
 
-        <Stat label="Affected pages" value={affectedPages} loading={loading} />
+        <Stat label={t('summaryCard.affected')} value={affectedPages} loading={loading} />
       </div>
 
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="settings__section-title text-sm">Missing pages</h2>
+        <h2 className="settings__section-title text-sm">{t('heading')}</h2>
 
-        <span className="text-muted text-xs">Sorted alphabetically</span>
+        <span className="text-muted text-xs">{t('sortLabel')}</span>
       </div>
 
       {loading ? (
@@ -196,6 +195,8 @@ function displayMissingPage(path: string): string {
 }
 
 function BrokenLinkGroupCard({ group }: { group: BrokenLinkGroup }) {
+  const { t } = useTranslation('brokenLinks')
+  
   return (
     <section className="border-border bg-background overflow-hidden rounded-lg border">
       <div className="border-border bg-surface flex items-center gap-2.5 border-b px-4 py-3">
@@ -231,7 +232,7 @@ function BrokenLinkGroupCard({ group }: { group: BrokenLinkGroup }) {
               </Link>
 
               <div className="text-muted mt-0.5 text-[11px]">
-                links to {displayMissingPage(group.to_path)}
+                {t('linksTo')} {displayMissingPage(group.to_path)}
               </div>
             </div>
           </div>
@@ -242,15 +243,15 @@ function BrokenLinkGroupCard({ group }: { group: BrokenLinkGroup }) {
 }
 
 function EmptyState() {
+  const { t } = useTranslation('brokenLinks')
+
   return (
     <div className="border-border rounded-lg border border-dashed px-5 py-16 text-center">
       <div className="text-success mb-3 text-3xl">✓</div>
 
-      <h2 className="mb-1 text-base font-semibold">No broken links</h2>
+      <h2 className="mb-1 text-base font-semibold">{t('empty.title')}</h2>
 
-      <p className="text-muted text-sm">
-        All links in the wiki point to existing pages.
-      </p>
+      <p className="text-muted text-sm">{t('empty.description')}</p>
     </div>
   )
 }

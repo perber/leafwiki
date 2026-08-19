@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { useResyncStore } from '@/stores/resync'
 import { useSetTitle } from '../viewer/setTitle'
 import { useToolbarActions } from './useToolbarActions'
-import BrokenLinksPage from '@/features/links/BrokenLinksPage'
+import BrokenLinks from '@/features/links/BrokenLinks'
 const PHASE_ORDER = ['tree', 'links', 'tags', 'search'] as const
 
 export default function MaintenanceSettings() {
@@ -88,7 +88,7 @@ export default function MaintenanceSettings() {
       </div>
 
       <div className="settings__section">
-        <BrokenLinksPage />
+        <BrokenLinks />
       </div>
     </div>
   )

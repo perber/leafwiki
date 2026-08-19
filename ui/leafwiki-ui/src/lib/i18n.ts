@@ -11,6 +11,7 @@ import enErrors from '../locales/en/errors.json'
 import enHistory from '../locales/en/history.json'
 import enImporter from '../locales/en/importer.json'
 import enMaintenance from '../locales/en/maintenance.json'
+import enBrokenLinks from '../locales/en/brokenLinks.json'
 import enPage from '../locales/en/page.json'
 import enRestore from '../locales/en/restore.json'
 import enSearch from '../locales/en/search.json'
@@ -34,6 +35,7 @@ i18next.use(initReactI18next).init({
       history: enHistory,
       importer: enImporter,
       maintenance: enMaintenance,
+      brokenLinks: enBrokenLinks,
       page: enPage,
       restore: enRestore,
       search: enSearch,
