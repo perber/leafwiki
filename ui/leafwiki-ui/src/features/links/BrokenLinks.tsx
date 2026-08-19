@@ -25,26 +25,27 @@ export default function BrokenLinks() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true)
-    } else {
-      setLoading(true)
-    }
+  const load = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
 
-    setError(null)
+      setError(null)
 
-    try {
-      setData(await fetchBrokenLinks())
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t('error.loadFailed'),
-      )
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [t])
+      try {
+        setData(await fetchBrokenLinks())
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('error.loadFailed'))
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    },
+    [t],
+  )
 
   useEffect(() => {
     load()
@@ -131,9 +132,17 @@ export default function BrokenLinks() {
           loading={loading}
         />
 
-        <Stat label={t('summaryCard.missing')} value={missingPages} loading={loading} />
+        <Stat
+          label={t('summaryCard.missing')}
+          value={missingPages}
+          loading={loading}
+        />
 
-        <Stat label={t('summaryCard.affected')} value={affectedPages} loading={loading} />
+        <Stat
+          label={t('summaryCard.affected')}
+          value={affectedPages}
+          loading={loading}
+        />
       </div>
 
       <div className="mb-2 flex items-center justify-between">
@@ -196,7 +205,7 @@ function displayMissingPage(path: string): string {
 
 function BrokenLinkGroupCard({ group }: { group: BrokenLinkGroup }) {
   const { t } = useTranslation('brokenLinks')
-  
+
   return (
     <section className="border-border bg-background overflow-hidden rounded-lg border">
       <div className="border-border bg-surface flex items-center gap-2.5 border-b px-4 py-3">
