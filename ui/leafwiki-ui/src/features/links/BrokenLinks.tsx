@@ -44,7 +44,7 @@ export default function BrokenLinks() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     load()
