@@ -217,7 +217,9 @@ function BrokenLinkGroupCard({ group }: { group: BrokenLinkGroup }) {
 
         <span className="bg-error/10 text-error ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold">
           {group.references.length}{' '}
-          {group.references.length === 1 ? t('groupCard.reference') : t('groupCard.references')}
+          {group.references.length === 1
+            ? t('groupCard.reference')
+            : t('groupCard.references')}
         </span>
       </div>
 
