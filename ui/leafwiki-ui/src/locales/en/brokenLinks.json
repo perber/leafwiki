@@ -13,6 +13,10 @@
     "missing": "Missing pages",
     "affected": "Affected pages"
   },
+  "groupCard": {
+    "reference": "reference",
+    "references": "references"
+  },
   "empty": {
     "title": "No broken links",
     "description": "All links in the wiki point to existing pages."
