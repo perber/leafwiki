@@ -371,3 +371,21 @@ func rewriteResolvedTargets(currentPath string, outgoings []Outgoing, rules []Re
 
 	return resolveTargetLinks(treeService, currentPath, paths)
 }
+
+func (b *LinkService) GetBrokenLinks() ([]BrokenLink, error) {
+	links, err := b.store.GetBrokenLinks()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range links {
+		page, err := b.treeService.GetPage(links[i].FromPageID)
+		if err != nil {
+			return nil, err
+		}
+
+		links[i].FromPath = page.CalculatePath()
+	}
+
+	return links, nil
+}
