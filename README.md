@@ -363,6 +363,8 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 
 ### Environment Variables
 
+Any `LEAFWIKI_*` variable can also be loaded from a file via the Docker secrets pattern `LEAFWIKI_*_FILE` (file contents win over the plain variable). Example: `LEAFWIKI_JWT_SECRET_FILE=/run/secrets/jwt`.
+
 | Variable                                | Description                                          | Default       | Since   |
 |-----------------------------------------|------------------------------------------------------|---------------|---------|
 | `LEAFWIKI_HOST`                         | Host/IP address                                      | `127.0.0.1`   | –       |
