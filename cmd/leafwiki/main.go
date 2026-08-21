@@ -128,6 +128,7 @@ func writeUsage(w io.Writer) {
 	                               *before* the subcommand, e.g. "leafwiki --data-dir ./data restore-snapshot file.zip").
 
 	Environment variables:
+	(each LEAFWIKI_* also supports LEAFWIKI_*_FILE — file contents override the plain variable)
 	LEAFWIKI_HOST
 	LEAFWIKI_PORT
 	LEAFWIKI_UNIX_SOCKET
@@ -193,7 +194,7 @@ func printUsage() {
 
 func setupLogger(w io.Writer, format string) {
 	level := slog.LevelInfo
-	switch os.Getenv("LEAFWIKI_LOG_LEVEL") {
+	switch lookupEnv("LEAFWIKI_LOG_LEVEL") {
 	case "debug":
 		level = slog.LevelDebug
 	case "error":
@@ -835,21 +836,21 @@ func removeStaleUnixSocket(socketPath string) error {
 	return err
 }
 
-// CLI > ENV > default(flag)
+// CLI > ENV (_FILE then plain) > default(flag)
 func resolveString(flagName, flagVal string, visited map[string]bool, envVar string, def string) string {
 	// If flag was explicitly set, it takes precedence
 	if visited[flagName] {
 		return strings.TrimSpace(flagVal)
 	}
-	// Next, check environment variable
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+	// Next, check environment variable (NAME_FILE wins over NAME)
+	if env := lookupEnv(envVar); env != "" {
 		return env
 	}
 	// Fall back to provided default when flag wasn't set and no env var is present
 	return def
 }
 
-// CLI > ENV > default
+// CLI > ENV (_FILE then plain) > default
 func resolveLogFormat(flagName, flagVal string, visited map[string]bool, envVar string, def string) string {
 	if visited[flagName] {
 		if f, ok := parseLogFormat(flagVal); ok {
@@ -857,7 +858,7 @@ func resolveLogFormat(flagName, flagVal string, visited map[string]bool, envVar 
 		}
 		fail("Invalid flag value", "flag", flagName, "value", flagVal, "expected", "text or json")
 	}
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+	if env := lookupEnv(envVar); env != "" {
 		if f, ok := parseLogFormat(env); ok {
 			return f
 		}
@@ -877,12 +878,12 @@ func parseLogFormat(s string) (string, bool) {
 	return "", false
 }
 
-// CLI > ENV > default(flag)
+// CLI > ENV (_FILE then plain) > default(flag)
 func resolveBool(flagName string, flagVal bool, visited map[string]bool, envVar string) bool {
 	if visited[flagName] {
 		return flagVal
 	}
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+	if env := lookupEnv(envVar); env != "" {
 		if b, ok := parseBool(env); ok {
 			return b
 		}
@@ -896,7 +897,7 @@ func resolveInt(flagName string, flagVal int, visited map[string]bool, envVar st
 	if visited[flagName] {
 		return flagVal
 	}
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+	if env := lookupEnv(envVar); env != "" {
 		var n int
 		if _, err := fmt.Sscanf(env, "%d", &n); err == nil {
 			return n
@@ -910,7 +911,7 @@ func resolveDuration(flagName string, flagVal time.Duration, visited map[string]
 	if visited[flagName] {
 		return flagVal
 	}
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
+	if env := lookupEnv(envVar); env != "" {
 		if d, ok := parseDuration(env); ok {
 			return d
 		}

@@ -259,6 +259,51 @@ func TestResolveString_TrimsCLIFlagValue(t *testing.T) {
 	}
 }
 
+func TestLookupEnv_FileTakesPrecedence(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "secret")
+	if err := os.WriteFile(filePath, []byte("from-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LEAFWIKI_TEST_SECRET", "from-env")
+	t.Setenv("LEAFWIKI_TEST_SECRET_FILE", filePath)
+
+	got := lookupEnv("LEAFWIKI_TEST_SECRET")
+	if got != "from-file" {
+		t.Fatalf("lookupEnv() = %q, want %q", got, "from-file")
+	}
+}
+
+func TestLookupEnv_PlainEnvWhenNoFile(t *testing.T) {
+	t.Setenv("LEAFWIKI_TEST_SECRET", "from-env")
+	t.Setenv("LEAFWIKI_TEST_SECRET_FILE", "")
+
+	got := lookupEnv("LEAFWIKI_TEST_SECRET")
+	if got != "from-env" {
+		t.Fatalf("lookupEnv() = %q, want %q", got, "from-env")
+	}
+}
+
+func TestResolveString_FileOverEnvUnderCLI(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "secret")
+	if err := os.WriteFile(filePath, []byte("file-value"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LEAFWIKI_JWT_SECRET", "env-value")
+	t.Setenv("LEAFWIKI_JWT_SECRET_FILE", filePath)
+
+	got := resolveString("jwt-secret", "", map[string]bool{}, "LEAFWIKI_JWT_SECRET", "")
+	if got != "file-value" {
+		t.Fatalf("resolveString() = %q, want %q", got, "file-value")
+	}
+
+	gotCLI := resolveString("jwt-secret", "cli-value", map[string]bool{"jwt-secret": true}, "LEAFWIKI_JWT_SECRET", "")
+	if gotCLI != "cli-value" {
+		t.Fatalf("resolveString(CLI) = %q, want %q", gotCLI, "cli-value")
+	}
+}
+
 func TestResolveLogFormat_Precedence(t *testing.T) {
 	tests := []struct {
 		name     string
