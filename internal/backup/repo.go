@@ -67,9 +67,13 @@ func Init(cfg Config) (*Repository, error) {
 	if cfg.AuthorEmail == "" {
 		return nil, fmt.Errorf("AuthorEmail is required")
 	}
+	if err := validateBackupPath(cfg.Path); err != nil {
+		return nil, err
+	}
+	cfg.Path = normalizeBackupPath(cfg.Path)
 
-	repoDir := filepath.Dir(filepath.Clean(cfg.RootDir))
-	slog.Info("backup: initializing", "repoDir", repoDir, "remote", cfg.RemoteURL, "branch", cfg.Branch, "interval", cfg.Interval)
+	repoDir := resolveRepoDir(cfg)
+	slog.Info("backup: initializing", "repoDir", repoDir, "path", cfg.Path, "remote", cfg.RemoteURL, "branch", cfg.Branch, "interval", cfg.Interval)
 
 	// Ensure parent directory exists
 	if err := os.MkdirAll(repoDir, 0755); err != nil {
@@ -324,12 +328,17 @@ func (r *Repository) makeInitialCommit() error {
 		return err
 	}
 
+	contentRoot, contentAssets, err := r.prepareContentDirs()
+	if err != nil {
+		return err
+	}
+
 	// Compute relative paths from repo root
-	rootRel, err := filepath.Rel(r.repoDir, r.cfg.RootDir)
+	rootRel, err := filepath.Rel(r.repoDir, contentRoot)
 	if err != nil {
 		return fmt.Errorf(errComputeRelativeRootFailed, err)
 	}
-	assetsRel, err := filepath.Rel(r.repoDir, r.cfg.AssetsDir)
+	assetsRel, err := filepath.Rel(r.repoDir, contentAssets)
 	if err != nil {
 		return fmt.Errorf(errComputeRelativeAssetsFailed, err)
 	}
@@ -341,41 +350,41 @@ func (r *Repository) makeInitialCommit() error {
 	rootDirMissing := false
 	assetsDirMissing := false
 
-	if _, err := os.Stat(r.cfg.RootDir); err == nil {
+	if _, err := os.Stat(contentRoot); err == nil {
 		slog.Debug("makeInitialCommit: staging root dir", "path", rootRel)
 		if _, err := wt.Add(filepath.ToSlash(rootRel)); err != nil {
 			return fmt.Errorf(errStageRootDirFailed, err)
 		}
 		// Check if root has any files
-		if hasFilesFlag, err := hasFiles(r.cfg.RootDir); err == nil && hasFilesFlag {
+		if hasFilesFlag, err := hasFiles(contentRoot); err == nil && hasFilesFlag {
 			stagedFiles = true
 			slog.Debug("makeInitialCommit: root dir has files, will commit")
 		} else if err != nil {
-			slog.Debug("makeInitialCommit: root dir read error, skipping", "path", r.cfg.RootDir, "err", err)
+			slog.Debug("makeInitialCommit: root dir read error, skipping", "path", contentRoot, "err", err)
 		} else {
 			slog.Debug("makeInitialCommit: root dir is empty, skipping")
 		}
 	} else {
 		rootDirMissing = true
-		slog.Debug("makeInitialCommit: root dir does not exist, skipping", "path", r.cfg.RootDir, "err", err)
+		slog.Debug("makeInitialCommit: root dir does not exist, skipping", "path", contentRoot, "err", err)
 	}
-	if _, err := os.Stat(r.cfg.AssetsDir); err == nil {
+	if _, err := os.Stat(contentAssets); err == nil {
 		slog.Debug("makeInitialCommit: staging assets dir", "path", assetsRel)
 		if _, err := wt.Add(filepath.ToSlash(assetsRel)); err != nil {
 			return fmt.Errorf(errStageAssetsDirFailed, err)
 		}
 		// Check if assets has any files
-		if hasFilesFlag, err := hasFiles(r.cfg.AssetsDir); err == nil && hasFilesFlag {
+		if hasFilesFlag, err := hasFiles(contentAssets); err == nil && hasFilesFlag {
 			stagedFiles = true
 			slog.Debug("makeInitialCommit: assets dir has files, will commit")
 		} else if err != nil {
-			slog.Debug("makeInitialCommit: assets dir read error, skipping", "path", r.cfg.AssetsDir, "err", err)
+			slog.Debug("makeInitialCommit: assets dir read error, skipping", "path", contentAssets, "err", err)
 		} else {
 			slog.Debug("makeInitialCommit: assets dir is empty, skipping")
 		}
 	} else {
 		assetsDirMissing = true
-		slog.Debug("makeInitialCommit: assets dir does not exist, skipping", "path", r.cfg.AssetsDir, "err", err)
+		slog.Debug("makeInitialCommit: assets dir does not exist, skipping", "path", contentAssets, "err", err)
 	}
 
 	// Warn if both directories are missing
@@ -486,13 +495,20 @@ func (r *Repository) RunBackup() error {
 		}
 	}
 
-	rootRel, err := filepath.Rel(r.repoDir, r.cfg.RootDir)
+	contentRoot, contentAssets, err := r.prepareContentDirs()
+	if err != nil {
+		errMsg := err.Error()
+		r.status.SetError(errMsg)
+		return err
+	}
+
+	rootRel, err := filepath.Rel(r.repoDir, contentRoot)
 	if err != nil {
 		errMsg := fmt.Errorf(errComputeRelativeRootFailed, err).Error()
 		r.status.SetError(errMsg)
 		return fmt.Errorf(errComputeRelativeRootFailed, err)
 	}
-	assetsRel, err := filepath.Rel(r.repoDir, r.cfg.AssetsDir)
+	assetsRel, err := filepath.Rel(r.repoDir, contentAssets)
 	if err != nil {
 		errMsg := fmt.Errorf(errComputeRelativeAssetsFailed, err).Error()
 		r.status.SetError(errMsg)
@@ -503,7 +519,7 @@ func (r *Repository) RunBackup() error {
 	rootDirMissing := false
 	assetsDirMissing := false
 
-	if _, err := os.Stat(r.cfg.RootDir); err == nil {
+	if _, err := os.Stat(contentRoot); err == nil {
 		if _, err := wt.Add(filepath.ToSlash(rootRel)); err != nil {
 			errMsg := fmt.Errorf(errStageRootDirFailed, err).Error()
 			slog.Debug("RunBackup: failed to stage root dir", "error", errMsg)
@@ -513,9 +529,9 @@ func (r *Repository) RunBackup() error {
 		slog.Debug("RunBackup: staged root dir", "path", rootRel)
 	} else {
 		rootDirMissing = true
-		slog.Debug("RunBackup: root dir not found, skipping", "path", r.cfg.RootDir)
+		slog.Debug("RunBackup: root dir not found, skipping", "path", contentRoot)
 	}
-	if _, err := os.Stat(r.cfg.AssetsDir); err == nil {
+	if _, err := os.Stat(contentAssets); err == nil {
 		if _, err := wt.Add(filepath.ToSlash(assetsRel)); err != nil {
 			errMsg := fmt.Errorf(errStageAssetsDirFailed, err).Error()
 			slog.Debug("RunBackup: failed to stage assets dir", "error", errMsg)
@@ -525,7 +541,7 @@ func (r *Repository) RunBackup() error {
 		slog.Debug("RunBackup: staged assets dir", "path", assetsRel)
 	} else {
 		assetsDirMissing = true
-		slog.Debug("RunBackup: assets dir not found, skipping", "path", r.cfg.AssetsDir)
+		slog.Debug("RunBackup: assets dir not found, skipping", "path", contentAssets)
 	}
 
 	// Warn if both directories are missing

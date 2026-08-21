@@ -4,8 +4,9 @@ import "time"
 
 type Config struct {
 	Enabled           bool
-	RootDir           string // path to LeafWiki root/ content directory
-	AssetsDir         string // path to LeafWiki assets/ directory
+	RootDir           string // path to LeafWiki root/ content directory (live data)
+	AssetsDir         string // path to LeafWiki assets/ directory (live data)
+	Path              string // optional relative subdirectory inside the git repo (monorepo), e.g. docs/wiki
 	AuthorName        string
 	AuthorEmail       string
 	RemoteURL         string        // SSH remote, e.g. git@github.com:user/repo.git
