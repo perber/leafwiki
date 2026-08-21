@@ -215,6 +215,20 @@ The server binds to `127.0.0.1:8080` by default. To expose it on the network:
 
 Default data directory is `./data`. Change with `--data-dir`.
 
+### Build from source
+
+Requires Go and Node.js. `make build` compiles the UI, embeds it, and produces a self-contained `leafwiki` binary (same as release/Docker builds). Use HTTP (`http://localhost:8080/`), not HTTPS, unless you terminate TLS in front of LeafWiki.
+
+```bash
+git clone https://github.com/perber/leafwiki.git
+cd leafwiki
+git switch --detach v0.12.1   # or any tag / main
+make build
+./leafwiki --disable-auth --host=127.0.0.1 --data-dir ./data --allow-insecure=true
+```
+
+For API-only local development with Vite, use `make build-api` (or `make run`) instead — see [Dev Setup](#dev-setup).
+
 ### Reset admin password
 
 ```bash
