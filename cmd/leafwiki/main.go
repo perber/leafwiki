@@ -113,6 +113,7 @@ func writeUsage(w io.Writer) {
 	--git-backup-ssh-key-path      Path to SSH private key for git backup
 	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
 	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
+	--git-backup-path              Relative subdirectory inside the git remote for wiki content (e.g. docs/wiki)
 	--git-backup-interval          Git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)
 	--snapshot                     Enable full backup snapshots (ZIP incl. the SQLite database) (default: true)
 	--snapshot-interval            Snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)
@@ -176,6 +177,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH
 	LEAFWIKI_GIT_BACKUP_SSH_KEY
 	LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS
+	LEAFWIKI_GIT_BACKUP_PATH
 	LEAFWIKI_GIT_BACKUP_INTERVAL
 	LEAFWIKI_SNAPSHOT
 	LEAFWIKI_SNAPSHOT_INTERVAL
@@ -283,6 +285,7 @@ type cliFlags struct {
 	gitBackupSSHKeyPath            *string
 	gitBackupSSHKey                *string
 	gitBackupSSHKnownHosts         *string
+	gitBackupPath                  *string
 	gitBackupInterval              *time.Duration
 	revisionCoalesceWindow         *time.Duration
 	snapshotEnabled                *bool
@@ -340,6 +343,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackupSSHKeyPath:            fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
 		gitBackupSSHKey:                fs.String(gitBackupSSHKeyFlagName, "", "raw SSH private key for git backup (env var preferred)"),
 		gitBackupSSHKnownHosts:         fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
+		gitBackupPath:                  fs.String("git-backup-path", "", "relative subdirectory inside the git remote for wiki content (e.g. docs/wiki)"),
 		gitBackupInterval:              fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
 		revisionCoalesceWindow:         fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
 		snapshotEnabled:                fs.Bool("snapshot", true, "enable full backup snapshots (ZIP incl. the SQLite database) (default: true)"),
@@ -432,6 +436,7 @@ func main() {
 	gitBackupSSHKey := resolveString(gitBackupSSHKeyFlagName, *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
 	gitBackupInterval := resolveDuration("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL")
 	gitBackupSSHKnownHosts := resolveString("git-backup-ssh-known-hosts", *flags.gitBackupSSHKnownHosts, visited, "LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS", "")
+	gitBackupPath := resolveString("git-backup-path", *flags.gitBackupPath, visited, "LEAFWIKI_GIT_BACKUP_PATH", "")
 	snapshotEnabled := resolveBool("snapshot", *flags.snapshotEnabled, visited, "LEAFWIKI_SNAPSHOT")
 	snapshotInterval := resolveDuration("snapshot-interval", *flags.snapshotInterval, visited, "LEAFWIKI_SNAPSHOT_INTERVAL")
 	snapshotRetention := resolveInt("snapshot-retention", *flags.snapshotRetention, visited, "LEAFWIKI_SNAPSHOT_RETENTION", 10)
@@ -598,6 +603,7 @@ func main() {
 			Enabled:           true,
 			RootDir:           filepath.Join(dataDir, "root"),
 			AssetsDir:         filepath.Join(dataDir, "assets"),
+			Path:              gitBackupPath,
 			AuthorName:        gitBackupAuthorName,
 			AuthorEmail:       gitBackupAuthorEmail,
 			RemoteURL:         gitBackupRemote,

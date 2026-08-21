@@ -358,6 +358,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--git-backup-author-name`       | ⚗️ Git commit author name                                               | `LeafWiki Backup` | v0.11.3 |
 | `--git-backup-author-email`      | ⚗️ Git commit author email                                              | `backup@leafwiki.local` | v0.11.3 |
 | `--git-backup-interval`          | ⚗️ Backup interval (e.g. `60m`, `2h`); `0` = manual-only               | `60m`         | v0.11.3 |
+| `--git-backup-path`              | ⚗️ Relative subdirectory inside the git remote for wiki content (e.g. `docs/wiki`) | `""` | v0.12.2 |
 
 > Docker image default: `LEAFWIKI_HOST` is set to `0.0.0.0` automatically by the container entrypoint if neither `--host` nor `LEAFWIKI_HOST` is provided.
 
@@ -417,6 +418,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_NAME`       | ⚗️ Git commit author name                           | `LeafWiki Backup` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL`      | ⚗️ Git commit author email                          | `backup@leafwiki.local` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_INTERVAL`          | ⚗️ Backup interval (e.g. `60m`); `0` = manual-only | `60m`         | v0.11.3 |
+| `LEAFWIKI_GIT_BACKUP_PATH`              | ⚗️ Relative subdirectory inside the git remote for wiki content | `""` | v0.12.2 |
 
 ### Custom Stylesheet
 
@@ -518,6 +520,7 @@ Backups run automatically on a configurable interval and can also be triggered m
 | `--git-backup-author-name` | Git commit author name | `LeafWiki Backup` |
 | `--git-backup-author-email` | Git commit author email | `backup@leafwiki.local` |
 | `--git-backup-interval` | Backup interval (e.g. `60m`, `2h`); `0` = manual-only | `60m` |
+| `--git-backup-path` | Relative subdirectory inside the git remote for wiki content (e.g. `docs/wiki`) | `""` |
 
 **Environment variables:**
 
@@ -532,6 +535,7 @@ Backups run automatically on a configurable interval and can also be triggered m
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_NAME` | Git commit author name |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL` | Git commit author email |
 | `LEAFWIKI_GIT_BACKUP_INTERVAL` | Backup interval |
+| `LEAFWIKI_GIT_BACKUP_PATH` | Relative subdirectory inside the git remote (monorepo), e.g. `docs/wiki` |
 
 **Example (Docker Compose):**
 
@@ -542,6 +546,8 @@ environment:
   - LEAFWIKI_GIT_BACKUP_BRANCH=main
   - LEAFWIKI_GIT_BACKUP_SSH_KEY=${LEAFWIKI_GIT_BACKUP_SSH_KEY}  # from .env file
   - LEAFWIKI_GIT_BACKUP_INTERVAL=60m
+  # Optional monorepo subdirectory (content lands under docs/wiki/root and docs/wiki/assets):
+  # - LEAFWIKI_GIT_BACKUP_PATH=docs/wiki
 ```
 
 **Notes:**
@@ -551,6 +557,7 @@ environment:
 - `--git-backup-ssh-known-hosts` is optional but recommended. If not set, LeafWiki falls back to `~/.ssh/known_hosts`. If that file does not exist either (common in containers), SSH host key verification is **disabled** — leaving connections open to MITM attacks. Set this flag explicitly in production.
 - If the remote diverges (e.g. someone pushed directly to the backup branch), LeafWiki will stop auto-pushing and show a **Conflict — remote diverged** warning in the UI. Click **Force Push** in the UI to overwrite the remote with the current local backup history. Your wiki content is never lost — the local backup repo is always authoritative.
 - This backs up **content only** — the SQLite database is not included. For a full backup, use your data directory (`cp -r` with the app stopped).
+- `--git-backup-path` (e.g. `docs/wiki`) stores the git repo under `<data-dir>/.git-backup` and places `root/` + `assets/` under that subdirectory so a monorepo remote can keep sibling files. Leave empty to keep the legacy in-place `<data-dir>/.git` layout.
 
 ---
 
