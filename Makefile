@@ -3,6 +3,10 @@ CMD_DIR=./cmd/leafwiki
 VERSION ?= $(shell ./scripts/resolve-version.sh)
 RELEASE_DIR := releases
 DOCKER_BUILDER := Dockerfile.builder
+UI_DIR := ui/leafwiki-ui
+HTTP_DIST := internal/http/dist
+EMBED_LDFLAGS := -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production
+LDFLAGS := -X main.Version=$(VERSION) $(EMBED_LDFLAGS)
 
 PLATFORMS := \
   linux/amd64 \
@@ -13,7 +17,22 @@ PLATFORMS := \
 
 all: build
 
-build:
+# Build the Vite SPA into internal/http/dist for go:embed.
+ui:
+	@echo "Building frontend..."
+	cd $(UI_DIR) && npm ci --ignore-scripts && VITE_API_URL=/ APP_VERSION=$(VERSION) npm run build
+	rm -rf $(HTTP_DIST)
+	mkdir -p $(HTTP_DIST)
+	cp -R $(UI_DIR)/dist/. $(HTTP_DIST)/
+	touch $(HTTP_DIST)/.gitkeep
+	@test -f $(HTTP_DIST)/index.html || (echo "Frontend build missing $(HTTP_DIST)/index.html" && exit 1)
+
+# Self-contained binary with embedded UI (matches release/Docker builds).
+build: ui
+	go build -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) $(CMD_DIR)
+
+# API-only binary for local Vite-proxied development (no embedded SPA).
+build-api:
 	go build -ldflags "-X main.Version=$(VERSION)" -o $(BINARY_NAME) $(CMD_DIR)
 
 run:
@@ -103,7 +122,9 @@ run-e2e-local-fast:
 
 help:
 	@echo "Available commands:"
-	@echo "  make build                – Build binary for current system"
+	@echo "  make build                – Build self-contained binary with embedded UI (needs Node.js)"
+	@echo "  make build-api            – Build API-only binary (use with Vite in Dev Setup)"
+	@echo "  make ui                   – Build frontend into internal/http/dist for embedding"
 	@echo "  make release              – Cross-compile binaries for all platforms (via Docker)"
 	@echo "  make clean                – Clean all generated files"
 	@echo "  make test                 – Run all Go tests"
@@ -113,8 +134,8 @@ help:
 	@echo "  make run-e2e-local        – Run end-to-end tests via local fast path"
 	@echo "  make run-e2e-local-fast   – Run E2E tests locally, skip UI build (use when dist/ is current)"
 	@echo "                              Optional: GREP=<pattern> to filter tests"
-	@echo "  make run                  – Run development server"
+	@echo "  make run                  – Run development server (API only; use Vite for UI)"
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
