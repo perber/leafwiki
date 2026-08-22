@@ -379,14 +379,17 @@ test.describe('History', () => {
     await expect(page.locator('a[data-testid^="tree-node-link-"]').first()).toBeVisible();
   });
 
-  test('sidebar-tree-visible-in-settings', async ({ page }) => {
-    // Regression for: tree sidebar tab not visible on settings pages.
+  test('settings-nav-visible-in-settings', async ({ page }) => {
+    // Settings mode swaps the wiki-tree sidebar for the settings section nav
+    // (unified settings page) — this replaces the older regression guard
+    // that expected the tree tab itself to stay visible there.
     await page.goto('/settings/branding');
     await page.waitForLoadState('networkidle');
 
-    const treeTabButton = page.locator('button[data-testid="sidebar-tree-tab-button"]');
-    await treeTabButton.waitFor({ state: 'visible' });
-    await expect(treeTabButton).toBeVisible();
+    const settingsNav = page.locator('[data-testid="settings-nav"]');
+    await settingsNav.waitFor({ state: 'visible' });
+    await expect(settingsNav).toBeVisible();
+    await expect(page.locator('[data-testid="settings-nav-item-branding"]')).toBeVisible();
   });
 
   test('restore-revision', async ({ page }) => {

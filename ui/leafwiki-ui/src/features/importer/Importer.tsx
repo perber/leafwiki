@@ -6,7 +6,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Trans } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { useSetTitle } from '../viewer/setTitle'
-import { useToolbarActions } from './useToolbarActions'
 
 type ResultFilter = 'all' | 'created' | 'skipped' | 'failed'
 
@@ -74,8 +73,6 @@ function getResultActionClass(
 }
 
 export default function Importer() {
-  // reset toolbar actions on mount
-  useToolbarActions()
   useSetTitle({ title: t('title') })
   const navigate = useNavigate()
   const zipRef = useRef<HTMLInputElement>(null)

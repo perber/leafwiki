@@ -7,7 +7,6 @@ import { toast } from 'sonner'
 import { useSetTitle } from '../viewer/setTitle'
 import { CreateApiKeyButton } from './CreateApiKeyButton'
 import { DeleteApiKeyButton } from './DeleteApiKeyButton'
-import { useToolbarActions } from './useToolbarActions'
 
 function formatTimestamp(value?: string): string {
   if (!value) return '—'
@@ -20,7 +19,6 @@ export default function ApiKeysManagement() {
   const { users, loadUsers } = useUserStore()
   const [loading, setLoading] = useState(true)
   useSetTitle({ title: t('page.title') })
-  useToolbarActions()
 
   useEffect(() => {
     Promise.all([loadApiKeys(), loadUsers()])

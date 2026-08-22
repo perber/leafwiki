@@ -1,5 +1,8 @@
 import { lazy } from 'react'
 
+export const AccountSettings = lazy(
+  () => import('../settings/account/AccountSettings'),
+)
 export const ApiKeysManagement = lazy(
   () => import('../apikeys/ApiKeysManagement'),
 )

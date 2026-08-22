@@ -1,8 +1,7 @@
 import { DialogManager } from '@/components/DialogManager'
 import { HotKeyHandler } from '@/components/HotKeyHandler'
-import UserToolbar from '@/components/UserToolbar'
+import UserMenu from '@/components/UserMenu'
 import * as authAPI from '@/lib/api/auth'
-import { useBackupStore } from '@/stores/backup'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
@@ -11,7 +10,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-describe('UserToolbar', () => {
+describe('UserMenu', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -28,10 +27,7 @@ describe('UserToolbar', () => {
       httpRemoteUserEnabled: false,
       loginUrl: '',
       logoutUrl: '',
-      userManagementUrl: '',
-      totpAvailable: false,
     })
-    useBackupStore.setState({ enabled: false })
     useSessionStore.setState({
       user: {
         id: 'user-1',
@@ -43,17 +39,41 @@ describe('UserToolbar', () => {
     })
   })
 
+  it('navigates to /settings when the Settings item is clicked', async () => {
+    const user = userEvent.setup({ delay: null })
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<UserMenu />} />
+          <Route
+            path="/settings"
+            element={<div data-testid="settings-page-sentinel">SETTINGS</div>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const avatar = screen.getByTestId('user-menu-avatar')
+    await user.click(avatar.closest('button') as HTMLButtonElement)
+    await user.click(screen.getByTestId('user-menu-settings'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-page-sentinel')).toBeInTheDocument()
+    })
+  })
+
   it('opens the shortcuts dialog from the user menu', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
 
     render(
       <MemoryRouter>
-        <UserToolbar />
+        <UserMenu />
         <DialogManager />
       </MemoryRouter>,
     )
 
-    const avatar = screen.getByTestId('user-toolbar-avatar')
+    const avatar = screen.getByTestId('user-menu-avatar')
     const trigger = avatar.closest('button')
 
     expect(trigger).toBeTruthy()
@@ -73,7 +93,7 @@ describe('UserToolbar', () => {
   it('opens the shortcuts dialog via the keyboard shortcut', async () => {
     render(
       <MemoryRouter>
-        <UserToolbar />
+        <UserMenu />
         <HotKeyHandler />
         <DialogManager />
       </MemoryRouter>,
@@ -92,7 +112,7 @@ describe('UserToolbar', () => {
 
     render(
       <MemoryRouter>
-        <UserToolbar />
+        <UserMenu />
         <HotKeyHandler />
         <DialogManager />
       </MemoryRouter>,
@@ -119,25 +139,40 @@ describe('UserToolbar', () => {
     })
 
     it('does not show the keyboard shortcuts menu item for viewer role', async () => {
-      const user = userEvent.setup()
+      const user = userEvent.setup({ delay: null })
 
       render(
         <MemoryRouter>
-          <UserToolbar />
+          <UserMenu />
         </MemoryRouter>,
       )
 
-      const avatar = screen.getByTestId('user-toolbar-avatar')
+      const avatar = screen.getByTestId('user-menu-avatar')
       const trigger = avatar.closest('button')
       await user.click(trigger as HTMLButtonElement)
 
       expect(screen.queryByText('Keyboard Shortcuts')).not.toBeInTheDocument()
     })
 
+    it('still shows the Settings item for viewer role', async () => {
+      const user = userEvent.setup({ delay: null })
+
+      render(
+        <MemoryRouter>
+          <UserMenu />
+        </MemoryRouter>,
+      )
+
+      const avatar = screen.getByTestId('user-menu-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+
+      expect(screen.getByTestId('user-menu-settings')).toBeInTheDocument()
+    })
+
     it('does not open the shortcuts dialog via keyboard shortcut for viewer role', async () => {
       render(
         <MemoryRouter>
-          <UserToolbar />
+          <UserMenu />
           <HotKeyHandler />
           <DialogManager />
         </MemoryRouter>,
@@ -157,7 +192,7 @@ describe('UserToolbar', () => {
       render(
         <MemoryRouter initialEntries={['/']}>
           <Routes>
-            <Route path="/" element={<UserToolbar />} />
+            <Route path="/" element={<UserMenu />} />
             <Route
               path="/login"
               element={<div data-testid="login-form-sentinel">LOGIN</div>}
@@ -184,7 +219,7 @@ describe('UserToolbar', () => {
     })
 
     it('redirects straight to the logout URL without rendering the local login screen', async () => {
-      const user = userEvent.setup()
+      const user = userEvent.setup({ delay: null })
       const logoutSpy = vi.spyOn(authAPI, 'logout').mockResolvedValue()
       useConfigStore.setState({
         logoutUrl: 'https://control-plane.example.com/logout',
@@ -192,9 +227,9 @@ describe('UserToolbar', () => {
 
       renderWithLoginRoute()
 
-      const avatar = screen.getByTestId('user-toolbar-avatar')
+      const avatar = screen.getByTestId('user-menu-avatar')
       await user.click(avatar.closest('button') as HTMLButtonElement)
-      await user.click(screen.getByTestId('user-toolbar-logout'))
+      await user.click(screen.getByTestId('user-menu-logout'))
 
       expect(logoutSpy).toHaveBeenCalled()
       expect(window.location.href).toBe(
@@ -206,14 +241,14 @@ describe('UserToolbar', () => {
     })
 
     it('falls back to the local /login route when no logout URL is configured', async () => {
-      const user = userEvent.setup()
+      const user = userEvent.setup({ delay: null })
       useConfigStore.setState({ logoutUrl: '' })
 
       renderWithLoginRoute()
 
-      const avatar = screen.getByTestId('user-toolbar-avatar')
+      const avatar = screen.getByTestId('user-menu-avatar')
       await user.click(avatar.closest('button') as HTMLButtonElement)
-      await user.click(screen.getByTestId('user-toolbar-logout'))
+      await user.click(screen.getByTestId('user-menu-logout'))
 
       await waitFor(() => {
         expect(screen.getByTestId('login-form-sentinel')).toBeInTheDocument()
@@ -247,138 +282,13 @@ describe('UserToolbar', () => {
 
       render(
         <MemoryRouter>
-          <UserToolbar />
+          <UserMenu />
         </MemoryRouter>,
       )
 
       fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
       expect(window.location.href).toBe('https://idp.example.com/login')
-    })
-  })
-
-  describe('totp menu item', () => {
-    it('does not show "enable two-factor authentication" when totp is not available on the server', async () => {
-      const user = userEvent.setup()
-      useConfigStore.setState({ totpAvailable: false })
-
-      render(
-        <MemoryRouter>
-          <UserToolbar />
-        </MemoryRouter>,
-      )
-
-      const avatar = screen.getByTestId('user-toolbar-avatar')
-      await user.click(avatar.closest('button') as HTMLButtonElement)
-
-      expect(
-        screen.queryByTestId('user-toolbar-totp-enable'),
-      ).not.toBeInTheDocument()
-    })
-
-    it('shows "enable two-factor authentication" when totp is available on the server', async () => {
-      const user = userEvent.setup()
-      useConfigStore.setState({ totpAvailable: true })
-
-      render(
-        <MemoryRouter>
-          <UserToolbar />
-        </MemoryRouter>,
-      )
-
-      const avatar = screen.getByTestId('user-toolbar-avatar')
-      await user.click(avatar.closest('button') as HTMLButtonElement)
-
-      expect(screen.getByTestId('user-toolbar-totp-enable')).toBeInTheDocument()
-    })
-
-    it('still shows "disable two-factor authentication" for a user who already has it enabled, even when totpAvailable is false', async () => {
-      const user = userEvent.setup()
-      useConfigStore.setState({ totpAvailable: false })
-      useSessionStore.setState({
-        user: {
-          id: 'user-1',
-          username: 'alice',
-          email: 'alice@example.com',
-          role: 'editor',
-          totpEnabled: true,
-        },
-      })
-
-      render(
-        <MemoryRouter>
-          <UserToolbar />
-        </MemoryRouter>,
-      )
-
-      const avatar = screen.getByTestId('user-toolbar-avatar')
-      await user.click(avatar.closest('button') as HTMLButtonElement)
-
-      expect(
-        screen.getByTestId('user-toolbar-totp-disable'),
-      ).toBeInTheDocument()
-    })
-  })
-
-  describe('user management link', () => {
-    beforeEach(() => {
-      useSessionStore.setState({
-        user: {
-          id: 'admin-1',
-          username: 'admin',
-          email: 'admin@example.com',
-          role: 'admin',
-          totpEnabled: false,
-        },
-      })
-    })
-
-    it('renders User Management as an external link when userManagementUrl is set', async () => {
-      const user = userEvent.setup()
-      useConfigStore.setState({
-        userManagementUrl: 'https://control-plane.example.com/users',
-      })
-
-      render(
-        <MemoryRouter>
-          <UserToolbar />
-        </MemoryRouter>,
-      )
-
-      const avatar = screen.getByTestId('user-toolbar-avatar')
-      await user.click(avatar.closest('button') as HTMLButtonElement)
-
-      const link = screen.getByText('User Management').closest('a')
-      expect(link).toHaveAttribute(
-        'href',
-        'https://control-plane.example.com/users',
-      )
-      expect(link).toHaveAttribute('target', '_blank')
-    })
-
-    it('navigates to the local /users route when userManagementUrl is not set', async () => {
-      const user = userEvent.setup()
-      useConfigStore.setState({ userManagementUrl: '' })
-
-      render(
-        <MemoryRouter initialEntries={['/']}>
-          <Routes>
-            <Route path="/" element={<UserToolbar />} />
-            <Route
-              path="/users"
-              element={<div data-testid="users-page-sentinel">USERS</div>}
-            />
-          </Routes>
-        </MemoryRouter>,
-      )
-
-      const avatar = screen.getByTestId('user-toolbar-avatar')
-      await user.click(avatar.closest('button') as HTMLButtonElement)
-      await user.click(screen.getByText('User Management'))
-
-      await waitFor(() => {
-        expect(screen.getByTestId('users-page-sentinel')).toBeInTheDocument()
-      })
     })
   })
 })

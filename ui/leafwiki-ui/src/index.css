@@ -696,32 +696,32 @@
     @apply bg-primary/10 border-primary/30 text-interface-text rounded border px-2 py-1 text-xs shadow-sm;
   }
 
-  /* UserToolbar Component */
-  .user-toolbar {
+  /* UserMenu Component */
+  .user-menu {
     @apply ml-auto flex items-center gap-4;
   }
 
-  .user-toolbar__avatar {
+  .user-menu__avatar {
     @apply h-5 w-5 max-sm:h-7 max-sm:w-7;
   }
 
-  .user-toolbar__avatar > span {
+  .user-menu__avatar > span {
     @apply bg-avatar-bg! text-avatar-foreground!;
   }
 
-  .user-toolbar__avatar-fallback {
+  .user-menu__avatar-fallback {
     @apply text-muted-foreground font-medium;
   }
 
-  .user-toolbar__not-logged-in {
+  .user-menu__not-logged-in {
     @apply text-error text-sm;
   }
 
-  .user-toolbar__menu-item {
+  .user-menu__menu-item {
     @apply text-interface-text hover:bg-surface-alt cursor-pointer;
   }
 
-  .user-toolbar-dropdown-trigger {
+  .user-menu__dropdown-trigger {
     @apply flex items-center space-x-2 focus:outline-hidden;
   }
 

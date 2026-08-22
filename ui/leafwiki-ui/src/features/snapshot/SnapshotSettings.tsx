@@ -28,7 +28,6 @@ import { toast } from 'sonner'
 import { useSnapshotStore } from '@/stores/snapshot'
 import { useRestoreStore } from '@/stores/restore'
 import { useSetTitle } from '../viewer/setTitle'
-import { useToolbarActions } from './useToolbarActions'
 
 function formatDate(value: string | null, fallback: string): string {
   if (!value) return fallback
@@ -78,7 +77,6 @@ export default function SnapshotSettings() {
   const [isRestoringUpload, setIsRestoringUpload] = useState(false)
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
-  useToolbarActions()
   useSetTitle({ title: t('pageTitle') })
 
   useEffect(() => {
