@@ -46,8 +46,9 @@ import (
 var Version = "dev"
 
 const (
-	gitBackupSSHKeyFlagName = "git-backup-ssh-key"
-	errInvalidEnvVarValue   = "Invalid environment variable value"
+	gitBackupSSHKeyFlagName       = "git-backup-ssh-key"
+	gitBackupHTTPPasswordFlagName = "git-backup-http-password"
+	errInvalidEnvVarValue         = "Invalid environment variable value"
 )
 
 func writeUsage(w io.Writer) {
@@ -110,11 +111,13 @@ func writeUsage(w io.Writer) {
 	--git-backup                   Enable git backup to a remote repository (default: false)
 	--git-backup-author-name       Git commit author name for backups (default: LeafWiki Backup)
 	--git-backup-author-email      Git commit author email for backups (default: backup@leafwiki.local)
-	--git-backup-remote            Git remote URL (SSH) for backups (required when git-backup is enabled)
+	--git-backup-remote            Git remote URL (SSH or HTTP(S)) for backups (required when git-backup is enabled)
 	--git-backup-branch            Git branch to push to (default: main)
 	--git-backup-ssh-key-path      Path to SSH private key for git backup
 	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
 	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
+	--git-backup-http-username     Username for HTTP(S) basic auth (used instead of an SSH key on http(s):// remotes)
+	--git-backup-http-password     Password or access token for HTTP(S) basic auth (env var preferred)
 	--git-backup-interval          Git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)
 	--snapshot                     Enable full backup snapshots (ZIP incl. the SQLite database) (default: true)
 	--snapshot-interval            Snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)
@@ -178,6 +181,8 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH
 	LEAFWIKI_GIT_BACKUP_SSH_KEY
 	LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS
+	LEAFWIKI_GIT_BACKUP_HTTP_USERNAME
+	LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD
 	LEAFWIKI_GIT_BACKUP_INTERVAL
 	LEAFWIKI_SNAPSHOT
 	LEAFWIKI_SNAPSHOT_INTERVAL
@@ -285,6 +290,8 @@ type cliFlags struct {
 	gitBackupSSHKeyPath            *string
 	gitBackupSSHKey                *string
 	gitBackupSSHKnownHosts         *string
+	gitBackupHTTPUsername          *string
+	gitBackupHTTPPassword          *string
 	gitBackupInterval              *time.Duration
 	revisionCoalesceWindow         *time.Duration
 	snapshotEnabled                *bool
@@ -347,11 +354,13 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackup:                      fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
 		gitBackupAuthorName:            fs.String("git-backup-author-name", "", "git commit author name for backups (default: LeafWiki Backup)"),
 		gitBackupAuthorEmail:           fs.String("git-backup-author-email", "", "git commit author email for backups (default: backup@leafwiki.local)"),
-		gitBackupRemote:                fs.String("git-backup-remote", "", "git remote URL (SSH) for backups (required when git-backup is enabled)"),
+		gitBackupRemote:                fs.String("git-backup-remote", "", "git remote URL (SSH or HTTP(S)) for backups (required when git-backup is enabled)"),
 		gitBackupBranch:                fs.String("git-backup-branch", "", "git branch to push to (default: main)"),
 		gitBackupSSHKeyPath:            fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
 		gitBackupSSHKey:                fs.String(gitBackupSSHKeyFlagName, "", "raw SSH private key for git backup (env var preferred)"),
 		gitBackupSSHKnownHosts:         fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
+		gitBackupHTTPUsername:          fs.String("git-backup-http-username", "", "username for HTTP(S) basic auth on http(s):// remotes"),
+		gitBackupHTTPPassword:          fs.String(gitBackupHTTPPasswordFlagName, "", "password or access token for HTTP(S) basic auth (env var preferred)"),
 		gitBackupInterval:              fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
 		revisionCoalesceWindow:         fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
 		snapshotEnabled:                fs.Bool("snapshot", true, "enable full backup snapshots (ZIP incl. the SQLite database) (default: true)"),
@@ -454,6 +463,8 @@ func main() {
 	gitBackupSSHKey := resolveString(gitBackupSSHKeyFlagName, *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
 	gitBackupInterval := resolveDuration("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL")
 	gitBackupSSHKnownHosts := resolveString("git-backup-ssh-known-hosts", *flags.gitBackupSSHKnownHosts, visited, "LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS", "")
+	gitBackupHTTPUsername := resolveString("git-backup-http-username", *flags.gitBackupHTTPUsername, visited, "LEAFWIKI_GIT_BACKUP_HTTP_USERNAME", "")
+	gitBackupHTTPPassword := resolveString(gitBackupHTTPPasswordFlagName, *flags.gitBackupHTTPPassword, visited, "LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD", "")
 	snapshotEnabled := resolveBool("snapshot", *flags.snapshotEnabled, visited, "LEAFWIKI_SNAPSHOT")
 	snapshotInterval := resolveDuration("snapshot-interval", *flags.snapshotInterval, visited, "LEAFWIKI_SNAPSHOT_INTERVAL")
 	snapshotRetention := resolveInt("snapshot-retention", *flags.snapshotRetention, visited, "LEAFWIKI_SNAPSHOT_RETENTION", 10)
@@ -522,8 +533,10 @@ func main() {
 
 	// Validate git backup configuration
 	// Note: git-backup-remote is optional (local-only mode is supported)
-	if gitBackupEnabled && gitBackupRemote != "" && gitBackupSSHKey == "" && gitBackupSSHKeyPath == "" {
-		fail("--git-backup-ssh-key or --git-backup-ssh-key-path is required when --git-backup-remote is set. Use LEAFWIKI_GIT_BACKUP_SSH_KEY or LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH.")
+	if gitBackupEnabled {
+		if err := validateGitBackupRemote(gitBackupRemote, gitBackupSSHKey, gitBackupSSHKeyPath, gitBackupHTTPUsername, gitBackupHTTPPassword); err != nil {
+			fail("Invalid git backup configuration", "error", err)
+		}
 	}
 
 	args := flag.Args()
@@ -643,11 +656,14 @@ func main() {
 	// Initialize git backup if enabled
 	var backupScheduler *backup.Scheduler
 	if gitBackupEnabled {
-		if gitBackupRemote != "" && !strings.HasPrefix(gitBackupRemote, "git@") && !strings.HasPrefix(gitBackupRemote, "ssh://") {
-			fail("--git-backup-remote must be an SSH URL (e.g. git@github.com:user/repo.git or ssh://...)")
-		}
 		if visited[gitBackupSSHKeyFlagName] {
 			slog.Warn("SSH private key passed via --git-backup-ssh-key flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_SSH_KEY environment variable")
+		}
+		if visited[gitBackupHTTPPasswordFlagName] {
+			slog.Warn("HTTP password passed via --git-backup-http-password flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD environment variable")
+		}
+		if strings.HasPrefix(strings.ToLower(gitBackupRemote), "http://") {
+			slog.Warn("--git-backup-remote uses plain http://; git backup credentials and wiki content are transmitted unencrypted — use https:// unless the remote is on a trusted network")
 		}
 		backupRepo, err := backup.Init(backup.Config{
 			Enabled:           true,
@@ -660,6 +676,8 @@ func main() {
 			SSHKeyPath:        gitBackupSSHKeyPath,
 			SSHKey:            gitBackupSSHKey,
 			SSHKnownHostsPath: gitBackupSSHKnownHosts,
+			HTTPUsername:      gitBackupHTTPUsername,
+			HTTPPassword:      gitBackupHTTPPassword,
 			Interval:          gitBackupInterval,
 		})
 		if err != nil {
@@ -1087,6 +1105,43 @@ func resolveLogoutURL(logoutURL, deprecatedFlagVal string, visited map[string]bo
 		return "", false
 	}
 	return deprecated, true
+}
+
+// validateGitBackupRemote checks the git backup remote URL and that credentials
+// matching its transport are configured: HTTP(S) remotes authenticate with a
+// username + password/token (e.g. a repo-scoped access token), SSH remotes with
+// a private key. An empty remote means local-only backup and needs no
+// credentials at all.
+func validateGitBackupRemote(remote, sshKey, sshKeyPath, httpUsername, httpPassword string) error {
+	if remote == "" {
+		return nil
+	}
+	lower := strings.ToLower(remote)
+
+	switch {
+	case strings.HasPrefix(lower, "http://"), strings.HasPrefix(lower, "https://"):
+		if httpUsername == "" && httpPassword == "" {
+			// Credentials may instead be embedded in the URL
+			// (https://user:token@host/repo.git), which git supports natively.
+			if parsed, err := url.Parse(remote); err == nil && parsed.User != nil {
+				return nil
+			}
+			return fmt.Errorf("--git-backup-http-username and --git-backup-http-password are required when --git-backup-remote is an HTTP(S) URL. Use LEAFWIKI_GIT_BACKUP_HTTP_USERNAME or LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD")
+		}
+		if httpUsername == "" || httpPassword == "" {
+			return fmt.Errorf("--git-backup-http-username and --git-backup-http-password must both be set; got only one of them")
+		}
+		return nil
+
+	case strings.HasPrefix(lower, "git@"), strings.HasPrefix(lower, "ssh://"):
+		if sshKey == "" && sshKeyPath == "" {
+			return fmt.Errorf("--git-backup-ssh-key or --git-backup-ssh-key-path is required when --git-backup-remote is set. Use LEAFWIKI_GIT_BACKUP_SSH_KEY or LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH")
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("--git-backup-remote must be an SSH URL (e.g. git@github.com:user/repo.git or ssh://...) or an HTTP(S) URL (e.g. https://github.com/user/repo.git)")
+	}
 }
 
 func validateRedirectURL(flagName, url string) error {
