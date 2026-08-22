@@ -25,7 +25,7 @@ func newAPIKeyRouterTest(t *testing.T) (*wiki.Wiki, http.Handler) {
 	t.Helper()
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
 		StorageDir:             t.TempDir(),
-		AdminPassword:          "admin",
+		AdminPassword:          "adminpassword",
 		JWTSecret:              "secretkey",
 		AccessTokenTimeout:     15 * time.Minute,
 		RefreshTokenTimeout:    7 * 24 * time.Hour,
