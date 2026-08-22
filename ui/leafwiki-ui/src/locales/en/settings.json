@@ -1,0 +1,14 @@
+{
+  "exit": "Exit settings",
+  "nav": {
+    "title": "Settings",
+    "account": "Account"
+  },
+  "account": {
+    "pageTitle": "Account",
+    "passwordSectionTitle": "Password",
+    "passwordSectionDescription": "Change your password. Make sure to remember it!",
+    "twoFactorSectionTitle": "Two-Factor Authentication",
+    "twoFactorSectionDescription": "Add an extra layer of security to your account."
+  }
+}

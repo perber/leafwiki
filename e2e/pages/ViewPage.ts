@@ -71,7 +71,7 @@ export default class ViewPage {
   }
 
   async isUserLoggedIn(): Promise<boolean> {
-    const avatar = this.page.getByTestId('user-toolbar-avatar');
+    const avatar = this.page.getByTestId('user-menu-avatar');
     try {
       return await avatar.isVisible({ timeout: 1000 });
     } catch {
@@ -80,11 +80,11 @@ export default class ViewPage {
   }
 
   async expectUserLoggedIn() {
-    await this.page.getByTestId('user-toolbar-avatar').waitFor({ state: 'visible' });
+    await this.page.getByTestId('user-menu-avatar').waitFor({ state: 'visible' });
   }
 
-  async clickUserToolbarAvatar() {
-    const avatar = this.page.getByTestId('user-toolbar-avatar');
+  async clickUserMenuAvatar() {
+    const avatar = this.page.getByTestId('user-menu-avatar');
     await avatar.waitFor({ state: 'visible' });
     await avatar.click();
   }
@@ -102,7 +102,7 @@ export default class ViewPage {
       // if the locator does not exist yet, ignore
     }
 
-    const avatar = this.page.getByTestId('user-toolbar-avatar');
+    const avatar = this.page.getByTestId('user-menu-avatar');
 
     // wait for avatar to be visible
     try {
@@ -116,7 +116,7 @@ export default class ViewPage {
     }
 
     // If a modal is still open from the test flow, close it before trying to
-    // use the user toolbar. Otherwise the dialog overlay can intercept clicks.
+    // use the user menu. Otherwise the dialog overlay can intercept clicks.
     try {
       if (await openDialog.isVisible({ timeout: 500 })) {
         await this.page.keyboard.press('Escape');
@@ -133,7 +133,7 @@ export default class ViewPage {
     await this.activateControl(avatar);
 
     // 4) Click logout button
-    const logoutButton = this.page.getByTestId('user-toolbar-logout');
+    const logoutButton = this.page.getByTestId('user-menu-logout');
     try {
       await logoutButton.waitFor({ state: 'visible', timeout: 5000 });
       await this.activateControl(logoutButton);

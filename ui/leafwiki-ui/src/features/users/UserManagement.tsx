@@ -8,14 +8,12 @@ import { ChangePasswordButton } from './ChangePasswordButton'
 import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
 import { ResendInviteButton } from './ResendInviteButton'
-import { useToolbarActions } from './useToolbarActions'
 
 export default function UserManagement() {
   const { t } = useTranslation('users')
   const { users, loadUsers, reset } = useUserStore()
   const [loading, setLoading] = useState(true)
   useSetTitle({ title: t('pageTitle') })
-  useToolbarActions()
 
   useEffect(() => {
     loadUsers()

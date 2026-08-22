@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useResyncStore } from '@/stores/resync'
 import { useSetTitle } from '../viewer/setTitle'
-import { useToolbarActions } from './useToolbarActions'
 
 const PHASE_ORDER = ['tree', 'links', 'tags', 'search'] as const
 
@@ -13,7 +12,6 @@ export default function MaintenanceSettings() {
   const { t } = useTranslation('maintenance')
   const { isLoading, phase, trigger } = useResyncStore()
 
-  useToolbarActions()
   useSetTitle({ title: t('pageTitle') })
 
   const phaseIndex = phase

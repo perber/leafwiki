@@ -84,11 +84,6 @@ export const ShortcutsDialog = lazy(() =>
   })),
 )
 export const Search = lazy(() => import('@/features/search/Search'))
-export const ChangeOwnPasswordDialog = lazy(() =>
-  import('@/features/users/ChangeOwnPasswordDialog').then((m) => ({
-    default: m.ChangeOwnPasswordDialog,
-  })),
-)
 export const ChangePasswordDialog = lazy(() =>
   import('@/features/users/ChangePasswordDialog').then((m) => ({
     default: m.ChangePasswordDialog,
@@ -112,15 +107,5 @@ export const ApiKeyFormDialog = lazy(() =>
 export const DeleteApiKeyDialog = lazy(() =>
   import('@/features/apikeys/DeleteApiKeyDialog').then((m) => ({
     default: m.DeleteApiKeyDialog,
-  })),
-)
-export const TOTPSetupDialog = lazy(() =>
-  import('@/features/users/TOTPSetupDialog').then((m) => ({
-    default: m.TOTPSetupDialog,
-  })),
-)
-export const TOTPDisableDialog = lazy(() =>
-  import('@/features/users/TOTPDisableDialog').then((m) => ({
-    default: m.TOTPDisableDialog,
   })),
 )
