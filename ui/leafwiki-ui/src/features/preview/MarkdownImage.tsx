@@ -82,6 +82,13 @@ export function MarkdownImage({
       onClick={(e) => {
         rest.onClick?.(e)
 
+        // Images wrapped in a link (Markdown `[![alt](img)](url)` or raw
+        // `<a><img></a>`) should follow the link instead of opening the
+        // preview dialog.
+        if (e.currentTarget.closest('a')) {
+          return
+        }
+
         if (shouldOpenInNewTab(e)) {
           window.open(versionedSrc, '_blank', 'noopener,noreferrer')
           return
