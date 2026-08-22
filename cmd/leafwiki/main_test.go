@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -994,27 +995,55 @@ func TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue(t *testing.T
 // release/Docker targets do, instead of leaving local builds on the "dev"
 // default silently.
 func TestMakefile_BuildAndRunTargets_InjectVersionLdflags(t *testing.T) {
-	content, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
 	if err != nil {
 		t.Fatalf("failed to read Makefile: %v", err)
 	}
+	content := string(raw)
 
 	for _, target := range []string{"build:", "run:"} {
-		idx := strings.Index(string(content), target)
+		idx := strings.Index(content, target)
 		if idx == -1 {
 			t.Fatalf("Makefile target %q not found", target)
 		}
 
-		recipeEnd := strings.Index(string(content)[idx:], "\n\n")
+		recipeEnd := strings.Index(content[idx:], "\n\n")
 		if recipeEnd == -1 {
 			recipeEnd = len(content) - idx
 		}
-		recipe := string(content)[idx : idx+recipeEnd]
+		recipe := content[idx : idx+recipeEnd]
 
-		if !strings.Contains(recipe, "-X main.Version=$(VERSION)") {
+		if !strings.Contains(resolveMakeVars(content, recipe), "-X main.Version=$(VERSION)") {
 			t.Fatalf("expected Makefile %q recipe to inject main.Version from $(VERSION), got: %s", target, recipe)
 		}
 	}
+}
+
+var makeVarAssignment = regexp.MustCompile(`(?m)^([A-Za-z_][A-Za-z0-9_]*)\s*(?::=|\?=|=)\s*(.*)$`)
+
+// resolveMakeVars expands $(NAME) references in s using NAME's assignment
+// elsewhere in the Makefile, so the check above still works when a recipe
+// builds its ldflags from a variable (e.g. $(LDFLAGS)) instead of a literal
+// string. $(VERSION) itself is left unresolved since the test asserts on
+// that exact reference.
+func resolveMakeVars(content, s string) string {
+	assignments := map[string]string{}
+	for _, m := range makeVarAssignment.FindAllStringSubmatch(content, -1) {
+		assignments[m[1]] = m[2]
+	}
+	delete(assignments, "VERSION")
+
+	for changed := true; changed; {
+		changed = false
+		for name, value := range assignments {
+			token := "$(" + name + ")"
+			if strings.Contains(s, token) {
+				s = strings.ReplaceAll(s, token, value)
+				changed = true
+			}
+		}
+	}
+	return s
 }
 
 // TestViteConfig_ResolvesVersionViaSharedScript pins that the frontend
