@@ -67,7 +67,7 @@ func writeUsage(w io.Writer) {
 	--port             Port to run the server on (default: 8080)
 	--unix-socket      Path to a unix domain socket to listen on (overrides --host and --port)
 	--data-dir         Path to data directory (default: ./data)
-	--admin-password   Initial admin password (used only if no admin exists)
+	--admin-password   Initial admin password (used only if no admin exists), min 8 characters
 	--admin-username   Initial admin username (used only if no admin exists) (default: admin)
 	--admin-email      Initial admin email (used only if no admin exists) (default: admin@localhost)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
@@ -320,7 +320,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		dataDir:                        fs.String("data-dir", "", "path to data directory"),
 		adminUsername:                  fs.String("admin-username", "", "initial admin username (used only if no admin exists) (default: admin)"),
 		adminEmail:                     fs.String("admin-email", "", "initial admin email (used only if no admin exists) (default: admin@localhost)"),
-		adminPassword:                  fs.String("admin-password", "", "initial admin password"),
+		adminPassword:                  fs.String("admin-password", "", "initial admin password, min 8 characters"),
 		jwtSecret:                      fs.String("jwt-secret", "", "JWT secret for authentication"),
 		totpEncryptionKey:              fs.String("totp-encryption-key", "", "key to encrypt per-user TOTP secrets at rest, min 32 bytes (leave unset to keep TOTP self-service unavailable)"),
 		publicAccess:                   fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),

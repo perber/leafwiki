@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -323,8 +324,8 @@ func (uc *CreateUserUseCase) Execute(_ context.Context, in CreateUserInput) (*Cr
 	}
 	if in.Password == "" {
 		ve.Add("password", "Password must not be empty")
-	} else if len(in.Password) < 8 {
-		ve.Add("password", "Password must be at least 8 characters long")
+	} else if len(in.Password) < coreauth.MinPasswordLength {
+		ve.Add("password", fmt.Sprintf("Password must be at least %d characters long", coreauth.MinPasswordLength))
 	}
 	if !coreauth.IsValidRole(in.Role) {
 		ve.Add("role", "Invalid role")
@@ -425,8 +426,8 @@ func (uc *ChangeOwnPasswordUseCase) Execute(_ context.Context, in ChangeOwnPassw
 	ve := sharederrors.NewValidationErrors()
 	if in.NewPassword == "" {
 		ve.Add("newPassword", "New password must not be empty")
-	} else if len(in.NewPassword) < 8 {
-		ve.Add("newPassword", "New password must be at least 8 characters long")
+	} else if len(in.NewPassword) < coreauth.MinPasswordLength {
+		ve.Add("newPassword", fmt.Sprintf("New password must be at least %d characters long", coreauth.MinPasswordLength))
 	}
 	if _, err := uc.user().DoesIDAndPasswordMatch(in.UserID, in.OldPassword); err != nil {
 		ve.Add("oldPassword", "Old password is incorrect")
@@ -580,8 +581,8 @@ func (uc *ConfirmPasswordResetUseCase) Execute(_ context.Context, in ConfirmPass
 	ve := sharederrors.NewValidationErrors()
 	if in.NewPassword == "" {
 		ve.Add("newPassword", "New password must not be empty")
-	} else if len(in.NewPassword) < 8 {
-		ve.Add("newPassword", "New password must be at least 8 characters long")
+	} else if len(in.NewPassword) < coreauth.MinPasswordLength {
+		ve.Add("newPassword", fmt.Sprintf("New password must be at least %d characters long", coreauth.MinPasswordLength))
 	}
 	if ve.HasErrors() {
 		return nil, ve
@@ -727,8 +728,8 @@ func (uc *ConfirmInviteUseCase) Execute(_ context.Context, in ConfirmInviteInput
 	ve := sharederrors.NewValidationErrors()
 	if in.NewPassword == "" {
 		ve.Add("newPassword", "New password must not be empty")
-	} else if len(in.NewPassword) < 8 {
-		ve.Add("newPassword", "New password must be at least 8 characters long")
+	} else if len(in.NewPassword) < coreauth.MinPasswordLength {
+		ve.Add("newPassword", fmt.Sprintf("New password must be at least %d characters long", coreauth.MinPasswordLength))
 	}
 	if ve.HasErrors() {
 		return nil, ve

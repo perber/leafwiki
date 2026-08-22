@@ -10,7 +10,7 @@ services:
         DISABLE_REFRESH_TOKEN_RATE_LIMIT: "true"
     command:
       - "--jwt-secret=proxy-e2e-secret"
-      - "--admin-password=admin"
+      - "--admin-password=adminproxypassword"
       - "--allow-insecure=true"
       - "--enable-http-remote-user=true"
       # Trust the entire proxy-net subnet so nginx can forward headers.
@@ -49,7 +49,7 @@ services:
         DISABLE_REFRESH_TOKEN_RATE_LIMIT: "true"
     command:
       - "--jwt-secret=proxy-e2e-secret"
-      - "--admin-password=admin"
+      - "--admin-password=adminproxypassword"
       - "--allow-insecure=true"
       - "--enable-http-remote-user=true"
       - "--trusted-proxy-ips=172.30.0.0/16"

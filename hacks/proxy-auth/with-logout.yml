@@ -54,7 +54,7 @@ services:
       dockerfile: Dockerfile
     command:
       - "--jwt-secret=hack-secret"
-      - "--admin-password=admin"
+      - "--admin-password=adminproxypassword"
       - "--allow-insecure=true"
       - "--enable-http-remote-user=true"
       - "--http-remote-user-header-name=X-Forwarded-User"

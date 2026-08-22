@@ -36,7 +36,7 @@ func createWikiTestInstance(t *testing.T) *wiki.Wiki {
 func createWikiTestInstanceWithRevisionFlag(t *testing.T, enableRevision bool) *wiki.Wiki {
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
 		StorageDir:          t.TempDir(),
-		AdminPassword:       "admin",
+		AdminPassword:       "adminpassword",
 		JWTSecret:           "secretkey",
 		AccessTokenTimeout:  15 * time.Minute,
 		RefreshTokenTimeout: 7 * 24 * time.Hour,
@@ -108,7 +108,7 @@ func createRouterTestInstanceWithAllowInsecure(w *wiki.Wiki, allowInsecure bool,
 
 func authenticatedRequest(t *testing.T, router http.Handler, method, url string, body *strings.Reader) *httptest.ResponseRecorder {
 	// Login
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -365,7 +365,7 @@ func uploadAssetViaAPI(t *testing.T, router http.Handler, pageID, filename, cont
 		t.Fatalf("Close(writer) failed: %v", err)
 	}
 
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -477,7 +477,7 @@ func uploadBrandingLogoViaAPI(t *testing.T, router http.Handler, filename string
 		t.Fatalf("Close(writer) failed: %v", err)
 	}
 
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -535,7 +535,7 @@ func uploadBrandingFaviconViaAPI(t *testing.T, router http.Handler, filename str
 		t.Fatalf("Close(writer) failed: %v", err)
 	}
 
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -799,7 +799,7 @@ func TestLoginEndpoint_ExplainsAllowInsecureRequirementOnHTTP(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstanceWithAllowInsecure(w, false, t)
 
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -1434,7 +1434,7 @@ func TestUploadAssetEndpoint_RejectsFilesExceedingConfiguredLimit(t *testing.T) 
 
 	page := createPageViaAPI(t, router, "Asset Limit Test", "asset-limit-test", nil, pageNodeKind())
 
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -1548,7 +1548,7 @@ func TestCancelImportPlanEndpoint(t *testing.T) {
 		t.Fatalf("Close multipart writer failed: %v", err)
 	}
 
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -1635,7 +1635,7 @@ func TestImportExecuteEndpoint_WithZipUpload_ImportsPagesLinksAndAssets(t *testi
 	fixtureDir := importerFixturePathForHTTPTests(t, "link-assets-package")
 	zipBytes := createZipFromDir(t, fixtureDir)
 
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -1816,7 +1816,7 @@ func TestImportExecuteEndpoint_UsesConfiguredAssetUploadLimit(t *testing.T) {
 
 	zipBytes := createZipFromDir(t, fixtureDir)
 
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -3242,7 +3242,7 @@ func TestAuthLoginEndpoint(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	body := `{"identifier": "admin", "password": "admin"}`
+	body := `{"identifier": "admin", "password": "adminpassword"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -3290,7 +3290,7 @@ func TestAuthRefreshToken(t *testing.T) {
 	}
 
 	// 1) Login
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -3823,7 +3823,7 @@ func TestAssetEndpoints(t *testing.T) {
 	router := createRouterTestInstance(w, t)
 
 	// Step 0: Login als Admin und Cookies holen
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -3959,7 +3959,7 @@ func TestAssetMutationRevisionsUseAuthenticatedUser(t *testing.T) {
 	router := createRouterTestInstanceWithRevision(w, t)
 	adminUserID := getAdminUserIDViaAPI(t, router)
 
-	loginBody := `{"identifier": "admin", "password": "admin"}`
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRec := httptest.NewRecorder()
@@ -4145,7 +4145,7 @@ func uploadTestAsset(t *testing.T, router *gin.Engine, w *wiki.Wiki, content str
 
 	if needsAuth {
 		// Login to get auth cookies
-		loginBody := `{"identifier": "admin", "password": "admin"}`
+		loginBody := `{"identifier": "admin", "password": "adminpassword"}`
 		loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
 		loginReq.Header.Set("Content-Type", "application/json")
 		loginRec := httptest.NewRecorder()

@@ -23,7 +23,7 @@ func createWikiTestInstance(t *testing.T) *Wiki {
 func createWikiTestInstanceWithMetrics(t *testing.T, metrics *httpmetrics.HTTPMetrics) *Wiki {
 	wikiInstance, err := NewWiki(&WikiOptions{
 		StorageDir:          t.TempDir(),
-		AdminPassword:       "admin",
+		AdminPassword:       "adminpassword",
 		JWTSecret:           "secretkey",
 		AccessTokenTimeout:  15 * time.Minute,
 		RefreshTokenTimeout: 7 * 24 * time.Hour,
@@ -191,7 +191,7 @@ func TestWiki_InitDefaultAdmin_UsesGivenPassword(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
-	_, err := w.user.GetUserByEmailOrUsernameAndPassword("admin", "admin")
+	_, err := w.user.GetUserByEmailOrUsernameAndPassword("admin", "adminpassword")
 	if err != nil {
 		t.Fatalf("Admin user not found: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestWiki_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
 		StorageDir:          t.TempDir(),
 		AdminUsername:       "root",
 		AdminEmail:          "root@example.com",
-		AdminPassword:       "admin",
+		AdminPassword:       "adminpassword",
 		JWTSecret:           "secretkey",
 		AccessTokenTimeout:  15 * time.Minute,
 		RefreshTokenTimeout: 7 * 24 * time.Hour,
@@ -212,7 +212,7 @@ func TestWiki_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
 	}
 	defer test_utils.WrapCloseWithErrorCheck(wikiInstance.Close, t)
 
-	user, err := wikiInstance.user.GetUserByEmailOrUsernameAndPassword("root", "admin")
+	user, err := wikiInstance.user.GetUserByEmailOrUsernameAndPassword("root", "adminpassword")
 	if err != nil {
 		t.Fatalf("Admin user with custom username not found: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 		t.Fatal("expected auth service to be initialized")
 	}
 
-	token, err := authSvc.Login("admin", "admin")
+	token, err := authSvc.Login("admin", "adminpassword")
 	if err != nil || token == nil {
 		t.Error("Expected login to succeed with default admin password")
 	}
@@ -293,7 +293,7 @@ func TestWiki_AuthDisabled_APIKeysUnavailable(t *testing.T) {
 func TestWiki_APIKeyManagementDisabled_APIKeysUnavailable(t *testing.T) {
 	wikiInstance, err := NewWiki(&WikiOptions{
 		StorageDir:             t.TempDir(),
-		AdminPassword:          "admin",
+		AdminPassword:          "adminpassword",
 		JWTSecret:              "secretkey",
 		AccessTokenTimeout:     15 * time.Minute,
 		RefreshTokenTimeout:    7 * 24 * time.Hour,
@@ -315,7 +315,7 @@ func TestWiki_APIKeyManagementDisabled_APIKeysUnavailable(t *testing.T) {
 func TestWiki_APIKeyManagementEnabled_APIKeysAvailable(t *testing.T) {
 	wikiInstance, err := NewWiki(&WikiOptions{
 		StorageDir:             t.TempDir(),
-		AdminPassword:          "admin",
+		AdminPassword:          "adminpassword",
 		JWTSecret:              "secretkey",
 		AccessTokenTimeout:     15 * time.Minute,
 		RefreshTokenTimeout:    7 * 24 * time.Hour,
@@ -475,7 +475,7 @@ func TestWiki_ResyncRespectsLeafwikiignore(t *testing.T) {
 
 	w, err := NewWiki(&WikiOptions{
 		StorageDir:          tmp,
-		AdminPassword:       "admin",
+		AdminPassword:       "adminpassword",
 		JWTSecret:           "secretkey",
 		AccessTokenTimeout:  15 * time.Minute,
 		RefreshTokenTimeout: 7 * 24 * time.Hour,

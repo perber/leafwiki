@@ -22,7 +22,7 @@
 #
 # The "admin" username is forwarded to LeafWiki via the X-Forwarded-User header.
 # LeafWiki resolves it against its own user database — the built-in admin account
-# (created by --admin-password=admin) matches, so login works out of the box.
+# (created by --admin-password=adminproxypassword) matches, so login works out of the box.
 #
 # Access:
 #   http://localhost:4180   ← entry point (oauth2-proxy handles auth, proxies to LeafWiki)
