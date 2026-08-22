@@ -49,6 +49,7 @@ describe('ApiKeyFormDialog', () => {
           email: 'a@example.com',
           role: 'editor',
           totpEnabled: false,
+          mustSetPassword: false,
         },
       ],
     })

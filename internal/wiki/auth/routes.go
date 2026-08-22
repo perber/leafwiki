@@ -42,6 +42,12 @@ type Routes struct {
 	disableTOTP       *DisableTOTPUseCase
 	getTOTPStatus     *GetTOTPStatusUseCase
 	authService       *coreauth.AuthService
+
+	requestPasswordReset *RequestPasswordResetUseCase
+	confirmPasswordReset *ConfirmPasswordResetUseCase
+	inviteUser           *InviteUserUseCase
+	resendInvite         *ResendInviteUseCase
+	confirmInvite        *ConfirmInviteUseCase
 }
 
 // RoutesConfig holds the dependencies to build an auth Routes instance.
@@ -61,6 +67,12 @@ type RoutesConfig struct {
 	DisableTOTP       *DisableTOTPUseCase
 	GetTOTPStatus     *GetTOTPStatusUseCase
 	AuthService       *coreauth.AuthService
+
+	RequestPasswordReset *RequestPasswordResetUseCase
+	ConfirmPasswordReset *ConfirmPasswordResetUseCase
+	InviteUser           *InviteUserUseCase
+	ResendInvite         *ResendInviteUseCase
+	ConfirmInvite        *ConfirmInviteUseCase
 }
 
 // NewRoutes constructs the auth RouteRegistrar.
@@ -81,6 +93,12 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		disableTOTP:       cfg.DisableTOTP,
 		getTOTPStatus:     cfg.GetTOTPStatus,
 		authService:       cfg.AuthService,
+
+		requestPasswordReset: cfg.RequestPasswordReset,
+		confirmPasswordReset: cfg.ConfirmPasswordReset,
+		inviteUser:           cfg.InviteUser,
+		resendInvite:         cfg.ResendInvite,
+		confirmInvite:        cfg.ConfirmInvite,
 	}
 }
 
@@ -129,6 +147,13 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	authGroup.GET("/users", authmw.RequireAdmin(opts.AuthDisabled), r.handleGetUsers)
 	authGroup.PUT("/users/:id", authmw.RequireSelfOrAdmin(opts.AuthDisabled), r.handleUpdateUser)
 	authGroup.DELETE("/users/:id", authmw.RequireAdmin(opts.AuthDisabled), r.handleDeleteUser)
+	// Invite is only ever meaningful with SMTP configured — the underlying
+	// use cases already short-circuit on ErrEmailDisabled when emailTokens()
+	// is nil (SMTP off or auth disabled), so registering these unconditionally
+	// (mirroring POST /users above) just means that case surfaces as a clean
+	// 403 instead of a 404.
+	authGroup.POST("/users/invite", authmw.RequireAdmin(opts.AuthDisabled), r.handleInviteUser)
+	authGroup.POST("/users/:id/invite/resend", authmw.RequireAdmin(opts.AuthDisabled), r.handleResendInvite)
 
 	if !opts.AuthDisabled {
 		authGroup.PUT("/users/me/password", r.handleChangeOwnPassword)
@@ -141,6 +166,19 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		authGroup.POST("/users/me/totp/setup/confirm", totpSetupRateLimiter, r.handleConfirmTOTPSetup(ctx))
 		authGroup.POST("/users/me/totp/disable", totpSetupRateLimiter, r.handleDisableTOTP(ctx))
 		authGroup.GET("/users/me/totp/status", r.handleTOTPStatus)
+
+		// Pre-auth password-reset/invite-accept endpoints: like login, these
+		// only make sense with real accounts, so they're gated on auth being
+		// enabled, not on SMTP specifically (the use cases handle the
+		// SMTP-disabled case themselves, returning ErrEmailDisabled).
+		emailRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)
+		// Separate, tighter per-identifier budget on top of the per-IP one
+		// above: the threat forgot-password uniquely has is mail-bombing one
+		// victim from many IPs, which a per-IP limiter alone doesn't stop.
+		passwordResetIdentifierLimiter := security.NewKeyedLimiter(3, time.Hour, false)
+		nonAuth.POST("/auth/password/forgot", emailRateLimiter, r.handleRequestPasswordReset(passwordResetIdentifierLimiter))
+		nonAuth.POST("/auth/password/reset", emailRateLimiter, r.handleConfirmPasswordReset)
+		nonAuth.POST("/auth/invite/accept", emailRateLimiter, r.handleConfirmInvite(ctx))
 	}
 }
 
@@ -177,6 +215,7 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			"enableApiKeyManagement":  opts.EnableAPIKeyManagement,
 			"gitBackupEnabled":        opts.GitBackupEnabled,
 			"snapshotEnabled":         opts.SnapshotEnabled,
+			"smtpEnabled":             opts.SMTPEnabled,
 			"totpAvailable":           opts.TOTPAvailable,
 			"httpRemoteUserEnabled":   opts.HTTPRemoteUser.Enabled,
 			"loginUrl":                opts.LoginURL,
@@ -574,4 +613,136 @@ func (r *Routes) handleTOTPStatus(c *gin.Context) {
 		"enabled":                out.Enabled,
 		"recoveryCodesRemaining": out.RecoveryCodesRemaining,
 	})
+}
+
+// handleRequestPasswordReset always returns the same response regardless of
+// whether identifier resolved to a user — see
+// coreauth.EmailTokenService.RequestPasswordReset's doc comment for the full
+// enumeration-protection rationale. identifierLimiter is checked here,
+// inside the handler, rather than as separate route middleware, because it
+// needs the parsed request body's identifier as its key.
+func (r *Routes) handleRequestPasswordReset(identifierLimiter *security.KeyedLimiter) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Identifier string `json:"identifier" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
+			return
+		}
+
+		// Silently skip dispatch once this identifier's budget is exhausted —
+		// still returning the generic success response below. Reporting 429
+		// here would itself confirm the identifier is being actively
+		// targeted/tracked, undermining the very protection the generic
+		// response exists for.
+		if identifierLimiter.Allow(req.Identifier) {
+			if err := r.requestPasswordReset.Execute(c.Request.Context(), RequestPasswordResetInput{Identifier: req.Identifier}); err != nil {
+				respondWithAuthError(c, err)
+				return
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "If an account exists for that identifier, a password reset email has been sent.",
+		})
+	}
+}
+
+func (r *Routes) handleConfirmPasswordReset(c *gin.Context) {
+	var req struct {
+		Token       string `json:"token" binding:"required"`
+		NewPassword string `json:"newPassword" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
+		return
+	}
+	out, err := r.confirmPasswordReset.Execute(c.Request.Context(), ConfirmPasswordResetInput{
+		Token: req.Token, NewPassword: req.NewPassword,
+	})
+	if err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": out.User})
+}
+
+func (r *Routes) handleInviteUser(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Email    string `json:"email" binding:"required"`
+		Role     string `json:"role" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
+		return
+	}
+	out, err := r.inviteUser.Execute(c.Request.Context(), InviteUserInput{
+		Username: req.Username, Email: req.Email, Role: req.Role,
+	})
+	if err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{
+		"user":      out.User,
+		"emailSent": out.EmailSent,
+	})
+}
+
+func (r *Routes) handleResendInvite(c *gin.Context) {
+	id := c.Param("id")
+	if err := r.resendInvite.Execute(c.Request.Context(), ResendInviteInput{UserID: id}); err != nil {
+		respondWithAuthError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// handleConfirmInvite consumes the invite token and, on success, issues auth
+// cookies directly (unlike handleConfirmPasswordReset) — see
+// ConfirmInviteUseCase's doc comment for why a freshly invited user is
+// auto-logged-in instead of sent to the login page.
+func (r *Routes) handleConfirmInvite(rctx httpinternal.RouterContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Token       string `json:"token" binding:"required"`
+			NewPassword string `json:"newPassword" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
+			return
+		}
+		out, err := r.confirmInvite.Execute(c.Request.Context(), ConfirmInviteInput{
+			Token: req.Token, NewPassword: req.NewPassword,
+		})
+		if err != nil {
+			respondWithAuthError(c, err)
+			return
+		}
+		if _, err := rctx.CSRFCookie.Issue(c); err != nil {
+			writeAuthCookieError(c, err,
+				"HTTPS is required for login cookies. Use HTTPS or start LeafWiki with --allow-insecure for trusted plain HTTP setups.",
+				errFailedToIssueCSRFCookie,
+				"failed to issue invite-accept CSRF cookie",
+			)
+			return
+		}
+		if err := rctx.AuthCookies.Set(c, out.Token.Token, out.Token.RefreshToken); err != nil {
+			if errors.Is(err, utils.ErrHTTPSRequired) {
+				respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed,
+					httpsRequiredUserMsg,
+					httpsRequiredLogMsg)
+				return
+			}
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthCookieFailed, "Failed to set authentication cookies", "failed to set authentication cookies")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":              "Invite accepted",
+			"user":                 out.Token.User,
+			"accessTokenExpiresAt": out.Token.AccessTokenExpiresAt,
+		})
+	}
 }

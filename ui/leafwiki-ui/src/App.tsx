@@ -23,6 +23,7 @@ function App() {
   const enableApiKeyManagement = useConfigStore((s) => s.enableApiKeyManagement)
   const userManagementUrl = useConfigStore((s) => s.userManagementUrl)
   const loginUrl = useConfigStore((s) => s.loginUrl)
+  const smtpEnabled = useConfigStore((s) => s.smtpEnabled)
   const loadBranding = useBrandingStore((s) => s.loadBranding)
   const lastConfigErrorRef = useRef<string | null>(null)
 
@@ -79,6 +80,7 @@ function App() {
         enableApiKeyManagement,
         userManagementUrl,
         loginUrl,
+        smtpEnabled,
         BASE_PATH || undefined,
       ),
     [
@@ -88,6 +90,7 @@ function App() {
       enableApiKeyManagement,
       userManagementUrl,
       loginUrl,
+      smtpEnabled,
     ],
   )
 

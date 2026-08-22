@@ -146,6 +146,48 @@ export async function completeTOTPLogin(
   return data
 }
 
+// requestPasswordReset always resolves (never throws for an unknown
+// identifier) — the backend deliberately returns the same response either
+// way, so the UI must not try to distinguish "sent" from "no such user".
+export async function requestPasswordReset(identifier: string): Promise<void> {
+  await postLoginRequest<{ message: string }>('/api/auth/password/forgot', {
+    identifier,
+  })
+}
+
+export type PasswordResetConfirmResponse = {
+  user: AuthResponse['user']
+}
+
+// confirmPasswordReset does NOT log the user in — a reset revokes every
+// existing session for the account (see the backend's
+// ConfirmPasswordResetUseCase), so the frontend sends the user to the login
+// page afterward instead of calling applyAuthResponse.
+export async function confirmPasswordReset(
+  token: string,
+  newPassword: string,
+): Promise<PasswordResetConfirmResponse> {
+  return postLoginRequest<PasswordResetConfirmResponse>(
+    '/api/auth/password/reset',
+    { token, newPassword },
+  )
+}
+
+// acceptInvite sets the invited user's real password and, unlike
+// confirmPasswordReset, logs them straight in — a freshly invited user has
+// no prior session to worry about (see the backend's ConfirmInviteUseCase).
+export async function acceptInvite(
+  token: string,
+  newPassword: string,
+): Promise<AuthResponse> {
+  const data = await postLoginRequest<AuthResponse>('/api/auth/invite/accept', {
+    token,
+    newPassword,
+  })
+  applyAuthResponse(data)
+  return data
+}
+
 export async function logout() {
   const { authDisabled } = useConfigStore.getState()
   if (authDisabled) return

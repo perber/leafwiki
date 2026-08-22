@@ -420,6 +420,45 @@ func (s *UserService) ResetAdminUserPassword(username, email string) (*User, err
 	return adminUser, nil
 }
 
+// InviteUser creates a new user with a random, bcrypt-hashed password that is
+// never returned or logged, and marks MustSetPassword so the admin UI can
+// show an "Invitation pending" state. The account exists and is fully usable
+// (listable, assignable API keys, etc.) but cannot meaningfully log in until
+// CompleteInvite sets a real password.
+func (s *UserService) InviteUser(username, email, role string) (*User, error) {
+	password, err := shared.GenerateRandomPassword(32)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.CreateUser(username, email, password, role)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.store.SetMustSetPassword(user.ID, true); err != nil {
+		return nil, err
+	}
+	user.MustSetPassword = true
+
+	s.log.Info("user invited", "userID", user.ID, "role", user.Role)
+	return user, nil
+}
+
+// CompleteInvite sets id's real password and clears MustSetPassword. Called
+// once an invite token is confirmed (see auth.EmailTokenService.ConfirmInvite).
+func (s *UserService) CompleteInvite(id, password string) error {
+	if err := s.UpdatePassword(id, password); err != nil {
+		return err
+	}
+	if err := s.store.SetMustSetPassword(id, false); err != nil {
+		return err
+	}
+
+	s.log.Info("invite accepted", "userID", id)
+	return nil
+}
+
 // ConsumeRecoveryCodeHash atomically replaces oldHashes with newHashes for id
 // via compare-and-swap: the write only takes effect if the stored hashes
 // still match oldHashes exactly. Returns swapped=false (with no error) if

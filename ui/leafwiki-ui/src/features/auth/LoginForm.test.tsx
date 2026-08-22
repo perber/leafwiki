@@ -211,3 +211,36 @@ describe('LoginForm TOTP flow', () => {
     await screen.findByText('Requested page')
   })
 })
+
+describe('LoginForm forgot-password link', () => {
+  beforeEach(() => {
+    loginMock.mockReset()
+    useSessionStore.setState({
+      user: null,
+      isRefreshing: false,
+      accessTokenExpiresAt: null,
+    })
+  })
+
+  it('is hidden when SMTP is not configured', () => {
+    useConfigStore.setState({
+      authDisabled: false,
+      httpRemoteUserEnabled: false,
+      smtpEnabled: false,
+    })
+    renderLoginForm()
+    expect(
+      screen.queryByTestId('login-forgot-password-link'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('is shown when SMTP is configured', () => {
+    useConfigStore.setState({
+      authDisabled: false,
+      httpRemoteUserEnabled: false,
+      smtpEnabled: true,
+    })
+    renderLoginForm()
+    expect(screen.getByTestId('login-forgot-password-link')).toBeInTheDocument()
+  })
+})
