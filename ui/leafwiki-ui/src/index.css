@@ -871,6 +871,10 @@
     @apply mt-2 w-full;
   }
 
+  .login__forgot-password {
+    @apply text-muted-foreground hover:text-interface-text mb-4 block text-sm underline-offset-2 hover:underline;
+  }
+
   /* TOTP setup dialog */
   .totp-setup__qr {
     @apply flex justify-center rounded bg-white p-3;

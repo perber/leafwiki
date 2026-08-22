@@ -18,3 +18,7 @@ var ErrAPIKeyInvalid = errors.New("invalid api key")
 var ErrAPIKeyRevoked = errors.New("api key has been revoked")
 var ErrAPIKeyExpired = errors.New("api key has expired")
 var ErrAPIKeyPrefixCollision = errors.New("api key prefix collision")
+
+var ErrEmailTokenInvalid = errors.New("invalid or expired token")
+var ErrEmailDisabled = errors.New("email is not configured")
+var ErrInviteAlreadyAccepted = errors.New("invite has already been accepted")

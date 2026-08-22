@@ -7,6 +7,7 @@ import { useSetTitle } from '../viewer/setTitle'
 import { ChangePasswordButton } from './ChangePasswordButton'
 import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
+import { ResendInviteButton } from './ResendInviteButton'
 import { useToolbarActions } from './useToolbarActions'
 
 export default function UserManagement() {
@@ -110,6 +111,14 @@ export default function UserManagement() {
                       </td>
                       <td className="settings__actions-cell">
                         <div className="settings__actions">
+                          {user.mustSetPassword && (
+                            <>
+                              <span className="settings__pill settings__pill-warning">
+                                {t('invite.pendingPill')}
+                              </span>
+                              <ResendInviteButton user={user} />
+                            </>
+                          )}
                           <CreateEditUserButton user={user} />
                           <ChangePasswordButton user={user} />
                           <DeleteUserButton user={user} />

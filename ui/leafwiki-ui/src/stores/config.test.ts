@@ -24,6 +24,7 @@ const baseConfig = {
   enableApiKeyManagement: false,
   gitBackupEnabled: false,
   snapshotEnabled: false,
+  smtpEnabled: false,
   totpAvailable: false,
   httpRemoteUserEnabled: true,
   loginUrl: '',

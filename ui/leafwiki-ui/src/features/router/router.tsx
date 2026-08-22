@@ -1,8 +1,10 @@
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router'
 import {
+  AcceptInvitePage,
   ApiKeysManagement,
   BackupSettings,
   BrandingSettings,
+  ForgotPasswordForm,
   Importer,
   LoginForm,
   MaintenanceSettings,
@@ -10,6 +12,7 @@ import {
   PageHistoryPage,
   PageViewer,
   PermalinkRedirect,
+  ResetPasswordPage,
   RootRedirect,
   SnapshotSettings,
   UserManagement,
@@ -25,6 +28,7 @@ export const createLeafWikiRouter = (
   enableApiKeyManagement: boolean,
   userManagementUrl: string,
   loginUrl: string,
+  smtpEnabled: boolean,
   basename?: string,
 ) =>
   createBrowserRouter(
@@ -38,6 +42,39 @@ export const createLeafWikiRouter = (
         ) : (
           <LoginForm />
         ),
+      },
+      // Local-account password-reset/invite pages only make sense with real
+      // accounts and SMTP configured — gated the same way as /login (auth
+      // disabled or an external login URL both mean "no built-in login form",
+      // so these can't be reached meaningfully either), plus smtpEnabled
+      // specifically since the backend use cases return ErrEmailDisabled
+      // otherwise.
+      {
+        path: '/forgot-password',
+        element:
+          authDisabled || loginUrl || !smtpEnabled ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <ForgotPasswordForm />
+          ),
+      },
+      {
+        path: '/reset-password',
+        element:
+          authDisabled || loginUrl || !smtpEnabled ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <ResetPasswordPage />
+          ),
+      },
+      {
+        path: '/accept-invite',
+        element:
+          authDisabled || loginUrl || !smtpEnabled ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <AcceptInvitePage />
+          ),
       },
       {
         path: '/',

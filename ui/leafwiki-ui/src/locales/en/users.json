@@ -9,6 +9,14 @@
     "role": "Role",
     "actions": "Actions"
   },
+  "invite": {
+    "pendingPill": "Invitation pending",
+    "resendAction": "Resend invite",
+    "resending": "Resending...",
+    "resendSuccessToast": "Invite email resent",
+    "resendErrorFallback": "Error resending invite",
+    "emailNotSentWarning": "User created, but the invite email could not be sent. Use \"Resend invite\" to try again."
+  },
   "validation": {
     "passwordTooShort": "Password must be at least 8 characters long",
     "passwordsDoNotMatch": "Passwords do not match"
@@ -42,7 +50,10 @@
     "rolePlaceholder": "Select a role",
     "roleViewer": "Viewer",
     "roleEditor": "Editor",
-    "roleAdmin": "Admin"
+    "roleAdmin": "Admin",
+    "modeSetPassword": "Set password now",
+    "modeInvite": "Send invite email",
+    "inviteSuccessToast": "Invite sent successfully"
   },
   "deleteUser": {
     "title": "Delete User?",

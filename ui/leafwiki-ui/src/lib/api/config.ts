@@ -22,6 +22,7 @@ export type Config = {
   enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
   snapshotEnabled: boolean
+  smtpEnabled: boolean
   totpAvailable: boolean
   httpRemoteUserEnabled: boolean
   loginUrl: string

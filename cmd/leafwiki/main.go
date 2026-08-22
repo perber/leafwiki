@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/backup"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/email"
 	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -290,6 +292,16 @@ type cliFlags struct {
 	snapshotRetention              *int
 	snapshotDir                    *string
 	restoreUploadMaxSize           *string
+	smtpHost                       *string
+	smtpPort                       *int
+	smtpUsername                   *string
+	smtpPassword                   *string
+	smtpFrom                       *string
+	smtpFromName                   *string
+	smtpSecurity                   *string
+	smtpInsecureSkipVerify         *bool
+	smtpTimeout                    *time.Duration
+	publicURL                      *string
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -347,6 +359,16 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		snapshotRetention:              fs.Int("snapshot-retention", 10, "number of most recent snapshots to keep; <= 0 = keep all (default: 10)"),
 		snapshotDir:                    fs.String("snapshot-dir", "", "directory to store snapshot ZIPs in (default: <data-dir>/snapshots)"),
 		restoreUploadMaxSize:           fs.String("restore-upload-max-size", "", "maximum size for an uploaded backup ZIP to restore from (for example 500MiB, 500MB, 524288000) (default: 500MiB)"),
+		smtpHost:                       fs.String("smtp-host", "", "SMTP server host for password-reset/invite email; unset disables the feature entirely (default: \"\")"),
+		smtpPort:                       fs.Int("smtp-port", 587, "SMTP server port (default: 587)"),
+		smtpUsername:                   fs.String("smtp-username", "", "SMTP auth username"),
+		smtpPassword:                   fs.String("smtp-password", "", "SMTP auth password (env var preferred)"),
+		smtpFrom:                       fs.String("smtp-from", "", "From address for outgoing email (required when --smtp-host is set)"),
+		smtpFromName:                   fs.String("smtp-from-name", "LeafWiki", "From display name for outgoing email (default: LeafWiki)"),
+		smtpSecurity:                   fs.String("smtp-security", "starttls", "SMTP transport security: none, starttls, or tls (default: starttls)"),
+		smtpInsecureSkipVerify:         fs.Bool("smtp-insecure-skip-verify", false, "skip TLS certificate verification for SMTP (default: false; do not use in production)"),
+		smtpTimeout:                    fs.Duration("smtp-timeout", 10*time.Second, "timeout for a single SMTP send (e.g. 10s) (default: 10s)"),
+		publicURL:                      fs.String("public-url", "", "absolute base URL used to build links in outgoing email, e.g. https://wiki.example.com (required when --smtp-host is set)"),
 	}
 }
 
@@ -436,6 +458,17 @@ func main() {
 	snapshotInterval := resolveDuration("snapshot-interval", *flags.snapshotInterval, visited, "LEAFWIKI_SNAPSHOT_INTERVAL")
 	snapshotRetention := resolveInt("snapshot-retention", *flags.snapshotRetention, visited, "LEAFWIKI_SNAPSHOT_RETENTION", 10)
 	snapshotDir := resolveString("snapshot-dir", *flags.snapshotDir, visited, "LEAFWIKI_SNAPSHOT_DIR", "")
+	smtpHost := resolveString("smtp-host", *flags.smtpHost, visited, "LEAFWIKI_SMTP_HOST", "")
+	smtpPort := resolveInt("smtp-port", *flags.smtpPort, visited, "LEAFWIKI_SMTP_PORT", 587)
+	smtpUsername := resolveString("smtp-username", *flags.smtpUsername, visited, "LEAFWIKI_SMTP_USERNAME", "")
+	smtpPassword := resolveString("smtp-password", *flags.smtpPassword, visited, "LEAFWIKI_SMTP_PASSWORD", "")
+	smtpFrom := resolveString("smtp-from", *flags.smtpFrom, visited, "LEAFWIKI_SMTP_FROM", "")
+	smtpFromName := resolveString("smtp-from-name", *flags.smtpFromName, visited, "LEAFWIKI_SMTP_FROM_NAME", "LeafWiki")
+	smtpSecurity := resolveString("smtp-security", *flags.smtpSecurity, visited, "LEAFWIKI_SMTP_SECURITY", "starttls")
+	smtpInsecureSkipVerify := resolveBool("smtp-insecure-skip-verify", *flags.smtpInsecureSkipVerify, visited, "LEAFWIKI_SMTP_INSECURE_SKIP_VERIFY")
+	smtpTimeout := resolveDuration("smtp-timeout", *flags.smtpTimeout, visited, "LEAFWIKI_SMTP_TIMEOUT")
+	publicURL := resolveString("public-url", *flags.publicURL, visited, "LEAFWIKI_PUBLIC_URL", "")
+	smtpEnabled := smtpHost != ""
 	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
 	if err != nil {
 		fail("invalid --trusted-proxy-ips value", "error", err)
@@ -457,6 +490,16 @@ func main() {
 	}
 	if err := validateRedirectURL("logout-url", logoutURL); err != nil {
 		fail("Invalid logout URL configuration", "error", err)
+	}
+
+	if err := validateSMTPConfig(smtpHost, smtpFrom, publicURL, smtpSecurity); err != nil {
+		fail("Invalid SMTP configuration", "error", err)
+	}
+	if smtpEnabled {
+		// A misconfigured public URL produces broken links in emails that
+		// have already gone out — irreversible — so log the resolved value
+		// once at boot rather than only on first use.
+		slog.Default().Info("SMTP email enabled", "host", smtpHost, "port", smtpPort, "security", smtpSecurity, "publicUrl", publicURL)
 	}
 	if err := validateRedirectURL("user-management-url", userManagementURL); err != nil {
 		fail("Invalid user management URL configuration", "error", err)
@@ -565,7 +608,19 @@ func main() {
 		EnableAPIKeyManagement: enableAPIKeyManagement,
 		MaxRevisionHistory:     maxRevisionHistory,
 		RevisionCoalesceWindow: revisionCoalesceWindow,
-		Metrics:                metrics,
+		SMTP: email.Config{
+			Host:               smtpHost,
+			Port:               smtpPort,
+			Username:           smtpUsername,
+			Password:           smtpPassword,
+			From:               smtpFrom,
+			FromName:           smtpFromName,
+			Security:           email.Security(smtpSecurity),
+			InsecureSkipVerify: smtpInsecureSkipVerify,
+			Timeout:            smtpTimeout,
+			PublicURL:          publicURL,
+		},
+		Metrics: metrics,
 	})
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)
@@ -676,6 +731,7 @@ func main() {
 		Metrics:                 metrics,
 		GitBackupEnabled:        gitBackupEnabled,
 		SnapshotEnabled:         snapshotEnabled,
+		SMTPEnabled:             smtpEnabled,
 		TOTPAvailable:           w.TOTPService() != nil,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:         enableHTTPRemoteUser,
@@ -987,6 +1043,33 @@ func validateHTTPRemoteUserAutoCreateConfig(autoCreateEnabled, remoteUserEnabled
 	}
 	if defaultRole == auth.RoleAdmin {
 		return fmt.Errorf("--http-remote-user-default-role must not be %q; promote auto-created users manually instead", auth.RoleAdmin)
+	}
+	return nil
+}
+
+// validateSMTPConfig fails fast at startup, mirroring
+// validateHTTPRemoteUserConfig, rather than silently disabling the feature or
+// leaving it half-configured until the first send attempt fails: a bad
+// --public-url in particular would only surface once already embedded in an
+// email that's gone out.
+func validateSMTPConfig(host, from, publicURL, security string) error {
+	if host == "" {
+		return nil
+	}
+	if from == "" {
+		return fmt.Errorf("--smtp-from is required when --smtp-host is set")
+	}
+	if publicURL == "" {
+		return fmt.Errorf("--public-url is required when --smtp-host is set")
+	}
+	u, err := url.Parse(publicURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("--public-url must be an absolute http(s):// URL, got %q", publicURL)
+	}
+	switch email.Security(security) {
+	case email.SecurityNone, email.SecurityStartTLS, email.SecurityTLS:
+	default:
+		return fmt.Errorf("--smtp-security must be one of none, starttls, tls, got %q", security)
 	}
 	return nil
 }

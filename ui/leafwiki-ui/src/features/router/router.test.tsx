@@ -2,7 +2,7 @@ import { isValidElement } from 'react'
 import { Navigate } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import ExternalRedirect from '../auth/ExternalRedirect'
-import { LoginForm } from './lazy-routes'
+import { ForgotPasswordForm, LoginForm } from './lazy-routes'
 import { createLeafWikiRouter } from './router'
 
 function loginRouteElementType(authDisabled: boolean, loginUrl: string) {
@@ -13,6 +13,7 @@ function loginRouteElementType(authDisabled: boolean, loginUrl: string) {
     false,
     '',
     loginUrl,
+    true,
   )
   const loginRoute = router.routes.find((route) => route.path === '/login')
   const element = loginRoute?.element
@@ -37,5 +38,33 @@ describe('createLeafWikiRouter /login route', () => {
 
   it('renders the local login form otherwise', () => {
     expect(loginRouteElementType(false, '')).toBe(LoginForm)
+  })
+})
+
+function forgotPasswordRouteElementType(smtpEnabled: boolean) {
+  const router = createLeafWikiRouter(
+    false,
+    false,
+    false,
+    false,
+    '',
+    '',
+    smtpEnabled,
+  )
+  const route = router.routes.find((r) => r.path === '/forgot-password')
+  const element = route?.element
+  if (!isValidElement(element)) {
+    throw new Error('expected /forgot-password route to render an element')
+  }
+  return element.type
+}
+
+describe('createLeafWikiRouter /forgot-password route', () => {
+  it('redirects to /login when SMTP is not configured', () => {
+    expect(forgotPasswordRouteElementType(false)).toBe(Navigate)
+  })
+
+  it('renders the forgot-password form when SMTP is configured', () => {
+    expect(forgotPasswordRouteElementType(true)).toBe(ForgotPasswordForm)
   })
 })

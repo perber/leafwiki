@@ -514,3 +514,234 @@ func (uc *GetUserByIDUseCase) Execute(_ context.Context, in GetUserByIDInput) (*
 	}
 	return &GetUserByIDOutput{User: user.ToPublicUser()}, nil
 }
+
+// ─── RequestPasswordResetUseCase ─────────────────────────────────────────────
+
+type RequestPasswordResetInput struct {
+	Identifier string
+}
+
+type RequestPasswordResetUseCase struct {
+	// emailTokens is resolved on every call (like user/resolver elsewhere in
+	// this file) rather than cached at construction. It returns nil when
+	// SMTP is unconfigured or auth is disabled — see wiki.initEmail.
+	emailTokens func() *coreauth.EmailTokenService
+}
+
+func NewRequestPasswordResetUseCase(e func() *coreauth.EmailTokenService) *RequestPasswordResetUseCase {
+	return &RequestPasswordResetUseCase{emailTokens: e}
+}
+
+// Execute always succeeds except when email isn't configured at all. It must
+// never distinguish "identifier resolved to a user" from "it didn't" — that
+// is the whole point of the enumeration-protection design here (see
+// coreauth.EmailTokenService.RequestPasswordReset's doc comment) — so the
+// actual send happens via RequestPasswordResetAsync, a background goroutine
+// whose outcome this call does not wait for or report.
+func (uc *RequestPasswordResetUseCase) Execute(_ context.Context, in RequestPasswordResetInput) error {
+	tokens := uc.emailTokens()
+	if tokens == nil {
+		return coreauth.ErrEmailDisabled
+	}
+	tokens.RequestPasswordResetAsync(in.Identifier)
+	return nil
+}
+
+// ─── ConfirmPasswordResetUseCase ─────────────────────────────────────────────
+
+type ConfirmPasswordResetInput struct {
+	Token       string
+	NewPassword string
+}
+
+type ConfirmPasswordResetOutput struct {
+	User *coreauth.PublicUser
+}
+
+type ConfirmPasswordResetUseCase struct {
+	emailTokens func() *coreauth.EmailTokenService
+}
+
+func NewConfirmPasswordResetUseCase(e func() *coreauth.EmailTokenService) *ConfirmPasswordResetUseCase {
+	return &ConfirmPasswordResetUseCase{emailTokens: e}
+}
+
+// Execute does not issue a session on success — unlike ConfirmInviteUseCase.
+// A reset just revoked every existing session for this user (see
+// EmailTokenService.ConfirmPasswordReset); auto-logging back in immediately
+// after would undercut that. The frontend sends the user to the login page
+// instead.
+func (uc *ConfirmPasswordResetUseCase) Execute(_ context.Context, in ConfirmPasswordResetInput) (*ConfirmPasswordResetOutput, error) {
+	tokens := uc.emailTokens()
+	if tokens == nil {
+		return nil, coreauth.ErrEmailDisabled
+	}
+
+	ve := sharederrors.NewValidationErrors()
+	if in.NewPassword == "" {
+		ve.Add("newPassword", "New password must not be empty")
+	} else if len(in.NewPassword) < 8 {
+		ve.Add("newPassword", "New password must be at least 8 characters long")
+	}
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
+	user, err := tokens.ConfirmPasswordReset(in.Token, in.NewPassword)
+	if err != nil {
+		return nil, err
+	}
+	return &ConfirmPasswordResetOutput{User: user.ToPublicUser()}, nil
+}
+
+// ─── InviteUserUseCase ────────────────────────────────────────────────────────
+
+type InviteUserInput struct {
+	Username string
+	Email    string
+	Role     string
+}
+
+type InviteUserOutput struct {
+	User      *coreauth.PublicUser
+	EmailSent bool
+}
+
+type InviteUserUseCase struct {
+	user        func() *coreauth.UserService
+	emailTokens func() *coreauth.EmailTokenService
+	resolver    *coreauth.UserResolver
+	log         *slog.Logger
+}
+
+func NewInviteUserUseCase(u func() *coreauth.UserService, e func() *coreauth.EmailTokenService, r *coreauth.UserResolver, log *slog.Logger) *InviteUserUseCase {
+	return &InviteUserUseCase{user: u, emailTokens: e, resolver: r, log: log}
+}
+
+// Execute mirrors CreateUserUseCase's validation (minus a password field —
+// InviteUser generates one internally, see coreauth.UserService.InviteUser).
+// A send failure does not fail the request or roll back user creation: the
+// admin already has a real user account to work with, and EmailSent=false
+// tells the frontend to offer a resend (see ResendInviteUseCase).
+func (uc *InviteUserUseCase) Execute(ctx context.Context, in InviteUserInput) (*InviteUserOutput, error) {
+	tokens := uc.emailTokens()
+	if tokens == nil {
+		return nil, coreauth.ErrEmailDisabled
+	}
+
+	ve := sharederrors.NewValidationErrors()
+	if in.Username == "" {
+		ve.Add("username", "Username must not be empty")
+	}
+	if in.Email == "" {
+		ve.Add("email", "Email must not be empty")
+	} else if !emailRegex.MatchString(in.Email) {
+		ve.Add("email", "Email is not valid")
+	}
+	if !coreauth.IsValidRole(in.Role) {
+		ve.Add("role", "Invalid role")
+	}
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
+	user, err := uc.user().InviteUser(in.Username, in.Email, in.Role)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.resolver.Reload(); err != nil {
+		uc.log.Warn("failed to reload user resolver cache", "error", err)
+	}
+
+	emailSent := true
+	if err := tokens.IssueInvite(ctx, user); err != nil {
+		uc.log.Warn("failed to send invite email", "userID", user.ID, "error", err)
+		emailSent = false
+	}
+
+	return &InviteUserOutput{User: user.ToPublicUser(), EmailSent: emailSent}, nil
+}
+
+// ─── ResendInviteUseCase ──────────────────────────────────────────────────────
+
+type ResendInviteInput struct {
+	UserID string
+}
+
+type ResendInviteUseCase struct {
+	user        func() *coreauth.UserService
+	emailTokens func() *coreauth.EmailTokenService
+}
+
+func NewResendInviteUseCase(u func() *coreauth.UserService, e func() *coreauth.EmailTokenService) *ResendInviteUseCase {
+	return &ResendInviteUseCase{user: u, emailTokens: e}
+}
+
+func (uc *ResendInviteUseCase) Execute(ctx context.Context, in ResendInviteInput) error {
+	tokens := uc.emailTokens()
+	if tokens == nil {
+		return coreauth.ErrEmailDisabled
+	}
+
+	user, err := uc.user().GetUserByID(in.UserID)
+	if err != nil {
+		return err
+	}
+	if !user.MustSetPassword {
+		return coreauth.ErrInviteAlreadyAccepted
+	}
+
+	return tokens.IssueInvite(ctx, user)
+}
+
+// ─── ConfirmInviteUseCase ─────────────────────────────────────────────────────
+
+type ConfirmInviteInput struct {
+	Token       string
+	NewPassword string
+}
+
+type ConfirmInviteOutput struct {
+	Token *coreauth.AuthToken
+}
+
+type ConfirmInviteUseCase struct {
+	emailTokens func() *coreauth.EmailTokenService
+	auth        *coreauth.AuthService
+}
+
+func NewConfirmInviteUseCase(e func() *coreauth.EmailTokenService, a *coreauth.AuthService) *ConfirmInviteUseCase {
+	return &ConfirmInviteUseCase{emailTokens: e, auth: a}
+}
+
+// Execute consumes the invite token, sets the user's password, and — unlike
+// ConfirmPasswordResetUseCase — issues a fresh session immediately: a freshly
+// invited user has no prior sessions to worry about, so there's no reason to
+// make them log in a second time right after setting their first password.
+func (uc *ConfirmInviteUseCase) Execute(_ context.Context, in ConfirmInviteInput) (*ConfirmInviteOutput, error) {
+	tokens := uc.emailTokens()
+	if tokens == nil {
+		return nil, coreauth.ErrEmailDisabled
+	}
+
+	ve := sharederrors.NewValidationErrors()
+	if in.NewPassword == "" {
+		ve.Add("newPassword", "New password must not be empty")
+	} else if len(in.NewPassword) < 8 {
+		ve.Add("newPassword", "New password must be at least 8 characters long")
+	}
+	if ve.HasErrors() {
+		return nil, ve
+	}
+
+	user, err := tokens.ConfirmInvite(in.Token, in.NewPassword)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := uc.auth.IssueSessionForUser(user.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &ConfirmInviteOutput{Token: token}, nil
+}

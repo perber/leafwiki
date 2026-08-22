@@ -207,6 +207,23 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	return a.sessions.IssueSession(user)
 }
 
+// IssueSessionForUser issues a fresh access/refresh token pair for userID
+// without a password check — used when a caller has already established
+// trust some other way. Currently only the invite-accept flow does this (see
+// wiki/auth's ConfirmInviteUseCase): a freshly invited user has just proven
+// control of their invite link and set a password, so a second login
+// immediately afterward would be redundant. Mirrors Login's final step,
+// skipping credential verification and any TOTP challenge (an invited user
+// has neither TOTP nor a failed-attempt history yet).
+func (a *AuthService) IssueSessionForUser(userID string) (*AuthToken, error) {
+	user, err := a.users().GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	user.Password = ""
+	return a.sessions.IssueSession(user)
+}
+
 // CompleteTOTPLogin finishes a login handshake started by Login when a user
 // has TOTP enabled. It validates challengeToken (single use, short-lived) and
 // then code as either a current TOTP code or an unused recovery code; only on
