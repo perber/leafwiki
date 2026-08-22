@@ -14,6 +14,12 @@ import (
 const (
 	defaultAdminUsername = "admin"
 	defaultAdminEmail    = "admin@localhost"
+
+	// MinPasswordLength is the minimum accepted length for user-chosen
+	// passwords, enforced consistently across every password entry point:
+	// user creation, password change/reset, invites, and the initial admin
+	// bootstrap password.
+	MinPasswordLength = 8
 )
 
 type UserService struct {
@@ -34,6 +40,10 @@ func (s *UserService) InitDefaultAdmin(username, email, newPassword string) erro
 	if _, err := s.store.GetAdminUser(); err == nil {
 		// Admin user already exists, no need to create a new one
 		return nil
+	}
+
+	if len(newPassword) < MinPasswordLength {
+		return fmt.Errorf("%w: initial admin password must be at least %d characters long", ErrPasswordTooShort, MinPasswordLength)
 	}
 
 	username = defaultIfEmpty(username, defaultAdminUsername)

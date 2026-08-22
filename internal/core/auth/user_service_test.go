@@ -155,7 +155,7 @@ func TestUserService_InitDefaultAdmin(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
 	service := NewUserService(store)
 
-	err := service.InitDefaultAdmin("", "", "")
+	err := service.InitDefaultAdmin("", "", "password123")
 	if err != nil {
 		t.Errorf("InitDefaultAdmin failed: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestUserService_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
 	service := NewUserService(store)
 
-	err := service.InitDefaultAdmin("root", "root@example.com", "")
+	err := service.InitDefaultAdmin("root", "root@example.com", "password123")
 	if err != nil {
 		t.Errorf("InitDefaultAdmin failed: %v", err)
 	}
@@ -178,6 +178,21 @@ func TestUserService_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
 	users, err := service.GetUsers()
 	if err != nil || len(users) != 1 || users[0].Username != "root" || users[0].Email != "root@example.com" {
 		t.Errorf("Expected admin user with custom username/email, got: %+v", users)
+	}
+}
+
+func TestUserService_InitDefaultAdmin_PasswordTooShort_ReturnsError(t *testing.T) {
+	store, _ := NewUserStore(t.TempDir())
+	service := NewUserService(store)
+
+	err := service.InitDefaultAdmin("root", "root@example.com", "short")
+	if !errors.Is(err, ErrPasswordTooShort) {
+		t.Fatalf("InitDefaultAdmin() error = %v, want ErrPasswordTooShort", err)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil || len(users) != 0 {
+		t.Errorf("Expected no admin user to be created, got: %+v", users)
 	}
 }
 

@@ -12,6 +12,7 @@ var ErrInvalidToken = errors.New("invalid token")
 var ErrSessionManagerNotWired = errors.New("session manager: resolveUser not configured (NewAuthService wires this; a SessionManager built directly must set it before use)")
 var ErrUserAccountLocked = errors.New("account temporarily locked due to too many failed login attempts")
 var ErrRemoteUserEmailConflict = errors.New("remote user auto-create: asserted email belongs to a different existing user")
+var ErrPasswordTooShort = errors.New("password is too short")
 
 var ErrAPIKeyNotFound = errors.New("api key not found")
 var ErrAPIKeyInvalid = errors.New("invalid api key")
