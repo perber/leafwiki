@@ -15,7 +15,9 @@ describe('normalizeWikiRoutePath', () => {
   })
 
   it('strips query and hash fragments', () => {
-    expect(normalizeWikiRoutePath('/docs/guide?q=1#section')).toBe('/docs/guide')
+    expect(normalizeWikiRoutePath('/docs/guide?q=1#section')).toBe(
+      '/docs/guide',
+    )
   })
 
   it('keeps root as /', () => {
@@ -25,7 +27,9 @@ describe('normalizeWikiRoutePath', () => {
 
 describe('toWikiLookupPath', () => {
   it('converts absolute wiki routes to tree lookup keys', () => {
-    expect(toWikiLookupPath('/docs/getting-started')).toBe('docs/getting-started')
+    expect(toWikiLookupPath('/docs/getting-started')).toBe(
+      'docs/getting-started',
+    )
     expect(toWikiLookupPath('/')).toBe('')
   })
 })
@@ -34,13 +38,16 @@ describe('getWikiTargetRoutePath', () => {
   it('maps edit and history routes back to the view path', () => {
     expect(getWikiTargetRoutePath('/e/docs/guide')).toBe('/docs/guide')
     expect(getWikiTargetRoutePath('/history/docs/guide')).toBe('/docs/guide')
+    expect(getWikiTargetRoutePath('/history')).toBe('/')
     expect(getWikiTargetRoutePath('/docs/guide')).toBe('/docs/guide')
   })
 })
 
 describe('resolveWikiLinkPath', () => {
   it('resolves relative links with page-as-folder semantics', () => {
-    expect(resolveWikiLinkPath('/docs/guide', 'setup')).toBe('/docs/guide/setup')
+    expect(resolveWikiLinkPath('/docs/guide', 'setup')).toBe(
+      '/docs/guide/setup',
+    )
     expect(resolveWikiLinkPath('/docs/guide', '../other')).toBe('/docs/other')
     expect(resolveWikiLinkPath('/docs/guide', './child/page')).toBe(
       '/docs/guide/child/page',
@@ -65,13 +72,24 @@ describe('getParentWikiRoutePath', () => {
 
 describe('getDeleteRedirectRoutePath', () => {
   it('redirects to the parent when the deleted page is open', () => {
-    expect(getDeleteRedirectRoutePath('/docs/guide', '/docs/guide')).toBe('/docs')
+    expect(getDeleteRedirectRoutePath('/docs/guide', '/docs/guide')).toBe(
+      '/docs',
+    )
+  })
+
+  it('redirects from editor and history routes for the deleted page', () => {
+    expect(getDeleteRedirectRoutePath('/e/docs/guide', '/docs/guide')).toBe(
+      '/docs',
+    )
+    expect(
+      getDeleteRedirectRoutePath('/history/docs/guide', '/docs/guide'),
+    ).toBe('/docs')
   })
 
   it('redirects to the parent when a nested route under the deleted page is open', () => {
-    expect(
-      getDeleteRedirectRoutePath('/docs/guide/setup', '/docs/guide'),
-    ).toBe('/docs')
+    expect(getDeleteRedirectRoutePath('/docs/guide/setup', '/docs/guide')).toBe(
+      '/docs',
+    )
   })
 
   it('keeps the current route when another page is open', () => {
