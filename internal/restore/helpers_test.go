@@ -171,6 +171,10 @@ func createRealUserSettingsDB(t *testing.T, dataDir, userID, language string) {
 	}
 }
 
+// createTestUsersDB creates a minimal users.db with just usersRequiredColumns
+// (swap.go) — enough to pass sanityCheckSQLiteDB's schema probe wherever a
+// test needs "a users.db that validates" without the real auth.UserStore
+// schema/migrations (see createRealUsersDB for that).
 func createTestUsersDB(t *testing.T, path, email string) {
 	t.Helper()
 	db, err := sql.Open("sqlite", path)
@@ -179,10 +183,18 @@ func createTestUsersDB(t *testing.T, path, email string) {
 	}
 	defer test_utils.WrapCloseWithErrorCheck(db.Close, t)
 
-	if _, err := db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT)"); err != nil {
+	if _, err := db.Exec(`CREATE TABLE users (
+		id TEXT PRIMARY KEY,
+		username TEXT NOT NULL UNIQUE,
+		password TEXT NOT NULL,
+		email TEXT NOT NULL UNIQUE,
+		role TEXT NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
 		t.Fatalf("failed to create users table: %v", err)
 	}
-	if _, err := db.Exec("INSERT INTO users (email) VALUES (?)", email); err != nil {
+	if _, err := db.Exec("INSERT INTO users (id, username, password, email, role) VALUES (?, ?, ?, ?, ?)",
+		"test-user-id", "test-user", "test-password-hash", email, "admin"); err != nil {
 		t.Fatalf("failed to seed users table: %v", err)
 	}
 }
