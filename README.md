@@ -40,7 +40,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   - [Environment Variables](#environment-variables)
   - [Custom Stylesheet](#custom-stylesheet)
   - [Reverse-Proxy Authentication](#reverse-proxy-authentication)
-  - [Unix Socket](#unix-socket-v0113)
+  - [Unix Socket (v0.11.3)](#unix-socket-v0113)
   - [Git Backup](#git-backup-v0113-experimental)
   - [Security](#security)
   - [Operations notes](#operations-notes)
