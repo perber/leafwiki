@@ -490,6 +490,22 @@ func (f *UserStore) CountAdminUsers() (int, error) {
 	return count, nil
 }
 
+// CountEditorUsers counts users with role admin or editor — the same
+// "editor" definition used across the plan-tier pricing (viewers are always
+// unlimited, admin+editor together count against the plan's editor limit).
+func (f *UserStore) CountEditorUsers() (int, error) {
+	err := f.Connect()
+	if err != nil {
+		return 0, err
+	}
+	row := f.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role IN ('admin', 'editor');`)
+	var count int
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (f *UserStore) GetUserCount() (int, error) {
 	// Ensure the database is connected
 	err := f.Connect()

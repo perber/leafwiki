@@ -13,6 +13,7 @@ var ErrSessionManagerNotWired = errors.New("session manager: resolveUser not con
 var ErrUserAccountLocked = errors.New("account temporarily locked due to too many failed login attempts")
 var ErrRemoteUserEmailConflict = errors.New("remote user auto-create: asserted email belongs to a different existing user")
 var ErrPasswordTooShort = errors.New("password is too short")
+var ErrEditorLimitReached = errors.New("editor limit reached for this plan")
 
 var ErrAPIKeyNotFound = errors.New("api key not found")
 var ErrAPIKeyInvalid = errors.New("invalid api key")

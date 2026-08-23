@@ -14,6 +14,7 @@ const baseCtx: SettingsSectionContext = {
   enableApiKeyManagement: false,
   totpAvailable: false,
   userManagementUrl: undefined,
+  editorLimit: 0,
 }
 
 function section(overrides: Partial<SettingsSection> = {}): SettingsSection {
@@ -143,6 +144,17 @@ describe('settingsSections gating (regression for the pre-registry backup/snapsh
     expect(
       isSectionVisible(apiKeys, { ...baseCtx, enableApiKeyManagement: true }),
     ).toBe(true)
+  })
+
+  it('hides users when editorLimit is 1 (a Solo plan can never have a second editor)', () => {
+    const users = settingsSections.find((s) => s.id === 'users')!
+    expect(isSectionVisible(users, { ...baseCtx, editorLimit: 1 })).toBe(false)
+  })
+
+  it('shows users when editorLimit is 0 (unlimited/self-hosted) or above 1 (e.g. a Team plan)', () => {
+    const users = settingsSections.find((s) => s.id === 'users')!
+    expect(isSectionVisible(users, { ...baseCtx, editorLimit: 0 })).toBe(true)
+    expect(isSectionVisible(users, { ...baseCtx, editorLimit: 10 })).toBe(true)
   })
 
   it('makes account visible to any authenticated role, unlike the admin-only sections', () => {

@@ -93,6 +93,7 @@ func writeUsage(w io.Writer) {
 	--metrics-host                Host/IP for the metrics listener (default: 127.0.0.1)
 	--metrics-port                Port for the metrics listener (default: 9091)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
+	--editor-limit                Maximum admin+editor users allowed; 0 = unlimited (default: 0)
 	--revision-coalesce-window    Window for coalescing rapid successive saves by the same author (e.g. 5m, 0 = disabled) (default: 5m)
 	--enable-http-remote-user               Enable reverse-proxy authentication via HTTP header (default: false)
 	--http-remote-user-header-name          HTTP header carrying the username or email from a trusted proxy (default: Remote-User)
@@ -145,6 +146,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_ADMIN_USERNAME
 	LEAFWIKI_ADMIN_EMAIL
 	LEAFWIKI_PUBLIC_ACCESS
+	LEAFWIKI_EDITOR_LIMIT
 	LEAFWIKI_ALLOW_INSECURE
 	LEAFWIKI_INJECT_CODE_IN_HEADER
 	LEAFWIKI_CUSTOM_STYLESHEET
@@ -271,6 +273,7 @@ type cliFlags struct {
 	metricsHost                    *string
 	metricsPort                    *string
 	maxRevisionHistory             *int
+	editorLimit                    *int
 	enableHTTPRemoteUser           *bool
 	httpRemoteUserHeader           *string
 	enableHTTPRemoteUserAutoCreate *bool
@@ -340,6 +343,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		metricsHost:                    fs.String("metrics-host", "", "host/IP address for the Prometheus metrics listener (default: 127.0.0.1)"),
 		metricsPort:                    fs.String("metrics-port", "", "port for the Prometheus metrics listener (default: 9091)"),
 		maxRevisionHistory:             fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
+		editorLimit:                    fs.Int("editor-limit", 0, "maximum admin+editor users allowed; 0 = unlimited (default: 0)"),
 		enableHTTPRemoteUser:           fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
 		httpRemoteUserHeader:           fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username or email from a trusted proxy (default: Remote-User)"),
 		enableHTTPRemoteUserAutoCreate: fs.Bool("enable-http-remote-user-auto-create", false, "auto-provision users asserted by the trusted proxy but unknown to LeafWiki (default: false)"),
@@ -439,6 +443,7 @@ func main() {
 	metricsHost := resolveString("metrics-host", *flags.metricsHost, visited, "LEAFWIKI_METRICS_HOST", "127.0.0.1")
 	metricsPort := resolveString("metrics-port", *flags.metricsPort, visited, "LEAFWIKI_METRICS_PORT", "9091")
 	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
+	editorLimit := resolveInt("editor-limit", *flags.editorLimit, visited, "LEAFWIKI_EDITOR_LIMIT", 0)
 	revisionCoalesceWindow := resolveDuration("revision-coalesce-window", *flags.revisionCoalesceWindow, visited, "LEAFWIKI_REVISION_COALESCE_WINDOW")
 	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
 	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
@@ -620,6 +625,7 @@ func main() {
 		EnableRevision:         enableRevision,
 		EnableAPIKeyManagement: enableAPIKeyManagement,
 		MaxRevisionHistory:     maxRevisionHistory,
+		EditorLimit:            editorLimit,
 		RevisionCoalesceWindow: revisionCoalesceWindow,
 		SMTP: email.Config{
 			Host:               smtpHost,
@@ -734,6 +740,7 @@ func main() {
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccess,
+		EditorLimit:             editorLimit,
 		InjectCodeInHeader:      injectCodeInHeader,
 		CustomStylesheet:        customStylesheet,
 		AllowInsecure:           allowInsecure,

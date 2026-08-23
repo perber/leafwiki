@@ -206,6 +206,7 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"publicAccess":            opts.PublicAccess,
+			"editorLimit":             opts.EditorLimit,
 			"hideLinkMetadataSection": opts.HideLinkMetadataSection,
 			"authDisabled":            opts.AuthDisabled,
 			"basePath":                opts.BasePath,
