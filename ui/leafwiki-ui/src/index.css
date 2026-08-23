@@ -2871,16 +2871,25 @@
     @apply mx-auto w-full max-w-4xl px-4 pt-4 pb-4 sm:px-8 sm:pt-8;
   }
 
-  .settings-nav {
-    @apply border-surface-border mb-6 flex flex-wrap gap-1 border-b pb-3;
+  .settings-nav .list-view__header {
+    @apply border-b-surface-border bg-surface h-12 min-h-0 border-b px-2;
   }
 
-  .settings-nav__link {
-    @apply text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm no-underline transition-colors;
+  .settings-nav .list-view__title {
+    @apply text-brand inline-flex items-center gap-1 px-3 py-1.5 text-sm font-normal;
   }
 
-  .settings-nav__link--active {
-    @apply bg-accent text-foreground font-medium;
+  .settings-nav .list-view__content {
+    @apply p-2 pt-0;
+  }
+
+  .settings-nav .list-view__item {
+    @apply flex items-center gap-2.5 rounded-none text-sm;
+  }
+
+  .settings-nav .list-view__item--active {
+    @apply border-surface-border/0 bg-surface-alt text-brand;
+    box-shadow: inset 3px 0 0 hsl(var(--brand));
   }
 
   .settings__title {

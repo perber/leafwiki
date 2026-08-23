@@ -9,6 +9,7 @@ import {
   settingsSections,
   useSettingsSectionContext,
 } from '@/lib/registries/settingsSectionRegistry'
+import { Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router'
 
@@ -24,7 +25,13 @@ export default function SettingsNav() {
 
   return (
     <ListView
-      header={<ListViewHeader>{t('nav.title')}</ListViewHeader>}
+      header={
+        <ListViewHeader>
+          <Settings size={16} />
+          {t('nav.title')}
+        </ListViewHeader>
+      }
+      className="settings-nav"
       testId="settings-nav"
     >
       <ListViewList>
