@@ -38,6 +38,14 @@ func RestoreOffline(dataDir, zipPath string) error {
 	if err := removeStaleWALSidecars(filepath.Join(dataDir, "api_keys.db")); err != nil {
 		return fmt.Errorf("failed to clean up stale api_keys.db WAL files before swap: %w", err)
 	}
+	// favorites.db and usersettings.db run in WAL mode too, same stale-sidecar
+	// risk, same fix.
+	if err := removeStaleWALSidecars(filepath.Join(dataDir, "favorites.db")); err != nil {
+		return fmt.Errorf("failed to clean up stale favorites.db WAL files before swap: %w", err)
+	}
+	if err := removeStaleWALSidecars(filepath.Join(dataDir, "usersettings.db")); err != nil {
+		return fmt.Errorf("failed to clean up stale usersettings.db WAL files before swap: %w", err)
+	}
 
 	sw := newSwapper(dataDir, stagingDir)
 	if err := sw.SwapAll(); err != nil {

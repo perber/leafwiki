@@ -3,7 +3,9 @@ package restore
 import (
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/favorites"
 	"github.com/perber/wiki/internal/snapshot"
+	"github.com/perber/wiki/internal/usersettings"
 )
 
 // Config holds everything the restore Manager needs to validate, stage, and
@@ -33,6 +35,14 @@ type Config struct {
 	// nil-guarded, matching the existing AuthService nil-guard used for
 	// --disable-auth.
 	APIKeyService *auth.APIKeyService
+	// Favorites' store (favorites.db) is hot-swapped in place, mirroring
+	// AuthService's users.db handling. Always on (no disabled mode), but
+	// nil-guarded anyway for test-fixture parity with the existing style.
+	Favorites *favorites.FavoritesStore
+	// UserSettings' store (usersettings.db) is hot-swapped in place, mirroring
+	// AuthService's users.db handling. Always on (no disabled mode), but
+	// nil-guarded anyway for test-fixture parity with the existing style.
+	UserSettings *usersettings.UserSettingsService
 	// BrandingService's in-memory config cache is reloaded from the restored
 	// branding.json after the file swap.
 	BrandingService *branding.BrandingService

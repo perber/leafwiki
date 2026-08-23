@@ -302,6 +302,63 @@ func (m *Manager) runFromZipPath(zipPath string, limits coreshared.ExtractionLim
 		}
 	}
 
+	// Same rationale as the AuthService/APIKeyService blocks above, mirrored
+	// for favorites.db.
+	if m.cfg.Favorites != nil {
+		if err := m.cfg.Favorites.PauseForSwap(); err != nil {
+			m.cfg.WriteGate.Disengage()
+			if m.cfg.AuthService != nil {
+				if repErr := m.cfg.AuthService.ReplaceUserStore(m.cfg.DataDir); repErr != nil {
+					m.job.FinishNeedsIntervention(fmt.Errorf("failed to release favorites.db before swap: %w (and failed to recover the user store: %v)", err, repErr))
+					return
+				}
+			}
+			if m.cfg.APIKeyService != nil {
+				if repErr := m.cfg.APIKeyService.Replace(m.cfg.DataDir); repErr != nil {
+					m.job.FinishNeedsIntervention(fmt.Errorf("failed to release favorites.db before swap: %w (and failed to recover the api key store: %v)", err, repErr))
+					return
+				}
+			}
+			if repErr := m.cfg.Favorites.Replace(m.cfg.DataDir); repErr != nil {
+				m.job.FinishNeedsIntervention(fmt.Errorf("failed to release favorites.db before swap: %w (and failed to recover the favorites store: %v)", err, repErr))
+				return
+			}
+			m.job.Finish(fmt.Errorf("failed to release favorites.db before swap: %w", err))
+			return
+		}
+	}
+
+	// Same rationale as the blocks above, mirrored for usersettings.db.
+	if m.cfg.UserSettings != nil {
+		if err := m.cfg.UserSettings.PauseForSwap(); err != nil {
+			m.cfg.WriteGate.Disengage()
+			if m.cfg.AuthService != nil {
+				if repErr := m.cfg.AuthService.ReplaceUserStore(m.cfg.DataDir); repErr != nil {
+					m.job.FinishNeedsIntervention(fmt.Errorf("failed to release usersettings.db before swap: %w (and failed to recover the user store: %v)", err, repErr))
+					return
+				}
+			}
+			if m.cfg.APIKeyService != nil {
+				if repErr := m.cfg.APIKeyService.Replace(m.cfg.DataDir); repErr != nil {
+					m.job.FinishNeedsIntervention(fmt.Errorf("failed to release usersettings.db before swap: %w (and failed to recover the api key store: %v)", err, repErr))
+					return
+				}
+			}
+			if m.cfg.Favorites != nil {
+				if repErr := m.cfg.Favorites.Replace(m.cfg.DataDir); repErr != nil {
+					m.job.FinishNeedsIntervention(fmt.Errorf("failed to release usersettings.db before swap: %w (and failed to recover the favorites store: %v)", err, repErr))
+					return
+				}
+			}
+			if repErr := m.cfg.UserSettings.Replace(m.cfg.DataDir); repErr != nil {
+				m.job.FinishNeedsIntervention(fmt.Errorf("failed to release usersettings.db before swap: %w (and failed to recover the user settings store: %v)", err, repErr))
+				return
+			}
+			m.job.Finish(fmt.Errorf("failed to release usersettings.db before swap: %w", err))
+			return
+		}
+	}
+
 	// Nothing on disk has been touched yet at this point (PauseUserStoreForSwap
 	// above only closes the in-process connection), so a failure here is
 	// reported the same retryable way as that step, without needing a
@@ -315,6 +372,16 @@ func (m *Manager) runFromZipPath(zipPath string, limits coreshared.ExtractionLim
 	// fix.
 	if err := removeStaleWALSidecars(filepath.Join(m.cfg.DataDir, "api_keys.db")); err != nil {
 		m.job.Finish(fmt.Errorf("failed to clean up stale api_keys.db WAL files before swap: %w", err))
+		return
+	}
+	// favorites.db and usersettings.db run in WAL mode too, same stale-sidecar
+	// risk, same fix.
+	if err := removeStaleWALSidecars(filepath.Join(m.cfg.DataDir, "favorites.db")); err != nil {
+		m.job.Finish(fmt.Errorf("failed to clean up stale favorites.db WAL files before swap: %w", err))
+		return
+	}
+	if err := removeStaleWALSidecars(filepath.Join(m.cfg.DataDir, "usersettings.db")); err != nil {
+		m.job.Finish(fmt.Errorf("failed to clean up stale usersettings.db WAL files before swap: %w", err))
 		return
 	}
 
@@ -359,6 +426,20 @@ func (m *Manager) runFromZipPath(zipPath string, limits coreshared.ExtractionLim
 	if m.cfg.APIKeyService != nil {
 		if err := m.cfg.APIKeyService.Replace(m.cfg.DataDir); err != nil {
 			m.rollbackOrIntervene(sw, fmt.Errorf("failed to reopen api key database: %w", err))
+			return
+		}
+	}
+
+	if m.cfg.Favorites != nil {
+		if err := m.cfg.Favorites.Replace(m.cfg.DataDir); err != nil {
+			m.rollbackOrIntervene(sw, fmt.Errorf("failed to reopen favorites database: %w", err))
+			return
+		}
+	}
+
+	if m.cfg.UserSettings != nil {
+		if err := m.cfg.UserSettings.Replace(m.cfg.DataDir); err != nil {
+			m.rollbackOrIntervene(sw, fmt.Errorf("failed to reopen user settings database: %w", err))
 			return
 		}
 	}
@@ -428,6 +509,26 @@ func (m *Manager) rollbackOrIntervene(sw *swapper, cause error) {
 			slog.Default().Error("restore: rollback succeeded but re-syncing APIKeyService against the restored files failed, instance needs manual intervention",
 				"cause", cause, "resync_error", err)
 			m.job.FinishNeedsIntervention(fmt.Errorf("%w (rollback succeeded but APIKeyService re-sync failed: %v)", cause, err))
+			return
+		}
+	}
+
+	// Same re-sync symmetry as the AuthService case above, for favorites.db.
+	if m.cfg.Favorites != nil {
+		if err := m.cfg.Favorites.Replace(m.cfg.DataDir); err != nil {
+			slog.Default().Error("restore: rollback succeeded but re-syncing Favorites against the restored files failed, instance needs manual intervention",
+				"cause", cause, "resync_error", err)
+			m.job.FinishNeedsIntervention(fmt.Errorf("%w (rollback succeeded but Favorites re-sync failed: %v)", cause, err))
+			return
+		}
+	}
+
+	// Same re-sync symmetry as the AuthService case above, for usersettings.db.
+	if m.cfg.UserSettings != nil {
+		if err := m.cfg.UserSettings.Replace(m.cfg.DataDir); err != nil {
+			slog.Default().Error("restore: rollback succeeded but re-syncing UserSettings against the restored files failed, instance needs manual intervention",
+				"cause", cause, "resync_error", err)
+			m.job.FinishNeedsIntervention(fmt.Errorf("%w (rollback succeeded but UserSettings re-sync failed: %v)", cause, err))
 			return
 		}
 	}

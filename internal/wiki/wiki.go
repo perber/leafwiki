@@ -333,7 +333,7 @@ func (w *Wiki) initPropertiesService() error {
 }
 
 func (w *Wiki) initFavoritesService() error {
-	store, err := favorites.NewFavoritesStore(w.storageDir)
+	store, err := favorites.NewFavoritesStore(w.storageDir, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to init favorites store: %w", err)
 	}
@@ -342,7 +342,7 @@ func (w *Wiki) initFavoritesService() error {
 }
 
 func (w *Wiki) initUserSettingsService() error {
-	store, err := usersettings.NewUserSettingsStore(w.storageDir)
+	store, err := usersettings.NewUserSettingsStore(w.storageDir, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to init user settings store: %w", err)
 	}
@@ -494,7 +494,7 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		CreateUser:        wikiauth.NewCreateUserUseCase(w.UserService, w.userResolver, w.log),
 		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.UserService, w.userResolver, w.log),
 		ChangeOwnPassword: wikiauth.NewChangeOwnPasswordUseCase(w.UserService),
-		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.UserService, w.userResolver, w.favorites, w.userSettings, w.log),
+		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.UserService, w.userResolver, w.favorites, w.userSettings, w.apiKeys, w.log),
 		GetUsers:          wikiauth.NewGetUsersUseCase(w.UserService),
 		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.UserService),
 		StartTOTPSetup:    wikiauth.NewStartTOTPSetupUseCase(w.auth),
@@ -944,6 +944,17 @@ func (w *Wiki) APIKeyService() *auth.APIKeyService {
 	return w.apiKeys
 }
 
+// Favorites returns the favorites store, e.g. for wiring into restore.Config.
+func (w *Wiki) Favorites() *favorites.FavoritesStore {
+	return w.favorites
+}
+
+// UserSettingsService returns the user settings service, e.g. for wiring
+// into restore.Config.
+func (w *Wiki) UserSettingsService() *usersettings.UserSettingsService {
+	return w.userSettings
+}
+
 // EmailTokenService returns the password-reset/invite token service, or nil
 // if SMTP isn't configured or auth is disabled (see initEmail). Every use
 // case that resolves this via the func()-based pattern (like UserService)
@@ -991,6 +1002,12 @@ func (w *Wiki) Close() error {
 	if w.userSettings != nil {
 		if err := w.userSettings.Close(); err != nil {
 			w.log.Error("error closing user settings store", "error", err)
+		}
+	}
+
+	if w.favorites != nil {
+		if err := w.favorites.Close(); err != nil {
+			w.log.Error("error closing favorites store", "error", err)
 		}
 	}
 

@@ -448,11 +448,12 @@ type DeleteUserUseCase struct {
 	resolver     *coreauth.UserResolver
 	favorites    *favorites.FavoritesStore
 	userSettings *usersettings.UserSettingsService
+	apiKeys      *coreauth.APIKeyService // nil when API key management is disabled (see wiki.go initAuth)
 	log          *slog.Logger
 }
 
-func NewDeleteUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, f *favorites.FavoritesStore, us *usersettings.UserSettingsService, log *slog.Logger) *DeleteUserUseCase {
-	return &DeleteUserUseCase{user: u, resolver: r, favorites: f, userSettings: us, log: log}
+func NewDeleteUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, f *favorites.FavoritesStore, us *usersettings.UserSettingsService, ak *coreauth.APIKeyService, log *slog.Logger) *DeleteUserUseCase {
+	return &DeleteUserUseCase{user: u, resolver: r, favorites: f, userSettings: us, apiKeys: ak, log: log}
 }
 
 func (uc *DeleteUserUseCase) Execute(_ context.Context, in DeleteUserInput) error {
@@ -467,6 +468,11 @@ func (uc *DeleteUserUseCase) Execute(_ context.Context, in DeleteUserInput) erro
 	}
 	if err := uc.userSettings.DeleteAllForUser(in.ID); err != nil {
 		uc.log.Warn("failed to delete user settings for deleted user", "userID", in.ID, "error", err)
+	}
+	if uc.apiKeys != nil {
+		if err := uc.apiKeys.DeleteAllForUser(in.ID); err != nil {
+			uc.log.Warn("failed to delete api keys for deleted user", "userID", in.ID, "error", err)
+		}
 	}
 	return nil
 }

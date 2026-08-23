@@ -16,8 +16,10 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 	coreshared "github.com/perber/wiki/internal/core/shared"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/favorites"
 	snapshotSvc "github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/usersettings"
 )
 
 // managerFixture wires a restore.Manager against a real live dataDir, a real
@@ -765,6 +767,111 @@ func TestManager_Restore_HappyPath_PreservesAPIKeys(t *testing.T) {
 	}
 	if _, err := apiKeyService.Resolve(liveToken); err == nil {
 		t.Error("expected the live-only api key (created after the snapshot) to no longer resolve after restore")
+	}
+}
+
+// TestManager_Restore_HappyPath_PreservesFavoritesAndUserSettings is the
+// regression test for the bug where a full backup/restore cycle silently
+// dropped favorites.db and usersettings.db: a favorite/setting saved before
+// the snapshot was taken (against the snapshot-source dataDir) must still be
+// present after restore, and a favorite/setting saved only against the live
+// dataDir (after the snapshot, so never captured) must be gone — mirroring
+// TestManager_Restore_HappyPath_PreservesAPIKeys's shape. This is also the
+// test that actually proves the in-place Replace fix works (the running
+// process's Favorites/UserSettings pointers must reflect the restored data,
+// not a stale open file handle from before the swap).
+func TestManager_Restore_HappyPath_PreservesFavoritesAndUserSettings(t *testing.T) {
+	src := t.TempDir()
+	test_utils.WriteFile(t, src, "root/welcome.md", "# Snapshot content\n")
+	createRealUsersDB(t, src, "snapshot-admin", "snapshot-admin@example.com", "snapshot-password-123")
+	createRealFavoritesDB(t, src, "user-1", "snapshot-page")
+	createRealUserSettingsDB(t, src, "user-1", "de")
+
+	snapshotMgr := snapshotSvc.NewManager(snapshotSvc.Config{
+		BackupsDir:         filepath.Join(src, "backups"),
+		RootDir:            filepath.Join(src, "root"),
+		UsersDBPath:        filepath.Join(src, "users.db"),
+		FavoritesDBPath:    filepath.Join(src, "favorites.db"),
+		UserSettingsDBPath: filepath.Join(src, "usersettings.db"),
+		WikiVersion:        "v1.0.0",
+	})
+	if err := snapshotMgr.RunOnce(context.Background()); err != nil {
+		t.Fatalf("failed to build fixture snapshot: %v", err)
+	}
+	entries, err := snapshotMgr.List()
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("expected 1 fixture snapshot, got %v (err=%v)", entries, err)
+	}
+	snapshotID := entries[0].ID
+
+	dataDir := t.TempDir()
+	createRealUsersDB(t, dataDir, "live-admin", "live-admin@example.com", "live-password-123")
+	createRealFavoritesDB(t, dataDir, "user-1", "live-only-page")
+	createRealUserSettingsDB(t, dataDir, "user-1", "en")
+
+	userStore, err := auth.NewUserStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewUserStore failed: %v", err)
+	}
+	sessionStore, err := auth.NewSessionStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewSessionStore failed: %v", err)
+	}
+	sessions := auth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authService := auth.NewAuthService(auth.NewUserService(userStore), sessions, nil)
+	t.Cleanup(func() { _ = authService.Close() })
+
+	favoritesStore, err := favorites.NewFavoritesStore(dataDir, nil)
+	if err != nil {
+		t.Fatalf("NewFavoritesStore failed: %v", err)
+	}
+	t.Cleanup(func() { _ = favoritesStore.Close() })
+
+	userSettingsStore, err := usersettings.NewUserSettingsStore(dataDir, nil)
+	if err != nil {
+		t.Fatalf("NewUserSettingsStore failed: %v", err)
+	}
+	userSettingsService := usersettings.NewUserSettingsService(userSettingsStore)
+	t.Cleanup(func() { _ = userSettingsService.Close() })
+
+	brandingService, err := branding.NewBrandingService(dataDir)
+	if err != nil {
+		t.Fatalf("NewBrandingService failed: %v", err)
+	}
+
+	manager := NewManager(Config{
+		SnapshotManager: snapshotMgr,
+		DataDir:         dataDir,
+		WikiVersion:     "v1.0.0",
+		WriteGate:       NewWriteGate(),
+		AuthService:     authService,
+		Favorites:       favoritesStore,
+		UserSettings:    userSettingsService,
+		BrandingService: brandingService,
+	})
+
+	if err := manager.TriggerRestore(snapshotID); err != nil {
+		t.Fatalf("TriggerRestore failed: %v", err)
+	}
+	status := waitForRestoreDone(t, manager)
+	if status.Error != "" {
+		t.Fatalf("expected successful restore, got error: %s", status.Error)
+	}
+
+	pageIDs, err := favoritesStore.ListPageIDsForUser("user-1")
+	if err != nil {
+		t.Fatalf("ListPageIDsForUser failed: %v", err)
+	}
+	if len(pageIDs) != 1 || pageIDs[0] != "snapshot-page" {
+		t.Errorf("expected only the snapshot's favorite (snapshot-page) to survive restore, got %v", pageIDs)
+	}
+
+	settings, err := userSettingsService.Get("user-1")
+	if err != nil {
+		t.Fatalf("Get user settings failed: %v", err)
+	}
+	if settings.Language != "de" {
+		t.Errorf("expected the snapshot's language (de) to survive restore, got %q", settings.Language)
 	}
 }
 

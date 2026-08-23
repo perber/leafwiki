@@ -498,9 +498,9 @@ func TestGetUsersUseCase_DoesNotExposeTOTPSecretOrRecoveryCodes(t *testing.T) {
 }
 
 // TestDeleteUser_RemovesFavoritesForUser verifies that deleting a user cascades
-// to clean up their favorites.db and usersettings.db rows, even though
-// sessions.db does not have the same cleanup today (deliberately not copying
-// that gap, see plans/favorites.md).
+// to clean up their favorites.db, usersettings.db, and api_keys.db rows, even
+// though sessions.db does not have the same cleanup today (deliberately not
+// copying that gap, see plans/favorites.md).
 func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 	store, err := coreauth.NewUserStore(t.TempDir())
 	if err != nil {
@@ -518,7 +518,7 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 		t.Fatalf("NewUserResolver: %v", err)
 	}
 
-	favoritesStore, err := favorites.NewFavoritesStore(t.TempDir())
+	favoritesStore, err := favorites.NewFavoritesStore(t.TempDir(), nil)
 	if err != nil {
 		t.Fatalf("NewFavoritesStore: %v", err)
 	}
@@ -528,7 +528,7 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 		}
 	})
 
-	settingsStore, err := usersettings.NewUserSettingsStore(t.TempDir())
+	settingsStore, err := usersettings.NewUserSettingsStore(t.TempDir(), nil)
 	if err != nil {
 		t.Fatalf("NewUserSettingsStore: %v", err)
 	}
@@ -538,6 +538,29 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 		}
 	})
 	settingsSvc := usersettings.NewUserSettingsService(settingsStore)
+
+	sessionStore, err := coreauth.NewSessionStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSessionStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := sessionStore.Close(); err != nil {
+			t.Errorf("Close session store: %v", err)
+		}
+	})
+	sessions := coreauth.NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
+	authSvc := coreauth.NewAuthService(userSvc, sessions, nil)
+
+	apiKeyStore, err := coreauth.NewAPIKeyStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewAPIKeyStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := apiKeyStore.Close(); err != nil {
+			t.Errorf("Close api key store: %v", err)
+		}
+	})
+	apiKeySvc := coreauth.NewAPIKeyService(apiKeyStore, authSvc)
 
 	user, err := userSvc.CreateUser("bob", "bob@example.com", "pass", coreauth.RoleViewer)
 	if err != nil {
@@ -550,8 +573,11 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 	if _, err := settingsSvc.Update(user.ID, usersettings.UserSettingsPatch{AutoSave: &autoSave}); err != nil {
 		t.Fatalf("failed to seed user settings: %v", err)
 	}
+	if _, _, err := apiKeySvc.CreateAPIKey(coreauth.CreateAPIKeyParams{Name: "bob's key", UserID: user.ID, CreatedBy: "admin"}); err != nil {
+		t.Fatalf("failed to seed api key: %v", err)
+	}
 
-	uc := NewDeleteUserUseCase(userSvcFn, resolver, favoritesStore, settingsSvc, slog.Default())
+	uc := NewDeleteUserUseCase(userSvcFn, resolver, favoritesStore, settingsSvc, apiKeySvc, slog.Default())
 	if err := uc.Execute(context.Background(), DeleteUserInput{ID: user.ID}); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
@@ -570,6 +596,68 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 	}
 	if settings.AutoSave != true {
 		t.Errorf("expected user settings for deleted user to be cleaned up (back to default AutoSave=true), got %v", settings.AutoSave)
+	}
+
+	keys, err := apiKeySvc.ListAPIKeys()
+	if err != nil {
+		t.Fatalf("ListAPIKeys: %v", err)
+	}
+	for _, k := range keys {
+		if k.UserID == user.ID {
+			t.Errorf("expected api keys for deleted user to be cleaned up, found key %s still owned by %s", k.ID, k.UserID)
+		}
+	}
+}
+
+// TestDeleteUser_APIKeysDisabled_SkipsCleanupWithoutError verifies the
+// nil-guard around API key cleanup: when API key management is disabled
+// (apiKeys is nil, the default), deleting a user must not panic or error.
+func TestDeleteUser_APIKeysDisabled_SkipsCleanupWithoutError(t *testing.T) {
+	store, err := coreauth.NewUserStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewUserStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Errorf("Close user store: %v", err)
+		}
+	})
+	userSvc := coreauth.NewUserService(store)
+	userSvcFn := func() *coreauth.UserService { return userSvc }
+	resolver, err := coreauth.NewUserResolver(userSvcFn)
+	if err != nil {
+		t.Fatalf("NewUserResolver: %v", err)
+	}
+
+	favoritesStore, err := favorites.NewFavoritesStore(t.TempDir(), nil)
+	if err != nil {
+		t.Fatalf("NewFavoritesStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := favoritesStore.Close(); err != nil {
+			t.Errorf("Close favorites store: %v", err)
+		}
+	})
+
+	settingsStore, err := usersettings.NewUserSettingsStore(t.TempDir(), nil)
+	if err != nil {
+		t.Fatalf("NewUserSettingsStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := settingsStore.Close(); err != nil {
+			t.Errorf("Close user settings store: %v", err)
+		}
+	})
+	settingsSvc := usersettings.NewUserSettingsService(settingsStore)
+
+	user, err := userSvc.CreateUser("carol", "carol@example.com", "pass", coreauth.RoleViewer)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	uc := NewDeleteUserUseCase(userSvcFn, resolver, favoritesStore, settingsSvc, nil, slog.Default())
+	if err := uc.Execute(context.Background(), DeleteUserInput{ID: user.ID}); err != nil {
+		t.Fatalf("Execute: %v", err)
 	}
 }
 

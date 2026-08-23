@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/favorites"
 	snapshotSvc "github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/usersettings"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
@@ -137,6 +139,36 @@ func createRealAPIKeysDB(t *testing.T, dataDir, ownerUserID, keyName string) str
 		t.Fatalf("CreateAPIKey failed: %v", err)
 	}
 	return token
+}
+
+// createRealFavoritesDB creates dataDir/favorites.db via the real
+// favorites.FavoritesStore and adds a single favorite for userID/pageID.
+func createRealFavoritesDB(t *testing.T, dataDir, userID, pageID string) {
+	t.Helper()
+	store, err := favorites.NewFavoritesStore(dataDir, nil)
+	if err != nil {
+		t.Fatalf("NewFavoritesStore failed: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	if err := store.Add(userID, pageID); err != nil {
+		t.Fatalf("Add favorite failed: %v", err)
+	}
+}
+
+// createRealUserSettingsDB creates dataDir/usersettings.db via the real
+// usersettings.UserSettingsStore and saves language for userID.
+func createRealUserSettingsDB(t *testing.T, dataDir, userID, language string) {
+	t.Helper()
+	store, err := usersettings.NewUserSettingsStore(dataDir, nil)
+	if err != nil {
+		t.Fatalf("NewUserSettingsStore failed: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	if err := store.Upsert(&usersettings.UserSettings{UserID: userID, Language: language, AutoSave: true, UpdatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("Upsert user settings failed: %v", err)
+	}
 }
 
 func createTestUsersDB(t *testing.T, path, email string) {

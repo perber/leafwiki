@@ -261,6 +261,17 @@ func (s *APIKeyStore) Revoke(id string) error {
 	})
 }
 
+// DeleteAllForUser removes every API key owned by userID. Called on user
+// delete — the key is already unusable for auth immediately once its owner
+// is gone (APIKeyService.Resolve re-validates the owner on every use), so
+// this is orphaned-row hygiene rather than a security-critical revocation.
+func (s *APIKeyStore) DeleteAllForUser(userID string) error {
+	return s.withDB(func(db *sql.DB) error {
+		_, err := db.Exec(`DELETE FROM api_keys WHERE user_id = ?;`, userID)
+		return err
+	})
+}
+
 // TouchLastUsed records that a key was just used. Throttling (to avoid a
 // write on every request) is the caller's responsibility.
 func (s *APIKeyStore) TouchLastUsed(id string, at time.Time) error {

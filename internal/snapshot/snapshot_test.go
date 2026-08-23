@@ -72,6 +72,38 @@ func createTestAPIKeysDB(t *testing.T, path string) {
 	}
 }
 
+func createTestFavoritesDB(t *testing.T, path string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("failed to open favorites db: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(db.Close, t)
+
+	if _, err := db.Exec("CREATE TABLE favorites (user_id TEXT, page_id TEXT)"); err != nil {
+		t.Fatalf("failed to create favorites table: %v", err)
+	}
+	if _, err := db.Exec("INSERT INTO favorites (user_id, page_id) VALUES (?, ?)", "user-1", "page-1"); err != nil {
+		t.Fatalf("failed to seed favorites table: %v", err)
+	}
+}
+
+func createTestUserSettingsDB(t *testing.T, path string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("failed to open user settings db: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(db.Close, t)
+
+	if _, err := db.Exec("CREATE TABLE user_settings (user_id TEXT, language TEXT)"); err != nil {
+		t.Fatalf("failed to create user_settings table: %v", err)
+	}
+	if _, err := db.Exec("INSERT INTO user_settings (user_id, language) VALUES (?, ?)", "user-1", "en"); err != nil {
+		t.Fatalf("failed to seed user_settings table: %v", err)
+	}
+}
+
 func TestCreateSnapshot_CreatesZip(t *testing.T) {
 	cfg := newTestConfig(t)
 
@@ -211,6 +243,115 @@ func TestCreateSnapshot_ContainsAPIKeysDBWhenPresent(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected an api_keys.db entry when the source file exists")
+	}
+}
+
+func TestCreateSnapshot_FavoritesDBIsOptional(t *testing.T) {
+	// A data dir predating this feature (or one where no user has favorited
+	// anything yet) has no favorites.db on disk. createSnapshot must not fail
+	// over that — newTestConfig doesn't set FavoritesDBPath, mirroring that.
+	cfg := newTestConfig(t)
+
+	id, err := createSnapshot(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("createSnapshot failed: %v", err)
+	}
+
+	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open zip: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
+
+	for _, f := range r.File {
+		if f.Name == "favorites.db" {
+			t.Error("expected no favorites.db entry when the source file doesn't exist")
+		}
+	}
+}
+
+func TestCreateSnapshot_ContainsFavoritesDBWhenPresent(t *testing.T) {
+	cfg := newTestConfig(t)
+	favoritesDBPath := filepath.Join(t.TempDir(), "favorites.db")
+	createTestFavoritesDB(t, favoritesDBPath)
+	cfg.FavoritesDBPath = favoritesDBPath
+
+	id, err := createSnapshot(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("createSnapshot failed: %v", err)
+	}
+
+	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open zip: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
+
+	found := false
+	for _, f := range r.File {
+		if f.Name == "favorites.db" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a favorites.db entry when the source file exists")
+	}
+}
+
+func TestCreateSnapshot_UserSettingsDBIsOptional(t *testing.T) {
+	// A data dir predating this feature (or one where no user has saved
+	// settings yet) has no usersettings.db on disk. createSnapshot must not
+	// fail over that — newTestConfig doesn't set UserSettingsDBPath, mirroring
+	// that.
+	cfg := newTestConfig(t)
+
+	id, err := createSnapshot(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("createSnapshot failed: %v", err)
+	}
+
+	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open zip: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
+
+	for _, f := range r.File {
+		if f.Name == "usersettings.db" {
+			t.Error("expected no usersettings.db entry when the source file doesn't exist")
+		}
+	}
+}
+
+func TestCreateSnapshot_ContainsUserSettingsDBWhenPresent(t *testing.T) {
+	cfg := newTestConfig(t)
+	userSettingsDBPath := filepath.Join(t.TempDir(), "usersettings.db")
+	createTestUserSettingsDB(t, userSettingsDBPath)
+	cfg.UserSettingsDBPath = userSettingsDBPath
+
+	id, err := createSnapshot(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("createSnapshot failed: %v", err)
+	}
+
+	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open zip: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
+
+	found := false
+	for _, f := range r.File {
+		if f.Name == "usersettings.db" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a usersettings.db entry when the source file exists")
 	}
 }
 

@@ -147,7 +147,7 @@ func sanityCheckUsersDB(path string) error {
 // part of the snapshot (session state is ephemeral, tied to the running
 // process) — see AuthService.InvalidateAllSessions, called post-swap instead
 // of being restored.
-var swapNames = []string{"root", "assets", "branding", "branding.json", "schema.json", "users.db", "api_keys.db"}
+var swapNames = []string{"root", "assets", "branding", "branding.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
 
 // removeStaleWALSidecars deletes dbPath's -wal and -shm sidecar files, if
 // present, without touching dbPath itself. Missing files are not an error.

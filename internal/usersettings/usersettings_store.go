@@ -3,24 +3,47 @@ package usersettings
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	_ "modernc.org/sqlite"
 )
 
+// ErrCodeUserSettingsStoreUnavailable identifies
+// errUserSettingsStoreUnavailable's LocalizedError. Mirrors
+// favorites.ErrCodeFavoritesStoreUnavailable / ErrCodeAPIKeyStoreUnavailable.
+const ErrCodeUserSettingsStoreUnavailable = "usersettings_store_unavailable"
+
+// errUserSettingsStoreUnavailable is returned while the store is suspended
+// for an in-progress live restore (see UserSettingsStore.PauseForSwap).
+func errUserSettingsStoreUnavailable() error {
+	return sharederrors.NewLocalizedError(
+		ErrCodeUserSettingsStoreUnavailable,
+		"The server is restoring from a backup — please try again in a moment",
+		"user settings store is suspended for an in-progress restore",
+		nil,
+	)
+}
+
 type UserSettingsStore struct {
 	mu sync.Mutex
 	db *sql.DB
+	// suspended is set by PauseForSwap and makes every query method refuse
+	// to serve queries against a possibly-stale db handle until Replace
+	// reopens it.
+	suspended bool
+	log       *slog.Logger
 }
 
-func NewUserSettingsStore(storageDir string) (*UserSettingsStore, error) {
+func NewUserSettingsStore(storageDir string, log *slog.Logger) (*UserSettingsStore, error) {
 	normalized := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
 	dbPath := filepath.Join(normalized, "usersettings.db")
 
-	s := &UserSettingsStore{}
+	s := &UserSettingsStore{log: log}
 	err := sqliteutil.RetryOnCorruption(dbPath, func() error {
 		db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 		if err != nil {
@@ -58,6 +81,9 @@ func (s *UserSettingsStore) Get(userID string) (*UserSettings, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.suspended || s.db == nil {
+		return nil, errUserSettingsStoreUnavailable()
+	}
 	return s.getLocked(userID)
 }
 
@@ -83,6 +109,9 @@ func (s *UserSettingsStore) Upsert(us *UserSettings) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.suspended || s.db == nil {
+		return errUserSettingsStoreUnavailable()
+	}
 	return s.upsertLocked(us)
 }
 
@@ -110,6 +139,10 @@ func (s *UserSettingsStore) UpdateAtomic(userID string, mutate func(*UserSetting
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.suspended || s.db == nil {
+		return nil, errUserSettingsStoreUnavailable()
+	}
+
 	current, err := s.getLocked(userID)
 	if err != nil {
 		return nil, err
@@ -126,9 +159,57 @@ func (s *UserSettingsStore) DeleteAllForUser(userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.suspended || s.db == nil {
+		return errUserSettingsStoreUnavailable()
+	}
+
 	_, err := s.db.Exec(`DELETE FROM user_settings WHERE user_id = ?`, userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete user settings for user %s: %w", userID, err)
+	}
+	return nil
+}
+
+// PauseForSwap closes the current *sql.DB connection and marks the store
+// suspended so every query method refuses to serve against a possibly-stale
+// handle, releasing any OS-level file lock on usersettings.db before a live
+// restore renames it. Idempotent: a second call is a safe no-op. Mirrors
+// favorites.FavoritesStore.PauseForSwap / APIKeyStore.suspend.
+func (s *UserSettingsStore) PauseForSwap() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.suspended = true
+	if s.db == nil {
+		return nil
+	}
+	err := s.db.Close()
+	s.db = nil
+	return err
+}
+
+// Replace reopens usersettings.db from storageDir and swaps the new
+// connection in, closing the previous one afterward — used by a live restore
+// once usersettings.db has been swapped in on disk (or left untouched, if
+// this snapshot didn't capture one). Preserves this UserSettingsStore's
+// identity: no caller needs to be told about the new connection, they
+// already hold this pointer. Mirrors favorites.FavoritesStore.Replace.
+func (s *UserSettingsStore) Replace(storageDir string) error {
+	fresh, err := NewUserSettingsStore(storageDir, s.log)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	old := s.db
+	s.db = fresh.db
+	s.suspended = false
+	s.mu.Unlock()
+
+	if old != nil {
+		if err := old.Close(); err != nil && s.log != nil {
+			s.log.Warn("failed to close previous user settings store after restore", "error", err)
+		}
 	}
 	return nil
 }

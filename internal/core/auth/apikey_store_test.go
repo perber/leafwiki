@@ -140,6 +140,41 @@ func TestAPIKeyStore_ListAll_OrderedNewestFirst(t *testing.T) {
 	}
 }
 
+func TestAPIKeyStore_DeleteAllForUser_RemovesOnlyThatUsersKeys(t *testing.T) {
+	store := setupTestAPIKeyStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	u1Key := &APIKey{ID: "k1", Name: "u1 key", UserID: "u1", Prefix: "p1", KeyHash: "h1", Role: RoleViewer, CreatedBy: "admin1", CreatedAt: time.Now()}
+	u2Key := &APIKey{ID: "k2", Name: "u2 key", UserID: "u2", Prefix: "p2", KeyHash: "h2", Role: RoleViewer, CreatedBy: "admin1", CreatedAt: time.Now()}
+	if err := store.CreateAPIKey(u1Key); err != nil {
+		t.Fatalf("CreateAPIKey err: %v", err)
+	}
+	if err := store.CreateAPIKey(u2Key); err != nil {
+		t.Fatalf("CreateAPIKey err: %v", err)
+	}
+
+	if err := store.DeleteAllForUser("u1"); err != nil {
+		t.Fatalf("DeleteAllForUser err: %v", err)
+	}
+
+	keys, err := store.ListAll()
+	if err != nil {
+		t.Fatalf("ListAll err: %v", err)
+	}
+	if len(keys) != 1 || keys[0].ID != "k2" {
+		t.Fatalf("expected only u2's key to remain, got %v", keys)
+	}
+}
+
+func TestAPIKeyStore_DeleteAllForUser_NoKeysIsNotAnError(t *testing.T) {
+	store := setupTestAPIKeyStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	if err := store.DeleteAllForUser("no-such-user"); err != nil {
+		t.Fatalf("DeleteAllForUser err: %v", err)
+	}
+}
+
 func TestAPIKeyStore_Revoke(t *testing.T) {
 	store := setupTestAPIKeyStore(t)
 	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)

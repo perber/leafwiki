@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/test_utils"
 )
 
 func newTestStore(t *testing.T) *UserSettingsStore {
 	t.Helper()
-	store, err := NewUserSettingsStore(t.TempDir())
+	store, err := NewUserSettingsStore(t.TempDir(), nil)
 	if err != nil {
 		t.Fatalf("NewUserSettingsStore: %v", err)
 	}
@@ -22,7 +23,7 @@ func newTestStore(t *testing.T) *UserSettingsStore {
 
 func TestUserSettingsStore_CreatesDatabaseInStorageDir(t *testing.T) {
 	tmp := t.TempDir()
-	store, err := NewUserSettingsStore(tmp)
+	store, err := NewUserSettingsStore(tmp, nil)
 	if err != nil {
 		t.Fatalf("NewUserSettingsStore: %v", err)
 	}
@@ -36,7 +37,7 @@ func TestUserSettingsStore_CreatesDatabaseInStorageDir(t *testing.T) {
 func TestUserSettingsStore_IdempotentSchema(t *testing.T) {
 	tmp := t.TempDir()
 	for i := 0; i < 3; i++ {
-		store, err := NewUserSettingsStore(tmp)
+		store, err := NewUserSettingsStore(tmp, nil)
 		if err != nil {
 			t.Fatalf("NewUserSettingsStore (run %d): %v", i, err)
 		}
@@ -176,5 +177,79 @@ func TestUserSettingsStore_Upsert_IsolatedPerUser(t *testing.T) {
 	}
 	if got1.AutoSave == got2.AutoSave {
 		t.Fatalf("expected user-1 and user-2 settings to be independent, both AutoSave=%v", got1.AutoSave)
+	}
+}
+
+func TestUserSettingsStore_PauseForSwap_ClosesDBAndBlocksQueries(t *testing.T) {
+	store := newTestStore(t)
+	if err := store.Upsert(&UserSettings{UserID: "user-1", Language: "en", AutoSave: true, UpdatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	if err := store.PauseForSwap(); err != nil {
+		t.Fatalf("PauseForSwap: %v", err)
+	}
+	if store.db != nil {
+		t.Fatal("expected db to be nil immediately after PauseForSwap")
+	}
+
+	_, err := store.Get("user-1")
+	if err == nil {
+		t.Fatal("expected a query against a suspended store to fail, not silently reconnect")
+	}
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != ErrCodeUserSettingsStoreUnavailable {
+		t.Fatalf("expected %s, got %v", ErrCodeUserSettingsStoreUnavailable, err)
+	}
+	if store.db != nil {
+		t.Fatal("expected the failed query to NOT have reopened db — that's exactly the race this fix prevents")
+	}
+
+	// PauseForSwap must be safe to call again while already suspended.
+	if err := store.PauseForSwap(); err != nil {
+		t.Fatalf("second PauseForSwap: %v", err)
+	}
+}
+
+func TestUserSettingsStore_Replace_ReopensAgainstNewFileAndClosesOld(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewUserSettingsStore(dir, nil)
+	if err != nil {
+		t.Fatalf("NewUserSettingsStore: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
+
+	if err := store.Upsert(&UserSettings{UserID: "user-1", Language: "en", AutoSave: true, UpdatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	if err := store.PauseForSwap(); err != nil {
+		t.Fatalf("PauseForSwap: %v", err)
+	}
+
+	// Simulate a restore having swapped in a different usersettings.db at the
+	// same path while this store's handle was released.
+	if err := os.Remove(filepath.Join(dir, "usersettings.db")); err != nil {
+		t.Fatalf("remove original usersettings.db: %v", err)
+	}
+	replacement, err := NewUserSettingsStore(dir, nil)
+	if err != nil {
+		t.Fatalf("NewUserSettingsStore (replacement): %v", err)
+	}
+	if err := replacement.Upsert(&UserSettings{UserID: "user-1", Language: "de", AutoSave: false, UpdatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("Upsert (replacement): %v", err)
+	}
+	if err := replacement.Close(); err != nil {
+		t.Fatalf("Close (replacement): %v", err)
+	}
+
+	if err := store.Replace(dir); err != nil {
+		t.Fatalf("Replace: %v", err)
+	}
+
+	got, err := store.Get("user-1")
+	if err != nil {
+		t.Fatalf("Get after Replace: %v", err)
+	}
+	if got.Language != "de" || got.AutoSave != false {
+		t.Fatalf("expected Replace to reflect the file actually on disk (Language=de, AutoSave=false), got %+v", got)
 	}
 }

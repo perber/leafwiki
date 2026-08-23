@@ -10,7 +10,7 @@ import (
 func setupUserSettingsUseCases(t *testing.T) (*GetUserSettingsUseCase, *UpdateUserSettingsUseCase) {
 	t.Helper()
 
-	store, err := coreusersettings.NewUserSettingsStore(t.TempDir())
+	store, err := coreusersettings.NewUserSettingsStore(t.TempDir(), nil)
 	if err != nil {
 		t.Fatalf("NewUserSettingsStore: %v", err)
 	}

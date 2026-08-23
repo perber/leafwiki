@@ -84,3 +84,15 @@ func (s *UserSettingsService) DeleteAllForUser(userID string) error {
 func (s *UserSettingsService) Close() error {
 	return s.store.Close()
 }
+
+// PauseForSwap releases the store's OS-level file lock on usersettings.db
+// before a live restore renames it. See UserSettingsStore.PauseForSwap.
+func (s *UserSettingsService) PauseForSwap() error {
+	return s.store.PauseForSwap()
+}
+
+// Replace reopens the store against storageDir/usersettings.db after a live
+// restore has swapped it in. See UserSettingsStore.Replace.
+func (s *UserSettingsService) Replace(storageDir string) error {
+	return s.store.Replace(storageDir)
+}
