@@ -14,6 +14,7 @@ type ConfigErrorResponse = {
 
 export type Config = {
   publicAccess: boolean
+  editorLimit: number
   hideLinkMetadataSection: boolean
   authDisabled: boolean
   maxAssetUploadSizeBytes: number

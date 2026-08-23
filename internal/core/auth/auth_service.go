@@ -68,6 +68,9 @@ func (a *AuthService) ReplaceUserStore(storageDir string) error {
 
 	a.mu.Lock()
 	old := a.userService
+	// Preserve the plan's editor limit across the swap — a restore changes
+	// user data, not which plan tier this instance is running under.
+	newUserService.SetEditorLimit(old.editorLimit)
 	a.userService = newUserService
 	a.mu.Unlock()
 

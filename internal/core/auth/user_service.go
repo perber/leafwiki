@@ -25,6 +25,12 @@ const (
 type UserService struct {
 	store *UserStore
 	log   *slog.Logger
+	// editorLimit caps how many admin+editor users may exist at once; 0
+	// (the default) means unlimited, matching today's self-hosted behavior.
+	// Set via SetEditorLimit rather than a constructor parameter so the
+	// dozens of existing NewUserService(store) call sites (production and
+	// tests) stay untouched — only wiki.WikiOptions.EditorLimit opts in.
+	editorLimit int
 }
 
 func NewUserService(store *UserStore) *UserService {
@@ -32,6 +38,29 @@ func NewUserService(store *UserStore) *UserService {
 		store: store,
 		log:   slog.Default().With("component", "UserService"),
 	}
+}
+
+// SetEditorLimit sets the max number of admin+editor users CreateUser/
+// UpdateUser will allow; 0 means unlimited. See the editorLimit field doc.
+func (s *UserService) SetEditorLimit(limit int) {
+	s.editorLimit = limit
+}
+
+// checkEditorLimit returns ErrEditorLimitReached if creating/promoting a
+// user into role would exceed editorLimit. Viewers are always allowed
+// (they never count against the limit), and a limit <= 0 means unlimited.
+func (s *UserService) checkEditorLimit(role string) error {
+	if s.editorLimit <= 0 || (role != RoleAdmin && role != RoleEditor) {
+		return nil
+	}
+	count, err := s.store.CountEditorUsers()
+	if err != nil {
+		return err
+	}
+	if count >= s.editorLimit {
+		return ErrEditorLimitReached
+	}
+	return nil
 }
 
 func (s *UserService) InitDefaultAdmin(username, email, newPassword string) error {
@@ -81,6 +110,10 @@ func (s *UserService) CreateUser(username, email, password, role string) (*User,
 	// Validate role
 	if !IsValidRole(role) {
 		return nil, ErrUserInvalidRole
+	}
+
+	if err := s.checkEditorLimit(role); err != nil {
+		return nil, err
 	}
 
 	// hash password
@@ -171,6 +204,17 @@ func (s *UserService) UpdateUser(id, username, email, password, role string) (*U
 		}
 		if count <= 1 {
 			return nil, ErrLastAdminCannotBeDemoted
+		}
+	}
+
+	// Only a promotion into admin/editor from a role that wasn't already
+	// counted (viewer) claims a new editor slot — reassigning someone who
+	// was already admin/editor (e.g. admin->editor) stays neutral and must
+	// not be blocked as if it were a third new editor.
+	wasCounted := user.Role == RoleAdmin || user.Role == RoleEditor
+	if !wasCounted {
+		if err := s.checkEditorLimit(role); err != nil {
+			return nil, err
 		}
 	}
 

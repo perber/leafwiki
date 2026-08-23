@@ -16,6 +16,7 @@
   "cannot %s root page": "Cannot %s root page",
   "circular reference detected": "Move would create a circular reference",
   "convert not allowed": "Convert operation not allowed",
+  "editor limit reached for this plan": "This plan's editor limit has been reached. Upgrade your plan to add more editors.",
   "email disabled": "Email is not configured on this server",
   "failed to clear authentication cookies": "Failed to clear authentication cookies",
   "failed to clear csrf cookie": "Failed to clear CSRF cookie",

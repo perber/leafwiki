@@ -91,6 +91,7 @@ type HTTPRemoteUserConfig struct {
 // RouterOptions holds global HTTP server configuration shared across all domains.
 type RouterOptions struct {
 	PublicAccess            bool                     // Whether the wiki allows public read access
+	EditorLimit             int                      // Max admin+editor users allowed; 0 = unlimited
 	InjectCodeInHeader      string                   // Raw HTML/JS code to inject into the <head> tag
 	CustomStylesheet        string                   // Path to a custom CSS file (resolved by wiki before passing)
 	AllowInsecure           bool                     // Whether to allow insecure HTTP connections

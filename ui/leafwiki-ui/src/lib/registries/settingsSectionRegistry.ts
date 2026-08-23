@@ -38,6 +38,7 @@ export interface SettingsSectionContext {
   enableApiKeyManagement: boolean
   totpAvailable: boolean
   userManagementUrl: string | undefined
+  editorLimit: number
 }
 
 export interface SettingsSection {
@@ -96,6 +97,12 @@ export const settingsSections: SettingsSection[] = [
     ns: 'auth',
     icon: Users,
     roles: ['admin'],
+    // At editorLimit === 1, this plan allows only the one owner/admin — no
+    // one can ever be added, so the section (and the loophole of adding
+    // users this way instead of through the enforced /api/users limit) is
+    // hidden entirely rather than shown empty. See ErrEditorLimitReached
+    // (internal/core/auth) for the backend enforcement this mirrors.
+    isEnabled: (ctx) => ctx.editorLimit !== 1,
     externalHref: (ctx) => ctx.userManagementUrl,
     Component: UserManagement,
   },
@@ -157,6 +164,7 @@ export function useSettingsSectionContext(): SettingsSectionContext {
   const enableApiKeyManagement = useConfigStore((s) => s.enableApiKeyManagement)
   const totpAvailable = useConfigStore((s) => s.totpAvailable)
   const userManagementUrl = useConfigStore((s) => s.userManagementUrl)
+  const editorLimit = useConfigStore((s) => s.editorLimit)
 
   return {
     role,
@@ -166,5 +174,6 @@ export function useSettingsSectionContext(): SettingsSectionContext {
     enableApiKeyManagement,
     totpAvailable,
     userManagementUrl: userManagementUrl || undefined,
+    editorLimit,
   }
 }
