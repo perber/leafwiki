@@ -83,7 +83,10 @@ export function ChangeOwnPasswordPanel() {
     fieldErrors.confirm !== ''
 
   return (
-    <div className="settings__field" data-testid="change-own-password-panel">
+    <div
+      className="settings__field space-y-3"
+      data-testid="change-own-password-panel"
+    >
       <input
         aria-hidden="true"
         autoComplete="username"
