@@ -6,6 +6,7 @@ import { create } from 'zustand'
 
 type ConfigStore = {
   publicAccess: boolean
+  editorLimit: number
   hideLinkMetadataSection: boolean
   authDisabled: boolean
   maxAssetUploadSizeBytes: number
@@ -14,6 +15,7 @@ type ConfigStore = {
   enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
   snapshotEnabled: boolean
+  smtpEnabled: boolean
   totpAvailable: boolean
   httpRemoteUserEnabled: boolean
   loginUrl: string
@@ -44,6 +46,7 @@ const CONFIG_LOAD_RETRY_DELAYS_MS = [500, 1000]
 
 export const useConfigStore = create<ConfigStore>((set) => ({
   publicAccess: false,
+  editorLimit: 0,
   hideLinkMetadataSection: false,
   authDisabled: false,
   maxAssetUploadSizeBytes: DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
@@ -52,6 +55,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   enableApiKeyManagement: false,
   gitBackupEnabled: false,
   snapshotEnabled: false,
+  smtpEnabled: false,
   totpAvailable: false,
   httpRemoteUserEnabled: false,
   loginUrl: '',
@@ -76,6 +80,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
 
         set({
           publicAccess: config.publicAccess,
+          editorLimit: config.editorLimit ?? 0,
           hideLinkMetadataSection: config.hideLinkMetadataSection,
           authDisabled: config.authDisabled,
           maxAssetUploadSizeBytes,
@@ -84,6 +89,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
           enableApiKeyManagement: config.enableApiKeyManagement ?? false,
           gitBackupEnabled: config.gitBackupEnabled ?? false,
           snapshotEnabled: config.snapshotEnabled ?? false,
+          smtpEnabled: config.smtpEnabled ?? false,
           totpAvailable: config.totpAvailable ?? false,
           httpRemoteUserEnabled: config.httpRemoteUserEnabled ?? false,
           loginUrl: config.loginUrl ?? '',

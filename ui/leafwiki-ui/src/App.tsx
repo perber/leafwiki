@@ -20,9 +20,8 @@ function App() {
   const loadConfig = useConfigStore((s) => s.loadConfig)
   const authDisabled = useConfigStore((s) => s.authDisabled)
   const enableRevision = useConfigStore((s) => s.enableRevision)
-  const enableApiKeyManagement = useConfigStore((s) => s.enableApiKeyManagement)
-  const userManagementUrl = useConfigStore((s) => s.userManagementUrl)
   const loginUrl = useConfigStore((s) => s.loginUrl)
+  const smtpEnabled = useConfigStore((s) => s.smtpEnabled)
   const loadBranding = useBrandingStore((s) => s.loadBranding)
   const lastConfigErrorRef = useRef<string | null>(null)
 
@@ -76,19 +75,11 @@ function App() {
         isReadOnlyViewer,
         authDisabled,
         enableRevision,
-        enableApiKeyManagement,
-        userManagementUrl,
         loginUrl,
+        smtpEnabled,
         BASE_PATH || undefined,
       ),
-    [
-      isReadOnlyViewer,
-      authDisabled,
-      enableRevision,
-      enableApiKeyManagement,
-      userManagementUrl,
-      loginUrl,
-    ],
+    [isReadOnlyViewer, authDisabled, enableRevision, loginUrl, smtpEnabled],
   )
 
   return (

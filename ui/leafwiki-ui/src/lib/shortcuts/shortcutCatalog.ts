@@ -26,6 +26,7 @@ export type ShortcutId =
   | 'editor.format.inlineCode'
   | 'editor.link.insert'
   | 'history.page.close'
+  | 'settings.exit'
   | 'asset.rename.confirm'
   | 'asset.rename.cancel'
 
@@ -67,7 +68,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     keyCombo: 'Mod+Slash',
     defaultDisplayLabel: 'Ctrl+/',
     macDisplayLabel: 'Cmd+/',
-    modes: ['view', 'edit', 'history', 'settings', 'user-management'],
+    modes: ['view', 'edit', 'history', 'settings'],
     customizable: true,
   },
   {
@@ -87,7 +88,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     keyCombo: 'Mod+Shift+KeyE',
     defaultDisplayLabel: 'Ctrl+Shift+E',
     macDisplayLabel: 'Cmd+Shift+E',
-    modes: ['view', 'edit', 'history', 'settings', 'user-management'],
+    modes: ['view', 'edit', 'history', 'settings'],
     customizable: true,
   },
   {
@@ -97,7 +98,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     keyCombo: 'Mod+Shift+KeyF',
     defaultDisplayLabel: 'Ctrl+Shift+F',
     macDisplayLabel: 'Cmd+Shift+F',
-    modes: ['view', 'edit', 'history', 'settings', 'user-management'],
+    modes: ['view', 'edit', 'history', 'settings'],
     customizable: true,
   },
   {
@@ -266,6 +267,15 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     keyCombo: 'Escape',
     defaultDisplayLabel: 'Esc',
     modes: ['history'],
+    customizable: false,
+  },
+  {
+    id: 'settings.exit',
+    labelKey: 'shortcutsHelp.items.exitSettings.action',
+    categoryKey: 'shortcutsHelp.categories.navigation',
+    keyCombo: 'Escape',
+    defaultDisplayLabel: 'Esc',
+    modes: ['settings'],
     customizable: false,
   },
   {

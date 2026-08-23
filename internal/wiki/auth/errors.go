@@ -35,6 +35,10 @@ const (
 	ErrCodeAuthTOTPNotEnabled           = "auth_totp_not_enabled"
 	ErrCodeAuthTOTPVerificationFailed   = "auth_totp_verification_failed"
 	ErrCodeAuthUserStoreUnavailable     = "auth_user_store_unavailable"
+	ErrCodeAuthEmailDisabled            = "auth_email_disabled"
+	ErrCodeAuthTokenInvalid             = "auth_token_invalid"
+	ErrCodeAuthInviteAlreadyAccepted    = "auth_invite_already_accepted"
+	ErrCodeAuthEditorLimitReached       = "auth_editor_limit_reached"
 )
 
 // AuthErrorResponse is the structured JSON error body returned by auth endpoints.
@@ -103,8 +107,16 @@ func respondWithAuthError(c *gin.Context, err error) {
 		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthAdminCannotDelete, "Admin user cannot be deleted", "admin user cannot be deleted")
 	case errors.Is(err, coreauth.ErrLastAdminCannotBeDemoted):
 		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthLastAdminCannotBeDemoted, "Cannot remove admin role from the last admin user", "cannot remove admin role from the last admin user")
+	case errors.Is(err, coreauth.ErrEditorLimitReached):
+		respondWithAuthStatusError(c, http.StatusForbidden, ErrCodeAuthEditorLimitReached, "Editor limit reached for this plan", "editor limit reached for this plan")
 	case errors.Is(err, ErrAuthDisabled):
 		respondWithAuthStatusError(c, http.StatusForbidden, ErrCodeAuthDisabled, "Authentication is disabled", "authentication is disabled")
+	case errors.Is(err, coreauth.ErrEmailDisabled):
+		respondWithAuthStatusError(c, http.StatusForbidden, ErrCodeAuthEmailDisabled, "Email is not configured on this server", "email disabled")
+	case errors.Is(err, coreauth.ErrEmailTokenInvalid):
+		respondWithAuthStatusError(c, http.StatusUnprocessableEntity, ErrCodeAuthTokenInvalid, "This link is invalid or has expired", "invalid or expired token")
+	case errors.Is(err, coreauth.ErrInviteAlreadyAccepted):
+		respondWithAuthStatusError(c, http.StatusConflict, ErrCodeAuthInviteAlreadyAccepted, "This invite has already been accepted", "invite already accepted")
 	default:
 		slog.Default().Error("unhandled auth error", "error", err)
 		respondWithAuthStatusError(c, http.StatusInternalServerError, ErrCodeAuthInternalError, "Authentication request failed", "authentication request failed")
@@ -135,10 +147,14 @@ func authErrorStatus(code string) int {
 		return http.StatusUnprocessableEntity
 	case ErrCodeAuthTOTPNotConfigured, ErrCodeAuthTOTPVerificationFailed, ErrCodeAuthUserStoreUnavailable:
 		return http.StatusServiceUnavailable
-	case ErrCodeAuthTOTPAlreadyEnabled:
+	case ErrCodeAuthTOTPAlreadyEnabled, ErrCodeAuthInviteAlreadyAccepted:
 		return http.StatusConflict
 	case ErrCodeAuthTOTPSetupNotStarted, ErrCodeAuthTOTPNotEnabled:
 		return http.StatusBadRequest
+	case ErrCodeAuthEmailDisabled:
+		return http.StatusForbidden
+	case ErrCodeAuthTokenInvalid:
+		return http.StatusUnprocessableEntity
 	default:
 		return http.StatusInternalServerError
 	}

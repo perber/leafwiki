@@ -11,6 +11,7 @@ import (
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/email"
 	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
@@ -42,18 +43,20 @@ import (
 )
 
 type Wiki struct {
-	tree         *tree.TreeService
-	slug         *tree.SlugService
-	auth         *auth.AuthService
-	userResolver *auth.UserResolver
-	user         *auth.UserService
-	apiKeys      *auth.APIKeyService
-	totp         *auth.TOTPService
-	asset        *assets.AssetService
-	branding     *branding.BrandingService
-	searchIndex  *search.SQLiteIndex
-	status       *search.IndexingStatus
-	storageDir   string
+	tree              *tree.TreeService
+	slug              *tree.SlugService
+	auth              *auth.AuthService
+	userResolver      *auth.UserResolver
+	user              *auth.UserService
+	apiKeys           *auth.APIKeyService
+	totp              *auth.TOTPService
+	emailTokenStore   *auth.EmailTokenStore
+	emailTokenService *auth.EmailTokenService
+	asset             *assets.AssetService
+	branding          *branding.BrandingService
+	searchIndex       *search.SQLiteIndex
+	status            *search.IndexingStatus
+	storageDir        string
 
 	// Domain route registrars (populated by NewWiki).
 	pagesRoutes      *wikipages.Routes
@@ -101,9 +104,11 @@ type WikiOptions struct {
 	EnableRevision          bool          // Whether revision recording/storage is enabled
 	EnableAPIKeyManagement  bool          // Whether the experimental API key management feature is enabled
 	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
+	EditorLimit             int           // Max admin+editor users allowed; 0 = unlimited
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
 	RevisionCoalesceWindow  time.Duration // Window for coalescing rapid successive saves; 0 = disabled
 	TOTPEncryptionKey       string        // Key used to encrypt per-user TOTP secrets at rest; empty disables TOTP self-service
+	SMTP                    email.Config  // SMTP config for password-reset/invite email; SMTP.Enabled()==false disables the feature entirely
 	Metrics                 *httpmetrics.HTTPMetrics
 }
 
@@ -118,6 +123,9 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		metrics:        options.Metrics,
 	}
 	if err := w.initAuth(options); err != nil {
+		return nil, err
+	}
+	if err := w.initEmail(options); err != nil {
 		return nil, err
 	}
 	if err := w.initCoreServices(options); err != nil {
@@ -200,6 +208,7 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 		return err
 	}
 	w.user = auth.NewUserService(store)
+	w.user.SetEditorLimit(options.EditorLimit)
 	if !options.AuthDisabled {
 		if err := w.user.InitDefaultAdmin(options.AdminUsername, options.AdminEmail, options.AdminPassword); err != nil {
 			return err
@@ -246,6 +255,28 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 			w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.auth)
 		}
 	}
+	return nil
+}
+
+// initEmail constructs the password-reset/invite token service when both
+// SMTP is configured and auth is enabled — mirroring the EnableAPIKeyManagement
+// block above, this keeps w.emailTokenService nil (and the corresponding
+// routes returning ErrEmailDisabled) whenever either precondition is false,
+// rather than constructing something unusable. Must run after initAuth,
+// which sets w.user and w.auth.
+func (w *Wiki) initEmail(options *WikiOptions) error {
+	if !options.SMTP.Enabled() || options.AuthDisabled {
+		return nil
+	}
+
+	store, err := auth.NewEmailTokenStore(w.storageDir)
+	if err != nil {
+		return err
+	}
+	w.emailTokenStore = store
+
+	mailer := email.NewService(options.SMTP)
+	w.emailTokenService = auth.NewEmailTokenService(store, w.user, w.auth, mailer, options.SMTP.PublicURL)
 	return nil
 }
 
@@ -456,6 +487,12 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		DisableTOTP:       wikiauth.NewDisableTOTPUseCase(w.auth, w.metrics),
 		GetTOTPStatus:     wikiauth.NewGetTOTPStatusUseCase(w.auth),
 		AuthService:       w.auth,
+
+		RequestPasswordReset: wikiauth.NewRequestPasswordResetUseCase(w.EmailTokenService),
+		ConfirmPasswordReset: wikiauth.NewConfirmPasswordResetUseCase(w.EmailTokenService),
+		InviteUser:           wikiauth.NewInviteUserUseCase(w.UserService, w.EmailTokenService, w.userResolver, w.log),
+		ResendInvite:         wikiauth.NewResendInviteUseCase(w.UserService, w.EmailTokenService),
+		ConfirmInvite:        wikiauth.NewConfirmInviteUseCase(w.EmailTokenService, w.auth),
 	})
 }
 
@@ -884,6 +921,14 @@ func (w *Wiki) APIKeyService() *auth.APIKeyService {
 	return w.apiKeys
 }
 
+// EmailTokenService returns the password-reset/invite token service, or nil
+// if SMTP isn't configured or auth is disabled (see initEmail). Every use
+// case that resolves this via the func()-based pattern (like UserService)
+// nil-checks it and returns ErrEmailDisabled.
+func (w *Wiki) EmailTokenService() *auth.EmailTokenService {
+	return w.emailTokenService
+}
+
 func (w *Wiki) Close() error {
 	w.shutdownCancel() // signal in-flight reloads to abort
 	w.reloadWG.Wait()  // drain goroutines before closing stores
@@ -902,6 +947,15 @@ func (w *Wiki) Close() error {
 	if w.apiKeys != nil {
 		if err := w.apiKeys.Close(); err != nil {
 			return err
+		}
+	}
+
+	if w.emailTokenService != nil {
+		w.emailTokenService.Close() // drains in-flight fire-and-forget password-reset sends
+	}
+	if w.emailTokenStore != nil {
+		if err := w.emailTokenStore.Close(); err != nil {
+			w.log.Error("error closing email token store", "error", err)
 		}
 	}
 

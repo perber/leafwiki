@@ -69,7 +69,7 @@ func loginAdmin(t *testing.T) string {
 
 func loginAdminAt(t *testing.T, baseURL string) string {
 	t.Helper()
-	payload := `{"identifier":"admin","password":"admin"}`
+	payload := `{"identifier":"admin","password":"adminproxypassword"}`
 	req, err := http.NewRequest(http.MethodPost, baseURL+"/api/auth/login", strings.NewReader(payload))
 	if err != nil {
 		t.Fatalf("build login request: %v", err)

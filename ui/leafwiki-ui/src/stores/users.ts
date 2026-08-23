@@ -11,6 +11,10 @@ type UserStore = {
   updateUser: (data: Parameters<typeof userAPI.updateUser>[0]) => Promise<void>
   deleteUser: (id: string) => Promise<void>
   changeOwnPassword: (oldPassword: string, newPassword: string) => Promise<void>
+  inviteUser: (
+    data: Parameters<typeof userAPI.inviteUser>[0],
+  ) => Promise<userAPI.InviteUserResponse>
+  resendInvite: (id: string) => Promise<void>
 }
 
 export const useUserStore = create<UserStore>((set, get) => ({
@@ -36,6 +40,16 @@ export const useUserStore = create<UserStore>((set, get) => ({
   deleteUser: async (id) => {
     await userAPI.deleteUser(id)
     await get().loadUsers()
+  },
+
+  inviteUser: async (data) => {
+    const result = await userAPI.inviteUser(data)
+    await get().loadUsers()
+    return result
+  },
+
+  resendInvite: async (id) => {
+    await userAPI.resendInvite(id)
   },
 
   changeOwnPassword: async (oldPassword, newPassword) => {

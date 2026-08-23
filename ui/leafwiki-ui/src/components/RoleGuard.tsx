@@ -1,5 +1,6 @@
 // components/RoleGuard.tsx
 
+import { hasRole } from '@/lib/roles'
 import { useSessionStore } from '@/stores/session'
 import { ReactNode } from 'react'
 
@@ -11,8 +12,7 @@ type Props = {
 export function RoleGuard({ roles, children }: Props) {
   const user = useSessionStore((state) => state.user)
 
-  if (!user) return null
-  if (!roles.includes(user.role)) return null
+  if (!hasRole(user?.role, roles)) return null
 
   return <>{children}</>
 }

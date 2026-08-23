@@ -4,10 +4,11 @@ import { completeTOTPLogin, login } from '@/lib/api/auth'
 import { mapApiError } from '@/lib/api/errors'
 import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
+import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Navigate, useLocation, useNavigate } from 'react-router'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
 function getRedirectTo(state: unknown): string | null {
@@ -44,6 +45,7 @@ export default function LoginForm() {
   const location = useLocation()
   const navigate = useNavigate()
   const user = useSessionStore((s) => s.user)
+  const smtpEnabled = useConfigStore((s) => s.smtpEnabled)
   const { siteName, logoFile, logoVersion } = useBrandingStore()
   const redirectTo = getRedirectTo(location.state)
 
@@ -192,6 +194,16 @@ export default function LoginForm() {
               spellCheck={false}
             />
           </div>
+
+          {smtpEnabled && (
+            <Link
+              to="/forgot-password"
+              className="login__forgot-password"
+              data-testid="login-forgot-password-link"
+            >
+              {t('login.forgotPasswordLink')}
+            </Link>
+          )}
 
           <Button
             type="submit"

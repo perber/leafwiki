@@ -15,6 +15,7 @@ import enBrokenLinks from '../locales/en/brokenLinks.json'
 import enPage from '../locales/en/page.json'
 import enRestore from '../locales/en/restore.json'
 import enSearch from '../locales/en/search.json'
+import enSettings from '../locales/en/settings.json'
 import enSnapshot from '../locales/en/snapshot.json'
 import enUsers from '../locales/en/users.json'
 import enViewer from '../locales/en/viewer.json'
@@ -39,6 +40,7 @@ i18next.use(initReactI18next).init({
       page: enPage,
       restore: enRestore,
       search: enSearch,
+      settings: enSettings,
       snapshot: enSnapshot,
       users: enUsers,
       viewer: enViewer,

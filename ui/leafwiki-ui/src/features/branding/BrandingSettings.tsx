@@ -15,7 +15,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useSetTitle } from '../viewer/setTitle'
-import { useToolbarActions } from './useToolbarActions'
 
 export default function BrandingSettings() {
   const {
@@ -39,8 +38,6 @@ export default function BrandingSettings() {
 
   const { t } = useTranslation('branding')
 
-  // reset toolbar actions on mount
-  useToolbarActions()
   useSetTitle({ title: t('pageTitle') })
 
   const [localSiteName, setLocalSiteName] = useState(siteName)

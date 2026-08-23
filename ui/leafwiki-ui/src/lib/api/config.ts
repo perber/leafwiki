@@ -14,6 +14,7 @@ type ConfigErrorResponse = {
 
 export type Config = {
   publicAccess: boolean
+  editorLimit: number
   hideLinkMetadataSection: boolean
   authDisabled: boolean
   maxAssetUploadSizeBytes: number
@@ -22,6 +23,7 @@ export type Config = {
   enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
   snapshotEnabled: boolean
+  smtpEnabled: boolean
   totpAvailable: boolean
   httpRemoteUserEnabled: boolean
   loginUrl: string

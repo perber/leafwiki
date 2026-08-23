@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useBackupStore } from '@/stores/backup'
 import { useSetTitle } from '../viewer/setTitle'
-import { useToolbarActions } from './useToolbarActions'
 
 const POLL_INTERVAL_MS = 5000
 
@@ -39,8 +38,6 @@ export default function BackupSettings() {
 
   const [isForcePushing, setIsForcePushing] = useState(false)
 
-  // reset toolbar actions on mount
-  useToolbarActions()
   useSetTitle({ title: t('pageTitle') })
 
   useEffect(() => {

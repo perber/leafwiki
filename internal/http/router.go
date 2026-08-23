@@ -91,6 +91,7 @@ type HTTPRemoteUserConfig struct {
 // RouterOptions holds global HTTP server configuration shared across all domains.
 type RouterOptions struct {
 	PublicAccess            bool                     // Whether the wiki allows public read access
+	EditorLimit             int                      // Max admin+editor users allowed; 0 = unlimited
 	InjectCodeInHeader      string                   // Raw HTML/JS code to inject into the <head> tag
 	CustomStylesheet        string                   // Path to a custom CSS file (resolved by wiki before passing)
 	AllowInsecure           bool                     // Whether to allow insecure HTTP connections
@@ -106,6 +107,7 @@ type RouterOptions struct {
 	Metrics                 *httpmetrics.HTTPMetrics // Optional Prometheus HTTP metrics collector; nil disables request instrumentation
 	GitBackupEnabled        bool                     // Whether git backup is enabled (surfaced to admin UI via /api/config)
 	SnapshotEnabled         bool                     // Whether full-backup (snapshot) is enabled (surfaced to admin UI via /api/config)
+	SMTPEnabled             bool                     // Whether SMTP (password reset / user invite email) is configured (surfaced to UI via /api/config)
 	TOTPAvailable           bool                     // Whether a TOTP encryption key is configured, i.e. TOTP self-service can be offered (surfaced to UI via /api/config)
 	HTTPRemoteUser          HTTPRemoteUserConfig     // Reverse-proxy authentication via HTTP header
 	APIKeyService           *coreauth.APIKeyService  // Bearer API-key authentication; nil disables the feature

@@ -7,14 +7,13 @@ import { useSetTitle } from '../viewer/setTitle'
 import { ChangePasswordButton } from './ChangePasswordButton'
 import { CreateEditUserButton } from './CreateEditUserButton'
 import { DeleteUserButton } from './DeleteUserButton'
-import { useToolbarActions } from './useToolbarActions'
+import { ResendInviteButton } from './ResendInviteButton'
 
 export default function UserManagement() {
   const { t } = useTranslation('users')
   const { users, loadUsers, reset } = useUserStore()
   const [loading, setLoading] = useState(true)
   useSetTitle({ title: t('pageTitle') })
-  useToolbarActions()
 
   useEffect(() => {
     loadUsers()
@@ -110,6 +109,14 @@ export default function UserManagement() {
                       </td>
                       <td className="settings__actions-cell">
                         <div className="settings__actions">
+                          {user.mustSetPassword && (
+                            <>
+                              <span className="settings__pill settings__pill-warning">
+                                {t('invite.pendingPill')}
+                              </span>
+                              <ResendInviteButton user={user} />
+                            </>
+                          )}
                           <CreateEditUserButton user={user} />
                           <ChangePasswordButton user={user} />
                           <DeleteUserButton user={user} />

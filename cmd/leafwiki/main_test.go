@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -346,6 +347,53 @@ func TestRunRestoreSnapshotCommand_InvalidZipPath_PropagatesError(t *testing.T) 
 	}
 	if errors.Is(err, errRestoreSnapshotUsage) {
 		t.Fatalf("runRestoreSnapshotCommand() error = %v, want a restore error, not the usage error", err)
+	}
+}
+
+func TestValidateGitBackupRemote(t *testing.T) {
+	const (
+		sshKey   = "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n"
+		keyPath  = "/etc/leafwiki/id_ed25519"
+		user     = "jochumdev"
+		password = "github_pat_secret"
+	)
+	tests := []struct {
+		name         string
+		remote       string
+		sshKey       string
+		sshKeyPath   string
+		httpUsername string
+		httpPassword string
+		wantErr      bool
+	}{
+		{name: "no remote is local-only and needs no credentials"},
+
+		{name: "ssh remote with inline key", remote: "git@github.com:user/repo.git", sshKey: sshKey},
+		{name: "ssh remote with key path", remote: "git@github.com:user/repo.git", sshKeyPath: keyPath},
+		{name: "ssh url with key", remote: "ssh://git@github.com/user/repo.git", sshKey: sshKey},
+		{name: "ssh remote without key", remote: "git@github.com:user/repo.git", wantErr: true},
+		{name: "ssh remote with only http credentials", remote: "git@github.com:user/repo.git", httpUsername: user, httpPassword: password, wantErr: true},
+
+		{name: "https remote with username and password", remote: "https://github.com/user/repo.git", httpUsername: user, httpPassword: password},
+		{name: "http remote with username and password", remote: "http://gitea.internal/user/repo.git", httpUsername: user, httpPassword: password},
+		{name: "uppercase https scheme", remote: "HTTPS://github.com/user/repo.git", httpUsername: user, httpPassword: password},
+		{name: "https remote with credentials embedded in the URL", remote: "https://jochumdev:github_pat_secret@github.com/user/repo.git"},
+		{name: "https remote without any credentials", remote: "https://github.com/user/repo.git", wantErr: true},
+		{name: "https remote with username only", remote: "https://github.com/user/repo.git", httpUsername: user, wantErr: true},
+		{name: "https remote with password only", remote: "https://github.com/user/repo.git", httpPassword: password, wantErr: true},
+		// An SSH key is not a substitute for HTTP credentials.
+		{name: "https remote with only an ssh key", remote: "https://github.com/user/repo.git", sshKey: sshKey, wantErr: true},
+
+		{name: "file remote is not supported", remote: "file:///srv/backup.git", sshKey: sshKey, wantErr: true},
+		{name: "bare path is not supported", remote: "/srv/backup.git", sshKey: sshKey, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateGitBackupRemote(tc.remote, tc.sshKey, tc.sshKeyPath, tc.httpUsername, tc.httpPassword)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateGitBackupRemote(%q, ...) error = %v, wantErr %v", tc.remote, err, tc.wantErr)
+			}
+		})
 	}
 }
 
@@ -902,6 +950,72 @@ func TestDockerfileBuilder_GoBuildLdflags_InjectsAppVersion(t *testing.T) {
 	}
 }
 
+// dockerBuildStageDeclaresArg checks that the multi-stage Docker build
+// stage containing marker (e.g. the `go build` line) is preceded by its own
+// `ARG argName` declaration *within that stage*. Docker scopes ARG per
+// build stage: an ARG declared in an earlier stage does not carry into a
+// later one, even though `${argName}` still substitutes silently as an
+// empty string there instead of failing the build.
+func dockerBuildStageDeclaresArg(t *testing.T, dockerfilePath, marker, argName string) bool {
+	t.Helper()
+
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", dockerfilePath, err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	markerIdx := -1
+	for i, line := range lines {
+		if strings.Contains(line, marker) {
+			markerIdx = i
+			break
+		}
+	}
+	if markerIdx == -1 {
+		t.Fatalf("no line containing %q found in %s", marker, dockerfilePath)
+	}
+
+	stageStart := 0
+	for i := markerIdx; i >= 0; i-- {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "FROM ") {
+			stageStart = i
+			break
+		}
+	}
+
+	for _, line := range lines[stageStart:markerIdx] {
+		if strings.TrimSpace(line) == "ARG "+argName {
+			return true
+		}
+	}
+	return false
+}
+
+// TestDockerfile_GoBuildStage_DeclaresAppVersionArg pins the bug where
+// Dockerfile's backend-build stage used ${APP_VERSION} in its go build
+// -ldflags without re-declaring `ARG APP_VERSION` in that stage (it was
+// only declared in the earlier frontend-build stage). Docker scopes ARG per
+// stage, so the ldflags line silently baked in an empty version string
+// instead of failing the build — every v0.12.x release image/binary shipped
+// main.Version="" (visible in the leafwiki_build_info metric and in the
+// snapshot/restore version-mismatch check, which silently no-ops when
+// WikiVersion is empty).
+func TestDockerfile_GoBuildStage_DeclaresAppVersionArg(t *testing.T) {
+	if !dockerBuildStageDeclaresArg(t, filepath.Join("..", "..", "Dockerfile"), "go build", "APP_VERSION") {
+		t.Fatal("Dockerfile's go build stage uses ${APP_VERSION} without declaring ARG APP_VERSION in that stage")
+	}
+}
+
+// TestDockerfileBuilder_GoBuildStage_DeclaresAppVersionArg is the same
+// regression check for Dockerfile.builder's builder stage.
+func TestDockerfileBuilder_GoBuildStage_DeclaresAppVersionArg(t *testing.T) {
+	if !dockerBuildStageDeclaresArg(t, filepath.Join("..", "..", "Dockerfile.builder"), "go build", "APP_VERSION") {
+		t.Fatal("Dockerfile.builder's builder stage uses ${APP_VERSION} without declaring ARG APP_VERSION in that stage")
+	}
+}
+
 // TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue exercises
 // the deterministic branch of scripts/resolve-version.sh (the shared
 // algorithm used by both `make build`/`make run` and vite.config.ts). The
@@ -928,27 +1042,55 @@ func TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue(t *testing.T
 // release/Docker targets do, instead of leaving local builds on the "dev"
 // default silently.
 func TestMakefile_BuildAndRunTargets_InjectVersionLdflags(t *testing.T) {
-	content, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
 	if err != nil {
 		t.Fatalf("failed to read Makefile: %v", err)
 	}
+	content := string(raw)
 
 	for _, target := range []string{"build:", "run:"} {
-		idx := strings.Index(string(content), target)
+		idx := strings.Index(content, target)
 		if idx == -1 {
 			t.Fatalf("Makefile target %q not found", target)
 		}
 
-		recipeEnd := strings.Index(string(content)[idx:], "\n\n")
+		recipeEnd := strings.Index(content[idx:], "\n\n")
 		if recipeEnd == -1 {
 			recipeEnd = len(content) - idx
 		}
-		recipe := string(content)[idx : idx+recipeEnd]
+		recipe := content[idx : idx+recipeEnd]
 
-		if !strings.Contains(recipe, "-X main.Version=$(VERSION)") {
+		if !strings.Contains(resolveMakeVars(content, recipe), "-X main.Version=$(VERSION)") {
 			t.Fatalf("expected Makefile %q recipe to inject main.Version from $(VERSION), got: %s", target, recipe)
 		}
 	}
+}
+
+var makeVarAssignment = regexp.MustCompile(`(?m)^([A-Za-z_][A-Za-z0-9_]*)\s*(?::=|\?=|=)\s*(.*)$`)
+
+// resolveMakeVars expands $(NAME) references in s using NAME's assignment
+// elsewhere in the Makefile, so the check above still works when a recipe
+// builds its ldflags from a variable (e.g. $(LDFLAGS)) instead of a literal
+// string. $(VERSION) itself is left unresolved since the test asserts on
+// that exact reference.
+func resolveMakeVars(content, s string) string {
+	assignments := map[string]string{}
+	for _, m := range makeVarAssignment.FindAllStringSubmatch(content, -1) {
+		assignments[m[1]] = m[2]
+	}
+	delete(assignments, "VERSION")
+
+	for changed := true; changed; {
+		changed = false
+		for name, value := range assignments {
+			token := "$(" + name + ")"
+			if strings.Contains(s, token) {
+				s = strings.ReplaceAll(s, token, value)
+				changed = true
+			}
+		}
+	}
+	return s
 }
 
 // TestViteConfig_ResolvesVersionViaSharedScript pins that the frontend

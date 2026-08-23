@@ -11,12 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import * as authAPI from '@/lib/api/auth'
 import i18next from '@/lib/i18n'
-import {
-  DIALOG_CHANGE_OWN_PASSWORD,
-  DIALOG_SHORTCUTS_HELP,
-  DIALOG_TOTP_DISABLE,
-  DIALOG_TOTP_SETUP,
-} from '@/lib/registries'
+import { DIALOG_SHORTCUTS_HELP } from '@/lib/registries'
 import { useTranslation } from 'react-i18next'
 import { redirectToExternal } from '@/lib/redirectToExternal'
 import {
@@ -41,14 +36,8 @@ const shortcutsDialogHotkeyLabel = getShortcutDisplayLabel(
   isMacOS,
 )
 
-export default function UserToolbar() {
-  const { t } = useTranslation([
-    'auth',
-    'backup',
-    'apikeys',
-    'snapshot',
-    'users',
-  ])
+export default function UserMenu() {
+  const { t } = useTranslation('auth')
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
@@ -56,16 +45,11 @@ export default function UserToolbar() {
   const openDialog = useDialogsStore((state) => state.openDialog)
   const authDisabled = useConfigStore((s) => s.authDisabled)
   const readOnly = useIsReadOnly()
-  const backupEnabled = useConfigStore((s) => s.gitBackupEnabled)
-  const apiKeysEnabled = useConfigStore((s) => s.enableApiKeyManagement)
-  const snapshotEnabled = useConfigStore((s) => s.snapshotEnabled)
-  const totpAvailable = useConfigStore((s) => s.totpAvailable)
   const httpRemoteUserEnabled = useConfigStore((s) => s.httpRemoteUserEnabled)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)
   const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)
   const logoutUrl = useConfigStore((s) => s.logoutUrl)
   const loginUrl = useConfigStore((s) => s.loginUrl)
-  const userManagementUrl = useConfigStore((s) => s.userManagementUrl)
 
   useEffect(() => {
     if (!authDisabled && (!user || readOnly)) {
@@ -89,7 +73,7 @@ export default function UserToolbar() {
 
   if (!user && !authDisabled) {
     return (
-      <div className="user-toolbar">
+      <div className="user-menu">
         <Button
           size="sm"
           onClick={() =>
@@ -104,8 +88,8 @@ export default function UserToolbar() {
 
   if (authDisabled) {
     return (
-      <div className="user-toolbar">
-        <span className="user-toolbar__not-logged-in">
+      <div className="user-menu">
+        <span className="user-menu__not-logged-in">
           {t('login.publicEditor')}
         </span>
       </div>
@@ -126,82 +110,24 @@ export default function UserToolbar() {
   }
 
   return (
-    <div className="user-toolbar">
+    <div className="user-menu">
       <DropdownMenu>
-        <DropdownMenuTrigger className="user-toolbar__dropdown-trigger">
-          <Avatar
-            className="user-toolbar__avatar"
-            data-testid="user-toolbar-avatar"
-          >
-            <AvatarFallback className="user-toolbar__avatar-fallback">
+        <DropdownMenuTrigger className="user-menu__dropdown-trigger">
+          <Avatar className="user-menu__avatar" data-testid="user-menu-avatar">
+            <AvatarFallback className="user-menu__avatar-fallback">
               {user?.username[0].toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <RoleGuard roles={['admin']}>
-            {userManagementUrl ? (
-              <DropdownMenuItem asChild className="cursor-pointer">
-                <a
-                  href={userManagementUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t('userMenu.userManagement')}
-                </a>
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={() => navigate('/users')}
-              >
-                {t('userMenu.userManagement')}
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => navigate('/settings/branding')}
-            >
-              {t('userMenu.brandingSettings')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => navigate('/settings/importer')}
-            >
-              {t('userMenu.import')}
-            </DropdownMenuItem>
-            {apiKeysEnabled && (
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={() => navigate('/settings/api-keys')}
-              >
-                {t('menu.title', { ns: 'apikeys' })}
-              </DropdownMenuItem>
-            )}
-            {backupEnabled && (
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={() => navigate('/settings/backup')}
-              >
-                {t('menuLabel', { ns: 'backup' })}
-              </DropdownMenuItem>
-            )}
-            {snapshotEnabled && (
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={() => navigate('/settings/snapshots')}
-              >
-                {t('menuLabel', { ns: 'snapshot' })}
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => navigate('/settings/maintenance')}
-            >
-              {t('userMenu.maintenance')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </RoleGuard>
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => navigate('/settings')}
+            data-testid="user-menu-settings"
+          >
+            {t('userMenu.settings')}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
             {t('userMenu.version', { version: __APP_VERSION__ })}
           </DropdownMenuLabel>
@@ -217,37 +143,11 @@ export default function UserToolbar() {
               </DropdownMenuShortcut>
             </DropdownMenuItem>
           </RoleGuard>
-          <DropdownMenuItem
-            className="cursor-pointer"
-            onClick={() => openDialog(DIALOG_CHANGE_OWN_PASSWORD)}
-          >
-            {t('userMenu.changeOwnPassword')}
-          </DropdownMenuItem>
-          {!authDisabled &&
-            (user?.totpEnabled ? (
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={() => openDialog(DIALOG_TOTP_DISABLE)}
-                data-testid="user-toolbar-totp-disable"
-              >
-                {t('totp.menuDisable', { ns: 'users' })}
-              </DropdownMenuItem>
-            ) : (
-              totpAvailable && (
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onClick={() => openDialog(DIALOG_TOTP_SETUP)}
-                  data-testid="user-toolbar-totp-enable"
-                >
-                  {t('totp.menuEnable', { ns: 'users' })}
-                </DropdownMenuItem>
-              )
-            ))}
           {(!httpRemoteUserEnabled || logoutUrl) && (
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={handleLogout}
-              data-testid="user-toolbar-logout"
+              data-testid="user-menu-logout"
             >
               {t('userMenu.logout')}
             </DropdownMenuItem>

@@ -1,5 +1,5 @@
 // Shared navigation mechanism for all "leave the app for an external URL"
-// call sites (login/logout redirects in ExternalRedirect and UserToolbar),
+// call sites (login/logout redirects in ExternalRedirect and UserMenu),
 // so redirect behavior only needs to change in one place.
 export function redirectToExternal(url: string, returnTo?: string) {
   if (!returnTo) {

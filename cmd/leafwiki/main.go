@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/backup"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/email"
 	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -44,8 +46,9 @@ import (
 var Version = "dev"
 
 const (
-	gitBackupSSHKeyFlagName = "git-backup-ssh-key"
-	errInvalidEnvVarValue   = "Invalid environment variable value"
+	gitBackupSSHKeyFlagName       = "git-backup-ssh-key"
+	gitBackupHTTPPasswordFlagName = "git-backup-http-password"
+	errInvalidEnvVarValue         = "Invalid environment variable value"
 )
 
 func writeUsage(w io.Writer) {
@@ -64,7 +67,7 @@ func writeUsage(w io.Writer) {
 	--port             Port to run the server on (default: 8080)
 	--unix-socket      Path to a unix domain socket to listen on (overrides --host and --port)
 	--data-dir         Path to data directory (default: ./data)
-	--admin-password   Initial admin password (used only if no admin exists)
+	--admin-password   Initial admin password (used only if no admin exists), min 8 characters
 	--admin-username   Initial admin username (used only if no admin exists) (default: admin)
 	--admin-email      Initial admin email (used only if no admin exists) (default: admin@localhost)
 	--jwt-secret       Secret for signing auth tokens (JWT) (required)
@@ -90,6 +93,7 @@ func writeUsage(w io.Writer) {
 	--metrics-host                Host/IP for the metrics listener (default: 127.0.0.1)
 	--metrics-port                Port for the metrics listener (default: 9091)
 	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
+	--editor-limit                Maximum admin+editor users allowed; 0 = unlimited (default: 0)
 	--revision-coalesce-window    Window for coalescing rapid successive saves by the same author (e.g. 5m, 0 = disabled) (default: 5m)
 	--enable-http-remote-user               Enable reverse-proxy authentication via HTTP header (default: false)
 	--http-remote-user-header-name          HTTP header carrying the username or email from a trusted proxy (default: Remote-User)
@@ -108,11 +112,13 @@ func writeUsage(w io.Writer) {
 	--git-backup                   Enable git backup to a remote repository (default: false)
 	--git-backup-author-name       Git commit author name for backups (default: LeafWiki Backup)
 	--git-backup-author-email      Git commit author email for backups (default: backup@leafwiki.local)
-	--git-backup-remote            Git remote URL (SSH) for backups (required when git-backup is enabled)
+	--git-backup-remote            Git remote URL (SSH or HTTP(S)) for backups (required when git-backup is enabled)
 	--git-backup-branch            Git branch to push to (default: main)
 	--git-backup-ssh-key-path      Path to SSH private key for git backup
 	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
 	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
+	--git-backup-http-username     Username for HTTP(S) basic auth (used instead of an SSH key on http(s):// remotes)
+	--git-backup-http-password     Password or access token for HTTP(S) basic auth (env var preferred)
 	--git-backup-interval          Git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)
 	--snapshot                     Enable full backup snapshots (ZIP incl. the SQLite database) (default: true)
 	--snapshot-interval            Snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)
@@ -140,6 +146,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_ADMIN_USERNAME
 	LEAFWIKI_ADMIN_EMAIL
 	LEAFWIKI_PUBLIC_ACCESS
+	LEAFWIKI_EDITOR_LIMIT
 	LEAFWIKI_ALLOW_INSECURE
 	LEAFWIKI_INJECT_CODE_IN_HEADER
 	LEAFWIKI_CUSTOM_STYLESHEET
@@ -176,6 +183,8 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH
 	LEAFWIKI_GIT_BACKUP_SSH_KEY
 	LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS
+	LEAFWIKI_GIT_BACKUP_HTTP_USERNAME
+	LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD
 	LEAFWIKI_GIT_BACKUP_INTERVAL
 	LEAFWIKI_SNAPSHOT
 	LEAFWIKI_SNAPSHOT_INTERVAL
@@ -264,6 +273,7 @@ type cliFlags struct {
 	metricsHost                    *string
 	metricsPort                    *string
 	maxRevisionHistory             *int
+	editorLimit                    *int
 	enableHTTPRemoteUser           *bool
 	httpRemoteUserHeader           *string
 	enableHTTPRemoteUserAutoCreate *bool
@@ -283,6 +293,8 @@ type cliFlags struct {
 	gitBackupSSHKeyPath            *string
 	gitBackupSSHKey                *string
 	gitBackupSSHKnownHosts         *string
+	gitBackupHTTPUsername          *string
+	gitBackupHTTPPassword          *string
 	gitBackupInterval              *time.Duration
 	revisionCoalesceWindow         *time.Duration
 	snapshotEnabled                *bool
@@ -290,6 +302,16 @@ type cliFlags struct {
 	snapshotRetention              *int
 	snapshotDir                    *string
 	restoreUploadMaxSize           *string
+	smtpHost                       *string
+	smtpPort                       *int
+	smtpUsername                   *string
+	smtpPassword                   *string
+	smtpFrom                       *string
+	smtpFromName                   *string
+	smtpSecurity                   *string
+	smtpInsecureSkipVerify         *bool
+	smtpTimeout                    *time.Duration
+	publicURL                      *string
 }
 
 func registerFlags(fs *flag.FlagSet) *cliFlags {
@@ -301,7 +323,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		dataDir:                        fs.String("data-dir", "", "path to data directory"),
 		adminUsername:                  fs.String("admin-username", "", "initial admin username (used only if no admin exists) (default: admin)"),
 		adminEmail:                     fs.String("admin-email", "", "initial admin email (used only if no admin exists) (default: admin@localhost)"),
-		adminPassword:                  fs.String("admin-password", "", "initial admin password"),
+		adminPassword:                  fs.String("admin-password", "", "initial admin password, min 8 characters"),
 		jwtSecret:                      fs.String("jwt-secret", "", "JWT secret for authentication"),
 		totpEncryptionKey:              fs.String("totp-encryption-key", "", "key to encrypt per-user TOTP secrets at rest, min 32 bytes (leave unset to keep TOTP self-service unavailable)"),
 		publicAccess:                   fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
@@ -321,6 +343,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		metricsHost:                    fs.String("metrics-host", "", "host/IP address for the Prometheus metrics listener (default: 127.0.0.1)"),
 		metricsPort:                    fs.String("metrics-port", "", "port for the Prometheus metrics listener (default: 9091)"),
 		maxRevisionHistory:             fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
+		editorLimit:                    fs.Int("editor-limit", 0, "maximum admin+editor users allowed; 0 = unlimited (default: 0)"),
 		enableHTTPRemoteUser:           fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
 		httpRemoteUserHeader:           fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username or email from a trusted proxy (default: Remote-User)"),
 		enableHTTPRemoteUserAutoCreate: fs.Bool("enable-http-remote-user-auto-create", false, "auto-provision users asserted by the trusted proxy but unknown to LeafWiki (default: false)"),
@@ -335,11 +358,13 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		gitBackup:                      fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
 		gitBackupAuthorName:            fs.String("git-backup-author-name", "", "git commit author name for backups (default: LeafWiki Backup)"),
 		gitBackupAuthorEmail:           fs.String("git-backup-author-email", "", "git commit author email for backups (default: backup@leafwiki.local)"),
-		gitBackupRemote:                fs.String("git-backup-remote", "", "git remote URL (SSH) for backups (required when git-backup is enabled)"),
+		gitBackupRemote:                fs.String("git-backup-remote", "", "git remote URL (SSH or HTTP(S)) for backups (required when git-backup is enabled)"),
 		gitBackupBranch:                fs.String("git-backup-branch", "", "git branch to push to (default: main)"),
 		gitBackupSSHKeyPath:            fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
 		gitBackupSSHKey:                fs.String(gitBackupSSHKeyFlagName, "", "raw SSH private key for git backup (env var preferred)"),
 		gitBackupSSHKnownHosts:         fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
+		gitBackupHTTPUsername:          fs.String("git-backup-http-username", "", "username for HTTP(S) basic auth on http(s):// remotes"),
+		gitBackupHTTPPassword:          fs.String(gitBackupHTTPPasswordFlagName, "", "password or access token for HTTP(S) basic auth (env var preferred)"),
 		gitBackupInterval:              fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
 		revisionCoalesceWindow:         fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
 		snapshotEnabled:                fs.Bool("snapshot", true, "enable full backup snapshots (ZIP incl. the SQLite database) (default: true)"),
@@ -347,6 +372,16 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		snapshotRetention:              fs.Int("snapshot-retention", 10, "number of most recent snapshots to keep; <= 0 = keep all (default: 10)"),
 		snapshotDir:                    fs.String("snapshot-dir", "", "directory to store snapshot ZIPs in (default: <data-dir>/snapshots)"),
 		restoreUploadMaxSize:           fs.String("restore-upload-max-size", "", "maximum size for an uploaded backup ZIP to restore from (for example 500MiB, 500MB, 524288000) (default: 500MiB)"),
+		smtpHost:                       fs.String("smtp-host", "", "SMTP server host for password-reset/invite email; unset disables the feature entirely (default: \"\")"),
+		smtpPort:                       fs.Int("smtp-port", 587, "SMTP server port (default: 587)"),
+		smtpUsername:                   fs.String("smtp-username", "", "SMTP auth username"),
+		smtpPassword:                   fs.String("smtp-password", "", "SMTP auth password (env var preferred)"),
+		smtpFrom:                       fs.String("smtp-from", "", "From address for outgoing email (required when --smtp-host is set)"),
+		smtpFromName:                   fs.String("smtp-from-name", "LeafWiki", "From display name for outgoing email (default: LeafWiki)"),
+		smtpSecurity:                   fs.String("smtp-security", "starttls", "SMTP transport security: none, starttls, or tls (default: starttls)"),
+		smtpInsecureSkipVerify:         fs.Bool("smtp-insecure-skip-verify", false, "skip TLS certificate verification for SMTP (default: false; do not use in production)"),
+		smtpTimeout:                    fs.Duration("smtp-timeout", 10*time.Second, "timeout for a single SMTP send (e.g. 10s) (default: 10s)"),
+		publicURL:                      fs.String("public-url", "", "absolute base URL used to build links in outgoing email, e.g. https://wiki.example.com (required when --smtp-host is set)"),
 	}
 }
 
@@ -408,6 +443,7 @@ func main() {
 	metricsHost := resolveString("metrics-host", *flags.metricsHost, visited, "LEAFWIKI_METRICS_HOST", "127.0.0.1")
 	metricsPort := resolveString("metrics-port", *flags.metricsPort, visited, "LEAFWIKI_METRICS_PORT", "9091")
 	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
+	editorLimit := resolveInt("editor-limit", *flags.editorLimit, visited, "LEAFWIKI_EDITOR_LIMIT", 0)
 	revisionCoalesceWindow := resolveDuration("revision-coalesce-window", *flags.revisionCoalesceWindow, visited, "LEAFWIKI_REVISION_COALESCE_WINDOW")
 	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
 	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
@@ -432,10 +468,23 @@ func main() {
 	gitBackupSSHKey := resolveString(gitBackupSSHKeyFlagName, *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
 	gitBackupInterval := resolveDuration("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL")
 	gitBackupSSHKnownHosts := resolveString("git-backup-ssh-known-hosts", *flags.gitBackupSSHKnownHosts, visited, "LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS", "")
+	gitBackupHTTPUsername := resolveString("git-backup-http-username", *flags.gitBackupHTTPUsername, visited, "LEAFWIKI_GIT_BACKUP_HTTP_USERNAME", "")
+	gitBackupHTTPPassword := resolveString(gitBackupHTTPPasswordFlagName, *flags.gitBackupHTTPPassword, visited, "LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD", "")
 	snapshotEnabled := resolveBool("snapshot", *flags.snapshotEnabled, visited, "LEAFWIKI_SNAPSHOT")
 	snapshotInterval := resolveDuration("snapshot-interval", *flags.snapshotInterval, visited, "LEAFWIKI_SNAPSHOT_INTERVAL")
 	snapshotRetention := resolveInt("snapshot-retention", *flags.snapshotRetention, visited, "LEAFWIKI_SNAPSHOT_RETENTION", 10)
 	snapshotDir := resolveString("snapshot-dir", *flags.snapshotDir, visited, "LEAFWIKI_SNAPSHOT_DIR", "")
+	smtpHost := resolveString("smtp-host", *flags.smtpHost, visited, "LEAFWIKI_SMTP_HOST", "")
+	smtpPort := resolveInt("smtp-port", *flags.smtpPort, visited, "LEAFWIKI_SMTP_PORT", 587)
+	smtpUsername := resolveString("smtp-username", *flags.smtpUsername, visited, "LEAFWIKI_SMTP_USERNAME", "")
+	smtpPassword := resolveString("smtp-password", *flags.smtpPassword, visited, "LEAFWIKI_SMTP_PASSWORD", "")
+	smtpFrom := resolveString("smtp-from", *flags.smtpFrom, visited, "LEAFWIKI_SMTP_FROM", "")
+	smtpFromName := resolveString("smtp-from-name", *flags.smtpFromName, visited, "LEAFWIKI_SMTP_FROM_NAME", "LeafWiki")
+	smtpSecurity := resolveString("smtp-security", *flags.smtpSecurity, visited, "LEAFWIKI_SMTP_SECURITY", "starttls")
+	smtpInsecureSkipVerify := resolveBool("smtp-insecure-skip-verify", *flags.smtpInsecureSkipVerify, visited, "LEAFWIKI_SMTP_INSECURE_SKIP_VERIFY")
+	smtpTimeout := resolveDuration("smtp-timeout", *flags.smtpTimeout, visited, "LEAFWIKI_SMTP_TIMEOUT")
+	publicURL := resolveString("public-url", *flags.publicURL, visited, "LEAFWIKI_PUBLIC_URL", "")
+	smtpEnabled := smtpHost != ""
 	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
 	if err != nil {
 		fail("invalid --trusted-proxy-ips value", "error", err)
@@ -458,6 +507,16 @@ func main() {
 	if err := validateRedirectURL("logout-url", logoutURL); err != nil {
 		fail("Invalid logout URL configuration", "error", err)
 	}
+
+	if err := validateSMTPConfig(smtpHost, smtpFrom, publicURL, smtpSecurity); err != nil {
+		fail("Invalid SMTP configuration", "error", err)
+	}
+	if smtpEnabled {
+		// A misconfigured public URL produces broken links in emails that
+		// have already gone out — irreversible — so log the resolved value
+		// once at boot rather than only on first use.
+		slog.Default().Info("SMTP email enabled", "host", smtpHost, "port", smtpPort, "security", smtpSecurity, "publicUrl", publicURL)
+	}
 	if err := validateRedirectURL("user-management-url", userManagementURL); err != nil {
 		fail("Invalid user management URL configuration", "error", err)
 	}
@@ -479,8 +538,10 @@ func main() {
 
 	// Validate git backup configuration
 	// Note: git-backup-remote is optional (local-only mode is supported)
-	if gitBackupEnabled && gitBackupRemote != "" && gitBackupSSHKey == "" && gitBackupSSHKeyPath == "" {
-		fail("--git-backup-ssh-key or --git-backup-ssh-key-path is required when --git-backup-remote is set. Use LEAFWIKI_GIT_BACKUP_SSH_KEY or LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH.")
+	if gitBackupEnabled {
+		if err := validateGitBackupRemote(gitBackupRemote, gitBackupSSHKey, gitBackupSSHKeyPath, gitBackupHTTPUsername, gitBackupHTTPPassword); err != nil {
+			fail("Invalid git backup configuration", "error", err)
+		}
 	}
 
 	args := flag.Args()
@@ -564,8 +625,21 @@ func main() {
 		EnableRevision:         enableRevision,
 		EnableAPIKeyManagement: enableAPIKeyManagement,
 		MaxRevisionHistory:     maxRevisionHistory,
+		EditorLimit:            editorLimit,
 		RevisionCoalesceWindow: revisionCoalesceWindow,
-		Metrics:                metrics,
+		SMTP: email.Config{
+			Host:               smtpHost,
+			Port:               smtpPort,
+			Username:           smtpUsername,
+			Password:           smtpPassword,
+			From:               smtpFrom,
+			FromName:           smtpFromName,
+			Security:           email.Security(smtpSecurity),
+			InsecureSkipVerify: smtpInsecureSkipVerify,
+			Timeout:            smtpTimeout,
+			PublicURL:          publicURL,
+		},
+		Metrics: metrics,
 	})
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)
@@ -588,11 +662,14 @@ func main() {
 	// Initialize git backup if enabled
 	var backupScheduler *backup.Scheduler
 	if gitBackupEnabled {
-		if gitBackupRemote != "" && !strings.HasPrefix(gitBackupRemote, "git@") && !strings.HasPrefix(gitBackupRemote, "ssh://") {
-			fail("--git-backup-remote must be an SSH URL (e.g. git@github.com:user/repo.git or ssh://...)")
-		}
 		if visited[gitBackupSSHKeyFlagName] {
 			slog.Warn("SSH private key passed via --git-backup-ssh-key flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_SSH_KEY environment variable")
+		}
+		if visited[gitBackupHTTPPasswordFlagName] {
+			slog.Warn("HTTP password passed via --git-backup-http-password flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD environment variable")
+		}
+		if strings.HasPrefix(strings.ToLower(gitBackupRemote), "http://") {
+			slog.Warn("--git-backup-remote uses plain http://; git backup credentials and wiki content are transmitted unencrypted — use https:// unless the remote is on a trusted network")
 		}
 		backupRepo, err := backup.Init(backup.Config{
 			Enabled:           true,
@@ -605,6 +682,8 @@ func main() {
 			SSHKeyPath:        gitBackupSSHKeyPath,
 			SSHKey:            gitBackupSSHKey,
 			SSHKnownHostsPath: gitBackupSSHKnownHosts,
+			HTTPUsername:      gitBackupHTTPUsername,
+			HTTPPassword:      gitBackupHTTPPassword,
 			Interval:          gitBackupInterval,
 		})
 		if err != nil {
@@ -661,6 +740,7 @@ func main() {
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccess,
+		EditorLimit:             editorLimit,
 		InjectCodeInHeader:      injectCodeInHeader,
 		CustomStylesheet:        customStylesheet,
 		AllowInsecure:           allowInsecure,
@@ -676,6 +756,7 @@ func main() {
 		Metrics:                 metrics,
 		GitBackupEnabled:        gitBackupEnabled,
 		SnapshotEnabled:         snapshotEnabled,
+		SMTPEnabled:             smtpEnabled,
 		TOTPAvailable:           w.TOTPService() != nil,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:         enableHTTPRemoteUser,
@@ -991,6 +1072,33 @@ func validateHTTPRemoteUserAutoCreateConfig(autoCreateEnabled, remoteUserEnabled
 	return nil
 }
 
+// validateSMTPConfig fails fast at startup, mirroring
+// validateHTTPRemoteUserConfig, rather than silently disabling the feature or
+// leaving it half-configured until the first send attempt fails: a bad
+// --public-url in particular would only surface once already embedded in an
+// email that's gone out.
+func validateSMTPConfig(host, from, publicURL, security string) error {
+	if host == "" {
+		return nil
+	}
+	if from == "" {
+		return fmt.Errorf("--smtp-from is required when --smtp-host is set")
+	}
+	if publicURL == "" {
+		return fmt.Errorf("--public-url is required when --smtp-host is set")
+	}
+	u, err := url.Parse(publicURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("--public-url must be an absolute http(s):// URL, got %q", publicURL)
+	}
+	switch email.Security(security) {
+	case email.SecurityNone, email.SecurityStartTLS, email.SecurityTLS:
+	default:
+		return fmt.Errorf("--smtp-security must be one of none, starttls, tls, got %q", security)
+	}
+	return nil
+}
+
 // resolveLogoutURL resolves --logout-url/LEAFWIKI_LOGOUT_URL, falling back to
 // the deprecated --http-remote-user-logout-url/LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
 // when the new option isn't set. usedDeprecated tells the caller whether to log
@@ -1004,6 +1112,43 @@ func resolveLogoutURL(logoutURL, deprecatedFlagVal string, visited map[string]bo
 		return "", false
 	}
 	return deprecated, true
+}
+
+// validateGitBackupRemote checks the git backup remote URL and that credentials
+// matching its transport are configured: HTTP(S) remotes authenticate with a
+// username + password/token (e.g. a repo-scoped access token), SSH remotes with
+// a private key. An empty remote means local-only backup and needs no
+// credentials at all.
+func validateGitBackupRemote(remote, sshKey, sshKeyPath, httpUsername, httpPassword string) error {
+	if remote == "" {
+		return nil
+	}
+	lower := strings.ToLower(remote)
+
+	switch {
+	case strings.HasPrefix(lower, "http://"), strings.HasPrefix(lower, "https://"):
+		if httpUsername == "" && httpPassword == "" {
+			// Credentials may instead be embedded in the URL
+			// (https://user:token@host/repo.git), which git supports natively.
+			if parsed, err := url.Parse(remote); err == nil && parsed.User != nil {
+				return nil
+			}
+			return fmt.Errorf("--git-backup-http-username and --git-backup-http-password are required when --git-backup-remote is an HTTP(S) URL. Use LEAFWIKI_GIT_BACKUP_HTTP_USERNAME or LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD")
+		}
+		if httpUsername == "" || httpPassword == "" {
+			return fmt.Errorf("--git-backup-http-username and --git-backup-http-password must both be set; got only one of them")
+		}
+		return nil
+
+	case strings.HasPrefix(lower, "git@"), strings.HasPrefix(lower, "ssh://"):
+		if sshKey == "" && sshKeyPath == "" {
+			return fmt.Errorf("--git-backup-ssh-key or --git-backup-ssh-key-path is required when --git-backup-remote is set. Use LEAFWIKI_GIT_BACKUP_SSH_KEY or LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH")
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("--git-backup-remote must be an SSH URL (e.g. git@github.com:user/repo.git or ssh://...) or an HTTP(S) URL (e.g. https://github.com/user/repo.git)")
+	}
 }
 
 func validateRedirectURL(flagName, url string) error {
