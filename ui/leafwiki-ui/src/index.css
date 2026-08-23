@@ -2880,7 +2880,7 @@
   }
 
   .settings-nav .list-view__content {
-    @apply p-2 pt-0;
+    @apply p-2;
   }
 
   .settings-nav .list-view__item {
