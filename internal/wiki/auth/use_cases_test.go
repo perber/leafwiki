@@ -16,6 +16,7 @@ import (
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/favorites"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
+	"github.com/perber/wiki/internal/usersettings"
 )
 
 func metricsBody(t *testing.T, metrics *httpmetrics.HTTPMetrics) string {
@@ -497,8 +498,9 @@ func TestGetUsersUseCase_DoesNotExposeTOTPSecretOrRecoveryCodes(t *testing.T) {
 }
 
 // TestDeleteUser_RemovesFavoritesForUser verifies that deleting a user cascades
-// to clean up their favorites.db rows, even though sessions.db does not have
-// the same cleanup today (deliberately not copying that gap, see plans/favorites.md).
+// to clean up their favorites.db and usersettings.db rows, even though
+// sessions.db does not have the same cleanup today (deliberately not copying
+// that gap, see plans/favorites.md).
 func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 	store, err := coreauth.NewUserStore(t.TempDir())
 	if err != nil {
@@ -526,6 +528,17 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 		}
 	})
 
+	settingsStore, err := usersettings.NewUserSettingsStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewUserSettingsStore: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := settingsStore.Close(); err != nil {
+			t.Errorf("Close user settings store: %v", err)
+		}
+	})
+	settingsSvc := usersettings.NewUserSettingsService(settingsStore)
+
 	user, err := userSvc.CreateUser("bob", "bob@example.com", "pass", coreauth.RoleViewer)
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
@@ -533,8 +546,12 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 	if err := favoritesStore.Add(user.ID, "page-1"); err != nil {
 		t.Fatalf("failed to seed favorite: %v", err)
 	}
+	autoSave := false
+	if _, err := settingsSvc.Update(user.ID, usersettings.UserSettingsPatch{AutoSave: &autoSave}); err != nil {
+		t.Fatalf("failed to seed user settings: %v", err)
+	}
 
-	uc := NewDeleteUserUseCase(userSvcFn, resolver, favoritesStore, slog.Default())
+	uc := NewDeleteUserUseCase(userSvcFn, resolver, favoritesStore, settingsSvc, slog.Default())
 	if err := uc.Execute(context.Background(), DeleteUserInput{ID: user.ID}); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
@@ -545,6 +562,14 @@ func TestDeleteUser_RemovesFavoritesForUser(t *testing.T) {
 	}
 	if len(ids) != 0 {
 		t.Errorf("expected favorites for deleted user to be cleaned up, got %v", ids)
+	}
+
+	settings, err := settingsSvc.Get(user.ID)
+	if err != nil {
+		t.Fatalf("Get user settings: %v", err)
+	}
+	if settings.AutoSave != true {
+		t.Errorf("expected user settings for deleted user to be cleaned up (back to default AutoSave=true), got %v", settings.AutoSave)
 	}
 }
 
