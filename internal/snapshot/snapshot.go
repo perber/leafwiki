@@ -75,6 +75,8 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 			if err := vacuumSQLiteDB(ctx, cfg.APIKeysDBPath, apiKeysDBCopy); err != nil {
 				return "", fmt.Errorf("failed to vacuum api keys database: %w", err)
 			}
+		} else if !os.IsNotExist(statErr) {
+			return "", fmt.Errorf("failed to stat api keys database: %w", statErr)
 		}
 	}
 
@@ -88,6 +90,8 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 			if err := vacuumSQLiteDB(ctx, cfg.FavoritesDBPath, favoritesDBCopy); err != nil {
 				return "", fmt.Errorf("failed to vacuum favorites database: %w", err)
 			}
+		} else if !os.IsNotExist(statErr) {
+			return "", fmt.Errorf("failed to stat favorites database: %w", statErr)
 		}
 	}
 
@@ -98,6 +102,8 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 			if err := vacuumSQLiteDB(ctx, cfg.UserSettingsDBPath, userSettingsDBCopy); err != nil {
 				return "", fmt.Errorf("failed to vacuum user settings database: %w", err)
 			}
+		} else if !os.IsNotExist(statErr) {
+			return "", fmt.Errorf("failed to stat user settings database: %w", statErr)
 		}
 	}
 

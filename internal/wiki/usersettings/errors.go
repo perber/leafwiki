@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	coreusersettings "github.com/perber/wiki/internal/usersettings"
 )
 
 const (
@@ -66,6 +67,8 @@ func userSettingsErrorStatus(code string) int {
 		return http.StatusBadRequest
 	case ErrCodeUserSettingsLoadFailed, ErrCodeUserSettingsUpdateFailed, ErrCodeUserSettingsDeleteFailed, ErrCodeUserSettingsInternalError:
 		return http.StatusInternalServerError
+	case coreusersettings.ErrCodeUserSettingsStoreUnavailable:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}

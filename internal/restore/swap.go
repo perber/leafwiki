@@ -80,9 +80,25 @@ func extractAndValidateWithLimits(zipPath, dataDir string, limits shared.Extract
 		return "", backupMeta{}, fmt.Errorf("failed to parse backup-meta.json: %w", err)
 	}
 
-	if err := sanityCheckUsersDB(filepath.Join(stagingDir, "users.db")); err != nil {
+	if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "users.db"), "users"); err != nil {
 		_ = os.RemoveAll(stagingDir)
 		return "", backupMeta{}, fmt.Errorf("staged users.db failed sanity check: %w", err)
+	}
+
+	// favorites.db and usersettings.db are optional (an older snapshot may
+	// predate the feature), so only sanity-check them when the snapshot
+	// actually staged one — same presence guard SwapAll itself uses.
+	if _, err := os.Stat(filepath.Join(stagingDir, "favorites.db")); err == nil {
+		if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "favorites.db"), "favorites"); err != nil {
+			_ = os.RemoveAll(stagingDir)
+			return "", backupMeta{}, fmt.Errorf("staged favorites.db failed sanity check: %w", err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(stagingDir, "usersettings.db")); err == nil {
+		if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "usersettings.db"), "user_settings"); err != nil {
+			_ = os.RemoveAll(stagingDir)
+			return "", backupMeta{}, fmt.Errorf("staged usersettings.db failed sanity check: %w", err)
+		}
 	}
 
 	return stagingDir, meta, nil
@@ -127,7 +143,12 @@ func extractZipEntry(f *zip.File, destDir string, limits shared.ExtractionLimits
 	return nil
 }
 
-func sanityCheckUsersDB(path string) error {
+// sanityCheckSQLiteDB opens path and runs a trivial query against table,
+// proving the staged file is a well-formed SQLite database with the schema
+// this restore expects — not, say, a corrupt file that a RetryOnCorruption
+// store constructor would otherwise silently delete and recreate empty once
+// swapped in and reopened (see NewFavoritesStore/NewUserSettingsStore).
+func sanityCheckSQLiteDB(path, table string) error {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return err
@@ -135,8 +156,8 @@ func sanityCheckUsersDB(path string) error {
 	defer func() { _ = db.Close() }()
 
 	var count int
-	if err := db.QueryRow("SELECT count(*) FROM users").Scan(&count); err != nil {
-		return fmt.Errorf("failed to query users table: %w", err)
+	if err := db.QueryRow(fmt.Sprintf("SELECT count(*) FROM %s", table)).Scan(&count); err != nil {
+		return fmt.Errorf("failed to query %s table: %w", table, err)
 	}
 	return nil
 }
@@ -148,6 +169,12 @@ func sanityCheckUsersDB(path string) error {
 // process) — see AuthService.InvalidateAllSessions, called post-swap instead
 // of being restored.
 var swapNames = []string{"root", "assets", "branding", "branding.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
+
+// walSidecarDBNames lists every WAL-mode database whose stale -wal/-shm
+// sidecars may need cleaning up before a swap — the DB subset of swapNames
+// (the non-DB entries — root/assets/branding/schema.json — never run in WAL
+// mode so don't belong here). Shared by manager.go and offline.go.
+var walSidecarDBNames = []string{"users.db", "api_keys.db", "favorites.db", "usersettings.db"}
 
 // removeStaleWALSidecars deletes dbPath's -wal and -shm sidecar files, if
 // present, without touching dbPath itself. Missing files are not an error.

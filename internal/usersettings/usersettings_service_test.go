@@ -70,6 +70,33 @@ func TestUserSettingsService_Update_PartialPatch_LeavesOtherFieldUnchanged(t *te
 	}
 }
 
+// TestUserSettingsService_Get_StoreUnavailable_PropagatesOriginalErrorCode
+// is the regression test for a real bug found in review: the service layer
+// used to rewrap every store error into a generic usersettings_load_failed
+// code, losing errUserSettingsStoreUnavailable's ErrCodeUserSettingsStoreUnavailable
+// — which an HTTP caller needs to see in order to map the response to 503
+// instead of a generic 500 (see internal/wiki/usersettings/errors.go).
+func TestUserSettingsService_Get_StoreUnavailable_PropagatesOriginalErrorCode(t *testing.T) {
+	store := newTestStore(t)
+	svc := NewUserSettingsService(store)
+
+	if err := store.PauseForSwap(); err != nil {
+		t.Fatalf("PauseForSwap: %v", err)
+	}
+
+	_, err := svc.Get("user-1")
+	if err == nil {
+		t.Fatal("expected an error while the store is suspended")
+	}
+	loc, ok := sharederrors.AsLocalizedError(err)
+	if !ok {
+		t.Fatalf("expected a *sharederrors.LocalizedError, got %T: %v", err, err)
+	}
+	if loc.Code != ErrCodeUserSettingsStoreUnavailable {
+		t.Fatalf("expected code %q to survive service-layer wrapping, got %q", ErrCodeUserSettingsStoreUnavailable, loc.Code)
+	}
+}
+
 func TestUserSettingsService_Update_InvalidLanguage_ReturnsValidationError(t *testing.T) {
 	svc := newTestService(t)
 

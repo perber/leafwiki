@@ -217,6 +217,20 @@ func TestCreateSnapshot_APIKeysDBIsOptional(t *testing.T) {
 	}
 }
 
+// TestCreateSnapshot_APIKeysDBStatErrorOtherThanNotExist_FailsSnapshot is
+// the same stat-error-swallowing regression as the favorites/usersettings
+// tests below, for the pre-existing api_keys.db block this pattern was
+// originally copied from.
+func TestCreateSnapshot_APIKeysDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
+	cfg := newTestConfig(t)
+	blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
+	cfg.APIKeysDBPath = filepath.Join(blocker, "api_keys.db")
+
+	if _, err := createSnapshot(context.Background(), cfg); err == nil {
+		t.Fatal("expected createSnapshot to fail on an api_keys.db stat error other than not-exist")
+	}
+}
+
 func TestCreateSnapshot_ContainsAPIKeysDBWhenPresent(t *testing.T) {
 	cfg := newTestConfig(t)
 	apiKeysDBPath := filepath.Join(t.TempDir(), "api_keys.db")
@@ -297,6 +311,35 @@ func TestCreateSnapshot_ContainsFavoritesDBWhenPresent(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected a favorites.db entry when the source file exists")
+	}
+}
+
+// TestCreateSnapshot_FavoritesDBStatErrorOtherThanNotExist_FailsSnapshot is
+// the regression test for a real bug found in review: an os.Stat error other
+// than "file doesn't exist" (e.g. permission denied, or here a path
+// component that isn't a directory) used to be silently treated the same as
+// "favorites.db just doesn't exist on this data dir yet", producing a
+// snapshot that quietly omits favorites data instead of failing loudly.
+func TestCreateSnapshot_FavoritesDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
+	cfg := newTestConfig(t)
+	blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
+	cfg.FavoritesDBPath = filepath.Join(blocker, "favorites.db")
+
+	if _, err := createSnapshot(context.Background(), cfg); err == nil {
+		t.Fatal("expected createSnapshot to fail on a favorites.db stat error other than not-exist")
+	}
+}
+
+// TestCreateSnapshot_UserSettingsDBStatErrorOtherThanNotExist_FailsSnapshot
+// mirrors TestCreateSnapshot_FavoritesDBStatErrorOtherThanNotExist_FailsSnapshot
+// for usersettings.db.
+func TestCreateSnapshot_UserSettingsDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
+	cfg := newTestConfig(t)
+	blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
+	cfg.UserSettingsDBPath = filepath.Join(blocker, "usersettings.db")
+
+	if _, err := createSnapshot(context.Background(), cfg); err == nil {
+		t.Fatal("expected createSnapshot to fail on a usersettings.db stat error other than not-exist")
 	}
 }
 

@@ -85,6 +85,53 @@ func TestExtractAndValidate_RejectsCorruptUsersDB(t *testing.T) {
 	}
 }
 
+// TestExtractAndValidate_RejectsCorruptFavoritesDB and
+// TestExtractAndValidate_RejectsCorruptUserSettingsDB are regression tests
+// for a real bug found in review: favorites.db/usersettings.db weren't
+// sanity-checked at all, unlike users.db. Both stores open via
+// sqliteutil.RetryOnCorruption (see NewFavoritesStore/NewUserSettingsStore),
+// which silently deletes and recreates a corrupt database file on open — so
+// without this check, a corrupt staged favorites.db/usersettings.db would
+// get swapped in, then silently wiped empty the moment Manager.Replace
+// reopens it, while the restore itself reports success.
+func TestExtractAndValidate_RejectsCorruptFavoritesDB(t *testing.T) {
+	zipPath := writeRawZip(t, map[string]string{
+		"backup-meta.json": `{"id":"x","version":"v1"}`,
+		"users.db":         string(validUsersDBBytes(t)),
+		"favorites.db":     "this is not a sqlite database",
+	})
+
+	if _, _, err := extractAndValidate(zipPath, t.TempDir()); err == nil {
+		t.Fatal("expected error for a favorites.db that fails the sanity query")
+	}
+}
+
+func TestExtractAndValidate_RejectsCorruptUserSettingsDB(t *testing.T) {
+	zipPath := writeRawZip(t, map[string]string{
+		"backup-meta.json": `{"id":"x","version":"v1"}`,
+		"users.db":         string(validUsersDBBytes(t)),
+		"usersettings.db":  "this is not a sqlite database",
+	})
+
+	if _, _, err := extractAndValidate(zipPath, t.TempDir()); err == nil {
+		t.Fatal("expected error for a usersettings.db that fails the sanity query")
+	}
+}
+
+// validUsersDBBytes returns the raw bytes of a users.db that passes
+// sanityCheckSQLiteDB, so tests targeting a different staged file's
+// corruption don't fail earlier at the (already-covered) users.db check.
+func validUsersDBBytes(t *testing.T) []byte {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "users.db")
+	createTestUsersDB(t, path, "a@example.com")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read fixture users.db: %v", err)
+	}
+	return b
+}
+
 // Regression tests for the zip-bomb unbounded-decompression DoS (CWE-409):
 // extractAndValidateWithLimits must enforce a per-file cap, a
 // cumulative-per-archive cap, and a decompression-ratio cap during restore

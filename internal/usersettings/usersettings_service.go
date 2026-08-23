@@ -23,15 +23,26 @@ func NewUserSettingsService(store *UserSettingsStore) *UserSettingsService {
 	return &UserSettingsService{store: store}
 }
 
+// wrapStoreErr propagates err as-is if the store already returned a
+// *sharederrors.LocalizedError (e.g. errUserSettingsStoreUnavailable, whose
+// code an HTTP caller needs to see in order to map it to 503 — see
+// userSettingsErrorStatus) — otherwise wraps it as a generic LocalizedError
+// under code/message/template.
+func wrapStoreErr(err error, code, message, template string) error {
+	if _, ok := sharederrors.AsLocalizedError(err); ok {
+		return err
+	}
+	return sharederrors.NewLocalizedError(code, message, template, err)
+}
+
 // Get returns userID's settings, defaulted if the user has never saved any.
 func (s *UserSettingsService) Get(userID string) (*UserSettings, error) {
 	settings, err := s.store.Get(userID)
 	if err != nil {
-		return nil, sharederrors.NewLocalizedError(
+		return nil, wrapStoreErr(err,
 			"usersettings_load_failed",
 			"Failed to load user settings",
 			"failed to load user settings",
-			err,
 		)
 	}
 	return settings, nil
@@ -58,11 +69,10 @@ func (s *UserSettingsService) Update(userID string, patch UserSettingsPatch) (*U
 		current.UpdatedAt = time.Now().UTC()
 	})
 	if err != nil {
-		return nil, sharederrors.NewLocalizedError(
+		return nil, wrapStoreErr(err,
 			"usersettings_update_failed",
 			"Failed to update user settings",
 			"failed to update user settings",
-			err,
 		)
 	}
 	return updated, nil
@@ -71,11 +81,10 @@ func (s *UserSettingsService) Update(userID string, patch UserSettingsPatch) (*U
 // DeleteAllForUser removes userID's saved settings, if any. Called on user delete.
 func (s *UserSettingsService) DeleteAllForUser(userID string) error {
 	if err := s.store.DeleteAllForUser(userID); err != nil {
-		return sharederrors.NewLocalizedError(
+		return wrapStoreErr(err,
 			"usersettings_delete_failed",
 			"Failed to delete user settings",
 			"failed to delete user settings",
-			err,
 		)
 	}
 	return nil

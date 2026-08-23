@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	coreusersettings "github.com/perber/wiki/internal/usersettings"
 )
 
 func TestRespondWithUserSettingsError_InvalidPayload_Returns400(t *testing.T) {
@@ -50,6 +51,31 @@ func TestRespondWithUserSettingsError_ValidationErrors_Returns400WithFields(t *t
 
 	if got, want := rec.Body.String(), `{"error":"validation_error","fields":[{"field":"language","message":"Language must be one of: en"}]}`; got != want {
 		t.Fatalf("body = %s, want %s", got, want)
+	}
+}
+
+// TestRespondWithUserSettingsError_StoreUnavailable_Returns503 is the
+// regression test for a real bug found in review: a store-unavailable error
+// (surfaced while a live restore has usersettings.db suspended) used to fall
+// through to the generic 500 default, unlike apikeys' equivalent case for
+// its own store, which already maps to 503 — a client can't tell "retry
+// shortly" apart from "something is broken" without this.
+func TestRespondWithUserSettingsError_StoreUnavailable_Returns503(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+
+	respondWithUserSettingsError(c, sharederrors.NewLocalizedError(
+		coreusersettings.ErrCodeUserSettingsStoreUnavailable,
+		"The server is restoring from a backup — please try again in a moment",
+		"user settings store is suspended for an in-progress restore",
+		nil,
+	))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 	}
 }
 
