@@ -190,10 +190,7 @@ function TotpDisableFlow() {
   if (!user) return null
 
   return (
-    <div
-      className="settings__field space-y-3"
-      data-testid="totp-disable-panel"
-    >
+    <div className="settings__field space-y-3" data-testid="totp-disable-panel">
       <FormInput
         label={t('totp.disable.passwordPlaceholder')}
         name="current-password"
