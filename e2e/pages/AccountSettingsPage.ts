@@ -16,4 +16,21 @@ export default class AccountSettingsPage {
   async toggleAutoSave() {
     await this.autoSaveCheckbox().click();
   }
+
+  pageTitle() {
+    return this.page.locator('h1.settings__title');
+  }
+
+  languageSelect() {
+    return this.page.locator('button[data-testid="preferences-language-select"]');
+  }
+
+  private languageOptions() {
+    return this.page.locator('[role="option"]');
+  }
+
+  async selectLanguage(name: string) {
+    await this.languageSelect().click();
+    await this.languageOptions().filter({ hasText: name }).first().click();
+  }
 }
