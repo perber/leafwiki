@@ -12,7 +12,7 @@ const DefaultLanguage = "en"
 type UserSettings struct {
 	UserID    string    `json:"userId"`
 	Language  string    `json:"language"`
-	AutoSave  bool      `json:"autosave"`
+	AutoSave  bool      `json:"autoSave"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 

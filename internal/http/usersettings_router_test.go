@@ -13,7 +13,7 @@ import (
 
 type apiUserSettings struct {
 	Language string `json:"language"`
-	AutoSave bool   `json:"autosave"`
+	AutoSave bool   `json:"autoSave"`
 }
 
 func TestUserSettings_Get_Unauthenticated_Rejected(t *testing.T) {
@@ -35,7 +35,7 @@ func TestUserSettings_Put_Unauthenticated_Rejected(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	req := httptest.NewRequest(http.MethodPut, "/api/user-settings", strings.NewReader(`{"autosave":false}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/user-settings", strings.NewReader(`{"autoSave":false}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -69,7 +69,7 @@ func TestUserSettings_Put_ValidPartialPatch_UpdatesAndPersists(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
 
-	putRec := authenticatedRequest(t, router, http.MethodPut, "/api/user-settings", strings.NewReader(`{"autosave":false}`))
+	putRec := authenticatedRequest(t, router, http.MethodPut, "/api/user-settings", strings.NewReader(`{"autoSave":false}`))
 	if putRec.Code != http.StatusOK {
 		t.Fatalf("expected 200 on PUT, got %d: %s", putRec.Code, putRec.Body.String())
 	}
@@ -119,7 +119,7 @@ func TestUserSettings_Get_IsPerUser_DoesNotLeakOtherUsersSettings(t *testing.T) 
 	}
 
 	// Admin turns autosave off for themself.
-	putRec := authenticatedRequest(t, router, http.MethodPut, "/api/user-settings", strings.NewReader(`{"autosave":false}`))
+	putRec := authenticatedRequest(t, router, http.MethodPut, "/api/user-settings", strings.NewReader(`{"autoSave":false}`))
 	if putRec.Code != http.StatusOK {
 		t.Fatalf("expected 200 on PUT, got %d: %s", putRec.Code, putRec.Body.String())
 	}
