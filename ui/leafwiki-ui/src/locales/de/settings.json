@@ -9,6 +9,13 @@
     "passwordSectionTitle": "Passwort",
     "passwordSectionDescription": "Ändern Sie Ihr Passwort. Merken Sie es sich gut!",
     "twoFactorSectionTitle": "Zwei-Faktor-Authentifizierung",
-    "twoFactorSectionDescription": "Fügen Sie Ihrem Konto eine zusätzliche Sicherheitsebene hinzu."
+    "twoFactorSectionDescription": "Fügen Sie Ihrem Konto eine zusätzliche Sicherheitsebene hinzu.",
+    "preferences": {
+      "sectionTitle": "Voreinstellungen",
+      "sectionDescription": "Bearbeitungseinstellungen, geräteübergreifend synchronisiert.",
+      "autoSaveLabel": "Automatisches Speichern aktivieren",
+      "autoSaveDescription": "Änderungen beim Bearbeiten einer Seite automatisch speichern.",
+      "autoSaveToggleError": "Einstellung für automatisches Speichern konnte nicht aktualisiert werden"
+    }
   }
 }
