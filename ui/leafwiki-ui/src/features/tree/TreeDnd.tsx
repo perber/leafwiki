@@ -1,11 +1,11 @@
 import {
   convertPage,
-  movePage,
   NODE_KIND_PAGE,
   NODE_KIND_SECTION,
   PageNode,
   sortPages,
 } from '@/lib/api/pages'
+import { refreshAfterPageRefactor } from '@/features/page/pageMutationRefresh'
 import { useTreeStore } from '@/stores/tree'
 import {
   DndContext,
@@ -24,8 +24,10 @@ import { getEventCoordinates } from '@dnd-kit/utilities'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import i18next from '@/lib/i18n'
+import { performTreeCrossParentMove } from './treeDndMove'
 import { useTreeDndStore } from './treeDndStore'
 import {
   buildOrderedIds,
@@ -151,6 +153,8 @@ export function TreeDndProvider({
   children: React.ReactNode
 }) {
   const { t } = useTranslation('viewer')
+  const currentPath = useLocation().pathname
+  const navigate = useNavigate()
   const [activeNode, setActiveNode] = useState<PageNode | null>(null)
   const [saving, setSaving] = useState(false)
   const subtreeIdsRef = useRef<Set<string>>(new Set())
@@ -293,13 +297,21 @@ export function TreeDndProvider({
     }
     setSaving(true)
     try {
-      await movePage(
-        dragged.id,
-        dragged.version,
-        resolution.parentId,
-        resolution.index,
-      )
-      await reloadTree({ silent: true })
+      const result = await performTreeCrossParentMove(dragged, resolution)
+      if (result.status === 'aborted') {
+        await reloadTree({ silent: true })
+        return
+      }
+      if (result.preview) {
+        await refreshAfterPageRefactor({
+          preview: result.preview,
+          currentPath,
+          navigate,
+          silentReload: true,
+        })
+      } else {
+        await reloadTree({ silent: true })
+      }
       if (currentParentId !== ROOT_ID) {
         offerConvertBackToPage(currentParentId)
       }

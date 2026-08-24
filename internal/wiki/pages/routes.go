@@ -564,6 +564,7 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 		Content      *string `json:"content"`
 		NewParentID  *string `json:"parentId"`
 		RewriteLinks bool    `json:"rewriteLinks"`
+		Position     *int    `json:"position"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
@@ -581,6 +582,7 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 			Content: req.Content, NewParentID: req.NewParentID,
 		},
 		RewriteLinks: req.RewriteLinks,
+		Position:     req.Position,
 	})
 	if err != nil {
 		respondWithPageError(c, err)
