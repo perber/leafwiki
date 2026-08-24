@@ -265,4 +265,33 @@ describe('TreeView explorer refresh button', () => {
     )
     expect(toastMock.success).not.toHaveBeenCalled()
   })
+
+  it('shows an error toast instead of success when the final tree reload fails', async () => {
+    // reloadTree() never rejects — it records failures in useTreeStore's
+    // error state instead (see the FIXME in stores/tree.ts) — so this must
+    // be detected by reading that state back, not by awaiting a throw.
+    useTreeStore.setState({
+      reloadTree: vi.fn().mockImplementation(async () => {
+        useTreeStore.setState({ error: 'network error' })
+      }),
+    })
+    useSessionStore.setState({
+      user: {
+        id: '1',
+        username: 'admin',
+        email: 'admin@example.com',
+        role: 'admin',
+        totpEnabled: false,
+      },
+    })
+    useConfigStore.setState({ gitBackupEnabled: false })
+    renderTreeView()
+
+    fireEvent.click(screen.getByTestId('tree-view-action-button-refresh'))
+
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith('toolbar.refreshError'),
+    )
+    expect(toastMock.success).not.toHaveBeenCalled()
+  })
 })

@@ -130,7 +130,14 @@ export default function TreeView() {
 
       await useResyncStore.getState().trigger()
       await reloadTree()
-      toast.success(t('toolbar.refreshSuccess'))
+      // reloadTree() catches its own fetch failures and only records them in
+      // useTreeStore's error state — it never rejects — so a failed final
+      // reload must be detected here rather than via this try's catch.
+      if (useTreeStore.getState().error) {
+        toast.error(t('toolbar.refreshError'))
+      } else {
+        toast.success(t('toolbar.refreshSuccess'))
+      }
     } catch (err) {
       if (
         err instanceof ApiLocalizedError &&

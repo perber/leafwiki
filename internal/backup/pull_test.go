@@ -119,3 +119,62 @@ func TestPull_NoRemoteConfigured(t *testing.T) {
 		t.Fatalf("expected Pull to be a no-op without a remote, got: %v", err)
 	}
 }
+
+// TestPull_FailsFastWhenBackupRunning tests that Pull mirrors ForcePush and
+// fails immediately (rather than blocking) when a backup cycle already holds
+// the lock — RunBackup's own network pull/push can each take up to
+// networkTimeout, which would otherwise stall the HTTP request behind it.
+func TestPull_FailsFastWhenBackupRunning(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, _ := newRepoWithRemote(t, bareDir)
+
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+
+	if err := repo.Pull(); err == nil {
+		t.Fatal("expected Pull to fail fast when a backup cycle is already running")
+	}
+}
+
+// TestPull_RecoversFromPriorConflict tests that a successful Pull clears a
+// stale NeedsIntervention/LastError left by an earlier failed Pull, without
+// bumping LastBackupAt (a pull is not a backup).
+func TestPull_RecoversFromPriorConflict(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+
+	commitToRemote(t, bareDir, "root/page.md", "version B from remote\n")
+	pagePath := filepath.Join(rootDir, "page.md")
+	if err := os.WriteFile(pagePath, []byte("version C local\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	if err := repo.Pull(); err == nil {
+		t.Fatal("expected first Pull to fail on file conflict")
+	}
+	if snap := repo.Status(); !snap.NeedsIntervention {
+		t.Fatal("expected NeedsIntervention after conflict")
+	}
+	lastBackupBefore := *repo.Status().LastBackupAt
+
+	// Resolve the conflict: discard the local edit so the working tree
+	// matches HEAD again, allowing the next pull to fast-forward cleanly.
+	if err := os.WriteFile(pagePath, []byte("# Page\n"), 0644); err != nil {
+		t.Fatalf("WriteFile (revert local change): %v", err)
+	}
+
+	if err := repo.Pull(); err != nil {
+		t.Fatalf("expected second Pull to succeed after resolving the conflict, got: %v", err)
+	}
+
+	snap := repo.Status()
+	if snap.NeedsIntervention {
+		t.Error("expected NeedsIntervention to be cleared after a successful recovery pull")
+	}
+	if snap.LastError != "" {
+		t.Errorf("expected LastError to be cleared, got %q", snap.LastError)
+	}
+	if snap.LastBackupAt == nil || !snap.LastBackupAt.Equal(lastBackupBefore) {
+		t.Errorf("expected LastBackupAt to be unchanged by a mere pull, before=%v after=%v", lastBackupBefore, snap.LastBackupAt)
+	}
+}
