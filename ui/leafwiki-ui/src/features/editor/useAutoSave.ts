@@ -271,14 +271,13 @@ export function useAutoSave(): { status: AutoSaveStatus } {
         !wasAlreadySaving &&
         statusRef.current !== 'paused'
       ) {
-        const editorState = useEditorStore.getState()
         const pageEditorState = usePageEditorStore.getState()
         const validationErrors = validateEditorFrontmatterMetadata(
           pageEditorState.tags,
           pageEditorState.frontmatterFields,
         )
         if (
-          editorState.autoSave &&
+          useUserSettingsStore.getState().autoSave &&
           isDirtyState(pageEditorState) &&
           pageEditorState.page?.slug === pageEditorState.slug &&
           Object.keys(validationErrors).length === 0
