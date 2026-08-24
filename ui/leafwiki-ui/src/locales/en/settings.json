@@ -9,6 +9,13 @@
     "passwordSectionTitle": "Password",
     "passwordSectionDescription": "Change your password. Make sure to remember it!",
     "twoFactorSectionTitle": "Two-Factor Authentication",
-    "twoFactorSectionDescription": "Add an extra layer of security to your account."
+    "twoFactorSectionDescription": "Add an extra layer of security to your account.",
+    "preferences": {
+      "sectionTitle": "Preferences",
+      "sectionDescription": "Editing preferences, synced across your devices.",
+      "autoSaveLabel": "Enable auto-save",
+      "autoSaveDescription": "Automatically save your changes while editing a page.",
+      "autoSaveToggleError": "Could not update auto-save setting"
+    }
   }
 }

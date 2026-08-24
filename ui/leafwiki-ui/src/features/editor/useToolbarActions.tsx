@@ -14,7 +14,7 @@ import { completionStatus } from '@codemirror/autocomplete'
 import { Save, X, Cloud } from 'lucide-react'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useEditorStore } from '@/stores/editor'
+import { useUserSettingsStore } from '@/stores/userSettings'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { type ToolbarButton, useToolbarStore } from '../toolbar/toolbarStore'
 import { usePageEditorStore } from './pageEditorStore'
@@ -51,8 +51,8 @@ export function useToolbarActions({
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
   const dirty = usePageEditorStore(isDirtyState)
-  const autoSave = useEditorStore((s) => s.autoSave)
-  const toggleAutoSave = useEditorStore((s) => s.toggleAutoSave)
+  const autoSave = useUserSettingsStore((s) => s.autoSave)
+  const toggleAutoSave = useUserSettingsStore((s) => s.toggleAutoSave)
   const isMacOS =
     typeof navigator !== 'undefined' &&
     /Mac|iPhone|iPad|iPod/.test(navigator.platform)
