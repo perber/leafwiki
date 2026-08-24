@@ -2306,7 +2306,7 @@
   }
 
   .table-wrapper table {
-    @apply w-full border-collapse;
+    @apply w-fit max-w-full border-collapse;
   }
 
   .table-wrapper tbody tr:nth-child(odd) {
