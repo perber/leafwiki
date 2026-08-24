@@ -93,7 +93,9 @@ export function MovePageDialog({ pageId }: { pageId: string }) {
           kind: 'move',
           parentId: newParentId,
         })
-        const rewriteLinks = await confirmPageRefactor(preview)
+        const rewriteLinks = await confirmPageRefactor(preview, {
+          allowSkipRewrite: true,
+        })
         if (rewriteLinks === null) {
           return false
         }

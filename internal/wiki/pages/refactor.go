@@ -63,6 +63,8 @@ type RefactorApplyInput struct {
 	Version string
 	RefactorPreviewInput
 	RewriteLinks bool
+	// Position is the target sibling index for RefactorKindMove; nil appends at the end.
+	Position *int
 }
 
 // PreviewPageRefactorUseCase computes what would change if a refactor is applied.
@@ -400,7 +402,7 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		}
 		moveStepStarted := time.Now()
 		moveUC := NewMovePageUseCase(uc.tree, o, uc.log, uc.metrics)
-		err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, Version: in.Version, ParentID: parentID})
+		err := moveUC.Execute(ctx, MovePageInput{UserID: in.UserID, ID: in.PageID, Version: in.Version, ParentID: parentID, Position: in.Position})
 		uc.metrics.ObserveRefactorStep(in.Kind, "move_target_page", moveStepStarted)
 		if err != nil {
 			return nil, err
