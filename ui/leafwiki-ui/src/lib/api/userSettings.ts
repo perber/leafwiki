@@ -8,6 +8,7 @@ export type UserSettings = {
 }
 
 export type UserSettingsPatch = {
+  language?: string
   autoSave?: boolean
 }
 

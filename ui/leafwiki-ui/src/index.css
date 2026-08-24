@@ -2916,6 +2916,10 @@
     @apply flex items-center gap-2;
   }
 
+  .settings__field-label {
+    @apply text-interface-text mb-2 block text-sm font-medium;
+  }
+
   .settings__preview {
     @apply bg-surface-alt mb-4 flex items-center gap-3 rounded-md p-4;
   }
