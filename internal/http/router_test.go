@@ -461,6 +461,42 @@ func writePageMarkdownForTest(t *testing.T, w *wiki.Wiki, page *apiPage, raw str
 	}
 }
 
+// loginAdminAndGetCSRF logs in as the seeded test admin and returns the CSRF
+// token plus session cookies needed for a subsequent authenticated request —
+// shared by every branding-upload test below so each one only has to build
+// the multipart request it actually cares about.
+func loginAdminAndGetCSRF(t *testing.T, router http.Handler) (csrfToken string, cookies []*http.Cookie) {
+	t.Helper()
+
+	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK on login, got %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	loginRes := loginRec.Result()
+	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
+
+	cookies = loginRes.Cookies()
+	csrfToken = loginRec.Header().Get("X-CSRF-Token")
+	if csrfToken == "" {
+		for _, c := range cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				csrfToken = c.Value
+				break
+			}
+		}
+	}
+	if csrfToken == "" {
+		t.Fatal("Expected CSRF token after login, got none")
+	}
+	return csrfToken, cookies
+}
+
 func uploadBrandingLogoViaAPI(t *testing.T, router http.Handler, filename string, content []byte) {
 	t.Helper()
 
@@ -477,32 +513,7 @@ func uploadBrandingLogoViaAPI(t *testing.T, router http.Handler, filename string
 		t.Fatalf("Close(writer) failed: %v", err)
 	}
 
-	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
-	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
-	loginReq.Header.Set("Content-Type", "application/json")
-	loginRec := httptest.NewRecorder()
-	router.ServeHTTP(loginRec, loginReq)
-
-	if loginRec.Code != http.StatusOK {
-		t.Fatalf("Expected 200 OK on login, got %d - %s", loginRec.Code, loginRec.Body.String())
-	}
-
-	loginRes := loginRec.Result()
-	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
-
-	cookies := loginRes.Cookies()
-	csrfToken := loginRec.Header().Get("X-CSRF-Token")
-	if csrfToken == "" {
-		for _, c := range cookies {
-			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
-				csrfToken = c.Value
-				break
-			}
-		}
-	}
-	if csrfToken == "" {
-		t.Fatal("Expected CSRF token after login, got none")
-	}
+	csrfToken, cookies := loginAdminAndGetCSRF(t, router)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/branding/logo", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -535,32 +546,7 @@ func uploadBrandingFaviconViaAPI(t *testing.T, router http.Handler, filename str
 		t.Fatalf("Close(writer) failed: %v", err)
 	}
 
-	loginBody := `{"identifier": "admin", "password": "adminpassword"}`
-	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(loginBody))
-	loginReq.Header.Set("Content-Type", "application/json")
-	loginRec := httptest.NewRecorder()
-	router.ServeHTTP(loginRec, loginReq)
-
-	if loginRec.Code != http.StatusOK {
-		t.Fatalf("Expected 200 OK on login, got %d - %s", loginRec.Code, loginRec.Body.String())
-	}
-
-	loginRes := loginRec.Result()
-	defer test_utils.WrapCloseWithErrorCheck(loginRes.Body.Close, t)
-
-	cookies := loginRes.Cookies()
-	csrfToken := loginRec.Header().Get("X-CSRF-Token")
-	if csrfToken == "" {
-		for _, c := range cookies {
-			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
-				csrfToken = c.Value
-				break
-			}
-		}
-	}
-	if csrfToken == "" {
-		t.Fatal("Expected CSRF token after login, got none")
-	}
+	csrfToken, cookies := loginAdminAndGetCSRF(t, router)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/branding/favicon", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -574,6 +560,185 @@ func uploadBrandingFaviconViaAPI(t *testing.T, router http.Handler, filename str
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK, got %d - %s", rec.Code, rec.Body.String())
+	}
+}
+
+// brandingErrorCode extracts the {"error":{"code": "..."}} field asserted by
+// the regression tests below, so each test body only has to state the code
+// it expects rather than re-deriving the response shape.
+func brandingErrorCode(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+
+	var resp struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode error response %q: %v", rec.Body.String(), err)
+	}
+	return resp.Error.Code
+}
+
+// The four tests below pin the pre-existing status code / error code
+// contract for branding logo/favicon upload's too-large and missing-file
+// cases (413/"branding_*_too_large", 400/"branding_*_missing"). They exist
+// specifically as a regression guard around internal/wiki/branding/routes.go
+// having been refactored onto the shared httpinternal.ParseUploadedFile
+// helper (see internal/http/upload.go) — before that refactor, nothing
+// exercised this error path at the HTTP layer at all, so a behavior change
+// here (wrong status, wrong code, or the check silently stopping working)
+// would have gone unnoticed.
+
+func TestBrandingUploadLogo_TooLarge_Returns413(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	cfg, err := w.BrandingService().GetBranding()
+	if err != nil {
+		t.Fatalf("GetBranding failed: %v", err)
+	}
+	oversized := bytes.Repeat([]byte("a"), int(cfg.BrandingConstraints.MaxLogoSize)+1)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "logo.png")
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+	if _, err := part.Write(oversized); err != nil {
+		t.Fatalf("Write(oversized logo) failed: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close(writer) failed: %v", err)
+	}
+
+	csrfToken, cookies := loginAdminAndGetCSRF(t, router)
+	req := httptest.NewRequest(http.MethodPost, "/api/branding/logo", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("Expected 413, got %d - %s", rec.Code, rec.Body.String())
+	}
+	if code := brandingErrorCode(t, rec); code != "branding_logo_too_large" {
+		t.Fatalf("Expected error code %q, got %q", "branding_logo_too_large", code)
+	}
+}
+
+func TestBrandingUploadLogo_MissingFile_Returns400(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	if err := writer.WriteField("notFile", "irrelevant"); err != nil {
+		t.Fatalf("WriteField failed: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close(writer) failed: %v", err)
+	}
+
+	csrfToken, cookies := loginAdminAndGetCSRF(t, router)
+	req := httptest.NewRequest(http.MethodPost, "/api/branding/logo", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400, got %d - %s", rec.Code, rec.Body.String())
+	}
+	if code := brandingErrorCode(t, rec); code != "branding_logo_missing" {
+		t.Fatalf("Expected error code %q, got %q", "branding_logo_missing", code)
+	}
+}
+
+func TestBrandingUploadFavicon_TooLarge_Returns413(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	cfg, err := w.BrandingService().GetBranding()
+	if err != nil {
+		t.Fatalf("GetBranding failed: %v", err)
+	}
+	oversized := bytes.Repeat([]byte("a"), int(cfg.BrandingConstraints.MaxFaviconSize)+1)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "favicon.ico")
+	if err != nil {
+		t.Fatalf("CreateFormFile failed: %v", err)
+	}
+	if _, err := part.Write(oversized); err != nil {
+		t.Fatalf("Write(oversized favicon) failed: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close(writer) failed: %v", err)
+	}
+
+	csrfToken, cookies := loginAdminAndGetCSRF(t, router)
+	req := httptest.NewRequest(http.MethodPost, "/api/branding/favicon", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("Expected 413, got %d - %s", rec.Code, rec.Body.String())
+	}
+	if code := brandingErrorCode(t, rec); code != "branding_favicon_too_large" {
+		t.Fatalf("Expected error code %q, got %q", "branding_favicon_too_large", code)
+	}
+}
+
+func TestBrandingUploadFavicon_MissingFile_Returns400(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	if err := writer.WriteField("notFile", "irrelevant"); err != nil {
+		t.Fatalf("WriteField failed: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close(writer) failed: %v", err)
+	}
+
+	csrfToken, cookies := loginAdminAndGetCSRF(t, router)
+	req := httptest.NewRequest(http.MethodPost, "/api/branding/favicon", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-CSRF-Token", csrfToken)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400, got %d - %s", rec.Code, rec.Body.String())
+	}
+	if code := brandingErrorCode(t, rec); code != "branding_favicon_missing" {
+		t.Fatalf("Expected error code %q, got %q", "branding_favicon_missing", code)
 	}
 }
 
