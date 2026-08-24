@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -9,6 +9,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { avatarUrl } from '@/lib/api/avatar'
 import * as authAPI from '@/lib/api/auth'
 import i18next from '@/lib/i18n'
 import { DIALOG_SHORTCUTS_HELP } from '@/lib/registries'
@@ -19,6 +20,7 @@ import {
   getShortcutDisplayLabel,
 } from '@/lib/shortcuts/shortcutCatalog'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { useAvatarStore } from '@/stores/avatar'
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useHotKeysStore } from '@/stores/hotkeys'
@@ -41,6 +43,7 @@ export default function UserMenu() {
   const supportPageUrl = 'https://leafwiki.com/support/'
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
+  const avatarVersion = useAvatarStore((s) => s.avatarVersion)
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const authDisabled = useConfigStore((s) => s.authDisabled)
@@ -114,6 +117,9 @@ export default function UserMenu() {
       <DropdownMenu>
         <DropdownMenuTrigger className="user-menu__dropdown-trigger">
           <Avatar className="user-menu__avatar" data-testid="user-menu-avatar">
+            {user && (
+              <AvatarImage src={avatarUrl(user.id, avatarVersion)} alt="" />
+            )}
             <AvatarFallback className="user-menu__avatar-fallback">
               {user?.username[0].toUpperCase()}
             </AvatarFallback>

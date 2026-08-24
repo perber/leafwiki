@@ -712,6 +712,7 @@ func main() {
 			RootDir:            filepath.Join(dataDir, "root"),
 			AssetsDir:          filepath.Join(dataDir, "assets"),
 			BrandingDir:        filepath.Join(dataDir, "branding"),
+			AvatarsDir:         filepath.Join(dataDir, "avatars"),
 			BrandingConfigFile: filepath.Join(dataDir, "branding.json"),
 			SchemaFile:         filepath.Join(dataDir, "schema.json"),
 			UsersDBPath:        filepath.Join(dataDir, "users.db"),

@@ -16,7 +16,7 @@ type Config struct {
 	// internal/snapshot.Manager).
 	SnapshotManager *snapshot.Manager
 	// DataDir is the instance's data directory (contains root/, assets/,
-	// branding/, branding.json, schema.json, users.db). The restore staging
+	// branding/, avatars/, branding.json, schema.json, users.db). The restore staging
 	// directory is created inside DataDir (not the OS temp dir) so the final
 	// swap can use os.Rename instead of a cross-filesystem copy.
 	DataDir string

@@ -1,6 +1,7 @@
 package branding
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -118,14 +119,13 @@ func (r *Routes) handleUploadLogo(c *gin.Context) {
 		return
 	}
 	maxSize := constraints.BrandingConstraints.MaxLogoSize
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
-	if err := c.Request.ParseMultipartForm(maxSize); err != nil {
-		respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingLogoTooLarge, "File too large", "file too large")
-		return
-	}
-	file, header, err := c.Request.FormFile("file")
+	file, header, err := httpinternal.ParseUploadedFile(c, maxSize, "file")
 	if err != nil {
-		respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingLogoMissing, "Missing file", "missing file")
+		if errors.Is(err, httpinternal.ErrUploadTooLarge) {
+			respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingLogoTooLarge, "File too large", "file too large")
+		} else {
+			respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingLogoMissing, "Missing file", "missing file")
+		}
 		return
 	}
 	defer func() {
@@ -157,14 +157,13 @@ func (r *Routes) handleUploadFavicon(c *gin.Context) {
 		return
 	}
 	maxSize := constraints.BrandingConstraints.MaxFaviconSize
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
-	if err := c.Request.ParseMultipartForm(maxSize); err != nil {
-		respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingFaviconTooLarge, "File too large", "file too large")
-		return
-	}
-	file, header, err := c.Request.FormFile("file")
+	file, header, err := httpinternal.ParseUploadedFile(c, maxSize, "file")
 	if err != nil {
-		respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingFaviconMissing, "Missing file", "missing file")
+		if errors.Is(err, httpinternal.ErrUploadTooLarge) {
+			respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingFaviconTooLarge, "File too large", "file too large")
+		} else {
+			respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingFaviconMissing, "Missing file", "missing file")
+		}
 		return
 	}
 	defer func() {
