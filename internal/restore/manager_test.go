@@ -48,6 +48,7 @@ func newManagerFixtureWithBranding(t *testing.T, wikiVersion, brandingJSON strin
 	dataDir := t.TempDir()
 	// Seed different "live" content so a successful restore is observable.
 	test_utils.WriteFile(t, dataDir, "root/live-page.md", "# Live content before restore\n")
+	test_utils.WriteFile(t, dataDir, "avatars/live-only-user.png", "fake-live-avatar-bytes")
 	createRealUsersDB(t, dataDir, "live-admin", "live-admin@example.com", "live-password-123")
 
 	sessionStore, err := auth.NewSessionStore(dataDir)
@@ -226,6 +227,17 @@ func TestManager_Restore_HappyPath(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(f.dataDir, "root", "live-page.md")); !os.IsNotExist(err) {
 		t.Errorf("expected pre-restore live content to be gone, got err=%v", err)
+	}
+
+	// avatars/ is a plain asset directory swapped alongside root/assets/
+	// branding — regression coverage for the snapshot/restore wiring added
+	// for avatar uploads (easy to silently drop avatars on every
+	// backup/restore cycle if forgotten).
+	if _, err := os.Stat(filepath.Join(f.dataDir, "avatars", "snapshot-user.png")); err != nil {
+		t.Errorf("expected restored avatars/snapshot-user.png: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(f.dataDir, "avatars", "live-only-user.png")); !os.IsNotExist(err) {
+		t.Errorf("expected pre-restore live-only avatar to be gone, got err=%v", err)
 	}
 
 	if f.resyncCalls != 1 {

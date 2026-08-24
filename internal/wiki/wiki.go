@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/perber/wiki/internal/avatar"
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
@@ -27,6 +28,7 @@ import (
 	wikiapikeys "github.com/perber/wiki/internal/wiki/apikeys"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikiauth "github.com/perber/wiki/internal/wiki/auth"
+	wikiavatar "github.com/perber/wiki/internal/wiki/avatar"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 	wikibranding "github.com/perber/wiki/internal/wiki/branding"
 	wikihealth "github.com/perber/wiki/internal/wiki/health"
@@ -56,6 +58,7 @@ type Wiki struct {
 	emailTokenService *auth.EmailTokenService
 	asset             *assets.AssetService
 	branding          *branding.BrandingService
+	avatar            *avatar.AvatarService
 	searchIndex       *search.SQLiteIndex
 	status            *search.IndexingStatus
 	storageDir        string
@@ -70,6 +73,7 @@ type Wiki struct {
 	tagsRoutes         *wikitags.Routes
 	propertiesRoutes   *wikiproperties.Routes
 	brandingRoutes     *wikibranding.Routes
+	avatarRoutes       *wikiavatar.Routes
 	apiKeysRoutes      *wikiapikeys.Routes
 	importerRoutes     *wikiimporter.Routes
 	healthRoutes       *wikihealth.Routes
@@ -155,6 +159,9 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		return nil, err
 	}
 	if err := w.initBranding(); err != nil {
+		return nil, err
+	}
+	if err := w.initAvatarService(); err != nil {
 		return nil, err
 	}
 	// Welcome page must exist before the revision service starts recording.
@@ -420,6 +427,15 @@ func (w *Wiki) initBranding() error {
 	return nil
 }
 
+func (w *Wiki) initAvatarService() error {
+	var err error
+	w.avatar, err = avatar.NewAvatarService(w.storageDir)
+	if err != nil {
+		return fmt.Errorf("failed to init avatar service: %w", err)
+	}
+	return nil
+}
+
 func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.pagesRoutes = w.buildPagesRoutes()
 	w.authRoutes = w.buildAuthRoutes()
@@ -430,6 +446,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.tagsRoutes = w.buildTagsRoutes()
 	w.propertiesRoutes = w.buildPropertiesRoutes()
 	w.brandingRoutes = w.buildBrandingRoutes()
+	w.avatarRoutes = w.buildAvatarRoutes()
 	w.userSettingsRoutes = w.buildUserSettingsRoutes()
 	w.apiKeysRoutes = w.buildAPIKeysRoutes()
 	w.importerRoutes = w.buildImporterRoutes(options)
@@ -584,6 +601,15 @@ func (w *Wiki) buildBrandingRoutes() *wikibranding.Routes {
 	})
 }
 
+func (w *Wiki) buildAvatarRoutes() *wikiavatar.Routes {
+	return wikiavatar.NewRoutes(wikiavatar.RoutesConfig{
+		UploadAvatar:  wikiavatar.NewUploadAvatarUseCase(w.avatar),
+		DeleteAvatar:  wikiavatar.NewDeleteAvatarUseCase(w.avatar),
+		AvatarService: w.avatar,
+		AuthService:   w.auth,
+	})
+}
+
 func (w *Wiki) buildUserSettingsRoutes() *wikiusersettings.Routes {
 	return wikiusersettings.NewRoutes(wikiusersettings.RoutesConfig{
 		GetUserSettings:    wikiusersettings.NewGetUserSettingsUseCase(w.userSettings),
@@ -634,6 +660,7 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.tagsRoutes,
 		w.propertiesRoutes,
 		w.brandingRoutes,
+		w.avatarRoutes,
 		w.userSettingsRoutes,
 		w.apiKeysRoutes,
 		w.importerRoutes,

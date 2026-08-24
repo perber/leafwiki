@@ -6,6 +6,18 @@
   },
   "account": {
     "pageTitle": "Account",
+    "avatar": {
+      "sectionTitle": "Profile Picture",
+      "sectionDescription": "Upload a picture to personalize your account.",
+      "currentLabel": "Current picture:",
+      "uploadButton": "Upload picture",
+      "deleteButton": "Remove picture",
+      "hint": "Allowed formats: {{exts}}. Max size: {{size}}.",
+      "uploadSuccess": "Profile picture uploaded",
+      "uploadFailed": "Could not upload profile picture",
+      "deleteSuccess": "Profile picture removed",
+      "deleteFailed": "Could not remove profile picture"
+    },
     "passwordSectionTitle": "Password",
     "passwordSectionDescription": "Change your password. Make sure to remember it!",
     "twoFactorSectionTitle": "Two-Factor Authentication",

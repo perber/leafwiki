@@ -6,6 +6,18 @@
   },
   "account": {
     "pageTitle": "Konto",
+    "avatar": {
+      "sectionTitle": "Profilbild",
+      "sectionDescription": "Laden Sie ein Bild hoch, um Ihr Konto zu personalisieren.",
+      "currentLabel": "Aktuelles Bild:",
+      "uploadButton": "Bild hochladen",
+      "deleteButton": "Bild entfernen",
+      "hint": "Erlaubte Formate: {{exts}}. Maximale Größe: {{size}}.",
+      "uploadSuccess": "Profilbild hochgeladen",
+      "uploadFailed": "Profilbild konnte nicht hochgeladen werden",
+      "deleteSuccess": "Profilbild entfernt",
+      "deleteFailed": "Profilbild konnte nicht entfernt werden"
+    },
     "passwordSectionTitle": "Passwort",
     "passwordSectionDescription": "Ändern Sie Ihr Passwort. Merken Sie es sich gut!",
     "twoFactorSectionTitle": "Zwei-Faktor-Authentifizierung",

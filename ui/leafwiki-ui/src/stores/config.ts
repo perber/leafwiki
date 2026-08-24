@@ -1,5 +1,9 @@
 import { getConfig } from '@/lib/api/config'
-import { DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES } from '@/lib/config'
+import {
+  DEFAULT_AVATAR_ALLOWED_EXTS,
+  DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
+  DEFAULT_MAX_AVATAR_UPLOAD_SIZE_BYTES,
+} from '@/lib/config'
 import i18next, { getAvailableLanguages } from '@/lib/i18n'
 import { sleep } from '@/lib/sleep'
 import { create } from 'zustand'
@@ -10,6 +14,8 @@ type ConfigStore = {
   hideLinkMetadataSection: boolean
   authDisabled: boolean
   maxAssetUploadSizeBytes: number
+  maxAvatarUploadSizeBytes: number
+  avatarAllowedExts: string[]
   enableRevision: boolean
   enableLinkRefactor: boolean
   enableApiKeyManagement: boolean
@@ -51,6 +57,8 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   hideLinkMetadataSection: false,
   authDisabled: false,
   maxAssetUploadSizeBytes: DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
+  maxAvatarUploadSizeBytes: DEFAULT_MAX_AVATAR_UPLOAD_SIZE_BYTES,
+  avatarAllowedExts: DEFAULT_AVATAR_ALLOWED_EXTS,
   enableRevision: false,
   enableLinkRefactor: false,
   enableApiKeyManagement: false,
@@ -79,6 +87,16 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         )
           ? config.maxAssetUploadSizeBytes
           : DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES
+        const maxAvatarUploadSizeBytes = Number.isFinite(
+          config.maxAvatarUploadSizeBytes,
+        )
+          ? config.maxAvatarUploadSizeBytes
+          : DEFAULT_MAX_AVATAR_UPLOAD_SIZE_BYTES
+        const avatarAllowedExts =
+          Array.isArray(config.avatarAllowedExts) &&
+          config.avatarAllowedExts.length > 0
+            ? config.avatarAllowedExts
+            : DEFAULT_AVATAR_ALLOWED_EXTS
 
         set({
           publicAccess: config.publicAccess,
@@ -86,6 +104,8 @@ export const useConfigStore = create<ConfigStore>((set) => ({
           hideLinkMetadataSection: config.hideLinkMetadataSection,
           authDisabled: config.authDisabled,
           maxAssetUploadSizeBytes,
+          maxAvatarUploadSizeBytes,
+          avatarAllowedExts,
           enableRevision: config.enableRevision ?? false,
           enableLinkRefactor: config.enableLinkRefactor ?? false,
           enableApiKeyManagement: config.enableApiKeyManagement ?? false,

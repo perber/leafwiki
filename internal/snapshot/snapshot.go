@@ -21,6 +21,7 @@ type Config struct {
 	AssetsDir          string
 	BrandingDir        string
 	BrandingConfigFile string // storageDir/branding.json (site name, active logo/favicon filename) — separate from BrandingDir, which only holds the uploaded logo/favicon image files
+	AvatarsDir         string // storageDir/avatars — one <userID>.png per user with a self-service avatar; may not exist on a data dir predating this feature, addDirToZip's os.Stat guard makes an absent dir a safe no-op
 	SchemaFile         string
 	UsersDBPath        string
 	APIKeysDBPath      string // storageDir/api_keys.db — may not exist (API key management is disabled by default); addFileToZip/os.Stat guards make an absent file a safe no-op
@@ -196,6 +197,9 @@ func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time
 		return err
 	}
 	if err := addDirToZip(w, cfg.BrandingDir, "branding/"); err != nil {
+		return err
+	}
+	if err := addDirToZip(w, cfg.AvatarsDir, "avatars/"); err != nil {
 		return err
 	}
 	if err := addFileToZip(w, cfg.BrandingConfigFile, "branding.json"); err != nil {

@@ -15,7 +15,7 @@ import (
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
-// fixtureSnapshot builds a real snapshot ZIP (root/assets/branding/
+// fixtureSnapshot builds a real snapshot ZIP (root/assets/branding/avatars/
 // branding.json/schema.json/users.db) from a fresh source layout — a
 // separate temp dir from whatever "live" dataDir a test then restores into —
 // and returns the returned snapshot.Manager (for SnapshotZipPath / List) and
@@ -36,10 +36,12 @@ func fixtureSnapshotWithBranding(t *testing.T, wikiVersion, brandingJSON string)
 	rootDir := filepath.Join(src, "root")
 	assetsDir := filepath.Join(src, "assets")
 	brandingDir := filepath.Join(src, "branding")
+	avatarsDir := filepath.Join(src, "avatars")
 
 	test_utils.WriteFile(t, rootDir, "welcome.md", "# Snapshot content\n")
 	test_utils.WriteFile(t, assetsDir, "logo.png", "fake-asset-bytes")
 	test_utils.WriteFile(t, brandingDir, "logo.png", "fake-logo-bytes")
+	test_utils.WriteFile(t, avatarsDir, "snapshot-user.png", "fake-avatar-bytes")
 	brandingConfigFile := test_utils.WriteFile(t, src, "branding.json", brandingJSON)
 	schemaFile := test_utils.WriteFile(t, src, "schema.json", `{"version":5}`)
 
@@ -51,6 +53,7 @@ func fixtureSnapshotWithBranding(t *testing.T, wikiVersion, brandingJSON string)
 		RootDir:            rootDir,
 		AssetsDir:          assetsDir,
 		BrandingDir:        brandingDir,
+		AvatarsDir:         avatarsDir,
 		BrandingConfigFile: brandingConfigFile,
 		SchemaFile:         schemaFile,
 		UsersDBPath:        usersDBPath,
