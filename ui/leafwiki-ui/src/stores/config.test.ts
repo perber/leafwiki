@@ -1,4 +1,5 @@
 import * as configApi from '@/lib/api/config'
+import i18next from '@/lib/i18n'
 import {
   afterEach,
   beforeEach,
@@ -30,6 +31,7 @@ const baseConfig = {
   loginUrl: '',
   logoutUrl: '',
   userManagementUrl: '',
+  defaultLanguage: '',
 }
 
 beforeEach(() => {
@@ -83,5 +85,43 @@ describe('loadConfig retry', () => {
 
     expect(useConfigStore.getState().configLoadSucceeded).toBe(true)
     expect(configApi.getConfig).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('loadConfig defaultLanguage', () => {
+  afterEach(async () => {
+    await i18next.changeLanguage('en')
+  })
+
+  it('switches the UI language when defaultLanguage is a shipped language', async () => {
+    ;(configApi.getConfig as Mock).mockResolvedValueOnce({
+      ...baseConfig,
+      defaultLanguage: 'de',
+    })
+
+    await useConfigStore.getState().loadConfig()
+
+    expect(i18next.language).toBe('de')
+    expect(useConfigStore.getState().defaultLanguage).toBe('de')
+  })
+
+  it('leaves the UI language unchanged when defaultLanguage is empty', async () => {
+    ;(configApi.getConfig as Mock).mockResolvedValueOnce(baseConfig)
+
+    await useConfigStore.getState().loadConfig()
+
+    expect(i18next.language).toBe('en')
+  })
+
+  it('ignores an unrecognized defaultLanguage', async () => {
+    ;(configApi.getConfig as Mock).mockResolvedValueOnce({
+      ...baseConfig,
+      defaultLanguage: 'fr',
+    })
+
+    await useConfigStore.getState().loadConfig()
+
+    expect(i18next.language).toBe('en')
+    expect(useConfigStore.getState().defaultLanguage).toBe('fr')
   })
 })

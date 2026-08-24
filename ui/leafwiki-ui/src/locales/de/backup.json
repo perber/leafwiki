@@ -1,0 +1,40 @@
+{
+  "pageTitle": "Git-Inhaltssicherung",
+  "loadStatusErrorFallback": "Sicherungsstatus konnte nicht geladen werden",
+  "pageDescription": "Sichert den Inhalt der Wiki-Seiten in ein Git-Repository. Dies umfasst nur Inhalte und beinhaltet keine vollständige Systemwiederherstellung.",
+  "sectionTitle": "Git-Inhaltssicherung",
+  "sectionDescription": "Überträgt Wiki-Änderungen automatisch in das konfigurierte Remote-Git-Repository. Konfigurieren Sie Ziel-Repository und Zugangsdaten in Ihren Servereinstellungen.",
+  "statusLabel": "Status",
+  "statusEnabled": "Aktiviert",
+  "statusDisabled": "Deaktiviert",
+  "lastBackupLabel": "Letzte Sicherung",
+  "never": "Nie",
+  "loading": "Wird geladen…",
+  "waitingForBackup": "Warte auf Abschluss der Sicherung…",
+  "lastErrorLabel": "Letzter Fehler",
+  "conflictTitle": "Konflikt — Remote weicht ab",
+  "conflictDescription": "Das Remote-Repository weicht vom lokalen Sicherungsverlauf ab und kann nicht per Fast-Forward zusammengeführt werden.",
+  "conflictWarning": "Ein Klick auf „Force Push“ überschreibt das Remote-Repository mit dem aktuellen lokalen Sicherungsverlauf. Ihr Wiki-Inhalt geht dabei nie verloren.",
+  "forcePushButton": "Force Push",
+  "hintDisabled": "Die Git-Sicherung ist nicht aktiviert. Konfigurieren Sie zum Aktivieren ein Remote-Repository in Ihren Server-Umgebungseinstellungen.",
+  "manualSectionTitle": "Manuelle Sicherung",
+  "manualSectionDescription": "Löst eine sofortige Synchronisierung (Pull, dann Push) des gesamten aktuellen Wiki-Inhalts mit dem Remote-Repository aus, ohne auf die nächste geplante Synchronisierung zu warten.",
+  "pushNow": "Jetzt synchronisieren",
+  "pushing": "Synchronisierung läuft…",
+  "menuLabel": "Git-Inhaltssicherung",
+  "warningAriaLabel": "Sicherungswarnung",
+  "tooltip": {
+    "adminConflict": "Konflikt bei der Git-Sicherung — manuelles Eingreifen erforderlich. Klicken, um die Sicherungseinstellungen zu öffnen.",
+    "adminFailure": "Die letzte Git-Sicherung ist fehlgeschlagen. Klicken, um die Sicherungseinstellungen zu öffnen.",
+    "editorConflict": "Konflikt bei der Git-Sicherung — kontaktieren Sie einen Administrator.",
+    "editorFailure": "Die letzte Git-Sicherung ist fehlgeschlagen — kontaktieren Sie einen Administrator."
+  },
+  "toast": {
+    "backupFailed": "Sicherung fehlgeschlagen: {{message}}",
+    "backupCompleted": "Sicherung erfolgreich abgeschlossen",
+    "backupTriggered": "Sicherung ausgelöst",
+    "backupTriggerFailed": "Sicherung konnte nicht ausgelöst werden",
+    "forcePushSuccess": "Force Push erfolgreich — Konflikt gelöst",
+    "forcePushFailed": "Force Push fehlgeschlagen"
+  }
+}

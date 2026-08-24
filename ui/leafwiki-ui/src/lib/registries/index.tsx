@@ -40,7 +40,7 @@ export const SIDEBAR_SEARCH_PANEL_ID = 'search'
 
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
-  label: i18next.t('sidebar.explorerTab', { ns: 'common' }),
+  label: () => i18next.t('sidebar.explorerTab', { ns: 'common' }),
   hotkey: getShortcutDefinition('sidebar.explorer.open').keyCombo,
   modes: ['view', 'edit', 'history', 'settings'],
   icon: () => <FolderTree size={16} />,
@@ -51,7 +51,7 @@ panelItemRegistry.register({
 
 panelItemRegistry.register({
   id: SIDEBAR_SEARCH_PANEL_ID,
-  label: i18next.t('sidebar.searchTab', { ns: 'common' }),
+  label: () => i18next.t('sidebar.searchTab', { ns: 'common' }),
   hotkey: getShortcutDefinition('sidebar.search.open').keyCombo,
   modes: ['view', 'edit', 'history', 'settings'],
   icon: () => <SearchIcon size={16} />,

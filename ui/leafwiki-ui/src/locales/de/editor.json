@@ -1,0 +1,124 @@
+{
+  "wikiLinkDisambiguation": {
+    "title": "Mehrere Seiten gefunden",
+    "descriptionPrefix": "Mehrere Seiten stimmen überein mit",
+    "descriptionSuffix": ". Wählen Sie die gewünschte aus."
+  },
+  "slugInput": {
+    "label": "Slug",
+    "placeholder": "Seiten-Slug",
+    "generateErrorFallback": "Fehler beim Generieren des Slugs"
+  },
+  "addPageDialog": {
+    "dateTitleTooltip": "Titel auf das heutige Datum setzen"
+  },
+  "editPageMetadataDialog": {
+    "dialogTitle": "Metadaten von {{item}} bearbeiten",
+    "dialogDescription": "Metadaten von {{item}} ändern",
+    "titleLabel": "Titel",
+    "titlePlaceholder": "Titel von {{item}}",
+    "pathPrefix": "Pfad:",
+    "cancelButton": "Abbrechen",
+    "saveButton": "Ändern",
+    "dateTitleTooltip": "Titel auf das heutige Datum setzen"
+  },
+  "toolbar": {
+    "closeEditorButton": "Editor schließen",
+    "savePageButton": "Seite speichern",
+    "boldTooltip": "Fett (Strg+B)",
+    "italicTooltip": "Kursiv (Strg+I)",
+    "strikethroughTooltip": "Durchgestrichen",
+    "highlightTooltip": "Hervorheben",
+    "linkTooltip": "Link (Strg+K)",
+    "heading1Tooltip": "Überschrift 1 (Strg+Alt+1)",
+    "heading2Tooltip": "Überschrift 2 (Strg+Alt+2)",
+    "heading3Tooltip": "Überschrift 3 (Strg+Alt+3)",
+    "tableTooltip": "Tabelle",
+    "tableSizeSelect": "Größe auswählen",
+    "tableSizeLabel": "{{col}} × {{row}}",
+    "tableInsertAriaLabel": "Tabelle {{col}} x {{row}} einfügen",
+    "codeBlockTooltip": "Codeblock",
+    "inlineCodeTooltip": "Inline-Code (Strg+`)",
+    "imageTooltip": "Bild / Datei",
+    "undoTooltip": "Rückgängig",
+    "redoTooltip": "Wiederholen",
+    "lineWrapEnableTooltip": "Zeilenumbruch aktivieren",
+    "lineWrapDisableTooltip": "Zeilenumbruch deaktivieren",
+    "moreOptionsAriaLabel": "Weitere Formatierungsoptionen",
+    "previewSplitTooltip": "Geteilte Vorschauansicht verwenden",
+    "previewStackedTooltip": "Gestapelte Vorschauansicht verwenden",
+    "showPreviewTooltip": "Vorschau anzeigen",
+    "hidePreviewTooltip": "Vorschau ausblenden",
+    "pasteRichTooltip": "Mit Formatierung einfügen (Strg+Umschalt+V)",
+    "pastePlainTooltip": "Ohne Formatierung einfügen (Strg+V)",
+    "pasteRich": "Mit Formatierung einfügen",
+    "pastePlain": "Ohne Formatierung einfügen",
+    "pasteClipboardError": "Zwischenablage konnte nicht gelesen werden",
+    "strikethrough": "Durchgestrichen",
+    "highlight": "Hervorheben",
+    "heading1": "Überschrift 1",
+    "heading2": "Überschrift 2",
+    "heading3": "Überschrift 3",
+    "insertTable": "Tabelle einfügen (3×3)",
+    "lineWrap": "Zeilenumbruch",
+    "autoSave": "Automatisches Speichern",
+    "autoSavePaused": "pausiert"
+  },
+  "pageEditor": {
+    "savedToast": "Seite erfolgreich gespeichert",
+    "saveErrorFallback": "Fehler beim Speichern der Seite",
+    "saveAnyway": "Trotzdem speichern",
+    "conflictAgainMessage": "Die Seite wurde während des Speicherns erneut geändert. Bitte laden Sie die Seite neu und wenden Sie Ihre Änderungen erneut an.",
+    "errorPrefix": "Fehler: {{error}}",
+    "metadataErrorsBeforeSave": "Bitte beheben Sie die Metadatenfehler vor dem Speichern.",
+    "contentNullFallback": "Aktualisierter Seiteninhalt ist null oder undefiniert",
+    "unknownErrorFallback": "Ein unbekannter Fehler ist aufgetreten"
+  },
+  "linkInsertDialog": {
+    "dialogTitle": "Link einfügen",
+    "displayTextLabel": "Anzeigetext",
+    "urlLabel": "URL",
+    "textPlaceholder": "Linktext",
+    "urlPlaceholder": "https:// oder Seiten durchsuchen…",
+    "cancelButton": "Abbrechen",
+    "insertButton": "Einfügen"
+  },
+  "frontmatterPanel": {
+    "metadataTitle": "Metadaten",
+    "tagsHeading": "Schlagwörter",
+    "propertiesHeading": "Eigenschaften",
+    "removeFieldAriaLabel": "Frontmatter-Feld {{field}} entfernen",
+    "addTagPlaceholder": "Schlagwort hinzufügen",
+    "keyPlaceholder": "Schlüssel",
+    "valuePlaceholder": "Wert"
+  },
+  "tagInput": {
+    "loading": "Wird geladen…",
+    "noMatchingTags": "Keine passenden Schlagwörter gefunden.",
+    "removeTagAriaLabel": "Schlagwort {{tag}} entfernen"
+  },
+  "markdownEditor": {
+    "editorTab": "Editor",
+    "previewTab": "Vorschau",
+    "resizeAriaLabel": "Editor- und Vorschaubereich anpassen",
+    "fileTooLarge": "Datei zu groß. Maximal {{maxSize}} erlaubt.",
+    "uploadedToast": "{{filename}} hochgeladen",
+    "uploadErrorFallback": "{{filename}} konnte nicht hochgeladen werden"
+  },
+  "autoSave": {
+    "savedToast": "Gespeichert",
+    "versionConflictToast": "Automatisches Speichern pausiert — die Seite wurde von einem anderen Benutzer geändert. Speichern Sie manuell, um fortzufahren.",
+    "errorFallback": "Automatisches Speichern fehlgeschlagen"
+  },
+  "frontmatterValidation": {
+    "tagsWhitespace": "Schlagwörter dürfen keine führenden oder abschließenden Leerzeichen enthalten.",
+    "tagsEmpty": "Schlagwörter dürfen nicht leer sein.",
+    "tagsUnique": "Schlagwörter müssen eindeutig sein.",
+    "keyEmpty": "Der Eigenschaftsschlüssel darf nicht leer sein.",
+    "keyWhitespace": "Der Eigenschaftsschlüssel darf keine führenden oder abschließenden Leerzeichen enthalten.",
+    "keyReservedPrefix": "Der Eigenschaftsschlüssel verwendet ein reserviertes Präfix.",
+    "keyReserved": "Der Eigenschaftsschlüssel ist reserviert.",
+    "keyUnique": "Der Eigenschaftsschlüssel muss eindeutig sein.",
+    "valueType": "Der Eigenschaftswert muss eine Zeichenkette, Zahl, ein Wahrheitswert oder eine flache Liste sein."
+  }
+}

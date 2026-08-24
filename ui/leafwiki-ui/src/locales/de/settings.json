@@ -1,0 +1,14 @@
+{
+  "exit": "Einstellungen verlassen",
+  "nav": {
+    "title": "Einstellungen",
+    "account": "Konto"
+  },
+  "account": {
+    "pageTitle": "Konto",
+    "passwordSectionTitle": "Passwort",
+    "passwordSectionDescription": "Ändern Sie Ihr Passwort. Merken Sie es sich gut!",
+    "twoFactorSectionTitle": "Zwei-Faktor-Authentifizierung",
+    "twoFactorSectionDescription": "Fügen Sie Ihrem Konto eine zusätzliche Sicherheitsebene hinzu."
+  }
+}

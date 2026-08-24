@@ -1,0 +1,33 @@
+{
+  "manager": {
+    "title": "Dateien",
+    "fileTooLarge": "Datei zu groß. Maximal {{maxSize}} erlaubt.",
+    "uploadErrorFallback": "Datei-Upload fehlgeschlagen",
+    "dropzoneText": "Dateien hierher ziehen oder klicken zum Hochladen",
+    "maxFileSize": "Maximale Dateigröße: {{maxSize}}",
+    "uploading_one": "{{count}} Datei wird hochgeladen…",
+    "uploading_other": "{{count}} Dateien werden hochgeladen…",
+    "loading": "Dateien werden geladen…",
+    "empty": "Noch keine Dateien vorhanden",
+    "tip": "Tipp: Doppelklick fügt das Standard-Markup ein. Bilder können auch als Links eingefügt werden, für Audio/Video gibt es einen Player-Einfüge-Button."
+  },
+  "item": {
+    "renameSuccess": "Datei umbenannt",
+    "renameErrorFallback": "Umbenennen fehlgeschlagen",
+    "deleteSuccess": "Datei gelöscht",
+    "deleteErrorFallback": "Löschen fehlgeschlagen",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "insertImageLink": "Bildlink einfügen",
+    "insertAudioPlayer": "Audio-Player einfügen",
+    "insertVideoPlayer": "Video-Player einfügen",
+    "insertImage": "Bild einfügen",
+    "insertLink": "Link einfügen",
+    "rename": "Umbenennen",
+    "delete": "Löschen"
+  },
+  "dialog": {
+    "title": "Dateiverwaltung",
+    "description": "Laden Sie eine Datei hoch oder wählen Sie eine aus, um sie in die Seite einzufügen."
+  }
+}
