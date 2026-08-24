@@ -147,7 +147,13 @@ describe('TreeView explorer refresh button', () => {
 
   it('does a plain tree reload without pull/resync for non-admins', async () => {
     useSessionStore.setState({
-      user: { id: '1', username: 'editor', role: 'editor' },
+      user: {
+        id: '1',
+        username: 'editor',
+        email: 'editor@example.com',
+        role: 'editor',
+        totpEnabled: false,
+      },
     })
     renderTreeView()
 
@@ -162,7 +168,13 @@ describe('TreeView explorer refresh button', () => {
 
   it('pulls, resyncs and reloads for admins when git backup is enabled', async () => {
     useSessionStore.setState({
-      user: { id: '1', username: 'admin', role: 'admin' },
+      user: {
+        id: '1',
+        username: 'admin',
+        email: 'admin@example.com',
+        role: 'admin',
+        totpEnabled: false,
+      },
     })
     useConfigStore.setState({ gitBackupEnabled: true })
     renderTreeView()
@@ -179,7 +191,13 @@ describe('TreeView explorer refresh button', () => {
 
   it('skips the pull step for admins when git backup is disabled, but still resyncs', async () => {
     useSessionStore.setState({
-      user: { id: '1', username: 'admin', role: 'admin' },
+      user: {
+        id: '1',
+        username: 'admin',
+        email: 'admin@example.com',
+        role: 'admin',
+        totpEnabled: false,
+      },
     })
     useConfigStore.setState({ gitBackupEnabled: false })
     renderTreeView()
@@ -195,7 +213,13 @@ describe('TreeView explorer refresh button', () => {
 
   it('shows an error toast but still resyncs when the pull fails', async () => {
     useSessionStore.setState({
-      user: { id: '1', username: 'admin', role: 'admin' },
+      user: {
+        id: '1',
+        username: 'admin',
+        email: 'admin@example.com',
+        role: 'admin',
+        totpEnabled: false,
+      },
     })
     useConfigStore.setState({ gitBackupEnabled: true })
     triggerPullMock.mockRejectedValue(new Error('pull conflict'))
@@ -214,7 +238,13 @@ describe('TreeView explorer refresh button', () => {
 
   it('shows an info toast when a resync is already running', async () => {
     useSessionStore.setState({
-      user: { id: '1', username: 'admin', role: 'admin' },
+      user: {
+        id: '1',
+        username: 'admin',
+        email: 'admin@example.com',
+        role: 'admin',
+        totpEnabled: false,
+      },
     })
     useConfigStore.setState({ gitBackupEnabled: false })
     triggerResyncMock.mockRejectedValue(
