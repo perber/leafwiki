@@ -83,7 +83,15 @@ const preview: PageRefactorPreview = {
   pageId: 'page-1',
   oldPath: 'section-a/child',
   newPath: 'section-b/child',
-  affectedPages: [],
+  affectedPages: [
+    {
+      fromPageId: 'linker-1',
+      fromTitle: 'Linker',
+      fromPath: 'linker',
+      matchedPaths: ['/section-a/child'],
+      warnings: [],
+    },
+  ],
   counts: { affectedPages: 1, matchedLinks: 1 },
   warnings: [],
 }

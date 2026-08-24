@@ -31,9 +31,22 @@ const preview: PageRefactorPreview = {
   pageId: 'page-1',
   oldPath: 'section-a/page-1',
   newPath: 'section-b/page-1',
-  affectedPages: [],
+  affectedPages: [
+    {
+      fromPageId: 'linker-1',
+      fromTitle: 'Linker',
+      fromPath: 'linker',
+      matchedPaths: ['/section-a/page-1'],
+      warnings: [],
+    },
+  ],
   counts: { affectedPages: 1, matchedLinks: 1 },
   warnings: [],
+}
+const noAffectedPreview: PageRefactorPreview = {
+  ...preview,
+  affectedPages: [],
+  counts: { affectedPages: 0, matchedLinks: 0 },
 }
 
 describe('performTreeCrossParentMove', () => {
@@ -57,7 +70,7 @@ describe('performTreeCrossParentMove', () => {
 
   it('applies with rewriteLinks:false when nothing is affected (no dialog shown)', async () => {
     useConfigStore.setState({ enableLinkRefactor: true })
-    vi.mocked(previewPageRefactor).mockResolvedValue(preview)
+    vi.mocked(previewPageRefactor).mockResolvedValue(noAffectedPreview)
     vi.mocked(confirmPageRefactor).mockResolvedValue(false)
     vi.mocked(applyPageRefactor).mockResolvedValue(null)
 
@@ -70,7 +83,7 @@ describe('performTreeCrossParentMove', () => {
       kind: 'move',
       parentId: 'section-b',
     })
-    expect(confirmPageRefactor).toHaveBeenCalledWith(preview, {
+    expect(confirmPageRefactor).toHaveBeenCalledWith(noAffectedPreview, {
       allowSkipRewrite: true,
     })
     expect(applyPageRefactor).toHaveBeenCalledWith('page-1', {
@@ -81,7 +94,7 @@ describe('performTreeCrossParentMove', () => {
       rewriteLinks: false,
     })
     expect(movePage).not.toHaveBeenCalled()
-    expect(result).toEqual({ status: 'moved', preview })
+    expect(result).toEqual({ status: 'moved', preview: noAffectedPreview })
   })
 
   it('applies with rewriteLinks:true when the user confirms the rewrite', async () => {
