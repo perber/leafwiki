@@ -24,6 +24,8 @@ type Config struct {
 	SchemaFile         string
 	UsersDBPath        string
 	APIKeysDBPath      string // storageDir/api_keys.db — may not exist (API key management is disabled by default); addFileToZip/os.Stat guards make an absent file a safe no-op
+	FavoritesDBPath    string // storageDir/favorites.db — may not exist on a data dir predating this feature; addFileToZip/os.Stat guards make an absent file a safe no-op
+	UserSettingsDBPath string // storageDir/usersettings.db — may not exist on a data dir predating this feature; addFileToZip/os.Stat guards make an absent file a safe no-op
 	WikiVersion        string // injected from build info
 
 	// Interval is the automatic snapshot interval; 0 means manual-only
@@ -73,12 +75,41 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 			if err := vacuumSQLiteDB(ctx, cfg.APIKeysDBPath, apiKeysDBCopy); err != nil {
 				return "", fmt.Errorf("failed to vacuum api keys database: %w", err)
 			}
+		} else if !os.IsNotExist(statErr) {
+			return "", fmt.Errorf("failed to stat api keys database: %w", statErr)
+		}
+	}
+
+	// favorites.db and usersettings.db are always-on features (unlike
+	// api_keys.db), but a data dir predating this feature may not have them
+	// yet — same missing-file handling as api_keys.db above.
+	var favoritesDBCopy string
+	if cfg.FavoritesDBPath != "" {
+		if _, statErr := os.Stat(cfg.FavoritesDBPath); statErr == nil {
+			favoritesDBCopy = filepath.Join(tmpDir, "favorites.db")
+			if err := vacuumSQLiteDB(ctx, cfg.FavoritesDBPath, favoritesDBCopy); err != nil {
+				return "", fmt.Errorf("failed to vacuum favorites database: %w", err)
+			}
+		} else if !os.IsNotExist(statErr) {
+			return "", fmt.Errorf("failed to stat favorites database: %w", statErr)
+		}
+	}
+
+	var userSettingsDBCopy string
+	if cfg.UserSettingsDBPath != "" {
+		if _, statErr := os.Stat(cfg.UserSettingsDBPath); statErr == nil {
+			userSettingsDBCopy = filepath.Join(tmpDir, "usersettings.db")
+			if err := vacuumSQLiteDB(ctx, cfg.UserSettingsDBPath, userSettingsDBCopy); err != nil {
+				return "", fmt.Errorf("failed to vacuum user settings database: %w", err)
+			}
+		} else if !os.IsNotExist(statErr) {
+			return "", fmt.Errorf("failed to stat user settings database: %w", statErr)
 		}
 	}
 
 	createdAt := time.Now().UTC()
 	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
-	if err := writeSnapshotZip(zipPath, cfg, id, createdAt, usersDBCopy, apiKeysDBCopy); err != nil {
+	if err := writeSnapshotZip(zipPath, cfg, id, createdAt, usersDBCopy, apiKeysDBCopy, favoritesDBCopy, userSettingsDBCopy); err != nil {
 		_ = os.Remove(zipPath) // best-effort cleanup of a partial/invalid zip left by the failed write
 		return "", fmt.Errorf("failed to write snapshot zip: %w", err)
 	}
@@ -149,7 +180,7 @@ func vacuumSQLiteDB(ctx context.Context, srcPath, dstPath string) error {
 	return nil
 }
 
-func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time, usersDBPath, apiKeysDBPath string) error {
+func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time, usersDBPath, apiKeysDBPath, favoritesDBPath, userSettingsDBPath string) error {
 	f, err := os.Create(zipPath)
 	if err != nil {
 		return fmt.Errorf("failed to create zip file: %w", err)
@@ -177,6 +208,12 @@ func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time
 		return err
 	}
 	if err := addFileToZip(w, apiKeysDBPath, "api_keys.db"); err != nil {
+		return err
+	}
+	if err := addFileToZip(w, favoritesDBPath, "favorites.db"); err != nil {
+		return err
+	}
+	if err := addFileToZip(w, userSettingsDBPath, "usersettings.db"); err != nil {
 		return err
 	}
 

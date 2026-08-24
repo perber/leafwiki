@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/favorites"
 )
 
 // Error codes for the pages domain.
@@ -121,6 +122,8 @@ func pageErrorStatus(code string) int {
 		return http.StatusBadRequest
 	case ErrCodePageVersionConflict:
 		return http.StatusConflict
+	case favorites.ErrCodeFavoritesStoreUnavailable:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusInternalServerError
 	}

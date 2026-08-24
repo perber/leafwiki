@@ -194,6 +194,11 @@ func (s *APIKeyService) RevokeAPIKey(id string) error {
 	return s.currentStore().Revoke(id)
 }
 
+// DeleteAllForUser removes every API key owned by userID. Called on user delete.
+func (s *APIKeyService) DeleteAllForUser(userID string) error {
+	return s.currentStore().DeleteAllForUser(userID)
+}
+
 // AsStoreUnavailableErr reports whether err is a store's own "suspended for
 // live restore" LocalizedError (APIKeyStore's or, via UserService,
 // UserStore's), returning it as a *LocalizedError if so. Resolve uses this to
