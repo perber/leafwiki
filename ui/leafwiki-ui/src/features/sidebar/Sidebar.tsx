@@ -46,6 +46,10 @@ export default function Sidebar() {
           label: item.label(),
           icon: item.icon,
         })),
+      // item.label() reads from the global i18n instance, so it must be
+      // recomputed on language change even though i18n.language isn't
+      // referenced directly in the callback.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [items, i18n.language],
     )
 
