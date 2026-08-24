@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+
 	// Blank-imported so image.Decode recognizes these formats' magic bytes.
 	_ "image/gif"
 	_ "image/jpeg"
