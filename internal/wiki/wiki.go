@@ -23,6 +23,7 @@ import (
 	"github.com/perber/wiki/internal/properties"
 	"github.com/perber/wiki/internal/search"
 	"github.com/perber/wiki/internal/tags"
+	"github.com/perber/wiki/internal/usersettings"
 	wikiapikeys "github.com/perber/wiki/internal/wiki/apikeys"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikiauth "github.com/perber/wiki/internal/wiki/auth"
@@ -40,6 +41,7 @@ import (
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
 	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 	wikitags "github.com/perber/wiki/internal/wiki/tags"
+	wikiusersettings "github.com/perber/wiki/internal/wiki/usersettings"
 )
 
 type Wiki struct {
@@ -59,35 +61,37 @@ type Wiki struct {
 	storageDir        string
 
 	// Domain route registrars (populated by NewWiki).
-	pagesRoutes      *wikipages.Routes
-	authRoutes       *wikiauth.Routes
-	assetsRoutes     *wikiassets.Routes
-	revisionsRoutes  *wikirevisions.Routes
-	searchRoutes     *wikisearch.Routes
-	linksRoutes      *wikilinks.Routes
-	tagsRoutes       *wikitags.Routes
-	propertiesRoutes *wikiproperties.Routes
-	brandingRoutes   *wikibranding.Routes
-	apiKeysRoutes    *wikiapikeys.Routes
-	importerRoutes   *wikiimporter.Routes
-	healthRoutes     *wikihealth.Routes
-	revision         *revision.Service
-	links            *links.LinkService
-	tags             *tags.TagsService
-	props            *properties.PropertiesService
-	favorites        *favorites.FavoritesStore
-	backupRoutes     *wikibackup.Routes
-	snapshotRoutes   *wikisnapshot.Routes
-	restoreRoutes    *wikirestore.Routes
-	resyncRoutes     *wikiresync.Routes
-	resyncJob        *wikiresync.ResyncJob
-	ignoreCache      *ignore.Cache
-	reloadMu         sync.Mutex
-	reloadWG         sync.WaitGroup
-	shutdownCtx      context.Context
-	shutdownCancel   context.CancelFunc
-	log              *slog.Logger
-	metrics          *httpmetrics.HTTPMetrics
+	pagesRoutes        *wikipages.Routes
+	authRoutes         *wikiauth.Routes
+	assetsRoutes       *wikiassets.Routes
+	revisionsRoutes    *wikirevisions.Routes
+	searchRoutes       *wikisearch.Routes
+	linksRoutes        *wikilinks.Routes
+	tagsRoutes         *wikitags.Routes
+	propertiesRoutes   *wikiproperties.Routes
+	brandingRoutes     *wikibranding.Routes
+	apiKeysRoutes      *wikiapikeys.Routes
+	importerRoutes     *wikiimporter.Routes
+	healthRoutes       *wikihealth.Routes
+	revision           *revision.Service
+	links              *links.LinkService
+	tags               *tags.TagsService
+	props              *properties.PropertiesService
+	favorites          *favorites.FavoritesStore
+	userSettings       *usersettings.UserSettingsService
+	userSettingsRoutes *wikiusersettings.Routes
+	backupRoutes       *wikibackup.Routes
+	snapshotRoutes     *wikisnapshot.Routes
+	restoreRoutes      *wikirestore.Routes
+	resyncRoutes       *wikiresync.Routes
+	resyncJob          *wikiresync.ResyncJob
+	ignoreCache        *ignore.Cache
+	reloadMu           sync.Mutex
+	reloadWG           sync.WaitGroup
+	shutdownCtx        context.Context
+	shutdownCancel     context.CancelFunc
+	log                *slog.Logger
+	metrics            *httpmetrics.HTTPMetrics
 }
 
 const SYSTEM_USER_ID = "system"
@@ -141,6 +145,9 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		return nil, err
 	}
 	if err := w.initFavoritesService(); err != nil {
+		return nil, err
+	}
+	if err := w.initUserSettingsService(); err != nil {
 		return nil, err
 	}
 	w.bootstrapTagsAndProperties()
@@ -328,11 +335,20 @@ func (w *Wiki) initPropertiesService() error {
 }
 
 func (w *Wiki) initFavoritesService() error {
-	store, err := favorites.NewFavoritesStore(w.storageDir)
+	store, err := favorites.NewFavoritesStore(w.storageDir, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to init favorites store: %w", err)
 	}
 	w.favorites = store
+	return nil
+}
+
+func (w *Wiki) initUserSettingsService() error {
+	store, err := usersettings.NewUserSettingsStore(w.storageDir, w.log)
+	if err != nil {
+		return fmt.Errorf("failed to init user settings store: %w", err)
+	}
+	w.userSettings = usersettings.NewUserSettingsService(store)
 	return nil
 }
 
@@ -414,6 +430,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.tagsRoutes = w.buildTagsRoutes()
 	w.propertiesRoutes = w.buildPropertiesRoutes()
 	w.brandingRoutes = w.buildBrandingRoutes()
+	w.userSettingsRoutes = w.buildUserSettingsRoutes()
 	w.apiKeysRoutes = w.buildAPIKeysRoutes()
 	w.importerRoutes = w.buildImporterRoutes(options)
 	w.healthRoutes = wikihealth.NewRoutes(wikihealth.RoutesConfig{
@@ -479,7 +496,7 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		CreateUser:        wikiauth.NewCreateUserUseCase(w.UserService, w.userResolver, w.log),
 		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.UserService, w.userResolver, w.log),
 		ChangeOwnPassword: wikiauth.NewChangeOwnPasswordUseCase(w.UserService),
-		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.UserService, w.userResolver, w.favorites, w.log),
+		DeleteUser:        wikiauth.NewDeleteUserUseCase(w.UserService, w.userResolver, w.favorites, w.userSettings, w.apiKeys, w.log),
 		GetUsers:          wikiauth.NewGetUsersUseCase(w.UserService),
 		GetUserByID:       wikiauth.NewGetUserByIDUseCase(w.UserService),
 		StartTOTPSetup:    wikiauth.NewStartTOTPSetupUseCase(w.auth),
@@ -568,6 +585,14 @@ func (w *Wiki) buildBrandingRoutes() *wikibranding.Routes {
 	})
 }
 
+func (w *Wiki) buildUserSettingsRoutes() *wikiusersettings.Routes {
+	return wikiusersettings.NewRoutes(wikiusersettings.RoutesConfig{
+		GetUserSettings:    wikiusersettings.NewGetUserSettingsUseCase(w.userSettings),
+		UpdateUserSettings: wikiusersettings.NewUpdateUserSettingsUseCase(w.userSettings),
+		AuthService:        w.auth,
+	})
+}
+
 func (w *Wiki) buildAPIKeysRoutes() *wikiapikeys.Routes {
 	return wikiapikeys.NewRoutes(wikiapikeys.RoutesConfig{
 		CreateAPIKey: wikiapikeys.NewCreateAPIKeyUseCase(w.apiKeys),
@@ -610,6 +635,7 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.tagsRoutes,
 		w.propertiesRoutes,
 		w.brandingRoutes,
+		w.userSettingsRoutes,
 		w.apiKeysRoutes,
 		w.importerRoutes,
 		w.healthRoutes,
@@ -921,6 +947,17 @@ func (w *Wiki) APIKeyService() *auth.APIKeyService {
 	return w.apiKeys
 }
 
+// Favorites returns the favorites store, e.g. for wiring into restore.Config.
+func (w *Wiki) Favorites() *favorites.FavoritesStore {
+	return w.favorites
+}
+
+// UserSettingsService returns the user settings service, e.g. for wiring
+// into restore.Config.
+func (w *Wiki) UserSettingsService() *usersettings.UserSettingsService {
+	return w.userSettings
+}
+
 // EmailTokenService returns the password-reset/invite token service, or nil
 // if SMTP isn't configured or auth is disabled (see initEmail). Every use
 // case that resolves this via the func()-based pattern (like UserService)
@@ -962,6 +999,18 @@ func (w *Wiki) Close() error {
 	if w.links != nil {
 		if err := w.links.Close(); err != nil {
 			w.log.Error("error closing links", "error", err)
+		}
+	}
+
+	if w.userSettings != nil {
+		if err := w.userSettings.Close(); err != nil {
+			w.log.Error("error closing user settings store", "error", err)
+		}
+	}
+
+	if w.favorites != nil {
+		if err := w.favorites.Close(); err != nil {
+			w.log.Error("error closing favorites store", "error", err)
 		}
 	}
 

@@ -29,6 +29,7 @@ export type Config = {
   loginUrl: string
   logoutUrl: string
   userManagementUrl: string
+  defaultLanguage: string
 }
 
 export async function getConfig(): Promise<Config> {

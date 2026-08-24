@@ -1,6 +1,7 @@
 import { asApiLocalizedError, mapApiError } from '@/lib/api/errors'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useEditorStore, type AutoSaveStatus } from '@/stores/editor'
+import { useUserSettingsStore } from '@/stores/userSettings'
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -22,7 +23,7 @@ export function useAutoSave(): { status: AutoSaveStatus } {
     0,
   )
 
-  const autoSave = useEditorStore((s) => s.autoSave)
+  const autoSave = useUserSettingsStore((s) => s.autoSave)
   const content = usePageEditorStore((s) => s.content)
   const tags = usePageEditorStore((s) => s.tags)
   const frontmatterFields = usePageEditorStore((s) => s.frontmatterFields)
@@ -270,14 +271,13 @@ export function useAutoSave(): { status: AutoSaveStatus } {
         !wasAlreadySaving &&
         statusRef.current !== 'paused'
       ) {
-        const editorState = useEditorStore.getState()
         const pageEditorState = usePageEditorStore.getState()
         const validationErrors = validateEditorFrontmatterMetadata(
           pageEditorState.tags,
           pageEditorState.frontmatterFields,
         )
         if (
-          editorState.autoSave &&
+          useUserSettingsStore.getState().autoSave &&
           isDirtyState(pageEditorState) &&
           pageEditorState.page?.slug === pageEditorState.slug &&
           Object.keys(validationErrors).length === 0

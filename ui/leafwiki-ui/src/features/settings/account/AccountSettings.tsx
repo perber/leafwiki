@@ -3,6 +3,7 @@ import { useSessionStore } from '@/stores/session'
 import { useTranslation } from 'react-i18next'
 import { useSetTitle } from '../../viewer/setTitle'
 import { ChangeOwnPasswordPanel } from './ChangeOwnPasswordPanel'
+import { PreferencesPanel } from './PreferencesPanel'
 import { TotpPanel } from './TotpPanel'
 
 export default function AccountSettings() {
@@ -36,6 +37,16 @@ export default function AccountSettings() {
           <TotpPanel />
         </div>
       )}
+
+      <div className="settings__section">
+        <h2 className="settings__section-title">
+          {t('account.preferences.sectionTitle')}
+        </h2>
+        <p className="settings__section-description">
+          {t('account.preferences.sectionDescription')}
+        </p>
+        <PreferencesPanel />
+      </div>
     </div>
   )
 }

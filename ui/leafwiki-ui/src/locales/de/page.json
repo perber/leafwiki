@@ -1,0 +1,127 @@
+{
+  "common": {
+    "page": "Seite",
+    "section": "Bereich",
+    "pageCapitalized": "Seite",
+    "sectionCapitalized": "Bereich",
+    "cancel": "Abbrechen",
+    "errorPrefix": "Fehler: {{error}}",
+    "unknownError": "Ein unbekannter Fehler ist aufgetreten"
+  },
+  "addDialog": {
+    "slugNotGenerated": "Der Slug konnte nicht generiert werden. Bitte geben Sie ihn manuell ein.",
+    "slugStillGenerating": "Bitte warten Sie, bis der Slug vollständig generiert wurde.",
+    "createdToast": "{{item}} erstellt",
+    "createErrorFallback": "Fehler beim Erstellen von {{item}}",
+    "create": "Erstellen",
+    "createAndEdit": "{{item}} erstellen & bearbeiten",
+    "titlePage": "Neue Seite erstellen",
+    "titleSection": "Neuen Bereich erstellen",
+    "descriptionPage": "Geben Sie den Titel der neuen Seite ein",
+    "descriptionSection": "Geben Sie den Titel des neuen Bereichs ein",
+    "titleLabel": "Titel",
+    "titlePlaceholder": "Titel von {{item}}",
+    "pathPrefix": "Pfad:"
+  },
+  "moveDialog": {
+    "movedToast": "Seite erfolgreich verschoben",
+    "moveErrorFallback": "Fehler beim Verschieben von {{item}}",
+    "title": "{{item}} verschieben",
+    "description": "Wählen Sie einen neuen übergeordneten Bereich für {{item}}",
+    "move": "Verschieben"
+  },
+  "deleteDialog": {
+    "loadReferencesErrorFallback": "Seitenverweise konnten nicht geladen werden",
+    "deletedToast": "{{item}} erfolgreich gelöscht",
+    "deleteErrorFallback": "Fehler beim Löschen von {{item}}",
+    "title": "{{item}} löschen?",
+    "description": "Möchten Sie {{item}} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deleting": "Wird gelöscht...",
+    "delete": "Löschen",
+    "modifiedWarningTitle": "Diese Seite wurde von einem anderen Benutzer geändert.",
+    "modifiedWarningBody": "Die Seite wurde aktualisiert. Möchten Sie sie trotzdem löschen?",
+    "backlinksLoading": "Es wird geprüft, welche Seiten auf diese Seite verweisen...",
+    "backlinksError": "Seitenverweise konnten nicht geladen werden. Das Löschen funktioniert weiterhin, die Auswirkung auf Links konnte jedoch nicht angezeigt werden.",
+    "backlinksWarning_one": "Auf diese Seite verweist {{count}} Seite.",
+    "backlinksWarning_other": "Auf diese Seite verweisen {{count}} Seiten.",
+    "backlinksWarningBody": "Das Löschen dieser Seite hinterlässt dort defekte Links.",
+    "noBacklinks": "Derzeit verweist keine Seite auf diese Seite.",
+    "deleteSubpages": "Auch alle Unterseiten löschen"
+  },
+  "sortDialog": {
+    "dragToReorder": "Zum Neuanordnen ziehen",
+    "sortedToast": "{{item}}-Unterelemente erfolgreich sortiert",
+    "sortErrorFallback": "Fehler beim Sortieren der {{item}}-Unterelemente",
+    "title": "{{item}}-Unterelemente sortieren",
+    "description": "Ziehen Sie Elemente zum Neuanordnen, verwenden Sie die Pfeile, oder wählen Sie eine Sortieroption. Änderungen werden nach Klick auf „Speichern“ übernommen.",
+    "save": "Speichern",
+    "sortAlphabetically": "Alphabetisch sortieren:",
+    "ascending": "A → Z",
+    "descending": "Z → A",
+    "sortSections": "Bereiche gruppieren:",
+    "sectionsFirst": "Bereiche zuerst",
+    "sectionsLast": "Bereiche zuletzt"
+  },
+  "copyDialog": {
+    "slugNotGenerated": "Der Slug konnte nicht generiert werden. Bitte geben Sie ihn manuell ein.",
+    "slugStillGenerating": "Bitte warten Sie, bis der Slug vollständig generiert wurde.",
+    "copiedToast": "{{item}} kopiert",
+    "copyErrorFallback": "Fehler beim Kopieren von {{item}}",
+    "copyOfTitle": "Kopie von {{title}}",
+    "title": "{{item}} kopieren",
+    "description": "Erstellen Sie eine Kopie von {{item}}",
+    "copying": "Wird kopiert...",
+    "copyAndEdit": "{{item}} kopieren & bearbeiten",
+    "titleLabel": "Titel",
+    "titlePlaceholder": "Titel von {{item}}",
+    "pathPrefix": "Pfad:"
+  },
+  "permalinkDialog": {
+    "copyErrorToast": "Permalink konnte nicht kopiert werden",
+    "copiedToast": "Permalink kopiert",
+    "title": "Seite teilen",
+    "description": "Teilbare URL für {{title}}",
+    "close": "Schließen",
+    "urlLabel": "Teilbare URL",
+    "copyLink": "Link kopieren",
+    "openLink": "Link öffnen"
+  },
+  "createByPathDialog": {
+    "createdToast": "Seite erfolgreich erstellt",
+    "createErrorFallback": "Fehler beim Erstellen der Seite",
+    "title": "Neue Seite erstellen",
+    "description": "Bitte geben Sie den Titel ein",
+    "creating": "Wird erstellt...",
+    "create": "Erstellen",
+    "createAndEdit": "Erstellen & bearbeiten",
+    "existsAlert": "An diesem Pfad existiert bereits eine Seite.",
+    "lookupResultTitle": "Ergebnis der Pfadprüfung:",
+    "segmentExists": "existiert",
+    "segmentWillBeCreated": "wird erstellt",
+    "titleLabel": "Titel",
+    "titlePlaceholder": "Seitentitel",
+    "pathLabel": "Pfad",
+    "pathPlaceholder": "Seitenpfad"
+  },
+  "select": {
+    "topLevel": "Oberste Ebene",
+    "searchPlaceholder": "Seiten durchsuchen...",
+    "searchAriaLabel": "Seiten durchsuchen",
+    "noPagesFound": "Keine Seiten gefunden.",
+    "pagesAriaLabel": "Seiten"
+  },
+  "refactorDialog": {
+    "title": "Verweise aktualisieren?",
+    "description": "Diese Änderung betrifft den Seitenpfad. Überprüfen Sie die betroffenen Seiten, bevor Sie fortfahren.",
+    "saveWithoutRewrite": "Ohne Aktualisierung der Links speichern",
+    "continue": "Fortfahren",
+    "oldPath": "Alter Pfad:",
+    "newPath": "Neuer Pfad:",
+    "updateLinksLabel": "Links auf verweisenden Seiten automatisch aktualisieren",
+    "referencingPages": "Verweisende Seiten ({{count}})",
+    "noReferences": "Keine Seite verweist auf diesen Pfad."
+  },
+  "historyPage": {
+    "backToPage": "Zurück zur Seite"
+  }
+}

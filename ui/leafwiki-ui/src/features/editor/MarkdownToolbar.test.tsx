@@ -35,17 +35,26 @@ vi.mock('@/stores/editor', () => ({
     selector: (state: {
       lineWrap: boolean
       toggleLineWrap: ReturnType<typeof vi.fn>
-      autoSave: boolean
-      toggleAutoSave: ReturnType<typeof vi.fn>
       autoSaveStatus: 'idle'
     }) => unknown,
   ) =>
     selector({
       lineWrap: true,
       toggleLineWrap: vi.fn(),
+      autoSaveStatus: 'idle',
+    }),
+}))
+
+vi.mock('@/stores/userSettings', () => ({
+  useUserSettingsStore: (
+    selector: (state: {
+      autoSave: boolean
+      toggleAutoSave: ReturnType<typeof vi.fn>
+    }) => unknown,
+  ) =>
+    selector({
       autoSave: true,
       toggleAutoSave: vi.fn(),
-      autoSaveStatus: 'idle',
     }),
 }))
 

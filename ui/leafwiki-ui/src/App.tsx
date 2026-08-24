@@ -5,6 +5,7 @@ import { BASE_PATH } from '@/lib/config'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useSessionStore } from '@/stores/session'
+import { useUserSettingsStore } from '@/stores/userSettings'
 import useApplyDesignMode from '@/useApplyDesignMode'
 import { Loader2 } from 'lucide-react'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
@@ -35,6 +36,8 @@ function App() {
   const isReadOnlyViewer = isReadOnly && !isLoggedIn
   const loadFavorites = useFavoritesStore((s) => s.loadFavorites)
   const clearFavorites = useFavoritesStore((s) => s.clearFavorites)
+  const loadUserSettings = useUserSettingsStore((s) => s.loadUserSettings)
+  const clearUserSettings = useUserSettingsStore((s) => s.clearUserSettings)
 
   useApplyDesignMode()
   useEffect(() => {
@@ -51,6 +54,16 @@ function App() {
       clearFavorites()
     }
   }, [userId, loadFavorites, clearFavorites])
+
+  // User settings (e.g. autoSave) are per-user server truth, just like
+  // favorites above — (re)load on login, reset on logout.
+  useEffect(() => {
+    if (userId) {
+      loadUserSettings()
+    } else {
+      clearUserSettings()
+    }
+  }, [userId, loadUserSettings, clearUserSettings])
 
   useLayoutEffect(() => {
     // Load branding configuration

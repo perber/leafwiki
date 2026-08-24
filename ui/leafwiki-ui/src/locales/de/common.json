@@ -1,0 +1,38 @@
+{
+  "sidebar": {
+    "explorerTab": "Explorer",
+    "searchTab": "Suche"
+  },
+  "errorBoundary": {
+    "heading": "Etwas ist schiefgelaufen",
+    "body": "Ein unerwarteter Fehler ist aufgetreten. Ein Neuladen der Seite behebt das meist.",
+    "reloadButton": "Seite neu laden",
+    "tryRecoverButton": "Wiederherstellung versuchen",
+    "detailsSummary": "Fehlerdetails"
+  },
+  "page404": {
+    "heading": "Seite nicht gefunden",
+    "body": "Die gesuchte Seite existiert nicht.",
+    "createPrompt": "Erstellen Sie die Seite über die Schaltfläche unten.",
+    "createButton": "Seite erstellen"
+  },
+  "unsavedChangesDialog": {
+    "title": "Ungespeicherte Änderungen",
+    "description": "Sie haben ungespeicherte Änderungen. Möchten Sie diese Seite wirklich verlassen? Ungespeicherte Daten gehen verloren.",
+    "cancelButton": "Abbrechen",
+    "leaveAnywayButton": "Trotzdem verlassen"
+  },
+  "dialog": {
+    "closeSrOnly": "Schließen"
+  },
+  "validation": {
+    "failedToast": "Validierung fehlgeschlagen"
+  },
+  "configLoad": {
+    "fetchErrorFallback": "Konfiguration konnte nicht geladen werden: {{status}} {{statusText}}",
+    "errorFallback": "Konfiguration konnte nicht geladen werden"
+  },
+  "language": {
+    "selfName": "Deutsch"
+  }
+}

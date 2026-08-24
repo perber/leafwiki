@@ -108,6 +108,8 @@ func writeUsage(w io.Writer) {
 	--http-remote-user-logout-url   Deprecated: use --logout-url instead
 	--user-management-url           URL to an external user-management page; when set, the built-in
 	                                 User Management UI is replaced with a link to this URL (default: "")
+	--default-language              Default UI language code for the frontend (e.g. en, de); must match
+	                                 a language shipped with the frontend, otherwise it is ignored (default: "")
 	--disable-request-log           Suppress per-request HTTP access log lines (default: false)
 	--git-backup                   Enable git backup to a remote repository (default: false)
 	--git-backup-author-name       Git commit author name for backups (default: LeafWiki Backup)
@@ -174,6 +176,7 @@ func writeUsage(w io.Writer) {
 	LEAFWIKI_LOGOUT_URL
 	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL  (deprecated: use LEAFWIKI_LOGOUT_URL instead)
 	LEAFWIKI_USER_MANAGEMENT_URL
+	LEAFWIKI_DEFAULT_LANGUAGE
 	LEAFWIKI_DISABLE_REQUEST_LOG
 	LEAFWIKI_GIT_BACKUP
 	LEAFWIKI_GIT_BACKUP_AUTHOR_NAME
@@ -284,6 +287,7 @@ type cliFlags struct {
 	logoutURL                      *string
 	httpRemoteUserLogoutURL        *string
 	userManagementURL              *string
+	defaultLanguage                *string
 	disableRequestLog              *bool
 	gitBackup                      *bool
 	gitBackupAuthorName            *string
@@ -354,6 +358,7 @@ func registerFlags(fs *flag.FlagSet) *cliFlags {
 		logoutURL:                      fs.String("logout-url", "", "URL the frontend redirects to after logout (e.g. an external SSO/IdP logout page)"),
 		httpRemoteUserLogoutURL:        fs.String("http-remote-user-logout-url", "", "deprecated: use --logout-url instead"),
 		userManagementURL:              fs.String("user-management-url", "", "URL to an external user-management page; when set, the built-in User Management UI is replaced with a link to this URL"),
+		defaultLanguage:                fs.String("default-language", "", "default UI language code for the frontend (e.g. en, de); must match a language shipped with the frontend, otherwise it is ignored"),
 		disableRequestLog:              fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
 		gitBackup:                      fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
 		gitBackupAuthorName:            fs.String("git-backup-author-name", "", "git commit author name for backups (default: LeafWiki Backup)"),
@@ -458,6 +463,7 @@ func main() {
 		logoutURL = resolved
 	}
 	userManagementURL := resolveString("user-management-url", *flags.userManagementURL, visited, "LEAFWIKI_USER_MANAGEMENT_URL", "")
+	defaultLanguage := resolveString("default-language", *flags.defaultLanguage, visited, "LEAFWIKI_DEFAULT_LANGUAGE", "")
 	disableRequestLog := resolveBool("disable-request-log", *flags.disableRequestLog, visited, "LEAFWIKI_DISABLE_REQUEST_LOG")
 	gitBackupEnabled := resolveBool("git-backup", *flags.gitBackup, visited, "LEAFWIKI_GIT_BACKUP")
 	gitBackupAuthorName := resolveString("git-backup-author-name", *flags.gitBackupAuthorName, visited, "LEAFWIKI_GIT_BACKUP_AUTHOR_NAME", "LeafWiki Backup")
@@ -710,6 +716,8 @@ func main() {
 			SchemaFile:         filepath.Join(dataDir, "schema.json"),
 			UsersDBPath:        filepath.Join(dataDir, "users.db"),
 			APIKeysDBPath:      filepath.Join(dataDir, "api_keys.db"),
+			FavoritesDBPath:    filepath.Join(dataDir, "favorites.db"),
+			UserSettingsDBPath: filepath.Join(dataDir, "usersettings.db"),
 			WikiVersion:        Version,
 			Interval:           snapshotInterval,
 			RetentionCount:     snapshotRetention,
@@ -726,6 +734,8 @@ func main() {
 			WriteGate:          writeGate,
 			AuthService:        w.AuthService(),
 			APIKeyService:      w.APIKeyService(),
+			Favorites:          w.Favorites(),
+			UserSettings:       w.UserSettingsService(),
 			BrandingService:    w.BrandingService(),
 			UserResolver:       w.UserResolver(),
 			TriggerResync:      w.TriggerResyncAsync,
@@ -770,6 +780,7 @@ func main() {
 		APIKeyService:     w.APIKeyService(),
 		DisableRequestLog: disableRequestLog,
 		UserManagementURL: userManagementURL,
+		DefaultLanguage:   defaultLanguage,
 		LoginURL:          loginURL,
 		LogoutURL:         logoutURL,
 		WriteGate:         writeGate,

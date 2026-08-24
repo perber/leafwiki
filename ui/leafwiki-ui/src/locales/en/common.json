@@ -31,5 +31,8 @@
   "configLoad": {
     "fetchErrorFallback": "Could not load config: {{status}} {{statusText}}",
     "errorFallback": "Could not load configuration"
+  },
+  "language": {
+    "selfName": "English"
   }
 }

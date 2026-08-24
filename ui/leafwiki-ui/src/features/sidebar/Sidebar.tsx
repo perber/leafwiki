@@ -6,6 +6,7 @@ import { useAppMode } from '@/lib/useAppMode'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSidebarStore } from '@/stores/sidebar'
 import { JSX, Suspense, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const registeredItems = panelItemRegistry.getAllItems()
 const sidebarShortcutIds: Partial<
@@ -16,6 +17,9 @@ const sidebarShortcutIds: Partial<
 }
 
 export default function Sidebar() {
+  // Panel item labels are resolved lazily (see PanelItem.label); re-rendering
+  // on language change keeps them in sync with the app-wide default language.
+  const { i18n } = useTranslation()
   const appMode = useAppMode()
   const sidebarMode = useSidebarStore((state) => state.sidebarMode)
   const setSidebarMode = useSidebarStore((state) => state.setSidebarMode)
@@ -39,10 +43,14 @@ export default function Sidebar() {
       () =>
         items.map((item) => ({
           id: item.id,
-          label: item.label,
+          label: item.label(),
           icon: item.icon,
         })),
-      [items],
+      // item.label() reads from the global i18n instance, so it must be
+      // recomputed on language change even though i18n.language isn't
+      // referenced directly in the callback.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [items, i18n.language],
     )
 
   useEffect(() => {
