@@ -172,7 +172,6 @@ describe('settingsSections gating (regression for the pre-registry backup/snapsh
       'backup',
       'snapshots',
       'importer',
-      'maintenance',
     ]
     for (const id of adminOnlyIds) {
       const s = settingsSections.find((sec) => sec.id === id)!

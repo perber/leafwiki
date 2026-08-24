@@ -11,7 +11,6 @@ import {
   BackupSettings,
   BrandingSettings,
   Importer,
-  MaintenanceSettings,
   SnapshotSettings,
   UserManagement,
 } from '@/features/router/lazy-routes'
@@ -25,7 +24,6 @@ import {
   Upload,
   User,
   Users,
-  Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import type { ComponentType, LazyExoticComponent } from 'react'
@@ -144,15 +142,6 @@ export const settingsSections: SettingsSection[] = [
     icon: Upload,
     roles: ['admin'],
     Component: Importer,
-  },
-  {
-    id: 'maintenance',
-    path: 'maintenance',
-    labelKey: 'userMenu.maintenance',
-    ns: 'auth',
-    icon: Wrench,
-    roles: ['admin'],
-    Component: MaintenanceSettings,
   },
 ]
 

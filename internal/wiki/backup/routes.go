@@ -51,6 +51,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	adminGroup.GET("/backup/status", r.handleGetBackupStatus)
 	adminGroup.POST("/backup/push", r.handleTriggerBackup)
 	adminGroup.POST("/backup/force-push", r.handleForcePush)
+	adminGroup.POST("/backup/pull", r.handleTriggerPull)
 }
 
 // handleGetBackupStatus returns the current backup status.
@@ -99,6 +100,21 @@ func (r *Routes) handleForcePush(c *gin.Context) {
 		return
 	}
 	if err := r.repo.ForcePush(); err != nil {
+		respondWithBackupStatusError(c, http.StatusInternalServerError, ErrCodeBackupInternalError, err.Error(), "backup internal error")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// handleTriggerPull fetches from the remote and fast-forward merges any new
+// commits into the local wiki content directories. Used by the explorer's
+// refresh button to pull external changes before a filesystem resync.
+func (r *Routes) handleTriggerPull(c *gin.Context) {
+	if r.repo == nil {
+		respondWithBackupStatusError(c, http.StatusServiceUnavailable, ErrCodeBackupNotEnabled, "Backup is not enabled", "backup not enabled")
+		return
+	}
+	if err := r.repo.Pull(); err != nil {
 		respondWithBackupStatusError(c, http.StatusInternalServerError, ErrCodeBackupInternalError, err.Error(), "backup internal error")
 		return
 	}

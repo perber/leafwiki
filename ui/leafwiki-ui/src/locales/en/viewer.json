@@ -75,7 +75,13 @@
   "toolbar": {
     "moreActions": "More actions",
     "expandAll": "Expand all",
-    "collapseAll": "Collapse all"
+    "collapseAll": "Collapse all",
+    "refresh": "Refresh explorer",
+    "refreshSuccess": "Explorer refreshed",
+    "refreshError": "Refresh failed",
+    "refreshAlreadyRunning": "Refresh already in progress",
+    "refreshPullFailed": "Pulling remote changes failed",
+    "syncJobLostFallback": "Sync job lost — server may have restarted"
   },
   "pageToolbar": {
     "itemPage": "Page",

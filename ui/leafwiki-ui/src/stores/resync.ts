@@ -60,7 +60,9 @@ export const useResyncStore = create<ResyncState>((set) => ({
       // running=false without done=true means the job was lost (server restart).
       if (!status.running) {
         set({ isLoading: false, phase: null })
-        throw new Error(i18next.t('syncJobLostFallback', { ns: 'maintenance' }))
+        throw new Error(
+          i18next.t('toolbar.syncJobLostFallback', { ns: 'viewer' }),
+        )
       }
     }
   },
