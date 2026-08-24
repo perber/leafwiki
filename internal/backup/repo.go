@@ -461,6 +461,43 @@ func hasStagedChanges(status gogit.Status) bool {
 	return false
 }
 
+// Pull fetches from the remote and fast-forward merges any new commits,
+// independent of a full backup cycle. Same error/conflict semantics as
+// pullBeforeBackup: conflicts and diverged history set r.status.NeedsIntervention,
+// transient errors set r.status.LastError. A no-op (nil error) if no remote is
+// configured. Fails fast (rather than blocking) if a backup cycle is already
+// running, mirroring ForcePush — RunBackup can hold the lock for minutes across
+// its own network pull/push, which would otherwise stall the HTTP request.
+func (r *Repository) Pull() error {
+	if !r.mu.TryLock() {
+		return fmt.Errorf("backup is currently running — try again in a moment")
+	}
+	defer r.mu.Unlock()
+
+	if r.cfg.RemoteURL == "" {
+		return nil
+	}
+
+	wt, err := r.repo.Worktree()
+	if err != nil {
+		errMsg := fmt.Errorf("failed to get worktree: %w", err).Error()
+		slog.Debug("Pull: failed to get worktree", "error", errMsg)
+		r.status.SetError(errMsg)
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	if err := r.pullBeforeBackup(wt); err != nil {
+		return err
+	}
+
+	// A successful pull resolves any stale error/conflict state from a prior
+	// cycle (e.g. the file conflict that caused it no longer exists on disk).
+	// Unlike SetSuccess, this must not touch LastBackupAt — a pull is not a
+	// backup, so it shouldn't be reported as one.
+	r.status.ClearIntervention()
+	return nil
+}
+
 // RunBackup pulls from the remote (fast-forward only) to integrate any external
 // commits, then stages all changes in root/ and assets/, commits if anything
 // changed, and pushes to the configured remote.
