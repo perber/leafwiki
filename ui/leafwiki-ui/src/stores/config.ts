@@ -1,6 +1,6 @@
 import { getConfig } from '@/lib/api/config'
 import { DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES } from '@/lib/config'
-import i18next from '@/lib/i18n'
+import i18next, { getAvailableLanguages } from '@/lib/i18n'
 import { sleep } from '@/lib/sleep'
 import { create } from 'zustand'
 
@@ -21,6 +21,7 @@ type ConfigStore = {
   loginUrl: string
   logoutUrl: string
   userManagementUrl: string
+  defaultLanguage: string
   error: string | null
   loading: boolean
   hasLoaded: boolean
@@ -61,6 +62,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   loginUrl: '',
   logoutUrl: '',
   userManagementUrl: '',
+  defaultLanguage: '',
   error: null,
   loading: false,
   hasLoaded: false,
@@ -95,11 +97,25 @@ export const useConfigStore = create<ConfigStore>((set) => ({
           loginUrl: config.loginUrl ?? '',
           logoutUrl: config.logoutUrl ?? '',
           userManagementUrl: config.userManagementUrl ?? '',
+          defaultLanguage: config.defaultLanguage ?? '',
           error: null,
           hasLoaded: true,
           configLoadSucceeded: true,
           loading: false,
         })
+
+        if (config.defaultLanguage) {
+          const isKnownLanguage = getAvailableLanguages().some(
+            (language) => language.code === config.defaultLanguage,
+          )
+          if (isKnownLanguage) {
+            void i18next.changeLanguage(config.defaultLanguage)
+          } else {
+            console.warn(
+              `Configured default language "${config.defaultLanguage}" is not shipped with the frontend, ignoring`,
+            )
+          }
+        }
         return
       } catch (error) {
         if (attempt === CONFIG_LOAD_MAX_ATTEMPTS) {

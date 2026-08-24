@@ -1,0 +1,108 @@
+{
+  "common": {
+    "unknown": "Unbekannt",
+    "unknownTime": "Unbekannte Zeit"
+  },
+  "errors": {
+    "loadListFallback": "Seitenverlauf konnte nicht geladen werden",
+    "loadPreviewFallback": "Revisionsvorschau konnte nicht geladen werden",
+    "compareFallback": "Revisionen konnten nicht verglichen werden",
+    "loadMoreFallback": "Weitere Revisionen konnten nicht geladen werden"
+  },
+  "trigger": {
+    "contentUpdate": "Gespeichert nach Inhaltsänderung",
+    "assetUpdate": "Gespeichert nach Dateiänderung",
+    "structureUpdate": "Gespeichert nach Strukturänderung",
+    "restore": "Gespeichert nach Wiederherstellung",
+    "delete": "Gespeichert vor Löschung",
+    "generic": "Gespeichert als {{type}}"
+  },
+  "assetChange": {
+    "added": "Hinzugefügt",
+    "removed": "Entfernt",
+    "replaced": "Ersetzt"
+  },
+  "restoreDialog": {
+    "title": "Revision wiederherstellen?",
+    "description": "Dies stellt Inhalt, Titel und Dateien der Revision wieder her. Der aktuelle Slug und Speicherort bleiben unverändert.",
+    "cancel": "Abbrechen",
+    "confirm": "Revision wiederherstellen",
+    "restoredTitleLabel": "Wiederhergestellter Titel:",
+    "slugNote": "Diese Revision verwendete den Slug <mono>{{revisionSlug}}</mono>. Der aktuelle Slug <mono>{{currentSlug}}</mono> bleibt unverändert."
+  },
+  "diff": {
+    "noTextDifference": "Kein Textunterschied zwischen dieser Revision und der aktiven Version."
+  },
+  "changes": {
+    "summaryHeading": "Änderungsübersicht",
+    "linesAdded": "Hinzugefügte Zeilen seit",
+    "linesRemoved": "Entfernte Zeilen seit",
+    "assetsChanged": "Geänderte Dateien",
+    "diffHeading": "Diff",
+    "diffNote": "verglichen mit der aktiven Version",
+    "assetsDetails": "Dateien ({{count}})",
+    "assetAdded": "{{count}} hinzugefügt",
+    "assetReplaced": "{{count}} ersetzt",
+    "assetRemoved": "{{count}} entfernt"
+  },
+  "rawText": {
+    "heading": "Rohtext",
+    "empty": "(leer)"
+  },
+  "assetsPanel": {
+    "heading": "Dateien",
+    "empty": "Mit dieser Revision wurden keine Dateien gespeichert.",
+    "octetStream": "application/octet-stream",
+    "openAsset": "Datei öffnen",
+    "downloadAsset": "Datei herunterladen"
+  },
+  "tabs": {
+    "preview": "Vorschau",
+    "changes": "Änderungen",
+    "raw": "Rohtext",
+    "assets": "Dateien",
+    "mobileRevisions": "Revisionen",
+    "mobileDetails": "Details"
+  },
+  "detail": {
+    "loadingHistory": "Verlauf wird geladen...",
+    "noRevisionSelectedTitle": "Keine Revision ausgewählt",
+    "noRevisionSelectedMessage": "Wählen Sie eine Revision aus der Liste, um Details anzuzeigen.",
+    "loadingDiff": "Diff wird geladen...",
+    "loadingPreview": "Vorschau wird geladen...",
+    "noPreview": "Keine Vorschau verfügbar.",
+    "noChangesFromCurrent": "Keine Unterschiede zur aktuellen Version.",
+    "noComparisonData": "Keine Vergleichsdaten verfügbar.",
+    "noRawText": "Kein Rohtext verfügbar.",
+    "noAssetData": "Keine Dateidaten verfügbar."
+  },
+  "list": {
+    "loading": "Verlauf wird geladen...",
+    "emptyWithLatest": "Noch keine vorherigen Revisionen. Ältere Versionen erscheinen hier nach weiteren Änderungen.",
+    "emptyNoLatest": "Noch keine Revisionen. Sie erscheinen hier, sobald sich die Seite ändert.",
+    "activeVersionBadge": "Aktive Version",
+    "loadMoreLoading": "Wird geladen...",
+    "loadMore": "Mehr laden",
+    "resizeAriaLabel": "Revisionsliste anpassen",
+    "title": "Revisionsverlauf"
+  },
+  "header": {
+    "revisionBy": "Revision von {{author}} · {{time}}",
+    "restoreLoading": "Wird wiederhergestellt...",
+    "currentVersion": "Aktuelle Version",
+    "restore": "Wiederherstellen",
+    "titleLabel": "Titel",
+    "slugLabel": "Slug",
+    "emptyValue": "(leer)"
+  },
+  "chips": {
+    "revisionSlug": "Revisions-Slug: {{slug}}",
+    "currentSlug": "Aktueller Slug: {{slug}}",
+    "assetChangesCount": "{{count}} Dateiänderungen",
+    "assetsCount": "{{count}} Dateien"
+  },
+  "toasts": {
+    "restoreSuccess": "Revision wiederhergestellt",
+    "restoreErrorFallback": "Revision konnte nicht wiederhergestellt werden"
+  }
+}

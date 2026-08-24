@@ -1,0 +1,32 @@
+{
+  "input": {
+    "placeholder": "Suchen...",
+    "clearButton": "Löschen"
+  },
+  "tags": {
+    "accordionTitle": "Alle Schlagwörter",
+    "available_one": "{{count}} Schlagwort verfügbar",
+    "available_other": "{{count}} Schlagwörter verfügbar",
+    "selected_one": "{{count}} Schlagwort ausgewählt",
+    "selected_other": "{{count}} Schlagwörter ausgewählt",
+    "loading": "Schlagwörter werden geladen…",
+    "error": "Schlagwörter konnten nicht geladen werden.",
+    "clearFilter": "Schlagwortfilter löschen"
+  },
+  "results": {
+    "loading": "Ergebnisse werden geladen...",
+    "noResults": "Keine Ergebnisse gefunden.",
+    "resultSummary_one": "<bold>{{count}}</bold> Ergebnis gefunden für",
+    "resultSummary_other": "<bold>{{count}}</bold> Ergebnisse gefunden für",
+    "filterQuery": "„{{query}}“",
+    "filterQueryWithTags_one": "„{{query}}“ mit {{count}} Schlagwort",
+    "filterQueryWithTags_other": "„{{query}}“ mit {{count}} Schlagwörtern",
+    "filterTagged": "markiert mit „{{tag}}“",
+    "filterTaggedWith_one": "markiert mit {{count}} Schlagwort",
+    "filterTaggedWith_other": "markiert mit {{count}} Schlagwörtern"
+  },
+  "resultCard": {
+    "kindPage": "Seite",
+    "kindSection": "Bereich"
+  }
+}

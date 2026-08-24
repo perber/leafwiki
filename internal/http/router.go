@@ -113,6 +113,7 @@ type RouterOptions struct {
 	APIKeyService           *coreauth.APIKeyService  // Bearer API-key authentication; nil disables the feature
 	DisableRequestLog       bool                     // Whether to suppress per-request access log lines
 	UserManagementURL       string                   // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
+	DefaultLanguage         string                   // Optional default UI language code (e.g. "de"); frontend applies it only if it matches a language it ships
 	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
 	LogoutURL               string                   // Optional URL the frontend redirects to after logout
 	WriteGate               *restore.WriteGate       // Optional; when set, gates mutating requests while a restore is in progress. nil disables the middleware entirely (no snapshot/restore enabled)

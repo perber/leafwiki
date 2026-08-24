@@ -222,6 +222,7 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			"loginUrl":                opts.LoginURL,
 			"logoutUrl":               opts.LogoutURL,
 			"userManagementUrl":       opts.UserManagementURL,
+			"defaultLanguage":         opts.DefaultLanguage,
 		})
 	}
 }
