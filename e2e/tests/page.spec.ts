@@ -1250,6 +1250,50 @@ test.describe('Authenticated', () => {
       .toEqual(desiredOrder);
   });
 
+  test('section-title-toggles-only-on-an-active-unmodified-click', async ({ page }) => {
+    const stamp = Date.now();
+    const sectionTitle = `Section Title Toggle ${stamp}`;
+    const sectionSlug = `section-title-toggle-${stamp}`;
+
+    await createTopLevelNode(page, {
+      title: sectionTitle,
+      slug: sectionSlug,
+      kind: 'section',
+    });
+    await page.reload();
+    await createChildPagesByPath(page, {
+      parentPath: sectionSlug,
+      titles: [`Section Child ${stamp}`],
+    });
+    await page.reload();
+
+    const treeView = new TreeView(page);
+    await treeView.expectNodeExpanded(sectionTitle, false);
+
+    // Navigation to an inactive section still uses PageViewer's automatic openNode.
+    await treeView.clickNodeTitle(sectionTitle);
+    await expect(page).toHaveURL(new RegExp(`/${sectionSlug}$`));
+    await treeView.expectNodeExpanded(sectionTitle, true);
+
+    await treeView.clickNodeTitle(sectionTitle);
+    await treeView.expectNodeExpanded(sectionTitle, false);
+
+    await treeView.clickNodeChevron(sectionTitle);
+    await treeView.expectNodeExpanded(sectionTitle, true);
+    await treeView.clickNodeChevron(sectionTitle);
+    await treeView.expectNodeExpanded(sectionTitle, false);
+    await treeView.clickNodeTitle(sectionTitle);
+    await treeView.expectNodeExpanded(sectionTitle, true);
+
+    for (const modifier of ['Control', 'Meta', 'Shift', 'Alt'] as const) {
+      await treeView.clickNodeTitle(sectionTitle, { modifiers: [modifier] });
+      await treeView.expectNodeExpanded(sectionTitle, true);
+    }
+
+    await treeView.clickNodeTitle(sectionTitle, { button: 'middle' });
+    await treeView.expectNodeExpanded(sectionTitle, true);
+  });
+
   test('copy-markdown-code-block', async ({ page }) => {
     const title = `Copy Code Block ${Date.now()}`;
     const viewPage = await createPageAndOpenViewer(page, title);
